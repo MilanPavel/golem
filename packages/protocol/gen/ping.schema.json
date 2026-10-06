@@ -1,0 +1,21 @@
+{
+  "additionalProperties": false,
+  "description": "Dummy heartbeat event. Proves Pydantic → JSON Schema → TypeScript.",
+  "properties": {
+    "nonce": {
+      "title": "Nonce",
+      "type": "string"
+    },
+    "type": {
+      "const": "system.ping",
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "type",
+    "nonce"
+  ],
+  "title": "Ping",
+  "type": "object"
+}

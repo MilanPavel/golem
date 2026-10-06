@@ -1,0 +1,9 @@
+{
+  "name": "golem",
+  "private": true,
+  "version": "0.0.0",
+  "packageManager": "pnpm@10.29.3",
+  "devDependencies": {
+    "json-schema-to-typescript": "^15.0.4"
+  }
+}
