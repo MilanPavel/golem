@@ -9,6 +9,7 @@ An Architecture Decision Record (ADR) is a short note of one choice: what was de
 | [003](003-protocol.md) | One Python model, generated TypeScript | accepted | 2026-10-05 |
 | [004](004-pid-lock.md) | A flock on the pid file owns the socket | accepted | 2026-10-06 |
 | [005](005-client-package.md) | One TypeScript client, and that client owns the golem command | accepted | 2026-10-06 |
+| [006](006-checkpoint-continuity.md) | The checkpoint is the chat's memory | accepted | 2026-10-07 |
 
 How the running code fits together is in [../architecture.md](../architecture.md).
 
