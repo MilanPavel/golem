@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, Literal
 
-from pydantic import BeforeValidator
+from pydantic import BeforeValidator, Field
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
@@ -27,11 +27,18 @@ from pydantic_settings import (
 from golem.paths import resolve_paths
 
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
+ModelProvider = Literal["anthropic", "openai", "openai_compat"]
 
 
 def _normalize_log_level(value: object) -> object:
     if isinstance(value, str):
         return value.strip().upper()
+    return value
+
+
+def _blank_to_none(value: object) -> object:
+    if isinstance(value, str) and value.strip() == "":
+        return None
     return value
 
 
@@ -58,6 +65,10 @@ class GolemSettings(BaseSettings):
     )
 
     log_level: Annotated[LogLevel, BeforeValidator(_normalize_log_level)] = "INFO"
+    model_profile: str = Field(default="remote", min_length=1)
+    model_provider: ModelProvider | None = None
+    model_name: str | None = Field(default=None, min_length=1)
+    model_base_url: Annotated[str | None, BeforeValidator(_blank_to_none)] = None
 
     @classmethod
     def settings_customise_sources(

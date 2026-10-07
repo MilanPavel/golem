@@ -12,9 +12,13 @@ import time
 from collections.abc import Callable, Mapping
 from pathlib import Path
 
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+
 from golem.config import load_settings
+from golem.graphs.chat import open_chat
 from golem.lock import DaemonAlreadyRunning, DaemonLock
 from golem.logging import configure_logging
+from golem.models.router import ModelRouter
 from golem.paths import GolemPaths, resolve_paths
 from golem.server.dispatcher import (
     PARSE_ERROR,
@@ -26,6 +30,7 @@ from golem.server.dispatcher import (
 from golem.server.framing import MAX_LINE_BYTES, FrameTooLong, read_frame
 from golem.server.handlers import standard_methods
 from golem.server.state import DaemonState
+from golem.sessions.manager import SessionManager
 
 log = logging.getLogger("golem.server")
 
@@ -56,8 +61,10 @@ class DaemonApp:
         *,
         extra_methods: Mapping[str, Method] | None = None,
         max_connections: int = MAX_CONNECTIONS,
+        router: ModelRouter | None = None,
     ) -> None:
         self.paths = paths
+        self._router = router
         self.state = DaemonState(paths=paths, started_at=time.monotonic())
         methods = standard_methods()
         if extra_methods:
@@ -90,19 +97,28 @@ class DaemonApp:
         loop = asyncio.get_running_loop()
         installed: list[signal.Signals] = []
         try:
-            if install_signals:
-                installed = _install_signals(loop, self.request_shutdown)
-            self._unlink_socket()
-            self._server = await self._listen()
-            os.chmod(self.paths.socket_path, 0o600)
-            log.info("listening on %s", self.paths.socket_path)
-            await self._stop.wait()
-            log.info("shutting down")
-            await self._shutdown()
+            router = self._router or ModelRouter(
+                load_settings(home=self.paths.home, project_dir=self.paths.home),
+            )
+            async with AsyncSqliteSaver.from_conn_string(str(self.paths.checkpoints_file)) as saver:
+                await saver.setup()
+                self.state.sessions = SessionManager(open_chat(router, saver))
+                try:
+                    if install_signals:
+                        installed = _install_signals(loop, self.request_shutdown)
+                    self._unlink_socket()
+                    self._server = await self._listen()
+                    os.chmod(self.paths.socket_path, 0o600)
+                    log.info("listening on %s", self.paths.socket_path)
+                    await self._stop.wait()
+                    log.info("shutting down")
+                    await self._shutdown()
+                finally:
+                    for sig in installed:
+                        loop.remove_signal_handler(sig)
+                    self._unlink_socket()
         finally:
-            for sig in installed:
-                loop.remove_signal_handler(sig)
-            self._unlink_socket()
+            self.state.sessions = None
             self._lock.release()
 
     def _on_client(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
@@ -146,6 +162,8 @@ class DaemonApp:
         self._draining = True
         if self._server is not None:
             self._server.close()
+        if self.state.sessions is not None:
+            await self.state.sessions.cancel_all()
         await self._dispatcher.drain()
         for task in list(self._clients):
             task.cancel()
@@ -221,7 +239,7 @@ async def serve_forever() -> int:
     settings = load_settings(home=paths.home, project_dir=paths.home)
     configure_logging(settings, paths)
     paths.ensure_layout()
-    app = DaemonApp(paths)
+    app = DaemonApp(paths, router=ModelRouter(settings))
     try:
         await app.serve()
     except DaemonAlreadyRunning as exc:

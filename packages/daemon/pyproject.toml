@@ -5,6 +5,11 @@ description = "Golem daemon."
 requires-python = ">=3.12"
 dependencies = [
   "golem-protocol",
+  "langchain-anthropic>=1.7.5",
+  "langchain-core>=1.6.7",
+  "langchain-openai>=1.6.7",
+  "langgraph>=1.2,<1.3",
+  "langgraph-checkpoint-sqlite>=3.1,<4",
   "pydantic>=2.10",
   "pydantic-settings>=2.10",
 ]
