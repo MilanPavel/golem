@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "packageManager": "pnpm@10.29.3",
   "devDependencies": {
+    "@golem/cli": "workspace:*",
     "json-schema-to-typescript": "^15.0.4"
   }
 }

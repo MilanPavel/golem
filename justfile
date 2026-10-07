@@ -26,25 +26,34 @@ gen:
     done
     uv run python -c 'from golem_protocol.codegen import default_gen_dir, export_version; export_version(default_gen_dir())'
 
-# Lint Python and the TUI.
+# Lint Python and the TypeScript packages.
 lint:
     uv run ruff check packages
     uv run ruff format --check packages
-    pnpm --filter @golem/tui lint
+    pnpm -r --if-present lint
 
 # Format Python.
 fmt:
     uv run ruff format packages
     uv run ruff check --fix packages
 
-# Typecheck Python (strict) and the TUI.
+# Typecheck Python (strict) and the TypeScript packages.
 typecheck:
     uv run pyright
-    pnpm --filter @golem/tui typecheck
+    pnpm -r --if-present typecheck
 
 # Run tests.
 test:
     uv run pytest
+    pnpm -r --if-present test
+
+# Run the golem CLI (status, daemon install|start|stop|logs).
+golem *args:
+    pnpm exec golem {{args}}
+
+# Open the status TUI.
+tui:
+    pnpm --filter @golem/tui start
 
 # Lint, typecheck, test, and fail if generated protocol files drift.
 check:
