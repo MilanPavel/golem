@@ -9,7 +9,9 @@
     "verbatimModuleSyntax": true,
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
-    "isolatedModules": true
+    "isolatedModules": true,
+    "allowImportingTsExtensions": true,
+    "jsx": "react-jsx"
   },
-  "include": ["src/**/*.ts", "../protocol/gen/**/*.ts"]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "../protocol/gen/**/*.ts"]
 }

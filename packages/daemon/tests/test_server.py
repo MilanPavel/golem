@@ -7,6 +7,7 @@ import json
 import os
 import signal
 import stat
+import subprocess
 from collections.abc import AsyncIterator, Mapping
 from pathlib import Path
 from typing import Any, cast
@@ -340,3 +341,39 @@ def test_kill_leaves_a_socket_the_next_start_replaces(short_home: Path) -> None:
         if second is not None:
             second.stop()
         first.stop()
+
+
+def test_typescript_status_reads_the_daemon(short_home: Path) -> None:
+    paths = resolve_paths(short_home)
+    serve = ServeProcess(short_home)
+    try:
+        serve.wait_listening(paths.socket_path)
+        completed = _golem_status(short_home)
+        assert completed.returncode == 0, completed.stderr
+        assert "connected" in completed.stdout
+        assert f"pid: {serve.proc.pid}" in completed.stdout
+        assert "protocol: 1.0" in completed.stdout
+        assert "state: running" in completed.stdout
+    finally:
+        serve.stop()
+
+
+def test_typescript_status_fails_when_daemon_is_down(short_home: Path) -> None:
+    completed = _golem_status(short_home)
+    assert completed.returncode == 1
+    assert "daemon is not running" in completed.stderr
+
+
+def _golem_status(home: Path) -> subprocess.CompletedProcess[str]:
+    root = Path(__file__).resolve().parents[3]
+    env = os.environ.copy()
+    env["GOLEM_HOME"] = str(home)
+    return subprocess.run(
+        ["pnpm", "exec", "golem", "status"],
+        cwd=root,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=20,
+        check=False,
+    )
