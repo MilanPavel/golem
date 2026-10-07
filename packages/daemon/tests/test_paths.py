@@ -42,6 +42,7 @@ def test_layout(tmp_path: Path) -> None:
     assert paths.flows_dir == home / "flows"
     assert paths.log_file == home / "logs" / "golem.jsonl"
     assert paths.socket_path == home / "run" / "golem.sock"
+    assert paths.pid_file == home / "run" / "golem.pid"
 
 
 def test_ensure_layout_creates_directories(tmp_path: Path) -> None:
