@@ -74,6 +74,48 @@ def test_unknown_log_level_is_rejected(tmp_path: Path) -> None:
         load_settings(home=home, project_dir=tmp_path / "project")
 
 
+def test_model_settings_load_from_toml_and_env(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    home = tmp_path / "home"
+    _write(home / "config.toml", 'model_provider = "openai"\nmodel_name = "gpt-test"\n')
+    settings = load_settings(home=home, project_dir=tmp_path / "project")
+    assert settings.model_provider == "openai"
+    assert settings.model_name == "gpt-test"
+    assert settings.model_profile == "remote"
+    monkeypatch.setenv("GOLEM_MODEL_NAME", "from-env")
+    overridden = load_settings(home=home, project_dir=tmp_path / "project")
+    assert overridden.model_name == "from-env"
+
+
+def test_openai_compat_loads_from_toml_and_env(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    home = tmp_path / "home"
+    _write(
+        home / "config.toml",
+        'model_provider = "openai_compat"\n'
+        'model_name = "qwen3.5:4b"\n'
+        'model_base_url = "http://127.0.0.1:9/v1"\n',
+    )
+    settings = load_settings(home=home, project_dir=tmp_path / "project")
+    assert settings.model_provider == "openai_compat"
+    assert settings.model_name == "qwen3.5:4b"
+    assert settings.model_base_url == "http://127.0.0.1:9/v1"
+    monkeypatch.setenv("GOLEM_MODEL_BASE_URL", "http://127.0.0.1:11434/v1")
+    overridden = load_settings(home=home, project_dir=tmp_path / "project")
+    assert overridden.model_base_url == "http://127.0.0.1:11434/v1"
+
+
+def test_unknown_model_provider_is_rejected(tmp_path: Path) -> None:
+    home = tmp_path / "home"
+    _write(home / "config.toml", 'model_provider = "local"\n')
+    with pytest.raises(ValidationError):
+        load_settings(home=home, project_dir=tmp_path / "project")
+
+
 def test_unknown_key_is_rejected(tmp_path: Path) -> None:
     home = tmp_path / "home"
     _write(home / "config.toml", 'nickname = "clay"\n')

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import os
 import signal
@@ -18,6 +19,7 @@ from support import ServeProcess
 
 from golem.config import load_settings
 from golem.logging import configure_logging
+from golem.models.router import ModelRouter
 from golem.paths import resolve_paths
 from golem.server.app import DaemonApp, SocketPathTooLong, assert_socket_path_fits
 from golem.server.dispatcher import (
@@ -30,23 +32,38 @@ from golem.server.dispatcher import (
 )
 from golem.server.framing import MAX_LINE_BYTES
 
-_HELLO = {"protocol_major": 1, "protocol_minor": 0, "client": "tui"}
+HELLO = {"protocol_major": 1, "protocol_minor": 0, "client": "tui"}
 
 
 class RpcClient:
+    """Reads the socket on one task so a response and events can arrive together."""
+
     def __init__(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         self._reader = reader
         self._writer = writer
         self._next = 1
+        self._waiters: dict[int, asyncio.Future[dict[str, object]]] = {}
+        self._orphan: asyncio.Queue[dict[str, object]] = asyncio.Queue()
+        self.events: list[dict[str, object]] = []
+        self._pump = asyncio.create_task(self._read_loop())
 
     @classmethod
     async def connect(cls, path: Path) -> RpcClient:
         reader, writer = await asyncio.open_unix_connection(os.fspath(path))
         return cls(reader, writer)
 
-    async def call(self, method: str, params: dict[str, Any] | None = None) -> dict[str, object]:
+    async def call(
+        self,
+        method: str,
+        params: dict[str, Any] | None = None,
+        *,
+        timeout: float = 2,
+    ) -> dict[str, object]:
         request_id = self._next
         self._next += 1
+        loop = asyncio.get_running_loop()
+        waiter: asyncio.Future[dict[str, object]] = loop.create_future()
+        self._waiters[request_id] = waiter
         body = {
             "jsonrpc": "2.0",
             "method": method,
@@ -55,20 +72,70 @@ class RpcClient:
         }
         self._writer.write(json.dumps(body).encode() + b"\n")
         await self._writer.drain()
-        line = await asyncio.wait_for(self._reader.readline(), timeout=2)
-        assert line, "connection closed"
-        payload = _object_dict(json.loads(line))
-        assert payload["id"] == request_id
-        return payload
+        try:
+            return await asyncio.wait_for(waiter, timeout=timeout)
+        finally:
+            self._waiters.pop(request_id, None)
 
     async def send_raw(self, data: bytes) -> dict[str, object]:
         self._writer.write(data)
-        line = await asyncio.wait_for(self._reader.readline(), timeout=2)
-        return _object_dict(json.loads(line))
+        return await asyncio.wait_for(self._orphan.get(), timeout=2)
+
+    async def wait_for_event(self, event_type: str, *, timeout: float = 2) -> dict[str, object]:
+        """Return a queued ``event`` whose ``params.type`` is ``event_type``."""
+        deadline = asyncio.get_running_loop().time() + timeout
+        while True:
+            found = _find_event(self.events, event_type)
+            if found is not None:
+                return found
+            remaining = deadline - asyncio.get_running_loop().time()
+            if remaining <= 0:
+                raise TimeoutError(self.events)
+            try:
+                payload = await asyncio.wait_for(self._orphan.get(), timeout=remaining)
+            except TimeoutError:
+                raise TimeoutError(self.events) from None
+            if payload.get("method") == "event":
+                self.events.append(payload)
 
     async def close(self) -> None:
+        self._pump.cancel()
         self._writer.close()
-        await self._writer.wait_closed()
+        with contextlib.suppress(ConnectionError, OSError):
+            await self._writer.wait_closed()
+
+    async def _read_loop(self) -> None:
+        try:
+            while True:
+                line = await self._reader.readline()
+                if not line:
+                    return
+                payload = _object_dict(json.loads(line))
+                request_id = payload.get("id")
+                waiter = self._waiters.get(request_id) if isinstance(request_id, int) else None
+                if waiter is not None and not waiter.done():
+                    waiter.set_result(payload)
+                    continue
+                await self._orphan.put(payload)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            return
+
+
+def _params(event: dict[str, object]) -> dict[str, object] | None:
+    params = event.get("params")
+    if isinstance(params, dict):
+        return cast(dict[str, object], params)
+    return None
+
+
+def _find_event(events: list[dict[str, object]], event_type: str) -> dict[str, object] | None:
+    for event in events:
+        params = _params(event)
+        if params is not None and params.get("type") == event_type:
+            return event
+    return None
 
 
 def _object_dict(value: object) -> dict[str, object]:
@@ -76,12 +143,12 @@ def _object_dict(value: object) -> dict[str, object]:
     return cast(dict[str, object], value)
 
 
-def _result(payload: dict[str, object]) -> dict[str, object]:
+def rpc_result(payload: dict[str, object]) -> dict[str, object]:
     assert "error" not in payload, payload
     return _object_dict(payload["result"])
 
 
-def _error_code(payload: dict[str, object]) -> int:
+def error_code(payload: dict[str, object]) -> int:
     code = _object_dict(payload["error"])["code"]
     assert isinstance(code, int)
     return code
@@ -109,29 +176,35 @@ async def _wait_listening(path: Path, task: asyncio.Task[None]) -> None:
 
 @pytest.fixture
 async def running(short_home: Path) -> AsyncIterator[DaemonApp]:
-    app, task = await _start(short_home)
+    app, task = await start_daemon(short_home)
     try:
         yield app
     finally:
-        await _stop(app, task)
+        await stop_daemon(app, task)
 
 
-async def _start(
+async def start_daemon(
     home: Path,
     *,
     extra_methods: Mapping[str, Method] | None = None,
     max_connections: int = 32,
+    router: ModelRouter | None = None,
 ) -> tuple[DaemonApp, asyncio.Task[None]]:
     paths = resolve_paths(home)
     paths.ensure_layout()
     configure_logging(load_settings(home=paths.home, project_dir=paths.home), paths)
-    app = DaemonApp(paths, extra_methods=extra_methods, max_connections=max_connections)
+    app = DaemonApp(
+        paths,
+        extra_methods=extra_methods,
+        max_connections=max_connections,
+        router=router,
+    )
     task = asyncio.create_task(app.serve(install_signals=False))
     await _wait_listening(paths.socket_path, task)
     return app, task
 
 
-async def _stop(app: DaemonApp, task: asyncio.Task[None]) -> None:
+async def stop_daemon(app: DaemonApp, task: asyncio.Task[None]) -> None:
     if not task.done():
         app.request_shutdown()
         await asyncio.wait_for(task, timeout=2)
@@ -140,18 +213,18 @@ async def _stop(app: DaemonApp, task: asyncio.Task[None]) -> None:
 async def test_hello_status_and_ping(running: DaemonApp) -> None:
     client = await RpcClient.connect(running.paths.socket_path)
     try:
-        hello = _result(await client.call("hello", _HELLO))
+        hello = rpc_result(await client.call("hello", HELLO))
         assert hello["protocol_major"] == 1
-        assert hello["protocol_minor"] == 0
+        assert hello["protocol_minor"] == 1
         assert hello["daemon_version"] == "0.0.0"
-        status = _result(await client.call("daemon.status"))
+        status = rpc_result(await client.call("daemon.status"))
         assert status["pid"] == os.getpid()
         assert status["state"] == "running"
         assert status["version"] == "0.0.0"
         uptime = status["uptime_seconds"]
         assert isinstance(uptime, int | float)
         assert uptime >= 0
-        ping = _result(await client.call("ping", {"nonce": "abc"}))
+        ping = rpc_result(await client.call("ping", {"nonce": "abc"}))
         assert ping == {"type": "system.ping", "nonce": "abc"}
         mode = stat.S_IMODE(running.paths.socket_path.stat().st_mode)
         assert mode == 0o600
@@ -162,11 +235,11 @@ async def test_hello_status_and_ping(running: DaemonApp) -> None:
 async def test_minor_mismatch_is_accepted(running: DaemonApp) -> None:
     client = await RpcClient.connect(running.paths.socket_path)
     try:
-        hello = _result(
-            await client.call("hello", {**_HELLO, "protocol_minor": 9}),
+        hello = rpc_result(
+            await client.call("hello", {**HELLO, "protocol_minor": 9}),
         )
         assert hello["protocol_major"] == 1
-        assert hello["protocol_minor"] == 0
+        assert hello["protocol_minor"] == 1
     finally:
         await client.close()
 
@@ -174,11 +247,11 @@ async def test_minor_mismatch_is_accepted(running: DaemonApp) -> None:
 async def test_major_mismatch_refuses_and_does_not_unlock_commands(running: DaemonApp) -> None:
     client = await RpcClient.connect(running.paths.socket_path)
     try:
-        mismatch = await client.call("hello", {**_HELLO, "protocol_major": 2})
-        assert _error_code(mismatch) == PROTOCOL_MISMATCH
+        mismatch = await client.call("hello", {**HELLO, "protocol_major": 2})
+        assert error_code(mismatch) == PROTOCOL_MISMATCH
         assert _object_dict(mismatch["error"])["data"] == {"client_major": 2, "daemon_major": 1}
         blocked = await client.call("ping", {"nonce": "x"})
-        assert _error_code(blocked) == HELLO_REQUIRED
+        assert error_code(blocked) == HELLO_REQUIRED
     finally:
         await client.close()
 
@@ -187,9 +260,9 @@ async def test_commands_before_hello_are_rejected(running: DaemonApp) -> None:
     client = await RpcClient.connect(running.paths.socket_path)
     try:
         status = await client.call("daemon.status")
-        assert _error_code(status) == HELLO_REQUIRED
+        assert error_code(status) == HELLO_REQUIRED
         ping = await client.call("ping", {"nonce": "x"})
-        assert _error_code(ping) == HELLO_REQUIRED
+        assert error_code(ping) == HELLO_REQUIRED
     finally:
         await client.close()
 
@@ -197,9 +270,9 @@ async def test_commands_before_hello_are_rejected(running: DaemonApp) -> None:
 async def test_unknown_method(running: DaemonApp) -> None:
     client = await RpcClient.connect(running.paths.socket_path)
     try:
-        await client.call("hello", _HELLO)
+        await client.call("hello", HELLO)
         missing = await client.call("no.such")
-        assert _error_code(missing) == METHOD_NOT_FOUND
+        assert error_code(missing) == METHOD_NOT_FOUND
     finally:
         await client.close()
 
@@ -208,7 +281,7 @@ async def test_invalid_json(running: DaemonApp) -> None:
     client = await RpcClient.connect(running.paths.socket_path)
     try:
         payload = await client.send_raw(b"not-json\n")
-        assert _error_code(payload) == PARSE_ERROR
+        assert error_code(payload) == PARSE_ERROR
         assert payload["id"] is None
     finally:
         await client.close()
@@ -218,17 +291,17 @@ async def test_line_too_long_closes_the_connection(running: DaemonApp) -> None:
     client = await RpcClient.connect(running.paths.socket_path)
     try:
         payload = await client.send_raw(b"x" * (MAX_LINE_BYTES + 8))
-        assert _error_code(payload) == PARSE_ERROR
+        assert error_code(payload) == PARSE_ERROR
         assert _object_dict(payload["error"])["message"] == "line too long"
     finally:
         await client.close()
 
 
 async def test_second_connection_is_rejected_at_capacity(short_home: Path) -> None:
-    app, task = await _start(short_home, max_connections=1)
+    app, task = await start_daemon(short_home, max_connections=1)
     first = await RpcClient.connect(app.paths.socket_path)
     try:
-        hello = _result(await first.call("hello", _HELLO))
+        hello = rpc_result(await first.call("hello", HELLO))
         assert hello["protocol_major"] == 1
         _reader, writer = await asyncio.open_unix_connection(os.fspath(app.paths.socket_path))
         data = await asyncio.wait_for(_reader.read(16), timeout=1)
@@ -236,20 +309,20 @@ async def test_second_connection_is_rejected_at_capacity(short_home: Path) -> No
         writer.close()
     finally:
         await first.close()
-        await _stop(app, task)
+        await stop_daemon(app, task)
 
 
 async def test_stale_socket_file_is_replaced(short_home: Path) -> None:
     paths = resolve_paths(short_home)
     paths.ensure_layout()
     paths.socket_path.write_text("stale", encoding="utf-8")
-    app, task = await _start(short_home)
+    app, task = await start_daemon(short_home)
     client = await RpcClient.connect(paths.socket_path)
     try:
-        assert "result" in await client.call("hello", _HELLO)
+        assert "result" in await client.call("hello", HELLO)
     finally:
         await client.close()
-        await _stop(app, task)
+        await stop_daemon(app, task)
 
 
 async def test_shutdown_drains_in_flight_handler(short_home: Path) -> None:
@@ -268,17 +341,17 @@ async def test_shutdown_drains_in_flight_handler(short_home: Path) -> None:
         await asyncio.sleep(0.3)
         return SlowResult()
 
-    app, task = await _start(
+    app, task = await start_daemon(
         short_home,
         extra_methods={"test.slow": Method("test.slow", SlowParams, True, slow)},
     )
     client = await RpcClient.connect(app.paths.socket_path)
-    await client.call("hello", _HELLO)
+    await client.call("hello", HELLO)
     slow_call = asyncio.create_task(client.call("test.slow"))
     await asyncio.wait_for(started.wait(), timeout=2)
     app.request_shutdown()
     payload, _done = await asyncio.wait_for(asyncio.gather(slow_call, task), timeout=2)
-    assert _result(payload) == {"done": True}
+    assert rpc_result(payload) == {"done": True}
     assert not app.paths.socket_path.exists()
     await client.close()
 
@@ -352,7 +425,7 @@ def test_typescript_status_reads_the_daemon(short_home: Path) -> None:
         assert completed.returncode == 0, completed.stderr
         assert "connected" in completed.stdout
         assert f"pid: {serve.proc.pid}" in completed.stdout
-        assert "protocol: 1.0" in completed.stdout
+        assert "protocol: 1.1" in completed.stdout
         assert "state: running" in completed.stdout
     finally:
         serve.stop()
