@@ -1,0 +1,25 @@
+{
+  "additionalProperties": false,
+  "description": "Daemon's protocol version and build.",
+  "properties": {
+    "daemon_version": {
+      "title": "Daemon Version",
+      "type": "string"
+    },
+    "protocol_major": {
+      "title": "Protocol Major",
+      "type": "integer"
+    },
+    "protocol_minor": {
+      "title": "Protocol Minor",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "protocol_major",
+    "protocol_minor",
+    "daemon_version"
+  ],
+  "title": "HelloResult",
+  "type": "object"
+}

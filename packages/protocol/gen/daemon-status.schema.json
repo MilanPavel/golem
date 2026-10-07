@@ -1,0 +1,44 @@
+{
+  "additionalProperties": false,
+  "description": "Result of ``daemon.status``.",
+  "properties": {
+    "pid": {
+      "title": "Pid",
+      "type": "integer"
+    },
+    "protocol_major": {
+      "title": "Protocol Major",
+      "type": "integer"
+    },
+    "protocol_minor": {
+      "title": "Protocol Minor",
+      "type": "integer"
+    },
+    "state": {
+      "enum": [
+        "running",
+        "draining"
+      ],
+      "title": "State",
+      "type": "string"
+    },
+    "uptime_seconds": {
+      "title": "Uptime Seconds",
+      "type": "number"
+    },
+    "version": {
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "pid",
+    "version",
+    "protocol_major",
+    "protocol_minor",
+    "uptime_seconds",
+    "state"
+  ],
+  "title": "DaemonStatus",
+  "type": "object"
+}

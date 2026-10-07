@@ -1,0 +1,34 @@
+{
+  "additionalProperties": false,
+  "description": "Successful response. ``result`` is the handler model dumped as JSON.",
+  "properties": {
+    "id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "integer"
+        }
+      ],
+      "title": "Id"
+    },
+    "jsonrpc": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Jsonrpc",
+      "type": "string"
+    },
+    "result": {
+      "additionalProperties": true,
+      "title": "Result",
+      "type": "object"
+    }
+  },
+  "required": [
+    "result",
+    "id"
+  ],
+  "title": "RpcSuccess",
+  "type": "object"
+}

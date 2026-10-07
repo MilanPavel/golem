@@ -1,0 +1,27 @@
+{
+  "additionalProperties": false,
+  "description": "First command on a connection. Negotiates the protocol version.",
+  "properties": {
+    "client": {
+      "maxLength": 32,
+      "minLength": 1,
+      "title": "Client",
+      "type": "string"
+    },
+    "protocol_major": {
+      "title": "Protocol Major",
+      "type": "integer"
+    },
+    "protocol_minor": {
+      "title": "Protocol Minor",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "protocol_major",
+    "protocol_minor",
+    "client"
+  ],
+  "title": "HelloParams",
+  "type": "object"
+}
