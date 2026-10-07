@@ -1,0 +1,30 @@
+{
+  "additionalProperties": false,
+  "description": "Full text of a user or assistant message.",
+  "properties": {
+    "message_id": {
+      "minLength": 1,
+      "title": "Message Id",
+      "type": "string"
+    },
+    "role": {
+      "enum": [
+        "user",
+        "assistant"
+      ],
+      "title": "Role",
+      "type": "string"
+    },
+    "text": {
+      "title": "Text",
+      "type": "string"
+    }
+  },
+  "required": [
+    "message_id",
+    "role",
+    "text"
+  ],
+  "title": "MessageCompletedData",
+  "type": "object"
+}

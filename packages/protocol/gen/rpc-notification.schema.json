@@ -1,0 +1,482 @@
+{
+  "$defs": {
+    "EmptyEventData": {
+      "additionalProperties": false,
+      "description": "No payload. Used by ``run.started`` and ``run.completed``.",
+      "properties": {},
+      "title": "EmptyEventData",
+      "type": "object"
+    },
+    "MessageCompletedData": {
+      "additionalProperties": false,
+      "description": "Full text of a user or assistant message.",
+      "properties": {
+        "message_id": {
+          "minLength": 1,
+          "title": "Message Id",
+          "type": "string"
+        },
+        "role": {
+          "enum": [
+            "user",
+            "assistant"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "message_id",
+        "role",
+        "text"
+      ],
+      "title": "MessageCompletedData",
+      "type": "object"
+    },
+    "MessageCompletedEvent": {
+      "additionalProperties": false,
+      "description": "The full text of one message. Replaces any deltas for that id.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/MessageCompletedData"
+        },
+        "run_id": {
+          "minLength": 1,
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "message.completed",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "run_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "MessageCompletedEvent",
+      "type": "object"
+    },
+    "MessageDeltaData": {
+      "additionalProperties": false,
+      "description": "One incremental fragment of an assistant message.",
+      "properties": {
+        "message_id": {
+          "minLength": 1,
+          "title": "Message Id",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "message_id",
+        "text"
+      ],
+      "title": "MessageDeltaData",
+      "type": "object"
+    },
+    "MessageDeltaEvent": {
+      "additionalProperties": false,
+      "description": "Tokens to append to the open assistant message.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/MessageDeltaData"
+        },
+        "run_id": {
+          "minLength": 1,
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "message.delta",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "run_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "MessageDeltaEvent",
+      "type": "object"
+    },
+    "MessageStartedData": {
+      "additionalProperties": false,
+      "description": "An assistant message is open and tokens may follow.",
+      "properties": {
+        "message_id": {
+          "minLength": 1,
+          "title": "Message Id",
+          "type": "string"
+        },
+        "role": {
+          "const": "assistant",
+          "title": "Role",
+          "type": "string"
+        }
+      },
+      "required": [
+        "message_id",
+        "role"
+      ],
+      "title": "MessageStartedData",
+      "type": "object"
+    },
+    "MessageStartedEvent": {
+      "additionalProperties": false,
+      "description": "The assistant bubble is open.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/MessageStartedData"
+        },
+        "run_id": {
+          "minLength": 1,
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "message.started",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "run_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "MessageStartedEvent",
+      "type": "object"
+    },
+    "RunCompletedEvent": {
+      "additionalProperties": false,
+      "description": "The graph run finished and the checkpoint is current.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/EmptyEventData"
+        },
+        "run_id": {
+          "minLength": 1,
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "run.completed",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "run_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "RunCompletedEvent",
+      "type": "object"
+    },
+    "RunFailedData": {
+      "additionalProperties": false,
+      "description": "Why a run stopped. No traceback.",
+      "properties": {
+        "message": {
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "message"
+      ],
+      "title": "RunFailedData",
+      "type": "object"
+    },
+    "RunFailedEvent": {
+      "additionalProperties": false,
+      "description": "The graph run stopped with an error.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/RunFailedData"
+        },
+        "run_id": {
+          "minLength": 1,
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "run.failed",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "run_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "RunFailedEvent",
+      "type": "object"
+    },
+    "RunStartedEvent": {
+      "additionalProperties": false,
+      "description": "A graph run is in progress for this session.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/EmptyEventData"
+        },
+        "run_id": {
+          "minLength": 1,
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "run.started",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "run_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "RunStartedEvent",
+      "type": "object"
+    },
+    "SessionCreatedData": {
+      "additionalProperties": false,
+      "description": "Profile stored for a new session.",
+      "properties": {
+        "model_profile": {
+          "minLength": 1,
+          "title": "Model Profile",
+          "type": "string"
+        }
+      },
+      "required": [
+        "model_profile"
+      ],
+      "title": "SessionCreatedData",
+      "type": "object"
+    },
+    "SessionCreatedEvent": {
+      "additionalProperties": false,
+      "description": "A session exists. ``run_id`` is null because no run has started.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/SessionCreatedData"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "null"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "session.created",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "run_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "SessionCreatedEvent",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Server → client event. No ``id``; this is not a response to a request.",
+  "properties": {
+    "jsonrpc": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Jsonrpc",
+      "type": "string"
+    },
+    "method": {
+      "const": "event",
+      "default": "event",
+      "title": "Method",
+      "type": "string"
+    },
+    "params": {
+      "discriminator": {
+        "mapping": {
+          "message.completed": "#/$defs/MessageCompletedEvent",
+          "message.delta": "#/$defs/MessageDeltaEvent",
+          "message.started": "#/$defs/MessageStartedEvent",
+          "run.completed": "#/$defs/RunCompletedEvent",
+          "run.failed": "#/$defs/RunFailedEvent",
+          "run.started": "#/$defs/RunStartedEvent",
+          "session.created": "#/$defs/SessionCreatedEvent"
+        },
+        "propertyName": "type"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/$defs/SessionCreatedEvent"
+        },
+        {
+          "$ref": "#/$defs/MessageStartedEvent"
+        },
+        {
+          "$ref": "#/$defs/MessageDeltaEvent"
+        },
+        {
+          "$ref": "#/$defs/MessageCompletedEvent"
+        },
+        {
+          "$ref": "#/$defs/RunStartedEvent"
+        },
+        {
+          "$ref": "#/$defs/RunCompletedEvent"
+        },
+        {
+          "$ref": "#/$defs/RunFailedEvent"
+        }
+      ],
+      "title": "Params"
+    }
+  },
+  "required": [
+    "params"
+  ],
+  "title": "RpcNotification",
+  "type": "object"
+}

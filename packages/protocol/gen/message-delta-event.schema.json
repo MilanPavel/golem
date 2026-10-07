@@ -1,0 +1,67 @@
+{
+  "$defs": {
+    "MessageDeltaData": {
+      "additionalProperties": false,
+      "description": "One incremental fragment of an assistant message.",
+      "properties": {
+        "message_id": {
+          "minLength": 1,
+          "title": "Message Id",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "message_id",
+        "text"
+      ],
+      "title": "MessageDeltaData",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Tokens to append to the open assistant message.",
+  "properties": {
+    "data": {
+      "$ref": "#/$defs/MessageDeltaData"
+    },
+    "run_id": {
+      "minLength": 1,
+      "title": "Run Id",
+      "type": "string"
+    },
+    "seq": {
+      "minimum": 1,
+      "title": "Seq",
+      "type": "integer"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    },
+    "ts": {
+      "minLength": 1,
+      "title": "Ts",
+      "type": "string"
+    },
+    "type": {
+      "const": "message.delta",
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "seq",
+    "session_id",
+    "run_id",
+    "ts",
+    "type",
+    "data"
+  ],
+  "title": "MessageDeltaEvent",
+  "type": "object"
+}

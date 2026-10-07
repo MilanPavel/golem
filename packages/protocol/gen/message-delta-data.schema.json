@@ -1,0 +1,21 @@
+{
+  "additionalProperties": false,
+  "description": "One incremental fragment of an assistant message.",
+  "properties": {
+    "message_id": {
+      "minLength": 1,
+      "title": "Message Id",
+      "type": "string"
+    },
+    "text": {
+      "title": "Text",
+      "type": "string"
+    }
+  },
+  "required": [
+    "message_id",
+    "text"
+  ],
+  "title": "MessageDeltaData",
+  "type": "object"
+}

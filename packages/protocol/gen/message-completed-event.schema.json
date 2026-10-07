@@ -1,0 +1,76 @@
+{
+  "$defs": {
+    "MessageCompletedData": {
+      "additionalProperties": false,
+      "description": "Full text of a user or assistant message.",
+      "properties": {
+        "message_id": {
+          "minLength": 1,
+          "title": "Message Id",
+          "type": "string"
+        },
+        "role": {
+          "enum": [
+            "user",
+            "assistant"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "message_id",
+        "role",
+        "text"
+      ],
+      "title": "MessageCompletedData",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The full text of one message. Replaces any deltas for that id.",
+  "properties": {
+    "data": {
+      "$ref": "#/$defs/MessageCompletedData"
+    },
+    "run_id": {
+      "minLength": 1,
+      "title": "Run Id",
+      "type": "string"
+    },
+    "seq": {
+      "minimum": 1,
+      "title": "Seq",
+      "type": "integer"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    },
+    "ts": {
+      "minLength": 1,
+      "title": "Ts",
+      "type": "string"
+    },
+    "type": {
+      "const": "message.completed",
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "seq",
+    "session_id",
+    "run_id",
+    "ts",
+    "type",
+    "data"
+  ],
+  "title": "MessageCompletedEvent",
+  "type": "object"
+}

@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "Why a run stopped. No traceback.",
+  "properties": {
+    "message": {
+      "minLength": 1,
+      "title": "Message",
+      "type": "string"
+    }
+  },
+  "required": [
+    "message"
+  ],
+  "title": "RunFailedData",
+  "type": "object"
+}

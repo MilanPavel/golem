@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "Profile stored for a new session.",
+  "properties": {
+    "model_profile": {
+      "minLength": 1,
+      "title": "Model Profile",
+      "type": "string"
+    }
+  },
+  "required": [
+    "model_profile"
+  ],
+  "title": "SessionCreatedData",
+  "type": "object"
+}

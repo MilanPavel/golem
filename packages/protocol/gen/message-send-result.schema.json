@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "The run that is now streaming events for this send.",
+  "properties": {
+    "run_id": {
+      "minLength": 1,
+      "title": "Run Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "run_id"
+  ],
+  "title": "MessageSendResult",
+  "type": "object"
+}

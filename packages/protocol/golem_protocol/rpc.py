@@ -4,6 +4,8 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
+from golem_protocol.events import ChatEvent
+
 
 def _reject_bool_id(value: object) -> object:
     if isinstance(value, bool):
@@ -55,4 +57,21 @@ class RpcFailure(BaseModel):
     id: RpcId | None = None
 
 
-__all__ = ["RpcErrorBody", "RpcFailure", "RpcId", "RpcRequest", "RpcSuccess"]
+class RpcNotification(BaseModel):
+    """Server → client event. No ``id``; this is not a response to a request."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    jsonrpc: Literal["2.0"] = "2.0"
+    method: Literal["event"] = "event"
+    params: ChatEvent
+
+
+__all__ = [
+    "RpcErrorBody",
+    "RpcFailure",
+    "RpcId",
+    "RpcNotification",
+    "RpcRequest",
+    "RpcSuccess",
+]

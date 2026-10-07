@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "The id of the session the daemon just created.",
+  "properties": {
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "session_id"
+  ],
+  "title": "SessionCreateResult",
+  "type": "object"
+}

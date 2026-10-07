@@ -1,0 +1,62 @@
+{
+  "$defs": {
+    "RunFailedData": {
+      "additionalProperties": false,
+      "description": "Why a run stopped. No traceback.",
+      "properties": {
+        "message": {
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "message"
+      ],
+      "title": "RunFailedData",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The graph run stopped with an error.",
+  "properties": {
+    "data": {
+      "$ref": "#/$defs/RunFailedData"
+    },
+    "run_id": {
+      "minLength": 1,
+      "title": "Run Id",
+      "type": "string"
+    },
+    "seq": {
+      "minimum": 1,
+      "title": "Seq",
+      "type": "integer"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    },
+    "ts": {
+      "minLength": 1,
+      "title": "Ts",
+      "type": "string"
+    },
+    "type": {
+      "const": "run.failed",
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "seq",
+    "session_id",
+    "run_id",
+    "ts",
+    "type",
+    "data"
+  ],
+  "title": "RunFailedEvent",
+  "type": "object"
+}
