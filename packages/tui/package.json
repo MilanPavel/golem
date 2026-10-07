@@ -12,6 +12,7 @@
   "dependencies": {
     "@golem/client": "workspace:*",
     "ink": "^8.0.0",
+    "marked": "^18.1.0",
     "react": "^19.3.0"
   },
   "devDependencies": {

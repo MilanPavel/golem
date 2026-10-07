@@ -3,11 +3,29 @@ import net from "node:net";
 
 import type { DaemonStatus } from "../../protocol/gen/daemon-status.ts";
 import type { HelloResult } from "../../protocol/gen/hello-result.ts";
+import type { MessageSendResult } from "../../protocol/gen/message-send-result.ts";
 import type { Ping } from "../../protocol/gen/ping.ts";
+import type { Params as ChatEvent } from "../../protocol/gen/rpc-notification.ts";
+import type { SessionCreateResult } from "../../protocol/gen/session-create-result.ts";
 import { PROTOCOL_MAJOR, PROTOCOL_MINOR } from "../../protocol/gen/version.ts";
 import { backoffDelayMs } from "./backoff.ts";
 
 const PROTOCOL_MISMATCH = -32001;
+export const SESSION_NOT_FOUND = -32003;
+export const SESSION_BUSY = -32004;
+export const MODEL_NOT_CONFIGURED = -32005;
+
+const EVENT_TYPES = new Set([
+  "session.created",
+  "message.started",
+  "message.delta",
+  "message.completed",
+  "run.started",
+  "run.completed",
+  "run.failed",
+]);
+
+export type { ChatEvent };
 const DEFAULT_HEARTBEAT_MS = 5_000;
 const DEFAULT_HEARTBEAT_TIMEOUT_MS = 10_000;
 const DEFAULT_CONNECT_TIMEOUT_MS = 2_000;
@@ -43,7 +61,10 @@ export interface GolemClient {
   readonly state: ConnectionState;
   readonly ready: Promise<void>;
   onState(listener: (state: ConnectionState) => void): () => void;
+  onEvent(listener: (event: ChatEvent) => void): () => void;
   status(): Promise<DaemonStatus>;
+  createSession(): Promise<SessionCreateResult>;
+  sendMessage(sessionId: string, text: string): Promise<MessageSendResult>;
   close(): void;
 }
 
@@ -60,6 +81,7 @@ export function connectGolem(options: ConnectOptions): GolemClient {
 
   let state: ConnectionState = { status: "connecting" };
   const listeners = new Set<(next: ConnectionState) => void>();
+  const eventListeners = new Set<(event: ChatEvent) => void>();
   const pending = new Map<number, Pending>();
   let nextId = 1;
   let generation = 0;
@@ -136,6 +158,19 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       message = JSON.parse(line) as unknown;
     } catch {
       socket?.destroy(new Error("invalid json"));
+      return;
+    }
+    if (isRecord(message) && message["method"] === "event") {
+      const event = asChatEvent(message["params"]);
+      if (event !== undefined) {
+        for (const listener of eventListeners) {
+          try {
+            listener(event);
+          } catch {
+            // A listener must not tear the socket down.
+          }
+        }
+      }
       return;
     }
     if (!isRecord(message) || message["id"] === undefined || message["id"] === null) {
@@ -296,11 +331,33 @@ export function connectGolem(options: ConnectOptions): GolemClient {
         listeners.delete(listener);
       };
     },
+    onEvent(listener: (event: ChatEvent) => void): () => void {
+      eventListeners.add(listener);
+      return () => {
+        eventListeners.delete(listener);
+      };
+    },
     async status(): Promise<DaemonStatus> {
       await ready;
       const result = await call("daemon.status", {});
       if (!isDaemonStatus(result)) {
         throw new Error("invalid daemon.status result");
+      }
+      return result;
+    },
+    async createSession(): Promise<SessionCreateResult> {
+      await ready;
+      const result = await call("session.create", {});
+      if (!isSessionCreateResult(result)) {
+        throw new Error("invalid session.create result");
+      }
+      return result;
+    },
+    async sendMessage(sessionId: string, text: string): Promise<MessageSendResult> {
+      await ready;
+      const result = await call("message.send", { session_id: sessionId, text });
+      if (!isMessageSendResult(result)) {
+        throw new Error("invalid message.send result");
       }
       return result;
     },
@@ -335,6 +392,31 @@ function isHelloResult(value: unknown): value is HelloResult {
 
 function isPing(value: unknown): value is Ping {
   return isRecord(value) && value["type"] === "system.ping" && typeof value["nonce"] === "string";
+}
+
+function asChatEvent(value: unknown): ChatEvent | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+  const type = value["type"];
+  if (typeof type !== "string" || !EVENT_TYPES.has(type)) {
+    return undefined;
+  }
+  if (typeof value["seq"] !== "number" || typeof value["session_id"] !== "string") {
+    return undefined;
+  }
+  if (!isRecord(value["data"])) {
+    return undefined;
+  }
+  return value as unknown as ChatEvent;
+}
+
+function isSessionCreateResult(value: unknown): value is SessionCreateResult {
+  return isRecord(value) && typeof value["session_id"] === "string";
+}
+
+function isMessageSendResult(value: unknown): value is MessageSendResult {
+  return isRecord(value) && typeof value["run_id"] === "string";
 }
 
 function isDaemonStatus(value: unknown): value is DaemonStatus {
