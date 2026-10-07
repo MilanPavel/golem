@@ -36,8 +36,10 @@ include = ["packages"]
 exclude = [".venv", "**/node_modules", "packages/protocol/gen"]
 venvPath = "."
 venv = ".venv"
+extraPaths = ["packages/daemon/tests"]
 
 [tool.pytest.ini_options]
 testpaths = ["packages/protocol/tests", "packages/daemon/tests"]
+pythonpath = ["packages/daemon/tests"]
 addopts = ["--strict-markers", "--strict-config"]
 asyncio_mode = "auto"

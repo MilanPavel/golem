@@ -55,6 +55,10 @@ class GolemPaths:
     def socket_path(self) -> Path:
         return self.run_dir / "golem.sock"
 
+    @property
+    def pid_file(self) -> Path:
+        return self.run_dir / "golem.pid"
+
     def ensure_layout(self) -> None:
         """Create the directories the daemon expects. Existing files stay in place."""
         self.home.mkdir(parents=True, exist_ok=True)
