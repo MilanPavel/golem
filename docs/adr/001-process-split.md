@@ -22,9 +22,11 @@ The home directory is the one `resolve_paths` picks, usually `~/.golem`. [archit
 
 ## What the code does today
 
-`GolemPaths.socket_path` is `<home>/run/golem.sock`. `ensure_layout()` creates the `run/` directory. No module opens the socket. No module reads or writes a client message.
+`python -m golem serve` listens on `GolemPaths.socket_path`, `<home>/run/golem.sock`, mode `0600`. Clients are the TUI and `golem status`. Both use `@golem/client`. They send commands and read JSON lines. They do not store the work.
 
-The parts of this split that already run are the home directory, `load_settings`, and `configure_logging`. They live in the `golem` package.
+`DaemonLock` holds `run/golem.pid` for the life of the process. [ADR-004](004-pid-lock.md) is that lock. `golem daemon install` writes the launchd plist that starts `python -m golem serve` at login and again after a crash.
+
+The home directory, `load_settings`, and `configure_logging` live in the `golem` package.
 
 ## Other shapes that lost
 
@@ -38,4 +40,4 @@ A hosted graph server would keep the files and the permission checks off this ma
 
 A client cannot call Python functions. Anything it needs has to cross the message shapes in [ADR-003](003-protocol.md).
 
-A crash can leave the socket file behind after the process is gone. The next start has to tell a dead file from a live one. Nothing in the tree does that check yet.
+A crash leaves the socket file in place. [ADR-004](004-pid-lock.md) is how the next start tells a dead file from a live one.

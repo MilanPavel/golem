@@ -39,9 +39,9 @@ flowchart TB
 
 One daemon per user. It starts when you log in, and launchd starts it again if it crashes. Closing the TUI does not stop it. That is the point: a chat can finish, or wait for your approval, while the TUI is closed.
 
-Clients reach it through a Unix socket at `~/.golem/run/golem.sock`. The file mode is `0600`, so only your user can open it. That permission is the login check. There is no account and no password.
+Clients reach it through a Unix socket at `~/.golem/run/golem.sock`. The file mode is `0600`, so only your user can open it. That permission is the login check. There is no account and no password. `run/golem.pid` is the lock that lets a restart delete a socket left behind by a crash. [ADR-004](adr/004-pid-lock.md) is that lock.
 
-A client is stateless. It attaches, asks for the events it missed, and then listens. The daemon holds the sessions.
+A client is stateless. It connects, sends commands, and listens. The commands that run today are `hello`, `daemon.status`, and `ping`. Sessions and the event log come later. The daemon will hold them, and a client will catch up by asking for the events it missed.
 
 ### What the daemon owns
 
@@ -94,6 +94,7 @@ The daemon keeps its files under one home directory. `resolve_paths` picks it: a
 | Path | Role |
 |---|---|
 | `run/golem.sock` | The socket clients connect to |
+| `run/golem.pid` | The lockfile. The daemon holds a flock on it and writes its pid |
 | `golem.db` | Sessions, the event log, runs, costs |
 | `checkpoints.db` | Where the graph runtime saved its steps. Separate so it can be wiped without deleting the event log |
 | `memory.db` | Long-term memory |
@@ -134,7 +135,7 @@ sequenceDiagram
   Daemon-->>Client: message.delta, then message.completed
 ```
 
-`hello` is the first command. The client and the daemon compare protocol versions. `PROTOCOL_MAJOR` is `1` and `PROTOCOL_MINOR` is `0`. A break in the shapes bumps the major number, and the daemon refuses the client.
+`hello` is the first command. The client and the daemon compare protocol versions. `PROTOCOL_MAJOR` is `1` and `PROTOCOL_MINOR` is `0`. A break in the shapes bumps the major number, and the daemon refuses the client. Any minor on the same major is accepted. After `hello`, the client sends `ping` every few seconds so a half-open socket is noticed, and `daemon.status` when it wants the pid and uptime.
 
 Each event line is one JSON-RPC 2.0 notification. The fields that matter:
 
@@ -152,6 +153,6 @@ Each event line is one JSON-RPC 2.0 notification. The fields that matter:
 
 Those shapes are written once, as Python classes in `golem_protocol`. `just gen` writes JSON Schema, then TypeScript, into `packages/protocol/gen/`. The TUI imports the generated types. A hand-written TypeScript copy would drift, and the bug would show up as a wrong screen. Here `just check` fails if the generated files do not match the classes.
 
-The class that exists is `Ping`: `type` is `system.ping`, and `nonce` is a string. Extra fields are rejected. It is the proof that a shape written in Python arrives as a TypeScript type. `packages/tui/src/index.ts` imports it. `pingNonce` returns `event.nonce`.
+The same pipeline is what a real event uses. Add a class, run `just gen`, and the client sees a typed payload. The socket code speaks those types. It does not invent a second schema.
 
-The same pipeline is what a real event uses. Add a class, run `just gen`, and the TUI sees a typed payload. The socket code speaks those types. It does not invent a second schema.
+The models on the wire today are `hello`, `daemon.status`, and `ping` (the `Ping` event is the ping result: `type` is `system.ping`, `nonce` is a string). `@golem/client` imports the generated types. The TUI and `golem status` both use that client. `packages/tui/src/index.ts` still exports `pingNonce`, which returns `event.nonce`.

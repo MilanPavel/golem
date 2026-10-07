@@ -1,6 +1,6 @@
 # Monorepo
 
-One git repository holds the Python packages and the TypeScript package. uv owns the Python side. pnpm owns the TypeScript side. `just` is the single entry point that runs both. The two sides meet in `packages/protocol/gen`, where Python models are exported as TypeScript types.
+One git repository holds the Python packages and the TypeScript packages. uv owns the Python side. pnpm owns the TypeScript side. `just` is the single entry point that runs both. The two sides meet in `packages/protocol/gen`, where Python models are exported as TypeScript types.
 
 ## Layout
 
@@ -16,6 +16,8 @@ golem/
    ├─ protocol/            # Python: golem-protocol
    │  └─ gen/              # generated JSON Schema and TypeScript
    ├─ daemon/              # Python: golem
+   ├─ client/              # TypeScript: @golem/client
+   ├─ cli/                 # TypeScript: @golem/cli  (bin: golem)
    └─ tui/                 # TypeScript: @golem/tui
 ```
 
@@ -32,13 +34,19 @@ Each member is a Hatchling project and names its import package explicitly (`gol
 | Package name | Import | Role |
 |---|---|---|
 | `golem-protocol` | `golem_protocol` | Pydantic models and schema export |
-| `golem` | `golem` | Paths, configuration, logging |
+| `golem` | `golem` | Daemon: paths, configuration, logging, socket server |
 
 ## TypeScript
 
-`pnpm-workspace.yaml` includes `packages/tui` only. The root `package.json` is private and sets `packageManager` to `pnpm@10.29.3`. Its only dependency is `json-schema-to-typescript`, used by `just gen`.
+`pnpm-workspace.yaml` includes `packages/client`, `packages/cli`, and `packages/tui`. The root `package.json` is private and sets `packageManager` to `pnpm@10.29.3`. It depends on `json-schema-to-typescript` for `just gen`, and on `@golem/cli` so `pnpm exec golem` resolves the bin.
 
-`@golem/tui` carries its own TypeScript, ESLint, and `typescript-eslint` devDependencies. Its `tsconfig.json` includes `src/**/*.ts` and `../protocol/gen/**/*.ts`, so the compiler sees the generated types. Imports use the relative path `../../protocol/gen/ping.js` (NodeNext resolves that to `ping.ts`). There is no npm package for the protocol.
+| Package | Role |
+|---|---|
+| `@golem/client` | Socket client shared by the TUI and the CLI. Imports generated types from `packages/protocol/gen`. |
+| `@golem/cli` | The `golem` bin. `status` uses the client. `daemon` subcommands run `python -m golem`. |
+| `@golem/tui` | Ink status line. Depends on `@golem/client`. |
+
+Each package carries its own TypeScript, ESLint, and `typescript-eslint` devDependencies. `tsconfig.json` includes that package's `src` and `../protocol/gen/**/*.ts`. `packages/protocol/gen/package.json` sets `"type": "module"` so the value exports in `version.ts` typecheck. The client and the CLI import those files with a `.ts` extension, which Node runs with type stripping. There is no npm package for the protocol.
 
 ## The crossing point
 
@@ -46,6 +54,7 @@ Each member is a Hatchling project and names its import package explicitly (`gol
 
 1. `uv run python -m golem_protocol.codegen` writes `packages/protocol/gen/*.schema.json` from the Pydantic models.
 2. `pnpm exec json2ts` writes the matching `*.ts` files next to those schemas.
+3. `export_version` writes `version.ts` from `PROTOCOL_MAJOR` and `PROTOCOL_MINOR`.
 
 The generated files are committed. `just check` copies `packages/protocol/gen`, runs `just gen`, and diffs the result. A drift fails the check.
 
@@ -55,12 +64,14 @@ The generated files are committed. `just check` copies `packages/protocol/gen`, 
 |---|---|
 | `just` | List the recipes below |
 | `uv sync --all-packages` | Install Python packages and the dev group into `.venv` |
-| `pnpm install` | Install the root tool and `@golem/tui` |
+| `pnpm install` | Install the root tool and the TypeScript packages |
 | `just gen` | Regenerate JSON Schema and TypeScript |
-| `just lint` | `ruff check`, `ruff format --check`, `eslint` in `@golem/tui` |
+| `just lint` | `ruff check`, `ruff format --check`, `eslint` in the TypeScript packages |
 | `just fmt` | `ruff format` and `ruff check --fix` |
-| `just typecheck` | `pyright` (strict) and `tsc --noEmit` in `@golem/tui` |
-| `just test` | `pytest` |
+| `just typecheck` | `pyright` (strict) and `tsc --noEmit` in the TypeScript packages |
+| `just test` | `pytest`, then the TypeScript package tests |
 | `just check` | `gen`, then lint, typecheck, and test; fails if `gen/` drifted |
+| `just golem …` | The `golem` CLI (`status`, `daemon install\|start\|stop\|logs`) |
+| `just tui` | The status TUI |
 
 CI runs `uv sync --all-packages --frozen`, `pnpm install --frozen-lockfile`, then `just check`. Both lockfiles are committed, so CI installs the same versions as a local sync.
