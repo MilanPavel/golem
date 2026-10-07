@@ -5,13 +5,30 @@ import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { connectGolem, type ConnectionState } from "./connect.ts";
+import { connectGolem, type ChatEvent, type ConnectionState } from "./connect.ts";
 
 interface FakeOptions {
   answerPing?: boolean;
   mismatch?: boolean;
   onHello?: (socket: Socket) => void;
   onStatus?: boolean;
+  eventBeforeStatus?: boolean;
+  eventBeforePing?: boolean;
+}
+
+function deltaEvent(): unknown {
+  return {
+    jsonrpc: "2.0",
+    method: "event",
+    params: {
+      seq: 1,
+      session_id: "s_test",
+      run_id: "r_test",
+      ts: "2026-10-07T10:00:00+00:00",
+      type: "message.delta",
+      data: { message_id: "m_test", text: "H" },
+    },
+  };
 }
 
 function attach(socket: Socket, options: FakeOptions): void {
@@ -41,12 +58,18 @@ function attach(socket: Socket, options: FakeOptions): void {
         });
         options.onHello?.(socket);
       } else if (message.method === "ping" && options.answerPing === true) {
+        if (options.eventBeforePing === true) {
+          write(socket, deltaEvent());
+        }
         write(socket, {
           jsonrpc: "2.0",
           id: message.id,
           result: { type: "system.ping", nonce: message.params?.nonce },
         });
       } else if (message.method === "daemon.status") {
+        if (options.eventBeforeStatus === true) {
+          write(socket, deltaEvent());
+        }
         write(socket, {
           jsonrpc: "2.0",
           id: message.id,
@@ -184,6 +207,64 @@ test("heartbeat timeout reconnects", async () => {
   try {
     await client.ready;
     await waitFor(() => connections >= 2 && client.state.status === "connected");
+  } finally {
+    client.close();
+    await server.close();
+  }
+});
+
+test("an event line does not settle a pending ping", async () => {
+  let connections = 0;
+  const server = await listen((socket) => {
+    connections += 1;
+    attach(socket, { answerPing: true, eventBeforePing: true });
+  });
+  const client = connectGolem({
+    socketPath: server.socketPath,
+    clientName: "tui",
+    reconnect: true,
+    backoff: () => 0,
+    heartbeatMs: 30,
+    heartbeatTimeoutMs: 80,
+  });
+  const events: ChatEvent[] = [];
+  client.onEvent((event) => {
+    events.push(event);
+  });
+  try {
+    await client.ready;
+    await waitFor(() => events.some((event) => event.type === "message.delta"));
+    await new Promise((resolve) => setTimeout(resolve, 90));
+    assert.equal(connections, 1);
+    assert.equal(client.state.status, "connected");
+  } finally {
+    client.close();
+    await server.close();
+  }
+});
+
+test("an event line does not settle a pending status call", async () => {
+  const server = await listen((socket) => {
+    attach(socket, { answerPing: true, eventBeforeStatus: true });
+  });
+  const client = connectGolem({
+    socketPath: server.socketPath,
+    clientName: "tui",
+    reconnect: false,
+    heartbeatMs: 60_000,
+  });
+  const events: ChatEvent[] = [];
+  client.onEvent((event) => {
+    events.push(event);
+  });
+  try {
+    const status = await client.status();
+    assert.equal(status.pid, 7);
+    assert.equal(events.length, 1);
+    assert.equal(events[0]?.type, "message.delta");
+    if (events[0]?.type === "message.delta") {
+      assert.equal(events[0].data.text, "H");
+    }
   } finally {
     client.close();
     await server.close();
