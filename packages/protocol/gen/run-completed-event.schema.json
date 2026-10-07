@@ -1,0 +1,53 @@
+{
+  "$defs": {
+    "EmptyEventData": {
+      "additionalProperties": false,
+      "description": "No payload. Used by ``run.started`` and ``run.completed``.",
+      "properties": {},
+      "title": "EmptyEventData",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The graph run finished and the checkpoint is current.",
+  "properties": {
+    "data": {
+      "$ref": "#/$defs/EmptyEventData"
+    },
+    "run_id": {
+      "minLength": 1,
+      "title": "Run Id",
+      "type": "string"
+    },
+    "seq": {
+      "minimum": 1,
+      "title": "Seq",
+      "type": "integer"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    },
+    "ts": {
+      "minLength": 1,
+      "title": "Ts",
+      "type": "string"
+    },
+    "type": {
+      "const": "run.completed",
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "seq",
+    "session_id",
+    "run_id",
+    "ts",
+    "type",
+    "data"
+  ],
+  "title": "RunCompletedEvent",
+  "type": "object"
+}

@@ -1,0 +1,7 @@
+{
+  "additionalProperties": false,
+  "description": "No payload. Used by ``run.started`` and ``run.completed``.",
+  "properties": {},
+  "title": "EmptyEventData",
+  "type": "object"
+}

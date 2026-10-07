@@ -1,0 +1,21 @@
+{
+  "additionalProperties": false,
+  "description": "``session.create``. An empty profile uses the daemon's configured one.",
+  "properties": {
+    "model_profile": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Model Profile"
+    }
+  },
+  "title": "SessionCreateParams",
+  "type": "object"
+}

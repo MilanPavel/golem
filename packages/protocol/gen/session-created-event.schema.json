@@ -1,0 +1,61 @@
+{
+  "$defs": {
+    "SessionCreatedData": {
+      "additionalProperties": false,
+      "description": "Profile stored for a new session.",
+      "properties": {
+        "model_profile": {
+          "minLength": 1,
+          "title": "Model Profile",
+          "type": "string"
+        }
+      },
+      "required": [
+        "model_profile"
+      ],
+      "title": "SessionCreatedData",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "A session exists. ``run_id`` is null because no run has started.",
+  "properties": {
+    "data": {
+      "$ref": "#/$defs/SessionCreatedData"
+    },
+    "run_id": {
+      "title": "Run Id",
+      "type": "null"
+    },
+    "seq": {
+      "minimum": 1,
+      "title": "Seq",
+      "type": "integer"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    },
+    "ts": {
+      "minLength": 1,
+      "title": "Ts",
+      "type": "string"
+    },
+    "type": {
+      "const": "session.created",
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "seq",
+    "session_id",
+    "run_id",
+    "ts",
+    "type",
+    "data"
+  ],
+  "title": "SessionCreatedEvent",
+  "type": "object"
+}

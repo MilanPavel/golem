@@ -7,9 +7,33 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from golem_protocol.commands import DaemonStatus, HelloParams, HelloResult, PingParams
-from golem_protocol.events import Ping
-from golem_protocol.rpc import RpcErrorBody, RpcFailure, RpcRequest, RpcSuccess
+from golem_protocol.commands import (
+    DaemonStatus,
+    HelloParams,
+    HelloResult,
+    MessageSendParams,
+    MessageSendResult,
+    PingParams,
+    SessionCreateParams,
+    SessionCreateResult,
+)
+from golem_protocol.events import (
+    EmptyEventData,
+    MessageCompletedData,
+    MessageCompletedEvent,
+    MessageDeltaData,
+    MessageDeltaEvent,
+    MessageStartedData,
+    MessageStartedEvent,
+    Ping,
+    RunCompletedEvent,
+    RunFailedData,
+    RunFailedEvent,
+    RunStartedEvent,
+    SessionCreatedData,
+    SessionCreatedEvent,
+)
+from golem_protocol.rpc import RpcErrorBody, RpcFailure, RpcNotification, RpcRequest, RpcSuccess
 from golem_protocol.version import PROTOCOL_MAJOR, PROTOCOL_MINOR
 
 MODELS: tuple[type[BaseModel], ...] = (
@@ -18,10 +42,28 @@ MODELS: tuple[type[BaseModel], ...] = (
     HelloParams,
     HelloResult,
     DaemonStatus,
+    SessionCreateParams,
+    SessionCreateResult,
+    MessageSendParams,
+    MessageSendResult,
+    SessionCreatedData,
+    SessionCreatedEvent,
+    MessageStartedData,
+    MessageStartedEvent,
+    MessageDeltaData,
+    MessageDeltaEvent,
+    MessageCompletedData,
+    MessageCompletedEvent,
+    EmptyEventData,
+    RunStartedEvent,
+    RunCompletedEvent,
+    RunFailedData,
+    RunFailedEvent,
     RpcRequest,
     RpcErrorBody,
     RpcSuccess,
     RpcFailure,
+    RpcNotification,
 )
 
 

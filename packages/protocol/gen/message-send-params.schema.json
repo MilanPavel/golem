@@ -1,0 +1,23 @@
+{
+  "additionalProperties": false,
+  "description": "``message.send``. Starts one graph run for this session.",
+  "properties": {
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    },
+    "text": {
+      "maxLength": 100000,
+      "minLength": 1,
+      "title": "Text",
+      "type": "string"
+    }
+  },
+  "required": [
+    "session_id",
+    "text"
+  ],
+  "title": "MessageSendParams",
+  "type": "object"
+}

@@ -1,0 +1,22 @@
+{
+  "additionalProperties": false,
+  "description": "An assistant message is open and tokens may follow.",
+  "properties": {
+    "message_id": {
+      "minLength": 1,
+      "title": "Message Id",
+      "type": "string"
+    },
+    "role": {
+      "const": "assistant",
+      "title": "Role",
+      "type": "string"
+    }
+  },
+  "required": [
+    "message_id",
+    "role"
+  ],
+  "title": "MessageStartedData",
+  "type": "object"
+}
