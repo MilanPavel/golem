@@ -5,9 +5,9 @@
 
 ## The idea
 
-LangGraph is the library chosen to run an agent loop and a long flow: stop, resume, stream tokens, retry a step. It is not a dependency of this repository. Nothing imports it.
+LangGraph runs an agent loop and a long flow: stop, resume, stream tokens, retry a step.
 
-The rule is small. The library runs a graph. Our packages own everything around the graph.
+The rule is small. The library runs a graph. Our packages own everything around the graph. Imports stay in `golem/graphs/` and `golem/models/`.
 
 ```mermaid
 flowchart TB
@@ -36,7 +36,9 @@ A step that stops for a person runs again from its first line when it resumes. A
 
 ## What the code does today
 
-No `pyproject.toml` depends on LangGraph. There is no graph module.
+`packages/daemon` depends on LangGraph 1.2 and `langgraph-checkpoint-sqlite` 3.1. The checkpoint core package on that line is 4.x. The sqlite package has no 4.x release, so the pin is `>=3.1,<4`.
+
+The chat graph is `START → call_model → END`. There are no tools. `AsyncSqliteSaver` is opened once in `DaemonApp.serve` and closed on shutdown. It writes `checkpoints.db`. The thread id is the session id. `golem/graphs/adapter.py` turns stream chunks into `message.delta` and `message.completed`. Provider clients are built in `golem/models/router.py`. `anthropic` and `openai` read `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`. `openai_compat` builds `ChatOpenAI` against `model_base_url`, or `http://127.0.0.1:11434/v1` when that field is empty, and sends the placeholder key `ollama`. Tests pass a fake chat model and do not call the network.
 
 The split is already visible as packages. Message shapes are `golem_protocol`. The home directory, settings, and logs are `golem`. The TypeScript package imports generated types and does not import Python.
 
@@ -50,6 +52,6 @@ Putting permission rules inside the graph ties a policy edit to old checkpoints.
 
 ## What it costs
 
-The graph's thread id and our session id have to be the same string, once both exist. The repository has neither store yet.
+The graph's thread id and our session id are the same string. Wiping `checkpoints.db` drops the model's memory and leaves the home directory's other files.
 
 Each new piece of code has to sit on one side of the line: inside a graph, or in a golem package.
