@@ -1,0 +1,47 @@
+{
+  "additionalProperties": false,
+  "description": "Client → daemon request. ``id`` is required; notifications are not accepted.",
+  "properties": {
+    "id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "integer"
+        }
+      ],
+      "title": "Id"
+    },
+    "jsonrpc": {
+      "const": "2.0",
+      "title": "Jsonrpc",
+      "type": "string"
+    },
+    "method": {
+      "minLength": 1,
+      "title": "Method",
+      "type": "string"
+    },
+    "params": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Params"
+    }
+  },
+  "required": [
+    "jsonrpc",
+    "method",
+    "id"
+  ],
+  "title": "RpcRequest",
+  "type": "object"
+}

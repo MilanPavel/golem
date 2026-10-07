@@ -1,0 +1,15 @@
+{
+  "additionalProperties": false,
+  "description": "Client heartbeat. The daemon echoes ``nonce`` on a ``Ping`` event.",
+  "properties": {
+    "nonce": {
+      "title": "Nonce",
+      "type": "string"
+    }
+  },
+  "required": [
+    "nonce"
+  ],
+  "title": "PingParams",
+  "type": "object"
+}

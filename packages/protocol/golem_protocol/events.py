@@ -1,7 +1,7 @@
 """Server → client events.
 
-Phase 0 ships ``Ping`` so schema generation has a real model.
-The event catalog from the plan is modeled in Phase 1.
+``Ping`` is the result body of the ``ping`` command. The rest of the event
+catalog arrives with the sessions that emit it.
 """
 
 from typing import Literal

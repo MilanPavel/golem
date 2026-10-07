@@ -1,0 +1,70 @@
+{
+  "$defs": {
+    "RpcErrorBody": {
+      "additionalProperties": false,
+      "description": "JSON-RPC error object.",
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "integer"
+        },
+        "data": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Data"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "RpcErrorBody",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Error response. ``id`` is null when the request id could not be read.",
+  "properties": {
+    "error": {
+      "$ref": "#/$defs/RpcErrorBody"
+    },
+    "id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Id"
+    },
+    "jsonrpc": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Jsonrpc",
+      "type": "string"
+    }
+  },
+  "required": [
+    "error"
+  ],
+  "title": "RpcFailure",
+  "type": "object"
+}
