@@ -26,18 +26,16 @@ The walk with the real model is in [architecture.md](../architecture.md).
 
 ## What the code does today
 
-`Ping` in `golem_protocol.events` is the only model.
+The daemon speaks these models. `just gen` writes a JSON Schema and a TypeScript file for each one, plus `version.ts` from `PROTOCOL_MAJOR` and `PROTOCOL_MINOR`.
 
-| Field | Rule |
+| Model | Role |
 |---|---|
-| `type` | the string `system.ping` |
-| `nonce` | a string |
+| `HelloParams`, `HelloResult` | `hello`. The major number must match. Any minor on that major is accepted. |
+| `DaemonStatus` | Result of `daemon.status`: pid, version, protocol, uptime, `running` or `draining`. |
+| `PingParams`, `Ping` | `ping`. The daemon echoes `nonce` on a `system.ping` result. |
+| `RpcRequest`, `RpcSuccess`, `RpcFailure` | One JSON-RPC 2.0 object per line. |
 
-`just gen` writes `packages/protocol/gen/ping.schema.json` and `ping.ts`. Both are committed. `packages/tui/src/index.ts` imports `Ping`. `pingNonce` returns the nonce. A nonce of `abc` comes back as `abc`.
-
-`PROTOCOL_MAJOR` is `1`. `PROTOCOL_MINOR` is `0`. They are constants in `golem_protocol/version.py`. No function compares a client's version to them.
-
-No socket is opened, so no JSON-RPC line is sent.
+`hello` runs before `ping` and `daemon.status`. A different major number is error `-32001`, and the client stops reconnecting. `@golem/client` imports the generated types. `pingNonce` in the TUI still reads a `Ping` nonce. That helper is the Phase 0 proof. The screen is the connection line.
 
 ## Other shapes that lost
 
@@ -49,8 +47,8 @@ Using AG-UI or ACP as the native message format is not decided. This record does
 
 ## What it costs
 
-Something still has to turn a graph library's stream into these models, and turn a person's answer back into a resume. That translator is not in the tree.
+`json-schema-to-typescript` is locked in `pnpm-lock.yaml`. Two machines generate the same TypeScript.
 
-`json-schema-to-typescript` is locked in `pnpm-lock.yaml`. Two machines generate the same `ping.ts`.
+A breaking change to a model bumps `PROTOCOL_MAJOR`. `hello` refuses a client on the wrong major number.
 
-A breaking change to a model bumps `PROTOCOL_MAJOR`. The daemon is supposed to refuse a client on the wrong major number. Nothing performs that check yet.
+Something still has to turn a graph library's stream into these models, and turn a person's answer back into a resume. That translator is not in the tree. The socket today carries `hello`, `daemon.status`, and `ping`.
