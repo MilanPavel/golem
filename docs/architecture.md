@@ -8,7 +8,7 @@ The choice behind each piece is in [adr/](adr/README.md). How the Python and Typ
 
 The **daemon** is the process that does the work. It keeps running after you close a terminal. Chats, tool calls, and long flows live there.
 
-A **client** attaches to that work. The TUI, a headless command, and a timer are all clients. A client does not own the model's memory. It connects and sends commands. Catching up from a log comes later. Today the TUI holds the transcript it has drawn.
+A **client** attaches to that work. The TUI, a headless command, and a timer are all clients. A client does not own the model's memory. It connects and sends commands. Catching up from a log comes later. Today the TUI holds the transcript it has drawn. The screen fills the terminal. The header carries a clay mark, the daemon version, and the selected model. The transcript scrolls only when it is taller than the space under the header. The wheel and the page keys move that window. A question, typed or already sent, is a full-width bar. The bottom line is the connection and the model. A meter appears above the question while a run is in progress and names the phase, the characters received, and the seconds elapsed.
 
 The **protocol** is the only language between them. The daemon is Python. The TUI is TypeScript. They do not share objects. They share message shapes, written once and generated for both sides.
 

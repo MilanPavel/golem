@@ -39,7 +39,7 @@ The daemon speaks these models. `just gen` writes a JSON Schema and a TypeScript
 | `RpcRequest`, `RpcSuccess`, `RpcFailure` | One JSON-RPC 2.0 object per line. A request has an `id`. |
 | `RpcNotification` | Method `event`, params `ChatEvent`, no `id`. |
 
-`PROTOCOL_MAJOR` is `1` and `PROTOCOL_MINOR` is `2`. Minor 2 adds the optional model fields on `DaemonStatus` and `SessionCreatedData`. The chat commands and the event notification arrived in minor 1. `hello` runs before the other commands. A different major number is error `-32001`, and the client stops reconnecting. A missing session is `-32003`, a second send while a run is open is `-32004`, and a model with no provider, name, or key is `-32005`. `@golem/client` imports the generated types and dispatches `event` lines to listeners. Those lines do not settle a pending `ping`. `pingNonce` in the TUI still reads a `Ping` nonce. The screen is the chat, plus the connection line.
+`PROTOCOL_MAJOR` is `1` and `PROTOCOL_MINOR` is `2`. Minor 2 adds the optional model fields on `DaemonStatus` and `SessionCreatedData`. The chat commands and the event notification arrived in minor 1. `hello` runs before the other commands. A different major number is error `-32001`, and the client stops reconnecting. A missing session is `-32003`, a second send while a run is open is `-32004`, and a model with no provider, name, or key is `-32005`. `@golem/client` imports the generated types and dispatches `event` lines to listeners. Those lines do not settle a pending `ping`. `pingNonce` in the TUI still reads a `Ping` nonce. The screen is the full-terminal frame described in [ADR-005](005-client-package.md).
 
 ## Other shapes that lost
 

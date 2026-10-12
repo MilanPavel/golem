@@ -12,6 +12,7 @@ export type ChatState = {
   busy: boolean;
   error: string | null;
   notice: string | null;
+  runStartedAt: string | null;
 };
 
 export const emptyChat: ChatState = {
@@ -19,6 +20,7 @@ export const emptyChat: ChatState = {
   busy: false,
   error: null,
   notice: null,
+  runStartedAt: null,
 };
 
 export function reduceChat(state: ChatState, event: ChatEvent): ChatState {
@@ -44,11 +46,11 @@ export function reduceChat(state: ChatState, event: ChatEvent): ChatState {
     case "message.completed":
       return { ...state, messages: upsertCompleted(state.messages, event) };
     case "run.started":
-      return { ...state, busy: true, error: null };
+      return { ...state, busy: true, error: null, runStartedAt: event.ts };
     case "run.completed":
-      return { ...state, busy: false };
+      return { ...state, busy: false, runStartedAt: null };
     case "run.failed":
-      return { ...state, busy: false, error: event.data.message };
+      return { ...state, busy: false, error: event.data.message, runStartedAt: null };
     default:
       return state;
   }
@@ -64,7 +66,7 @@ export function appendDelta(state: ChatState, messageId: string, text: string): 
 }
 
 export function connectionLost(state: ChatState): ChatState {
-  return { ...state, busy: false };
+  return { ...state, busy: false, runStartedAt: null };
 }
 
 export type DeltaBatcher = {

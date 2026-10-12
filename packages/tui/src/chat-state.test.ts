@@ -62,6 +62,7 @@ test("reducer builds a turn from events", () => {
     }),
   );
   assert.equal(state.busy, true);
+  assert.equal(state.runStartedAt, "t");
   assert.equal(state.messages[1]?.text, "Hi");
   assert.equal(state.messages[1]?.streaming, true);
   state = reduceChat(
@@ -87,6 +88,7 @@ test("reducer builds a turn from events", () => {
     }),
   );
   assert.equal(state.busy, false);
+  assert.equal(state.runStartedAt, null);
   assert.equal(state.messages[0]?.text, "hello");
   assert.equal(state.messages[1]?.text, "Hi there");
   assert.equal(state.messages[1]?.streaming, false);
@@ -110,12 +112,15 @@ test("run.failed unlocks input and keeps the reason", () => {
     data: { message: "model exploded" },
   });
   assert.equal(failed.busy, false);
+  assert.equal(failed.runStartedAt, null);
   assert.equal(failed.error, "model exploded");
 });
 
 test("connectionLost clears a busy run", () => {
-  const busy = { ...emptyChat, busy: true };
-  assert.equal(connectionLost(busy).busy, false);
+  const busy = { ...emptyChat, busy: true, runStartedAt: "2026-10-07T00:00:00.000Z" };
+  const lost = connectionLost(busy);
+  assert.equal(lost.busy, false);
+  assert.equal(lost.runStartedAt, null);
 });
 
 test("delta batcher flushes immediately and on the timer", async () => {

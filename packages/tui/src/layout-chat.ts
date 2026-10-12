@@ -9,36 +9,111 @@ export type Span = {
   code?: boolean;
 };
 
-export type LayoutLine = readonly Span[];
+export type LineRole = "user" | "assistant" | "plain";
 
-const CHROME_ROWS = 2;
+export type LayoutLine = {
+  role: LineRole;
+  spans: readonly Span[];
+};
 
-export function layoutChat(
-  messages: readonly ChatMessage[],
-  columns: number,
-  rows: number,
-): LayoutLine[] {
+export type Viewport = {
+  lines: LayoutLine[];
+  overflow: boolean;
+  offsetFromBottom: number;
+};
+
+export type Transcript = Viewport & {
+  gutter: readonly string[] | null;
+};
+
+export function layoutMessages(messages: readonly ChatMessage[], columns: number): LayoutLine[] {
   const width = Math.max(1, columns);
-  const bodyRows = Math.max(0, rows - CHROME_ROWS);
   const lines: LayoutLine[] = [];
   for (const message of messages) {
     if (lines.length > 0) {
-      lines.push([{ text: "" }]);
+      lines.push({ role: "plain", spans: [{ text: "" }] });
     }
-    lines.push([{ text: message.role === "user" ? "you" : "golem", bold: true }]);
+    const role: LineRole = message.role === "user" ? "user" : "assistant";
+    const label = role === "user" ? "you" : "golem";
     const body = message.streaming
       ? wrapSpans([{ text: message.text }], width)
       : markdownLines(message.text, width);
-    lines.push(...body);
+    lines.push(paint({ role, spans: [{ text: label, bold: true }] }, width));
+    for (const spans of body) {
+      lines.push(paint({ role, spans }, width));
+    }
   }
-  if (lines.length <= bodyRows) {
-    return lines;
-  }
-  return lines.slice(lines.length - bodyRows);
+  return lines;
 }
 
-function markdownLines(source: string, width: number): LayoutLine[] {
-  const lines: LayoutLine[] = [];
+export function fitViewport(
+  lines: readonly LayoutLine[],
+  bodyRows: number,
+  offsetFromBottom: number,
+): Viewport {
+  const rows = Math.max(0, Math.floor(bodyRows));
+  if (rows === 0) {
+    return { lines: [], overflow: lines.length > 0, offsetFromBottom: 0 };
+  }
+  if (lines.length <= rows) {
+    return { lines: [...lines], overflow: false, offsetFromBottom: 0 };
+  }
+  const maxOffset = lines.length - rows;
+  const offset = Math.min(Math.max(0, Math.floor(offsetFromBottom)), maxOffset);
+  const end = lines.length - offset;
+  return {
+    lines: lines.slice(end - rows, end),
+    overflow: true,
+    offsetFromBottom: offset,
+  };
+}
+
+export function gutterColumn(total: number, bodyRows: number, offsetFromBottom: number): string[] {
+  const rows = Math.max(1, bodyRows);
+  const maxOffset = Math.max(0, total - rows);
+  const offset = Math.min(Math.max(0, offsetFromBottom), maxOffset);
+  const fromTop = maxOffset - offset;
+  const thumb = maxOffset === 0 ? rows - 1 : Math.round((fromTop / maxOffset) * (rows - 1));
+  return Array.from({ length: rows }, (_, index) => (index === thumb ? "█" : "│"));
+}
+
+export function layoutTranscript(
+  messages: readonly ChatMessage[],
+  columns: number,
+  bodyRows: number,
+  offsetFromBottom: number,
+): Transcript {
+  const width = Math.max(1, columns);
+  const full = layoutMessages(messages, width);
+  const rows = Math.max(0, bodyRows);
+  const overflows = rows > 0 && full.length > rows;
+  const contentWidth = overflows ? Math.max(1, width - 1) : width;
+  const lines = overflows ? layoutMessages(messages, contentWidth) : full;
+  const fitted = fitViewport(lines, rows, offsetFromBottom);
+  const gutter =
+    fitted.overflow && fitted.lines.length > 0
+      ? gutterColumn(lines.length, fitted.lines.length, fitted.offsetFromBottom)
+      : null;
+  return { ...fitted, gutter };
+}
+
+export function padLine(line: LayoutLine, width: number): LayoutLine {
+  const used = line.spans.reduce((sum, span) => sum + span.text.length, 0);
+  if (used >= width) {
+    return line;
+  }
+  return { role: line.role, spans: [...line.spans, { text: " ".repeat(width - used) }] };
+}
+
+function paint(line: LayoutLine, width: number): LayoutLine {
+  if (line.role !== "user") {
+    return line;
+  }
+  return padLine(line, width);
+}
+
+function markdownLines(source: string, width: number): Span[][] {
+  const lines: Span[][] = [];
   for (const token of Lexer.lex(source)) {
     lines.push(...blockLines(token, width));
   }
@@ -48,7 +123,7 @@ function markdownLines(source: string, width: number): LayoutLine[] {
   return lines;
 }
 
-function blockLines(token: Token, width: number): LayoutLine[] {
+function blockLines(token: Token, width: number): Span[][] {
   if (token.type === "space") {
     return [[{ text: "" }]];
   }
@@ -57,7 +132,7 @@ function blockLines(token: Token, width: number): LayoutLine[] {
     return code.text
       .replace(/\n$/, "")
       .split("\n")
-      .map((line: string) => [{ text: line, code: true }]);
+      .flatMap((line: string) => wrapSpans([{ text: line, code: true }], width));
   }
   if (token.type === "list") {
     return listLines(token as Tokens.List, width);
@@ -78,8 +153,8 @@ function blockLines(token: Token, width: number): LayoutLine[] {
   return [];
 }
 
-function listLines(token: Tokens.List, width: number): LayoutLine[] {
-  const lines: LayoutLine[] = [];
+function listLines(token: Tokens.List, width: number): Span[][] {
+  const lines: Span[][] = [];
   for (const item of token.items) {
     const spans: Span[] = [{ text: "- " }];
     for (const child of item.tokens) {
@@ -123,7 +198,7 @@ function inlineSpans(tokens: Token[] | undefined): Span[] {
   return spans;
 }
 
-export function wrapSpans(spans: readonly Span[], width: number): LayoutLine[] {
+export function wrapSpans(spans: readonly Span[], width: number): Span[][] {
   const widthSafe = Math.max(1, width);
   const lines: Span[][] = [];
   let current: Span[] = [];

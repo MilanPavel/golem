@@ -23,7 +23,7 @@ flowchart LR
 
 `@golem/client` connects, sends `hello`, and pings every 5 seconds. A missed ping drops the socket. The TUI reconnects with backoff from 200 ms up to 5 s. `golem status` tries once and exits 1 if nothing is listening. A protocol major mismatch stops the retries.
 
-The TUI is Ink 8 and React 19. The screen is a chat column plus the connection line: `connected`, `reconnecting`, or the mismatch reason. That line is a function of the client state. The bubbles are a function of the chat events. [ADR-006](006-checkpoint-continuity.md) is what survives a restart. `ink-testing-library` does not support this Ink, so the tests check those functions. They do not render a frame.
+The TUI is Ink 8 and React 19. It takes the alternate screen and draws a frame the height of the terminal, one column short, so a full-width bar does not wrap an extra row. The header is a clay mark, the daemon version from `daemon.status`, and the selected model. The transcript is a function of the chat events. It scrolls only when the laid-out lines are taller than the body. Page Up, Page Down, Home, End, and the wheel move that window. User questions are full-width bars, in the transcript and in the composer. The status line is the connection, from the client state, plus the model. The model comes from `daemon.status` until `session.created` arrives, and the session value wins. A meter is mounted only while a run is busy: `thinking` before the first token, then `writing` with the characters received and the seconds since `run.started`. [ADR-006](006-checkpoint-continuity.md) is what survives a restart. `ink-testing-library` does not support this Ink, so the tests check those functions. They do not render a frame.
 
 ## Other shapes that lost
 
