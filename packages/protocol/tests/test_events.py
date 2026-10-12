@@ -85,6 +85,17 @@ def test_chat_event_union_round_trip() -> None:
     assert EmptyEventData().model_dump() == {}
 
 
+def test_session_created_names_the_configured_model() -> None:
+    data = SessionCreatedData(
+        model_profile="remote",
+        model_provider="openai_compat",
+        model_name="qwen3.5:4b",
+    )
+    assert SessionCreatedData.model_validate_json(data.model_dump_json()) == data
+    with pytest.raises(ValidationError):
+        SessionCreatedData(model_profile="remote", model_name="")
+
+
 def test_chat_event_rejects_the_wrong_payload() -> None:
     with pytest.raises(ValidationError):
         _ADAPTER.validate_python(

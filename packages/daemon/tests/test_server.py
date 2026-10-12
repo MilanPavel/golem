@@ -31,6 +31,7 @@ from golem.server.dispatcher import (
     RequestContext,
 )
 from golem.server.framing import MAX_LINE_BYTES
+from golem_protocol.version import PROTOCOL_MINOR
 
 HELLO = {"protocol_major": 1, "protocol_minor": 0, "client": "tui"}
 
@@ -215,12 +216,15 @@ async def test_hello_status_and_ping(running: DaemonApp) -> None:
     try:
         hello = rpc_result(await client.call("hello", HELLO))
         assert hello["protocol_major"] == 1
-        assert hello["protocol_minor"] == 1
+        assert hello["protocol_minor"] == PROTOCOL_MINOR
         assert hello["daemon_version"] == "0.0.0"
         status = rpc_result(await client.call("daemon.status"))
         assert status["pid"] == os.getpid()
         assert status["state"] == "running"
         assert status["version"] == "0.0.0"
+        assert status["model_profile"] == "remote"
+        assert status["model_provider"] is None
+        assert status["model_name"] is None
         uptime = status["uptime_seconds"]
         assert isinstance(uptime, int | float)
         assert uptime >= 0
@@ -239,7 +243,7 @@ async def test_minor_mismatch_is_accepted(running: DaemonApp) -> None:
             await client.call("hello", {**HELLO, "protocol_minor": 9}),
         )
         assert hello["protocol_major"] == 1
-        assert hello["protocol_minor"] == 1
+        assert hello["protocol_minor"] == PROTOCOL_MINOR
     finally:
         await client.close()
 
@@ -425,7 +429,7 @@ def test_typescript_status_reads_the_daemon(short_home: Path) -> None:
         assert completed.returncode == 0, completed.stderr
         assert "connected" in completed.stdout
         assert f"pid: {serve.proc.pid}" in completed.stdout
-        assert "protocol: 1.1" in completed.stdout
+        assert f"protocol: 1.{PROTOCOL_MINOR}" in completed.stdout
         assert "state: running" in completed.stdout
     finally:
         serve.stop()

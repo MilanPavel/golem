@@ -21,11 +21,18 @@ class Ping(BaseModel):
 
 
 class SessionCreatedData(BaseModel):
-    """Profile stored for a new session."""
+    """Profile stored for a new session.
+
+    ``model_provider`` and ``model_name`` are set when this profile is the
+    one the daemon is configured to run. They are null for any other profile,
+    and when the provider or name is not configured.
+    """
 
     model_config = _CONFIG
 
     model_profile: str = Field(min_length=1)
+    model_provider: str | None = Field(default=None, min_length=1)
+    model_name: str | None = Field(default=None, min_length=1)
 
 
 class MessageStartedData(BaseModel):

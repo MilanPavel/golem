@@ -15,6 +15,7 @@ from datetime import UTC, datetime
 from golem.graphs.adapter import TextCompleted, TextDelta, translate
 from golem.graphs.chat import ChatRuntime
 from golem.graphs.state import SCHEMA_VERSION
+from golem.models.router import ModelIdentity
 from golem.sessions.ids import new_id
 from golem_protocol.events import (
     ChatEvent,
@@ -75,6 +76,7 @@ class SessionManager:
     async def create(self, model_profile: str | None, sink: EventSink) -> str:
         """Remember a new session and emit ``session.created``."""
         profile = self._runtime.router.profile_name if model_profile is None else model_profile
+        chosen = self._runtime.router.identity(profile)
         async with self._lock:
             session = _LiveSession(
                 session_id=new_id("s"),
@@ -91,10 +93,18 @@ class SessionManager:
                     run_id=None,
                     ts=ts,
                     type="session.created",
-                    data=SessionCreatedData(model_profile=profile),
+                    data=SessionCreatedData(
+                        model_profile=profile,
+                        model_provider=chosen.provider,
+                        model_name=chosen.name,
+                    ),
                 ),
             )
             return session.session_id
+
+    def configured_model(self) -> ModelIdentity:
+        """The model ``daemon.status`` reports for this process."""
+        return self._runtime.router.identity()
 
     async def send(self, session_id: str, text: str, sink: EventSink) -> str:
         """Start one graph run. Returns ``run_id`` before the model finishes.

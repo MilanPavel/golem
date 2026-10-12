@@ -26,12 +26,17 @@ def test_daemon_status_state() -> None:
         protocol_minor=0,
         uptime_seconds=1.5,
         state="running",
+        model_profile="remote",
+        model_provider="openai_compat",
+        model_name="qwen3.5:4b",
     )
     assert DaemonStatus.model_validate_json(status.model_dump_json()) == status
     with pytest.raises(ValidationError):
         DaemonStatus.model_validate(
             {**status.model_dump(), "state": "asleep"},
         )
+    with pytest.raises(ValidationError):
+        DaemonStatus.model_validate({**status.model_dump(), "model_name": ""})
 
 
 def test_ping_params() -> None:

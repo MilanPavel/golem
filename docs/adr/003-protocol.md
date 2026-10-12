@@ -31,15 +31,15 @@ The daemon speaks these models. `just gen` writes a JSON Schema and a TypeScript
 | Model | Role |
 |---|---|
 | `HelloParams`, `HelloResult` | `hello`. The major number must match. Any minor on that major is accepted. |
-| `DaemonStatus` | Result of `daemon.status`: pid, version, protocol, uptime, `running` or `draining`. |
+| `DaemonStatus` | Result of `daemon.status`: pid, version, protocol, uptime, `running` or `draining`, and the configured `model_profile`, `model_provider`, and `model_name`. Provider and name are null when unset. |
 | `PingParams`, `Ping` | `ping`. The daemon echoes `nonce` on a `system.ping` result. |
 | `SessionCreateParams`, `SessionCreateResult` | `session.create`. Returns `session_id`. |
 | `MessageSendParams`, `MessageSendResult` | `message.send`. Returns `run_id` while the run continues. |
-| `ChatEvent` | One of `session.created`, `message.started`, `message.delta`, `message.completed`, `run.started`, `run.completed`, `run.failed`. |
+| `ChatEvent` | One of `session.created`, `message.started`, `message.delta`, `message.completed`, `run.started`, `run.completed`, `run.failed`. `session.created` carries `model_profile`, and `model_provider` and `model_name` when that profile is the configured one. |
 | `RpcRequest`, `RpcSuccess`, `RpcFailure` | One JSON-RPC 2.0 object per line. A request has an `id`. |
 | `RpcNotification` | Method `event`, params `ChatEvent`, no `id`. |
 
-`PROTOCOL_MAJOR` is `1` and `PROTOCOL_MINOR` is `1`. The chat commands and the event notification are that minor. `hello` runs before the other commands. A different major number is error `-32001`, and the client stops reconnecting. A missing session is `-32003`, a second send while a run is open is `-32004`, and a model with no provider, name, or key is `-32005`. `@golem/client` imports the generated types and dispatches `event` lines to listeners. Those lines do not settle a pending `ping`. `pingNonce` in the TUI still reads a `Ping` nonce. The screen is the chat, plus the connection line.
+`PROTOCOL_MAJOR` is `1` and `PROTOCOL_MINOR` is `2`. Minor 2 adds the optional model fields on `DaemonStatus` and `SessionCreatedData`. The chat commands and the event notification arrived in minor 1. `hello` runs before the other commands. A different major number is error `-32001`, and the client stops reconnecting. A missing session is `-32003`, a second send while a run is open is `-32004`, and a model with no provider, name, or key is `-32005`. `@golem/client` imports the generated types and dispatches `event` lines to listeners. Those lines do not settle a pending `ping`. `pingNonce` in the TUI still reads a `Ping` nonce. The screen is the chat, plus the connection line.
 
 ## Other shapes that lost
 

@@ -66,6 +66,7 @@ async def _hello(ctx: RequestContext, params: HelloParams) -> HelloResult:
 
 async def _status(ctx: RequestContext, params: _EmptyParams) -> DaemonStatus:
     del params
+    profile, provider, name = _configured_model(ctx)
     return DaemonStatus(
         pid=os.getpid(),
         version=__version__,
@@ -73,7 +74,18 @@ async def _status(ctx: RequestContext, params: _EmptyParams) -> DaemonStatus:
         protocol_minor=PROTOCOL_MINOR,
         uptime_seconds=time.monotonic() - ctx.state.started_at,
         state=ctx.state.state,
+        model_profile=profile,
+        model_provider=provider,
+        model_name=name,
     )
+
+
+def _configured_model(ctx: RequestContext) -> tuple[str | None, str | None, str | None]:
+    sessions = ctx.state.sessions
+    if sessions is None:
+        return None, None, None
+    identity = sessions.configured_model()
+    return identity.profile, identity.provider, identity.name
 
 
 async def _ping(ctx: RequestContext, params: PingParams) -> Ping:

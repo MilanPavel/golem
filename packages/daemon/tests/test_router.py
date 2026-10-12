@@ -3,7 +3,7 @@ from fakes import ScriptedChatModel
 from langchain_openai import ChatOpenAI
 
 from golem.config import GolemSettings
-from golem.models.router import ModelConfigError, ModelRouter
+from golem.models.router import ModelConfigError, ModelIdentity, ModelRouter
 
 
 def test_injected_model_is_returned_for_the_profile() -> None:
@@ -11,6 +11,18 @@ def test_injected_model_is_returned_for_the_profile() -> None:
     router = ModelRouter(model=model)
     assert router.profile_name == "remote"
     assert router.chat_model("remote") is model
+    assert router.identity() == ModelIdentity(profile="remote", provider=None, name=None)
+
+
+def test_identity_reports_the_configured_model() -> None:
+    settings = GolemSettings(model_provider="openai_compat", model_name="qwen3.5:4b")
+    router = ModelRouter(settings)
+    assert router.identity() == ModelIdentity(
+        profile="remote",
+        provider="openai_compat",
+        name="qwen3.5:4b",
+    )
+    assert router.identity("other") == ModelIdentity(profile="other", provider=None, name=None)
 
 
 def test_unknown_profile_is_rejected() -> None:

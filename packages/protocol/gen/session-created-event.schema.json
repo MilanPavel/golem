@@ -2,12 +2,38 @@
   "$defs": {
     "SessionCreatedData": {
       "additionalProperties": false,
-      "description": "Profile stored for a new session.",
+      "description": "Profile stored for a new session.\n\n``model_provider`` and ``model_name`` are set when this profile is the\none the daemon is configured to run. They are null for any other profile,\nand when the provider or name is not configured.",
       "properties": {
+        "model_name": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model Name"
+        },
         "model_profile": {
           "minLength": 1,
           "title": "Model Profile",
           "type": "string"
+        },
+        "model_provider": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model Provider"
         }
       },
       "required": [

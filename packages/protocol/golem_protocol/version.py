@@ -1,8 +1,8 @@
 """Protocol version negotiated by ``hello``.
 
-Adding chat commands and events bumps the minor number. Shapes already on
-the wire are unchanged, so the major number stays.
+Adding a command, an event, or an optional field bumps the minor number.
+A break in a shape already on the wire bumps the major number.
 """
 
 PROTOCOL_MAJOR = 1
-PROTOCOL_MINOR = 1
+PROTOCOL_MINOR = 2

@@ -8,6 +8,7 @@ from typing import cast
 from fakes import GatedChatModel, ScriptedChatModel
 from test_server import HELLO, RpcClient, error_code, rpc_result, start_daemon, stop_daemon
 
+from golem.config import GolemSettings
 from golem.models.router import ModelRouter
 from golem.server.dispatcher import MODEL_NOT_CONFIGURED, SESSION_BUSY, SESSION_NOT_FOUND
 
@@ -75,6 +76,12 @@ async def test_send_streams_deltas_then_completes(short_home: Path) -> None:
         await client.wait_for_event("run.completed")
         types = _event_types(client.events)
         assert types[0] == "session.created"
+        created_params = _record(client.events[0].get("params"))
+        created_data = _record(created_params.get("data")) if created_params else None
+        assert created_data is not None
+        assert created_data["model_profile"] == "remote"
+        assert created_data["model_provider"] is None
+        assert created_data["model_name"] is None
         assert "message.delta" in types
         assert "message.completed" in types
         assert types[-1] == "run.completed"
@@ -106,6 +113,30 @@ async def test_missing_and_busy_sessions(short_home: Path) -> None:
         assert error_code(busy) == SESSION_BUSY
         model.release.set()
         await client.wait_for_event("run.completed")
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+
+
+async def test_status_and_session_name_the_configured_model(short_home: Path) -> None:
+    settings = GolemSettings(model_provider="openai_compat", model_name="qwen3.5:4b")
+    app, task = await start_daemon(short_home, router=ModelRouter(settings))
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        assert "result" in await client.call("hello", HELLO)
+        status = rpc_result(await client.call("daemon.status"))
+        assert status["model_profile"] == "remote"
+        assert status["model_provider"] == "openai_compat"
+        assert status["model_name"] == "qwen3.5:4b"
+        created = rpc_result(await client.call("session.create", {}))
+        assert isinstance(created["session_id"], str)
+        await client.wait_for_event("session.created")
+        params = _record(client.events[0].get("params"))
+        data = _record(params.get("data")) if params else None
+        assert data is not None
+        assert data["model_profile"] == "remote"
+        assert data["model_provider"] == "openai_compat"
+        assert data["model_name"] == "qwen3.5:4b"
     finally:
         await client.close()
         await stop_daemon(app, task)

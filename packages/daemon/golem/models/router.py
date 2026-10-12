@@ -8,6 +8,7 @@ Neither the key nor the base URL is stored in graph state.
 from __future__ import annotations
 
 import os
+from dataclasses import dataclass
 
 from langchain_core.language_models import BaseChatModel
 
@@ -19,6 +20,20 @@ class ModelConfigError(Exception):
 
 
 _OLLAMA_BASE_URL = "http://127.0.0.1:11434/v1"
+
+
+@dataclass(frozen=True, slots=True)
+class ModelIdentity:
+    """Profile the router answers, plus provider and name when they are set.
+
+    ``provider`` and ``name`` are None when settings omit them, when this
+    router wraps a test double, or when the asked-for profile is not the
+    configured one.
+    """
+
+    profile: str
+    provider: str | None
+    name: str | None
 
 
 class ModelRouter:
@@ -44,6 +59,22 @@ class ModelRouter:
         if self._settings is not None:
             return self._settings.model_profile
         return "remote"
+
+    def identity(self, profile: str | None = None) -> ModelIdentity:
+        """Provider and name for ``profile``, or for :attr:`profile_name`.
+
+        A profile other than the configured one returns null provider and
+        name. The configured name is not that profile's model.
+        """
+        active = self.profile_name if profile is None else profile
+        settings = self._settings
+        if settings is None or active != self.profile_name:
+            return ModelIdentity(profile=active, provider=None, name=None)
+        return ModelIdentity(
+            profile=active,
+            provider=settings.model_provider,
+            name=settings.model_name,
+        )
 
     def chat_model(self, profile: str) -> BaseChatModel:
         """Return the chat model for ``profile``.

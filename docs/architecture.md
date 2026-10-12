@@ -135,7 +135,7 @@ sequenceDiagram
   Daemon-->>Client: message.delta, then message.completed
 ```
 
-`hello` is the first command. The client and the daemon compare protocol versions. `PROTOCOL_MAJOR` is `1` and `PROTOCOL_MINOR` is `1`. A break in the shapes bumps the major number, and the daemon refuses the client. Any minor on the same major is accepted. After `hello`, the client sends `ping` every few seconds so a half-open socket is noticed, and `daemon.status` when it wants the pid and uptime. A chat sends `session.create`, then `message.send`.
+`hello` is the first command. The client and the daemon compare protocol versions. `PROTOCOL_MAJOR` is `1` and `PROTOCOL_MINOR` is `2`. Minor 2 adds optional model fields: `daemon.status` includes `model_profile`, `model_provider`, and `model_name`, and `session.created` includes `model_provider` and `model_name` beside `model_profile`. Provider and name are null when they are not set. A break in the shapes bumps the major number, and the daemon refuses the client. Any minor on the same major is accepted. After `hello`, the client sends `ping` every few seconds so a half-open socket is noticed, and `daemon.status` when it wants the pid, uptime, and the configured model. A chat sends `session.create`, then `message.send`.
 
 Each event line is one JSON-RPC 2.0 notification. The fields that matter:
 
@@ -155,4 +155,4 @@ Those shapes are written once, as Python classes in `golem_protocol`. `just gen`
 
 The same pipeline is what a real event uses. Add a class, run `just gen`, and the client sees a typed payload. The socket code speaks those types. It does not invent a second schema.
 
-The models on the wire today are `hello`, `daemon.status`, `ping`, `session.create`, and `message.send`, plus chat events on an `event` notification: `session.created`, `message.started`, `message.delta`, `message.completed`, `run.started`, `run.completed`, `run.failed`. `Ping` is still the ping result: `type` is `system.ping`, `nonce` is a string. `@golem/client` imports the generated types. The TUI and `golem status` both use that client. `packages/tui/src/index.ts` still exports `pingNonce`, which returns `event.nonce`.
+The models on the wire today are `hello`, `daemon.status`, `ping`, `session.create`, and `message.send`, plus chat events on an `event` notification: `session.created`, `message.started`, `message.delta`, `message.completed`, `run.started`, `run.completed`, `run.failed`. `daemon.status` and `session.created` carry the configured model: profile, provider, and name. `Ping` is still the ping result: `type` is `system.ping`, `nonce` is a string. `@golem/client` imports the generated types. The TUI and `golem status` both use that client. `packages/tui/src/index.ts` still exports `pingNonce`, which returns `event.nonce`.

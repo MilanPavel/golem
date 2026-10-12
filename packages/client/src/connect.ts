@@ -419,6 +419,10 @@ function isMessageSendResult(value: unknown): value is MessageSendResult {
   return isRecord(value) && typeof value["run_id"] === "string";
 }
 
+function isOptionalString(value: unknown): boolean {
+  return value === undefined || value === null || (typeof value === "string" && value.length > 0);
+}
+
 function isDaemonStatus(value: unknown): value is DaemonStatus {
   return (
     isRecord(value) &&
@@ -427,6 +431,9 @@ function isDaemonStatus(value: unknown): value is DaemonStatus {
     typeof value["protocol_major"] === "number" &&
     typeof value["protocol_minor"] === "number" &&
     typeof value["uptime_seconds"] === "number" &&
-    (value["state"] === "running" || value["state"] === "draining")
+    (value["state"] === "running" || value["state"] === "draining") &&
+    isOptionalString(value["model_profile"]) &&
+    isOptionalString(value["model_provider"]) &&
+    isOptionalString(value["model_name"])
   );
 }

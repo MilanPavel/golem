@@ -1,7 +1,46 @@
 {
   "additionalProperties": false,
-  "description": "Result of ``daemon.status``.",
+  "description": "Result of ``daemon.status``.\n\n``model_profile``, ``model_provider``, and ``model_name`` describe the\nmodel the daemon is configured to use. Provider and name are null when\nthey are not set.",
   "properties": {
+    "model_name": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Model Name"
+    },
+    "model_profile": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Model Profile"
+    },
+    "model_provider": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Model Provider"
+    },
     "pid": {
       "title": "Pid",
       "type": "integer"

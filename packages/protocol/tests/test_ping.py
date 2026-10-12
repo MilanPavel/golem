@@ -16,6 +16,6 @@ def test_ping_rejects_unknown_fields() -> None:
         Ping.model_validate({"type": "system.ping", "nonce": "abc", "extra": 1})
 
 
-def test_protocol_version_is_draft_v1() -> None:
+def test_protocol_version_is_minor_2() -> None:
     assert PROTOCOL_MAJOR == 1
-    assert PROTOCOL_MINOR == 1
+    assert PROTOCOL_MINOR == 2

@@ -29,7 +29,12 @@ class HelloResult(BaseModel):
 
 
 class DaemonStatus(BaseModel):
-    """Result of ``daemon.status``."""
+    """Result of ``daemon.status``.
+
+    ``model_profile``, ``model_provider``, and ``model_name`` describe the
+    model the daemon is configured to use. Provider and name are null when
+    they are not set.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -39,6 +44,9 @@ class DaemonStatus(BaseModel):
     protocol_minor: int
     uptime_seconds: float
     state: Literal["running", "draining"]
+    model_profile: str | None = Field(default=None, min_length=1)
+    model_provider: str | None = Field(default=None, min_length=1)
+    model_name: str | None = Field(default=None, min_length=1)
 
 
 class PingParams(BaseModel):

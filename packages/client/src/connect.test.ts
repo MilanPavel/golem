@@ -14,6 +14,7 @@ interface FakeOptions {
   onStatus?: boolean;
   eventBeforeStatus?: boolean;
   eventBeforePing?: boolean;
+  statusExtra?: Record<string, unknown>;
 }
 
 function deltaEvent(): unknown {
@@ -80,6 +81,7 @@ function attach(socket: Socket, options: FakeOptions): void {
             protocol_minor: 0,
             uptime_seconds: 3,
             state: "running",
+            ...options.statusExtra,
           },
         });
       }
@@ -268,6 +270,50 @@ test("an event line does not settle a pending status call", async () => {
   } finally {
     client.close();
     await server.close();
+  }
+});
+
+test("status accepts a model name and rejects a blank one", async () => {
+  const named = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      statusExtra: {
+        model_profile: "remote",
+        model_provider: "openai_compat",
+        model_name: "qwen3.5:4b",
+      },
+    });
+  });
+  const client = connectGolem({
+    socketPath: named.socketPath,
+    clientName: "tui",
+    reconnect: false,
+    heartbeatMs: 60_000,
+  });
+  try {
+    const status = await client.status();
+    assert.equal(status.model_profile, "remote");
+    assert.equal(status.model_provider, "openai_compat");
+    assert.equal(status.model_name, "qwen3.5:4b");
+  } finally {
+    client.close();
+    await named.close();
+  }
+
+  const blank = await listen((socket) => {
+    attach(socket, { answerPing: true, statusExtra: { model_name: "" } });
+  });
+  const refused = connectGolem({
+    socketPath: blank.socketPath,
+    clientName: "tui",
+    reconnect: false,
+    heartbeatMs: 60_000,
+  });
+  try {
+    await assert.rejects(() => refused.status(), /invalid daemon.status result/);
+  } finally {
+    refused.close();
+    await blank.close();
   }
 });
 

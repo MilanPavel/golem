@@ -10,7 +10,9 @@ export type Params =
   | RunStartedEvent
   | RunCompletedEvent
   | RunFailedEvent;
+export type ModelName = string | null;
 export type ModelProfile = string;
+export type ModelProvider = string | null;
 export type RunId = null;
 export type Seq = number;
 export type SessionId = string;
@@ -80,11 +82,17 @@ export interface SessionCreatedEvent {
 /**
  * Profile stored for a new session.
  *
+ * ``model_provider`` and ``model_name`` are set when this profile is the
+ * one the daemon is configured to run. They are null for any other profile,
+ * and when the provider or name is not configured.
+ *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "SessionCreatedData".
  */
 export interface SessionCreatedData {
+  model_name?: ModelName;
   model_profile: ModelProfile;
+  model_provider?: ModelProvider;
 }
 /**
  * The assistant bubble is open.
