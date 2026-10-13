@@ -3,7 +3,7 @@
 A phased plan for building a terminal-operated agent ("the golem"): a long-running Python daemon that runs chats and flows against local and remote LLMs, with an Ink TUI as its primary client. LangGraph is the execution engine for both conversational agents and durable flows.
 
 > Name: `golem`, after the clay servant of the Prague legend — brought to life to do work on its maker's behalf.
-> Version note: LangGraph is on the 1.2.x line as of mid-2026 (checkpoint libs 4.x). APIs referenced here (`StateGraph`, `interrupt`, `Command`, checkpointers, Functional API) are stable since 1.0, but pin versions and check the changelog before each phase.
+> Version note: LangGraph 1.2.14 is pinned, with `langgraph-checkpoint` 4.2.0 and `langgraph-checkpoint-sqlite` 3.1.1. There is no 4.x release of the sqlite package. APIs referenced here (`StateGraph`, `interrupt`, `Command`, checkpointers, Functional API) are stable since 1.0, but pin versions and check the changelog before each phase.
 
 ---
 
@@ -70,7 +70,7 @@ A phased plan for building a terminal-operated agent ("the golem"): a long-runni
   - `checkpoints.db` — the LangGraph checkpointer. It is kept separate so it can be wiped or migrated independently.
   - `memory.db` — the long-term store and vectors.
   - `skills/`, `flows/`, `config.toml`, `logs/`.
-- **Clients** are stateless. They attach, replay the needed events, and stream.
+- **Clients** attach, replay the needed events, and stream. Until the event log exists, the TUI holds the transcript itself. [ADR-006](adr/006-checkpoint-continuity.md).
 
 ### Tech stack (verify versions at each phase)
 
@@ -79,13 +79,13 @@ A phased plan for building a terminal-operated agent ("the golem"): a long-runni
 | Python tooling | `uv`, `ruff`, `pyright` (strict), `pytest` + `pytest-asyncio` | Python 3.12+ |
 | Agent runtime | `langgraph` 1.2.x, `langgraph-checkpoint-sqlite` | Graph API for agents, Functional API for flows |
 | Model clients | `langchain-core` chat models: `langchain-anthropic`, `langchain-openai` | Local servers expose OpenAI-compatible APIs, so one client covers MLX, Ollama and LM Studio |
-| Local inference | `mlx-lm` server or Ollama | MLX is usually faster on Apple Silicon; Ollama is easier to manage |
+| Local inference | Ollama, through the OpenAI-compatible API | Chat uses this now. An MLX server would be another `openai_compat` base URL |
 | MCP | `langchain-mcp-adapters` or the official `mcp` SDK | Adapters convert MCP tools into LangChain tools |
 | Schemas | Pydantic v2 → JSON Schema → TS types (`json-schema-to-typescript`) | Single source of truth |
 | Storage | SQLite (WAL) via `aiosqlite`; `sqlite-vec` later | |
 | Scheduling | APScheduler (async) + `watchfiles` | Phase 9 |
 | Observability | OpenTelemetry → Langfuse (self-hosted) or plain JSONL traces | Phase 11 |
-| TUI | Ink + React, TypeScript, `pnpm` | Reuse the existing Command Center components |
+| TUI | Ink 8 + React 19, TypeScript, `pnpm` | Chat column, status line, single-line input |
 
 ---
 
@@ -134,36 +134,35 @@ Getting this boundary right is the most important design decision after the prot
 ```
 golem/
 ├─ packages/
-│  ├─ protocol/            # Pydantic models = source of truth
-│  │  ├─ golem_protocol/   #   events.py, commands.py, version.py
-│  │  └─ gen/              #   generated JSON Schema + TS types
+│  ├─ protocol/            # Pydantic models = source of truth; gen/ is generated
 │  ├─ daemon/              # Python package `golem`
 │  │  └─ golem/
 │  │     ├─ server/        #   socket server, JSON-RPC dispatch
-│  │     ├─ sessions/      #   session manager, event log, replay
-│  │     ├─ graphs/        #   agent graph, nodes, state
-│  │     ├─ flows/         #   flow registry, built-in flows
-│  │     ├─ models/        #   router, profiles, budgets, token counting
-│  │     ├─ tools/         #   built-ins, permission engine, sandbox
-│  │     ├─ mcp/           #   MCP supervisor
-│  │     ├─ skills/        #   registry, selection, loader
-│  │     ├─ memory/        #   store, embeddings
-│  │     ├─ triggers/      #   scheduler, watchers
-│  │     └─ obs/           #   tracing, cost ledger
-│  └─ tui/                 # Ink app
-│     └─ src/ (client/, views/, components/, state/)
-├─ flows/                  # user flows (also loadable from ~/.golem/flows)
-├─ skills/                 # bundled skills
-├─ evals/                  # eval sets + harness
+│  │     ├─ sessions/      #   create, send, in-memory seq (no event log yet)
+│  │     ├─ graphs/        #   chat graph and stream adapter
+│  │     ├─ models/        #   one profile: anthropic, openai, or openai_compat
+│  │     ├─ flows/         #   later: flow registry
+│  │     ├─ tools/         #   later: built-ins, permission engine, sandbox
+│  │     ├─ mcp/           #   later: MCP supervisor
+│  │     ├─ skills/        #   later: registry, selection, loader
+│  │     ├─ memory/        #   later: store, embeddings
+│  │     ├─ triggers/      #   later: scheduler, watchers
+│  │     └─ obs/           #   later: tracing, cost ledger
+│  ├─ client/              # TypeScript socket client, shared by the TUI and CLI
+│  ├─ cli/                 # `golem` bin
+│  └─ tui/                 # Ink chat
+├─ flows/                  # later: user flows (also loadable from ~/.golem/flows)
+├─ skills/                 # later: bundled skills
+├─ evals/                  # later: eval sets + harness
 ├─ docs/adr/
-└─ justfile                # dev tasks: gen, test, run, lint
+└─ justfile
 ```
 
 ---
 
 ## 4. Protocol (draft v1)
 
-JSON-RPC 2.0 framed as newline-delimited JSON over the Unix socket.
+JSON-RPC 2.0 framed as newline-delimited JSON over the Unix socket. Protocol 1.1 is on the wire: `hello`, `daemon.status`, `ping`, `session.create`, `message.send`, and `event` notifications for `session.created`, `message.started`, `message.delta`, `message.completed`, `run.started`, `run.completed`, `run.failed`. `seq` is counted in memory per session and starts again at 1 after a daemon restart. The tables below are the rest of v1, not built yet.
 
 ### Envelope for server → client events (JSON-RPC notifications)
 
@@ -203,84 +202,15 @@ JSON-RPC 2.0 framed as newline-delimited JSON over the Unix socket.
 
 ## 5. Phases
 
-Each phase lists its goal, deliverables, LangGraph specifics, exit criteria, and the traps to watch for. Rough effort assumes side-project time.
+Phases 0–2 are done. What is left starts at phase 3. Each remaining phase lists its goal, deliverables, and exit criteria. Rough effort assumes side-project time.
 
----
+### Already shipped
 
-### Phase 0 — Foundations (≈ 1 weekend)
+The daemon listens on `~/.golem/run/golem.sock`, survives a crash via launchd, and the TUI reconnects. `golem status` uses the same client as the TUI. `just check` regenerates the protocol types and fails if they drift.
 
-**Goal:** a monorepo that builds, lints, tests and generates types.
+A chat is `START → call_model → END`. `session.create` and `message.send` stream `message.delta` into the TUI, and the finished bubble is markdown. Model context lives in `checkpoints.db` with `thread_id = session_id`. Closing the TUI drops the on-screen transcript. ADR-006 records that split.
 
-**Deliverables:**
-- `uv` workspace for `protocol` + `daemon`, and a `pnpm` workspace for `tui`.
-- `ruff`, `pyright --strict`, `pytest`, `eslint`/`tsc`, plus a `just` recipe for each.
-- `just gen`: Pydantic → JSON Schema → TS types, with a CI check that generated files are up to date.
-- `~/.golem` path resolution, `config.toml` loading with Pydantic Settings, and structured logging (JSON to file, pretty to stderr).
-- ADR-001 (process split), ADR-002 (LangGraph boundary), ADR-003 (protocol).
-
-**Exit criteria:** CI is green, and `just gen` produces TS types for a dummy `Ping` event.
-
----
-
-### Phase 1 — Daemon skeleton + protocol (≈ 1–2 weekends)
-
-**Goal:** a daemon that the TUI connects to, talks to, and reconnects to.
-
-**Deliverables:**
-- An asyncio Unix-socket server with NDJSON framing and a JSON-RPC dispatcher with typed handlers.
-- `hello` version negotiation, `daemon.status`, heartbeat pings, and graceful shutdown on SIGTERM that drains running tasks.
-- A launchd plist plus `golem daemon install | start | stop | logs`.
-- TUI: connection manager with auto-reconnect and backoff, and a status bar showing connected / reconnecting.
-- Headless CLI entry (`golem status`) using the same client library. Ship the client as a small TS package shared by the TUI and CLI.
-
-**Exit criteria:** killing the daemon makes the TUI show "reconnecting", and it recovers automatically when launchd restarts the daemon.
-
-**Watch out:** stale socket files after a crash. Unlink them on startup if no process holds the lock (use a PID lockfile).
-
----
-
-### Phase 2 — Chat graph v1 + minimal TUI chat (≈ 2 weekends)
-
-**Goal:** streaming chat with one remote model, persisted with a LangGraph checkpointer.
-
-**Deliverables:**
-- An agent `State` (TypedDict or Pydantic) holding `messages` (with the `add_messages` reducer), `session_id`, `model_profile` and `schema_version`.
-- Graph: `START → call_model → END`. No tools yet.
-- `AsyncSqliteSaver`, with `thread_id = session_id`.
-- A stream adapter that maps `stream_mode="messages"` chunks to `message.delta` and `updates` to `message.completed`.
-- Session manager: `session.create`, `message.send`. Each send runs the graph in its own `asyncio.Task` that is registered under `run_id`.
-- TUI: chat view, input box, streaming render with deltas batched about every 16 ms, and a markdown render of completed messages.
-
-**Sketch:**
-
-```python
-from langgraph.graph import StateGraph, START, END, MessagesState
-from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
-
-class AgentState(MessagesState):
-    session_id: str
-    model_profile: str
-    schema_version: int
-
-async def call_model(state: AgentState, config):
-    model = router.chat_model(state["model_profile"])
-    return {"messages": [await model.ainvoke(state["messages"])]}
-
-builder = StateGraph(AgentState)
-builder.add_node("call_model", call_model)
-builder.add_edge(START, "call_model")
-builder.add_edge("call_model", END)
-
-async with AsyncSqliteSaver.from_conn_string(str(paths.checkpoints_db)) as saver:
-    graph = builder.compile(checkpointer=saver)
-    cfg = {"configurable": {"thread_id": session_id}}
-    async for mode, chunk in graph.astream(inp, cfg, stream_mode=["messages", "updates"]):
-        await adapter.emit(session_id, run_id, mode, chunk)
-```
-
-**Exit criteria:** a multi-turn chat streams in the TUI, and restarting the daemon and continuing the session keeps context.
-
-**Watch out:** don't let the adapter know about specific providers. It sees LangChain message chunks only.
+One profile is configured with flat settings: `model_provider` (`anthropic`, `openai`, or `openai_compat`), `model_name`, and `model_base_url`. `openai_compat` defaults to Ollama at `http://127.0.0.1:11434/v1` and does not read an API key. The profile table, routing policy, budgets, and compaction are still phase 6.
 
 ---
 
@@ -298,7 +228,7 @@ async with AsyncSqliteSaver.from_conn_string(str(paths.checkpoints_db)) as saver
 
 **Exit criteria:** start a long answer, close the TUI, reopen it, attach, and see the full message so far plus the live remainder. Cancel works mid-stream.
 
-**Watch out:** two histories exist, the checkpoint (model context) and the event log (UI history). They will diverge after compaction (Phase 6), and that's intended. Document it in an ADR.
+**Watch out:** two histories exist, the checkpoint (model context) and the event log (UI history). They will diverge after compaction (Phase 6), and that's intended. ADR-006 already records the split for the current TUI transcript.
 
 ---
 
@@ -362,7 +292,7 @@ async with AsyncSqliteSaver.from_conn_string(str(paths.checkpoints_db)) as saver
 - An MCP supervisor:
   - Starts stdio servers from config and connects to HTTP ones.
   - Runs health checks and restarts servers with backoff.
-  - Emits `mcp.server.status`. Port your Command Center health view onto this.
+  - Emits `mcp.server.status`, and the TUI shows that health.
 - Tool namespacing (`mcp.<server>.<tool>`) and policy rules matching on namespace.
 - Lazy exposure: don't dump every MCP tool into every prompt. Tools are enabled per session or project, or pulled in by an active skill (Phase 7).
 - Conversion through `langchain-mcp-adapters` (or your own thin wrapper), with every call routed through your tools node.
@@ -377,12 +307,14 @@ async with AsyncSqliteSaver.from_conn_string(str(paths.checkpoints_db)) as saver
 
 **Goal:** right model per step, a cost ceiling, and long sessions that don't collapse.
 
+A single `openai_compat` provider already talks to Ollama. This phase replaces that flat trio (`model_provider`, `model_name`, `model_base_url`) with named profiles and a policy that picks among them.
+
 **Deliverables:**
 - **Model profiles** in config:
   ```toml
   [models.local-fast]
   provider = "openai_compat"
-  base_url = "http://127.0.0.1:8080/v1"
+  base_url = "http://127.0.0.1:11434/v1"
   model = "<your-local-model>"
   ctx = 32768
   tools = "weak"
@@ -578,7 +510,7 @@ The exact `@entrypoint` / `@task` signatures (including how futures are awaited)
 | Graphs/flows | Run with an in-memory checkpointer; test interrupt → resume paths explicitly |
 | Permissions | Table-driven tests over the policy matrix |
 | Daemon | Integration tests over a real socket in a temp `~/.golem` |
-| TUI | `ink-testing-library` for components; a fake daemon replaying recorded events |
+| TUI | Reducer and layout functions. Ink 8 has no working `ink-testing-library`. A fake daemon replaying recorded events waits on the event log |
 
 ### Configuration layering
 
@@ -610,7 +542,7 @@ The built-in defaults are overridden by `~/.golem/config.toml`, then `<project>/
 | Checkpoint/state schema breaks | Lost sessions/runs | `schema_version`, additive changes only, event log as the real history, flow versioning |
 | Duplicate side effects on resume | Real-world damage | Effects after interrupts, idempotency keys, crash tests |
 | Remote cost creep | Money | Budget ledger with hard caps, router forced to local over the cap |
-| Scope explosion | Never finishing | Phase exit criteria, a strict non-goals list, daily use of the tool from Phase 2 |
+| Scope explosion | Never finishing | Phase exit criteria, a strict non-goals list, daily use of the chat that already ships |
 | Prompt injection via tools/MCP | Unsafe actions | No auto-approve from content, sandbox, minimal default permissions |
 
 ---
@@ -619,21 +551,20 @@ The built-in defaults are overridden by `~/.golem/config.toml`, then `<project>/
 
 | Milestone | Phases | What you can do |
 |---|---|---|
-| M1 — Talks | 0–3 | Persistent multi-session chat in the TUI, detach/reattach, cancel |
+| M1 — Talks | 3 | Detach, reattach, and cancel. One streaming session already works |
 | M2 — Acts | 4–5 | Coding and ops tasks with approvals, MCP tools |
 | M3 — Thinks cheaply | 6–7 | Local-first routing, budgets, long sessions, skills |
 | M4 — Works alone | 8–9 | Scheduled durable flows, notifications, approvals while detached |
 | M5 — Remembers and proves itself | 10–12 | Memory, evals, hardening |
 
-Start using it daily at M1, and replace the matching Claude Code workflows one at a time from M2 onward. That way your real usage drives the priorities.
+The chat that ships is already usable. M1 adds detach, reattach, and cancel. Replace matching Claude Code workflows one at a time from M2 onward, and let that usage set the order.
 
 ---
 
-## 9. Open questions to decide early (write ADRs)
+## 9. Open questions (write ADRs)
 
-1. Pydantic or TypedDict for graph state? Pydantic gives validation, while TypedDict is lighter and has fewer serialization surprises.
-2. MLX server vs. Ollama as the default local runtime. Benchmark your models on your Mac.
-3. LangChain chat-model clients vs. a custom thin provider layer underneath LangGraph.
-4. ACP / AG-UI compatibility for the protocol: adopt it, mirror it, or ignore it?
-5. Are memory writes always confirmed, or auto-saved for some namespaces?
-6. Flow definitions: Python only, or also a YAML DSL for simple ones? (Recommendation: Python only until it hurts.)
+Graph state is `AgentState(MessagesState)`. Chat models are LangChain clients. The local runtime is Ollama through `openai_compat`. Still open:
+
+1. ACP / AG-UI compatibility for the protocol: adopt it, mirror it, or ignore it?
+2. Are memory writes always confirmed, or auto-saved for some namespaces?
+3. Flow definitions: Python only, or also a YAML DSL for simple ones? (Recommendation: Python only until it hurts.)
