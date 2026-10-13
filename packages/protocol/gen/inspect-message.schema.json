@@ -1,0 +1,26 @@
+{
+  "additionalProperties": false,
+  "description": "One checkpoint message as plain text.",
+  "properties": {
+    "role": {
+      "enum": [
+        "user",
+        "assistant",
+        "system",
+        "tool"
+      ],
+      "title": "Role",
+      "type": "string"
+    },
+    "text": {
+      "title": "Text",
+      "type": "string"
+    }
+  },
+  "required": [
+    "role",
+    "text"
+  ],
+  "title": "InspectMessage",
+  "type": "object"
+}

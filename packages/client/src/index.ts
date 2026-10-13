@@ -11,3 +11,11 @@ export {
   type GolemClient,
 } from "./connect.ts";
 export { resolveSocketPath } from "./socket-path.ts";
+export {
+  formatWireLine,
+  pingTotal,
+  pushWire,
+  WIRE_LIMIT,
+  type WireFrame,
+  type WireLine,
+} from "./wire.ts";

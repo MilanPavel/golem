@@ -1,6 +1,12 @@
-from langchain_core.messages import AIMessage, AIMessageChunk, HumanMessage
+from langchain_core.messages import (
+    AIMessage,
+    AIMessageChunk,
+    HumanMessage,
+    SystemMessage,
+    ToolMessage,
+)
 
-from golem.graphs.adapter import TextCompleted, TextDelta, translate
+from golem.graphs.adapter import PlainMessage, TextCompleted, TextDelta, plain_messages, translate
 
 
 def test_message_chunk_becomes_a_delta() -> None:
@@ -39,6 +45,25 @@ def test_call_model_update_becomes_the_final_text() -> None:
         "data": {"call_model": {"messages": [AIMessage(content="Hello")]}},
     }
     assert translate(part) == TextCompleted("Hello")
+
+
+def test_plain_messages_are_role_and_text() -> None:
+    values = {
+        "messages": [
+            SystemMessage(content="rules"),
+            HumanMessage(content="hi"),
+            AIMessage(content="hello"),
+            ToolMessage(content="file", tool_call_id="call-1"),
+            "skip",
+        ]
+    }
+    assert plain_messages(values) == [
+        PlainMessage("system", "rules"),
+        PlainMessage("user", "hi"),
+        PlainMessage("assistant", "hello"),
+        PlainMessage("tool", "file"),
+    ]
+    assert plain_messages({}) == []
 
 
 def test_updates_without_call_model_are_ignored() -> None:

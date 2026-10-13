@@ -6,6 +6,7 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { connectGolem, type ChatEvent, type ConnectionState } from "./connect.ts";
+import { formatWireLine } from "./wire.ts";
 
 interface FakeOptions {
   answerPing?: boolean;
@@ -314,6 +315,31 @@ test("status accepts a model name and rejects a blank one", async () => {
   } finally {
     refused.close();
     await blank.close();
+  }
+});
+
+test("the wire log records commands and token fragments", async () => {
+  const server = await listen((socket) => {
+    attach(socket, { answerPing: true, eventBeforeStatus: true });
+  });
+  const client = connectGolem({
+    socketPath: server.socketPath,
+    clientName: "tui",
+    reconnect: false,
+    heartbeatMs: 60_000,
+  });
+  let latest: string[] = [];
+  client.onWire((lines) => {
+    latest = lines.map(formatWireLine);
+  });
+  try {
+    await client.status();
+    assert.ok(latest.some((line) => line.includes("hello")));
+    assert.ok(latest.some((line) => line.includes("daemon.status")));
+    assert.ok(latest.some((line) => line.includes("message.delta")));
+  } finally {
+    client.close();
+    await server.close();
   }
 });
 

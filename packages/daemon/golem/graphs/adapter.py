@@ -6,8 +6,9 @@ model router.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import cast
+from typing import Literal, cast
 
 from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage
 
@@ -37,6 +38,38 @@ def translate(part: object) -> TextDelta | TextCompleted | None:
     if kind == "updates":
         return _completed(raw.get("data"))
     return None
+
+
+_ROLES: dict[str, Literal["user", "assistant", "system", "tool"]] = {
+    "human": "user",
+    "ai": "assistant",
+    "system": "system",
+    "tool": "tool",
+}
+
+
+@dataclass(frozen=True, slots=True)
+class PlainMessage:
+    """A checkpoint message with the provider types removed."""
+
+    role: Literal["user", "assistant", "system", "tool"]
+    text: str
+
+
+def plain_messages(values: Mapping[str, object]) -> list[PlainMessage]:
+    """Messages stored for a session, in checkpoint order."""
+    raw = values.get("messages")
+    if not isinstance(raw, list):
+        return []
+    found: list[PlainMessage] = []
+    for item in cast(list[object], raw):
+        if not isinstance(item, BaseMessage):
+            continue
+        role = _ROLES.get(item.type)
+        if role is None:
+            continue
+        found.append(PlainMessage(role, message_text(item)))
+    return found
 
 
 def message_text(message: BaseMessage) -> str:

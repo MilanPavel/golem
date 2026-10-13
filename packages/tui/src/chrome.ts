@@ -11,6 +11,7 @@ export type FrameBudget = {
   meter: number;
   composer: number;
   status: number;
+  debug: number;
 };
 
 export type ComposerRow = {
@@ -25,24 +26,41 @@ export function frameColumns(terminalColumns: number): number {
   return width > 1 ? width - 1 : width;
 }
 
+const DEBUG_ROWS = 7;
+
 export function frameBudget(input: {
   rows: number;
   columns: number;
   draft: string;
   busy: boolean;
   banner: boolean;
+  debug?: boolean;
 }): FrameBudget {
   const rows = Math.max(0, Math.floor(input.rows));
   if (rows === 0) {
-    return { mode: "hidden", header: 0, body: 0, banner: 0, meter: 0, composer: 0, status: 0 };
+    return {
+      mode: "hidden",
+      header: 0,
+      body: 0,
+      banner: 0,
+      meter: 0,
+      composer: 0,
+      status: 0,
+      debug: 0,
+    };
   }
   let header = input.rows >= 20 && input.columns >= LOGO_WIDTH + 24 ? LOGO_ROWS : 1;
   let composer = input.busy ? 1 : Math.min(5, composerLineCount(input.draft, input.columns));
   let meter = input.busy ? 1 : 0;
   let banner = input.banner ? 1 : 0;
   let status = 1;
+  let debug = input.debug === true ? DEBUG_ROWS : 0;
 
   const shrink = (): boolean => {
+    if (debug > 3) {
+      debug -= 1;
+      return true;
+    }
     if (composer > 1) {
       composer -= 1;
       return true;
@@ -57,6 +75,10 @@ export function frameBudget(input: {
     }
     if (banner > 0) {
       banner = 0;
+      return true;
+    }
+    if (debug > 0) {
+      debug -= 1;
       return true;
     }
     if (header > 0) {
@@ -74,11 +96,11 @@ export function frameBudget(input: {
     return false;
   };
 
-  while (header + banner + meter + composer + status >= rows && shrink()) {
+  while (header + banner + meter + composer + status + debug >= rows && shrink()) {
     // Leave at least one row for the transcript when the terminal has a row.
   }
 
-  const used = header + banner + meter + composer + status;
+  const used = header + banner + meter + composer + status + debug;
   return {
     mode: header >= LOGO_ROWS ? "full" : header > 0 ? "compact" : "hidden",
     header,
@@ -87,6 +109,7 @@ export function frameBudget(input: {
     meter,
     composer,
     status,
+    debug,
   };
 }
 

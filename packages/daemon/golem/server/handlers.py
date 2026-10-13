@@ -1,4 +1,4 @@
-"""Daemon commands: ``hello``, ``daemon.status``, ``ping``, and chat."""
+"""Daemon commands: ``hello``, ``daemon.status``, ``ping``, chat, and inspect."""
 
 from __future__ import annotations
 
@@ -31,11 +31,14 @@ from golem_protocol.commands import (
     DaemonStatus,
     HelloParams,
     HelloResult,
+    InspectMessage,
     MessageSendParams,
     MessageSendResult,
     PingParams,
     SessionCreateParams,
     SessionCreateResult,
+    SessionInspectParams,
+    SessionInspectResult,
 )
 from golem_protocol.events import ChatEvent, Ping
 from golem_protocol.rpc import RpcNotification
@@ -114,6 +117,28 @@ async def _message_send(ctx: RequestContext, params: MessageSendParams) -> Messa
     return MessageSendResult(run_id=run_id)
 
 
+async def _session_inspect(
+    ctx: RequestContext, params: SessionInspectParams
+) -> SessionInspectResult:
+    sessions = _sessions(ctx)
+    try:
+        view = await sessions.inspect(params.session_id)
+    except SessionNotFoundError as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
+    except SchemaMismatchError as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, str(exc)) from exc
+    return SessionInspectResult(
+        session_id=view.session_id,
+        model_profile=view.model_profile,
+        model_provider=view.model_provider,
+        model_name=view.model_name,
+        message_count=len(view.messages),
+        messages=[
+            InspectMessage(role=message.role, text=message.text) for message in view.messages
+        ],
+    )
+
+
 def _sessions(ctx: RequestContext) -> SessionManager:
     sessions = ctx.state.sessions
     if sessions is None:
@@ -139,4 +164,5 @@ def standard_methods() -> dict[str, Method]:
         "ping": Method("ping", PingParams, True, _ping),
         "session.create": Method("session.create", SessionCreateParams, True, _session_create),
         "message.send": Method("message.send", MessageSendParams, True, _message_send),
+        "session.inspect": Method("session.inspect", SessionInspectParams, True, _session_inspect),
     }

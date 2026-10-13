@@ -90,13 +90,50 @@ class MessageSendResult(BaseModel):
     run_id: str = Field(min_length=1)
 
 
+class SessionInspectParams(BaseModel):
+    """``session.inspect``. Read the checkpoint for one session. Does not call the model."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+
+
+class InspectMessage(BaseModel):
+    """One checkpoint message as plain text."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    role: Literal["user", "assistant", "system", "tool"]
+    text: str
+
+
+class SessionInspectResult(BaseModel):
+    """The conversation stored for this session.
+
+    ``message_count`` is the length of ``messages``. Provider and name are
+    null when this profile is not the one the daemon is configured to run.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    model_profile: str = Field(min_length=1)
+    model_provider: str | None = Field(default=None, min_length=1)
+    model_name: str | None = Field(default=None, min_length=1)
+    message_count: int = Field(ge=0)
+    messages: list[InspectMessage]
+
+
 __all__ = [
     "DaemonStatus",
     "HelloParams",
     "HelloResult",
+    "InspectMessage",
     "MessageSendParams",
     "MessageSendResult",
     "PingParams",
     "SessionCreateParams",
     "SessionCreateResult",
+    "SessionInspectParams",
+    "SessionInspectResult",
 ]

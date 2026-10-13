@@ -12,7 +12,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-from golem.graphs.adapter import TextCompleted, TextDelta, translate
+from golem.graphs.adapter import PlainMessage, TextCompleted, TextDelta, plain_messages, translate
 from golem.graphs.chat import ChatRuntime
 from golem.graphs.state import SCHEMA_VERSION
 from golem.models.router import ModelIdentity
@@ -45,6 +45,17 @@ class SessionNotFoundError(Exception):
 
 class SessionBusyError(Exception):
     """A run is already in progress for this session."""
+
+
+@dataclass(frozen=True, slots=True)
+class SessionView:
+    """Checkpoint text for one session. Provider types stay in the graph."""
+
+    session_id: str
+    model_profile: str
+    model_provider: str | None
+    model_name: str | None
+    messages: list[PlainMessage]
 
 
 class SchemaMismatchError(Exception):
@@ -101,6 +112,20 @@ class SessionManager:
                 ),
             )
             return session.session_id
+
+    async def inspect(self, session_id: str) -> SessionView:
+        """The messages the next model call would see. Does not start a run."""
+        async with self._lock:
+            session = await self._resolve(session_id)
+            values = await self._runtime.values(session_id)
+            identity = self._runtime.router.identity(session.model_profile)
+            return SessionView(
+                session_id=session.session_id,
+                model_profile=session.model_profile,
+                model_provider=identity.provider,
+                model_name=identity.name,
+                messages=plain_messages(values),
+            )
 
     def configured_model(self) -> ModelIdentity:
         """The model ``daemon.status`` reports for this process."""
@@ -303,4 +328,5 @@ __all__ = [
     "SessionBusyError",
     "SessionManager",
     "SessionNotFoundError",
+    "SessionView",
 ]

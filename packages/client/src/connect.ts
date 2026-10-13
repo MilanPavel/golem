@@ -7,8 +7,10 @@ import type { MessageSendResult } from "../../protocol/gen/message-send-result.t
 import type { Ping } from "../../protocol/gen/ping.ts";
 import type { Params as ChatEvent } from "../../protocol/gen/rpc-notification.ts";
 import type { SessionCreateResult } from "../../protocol/gen/session-create-result.ts";
+import type { SessionInspectResult } from "../../protocol/gen/session-inspect-result.ts";
 import { PROTOCOL_MAJOR, PROTOCOL_MINOR } from "../../protocol/gen/version.ts";
 import { backoffDelayMs } from "./backoff.ts";
+import { pushWire, type WireFrame, type WireLine } from "./wire.ts";
 
 const PROTOCOL_MISMATCH = -32001;
 export const SESSION_NOT_FOUND = -32003;
@@ -62,13 +64,16 @@ export interface GolemClient {
   readonly ready: Promise<void>;
   onState(listener: (state: ConnectionState) => void): () => void;
   onEvent(listener: (event: ChatEvent) => void): () => void;
+  onWire(listener: (lines: readonly WireLine[]) => void): () => void;
   status(): Promise<DaemonStatus>;
   createSession(): Promise<SessionCreateResult>;
   sendMessage(sessionId: string, text: string): Promise<MessageSendResult>;
+  inspectSession(sessionId: string): Promise<SessionInspectResult>;
   close(): void;
 }
 
 interface Pending {
+  method: string;
   resolve: (value: unknown) => void;
   reject: (error: Error) => void;
 }
@@ -82,7 +87,9 @@ export function connectGolem(options: ConnectOptions): GolemClient {
   let state: ConnectionState = { status: "connecting" };
   const listeners = new Set<(next: ConnectionState) => void>();
   const eventListeners = new Set<(event: ChatEvent) => void>();
+  const wireListeners = new Set<(lines: readonly WireLine[]) => void>();
   const pending = new Map<number, Pending>();
+  let wire: WireLine[] = [];
   let nextId = 1;
   let generation = 0;
   let attempt = 0;
@@ -138,6 +145,17 @@ export function connectGolem(options: ConnectOptions): GolemClient {
     pending.clear();
   }
 
+  function record(frame: WireFrame): void {
+    wire = pushWire(wire, frame);
+    for (const listener of wireListeners) {
+      try {
+        listener(wire);
+      } catch {
+        // A listener must not tear the socket down.
+      }
+    }
+  }
+
   function call(method: string, params: Record<string, unknown>): Promise<unknown> {
     const current = socket;
     if (current === undefined || current.destroyed) {
@@ -145,10 +163,16 @@ export function connectGolem(options: ConnectOptions): GolemClient {
     }
     const id = nextId;
     nextId += 1;
-    const body = `${JSON.stringify({ jsonrpc: "2.0", method, params, id })}\n`;
+    const payload = JSON.stringify({ jsonrpc: "2.0", method, params, id });
     return new Promise((resolve, reject) => {
-      pending.set(id, { resolve, reject });
-      current.write(body);
+      pending.set(id, { method, resolve, reject });
+      record({
+        direction: "out",
+        kind: method === "ping" ? "ping" : method,
+        detail: outgoingDetail(method, params),
+        json: method === "ping" ? "" : payload,
+      });
+      current.write(`${payload}\n`);
     });
   }
 
@@ -157,10 +181,12 @@ export function connectGolem(options: ConnectOptions): GolemClient {
     try {
       message = JSON.parse(line) as unknown;
     } catch {
+      record({ direction: "in", kind: "invalid json" });
       socket?.destroy(new Error("invalid json"));
       return;
     }
     if (isRecord(message) && message["method"] === "event") {
+      record({ ...eventFrame(message["params"]), json: line });
       const event = asChatEvent(message["params"]);
       if (event !== undefined) {
         for (const listener of eventListeners) {
@@ -187,6 +213,12 @@ export function connectGolem(options: ConnectOptions): GolemClient {
     pending.delete(id);
     const errorBody = message["error"];
     if (isRecord(errorBody)) {
+      record({
+        direction: "in",
+        kind: `${waiter.method} error`,
+        detail: typeof errorBody["message"] === "string" ? flat(errorBody["message"]) : "",
+        json: line,
+      });
       const code = typeof errorBody["code"] === "number" ? errorBody["code"] : -1;
       const text = typeof errorBody["message"] === "string" ? errorBody["message"] : "rpc error";
       const error = new RpcError(code, text);
@@ -199,6 +231,12 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       waiter.reject(error);
       return;
     }
+    record({
+      direction: "in",
+      kind: waiter.method === "ping" ? "ping" : waiter.method,
+      detail: resultDetail(waiter.method, message["result"]),
+      json: waiter.method === "ping" ? "" : line,
+    });
     waiter.resolve(message["result"]);
   }
 
@@ -337,6 +375,13 @@ export function connectGolem(options: ConnectOptions): GolemClient {
         eventListeners.delete(listener);
       };
     },
+    onWire(listener: (lines: readonly WireLine[]) => void): () => void {
+      wireListeners.add(listener);
+      listener(wire);
+      return () => {
+        wireListeners.delete(listener);
+      };
+    },
     async status(): Promise<DaemonStatus> {
       await ready;
       const result = await call("daemon.status", {});
@@ -358,6 +403,14 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("message.send", { session_id: sessionId, text });
       if (!isMessageSendResult(result)) {
         throw new Error("invalid message.send result");
+      }
+      return result;
+    },
+    async inspectSession(sessionId: string): Promise<SessionInspectResult> {
+      await ready;
+      const result = await call("session.inspect", { session_id: sessionId });
+      if (!isSessionInspectResult(result)) {
+        throw new Error("invalid session.inspect result");
       }
       return result;
     },
@@ -411,12 +464,101 @@ function asChatEvent(value: unknown): ChatEvent | undefined {
   return value as unknown as ChatEvent;
 }
 
+function eventFrame(params: unknown): WireFrame {
+  if (!isRecord(params) || typeof params["type"] !== "string") {
+    return { direction: "in", kind: "event" };
+  }
+  const data = isRecord(params["data"]) ? params["data"] : undefined;
+  if (params["type"] === "message.delta") {
+    const text = data !== undefined && typeof data["text"] === "string" ? data["text"] : "";
+    return { direction: "in", kind: "message.delta", chars: text.length, detail: text };
+  }
+  const seq = typeof params["seq"] === "number" ? `seq ${params["seq"]}` : "";
+  return { direction: "in", kind: params["type"], detail: eventDetail(params["type"], seq, data) };
+}
+
+function eventDetail(type: string, seq: string, data: Record<string, unknown> | undefined): string {
+  const parts: string[] = [];
+  if (seq.length > 0) {
+    parts.push(seq);
+  }
+  if (data === undefined) {
+    return parts.join("  ");
+  }
+  if (type === "message.completed" || type === "message.started") {
+    if (typeof data["role"] === "string") {
+      parts.push(data["role"]);
+    }
+    if (typeof data["text"] === "string" && data["text"].length > 0) {
+      parts.push(flat(data["text"]));
+    }
+  } else if (type === "run.failed" && typeof data["message"] === "string") {
+    parts.push(flat(data["message"]));
+  } else if (type === "session.created") {
+    const name = typeof data["model_name"] === "string" ? data["model_name"] : "";
+    const profile = typeof data["model_profile"] === "string" ? data["model_profile"] : "";
+    const model = [name, profile].filter((part) => part.length > 0).join(" · ");
+    if (model.length > 0) {
+      parts.push(model);
+    }
+  }
+  return parts.join("  ");
+}
+
+function outgoingDetail(method: string, params: Record<string, unknown>): string {
+  if (method === "ping") {
+    return "";
+  }
+  if (method === "message.send" && typeof params["text"] === "string") {
+    return flat(params["text"]);
+  }
+  if (typeof params["session_id"] === "string") {
+    return params["session_id"];
+  }
+  return "";
+}
+
+function resultDetail(method: string, result: unknown): string {
+  if (method === "ping" || !isRecord(result)) {
+    return "";
+  }
+  if (method === "message.send" && typeof result["run_id"] === "string") {
+    return result["run_id"];
+  }
+  if (method === "session.create" && typeof result["session_id"] === "string") {
+    return result["session_id"];
+  }
+  if (method === "session.inspect" && typeof result["message_count"] === "number") {
+    return `${result["message_count"]} messages`;
+  }
+  if (method === "daemon.status" && typeof result["model_name"] === "string") {
+    return result["model_name"];
+  }
+  return "";
+}
+
+function flat(text: string): string {
+  return text.replace(/\s+/g, " ").trim();
+}
+
 function isSessionCreateResult(value: unknown): value is SessionCreateResult {
   return isRecord(value) && typeof value["session_id"] === "string";
 }
 
 function isMessageSendResult(value: unknown): value is MessageSendResult {
   return isRecord(value) && typeof value["run_id"] === "string";
+}
+
+function isSessionInspectResult(value: unknown): value is SessionInspectResult {
+  return (
+    isRecord(value) &&
+    typeof value["session_id"] === "string" &&
+    typeof value["model_profile"] === "string" &&
+    typeof value["message_count"] === "number" &&
+    Array.isArray(value["messages"]) &&
+    isOptionalString(value["model_provider"]) &&
+    isOptionalString(value["model_name"])
+  );
 }
 
 function isOptionalString(value: unknown): boolean {

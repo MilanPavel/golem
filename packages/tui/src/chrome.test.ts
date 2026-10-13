@@ -80,6 +80,31 @@ test("a wrapped question takes rows from the transcript", () => {
   assert.equal(wrapped.body, idle.body - 2);
 });
 
+test("an open debug panel takes rows from the transcript", () => {
+  const idle = frameBudget({ rows: 24, columns: 80, draft: "", busy: false, banner: false });
+  const open = frameBudget({
+    rows: 24,
+    columns: 80,
+    draft: "",
+    busy: false,
+    banner: false,
+    debug: true,
+  });
+  assert.equal(open.debug, 7);
+  assert.equal(open.body, idle.body - 7);
+  assert.equal(
+    open.header + open.body + open.banner + open.meter + open.composer + open.status + open.debug,
+    24,
+  );
+
+  const cramped = frameBudget({ rows: 6, columns: 80, draft: "", busy: false, banner: false, debug: true });
+  assert.ok(cramped.body >= 1);
+  assert.equal(
+    cramped.header + cramped.body + cramped.banner + cramped.meter + cramped.composer + cramped.status + cramped.debug,
+    6,
+  );
+});
+
 test("banner text stays on one line", () => {
   assert.equal(bannerText("session was not found", 80), "session was not found");
   assert.equal(bannerText("abcdef", 4), "abc…");

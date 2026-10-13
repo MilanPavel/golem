@@ -93,6 +93,36 @@ async def test_send_streams_deltas_then_completes(short_home: Path) -> None:
         await stop_daemon(app, task)
 
 
+async def test_inspect_reads_checkpoint_messages(short_home: Path) -> None:
+    model = ScriptedChatModel(replies=["Hi"])
+    app, task = await start_daemon(short_home, router=ModelRouter(model=model))
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        missing = await client.call("session.inspect", {"session_id": "s_missing"})
+        assert error_code(missing) == SESSION_NOT_FOUND
+        created = rpc_result(await client.call("session.create", {}))
+        session_id = created["session_id"]
+        assert isinstance(session_id, str)
+        empty = rpc_result(await client.call("session.inspect", {"session_id": session_id}))
+        assert empty["message_count"] == 0
+        assert empty["messages"] == []
+        assert empty["model_profile"] == "remote"
+        assert empty["model_provider"] is None
+        assert empty["model_name"] is None
+        await client.call("message.send", {"session_id": session_id, "text": "hello"})
+        await client.wait_for_event("run.completed")
+        inspected = rpc_result(await client.call("session.inspect", {"session_id": session_id}))
+        assert inspected["message_count"] == 2
+        assert inspected["messages"] == [
+            {"role": "user", "text": "hello"},
+            {"role": "assistant", "text": "Hi"},
+        ]
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+
+
 async def test_missing_and_busy_sessions(short_home: Path) -> None:
     model = GatedChatModel()
     app, task = await start_daemon(short_home, router=ModelRouter(model=model))

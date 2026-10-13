@@ -1,7 +1,7 @@
 import { homedir } from "node:os";
 import { useEffect, useRef, useState } from "react";
 import { Box, Text, useInput, useWindowSize } from "ink";
-import { RpcError, SESSION_NOT_FOUND, type ConnectionState, type GolemClient } from "@golem/client";
+import { RpcError, SESSION_NOT_FOUND, type ConnectionState, type GolemClient, type WireLine } from "@golem/client";
 
 import {
   connectionLost,
@@ -11,7 +11,9 @@ import {
   type ChatState,
   type DeltaBatcher,
 } from "./chat-state.ts";
+import { applyComposer, closedDebug, toggleDebugTab, type DebugState } from "./commands.ts";
 import { bannerText, frameBudget, frameColumns, layoutComposer } from "./chrome.ts";
+import { holdDebugOffset, layoutDebug, type CheckpointMessage, type DebugTone } from "./debug-view.ts";
 import { Header } from "./header.tsx";
 import { layoutTranscript, type LayoutLine } from "./layout-chat.ts";
 import { assistantChars, elapsedSeconds, meterLine, meterPhase } from "./progress.ts";
@@ -36,14 +38,26 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   const [version, setVersion] = useState("");
   const [offset, setOffset] = useState(0);
   const [tick, setTick] = useState(0);
+  const [debug, setDebug] = useState<DebugState>(closedDebug);
+  const [debugOffset, setDebugOffset] = useState(0);
+  const [wire, setWire] = useState<readonly WireLine[]>([]);
+  const [modelMessages, setModelMessages] = useState<CheckpointMessage[]>([]);
+  const [modelCount, setModelCount] = useState<number | null>(null);
   const sessionRef = useRef<string | null>(null);
   const creating = useRef(false);
   const draftRef = useRef(draft);
   const busyRef = useRef(chat.busy);
   const connectionRef = useRef(connection);
+  const debugRef = useRef(debug);
+  const panelOpen = useRef(false);
+  const inspectGen = useRef(0);
+  const loadCheckpointRef = useRef<(sessionId: string) => void>(() => undefined);
+  const debugLines = useRef(0);
   draftRef.current = draft;
   busyRef.current = chat.busy;
   connectionRef.current = connection;
+  debugRef.current = debug;
+  panelOpen.current = debug.open;
   const size = useWindowSize();
   const columns = frameColumns(size.columns || 80);
   const rows = size.rows || 24;
@@ -54,6 +68,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
     draft,
     busy: chat.busy,
     banner: banner !== null && banner.length > 0,
+    debug: debug.open,
   });
   const transcript = layoutTranscript(chat.messages, columns, budget.body, offset);
   const model = preferModel(sessionModel, daemonModel);
@@ -62,6 +77,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   const status = fitStatus({ connection: statusLabel(connection), model: chip, cwd }, columns);
   const phase = meterPhase(chat.busy, assistantChars(chat.messages));
   const page = Math.max(1, budget.body - 1);
+  const debugPage = Math.max(1, budget.debug - 2);
 
   const batcher = useRef<DeltaBatcher | null>(null);
   if (batcher.current === null) {
@@ -71,6 +87,33 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   }
 
   useEffect(() => () => batcher.current?.stop(), []);
+
+  useEffect(() => {
+    return client.onWire((lines) => {
+      setWire(lines);
+    });
+  }, [client]);
+
+  async function loadCheckpoint(sessionId: string): Promise<void> {
+    const gen = ++inspectGen.current;
+    try {
+      const result = await client.inspectSession(sessionId);
+      if (gen !== inspectGen.current) {
+        return;
+      }
+      setModelMessages(result.messages.map((message) => ({ role: message.role, text: message.text })));
+      setModelCount(result.message_count);
+    } catch (error: unknown) {
+      if (gen !== inspectGen.current) {
+        return;
+      }
+      setModelCount(null);
+      setChat((current) => ({ ...current, notice: messageOf(error) }));
+    }
+  }
+  loadCheckpointRef.current = (sessionId: string) => {
+    void loadCheckpoint(sessionId);
+  };
 
   useEffect(() => {
     if (transcript.offsetFromBottom !== offset) {
@@ -83,6 +126,10 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       return;
     }
     return onWheel((steps) => {
+      if (panelOpen.current) {
+        setDebugOffset((current) => nextOffset(current, steps));
+        return;
+      }
       setOffset((current) => nextOffset(current, steps));
     });
   }, [onWheel]);
@@ -153,6 +200,12 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
         batcher.current?.flush();
       }
       setChat((current) => reduceChat(current, event));
+      if (event.type === "run.completed" && panelOpen.current) {
+        const session = sessionRef.current;
+        if (session !== null) {
+          loadCheckpointRef.current(session);
+        }
+      }
     });
   }, [client]);
 
@@ -179,24 +232,47 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   }, [client, connection.status]);
 
   function submit(): void {
-    const text = draftRef.current.trim();
+    const outcome = applyComposer(debugRef.current, draftRef.current);
+    if (outcome.kind === "idle") {
+      return;
+    }
+    if (outcome.kind === "unknown") {
+      setChat((current) => ({ ...current, notice: outcome.notice }));
+      return;
+    }
+    if (outcome.kind === "local") {
+      showDebug(outcome.debug);
+      setDraft(outcome.restore ?? "");
+      setChat((current) => ({ ...current, notice: outcome.notice }));
+      if (outcome.refreshModel) {
+        const session = sessionRef.current;
+        if (session !== null && connectionRef.current.status === "connected") {
+          loadCheckpointRef.current(session);
+        }
+      }
+      return;
+    }
+    const text = outcome.text;
     const currentSession = sessionRef.current;
     if (
-      text.length === 0 ||
       busyRef.current ||
       currentSession === null ||
       connectionRef.current.status !== "connected"
     ) {
       return;
     }
+    showDebug(outcome.debug);
     setDraft("");
     setOffset(0);
+    setChat((current) => ({ ...current, notice: null }));
     void client.sendMessage(currentSession, text).catch((error: unknown) => {
       if (error instanceof RpcError && error.code === SESSION_NOT_FOUND) {
         sessionRef.current = null;
         creating.current = false;
         setSessionId(null);
         setDraft(text);
+        setModelMessages([]);
+        setModelCount(null);
         setChat((current) => ({
           ...current,
           busy: false,
@@ -215,6 +291,9 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
         const result = await client.createSession();
         sessionRef.current = result.session_id;
         setSessionId(result.session_id);
+        if (panelOpen.current) {
+          loadCheckpointRef.current(result.session_id);
+        }
       } catch (error: unknown) {
         creating.current = false;
         setChat((current) => ({ ...current, error: messageOf(error) }));
@@ -222,21 +301,65 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
     }
   }
 
+  function showDebug(next: DebugState): void {
+    if (next.open !== debugRef.current.open || next.tab !== debugRef.current.tab) {
+      debugLines.current = 0;
+      setDebugOffset(0);
+    }
+    setDebug(next);
+  }
+
   useInput((input, key) => {
     if (key.pageUp) {
-      setOffset((value) => value + page);
+      if (debugRef.current.open) {
+        setDebugOffset((value) => value + debugPage);
+      } else {
+        setOffset((value) => value + page);
+      }
       return;
     }
     if (key.pageDown) {
-      setOffset((value) => Math.max(0, value - page));
+      if (debugRef.current.open) {
+        setDebugOffset((value) => Math.max(0, value - debugPage));
+      } else {
+        setOffset((value) => Math.max(0, value - page));
+      }
       return;
     }
     if (key.home) {
-      setOffset(Number.MAX_SAFE_INTEGER);
+      if (debugRef.current.open) {
+        setDebugOffset(Number.MAX_SAFE_INTEGER);
+      } else {
+        setOffset(Number.MAX_SAFE_INTEGER);
+      }
       return;
     }
     if (key.end) {
-      setOffset(0);
+      if (debugRef.current.open) {
+        setDebugOffset(0);
+      } else {
+        setOffset(0);
+      }
+      return;
+    }
+    if (key.escape) {
+      if (debugRef.current.open) {
+        showDebug({ ...debugRef.current, open: false });
+      }
+      return;
+    }
+    if (key.tab) {
+      if (debugRef.current.open) {
+        const next = toggleDebugTab(debugRef.current);
+        showDebug(next);
+        if (
+          next.tab === "model" &&
+          sessionRef.current !== null &&
+          connectionRef.current.status === "connected"
+        ) {
+          loadCheckpointRef.current(sessionRef.current);
+        }
+      }
       return;
     }
     if (connectionRef.current.status !== "connected" || sessionId === null) {
@@ -253,7 +376,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       setDraft((value) => value.slice(0, -1));
       return;
     }
-    if (key.ctrl || key.meta || key.escape || key.tab) {
+    if (key.ctrl || key.meta) {
       return;
     }
     if (input.length > 0) {
@@ -263,6 +386,30 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
 
   const contentWidth = transcript.gutter === null ? columns : Math.max(1, columns - 1);
   const composer = layoutComposer(draft, columns, budget.composer, chat.busy);
+  const debugLayout = layoutDebug({
+    debug,
+    rows: budget.debug,
+    columns,
+    wire,
+    messages: modelMessages,
+    screenCount: chat.messages.length,
+    modelCount,
+    offsetFromBottom: debugOffset,
+  });
+
+  useEffect(() => {
+    const previous = debugLines.current;
+    const nextCount = debugLayout.lineCount;
+    const held = holdDebugOffset(debugOffset, previous, nextCount);
+    debugLines.current = nextCount;
+    if (held !== debugOffset) {
+      setDebugOffset(held);
+      return;
+    }
+    if (debugLayout.offsetFromBottom !== debugOffset) {
+      setDebugOffset(debugLayout.offsetFromBottom);
+    }
+  }, [debugLayout.lineCount, debugLayout.offsetFromBottom, debugOffset]);
 
   return (
     <Box flexDirection="column" width={columns} height={rows} overflow="hidden">
@@ -284,6 +431,40 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
           </Box>
         ))}
       </Box>
+      {budget.debug > 0 ? (
+        <Box
+          flexDirection="column"
+          width={columns}
+          height={budget.debug}
+          flexShrink={0}
+          overflow="hidden"
+          backgroundColor={QUESTION_BG}
+        >
+          {debugLayout.rows.map((row, index) => {
+            const text = row.spans.map((span) => span.text).join("");
+            const pad = " ".repeat(Math.max(0, columns - text.length));
+            return (
+              <Box key={index} width={columns} height={1} overflow="hidden" backgroundColor={QUESTION_BG}>
+                <Text wrap="truncate-end" backgroundColor={QUESTION_BG}>
+                  {row.spans.map((span, spanIndex) => (
+                    <Text
+                      key={spanIndex}
+                      dimColor={span.tone === "dim"}
+                      bold={span.tone === "active"}
+                      color={toneColor(span.tone)}
+                      backgroundColor={QUESTION_BG}
+                      wrap="truncate-end"
+                    >
+                      {span.text.length > 0 ? span.text : " "}
+                    </Text>
+                  ))}
+                  <Text backgroundColor={QUESTION_BG}>{pad}</Text>
+                </Text>
+              </Box>
+            );
+          })}
+        </Box>
+      ) : null}
       {budget.banner > 0 && banner !== null ? (
         <Text color={chat.error !== null ? "red" : "yellow"} wrap="truncate-end">
           {bannerText(banner, columns)}
@@ -374,6 +555,19 @@ function messageOf(error: unknown): string {
     return error.message;
   }
   return "request failed";
+}
+
+function toneColor(tone: DebugTone): string | undefined {
+  if (tone === "active") {
+    return CLAY;
+  }
+  if (tone === "note") {
+    return "yellow";
+  }
+  if (tone === "plain" || tone === "pending") {
+    return QUESTION_FG;
+  }
+  return undefined;
 }
 
 function colorFor(state: ConnectionState): "green" | "yellow" | "red" {

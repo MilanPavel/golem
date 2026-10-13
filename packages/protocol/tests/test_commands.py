@@ -1,7 +1,14 @@
 import pytest
 from pydantic import ValidationError
 
-from golem_protocol.commands import DaemonStatus, HelloParams, HelloResult, PingParams
+from golem_protocol.commands import (
+    DaemonStatus,
+    HelloParams,
+    HelloResult,
+    InspectMessage,
+    PingParams,
+    SessionInspectResult,
+)
 from golem_protocol.events import Ping
 from golem_protocol.rpc import RpcErrorBody, RpcFailure, RpcRequest, RpcSuccess
 
@@ -58,6 +65,20 @@ def test_rpc_failure_allows_null_id() -> None:
     restored = RpcFailure.model_validate_json(failure.model_dump_json())
     assert restored.error.code == -32700
     assert restored.id is None
+
+
+def test_session_inspect_round_trip() -> None:
+    result = SessionInspectResult(
+        session_id="s_test",
+        model_profile="remote",
+        model_provider=None,
+        model_name=None,
+        message_count=1,
+        messages=[InspectMessage(role="user", text="hello")],
+    )
+    assert SessionInspectResult.model_validate_json(result.model_dump_json()) == result
+    with pytest.raises(ValidationError):
+        InspectMessage.model_validate({"role": "human", "text": "hello"})
 
 
 def test_rpc_success_carries_ping_result() -> None:

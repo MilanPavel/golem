@@ -1,0 +1,90 @@
+{
+  "$defs": {
+    "InspectMessage": {
+      "additionalProperties": false,
+      "description": "One checkpoint message as plain text.",
+      "properties": {
+        "role": {
+          "enum": [
+            "user",
+            "assistant",
+            "system",
+            "tool"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "role",
+        "text"
+      ],
+      "title": "InspectMessage",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The conversation stored for this session.\n\n``message_count`` is the length of ``messages``. Provider and name are\nnull when this profile is not the one the daemon is configured to run.",
+  "properties": {
+    "message_count": {
+      "minimum": 0,
+      "title": "Message Count",
+      "type": "integer"
+    },
+    "messages": {
+      "items": {
+        "$ref": "#/$defs/InspectMessage"
+      },
+      "title": "Messages",
+      "type": "array"
+    },
+    "model_name": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Model Name"
+    },
+    "model_profile": {
+      "minLength": 1,
+      "title": "Model Profile",
+      "type": "string"
+    },
+    "model_provider": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Model Provider"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "session_id",
+    "model_profile",
+    "message_count",
+    "messages"
+  ],
+  "title": "SessionInspectResult",
+  "type": "object"
+}

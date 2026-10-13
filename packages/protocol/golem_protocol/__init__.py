@@ -4,11 +4,14 @@ from golem_protocol.commands import (
     DaemonStatus,
     HelloParams,
     HelloResult,
+    InspectMessage,
     MessageSendParams,
     MessageSendResult,
     PingParams,
     SessionCreateParams,
     SessionCreateResult,
+    SessionInspectParams,
+    SessionInspectResult,
 )
 from golem_protocol.events import ChatEvent, Ping
 from golem_protocol.rpc import RpcErrorBody, RpcFailure, RpcNotification, RpcRequest, RpcSuccess
@@ -21,6 +24,7 @@ __all__ = [
     "DaemonStatus",
     "HelloParams",
     "HelloResult",
+    "InspectMessage",
     "MessageSendParams",
     "MessageSendResult",
     "Ping",
@@ -32,4 +36,6 @@ __all__ = [
     "RpcSuccess",
     "SessionCreateParams",
     "SessionCreateResult",
+    "SessionInspectParams",
+    "SessionInspectResult",
 ]
