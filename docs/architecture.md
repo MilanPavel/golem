@@ -1,39 +1,92 @@
 # Architecture
 
-Golem is one long-running program, and several clients that attach to it. This file explains those pieces: the daemon, the protocol, and why they are separate.
+Golem is one long-running program, and several clients that attach to it. This file explains those pieces in plain words: the daemon, the clients, the protocol between them, and where the data lives.
 
 The choice behind each piece is in [adr/](adr/README.md). How the Python and TypeScript trees share one repository is in [monorepo.md](monorepo.md).
 
 ## The short version
 
-The **daemon** is the process that does the work. It keeps running after you close a terminal. Chats, tool calls, and long flows live there.
+The **daemon** is the process that does the work. It keeps running after you close a terminal. Chats, tool calls, and long flows live there. The model is only ever called from the daemon.
 
-A **client** attaches to that work. The TUI, a headless command, and a timer are all clients. A client does not own the model's memory. It connects and sends commands. Catching up from a log comes later. Today the TUI holds the transcript it has drawn. The screen fills the terminal. The header carries a clay mark, the daemon version, and the selected model. The transcript scrolls only when it is taller than the space under the header. The wheel and the page keys move that window, and they move the debug panel instead while it is open. A question, typed or already sent, is a full-width bar. The bottom line is the connection and the model. A meter appears above the question while a run is in progress and names the phase, the characters received, and the seconds elapsed. Typing `/debug` opens a panel under the transcript. Typing it again, or pressing Escape, closes it. Lines in the panel wrap, and Page Up and Page Down scroll them. One tab lists recent socket lines. The other shows the messages stored for the model. `/debug hold` shows the next line there before it is sent.
+A **client** attaches to that work. The TUI and the `golem` command are clients today. A timer or a file watch will be one later. A client connects, sends commands, and draws the events it receives. It does not hold the model's memory. How the TUI looks and which keys it takes is in [ADR-005](adr/005-client-package.md).
 
-The **protocol** is the only language between them. The daemon is Python. The TUI is TypeScript. They do not share objects. They share message shapes, written once and generated for both sides.
+The **protocol** is the only language between them. The daemon is Python. The clients are TypeScript. They do not share objects. They share message shapes, written once and generated for both sides.
 
-Inside the daemon, a graph library runs the agent loop. That library never speaks to a client. An adapter turns its stream into protocol events first.
+## Words used here
+
+| Word | Meaning |
+|---|---|
+| Daemon | The one background Python process per user. It owns the files and runs the model. |
+| Client | Any program that connects to the daemon's socket. It sends commands and reads events. |
+| Session | One chat, or later one flow. It has an id. |
+| Run | One answer inside a session: from the sentence you send until the model stops. |
+| Command | A request from a client to the daemon, such as `message.send`. |
+| Event | A fact the daemon reports back, such as `message.delta`. |
+| Checkpoint | The model's saved memory for a session, stored after each step. |
+| Graph | The agent loop. A LangGraph library call inside the daemon, not a separate service. |
+| Flow | A graph whose steps our Python picks, and whose expensive steps are saved. Planned. |
+
+## The system on one machine
+
+Everything runs on your machine, except the model when you pick a remote provider. There are two kinds of process: one daemon, and any number of clients.
 
 ```mermaid
-flowchart TB
-  subgraph clients ["Clients"]
+flowchart LR
+  launchd["launchd"]
+  subgraph clientProcs ["Clients (Node)"]
     tui["TUI"]
-    cli["CLI"]
-    triggers["Timers and file watches"]
+    cli["golem command"]
   end
   sock["Unix socket<br>~/.golem/run/golem.sock"]
-  subgraph daemon ["Daemon"]
-    proto["Protocol server"]
-    sessions["Sessions and event log"]
-    runtime["Graph runtime"]
-    around["Router, permissions, skills"]
+  subgraph daemonProc ["Daemon (Python)"]
+    server["Protocol server"]
+    sessions["Session manager<br>(in memory)"]
+    runtime["Graph runtime<br>(LangGraph)"]
+    router["Model router"]
   end
-  clients --> sock --> proto
-  proto --> sessions
+  subgraph disk ["~/.golem"]
+    ckpt[("checkpoints.db<br>SQLite")]
+    golemdb[("golem.db<br>planned")]
+    memdb[("memory.db<br>planned")]
+  end
+  model["Model API<br>Anthropic, OpenAI, or local Ollama"]
+  launchd -->|"starts, restarts"| daemonProc
+  tui -->|"JSON lines"| sock
+  cli -->|"JSON lines"| sock
+  sock --> server
+  server --> sessions
   sessions --> runtime
-  runtime --> around
-  runtime --> proto
+  runtime --> router
+  runtime -->|"read, write"| ckpt
+  router -->|"HTTPS or local HTTP"| model
+  sessions -.-> golemdb
+  runtime -.-> memdb
 ```
+
+What talks to what, and how:
+
+- **Client to daemon.** A Unix socket file. Each line is one JSON-RPC 2.0 object. No network port is opened.
+- **Inside the daemon.** Ordinary Python calls in one asyncio process. A run is an asyncio task. The graph is a library the session manager calls. It is not a second process.
+- **Daemon to model.** HTTPS to Anthropic or OpenAI, or plain HTTP to an OpenAI-compatible server on this machine, such as Ollama. The model router picks one from the settings.
+- **Daemon to disk.** SQLite files under `~/.golem`. Today only `checkpoints.db` is written, through LangGraph's SQLite checkpointer.
+- **Who starts what.** launchd starts the daemon at login and again after a crash. You start the clients.
+
+## Built today, planned next
+
+Built today:
+
+- The daemon, its socket, the pid lock, and the launchd job.
+- `@golem/client`, the TUI, and `golem status`.
+- Chat sessions. Each one runs a single agent graph against one configured model.
+- Checkpoints in `checkpoints.db`. They survive a daemon restart. [ADR-006](adr/006-checkpoint-continuity.md) is that choice.
+
+Planned next:
+
+- The event log in `golem.db`, and `attach`, so a client that reconnects can rebuild its screen from `seq`.
+- A durable session list. Today it is in memory. After a restart, a session id still works if its checkpoint exists, but `seq` starts again at 1.
+- Flows, tool permissions, skills, and long-term memory in `memory.db`.
+
+Until the event log exists, the TUI keeps the messages it has shown, and only for as long as the TUI process runs.
 
 ## The daemon
 
@@ -41,26 +94,25 @@ One daemon per user. It starts when you log in, and launchd starts it again if i
 
 Clients reach it through a Unix socket at `~/.golem/run/golem.sock`. The file mode is `0600`, so only your user can open it. That permission is the login check. There is no account and no password. `run/golem.pid` is the lock that lets a restart delete a socket left behind by a crash. [ADR-004](adr/004-pid-lock.md) is that lock.
 
-A client connects, sends commands, and listens. The commands that run today are `hello`, `daemon.status`, `ping`, `session.create`, `message.send`, and `session.inspect`. Chat events come back as notifications. The model's memory for a session is the checkpoint in `checkpoints.db`, keyed by that session id. The event log is not written yet, so a client cannot ask for events it missed. The TUI keeps the bubbles it has drawn, and that transcript lasts only as long as the TUI process. [ADR-006](adr/006-checkpoint-continuity.md) is that split.
-
 ### What the daemon owns
 
-The socket is only the door. Behind it, four jobs sit in one process:
+The socket is only the door. Behind it, these jobs sit in one process:
 
-| Job | What it does |
-|---|---|
-| Protocol server | Reads one JSON line at a time. Runs the command. Writes events back. |
-| Sessions | One chat or one flow run. Each has an id and a growing list of events. |
-| Event log | The history. A client that reconnects reads it and rebuilds the screen. |
-| Graph runtime | The agent loop, and flows whose steps are saved so a crash can resume. |
+| Job | What it does | Status |
+|---|---|---|
+| Protocol server | Reads one JSON line at a time. Runs the command. Writes events back. | Built |
+| Sessions | One chat or one flow run. Each has an id. | Built, list kept in memory |
+| Graph runtime | The agent loop. Its memory is the checkpoint. | Built |
+| Model router | Turns the configured profile into a chat model. | Built |
+| Event log | The history. A client that reconnects reads it and rebuilds the screen. | Planned |
 
 The graph does not own the rest of the product. It calls ordinary Python for three things that have to stay ours:
 
 - **Which model** answers this step, and whether the budget allows it.
-- **Whether a tool may run.** Every side effect, including ones from a flow or a skill, asks the same permission check.
-- **Which skills** are active. A skill is a `SKILL.md` the model can be given. The registry lives in the daemon.
+- **Whether a tool may run.** Every side effect, including ones from a flow or a skill, asks the same permission check. Planned.
+- **Which skills** are active. A skill is a `SKILL.md` the model can be given. The registry lives in the daemon. Planned.
 
-LangChain message objects stay inside the graph. The protocol server never sends them out. [ADR-002](adr/002-langgraph-boundary.md) is that boundary.
+LangChain message objects stay inside the graph. The protocol server never sends them out. An adapter turns the graph's stream into protocol events first. [ADR-002](adr/002-langgraph-boundary.md) is that boundary.
 
 ### One turn
 
@@ -70,20 +122,25 @@ You type in the TUI. The daemon is the only place the model runs.
 sequenceDiagram
   participant You
   participant TUI
-  participant Daemon as Daemon
-  participant Graph as Graph
+  participant Daemon
+  participant Graph
+  participant Model
   You->>TUI: a sentence
-  TUI->>Daemon: command message.send
-  Daemon->>Graph: continue this session
-  Graph-->>Daemon: tokens and tool steps
-  Daemon->>Daemon: turn those into events
-  Daemon-->>TUI: event lines
+  TUI->>Daemon: message.send
+  Daemon-->>TUI: your message.completed, run.started, message.started
+  Daemon->>Graph: continue thread = session id
+  Graph->>Model: messages so far
+  Model-->>Graph: tokens
+  Graph-->>Daemon: stream chunks
+  Daemon-->>TUI: message.delta, many times
+  Graph->>Graph: write checkpoint
+  Daemon-->>TUI: message.completed, run.completed
   TUI-->>You: the screen updates
 ```
 
-Those events are what a session log will store. Today they are notifications on the open socket. `message.send` continues the graph at `thread_id` equal to the session id, and the checkpointer writes `checkpoints.db`. If you quit the TUI halfway through, the daemon can still finish the run and save that checkpoint. Opening the TUI again does not rebuild the screen: there is no `attach` yet, and the bubbles from before the quit are gone.
+If you quit the TUI halfway through, the daemon still finishes the run and saves the checkpoint. The next message in that session continues from it.
 
-Two graphs, on purpose. In an **agent** session, the model picks the next step. In a **flow**, our Python picks the next step, and each expensive step is saved so a resume does not run it again.
+There will be two kinds of graph, on purpose. In an **agent** session, the model picks the next step. In a **flow**, our Python picks the next step, and each expensive step is saved so a resume does not run it again.
 
 A step that stops to ask you a question runs again from its first line when you answer. The side effect goes after that stop, or in its own step, so a resume does not do it twice.
 
@@ -91,28 +148,34 @@ A step that stops to ask you a question runs again from its first line when you 
 
 The daemon keeps its files under one home directory. `resolve_paths` picks it: a function argument, otherwise `GOLEM_HOME`, otherwise `~/.golem`.
 
-| Path | Role |
-|---|---|
-| `run/golem.sock` | The socket clients connect to |
-| `run/golem.pid` | The lockfile. The daemon holds a flock on it and writes its pid |
-| `golem.db` | Sessions, the event log, runs, costs |
-| `checkpoints.db` | Model context for a chat thread. The thread id is the session id. Separate so it can be wiped without deleting the event log |
-| `memory.db` | Long-term memory |
-| `config.toml` | Settings for this user |
-| `logs/golem.jsonl` | The daemon's own log, one JSON object per line |
-| `skills/`, `flows/` | Skills and flows you added on this machine |
+| Path | Role | Status |
+|---|---|---|
+| `run/golem.sock` | The socket clients connect to | Built |
+| `run/golem.pid` | The lockfile. The daemon holds a flock on it and writes its pid | Built |
+| `checkpoints.db` | Model memory for a chat. The thread id is the session id. Separate so it can be wiped without deleting the event log | Built |
+| `config.toml` | Settings for this user | Built |
+| `logs/golem.jsonl` | The daemon's own log, one JSON object per line | Built |
+| `golem.db` | Sessions, the event log, runs, costs | Planned |
+| `memory.db` | Long-term memory | Planned |
+| `skills/`, `flows/` | Skills and flows you added on this machine | Planned |
 
-A project can also have `<project>/.golem/config.toml`. That file overrides the home file. `GOLEM_LOG_LEVEL` overrides both. An explicit `log_level` on the call overrides the environment. Settings loaded today are `log_level` (`DEBUG`, `INFO`, `WARNING`, `ERROR`), `model_profile` (default `remote`), `model_provider` (`anthropic`, `openai`, or `openai_compat`), `model_name`, and `model_base_url`. `GOLEM_MODEL_PROVIDER`, `GOLEM_MODEL_NAME`, and `GOLEM_MODEL_BASE_URL` override the file. `anthropic` and `openai` read `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`. `openai_compat` needs no key. An empty `model_base_url` means `http://127.0.0.1:11434/v1`.
+Settings come from three places. Each one overrides the one before it: `~/.golem/config.toml`, then `<project>/.golem/config.toml`, then `GOLEM_…` environment variables. An explicit `log_level` passed to `load_settings` wins over all three. The keys read today:
 
-Each log record is written twice: a short line on stderr, and a JSON line in `logs/golem.jsonl`. Loggers named `golem.…` flow up to the `golem` logger.
+- `log_level`: `DEBUG`, `INFO`, `WARNING`, or `ERROR`. Environment: `GOLEM_LOG_LEVEL`.
+- `model_profile`: default `remote`.
+- `model_provider`: `anthropic`, `openai`, or `openai_compat`. Environment: `GOLEM_MODEL_PROVIDER`.
+- `model_name`. Environment: `GOLEM_MODEL_NAME`.
+- `model_base_url`: only for `openai_compat`. Empty means `http://127.0.0.1:11434/v1`. Environment: `GOLEM_MODEL_BASE_URL`.
+
+API keys are never in the file. `anthropic` reads `ANTHROPIC_API_KEY`, and `openai` reads `OPENAI_API_KEY`. `openai_compat` needs no key.
+
+Each log record is written twice: a short line on stderr, and a JSON line in `logs/golem.jsonl`.
 
 ## The protocol
 
 The protocol exists so a client never has to understand the daemon's insides.
 
-The TUI is TypeScript. The daemon is Python. A graph library in the middle has its own message classes, and those classes change. If the TUI spoke those classes, every client would be tied to that library, and a reconnect would have no stable history to read.
-
-So the daemon translates. What crosses the socket is our messages only.
+The graph library has its own message classes, and those classes change. If the TUI spoke those classes, every client would be tied to that library, and a reconnect would have no stable history to read. So the daemon translates. What crosses the socket is our messages only.
 
 ### Two directions
 
@@ -120,7 +183,7 @@ So the daemon translates. What crosses the socket is our messages only.
 
 **Events** go from daemon to client. They report something that already happened: a token arrived, a tool finished, a model was chosen, a run stopped.
 
-An event is a fact. The client builds the whole screen from the facts, in order. Replay is not a special mode. It is the same stream, read from the start or from the last number the client has.
+An event is a fact. The client builds the whole screen from the facts, in order. Once the event log exists, replay will not be a special mode. It is the same stream, read from the start or from the last number the client has. The diagram shows that planned shape. `attach` is not built yet.
 
 ```mermaid
 sequenceDiagram
@@ -135,7 +198,7 @@ sequenceDiagram
   Daemon-->>Client: message.delta, then message.completed
 ```
 
-`hello` is the first command. The client and the daemon compare protocol versions. `PROTOCOL_MAJOR` is `1` and `PROTOCOL_MINOR` is `3`. Minor 2 adds optional model fields: `daemon.status` includes `model_profile`, `model_provider`, and `model_name`, and `session.created` includes `model_provider` and `model_name` beside `model_profile`. Provider and name are null when they are not set. Minor 3 adds `session.inspect`, which returns the checkpoint messages as a role and plain text. A break in the shapes bumps the major number, and the daemon refuses the client. Any minor on the same major is accepted. After `hello`, the client sends `ping` every few seconds so a half-open socket is noticed, and `daemon.status` when it wants the pid, uptime, and the configured model. A chat sends `session.create`, then `message.send`. `session.inspect` reads the saved messages and does not call the model.
+`hello` is the first command. The client and the daemon compare protocol versions. A break in the shapes bumps the major number, and the daemon refuses the client. Any minor on the same major is accepted. The current numbers and what each minor added are in [ADR-003](adr/003-protocol.md).
 
 Each event line is one JSON-RPC 2.0 notification. The fields that matter:
 
@@ -147,12 +210,18 @@ Each event line is one JSON-RPC 2.0 notification. The fields that matter:
 | `type` | What happened, such as `message.delta` |
 | `data` | The payload for that type |
 
-`message.delta` is the live token stream. A later copy in `golem.db` will keep `message.completed` instead, so the database does not store every fragment. That copy is not written yet.
+`message.delta` is the live token stream. The planned copy in `golem.db` will keep `message.completed` instead, so the database does not store every fragment.
+
+### What is on the wire today
+
+| Commands | Events |
+|---|---|
+| `hello`, `ping`, `daemon.status`, `session.create`, `message.send`, `session.inspect` | `session.created`, `message.started`, `message.delta`, `message.completed`, `run.started`, `run.completed`, `run.failed` |
+
+After `hello`, a client sends `ping` every few seconds so a half-open socket is noticed. `daemon.status` returns the pid, uptime, and configured model. A chat sends `session.create`, then `message.send`. `session.inspect` reads the saved checkpoint messages and does not call the model.
 
 ### Why a protocol package
 
-Those shapes are written once, as Python classes in `golem_protocol`. `just gen` writes JSON Schema, then TypeScript, into `packages/protocol/gen/`. The TUI imports the generated types. A hand-written TypeScript copy would drift, and the bug would show up as a wrong screen. Here `just check` fails if the generated files do not match the classes.
+Those shapes are written once, as Python classes in `golem_protocol`. `just gen` writes JSON Schema, then TypeScript, into `packages/protocol/gen/`. `@golem/client` imports the generated types, and the TUI and `golem status` both use that client. A hand-written TypeScript copy would drift, and the bug would show up as a wrong screen. Here `just check` fails if the generated files do not match the classes.
 
-The same pipeline is what a real event uses. Add a class, run `just gen`, and the client sees a typed payload. The socket code speaks those types. It does not invent a second schema.
-
-The models on the wire today are `hello`, `daemon.status`, `ping`, `session.create`, `message.send`, and `session.inspect`, plus chat events on an `event` notification: `session.created`, `message.started`, `message.delta`, `message.completed`, `run.started`, `run.completed`, `run.failed`. `daemon.status` and `session.created` carry the configured model: profile, provider, and name. `Ping` is still the ping result: `type` is `system.ping`, `nonce` is a string. `@golem/client` imports the generated types. The TUI and `golem status` both use that client. `packages/tui/src/index.ts` still exports `pingNonce`, which returns `event.nonce`.
+Adding a message is the same every time. Add a class, run `just gen`, and the client sees a typed payload.

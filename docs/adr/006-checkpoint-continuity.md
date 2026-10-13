@@ -7,7 +7,7 @@
 
 A later turn has to see the earlier ones after the daemon restarts. The sentences on the screen are a different store.
 
-`checkpoints.db` is the memory the model reads. The bubbles belong to the TUI process that reduced them from live events. A durable event log, and a client that rebuilds the screen from it, wait until that log exists.
+`checkpoints.db` is the memory the model reads. The messages on screen belong to the TUI process that reduced them from live events. A durable event log, and a client that rebuilds the screen from it, wait until that log exists.
 
 ## What the code does today
 
@@ -29,4 +29,4 @@ Replaying missed events from the daemon's memory would be wrong after a restart,
 
 ## What it costs
 
-Quit the TUI and the bubbles are gone, even though the daemon still has the thread. Two TUI processes do not share a screen. A run whose client has gone still spends the model call. Those tokens are not shown later.
+Quit the TUI and the messages on screen are gone, even though the daemon still has the thread. Two TUI processes do not share a screen. A run whose client has gone still spends the model call. Those tokens are not shown later.
