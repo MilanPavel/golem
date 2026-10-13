@@ -90,9 +90,15 @@ Until the event log exists, the TUI keeps the messages it has shown, and only fo
 
 ## The daemon
 
+<img src="images/daemon.jpg" alt="The golem walks the lanes of old Prague at night with a lantern while the rabbi stays at his window" width="280" align="left" hspace="20" vspace="4">
+
+*Like the golem of Prague, the daemon keeps working through the night while its master is away.*
+
 One daemon per user. It starts when you log in, and launchd starts it again if it crashes. Closing the TUI does not stop it. That is the point: a chat can finish, or wait for your approval, while the TUI is closed.
 
 Clients reach it through a Unix socket at `~/.golem/run/golem.sock`. The file mode is `0600`, so only your user can open it. That permission is the login check. There is no account and no password. `run/golem.pid` is the lock that lets a restart delete a socket left behind by a crash. [ADR-004](adr/004-pid-lock.md) is that lock.
+
+<br clear="left">
 
 ### What the daemon owns
 
@@ -173,9 +179,15 @@ Each log record is written twice: a short line on stderr, and a JSON line in `lo
 
 ## The protocol
 
+<img src="images/protocol.jpg" alt="The rabbi slides a scroll marked with JSON braces into the slot in the golem's chest" width="280" align="left" hspace="20" vspace="4">
+
+*In the legend, the golem obeyed only what was written on the shem, the scroll in its chest. The daemon is the same: it acts only on messages in the agreed shape.*
+
 The protocol exists so a client never has to understand the daemon's insides.
 
 The graph library has its own message classes, and those classes change. If the TUI spoke those classes, every client would be tied to that library, and a reconnect would have no stable history to read. So the daemon translates. What crosses the socket is our messages only.
+
+<br clear="left">
 
 ### Two directions
 
