@@ -35,6 +35,9 @@ function deltaEvent(): unknown {
 
 function attach(socket: Socket, options: FakeOptions): void {
   let buffer = "";
+  socket.on("error", () => {
+    // The client may close while a reply is still being written.
+  });
   socket.on("data", (chunk: Buffer) => {
     buffer += chunk.toString("utf8");
     let newline = buffer.indexOf("\n");
