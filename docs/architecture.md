@@ -1,14 +1,20 @@
 # Architecture
 
-Golem is one long-running program, and several clients that attach to it. This file explains those pieces in plain words: the daemon, the clients, the protocol between them, and where the data lives.
+<img src="images/map.jpg" alt="A pen-and-ink study of the clay golem inscribed in a circle and a square, arms in two positions" width="280" align="left" hspace="20" vspace="4">
+
+*First the body, set in a circle and a square. The street, the socket, and the screen are built around that figure.*
+
+Golem is one long-running program, and several clients that attach to it. This file explains those pieces in plain words: the daemon, the clients, the protocol between them, the screen, and where the data lives.
 
 The choice behind each piece is in [adr/](adr/README.md). How the Python and TypeScript trees share one repository is in [monorepo.md](monorepo.md).
+
+<br clear="left">
 
 ## The short version
 
 The **daemon** is the process that does the work. It keeps running after you close a terminal. Chats, tool calls, and long flows live there. The model is only ever called from the daemon.
 
-A **client** attaches to that work. The TUI and the `golem` command are clients today. A timer or a file watch will be one later. A client connects, sends commands, and draws the events it receives. It does not hold the model's memory. How the TUI looks and which keys it takes is in [ADR-005](adr/005-client-package.md).
+A **client** attaches to that work. The TUI and the `golem` command are clients today. A timer or a file watch will be one later. A client connects, sends commands, and draws the events it receives. It does not hold the model's memory. The screen itself is [the last chapter](#the-tui). The choices behind it are in [ADR-005](adr/005-client-package.md).
 
 The **protocol** is the only language between them. The daemon is Python. The clients are TypeScript. They do not share objects. They share message shapes, written once and generated for both sides.
 
@@ -237,3 +243,122 @@ After `hello`, a client sends `ping` every few seconds so a half-open socket is 
 Those shapes are written once, as Python classes in `golem_protocol`. `just gen` writes JSON Schema, then TypeScript, into `packages/protocol/gen/`. `@golem/client` imports the generated types, and the TUI and `golem status` both use that client. A hand-written TypeScript copy would drift, and the bug would show up as a wrong screen. Here `just check` fails if the generated files do not match the classes.
 
 Adding a message is the same every time. Add a class, run `just gen`, and the client sees a typed payload.
+
+## The TUI
+
+<img src="images/tui.jpg" alt="The rabbi paints a dark mark onto the golem's chest with a brush and palette" width="280" align="left" hspace="20" vspace="4">
+
+*The body is already standing. The brush is still laying on the mark.*
+
+The TUI is `@golem/tui`. `main.tsx` opens one client, takes the alternate screen, and mounts `App`. The screen draws. It does not run the model, and it does not open the socket. `@golem/client` does that. `golem status` uses the same library, asks once, and exits. The TUI asks the client to reconnect.
+
+The picture is rebuilt on every paint. `chrome.ts`, `layout-chat.ts`, and `debug-view.ts` turn memory into rows, and those rows are thrown away. What stays is the conversation, the draft, and a few facts about the link.
+
+<br clear="left">
+
+### A line, from the keys to the screen
+
+Enter does not insert your sentence. `applyComposer` decides first. A line that starts with `/` is a local command. Anything else is text to send, and a line that starts with `//` is text too: the two slashes are stripped so a message can itself start with `/`.
+
+```mermaid
+sequenceDiagram
+  participant You
+  participant App
+  participant Client
+  participant Daemon
+  You->>App: Enter
+  App->>App: applyComposer
+  App->>Client: sendMessage
+  Client->>Daemon: message.send
+  Daemon-->>App: message.completed, your line
+  App->>App: reduceChat
+  Daemon-->>App: run.started, message.started
+  Daemon-->>Client: message.delta, many times
+  Note over App: collect for 16ms, then one update
+  Daemon-->>App: message.completed, run.completed
+```
+
+`message.send` only answers that a run started. Your line appears when `message.completed` comes back, and the draft is already cleared. If the send fails, the draft returns and the banner turns red. If the code is `SESSION_NOT_FOUND` (`-32003`), the screen drops the session, puts the draft back, and opens a new one.
+
+`/debug` opens a panel. `/debug wire` and `/debug model` pick a tab. `/debug hold` keeps the next line on the screen and does not send it. `/debug go` sends that held line. Esc closes the panel. Tab swaps the tab.
+
+### The screen, top to bottom
+
+Read this from top to bottom. Each box is one horizontal band. A band that has nothing to show takes no rows. The transcript receives every row the others leave.
+
+```mermaid
+flowchart TB
+  header["Header<br>logo, or one summary line"]
+  body["Transcript<br>the chat, and it fills what is left"]
+  debug["Debug<br>only after /debug"]
+  banner["Banner<br>only for an error or a notice"]
+  meter["Meter<br>only while a reply is in progress"]
+  composer["Composer<br>the line you are typing"]
+  status["Status<br>connection, model, folder"]
+  header --> body --> debug --> banner --> meter --> composer --> status
+```
+
+A window at least 20 rows tall and 42 columns wide gives the header the logo: 18 columns, 7 rows, because two pixel rows share one cell. Beside it sit the daemon version, the model (`name · profile`), and the folder. A smaller window uses one line: `█ golem`, then the model, then the folder. No rows at all draws nothing.
+
+The other bands ask for rows only when they are needed.
+
+- The debug panel wants 7.
+- The composer wants up to 5 for a long draft, or 1 while a reply is in progress. That one row is `…`, and typing is ignored.
+- The meter wants 1 while a reply is in progress: `thinking`, then `writing · N chars · Ns`, with a small block that moves.
+- An error wants 1 row in red. A notice wants 1 row in yellow.
+- The status line wants 1: the connection word, the model, the folder. A narrow window drops the folder first, then the model.
+
+A 24×80 terminal becomes a frame 79 columns wide. One column is left unused, because a glyph in the last column would wrap and scroll the header away. With the logo, a one-line composer, and the status line, the chat has 15 rows.
+
+If the window is short, bands give rows back until the chat still has one. In order: the debug panel shrinks toward 3 rows, the composer shrinks to one line, the meter goes away, the logo collapses to one line, the banner goes away, the debug panel goes away, the header goes away, the composer goes away, and last the status line.
+
+Inside the transcript, messages are painted in order with a blank line between them. Each starts with a bold `you` or `golem`. Your lines sit on a clay background. While `streaming` is set, the text is wrapped as plain characters. When the answer is finished, the same text is drawn as markdown. If the laid-out lines are taller than the band, a scrollbar appears (`│`, with `█` as the thumb) and the text uses one fewer column.
+
+Scroll is how many lines sit below the window. Zero means the newest line is on screen. Page Up, Page Down, Home, End, and the wheel move it. The wheel moves the debug panel instead while that panel is open.
+
+The debug band keeps its first row for the title. The wire tab lists recent protocol lines and hides pings, though the title still counts them. The model tab lists the checkpoint from `session.inspect`. If the on-screen count and `message_count` differ, a yellow line says `screen N · model M`.
+
+### What the screen keeps
+
+`chat` is the conversation: a list of messages, plus four fields. Each message has an id, a role, the text so far, and `streaming`. `busy` is true while the model works. `error` is the red line. `notice` is the yellow line. `runStartedAt` is the timestamp the meter uses for seconds.
+
+`reduceChat` folds one event at a time. It does not keep the events.
+
+| Event | What the screen does |
+|---|---|
+| `message.completed` | Insert the message, or replace it when the id is already there. Streaming turns off. |
+| `run.started` | `busy` on, error cleared, start time stored. |
+| `message.started` | Append an empty assistant message, streaming on. |
+| `message.delta` | Append text to that id. An unknown id changes nothing. |
+| `run.completed` | `busy` off. |
+| `run.failed` | `busy` off, and `error` is the daemon's message. |
+
+Deltas do not take that path one socket frame at a time. They wait in a small map, grouped by message id, for about 16 milliseconds, then land as one update. When the answer finishes, that map is emptied first, and `message.completed` replaces the text with the full answer. `session.created` does not change `chat`. The screen reads the model off that event on its own.
+
+If the socket drops, `busy` turns off. The half-written answer stays, still marked streaming, so it is not passed through markdown. Nothing deletes old messages. The list lasts as long as this TUI process. The daemon's copy is the checkpoint.
+
+The draft is the composer text. Keystrokes add to it. Enter clears it only when the line is sent.
+
+The link is remembered as `connection`: connecting, connected, reconnecting, closed, or rejected. The status line paints that word green, yellow, or red. `sessionId` is this chat on the daemon. Until it exists, and until the link is connected, typing does nothing. The header's model prefers the session's profile, provider, and name, and fills any hole from `daemon.status`.
+
+`offset` is the transcript scroll. `debugOffset` is the same count inside the debug panel. `tick` increases ten times a second while `busy` is true. The screen never prints it. It exists so the meter block moves.
+
+The debug panel remembers whether it is open, which tab is showing, whether hold is on, and the text held back from sending. `wire` is a copy of the client's last protocol lines, at most 50. `modelMessages` is a second copy of the conversation, loaded when the model tab opens, when hold turns on, and when a run finishes while the panel is open. It does not update on each token. A slow inspect is dropped when a newer one has already started.
+
+Keystrokes and socket messages arrive in callbacks that cannot see the latest React values. The session id, the draft, the busy flag, the connection, and the debug panel are also kept in refs for those callbacks. There is still one conversation.
+
+### The shared client
+
+```mermaid
+flowchart LR
+  tui["TUI"] --> client["@golem/client"]
+  cli["golem status"] --> client
+  client --> sock["Unix socket"]
+  sock --> daemon["Daemon"]
+```
+
+`main.tsx` calls `connectGolem` with the name `tui` and reconnect turned on. The socket is `~/.golem/run/golem.sock`, or under `GOLEM_HOME` when that is set. The first line is `hello`. After the daemon accepts the protocol version, the screen asks for `daemon.status` and `session.create`.
+
+Every 5 seconds the client sends `ping` with a fresh nonce. If the matching reply does not arrive within 10 seconds, the socket is dropped. The first reconnect wait is at most 200 milliseconds. Later waits double, up to 5 seconds. A protocol major mismatch sets the state to `rejected` and stops the retries. `golem status` is the other way around: `reconnect: false`, one `daemon.status`, then `close()`.
+
+The client does not build the transcript. It hands each `event` line to `App`. It also keeps those last 50 lines, which the debug panel copies.
