@@ -1,3 +1,5 @@
+from typing import get_args
+
 import pytest
 from pydantic import TypeAdapter, ValidationError
 
@@ -10,6 +12,7 @@ from golem_protocol.commands import (
 from golem_protocol.events import (
     ChatEvent,
     EmptyEventData,
+    EventType,
     MessageCompletedData,
     MessageCompletedEvent,
     MessageDeltaData,
@@ -94,6 +97,12 @@ def test_session_created_names_the_configured_model() -> None:
     assert SessionCreatedData.model_validate_json(data.model_dump_json()) == data
     with pytest.raises(ValidationError):
         SessionCreatedData(model_profile="remote", model_name="")
+
+
+def test_event_type_lists_every_chat_event() -> None:
+    members = get_args(get_args(ChatEvent)[0])
+    declared = {get_args(member.model_fields["type"].annotation)[0] for member in members}
+    assert declared == set(get_args(EventType))
 
 
 def test_chat_event_rejects_the_wrong_payload() -> None:

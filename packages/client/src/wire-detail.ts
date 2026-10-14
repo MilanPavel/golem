@@ -1,0 +1,79 @@
+import { isRecord } from "./guards.ts";
+import type { WireFrame } from "./wire.ts";
+
+export function eventFrame(params: unknown): WireFrame {
+  if (!isRecord(params) || typeof params["type"] !== "string") {
+    return { direction: "in", kind: "event" };
+  }
+  const data = isRecord(params["data"]) ? params["data"] : undefined;
+  if (params["type"] === "message.delta") {
+    const text = data !== undefined && typeof data["text"] === "string" ? data["text"] : "";
+    return { direction: "in", kind: "message.delta", chars: text.length, detail: text };
+  }
+  const seq = typeof params["seq"] === "number" ? `seq ${params["seq"]}` : "";
+  return { direction: "in", kind: params["type"], detail: eventDetail(params["type"], seq, data) };
+}
+
+export function outgoingDetail(method: string, params: Record<string, unknown>): string {
+  if (method === "ping") {
+    return "";
+  }
+  if (method === "message.send" && typeof params["text"] === "string") {
+    return flat(params["text"]);
+  }
+  if (typeof params["session_id"] === "string") {
+    return params["session_id"];
+  }
+  return "";
+}
+
+export function resultDetail(method: string, result: unknown): string {
+  if (method === "ping" || !isRecord(result)) {
+    return "";
+  }
+  if (method === "message.send" && typeof result["run_id"] === "string") {
+    return result["run_id"];
+  }
+  if (method === "session.create" && typeof result["session_id"] === "string") {
+    return result["session_id"];
+  }
+  if (method === "session.inspect" && typeof result["message_count"] === "number") {
+    return `${result["message_count"]} messages`;
+  }
+  if (method === "daemon.status" && typeof result["model_name"] === "string") {
+    return result["model_name"];
+  }
+  return "";
+}
+
+export function flat(text: string): string {
+  return text.replace(/\s+/g, " ").trim();
+}
+
+function eventDetail(type: string, seq: string, data: Record<string, unknown> | undefined): string {
+  const parts: string[] = [];
+  if (seq.length > 0) {
+    parts.push(seq);
+  }
+  if (data === undefined) {
+    return parts.join("  ");
+  }
+  if (type === "message.completed" || type === "message.started") {
+    if (typeof data["role"] === "string") {
+      parts.push(data["role"]);
+    }
+    if (typeof data["text"] === "string" && data["text"].length > 0) {
+      parts.push(flat(data["text"]));
+    }
+  } else if (type === "run.failed" && typeof data["message"] === "string") {
+    parts.push(flat(data["message"]));
+  } else if (type === "session.created") {
+    const name = typeof data["model_name"] === "string" ? data["model_name"] : "";
+    const profile = typeof data["model_profile"] === "string" ? data["model_profile"] : "";
+    const model = [name, profile].filter((part) => part.length > 0).join(" · ");
+    if (model.length > 0) {
+      parts.push(model);
+    }
+  }
+  return parts.join("  ");
+}

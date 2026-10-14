@@ -2,30 +2,29 @@ import { randomUUID } from "node:crypto";
 import net from "node:net";
 
 import type { DaemonStatus } from "../../protocol/gen/daemon-status.ts";
-import type { HelloResult } from "../../protocol/gen/hello-result.ts";
 import type { MessageSendResult } from "../../protocol/gen/message-send-result.ts";
-import type { Ping } from "../../protocol/gen/ping.ts";
 import type { Params as ChatEvent } from "../../protocol/gen/rpc-notification.ts";
 import type { SessionCreateResult } from "../../protocol/gen/session-create-result.ts";
 import type { SessionInspectResult } from "../../protocol/gen/session-inspect-result.ts";
 import { PROTOCOL_MAJOR, PROTOCOL_MINOR } from "../../protocol/gen/version.ts";
 import { backoffDelayMs } from "./backoff.ts";
+import {
+  asChatEvent,
+  isDaemonStatus,
+  isHelloResult,
+  isMessageSendResult,
+  isPing,
+  isRecord,
+  isSessionCreateResult,
+  isSessionInspectResult,
+} from "./guards.ts";
 import { pushWire, type WireFrame, type WireLine } from "./wire.ts";
+import { eventFrame, flat, outgoingDetail, resultDetail } from "./wire-detail.ts";
 
 const PROTOCOL_MISMATCH = -32001;
 export const SESSION_NOT_FOUND = -32003;
 export const SESSION_BUSY = -32004;
 export const MODEL_NOT_CONFIGURED = -32005;
-
-const EVENT_TYPES = new Set([
-  "session.created",
-  "message.started",
-  "message.delta",
-  "message.completed",
-  "run.started",
-  "run.completed",
-  "run.failed",
-]);
 
 export type { ChatEvent };
 const DEFAULT_HEARTBEAT_MS = 5_000;
@@ -433,149 +432,4 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       setState({ status: "closed", reason: "closed" });
     },
   };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function isHelloResult(value: unknown): value is HelloResult {
-  return isRecord(value) && typeof value["protocol_major"] === "number";
-}
-
-function isPing(value: unknown): value is Ping {
-  return isRecord(value) && value["type"] === "system.ping" && typeof value["nonce"] === "string";
-}
-
-function asChatEvent(value: unknown): ChatEvent | undefined {
-  if (!isRecord(value)) {
-    return undefined;
-  }
-  const type = value["type"];
-  if (typeof type !== "string" || !EVENT_TYPES.has(type)) {
-    return undefined;
-  }
-  if (typeof value["seq"] !== "number" || typeof value["session_id"] !== "string") {
-    return undefined;
-  }
-  if (!isRecord(value["data"])) {
-    return undefined;
-  }
-  return value as unknown as ChatEvent;
-}
-
-function eventFrame(params: unknown): WireFrame {
-  if (!isRecord(params) || typeof params["type"] !== "string") {
-    return { direction: "in", kind: "event" };
-  }
-  const data = isRecord(params["data"]) ? params["data"] : undefined;
-  if (params["type"] === "message.delta") {
-    const text = data !== undefined && typeof data["text"] === "string" ? data["text"] : "";
-    return { direction: "in", kind: "message.delta", chars: text.length, detail: text };
-  }
-  const seq = typeof params["seq"] === "number" ? `seq ${params["seq"]}` : "";
-  return { direction: "in", kind: params["type"], detail: eventDetail(params["type"], seq, data) };
-}
-
-function eventDetail(type: string, seq: string, data: Record<string, unknown> | undefined): string {
-  const parts: string[] = [];
-  if (seq.length > 0) {
-    parts.push(seq);
-  }
-  if (data === undefined) {
-    return parts.join("  ");
-  }
-  if (type === "message.completed" || type === "message.started") {
-    if (typeof data["role"] === "string") {
-      parts.push(data["role"]);
-    }
-    if (typeof data["text"] === "string" && data["text"].length > 0) {
-      parts.push(flat(data["text"]));
-    }
-  } else if (type === "run.failed" && typeof data["message"] === "string") {
-    parts.push(flat(data["message"]));
-  } else if (type === "session.created") {
-    const name = typeof data["model_name"] === "string" ? data["model_name"] : "";
-    const profile = typeof data["model_profile"] === "string" ? data["model_profile"] : "";
-    const model = [name, profile].filter((part) => part.length > 0).join(" · ");
-    if (model.length > 0) {
-      parts.push(model);
-    }
-  }
-  return parts.join("  ");
-}
-
-function outgoingDetail(method: string, params: Record<string, unknown>): string {
-  if (method === "ping") {
-    return "";
-  }
-  if (method === "message.send" && typeof params["text"] === "string") {
-    return flat(params["text"]);
-  }
-  if (typeof params["session_id"] === "string") {
-    return params["session_id"];
-  }
-  return "";
-}
-
-function resultDetail(method: string, result: unknown): string {
-  if (method === "ping" || !isRecord(result)) {
-    return "";
-  }
-  if (method === "message.send" && typeof result["run_id"] === "string") {
-    return result["run_id"];
-  }
-  if (method === "session.create" && typeof result["session_id"] === "string") {
-    return result["session_id"];
-  }
-  if (method === "session.inspect" && typeof result["message_count"] === "number") {
-    return `${result["message_count"]} messages`;
-  }
-  if (method === "daemon.status" && typeof result["model_name"] === "string") {
-    return result["model_name"];
-  }
-  return "";
-}
-
-function flat(text: string): string {
-  return text.replace(/\s+/g, " ").trim();
-}
-
-function isSessionCreateResult(value: unknown): value is SessionCreateResult {
-  return isRecord(value) && typeof value["session_id"] === "string";
-}
-
-function isMessageSendResult(value: unknown): value is MessageSendResult {
-  return isRecord(value) && typeof value["run_id"] === "string";
-}
-
-function isSessionInspectResult(value: unknown): value is SessionInspectResult {
-  return (
-    isRecord(value) &&
-    typeof value["session_id"] === "string" &&
-    typeof value["model_profile"] === "string" &&
-    typeof value["message_count"] === "number" &&
-    Array.isArray(value["messages"]) &&
-    isOptionalString(value["model_provider"]) &&
-    isOptionalString(value["model_name"])
-  );
-}
-
-function isOptionalString(value: unknown): boolean {
-  return value === undefined || value === null || (typeof value === "string" && value.length > 0);
-}
-
-function isDaemonStatus(value: unknown): value is DaemonStatus {
-  return (
-    isRecord(value) &&
-    typeof value["pid"] === "number" &&
-    typeof value["version"] === "string" &&
-    typeof value["protocol_major"] === "number" &&
-    typeof value["protocol_minor"] === "number" &&
-    typeof value["uptime_seconds"] === "number" &&
-    (value["state"] === "running" || value["state"] === "draining") &&
-    isOptionalString(value["model_profile"]) &&
-    isOptionalString(value["model_provider"]) &&
-    isOptionalString(value["model_name"])
-  );
 }

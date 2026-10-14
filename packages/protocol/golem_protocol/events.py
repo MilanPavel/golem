@@ -168,6 +168,18 @@ class RunFailedEvent(BaseModel):
     data: RunFailedData
 
 
+EventType = Literal[
+    "session.created",
+    "message.started",
+    "message.delta",
+    "message.completed",
+    "run.started",
+    "run.completed",
+    "run.failed",
+]
+"""The ``type`` of each :data:`ChatEvent` member."""
+
+
 ChatEvent = Annotated[
     SessionCreatedEvent
     | MessageStartedEvent
@@ -183,6 +195,7 @@ ChatEvent = Annotated[
 __all__ = [
     "ChatEvent",
     "EmptyEventData",
+    "EventType",
     "MessageCompletedData",
     "MessageCompletedEvent",
     "MessageDeltaData",

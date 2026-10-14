@@ -20,8 +20,8 @@ from golem.server.dispatcher import (
     RequestContext,
     RpcCallError,
 )
+from golem.sessions.log import EventSink
 from golem.sessions.manager import (
-    EventSink,
     SchemaMismatchError,
     SessionBusyError,
     SessionManager,
