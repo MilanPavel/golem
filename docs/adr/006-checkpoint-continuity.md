@@ -7,7 +7,7 @@
 
 A later turn has to see the earlier ones after the daemon restarts. The sentences on the screen are a different store.
 
-`checkpoints.db` is the memory the model reads. The messages on screen belong to the TUI process that reduced them from live events. A durable event log, and a client that rebuilds the screen from it, wait until that log exists.
+`checkpoints.db` is the memory the model reads. The messages on screen belong to the TUI process that reduced them from live events. The durable event log now exists in `golem.db`. A client that rebuilds the screen from it waits for `session.attach`.
 
 ## What the code does today
 
@@ -15,7 +15,9 @@ A later turn has to see the earlier ones after the daemon restarts. The sentence
 
 The TUI calls `session.create` once. A reconnect does not call it again. The next `message.send` loads `thread_id = session_id`. A session that was created and never sent has no checkpoint, so `message.send` returns `-32003`. The TUI starts a new session and says the old one was not found.
 
-Events are JSON-RPC notifications with method `event`: `session.created`, `message.started`, `message.delta`, `message.completed`, `run.started`, `run.completed`, `run.failed`. `seq` is counted in memory per session and starts again at 1 after a daemon restart. If the socket drops mid-run, the graph task still finishes and still checkpoints. Events that cannot be written are dropped. Nothing is replayed.
+Events are JSON-RPC notifications with method `event`: `session.created`, `message.started`, `message.delta`, `message.completed`, `run.started`, `run.completed`, `run.failed`. Every event is written to `golem.db` before it goes to the socket, and `seq` continues from the log after a restart. Deltas are deleted when their `message.completed` is written, so `seq` can have gaps. If the socket drops mid-run, the graph task still finishes and still checkpoints. Nothing is replayed to a client yet.
+
+A run that was still open when the daemon stopped is closed at the next start. Its assistant message gets a `message.completed` with the text streamed so far and `interrupted: true`, then `run.failed`. That partial text is also written into the checkpoint, so the next turn sees what the screen showed.
 
 Closing the TUI drops the transcript. Restarting the daemon, then sending on the same session, keeps the model context.
 

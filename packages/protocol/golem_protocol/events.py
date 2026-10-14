@@ -6,7 +6,7 @@
 
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 
 _CONFIG = ConfigDict(extra="forbid", frozen=True)
 
@@ -54,13 +54,18 @@ class MessageDeltaData(BaseModel):
 
 
 class MessageCompletedData(BaseModel):
-    """Full text of a user or assistant message."""
+    """Full text of a user or assistant message.
+
+    ``interrupted`` is true when the run stopped before the model finished.
+    ``text`` is then what had streamed so far.
+    """
 
     model_config = _CONFIG
 
     message_id: str = Field(min_length=1)
     role: Literal["user", "assistant"]
     text: str
+    interrupted: bool = False
 
 
 class EmptyEventData(BaseModel):
@@ -191,8 +196,12 @@ ChatEvent = Annotated[
     Field(discriminator="type"),
 ]
 
+CHAT_EVENT: TypeAdapter[ChatEvent] = TypeAdapter(ChatEvent)
+"""Validates a plain mapping or JSON into one :data:`ChatEvent`."""
+
 
 __all__ = [
+    "CHAT_EVENT",
     "ChatEvent",
     "EmptyEventData",
     "EventType",

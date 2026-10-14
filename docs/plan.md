@@ -70,7 +70,7 @@ A phased plan for building a terminal-operated agent ("the golem"): a long-runni
   - `checkpoints.db` — the LangGraph checkpointer. It is kept separate so it can be wiped or migrated independently.
   - `memory.db` — the long-term store and vectors.
   - `skills/`, `flows/`, `config.toml`, `logs/`.
-- **Clients** attach, replay the needed events, and stream. Until the event log exists, the TUI holds the transcript itself. [ADR-006](adr/006-checkpoint-continuity.md).
+- **Clients** attach, replay the needed events, and stream. The event log exists. Until `session.attach` does, the TUI holds the transcript itself. [ADR-006](adr/006-checkpoint-continuity.md).
 
 ### Tech stack (verify versions at each phase)
 
@@ -138,7 +138,8 @@ golem/
 │  ├─ daemon/              # Python package `golem`
 │  │  └─ golem/
 │  │     ├─ server/        #   socket server, JSON-RPC dispatch
-│  │     ├─ sessions/      #   create, send, in-memory seq (no event log yet)
+│  │     ├─ sessions/      #   create, send, event numbering, run recovery
+│  │     ├─ store/         #   golem.db: migrations, event log, session and run rows
 │  │     ├─ graphs/        #   chat graph and stream adapter
 │  │     ├─ models/        #   one profile: anthropic, openai, or openai_compat
 │  │     ├─ flows/         #   later: flow registry
@@ -162,7 +163,7 @@ golem/
 
 ## 4. Protocol (draft v1)
 
-JSON-RPC 2.0 framed as newline-delimited JSON over the Unix socket. Protocol 1.1 is on the wire: `hello`, `daemon.status`, `ping`, `session.create`, `message.send`, and `event` notifications for `session.created`, `message.started`, `message.delta`, `message.completed`, `run.started`, `run.completed`, `run.failed`. `seq` is counted in memory per session and starts again at 1 after a daemon restart. The tables below are the rest of v1, not built yet.
+JSON-RPC 2.0 framed as newline-delimited JSON over the Unix socket. Protocol 1.4 is on the wire: `hello`, `daemon.status`, `ping`, `session.create`, `message.send`, `session.inspect`, and `event` notifications for `session.created`, `message.started`, `message.delta`, `message.completed`, `run.started`, `run.completed`, `run.failed`. Every event is stored in `golem.db` before it is sent, so `seq` survives a daemon restart. It is monotonic per session, with gaps where deltas were coalesced. The tables below are the rest of v1, not built yet.
 
 ### Envelope for server → client events (JSON-RPC notifications)
 
@@ -211,6 +212,8 @@ The daemon listens on `~/.golem/run/golem.sock`, survives a crash via launchd, a
 A chat is `START → call_model → END`. `session.create` and `message.send` stream `message.delta` into the TUI, and the finished bubble is markdown. Model context lives in `checkpoints.db` with `thread_id = session_id`. Closing the TUI drops the on-screen transcript. ADR-006 records that split.
 
 One profile is configured with flat settings: `model_provider` (`anthropic`, `openai`, or `openai_compat`), `model_name`, and `model_base_url`. `openai_compat` defaults to Ollama at `http://127.0.0.1:11434/v1` and does not read an API key. The profile table, routing policy, budgets, and compaction are still phase 6.
+
+From phase 3 so far: every event is written to `golem.db` (`events`, plus the `sessions` and `runs` tables derived from it) before it is sent, so `seq` and sessions survive a restart. Checkpoint messages carry the protocol message ids. A run left open by a stopped daemon is closed at the next start, with its partial reply in both the log and the checkpoint.
 
 ---
 

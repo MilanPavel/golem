@@ -58,9 +58,10 @@ class ScriptedChatModel(BaseChatModel):
 
 
 class GatedChatModel(BaseChatModel):
-    """Blocks inside the stream until :attr:`release` is set."""
+    """Streams ``streamed`` one character at a time, then blocks until :attr:`release`."""
 
     reply: str = "ok"
+    streamed: str = ""
     _started: asyncio.Event = PrivateAttr(default_factory=asyncio.Event)
     _release: asyncio.Event = PrivateAttr(default_factory=asyncio.Event)
 
@@ -94,6 +95,8 @@ class GatedChatModel(BaseChatModel):
         **kwargs: Any,
     ) -> AsyncIterator[ChatGenerationChunk]:
         del messages, stop, run_manager, kwargs
+        for char in self.streamed:
+            yield ChatGenerationChunk(message=AIMessageChunk(content=char))
         self._started.set()
         await self._release.wait()
         yield ChatGenerationChunk(message=AIMessageChunk(content=self.reply))

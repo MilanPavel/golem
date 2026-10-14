@@ -230,6 +230,7 @@ name = "golem"
 version = "0.0.0"
 source = { editable = "packages/daemon" }
 dependencies = [
+    { name = "aiosqlite" },
     { name = "golem-protocol" },
     { name = "langchain-anthropic" },
     { name = "langchain-core" },
@@ -242,6 +243,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "aiosqlite", specifier = ">=0.22" },
     { name = "golem-protocol", editable = "packages/protocol" },
     { name = "langchain-anthropic", specifier = ">=1.7.5" },
     { name = "langchain-core", specifier = ">=1.6.7" },

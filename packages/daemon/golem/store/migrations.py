@@ -1,0 +1,50 @@
+"""Schema for ``golem.db``, one tuple of statements per ``user_version``.
+
+Append a migration. Never edit one that has shipped.
+"""
+
+from __future__ import annotations
+
+MIGRATIONS: tuple[tuple[str, ...], ...] = (
+    (
+        """
+        CREATE TABLE sessions (
+            session_id TEXT PRIMARY KEY,
+            model_profile TEXT NOT NULL,
+            title TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            forked_from_session_id TEXT,
+            forked_from_message_id TEXT
+        )
+        """,
+        """
+        CREATE TABLE runs (
+            run_id TEXT PRIMARY KEY,
+            session_id TEXT NOT NULL REFERENCES sessions (session_id),
+            status TEXT NOT NULL,
+            started_at TEXT NOT NULL,
+            ended_at TEXT,
+            error TEXT
+        )
+        """,
+        "CREATE INDEX runs_status ON runs (status)",
+        """
+        CREATE TABLE events (
+            session_id TEXT NOT NULL REFERENCES sessions (session_id),
+            seq INTEGER NOT NULL,
+            ts TEXT NOT NULL,
+            type TEXT NOT NULL,
+            run_id TEXT,
+            message_id TEXT,
+            data TEXT NOT NULL,
+            PRIMARY KEY (session_id, seq)
+        ) WITHOUT ROWID
+        """,
+        """
+        CREATE INDEX events_message ON events (session_id, message_id)
+        WHERE message_id IS NOT NULL
+        """,
+        "CREATE INDEX events_run ON events (run_id) WHERE run_id IS NOT NULL",
+    ),
+)

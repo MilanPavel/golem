@@ -4,6 +4,7 @@ version = "0.0.0"
 description = "Golem daemon."
 requires-python = ">=3.12"
 dependencies = [
+  "aiosqlite>=0.22",
   "golem-protocol",
   "langchain-anthropic>=1.7.5",
   "langchain-core>=1.6.7",

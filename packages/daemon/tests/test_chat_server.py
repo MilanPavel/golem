@@ -203,6 +203,7 @@ async def test_restart_continues_the_same_thread(short_home: Path) -> None:
         await client.close()
         await stop_daemon(app, task)
 
+    last_seq = max(_seqs(client.events))
     app, task = await start_daemon(short_home, router=router)
     client = await RpcClient.connect(app.paths.socket_path)
     try:
@@ -210,6 +211,44 @@ async def test_restart_continues_the_same_thread(short_home: Path) -> None:
         await client.call("message.send", {"session_id": session_id, "text": "two"})
         await client.wait_for_event("run.completed")
         assert model.seen[1] == ["one", "alpha", "two"]
+        assert min(_seqs(client.events)) == last_seq + 1
     finally:
         await client.close()
         await stop_daemon(app, task)
+
+
+async def test_a_session_never_sent_survives_a_restart(short_home: Path) -> None:
+    model = ScriptedChatModel(replies=["alpha"])
+    router = ModelRouter(model=model)
+    app, task = await start_daemon(short_home, router=router)
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        created = rpc_result(await client.call("session.create", {}))
+        session_id = created["session_id"]
+        assert isinstance(session_id, str)
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+
+    app, task = await start_daemon(short_home, router=router)
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        sent = await client.call("message.send", {"session_id": session_id, "text": "one"})
+        assert "result" in sent
+        await client.wait_for_event("run.completed")
+        assert model.seen[0] == ["one"]
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+
+
+def _seqs(events: list[dict[str, object]]) -> list[int]:
+    seqs: list[int] = []
+    for event in events:
+        params = _record(event.get("params"))
+        seq = params.get("seq") if params else None
+        if isinstance(seq, int):
+            seqs.append(seq)
+    return seqs

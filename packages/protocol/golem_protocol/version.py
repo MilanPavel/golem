@@ -5,4 +5,4 @@ A break in a shape already on the wire bumps the major number.
 """
 
 PROTOCOL_MAJOR = 1
-PROTOCOL_MINOR = 3
+PROTOCOL_MINOR = 4

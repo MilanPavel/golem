@@ -2,8 +2,13 @@
   "$defs": {
     "MessageCompletedData": {
       "additionalProperties": false,
-      "description": "Full text of a user or assistant message.",
+      "description": "Full text of a user or assistant message.\n\n``interrupted`` is true when the run stopped before the model finished.\n``text`` is then what had streamed so far.",
       "properties": {
+        "interrupted": {
+          "default": false,
+          "title": "Interrupted",
+          "type": "boolean"
+        },
         "message_id": {
           "minLength": 1,
           "title": "Message Id",

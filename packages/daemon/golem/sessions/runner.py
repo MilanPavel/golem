@@ -57,6 +57,8 @@ async def run_turn(runtime: ChatRuntime, events: SessionLog, turn: Turn, sink: E
             text=turn.text,
             model_profile=turn.model_profile,
             schema_version=turn.schema_version,
+            user_message_id=turn.user_message_id,
+            assistant_message_id=turn.assistant_message_id,
         ):
             fact = translate(part)
             if isinstance(fact, TextDelta):

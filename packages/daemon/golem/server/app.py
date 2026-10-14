@@ -15,7 +15,7 @@ from pathlib import Path
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 from golem.config import load_settings
-from golem.graphs.chat import open_chat
+from golem.graphs.chat import ChatRuntime, open_chat
 from golem.lock import DaemonAlreadyRunning, DaemonLock
 from golem.logging import configure_logging
 from golem.models.router import ModelRouter
@@ -30,7 +30,12 @@ from golem.server.dispatcher import (
 from golem.server.framing import MAX_LINE_BYTES, FrameTooLong, read_frame
 from golem.server.handlers import standard_methods
 from golem.server.state import DaemonState
+from golem.sessions.log import SessionLog
 from golem.sessions.manager import SessionManager
+from golem.sessions.recovery import recover_runs
+from golem.store.database import Database, DatabaseTooNewError
+from golem.store.events import EventLog
+from golem.store.records import RunRecords, SessionRecords
 
 log = logging.getLogger("golem.server")
 
@@ -100,9 +105,12 @@ class DaemonApp:
             router = self._router or ModelRouter(
                 load_settings(home=self.paths.home, project_dir=self.paths.home),
             )
-            async with AsyncSqliteSaver.from_conn_string(str(self.paths.checkpoints_file)) as saver:
+            async with (
+                Database.open(self.paths.database_file) as database,
+                AsyncSqliteSaver.from_conn_string(str(self.paths.checkpoints_file)) as saver,
+            ):
                 await saver.setup()
-                self.state.sessions = SessionManager(open_chat(router, saver))
+                self.state.sessions = await _open_sessions(database, open_chat(router, saver))
                 try:
                     if install_signals:
                         installed = _install_signals(loop, self.request_shutdown)
@@ -200,6 +208,13 @@ class DaemonApp:
             log.error("client task failed", exc_info=exc)
 
 
+async def _open_sessions(database: Database, runtime: ChatRuntime) -> SessionManager:
+    events = EventLog(database)
+    session_log = SessionLog(events)
+    await recover_runs(RunRecords(database), events, session_log, runtime)
+    return SessionManager(runtime, session_log, SessionRecords(database))
+
+
 def _install_signals(
     loop: asyncio.AbstractEventLoop,
     callback: Callable[[], None],
@@ -246,7 +261,7 @@ async def serve_forever() -> int:
         log.error("%s", exc)
         print(exc, file=sys.stderr)
         return 1
-    except SocketPathTooLong as exc:
+    except (SocketPathTooLong, DatabaseTooNewError) as exc:
         log.error("%s", exc)
         print(exc, file=sys.stderr)
         return 1

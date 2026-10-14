@@ -46,13 +46,13 @@ flowchart LR
   sock["Unix socket<br>~/.golem/run/golem.sock"]
   subgraph daemonProc ["Daemon (Python)"]
     server["Protocol server"]
-    sessions["Session manager<br>(in memory)"]
+    sessions["Session manager"]
     runtime["Graph runtime<br>(LangGraph)"]
     router["Model router"]
   end
   subgraph disk ["~/.golem"]
     ckpt[("checkpoints.db<br>SQLite")]
-    golemdb[("golem.db<br>planned")]
+    golemdb[("golem.db<br>SQLite")]
     memdb[("memory.db<br>planned")]
   end
   model["Model API<br>Anthropic, OpenAI, or local Ollama"]
@@ -65,7 +65,7 @@ flowchart LR
   runtime --> router
   runtime -->|"read, write"| ckpt
   router -->|"HTTPS or local HTTP"| model
-  sessions -.-> golemdb
+  sessions -->|"append events"| golemdb
   runtime -.-> memdb
 ```
 
@@ -74,7 +74,7 @@ What talks to what, and how:
 - **Client to daemon.** A Unix socket file. Each line is one JSON-RPC 2.0 object. No network port is opened.
 - **Inside the daemon.** Ordinary Python calls in one asyncio process. A run is an asyncio task. The graph is a library the session manager calls. It is not a second process.
 - **Daemon to model.** HTTPS to Anthropic or OpenAI, or plain HTTP to an OpenAI-compatible server on this machine, such as Ollama. The model router picks one from the settings.
-- **Daemon to disk.** SQLite files under `~/.golem`. Today only `checkpoints.db` is written, through LangGraph's SQLite checkpointer.
+- **Daemon to disk.** SQLite files under `~/.golem`. `checkpoints.db` is written by LangGraph's SQLite checkpointer. `golem.db` is ours: the event log and the session and run tables, through one `aiosqlite` connection.
 - **Who starts what.** launchd starts the daemon at login and again after a crash. You start the clients.
 
 ## Built today, planned next
@@ -85,14 +85,15 @@ Built today:
 - `@golem/client`, the TUI, and `golem status`.
 - Chat sessions. Each one runs a single agent graph against one configured model.
 - Checkpoints in `checkpoints.db`. They survive a daemon restart. [ADR-006](adr/006-checkpoint-continuity.md) is that choice.
+- The event log in `golem.db`. Every event is written there before it goes to the socket, so sessions, runs, and `seq` survive a restart. A run left open by a stopped daemon is closed at the next start.
 
 Planned next:
 
-- The event log in `golem.db`, and `attach`, so a client that reconnects can rebuild its screen from `seq`.
-- A durable session list. Today it is in memory. After a restart, a session id still works if its checkpoint exists, but `seq` starts again at 1.
+- `attach`, so a client that reconnects rebuilds its screen from the log, after the last `seq` it saw.
+- Cancel, a session list, titles, and fork.
 - Flows, tool permissions, skills, and long-term memory in `memory.db`.
 
-Until the event log exists, the TUI keeps the messages it has shown, and only for as long as the TUI process runs.
+Until `attach` exists, the TUI keeps the messages it has shown, and only for as long as the TUI process runs. The log already has them.
 
 ## The daemon
 
@@ -113,10 +114,10 @@ The socket is only the door. Behind it, these jobs sit in one process:
 | Job | What it does | Status |
 |---|---|---|
 | Protocol server | Reads one JSON line at a time. Runs the command. Writes events back. | Built |
-| Sessions | One chat or one flow run. Each has an id. | Built, list kept in memory |
+| Sessions | One chat or one flow run. Each has an id and a row in `golem.db`. | Built |
 | Graph runtime | The agent loop. Its memory is the checkpoint. | Built |
 | Model router | Turns the configured profile into a chat model. | Built |
-| Event log | The history. A client that reconnects reads it and rebuilds the screen. | Planned |
+| Event log | The history. Every event, numbered by `seq`, written before it is sent. A client that reconnects will read it and rebuild the screen. | Written. Replay to clients planned |
 
 The graph does not own the rest of the product. It calls ordinary Python for three things that have to stay ours:
 
@@ -150,7 +151,11 @@ sequenceDiagram
   TUI-->>You: the screen updates
 ```
 
+Every event in that diagram is written to `golem.db` first, then sent. The checkpoint messages carry the same message ids as the events, so the two stores name the same sentence the same way.
+
 If you quit the TUI halfway through, the daemon still finishes the run and saves the checkpoint. The next message in that session continues from it.
+
+If the daemon itself stops halfway through, the run has no task left to finish it. At the next start the daemon closes it: the open answer gets a `message.completed` with the text streamed so far and `interrupted: true`, then `run.failed`. The same partial text is written into the checkpoint, so the model's next turn sees what the screen showed.
 
 There will be two kinds of graph, on purpose. In an **agent** session, the model picks the next step. In a **flow**, our Python picks the next step, and each expensive step is saved so a resume does not run it again.
 
@@ -167,9 +172,11 @@ The daemon keeps its files under one home directory. `resolve_paths` picks it: a
 | `checkpoints.db` | Model memory for a chat. The thread id is the session id. Separate so it can be wiped without deleting the event log | Built |
 | `config.toml` | Settings for this user | Built |
 | `logs/golem.jsonl` | The daemon's own log, one JSON object per line | Built |
-| `golem.db` | Sessions, the event log, runs, costs | Planned |
+| `golem.db` | The event log, and the `sessions` and `runs` tables derived from it. Costs later | Built |
 | `memory.db` | Long-term memory | Planned |
 | `skills/`, `flows/` | Skills and flows you added on this machine | Planned |
+
+In `golem.db`, `events` is the source. `sessions` and `runs` are written in the same transaction as the event they follow: `session.created` adds a session, `run.started` opens a run, and `run.completed` or `run.failed` closes it. The schema version is SQLite's `user_version`. Each numbered migration in `golem/store/migrations.py` runs once, and a file from a newer daemon is refused.
 
 Settings come from three places. Each one overrides the one before it: `~/.golem/config.toml`, then `<project>/.golem/config.toml`, then `GOLEM_…` environment variables. An explicit `log_level` passed to `load_settings` wins over all three. The keys read today:
 
@@ -201,7 +208,7 @@ The graph library has its own message classes, and those classes change. If the 
 
 **Events** go from daemon to client. They report something that already happened: a token arrived, a tool finished, a model was chosen, a run stopped.
 
-An event is a fact. The client builds the whole screen from the facts, in order. Once the event log exists, replay will not be a special mode. It is the same stream, read from the start or from the last number the client has. The diagram shows that planned shape. `attach` is not built yet.
+An event is a fact. The client builds the whole screen from the facts, in order. The daemon already writes every fact to the event log. Replay will not be a special mode: it is the same stream, read from the start or from the last number the client has. The diagram shows that planned shape. `attach` is not built yet.
 
 ```mermaid
 sequenceDiagram
@@ -222,13 +229,15 @@ Each event line is one JSON-RPC 2.0 notification. The fields that matter:
 
 | Field | Meaning |
 |---|---|
-| `seq` | A rising number for this session. The client uses it to ask for "everything after here". |
+| `seq` | A rising number for this session. It survives a restart and can skip numbers. The client uses it to ask for "everything after here". |
 | `session_id` | Which chat or flow |
 | `run_id` | Which execution, when a session can have more than one |
 | `type` | What happened, such as `message.delta` |
 | `data` | The payload for that type |
 
-`message.delta` is the live token stream. The planned copy in `golem.db` will keep `message.completed` instead, so the database does not store every fragment.
+`message.delta` is the live token stream. `golem.db` keeps the deltas only while the message is open. Writing its `message.completed` deletes them in the same transaction, so the database does not keep every fragment, and a reader that comes in mid-answer can still see the text so far. That is why `seq` skips numbers.
+
+`message.completed` has `interrupted: true` when the run stopped before the model finished. Its text is then what had streamed.
 
 ### What is on the wire today
 

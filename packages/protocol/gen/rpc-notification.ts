@@ -32,6 +32,7 @@ export type Seq2 = number;
 export type SessionId2 = string;
 export type Ts2 = string;
 export type Type2 = 'message.delta';
+export type Interrupted = boolean;
 export type MessageId2 = string;
 export type Role1 = 'user' | 'assistant';
 export type Text1 = string;
@@ -159,10 +160,14 @@ export interface MessageCompletedEvent {
 /**
  * Full text of a user or assistant message.
  *
+ * ``interrupted`` is true when the run stopped before the model finished.
+ * ``text`` is then what had streamed so far.
+ *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "MessageCompletedData".
  */
 export interface MessageCompletedData {
+  interrupted?: Interrupted;
   message_id: MessageId2;
   role: Role1;
   text: Text1;

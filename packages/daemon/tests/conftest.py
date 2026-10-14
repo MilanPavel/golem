@@ -1,9 +1,11 @@
 import shutil
 import uuid
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
 
 import pytest
+
+from golem.store.database import Database
 
 
 @pytest.fixture(autouse=True)
@@ -14,6 +16,13 @@ def _clear_golem_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("GOLEM_MODEL_PROVIDER", raising=False)
     monkeypatch.delenv("GOLEM_MODEL_NAME", raising=False)
     monkeypatch.delenv("GOLEM_MODEL_BASE_URL", raising=False)
+
+
+@pytest.fixture
+async def database(tmp_path: Path) -> AsyncIterator[Database]:
+    """A migrated ``golem.db`` in a temporary directory."""
+    async with Database.open(tmp_path / "golem.db") as opened:
+        yield opened
 
 
 @pytest.fixture

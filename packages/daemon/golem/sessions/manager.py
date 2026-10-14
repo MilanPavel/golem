@@ -1,7 +1,8 @@
-"""In-memory sessions whose model context lives in the checkpointer.
+"""Sessions: their rows and events live in ``golem.db``, their model context
+in the checkpointer.
 
-Events are live notifications. Nothing is written to an event log. A daemon
-restart keeps the checkpoint and starts ``seq`` at 1 again.
+A session found only in the checkpointer predates the event log. Resolving it
+writes the ``session.created`` it never had, with an empty history before it.
 """
 
 from __future__ import annotations
@@ -15,15 +16,16 @@ from golem.graphs.chat import ChatRuntime
 from golem.graphs.state import SCHEMA_VERSION
 from golem.models.router import ModelIdentity
 from golem.sessions.ids import new_id
-from golem.sessions.log import EventSink, SessionLog
+from golem.sessions.log import EventSink, SessionLog, discard
 from golem.sessions.runner import Turn, run_turn
+from golem.store.records import SessionRecords
 from golem_protocol.events import SessionCreatedData
 
 log = logging.getLogger("golem.sessions")
 
 
 class SessionNotFoundError(Exception):
-    """No in-memory session and no checkpoint for this id."""
+    """No session row and no checkpoint for this id."""
 
 
 class SessionBusyError(Exception):
@@ -60,9 +62,15 @@ class _LiveSession:
 class SessionManager:
     """``session.create`` and ``message.send`` for one daemon process."""
 
-    def __init__(self, runtime: ChatRuntime) -> None:
+    def __init__(
+        self,
+        runtime: ChatRuntime,
+        events: SessionLog,
+        records: SessionRecords,
+    ) -> None:
         self._runtime = runtime
-        self._events = SessionLog()
+        self._events = events
+        self._records = records
         self._sessions: dict[str, _LiveSession] = {}
         self._tasks: set[asyncio.Task[None]] = set()
         self._lock = asyncio.Lock()
@@ -70,25 +78,14 @@ class SessionManager:
     async def create(self, model_profile: str | None, sink: EventSink) -> str:
         """Remember a new session and emit ``session.created``."""
         profile = self._runtime.router.profile_name if model_profile is None else model_profile
-        chosen = self._runtime.router.identity(profile)
         async with self._lock:
             session = _LiveSession(
                 session_id=new_id("s"),
                 model_profile=profile,
                 schema_version=SCHEMA_VERSION,
             )
+            await self._announce(session, sink)
             self._sessions[session.session_id] = session
-            await self._events.emit(
-                sink,
-                session.session_id,
-                None,
-                "session.created",
-                SessionCreatedData(
-                    model_profile=profile,
-                    model_provider=chosen.provider,
-                    model_name=chosen.name,
-                ),
-            )
             return session.session_id
 
     async def inspect(self, session_id: str) -> SessionView:
@@ -150,22 +147,40 @@ class SessionManager:
         existing = self._sessions.get(session_id)
         if existing is not None:
             return existing
+        record = await self._records.get(session_id)
         values = await self._runtime.values(session_id)
-        if not values:
-            raise SessionNotFoundError(session_id)
-        profile = values.get("model_profile")
-        schema = values.get("schema_version")
-        if not isinstance(profile, str) or profile == "":
-            raise SessionNotFoundError(session_id)
-        if schema != SCHEMA_VERSION:
-            raise SchemaMismatchError(schema)
+        if values and values.get("schema_version") != SCHEMA_VERSION:
+            raise SchemaMismatchError(values.get("schema_version"))
+        if record is not None:
+            profile = record.model_profile
+        else:
+            found = values.get("model_profile")
+            if not isinstance(found, str) or found == "":
+                raise SessionNotFoundError(session_id)
+            profile = found
         session = _LiveSession(
             session_id=session_id,
             model_profile=profile,
             schema_version=SCHEMA_VERSION,
         )
+        if record is None:
+            await self._announce(session, discard)
         self._sessions[session_id] = session
         return session
+
+    async def _announce(self, session: _LiveSession, sink: EventSink) -> None:
+        chosen = self._runtime.router.identity(session.model_profile)
+        await self._events.emit(
+            sink,
+            session.session_id,
+            None,
+            "session.created",
+            SessionCreatedData(
+                model_profile=session.model_profile,
+                model_provider=chosen.provider,
+                model_name=chosen.name,
+            ),
+        )
 
     def _finished(self, task: asyncio.Task[None]) -> None:
         self._tasks.discard(task)
