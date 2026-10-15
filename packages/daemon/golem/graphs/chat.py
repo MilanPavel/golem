@@ -6,7 +6,8 @@ Checkpoint messages carry the protocol ``message_id`` as their LangChain
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
+from collections.abc import AsyncGenerator, Awaitable, Callable, Mapping
+from contextlib import aclosing
 from typing import Protocol, cast
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
@@ -37,7 +38,7 @@ class _RunningGraph(Protocol):
         *,
         stream_mode: list[str],
         version: str,
-    ) -> AsyncIterator[object]: ...
+    ) -> AsyncGenerator[object]: ...
 
     async def aget_state(self, config: RunnableConfig) -> _Checkpoint: ...
 
@@ -85,8 +86,12 @@ class ChatRuntime:
         schema_version: int,
         user_message_id: str,
         assistant_message_id: str,
-    ) -> AsyncIterator[object]:
-        """Stream one user turn. The first turn writes the state fields."""
+    ) -> AsyncGenerator[object]:
+        """Stream one user turn. The first turn writes the state fields.
+
+        Close the generator (``contextlib.aclosing``) when you stop early, so
+        the graph run ends before the checkpoint is touched again.
+        """
         config: RunnableConfig = {
             "configurable": {"thread_id": session_id, _ASSISTANT_ID: assistant_message_id},
         }
@@ -98,13 +103,15 @@ class ChatRuntime:
             schema_version=schema_version,
             has_checkpoint=bool(existing),
         )
-        async for part in self._graph.astream(
+        parts = self._graph.astream(
             graph_input,
             config,
             stream_mode=["messages", "updates"],
             version="v2",
-        ):
-            yield part
+        )
+        async with aclosing(parts):
+            async for part in parts:
+                yield part
 
     async def message_text(self, session_id: str, message_id: str) -> str | None:
         """Text of the checkpoint message with ``message_id``, or None."""

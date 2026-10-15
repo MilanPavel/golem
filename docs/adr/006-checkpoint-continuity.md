@@ -17,7 +17,7 @@ The TUI attaches to the newest session at startup, or creates one. A reconnect a
 
 Events are JSON-RPC notifications with method `event`: `session.created`, `message.started`, `message.delta`, `message.completed`, `run.started`, `run.completed`, `run.failed`. Every event is written to `golem.db` before it goes to the socket, and `seq` continues from the log after a restart. Deltas are deleted when their `message.completed` is written, so `seq` can have gaps. If the socket drops mid-run, the graph task still finishes and still checkpoints. The next attach replays what the client missed.
 
-A run that was still open when the daemon stopped is closed at the next start. Its assistant message gets a `message.completed` with the text streamed so far and `interrupted: true`, then `run.failed`. That partial text is also written into the checkpoint, so the next turn sees what the screen showed.
+A run that was still open when the daemon stopped is closed at the next start. Its assistant message gets a `message.completed` with the text streamed so far and `interrupted: true`, then `run.failed`. That partial text is also written into the checkpoint, so the next turn sees what the screen showed. A run cancelled with `run.cancel`, or by stopping the daemon, keeps its partial reply the same way, then ends with `run.cancelled` ([ADR-008](008-cancellation.md)).
 
 Closing the TUI and opening it again redraws the newest session from the log. Restarting the daemon, then sending on the same session, keeps the model context.
 

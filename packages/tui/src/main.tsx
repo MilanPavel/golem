@@ -28,6 +28,7 @@ try {
   const instance = render(<App client={client} onWheel={pointer.subscribe} />, {
     stdin: pointer.stdin,
     alternateScreen: true,
+    exitOnCtrlC: false,
   });
   await instance.waitUntilExit();
 } finally {

@@ -26,6 +26,8 @@ export type Transcript = Viewport & {
   gutter: readonly string[] | null;
 };
 
+export const INTERRUPTED_MARK = "· interrupted";
+
 export function layoutMessages(messages: readonly ChatMessage[], columns: number): LayoutLine[] {
   const width = Math.max(1, columns);
   const lines: LayoutLine[] = [];
@@ -41,6 +43,9 @@ export function layoutMessages(messages: readonly ChatMessage[], columns: number
     lines.push(paint({ role, spans: [{ text: label, bold: true }] }, width));
     for (const spans of body) {
       lines.push(paint({ role, spans }, width));
+    }
+    if (message.interrupted === true) {
+      lines.push(paint({ role, spans: [{ text: INTERRUPTED_MARK, italic: true }] }, width));
     }
   }
   return lines;

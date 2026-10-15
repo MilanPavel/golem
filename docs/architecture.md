@@ -90,7 +90,7 @@ Built today:
 
 Planned next:
 
-- Cancel, a session switcher, titles, and fork.
+- A session switcher, titles, and fork.
 - Flows, tool permissions, skills, and long-term memory in `memory.db`.
 
 ## The daemon
@@ -153,7 +153,9 @@ Every event in that diagram is written to `golem.db` first, then sent. The check
 
 If you quit the TUI halfway through, the daemon still finishes the run and saves the checkpoint. The next message in that session continues from it.
 
-If the daemon itself stops halfway through, the run has no task left to finish it. At the next start the daemon closes it: the open answer gets a `message.completed` with the text streamed so far and `interrupted: true`, then `run.failed`. The same partial text is written into the checkpoint, so the model's next turn sees what the screen showed.
+If you press Ctrl-C while the answer streams, the TUI sends `run.cancel`. The daemon cancels the run task. The answer gets a `message.completed` with the text streamed so far and `interrupted: true`, then `run.cancelled` with the reason `user`. The same partial text is written into the checkpoint, so "go on" continues from it ([ADR-008](adr/008-cancellation.md)). Stopping the daemon does the same for every open run, with the reason `shutdown`.
+
+If the daemon dies halfway through, the run has no task left to finish it. At the next start the daemon closes it: the open answer gets a `message.completed` with the text streamed so far and `interrupted: true`, then `run.failed`. The same partial text is written into the checkpoint, so the model's next turn sees what the screen showed.
 
 There will be two kinds of graph, on purpose. In an **agent** session, the model picks the next step. In a **flow**, our Python picks the next step, and each expensive step is saved so a resume does not run it again.
 
@@ -174,7 +176,7 @@ The daemon keeps its files under one home directory. `resolve_paths` picks it: a
 | `memory.db` | Long-term memory | Planned |
 | `skills/`, `flows/` | Skills and flows you added on this machine | Planned |
 
-In `golem.db`, `events` is the source. `sessions` and `runs` are written in the same transaction as the event they follow: `session.created` adds a session, `run.started` opens a run, and `run.completed` or `run.failed` closes it. The schema version is SQLite's `user_version`. Each numbered migration in `golem/store/migrations.py` runs once, and a file from a newer daemon is refused.
+In `golem.db`, `events` is the source. `sessions` and `runs` are written in the same transaction as the event they follow: `session.created` adds a session, `run.started` opens a run, and `run.completed`, `run.failed`, or `run.cancelled` closes it. The schema version is SQLite's `user_version`. Each numbered migration in `golem/store/migrations.py` runs once, and a file from a newer daemon is refused.
 
 Settings come from three places. Each one overrides the one before it: `~/.golem/config.toml`, then `<project>/.golem/config.toml`, then `GOLEM_…` environment variables. An explicit `log_level` passed to `load_settings` wins over all three. The keys read today:
 
@@ -243,7 +245,7 @@ Each event line is one JSON-RPC 2.0 notification. The fields that matter:
 
 | Commands | Events |
 |---|---|
-| `hello`, `ping`, `daemon.status`, `session.create`, `session.attach`, `session.detach`, `session.list`, `message.send`, `session.inspect` | `session.created`, `message.started`, `message.delta`, `message.completed`, `run.started`, `run.completed`, `run.failed` |
+| `hello`, `ping`, `daemon.status`, `session.create`, `session.attach`, `session.detach`, `session.list`, `message.send`, `run.cancel`, `session.inspect` | `session.created`, `message.started`, `message.delta`, `message.completed`, `run.started`, `run.completed`, `run.failed`, `run.cancelled` |
 
 After `hello`, a client sends `ping` every few seconds so a half-open socket is noticed. `daemon.status` returns the pid, uptime, and configured model. A new chat sends `session.create`, then `session.attach` with `after_seq` 0, then `message.send`. `session.list` returns sessions newest activity first, each with `idle` or `running` and its last `seq`. `session.detach` stops one session's events. `session.inspect` reads the saved checkpoint messages and does not call the model.
 
@@ -341,6 +343,7 @@ The debug band keeps its first row for the title. The wire tab lists recent prot
 | `message.delta` | Append text to that id. An unknown id changes nothing. |
 | `run.completed` | `busy` off. |
 | `run.failed` | `busy` off, and `error` is the daemon's message. |
+| `run.cancelled` | `busy` off, and the notice says why: you cancelled it, or the daemon stopped. |
 
 Deltas do not take that path one socket frame at a time. They wait in a small map, grouped by message id, for about 16 milliseconds, then land as one update. When the answer finishes, that map is emptied first, and `message.completed` replaces the text with the full answer. `session.created` does not change `chat`. The screen reads the model off that event on its own.
 

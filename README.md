@@ -22,7 +22,7 @@ From the repository, after `uv sync --all-packages` and `pnpm install`:
 just golem daemon install   # write ~/Library/LaunchAgents/dev.golem.daemon.plist and load it
 just golem daemon start     # start it if it is stopped
 just golem status           # pid, version, protocol, uptime; exits 1 if nothing is listening
-just tui                    # one line: connected, or reconnecting. Ctrl-C quits the TUI only
+just tui                    # Ctrl-C stops the current answer; twice quits the TUI only
 just golem daemon logs      # ~/.golem/logs/golem.jsonl
 just golem daemon stop      # unload the job so it stays down
 ```

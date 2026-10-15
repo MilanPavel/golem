@@ -24,6 +24,9 @@ export function outgoingDetail(method: string, params: Record<string, unknown>):
   if (typeof params["session_id"] === "string") {
     return params["session_id"];
   }
+  if (typeof params["run_id"] === "string") {
+    return params["run_id"];
+  }
   return "";
 }
 
@@ -36,6 +39,9 @@ export function resultDetail(method: string, result: unknown): string {
   }
   if (method === "session.create" && typeof result["session_id"] === "string") {
     return result["session_id"];
+  }
+  if (method === "run.cancel" && typeof result["cancelled"] === "boolean") {
+    return result["cancelled"] ? "cancelled" : "already ended";
   }
   if (method === "session.attach" && typeof result["last_seq"] === "number") {
     return `last seq ${result["last_seq"]}`;
@@ -71,6 +77,11 @@ function eventDetail(type: string, seq: string, data: Record<string, unknown> | 
     if (typeof data["text"] === "string" && data["text"].length > 0) {
       parts.push(flat(data["text"]));
     }
+    if (data["interrupted"] === true) {
+      parts.push("interrupted");
+    }
+  } else if (type === "run.cancelled" && typeof data["reason"] === "string") {
+    parts.push(data["reason"]);
   } else if (type === "run.failed" && typeof data["message"] === "string") {
     parts.push(flat(data["message"]));
   } else if (type === "session.created") {

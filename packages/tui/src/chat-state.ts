@@ -5,6 +5,8 @@ export type ChatMessage = {
   role: "user" | "assistant";
   text: string;
   streaming: boolean;
+  /** The run stopped before the model finished this reply. */
+  interrupted?: boolean;
 };
 
 export type ChatState = {
@@ -13,6 +15,8 @@ export type ChatState = {
   error: string | null;
   notice: string | null;
   runStartedAt: string | null;
+  /** The run in progress, for Ctrl-C. */
+  runId: string | null;
 };
 
 export const emptyChat: ChatState = {
@@ -21,7 +25,11 @@ export const emptyChat: ChatState = {
   error: null,
   notice: null,
   runStartedAt: null,
+  runId: null,
 };
+
+export const CANCELLED_NOTICE = "cancelled";
+export const SHUTDOWN_NOTICE = "the daemon stopped, so the run was cancelled";
 
 export function reduceChat(state: ChatState, event: ChatEvent): ChatState {
   switch (event.type) {
@@ -46,11 +54,19 @@ export function reduceChat(state: ChatState, event: ChatEvent): ChatState {
     case "message.completed":
       return { ...state, messages: upsertCompleted(state.messages, event) };
     case "run.started":
-      return { ...state, busy: true, error: null, runStartedAt: event.ts };
+      return { ...state, busy: true, error: null, runStartedAt: event.ts, runId: event.run_id };
     case "run.completed":
-      return { ...state, busy: false, runStartedAt: null };
+      return { ...state, busy: false, runStartedAt: null, runId: null };
     case "run.failed":
-      return { ...state, busy: false, error: event.data.message, runStartedAt: null };
+      return { ...state, busy: false, error: event.data.message, runStartedAt: null, runId: null };
+    case "run.cancelled":
+      return {
+        ...state,
+        busy: false,
+        runStartedAt: null,
+        runId: null,
+        notice: event.data.reason === "user" ? CANCELLED_NOTICE : SHUTDOWN_NOTICE,
+      };
     default:
       return state;
   }
@@ -112,6 +128,7 @@ function upsertCompleted(messages: readonly ChatMessage[], event: ChatEvent): Ch
     role: event.data.role,
     text: event.data.text,
     streaming: false,
+    interrupted: event.data.interrupted === true,
   };
   const index = messages.findIndex((message) => message.id === next.id);
   if (index < 0) {

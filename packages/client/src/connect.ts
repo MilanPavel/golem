@@ -4,6 +4,7 @@ import net from "node:net";
 import type { DaemonStatus } from "../../protocol/gen/daemon-status.ts";
 import type { MessageSendResult } from "../../protocol/gen/message-send-result.ts";
 import type { Params as ChatEvent } from "../../protocol/gen/rpc-notification.ts";
+import type { RunCancelResult } from "../../protocol/gen/run-cancel-result.ts";
 import type { SessionAttachResult } from "../../protocol/gen/session-attach-result.ts";
 import type { SessionCreateResult } from "../../protocol/gen/session-create-result.ts";
 import type { SessionInspectResult } from "../../protocol/gen/session-inspect-result.ts";
@@ -18,6 +19,7 @@ import {
   isMessageSendResult,
   isPing,
   isRecord,
+  isRunCancelResult,
   isSessionAttachResult,
   isSessionCreateResult,
   isSessionInspectResult,
@@ -30,6 +32,7 @@ const PROTOCOL_MISMATCH = -32001;
 export const SESSION_NOT_FOUND = -32003;
 export const SESSION_BUSY = -32004;
 export const MODEL_NOT_CONFIGURED = -32005;
+export const RUN_NOT_FOUND = -32006;
 
 export type { ChatEvent, SessionSummary };
 const DEFAULT_HEARTBEAT_MS = 5_000;
@@ -80,6 +83,8 @@ export interface GolemClient {
   detachSession(sessionId: string): Promise<void>;
   listSessions(limit?: number): Promise<SessionListResult>;
   sendMessage(sessionId: string, text: string): Promise<MessageSendResult>;
+  /** Stop a run. Resolves after `run.cancelled` is in the log; `cancelled` is false when it had ended. */
+  cancelRun(runId: string): Promise<RunCancelResult>;
   inspectSession(sessionId: string): Promise<SessionInspectResult>;
   close(): void;
 }
@@ -473,6 +478,14 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("message.send", { session_id: sessionId, text });
       if (!isMessageSendResult(result)) {
         throw new Error("invalid message.send result");
+      }
+      return result;
+    },
+    async cancelRun(runId: string): Promise<RunCancelResult> {
+      await ready;
+      const result = await call("run.cancel", { run_id: runId });
+      if (!isRunCancelResult(result)) {
+        throw new Error("invalid run.cancel result");
       }
       return result;
     },

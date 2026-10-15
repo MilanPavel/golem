@@ -58,10 +58,14 @@ class ScriptedChatModel(BaseChatModel):
 
 
 class GatedChatModel(BaseChatModel):
-    """Streams ``streamed`` one character at a time, then blocks until :attr:`release`."""
+    """Streams ``streamed`` one character at a time, then blocks until :attr:`release`.
+
+    Records each prompt in ``seen``.
+    """
 
     reply: str = "ok"
     streamed: str = ""
+    seen: list[list[str]] = Field(default_factory=_no_prompts)
     _started: asyncio.Event = PrivateAttr(default_factory=asyncio.Event)
     _release: asyncio.Event = PrivateAttr(default_factory=asyncio.Event)
 
@@ -94,7 +98,8 @@ class GatedChatModel(BaseChatModel):
         run_manager: AsyncCallbackManagerForLLMRun | None = None,
         **kwargs: Any,
     ) -> AsyncIterator[ChatGenerationChunk]:
-        del messages, stop, run_manager, kwargs
+        del stop, run_manager, kwargs
+        self.seen.append([message.text for message in messages])
         for char in self.streamed:
             yield ChatGenerationChunk(message=AIMessageChunk(content=char))
         self._started.set()

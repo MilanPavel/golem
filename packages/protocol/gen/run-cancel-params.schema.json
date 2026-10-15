@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "``run.cancel``. Stop a run that is still in progress.",
+  "properties": {
+    "run_id": {
+      "minLength": 1,
+      "title": "Run Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "run_id"
+  ],
+  "title": "RunCancelParams",
+  "type": "object"
+}

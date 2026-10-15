@@ -1,0 +1,15 @@
+{
+  "additionalProperties": false,
+  "description": "Whether the run was stopped.\n\n``cancelled`` is false when the run had already ended. When it is true,\n``run.cancelled`` is already in the log.",
+  "properties": {
+    "cancelled": {
+      "title": "Cancelled",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "cancelled"
+  ],
+  "title": "RunCancelResult",
+  "type": "object"
+}

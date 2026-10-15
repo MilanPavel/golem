@@ -1,6 +1,6 @@
 import { homedir } from "node:os";
 import { useEffect, useRef, useState } from "react";
-import { Box, Text, useInput, useWindowSize } from "ink";
+import { Box, Text, useApp, useInput, useWindowSize } from "ink";
 import { RpcError, SESSION_NOT_FOUND, type ConnectionState, type GolemClient, type WireLine } from "@golem/client";
 
 import {
@@ -14,6 +14,7 @@ import { applyComposer, closedDebug, toggleDebugTab, type DebugState } from "./c
 import { bannerText, frameBudget, frameColumns, layoutComposer } from "./chrome.ts";
 import { holdDebugOffset, layoutDebug, type CheckpointMessage, type DebugTone } from "./debug-view.ts";
 import { Header } from "./header.tsx";
+import { EXIT_HINT, EXIT_WINDOW_MS, idleInterrupt, pressCtrlC } from "./interrupt.ts";
 import { layoutTranscript, type LayoutLine } from "./layout-chat.ts";
 import { assistantChars, elapsedSeconds, meterLine, meterPhase } from "./progress.ts";
 import {
@@ -44,6 +45,9 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   const [modelCount, setModelCount] = useState<number | null>(null);
   const draftRef = useRef(draft);
   const busyRef = useRef(chat.busy);
+  const runIdRef = useRef(chat.runId);
+  const interrupt = useRef(idleInterrupt);
+  const { exit } = useApp();
   const connectionRef = useRef(connection);
   const debugRef = useRef(debug);
   const panelOpen = useRef(false);
@@ -52,6 +56,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   const debugLines = useRef(0);
   draftRef.current = draft;
   busyRef.current = chat.busy;
+  runIdRef.current = chat.runId;
   connectionRef.current = connection;
   debugRef.current = debug;
   panelOpen.current = debug.open;
@@ -269,6 +274,28 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
     });
   }
 
+  function onCtrlC(): void {
+    const connected = connectionRef.current.status === "connected";
+    const pressed = pressCtrlC(interrupt.current, connected ? runIdRef.current : null, Date.now());
+    interrupt.current = pressed.state;
+    const action = pressed.action;
+    if (action.kind === "exit") {
+      exit();
+      return;
+    }
+    if (action.kind === "arm") {
+      setChat((current) => ({ ...current, notice: EXIT_HINT }));
+      setTimeout(() => {
+        setChat((current) => (current.notice === EXIT_HINT ? { ...current, notice: null } : current));
+      }, EXIT_WINDOW_MS);
+      return;
+    }
+    setChat((current) => ({ ...current, notice: "cancelling…" }));
+    void client.cancelRun(action.runId).catch((error: unknown) => {
+      setChat((current) => ({ ...current, notice: null, error: messageOf(error) }));
+    });
+  }
+
   function showDebug(next: DebugState): void {
     if (next.open !== debugRef.current.open || next.tab !== debugRef.current.tab) {
       debugLines.current = 0;
@@ -278,6 +305,10 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   }
 
   useInput((input, key) => {
+    if (key.ctrl && input === "c") {
+      onCtrlC();
+      return;
+    }
     if (key.pageUp) {
       if (debugRef.current.open) {
         setDebugOffset((value) => value + debugPage);

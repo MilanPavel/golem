@@ -9,7 +9,8 @@ export type Params =
   | MessageCompletedEvent
   | RunStartedEvent
   | RunCompletedEvent
-  | RunFailedEvent;
+  | RunFailedEvent
+  | RunCancelledEvent;
 export type ModelName = string | null;
 export type ModelProfile = string;
 export type ModelProvider = string | null;
@@ -57,6 +58,12 @@ export type Seq6 = number;
 export type SessionId6 = string;
 export type Ts6 = string;
 export type Type6 = 'run.failed';
+export type Reason = 'user' | 'shutdown';
+export type RunId7 = string;
+export type Seq7 = number;
+export type SessionId7 = string;
+export type Ts7 = string;
+export type Type7 = 'run.cancelled';
 
 /**
  * Server → client event. No ``id``; this is not a response to a request.
@@ -229,4 +236,27 @@ export interface RunFailedEvent {
  */
 export interface RunFailedData {
   message: Message;
+}
+/**
+ * The run was stopped before the model finished. The partial reply is kept.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "RunCancelledEvent".
+ */
+export interface RunCancelledEvent {
+  data: RunCancelledData;
+  run_id: RunId7;
+  seq: Seq7;
+  session_id: SessionId7;
+  ts: Ts7;
+  type: Type7;
+}
+/**
+ * Who stopped the run. ``user`` is ``run.cancel``, ``shutdown`` the daemon stopping.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "RunCancelledData".
+ */
+export interface RunCancelledData {
+  reason: Reason;
 }

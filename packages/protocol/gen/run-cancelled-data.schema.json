@@ -1,0 +1,19 @@
+{
+  "additionalProperties": false,
+  "description": "Who stopped the run. ``user`` is ``run.cancel``, ``shutdown`` the daemon stopping.",
+  "properties": {
+    "reason": {
+      "enum": [
+        "user",
+        "shutdown"
+      ],
+      "title": "Reason",
+      "type": "string"
+    }
+  },
+  "required": [
+    "reason"
+  ],
+  "title": "RunCancelledData",
+  "type": "object"
+}

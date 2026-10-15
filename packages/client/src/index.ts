@@ -3,6 +3,7 @@ export {
   connectGolem,
   MODEL_NOT_CONFIGURED,
   RpcError,
+  RUN_NOT_FOUND,
   SESSION_BUSY,
   SESSION_NOT_FOUND,
   type ChatEvent,

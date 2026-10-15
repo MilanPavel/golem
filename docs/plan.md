@@ -163,7 +163,7 @@ golem/
 
 ## 4. Protocol (draft v1)
 
-JSON-RPC 2.0 framed as newline-delimited JSON over the Unix socket. Protocol 2.0 is on the wire: `hello`, `daemon.status`, `ping`, `session.create`, `session.attach`, `session.detach`, `session.list`, `message.send`, `session.inspect`, and `event` notifications for `session.created`, `message.started`, `message.delta`, `message.completed`, `run.started`, `run.completed`, `run.failed`. Every event is stored in `golem.db` before it is sent, so `seq` survives a daemon restart. It is monotonic per session, with gaps where deltas were coalesced. Events go only to connections attached to the session. The tables below are the rest of v1, not built yet.
+JSON-RPC 2.0 framed as newline-delimited JSON over the Unix socket. Protocol 2.1 is on the wire: `hello`, `daemon.status`, `ping`, `session.create`, `session.attach`, `session.detach`, `session.list`, `message.send`, `run.cancel`, `session.inspect`, and `event` notifications for `session.created`, `message.started`, `message.delta`, `message.completed`, `run.started`, `run.completed`, `run.failed`, `run.cancelled`. Every event is stored in `golem.db` before it is sent, so `seq` survives a daemon restart. It is monotonic per session, with gaps where deltas were coalesced. Events go only to connections attached to the session. The tables below are the rest of v1, not built yet.
 
 ### Envelope for server → client events (JSON-RPC notifications)
 
@@ -213,7 +213,7 @@ A chat is `START → call_model → END`. `session.create` and `message.send` st
 
 One profile is configured with flat settings: `model_provider` (`anthropic`, `openai`, or `openai_compat`), `model_name`, and `model_base_url`. `openai_compat` defaults to Ollama at `http://127.0.0.1:11434/v1` and does not read an API key. The profile table, routing policy, budgets, and compaction are still phase 6.
 
-From phase 3 so far: every event is written to `golem.db` (`events`, plus the `sessions` and `runs` tables derived from it) before it is sent, so `seq` and sessions survive a restart. Checkpoint messages carry the protocol message ids. A run left open by a stopped daemon is closed at the next start, with its partial reply in both the log and the checkpoint. `session.attach` replays the log after a `seq` and then streams, to any number of clients. The client attaches again after a reconnect, and the TUI opens the newest session at startup, so closing the TUI mid-answer and reopening it shows the text so far plus the rest. `session.list` reports sessions with `idle` or `running`.
+From phase 3 so far: every event is written to `golem.db` (`events`, plus the `sessions` and `runs` tables derived from it) before it is sent, so `seq` and sessions survive a restart. Checkpoint messages carry the protocol message ids. A run left open by a stopped daemon is closed at the next start, with its partial reply in both the log and the checkpoint. `session.attach` replays the log after a `seq` and then streams, to any number of clients. The client attaches again after a reconnect, and the TUI opens the newest session at startup, so closing the TUI mid-answer and reopening it shows the text so far plus the rest. `session.list` reports sessions with `idle` or `running`. `run.cancel` stops a run and keeps its partial reply, marked interrupted, in the log and the checkpoint. In the TUI, Ctrl-C cancels the answer, and pressing it twice exits.
 
 ---
 

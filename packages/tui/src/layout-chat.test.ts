@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import type { ChatMessage } from "./chat-state.ts";
-import { gutterColumn, layoutMessages, layoutTranscript, type Span } from "./layout-chat.ts";
+import { gutterColumn, INTERRUPTED_MARK, layoutMessages, layoutTranscript, type Span } from "./layout-chat.ts";
 
 function textOf(spans: readonly Span[]): string {
   return spans.map((span) => span.text).join("");
@@ -78,4 +78,11 @@ test("the thumb sits on the last row when the view follows the tail", () => {
   const gutter = gutterColumn(10, 4, 0);
   assert.deepEqual(gutter, ["│", "│", "│", "█"]);
   assert.equal(gutterColumn(10, 4, 6)[0], "█");
+});
+
+test("an interrupted reply ends with a mark", () => {
+  const lines = layoutMessages([{ ...message("a", "assistant", "Hel"), interrupted: true }], 80);
+  const last = lines.at(-1);
+  assert.equal(last?.spans[0]?.text.trimEnd(), INTERRUPTED_MARK);
+  assert.equal(last?.spans[0]?.italic, true);
 });

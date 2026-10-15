@@ -5,6 +5,8 @@ import type { ChatEvent } from "@golem/client";
 
 import {
   appendDelta,
+  CANCELLED_NOTICE,
+  SHUTDOWN_NOTICE,
   createDeltaBatcher,
   emptyChat,
   reduceChat,
@@ -188,4 +190,52 @@ test("appendDelta only touches the matching bubble", () => {
   );
   assert.equal(state.messages[0]?.text, "Hi");
   assert.equal(state.messages[1]?.text, "no");
+});
+
+test("run.cancelled ends the run and keeps the interrupted reply", () => {
+  const stored: ChatEvent[] = [
+    { seq: 1, session_id: "s", run_id: "r", ts: "t", type: "run.started", data: {} },
+    {
+      seq: 2,
+      session_id: "s",
+      run_id: "r",
+      ts: "t",
+      type: "message.started",
+      data: { message_id: "m_a", role: "assistant" },
+    },
+    {
+      seq: 4,
+      session_id: "s",
+      run_id: "r",
+      ts: "t",
+      type: "message.completed",
+      data: { message_id: "m_a", role: "assistant", text: "Hel", interrupted: true },
+    },
+  ];
+  const running = stored.reduce(reduceChat, emptyChat);
+  assert.equal(running.runId, "r");
+  const cancelled = reduceChat(running, {
+    seq: 5,
+    session_id: "s",
+    run_id: "r",
+    ts: "t",
+    type: "run.cancelled",
+    data: { reason: "user" },
+  });
+  assert.equal(cancelled.busy, false);
+  assert.equal(cancelled.runId, null);
+  assert.equal(cancelled.notice, CANCELLED_NOTICE);
+  assert.deepEqual(
+    cancelled.messages.map((message) => [message.text, message.streaming, message.interrupted]),
+    [["Hel", false, true]],
+  );
+  const stopped = reduceChat(running, {
+    seq: 5,
+    session_id: "s",
+    run_id: "r",
+    ts: "t",
+    type: "run.cancelled",
+    data: { reason: "shutdown" },
+  });
+  assert.equal(stopped.notice, SHUTDOWN_NOTICE);
 });

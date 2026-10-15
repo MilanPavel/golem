@@ -217,6 +217,69 @@
       "title": "MessageStartedEvent",
       "type": "object"
     },
+    "RunCancelledData": {
+      "additionalProperties": false,
+      "description": "Who stopped the run. ``user`` is ``run.cancel``, ``shutdown`` the daemon stopping.",
+      "properties": {
+        "reason": {
+          "enum": [
+            "user",
+            "shutdown"
+          ],
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "reason"
+      ],
+      "title": "RunCancelledData",
+      "type": "object"
+    },
+    "RunCancelledEvent": {
+      "additionalProperties": false,
+      "description": "The run was stopped before the model finished. The partial reply is kept.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/RunCancelledData"
+        },
+        "run_id": {
+          "minLength": 1,
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "run.cancelled",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "run_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "RunCancelledEvent",
+      "type": "object"
+    },
     "RunCompletedEvent": {
       "additionalProperties": false,
       "description": "The graph run finished and the checkpoint is current.",
@@ -472,6 +535,7 @@
           "message.completed": "#/$defs/MessageCompletedEvent",
           "message.delta": "#/$defs/MessageDeltaEvent",
           "message.started": "#/$defs/MessageStartedEvent",
+          "run.cancelled": "#/$defs/RunCancelledEvent",
           "run.completed": "#/$defs/RunCompletedEvent",
           "run.failed": "#/$defs/RunFailedEvent",
           "run.started": "#/$defs/RunStartedEvent",
@@ -500,6 +564,9 @@
         },
         {
           "$ref": "#/$defs/RunFailedEvent"
+        },
+        {
+          "$ref": "#/$defs/RunCancelledEvent"
         }
       ],
       "title": "Params"

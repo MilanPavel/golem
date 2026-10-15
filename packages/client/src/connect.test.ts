@@ -18,6 +18,7 @@ interface FakeOptions {
   eventBeforePing?: boolean;
   statusExtra?: Record<string, unknown>;
   onAttach?: (socket: Socket, params: AttachParams, id: number) => void;
+  results?: Record<string, unknown>;
 }
 
 interface AttachParams {
@@ -84,6 +85,8 @@ function attach(socket: Socket, options: FakeOptions): void {
           { session_id: message.params?.session_id ?? "", after_seq: message.params?.after_seq ?? 0 },
           message.id,
         );
+      } else if (options.results?.[message.method] !== undefined) {
+        write(socket, { jsonrpc: "2.0", id: message.id, result: options.results[message.method] });
       } else if (message.method === "daemon.status") {
         if (options.eventBeforeStatus === true) {
           write(socket, deltaEvent());
@@ -451,6 +454,24 @@ test("a session gone after a reconnect is no longer followed", async () => {
     await client.attachSession("s_test");
     await waitFor(() => connections >= 3 && client.state.status === "connected");
     assert.deepEqual(attaches, [1, 2]);
+  } finally {
+    client.close();
+    await server.close();
+  }
+});
+
+test("cancelRun reads the run.cancel result", async () => {
+  const server = await listen((socket) => {
+    attach(socket, { answerPing: true, results: { "run.cancel": { cancelled: true } } });
+  });
+  const client = connectGolem({
+    socketPath: server.socketPath,
+    clientName: "tui",
+    reconnect: false,
+    heartbeatMs: 60_000,
+  });
+  try {
+    assert.deepEqual(await client.cancelRun("r_test"), { cancelled: true });
   } finally {
     client.close();
     await server.close();

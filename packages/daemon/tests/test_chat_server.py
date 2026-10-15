@@ -12,7 +12,12 @@ from test_server import HELLO, RpcClient, error_code, rpc_result, start_daemon, 
 
 from golem.config import GolemSettings
 from golem.models.router import ModelRouter
-from golem.server.dispatcher import MODEL_NOT_CONFIGURED, SESSION_BUSY, SESSION_NOT_FOUND
+from golem.server.dispatcher import (
+    MODEL_NOT_CONFIGURED,
+    RUN_NOT_FOUND,
+    SESSION_BUSY,
+    SESSION_NOT_FOUND,
+)
 
 
 def _record(value: object) -> dict[str, object] | None:
@@ -414,6 +419,57 @@ async def test_list_puts_recent_activity_first(short_home: Path) -> None:
         only = _record(cast(list[object], limited["sessions"])[0])
         assert only is not None
         assert (only["session_id"], only["status"]) == (older, "idle")
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+
+
+def _event_data(event: dict[str, object]) -> dict[str, object]:
+    params = _record(event.get("params"))
+    data = _record(params.get("data")) if params else None
+    assert data is not None
+    return data
+
+
+async def test_run_cancel_stops_the_run_and_keeps_the_partial_reply(short_home: Path) -> None:
+    model = GatedChatModel(streamed="Hel", reply="lo")
+    app, task = await start_daemon(short_home, router=ModelRouter(model=model))
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        missing = await client.call("run.cancel", {"run_id": "r_missing"})
+        assert error_code(missing) == RUN_NOT_FOUND
+        session_id = await _open(client)
+        sent = rpc_result(
+            await client.call("message.send", {"session_id": session_id, "text": "hi"})
+        )
+        await _until(client, _streamed("Hel"))
+
+        cancelled = rpc_result(await client.call("run.cancel", {"run_id": sent["run_id"]}))
+        assert cancelled == {"cancelled": True}
+        events = await client.take_events()
+        assert _event_types(events)[-2:] == ["message.completed", "run.cancelled"]
+        assert _event_data(events[-2])["interrupted"] is True
+        assert _event_data(events[-1]) == {"reason": "user"}
+        again = rpc_result(await client.call("run.cancel", {"run_id": sent["run_id"]}))
+        assert again == {"cancelled": False}
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+
+
+async def test_stopping_the_daemon_cancels_runs_with_the_shutdown_reason(short_home: Path) -> None:
+    model = GatedChatModel(streamed="Hel", reply="lo")
+    app, task = await start_daemon(short_home, router=ModelRouter(model=model))
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        session_id = await _open(client)
+        await client.call("message.send", {"session_id": session_id, "text": "hi"})
+        await _until(client, _streamed("Hel"))
+        await stop_daemon(app, task)
+        cancelled = await client.wait_for_event("run.cancelled")
+        assert _event_data(cancelled) == {"reason": "shutdown"}
     finally:
         await client.close()
         await stop_daemon(app, task)

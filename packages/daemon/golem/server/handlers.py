@@ -14,6 +14,7 @@ from golem.server.dispatcher import (
     INTERNAL_ERROR,
     MODEL_NOT_CONFIGURED,
     PROTOCOL_MISMATCH,
+    RUN_NOT_FOUND,
     SESSION_BUSY,
     SESSION_NOT_FOUND,
     Method,
@@ -21,6 +22,7 @@ from golem.server.dispatcher import (
     RpcCallError,
 )
 from golem.sessions.manager import (
+    RunNotFoundError,
     SchemaMismatchError,
     SessionBusyError,
     SessionManager,
@@ -34,6 +36,8 @@ from golem_protocol.commands import (
     MessageSendParams,
     MessageSendResult,
     PingParams,
+    RunCancelParams,
+    RunCancelResult,
     SessionAttachParams,
     SessionAttachResult,
     SessionCreateParams,
@@ -156,6 +160,14 @@ async def _message_send(ctx: RequestContext, params: MessageSendParams) -> Messa
     return MessageSendResult(run_id=run_id)
 
 
+async def _run_cancel(ctx: RequestContext, params: RunCancelParams) -> RunCancelResult:
+    try:
+        cancelled = await _sessions(ctx).cancel(params.run_id)
+    except RunNotFoundError as exc:
+        raise RpcCallError(RUN_NOT_FOUND, "run not found") from exc
+    return RunCancelResult(cancelled=cancelled)
+
+
 async def _session_inspect(
     ctx: RequestContext, params: SessionInspectParams
 ) -> SessionInspectResult:
@@ -196,5 +208,6 @@ def standard_methods() -> dict[str, Method]:
         "session.detach": Method("session.detach", SessionDetachParams, True, _session_detach),
         "session.list": Method("session.list", SessionListParams, True, _session_list),
         "message.send": Method("message.send", MessageSendParams, True, _message_send),
+        "run.cancel": Method("run.cancel", RunCancelParams, True, _run_cancel),
         "session.inspect": Method("session.inspect", SessionInspectParams, True, _session_inspect),
     }

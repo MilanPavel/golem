@@ -18,8 +18,8 @@ from golem.models.router import ModelIdentity
 from golem.sessions.bus import EventTarget
 from golem.sessions.ids import new_id
 from golem.sessions.log import SessionLog
-from golem.sessions.runner import Turn, run_turn
-from golem.store.records import SessionActivity, SessionRecords
+from golem.sessions.runner import CancelReason, RunControl, Turn, run_turn
+from golem.store.records import RunRecords, SessionActivity, SessionRecords
 from golem_protocol.events import SessionCreatedData
 
 log = logging.getLogger("golem.sessions")
@@ -31,6 +31,10 @@ class SessionNotFoundError(Exception):
 
 class SessionBusyError(Exception):
     """A run is already in progress for this session."""
+
+
+class RunNotFoundError(Exception):
+    """No run with this id, in progress or finished."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,20 +64,28 @@ class _LiveSession:
     task: asyncio.Task[None] | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class _LiveRun:
+    task: asyncio.Task[None]
+    control: RunControl
+
+
 class SessionManager:
-    """Create, attach, list, inspect, and send, for one daemon process."""
+    """Create, attach, list, inspect, send, and cancel, for one daemon process."""
 
     def __init__(
         self,
         runtime: ChatRuntime,
         events: SessionLog,
         records: SessionRecords,
+        runs: RunRecords,
     ) -> None:
         self._runtime = runtime
         self._events = events
         self._records = records
+        self._run_records = runs
         self._sessions: dict[str, _LiveSession] = {}
-        self._tasks: set[asyncio.Task[None]] = set()
+        self._runs: dict[str, _LiveRun] = {}
         self._lock = asyncio.Lock()
 
     async def create(self, model_profile: str | None) -> str:
@@ -151,22 +163,43 @@ class SessionManager:
                 user_message_id=new_id("m"),
                 assistant_message_id=new_id("m"),
             )
+            control = RunControl()
             task = asyncio.create_task(
-                run_turn(self._runtime, self._events, turn),
+                run_turn(self._runtime, self._events, turn, control),
                 name=f"golem-run-{turn.run_id}",
             )
             session.task = task
-            self._tasks.add(task)
-            task.add_done_callback(self._finished)
+            self._runs[turn.run_id] = _LiveRun(task=task, control=control)
+            task.add_done_callback(lambda done: self._finished(turn.run_id, done))
+            await control.started.wait()
             return turn.run_id
 
+    async def cancel(self, run_id: str) -> bool:
+        """Stop a run in progress. Returns once ``run.cancelled`` is in the log.
+
+        Returns False for a run that already ended. Raises
+        :class:`RunNotFoundError` for an id the daemon never ran.
+        """
+        live = self._runs.get(run_id)
+        if live is not None and not live.task.done():
+            await self._stop([live], "user")
+            return True
+        if await self._run_records.get(run_id) is None:
+            raise RunNotFoundError(run_id)
+        return False
+
     async def cancel_all(self) -> None:
-        """Cancel in-flight runs. The checkpoint keeps the last completed step."""
-        tasks = list(self._tasks)
-        for task in tasks:
-            task.cancel()
+        """Stop every run in progress, with the reason ``shutdown``."""
+        await self._stop(list(self._runs.values()), "shutdown")
+
+    async def _stop(self, runs: list[_LiveRun], reason: CancelReason) -> None:
+        for run in runs:
+            if run.control.reason is None:
+                run.control.reason = reason
+                run.task.cancel()
+        tasks = {run.task for run in runs}
         if tasks:
-            await asyncio.wait(set(tasks))
+            await asyncio.wait(tasks)
 
     async def _resolve(self, session_id: str) -> _LiveSession:
         existing = self._sessions.get(session_id)
@@ -206,8 +239,8 @@ class SessionManager:
             ),
         )
 
-    def _finished(self, task: asyncio.Task[None]) -> None:
-        self._tasks.discard(task)
+    def _finished(self, run_id: str, task: asyncio.Task[None]) -> None:
+        self._runs.pop(run_id, None)
         if task.cancelled():
             return
         exc = task.exception()
@@ -216,6 +249,7 @@ class SessionManager:
 
 
 __all__ = [
+    "RunNotFoundError",
     "SchemaMismatchError",
     "SessionBusyError",
     "SessionManager",

@@ -3,6 +3,7 @@ import type { HelloResult } from "../../protocol/gen/hello-result.ts";
 import type { MessageSendResult } from "../../protocol/gen/message-send-result.ts";
 import type { Ping } from "../../protocol/gen/ping.ts";
 import type { Params as ChatEvent } from "../../protocol/gen/rpc-notification.ts";
+import type { RunCancelResult } from "../../protocol/gen/run-cancel-result.ts";
 import type { SessionAttachResult } from "../../protocol/gen/session-attach-result.ts";
 import type { SessionCreateResult } from "../../protocol/gen/session-create-result.ts";
 import type { SessionInspectResult } from "../../protocol/gen/session-inspect-result.ts";
@@ -16,6 +17,7 @@ const EVENT_TYPES = new Set([
   "run.started",
   "run.completed",
   "run.failed",
+  "run.cancelled",
 ]);
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
@@ -72,6 +74,10 @@ function isSessionSummary(value: unknown): value is SessionSummary {
     typeof value["last_seq"] === "number" &&
     (value["title"] === undefined || value["title"] === null || typeof value["title"] === "string")
   );
+}
+
+export function isRunCancelResult(value: unknown): value is RunCancelResult {
+  return isRecord(value) && typeof value["cancelled"] === "boolean";
 }
 
 export function isMessageSendResult(value: unknown): value is MessageSendResult {

@@ -1,0 +1,65 @@
+{
+  "$defs": {
+    "RunCancelledData": {
+      "additionalProperties": false,
+      "description": "Who stopped the run. ``user`` is ``run.cancel``, ``shutdown`` the daemon stopping.",
+      "properties": {
+        "reason": {
+          "enum": [
+            "user",
+            "shutdown"
+          ],
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "reason"
+      ],
+      "title": "RunCancelledData",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The run was stopped before the model finished. The partial reply is kept.",
+  "properties": {
+    "data": {
+      "$ref": "#/$defs/RunCancelledData"
+    },
+    "run_id": {
+      "minLength": 1,
+      "title": "Run Id",
+      "type": "string"
+    },
+    "seq": {
+      "minimum": 1,
+      "title": "Seq",
+      "type": "integer"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    },
+    "ts": {
+      "minLength": 1,
+      "title": "Ts",
+      "type": "string"
+    },
+    "type": {
+      "const": "run.cancelled",
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "seq",
+    "session_id",
+    "run_id",
+    "ts",
+    "type",
+    "data"
+  ],
+  "title": "RunCancelledEvent",
+  "type": "object"
+}

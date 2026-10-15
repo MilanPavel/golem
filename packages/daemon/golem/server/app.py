@@ -225,8 +225,9 @@ class DaemonApp:
 async def _open_sessions(database: Database, runtime: ChatRuntime) -> SessionManager:
     events = EventLog(database)
     session_log = SessionLog(events, EventBus())
-    await recover_runs(RunRecords(database), events, session_log, runtime)
-    return SessionManager(runtime, session_log, SessionRecords(database))
+    runs = RunRecords(database)
+    await recover_runs(runs, events, session_log, runtime)
+    return SessionManager(runtime, session_log, SessionRecords(database), runs)
 
 
 def _install_signals(

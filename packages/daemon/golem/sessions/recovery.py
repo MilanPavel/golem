@@ -12,12 +12,12 @@ import logging
 from dataclasses import dataclass
 
 from golem.graphs.chat import ChatRuntime
+from golem.sessions.interrupted import close_reply
 from golem.sessions.log import SessionLog
 from golem.store.events import EventLog
 from golem.store.records import RunRecord, RunRecords
 from golem_protocol.events import (
     ChatEvent,
-    MessageCompletedData,
     MessageCompletedEvent,
     MessageDeltaEvent,
     MessageStartedEvent,
@@ -93,24 +93,14 @@ async def _close(
 ) -> None:
     turn = open_turn(await events.for_run(run.run_id))
     if turn.assistant_message_id is not None:
-        finished = await runtime.message_text(run.session_id, turn.assistant_message_id)
-        if finished is None and turn.user_message_id is not None:
-            await runtime.record_interrupted(
-                run.session_id,
-                user_message_id=turn.user_message_id,
-                assistant_message_id=turn.assistant_message_id,
-                text=turn.partial,
-            )
-        await session_log.emit(
-            run.session_id,
-            run.run_id,
-            "message.completed",
-            MessageCompletedData(
-                message_id=turn.assistant_message_id,
-                role="assistant",
-                text=turn.partial if finished is None else finished,
-                interrupted=finished is None,
-            ),
+        await close_reply(
+            runtime,
+            session_log,
+            session_id=run.session_id,
+            run_id=run.run_id,
+            user_message_id=turn.user_message_id,
+            assistant_message_id=turn.assistant_message_id,
+            partial=turn.partial,
         )
     await session_log.emit(
         run.session_id,

@@ -166,6 +166,26 @@ class MessageSendResult(BaseModel):
     run_id: str = Field(min_length=1)
 
 
+class RunCancelParams(BaseModel):
+    """``run.cancel``. Stop a run that is still in progress."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    run_id: str = Field(min_length=1)
+
+
+class RunCancelResult(BaseModel):
+    """Whether the run was stopped.
+
+    ``cancelled`` is false when the run had already ended. When it is true,
+    ``run.cancelled`` is already in the log.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    cancelled: bool
+
+
 class SessionInspectParams(BaseModel):
     """``session.inspect``. Read the checkpoint for one session. Does not call the model."""
 
@@ -208,6 +228,8 @@ __all__ = [
     "MessageSendParams",
     "MessageSendResult",
     "PingParams",
+    "RunCancelParams",
+    "RunCancelResult",
     "SessionAttachParams",
     "SessionAttachResult",
     "SessionCreateParams",

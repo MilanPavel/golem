@@ -82,6 +82,14 @@ class RunFailedData(BaseModel):
     message: str = Field(min_length=1)
 
 
+class RunCancelledData(BaseModel):
+    """Who stopped the run. ``user`` is ``run.cancel``, ``shutdown`` the daemon stopping."""
+
+    model_config = _CONFIG
+
+    reason: Literal["user", "shutdown"]
+
+
 class SessionCreatedEvent(BaseModel):
     """A session exists. ``run_id`` is null because no run has started."""
 
@@ -173,6 +181,19 @@ class RunFailedEvent(BaseModel):
     data: RunFailedData
 
 
+class RunCancelledEvent(BaseModel):
+    """The run was stopped before the model finished. The partial reply is kept."""
+
+    model_config = _CONFIG
+
+    seq: int = Field(ge=1)
+    session_id: str = Field(min_length=1)
+    run_id: str = Field(min_length=1)
+    ts: str = Field(min_length=1)
+    type: Literal["run.cancelled"]
+    data: RunCancelledData
+
+
 EventType = Literal[
     "session.created",
     "message.started",
@@ -181,6 +202,7 @@ EventType = Literal[
     "run.started",
     "run.completed",
     "run.failed",
+    "run.cancelled",
 ]
 """The ``type`` of each :data:`ChatEvent` member."""
 
@@ -192,7 +214,8 @@ ChatEvent = Annotated[
     | MessageCompletedEvent
     | RunStartedEvent
     | RunCompletedEvent
-    | RunFailedEvent,
+    | RunFailedEvent
+    | RunCancelledEvent,
     Field(discriminator="type"),
 ]
 
@@ -212,6 +235,8 @@ __all__ = [
     "MessageStartedData",
     "MessageStartedEvent",
     "Ping",
+    "RunCancelledData",
+    "RunCancelledEvent",
     "RunCompletedEvent",
     "RunFailedData",
     "RunFailedEvent",
