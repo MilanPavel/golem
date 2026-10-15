@@ -21,6 +21,15 @@ class SessionRecord:
 
 
 @dataclass(frozen=True, slots=True)
+class SessionActivity:
+    """A session row plus whether a run is open and its newest ``seq``."""
+
+    session: SessionRecord
+    running: bool
+    last_seq: int
+
+
+@dataclass(frozen=True, slots=True)
 class RunRecord:
     run_id: str
     session_id: str
@@ -40,15 +49,27 @@ class SessionRecords:
             " FROM sessions WHERE session_id = ?",
             (session_id,),
         )
-        if row is None:
-            return None
-        return SessionRecord(
-            session_id=row["session_id"],
-            model_profile=row["model_profile"],
-            title=row["title"],
-            created_at=row["created_at"],
-            updated_at=row["updated_at"],
+        return None if row is None else _session(row)
+
+    async def recent(self, limit: int) -> list[SessionActivity]:
+        """Sessions with the newest activity first."""
+        rows = await self._database.fetch_all(
+            "SELECT s.session_id, s.model_profile, s.title, s.created_at, s.updated_at,"
+            " EXISTS (SELECT 1 FROM runs r"
+            "  WHERE r.session_id = s.session_id AND r.status = 'running') AS running,"
+            " (SELECT COALESCE(MAX(e.seq), 0) FROM events e"
+            "  WHERE e.session_id = s.session_id) AS last_seq"
+            " FROM sessions s ORDER BY s.updated_at DESC, s.session_id DESC LIMIT ?",
+            (limit,),
         )
+        return [
+            SessionActivity(
+                session=_session(row),
+                running=bool(row["running"]),
+                last_seq=int(row["last_seq"]),
+            )
+            for row in rows
+        ]
 
 
 class RunRecords:
@@ -72,6 +93,16 @@ class RunRecords:
         return [_run(row) for row in rows]
 
 
+def _session(row: sqlite3.Row) -> SessionRecord:
+    return SessionRecord(
+        session_id=row["session_id"],
+        model_profile=row["model_profile"],
+        title=row["title"],
+        created_at=row["created_at"],
+        updated_at=row["updated_at"],
+    )
+
+
 def _run(row: sqlite3.Row) -> RunRecord:
     return RunRecord(
         run_id=row["run_id"],
@@ -83,4 +114,11 @@ def _run(row: sqlite3.Row) -> RunRecord:
     )
 
 
-__all__ = ["RunRecord", "RunRecords", "RunStatus", "SessionRecord", "SessionRecords"]
+__all__ = [
+    "RunRecord",
+    "RunRecords",
+    "RunStatus",
+    "SessionActivity",
+    "SessionRecord",
+    "SessionRecords",
+]

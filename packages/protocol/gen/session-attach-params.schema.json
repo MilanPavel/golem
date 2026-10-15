@@ -1,0 +1,22 @@
+{
+  "additionalProperties": false,
+  "description": "``session.attach``. Replay events after ``after_seq``, then stream live ones.\n\nEvents reach a connection only for sessions it attached. Replayed events\nare written before any live event, with no gap and no repeat.",
+  "properties": {
+    "after_seq": {
+      "default": 0,
+      "minimum": 0,
+      "title": "After Seq",
+      "type": "integer"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "session_id"
+  ],
+  "title": "SessionAttachParams",
+  "type": "object"
+}

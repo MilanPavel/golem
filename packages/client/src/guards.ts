@@ -3,8 +3,10 @@ import type { HelloResult } from "../../protocol/gen/hello-result.ts";
 import type { MessageSendResult } from "../../protocol/gen/message-send-result.ts";
 import type { Ping } from "../../protocol/gen/ping.ts";
 import type { Params as ChatEvent } from "../../protocol/gen/rpc-notification.ts";
+import type { SessionAttachResult } from "../../protocol/gen/session-attach-result.ts";
 import type { SessionCreateResult } from "../../protocol/gen/session-create-result.ts";
 import type { SessionInspectResult } from "../../protocol/gen/session-inspect-result.ts";
+import type { SessionListResult, SessionSummary } from "../../protocol/gen/session-list-result.ts";
 
 const EVENT_TYPES = new Set([
   "session.created",
@@ -47,6 +49,29 @@ export function asChatEvent(value: unknown): ChatEvent | undefined {
 
 export function isSessionCreateResult(value: unknown): value is SessionCreateResult {
   return isRecord(value) && typeof value["session_id"] === "string";
+}
+
+export function isSessionAttachResult(value: unknown): value is SessionAttachResult {
+  return (
+    isRecord(value) && typeof value["session_id"] === "string" && typeof value["last_seq"] === "number"
+  );
+}
+
+export function isSessionListResult(value: unknown): value is SessionListResult {
+  return isRecord(value) && Array.isArray(value["sessions"]) && value["sessions"].every(isSessionSummary);
+}
+
+function isSessionSummary(value: unknown): value is SessionSummary {
+  return (
+    isRecord(value) &&
+    typeof value["session_id"] === "string" &&
+    typeof value["model_profile"] === "string" &&
+    (value["status"] === "idle" || value["status"] === "running") &&
+    typeof value["created_at"] === "string" &&
+    typeof value["updated_at"] === "string" &&
+    typeof value["last_seq"] === "number" &&
+    (value["title"] === undefined || value["title"] === null || typeof value["title"] === "string")
+  );
 }
 
 export function isMessageSendResult(value: unknown): value is MessageSendResult {

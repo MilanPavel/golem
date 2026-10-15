@@ -28,6 +28,10 @@ export function frameColumns(terminalColumns: number): number {
 
 const DEBUG_ROWS = 7;
 
+export const HEADER_GAP = 2;
+export const HEADER_PAD_TOP = 1;
+export const HEADER_ROWS = HEADER_PAD_TOP + LOGO_ROWS + 1;
+
 export function frameBudget(input: {
   rows: number;
   columns: number;
@@ -49,7 +53,7 @@ export function frameBudget(input: {
       debug: 0,
     };
   }
-  let header = input.rows >= 20 && input.columns >= LOGO_WIDTH + 24 ? LOGO_ROWS : 1;
+  let header = input.rows >= 20 && input.columns >= LOGO_WIDTH + HEADER_GAP + 24 ? HEADER_ROWS : 1;
   let composer = input.busy ? 1 : Math.min(5, composerLineCount(input.draft, input.columns));
   let meter = input.busy ? 1 : 0;
   let banner = input.banner ? 1 : 0;
@@ -102,7 +106,7 @@ export function frameBudget(input: {
 
   const used = header + banner + meter + composer + status + debug;
   return {
-    mode: header >= LOGO_ROWS ? "full" : header > 0 ? "compact" : "hidden",
+    mode: header >= HEADER_ROWS ? "full" : header > 0 ? "compact" : "hidden",
     header,
     body: rows - used,
     banner,

@@ -1,4 +1,4 @@
-"""Daemon commands: ``hello``, ``daemon.status``, ``ping``, chat, and inspect."""
+"""Daemon commands: ``hello``, ``daemon.status``, ``ping``, sessions, chat, and inspect."""
 
 from __future__ import annotations
 
@@ -20,7 +20,6 @@ from golem.server.dispatcher import (
     RequestContext,
     RpcCallError,
 )
-from golem.sessions.log import EventSink
 from golem.sessions.manager import (
     SchemaMismatchError,
     SessionBusyError,
@@ -35,13 +34,19 @@ from golem_protocol.commands import (
     MessageSendParams,
     MessageSendResult,
     PingParams,
+    SessionAttachParams,
+    SessionAttachResult,
     SessionCreateParams,
     SessionCreateResult,
+    SessionDetachParams,
+    SessionDetachResult,
     SessionInspectParams,
     SessionInspectResult,
+    SessionListParams,
+    SessionListResult,
+    SessionSummary,
 )
-from golem_protocol.events import ChatEvent, Ping
-from golem_protocol.rpc import RpcNotification
+from golem_protocol.events import Ping
 from golem_protocol.version import PROTOCOL_MAJOR, PROTOCOL_MINOR
 
 log = logging.getLogger("golem.server")
@@ -98,14 +103,48 @@ async def _ping(ctx: RequestContext, params: PingParams) -> Ping:
 
 async def _session_create(ctx: RequestContext, params: SessionCreateParams) -> SessionCreateResult:
     sessions = _sessions(ctx)
-    session_id = await sessions.create(params.model_profile, _sink(ctx))
+    session_id = await sessions.create(params.model_profile)
     return SessionCreateResult(session_id=session_id)
+
+
+async def _session_attach(ctx: RequestContext, params: SessionAttachParams) -> SessionAttachResult:
+    sessions = _sessions(ctx)
+    try:
+        last_seq = await sessions.attach(params.session_id, params.after_seq, ctx.connection)
+    except SessionNotFoundError as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
+    except SchemaMismatchError as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, str(exc)) from exc
+    return SessionAttachResult(session_id=params.session_id, last_seq=last_seq)
+
+
+async def _session_detach(ctx: RequestContext, params: SessionDetachParams) -> SessionDetachResult:
+    _sessions(ctx).detach(params.session_id, ctx.connection)
+    return SessionDetachResult()
+
+
+async def _session_list(ctx: RequestContext, params: SessionListParams) -> SessionListResult:
+    found = await _sessions(ctx).recent(params.limit)
+    return SessionListResult(
+        sessions=[
+            SessionSummary(
+                session_id=item.session.session_id,
+                model_profile=item.session.model_profile,
+                title=item.session.title,
+                status="running" if item.running else "idle",
+                created_at=item.session.created_at,
+                updated_at=item.session.updated_at,
+                last_seq=item.last_seq,
+            )
+            for item in found
+        ]
+    )
 
 
 async def _message_send(ctx: RequestContext, params: MessageSendParams) -> MessageSendResult:
     sessions = _sessions(ctx)
     try:
-        run_id = await sessions.send(params.session_id, params.text, _sink(ctx))
+        run_id = await sessions.send(params.session_id, params.text)
     except SessionNotFoundError as exc:
         raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
     except SessionBusyError as exc:
@@ -146,16 +185,6 @@ def _sessions(ctx: RequestContext) -> SessionManager:
     return sessions
 
 
-def _sink(ctx: RequestContext) -> EventSink:
-    async def emit(event: ChatEvent) -> None:
-        try:
-            await ctx.connection.send(RpcNotification(params=event))
-        except (ConnectionError, OSError):
-            log.debug("client went away during %s", event.type)
-
-    return emit
-
-
 def standard_methods() -> dict[str, Method]:
     """The commands the daemon answers."""
     return {
@@ -163,6 +192,9 @@ def standard_methods() -> dict[str, Method]:
         "daemon.status": Method("daemon.status", _EmptyParams, True, _status),
         "ping": Method("ping", PingParams, True, _ping),
         "session.create": Method("session.create", SessionCreateParams, True, _session_create),
+        "session.attach": Method("session.attach", SessionAttachParams, True, _session_attach),
+        "session.detach": Method("session.detach", SessionDetachParams, True, _session_detach),
+        "session.list": Method("session.list", SessionListParams, True, _session_list),
         "message.send": Method("message.send", MessageSendParams, True, _message_send),
         "session.inspect": Method("session.inspect", SessionInspectParams, True, _session_inspect),
     }

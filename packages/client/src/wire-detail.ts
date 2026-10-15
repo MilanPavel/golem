@@ -37,6 +37,12 @@ export function resultDetail(method: string, result: unknown): string {
   if (method === "session.create" && typeof result["session_id"] === "string") {
     return result["session_id"];
   }
+  if (method === "session.attach" && typeof result["last_seq"] === "number") {
+    return `last seq ${result["last_seq"]}`;
+  }
+  if (method === "session.list" && Array.isArray(result["sessions"])) {
+    return `${result["sessions"].length} sessions`;
+  }
   if (method === "session.inspect" && typeof result["message_count"] === "number") {
     return `${result["message_count"]} messages`;
   }

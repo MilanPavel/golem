@@ -1,6 +1,6 @@
 {
   "additionalProperties": false,
-  "description": "``session.create``. An empty profile uses the daemon's configured one.",
+  "description": "``session.create``. An empty profile uses the daemon's configured one.\n\nThe caller is not attached. ``session.attach`` replays ``session.created``.",
   "properties": {
     "model_profile": {
       "anyOf": [

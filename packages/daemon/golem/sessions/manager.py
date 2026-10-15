@@ -15,10 +15,11 @@ from golem.graphs.adapter import PlainMessage, plain_messages
 from golem.graphs.chat import ChatRuntime
 from golem.graphs.state import SCHEMA_VERSION
 from golem.models.router import ModelIdentity
+from golem.sessions.bus import EventTarget
 from golem.sessions.ids import new_id
-from golem.sessions.log import EventSink, SessionLog, discard
+from golem.sessions.log import SessionLog
 from golem.sessions.runner import Turn, run_turn
-from golem.store.records import SessionRecords
+from golem.store.records import SessionActivity, SessionRecords
 from golem_protocol.events import SessionCreatedData
 
 log = logging.getLogger("golem.sessions")
@@ -60,7 +61,7 @@ class _LiveSession:
 
 
 class SessionManager:
-    """``session.create`` and ``message.send`` for one daemon process."""
+    """Create, attach, list, inspect, and send, for one daemon process."""
 
     def __init__(
         self,
@@ -75,8 +76,8 @@ class SessionManager:
         self._tasks: set[asyncio.Task[None]] = set()
         self._lock = asyncio.Lock()
 
-    async def create(self, model_profile: str | None, sink: EventSink) -> str:
-        """Remember a new session and emit ``session.created``."""
+    async def create(self, model_profile: str | None) -> str:
+        """Store a new session and its ``session.created``. Nobody is attached yet."""
         profile = self._runtime.router.profile_name if model_profile is None else model_profile
         async with self._lock:
             session = _LiveSession(
@@ -84,9 +85,31 @@ class SessionManager:
                 model_profile=profile,
                 schema_version=SCHEMA_VERSION,
             )
-            await self._announce(session, sink)
+            await self._announce(session)
             self._sessions[session.session_id] = session
             return session.session_id
+
+    async def attach(self, session_id: str, after_seq: int, target: EventTarget) -> int:
+        """Replay events after ``after_seq`` to ``target``, then stream live ones.
+
+        Returns the newest ``seq``. Raises :class:`SessionNotFoundError` or
+        :class:`SchemaMismatchError`.
+        """
+        async with self._lock:
+            await self._resolve(session_id)
+        return await self._events.attach(session_id, after_seq, target)
+
+    def detach(self, session_id: str, target: EventTarget) -> None:
+        """Stop live events for ``session_id`` on ``target``."""
+        self._events.detach(session_id, target)
+
+    def detach_all(self, target: EventTarget) -> None:
+        """Forget ``target`` everywhere. Called when its connection closes."""
+        self._events.detach_all(target)
+
+    async def recent(self, limit: int) -> list[SessionActivity]:
+        """Sessions with the newest activity first."""
+        return await self._records.recent(limit)
 
     async def inspect(self, session_id: str) -> SessionView:
         """The messages the next model call would see. Does not start a run."""
@@ -106,8 +129,10 @@ class SessionManager:
         """The model ``daemon.status`` reports for this process."""
         return self._runtime.router.identity()
 
-    async def send(self, session_id: str, text: str, sink: EventSink) -> str:
+    async def send(self, session_id: str, text: str) -> str:
         """Start one graph run. Returns ``run_id`` before the model finishes.
+
+        The run's events go to the targets attached to ``session_id``.
 
         Raises :class:`SessionNotFoundError`, :class:`SessionBusyError`,
         :class:`SchemaMismatchError`, or :class:`~golem.models.router.ModelConfigError`.
@@ -127,7 +152,7 @@ class SessionManager:
                 assistant_message_id=new_id("m"),
             )
             task = asyncio.create_task(
-                run_turn(self._runtime, self._events, turn, sink),
+                run_turn(self._runtime, self._events, turn),
                 name=f"golem-run-{turn.run_id}",
             )
             session.task = task
@@ -164,14 +189,13 @@ class SessionManager:
             schema_version=SCHEMA_VERSION,
         )
         if record is None:
-            await self._announce(session, discard)
+            await self._announce(session)
         self._sessions[session_id] = session
         return session
 
-    async def _announce(self, session: _LiveSession, sink: EventSink) -> None:
+    async def _announce(self, session: _LiveSession) -> None:
         chosen = self._runtime.router.identity(session.model_profile)
         await self._events.emit(
-            sink,
             session.session_id,
             None,
             "session.created",

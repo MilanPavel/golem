@@ -1,4 +1,4 @@
-"""JSON-RPC dispatch. Handlers run as tasks so a later phase can stream events."""
+"""JSON-RPC dispatch. Handlers run as tasks, so a slow command does not block the next line."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from typing import Any, cast
 
 from pydantic import BaseModel, ValidationError
 
+from golem.server.connection import ClientConnection
 from golem.server.state import DaemonState
 from golem_protocol.rpc import RpcErrorBody, RpcFailure, RpcRequest, RpcSuccess
 
@@ -37,22 +38,6 @@ class RpcCallError(Exception):
         super().__init__(message)
         self.code = code
         self.data = data
-
-
-class ClientConnection:
-    """One accepted socket."""
-
-    def __init__(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
-        self.reader = reader
-        self.writer = writer
-        self.welcomed = False
-        self._write_lock = asyncio.Lock()
-
-    async def send(self, model: BaseModel) -> None:
-        payload = model.model_dump_json().encode("utf-8") + b"\n"
-        async with self._write_lock:
-            self.writer.write(payload)
-            await self.writer.drain()
 
 
 @dataclass(frozen=True, slots=True)

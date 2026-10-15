@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 from golem.graphs.adapter import TextCompleted, TextDelta, translate
 from golem.graphs.chat import ChatRuntime
-from golem.sessions.log import EventSink, SessionLog
+from golem.sessions.log import SessionLog
 from golem_protocol.events import (
     EmptyEventData,
     EventType,
@@ -36,11 +36,11 @@ class Turn:
     assistant_message_id: str
 
 
-async def run_turn(runtime: ChatRuntime, events: SessionLog, turn: Turn, sink: EventSink) -> None:
+async def run_turn(runtime: ChatRuntime, events: SessionLog, turn: Turn) -> None:
     """Run ``turn`` to the end. A failure becomes ``run.failed``, not an exception."""
 
     async def emit(kind: EventType, data: BaseModel) -> None:
-        await events.emit(sink, turn.session_id, turn.run_id, kind, data)
+        await events.emit(turn.session_id, turn.run_id, kind, data)
 
     try:
         await emit(

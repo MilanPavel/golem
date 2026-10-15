@@ -12,7 +12,7 @@ import logging
 from dataclasses import dataclass
 
 from golem.graphs.chat import ChatRuntime
-from golem.sessions.log import SessionLog, discard
+from golem.sessions.log import SessionLog
 from golem.store.events import EventLog
 from golem.store.records import RunRecord, RunRecords
 from golem_protocol.events import (
@@ -102,7 +102,6 @@ async def _close(
                 text=turn.partial,
             )
         await session_log.emit(
-            discard,
             run.session_id,
             run.run_id,
             "message.completed",
@@ -114,7 +113,6 @@ async def _close(
             ),
         )
     await session_log.emit(
-        discard,
         run.session_id,
         run.run_id,
         "run.failed",

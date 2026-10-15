@@ -1,0 +1,82 @@
+{
+  "$defs": {
+    "SessionSummary": {
+      "additionalProperties": false,
+      "description": "One session as ``session.list`` reports it.\n\n``status`` is ``running`` while a run is open. ``last_seq`` is the newest\nstored event, so a client can tell what it has not seen.",
+      "properties": {
+        "created_at": {
+          "minLength": 1,
+          "title": "Created At",
+          "type": "string"
+        },
+        "last_seq": {
+          "minimum": 0,
+          "title": "Last Seq",
+          "type": "integer"
+        },
+        "model_profile": {
+          "minLength": 1,
+          "title": "Model Profile",
+          "type": "string"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "idle",
+            "running"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        },
+        "updated_at": {
+          "minLength": 1,
+          "title": "Updated At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "session_id",
+        "model_profile",
+        "status",
+        "created_at",
+        "updated_at",
+        "last_seq"
+      ],
+      "title": "SessionSummary",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Sessions, newest activity first.",
+  "properties": {
+    "sessions": {
+      "items": {
+        "$ref": "#/$defs/SessionSummary"
+      },
+      "title": "Sessions",
+      "type": "array"
+    }
+  },
+  "required": [
+    "sessions"
+  ],
+  "title": "SessionListResult",
+  "type": "object"
+}

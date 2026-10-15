@@ -31,9 +31,9 @@ from golem.server.dispatcher import (
     RequestContext,
 )
 from golem.server.framing import MAX_LINE_BYTES
-from golem_protocol.version import PROTOCOL_MINOR
+from golem_protocol.version import PROTOCOL_MAJOR, PROTOCOL_MINOR
 
-HELLO = {"protocol_major": 1, "protocol_minor": 0, "client": "tui"}
+HELLO = {"protocol_major": PROTOCOL_MAJOR, "protocol_minor": 0, "client": "tui"}
 
 
 class RpcClient:
@@ -98,6 +98,15 @@ class RpcClient:
                 raise TimeoutError(self.events) from None
             if payload.get("method") == "event":
                 self.events.append(payload)
+
+    async def take_events(self) -> list[dict[str, object]]:
+        """Collect every event the daemon queued before a ``ping`` round trip."""
+        await self.call("ping", {"nonce": "barrier"})
+        while not self._orphan.empty():
+            payload = self._orphan.get_nowait()
+            if payload.get("method") == "event":
+                self.events.append(payload)
+        return self.events
 
     async def close(self) -> None:
         self._pump.cancel()
@@ -215,7 +224,7 @@ async def test_hello_status_and_ping(running: DaemonApp) -> None:
     client = await RpcClient.connect(running.paths.socket_path)
     try:
         hello = rpc_result(await client.call("hello", HELLO))
-        assert hello["protocol_major"] == 1
+        assert hello["protocol_major"] == PROTOCOL_MAJOR
         assert hello["protocol_minor"] == PROTOCOL_MINOR
         assert hello["daemon_version"] == "0.0.0"
         status = rpc_result(await client.call("daemon.status"))
@@ -242,7 +251,7 @@ async def test_minor_mismatch_is_accepted(running: DaemonApp) -> None:
         hello = rpc_result(
             await client.call("hello", {**HELLO, "protocol_minor": 9}),
         )
-        assert hello["protocol_major"] == 1
+        assert hello["protocol_major"] == PROTOCOL_MAJOR
         assert hello["protocol_minor"] == PROTOCOL_MINOR
     finally:
         await client.close()
@@ -251,9 +260,12 @@ async def test_minor_mismatch_is_accepted(running: DaemonApp) -> None:
 async def test_major_mismatch_refuses_and_does_not_unlock_commands(running: DaemonApp) -> None:
     client = await RpcClient.connect(running.paths.socket_path)
     try:
-        mismatch = await client.call("hello", {**HELLO, "protocol_major": 2})
+        mismatch = await client.call("hello", {**HELLO, "protocol_major": PROTOCOL_MAJOR + 1})
         assert error_code(mismatch) == PROTOCOL_MISMATCH
-        assert _object_dict(mismatch["error"])["data"] == {"client_major": 2, "daemon_major": 1}
+        assert _object_dict(mismatch["error"])["data"] == {
+            "client_major": PROTOCOL_MAJOR + 1,
+            "daemon_major": PROTOCOL_MAJOR,
+        }
         blocked = await client.call("ping", {"nonce": "x"})
         assert error_code(blocked) == HELLO_REQUIRED
     finally:
@@ -306,7 +318,7 @@ async def test_second_connection_is_rejected_at_capacity(short_home: Path) -> No
     first = await RpcClient.connect(app.paths.socket_path)
     try:
         hello = rpc_result(await first.call("hello", HELLO))
-        assert hello["protocol_major"] == 1
+        assert hello["protocol_major"] == PROTOCOL_MAJOR
         _reader, writer = await asyncio.open_unix_connection(os.fspath(app.paths.socket_path))
         data = await asyncio.wait_for(_reader.read(16), timeout=1)
         assert data == b""
@@ -429,7 +441,7 @@ def test_typescript_status_reads_the_daemon(short_home: Path) -> None:
         assert completed.returncode == 0, completed.stderr
         assert "connected" in completed.stdout
         assert f"pid: {serve.proc.pid}" in completed.stdout
-        assert f"protocol: 1.{PROTOCOL_MINOR}" in completed.stdout
+        assert f"protocol: {PROTOCOL_MAJOR}.{PROTOCOL_MINOR}" in completed.stdout
         assert "state: running" in completed.stdout
     finally:
         serve.stop()

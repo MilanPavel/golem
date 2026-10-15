@@ -4,7 +4,6 @@ import { Box, Text, useInput, useWindowSize } from "ink";
 import { RpcError, SESSION_NOT_FOUND, type ConnectionState, type GolemClient, type WireLine } from "@golem/client";
 
 import {
-  connectionLost,
   createDeltaBatcher,
   emptyChat,
   reduceChat,
@@ -27,12 +26,12 @@ import {
 } from "./status-label.ts";
 import { nextOffset, type WheelSubscribe } from "./screen.ts";
 import { CLAY, QUESTION_BG, QUESTION_FG } from "./theme.ts";
+import { useSession } from "./use-session.ts";
 
 export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelSubscribe }) {
   const [connection, setConnection] = useState<ConnectionState>(client.state);
   const [chat, setChat] = useState<ChatState>(emptyChat);
   const [draft, setDraft] = useState("");
-  const [sessionId, setSessionId] = useState<string | null>(null);
   const [sessionModel, setSessionModel] = useState<ModelInfo | null>(null);
   const [daemonModel, setDaemonModel] = useState<ModelInfo | null>(null);
   const [version, setVersion] = useState("");
@@ -43,8 +42,6 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   const [wire, setWire] = useState<readonly WireLine[]>([]);
   const [modelMessages, setModelMessages] = useState<CheckpointMessage[]>([]);
   const [modelCount, setModelCount] = useState<number | null>(null);
-  const sessionRef = useRef<string | null>(null);
-  const creating = useRef(false);
   const draftRef = useRef(draft);
   const busyRef = useRef(chat.busy);
   const connectionRef = useRef(connection);
@@ -85,6 +82,25 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       setChat((current) => reduceChat(current, deltaEvent(messageId, text)));
     });
   }
+
+  const session = useSession(client, connection.status === "connected", {
+    onSwitch: (next) => {
+      batcher.current?.flush();
+      setChat((current) => ({ ...emptyChat, notice: current.notice }));
+      setSessionModel(null);
+      setModelMessages([]);
+      setModelCount(null);
+      setOffset(0);
+      if (panelOpen.current) {
+        loadCheckpointRef.current(next);
+      }
+    },
+    onError: (error) => {
+      setChat((current) => ({ ...current, error: messageOf(error) }));
+    },
+  });
+  const sessionRef = session.ref;
+  const sessionId = session.id;
 
   useEffect(() => () => batcher.current?.stop(), []);
 
@@ -150,7 +166,6 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       setConnection(next);
       if (next.status !== "connected") {
         batcher.current?.flush();
-        setChat((current) => connectionLost(current));
       }
     });
   }, [client]);
@@ -181,6 +196,9 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
 
   useEffect(() => {
     return client.onEvent((event) => {
+      if (event.session_id !== sessionRef.current) {
+        return;
+      }
       if (event.type === "session.created") {
         setSessionModel({
           profile: event.data.model_profile,
@@ -201,35 +219,10 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       }
       setChat((current) => reduceChat(current, event));
       if (event.type === "run.completed" && panelOpen.current) {
-        const session = sessionRef.current;
-        if (session !== null) {
-          loadCheckpointRef.current(session);
-        }
+        loadCheckpointRef.current(event.session_id);
       }
     });
-  }, [client]);
-
-  useEffect(() => {
-    if (connection.status !== "connected") {
-      return;
-    }
-    void openSession();
-
-    async function openSession(): Promise<void> {
-      if (creating.current || sessionRef.current !== null) {
-        return;
-      }
-      creating.current = true;
-      try {
-        const result = await client.createSession();
-        sessionRef.current = result.session_id;
-        setSessionId(result.session_id);
-      } catch (error: unknown) {
-        creating.current = false;
-        setChat((current) => ({ ...current, error: messageOf(error) }));
-      }
-    }
-  }, [client, connection.status]);
+  }, [client, sessionRef]);
 
   function submit(): void {
     const outcome = applyComposer(debugRef.current, draftRef.current);
@@ -245,9 +238,9 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       setDraft(outcome.restore ?? "");
       setChat((current) => ({ ...current, notice: outcome.notice }));
       if (outcome.refreshModel) {
-        const session = sessionRef.current;
-        if (session !== null && connectionRef.current.status === "connected") {
-          loadCheckpointRef.current(session);
+        const current = sessionRef.current;
+        if (current !== null && connectionRef.current.status === "connected") {
+          loadCheckpointRef.current(current);
         }
       }
       return;
@@ -266,39 +259,14 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
     setOffset(0);
     setChat((current) => ({ ...current, notice: null }));
     void client.sendMessage(currentSession, text).catch((error: unknown) => {
+      setDraft(text);
       if (error instanceof RpcError && error.code === SESSION_NOT_FOUND) {
-        sessionRef.current = null;
-        creating.current = false;
-        setSessionId(null);
-        setDraft(text);
-        setModelMessages([]);
-        setModelCount(null);
-        setChat((current) => ({
-          ...current,
-          busy: false,
-          notice: "session was not found; started a new one",
-        }));
-        void replaceSession();
+        setChat((current) => ({ ...current, notice: "session was not found; started a new one" }));
+        session.startNew();
         return;
       }
-      setDraft(text);
       setChat((current) => ({ ...current, busy: false, error: messageOf(error) }));
     });
-
-    async function replaceSession(): Promise<void> {
-      creating.current = true;
-      try {
-        const result = await client.createSession();
-        sessionRef.current = result.session_id;
-        setSessionId(result.session_id);
-        if (panelOpen.current) {
-          loadCheckpointRef.current(result.session_id);
-        }
-      } catch (error: unknown) {
-        creating.current = false;
-        setChat((current) => ({ ...current, error: messageOf(error) }));
-      }
-    }
   }
 
   function showDebug(next: DebugState): void {

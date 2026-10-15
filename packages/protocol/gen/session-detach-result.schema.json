@@ -1,0 +1,7 @@
+{
+  "additionalProperties": false,
+  "description": "No payload. Detaching a session that was not attached is not an error.",
+  "properties": {},
+  "title": "SessionDetachResult",
+  "type": "object"
+}

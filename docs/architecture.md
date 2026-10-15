@@ -86,14 +86,12 @@ Built today:
 - Chat sessions. Each one runs a single agent graph against one configured model.
 - Checkpoints in `checkpoints.db`. They survive a daemon restart. [ADR-006](adr/006-checkpoint-continuity.md) is that choice.
 - The event log in `golem.db`. Every event is written there before it goes to the socket, so sessions, runs, and `seq` survive a restart. A run left open by a stopped daemon is closed at the next start.
+- `session.attach`. A client gets the stored events after the last `seq` it saw, then the live ones. Any number of clients can follow one session. The TUI opens the newest session at startup. [ADR-007](adr/007-attach-and-fan-out.md) is that choice.
 
 Planned next:
 
-- `attach`, so a client that reconnects rebuilds its screen from the log, after the last `seq` it saw.
-- Cancel, a session list, titles, and fork.
+- Cancel, a session switcher, titles, and fork.
 - Flows, tool permissions, skills, and long-term memory in `memory.db`.
-
-Until `attach` exists, the TUI keeps the messages it has shown, and only for as long as the TUI process runs. The log already has them.
 
 ## The daemon
 
@@ -113,7 +111,7 @@ The socket is only the door. Behind it, these jobs sit in one process:
 
 | Job | What it does | Status |
 |---|---|---|
-| Protocol server | Reads one JSON line at a time. Runs the command. Writes events back. | Built |
+| Protocol server | Reads one JSON line at a time. Runs the command. Queues the reply, and the events of attached sessions, for that connection. | Built |
 | Sessions | One chat or one flow run. Each has an id and a row in `golem.db`. | Built |
 | Graph runtime | The agent loop. Its memory is the checkpoint. | Built |
 | Model router | Turns the configured profile into a chat model. | Built |
@@ -208,7 +206,7 @@ The graph library has its own message classes, and those classes change. If the 
 
 **Events** go from daemon to client. They report something that already happened: a token arrived, a tool finished, a model was chosen, a run stopped.
 
-An event is a fact. The client builds the whole screen from the facts, in order. The daemon already writes every fact to the event log. Replay will not be a special mode: it is the same stream, read from the start or from the last number the client has. The diagram shows that planned shape. `attach` is not built yet.
+An event is a fact. The client builds the whole screen from the facts, in order. The daemon writes every fact to the event log first. Replay is not a special mode: it is the same stream, read from the start or from the last number the client has.
 
 ```mermaid
 sequenceDiagram
@@ -224,6 +222,8 @@ sequenceDiagram
 ```
 
 `hello` is the first command. The client and the daemon compare protocol versions. A break in the shapes bumps the major number, and the daemon refuses the client. Any minor on the same major is accepted. The current numbers and what each minor added are in [ADR-003](adr/003-protocol.md).
+
+A connection gets a session's events only after `session.attach`. Several connections can attach to one session, and each gets every event. The daemon holds one lock per session while it reads the replay and subscribes the connection, so no event lands in between. Each connection has its own outbound queue, so a slow terminal does not slow a run. A client that falls 20 000 lines behind is dropped, and it attaches again from its last `seq`.
 
 Each event line is one JSON-RPC 2.0 notification. The fields that matter:
 
@@ -243,9 +243,9 @@ Each event line is one JSON-RPC 2.0 notification. The fields that matter:
 
 | Commands | Events |
 |---|---|
-| `hello`, `ping`, `daemon.status`, `session.create`, `message.send`, `session.inspect` | `session.created`, `message.started`, `message.delta`, `message.completed`, `run.started`, `run.completed`, `run.failed` |
+| `hello`, `ping`, `daemon.status`, `session.create`, `session.attach`, `session.detach`, `session.list`, `message.send`, `session.inspect` | `session.created`, `message.started`, `message.delta`, `message.completed`, `run.started`, `run.completed`, `run.failed` |
 
-After `hello`, a client sends `ping` every few seconds so a half-open socket is noticed. `daemon.status` returns the pid, uptime, and configured model. A chat sends `session.create`, then `message.send`. `session.inspect` reads the saved checkpoint messages and does not call the model.
+After `hello`, a client sends `ping` every few seconds so a half-open socket is noticed. `daemon.status` returns the pid, uptime, and configured model. A new chat sends `session.create`, then `session.attach` with `after_seq` 0, then `message.send`. `session.list` returns sessions newest activity first, each with `idle` or `running` and its last `seq`. `session.detach` stops one session's events. `session.inspect` reads the saved checkpoint messages and does not call the model.
 
 ### Why a protocol package
 
@@ -287,7 +287,7 @@ sequenceDiagram
   Daemon-->>App: message.completed, run.completed
 ```
 
-`message.send` only answers that a run started. Your line appears when `message.completed` comes back, and the draft is already cleared. If the send fails, the draft returns and the banner turns red. If the code is `SESSION_NOT_FOUND` (`-32003`), the screen drops the session, puts the draft back, and opens a new one.
+`message.send` only answers that a run started. Your line appears when `message.completed` comes back, and the draft is already cleared. If the send fails, the draft returns and the banner turns red. If the code is `SESSION_NOT_FOUND` (`-32003`), the screen puts the draft back, then creates and attaches to a new session.
 
 `/debug` opens a panel. `/debug wire` and `/debug model` pick a tab. `/debug hold` keeps the next line on the screen and does not send it. `/debug go` sends that held line. Esc closes the panel. Tab swaps the tab.
 
@@ -344,11 +344,13 @@ The debug band keeps its first row for the title. The wire tab lists recent prot
 
 Deltas do not take that path one socket frame at a time. They wait in a small map, grouped by message id, for about 16 milliseconds, then land as one update. When the answer finishes, that map is emptied first, and `message.completed` replaces the text with the full answer. `session.created` does not change `chat`. The screen reads the model off that event on its own.
 
-If the socket drops, `busy` turns off. The half-written answer stays, still marked streaming, so it is not passed through markdown. Nothing deletes old messages. The list lasts as long as this TUI process. The daemon's copy is the checkpoint.
+A replay is the same events, so the same table draws it. Stored deltas are already folded into their `message.completed`, so a finished answer arrives whole. An answer still in progress arrives as `message.started` and its deltas so far.
+
+If the socket drops, `busy` stays as it was. The half-written answer stays, still marked streaming. After the reconnect the client attaches again, and the events it missed say whether the run finished. Events for any other session are ignored.
 
 The draft is the composer text. Keystrokes add to it. Enter clears it only when the line is sent.
 
-The link is remembered as `connection`: connecting, connected, reconnecting, closed, or rejected. The status line paints that word green, yellow, or red. `sessionId` is this chat on the daemon. Until it exists, and until the link is connected, typing does nothing. The header's model prefers the session's profile, provider, and name, and fills any hole from `daemon.status`.
+The link is remembered as `connection`: connecting, connected, reconnecting, closed, or rejected. The status line paints that word green, yellow, or red. `sessionId` is this chat on the daemon. `use-session.ts` picks it: on the first connect, the newest session from `session.list`, or a new one when there is none. It is set before the attach, so the replay is drawn. Until it exists, and until the link is connected, typing does nothing. The header's model prefers the session's profile, provider, and name, and fills any hole from `daemon.status`.
 
 `offset` is the transcript scroll. `debugOffset` is the same count inside the debug panel. `tick` increases ten times a second while `busy` is true. The screen never prints it. It exists so the meter block moves.
 
@@ -366,8 +368,10 @@ flowchart LR
   sock --> daemon["Daemon"]
 ```
 
-`main.tsx` calls `connectGolem` with the name `tui` and reconnect turned on. The socket is `~/.golem/run/golem.sock`, or under `GOLEM_HOME` when that is set. The first line is `hello`. After the daemon accepts the protocol version, the screen asks for `daemon.status` and `session.create`.
+`main.tsx` calls `connectGolem` with the name `tui` and reconnect turned on. The socket is `~/.golem/run/golem.sock`, or under `GOLEM_HOME` when that is set. The first line is `hello`. After the daemon accepts the protocol version, the screen asks for `daemon.status` and `session.list`, then attaches to the newest session, or runs `session.create` and attaches.
 
 Every 5 seconds the client sends `ping` with a fresh nonce. If the matching reply does not arrive within 10 seconds, the socket is dropped. The first reconnect wait is at most 200 milliseconds. Later waits double, up to 5 seconds. A protocol major mismatch sets the state to `rejected` and stops the retries. `golem status` is the other way around: `reconnect: false`, one `daemon.status`, then `close()`.
+
+The client remembers each attached session and the last `seq` it delivered. After a reconnect it sends `session.attach` for each one from that `seq`, before it reports `connected`. Events at or below that `seq` are dropped, because a replay can repeat them.
 
 The client does not build the transcript. It hands each `event` line to `App`. It also keeps those last 50 lines, which the debug panel copies.

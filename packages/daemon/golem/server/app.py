@@ -20,9 +20,9 @@ from golem.lock import DaemonAlreadyRunning, DaemonLock
 from golem.logging import configure_logging
 from golem.models.router import ModelRouter
 from golem.paths import GolemPaths, resolve_paths
+from golem.server.connection import ClientConnection
 from golem.server.dispatcher import (
     PARSE_ERROR,
-    ClientConnection,
     Dispatcher,
     Method,
     send_failure,
@@ -30,6 +30,7 @@ from golem.server.dispatcher import (
 from golem.server.framing import MAX_LINE_BYTES, FrameTooLong, read_frame
 from golem.server.handlers import standard_methods
 from golem.server.state import DaemonState
+from golem.sessions.bus import EventBus
 from golem.sessions.log import SessionLog
 from golem.sessions.manager import SessionManager
 from golem.sessions.recovery import recover_runs
@@ -40,6 +41,7 @@ from golem.store.records import RunRecords, SessionRecords
 log = logging.getLogger("golem.server")
 
 MAX_CONNECTIONS = 32
+FLUSH_TIMEOUT_SECONDS = 1.0
 # sockaddr_un.sun_path is 104 bytes on macOS, including the trailing NUL.
 _MAX_SOCKET_BYTES = 103
 
@@ -79,6 +81,7 @@ class DaemonApp:
         self._lock = DaemonLock(paths)
         self._server: asyncio.Server | None = None
         self._clients: set[asyncio.Task[None]] = set()
+        self._connections: set[ClientConnection] = set()
         self._stop = asyncio.Event()
         self._draining = False
 
@@ -143,7 +146,8 @@ class DaemonApp:
         reader: asyncio.StreamReader,
         writer: asyncio.StreamWriter,
     ) -> None:
-        connection = ClientConnection(reader, writer)
+        connection = ClientConnection(writer)
+        self._connections.add(connection)
         log.info("client connected")
         try:
             while not self._draining:
@@ -161,7 +165,14 @@ class DaemonApp:
             log.exception("client loop failed")
         finally:
             log.info("client disconnected")
-            writer.close()
+            if self.state.sessions is not None:
+                self.state.sessions.detach_all(connection)
+            try:
+                await connection.flush(FLUSH_TIMEOUT_SECONDS)
+            finally:
+                self._connections.discard(connection)
+                connection.close()
+                writer.close()
             with contextlib.suppress(ConnectionError, OSError):
                 await writer.wait_closed()
 
@@ -173,6 +184,9 @@ class DaemonApp:
         if self.state.sessions is not None:
             await self.state.sessions.cancel_all()
         await self._dispatcher.drain()
+        await asyncio.gather(
+            *(connection.flush(FLUSH_TIMEOUT_SECONDS) for connection in self._connections),
+        )
         for task in list(self._clients):
             task.cancel()
         if self._clients:
@@ -210,7 +224,7 @@ class DaemonApp:
 
 async def _open_sessions(database: Database, runtime: ChatRuntime) -> SessionManager:
     events = EventLog(database)
-    session_log = SessionLog(events)
+    session_log = SessionLog(events, EventBus())
     await recover_runs(RunRecords(database), events, session_log, runtime)
     return SessionManager(runtime, session_log, SessionRecords(database))
 

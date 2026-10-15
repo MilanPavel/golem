@@ -4,6 +4,8 @@ export type ModelProfile = string | null;
 
 /**
  * ``session.create``. An empty profile uses the daemon's configured one.
+ *
+ * The caller is not attached. ``session.attach`` replays ``session.created``.
  */
 export interface SessionCreateParams {
   model_profile?: ModelProfile;

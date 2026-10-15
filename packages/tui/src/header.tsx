@@ -1,8 +1,8 @@
 import { Box, Text } from "ink";
 
-import type { FrameMode } from "./chrome.ts";
+import { HEADER_GAP, HEADER_PAD_TOP, HEADER_ROWS, type FrameMode } from "./chrome.ts";
 import { LOGO_ROWS, LOGO_WIDTH, logoRows, type LogoRun } from "./logo.ts";
-import { CLAY, LOGO_BODY, LOGO_EYE, LOGO_HIGHLIGHT, LOGO_SHADOW } from "./theme.ts";
+import { CLAY, LOGO_BODY, LOGO_EYE } from "./theme.ts";
 
 export function Header({
   mode,
@@ -29,10 +29,16 @@ export function Header({
       </Text>
     );
   }
-  const textWidth = Math.max(1, columns - LOGO_WIDTH - 1);
+  const textWidth = Math.max(1, columns - LOGO_WIDTH - HEADER_GAP);
   return (
-    <Box width={columns} height={LOGO_ROWS} flexDirection="row">
-      <Box width={LOGO_WIDTH} flexDirection="column" marginRight={1}>
+    <Box
+      width={columns}
+      height={HEADER_ROWS}
+      flexDirection="row"
+      paddingTop={HEADER_PAD_TOP}
+      paddingBottom={HEADER_ROWS - HEADER_PAD_TOP - LOGO_ROWS}
+    >
+      <Box width={LOGO_WIDTH} flexDirection="column" marginRight={HEADER_GAP}>
         {logoRows.map((line, lineIndex) => (
           <Text key={lineIndex} wrap="truncate-end">
             {line.map((run, index) => (
@@ -60,14 +66,8 @@ export function Header({
 }
 
 function tone(name: LogoRun["color"]): string | undefined {
-  if (name === "highlight") {
-    return LOGO_HIGHLIGHT;
-  }
   if (name === "body") {
     return LOGO_BODY;
-  }
-  if (name === "shadow") {
-    return LOGO_SHADOW;
   }
   if (name === "eye") {
     return LOGO_EYE;

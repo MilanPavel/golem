@@ -9,6 +9,7 @@ export {
   type ConnectionState,
   type ConnectOptions,
   type GolemClient,
+  type SessionSummary,
 } from "./connect.ts";
 export { resolveSocketPath } from "./socket-path.ts";
 export {

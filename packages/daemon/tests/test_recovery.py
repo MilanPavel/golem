@@ -12,7 +12,8 @@ from langgraph.checkpoint.memory import InMemorySaver
 
 from golem.graphs.chat import INTERRUPTED_KEY, ChatRuntime, open_chat
 from golem.models.router import ModelRouter
-from golem.sessions.log import SessionLog, discard
+from golem.sessions.bus import EventBus
+from golem.sessions.log import SessionLog
 from golem.sessions.manager import SessionManager
 from golem.sessions.recovery import STOPPED_MESSAGE, OpenTurn, open_turn, recover_runs
 from golem.store.database import Database
@@ -76,15 +77,15 @@ def _last_message(values: Mapping[str, object]) -> BaseMessage:
 
 def _manager(runtime: ChatRuntime, database: Database) -> tuple[SessionManager, EventLog]:
     events = EventLog(database)
-    return SessionManager(runtime, SessionLog(events), SessionRecords(database)), events
+    return SessionManager(runtime, SessionLog(events, EventBus()), SessionRecords(database)), events
 
 
 async def test_a_lost_run_completes_its_partial_reply(database: Database) -> None:
     model = GatedChatModel(streamed="Hel", reply="lo")
     runtime = open_chat(ModelRouter(model=model), InMemorySaver())
     manager, events = _manager(runtime, database)
-    session_id = await manager.create(None, discard)
-    run_id = await manager.send(session_id, "hi", discard)
+    session_id = await manager.create(None)
+    run_id = await manager.send(session_id, "hi")
     await model.started.wait()
 
     async def streamed() -> bool:
@@ -94,7 +95,9 @@ async def test_a_lost_run_completes_its_partial_reply(database: Database) -> Non
     await _until(streamed)
     await manager.cancel_all()
 
-    closed = await recover_runs(RunRecords(database), events, SessionLog(events), runtime)
+    closed = await recover_runs(
+        RunRecords(database), events, SessionLog(events, EventBus()), runtime
+    )
     assert closed == [run_id]
     tail = (await events.for_run(run_id))[-2:]
     completed, failed = tail
@@ -111,14 +114,17 @@ async def test_a_lost_run_completes_its_partial_reply(database: Database) -> Non
     run = await RunRecords(database).get(run_id)
     assert run is not None
     assert (run.status, run.error) == ("failed", STOPPED_MESSAGE)
-    assert await recover_runs(RunRecords(database), events, SessionLog(events), runtime) == []
+    assert (
+        await recover_runs(RunRecords(database), events, SessionLog(events, EventBus()), runtime)
+        == []
+    )
 
 
 async def test_a_reply_the_checkpoint_finished_is_kept(database: Database) -> None:
     runtime = open_chat(ModelRouter(model=ScriptedChatModel(replies=["alpha"])), InMemorySaver())
     manager, events = _manager(runtime, database)
-    session_id = await manager.create(None, discard)
-    run_id = await manager.send(session_id, "hi", discard)
+    session_id = await manager.create(None)
+    run_id = await manager.send(session_id, "hi")
 
     async def finished() -> bool:
         run = await RunRecords(database).get(run_id)
@@ -130,17 +136,15 @@ async def test_a_reply_the_checkpoint_finished_is_kept(database: Database) -> No
         for e in await events.for_run(run_id)
         if isinstance(e, MessageCompletedEvent) and e.data.role == "assistant"
     )
-    log = SessionLog(events)
-    await log.emit(discard, session_id, "r_lost", "run.started", EmptyEventData())
+    log = SessionLog(events, EventBus())
+    await log.emit(session_id, "r_lost", "run.started", EmptyEventData())
     await log.emit(
-        discard,
         session_id,
         "r_lost",
         "message.started",
         MessageStartedData(message_id=reply_id, role="assistant"),
     )
     await log.emit(
-        discard,
         session_id,
         "r_lost",
         "message.delta",

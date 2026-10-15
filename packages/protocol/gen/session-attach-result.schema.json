@@ -1,0 +1,22 @@
+{
+  "additionalProperties": false,
+  "description": "``last_seq`` is the newest event when the replay was read.",
+  "properties": {
+    "last_seq": {
+      "minimum": 0,
+      "title": "Last Seq",
+      "type": "integer"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "session_id",
+    "last_seq"
+  ],
+  "title": "SessionAttachResult",
+  "type": "object"
+}

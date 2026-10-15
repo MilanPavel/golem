@@ -1,28 +1,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { LOGO_ROWS, LOGO_WIDTH, logoPixels, logoRows, type LogoTone } from "./logo.ts";
+import { LOGO_ROWS, LOGO_WIDTH, logoPixels, logoRows } from "./logo.ts";
 
-test("the mark is the gridded clay figure", () => {
-  assert.equal(LOGO_ROWS, 7);
-  assert.equal(LOGO_WIDTH, 18);
+test("the mark is a symmetric clay figure", () => {
+  assert.equal(LOGO_ROWS, 3);
+  assert.equal(LOGO_WIDTH, 9);
   assert.equal(logoPixels.length, LOGO_ROWS * 2);
   for (const row of logoPixels) {
     assert.equal(row.length, LOGO_WIDTH);
-    for (let x = 0; x < LOGO_WIDTH; x += 1) {
-      const left: LogoTone | null = row[x] ?? null;
-      const mirrored: LogoTone | null = row[LOGO_WIDTH - 1 - x] ?? null;
-      assert.equal(left === null, mirrored === null);
-      if (left === "eye" || mirrored === "eye") {
-        assert.equal(left, mirrored);
-      }
-      if (left === "highlight") {
-        assert.equal(mirrored, "shadow");
-      }
-      if (left === "body") {
-        assert.equal(mirrored, "body");
-      }
-    }
+    assert.deepEqual(row, [...row].reverse());
   }
   for (const line of logoRows) {
     const width = line.reduce((sum, run) => sum + run.text.length, 0);
@@ -30,14 +17,13 @@ test("the mark is the gridded clay figure", () => {
   }
 });
 
-test("the forehead dot sits above two slanted eyes", () => {
-  assert.equal(logoPixels[2]?.[8], "eye");
-  assert.equal(logoPixels[2]?.[9], "eye");
-  assert.equal(logoPixels[3]?.[8], "body");
-  assert.equal(logoPixels[4]?.[5], "eye");
-  assert.equal(logoPixels[5]?.[5], "body");
-  assert.equal(logoPixels[4]?.[8], "body");
-  assert.equal(logoPixels[0]?.[7], "highlight");
-  assert.equal(logoPixels[13]?.[1], "shadow");
-  assert.ok(logoRows.some((line) => line.some((run) => run.color === "eye" && run.background === "body")));
+test("a block head with two eyes on broad shoulders, arms hanging, two legs", () => {
+  assert.deepEqual(logoPixels[1]?.slice(2, 7), ["body", "eye", "body", "eye", "body"]);
+  assert.equal(logoPixels[0]?.[2], null);
+  assert.equal(logoPixels[1]?.[2], "body");
+  assert.equal(logoPixels[2]?.[0], "body");
+  assert.equal(logoPixels[3]?.[1], null);
+  assert.equal(logoPixels[5]?.[4], null);
+  assert.equal(logoPixels[5]?.[0], null);
+  assert.ok(logoRows[0]?.some((run) => run.color === "body" && run.background === "eye"));
 });

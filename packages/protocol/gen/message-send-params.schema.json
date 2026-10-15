@@ -1,6 +1,6 @@
 {
   "additionalProperties": false,
-  "description": "``message.send``. Starts one graph run for this session.",
+  "description": "``message.send``. Starts one graph run for this session.\n\nThe run's events go to the connections attached to the session.",
   "properties": {
     "session_id": {
       "minLength": 1,

@@ -4,9 +4,12 @@ import net from "node:net";
 import type { DaemonStatus } from "../../protocol/gen/daemon-status.ts";
 import type { MessageSendResult } from "../../protocol/gen/message-send-result.ts";
 import type { Params as ChatEvent } from "../../protocol/gen/rpc-notification.ts";
+import type { SessionAttachResult } from "../../protocol/gen/session-attach-result.ts";
 import type { SessionCreateResult } from "../../protocol/gen/session-create-result.ts";
 import type { SessionInspectResult } from "../../protocol/gen/session-inspect-result.ts";
+import type { SessionListResult, SessionSummary } from "../../protocol/gen/session-list-result.ts";
 import { PROTOCOL_MAJOR, PROTOCOL_MINOR } from "../../protocol/gen/version.ts";
+import { Attachments } from "./attachments.ts";
 import { backoffDelayMs } from "./backoff.ts";
 import {
   asChatEvent,
@@ -15,8 +18,10 @@ import {
   isMessageSendResult,
   isPing,
   isRecord,
+  isSessionAttachResult,
   isSessionCreateResult,
   isSessionInspectResult,
+  isSessionListResult,
 } from "./guards.ts";
 import { pushWire, type WireFrame, type WireLine } from "./wire.ts";
 import { eventFrame, flat, outgoingDetail, resultDetail } from "./wire-detail.ts";
@@ -26,7 +31,7 @@ export const SESSION_NOT_FOUND = -32003;
 export const SESSION_BUSY = -32004;
 export const MODEL_NOT_CONFIGURED = -32005;
 
-export type { ChatEvent };
+export type { ChatEvent, SessionSummary };
 const DEFAULT_HEARTBEAT_MS = 5_000;
 const DEFAULT_HEARTBEAT_TIMEOUT_MS = 10_000;
 const DEFAULT_CONNECT_TIMEOUT_MS = 2_000;
@@ -65,7 +70,15 @@ export interface GolemClient {
   onEvent(listener: (event: ChatEvent) => void): () => void;
   onWire(listener: (lines: readonly WireLine[]) => void): () => void;
   status(): Promise<DaemonStatus>;
+  /** Create a session. Its events arrive only after {@link GolemClient.attachSession}. */
   createSession(): Promise<SessionCreateResult>;
+  /**
+   * Replay the session's events after `afterSeq`, then stream new ones.
+   * The client attaches again after a reconnect, from the last `seq` it saw.
+   */
+  attachSession(sessionId: string, afterSeq?: number): Promise<SessionAttachResult>;
+  detachSession(sessionId: string): Promise<void>;
+  listSessions(limit?: number): Promise<SessionListResult>;
   sendMessage(sessionId: string, text: string): Promise<MessageSendResult>;
   inspectSession(sessionId: string): Promise<SessionInspectResult>;
   close(): void;
@@ -88,6 +101,7 @@ export function connectGolem(options: ConnectOptions): GolemClient {
   const eventListeners = new Set<(event: ChatEvent) => void>();
   const wireListeners = new Set<(lines: readonly WireLine[]) => void>();
   const pending = new Map<number, Pending>();
+  const attachments = new Attachments();
   let wire: WireLine[] = [];
   let nextId = 1;
   let generation = 0;
@@ -187,7 +201,7 @@ export function connectGolem(options: ConnectOptions): GolemClient {
     if (isRecord(message) && message["method"] === "event") {
       record({ ...eventFrame(message["params"]), json: line });
       const event = asChatEvent(message["params"]);
-      if (event !== undefined) {
+      if (event !== undefined && attachments.accept(event)) {
         for (const listener of eventListeners) {
           try {
             listener(event);
@@ -267,6 +281,21 @@ export function connectGolem(options: ConnectOptions): GolemClient {
     }, delayMs);
   }
 
+  async function reattach(): Promise<void> {
+    await Promise.all(
+      attachments.entries().map(async ([sessionId, afterSeq]) => {
+        try {
+          await call("session.attach", { session_id: sessionId, after_seq: afterSeq });
+        } catch (error) {
+          if (!(error instanceof RpcError) || error.code !== SESSION_NOT_FOUND) {
+            throw error;
+          }
+          attachments.untrack(sessionId);
+        }
+      }),
+    );
+  }
+
   function startHeartbeat(current: net.Socket, gen: number): void {
     stopHeartbeat();
     heartbeatTimer = setInterval(() => {
@@ -327,7 +356,7 @@ export function connectGolem(options: ConnectOptions): GolemClient {
         protocol_minor: PROTOCOL_MINOR,
         client: options.clientName,
       })
-        .then((result) => {
+        .then(async (result) => {
           if (gen !== generation) {
             return;
           }
@@ -344,6 +373,10 @@ export function connectGolem(options: ConnectOptions): GolemClient {
             clearTimeout(connectTimer);
             connectTimer = undefined;
           }
+          await reattach();
+          if (gen !== generation) {
+            return;
+          }
           attempt = 0;
           setState({ status: "connected" });
           settleReady();
@@ -351,6 +384,10 @@ export function connectGolem(options: ConnectOptions): GolemClient {
         })
         .catch(() => {
           // The close handler reconnects, or records a protocol rejection.
+          // A reattach that failed for another reason drops the socket and retries.
+          if (gen === generation && !rejected) {
+            current.destroy();
+          }
         });
     });
   }
@@ -394,6 +431,40 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("session.create", {});
       if (!isSessionCreateResult(result)) {
         throw new Error("invalid session.create result");
+      }
+      return result;
+    },
+    async attachSession(sessionId: string, afterSeq = 0): Promise<SessionAttachResult> {
+      await ready;
+      const followed = attachments.seen(sessionId) !== undefined;
+      attachments.track(sessionId, afterSeq);
+      let result: unknown;
+      try {
+        result = await call("session.attach", {
+          session_id: sessionId,
+          after_seq: attachments.seen(sessionId),
+        });
+      } catch (error) {
+        if (!followed) {
+          attachments.untrack(sessionId);
+        }
+        throw error;
+      }
+      if (!isSessionAttachResult(result)) {
+        throw new Error("invalid session.attach result");
+      }
+      return result;
+    },
+    async detachSession(sessionId: string): Promise<void> {
+      await ready;
+      await call("session.detach", { session_id: sessionId });
+      attachments.untrack(sessionId);
+    },
+    async listSessions(limit?: number): Promise<SessionListResult> {
+      await ready;
+      const result = await call("session.list", limit === undefined ? {} : { limit });
+      if (!isSessionListResult(result)) {
+        throw new Error("invalid session.list result");
       }
       return result;
     },

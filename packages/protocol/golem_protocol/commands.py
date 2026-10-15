@@ -58,7 +58,10 @@ class PingParams(BaseModel):
 
 
 class SessionCreateParams(BaseModel):
-    """``session.create``. An empty profile uses the daemon's configured one."""
+    """``session.create``. An empty profile uses the daemon's configured one.
+
+    The caller is not attached. ``session.attach`` replays ``session.created``.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -73,8 +76,81 @@ class SessionCreateResult(BaseModel):
     session_id: str = Field(min_length=1)
 
 
+class SessionAttachParams(BaseModel):
+    """``session.attach``. Replay events after ``after_seq``, then stream live ones.
+
+    Events reach a connection only for sessions it attached. Replayed events
+    are written before any live event, with no gap and no repeat.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    after_seq: int = Field(default=0, ge=0)
+
+
+class SessionAttachResult(BaseModel):
+    """``last_seq`` is the newest event when the replay was read."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    last_seq: int = Field(ge=0)
+
+
+class SessionDetachParams(BaseModel):
+    """``session.detach``. Stop live events for this session on this connection."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+
+
+class SessionDetachResult(BaseModel):
+    """No payload. Detaching a session that was not attached is not an error."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+class SessionListParams(BaseModel):
+    """``session.list``. Newest activity first."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    limit: int = Field(default=50, ge=1, le=500)
+
+
+class SessionSummary(BaseModel):
+    """One session as ``session.list`` reports it.
+
+    ``status`` is ``running`` while a run is open. ``last_seq`` is the newest
+    stored event, so a client can tell what it has not seen.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    model_profile: str = Field(min_length=1)
+    title: str | None = Field(default=None, min_length=1)
+    status: Literal["idle", "running"]
+    created_at: str = Field(min_length=1)
+    updated_at: str = Field(min_length=1)
+    last_seq: int = Field(ge=0)
+
+
+class SessionListResult(BaseModel):
+    """Sessions, newest activity first."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    sessions: list[SessionSummary]
+
+
 class MessageSendParams(BaseModel):
-    """``message.send``. Starts one graph run for this session."""
+    """``message.send``. Starts one graph run for this session.
+
+    The run's events go to the connections attached to the session.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -132,8 +208,15 @@ __all__ = [
     "MessageSendParams",
     "MessageSendResult",
     "PingParams",
+    "SessionAttachParams",
+    "SessionAttachResult",
     "SessionCreateParams",
     "SessionCreateResult",
+    "SessionDetachParams",
+    "SessionDetachResult",
     "SessionInspectParams",
     "SessionInspectResult",
+    "SessionListParams",
+    "SessionListResult",
+    "SessionSummary",
 ]

@@ -12,16 +12,17 @@ test("the frame leaves the last column empty", () => {
 test("frame rows add up to the terminal", () => {
   const idle = frameBudget({ rows: 24, columns: 80, draft: "", busy: false, banner: false });
   assert.equal(idle.mode, "full");
-  assert.equal(idle.header, 7);
+  assert.equal(idle.header, 5);
+  assert.equal(idle.mode, "full");
   assert.equal(idle.composer, 1);
   assert.equal(idle.meter, 0);
   assert.equal(idle.status, 1);
-  assert.equal(idle.body, 15);
+  assert.equal(idle.body, 17);
   assert.equal(idle.header + idle.body + idle.banner + idle.meter + idle.composer + idle.status, 24);
 
   const busy = frameBudget({ rows: 24, columns: 80, draft: "", busy: true, banner: false });
   assert.equal(busy.meter, 1);
-  assert.equal(busy.body, 14);
+  assert.equal(busy.body, 16);
   assert.equal(busy.header + busy.body + busy.banner + busy.meter + busy.composer + busy.status, 24);
 });
 

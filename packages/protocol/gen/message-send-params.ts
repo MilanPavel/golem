@@ -5,6 +5,8 @@ export type Text = string;
 
 /**
  * ``message.send``. Starts one graph run for this session.
+ *
+ * The run's events go to the connections attached to the session.
  */
 export interface MessageSendParams {
   session_id: SessionId;

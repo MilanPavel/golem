@@ -65,10 +65,6 @@ export function appendDelta(state: ChatState, messageId: string, text: string): 
   };
 }
 
-export function connectionLost(state: ChatState): ChatState {
-  return { ...state, busy: false, runStartedAt: null };
-}
-
 export type DeltaBatcher = {
   push(messageId: string, text: string): void;
   flush(): void;

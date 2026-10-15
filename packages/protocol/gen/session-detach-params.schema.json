@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "``session.detach``. Stop live events for this session on this connection.",
+  "properties": {
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "session_id"
+  ],
+  "title": "SessionDetachParams",
+  "type": "object"
+}

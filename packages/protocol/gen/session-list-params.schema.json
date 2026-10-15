@@ -1,0 +1,15 @@
+{
+  "additionalProperties": false,
+  "description": "``session.list``. Newest activity first.",
+  "properties": {
+    "limit": {
+      "default": 50,
+      "maximum": 500,
+      "minimum": 1,
+      "title": "Limit",
+      "type": "integer"
+    }
+  },
+  "title": "SessionListParams",
+  "type": "object"
+}

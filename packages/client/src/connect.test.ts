@@ -5,6 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
+import { PROTOCOL_MAJOR } from "../../protocol/gen/version.ts";
 import { connectGolem, type ChatEvent, type ConnectionState } from "./connect.ts";
 import { formatWireLine } from "./wire.ts";
 
@@ -16,14 +17,20 @@ interface FakeOptions {
   eventBeforeStatus?: boolean;
   eventBeforePing?: boolean;
   statusExtra?: Record<string, unknown>;
+  onAttach?: (socket: Socket, params: AttachParams, id: number) => void;
 }
 
-function deltaEvent(): unknown {
+interface AttachParams {
+  session_id: string;
+  after_seq: number;
+}
+
+function deltaEvent(seq = 1): unknown {
   return {
     jsonrpc: "2.0",
     method: "event",
     params: {
-      seq: 1,
+      seq,
       session_id: "s_test",
       run_id: "r_test",
       ts: "2026-10-07T10:00:00+00:00",
@@ -47,7 +54,7 @@ function attach(socket: Socket, options: FakeOptions): void {
       const message = JSON.parse(line) as {
         id: number;
         method: string;
-        params?: { nonce?: string };
+        params?: { nonce?: string } & Partial<AttachParams>;
       };
       if (message.method === "hello" && options.mismatch === true) {
         write(socket, {
@@ -59,7 +66,7 @@ function attach(socket: Socket, options: FakeOptions): void {
         write(socket, {
           jsonrpc: "2.0",
           id: message.id,
-          result: { protocol_major: 1, protocol_minor: 0, daemon_version: "0.0.0" },
+          result: { protocol_major: PROTOCOL_MAJOR, protocol_minor: 0, daemon_version: "0.0.0" },
         });
         options.onHello?.(socket);
       } else if (message.method === "ping" && options.answerPing === true) {
@@ -71,6 +78,12 @@ function attach(socket: Socket, options: FakeOptions): void {
           id: message.id,
           result: { type: "system.ping", nonce: message.params?.nonce },
         });
+      } else if (message.method === "session.attach" && options.onAttach !== undefined) {
+        options.onAttach(
+          socket,
+          { session_id: message.params?.session_id ?? "", after_seq: message.params?.after_seq ?? 0 },
+          message.id,
+        );
       } else if (message.method === "daemon.status") {
         if (options.eventBeforeStatus === true) {
           write(socket, deltaEvent());
@@ -81,7 +94,7 @@ function attach(socket: Socket, options: FakeOptions): void {
           result: {
             pid: 7,
             version: "0.0.0",
-            protocol_major: 1,
+            protocol_major: PROTOCOL_MAJOR,
             protocol_minor: 0,
             uptime_seconds: 3,
             state: "running",
@@ -360,7 +373,84 @@ test("status reads daemon.status once hello succeeds", async () => {
     const status = await client.status();
     assert.equal(status.pid, 7);
     assert.equal(status.state, "running");
-    assert.equal(status.protocol_major, 1);
+    assert.equal(status.protocol_major, PROTOCOL_MAJOR);
+  } finally {
+    client.close();
+    await server.close();
+  }
+});
+
+test("reattaches after a reconnect from the last seq and drops replayed events", async () => {
+  const afterSeqs: number[] = [];
+  let connections = 0;
+  const server = await listen((socket) => {
+    connections += 1;
+    const mine = connections;
+    attach(socket, {
+      answerPing: true,
+      onAttach: (current, params, id) => {
+        afterSeqs.push(params.after_seq);
+        const replay = mine === 1 ? [1, 2] : [2, 3];
+        for (const seq of replay) {
+          write(current, deltaEvent(seq));
+        }
+        write(current, { jsonrpc: "2.0", id, result: { session_id: params.session_id, last_seq: 3 } });
+        if (mine === 1) {
+          current.end();
+        }
+      },
+    });
+  });
+  const client = connectGolem({
+    socketPath: server.socketPath,
+    clientName: "tui",
+    reconnect: true,
+    backoff: () => 0,
+    heartbeatMs: 60_000,
+  });
+  const seqs: number[] = [];
+  client.onEvent((event) => seqs.push(event.seq));
+  try {
+    await client.attachSession("s_test");
+    await waitFor(() => connections >= 2 && client.state.status === "connected");
+    assert.deepEqual(afterSeqs, [0, 2]);
+    assert.deepEqual(seqs, [1, 2, 3]);
+  } finally {
+    client.close();
+    await server.close();
+  }
+});
+
+test("a session gone after a reconnect is no longer followed", async () => {
+  const attaches: number[] = [];
+  let connections = 0;
+  const server = await listen((socket) => {
+    connections += 1;
+    const mine = connections;
+    attach(socket, {
+      answerPing: true,
+      onAttach: (current, params, id) => {
+        attaches.push(mine);
+        if (mine === 1) {
+          write(current, { jsonrpc: "2.0", id, result: { session_id: params.session_id, last_seq: 0 } });
+        } else {
+          write(current, { jsonrpc: "2.0", id, error: { code: -32003, message: "session not found" } });
+        }
+        current.end();
+      },
+    });
+  });
+  const client = connectGolem({
+    socketPath: server.socketPath,
+    clientName: "tui",
+    reconnect: true,
+    backoff: () => 0,
+    heartbeatMs: 60_000,
+  });
+  try {
+    await client.attachSession("s_test");
+    await waitFor(() => connections >= 3 && client.state.status === "connected");
+    assert.deepEqual(attaches, [1, 2]);
   } finally {
     client.close();
     await server.close();

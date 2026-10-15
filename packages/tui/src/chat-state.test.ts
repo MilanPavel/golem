@@ -5,7 +5,6 @@ import type { ChatEvent } from "@golem/client";
 
 import {
   appendDelta,
-  connectionLost,
   createDeltaBatcher,
   emptyChat,
   reduceChat,
@@ -116,11 +115,44 @@ test("run.failed unlocks input and keeps the reason", () => {
   assert.equal(failed.error, "model exploded");
 });
 
-test("connectionLost clears a busy run", () => {
-  const busy = { ...emptyChat, busy: true, runStartedAt: "2026-10-07T00:00:00.000Z" };
-  const lost = connectionLost(busy);
-  assert.equal(lost.busy, false);
-  assert.equal(lost.runStartedAt, null);
+test("a replay of stored events rebuilds the transcript without deltas", () => {
+  const stored: ChatEvent[] = [
+    { seq: 2, session_id: "s", run_id: "r", ts: "t", type: "run.started", data: {} },
+    {
+      seq: 3,
+      session_id: "s",
+      run_id: "r",
+      ts: "t",
+      type: "message.completed",
+      data: { message_id: "m_u", role: "user", text: "hi" },
+    },
+    {
+      seq: 4,
+      session_id: "s",
+      run_id: "r",
+      ts: "t",
+      type: "message.started",
+      data: { message_id: "m_a", role: "assistant" },
+    },
+    {
+      seq: 7,
+      session_id: "s",
+      run_id: "r",
+      ts: "t",
+      type: "message.completed",
+      data: { message_id: "m_a", role: "assistant", text: "Hello" },
+    },
+    { seq: 8, session_id: "s", run_id: "r", ts: "t", type: "run.completed", data: {} },
+  ];
+  const state = stored.reduce(reduceChat, emptyChat);
+  assert.deepEqual(
+    state.messages.map((message) => [message.role, message.text, message.streaming]),
+    [
+      ["user", "hi", false],
+      ["assistant", "Hello", false],
+    ],
+  );
+  assert.equal(state.busy, false);
 });
 
 test("delta batcher flushes immediately and on the timer", async () => {
