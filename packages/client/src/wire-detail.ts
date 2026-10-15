@@ -14,6 +14,16 @@ export function eventFrame(params: unknown): WireFrame {
   return { direction: "in", kind: params["type"], detail: eventDetail(params["type"], seq, data) };
 }
 
+export function summaryFrame(params: unknown): WireFrame {
+  if (!isRecord(params)) {
+    return { direction: "in", kind: "session.summary" };
+  }
+  const parts = [params["session_id"], params["status"], params["title"]].filter(
+    (part): part is string => typeof part === "string" && part.length > 0,
+  );
+  return { direction: "in", kind: "session.summary", detail: parts.join("  ") };
+}
+
 export function outgoingDetail(method: string, params: Record<string, unknown>): string {
   if (method === "ping") {
     return "";
@@ -80,6 +90,8 @@ function eventDetail(type: string, seq: string, data: Record<string, unknown> | 
     if (data["interrupted"] === true) {
       parts.push("interrupted");
     }
+  } else if (type === "session.updated" && typeof data["title"] === "string") {
+    parts.push(flat(data["title"]));
   } else if (type === "run.cancelled" && typeof data["reason"] === "string") {
     parts.push(data["reason"]);
   } else if (type === "run.failed" && typeof data["message"] === "string") {

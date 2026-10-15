@@ -12,6 +12,7 @@ export {
   type GolemClient,
   type SessionSummary,
 } from "./connect.ts";
+export { mergeSummary } from "./session-index.ts";
 export { resolveSocketPath } from "./socket-path.ts";
 export {
   formatWireLine,

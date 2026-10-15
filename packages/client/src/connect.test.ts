@@ -6,7 +6,8 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { PROTOCOL_MAJOR } from "../../protocol/gen/version.ts";
-import { connectGolem, type ChatEvent, type ConnectionState } from "./connect.ts";
+import { connectGolem, type ChatEvent, type ConnectionState, type SessionSummary } from "./connect.ts";
+import { mergeSummary } from "./session-index.ts";
 import { formatWireLine } from "./wire.ts";
 
 interface FakeOptions {
@@ -19,6 +20,7 @@ interface FakeOptions {
   statusExtra?: Record<string, unknown>;
   onAttach?: (socket: Socket, params: AttachParams, id: number) => void;
   results?: Record<string, unknown>;
+  onRequest?: (socket: Socket, method: string, params: Record<string, unknown>) => void;
 }
 
 interface AttachParams {
@@ -57,6 +59,7 @@ function attach(socket: Socket, options: FakeOptions): void {
         method: string;
         params?: { nonce?: string } & Partial<AttachParams>;
       };
+      options.onRequest?.(socket, message.method, message.params ?? {});
       if (message.method === "hello" && options.mismatch === true) {
         write(socket, {
           jsonrpc: "2.0",
@@ -472,6 +475,79 @@ test("cancelRun reads the run.cancel result", async () => {
   });
   try {
     assert.deepEqual(await client.cancelRun("r_test"), { cancelled: true });
+  } finally {
+    client.close();
+    await server.close();
+  }
+});
+
+function summary(lastSeq: number, title: string | null = null): SessionSummary {
+  return {
+    session_id: "s_test",
+    model_profile: "remote",
+    title,
+    status: "idle",
+    created_at: "2026-10-07T10:00:00+00:00",
+    updated_at: "2026-10-07T10:00:00+00:00",
+    last_seq: lastSeq,
+  };
+}
+
+test("watchSessions reports the list, each change, and watches again after a reconnect", async () => {
+  const watches: unknown[] = [];
+  let connections = 0;
+  const server = await listen((socket) => {
+    connections += 1;
+    const mine = connections;
+    attach(socket, {
+      answerPing: true,
+      results: { "session.list": { sessions: [summary(mine === 1 ? 2 : 4)] } },
+      onRequest: (current, method, params) => {
+        if (method !== "session.list") {
+          return;
+        }
+        watches.push(params["watch"]);
+        if (mine === 1) {
+          setImmediate(() => {
+            write(current, { jsonrpc: "2.0", method: "session.summary", params: summary(3, "Named") });
+            current.end();
+          });
+        }
+      },
+    });
+  });
+  const client = connectGolem({
+    socketPath: server.socketPath,
+    clientName: "tui",
+    reconnect: true,
+    backoff: () => 0,
+    heartbeatMs: 60_000,
+  });
+  const seen: [number, string | null | undefined][] = [];
+  let merged: readonly SessionSummary[] = [];
+  client.onSessionSummary((next) => {
+    seen.push([next.last_seq, next.title]);
+    merged = mergeSummary(merged, next);
+  });
+  const events: ChatEvent[] = [];
+  client.onEvent((event) => events.push(event));
+  try {
+    await client.watchSessions();
+    await waitFor(() => seen.length >= 3);
+    assert.deepEqual(watches, [true, true]);
+    assert.deepEqual(
+      [...seen].sort((a, b) => a[0] - b[0]),
+      [
+        [2, null],
+        [3, "Named"],
+        [4, null],
+      ],
+    );
+    assert.deepEqual(
+      merged.map((item) => item.last_seq),
+      [4],
+    );
+    assert.deepEqual(events, []);
   } finally {
     client.close();
     await server.close();

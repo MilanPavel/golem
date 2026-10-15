@@ -34,6 +34,7 @@ export const SHUTDOWN_NOTICE = "the daemon stopped, so the run was cancelled";
 export function reduceChat(state: ChatState, event: ChatEvent): ChatState {
   switch (event.type) {
     case "session.created":
+    case "session.updated":
       return state;
     case "message.started":
       return {

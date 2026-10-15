@@ -46,8 +46,17 @@ from golem_protocol.events import (
     RunStartedEvent,
     SessionCreatedData,
     SessionCreatedEvent,
+    SessionUpdatedData,
+    SessionUpdatedEvent,
 )
-from golem_protocol.rpc import RpcErrorBody, RpcFailure, RpcNotification, RpcRequest, RpcSuccess
+from golem_protocol.rpc import (
+    RpcErrorBody,
+    RpcFailure,
+    RpcNotification,
+    RpcRequest,
+    RpcSuccess,
+    SessionSummaryNotification,
+)
 from golem_protocol.version import PROTOCOL_MAJOR, PROTOCOL_MINOR
 
 MODELS: tuple[type[BaseModel], ...] = (
@@ -74,6 +83,8 @@ MODELS: tuple[type[BaseModel], ...] = (
     SessionListResult,
     SessionCreatedData,
     SessionCreatedEvent,
+    SessionUpdatedData,
+    SessionUpdatedEvent,
     MessageStartedData,
     MessageStartedEvent,
     MessageDeltaData,
@@ -92,6 +103,7 @@ MODELS: tuple[type[BaseModel], ...] = (
     RpcSuccess,
     RpcFailure,
     RpcNotification,
+    SessionSummaryNotification,
 )
 
 

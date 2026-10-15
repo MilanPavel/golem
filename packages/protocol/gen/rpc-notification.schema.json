@@ -512,6 +512,65 @@
       ],
       "title": "SessionCreatedEvent",
       "type": "object"
+    },
+    "SessionUpdatedData": {
+      "additionalProperties": false,
+      "description": "A session attribute changed. Today that is only its title.",
+      "properties": {
+        "title": {
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "title"
+      ],
+      "title": "SessionUpdatedData",
+      "type": "object"
+    },
+    "SessionUpdatedEvent": {
+      "additionalProperties": false,
+      "description": "The session got a title. ``run_id`` is null: no run owns the change.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/SessionUpdatedData"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "null"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "session.updated",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "run_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "SessionUpdatedEvent",
+      "type": "object"
     }
   },
   "additionalProperties": false,
@@ -539,13 +598,17 @@
           "run.completed": "#/$defs/RunCompletedEvent",
           "run.failed": "#/$defs/RunFailedEvent",
           "run.started": "#/$defs/RunStartedEvent",
-          "session.created": "#/$defs/SessionCreatedEvent"
+          "session.created": "#/$defs/SessionCreatedEvent",
+          "session.updated": "#/$defs/SessionUpdatedEvent"
         },
         "propertyName": "type"
       },
       "oneOf": [
         {
           "$ref": "#/$defs/SessionCreatedEvent"
+        },
+        {
+          "$ref": "#/$defs/SessionUpdatedEvent"
         },
         {
           "$ref": "#/$defs/MessageStartedEvent"

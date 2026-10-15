@@ -11,6 +11,7 @@ import type { SessionListResult, SessionSummary } from "../../protocol/gen/sessi
 
 const EVENT_TYPES = new Set([
   "session.created",
+  "session.updated",
   "message.started",
   "message.delta",
   "message.completed",
@@ -63,7 +64,7 @@ export function isSessionListResult(value: unknown): value is SessionListResult 
   return isRecord(value) && Array.isArray(value["sessions"]) && value["sessions"].every(isSessionSummary);
 }
 
-function isSessionSummary(value: unknown): value is SessionSummary {
+export function isSessionSummary(value: unknown): value is SessionSummary {
   return (
     isRecord(value) &&
     typeof value["session_id"] === "string" &&

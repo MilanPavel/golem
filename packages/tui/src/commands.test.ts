@@ -110,3 +110,10 @@ test("hold again puts the unsent line back", () => {
     assert.equal(outcome.restore, "hello");
   }
 });
+
+test("/sessions and /new are commands without arguments", () => {
+  assert.deepEqual(applyComposer(closedDebug, "/sessions"), { kind: "sessions" });
+  assert.deepEqual(applyComposer(closedDebug, " /new "), { kind: "new" });
+  assert.equal(applyComposer(closedDebug, "/new now").kind, "unknown");
+  assert.equal(applyComposer(closedDebug, "/session").kind, "unknown");
+});

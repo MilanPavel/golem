@@ -24,9 +24,10 @@ import {
   isSessionCreateResult,
   isSessionInspectResult,
   isSessionListResult,
+  isSessionSummary,
 } from "./guards.ts";
 import { pushWire, type WireFrame, type WireLine } from "./wire.ts";
-import { eventFrame, flat, outgoingDetail, resultDetail } from "./wire-detail.ts";
+import { eventFrame, flat, outgoingDetail, resultDetail, summaryFrame } from "./wire-detail.ts";
 
 const PROTOCOL_MISMATCH = -32001;
 export const SESSION_NOT_FOUND = -32003;
@@ -71,6 +72,8 @@ export interface GolemClient {
   readonly ready: Promise<void>;
   onState(listener: (state: ConnectionState) => void): () => void;
   onEvent(listener: (event: ChatEvent) => void): () => void;
+  /** Summaries from {@link GolemClient.watchSessions}: the list itself, then each change. */
+  onSessionSummary(listener: (summary: SessionSummary) => void): () => void;
   onWire(listener: (lines: readonly WireLine[]) => void): () => void;
   status(): Promise<DaemonStatus>;
   /** Create a session. Its events arrive only after {@link GolemClient.attachSession}. */
@@ -82,6 +85,12 @@ export interface GolemClient {
   attachSession(sessionId: string, afterSeq?: number): Promise<SessionAttachResult>;
   detachSession(sessionId: string): Promise<void>;
   listSessions(limit?: number): Promise<SessionListResult>;
+  /**
+   * Follow the session list. Every listed session, then every later change,
+   * reaches {@link GolemClient.onSessionSummary}. After a reconnect the client
+   * lists and watches again by itself. Merge with `mergeSummary`.
+   */
+  watchSessions(limit?: number): Promise<void>;
   sendMessage(sessionId: string, text: string): Promise<MessageSendResult>;
   /** Stop a run. Resolves after `run.cancelled` is in the log; `cancelled` is false when it had ended. */
   cancelRun(runId: string): Promise<RunCancelResult>;
@@ -104,9 +113,12 @@ export function connectGolem(options: ConnectOptions): GolemClient {
   let state: ConnectionState = { status: "connecting" };
   const listeners = new Set<(next: ConnectionState) => void>();
   const eventListeners = new Set<(event: ChatEvent) => void>();
+  const summaryListeners = new Set<(summary: SessionSummary) => void>();
   const wireListeners = new Set<(lines: readonly WireLine[]) => void>();
   const pending = new Map<number, Pending>();
   const attachments = new Attachments();
+  let watching = false;
+  let watchLimit: number | undefined;
   let wire: WireLine[] = [];
   let nextId = 1;
   let generation = 0;
@@ -217,6 +229,13 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       }
       return;
     }
+    if (isRecord(message) && message["method"] === "session.summary") {
+      record({ ...summaryFrame(message["params"]), json: line });
+      if (isSessionSummary(message["params"])) {
+        emitSummary(message["params"]);
+      }
+      return;
+    }
     if (!isRecord(message) || message["id"] === undefined || message["id"] === null) {
       return;
     }
@@ -258,6 +277,27 @@ export function connectGolem(options: ConnectOptions): GolemClient {
     waiter.resolve(message["result"]);
   }
 
+  function emitSummary(summary: SessionSummary): void {
+    for (const listener of summaryListeners) {
+      try {
+        listener(summary);
+      } catch {
+        // A listener must not tear the socket down.
+      }
+    }
+  }
+
+  async function watch(limit: number | undefined): Promise<void> {
+    const params: Record<string, unknown> = limit === undefined ? { watch: true } : { watch: true, limit };
+    const result = await call("session.list", params);
+    if (!isSessionListResult(result)) {
+      throw new Error("invalid session.list result");
+    }
+    for (const summary of result.sessions) {
+      emitSummary(summary);
+    }
+  }
+
   function onSocketClosed(error: Error | undefined): void {
     stopHeartbeat();
     if (connectTimer !== undefined) {
@@ -286,9 +326,10 @@ export function connectGolem(options: ConnectOptions): GolemClient {
     }, delayMs);
   }
 
-  async function reattach(): Promise<void> {
-    await Promise.all(
-      attachments.entries().map(async ([sessionId, afterSeq]) => {
+  async function reattach(watching: boolean): Promise<void> {
+    await Promise.all([
+      ...(watching ? [watch(watchLimit)] : []),
+      ...attachments.entries().map(async ([sessionId, afterSeq]) => {
         try {
           await call("session.attach", { session_id: sessionId, after_seq: afterSeq });
         } catch (error) {
@@ -298,7 +339,7 @@ export function connectGolem(options: ConnectOptions): GolemClient {
           attachments.untrack(sessionId);
         }
       }),
-    );
+    ]);
   }
 
   function startHeartbeat(current: net.Socket, gen: number): void {
@@ -378,7 +419,7 @@ export function connectGolem(options: ConnectOptions): GolemClient {
             clearTimeout(connectTimer);
             connectTimer = undefined;
           }
-          await reattach();
+          await reattach(watching);
           if (gen !== generation) {
             return;
           }
@@ -414,6 +455,12 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       eventListeners.add(listener);
       return () => {
         eventListeners.delete(listener);
+      };
+    },
+    onSessionSummary(listener: (summary: SessionSummary) => void): () => void {
+      summaryListeners.add(listener);
+      return () => {
+        summaryListeners.delete(listener);
       };
     },
     onWire(listener: (lines: readonly WireLine[]) => void): () => void {
@@ -472,6 +519,12 @@ export function connectGolem(options: ConnectOptions): GolemClient {
         throw new Error("invalid session.list result");
       }
       return result;
+    },
+    async watchSessions(limit?: number): Promise<void> {
+      await ready;
+      watchLimit = limit;
+      watching = true;
+      await watch(limit);
     },
     async sendMessage(sessionId: string, text: string): Promise<MessageSendResult> {
       await ready;

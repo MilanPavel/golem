@@ -4,6 +4,7 @@ export type Jsonrpc = '2.0';
 export type Method = 'event';
 export type Params =
   | SessionCreatedEvent
+  | SessionUpdatedEvent
   | MessageStartedEvent
   | MessageDeltaEvent
   | MessageCompletedEvent
@@ -19,51 +20,57 @@ export type Seq = number;
 export type SessionId = string;
 export type Ts = string;
 export type Type = 'session.created';
-export type MessageId = string;
-export type Role = 'assistant';
-export type RunId1 = string;
+export type Title = string;
+export type RunId1 = null;
 export type Seq1 = number;
 export type SessionId1 = string;
 export type Ts1 = string;
-export type Type1 = 'message.started';
-export type MessageId1 = string;
-export type Text = string;
+export type Type1 = 'session.updated';
+export type MessageId = string;
+export type Role = 'assistant';
 export type RunId2 = string;
 export type Seq2 = number;
 export type SessionId2 = string;
 export type Ts2 = string;
-export type Type2 = 'message.delta';
-export type Interrupted = boolean;
-export type MessageId2 = string;
-export type Role1 = 'user' | 'assistant';
-export type Text1 = string;
+export type Type2 = 'message.started';
+export type MessageId1 = string;
+export type Text = string;
 export type RunId3 = string;
 export type Seq3 = number;
 export type SessionId3 = string;
 export type Ts3 = string;
-export type Type3 = 'message.completed';
+export type Type3 = 'message.delta';
+export type Interrupted = boolean;
+export type MessageId2 = string;
+export type Role1 = 'user' | 'assistant';
+export type Text1 = string;
 export type RunId4 = string;
 export type Seq4 = number;
 export type SessionId4 = string;
 export type Ts4 = string;
-export type Type4 = 'run.started';
+export type Type4 = 'message.completed';
 export type RunId5 = string;
 export type Seq5 = number;
 export type SessionId5 = string;
 export type Ts5 = string;
-export type Type5 = 'run.completed';
-export type Message = string;
+export type Type5 = 'run.started';
 export type RunId6 = string;
 export type Seq6 = number;
 export type SessionId6 = string;
 export type Ts6 = string;
-export type Type6 = 'run.failed';
-export type Reason = 'user' | 'shutdown';
+export type Type6 = 'run.completed';
+export type Message = string;
 export type RunId7 = string;
 export type Seq7 = number;
 export type SessionId7 = string;
 export type Ts7 = string;
-export type Type7 = 'run.cancelled';
+export type Type7 = 'run.failed';
+export type Reason = 'user' | 'shutdown';
+export type RunId8 = string;
+export type Seq8 = number;
+export type SessionId8 = string;
+export type Ts8 = string;
+export type Type8 = 'run.cancelled';
 
 /**
  * Server → client event. No ``id``; this is not a response to a request.
@@ -103,6 +110,29 @@ export interface SessionCreatedData {
   model_provider?: ModelProvider;
 }
 /**
+ * The session got a title. ``run_id`` is null: no run owns the change.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "SessionUpdatedEvent".
+ */
+export interface SessionUpdatedEvent {
+  data: SessionUpdatedData;
+  run_id: RunId1;
+  seq: Seq1;
+  session_id: SessionId1;
+  ts: Ts1;
+  type: Type1;
+}
+/**
+ * A session attribute changed. Today that is only its title.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "SessionUpdatedData".
+ */
+export interface SessionUpdatedData {
+  title: Title;
+}
+/**
  * The assistant bubble is open.
  *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
@@ -110,11 +140,11 @@ export interface SessionCreatedData {
  */
 export interface MessageStartedEvent {
   data: MessageStartedData;
-  run_id: RunId1;
-  seq: Seq1;
-  session_id: SessionId1;
-  ts: Ts1;
-  type: Type1;
+  run_id: RunId2;
+  seq: Seq2;
+  session_id: SessionId2;
+  ts: Ts2;
+  type: Type2;
 }
 /**
  * An assistant message is open and tokens may follow.
@@ -134,11 +164,11 @@ export interface MessageStartedData {
  */
 export interface MessageDeltaEvent {
   data: MessageDeltaData;
-  run_id: RunId2;
-  seq: Seq2;
-  session_id: SessionId2;
-  ts: Ts2;
-  type: Type2;
+  run_id: RunId3;
+  seq: Seq3;
+  session_id: SessionId3;
+  ts: Ts3;
+  type: Type3;
 }
 /**
  * One incremental fragment of an assistant message.
@@ -158,11 +188,11 @@ export interface MessageDeltaData {
  */
 export interface MessageCompletedEvent {
   data: MessageCompletedData;
-  run_id: RunId3;
-  seq: Seq3;
-  session_id: SessionId3;
-  ts: Ts3;
-  type: Type3;
+  run_id: RunId4;
+  seq: Seq4;
+  session_id: SessionId4;
+  ts: Ts4;
+  type: Type4;
 }
 /**
  * Full text of a user or assistant message.
@@ -187,11 +217,11 @@ export interface MessageCompletedData {
  */
 export interface RunStartedEvent {
   data: EmptyEventData;
-  run_id: RunId4;
-  seq: Seq4;
-  session_id: SessionId4;
-  ts: Ts4;
-  type: Type4;
+  run_id: RunId5;
+  seq: Seq5;
+  session_id: SessionId5;
+  ts: Ts5;
+  type: Type5;
 }
 /**
  * No payload. Used by ``run.started`` and ``run.completed``.
@@ -208,11 +238,11 @@ export interface EmptyEventData {}
  */
 export interface RunCompletedEvent {
   data: EmptyEventData;
-  run_id: RunId5;
-  seq: Seq5;
-  session_id: SessionId5;
-  ts: Ts5;
-  type: Type5;
+  run_id: RunId6;
+  seq: Seq6;
+  session_id: SessionId6;
+  ts: Ts6;
+  type: Type6;
 }
 /**
  * The graph run stopped with an error.
@@ -222,11 +252,11 @@ export interface RunCompletedEvent {
  */
 export interface RunFailedEvent {
   data: RunFailedData;
-  run_id: RunId6;
-  seq: Seq6;
-  session_id: SessionId6;
-  ts: Ts6;
-  type: Type6;
+  run_id: RunId7;
+  seq: Seq7;
+  session_id: SessionId7;
+  ts: Ts7;
+  type: Type7;
 }
 /**
  * Why a run stopped. No traceback.
@@ -245,11 +275,11 @@ export interface RunFailedData {
  */
 export interface RunCancelledEvent {
   data: RunCancelledData;
-  run_id: RunId7;
-  seq: Seq7;
-  session_id: SessionId7;
-  ts: Ts7;
-  type: Type7;
+  run_id: RunId8;
+  seq: Seq8;
+  session_id: SessionId8;
+  ts: Ts8;
+  type: Type8;
 }
 /**
  * Who stopped the run. ``user`` is ``run.cancel``, ``shutdown`` the daemon stopping.

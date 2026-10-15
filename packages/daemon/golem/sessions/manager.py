@@ -3,6 +3,9 @@ in the checkpointer.
 
 A session found only in the checkpointer predates the event log. Resolving it
 writes the ``session.created`` it never had, with an empty history before it.
+
+A session without a title gets one after its first completed run, from a
+task that does not keep the session busy.
 """
 
 from __future__ import annotations
@@ -15,12 +18,13 @@ from golem.graphs.adapter import PlainMessage, plain_messages
 from golem.graphs.chat import ChatRuntime
 from golem.graphs.state import SCHEMA_VERSION
 from golem.models.router import ModelIdentity
-from golem.sessions.bus import EventTarget
+from golem.sessions.bus import EventTarget, SummaryTarget
 from golem.sessions.ids import new_id
 from golem.sessions.log import SessionLog
 from golem.sessions.runner import CancelReason, RunControl, Turn, run_turn
+from golem.sessions.titles import TitleGenerator, choose_title
 from golem.store.records import RunRecords, SessionActivity, SessionRecords
-from golem_protocol.events import SessionCreatedData
+from golem_protocol.events import SessionCreatedData, SessionUpdatedData
 
 log = logging.getLogger("golem.sessions")
 
@@ -61,6 +65,8 @@ class _LiveSession:
     session_id: str
     model_profile: str
     schema_version: int
+    title: str | None = None
+    titling: bool = False
     task: asyncio.Task[None] | None = None
 
 
@@ -79,13 +85,17 @@ class SessionManager:
         events: SessionLog,
         records: SessionRecords,
         runs: RunRecords,
+        *,
+        titles: TitleGenerator | None = None,
     ) -> None:
         self._runtime = runtime
         self._events = events
         self._records = records
         self._run_records = runs
+        self._titles = titles
         self._sessions: dict[str, _LiveSession] = {}
         self._runs: dict[str, _LiveRun] = {}
+        self._naming: set[asyncio.Task[None]] = set()
         self._lock = asyncio.Lock()
 
     async def create(self, model_profile: str | None) -> str:
@@ -115,13 +125,17 @@ class SessionManager:
         """Stop live events for ``session_id`` on ``target``."""
         self._events.detach(session_id, target)
 
-    def detach_all(self, target: EventTarget) -> None:
-        """Forget ``target`` everywhere. Called when its connection closes."""
+    def detach_all(self, target: object) -> None:
+        """Forget ``target`` everywhere, as a watcher too. Called when its connection closes."""
         self._events.detach_all(target)
 
     async def recent(self, limit: int) -> list[SessionActivity]:
         """Sessions with the newest activity first."""
         return await self._records.recent(limit)
+
+    async def watch(self, limit: int, target: SummaryTarget) -> list[SessionActivity]:
+        """Like :meth:`recent`, and ``target`` gets each later change as a summary."""
+        return await self._events.watch(limit, target)
 
     async def inspect(self, session_id: str) -> SessionView:
         """The messages the next model call would see. Does not start a run."""
@@ -165,7 +179,7 @@ class SessionManager:
             )
             control = RunControl()
             task = asyncio.create_task(
-                run_turn(self._runtime, self._events, turn, control),
+                self._turn(session, turn, control),
                 name=f"golem-run-{turn.run_id}",
             )
             session.task = task
@@ -189,8 +203,16 @@ class SessionManager:
         return False
 
     async def cancel_all(self) -> None:
-        """Stop every run in progress, with the reason ``shutdown``."""
+        """Stop every run in progress, with the reason ``shutdown``, and any title being chosen.
+
+        A session whose title was cancelled gets one after its next completed run.
+        """
         await self._stop(list(self._runs.values()), "shutdown")
+        naming = set(self._naming)
+        for task in naming:
+            task.cancel()
+        if naming:
+            await asyncio.wait(naming)
 
     async def _stop(self, runs: list[_LiveRun], reason: CancelReason) -> None:
         for run in runs:
@@ -200,6 +222,32 @@ class SessionManager:
         tasks = {run.task for run in runs}
         if tasks:
             await asyncio.wait(tasks)
+
+    async def _turn(self, session: _LiveSession, turn: Turn, control: RunControl) -> None:
+        reply = await run_turn(self._runtime, self._events, turn, control)
+        if reply is None or self._titles is None or session.title is not None or session.titling:
+            return
+        session.titling = True
+        task = asyncio.create_task(
+            self._name(session, self._titles, turn.text, reply),
+            name=f"golem-title-{session.session_id}",
+        )
+        self._naming.add(task)
+        task.add_done_callback(self._named)
+
+    async def _name(
+        self, session: _LiveSession, titles: TitleGenerator, prompt: str, reply: str
+    ) -> None:
+        try:
+            title = await choose_title(
+                titles, model_profile=session.model_profile, prompt=prompt, reply=reply
+            )
+            await self._events.emit(
+                session.session_id, None, "session.updated", SessionUpdatedData(title=title)
+            )
+            session.title = title
+        finally:
+            session.titling = False
 
     async def _resolve(self, session_id: str) -> _LiveSession:
         existing = self._sessions.get(session_id)
@@ -220,6 +268,7 @@ class SessionManager:
             session_id=session_id,
             model_profile=profile,
             schema_version=SCHEMA_VERSION,
+            title=None if record is None else record.title,
         )
         if record is None:
             await self._announce(session)
@@ -241,11 +290,19 @@ class SessionManager:
 
     def _finished(self, run_id: str, task: asyncio.Task[None]) -> None:
         self._runs.pop(run_id, None)
-        if task.cancelled():
-            return
-        exc = task.exception()
-        if exc is not None:
-            log.error("run task failed", exc_info=exc)
+        _report(task, "run task failed")
+
+    def _named(self, task: asyncio.Task[None]) -> None:
+        self._naming.discard(task)
+        _report(task, "title task failed")
+
+
+def _report(task: asyncio.Task[None], message: str) -> None:
+    if task.cancelled():
+        return
+    exc = task.exception()
+    if exc is not None:
+        log.error(message, exc_info=exc)
 
 
 __all__ = [

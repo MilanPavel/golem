@@ -10,6 +10,15 @@ from golem.store.database import Database
 
 RunStatus = Literal["running", "completed", "failed", "cancelled"]
 
+_ACTIVITY = (
+    "SELECT s.session_id, s.model_profile, s.title, s.created_at, s.updated_at,"
+    " EXISTS (SELECT 1 FROM runs r"
+    "  WHERE r.session_id = s.session_id AND r.status = 'running') AS running,"
+    " (SELECT COALESCE(MAX(e.seq), 0) FROM events e"
+    "  WHERE e.session_id = s.session_id) AS last_seq"
+    " FROM sessions s"
+)
+
 
 @dataclass(frozen=True, slots=True)
 class SessionRecord:
@@ -51,25 +60,18 @@ class SessionRecords:
         )
         return None if row is None else _session(row)
 
+    async def activity(self, session_id: str) -> SessionActivity | None:
+        """One session's row, whether a run is open, and its newest ``seq``."""
+        row = await self._database.fetch_one(f"{_ACTIVITY} WHERE s.session_id = ?", (session_id,))
+        return None if row is None else _activity(row)
+
     async def recent(self, limit: int) -> list[SessionActivity]:
         """Sessions with the newest activity first."""
         rows = await self._database.fetch_all(
-            "SELECT s.session_id, s.model_profile, s.title, s.created_at, s.updated_at,"
-            " EXISTS (SELECT 1 FROM runs r"
-            "  WHERE r.session_id = s.session_id AND r.status = 'running') AS running,"
-            " (SELECT COALESCE(MAX(e.seq), 0) FROM events e"
-            "  WHERE e.session_id = s.session_id) AS last_seq"
-            " FROM sessions s ORDER BY s.updated_at DESC, s.session_id DESC LIMIT ?",
+            f"{_ACTIVITY} ORDER BY s.updated_at DESC, s.session_id DESC LIMIT ?",
             (limit,),
         )
-        return [
-            SessionActivity(
-                session=_session(row),
-                running=bool(row["running"]),
-                last_seq=int(row["last_seq"]),
-            )
-            for row in rows
-        ]
+        return [_activity(row) for row in rows]
 
 
 class RunRecords:
@@ -100,6 +102,14 @@ def _session(row: sqlite3.Row) -> SessionRecord:
         title=row["title"],
         created_at=row["created_at"],
         updated_at=row["updated_at"],
+    )
+
+
+def _activity(row: sqlite3.Row) -> SessionActivity:
+    return SessionActivity(
+        session=_session(row),
+        running=bool(row["running"]),
+        last_seq=int(row["last_seq"]),
     )
 
 

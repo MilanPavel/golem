@@ -62,15 +62,16 @@ class RunControl:
 class _Progress:
     run_started: bool = False
     reply_opened: bool = False
-    reply_completed: bool = False
+    reply: str | None = None
     parts: list[str] = field(default_factory=list[str])
 
 
 async def run_turn(
     runtime: ChatRuntime, events: SessionLog, turn: Turn, control: RunControl
-) -> None:
+) -> str | None:
     """Run ``turn`` to the end. A failure becomes ``run.failed``, not an exception.
 
+    Returns the reply when the run completed, and None when it failed.
     Cancellation is re-raised after ``run.cancelled`` is in the log.
     """
     progress = _Progress()
@@ -110,7 +111,7 @@ async def run_turn(
                         MessageDeltaData(message_id=turn.assistant_message_id, text=fact.text),
                     )
                 elif isinstance(fact, TextCompleted):
-                    progress.reply_completed = True
+                    progress.reply = fact.text
                     await emit(
                         "message.completed",
                         MessageCompletedData(
@@ -127,6 +128,8 @@ async def run_turn(
         log.exception("run %s failed", turn.run_id)
         message = str(exc).strip() or type(exc).__name__
         await emit("run.failed", RunFailedData(message=message))
+        return None
+    return "".join(progress.parts) if progress.reply is None else progress.reply
 
 
 async def _stopped(
@@ -140,7 +143,7 @@ async def _stopped(
     try:
         if not progress.run_started:
             await events.emit(turn.session_id, turn.run_id, "run.started", EmptyEventData())
-        if progress.reply_opened and not progress.reply_completed:
+        if progress.reply_opened and progress.reply is None:
             await close_reply(
                 runtime,
                 events,

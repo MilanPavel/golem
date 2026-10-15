@@ -18,6 +18,8 @@ export type ComposerOutcome =
   | { kind: "idle" }
   | { kind: "unknown"; notice: string }
   | { kind: "send"; text: string; debug: DebugState }
+  | { kind: "sessions" }
+  | { kind: "new" }
   | {
       kind: "local";
       debug: DebugState;
@@ -26,7 +28,19 @@ export type ComposerOutcome =
       refreshModel: boolean;
     };
 
+type Command = {
+  name: string;
+  run: (debug: DebugState, args: readonly string[]) => ComposerOutcome;
+};
+
 const UNKNOWN = "unknown command";
+
+/** Every slash command. A name not in this table is an unknown command, not a message. */
+const COMMANDS: readonly Command[] = [
+  { name: "/debug", run: debugCommand },
+  { name: "/sessions", run: withoutArgs({ kind: "sessions" }) },
+  { name: "/new", run: withoutArgs({ kind: "new" }) },
+];
 
 export function toggleDebugTab(debug: DebugState): DebugState {
   if (!debug.open) {
@@ -66,11 +80,24 @@ function sendOrPreview(debug: DebugState, text: string): ComposerOutcome {
 }
 
 function applyCommand(debug: DebugState, text: string): ComposerOutcome {
-  const parts = text.split(/\s+/);
-  if (parts[0] !== "/debug" || parts.length > 2) {
-    return { kind: "unknown", notice: UNKNOWN };
+  const [name, ...args] = text.split(/\s+/);
+  const command = COMMANDS.find((candidate) => candidate.name === name);
+  return command === undefined ? unknown() : command.run(debug, args);
+}
+
+function withoutArgs(outcome: ComposerOutcome): Command["run"] {
+  return (_debug, args) => (args.length === 0 ? outcome : unknown());
+}
+
+function unknown(): ComposerOutcome {
+  return { kind: "unknown", notice: UNKNOWN };
+}
+
+function debugCommand(debug: DebugState, args: readonly string[]): ComposerOutcome {
+  if (args.length > 1) {
+    return unknown();
   }
-  const arg = parts[1];
+  const arg = args[0];
   if (arg === undefined) {
     if (debug.open) {
       return local({ ...debug, open: false }, null, false);
@@ -99,7 +126,7 @@ function applyCommand(debug: DebugState, text: string): ComposerOutcome {
       debug: { ...debug, hold: false, held: null },
     };
   }
-  return { kind: "unknown", notice: UNKNOWN };
+  return unknown();
 }
 
 function local(

@@ -1,6 +1,6 @@
 import { homedir } from "node:os";
 import { useEffect, useRef, useState } from "react";
-import { Box, Text, useApp, useInput, useWindowSize } from "ink";
+import { Box, Text, useApp, useInput, useWindowSize, type Key } from "ink";
 import { RpcError, SESSION_NOT_FOUND, type ConnectionState, type GolemClient, type WireLine } from "@golem/client";
 
 import {
@@ -26,7 +26,17 @@ import {
   type ModelInfo,
 } from "./status-label.ts";
 import { nextOffset, type WheelSubscribe } from "./screen.ts";
+import {
+  closedSwitcher,
+  layoutSwitcher,
+  openSwitcher,
+  pressSwitcher,
+  type SwitcherKey,
+  type SwitcherState,
+} from "./switcher.ts";
+import { SwitcherView } from "./switcher.tsx";
 import { CLAY, QUESTION_BG, QUESTION_FG } from "./theme.ts";
+import { useSessionIndex } from "./use-session-index.ts";
 import { useSession } from "./use-session.ts";
 
 export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelSubscribe }) {
@@ -43,6 +53,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   const [wire, setWire] = useState<readonly WireLine[]>([]);
   const [modelMessages, setModelMessages] = useState<CheckpointMessage[]>([]);
   const [modelCount, setModelCount] = useState<number | null>(null);
+  const [switcher, setSwitcher] = useState<SwitcherState>(closedSwitcher);
   const draftRef = useRef(draft);
   const busyRef = useRef(chat.busy);
   const runIdRef = useRef(chat.runId);
@@ -50,6 +61,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   const { exit } = useApp();
   const connectionRef = useRef(connection);
   const debugRef = useRef(debug);
+  const switcherRef = useRef(switcher);
   const panelOpen = useRef(false);
   const inspectGen = useRef(0);
   const loadCheckpointRef = useRef<(sessionId: string) => void>(() => undefined);
@@ -59,6 +71,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   runIdRef.current = chat.runId;
   connectionRef.current = connection;
   debugRef.current = debug;
+  switcherRef.current = switcher;
   panelOpen.current = debug.open;
   const size = useWindowSize();
   const columns = frameColumns(size.columns || 80);
@@ -106,6 +119,9 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   });
   const sessionRef = session.ref;
   const sessionId = session.id;
+  const sessions = useSessionIndex(client, connection.status === "connected");
+  const sessionsRef = useRef(sessions);
+  sessionsRef.current = sessions;
 
   useEffect(() => () => batcher.current?.stop(), []);
 
@@ -238,6 +254,16 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       setChat((current) => ({ ...current, notice: outcome.notice }));
       return;
     }
+    if (outcome.kind === "sessions") {
+      setDraft("");
+      setSwitcher(openSwitcher(sessionRef.current));
+      return;
+    }
+    if (outcome.kind === "new") {
+      setDraft("");
+      session.startNew();
+      return;
+    }
     if (outcome.kind === "local") {
       showDebug(outcome.debug);
       setDraft(outcome.restore ?? "");
@@ -296,6 +322,17 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
     });
   }
 
+  function onSwitcherKey(key: SwitcherKey): void {
+    const pressed = pressSwitcher(switcherRef.current, sessionsRef.current, key, sessionRef.current);
+    setSwitcher(pressed.state);
+    const action = pressed.action;
+    if (action.kind === "open") {
+      session.switchTo(action.sessionId);
+    } else if (action.kind === "new") {
+      session.startNew();
+    }
+  }
+
   function showDebug(next: DebugState): void {
     if (next.open !== debugRef.current.open || next.tab !== debugRef.current.tab) {
       debugLines.current = 0;
@@ -307,6 +344,13 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   useInput((input, key) => {
     if (key.ctrl && input === "c") {
       onCtrlC();
+      return;
+    }
+    if (switcherRef.current.open) {
+      const pressed = switcherKey(input, key);
+      if (pressed !== null) {
+        onSwitcherKey(pressed);
+      }
       return;
     }
     if (key.pageUp) {
@@ -413,6 +457,20 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   return (
     <Box flexDirection="column" width={columns} height={rows} overflow="hidden">
       <Header mode={budget.mode} version={version} model={chip} cwd={cwd} columns={columns} />
+      {switcher.open ? (
+        <SwitcherView
+          rows={layoutSwitcher({
+            state: switcher,
+            sessions,
+            current: sessionId,
+            now: Date.now(),
+            columns,
+            rows: budget.body - 1,
+          })}
+          columns={columns}
+          height={budget.body}
+        />
+      ) : (
       <Box flexDirection="column" width={columns} height={budget.body} flexShrink={0} overflow="hidden">
         {chat.messages.length === 0 ? <Text dimColor>Type a message.</Text> : null}
         {transcript.lines.map((line, index) => (
@@ -430,6 +488,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
           </Box>
         ))}
       </Box>
+      )}
       {budget.debug > 0 ? (
         <Box
           flexDirection="column"
@@ -536,6 +595,22 @@ function LineView({ line }: { line: LayoutLine }) {
       ))}
     </Text>
   );
+}
+
+function switcherKey(input: string, key: Key): SwitcherKey | null {
+  if (key.upArrow) {
+    return "up";
+  }
+  if (key.downArrow) {
+    return "down";
+  }
+  if (key.return) {
+    return "enter";
+  }
+  if (key.escape) {
+    return "close";
+  }
+  return input === "n" ? "new" : null;
 }
 
 function deltaEvent(messageId: string, text: string) {

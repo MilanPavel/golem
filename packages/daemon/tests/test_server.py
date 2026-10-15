@@ -31,6 +31,7 @@ from golem.server.dispatcher import (
     RequestContext,
 )
 from golem.server.framing import MAX_LINE_BYTES
+from golem.sessions.titles import TitleGenerator
 from golem_protocol.version import PROTOCOL_MAJOR, PROTOCOL_MINOR
 
 HELLO = {"protocol_major": PROTOCOL_MAJOR, "protocol_minor": 0, "client": "tui"}
@@ -46,6 +47,7 @@ class RpcClient:
         self._waiters: dict[int, asyncio.Future[dict[str, object]]] = {}
         self._orphan: asyncio.Queue[dict[str, object]] = asyncio.Queue()
         self.events: list[dict[str, object]] = []
+        self.summaries: list[dict[str, object]] = []
         self._pump = asyncio.create_task(self._read_loop())
 
     @classmethod
@@ -96,17 +98,26 @@ class RpcClient:
                 payload = await asyncio.wait_for(self._orphan.get(), timeout=remaining)
             except TimeoutError:
                 raise TimeoutError(self.events) from None
-            if payload.get("method") == "event":
-                self.events.append(payload)
+            self._keep(payload)
 
     async def take_events(self) -> list[dict[str, object]]:
         """Collect every event the daemon queued before a ``ping`` round trip."""
         await self.call("ping", {"nonce": "barrier"})
         while not self._orphan.empty():
             payload = self._orphan.get_nowait()
-            if payload.get("method") == "event":
-                self.events.append(payload)
+            self._keep(payload)
         return self.events
+
+    async def take_summaries(self) -> list[dict[str, object]]:
+        """Collect every ``session.summary`` queued before a ``ping`` round trip."""
+        await self.take_events()
+        return self.summaries
+
+    def _keep(self, payload: dict[str, object]) -> None:
+        if payload.get("method") == "event":
+            self.events.append(payload)
+        elif payload.get("method") == "session.summary":
+            self.summaries.append(payload)
 
     async def close(self) -> None:
         self._pump.cancel()
@@ -199,6 +210,7 @@ async def start_daemon(
     extra_methods: Mapping[str, Method] | None = None,
     max_connections: int = 32,
     router: ModelRouter | None = None,
+    titles: TitleGenerator | None = None,
 ) -> tuple[DaemonApp, asyncio.Task[None]]:
     paths = resolve_paths(home)
     paths.ensure_layout()
@@ -208,6 +220,7 @@ async def start_daemon(
         extra_methods=extra_methods,
         max_connections=max_connections,
         router=router,
+        titles=titles,
     )
     task = asyncio.create_task(app.serve(install_signals=False))
     await _wait_listening(paths.socket_path, task)

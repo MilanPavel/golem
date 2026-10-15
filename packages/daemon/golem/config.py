@@ -69,6 +69,7 @@ class GolemSettings(BaseSettings):
     model_provider: ModelProvider | None = None
     model_name: str | None = Field(default=None, min_length=1)
     model_base_url: Annotated[str | None, BeforeValidator(_blank_to_none)] = None
+    session_titles: bool = True
 
     @classmethod
     def settings_customise_sources(

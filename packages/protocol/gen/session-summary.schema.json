@@ -1,6 +1,6 @@
 {
   "additionalProperties": false,
-  "description": "One session as ``session.list`` reports it.\n\n``status`` is ``running`` while a run is open. ``last_seq`` is the newest\nstored event, so a client can tell what it has not seen.",
+  "description": "One session as ``session.list`` reports it.\n\n``status`` is ``running`` while a run is open. ``last_seq`` is the newest\nstored event, so a client can tell what it has not seen, and which of\ntwo summaries of one session is newer.",
   "properties": {
     "created_at": {
       "minLength": 1,

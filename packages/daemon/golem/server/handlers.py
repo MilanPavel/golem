@@ -28,6 +28,7 @@ from golem.sessions.manager import (
     SessionManager,
     SessionNotFoundError,
 )
+from golem.sessions.summaries import summarize
 from golem_protocol.commands import (
     DaemonStatus,
     HelloParams,
@@ -48,7 +49,6 @@ from golem_protocol.commands import (
     SessionInspectResult,
     SessionListParams,
     SessionListResult,
-    SessionSummary,
 )
 from golem_protocol.events import Ping
 from golem_protocol.version import PROTOCOL_MAJOR, PROTOCOL_MINOR
@@ -128,21 +128,12 @@ async def _session_detach(ctx: RequestContext, params: SessionDetachParams) -> S
 
 
 async def _session_list(ctx: RequestContext, params: SessionListParams) -> SessionListResult:
-    found = await _sessions(ctx).recent(params.limit)
-    return SessionListResult(
-        sessions=[
-            SessionSummary(
-                session_id=item.session.session_id,
-                model_profile=item.session.model_profile,
-                title=item.session.title,
-                status="running" if item.running else "idle",
-                created_at=item.session.created_at,
-                updated_at=item.session.updated_at,
-                last_seq=item.last_seq,
-            )
-            for item in found
-        ]
-    )
+    sessions = _sessions(ctx)
+    if params.watch:
+        found = await sessions.watch(params.limit, ctx.connection)
+    else:
+        found = await sessions.recent(params.limit)
+    return SessionListResult(sessions=[summarize(item) for item in found])
 
 
 async def _message_send(ctx: RequestContext, params: MessageSendParams) -> MessageSendResult:

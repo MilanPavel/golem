@@ -4,6 +4,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
+from golem_protocol.commands import SessionSummary
 from golem_protocol.events import ChatEvent
 
 
@@ -67,6 +68,20 @@ class RpcNotification(BaseModel):
     params: ChatEvent
 
 
+class SessionSummaryNotification(BaseModel):
+    """Server → watcher: a session's summary after it changed.
+
+    Sent to connections that called ``session.list`` with ``watch``. It is not
+    part of any session's event stream and has no ``seq`` of its own.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    jsonrpc: Literal["2.0"] = "2.0"
+    method: Literal["session.summary"] = "session.summary"
+    params: SessionSummary
+
+
 __all__ = [
     "RpcErrorBody",
     "RpcFailure",
@@ -74,4 +89,5 @@ __all__ = [
     "RpcNotification",
     "RpcRequest",
     "RpcSuccess",
+    "SessionSummaryNotification",
 ]

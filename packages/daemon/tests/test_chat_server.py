@@ -473,3 +473,57 @@ async def test_stopping_the_daemon_cancels_runs_with_the_shutdown_reason(short_h
     finally:
         await client.close()
         await stop_daemon(app, task)
+
+
+class _OneTitle:
+    async def title(self, model_profile: str, prompt: str, reply: str) -> str:
+        del model_profile, prompt, reply
+        return "Greeting"
+
+
+async def _summaries_until(
+    client: RpcClient, done: Callable[[list[dict[str, object]]], bool]
+) -> list[dict[str, object]]:
+    async with asyncio.timeout(2):
+        while True:
+            summaries = [
+                params
+                for item in await client.take_summaries()
+                if (params := _record(item.get("params"))) is not None
+            ]
+            if done(summaries):
+                return summaries
+            await asyncio.sleep(0.01)
+
+
+async def test_a_watcher_follows_every_session_without_attaching(short_home: Path) -> None:
+    model = ScriptedChatModel(replies=["Hi"])
+    app, task = await start_daemon(short_home, router=ModelRouter(model=model), titles=_OneTitle())
+    watcher = await RpcClient.connect(app.paths.socket_path)
+    sender = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await watcher.call("hello", HELLO)
+        await sender.call("hello", HELLO)
+        listed = rpc_result(await watcher.call("session.list", {"watch": True}))
+        assert listed["sessions"] == []
+
+        session_id = await _open(sender)
+        await sender.call("message.send", {"session_id": session_id, "text": "hello"})
+
+        summaries = await _summaries_until(
+            watcher, lambda found: any(s.get("title") == "Greeting" for s in found)
+        )
+        assert {s["session_id"] for s in summaries} == {session_id}
+        assert [s["status"] for s in summaries][:3] == ["idle", "idle", "running"]
+        last = summaries[-1]
+        assert (last["status"], last["title"]) == ("idle", "Greeting")
+        seqs = [cast(int, s["last_seq"]) for s in summaries]
+        assert seqs == sorted(seqs)
+        assert watcher.events == []
+
+        relisted = rpc_result(await sender.call("session.list", {}))
+        assert _record(cast(list[object], relisted["sessions"])[0]) == last
+    finally:
+        await watcher.close()
+        await sender.close()
+        await stop_daemon(app, task)

@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "A session attribute changed. Today that is only its title.",
+  "properties": {
+    "title": {
+      "minLength": 1,
+      "title": "Title",
+      "type": "string"
+    }
+  },
+  "required": [
+    "title"
+  ],
+  "title": "SessionUpdatedData",
+  "type": "object"
+}

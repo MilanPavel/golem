@@ -15,6 +15,7 @@ from golem_protocol.events import (
     RunFailedEvent,
     RunStartedEvent,
     SessionCreatedEvent,
+    SessionUpdatedEvent,
 )
 
 
@@ -27,7 +28,12 @@ async def project(tx: Transaction, event: ChatEvent) -> None:
             (event.session_id, event.data.model_profile, event.ts, event.ts),
         )
         return
-    if isinstance(event, RunStartedEvent):
+    if isinstance(event, SessionUpdatedEvent):
+        await tx.execute(
+            "UPDATE sessions SET title = ? WHERE session_id = ?",
+            (event.data.title, event.session_id),
+        )
+    elif isinstance(event, RunStartedEvent):
         await tx.execute(
             "INSERT INTO runs (run_id, session_id, status, started_at) VALUES (?, ?, 'running', ?)",
             (event.run_id, event.session_id, event.ts),

@@ -3,7 +3,7 @@ import { test } from "node:test";
 
 import { RpcError, SESSION_NOT_FOUND, type SessionSummary } from "@golem/client";
 
-import { openLatest, openNew, type SessionOpener } from "./session-open.ts";
+import { openLatest, openNew, openOne, type SessionOpener } from "./session-open.ts";
 
 function summary(sessionId: string): SessionSummary {
   return {
@@ -74,4 +74,13 @@ test("openNew chooses the session before the replay arrives", async () => {
   await openNew(chooseFirst, () => order.push("choose"));
   assert.deepEqual(order, ["choose", "attach"]);
   assert.deepEqual(calls, ["create", "attach s_new"]);
+});
+
+test("openOne chooses the session before attaching to it", async () => {
+  const { client, calls } = fake([]);
+  const opened = await openOne(client, "s_b", (sessionId) => {
+    calls.push(`choose ${sessionId}`);
+  });
+  assert.equal(opened, "s_b");
+  assert.deepEqual(calls, ["choose s_b", "attach s_b"]);
 });

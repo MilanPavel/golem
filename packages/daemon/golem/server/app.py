@@ -34,6 +34,7 @@ from golem.sessions.bus import EventBus
 from golem.sessions.log import SessionLog
 from golem.sessions.manager import SessionManager
 from golem.sessions.recovery import recover_runs
+from golem.sessions.titles import ModelTitles, TitleGenerator
 from golem.store.database import Database, DatabaseTooNewError
 from golem.store.events import EventLog
 from golem.store.records import RunRecords, SessionRecords
@@ -69,9 +70,11 @@ class DaemonApp:
         extra_methods: Mapping[str, Method] | None = None,
         max_connections: int = MAX_CONNECTIONS,
         router: ModelRouter | None = None,
+        titles: TitleGenerator | None = None,
     ) -> None:
         self.paths = paths
         self._router = router
+        self._titles = titles
         self.state = DaemonState(paths=paths, started_at=time.monotonic())
         methods = standard_methods()
         if extra_methods:
@@ -113,7 +116,9 @@ class DaemonApp:
                 AsyncSqliteSaver.from_conn_string(str(self.paths.checkpoints_file)) as saver,
             ):
                 await saver.setup()
-                self.state.sessions = await _open_sessions(database, open_chat(router, saver))
+                self.state.sessions = await _open_sessions(
+                    database, open_chat(router, saver), self._titles
+                )
                 try:
                     if install_signals:
                         installed = _install_signals(loop, self.request_shutdown)
@@ -222,12 +227,15 @@ class DaemonApp:
             log.error("client task failed", exc_info=exc)
 
 
-async def _open_sessions(database: Database, runtime: ChatRuntime) -> SessionManager:
+async def _open_sessions(
+    database: Database, runtime: ChatRuntime, titles: TitleGenerator | None
+) -> SessionManager:
     events = EventLog(database)
-    session_log = SessionLog(events, EventBus())
+    records = SessionRecords(database)
+    session_log = SessionLog(events, EventBus(), records)
     runs = RunRecords(database)
     await recover_runs(runs, events, session_log, runtime)
-    return SessionManager(runtime, session_log, SessionRecords(database), runs)
+    return SessionManager(runtime, session_log, records, runs, titles=titles)
 
 
 def _install_signals(
@@ -269,7 +277,9 @@ async def serve_forever() -> int:
     settings = load_settings(home=paths.home, project_dir=paths.home)
     configure_logging(settings, paths)
     paths.ensure_layout()
-    app = DaemonApp(paths, router=ModelRouter(settings))
+    router = ModelRouter(settings)
+    titles = ModelTitles(router) if settings.session_titles else None
+    app = DaemonApp(paths, router=router, titles=titles)
     try:
         await app.serve()
     except DaemonAlreadyRunning as exc:

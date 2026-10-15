@@ -90,6 +90,14 @@ class RunCancelledData(BaseModel):
     reason: Literal["user", "shutdown"]
 
 
+class SessionUpdatedData(BaseModel):
+    """A session attribute changed. Today that is only its title."""
+
+    model_config = _CONFIG
+
+    title: str = Field(min_length=1)
+
+
 class SessionCreatedEvent(BaseModel):
     """A session exists. ``run_id`` is null because no run has started."""
 
@@ -101,6 +109,19 @@ class SessionCreatedEvent(BaseModel):
     ts: str = Field(min_length=1)
     type: Literal["session.created"]
     data: SessionCreatedData
+
+
+class SessionUpdatedEvent(BaseModel):
+    """The session got a title. ``run_id`` is null: no run owns the change."""
+
+    model_config = _CONFIG
+
+    seq: int = Field(ge=1)
+    session_id: str = Field(min_length=1)
+    run_id: None
+    ts: str = Field(min_length=1)
+    type: Literal["session.updated"]
+    data: SessionUpdatedData
 
 
 class MessageStartedEvent(BaseModel):
@@ -196,6 +217,7 @@ class RunCancelledEvent(BaseModel):
 
 EventType = Literal[
     "session.created",
+    "session.updated",
     "message.started",
     "message.delta",
     "message.completed",
@@ -209,6 +231,7 @@ EventType = Literal[
 
 ChatEvent = Annotated[
     SessionCreatedEvent
+    | SessionUpdatedEvent
     | MessageStartedEvent
     | MessageDeltaEvent
     | MessageCompletedEvent
@@ -243,4 +266,6 @@ __all__ = [
     "RunStartedEvent",
     "SessionCreatedData",
     "SessionCreatedEvent",
+    "SessionUpdatedData",
+    "SessionUpdatedEvent",
 ]

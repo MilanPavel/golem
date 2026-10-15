@@ -113,18 +113,25 @@ class SessionDetachResult(BaseModel):
 
 
 class SessionListParams(BaseModel):
-    """``session.list``. Newest activity first."""
+    """``session.list``. Newest activity first.
+
+    With ``watch``, the connection also gets a ``session.summary``
+    notification whenever a session's summary changes, until it closes.
+    Watching again is not an error.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     limit: int = Field(default=50, ge=1, le=500)
+    watch: bool = False
 
 
 class SessionSummary(BaseModel):
     """One session as ``session.list`` reports it.
 
     ``status`` is ``running`` while a run is open. ``last_seq`` is the newest
-    stored event, so a client can tell what it has not seen.
+    stored event, so a client can tell what it has not seen, and which of
+    two summaries of one session is newer.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)

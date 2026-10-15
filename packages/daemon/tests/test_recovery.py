@@ -81,9 +81,13 @@ def _last_message(values: Mapping[str, object]) -> BaseMessage:
 
 def _manager(runtime: ChatRuntime, database: Database) -> tuple[SessionManager, EventLog]:
     events = EventLog(database)
-    log = SessionLog(events, EventBus())
+    log = _session_log(database, events)
     manager = SessionManager(runtime, log, SessionRecords(database), RunRecords(database))
     return manager, events
+
+
+def _session_log(database: Database, events: EventLog) -> SessionLog:
+    return SessionLog(events, EventBus(), SessionRecords(database))
 
 
 async def _lose_a_run(runtime: ChatRuntime, model: GatedChatModel, log: SessionLog) -> None:
@@ -127,10 +131,10 @@ async def test_a_lost_run_completes_its_partial_reply(database: Database) -> Non
     model = GatedChatModel(streamed="Hel", reply="lo")
     runtime = open_chat(ModelRouter(model=model), InMemorySaver())
     events = EventLog(database)
-    await _lose_a_run(runtime, model, SessionLog(events, EventBus()))
+    await _lose_a_run(runtime, model, _session_log(database, events))
 
     closed = await recover_runs(
-        RunRecords(database), events, SessionLog(events, EventBus()), runtime
+        RunRecords(database), events, _session_log(database, events), runtime
     )
     assert closed == ["r_lost"]
     completed, failed = (await events.for_run("r_lost"))[-2:]
@@ -148,7 +152,7 @@ async def test_a_lost_run_completes_its_partial_reply(database: Database) -> Non
     assert run is not None
     assert (run.status, run.error) == ("failed", STOPPED_MESSAGE)
     assert (
-        await recover_runs(RunRecords(database), events, SessionLog(events, EventBus()), runtime)
+        await recover_runs(RunRecords(database), events, _session_log(database, events), runtime)
         == []
     )
 
@@ -169,7 +173,7 @@ async def test_a_reply_the_checkpoint_finished_is_kept(database: Database) -> No
         for e in await events.for_run(run_id)
         if isinstance(e, MessageCompletedEvent) and e.data.role == "assistant"
     )
-    log = SessionLog(events, EventBus())
+    log = _session_log(database, events)
     await log.emit(session_id, "r_lost", "run.started", EmptyEventData())
     await log.emit(
         session_id,

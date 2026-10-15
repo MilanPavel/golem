@@ -26,6 +26,17 @@ export async function openLatest(client: SessionOpener, choose: (sessionId: stri
   return openNew(client, choose);
 }
 
+/** Attach to `sessionId`, chosen in the switcher. */
+export async function openOne(
+  client: SessionOpener,
+  sessionId: string,
+  choose: (sessionId: string) => void,
+): Promise<string> {
+  choose(sessionId);
+  await client.attachSession(sessionId);
+  return sessionId;
+}
+
 /** Create a session and attach to it. */
 export async function openNew(client: SessionOpener, choose: (sessionId: string) => void): Promise<string> {
   const { session_id: sessionId } = await client.createSession();

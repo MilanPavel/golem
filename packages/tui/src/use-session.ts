@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import type { GolemClient } from "@golem/client";
 
-import { openLatest, openNew } from "./session-open.ts";
+import { openLatest, openNew, openOne } from "./session-open.ts";
 
 export type SessionCallbacks = {
   /** The TUI now follows `sessionId`. Clear what belonged to the previous one. */
@@ -15,6 +15,8 @@ export type SessionHandle = {
   readonly ref: RefObject<string | null>;
   /** Leave the current session and start a fresh one. */
   startNew: () => void;
+  /** Leave the current session and follow `sessionId`. */
+  switchTo: (sessionId: string) => void;
 };
 
 /**
@@ -67,5 +69,14 @@ export function useSession(client: GolemClient, connected: boolean, callbacks: S
     void open(openNew);
   }, [open]);
 
-  return { id, ref, startNew };
+  const switchTo = useCallback(
+    (sessionId: string) => {
+      if (sessionId !== ref.current) {
+        void open((opener, choose) => openOne(opener, sessionId, choose));
+      }
+    },
+    [open],
+  );
+
+  return { id, ref, startNew, switchTo };
 }

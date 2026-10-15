@@ -33,11 +33,9 @@ class _Chat:
         self.runtime = runtime
         self.events = EventLog(database)
         self.runs = RunRecords(database)
+        records = SessionRecords(database)
         self.manager = SessionManager(
-            runtime,
-            SessionLog(self.events, EventBus()),
-            SessionRecords(database),
-            self.runs,
+            runtime, SessionLog(self.events, EventBus(), records), records, self.runs
         )
 
     async def streamed(self, run_id: str, text: str) -> None:

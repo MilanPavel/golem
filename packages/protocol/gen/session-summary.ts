@@ -12,7 +12,8 @@ export type UpdatedAt = string;
  * One session as ``session.list`` reports it.
  *
  * ``status`` is ``running`` while a run is open. ``last_seq`` is the newest
- * stored event, so a client can tell what it has not seen.
+ * stored event, so a client can tell what it has not seen, and which of
+ * two summaries of one session is newer.
  */
 export interface SessionSummary {
   created_at: CreatedAt;

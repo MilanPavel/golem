@@ -14,8 +14,9 @@ from typing import Protocol
 
 from pydantic import BaseModel
 
+from golem_protocol.commands import SessionSummary
 from golem_protocol.events import ChatEvent
-from golem_protocol.rpc import RpcNotification
+from golem_protocol.rpc import RpcNotification, SessionSummaryNotification
 
 log = logging.getLogger("golem.server")
 
@@ -59,6 +60,10 @@ class ClientConnection:
     def deliver(self, event: ChatEvent) -> None:
         """Queue one event notification. Same errors as :meth:`enqueue`."""
         self.enqueue(RpcNotification(params=event))
+
+    def deliver_summary(self, summary: SessionSummary) -> None:
+        """Queue one ``session.summary`` notification. Same errors as :meth:`enqueue`."""
+        self.enqueue(SessionSummaryNotification(params=summary))
 
     def enqueue(self, model: BaseModel) -> None:
         """Queue one frame.
