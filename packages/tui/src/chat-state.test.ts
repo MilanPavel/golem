@@ -5,6 +5,7 @@ import type { ChatEvent } from "@golem/client";
 
 import {
   appendDelta,
+  forkPoint,
   CANCELLED_NOTICE,
   SHUTDOWN_NOTICE,
   createDeltaBatcher,
@@ -238,4 +239,18 @@ test("run.cancelled ends the run and keeps the interrupted reply", () => {
     data: { reason: "shutdown" },
   });
   assert.equal(stopped.notice, SHUTDOWN_NOTICE);
+});
+
+test("forkPoint is the newest finished message with something stored", () => {
+  const message = (id: string, streaming: boolean, text = "x", interrupted = false) => ({
+    id,
+    role: "assistant" as const,
+    text,
+    streaming,
+    interrupted,
+  });
+  assert.equal(forkPoint([]), null);
+  assert.equal(forkPoint([message("m_1", false), message("m_2", true)]), "m_1");
+  assert.equal(forkPoint([message("m_1", false), message("m_2", false, "", true)]), "m_1");
+  assert.equal(forkPoint([message("m_1", false), message("m_2", false, "Hel", true)]), "m_2");
 });

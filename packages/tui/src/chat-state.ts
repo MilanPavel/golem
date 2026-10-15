@@ -31,6 +31,20 @@ export const emptyChat: ChatState = {
 export const CANCELLED_NOTICE = "cancelled";
 export const SHUTDOWN_NOTICE = "the daemon stopped, so the run was cancelled";
 
+/**
+ * The newest message `/fork` can cut at: finished, and not an interrupted
+ * reply with no text, which the checkpoint never stored.
+ */
+export function forkPoint(messages: readonly ChatMessage[]): string | null {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message !== undefined && !message.streaming && !(message.interrupted === true && message.text === "")) {
+      return message.id;
+    }
+  }
+  return null;
+}
+
 export function reduceChat(state: ChatState, event: ChatEvent): ChatState {
   switch (event.type) {
     case "session.created":

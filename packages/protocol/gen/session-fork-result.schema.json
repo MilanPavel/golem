@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "The new session's id.",
+  "properties": {
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "session_id"
+  ],
+  "title": "SessionForkResult",
+  "type": "object"
+}

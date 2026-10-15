@@ -6,6 +6,7 @@ import { RpcError, SESSION_NOT_FOUND, type ConnectionState, type GolemClient, ty
 import {
   createDeltaBatcher,
   emptyChat,
+  forkPoint,
   reduceChat,
   type ChatState,
   type DeltaBatcher,
@@ -56,6 +57,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   const [switcher, setSwitcher] = useState<SwitcherState>(closedSwitcher);
   const draftRef = useRef(draft);
   const busyRef = useRef(chat.busy);
+  const chatRef = useRef(chat);
   const runIdRef = useRef(chat.runId);
   const interrupt = useRef(idleInterrupt);
   const { exit } = useApp();
@@ -68,6 +70,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   const debugLines = useRef(0);
   draftRef.current = draft;
   busyRef.current = chat.busy;
+  chatRef.current = chat;
   runIdRef.current = chat.runId;
   connectionRef.current = connection;
   debugRef.current = debug;
@@ -264,6 +267,11 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       session.startNew();
       return;
     }
+    if (outcome.kind === "fork") {
+      setDraft("");
+      forkHere();
+      return;
+    }
     if (outcome.kind === "title") {
       setDraft("");
       retitle(outcome.title);
@@ -325,6 +333,27 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
     void client.cancelRun(action.runId).catch((error: unknown) => {
       setChat((current) => ({ ...current, notice: null, error: messageOf(error) }));
     });
+  }
+
+  function forkHere(): void {
+    const current = sessionRef.current;
+    const at = forkPoint(chatRef.current.messages);
+    if (at === null) {
+      setChat((state) => ({ ...state, notice: "nothing to fork yet" }));
+      return;
+    }
+    if (current === null || connectionRef.current.status !== "connected") {
+      return;
+    }
+    void client.forkSession(current, at).then(
+      (result) => {
+        session.switchTo(result.session_id);
+        setChat((state) => ({ ...state, notice: "forked; this is the new session" }));
+      },
+      (error: unknown) => {
+        setChat((state) => ({ ...state, error: messageOf(error) }));
+      },
+    );
   }
 
   function retitle(title: string | null): void {

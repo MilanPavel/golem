@@ -7,6 +7,28 @@
       "title": "EmptyEventData",
       "type": "object"
     },
+    "ForkedFrom": {
+      "additionalProperties": false,
+      "description": "The session and message a fork was copied from.",
+      "properties": {
+        "message_id": {
+          "minLength": 1,
+          "title": "Message Id",
+          "type": "string"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "session_id",
+        "message_id"
+      ],
+      "title": "ForkedFrom",
+      "type": "object"
+    },
     "MessageCompletedData": {
       "additionalProperties": false,
       "description": "Full text of a user or assistant message.\n\n``interrupted`` is true when the run stopped before the model finished.\n``text`` is then what had streamed so far.",
@@ -430,8 +452,19 @@
     },
     "SessionCreatedData": {
       "additionalProperties": false,
-      "description": "Profile stored for a new session.\n\n``model_provider`` and ``model_name`` are set when this profile is the\none the daemon is configured to run. They are null for any other profile,\nand when the provider or name is not configured.",
+      "description": "Profile stored for a new session.\n\n``model_provider`` and ``model_name`` are set when this profile is the\none the daemon is configured to run. They are null for any other profile,\nand when the provider or name is not configured. ``forked_from`` is set\non a session made by ``session.fork``.",
       "properties": {
+        "forked_from": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ForkedFrom"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "model_name": {
           "anyOf": [
             {

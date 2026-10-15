@@ -47,7 +47,7 @@ export function resultDetail(method: string, result: unknown): string {
   if (method === "message.send" && typeof result["run_id"] === "string") {
     return result["run_id"];
   }
-  if (method === "session.create" && typeof result["session_id"] === "string") {
+  if ((method === "session.create" || method === "session.fork") && typeof result["session_id"] === "string") {
     return result["session_id"];
   }
   if (method === "session.rename" && typeof result["title"] === "string") {
@@ -105,6 +105,10 @@ function eventDetail(type: string, seq: string, data: Record<string, unknown> | 
     const model = [name, profile].filter((part) => part.length > 0).join(" · ");
     if (model.length > 0) {
       parts.push(model);
+    }
+    const parent = isRecord(data["forked_from"]) ? data["forked_from"]["session_id"] : undefined;
+    if (typeof parent === "string") {
+      parts.push(`fork of ${parent}`);
     }
   }
   return parts.join("  ");

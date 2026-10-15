@@ -23,6 +23,8 @@ from golem_protocol.commands import (
     SessionCreateResult,
     SessionDetachParams,
     SessionDetachResult,
+    SessionForkParams,
+    SessionForkResult,
     SessionInspectParams,
     SessionInspectResult,
     SessionListParams,
@@ -33,6 +35,7 @@ from golem_protocol.commands import (
 )
 from golem_protocol.events import (
     EmptyEventData,
+    ForkedFrom,
     MessageCompletedData,
     MessageCompletedEvent,
     MessageDeltaData,
@@ -85,6 +88,9 @@ MODELS: tuple[type[BaseModel], ...] = (
     SessionListResult,
     SessionRenameParams,
     SessionRenameResult,
+    SessionForkParams,
+    SessionForkResult,
+    ForkedFrom,
     SessionCreatedData,
     SessionCreatedEvent,
     SessionUpdatedData,

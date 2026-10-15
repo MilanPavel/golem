@@ -13,6 +13,7 @@ from golem.models.router import ModelConfigError
 from golem.server.dispatcher import (
     INTERNAL_ERROR,
     INVALID_PARAMS,
+    MESSAGE_NOT_FOUND,
     MODEL_NOT_CONFIGURED,
     PROTOCOL_MISMATCH,
     RUN_NOT_FOUND,
@@ -24,6 +25,7 @@ from golem.server.dispatcher import (
 )
 from golem.sessions.manager import (
     BlankTitleError,
+    MessageNotFoundError,
     RunNotFoundError,
     SchemaMismatchError,
     SessionBusyError,
@@ -47,6 +49,8 @@ from golem_protocol.commands import (
     SessionCreateResult,
     SessionDetachParams,
     SessionDetachResult,
+    SessionForkParams,
+    SessionForkResult,
     SessionInspectParams,
     SessionInspectResult,
     SessionListParams,
@@ -140,6 +144,18 @@ async def _session_list(ctx: RequestContext, params: SessionListParams) -> Sessi
     return SessionListResult(sessions=[summarize(item) for item in found])
 
 
+async def _session_fork(ctx: RequestContext, params: SessionForkParams) -> SessionForkResult:
+    try:
+        session_id = await _sessions(ctx).fork(params.session_id, params.at_message_id)
+    except MessageNotFoundError as exc:
+        raise RpcCallError(MESSAGE_NOT_FOUND, "message not found") from exc
+    except SessionNotFoundError as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
+    except SchemaMismatchError as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, str(exc)) from exc
+    return SessionForkResult(session_id=session_id)
+
+
 async def _session_rename(ctx: RequestContext, params: SessionRenameParams) -> SessionRenameResult:
     try:
         title = await _sessions(ctx).rename(params.session_id, params.title)
@@ -214,6 +230,7 @@ def standard_methods() -> dict[str, Method]:
         "session.attach": Method("session.attach", SessionAttachParams, True, _session_attach),
         "session.detach": Method("session.detach", SessionDetachParams, True, _session_detach),
         "session.list": Method("session.list", SessionListParams, True, _session_list),
+        "session.fork": Method("session.fork", SessionForkParams, True, _session_fork),
         "session.rename": Method("session.rename", SessionRenameParams, True, _session_rename),
         "message.send": Method("message.send", MessageSendParams, True, _message_send),
         "run.cancel": Method("run.cancel", RunCancelParams, True, _run_cancel),

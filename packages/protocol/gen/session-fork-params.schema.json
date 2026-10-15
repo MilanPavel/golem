@@ -1,0 +1,22 @@
+{
+  "additionalProperties": false,
+  "description": "``session.fork``. A new session with this one's history up to ``at_message_id``.\n\nThe source may be running: the fork reads completed checkpoints. The\ncaller is not attached to the new session.",
+  "properties": {
+    "at_message_id": {
+      "minLength": 1,
+      "title": "At Message Id",
+      "type": "string"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "session_id",
+    "at_message_id"
+  ],
+  "title": "SessionForkParams",
+  "type": "object"
+}

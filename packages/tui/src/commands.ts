@@ -20,6 +20,7 @@ export type ComposerOutcome =
   | { kind: "send"; text: string; debug: DebugState }
   | { kind: "sessions" }
   | { kind: "new" }
+  | { kind: "fork" }
   | { kind: "title"; title: string | null }
   | {
       kind: "local";
@@ -41,6 +42,7 @@ const COMMANDS: readonly Command[] = [
   { name: "/debug", run: debugCommand },
   { name: "/sessions", run: withoutArgs({ kind: "sessions" }) },
   { name: "/new", run: withoutArgs({ kind: "new" }) },
+  { name: "/fork", run: withoutArgs({ kind: "fork" }) },
   { name: "/title", run: (_debug, args) => ({ kind: "title", title: args.length === 0 ? null : args.join(" ") }) },
 ];
 

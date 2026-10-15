@@ -1,0 +1,22 @@
+{
+  "additionalProperties": false,
+  "description": "The session and message a fork was copied from.",
+  "properties": {
+    "message_id": {
+      "minLength": 1,
+      "title": "Message Id",
+      "type": "string"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "session_id",
+    "message_id"
+  ],
+  "title": "ForkedFrom",
+  "type": "object"
+}

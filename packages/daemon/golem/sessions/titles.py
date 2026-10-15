@@ -68,6 +68,16 @@ async def choose_title(
     return clean_title(proposed) or clean_title(prompt) or "untitled"
 
 
+_FORK_SUFFIX = " (fork)"
+
+
+def fork_title(title: str) -> str:
+    """``title (fork)``, with ``title`` cut so the whole fits in 60 characters."""
+    room = TITLE_MAX_CHARS - len(_FORK_SUFFIX)
+    base = title if len(title) <= room else title[: room - 1].rstrip() + "…"
+    return base + _FORK_SUFFIX
+
+
 def clean_title(text: str) -> str:
     """The first non-blank line, unquoted, one space between words, at most 60 chars.
 
@@ -87,4 +97,5 @@ __all__ = [
     "TitleGenerator",
     "choose_title",
     "clean_title",
+    "fork_title",
 ]

@@ -13,7 +13,8 @@ An Architecture Decision Record (ADR) is a short note of one choice: what was de
 | [007](007-attach-and-fan-out.md) | A connection sees only the sessions it attached | accepted | 2026-10-14 |
 | [008](008-cancellation.md) | A cancelled run keeps what it said | accepted | 2026-10-14 |
 | [009](009-session-list.md) | The session list has its own notification | accepted | 2026-10-15 |
+| [010](010-fork.md) | A fork is cut from the checkpoint history | accepted | 2026-10-15 |
 
 How the running code fits together is in [../architecture.md](../architecture.md).
 
-New records use [template.md](template.md). Number the next file `010-….md` and add a row here.
+New records use [template.md](template.md). Number the next file `011-….md` and add a row here.

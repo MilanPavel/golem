@@ -7,6 +7,7 @@ import type { Params as ChatEvent } from "../../protocol/gen/rpc-notification.ts
 import type { RunCancelResult } from "../../protocol/gen/run-cancel-result.ts";
 import type { SessionAttachResult } from "../../protocol/gen/session-attach-result.ts";
 import type { SessionCreateResult } from "../../protocol/gen/session-create-result.ts";
+import type { SessionForkResult } from "../../protocol/gen/session-fork-result.ts";
 import type { SessionInspectResult } from "../../protocol/gen/session-inspect-result.ts";
 import type { SessionListResult, SessionSummary } from "../../protocol/gen/session-list-result.ts";
 import type { SessionRenameResult } from "../../protocol/gen/session-rename-result.ts";
@@ -23,6 +24,7 @@ import {
   isRunCancelResult,
   isSessionAttachResult,
   isSessionCreateResult,
+  isSessionForkResult,
   isSessionInspectResult,
   isSessionListResult,
   isSessionRenameResult,
@@ -36,6 +38,7 @@ export const SESSION_NOT_FOUND = -32003;
 export const SESSION_BUSY = -32004;
 export const MODEL_NOT_CONFIGURED = -32005;
 export const RUN_NOT_FOUND = -32006;
+export const MESSAGE_NOT_FOUND = -32007;
 
 export type { ChatEvent, SessionSummary };
 const DEFAULT_HEARTBEAT_MS = 5_000;
@@ -93,6 +96,11 @@ export interface GolemClient {
    * lists and watches again by itself. Merge with `mergeSummary`.
    */
   watchSessions(limit?: number): Promise<void>;
+  /**
+   * Copy a session's history up to `atMessageId` into a new session. Its events
+   * arrive only after {@link GolemClient.attachSession}.
+   */
+  forkSession(sessionId: string, atMessageId: string): Promise<SessionForkResult>;
   /** Set the title by hand. Resolves with the title as stored: one line, at most 60 characters. */
   renameSession(sessionId: string, title: string): Promise<SessionRenameResult>;
   sendMessage(sessionId: string, text: string): Promise<MessageSendResult>;
@@ -529,6 +537,14 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       watchLimit = limit;
       watching = true;
       await watch(limit);
+    },
+    async forkSession(sessionId: string, atMessageId: string): Promise<SessionForkResult> {
+      await ready;
+      const result = await call("session.fork", { session_id: sessionId, at_message_id: atMessageId });
+      if (!isSessionForkResult(result)) {
+        throw new Error("invalid session.fork result");
+      }
+      return result;
     },
     async renameSession(sessionId: string, title: string): Promise<SessionRenameResult> {
       await ready;

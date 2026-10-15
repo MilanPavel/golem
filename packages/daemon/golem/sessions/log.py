@@ -73,6 +73,10 @@ class SessionLog:
         self._bus.watch(target)
         return await self._records.recent(limit)
 
+    async def stored(self, session_id: str) -> list[ChatEvent]:
+        """Every stored event of ``session_id``, in order."""
+        return await self._events.after(session_id, 0)
+
     def detach(self, session_id: str, target: EventTarget) -> None:
         self._bus.unsubscribe(session_id, target)
 

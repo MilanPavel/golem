@@ -22,10 +22,18 @@ from golem_protocol.events import (
 async def project(tx: Transaction, event: ChatEvent) -> None:
     """Apply ``event`` to the projected tables."""
     if isinstance(event, SessionCreatedEvent):
+        parent = event.data.forked_from
         await tx.execute(
-            "INSERT INTO sessions (session_id, model_profile, created_at, updated_at)"
-            " VALUES (?, ?, ?, ?)",
-            (event.session_id, event.data.model_profile, event.ts, event.ts),
+            "INSERT INTO sessions (session_id, model_profile, created_at, updated_at,"
+            " forked_from_session_id, forked_from_message_id) VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                event.session_id,
+                event.data.model_profile,
+                event.ts,
+                event.ts,
+                None if parent is None else parent.session_id,
+                None if parent is None else parent.message_id,
+            ),
         )
         return
     if isinstance(event, SessionUpdatedEvent):

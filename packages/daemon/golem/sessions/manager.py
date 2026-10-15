@@ -22,9 +22,15 @@ from golem.sessions.bus import EventTarget, SummaryTarget
 from golem.sessions.ids import new_id
 from golem.sessions.log import SessionLog
 from golem.sessions.runner import CancelReason, RunControl, Turn, run_turn
-from golem.sessions.titles import TitleGenerator, choose_title, clean_title
+from golem.sessions.titles import TitleGenerator, choose_title, clean_title, fork_title
 from golem.store.records import RunRecords, SessionActivity, SessionRecords
-from golem_protocol.events import SessionCreatedData, SessionUpdatedData
+from golem_protocol.events import (
+    ChatEvent,
+    ForkedFrom,
+    MessageCompletedEvent,
+    SessionCreatedData,
+    SessionUpdatedData,
+)
 
 log = logging.getLogger("golem.sessions")
 
@@ -39,6 +45,10 @@ class SessionBusyError(Exception):
 
 class BlankTitleError(Exception):
     """Nothing is left of the title once it is cleaned."""
+
+
+class MessageNotFoundError(Exception):
+    """The session has no completed message with this id to fork at."""
 
 
 class RunNotFoundError(Exception):
@@ -114,6 +124,40 @@ class SessionManager:
             await self._announce(session)
             self._sessions[session.session_id] = session
             return session.session_id
+
+    async def fork(self, session_id: str, at_message_id: str) -> str:
+        """A new session with ``session_id``'s history up to ``at_message_id``.
+
+        The new thread starts from the checkpoint that ends at that message.
+        Its log gets the parent's ``message.completed`` events up to it, with
+        their original ``run_id`` and new ``seq``. Nobody is attached yet.
+
+        Raises :class:`MessageNotFoundError`, :class:`SessionNotFoundError`,
+        or :class:`SchemaMismatchError`.
+        """
+        async with self._lock:
+            source = await self._resolve(session_id)
+            history = _completed_through(await self._events.stored(session_id), at_message_id)
+            if history is None:
+                raise MessageNotFoundError(at_message_id)
+            fork = _LiveSession(
+                session_id=new_id("s"),
+                model_profile=source.model_profile,
+                schema_version=SCHEMA_VERSION,
+            )
+            if not await self._runtime.fork(
+                session_id, fork.session_id, at_message_id=at_message_id
+            ):
+                raise MessageNotFoundError(at_message_id)
+            await self._announce(fork, ForkedFrom(session_id=session_id, message_id=at_message_id))
+            for event in history:
+                await self._events.emit(
+                    fork.session_id, event.run_id, "message.completed", event.data
+                )
+            if source.title is not None:
+                await self._set_title(fork, fork_title(source.title))
+            self._sessions[fork.session_id] = fork
+            return fork.session_id
 
     async def attach(self, session_id: str, after_seq: int, target: EventTarget) -> int:
         """Replay events after ``after_seq`` to ``target``, then stream live ones.
@@ -298,7 +342,7 @@ class SessionManager:
         self._sessions[session_id] = session
         return session
 
-    async def _announce(self, session: _LiveSession) -> None:
+    async def _announce(self, session: _LiveSession, forked_from: ForkedFrom | None = None) -> None:
         chosen = self._runtime.router.identity(session.model_profile)
         await self._events.emit(
             session.session_id,
@@ -308,6 +352,7 @@ class SessionManager:
                 model_profile=session.model_profile,
                 model_provider=chosen.provider,
                 model_name=chosen.name,
+                forked_from=forked_from,
             ),
         )
 
@@ -320,6 +365,19 @@ class SessionManager:
         _report(task, "title task failed")
 
 
+def _completed_through(
+    events: list[ChatEvent], message_id: str
+) -> list[MessageCompletedEvent] | None:
+    """The completed messages up to and including ``message_id``, or None if it never completed."""
+    completed: list[MessageCompletedEvent] = []
+    for event in events:
+        if isinstance(event, MessageCompletedEvent):
+            completed.append(event)
+            if event.data.message_id == message_id:
+                return completed
+    return None
+
+
 def _report(task: asyncio.Task[None], message: str) -> None:
     if task.cancelled():
         return
@@ -330,6 +388,7 @@ def _report(task: asyncio.Task[None], message: str) -> None:
 
 __all__ = [
     "BlankTitleError",
+    "MessageNotFoundError",
     "RunNotFoundError",
     "SchemaMismatchError",
     "SessionBusyError",

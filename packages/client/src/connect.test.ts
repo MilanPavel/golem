@@ -576,3 +576,26 @@ test("renameSession sends the title and reads the stored one", async () => {
     await server.close();
   }
 });
+
+test("forkSession sends the message id and reads the new session", async () => {
+  const sent: Record<string, unknown>[] = [];
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: { "session.fork": { session_id: "s_fork" } },
+      onRequest: (_socket, method, params) => {
+        if (method === "session.fork") {
+          sent.push(params);
+        }
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    assert.deepEqual(await client.forkSession("s_test", "m_a"), { session_id: "s_fork" });
+    assert.deepEqual(sent, [{ session_id: "s_test", at_message_id: "m_a" }]);
+  } finally {
+    client.close();
+    await server.close();
+  }
+});

@@ -1,12 +1,13 @@
 """The chat graph: ``START → call_model → END``.
 
 Checkpoint messages carry the protocol ``message_id`` as their LangChain
-``id``, so the event log and the checkpoint name the same message.
+``id``, so the event log and the checkpoint name the same message. A fork
+uses those ids to find where to cut a thread's history.
 """
 
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator, Awaitable, Callable, Mapping
+from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable, Mapping
 from contextlib import aclosing
 from typing import Protocol, cast
 
@@ -41,6 +42,8 @@ class _RunningGraph(Protocol):
     ) -> AsyncGenerator[object]: ...
 
     async def aget_state(self, config: RunnableConfig) -> _Checkpoint: ...
+
+    def aget_state_history(self, config: RunnableConfig) -> AsyncIterator[_Checkpoint]: ...
 
     async def aupdate_state(
         self,
@@ -150,6 +153,23 @@ class ChatRuntime:
             as_node="call_model",
         )
         return True
+
+    async def fork(self, source_id: str, target_id: str, *, at_message_id: str) -> bool:
+        """Start ``target_id`` with ``source_id``'s state as it was at ``at_message_id``.
+
+        Reads the newest checkpoint whose last message has that id, so it
+        works while ``source_id`` is running, and leaves the source untouched.
+        Returns False when no checkpoint ends there.
+        """
+        async for snapshot in self._graph.aget_state_history(self._config(source_id)):
+            messages = _messages(snapshot.values)
+            if messages and messages[-1].id == at_message_id:
+                values = {**snapshot.values, "messages": messages, "session_id": target_id}
+                await self._graph.aupdate_state(
+                    self._config(target_id), values, as_node="call_model"
+                )
+                return True
+        return False
 
     def _config(self, session_id: str) -> RunnableConfig:
         return {"configurable": {"thread_id": session_id}}

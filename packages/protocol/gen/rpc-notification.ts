@@ -12,63 +12,65 @@ export type Params =
   | RunCompletedEvent
   | RunFailedEvent
   | RunCancelledEvent;
+export type MessageId = string;
+export type SessionId = string;
 export type ModelName = string | null;
 export type ModelProfile = string;
 export type ModelProvider = string | null;
 export type RunId = null;
 export type Seq = number;
-export type SessionId = string;
+export type SessionId1 = string;
 export type Ts = string;
 export type Type = 'session.created';
 export type Title = string;
 export type RunId1 = null;
 export type Seq1 = number;
-export type SessionId1 = string;
+export type SessionId2 = string;
 export type Ts1 = string;
 export type Type1 = 'session.updated';
-export type MessageId = string;
+export type MessageId1 = string;
 export type Role = 'assistant';
 export type RunId2 = string;
 export type Seq2 = number;
-export type SessionId2 = string;
+export type SessionId3 = string;
 export type Ts2 = string;
 export type Type2 = 'message.started';
-export type MessageId1 = string;
+export type MessageId2 = string;
 export type Text = string;
 export type RunId3 = string;
 export type Seq3 = number;
-export type SessionId3 = string;
+export type SessionId4 = string;
 export type Ts3 = string;
 export type Type3 = 'message.delta';
 export type Interrupted = boolean;
-export type MessageId2 = string;
+export type MessageId3 = string;
 export type Role1 = 'user' | 'assistant';
 export type Text1 = string;
 export type RunId4 = string;
 export type Seq4 = number;
-export type SessionId4 = string;
+export type SessionId5 = string;
 export type Ts4 = string;
 export type Type4 = 'message.completed';
 export type RunId5 = string;
 export type Seq5 = number;
-export type SessionId5 = string;
+export type SessionId6 = string;
 export type Ts5 = string;
 export type Type5 = 'run.started';
 export type RunId6 = string;
 export type Seq6 = number;
-export type SessionId6 = string;
+export type SessionId7 = string;
 export type Ts6 = string;
 export type Type6 = 'run.completed';
 export type Message = string;
 export type RunId7 = string;
 export type Seq7 = number;
-export type SessionId7 = string;
+export type SessionId8 = string;
 export type Ts7 = string;
 export type Type7 = 'run.failed';
 export type Reason = 'user' | 'shutdown';
 export type RunId8 = string;
 export type Seq8 = number;
-export type SessionId8 = string;
+export type SessionId9 = string;
 export type Ts8 = string;
 export type Type8 = 'run.cancelled';
 
@@ -90,7 +92,7 @@ export interface SessionCreatedEvent {
   data: SessionCreatedData;
   run_id: RunId;
   seq: Seq;
-  session_id: SessionId;
+  session_id: SessionId1;
   ts: Ts;
   type: Type;
 }
@@ -99,15 +101,27 @@ export interface SessionCreatedEvent {
  *
  * ``model_provider`` and ``model_name`` are set when this profile is the
  * one the daemon is configured to run. They are null for any other profile,
- * and when the provider or name is not configured.
+ * and when the provider or name is not configured. ``forked_from`` is set
+ * on a session made by ``session.fork``.
  *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "SessionCreatedData".
  */
 export interface SessionCreatedData {
+  forked_from?: ForkedFrom | null;
   model_name?: ModelName;
   model_profile: ModelProfile;
   model_provider?: ModelProvider;
+}
+/**
+ * The session and message a fork was copied from.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "ForkedFrom".
+ */
+export interface ForkedFrom {
+  message_id: MessageId;
+  session_id: SessionId;
 }
 /**
  * The session got a title. ``run_id`` is null: no run owns the change.
@@ -119,7 +133,7 @@ export interface SessionUpdatedEvent {
   data: SessionUpdatedData;
   run_id: RunId1;
   seq: Seq1;
-  session_id: SessionId1;
+  session_id: SessionId2;
   ts: Ts1;
   type: Type1;
 }
@@ -142,7 +156,7 @@ export interface MessageStartedEvent {
   data: MessageStartedData;
   run_id: RunId2;
   seq: Seq2;
-  session_id: SessionId2;
+  session_id: SessionId3;
   ts: Ts2;
   type: Type2;
 }
@@ -153,7 +167,7 @@ export interface MessageStartedEvent {
  * via the `definition` "MessageStartedData".
  */
 export interface MessageStartedData {
-  message_id: MessageId;
+  message_id: MessageId1;
   role: Role;
 }
 /**
@@ -166,7 +180,7 @@ export interface MessageDeltaEvent {
   data: MessageDeltaData;
   run_id: RunId3;
   seq: Seq3;
-  session_id: SessionId3;
+  session_id: SessionId4;
   ts: Ts3;
   type: Type3;
 }
@@ -177,7 +191,7 @@ export interface MessageDeltaEvent {
  * via the `definition` "MessageDeltaData".
  */
 export interface MessageDeltaData {
-  message_id: MessageId1;
+  message_id: MessageId2;
   text: Text;
 }
 /**
@@ -190,7 +204,7 @@ export interface MessageCompletedEvent {
   data: MessageCompletedData;
   run_id: RunId4;
   seq: Seq4;
-  session_id: SessionId4;
+  session_id: SessionId5;
   ts: Ts4;
   type: Type4;
 }
@@ -205,7 +219,7 @@ export interface MessageCompletedEvent {
  */
 export interface MessageCompletedData {
   interrupted?: Interrupted;
-  message_id: MessageId2;
+  message_id: MessageId3;
   role: Role1;
   text: Text1;
 }
@@ -219,7 +233,7 @@ export interface RunStartedEvent {
   data: EmptyEventData;
   run_id: RunId5;
   seq: Seq5;
-  session_id: SessionId5;
+  session_id: SessionId6;
   ts: Ts5;
   type: Type5;
 }
@@ -240,7 +254,7 @@ export interface RunCompletedEvent {
   data: EmptyEventData;
   run_id: RunId6;
   seq: Seq6;
-  session_id: SessionId6;
+  session_id: SessionId7;
   ts: Ts6;
   type: Type6;
 }
@@ -254,7 +268,7 @@ export interface RunFailedEvent {
   data: RunFailedData;
   run_id: RunId7;
   seq: Seq7;
-  session_id: SessionId7;
+  session_id: SessionId8;
   ts: Ts7;
   type: Type7;
 }
@@ -277,7 +291,7 @@ export interface RunCancelledEvent {
   data: RunCancelledData;
   run_id: RunId8;
   seq: Seq8;
-  session_id: SessionId8;
+  session_id: SessionId9;
   ts: Ts8;
   type: Type8;
 }

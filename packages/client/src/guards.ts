@@ -6,6 +6,7 @@ import type { Params as ChatEvent } from "../../protocol/gen/rpc-notification.ts
 import type { RunCancelResult } from "../../protocol/gen/run-cancel-result.ts";
 import type { SessionAttachResult } from "../../protocol/gen/session-attach-result.ts";
 import type { SessionCreateResult } from "../../protocol/gen/session-create-result.ts";
+import type { SessionForkResult } from "../../protocol/gen/session-fork-result.ts";
 import type { SessionInspectResult } from "../../protocol/gen/session-inspect-result.ts";
 import type { SessionListResult, SessionSummary } from "../../protocol/gen/session-list-result.ts";
 import type { SessionRenameResult } from "../../protocol/gen/session-rename-result.ts";
@@ -52,6 +53,10 @@ export function asChatEvent(value: unknown): ChatEvent | undefined {
 }
 
 export function isSessionCreateResult(value: unknown): value is SessionCreateResult {
+  return isRecord(value) && typeof value["session_id"] === "string";
+}
+
+export function isSessionForkResult(value: unknown): value is SessionForkResult {
   return isRecord(value) && typeof value["session_id"] === "string";
 }
 

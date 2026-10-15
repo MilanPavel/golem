@@ -89,10 +89,10 @@ Built today:
 - `session.attach`. A client gets the stored events after the last `seq` it saw, then the live ones. Any number of clients can follow one session. The TUI opens the newest session at startup. [ADR-007](adr/007-attach-and-fan-out.md) is that choice.
 - `run.cancel`, and Ctrl-C in the TUI. A cancelled answer keeps what it said. [ADR-008](adr/008-cancellation.md).
 - Titles, a live session list, and the TUI switcher (`/sessions`, `/new`, `/title`). [ADR-009](adr/009-session-list.md).
+- `session.fork` and `/fork`. A new session with the history up to one message. [ADR-010](adr/010-fork.md).
 
 Planned next:
 
-- Fork.
 - Flows, tool permissions, skills, and long-term memory in `memory.db`.
 
 ## The daemon
@@ -248,9 +248,9 @@ Each event line is one JSON-RPC 2.0 notification. The fields that matter:
 
 | Commands | Events |
 |---|---|
-| `hello`, `ping`, `daemon.status`, `session.create`, `session.attach`, `session.detach`, `session.list`, `session.rename`, `message.send`, `run.cancel`, `session.inspect` | `session.created`, `message.started`, `message.delta`, `message.completed`, `run.started`, `run.completed`, `run.failed`, `run.cancelled`, `session.updated`; `session.summary` to watchers |
+| `hello`, `ping`, `daemon.status`, `session.create`, `session.attach`, `session.detach`, `session.list`, `session.rename`, `session.fork`, `message.send`, `run.cancel`, `session.inspect` | `session.created`, `message.started`, `message.delta`, `message.completed`, `run.started`, `run.completed`, `run.failed`, `run.cancelled`, `session.updated`; `session.summary` to watchers |
 
-After `hello`, a client sends `ping` every few seconds so a half-open socket is noticed. `daemon.status` returns the pid, uptime, and configured model. A new chat sends `session.create`, then `session.attach` with `after_seq` 0, then `message.send`. `session.list` returns sessions newest activity first, each with `idle` or `running`, its title, and its last `seq`. With `watch: true`, the connection also gets a `session.summary` after every change to any session, until it closes. `session.rename` sets a title by hand. `session.detach` stops one session's events. `session.inspect` reads the saved checkpoint messages and does not call the model.
+After `hello`, a client sends `ping` every few seconds so a half-open socket is noticed. `daemon.status` returns the pid, uptime, and configured model. A new chat sends `session.create`, then `session.attach` with `after_seq` 0, then `message.send`. `session.list` returns sessions newest activity first, each with `idle` or `running`, its title, and its last `seq`. With `watch: true`, the connection also gets a `session.summary` after every change to any session, until it closes. `session.rename` sets a title by hand. `session.fork` copies a session's history up to one message into a new session, and the client attaches to it. `session.detach` stops one session's events. `session.inspect` reads the saved checkpoint messages and does not call the model.
 
 ### Why a protocol package
 
@@ -294,7 +294,7 @@ sequenceDiagram
 
 `message.send` only answers that a run started. Your line appears when `message.completed` comes back, and the draft is already cleared. If the send fails, the draft returns and the banner turns red. If the code is `SESSION_NOT_FOUND` (`-32003`), the screen puts the draft back, then creates and attaches to a new session.
 
-`/sessions` shows every session in place of the transcript: a green dot while a run is open, the title, and how long ago it was active. Up and down move, Enter attaches, `n` starts a new session, and Esc closes. `/new` starts a new session directly. `/title <name>` renames the current session, and `/title` alone shows its title. The other session keeps running in the daemon. The slash commands are one table in `commands.ts`, and any other `/word` is an unknown command.
+`/sessions` shows every session in place of the transcript: a green dot while a run is open, the title, and how long ago it was active. Up and down move, Enter attaches, `n` starts a new session, and Esc closes. `/new` starts a new session directly. `/title <name>` renames the current session, and `/title` alone shows its title. `/fork` copies this session up to its newest finished message into a new session and switches to it. The other session keeps running in the daemon. The slash commands are one table in `commands.ts`, and any other `/word` is an unknown command.
 
 `/debug` opens a panel. `/debug wire` and `/debug model` pick a tab. `/debug hold` keeps the next line on the screen and does not send it. `/debug go` sends that held line. Esc closes the panel. Tab swaps the tab.
 

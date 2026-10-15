@@ -20,12 +20,22 @@ class Ping(BaseModel):
     nonce: str
 
 
+class ForkedFrom(BaseModel):
+    """The session and message a fork was copied from."""
+
+    model_config = _CONFIG
+
+    session_id: str = Field(min_length=1)
+    message_id: str = Field(min_length=1)
+
+
 class SessionCreatedData(BaseModel):
     """Profile stored for a new session.
 
     ``model_provider`` and ``model_name`` are set when this profile is the
     one the daemon is configured to run. They are null for any other profile,
-    and when the provider or name is not configured.
+    and when the provider or name is not configured. ``forked_from`` is set
+    on a session made by ``session.fork``.
     """
 
     model_config = _CONFIG
@@ -33,6 +43,7 @@ class SessionCreatedData(BaseModel):
     model_profile: str = Field(min_length=1)
     model_provider: str | None = Field(default=None, min_length=1)
     model_name: str | None = Field(default=None, min_length=1)
+    forked_from: ForkedFrom | None = None
 
 
 class MessageStartedData(BaseModel):
@@ -251,6 +262,7 @@ __all__ = [
     "ChatEvent",
     "EmptyEventData",
     "EventType",
+    "ForkedFrom",
     "MessageCompletedData",
     "MessageCompletedEvent",
     "MessageDeltaData",

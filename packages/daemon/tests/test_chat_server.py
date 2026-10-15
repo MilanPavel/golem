@@ -14,6 +14,7 @@ from golem.config import GolemSettings
 from golem.models.router import ModelRouter
 from golem.server.dispatcher import (
     INVALID_PARAMS,
+    MESSAGE_NOT_FOUND,
     MODEL_NOT_CONFIGURED,
     RUN_NOT_FOUND,
     SESSION_BUSY,
@@ -550,6 +551,41 @@ async def test_rename_sets_the_title_a_watcher_sees(short_home: Path) -> None:
         assert error_code(blank) == INVALID_PARAMS
         missing = await client.call("session.rename", {"session_id": "s_missing", "title": "x"})
         assert error_code(missing) == SESSION_NOT_FOUND
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+
+
+async def test_fork_returns_a_session_whose_replay_is_the_copied_history(short_home: Path) -> None:
+    app, task = await start_daemon(
+        short_home, router=ModelRouter(model=ScriptedChatModel(replies=["Hi"]))
+    )
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        source = await _open(client)
+        await client.call("message.send", {"session_id": source, "text": "hello"})
+        await client.wait_for_event("run.completed")
+        reply = _event_data(client.events[-2])
+        assert reply["role"] == "assistant"
+
+        missing = await client.call("session.fork", {"session_id": source, "at_message_id": "m_x"})
+        assert error_code(missing) == MESSAGE_NOT_FOUND
+        forked = rpc_result(
+            await client.call(
+                "session.fork", {"session_id": source, "at_message_id": reply["message_id"]}
+            )
+        )
+        fork = forked["session_id"]
+        assert isinstance(fork, str) and fork != source
+
+        before = len(client.events)
+        await _attach(client, fork)
+        replay = (await client.take_events())[before:]
+        assert _event_types(replay) == ["session.created", "message.completed", "message.completed"]
+        assert _completed_text(replay, "assistant") == ["Hi"]
+        created = _event_data(replay[0])
+        assert created["forked_from"] == {"session_id": source, "message_id": reply["message_id"]}
     finally:
         await client.close()
         await stop_daemon(app, task)

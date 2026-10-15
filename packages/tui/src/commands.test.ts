@@ -122,3 +122,8 @@ test("/title takes the rest of the line as the name, or nothing to show it", () 
   assert.deepEqual(applyComposer(closedDebug, "/title  Trip   plans "), { kind: "title", title: "Trip plans" });
   assert.deepEqual(applyComposer(closedDebug, "/title"), { kind: "title", title: null });
 });
+
+test("/fork takes no arguments", () => {
+  assert.deepEqual(applyComposer(closedDebug, "/fork"), { kind: "fork" });
+  assert.equal(applyComposer(closedDebug, "/fork here").kind, "unknown");
+});
