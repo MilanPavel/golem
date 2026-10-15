@@ -1,30 +1,20 @@
 /** Pixel mark. Two pixel rows share a cell; a split cell is `▀` with both colors. */
 
 const ART = [
-  ".......lbbs.......",
-  ".....lbbbbbbs.....",
-  ".....lbbddbbs.....",
-  "....lbbbbbbbbs....",
-  "....ldddbbddds....",
-  "....lbddbbddbs....",
-  "....lbbbbbbbbs....",
-  "....lbbbbbbbbs....",
-  "....lbbbbbbbbs....",
-  "..lbbbbbbbbbbbbs..",
-  ".lbbbbbbbbbbbbbbs.",
-  "lbbbbbbbbbbbbbbbbs",
-  "lbbbbbbbbbbbbbbbbs",
-  ".ssssssssssssssss.",
+  "...bbb...",
+  "..bdbdb..",
+  "bbbbbbbbb",
+  "b.bbbbb.b",
+  "b.bbbbb.b",
+  "..bb.bb..",
 ] as const;
 
-export type LogoTone = "highlight" | "body" | "shadow" | "eye";
+export type LogoTone = "body" | "eye";
 
 type Pixel = LogoTone | null;
 
 const TONE: Record<string, LogoTone> = {
-  l: "highlight",
   b: "body",
-  s: "shadow",
   d: "eye",
 };
 
