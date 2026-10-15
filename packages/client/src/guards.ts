@@ -8,6 +8,7 @@ import type { SessionAttachResult } from "../../protocol/gen/session-attach-resu
 import type { SessionCreateResult } from "../../protocol/gen/session-create-result.ts";
 import type { SessionInspectResult } from "../../protocol/gen/session-inspect-result.ts";
 import type { SessionListResult, SessionSummary } from "../../protocol/gen/session-list-result.ts";
+import type { SessionRenameResult } from "../../protocol/gen/session-rename-result.ts";
 
 const EVENT_TYPES = new Set([
   "session.created",
@@ -75,6 +76,10 @@ export function isSessionSummary(value: unknown): value is SessionSummary {
     typeof value["last_seq"] === "number" &&
     (value["title"] === undefined || value["title"] === null || typeof value["title"] === "string")
   );
+}
+
+export function isSessionRenameResult(value: unknown): value is SessionRenameResult {
+  return isRecord(value) && typeof value["title"] === "string";
 }
 
 export function isRunCancelResult(value: unknown): value is RunCancelResult {

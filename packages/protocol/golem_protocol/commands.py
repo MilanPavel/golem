@@ -193,6 +193,23 @@ class RunCancelResult(BaseModel):
     cancelled: bool
 
 
+class SessionRenameParams(BaseModel):
+    """``session.rename``. Set the title by hand. An automatic title never replaces it."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    title: str = Field(min_length=1, max_length=500)
+
+
+class SessionRenameResult(BaseModel):
+    """The title as stored: its first line, at most 60 characters."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    title: str = Field(min_length=1)
+
+
 class SessionInspectParams(BaseModel):
     """``session.inspect``. Read the checkpoint for one session. Does not call the model."""
 
@@ -247,5 +264,7 @@ __all__ = [
     "SessionInspectResult",
     "SessionListParams",
     "SessionListResult",
+    "SessionRenameParams",
+    "SessionRenameResult",
     "SessionSummary",
 ]

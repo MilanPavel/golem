@@ -13,7 +13,7 @@ from golem.graphs.chat import open_chat
 from golem.models.router import ModelRouter
 from golem.sessions.bus import EventBus
 from golem.sessions.log import SessionLog
-from golem.sessions.manager import SessionManager
+from golem.sessions.manager import BlankTitleError, SessionManager, SessionNotFoundError
 from golem.sessions.titles import (
     TITLE_MAX_CHARS,
     ModelTitles,
@@ -40,6 +40,19 @@ class _Titles:
         if isinstance(proposal, Exception):
             raise proposal
         return proposal
+
+
+class _Gated:
+    def __init__(self, proposal: str) -> None:
+        self.proposal = proposal
+        self.asked = asyncio.Event()
+        self.release = asyncio.Event()
+
+    async def title(self, model_profile: str, prompt: str, reply: str) -> str:
+        del model_profile, prompt, reply
+        self.asked.set()
+        await self.release.wait()
+        return self.proposal
 
 
 class _Never:
@@ -174,3 +187,43 @@ async def test_shutdown_cancels_a_title_still_being_chosen(database: Database) -
     await manager.cancel_all()
 
     assert await _titled(events, session_id) == []
+
+
+async def test_rename_stores_the_cleaned_title(database: Database) -> None:
+    manager, events = _manager(database, ScriptedChatModel(replies=[]), None)
+    session_id = await manager.create(None)
+
+    assert await manager.rename(session_id, '  "Trip plans."\nsecond line') == "Trip plans"
+
+    assert await _titled(events, session_id) == ["Trip plans"]
+    record = await SessionRecords(database).get(session_id)
+    assert record is not None
+    assert record.title == "Trip plans"
+
+
+async def test_rename_rejects_a_blank_title_and_a_missing_session(database: Database) -> None:
+    manager, _ = _manager(database, ScriptedChatModel(replies=[]), None)
+    session_id = await manager.create(None)
+    with pytest.raises(BlankTitleError):
+        await manager.rename(session_id, " \n ")
+    with pytest.raises(SessionNotFoundError):
+        await manager.rename("s_missing", "Name")
+
+
+async def test_a_title_set_by_hand_wins_over_one_being_chosen(database: Database) -> None:
+    titles = _Gated("Automatic")
+    manager, events = _manager(database, ScriptedChatModel(replies=["Hi", "Again"]), titles)
+    session_id = await manager.create(None)
+    await manager.send(session_id, "hello")
+    await asyncio.wait_for(titles.asked.wait(), timeout=2)
+
+    await manager.rename(session_id, "Mine")
+    titles.release.set()
+    second = await manager.send(session_id, "more")
+
+    async def ended() -> bool:
+        return any(event.type == "run.completed" for event in await events.for_run(second))
+
+    await _until(ended)
+    await manager.cancel_all()
+    assert await _titled(events, session_id) == ["Mine"]

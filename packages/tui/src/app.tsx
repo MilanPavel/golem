@@ -264,6 +264,11 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       session.startNew();
       return;
     }
+    if (outcome.kind === "title") {
+      setDraft("");
+      retitle(outcome.title);
+      return;
+    }
     if (outcome.kind === "local") {
       showDebug(outcome.debug);
       setDraft(outcome.restore ?? "");
@@ -320,6 +325,26 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
     void client.cancelRun(action.runId).catch((error: unknown) => {
       setChat((current) => ({ ...current, notice: null, error: messageOf(error) }));
     });
+  }
+
+  function retitle(title: string | null): void {
+    const current = sessionRef.current;
+    if (title === null) {
+      const known = sessionsRef.current.find((summary) => summary.session_id === current)?.title;
+      setChat((state) => ({ ...state, notice: titleNotice(known ?? null) }));
+      return;
+    }
+    if (current === null || connectionRef.current.status !== "connected") {
+      return;
+    }
+    void client.renameSession(current, title).then(
+      (result) => {
+        setChat((state) => ({ ...state, error: null, notice: titleNotice(result.title) }));
+      },
+      (error: unknown) => {
+        setChat((state) => ({ ...state, error: messageOf(error) }));
+      },
+    );
   }
 
   function onSwitcherKey(key: SwitcherKey): void {
@@ -595,6 +620,10 @@ function LineView({ line }: { line: LayoutLine }) {
       ))}
     </Text>
   );
+}
+
+function titleNotice(title: string | null): string {
+  return title === null ? "this session has no title yet; /title <name> sets one" : `title: ${title}`;
 }
 
 function switcherKey(input: string, key: Key): SwitcherKey | null {

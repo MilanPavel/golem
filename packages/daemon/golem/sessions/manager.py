@@ -22,7 +22,7 @@ from golem.sessions.bus import EventTarget, SummaryTarget
 from golem.sessions.ids import new_id
 from golem.sessions.log import SessionLog
 from golem.sessions.runner import CancelReason, RunControl, Turn, run_turn
-from golem.sessions.titles import TitleGenerator, choose_title
+from golem.sessions.titles import TitleGenerator, choose_title, clean_title
 from golem.store.records import RunRecords, SessionActivity, SessionRecords
 from golem_protocol.events import SessionCreatedData, SessionUpdatedData
 
@@ -35,6 +35,10 @@ class SessionNotFoundError(Exception):
 
 class SessionBusyError(Exception):
     """A run is already in progress for this session."""
+
+
+class BlankTitleError(Exception):
+    """Nothing is left of the title once it is cleaned."""
 
 
 class RunNotFoundError(Exception):
@@ -151,6 +155,20 @@ class SessionManager:
                 messages=plain_messages(values),
             )
 
+    async def rename(self, session_id: str, title: str) -> str:
+        """Set the title by hand. Returns it cleaned.
+
+        Raises :class:`BlankTitleError`, :class:`SessionNotFoundError`, or
+        :class:`SchemaMismatchError`.
+        """
+        cleaned = clean_title(title)
+        if cleaned == "":
+            raise BlankTitleError(session_id)
+        async with self._lock:
+            session = await self._resolve(session_id)
+            await self._set_title(session, cleaned)
+        return cleaned
+
     def configured_model(self) -> ModelIdentity:
         """The model ``daemon.status`` reports for this process."""
         return self._runtime.router.identity()
@@ -242,12 +260,17 @@ class SessionManager:
             title = await choose_title(
                 titles, model_profile=session.model_profile, prompt=prompt, reply=reply
             )
-            await self._events.emit(
-                session.session_id, None, "session.updated", SessionUpdatedData(title=title)
-            )
-            session.title = title
+            async with self._lock:
+                if session.title is None:
+                    await self._set_title(session, title)
         finally:
             session.titling = False
+
+    async def _set_title(self, session: _LiveSession, title: str) -> None:
+        await self._events.emit(
+            session.session_id, None, "session.updated", SessionUpdatedData(title=title)
+        )
+        session.title = title
 
     async def _resolve(self, session_id: str) -> _LiveSession:
         existing = self._sessions.get(session_id)
@@ -306,6 +329,7 @@ def _report(task: asyncio.Task[None], message: str) -> None:
 
 
 __all__ = [
+    "BlankTitleError",
     "RunNotFoundError",
     "SchemaMismatchError",
     "SessionBusyError",

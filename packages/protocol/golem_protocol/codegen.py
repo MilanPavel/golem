@@ -27,6 +27,8 @@ from golem_protocol.commands import (
     SessionInspectResult,
     SessionListParams,
     SessionListResult,
+    SessionRenameParams,
+    SessionRenameResult,
     SessionSummary,
 )
 from golem_protocol.events import (
@@ -81,6 +83,8 @@ MODELS: tuple[type[BaseModel], ...] = (
     SessionListParams,
     SessionSummary,
     SessionListResult,
+    SessionRenameParams,
+    SessionRenameResult,
     SessionCreatedData,
     SessionCreatedEvent,
     SessionUpdatedData,

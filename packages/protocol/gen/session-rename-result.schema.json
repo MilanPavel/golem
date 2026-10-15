@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "The title as stored: its first line, at most 60 characters.",
+  "properties": {
+    "title": {
+      "minLength": 1,
+      "title": "Title",
+      "type": "string"
+    }
+  },
+  "required": [
+    "title"
+  ],
+  "title": "SessionRenameResult",
+  "type": "object"
+}

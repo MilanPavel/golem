@@ -50,6 +50,9 @@ export function resultDetail(method: string, result: unknown): string {
   if (method === "session.create" && typeof result["session_id"] === "string") {
     return result["session_id"];
   }
+  if (method === "session.rename" && typeof result["title"] === "string") {
+    return flat(result["title"]);
+  }
   if (method === "run.cancel" && typeof result["cancelled"] === "boolean") {
     return result["cancelled"] ? "cancelled" : "already ended";
   }

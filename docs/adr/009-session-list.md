@@ -19,7 +19,9 @@ A session gets a title once, after its first completed run. The title is an even
 
 After a session's first completed run, the manager starts a task that asks for a title. It is a separate task, so the session can take the next message while the title is chosen. `golem/sessions/titles.py` asks the session's own model, outside the graph, with a 20 s limit. The result is cut to its first line and 60 characters. If the call fails, times out, or returns nothing, the title is the first line the user wrote. The task emits `session.updated {title}`, and the projection writes `sessions.title`. A title still being chosen at shutdown is cancelled, and the next completed run tries again. `session_titles = false` in the config turns this off, and no title is set.
 
-In the TUI, `/sessions` replaces the transcript with the list. Up and down move, Enter attaches, `n` starts a new session, and Esc closes. `/new` starts a new session directly. A running session has a green dot. The slash commands are one table in `commands.ts`.
+`session.rename {session_id, title}` sets a title by hand, cleaned the same way, and returns it. It emits the same `session.updated`. A blank title is `-32602`. The manager lock orders a rename against an automatic title still being chosen. Whichever lands first is kept, and an automatic title never replaces one that is already set. In the TUI, `/title <name>` renames the current session and `/title` alone shows its title.
+
+`/sessions` replaces the transcript with the list. Up and down move, Enter attaches, `n` starts a new session, and Esc closes. `/new` starts a new session directly. A running session has a green dot. The slash commands are one table in `commands.ts`.
 
 ## Other shapes that lost
 
@@ -39,4 +41,4 @@ Watching has no stop command. Closing the connection stops it. The TUI watches f
 
 Titles use the session's model until phase 6 adds a cheap profile, so each new session costs one extra model call.
 
-Protocol minor `2` adds `watch`, `session.summary`, and `session.updated`. A `2.1` client never asks to watch, and its `asChatEvent` drops `session.updated`.
+Protocol minor `2` adds `watch`, `session.summary`, and `session.updated`. Minor `3` adds `session.rename`. A `2.1` client never asks to watch, and its `asChatEvent` drops `session.updated`.

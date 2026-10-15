@@ -1,0 +1,23 @@
+{
+  "additionalProperties": false,
+  "description": "``session.rename``. Set the title by hand. An automatic title never replaces it.",
+  "properties": {
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    },
+    "title": {
+      "maxLength": 500,
+      "minLength": 1,
+      "title": "Title",
+      "type": "string"
+    }
+  },
+  "required": [
+    "session_id",
+    "title"
+  ],
+  "title": "SessionRenameParams",
+  "type": "object"
+}

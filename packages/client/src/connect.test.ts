@@ -553,3 +553,26 @@ test("watchSessions reports the list, each change, and watches again after a rec
     await server.close();
   }
 });
+
+test("renameSession sends the title and reads the stored one", async () => {
+  const sent: Record<string, unknown>[] = [];
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: { "session.rename": { title: "Plans" } },
+      onRequest: (_socket, method, params) => {
+        if (method === "session.rename") {
+          sent.push(params);
+        }
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    assert.deepEqual(await client.renameSession("s_test", "Plans."), { title: "Plans" });
+    assert.deepEqual(sent, [{ session_id: "s_test", title: "Plans." }]);
+  } finally {
+    client.close();
+    await server.close();
+  }
+});

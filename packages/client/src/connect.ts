@@ -9,6 +9,7 @@ import type { SessionAttachResult } from "../../protocol/gen/session-attach-resu
 import type { SessionCreateResult } from "../../protocol/gen/session-create-result.ts";
 import type { SessionInspectResult } from "../../protocol/gen/session-inspect-result.ts";
 import type { SessionListResult, SessionSummary } from "../../protocol/gen/session-list-result.ts";
+import type { SessionRenameResult } from "../../protocol/gen/session-rename-result.ts";
 import { PROTOCOL_MAJOR, PROTOCOL_MINOR } from "../../protocol/gen/version.ts";
 import { Attachments } from "./attachments.ts";
 import { backoffDelayMs } from "./backoff.ts";
@@ -24,6 +25,7 @@ import {
   isSessionCreateResult,
   isSessionInspectResult,
   isSessionListResult,
+  isSessionRenameResult,
   isSessionSummary,
 } from "./guards.ts";
 import { pushWire, type WireFrame, type WireLine } from "./wire.ts";
@@ -91,6 +93,8 @@ export interface GolemClient {
    * lists and watches again by itself. Merge with `mergeSummary`.
    */
   watchSessions(limit?: number): Promise<void>;
+  /** Set the title by hand. Resolves with the title as stored: one line, at most 60 characters. */
+  renameSession(sessionId: string, title: string): Promise<SessionRenameResult>;
   sendMessage(sessionId: string, text: string): Promise<MessageSendResult>;
   /** Stop a run. Resolves after `run.cancelled` is in the log; `cancelled` is false when it had ended. */
   cancelRun(runId: string): Promise<RunCancelResult>;
@@ -525,6 +529,14 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       watchLimit = limit;
       watching = true;
       await watch(limit);
+    },
+    async renameSession(sessionId: string, title: string): Promise<SessionRenameResult> {
+      await ready;
+      const result = await call("session.rename", { session_id: sessionId, title });
+      if (!isSessionRenameResult(result)) {
+        throw new Error("invalid session.rename result");
+      }
+      return result;
     },
     async sendMessage(sessionId: string, text: string): Promise<MessageSendResult> {
       await ready;

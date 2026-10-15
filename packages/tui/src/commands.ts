@@ -20,6 +20,7 @@ export type ComposerOutcome =
   | { kind: "send"; text: string; debug: DebugState }
   | { kind: "sessions" }
   | { kind: "new" }
+  | { kind: "title"; title: string | null }
   | {
       kind: "local";
       debug: DebugState;
@@ -40,6 +41,7 @@ const COMMANDS: readonly Command[] = [
   { name: "/debug", run: debugCommand },
   { name: "/sessions", run: withoutArgs({ kind: "sessions" }) },
   { name: "/new", run: withoutArgs({ kind: "new" }) },
+  { name: "/title", run: (_debug, args) => ({ kind: "title", title: args.length === 0 ? null : args.join(" ") }) },
 ];
 
 export function toggleDebugTab(debug: DebugState): DebugState {

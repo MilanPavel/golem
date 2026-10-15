@@ -13,6 +13,7 @@ from test_server import HELLO, RpcClient, error_code, rpc_result, start_daemon, 
 from golem.config import GolemSettings
 from golem.models.router import ModelRouter
 from golem.server.dispatcher import (
+    INVALID_PARAMS,
     MODEL_NOT_CONFIGURED,
     RUN_NOT_FOUND,
     SESSION_BUSY,
@@ -526,4 +527,29 @@ async def test_a_watcher_follows_every_session_without_attaching(short_home: Pat
     finally:
         await watcher.close()
         await sender.close()
+        await stop_daemon(app, task)
+
+
+async def test_rename_sets_the_title_a_watcher_sees(short_home: Path) -> None:
+    app, task = await start_daemon(
+        short_home, router=ModelRouter(model=ScriptedChatModel(replies=[]))
+    )
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        session_id = await _open(client)
+        await client.call("session.list", {"watch": True})
+
+        renamed = await client.call("session.rename", {"session_id": session_id, "title": "Plans."})
+        assert rpc_result(renamed) == {"title": "Plans"}
+        await _summaries_until(client, lambda found: any(s.get("title") == "Plans" for s in found))
+        updated = await client.wait_for_event("session.updated")
+        assert _event_data(updated) == {"title": "Plans"}
+
+        blank = await client.call("session.rename", {"session_id": session_id, "title": " "})
+        assert error_code(blank) == INVALID_PARAMS
+        missing = await client.call("session.rename", {"session_id": "s_missing", "title": "x"})
+        assert error_code(missing) == SESSION_NOT_FOUND
+    finally:
+        await client.close()
         await stop_daemon(app, task)

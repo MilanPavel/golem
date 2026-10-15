@@ -117,3 +117,8 @@ test("/sessions and /new are commands without arguments", () => {
   assert.equal(applyComposer(closedDebug, "/new now").kind, "unknown");
   assert.equal(applyComposer(closedDebug, "/session").kind, "unknown");
 });
+
+test("/title takes the rest of the line as the name, or nothing to show it", () => {
+  assert.deepEqual(applyComposer(closedDebug, "/title  Trip   plans "), { kind: "title", title: "Trip plans" });
+  assert.deepEqual(applyComposer(closedDebug, "/title"), { kind: "title", title: null });
+});
