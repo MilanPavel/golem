@@ -39,6 +39,6 @@ A summary repeats every field even when one changed. The rows are small, and the
 
 Watching has no stop command. Closing the connection stops it. The TUI watches for as long as it runs.
 
-Titles use the session's model until phase 6 adds a cheap profile, so each new session costs one extra model call.
+Titles use the session's model until plan step 7.3 adds a cheap profile, so each new session costs one extra model call.
 
 Protocol minor `2` adds `watch`, `session.summary`, and `session.updated`. Minor `3` adds `session.rename`. A `2.1` client never asks to watch, and its `asChatEvent` drops `session.updated`.
