@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import sqlite3
 from collections.abc import Callable
 from pathlib import Path
 from typing import cast
@@ -394,6 +395,88 @@ async def test_attach_to_a_missing_session_is_not_found(short_home: Path) -> Non
     finally:
         await client.close()
         await stop_daemon(app, task)
+
+
+async def test_close_hides_the_session_after_a_restart(short_home: Path) -> None:
+    app, task = await start_daemon(
+        short_home, router=ModelRouter(model=ScriptedChatModel(replies=["ok"]))
+    )
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        closed_id = await _open(client)
+        kept_id = await _open(client)
+        await client.call("message.send", {"session_id": closed_id, "text": "remember this"})
+        await client.wait_for_event("run.completed")
+
+        closed = rpc_result(await client.call("session.close", {"session_id": closed_id}))
+        assert closed["session_id"] == closed_id
+        await client.wait_for_event("session.closed")
+        listed = rpc_result(await client.call("session.list", {}))
+        assert _session_ids(listed) == [kept_id]
+        again = rpc_result(await client.call("session.close", {"session_id": closed_id}))
+        assert again["session_id"] == closed_id
+        missing = await client.call("message.send", {"session_id": closed_id, "text": "no"})
+        assert error_code(missing) == SESSION_NOT_FOUND
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+
+    restarted, restarted_task = await start_daemon(
+        short_home, router=ModelRouter(model=ScriptedChatModel(replies=["ok"]))
+    )
+    again_client = await RpcClient.connect(restarted.paths.socket_path)
+    try:
+        await again_client.call("hello", HELLO)
+        listed = rpc_result(await again_client.call("session.list", {}))
+        assert _session_ids(listed) == [kept_id]
+        with sqlite3.connect(restarted.paths.database_file) as raw:
+            rows = raw.execute(
+                "SELECT type FROM events WHERE session_id = ? ORDER BY seq",
+                (closed_id,),
+            ).fetchall()
+        assert "session.created" in [row[0] for row in rows]
+        assert "session.closed" in [row[0] for row in rows]
+        assert "message.completed" in [row[0] for row in rows]
+    finally:
+        await again_client.close()
+        await stop_daemon(restarted, restarted_task)
+
+
+async def test_close_cancels_a_run_in_progress(short_home: Path) -> None:
+    model = GatedChatModel()
+    app, task = await start_daemon(short_home, router=ModelRouter(model=model))
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        session_id = await _open(client)
+        await client.call("message.send", {"session_id": session_id, "text": "hi"})
+        await model.started.wait()
+        closed = rpc_result(await client.call("session.close", {"session_id": session_id}))
+        assert closed["session_id"] == session_id
+        await client.wait_for_event("run.cancelled")
+        await client.wait_for_event("session.closed")
+        listed = rpc_result(await client.call("session.list", {}))
+        assert _session_ids(listed) == []
+    finally:
+        model.release.set()
+        await client.close()
+        await stop_daemon(app, task)
+
+
+def _session_ids(listed: dict[str, object]) -> list[str]:
+    found: list[str] = []
+    sessions = listed.get("sessions")
+    if not isinstance(sessions, list):
+        return found
+    for item in sessions:
+        record = _record(item)
+        if record is None:
+            continue
+        session_id = record.get("session_id")
+        if isinstance(session_id, str):
+            found.append(session_id)
+    return found
 
 
 async def test_list_puts_recent_activity_first(short_home: Path) -> None:

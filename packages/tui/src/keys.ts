@@ -1,4 +1,5 @@
 import { type EditOp } from "./edit.ts";
+import { type SwitcherKey } from "./switcher.ts";
 
 /** Where a binding applies. The overlay groups rows by these names. */
 export type KeyContext = "composer" | "transcript" | "switcher" | "debug";
@@ -7,6 +8,7 @@ export const KEY_CONTEXTS: readonly KeyContext[] = ["composer", "transcript", "s
 
 export type PressName =
   | "ctrl-c"
+  | "ctrl-d"
   | "f1"
   | "question"
   | "escape"
@@ -64,6 +66,10 @@ export type KeyPlace = {
   overlay: boolean;
   help: boolean;
   switcher: boolean;
+  /** Ctrl-D has asked before closing the selected session. */
+  switcherConfirm: boolean;
+  /** The switcher filter has at least one letter. */
+  switcherFiltering: boolean;
   debug: boolean;
   draftEmpty: boolean;
   busy: boolean;
@@ -84,7 +90,7 @@ export type KeyEffect =
   | { kind: "scroll"; target: "debug" | "transcript"; toward: ScrollToward }
   | { kind: "close-debug" }
   | { kind: "debug-tab" }
-  | { kind: "switcher"; key: "up" | "down" | "enter" | "new" | "close" }
+  | { kind: "switcher"; key: SwitcherKey }
   | { kind: "suggest"; key: "up" | "down" | "tab" | "enter" | "close" }
   | { kind: "history"; key: "older" | "newer" | "close" }
   | { kind: "submit" }
@@ -99,6 +105,8 @@ type KeyWhen = {
   overlay?: boolean;
   help?: boolean;
   switcher?: boolean;
+  switcherConfirm?: boolean;
+  switcherFiltering?: boolean;
   debug?: boolean;
   draftEmpty?: boolean;
   busy?: boolean;
@@ -274,11 +282,57 @@ export const KEYS: readonly KeyBinding[] = [
     run: () => ({ kind: "close-help" }),
   },
   {
+    id: "switcher-confirm",
+    label: "y",
+    contexts: ["switcher"],
+    description: "Closes the selected session.",
+    when: { input: "y", overlay: false, switcher: true, switcherConfirm: true },
+    run: () => ({ kind: "switcher", key: "confirm" }),
+  },
+  {
+    id: "switcher-disarm",
+    label: "Esc",
+    contexts: ["switcher"],
+    description: "Cancels closing a session.",
+    when: { name: "escape", overlay: false, switcher: true, switcherConfirm: true },
+    run: () => ({ kind: "switcher", key: "disarm" }),
+  },
+  {
+    id: "switcher-arm",
+    label: "Ctrl-D",
+    contexts: ["switcher"],
+    description: "Asks before closing the selected session.",
+    when: { name: "ctrl-d", overlay: false, switcher: true, switcherConfirm: false },
+    run: () => ({ kind: "switcher", key: "arm" }),
+  },
+  {
+    id: "switcher-backspace",
+    label: "Backspace",
+    contexts: ["switcher"],
+    description: "Deletes the last letter of the filter.",
+    when: { name: "backspace", overlay: false, switcher: true, switcherConfirm: false },
+    run: () => ({ kind: "switcher", key: "backspace" }),
+  },
+  {
+    id: "switcher-clear",
+    label: "Esc",
+    contexts: ["switcher"],
+    description: "Clears the filter.",
+    when: {
+      name: "escape",
+      overlay: false,
+      switcher: true,
+      switcherConfirm: false,
+      switcherFiltering: true,
+    },
+    run: () => ({ kind: "switcher", key: "clear-query" }),
+  },
+  {
     id: "switcher-up",
     label: "Up",
     contexts: ["switcher"],
     description: "Moves the selection up.",
-    when: { name: "up", overlay: false, switcher: true },
+    when: { name: "up", overlay: false, switcher: true, switcherConfirm: false },
     run: () => ({ kind: "switcher", key: "up" }),
   },
   {
@@ -286,7 +340,7 @@ export const KEYS: readonly KeyBinding[] = [
     label: "Down",
     contexts: ["switcher"],
     description: "Moves the selection down.",
-    when: { name: "down", overlay: false, switcher: true },
+    when: { name: "down", overlay: false, switcher: true, switcherConfirm: false },
     run: () => ({ kind: "switcher", key: "down" }),
   },
   {
@@ -294,7 +348,7 @@ export const KEYS: readonly KeyBinding[] = [
     label: "Enter",
     contexts: ["switcher"],
     description: "Opens the selected session.",
-    when: { name: "return", overlay: false, switcher: true },
+    when: { name: "return", overlay: false, switcher: true, switcherConfirm: false },
     run: () => ({ kind: "switcher", key: "enter" }),
   },
   {
@@ -302,7 +356,7 @@ export const KEYS: readonly KeyBinding[] = [
     label: "n",
     contexts: ["switcher"],
     description: "Starts a new session.",
-    when: { input: "n", overlay: false, switcher: true },
+    when: { input: "n", overlay: false, switcher: true, switcherConfirm: false, switcherFiltering: false },
     run: () => ({ kind: "switcher", key: "new" }),
   },
   {
@@ -310,7 +364,14 @@ export const KEYS: readonly KeyBinding[] = [
     label: "Esc",
     contexts: ["switcher"],
     description: "Closes the switcher.",
-    when: { name: "escape", overlay: false, help: false, switcher: true },
+    when: {
+      name: "escape",
+      overlay: false,
+      help: false,
+      switcher: true,
+      switcherConfirm: false,
+      switcherFiltering: false,
+    },
     run: () => ({ kind: "switcher", key: "close" }),
   },
   {
@@ -421,6 +482,17 @@ export function pressKey(place: KeyPlace, press: Press): KeyEffect {
     return binding.run(place);
   }
   if (
+    place.switcher &&
+    !place.switcherConfirm &&
+    !place.overlay &&
+    press.input.length === 1 &&
+    !press.ctrl &&
+    !press.meta &&
+    press.name === null
+  ) {
+    return { kind: "switcher", key: { kind: "type", text: press.input } };
+  }
+  if (
     press.input.length > 0 &&
     !press.ctrl &&
     !press.meta &&
@@ -438,6 +510,9 @@ export function classifyPress(input: string, key: KeyFlags): Press {
   const press: Press = { name: null, input, ctrl: key.ctrl, meta: key.meta };
   if (key.ctrl && input === "c") {
     return { ...press, name: "ctrl-c" };
+  }
+  if (key.ctrl && input === "d") {
+    return { ...press, name: "ctrl-d" };
   }
   if (key.ctrl && !key.meta) {
     const named = ctrlName(input);
@@ -555,6 +630,12 @@ function whenMatches(when: KeyWhen, place: KeyPlace, press: Press): boolean {
     return false;
   }
   if (when.switcher !== undefined && when.switcher !== place.switcher) {
+    return false;
+  }
+  if (when.switcherConfirm !== undefined && when.switcherConfirm !== place.switcherConfirm) {
+    return false;
+  }
+  if (when.switcherFiltering !== undefined && when.switcherFiltering !== place.switcherFiltering) {
     return false;
   }
   if (when.debug !== undefined && when.debug !== place.debug) {

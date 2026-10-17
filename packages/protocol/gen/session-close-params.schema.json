@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "``session.close``. Hide the session from ``session.list``.\n\nIts events stay in the log. A run still in progress is cancelled first.\nClosing a session that is already closed is not an error.",
+  "properties": {
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "session_id"
+  ],
+  "title": "SessionCloseParams",
+  "type": "object"
+}

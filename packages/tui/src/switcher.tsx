@@ -1,6 +1,6 @@
 import { Box, Text } from "ink";
 
-import { NO_SESSIONS, SWITCHER_HINT, type SwitcherRow } from "./switcher.ts";
+import { type SwitcherRow } from "./switcher.ts";
 import { CLAY } from "./theme.ts";
 
 /** The session list in place of the transcript. The first line is the key hint. */
@@ -8,17 +8,21 @@ export function SwitcherView({
   rows,
   columns,
   height,
+  hint,
+  empty,
 }: {
   rows: readonly SwitcherRow[];
   columns: number;
   height: number;
+  hint: string;
+  empty: string;
 }) {
   return (
     <Box flexDirection="column" width={columns} height={height} flexShrink={0} overflow="hidden">
       <Text dimColor wrap="truncate-end">
-        {`Sessions  ${SWITCHER_HINT}`}
+        {`Sessions  ${hint}`}
       </Text>
-      {rows.length === 0 ? <Text dimColor>{NO_SESSIONS}</Text> : null}
+      {rows.length === 0 ? <Text dimColor>{empty}</Text> : null}
       {rows.map((row) => {
         const pad = " ".repeat(Math.max(1, columns - row.title.length - row.age.length - 5));
         return (

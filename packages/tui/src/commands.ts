@@ -23,6 +23,7 @@ export type ComposerOutcome =
   | { kind: "new" }
   | { kind: "fork" }
   | { kind: "title"; title: string | null }
+  | { kind: "close-session" }
   | { kind: "copy"; code: boolean }
   | { kind: "export"; path: string | null }
   | { kind: "time" }
@@ -48,6 +49,12 @@ const UNKNOWN = "unknown command \u2014 /help lists them";
 
 /** Every slash command. A name not in this table is an unknown command, not a message. */
 export const COMMANDS: readonly Command[] = [
+  {
+    name: "/close",
+    args: "",
+    description: "Closes this session and opens another.",
+    run: withoutArgs({ kind: "close-session" }),
+  },
   {
     name: "/copy",
     args: "[code]",

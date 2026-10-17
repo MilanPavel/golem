@@ -5,6 +5,7 @@ import type { Ping } from "../../protocol/gen/ping.ts";
 import type { Params as ChatEvent } from "../../protocol/gen/rpc-notification.ts";
 import type { RunCancelResult } from "../../protocol/gen/run-cancel-result.ts";
 import type { SessionAttachResult } from "../../protocol/gen/session-attach-result.ts";
+import type { SessionCloseResult } from "../../protocol/gen/session-close-result.ts";
 import type { SessionCreateResult } from "../../protocol/gen/session-create-result.ts";
 import type { SessionForkResult } from "../../protocol/gen/session-fork-result.ts";
 import type { SessionInspectResult } from "../../protocol/gen/session-inspect-result.ts";
@@ -14,6 +15,7 @@ import type { SessionRenameResult } from "../../protocol/gen/session-rename-resu
 const EVENT_TYPES = new Set([
   "session.created",
   "session.updated",
+  "session.closed",
   "message.started",
   "message.delta",
   "message.completed",
@@ -56,6 +58,10 @@ export function isSessionCreateResult(value: unknown): value is SessionCreateRes
   return isRecord(value) && typeof value["session_id"] === "string";
 }
 
+export function isSessionCloseResult(value: unknown): value is SessionCloseResult {
+  return isRecord(value) && typeof value["session_id"] === "string";
+}
+
 export function isSessionForkResult(value: unknown): value is SessionForkResult {
   return isRecord(value) && typeof value["session_id"] === "string";
 }
@@ -75,7 +81,7 @@ export function isSessionSummary(value: unknown): value is SessionSummary {
     isRecord(value) &&
     typeof value["session_id"] === "string" &&
     typeof value["model_profile"] === "string" &&
-    (value["status"] === "idle" || value["status"] === "running") &&
+    (value["status"] === "idle" || value["status"] === "running" || value["status"] === "closed") &&
     typeof value["created_at"] === "string" &&
     typeof value["updated_at"] === "string" &&
     typeof value["last_seq"] === "number" &&

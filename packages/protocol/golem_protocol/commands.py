@@ -129,7 +129,8 @@ class SessionListParams(BaseModel):
 class SessionSummary(BaseModel):
     """One session as ``session.list`` reports it.
 
-    ``status`` is ``running`` while a run is open. ``last_seq`` is the newest
+    ``status`` is ``running`` while a run is open, and ``closed`` after
+    ``session.close``. ``last_seq`` is the newest
     stored event, so a client can tell what it has not seen, and which of
     two summaries of one session is newer.
     """
@@ -139,7 +140,7 @@ class SessionSummary(BaseModel):
     session_id: str = Field(min_length=1)
     model_profile: str = Field(min_length=1)
     title: str | None = Field(default=None, min_length=1)
-    status: Literal["idle", "running"]
+    status: Literal["idle", "running", "closed"]
     created_at: str = Field(min_length=1)
     updated_at: str = Field(min_length=1)
     last_seq: int = Field(ge=0)
@@ -191,6 +192,26 @@ class RunCancelResult(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     cancelled: bool
+
+
+class SessionCloseParams(BaseModel):
+    """``session.close``. Hide the session from ``session.list``.
+
+    Its events stay in the log. A run still in progress is cancelled first.
+    Closing a session that is already closed is not an error.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+
+
+class SessionCloseResult(BaseModel):
+    """The session that is now hidden."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
 
 
 class SessionRenameParams(BaseModel):
@@ -277,6 +298,8 @@ __all__ = [
     "RunCancelResult",
     "SessionAttachParams",
     "SessionAttachResult",
+    "SessionCloseParams",
+    "SessionCloseResult",
     "SessionCreateParams",
     "SessionCreateResult",
     "SessionDetachParams",

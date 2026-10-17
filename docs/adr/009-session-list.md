@@ -21,7 +21,7 @@ After a session's first completed run, the manager starts a task that asks for a
 
 `session.rename {session_id, title}` sets a title by hand, cleaned the same way, and returns it. It emits the same `session.updated`. A blank title is `-32602`. The manager lock orders a rename against an automatic title still being chosen. Whichever lands first is kept, and an automatic title never replaces one that is already set. In the TUI, `/title <name>` renames the current session and `/title` alone shows its title.
 
-`/sessions` replaces the transcript with the list. Up and down move, Enter attaches, `n` starts a new session, and Esc closes. `/new` starts a new session directly. A running session has a green dot. The slash commands are one table in `commands.ts`.
+`/sessions` replaces the transcript with the list. Up and down move, Enter attaches, `n` starts a new session while the filter is empty, and typing narrows the list by title. Ctrl-D asks before closing the selected row; `y` hides that session and the list stays open. Esc clears a filter, cancels that confirm, or closes the list. `/close` hides the current session and opens the newest one still listed, or a new session when it was the last. A running session is cancelled first. `session.closed` sets `closed_at`, `session.list` skips those rows, and a summary with status `closed` drops the row from a watched list. The events stay in the log. `/new` starts a new session directly. A running session has a green dot. The slash commands are one table in `commands.ts`.
 
 ## Other shapes that lost
 
@@ -41,4 +41,4 @@ Watching has no stop command. Closing the connection stops it. The TUI watches f
 
 Titles use the session's model until plan step 7.3 adds a cheap profile, so each new session costs one extra model call.
 
-Protocol minor `2` adds `watch`, `session.summary`, and `session.updated`. Minor `3` adds `session.rename`. A `2.1` client never asks to watch, and its `asChatEvent` drops `session.updated`.
+Protocol minor `2` adds `watch`, `session.summary`, and `session.updated`. Minor `3` adds `session.rename`. Minor `5` adds `session.close`, `session.closed`, and `closed` on a session summary. A `2.1` client never asks to watch, and its `asChatEvent` drops `session.updated`.

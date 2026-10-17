@@ -4,14 +4,15 @@ export type CreatedAt = string;
 export type LastSeq = number;
 export type ModelProfile = string;
 export type SessionId = string;
-export type Status = 'idle' | 'running';
+export type Status = 'idle' | 'running' | 'closed';
 export type Title = string | null;
 export type UpdatedAt = string;
 
 /**
  * One session as ``session.list`` reports it.
  *
- * ``status`` is ``running`` while a run is open. ``last_seq`` is the newest
+ * ``status`` is ``running`` while a run is open, and ``closed`` after
+ * ``session.close``. ``last_seq`` is the newest
  * stored event, so a client can tell what it has not seen, and which of
  * two summaries of one session is newer.
  */

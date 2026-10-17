@@ -155,6 +155,11 @@ test("/copy, /export, and /time stay on this machine", () => {
   assert.equal(applyComposer(closedDebug, "/time on").kind, "unknown");
 });
 
+test("/close takes no arguments", () => {
+  assert.deepEqual(applyComposer(closedDebug, "/close"), { kind: "close-session" });
+  assert.equal(applyComposer(closedDebug, "/close now").kind, "unknown");
+});
+
 test("/fork takes no arguments", () => {
   assert.deepEqual(applyComposer(closedDebug, "/fork"), { kind: "fork" });
   assert.equal(applyComposer(closedDebug, "/fork here").kind, "unknown");

@@ -18,7 +18,7 @@ export interface RunStartedEvent {
   type: Type;
 }
 /**
- * No payload. Used by ``run.started`` and ``run.completed``.
+ * No payload. Used by ``run.started``, ``run.completed``, and ``session.closed``.
  *
  * This interface was referenced by `RunStartedEvent`'s JSON-Schema
  * via the `definition` "EmptyEventData".

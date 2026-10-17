@@ -45,6 +45,8 @@ from golem_protocol.commands import (
     RunCancelResult,
     SessionAttachParams,
     SessionAttachResult,
+    SessionCloseParams,
+    SessionCloseResult,
     SessionCreateParams,
     SessionCreateResult,
     SessionDetachParams,
@@ -156,6 +158,14 @@ async def _session_fork(ctx: RequestContext, params: SessionForkParams) -> Sessi
     return SessionForkResult(session_id=session_id)
 
 
+async def _session_close(ctx: RequestContext, params: SessionCloseParams) -> SessionCloseResult:
+    try:
+        session_id = await _sessions(ctx).close(params.session_id)
+    except SessionNotFoundError as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
+    return SessionCloseResult(session_id=session_id)
+
+
 async def _session_rename(ctx: RequestContext, params: SessionRenameParams) -> SessionRenameResult:
     try:
         title = await _sessions(ctx).rename(params.session_id, params.title)
@@ -231,6 +241,7 @@ def standard_methods() -> dict[str, Method]:
         "session.detach": Method("session.detach", SessionDetachParams, True, _session_detach),
         "session.list": Method("session.list", SessionListParams, True, _session_list),
         "session.fork": Method("session.fork", SessionForkParams, True, _session_fork),
+        "session.close": Method("session.close", SessionCloseParams, True, _session_close),
         "session.rename": Method("session.rename", SessionRenameParams, True, _session_rename),
         "message.send": Method("message.send", MessageSendParams, True, _message_send),
         "run.cancel": Method("run.cancel", RunCancelParams, True, _run_cancel),

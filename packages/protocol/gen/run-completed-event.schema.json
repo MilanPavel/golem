@@ -2,7 +2,7 @@
   "$defs": {
     "EmptyEventData": {
       "additionalProperties": false,
-      "description": "No payload. Used by ``run.started`` and ``run.completed``.",
+      "description": "No payload. Used by ``run.started``, ``run.completed``, and ``session.closed``.",
       "properties": {},
       "title": "EmptyEventData",
       "type": "object"

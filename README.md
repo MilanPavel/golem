@@ -172,6 +172,7 @@ A finished answer shows how long it took, under the text. `/time` shows the time
 | `/export <path>` | Writes that markdown to the path you give |
 | `/time` | Shows or hides the time beside each message |
 | `/sessions` | Opens the session switcher, with live status |
+| `/close` | Closes this session and opens the newest other one |
 | `/new` | Starts a new session |
 | `/title` | Shows the current session's title |
 | `/title <name>` | Renames the current session |
@@ -202,7 +203,7 @@ Type `/` and matching commands appear above the composer. Typing narrows them, p
 | Page Up, Page Down, Home, End, mouse wheel | Scroll the chat. End jumps back to new lines. The same keys scroll the key list while it is open |
 | Up, Down | Move through command suggestions while that list is open |
 | Tab | Fills in the selected command or argument. Also switches the debug tab |
-| Up, Down, Enter, `n`, Esc | Move through the session switcher, open a session, start a new one, close the switcher |
+| Up, Down, Enter, `n`, type, Ctrl-D, Esc | In the session switcher: move, open, start a new session when the filter is empty, filter by title, ask to close the selected session (`y` confirms), or leave. Esc clears a filter, cancels that confirm, or closes the list |
 | Tab | Switches the debug tab |
 | Esc | While recalling, restores the line you had. Then it closes suggestions, the command list, and the debug panel |
 

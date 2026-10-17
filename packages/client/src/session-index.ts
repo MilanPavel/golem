@@ -8,6 +8,9 @@ import type { SessionSummary } from "../../protocol/gen/session-list-result.ts";
  * older copy never replaces a newer one.
  */
 export function mergeSummary(index: readonly SessionSummary[], next: SessionSummary): readonly SessionSummary[] {
+  if (next.status === "closed") {
+    return index.filter((summary) => summary.session_id !== next.session_id);
+  }
   const current = index.find((summary) => summary.session_id === next.session_id);
   if (current !== undefined && current.last_seq > next.last_seq) {
     return index;

@@ -6,6 +6,7 @@ import type { MessageSendResult } from "../../protocol/gen/message-send-result.t
 import type { Params as ChatEvent } from "../../protocol/gen/rpc-notification.ts";
 import type { RunCancelResult } from "../../protocol/gen/run-cancel-result.ts";
 import type { SessionAttachResult } from "../../protocol/gen/session-attach-result.ts";
+import type { SessionCloseResult } from "../../protocol/gen/session-close-result.ts";
 import type { SessionCreateResult } from "../../protocol/gen/session-create-result.ts";
 import type { SessionForkResult } from "../../protocol/gen/session-fork-result.ts";
 import type { SessionInspectResult } from "../../protocol/gen/session-inspect-result.ts";
@@ -23,6 +24,7 @@ import {
   isRecord,
   isRunCancelResult,
   isSessionAttachResult,
+  isSessionCloseResult,
   isSessionCreateResult,
   isSessionForkResult,
   isSessionInspectResult,
@@ -100,6 +102,8 @@ export interface GolemClient {
    * Copy a session's history up to `atMessageId` into a new session. Its events
    * arrive only after {@link GolemClient.attachSession}.
    */
+  /** Hide the session from the list. Its events stay in the log. */
+  closeSession(sessionId: string): Promise<SessionCloseResult>;
   forkSession(sessionId: string, atMessageId: string): Promise<SessionForkResult>;
   /** Set the title by hand. Resolves with the title as stored: one line, at most 60 characters. */
   renameSession(sessionId: string, title: string): Promise<SessionRenameResult>;
@@ -537,6 +541,14 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       watchLimit = limit;
       watching = true;
       await watch(limit);
+    },
+    async closeSession(sessionId: string): Promise<SessionCloseResult> {
+      await ready;
+      const result = await call("session.close", { session_id: sessionId });
+      if (!isSessionCloseResult(result)) {
+        throw new Error("invalid session.close result");
+      }
+      return result;
     },
     async forkSession(sessionId: string, atMessageId: string): Promise<SessionForkResult> {
       await ready;

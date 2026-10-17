@@ -24,6 +24,7 @@ from golem_protocol.events import (
     RunFailedData,
     RunFailedEvent,
     RunStartedEvent,
+    SessionClosedEvent,
     SessionCreatedData,
     SessionCreatedEvent,
 )
@@ -164,6 +165,27 @@ async def test_sessions_and_runs_follow_the_log(database: Database) -> None:
     assert run is not None
     assert (run.status, run.ended_at, run.error) == ("completed", _ts(4), None)
     assert await runs.running() == []
+
+
+async def test_closing_hides_the_session_and_keeps_its_events(database: Database) -> None:
+    log = EventLog(database)
+    sessions = SessionRecords(database)
+    await log.append(_created())
+    await log.append(
+        SessionClosedEvent(
+            seq=2,
+            session_id=_S,
+            run_id=None,
+            ts=_ts(2),
+            type="session.closed",
+            data=EmptyEventData(),
+        )
+    )
+    assert await sessions.recent(10) == []
+    stored = await sessions.get(_S)
+    assert stored is not None
+    assert stored.closed_at == _ts(2)
+    assert [event.type for event in await log.after(_S)] == ["session.created", "session.closed"]
 
 
 async def test_a_failed_run_keeps_its_reason(database: Database) -> None:

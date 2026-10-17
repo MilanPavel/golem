@@ -26,6 +26,7 @@ from golem.sessions.titles import TitleGenerator, choose_title, clean_title, for
 from golem.store.records import RunRecords, SessionActivity, SessionRecords
 from golem_protocol.events import (
     ChatEvent,
+    EmptyEventData,
     ForkedFrom,
     MessageCompletedEvent,
     SessionCreatedData,
@@ -81,6 +82,7 @@ class _LiveSession:
     schema_version: int
     title: str | None = None
     titling: bool = False
+    closed: bool = False
     task: asyncio.Task[None] | None = None
 
 
@@ -91,7 +93,7 @@ class _LiveRun:
 
 
 class SessionManager:
-    """Create, attach, list, inspect, send, and cancel, for one daemon process."""
+    """Create, attach, list, inspect, send, cancel, and close, for one daemon process."""
 
     def __init__(
         self,
@@ -199,6 +201,42 @@ class SessionManager:
                 messages=plain_messages(values),
             )
 
+    async def close(self, session_id: str) -> str:
+        """Hide ``session_id`` from the list. Its events stay in the log.
+
+        A run still in progress is cancelled first. Closing a session that is
+        already hidden returns its id.
+
+        Raises :class:`SessionNotFoundError`.
+        """
+        while True:
+            async with self._lock:
+                record = await self._records.get(session_id)
+                if record is None:
+                    raise SessionNotFoundError(session_id)
+                if record.closed_at is not None:
+                    self._sessions.pop(session_id, None)
+                    return session_id
+                session = self._sessions.get(session_id)
+                if session is not None:
+                    session.closed = True
+                live = self._run_for(session)
+                naming = [
+                    task
+                    for task in self._naming
+                    if task.get_name() == f"golem-title-{session_id}" and not task.done()
+                ]
+                if live is None and not naming:
+                    await self._events.emit(session_id, None, "session.closed", EmptyEventData())
+                    self._sessions.pop(session_id, None)
+                    return session_id
+            if live is not None:
+                await self._stop([live], "user")
+            for task in naming:
+                task.cancel()
+            if naming:
+                await asyncio.wait(naming)
+
     async def rename(self, session_id: str, title: str) -> str:
         """Set the title by hand. Returns it cleaned.
 
@@ -305,7 +343,7 @@ class SessionManager:
                 titles, model_profile=session.model_profile, prompt=prompt, reply=reply
             )
             async with self._lock:
-                if session.title is None:
+                if session.title is None and not session.closed:
                     await self._set_title(session, title)
         finally:
             session.titling = False
@@ -316,11 +354,23 @@ class SessionManager:
         )
         session.title = title
 
+    def _run_for(self, session: _LiveSession | None) -> _LiveRun | None:
+        if session is None or session.task is None or session.task.done():
+            return None
+        for run in self._runs.values():
+            if run.task is session.task:
+                return run
+        return None
+
     async def _resolve(self, session_id: str) -> _LiveSession:
         existing = self._sessions.get(session_id)
         if existing is not None:
+            if existing.closed:
+                raise SessionNotFoundError(session_id)
             return existing
         record = await self._records.get(session_id)
+        if record is not None and record.closed_at is not None:
+            raise SessionNotFoundError(session_id)
         values = await self._runtime.values(session_id)
         if values and values.get("schema_version") != SCHEMA_VERSION:
             raise SchemaMismatchError(values.get("schema_version"))

@@ -33,6 +33,18 @@ test("an older summary of a known session is ignored", () => {
   assert.equal(mergeSummary(index, summary("s_a", "2026-10-07T10:01:00", 3)), index);
 });
 
+test("a closed summary leaves the list and an unknown closed session is not added", () => {
+  const index = [summary("s_a", "2026-10-07T10:02:00", 4), summary("s_b", "2026-10-07T10:01:00", 2)];
+  const closed = { ...summary("s_a", "2026-10-07T10:03:00", 5), status: "closed" as const };
+  assert.deepEqual(
+    mergeSummary(index, closed).map((item) => item.session_id),
+    ["s_b"],
+  );
+  assert.deepEqual(mergeSummary([summary("s_b", "2026-10-07T10:01:00", 2)], closed), [
+    summary("s_b", "2026-10-07T10:01:00", 2),
+  ]);
+});
+
 test("a new session is added in activity order, ties broken by id", () => {
   const index = [summary("s_a", "2026-10-07T10:02:00", 1)];
   const merged = mergeSummary(index, summary("s_b", "2026-10-07T10:02:00", 1));

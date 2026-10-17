@@ -19,6 +19,8 @@ function place(overrides: Partial<KeyPlace> = {}): KeyPlace {
     overlay: false,
     help: false,
     switcher: false,
+    switcherConfirm: false,
+    switcherFiltering: false,
     debug: false,
     draftEmpty: true,
     busy: false,
@@ -117,6 +119,26 @@ test("keys dispatch through the table", () => {
   assert.deepEqual(pressed("", { downArrow: true }, { switcher: true }), { kind: "switcher", key: "down" });
   assert.deepEqual(pressed("", { return: true }, { switcher: true }), { kind: "switcher", key: "enter" });
   assert.deepEqual(pressed("n", {}, { switcher: true }), { kind: "switcher", key: "new" });
+  assert.deepEqual(pressed("b", {}, { switcher: true }), { kind: "switcher", key: { kind: "type", text: "b" } });
+  assert.deepEqual(pressed("n", {}, { switcher: true, switcherFiltering: true }), {
+    kind: "switcher",
+    key: { kind: "type", text: "n" },
+  });
+  assert.deepEqual(pressed("d", { ctrl: true }, { switcher: true }), { kind: "switcher", key: "arm" });
+  assert.deepEqual(pressed("d", { ctrl: true }), { kind: "ignore" });
+  assert.deepEqual(pressed("y", {}, { switcher: true, switcherConfirm: true }), {
+    kind: "switcher",
+    key: "confirm",
+  });
+  assert.deepEqual(pressed("", { escape: true }, { switcher: true, switcherConfirm: true }), {
+    kind: "switcher",
+    key: "disarm",
+  });
+  assert.deepEqual(pressed("", { escape: true }, { switcher: true, switcherFiltering: true }), {
+    kind: "switcher",
+    key: "clear-query",
+  });
+  assert.deepEqual(pressed("", { backspace: true }, { switcher: true }), { kind: "switcher", key: "backspace" });
   assert.deepEqual(pressed("n", {}), { kind: "insert", text: "n" });
   assert.deepEqual(pressed("", { upArrow: true }, { suggestions: true }), { kind: "suggest", key: "up" });
   assert.deepEqual(pressed("", { downArrow: true }, { suggestions: true }), { kind: "suggest", key: "down" });

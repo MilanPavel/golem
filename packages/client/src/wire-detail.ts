@@ -47,7 +47,10 @@ export function resultDetail(method: string, result: unknown): string {
   if (method === "message.send" && typeof result["run_id"] === "string") {
     return result["run_id"];
   }
-  if ((method === "session.create" || method === "session.fork") && typeof result["session_id"] === "string") {
+  if (
+    (method === "session.create" || method === "session.fork" || method === "session.close") &&
+    typeof result["session_id"] === "string"
+  ) {
     return result["session_id"];
   }
   if (method === "session.rename" && typeof result["title"] === "string") {

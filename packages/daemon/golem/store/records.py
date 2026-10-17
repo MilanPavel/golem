@@ -11,7 +11,7 @@ from golem.store.database import Database
 RunStatus = Literal["running", "completed", "failed", "cancelled"]
 
 _ACTIVITY = (
-    "SELECT s.session_id, s.model_profile, s.title, s.created_at, s.updated_at,"
+    "SELECT s.session_id, s.model_profile, s.title, s.created_at, s.updated_at, s.closed_at,"
     " EXISTS (SELECT 1 FROM runs r"
     "  WHERE r.session_id = s.session_id AND r.status = 'running') AS running,"
     " (SELECT COALESCE(MAX(e.seq), 0) FROM events e"
@@ -27,6 +27,7 @@ class SessionRecord:
     title: str | None
     created_at: str
     updated_at: str
+    closed_at: str | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,7 +55,7 @@ class SessionRecords:
 
     async def get(self, session_id: str) -> SessionRecord | None:
         row = await self._database.fetch_one(
-            "SELECT session_id, model_profile, title, created_at, updated_at"
+            "SELECT session_id, model_profile, title, created_at, updated_at, closed_at"
             " FROM sessions WHERE session_id = ?",
             (session_id,),
         )
@@ -66,9 +67,10 @@ class SessionRecords:
         return None if row is None else _activity(row)
 
     async def recent(self, limit: int) -> list[SessionActivity]:
-        """Sessions with the newest activity first."""
+        """Open sessions with the newest activity first. Closed ones stay in the log."""
         rows = await self._database.fetch_all(
-            f"{_ACTIVITY} ORDER BY s.updated_at DESC, s.session_id DESC LIMIT ?",
+            f"{_ACTIVITY} WHERE s.closed_at IS NULL"
+            " ORDER BY s.updated_at DESC, s.session_id DESC LIMIT ?",
             (limit,),
         )
         return [_activity(row) for row in rows]
@@ -102,6 +104,7 @@ def _session(row: sqlite3.Row) -> SessionRecord:
         title=row["title"],
         created_at=row["created_at"],
         updated_at=row["updated_at"],
+        closed_at=row["closed_at"],
     )
 
 

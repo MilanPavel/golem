@@ -12,7 +12,9 @@ def summarize(activity: SessionActivity) -> SessionSummary:
         session_id=session.session_id,
         model_profile=session.model_profile,
         title=session.title,
-        status="running" if activity.running else "idle",
+        status=(
+            "closed" if session.closed_at is not None else "running" if activity.running else "idle"
+        ),
         created_at=session.created_at,
         updated_at=session.updated_at,
         last_seq=activity.last_seq,

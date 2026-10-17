@@ -106,6 +106,57 @@ test("a long list scrolls to keep the selection visible, and long titles are cut
   assert.equal(first?.title, `${"x".repeat(11)}…`);
 });
 
+test("typing filters by title, and movement stays inside the matches", () => {
+  const typed = press([{ kind: "type", text: "b" }]);
+  assert.equal(typed.state.query, "b");
+  assert.equal(typed.state.open, true);
+  const rows = layoutSwitcher({
+    state: typed.state,
+    sessions: SESSIONS,
+    current: "s_a",
+    now: NOW,
+    columns: 40,
+    rows: 5,
+  });
+  assert.deepEqual(
+    rows.map((row) => row.sessionId),
+    ["s_b"],
+  );
+  assert.equal(press([{ kind: "type", text: "b" }, "down"]).state.selected, "s_b");
+});
+
+test("Ctrl-D then y closes the selected session and leaves the list open", () => {
+  const asked = press(["down", "arm"]);
+  assert.equal(asked.state.confirm, true);
+  assert.equal(asked.state.open, true);
+  assert.deepEqual(press(["down", "arm", "confirm"]), {
+    state: { ...openSwitcher("s_b"), confirm: false },
+    action: { kind: "close-session", sessionId: "s_b" },
+  });
+});
+
+test("Esc during confirm only cancels it, and Esc with a filter clears the filter", () => {
+  const armed = press(["arm", "disarm"]);
+  assert.equal(armed.state.confirm, false);
+  assert.equal(armed.state.open, true);
+  assert.deepEqual(armed.action, { kind: "none" });
+  const cleared = press([{ kind: "type", text: "be" }, "backspace", "clear-query"]);
+  assert.equal(cleared.state.query, "");
+  assert.equal(cleared.state.open, true);
+});
+
+test("n starts a session only through the new key, and an empty match list does not ask to close", () => {
+  assert.deepEqual(press(["new"]).action, { kind: "new" });
+  const missed = pressSwitcher(
+    { ...openSwitcher("s_a"), query: "zzz" },
+    SESSIONS,
+    "arm",
+    "s_a",
+  );
+  assert.equal(missed.state.confirm, false);
+  assert.deepEqual(missed.action, { kind: "none" });
+});
+
 test("ages read as now, minutes, hours, days, then a date", () => {
   const cases: [string, string][] = [
     ["2026-10-15T11:59:30Z", "now"],

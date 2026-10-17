@@ -80,7 +80,7 @@ class MessageCompletedData(BaseModel):
 
 
 class EmptyEventData(BaseModel):
-    """No payload. Used by ``run.started`` and ``run.completed``."""
+    """No payload. Used by ``run.started``, ``run.completed``, and ``session.closed``."""
 
     model_config = _CONFIG
 
@@ -133,6 +133,22 @@ class SessionUpdatedEvent(BaseModel):
     ts: str = Field(min_length=1)
     type: Literal["session.updated"]
     data: SessionUpdatedData
+
+
+class SessionClosedEvent(BaseModel):
+    """The session left the list. ``run_id`` is null: no run owns the change.
+
+    The earlier events stay in the log. ``session.list`` hides the session.
+    """
+
+    model_config = _CONFIG
+
+    seq: int = Field(ge=1)
+    session_id: str = Field(min_length=1)
+    run_id: None
+    ts: str = Field(min_length=1)
+    type: Literal["session.closed"]
+    data: EmptyEventData
 
 
 class MessageStartedEvent(BaseModel):
@@ -229,6 +245,7 @@ class RunCancelledEvent(BaseModel):
 EventType = Literal[
     "session.created",
     "session.updated",
+    "session.closed",
     "message.started",
     "message.delta",
     "message.completed",
@@ -243,6 +260,7 @@ EventType = Literal[
 ChatEvent = Annotated[
     SessionCreatedEvent
     | SessionUpdatedEvent
+    | SessionClosedEvent
     | MessageStartedEvent
     | MessageDeltaEvent
     | MessageCompletedEvent
@@ -276,6 +294,7 @@ __all__ = [
     "RunFailedData",
     "RunFailedEvent",
     "RunStartedEvent",
+    "SessionClosedEvent",
     "SessionCreatedData",
     "SessionCreatedEvent",
     "SessionUpdatedData",

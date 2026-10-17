@@ -67,8 +67,10 @@ import { nextOffset, WHEEL_LINES, type WheelSubscribe } from "./screen.ts";
 import {
   closedSwitcher,
   layoutSwitcher,
+  NO_SESSIONS,
   openSwitcher,
   pressSwitcher,
+  switcherHint,
   type SwitcherKey,
   type SwitcherState,
 } from "./switcher.ts";
@@ -497,6 +499,14 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       retitle(outcome.title);
       return;
     }
+    if (outcome.kind === "close-session") {
+      setDraft(draftAt(""));
+      const current = sessionRef.current;
+      if (current !== null && connectionRef.current.status === "connected") {
+        closeHere(current, false);
+      }
+      return;
+    }
     if (outcome.kind === "copy") {
       setDraft(draftAt(""));
       const text = outcome.code ? copyCode(chatRef.current.messages) : copyAnswer(chatRef.current.messages);
@@ -671,6 +681,30 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
     );
   }
 
+  function closeHere(sessionId: string, stayInSwitcher: boolean): void {
+    void client.closeSession(sessionId).then(
+      () => {
+        setChat((current) => ({ ...current, error: null, notice: "closed" }));
+        if (sessionRef.current === sessionId) {
+          const next = sessionsRef.current.find(
+            (summary) => summary.session_id !== sessionId && summary.status !== "closed",
+          );
+          if (next === undefined) {
+            session.startNew();
+          } else {
+            session.switchTo(next.session_id);
+          }
+        }
+        if (!stayInSwitcher) {
+          setSwitcher(closedSwitcher);
+        }
+      },
+      (error: unknown) => {
+        setChat((current) => ({ ...current, error: messageOf(error) }));
+      },
+    );
+  }
+
   function onSwitcherKey(key: SwitcherKey): void {
     const pressed = pressSwitcher(switcherRef.current, sessionsRef.current, key, sessionRef.current);
     setSwitcher(pressed.state);
@@ -679,6 +713,8 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       session.switchTo(action.sessionId);
     } else if (action.kind === "new") {
       session.startNew();
+    } else if (action.kind === "close-session") {
+      closeHere(action.sessionId, true);
     }
   }
 
@@ -695,6 +731,8 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       overlay: keysOpen,
       help: helpOpen,
       switcher: switcherRef.current.open,
+      switcherConfirm: switcherRef.current.confirm,
+      switcherFiltering: switcherRef.current.query.length > 0,
       debug: debugRef.current.open,
       draftEmpty: draftRef.current.text.length === 0,
       busy: busyRef.current,
@@ -914,6 +952,8 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
           })}
           columns={columns}
           height={budget.body}
+          hint={switcherHint(switcher, sessions)}
+          empty={switcher.query.length > 0 ? "No matching sessions." : NO_SESSIONS}
         />
       ) : (
       <Box flexDirection="column" width={columns} height={budget.body} flexShrink={0} overflow="hidden">

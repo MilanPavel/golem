@@ -1,17 +1,34 @@
 import type { SessionSummary } from "@golem/client";
 
 /** The selection is a session id, so it stays put while live summaries reorder the list. */
-export type SwitcherState = { open: boolean; selected: string | null };
+export type SwitcherState = {
+  open: boolean;
+  selected: string | null;
+  query: string;
+  confirm: boolean;
+};
 
-export const closedSwitcher: SwitcherState = { open: false, selected: null };
+export const closedSwitcher: SwitcherState = { open: false, selected: null, query: "", confirm: false };
 
-export type SwitcherKey = "up" | "down" | "enter" | "new" | "close";
+export type SwitcherKey =
+  | "up"
+  | "down"
+  | "enter"
+  | "new"
+  | "close"
+  | "arm"
+  | "confirm"
+  | "disarm"
+  | "backspace"
+  | "clear-query"
+  | { kind: "type"; text: string };
 
 export type SwitcherAction =
   | { kind: "none" }
   | { kind: "open"; sessionId: string }
   | { kind: "new" }
-  | { kind: "close" };
+  | { kind: "close" }
+  | { kind: "close-session"; sessionId: string };
 
 export type SwitcherRow = {
   sessionId: string;
@@ -22,12 +39,33 @@ export type SwitcherRow = {
   age: string;
 };
 
-export const SWITCHER_HINT = "↑↓ move · Enter open · n new · Esc close";
 export const NO_SESSIONS = "No sessions yet. Press n to start one.";
 export const UNTITLED = "untitled";
 
+const QUERY_MAX = 200;
+
 export function openSwitcher(current: string | null): SwitcherState {
-  return { open: true, selected: current };
+  return { open: true, selected: current, query: "", confirm: false };
+}
+
+/** Sessions whose title contains `query`, ignoring case. An empty query keeps every session. */
+export function visibleSessions(sessions: readonly SessionSummary[], query: string): SessionSummary[] {
+  if (query.length === 0) {
+    return [...sessions];
+  }
+  const needle = query.toLowerCase();
+  return sessions.filter((summary) => (summary.title ?? UNTITLED).toLowerCase().includes(needle));
+}
+
+/** The hint under the switcher header. Confirm, a typed filter, then the idle list. */
+export function switcherHint(state: SwitcherState, sessions: readonly SessionSummary[]): string {
+  if (state.confirm) {
+    return `Close "${rowTitle(state, sessions)}"? y / Esc`;
+  }
+  if (state.query.length > 0) {
+    return `filter: ${state.query}  ↑↓ move · Enter open · Ctrl-D close · Esc clear`;
+  }
+  return "↑↓ move · Enter open · n new · type to filter · Ctrl-D close · Esc close";
 }
 
 /** Apply one key while the switcher is open. Enter on the current session just closes it. */
@@ -37,22 +75,57 @@ export function pressSwitcher(
   key: SwitcherKey,
   current: string | null,
 ): { state: SwitcherState; action: SwitcherAction } {
+  if (state.confirm && key !== "confirm" && key !== "disarm") {
+    return { state, action: { kind: "none" } };
+  }
+  if (key === "disarm") {
+    return { state: { ...state, confirm: false }, action: { kind: "none" } };
+  }
   if (key === "close") {
     return { state: closedSwitcher, action: { kind: "close" } };
+  }
+  if (key === "clear-query") {
+    return { state: { ...state, query: "" }, action: { kind: "none" } };
+  }
+  if (key === "backspace") {
+    return { state: { ...state, query: state.query.slice(0, -1) }, action: { kind: "none" } };
+  }
+  if (typeof key === "object") {
+    return {
+      state: { ...state, query: (state.query + key.text).slice(0, QUERY_MAX) },
+      action: { kind: "none" },
+    };
+  }
+  const visible = visibleSessions(sessions, state.query);
+  if (key === "arm") {
+    if (visible.length === 0) {
+      return { state, action: { kind: "none" } };
+    }
+    return { state: { ...state, confirm: true }, action: { kind: "none" } };
+  }
+  if (key === "confirm") {
+    const chosen = visible[selectedIndex(state, visible)];
+    if (chosen === undefined) {
+      return { state: { ...state, confirm: false }, action: { kind: "none" } };
+    }
+    return {
+      state: { ...state, confirm: false },
+      action: { kind: "close-session", sessionId: chosen.session_id },
+    };
   }
   if (key === "new") {
     return { state: closedSwitcher, action: { kind: "new" } };
   }
-  const index = selectedIndex(state, sessions);
+  const index = selectedIndex(state, visible);
   if (key === "enter") {
-    const chosen = sessions[index];
+    const chosen = visible[index];
     if (chosen === undefined || chosen.session_id === current) {
       return { state: closedSwitcher, action: { kind: "close" } };
     }
     return { state: closedSwitcher, action: { kind: "open", sessionId: chosen.session_id } };
   }
   const step = key === "up" ? -1 : 1;
-  const next = sessions[Math.min(Math.max(index + step, 0), sessions.length - 1)];
+  const next = visible[Math.min(Math.max(index + step, 0), visible.length - 1)];
   return { state: { ...state, selected: next?.session_id ?? null }, action: { kind: "none" } };
 }
 
@@ -65,7 +138,8 @@ export function layoutSwitcher(input: {
   columns: number;
   rows: number;
 }): SwitcherRow[] {
-  const { sessions, rows } = input;
+  const sessions = visibleSessions(input.sessions, input.state.query);
+  const { rows } = input;
   if (rows <= 0) {
     return [];
   }
@@ -110,6 +184,13 @@ export function relativeAge(iso: string, now: number): string {
 
 /** Pointer, dot, and the spaces around them and the age. */
 const ROW_CHROME = 6;
+
+function rowTitle(state: SwitcherState, sessions: readonly SessionSummary[]): string {
+  const visible = visibleSessions(sessions, state.query);
+  const chosen = visible[selectedIndex(state, visible)];
+  const title = chosen?.title;
+  return title === undefined || title === null || title.length === 0 ? UNTITLED : title;
+}
 
 function selectedIndex(state: SwitcherState, sessions: readonly SessionSummary[]): number {
   const found = sessions.findIndex((summary) => summary.session_id === state.selected);

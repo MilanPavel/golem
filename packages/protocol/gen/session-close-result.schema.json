@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "The session that is now hidden.",
+  "properties": {
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "session_id"
+  ],
+  "title": "SessionCloseResult",
+  "type": "object"
+}

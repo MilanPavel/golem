@@ -2,7 +2,7 @@
   "$defs": {
     "SessionSummary": {
       "additionalProperties": false,
-      "description": "One session as ``session.list`` reports it.\n\n``status`` is ``running`` while a run is open. ``last_seq`` is the newest\nstored event, so a client can tell what it has not seen, and which of\ntwo summaries of one session is newer.",
+      "description": "One session as ``session.list`` reports it.\n\n``status`` is ``running`` while a run is open, and ``closed`` after\n``session.close``. ``last_seq`` is the newest\nstored event, so a client can tell what it has not seen, and which of\ntwo summaries of one session is newer.",
       "properties": {
         "created_at": {
           "minLength": 1,
@@ -27,7 +27,8 @@
         "status": {
           "enum": [
             "idle",
-            "running"
+            "running",
+            "closed"
           ],
           "title": "Status",
           "type": "string"
