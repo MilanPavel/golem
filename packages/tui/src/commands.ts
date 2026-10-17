@@ -17,6 +17,7 @@ export const closedDebug: DebugState = {
 export type ComposerOutcome =
   | { kind: "idle" }
   | { kind: "unknown"; notice: string }
+  | { kind: "help" }
   | { kind: "send"; text: string; debug: DebugState }
   | { kind: "sessions" }
   | { kind: "new" }
@@ -30,21 +31,66 @@ export type ComposerOutcome =
       refreshModel: boolean;
     };
 
-type Command = {
+export type Command = {
   name: string;
+  /** Shown after the name. Empty when the command takes nothing. */
+  args: string;
+  description: string;
+  /** Fixed argument choices. Free text, such as a title, has none. */
+  choices?: readonly string[];
   run: (debug: DebugState, args: readonly string[]) => ComposerOutcome;
 };
 
-const UNKNOWN = "unknown command";
+const UNKNOWN = "unknown command \u2014 /help lists them";
 
 /** Every slash command. A name not in this table is an unknown command, not a message. */
-const COMMANDS: readonly Command[] = [
-  { name: "/debug", run: debugCommand },
-  { name: "/sessions", run: withoutArgs({ kind: "sessions" }) },
-  { name: "/new", run: withoutArgs({ kind: "new" }) },
-  { name: "/fork", run: withoutArgs({ kind: "fork" }) },
-  { name: "/title", run: (_debug, args) => ({ kind: "title", title: args.length === 0 ? null : args.join(" ") }) },
+export const COMMANDS: readonly Command[] = [
+  {
+    name: "/debug",
+    args: "[wire|model|hold|go]",
+    description: "Opens or closes the debug panel, or picks wire, model, hold, or go.",
+    choices: ["wire", "model", "hold", "go"],
+    run: debugCommand,
+  },
+  {
+    name: "/fork",
+    args: "",
+    description: "Copies this session up to its newest finished message.",
+    run: withoutArgs({ kind: "fork" }),
+  },
+  {
+    name: "/help",
+    args: "",
+    description: "Lists every command.",
+    run: withoutArgs({ kind: "help" }),
+  },
+  {
+    name: "/new",
+    args: "",
+    description: "Starts a new session.",
+    run: withoutArgs({ kind: "new" }),
+  },
+  {
+    name: "/sessions",
+    args: "",
+    description: "Opens the session switcher.",
+    run: withoutArgs({ kind: "sessions" }),
+  },
+  {
+    name: "/title",
+    args: "[name]",
+    description: "Shows the title, or sets it.",
+    run: (_debug, args) => ({ kind: "title", title: args.length === 0 ? null : args.join(" ") }),
+  },
 ];
+
+/** One row per command. The lines are the table, and nothing is added around it. */
+export function helpLines(commands: readonly Pick<Command, "name" | "args" | "description">[], columns: number): string[] {
+  const usage = (command: Pick<Command, "name" | "args">): string =>
+    command.args.length > 0 ? `${command.name} ${command.args}` : command.name;
+  const width = commands.reduce((max, command) => Math.max(max, usage(command).length), 0);
+  return commands.map((command) => fitLine(`${usage(command).padEnd(width)}  ${command.description}`, columns));
+}
 
 export function toggleDebugTab(debug: DebugState): DebugState {
   if (!debug.open) {
@@ -131,6 +177,19 @@ function debugCommand(debug: DebugState, args: readonly string[]): ComposerOutco
     };
   }
   return unknown();
+}
+
+function fitLine(text: string, columns: number): string {
+  if (columns <= 0) {
+    return "";
+  }
+  if (text.length <= columns) {
+    return text;
+  }
+  if (columns === 1) {
+    return "\u2026";
+  }
+  return `${text.slice(0, columns - 1)}\u2026`;
 }
 
 function local(

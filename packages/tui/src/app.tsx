@@ -1,6 +1,6 @@
 import { homedir } from "node:os";
 import { useEffect, useRef, useState } from "react";
-import { Box, Text, useApp, useInput, useWindowSize, type Key } from "ink";
+import { Box, Text, useApp, useInput, useStdin, useWindowSize } from "ink";
 import { RpcError, SESSION_NOT_FOUND, type ConnectionState, type GolemClient, type WireLine } from "@golem/client";
 
 import {
@@ -11,11 +11,22 @@ import {
   type ChatState,
   type DeltaBatcher,
 } from "./chat-state.ts";
-import { applyComposer, closedDebug, toggleDebugTab, type DebugState } from "./commands.ts";
+import { applyComposer, closedDebug, COMMANDS, helpLines, toggleDebugTab, type DebugState } from "./commands.ts";
 import { bannerText, frameBudget, frameColumns, layoutComposer } from "./chrome.ts";
 import { holdDebugOffset, layoutDebug, type CheckpointMessage, type DebugTone } from "./debug-view.ts";
 import { Header } from "./header.tsx";
 import { EXIT_HINT, EXIT_WINDOW_MS, idleInterrupt, pressCtrlC } from "./interrupt.ts";
+import {
+  classifyPress,
+  isF1,
+  KEYS,
+  keyOverlayLines,
+  moveOverlayOffset,
+  pressKey,
+  type KeyEffect,
+  type KeyPlace,
+  type OverlayLine,
+} from "./keys.ts";
 import { layoutTranscript, type LayoutLine } from "./layout-chat.ts";
 import { assistantChars, elapsedSeconds, meterLine, meterPhase } from "./progress.ts";
 import {
@@ -34,7 +45,7 @@ import {
 } from "./status-label.ts";
 import { TUI_VERSION } from "./version.ts";
 import { applyWindowTitle } from "./window-title.ts";
-import { nextOffset, type WheelSubscribe } from "./screen.ts";
+import { nextOffset, WHEEL_LINES, type WheelSubscribe } from "./screen.ts";
 import {
   closedSwitcher,
   layoutSwitcher,
@@ -66,19 +77,26 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   const [modelMessages, setModelMessages] = useState<CheckpointMessage[]>([]);
   const [modelCount, setModelCount] = useState<number | null>(null);
   const [switcher, setSwitcher] = useState<SwitcherState>(closedSwitcher);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [keysOpen, setKeysOpen] = useState(false);
+  const [keysOffset, setKeysOffset] = useState(0);
   const draftRef = useRef(draft);
   const busyRef = useRef(chat.busy);
   const chatRef = useRef(chat);
   const runIdRef = useRef(chat.runId);
   const interrupt = useRef(idleInterrupt);
   const { exit } = useApp();
+  const { stdin } = useStdin();
   const connectionRef = useRef(connection);
   const debugRef = useRef(debug);
   const switcherRef = useRef(switcher);
   const panelOpen = useRef(false);
+  const keysOpenRef = useRef(false);
+  const overlayFrame = useRef({ columns: 80, body: 1 });
   const inspectGen = useRef(0);
   const loadCheckpointRef = useRef<(sessionId: string) => void>(() => undefined);
   const debugLines = useRef(0);
+  const onF1 = useRef<() => void>(() => undefined);
   draftRef.current = draft;
   busyRef.current = chat.busy;
   chatRef.current = chat;
@@ -87,6 +105,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   debugRef.current = debug;
   switcherRef.current = switcher;
   panelOpen.current = debug.open;
+  keysOpenRef.current = keysOpen;
   const size = useWindowSize();
   const columns = frameColumns(size.columns || 80);
   const rows = size.rows || 24;
@@ -99,13 +118,17 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
     banner: banner !== null && banner.length > 0,
     debug: debug.open,
   });
-  const transcript = layoutTranscript(chat.messages, columns, budget.body, offset);
+  overlayFrame.current = { columns, body: budget.body };
+  const helpText = helpOpen && !keysOpen && !switcher.open ? helpLines(COMMANDS, columns) : [];
+  const helpHeight = Math.min(helpText.length, budget.body);
+  const chatHeight = budget.body - helpHeight;
+  const transcript = layoutTranscript(chat.messages, columns, chatHeight, offset);
   const model = preferModel(sessionModel, daemonModel);
   const chip = modelChip(model.name, model.profile);
   const cwd = shortCwd(process.cwd(), homedir());
   const versions = versionLabel(TUI_VERSION, daemonVersion);
   const phase = meterPhase(chat.busy, assistantChars(chat.messages));
-  const page = Math.max(1, budget.body - 1);
+  const page = Math.max(1, (keysOpen ? budget.body : Math.max(1, chatHeight)) - 1);
   const debugPage = Math.max(1, budget.debug - 2);
 
   const batcher = useRef<DeltaBatcher | null>(null);
@@ -119,6 +142,8 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
     onSwitch: (next) => {
       batcher.current?.flush();
       setLiveTitle(null);
+      setHelpOpen(false);
+      setKeysOpen(false);
       setChat((current) => ({ ...emptyChat, notice: current.notice }));
       setSessionModel(null);
       setModelMessages([]);
@@ -196,6 +221,14 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       return;
     }
     return onWheel((steps) => {
+      if (keysOpenRef.current) {
+        const frame = overlayFrame.current;
+        const count = keyOverlayLines(KEYS, frame.columns).length;
+        const visible = Math.max(1, frame.body);
+        const max = Math.max(0, count - visible);
+        setKeysOffset((current) => Math.max(0, Math.min(max, current - steps * WHEEL_LINES)));
+        return;
+      }
       if (panelOpen.current) {
         setDebugOffset((current) => nextOffset(current, steps));
         return;
@@ -298,11 +331,34 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
     applyWindowTitle(titleLabel);
   }, [titleLabel]);
 
+  // Ink names F1 and then drops it, so the key table never sees that press.
+  useEffect(() => {
+    const onData = (chunk: Buffer | string) => {
+      const text = typeof chunk === "string" ? chunk : chunk.toString("utf8");
+      if (isF1(text)) {
+        onF1.current();
+      }
+    };
+    stdin.on("data", onData);
+    return () => {
+      stdin.off("data", onData);
+    };
+  }, [stdin]);
+
   function submit(): void {
     const outcome = applyComposer(debugRef.current, draftRef.current);
     if (outcome.kind === "idle") {
       return;
     }
+    if (outcome.kind === "help") {
+      setDraft("");
+      setHelpOpen(true);
+      setKeysOpen(false);
+      setSwitcher(closedSwitcher);
+      setChat((current) => ({ ...current, notice: null }));
+      return;
+    }
+    setHelpOpen(false);
     if (outcome.kind === "unknown") {
       setChat((current) => ({ ...current, notice: outcome.notice }));
       return;
@@ -445,58 +501,51 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
     setDebug(next);
   }
 
-  useInput((input, key) => {
-    if (key.ctrl && input === "c") {
-      onCtrlC();
-      return;
-    }
-    if (switcherRef.current.open) {
-      const pressed = switcherKey(input, key);
-      if (pressed !== null) {
-        onSwitcherKey(pressed);
-      }
-      return;
-    }
-    if (key.pageUp) {
-      if (debugRef.current.open) {
-        setDebugOffset((value) => value + debugPage);
-      } else {
-        setOffset((value) => value + page);
-      }
-      return;
-    }
-    if (key.pageDown) {
-      if (debugRef.current.open) {
-        setDebugOffset((value) => Math.max(0, value - debugPage));
-      } else {
-        setOffset((value) => Math.max(0, value - page));
-      }
-      return;
-    }
-    if (key.home) {
-      if (debugRef.current.open) {
-        setDebugOffset(Number.MAX_SAFE_INTEGER);
-      } else {
-        setOffset(Number.MAX_SAFE_INTEGER);
-      }
-      return;
-    }
-    if (key.end) {
-      if (debugRef.current.open) {
-        setDebugOffset(0);
-      } else {
-        setOffset(0);
-      }
-      return;
-    }
-    if (key.escape) {
-      if (debugRef.current.open) {
+  function currentPlace(): KeyPlace {
+    return {
+      overlay: keysOpen,
+      help: helpOpen,
+      switcher: switcherRef.current.open,
+      debug: debugRef.current.open,
+      draftEmpty: draftRef.current.length === 0,
+      busy: busyRef.current,
+      connected: connectionRef.current.status === "connected" && sessionRef.current !== null,
+    };
+  }
+
+  function applyKeyEffect(effect: KeyEffect): void {
+    switch (effect.kind) {
+      case "cancel":
+        onCtrlC();
+        return;
+      case "toggle-overlay":
+        setKeysOpen((open) => !open);
+        setKeysOffset(0);
+        return;
+      case "close-overlay":
+        setKeysOpen(false);
+        setKeysOffset(0);
+        return;
+      case "close-help":
+        setHelpOpen(false);
+        return;
+      case "scroll-overlay":
+        setKeysOffset((current) =>
+          moveOverlayOffset(
+            current,
+            effect.toward,
+            keyOverlayLines(KEYS, columns).length,
+            Math.max(1, budget.body),
+          ),
+        );
+        return;
+      case "scroll":
+        scrollView(effect.target, effect.toward);
+        return;
+      case "close-debug":
         showDebug({ ...debugRef.current, open: false });
-      }
-      return;
-    }
-    if (key.tab) {
-      if (debugRef.current.open) {
+        return;
+      case "debug-tab": {
         const next = toggleDebugTab(debugRef.current);
         showDebug(next);
         if (
@@ -506,29 +555,49 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
         ) {
           loadCheckpointRef.current(sessionRef.current);
         }
+        return;
       }
+      case "switcher":
+        onSwitcherKey(effect.key);
+        return;
+      case "submit":
+        submit();
+        return;
+      case "backspace":
+        setDraft((value) => value.slice(0, -1));
+        return;
+      case "insert":
+        setDraft((value) => value + effect.text);
+        return;
+      case "ignore":
+        return;
+    }
+  }
+
+  function scrollView(target: "debug" | "transcript", toward: "up" | "down" | "start" | "end"): void {
+    const step = target === "debug" ? debugPage : page;
+    const move = target === "debug" ? setDebugOffset : setOffset;
+    if (toward === "up") {
+      move((value) => value + step);
       return;
     }
-    if (connectionRef.current.status !== "connected" || sessionId === null) {
+    if (toward === "down") {
+      move((value) => Math.max(0, value - step));
       return;
     }
-    if (key.return) {
-      submit();
+    if (toward === "start") {
+      move(Number.MAX_SAFE_INTEGER);
       return;
     }
-    if (busyRef.current) {
-      return;
-    }
-    if (key.backspace || key.delete) {
-      setDraft((value) => value.slice(0, -1));
-      return;
-    }
-    if (key.ctrl || key.meta) {
-      return;
-    }
-    if (input.length > 0) {
-      setDraft((value) => value + input);
-    }
+    move(0);
+  }
+
+  onF1.current = () => {
+    applyKeyEffect(pressKey(currentPlace(), { name: "f1", input: "", ctrl: false, meta: false }));
+  };
+
+  useInput((input, key) => {
+    applyKeyEffect(pressKey(currentPlace(), classifyPress(input, key)));
   });
 
   const contentWidth = transcript.gutter === null ? columns : Math.max(1, columns - 1);
@@ -568,7 +637,14 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
         cwd={cwd}
         columns={columns}
       />
-      {switcher.open ? (
+      {keysOpen ? (
+        <LineList
+          lines={keyOverlayLines(KEYS, columns)}
+          columns={columns}
+          height={budget.body}
+          offset={keysOffset}
+        />
+      ) : switcher.open ? (
         <SwitcherView
           rows={layoutSwitcher({
             state: switcher,
@@ -583,21 +659,32 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
         />
       ) : (
       <Box flexDirection="column" width={columns} height={budget.body} flexShrink={0} overflow="hidden">
-        {chat.messages.length === 0 ? <Text dimColor>Type a message.</Text> : null}
-        {transcript.lines.map((line, index) => (
-          <Box key={index} width={columns} height={1} overflow="hidden">
-            <Box
-              width={contentWidth}
-              height={1}
-              backgroundColor={line.role === "user" ? QUESTION_BG : undefined}
-            >
-              <LineView line={line} />
+        <Box flexDirection="column" width={columns} height={chatHeight} flexShrink={0} overflow="hidden">
+          {chatHeight > 0 && chat.messages.length === 0 ? <Text dimColor>Type a message.</Text> : null}
+          {transcript.lines.map((line, index) => (
+            <Box key={index} width={columns} height={1} overflow="hidden">
+              <Box
+                width={contentWidth}
+                height={1}
+                backgroundColor={line.role === "user" ? QUESTION_BG : undefined}
+              >
+                <LineView line={line} />
+              </Box>
+              {transcript.gutter !== null ? (
+                <Text dimColor>{transcript.gutter[index] ?? " "}</Text>
+              ) : null}
             </Box>
-            {transcript.gutter !== null ? (
-              <Text dimColor>{transcript.gutter[index] ?? " "}</Text>
-            ) : null}
-          </Box>
-        ))}
+          ))}
+        </Box>
+        {helpHeight > 0 ? (
+          <LineList
+            lines={helpText.map((text) => ({ text, dim: false }))}
+            columns={columns}
+            height={helpHeight}
+            offset={0}
+            color="yellow"
+          />
+        ) : null}
       </Box>
       )}
       {budget.debug > 0 ? (
@@ -713,20 +800,30 @@ function titleNotice(title: string | null): string {
   return title === null ? "this session has no title yet; /title <name> sets one" : `title: ${title}`;
 }
 
-function switcherKey(input: string, key: Key): SwitcherKey | null {
-  if (key.upArrow) {
-    return "up";
-  }
-  if (key.downArrow) {
-    return "down";
-  }
-  if (key.return) {
-    return "enter";
-  }
-  if (key.escape) {
-    return "close";
-  }
-  return input === "n" ? "new" : null;
+function LineList({
+  lines,
+  columns,
+  height,
+  offset,
+  color,
+}: {
+  lines: readonly OverlayLine[];
+  columns: number;
+  height: number;
+  offset: number;
+  color?: "yellow";
+}) {
+  const start = Math.max(0, Math.min(offset, Math.max(0, lines.length - height)));
+  const shown = lines.slice(start, start + Math.max(0, height));
+  return (
+    <Box flexDirection="column" width={columns} height={height} flexShrink={0} overflow="hidden">
+      {shown.map((line, index) => (
+        <Text key={index} dimColor={line.dim} color={line.dim ? undefined : color} wrap="truncate-end">
+          {line.text.length === 0 ? " " : line.text}
+        </Text>
+      ))}
+    </Box>
+  );
 }
 
 function deltaEvent(messageId: string, text: string) {

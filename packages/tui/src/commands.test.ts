@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { applyComposer, closedDebug, toggleDebugTab, type DebugState } from "./commands.ts";
+import { applyComposer, closedDebug, COMMANDS, helpLines, toggleDebugTab, type DebugState } from "./commands.ts";
 
 test("a sentence is sent and a slash command is not", () => {
   const sentence = applyComposer(closedDebug, "hello");
@@ -42,7 +42,7 @@ test("a doubled slash sends the rest as a normal message", () => {
 
 test("an unknown slash command stays out of the model", () => {
   const outcome = applyComposer(closedDebug, "/foo");
-  assert.deepEqual(outcome, { kind: "unknown", notice: "unknown command" });
+  assert.deepEqual(outcome, { kind: "unknown", notice: "unknown command \u2014 /help lists them" });
   assert.equal(applyComposer(closedDebug, "/debug extra").kind, "unknown");
 });
 
@@ -121,6 +121,28 @@ test("/sessions and /new are commands without arguments", () => {
 test("/title takes the rest of the line as the name, or nothing to show it", () => {
   assert.deepEqual(applyComposer(closedDebug, "/title  Trip   plans "), { kind: "title", title: "Trip plans" });
   assert.deepEqual(applyComposer(closedDebug, "/title"), { kind: "title", title: null });
+});
+
+test("/help lists nothing of its own, and every command has a description", () => {
+  assert.equal(COMMANDS.length > 0, true);
+  for (const command of COMMANDS) {
+    assert.equal(command.description.trim().length > 0, true);
+  }
+  const lines = helpLines(COMMANDS, 120);
+  assert.equal(lines.length, COMMANDS.length);
+  for (const command of COMMANDS) {
+    assert.equal(
+      lines.some((line) => line.startsWith(command.name) && line.includes(command.description)),
+      true,
+    );
+  }
+  assert.deepEqual(helpLines([{ name: "/only", args: "", description: "Just this" }], 80), ["/only  Just this"]);
+  assert.equal(helpLines([{ name: "/only", args: "[a|b]", description: "Picks" }], 80)[0]?.startsWith("/only [a|b]"), true);
+
+  assert.deepEqual(applyComposer(closedDebug, "/help"), { kind: "help" });
+  assert.equal(applyComposer(closedDebug, "/help more").kind, "unknown");
+  const debug = COMMANDS.find((command) => command.name === "/debug");
+  assert.deepEqual(debug?.choices, ["wire", "model", "hold", "go"]);
 });
 
 test("/fork takes no arguments", () => {

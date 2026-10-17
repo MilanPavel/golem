@@ -159,6 +159,7 @@ The header shows which golem this is. The status line shows the session title, h
 
 | Command | What it does |
 |---|---|
+| `/help` | Lists every command, with its arguments |
 | `/sessions` | Opens the session switcher, with live status |
 | `/new` | Starts a new session |
 | `/title` | Shows the current session's title |
@@ -170,16 +171,20 @@ The header shows which golem this is. The status line shows the session title, h
 | `/debug go` | Sends the held message |
 | `//text` | Sends `/text` as a message, not a command |
 
+Anything else that starts with `/` stays on screen: `unknown command — /help lists them`.
+
 ### Keys
 
 | Key | What it does |
 |---|---|
 | Enter | Sends the message |
+| `?` | On an empty line, shows every key. `?` or Esc closes the list |
+| F1 | Shows or hides the key list |
 | Ctrl-C | Cancels the answer in progress. A second Ctrl-C quits |
-| Page Up, Page Down, Home, End, mouse wheel | Scroll the chat |
-| Up, Down, Enter, Esc | Move through the session switcher, open a session, close the switcher |
+| Page Up, Page Down, Home, End, mouse wheel | Scroll the chat. The same keys scroll the key list while it is open |
+| Up, Down, Enter, `n`, Esc | Move through the session switcher, open a session, start a new one, close the switcher |
 | Tab | Switches the debug tab |
-| Esc | Closes the debug panel |
+| Esc | Closes the command list, then the debug panel |
 
 ## Where things live
 
