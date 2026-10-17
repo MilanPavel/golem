@@ -32,6 +32,8 @@ function flags(overrides: Partial<KeyFlags> = {}): KeyFlags {
   return {
     upArrow: false,
     downArrow: false,
+    leftArrow: false,
+    rightArrow: false,
     pageDown: false,
     pageUp: false,
     home: false,
@@ -132,11 +134,25 @@ test("keys dispatch through the table", () => {
   });
   assert.deepEqual(pressed("", { return: true }), { kind: "submit" });
   assert.deepEqual(pressed("", { return: true }, { connected: false }), { kind: "ignore" });
-  assert.deepEqual(pressed("", { backspace: true }), { kind: "backspace" });
+  assert.deepEqual(pressed("", { backspace: true }), { kind: "edit", op: "backspace" });
+  assert.deepEqual(pressed("", { delete: true }), { kind: "edit", op: "delete" });
   assert.deepEqual(pressed("", { delete: true }, { busy: true }), { kind: "ignore" });
+  assert.deepEqual(pressed("", { leftArrow: true }), { kind: "edit", op: "left" });
+  assert.deepEqual(pressed("", { rightArrow: true, meta: true }), { kind: "edit", op: "word-right" });
+  assert.deepEqual(pressed("a", { ctrl: true }), { kind: "edit", op: "line-start" });
+  assert.deepEqual(pressed("e", { ctrl: true }), { kind: "edit", op: "line-end" });
+  assert.deepEqual(pressed("w", { ctrl: true }), { kind: "edit", op: "delete-word" });
+  assert.deepEqual(pressed("", { backspace: true, meta: true }), { kind: "edit", op: "delete-word" });
+  assert.deepEqual(pressed("", { return: true, meta: true }), { kind: "edit", op: "newline" });
+  assert.deepEqual(pressed("", { return: true, shift: true }), { kind: "edit", op: "newline" });
+  assert.deepEqual(pressed("", { return: true, shift: true }, { suggestions: true }), {
+    kind: "edit",
+    op: "newline",
+  });
+  assert.deepEqual(pressed("g", { ctrl: true }), { kind: "edit-external" });
   assert.deepEqual(pressed("", { tab: true }, { debug: true }), { kind: "debug-tab" });
   assert.deepEqual(pressed("", { tab: true }, { debug: true, switcher: true }), { kind: "ignore" });
-  assert.deepEqual(pressed("a", { ctrl: true }), { kind: "ignore" });
+  assert.deepEqual(pressed("b", { ctrl: true }), { kind: "ignore" });
 });
 
 test("F1 is the sequence Ink drops before the input handler", () => {

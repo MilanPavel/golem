@@ -1,3 +1,5 @@
+import { type EditOp } from "./edit.ts";
+
 /** Where a binding applies. The overlay groups rows by these names. */
 export type KeyContext = "composer" | "transcript" | "switcher" | "debug";
 
@@ -15,8 +17,21 @@ export type PressName =
   | "tab"
   | "return"
   | "backspace"
+  | "delete"
   | "up"
-  | "down";
+  | "down"
+  | "left"
+  | "right"
+  | "alt-left"
+  | "alt-right"
+  | "alt-return"
+  | "alt-backspace"
+  | "ctrl-a"
+  | "ctrl-e"
+  | "ctrl-w"
+  | "ctrl-u"
+  | "ctrl-k"
+  | "ctrl-g";
 
 export type Press = {
   name: PressName | null;
@@ -29,6 +44,8 @@ export type Press = {
 export type KeyFlags = {
   upArrow: boolean;
   downArrow: boolean;
+  leftArrow: boolean;
+  rightArrow: boolean;
   pageDown: boolean;
   pageUp: boolean;
   home: boolean;
@@ -68,7 +85,8 @@ export type KeyEffect =
   | { kind: "switcher"; key: "up" | "down" | "enter" | "new" | "close" }
   | { kind: "suggest"; key: "up" | "down" | "tab" | "enter" | "close" }
   | { kind: "submit" }
-  | { kind: "backspace" }
+  | { kind: "edit"; op: EditOp }
+  | { kind: "edit-external" }
   | { kind: "insert"; text: string }
   | { kind: "ignore" };
 
@@ -298,15 +316,50 @@ export const KEYS: readonly KeyBinding[] = [
     when: { name: "return", overlay: false, switcher: false, connected: true },
     run: () => ({ kind: "submit" }),
   },
-  {
-    id: "backspace",
-    label: "Backspace",
-    contexts: ["composer"],
-    description: "Deletes the last character.",
-    when: { name: "backspace", overlay: false, switcher: false, busy: false, connected: true },
-    run: () => ({ kind: "backspace" }),
-  },
+  ...editKeys(),
 ];
+
+function editKey(
+  id: string,
+  label: string,
+  description: string,
+  name: PressName,
+  op: EditOp | "external",
+): KeyBinding {
+  return {
+    id,
+    label,
+    contexts: ["composer"],
+    description,
+    when: { name, overlay: false, switcher: false, busy: false, connected: true },
+    run: () => (op === "external" ? { kind: "edit-external" } : { kind: "edit", op }),
+  };
+}
+
+function editKeys(): KeyBinding[] {
+  return [
+    editKey("left", "Left", "Moves the cursor left.", "left", "left"),
+    editKey("right", "Right", "Moves the cursor right.", "right", "right"),
+    editKey("word-left", "Alt-Left", "Moves the cursor to the previous word.", "alt-left", "word-left"),
+    editKey("word-right", "Alt-Right", "Moves the cursor to the next word.", "alt-right", "word-right"),
+    editKey("line-start", "Ctrl-A", "Moves the cursor to the start of the line.", "ctrl-a", "line-start"),
+    editKey("line-end", "Ctrl-E", "Moves the cursor to the end of the line.", "ctrl-e", "line-end"),
+    editKey("backspace", "Backspace", "Deletes the character before the cursor.", "backspace", "backspace"),
+    editKey("delete", "Delete", "Deletes the character after the cursor.", "delete", "delete"),
+    editKey("delete-word", "Ctrl-W", "Deletes the word before the cursor.", "ctrl-w", "delete-word"),
+    editKey(
+      "alt-backspace",
+      "Alt-Backspace",
+      "Deletes the word before the cursor.",
+      "alt-backspace",
+      "delete-word",
+    ),
+    editKey("delete-to-start", "Ctrl-U", "Deletes back to the start of the line.", "ctrl-u", "delete-to-start"),
+    editKey("delete-to-end", "Ctrl-K", "Deletes forward to the end of the line.", "ctrl-k", "delete-to-end"),
+    editKey("newline", "Shift-Enter", "Inserts a new line. Alt-Enter does the same.", "alt-return", "newline"),
+    editKey("editor", "Ctrl-G", "Opens the draft in your editor.", "ctrl-g", "external"),
+  ];
+}
 
 export type OverlayLine = {
   text: string;
@@ -357,6 +410,18 @@ export function classifyPress(input: string, key: KeyFlags): Press {
   if (key.ctrl && input === "c") {
     return { ...press, name: "ctrl-c" };
   }
+  if (key.ctrl && !key.meta) {
+    const named = ctrlName(input);
+    if (named !== null) {
+      return { ...press, name: named };
+    }
+  }
+  if (key.leftArrow) {
+    return { ...press, name: key.meta ? "alt-left" : "left" };
+  }
+  if (key.rightArrow) {
+    return { ...press, name: key.meta ? "alt-right" : "right" };
+  }
   if (key.pageUp) {
     return { ...press, name: "page-up" };
   }
@@ -382,15 +447,40 @@ export function classifyPress(input: string, key: KeyFlags): Press {
     return { ...press, name: "tab" };
   }
   if (key.return) {
-    return { ...press, name: "return" };
+    return { ...press, name: key.meta || key.shift ? "alt-return" : "return" };
   }
-  if (key.backspace || key.delete) {
-    return { ...press, name: "backspace" };
+  if (key.backspace) {
+    return { ...press, name: key.meta ? "alt-backspace" : "backspace" };
+  }
+  if (key.delete) {
+    return { ...press, name: "delete" };
   }
   if (input === "?") {
     return { ...press, name: "question" };
   }
   return press;
+}
+
+function ctrlName(input: string): PressName | null {
+  if (input === "a") {
+    return "ctrl-a";
+  }
+  if (input === "e") {
+    return "ctrl-e";
+  }
+  if (input === "w") {
+    return "ctrl-w";
+  }
+  if (input === "u") {
+    return "ctrl-u";
+  }
+  if (input === "k") {
+    return "ctrl-k";
+  }
+  if (input === "g") {
+    return "ctrl-g";
+  }
+  return null;
 }
 
 /** Sequences Ink names `f1` and then drops, so `useInput` never reports the key. */

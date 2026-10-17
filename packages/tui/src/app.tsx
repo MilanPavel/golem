@@ -1,6 +1,6 @@
 import { homedir } from "node:os";
 import { useEffect, useRef, useState } from "react";
-import { Box, Text, useApp, useInput, useStdin, useWindowSize } from "ink";
+import { Box, Text, useApp, useInput, usePaste, useStdin, useWindowSize } from "ink";
 import { RpcError, SESSION_NOT_FOUND, type ConnectionState, type GolemClient, type WireLine } from "@golem/client";
 
 import {
@@ -12,6 +12,7 @@ import {
   type DeltaBatcher,
 } from "./chat-state.ts";
 import { applyComposer, closedDebug, COMMANDS, helpLines, toggleDebugTab, type DebugState } from "./commands.ts";
+import { draftAt, edit, editDraft, insertText, type Draft } from "./edit.ts";
 import {
   applySuggestion,
   moveSuggestion,
@@ -69,7 +70,7 @@ import { useSession } from "./use-session.ts";
 export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelSubscribe }) {
   const [connection, setConnection] = useState<ConnectionState>(client.state);
   const [chat, setChat] = useState<ChatState>(emptyChat);
-  const [draft, setDraft] = useState("");
+  const [draft, setDraft] = useState<Draft>({ text: "", cursor: 0 });
   const [sessionModel, setSessionModel] = useState<ModelInfo | null>(null);
   const [daemonModel, setDaemonModel] = useState<ModelInfo | null>(null);
   const [daemonVersion, setDaemonVersion] = useState("");
@@ -94,7 +95,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   const chatRef = useRef(chat);
   const runIdRef = useRef(chat.runId);
   const interrupt = useRef(idleInterrupt);
-  const { exit } = useApp();
+  const { exit, suspendTerminal } = useApp();
   const { stdin } = useStdin();
   const connectionRef = useRef(connection);
   const debugRef = useRef(debug);
@@ -111,6 +112,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   const loadCheckpointRef = useRef<(sessionId: string) => void>(() => undefined);
   const debugLines = useRef(0);
   const onF1 = useRef<() => void>(() => undefined);
+  const editing = useRef(false);
   draftRef.current = draft;
   busyRef.current = chat.busy;
   chatRef.current = chat;
@@ -125,13 +127,13 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   const rows = size.rows || 24;
   const banner = chat.error ?? chat.notice;
   const suggestMatches =
-    chat.busy || switcher.open || keysOpen || suggestDismissed ? [] : suggest(draft, COMMANDS);
+    chat.busy || switcher.open || keysOpen || suggestDismissed ? [] : suggest(draft.text, COMMANDS);
   const suggestSelected =
-    suggestPick.draft === draft ? Math.min(suggestPick.index, Math.max(0, suggestMatches.length - 1)) : 0;
+    suggestPick.draft === draft.text ? Math.min(suggestPick.index, Math.max(0, suggestMatches.length - 1)) : 0;
   const budget = frameBudget({
     rows,
     columns,
-    draft,
+    draft: draft.text,
     busy: chat.busy,
     banner: banner !== null && banner.length > 0,
     debug: debug.open,
@@ -356,10 +358,10 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   }, [titleLabel]);
 
   useEffect(() => {
-    if (!draft.startsWith("/") || draft.startsWith("//")) {
+    if (!draft.text.startsWith("/") || draft.text.startsWith("//")) {
       setSuggestDismissed(false);
     }
-  }, [draft]);
+  }, [draft.text]);
 
   // Ink names F1 and then drops it, so the key table never sees that press.
   useEffect(() => {
@@ -376,12 +378,12 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   }, [stdin]);
 
   function submit(): void {
-    const outcome = applyComposer(debugRef.current, draftRef.current);
+    const outcome = applyComposer(debugRef.current, draftRef.current.text);
     if (outcome.kind === "idle") {
       return;
     }
     if (outcome.kind === "help") {
-      setDraft("");
+      setDraft(draftAt(""));
       setHelpOpen(true);
       setKeysOpen(false);
       setSwitcher(closedSwitcher);
@@ -394,28 +396,28 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       return;
     }
     if (outcome.kind === "sessions") {
-      setDraft("");
+      setDraft(draftAt(""));
       setSwitcher(openSwitcher(sessionRef.current));
       return;
     }
     if (outcome.kind === "new") {
-      setDraft("");
+      setDraft(draftAt(""));
       session.startNew();
       return;
     }
     if (outcome.kind === "fork") {
-      setDraft("");
+      setDraft(draftAt(""));
       forkHere();
       return;
     }
     if (outcome.kind === "title") {
-      setDraft("");
+      setDraft(draftAt(""));
       retitle(outcome.title);
       return;
     }
     if (outcome.kind === "local") {
       showDebug(outcome.debug);
-      setDraft(outcome.restore ?? "");
+      setDraft(draftAt(outcome.restore ?? ""));
       setChat((current) => ({ ...current, notice: outcome.notice }));
       if (outcome.refreshModel) {
         const current = sessionRef.current;
@@ -435,11 +437,11 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       return;
     }
     showDebug(outcome.debug);
-    setDraft("");
+    setDraft(draftAt(""));
     setOffset(0);
     setChat((current) => ({ ...current, notice: null }));
     void client.sendMessage(currentSession, text).catch((error: unknown) => {
-      setDraft(text);
+      setDraft(draftAt(text));
       if (error instanceof RpcError && error.code === SESSION_NOT_FOUND) {
         setChat((current) => ({ ...current, notice: "session was not found; started a new one" }));
         session.startNew();
@@ -537,7 +539,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       help: helpOpen,
       switcher: switcherRef.current.open,
       debug: debugRef.current.open,
-      draftEmpty: draftRef.current.length === 0,
+      draftEmpty: draftRef.current.text.length === 0,
       busy: busyRef.current,
       connected: connectionRef.current.status === "connected" && sessionRef.current !== null,
       suggestions: suggestRef.current.open,
@@ -588,14 +590,37 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       case "submit":
         submit();
         return;
-      case "backspace":
-        setDraft((value) => value.slice(0, -1));
+      case "edit":
+        setDraft(edit(draftRef.current, effect.op));
+        return;
+      case "edit-external":
+        void openEditor();
         return;
       case "insert":
-        setDraft((value) => value + effect.text);
+        setDraft(insertText(draftRef.current, effect.text));
         return;
       case "ignore":
         return;
+    }
+  }
+
+  async function openEditor(): Promise<void> {
+    if (editing.current || busyRef.current || switcherRef.current.open || keysOpenRef.current) {
+      return;
+    }
+    if (connectionRef.current.status !== "connected" || sessionRef.current === null) {
+      return;
+    }
+    editing.current = true;
+    try {
+      const saved = await editDraft(draftRef.current.text, suspendTerminal);
+      if (saved !== null) {
+        setDraft(draftAt(saved));
+      }
+    } catch {
+      // The editor did not start. The draft stays.
+    } finally {
+      editing.current = false;
     }
   }
 
@@ -615,20 +640,20 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
     const current = suggestRef.current;
     if (key === "up" || key === "down") {
       setSuggestPick({
-        draft: draftRef.current,
+        draft: draftRef.current.text,
         index: moveSuggestion(current.selected, key, current.items.length),
       });
       return;
     }
-    const next = applySuggestion(draftRef.current, current.items, current.selected, key);
-    if (next.draft !== draftRef.current) {
-      setDraft(next.draft);
+    const next = applySuggestion(draftRef.current.text, current.items, current.selected, key);
+    if (next.draft !== draftRef.current.text) {
+      setDraft(draftAt(next.draft));
     }
     if (next.submit) {
       submit();
       return;
     }
-    if (key === "tab" && next.draft === draftRef.current && debugRef.current.open) {
+    if (key === "tab" && next.draft === draftRef.current.text && debugRef.current.open) {
       switchDebugTab();
     }
   }
@@ -656,11 +681,24 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   };
 
   useInput((input, key) => {
+    if (key.eventType === "release") {
+      return;
+    }
     applyKeyEffect(pressKey(currentPlace(), classifyPress(input, key)));
   });
 
+  usePaste((text) => {
+    if (busyRef.current || switcherRef.current.open || keysOpenRef.current) {
+      return;
+    }
+    if (connectionRef.current.status !== "connected" || sessionRef.current === null) {
+      return;
+    }
+    setDraft(insertText(draftRef.current, text));
+  });
+
   const contentWidth = transcript.gutter === null ? columns : Math.max(1, columns - 1);
-  const composer = layoutComposer(draft, columns, budget.composer, chat.busy);
+  const composer = layoutComposer(draft.text, draft.cursor, columns, budget.composer, chat.busy);
   const debugLayout = layoutDebug({
     debug,
     rows: budget.debug,
@@ -807,14 +845,19 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       {budget.composer > 0 ? (
         <Box flexDirection="column" width={columns} height={budget.composer} flexShrink={0}>
           {composer.map((line, index) => {
-            const used = line.prefix.length + line.text.length + (line.cursor ? 1 : 0);
+            const at = line.cursorAt;
+            const after = at !== null && at >= line.text.length;
+            const point = at !== null && !after ? codePointSize(line.text, at) : 0;
+            const used = line.prefix.length + line.text.length + (after ? 1 : 0);
             const pad = " ".repeat(Math.max(0, columns - used));
             return (
               <Box key={index} width={columns} height={1} backgroundColor={QUESTION_BG} overflow="hidden">
                 <Text color={QUESTION_FG} wrap="truncate-end">
                   {line.prefix}
-                  {line.text}
-                  {line.cursor ? <Text inverse> </Text> : null}
+                  {at === null ? line.text : line.text.slice(0, at)}
+                  {at !== null && after ? <Text inverse> </Text> : null}
+                  {at !== null && !after ? <Text inverse>{line.text.slice(at, at + point)}</Text> : null}
+                  {at !== null && !after ? line.text.slice(at + point) : null}
                   {pad}
                 </Text>
               </Box>
@@ -889,6 +932,11 @@ function SuggestionBand({
       })}
     </Box>
   );
+}
+
+function codePointSize(text: string, index: number): number {
+  const code = text.charCodeAt(index);
+  return code >= 0xd800 && code <= 0xdbff ? 2 : 1;
 }
 
 function titleNotice(title: string | null): string {

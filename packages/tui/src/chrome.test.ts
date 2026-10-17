@@ -53,19 +53,64 @@ test("a short terminal drops the logo and keeps one transcript row", () => {
 });
 
 test("the composer wraps the draft and keeps the cursor on the tail", () => {
-  const rows = layoutComposer("hello", 20, 1, false);
+  const rows = layoutComposer("hello", 5, 20, 1, false);
   assert.equal(rows.length, 1);
   assert.equal(rows[0]?.prefix, "> ");
   assert.equal(rows[0]?.text, "hello");
-  assert.equal(rows[0]?.cursor, true);
+  assert.equal(rows[0]?.cursorAt, 5);
 
-  const tail = layoutComposer("a".repeat(100), 12, 1, false);
+  const middle = layoutComposer("hello", 2, 20, 1, false);
+  assert.equal(middle[0]?.cursorAt, 2);
+
+  const lines = layoutComposer("ab\ncd", 4, 20, 5, false);
+  assert.deepEqual(
+    lines.map((line) => [line.text, line.cursorAt]),
+    [
+      ["ab", null],
+      ["cd", 1],
+    ],
+  );
+
+  const tail = layoutComposer("a".repeat(100), 100, 12, 1, false);
   assert.equal(tail.length, 1);
   assert.equal(tail[0]?.prefix, "  ");
   assert.equal(tail[0]?.text.endsWith("a"), true);
 
-  const busy = layoutComposer("hello", 20, 1, true);
-  assert.deepEqual(busy, [{ prefix: "", text: "…", cursor: false }]);
+  const busy = layoutComposer("hello", 5, 20, 1, true);
+  assert.deepEqual(busy, [{ prefix: "", text: "…", cursorAt: null }]);
+
+  const grown = layoutComposer("hello\n", 6, 40, 2, false);
+  assert.equal(grown[0]?.prefix, "> ");
+  assert.equal(grown[0]?.text, "hello");
+  assert.equal(grown[0]?.cursorAt, null);
+  assert.equal(grown[1]?.prefix, "  ");
+  assert.equal(grown[1]?.text, "");
+  assert.equal(grown[1]?.cursorAt, 0);
+
+  const cursorLine = layoutComposer("hello\n", 6, 40, 1, false);
+  assert.equal(cursorLine.length, 1);
+  assert.equal(cursorLine[0]?.text, "");
+  assert.equal(cursorLine[0]?.cursorAt, 0);
+});
+
+test("a new line grows the composer and the chat gives up that row", () => {
+  const one = frameBudget({ rows: 24, columns: 80, draft: "hello", busy: false, banner: false });
+  const two = frameBudget({ rows: 24, columns: 80, draft: "hello\n", busy: false, banner: false });
+  assert.equal(one.composer, 1);
+  assert.equal(two.composer, 2);
+  assert.equal(two.body, one.body - 1);
+  assert.equal(two.header + two.body + two.banner + two.meter + two.composer + two.status, 24);
+
+  const capped = frameBudget({
+    rows: 24,
+    columns: 80,
+    draft: "a\nb\nc\nd\ne\nf",
+    busy: false,
+    banner: false,
+  });
+  assert.equal(capped.composer, 5);
+  assert.equal(capped.body, one.body - 4);
+  assert.equal(capped.header + capped.body + capped.banner + capped.meter + capped.composer + capped.status, 24);
 });
 
 test("a wrapped question takes rows from the transcript", () => {

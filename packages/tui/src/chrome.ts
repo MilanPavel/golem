@@ -1,5 +1,4 @@
 import { LOGO_ROWS, LOGO_WIDTH } from "./logo.ts";
-import { wrapSpans } from "./layout-chat.ts";
 
 export type FrameMode = "full" | "compact" | "hidden";
 
@@ -18,7 +17,8 @@ export type FrameBudget = {
 export type ComposerRow = {
   prefix: string;
   text: string;
-  cursor: boolean;
+  /** Index in `text` of the block cursor. `text.length` means the block sits after the line. */
+  cursorAt: number | null;
 };
 
 // A glyph in the last column wraps before the newline, so the frame grows and the header scrolls away.
@@ -129,11 +129,13 @@ export function frameBudget(input: {
 
 export function composerLineCount(draft: string, columns: number): number {
   const { text } = draftWidth(Math.max(1, columns));
-  return Math.max(1, wrapSpans([{ text: draft }], text).length);
+  // composerLines keeps the empty row after a trailing newline. wrapSpans drops it.
+  return Math.max(1, composerLines(draft, text).length);
 }
 
 export function layoutComposer(
   draft: string,
+  cursor: number,
   columns: number,
   rows: number,
   busy: boolean,
@@ -142,18 +144,89 @@ export function layoutComposer(
     return [];
   }
   if (busy) {
-    return [{ prefix: "", text: "…", cursor: false }];
+    return [{ prefix: "", text: "…", cursorAt: null }];
   }
   const measure = draftWidth(Math.max(1, columns));
-  const wrapped = wrapSpans([{ text: draft }], measure.text);
-  const visible = wrapped.slice(Math.max(0, wrapped.length - rows));
-  const showingTail = wrapped.length > rows;
-  return visible.map((spans, index) => {
-    const text = spans.map((span) => span.text).join("");
-    const prefix = measure.prefix === 0 ? "" : index === 0 && !showingTail ? "> " : "  ";
-    const last = index === visible.length - 1;
-    return { prefix, text, cursor: last && measure.cursor };
+  const lines = composerLines(draft, measure.text);
+  const at = Math.max(0, Math.min(cursor, draft.length));
+  const cursorRow = lines.findIndex((line, index) => {
+    const last = index === lines.length - 1;
+    return last || at <= line.end;
   });
+  const row = cursorRow === -1 ? 0 : cursorRow;
+  const start = Math.max(0, Math.min(Math.max(0, row - rows + 1), Math.max(0, lines.length - rows)));
+  const visible = lines.slice(start, start + rows);
+  const showingTail = start > 0;
+  return visible.map((line, index) => {
+    const prefix = measure.prefix === 0 ? "" : index === 0 && !showingTail ? "> " : "  ";
+    const active = start + index === row;
+    return { prefix, text: line.text, cursorAt: active ? cursorColumn(line, at) : null };
+  });
+}
+
+type ComposerLine = {
+  text: string;
+  start: number;
+  /** Last cursor index that still belongs on this line. */
+  end: number;
+};
+
+function composerLines(source: string, width: number): ComposerLine[] {
+  const widthSafe = Math.max(1, width);
+  const lines: ComposerLine[] = [];
+  let text = "";
+  let used = 0;
+  let start = 0;
+  let index = 0;
+
+  const push = (end: number) => {
+    lines.push({ text, start, end });
+    text = "";
+    used = 0;
+    start = end;
+  };
+
+  while (index < source.length) {
+    if (source[index] === "\n") {
+      push(index);
+      index += 1;
+      start = index;
+      continue;
+    }
+    const room = widthSafe - used;
+    let next = index;
+    while (next < source.length && source[next] !== "\n" && next - index < room) {
+      next += 1;
+    }
+    const window = source.slice(index, next);
+    if (next < source.length && source[next] !== "\n" && window.length === room) {
+      let take = window.lastIndexOf(" ");
+      if (take <= 0) {
+        take = room;
+      }
+      text += source.slice(index, index + take);
+      index += take;
+      const boundary = source[index] === " " ? index : index - 1;
+      if (source[index] === " ") {
+        index += 1;
+      }
+      push(boundary);
+      start = index;
+      continue;
+    }
+    text += window;
+    used += window.length;
+    index = next;
+  }
+  push(source.length);
+  return lines;
+}
+
+function cursorColumn(line: ComposerLine, cursor: number): number {
+  if (cursor >= line.start + line.text.length) {
+    return line.text.length;
+  }
+  return Math.max(0, cursor - line.start);
 }
 
 export function bannerText(message: string, columns: number): string {

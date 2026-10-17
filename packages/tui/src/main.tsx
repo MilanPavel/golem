@@ -40,6 +40,8 @@ try {
     stdin: pointer.stdin,
     alternateScreen: true,
     exitOnCtrlC: false,
+    // Shift-Enter is otherwise the same byte as Enter. Terminals that answer the query send it apart.
+    kittyKeyboard: { mode: "auto" },
   });
   await instance.waitUntilExit();
 } finally {

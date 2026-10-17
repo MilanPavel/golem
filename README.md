@@ -183,7 +183,11 @@ Type `/` and matching commands appear above the composer. Typing narrows them, p
 
 | Key | What it does |
 |---|---|
-| Enter | Sends the message |
+| Enter | Sends the message. Shift-Enter or Alt-Enter inserts a line |
+| Left, Right | Move the cursor. Alt-Left and Alt-Right move by word |
+| Ctrl-A, Ctrl-E | Jump to the start or end of the line |
+| Backspace, Delete, Ctrl-W, Ctrl-U, Ctrl-K | Delete around the cursor |
+| Ctrl-G | Opens the draft in `$EDITOR`, or `vi` |
 | `?` | On an empty line, shows every key. `?` or Esc closes the list |
 | F1 | Shows or hides the key list |
 | Ctrl-C | Cancels the answer in progress. A second Ctrl-C quits |

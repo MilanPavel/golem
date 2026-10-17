@@ -40,6 +40,22 @@ test("overflow keeps the tail until the offset moves toward the start", () => {
   assert.equal(head.gutter?.[0], "█");
 });
 
+test("a shorter window keeps the same line at the bottom", () => {
+  const messages: ChatMessage[] = [];
+  for (let index = 0; index < 8; index += 1) {
+    messages.push(message(String(index), "user", `line ${index}`));
+  }
+  const tail = layoutTranscript(messages, 40, 6, 0);
+  const squeezed = layoutTranscript(messages, 40, 4, 0);
+  assert.equal(squeezed.offsetFromBottom, 0);
+  assert.equal(textOf(squeezed.lines.at(-1)?.spans ?? []), textOf(tail.lines.at(-1)?.spans ?? []));
+
+  const scrolled = layoutTranscript(messages, 40, 6, 5);
+  const still = layoutTranscript(messages, 40, 4, scrolled.offsetFromBottom);
+  assert.equal(still.offsetFromBottom, scrolled.offsetFromBottom);
+  assert.equal(textOf(still.lines.at(-1)?.spans ?? []), textOf(scrolled.lines.at(-1)?.spans ?? []));
+});
+
 test("user lines fill the content width and assistant lines do not", () => {
   const lines = layoutMessages(
     [message("u", "user", "hi"), message("a", "assistant", "ok")],

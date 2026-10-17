@@ -18,6 +18,9 @@ test("pointer reports drain wheel events and keep keys", () => {
   assert.deepEqual(drainPointer(down), { steps: [-1], forward: "", rest: "" });
   assert.deepEqual(drainPointer(`ab${up}c`), { steps: [1], forward: "abc", rest: "" });
   assert.deepEqual(drainPointer("\u001b[A"), { steps: [], forward: "\u001b[A", rest: "" });
+  assert.deepEqual(drainPointer("\u001b[27;2;13~"), { steps: [], forward: "\u001b[13;2u", rest: "" });
+  assert.deepEqual(drainPointer("\u001b[27;2"), { steps: [], forward: "", rest: "\u001b[27;2" });
+  assert.deepEqual(drainPointer("a\u001b[27;2;13~b"), { steps: [], forward: "a\u001b[13;2ub", rest: "" });
   assert.deepEqual(drainPointer("\u001b[<0;2;3M"), { steps: [], forward: "", rest: "" });
   assert.deepEqual(drainPointer("\u001b[<64;1;1m"), { steps: [], forward: "", rest: "" });
   assert.deepEqual(drainPointer("\u001b[<68;1;1M"), { steps: [1], forward: "", rest: "" });
@@ -44,6 +47,28 @@ test("a tty enables mouse tracking and forwards keys", async () => {
   pointer.restore();
   pointer.restore();
   assert.deepEqual(written, ["\u001b[?1006h\u001b[?1000h", "\u001b[?1000l\u001b[?1006l"]);
+});
+
+test("raw mode off stops reading so an editor can take the keys", async () => {
+  const written: string[] = [];
+  const stdin = new PassThrough() as unknown as NodeJS.ReadStream;
+  stdin.setRawMode = () => stdin;
+  const pointer = bindPointer(stdin, (data) => written.push(data), true);
+  const keys: string[] = [];
+  pointer.stdin.on("data", (chunk: Buffer | string) => {
+    keys.push(typeof chunk === "string" ? chunk : chunk.toString("utf8"));
+  });
+  pointer.stdin.setRawMode(false);
+  assert.equal(stdin.listenerCount("data"), 0);
+  assert.equal(written.at(-1), "\u001b[?1000l\u001b[?1006l");
+
+  pointer.stdin.setRawMode(true);
+  assert.equal(stdin.listenerCount("data"), 1);
+  assert.equal(written.at(-1), "\u001b[?1006h\u001b[?1000h");
+  stdin.write("x");
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(keys, ["x"]);
+  pointer.restore();
 });
 
 test("a pipe does not touch the pointer", () => {

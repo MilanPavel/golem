@@ -35,6 +35,16 @@ export function drainPointer(input: string): { steps: number[]; forward: string;
       index = mouse.next;
       continue;
     }
+    const shiftEnter = readShiftEnter(input, start);
+    if (shiftEnter === "more") {
+      return { steps, forward, rest: input.slice(start) };
+    }
+    if (typeof shiftEnter === "number") {
+      // xterm modifyOtherKeys. Ink already understands the kitty form as Shift-Enter.
+      forward += `${ESC}[13;2u`;
+      index = shiftEnter;
+      continue;
+    }
     forward += ESC;
     index = start + 1;
   }
@@ -45,6 +55,20 @@ type MouseRead =
   | { kind: "more" }
   | { kind: "no" }
   | { kind: "event"; next: number; steps: number };
+
+const SHIFT_ENTER = `${ESC}[27;2;13~`;
+
+/** A finished sequence, a prefix that still needs bytes, or something else. */
+function readShiftEnter(input: string, start: number): "more" | "no" | number {
+  const slice = input.slice(start, start + SHIFT_ENTER.length);
+  if (slice === SHIFT_ENTER) {
+    return start + SHIFT_ENTER.length;
+  }
+  if (SHIFT_ENTER.startsWith(slice) && start + slice.length === input.length) {
+    return "more";
+  }
+  return "no";
+}
 
 function readMouse(input: string, start: number): MouseRead {
   const marker = `${ESC}[<`;
@@ -141,16 +165,10 @@ export function bindPointer(
     return stream;
   };
   stream.isTTY = true;
-  stream.setRawMode = (enabled: boolean) => {
-    stdin.setRawMode(enabled);
-    if (enabled) {
-      stdin.resume();
-    }
-    return stream;
-  };
   let pending = "";
   let timer: NodeJS.Timeout | undefined;
   let restored = false;
+  let capturing = true;
   const publish = (steps: number) => {
     for (const listener of listeners) {
       listener(steps);
@@ -186,6 +204,41 @@ export function bindPointer(
       timer.unref();
     }
   };
+  // An editor shares this tty. A live data listener consumes the bytes Vim is waiting for,
+  // so typing lags and :wq never returns to the chat. Raw mode off means Ink has handed the terminal over.
+  const stopCapture = (): void => {
+    if (!capturing) {
+      return;
+    }
+    capturing = false;
+    if (timer !== undefined) {
+      clearTimeout(timer);
+      timer = undefined;
+    }
+    pending = "";
+    stdin.off("data", onData);
+    stdin.pause();
+    write(DISABLE_MOUSE);
+  };
+  const startCapture = (): void => {
+    if (capturing || restored) {
+      return;
+    }
+    capturing = true;
+    stdin.on("data", onData);
+    stdin.resume();
+    write(ENABLE_MOUSE);
+  };
+  stream.setRawMode = (enabled: boolean) => {
+    stdin.setRawMode(enabled);
+    if (enabled) {
+      startCapture();
+      stdin.resume();
+    } else {
+      stopCapture();
+    }
+    return stream;
+  };
   stdin.on("data", onData);
   write(ENABLE_MOUSE);
   return {
@@ -201,12 +254,7 @@ export function bindPointer(
         return;
       }
       restored = true;
-      if (timer !== undefined) {
-        clearTimeout(timer);
-        timer = undefined;
-      }
-      stdin.off("data", onData);
-      write(DISABLE_MOUSE);
+      stopCapture();
     },
   };
 }
