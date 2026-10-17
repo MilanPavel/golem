@@ -19,13 +19,21 @@ import { EXIT_HINT, EXIT_WINDOW_MS, idleInterrupt, pressCtrlC } from "./interrup
 import { layoutTranscript, type LayoutLine } from "./layout-chat.ts";
 import { assistantChars, elapsedSeconds, meterLine, meterPhase } from "./progress.ts";
 import {
-  fitStatus,
+  fitSegments,
   modelChip,
   preferModel,
   shortCwd,
+  shownSessionTitle,
+  startedAtMs,
   statusLabel,
+  statusSegments,
+  uptimeRefreshMs,
+  versionLabel,
   type ModelInfo,
+  type StatusSegment,
 } from "./status-label.ts";
+import { TUI_VERSION } from "./version.ts";
+import { applyWindowTitle } from "./window-title.ts";
 import { nextOffset, type WheelSubscribe } from "./screen.ts";
 import {
   closedSwitcher,
@@ -46,7 +54,10 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   const [draft, setDraft] = useState("");
   const [sessionModel, setSessionModel] = useState<ModelInfo | null>(null);
   const [daemonModel, setDaemonModel] = useState<ModelInfo | null>(null);
-  const [version, setVersion] = useState("");
+  const [daemonVersion, setDaemonVersion] = useState("");
+  const [daemonStartedAt, setDaemonStartedAt] = useState<number | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  const [liveTitle, setLiveTitle] = useState<{ sessionId: string; title: string } | null>(null);
   const [offset, setOffset] = useState(0);
   const [tick, setTick] = useState(0);
   const [debug, setDebug] = useState<DebugState>(closedDebug);
@@ -92,7 +103,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   const model = preferModel(sessionModel, daemonModel);
   const chip = modelChip(model.name, model.profile);
   const cwd = shortCwd(process.cwd(), homedir());
-  const status = fitStatus({ connection: statusLabel(connection), model: chip, cwd }, columns);
+  const versions = versionLabel(TUI_VERSION, daemonVersion);
   const phase = meterPhase(chat.busy, assistantChars(chat.messages));
   const page = Math.max(1, budget.body - 1);
   const debugPage = Math.max(1, budget.debug - 2);
@@ -107,6 +118,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   const session = useSession(client, connection.status === "connected", {
     onSwitch: (next) => {
       batcher.current?.flush();
+      setLiveTitle(null);
       setChat((current) => ({ ...emptyChat, notice: current.notice }));
       setSessionModel(null);
       setModelMessages([]);
@@ -125,6 +137,24 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   const sessions = useSessionIndex(client, connection.status === "connected");
   const sessionsRef = useRef(sessions);
   sessionsRef.current = sessions;
+  const indexedTitle = sessions.find((summary) => summary.session_id === sessionId)?.title;
+  const titleLabel = shownSessionTitle(sessionId, liveTitle, indexedTitle);
+  const uptimeSeconds =
+    connection.status !== "connected" || daemonStartedAt === null
+      ? null
+      : Math.max(0, (now - daemonStartedAt) / 1000);
+  const uptimeRefresh = uptimeRefreshMs(uptimeSeconds);
+  const status = fitSegments(
+    statusSegments({
+      connection: statusLabel(connection),
+      title: titleLabel,
+      model: chip,
+      folder: cwd,
+      messageCount: sessionId === null ? null : chat.messages.length,
+      uptimeSeconds,
+    }),
+    columns,
+  );
 
   useEffect(() => () => batcher.current?.stop(), []);
 
@@ -204,7 +234,10 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
         if (cancelled) {
           return;
         }
-        setVersion(statusResult.version);
+        const at = Date.now();
+        setNow(at);
+        setDaemonVersion(statusResult.version);
+        setDaemonStartedAt(startedAtMs(at, statusResult.uptime_seconds));
         setDaemonModel({
           profile: statusResult.model_profile ?? null,
           provider: statusResult.model_provider ?? null,
@@ -230,6 +263,9 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
           name: event.data.model_name ?? null,
         });
       }
+      if (event.type === "session.updated") {
+        setLiveTitle({ sessionId: event.session_id, title: event.data.title });
+      }
       if (event.type === "message.delta") {
         batcher.current?.push(event.data.message_id, event.data.text);
         return;
@@ -247,6 +283,20 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       }
     });
   }, [client, sessionRef]);
+
+  useEffect(() => {
+    if (uptimeRefresh === null) {
+      return;
+    }
+    const timer = setInterval(() => {
+      setNow(Date.now());
+    }, uptimeRefresh);
+    return () => clearInterval(timer);
+  }, [uptimeRefresh]);
+
+  useEffect(() => {
+    applyWindowTitle(titleLabel);
+  }, [titleLabel]);
 
   function submit(): void {
     const outcome = applyComposer(debugRef.current, draftRef.current);
@@ -510,7 +560,14 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
 
   return (
     <Box flexDirection="column" width={columns} height={rows} overflow="hidden">
-      <Header mode={budget.mode} version={version} model={chip} cwd={cwd} columns={columns} />
+      <Header
+        mode={budget.mode}
+        version={versions.text}
+        versionWarn={versions.warn}
+        model={chip}
+        cwd={cwd}
+        columns={columns}
+      />
       {switcher.open ? (
         <SwitcherView
           rows={layoutSwitcher({
@@ -613,13 +670,14 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       ) : null}
       {budget.status > 0 ? (
         <Text wrap="truncate-end">
-          <Text color={colorFor(connection)}>{status.connection}</Text>
-          {status.model.length > 0 ? (
-            <Text color={CLAY} bold>
-              {`  ${status.model}`}
-            </Text>
-          ) : null}
-          {status.cwd.length > 0 ? <Text dimColor>{`  ${status.cwd}`}</Text> : null}
+          {status.map((segment, index) => (
+            <StatusSegmentView
+              key={segment.id}
+              segment={segment}
+              connection={connection}
+              leading={index > 0}
+            />
+          ))}
         </Text>
       ) : null}
     </Box>
@@ -700,6 +758,32 @@ function toneColor(tone: DebugTone): string | undefined {
     return QUESTION_FG;
   }
   return undefined;
+}
+
+function StatusSegmentView({
+  segment,
+  connection,
+  leading,
+}: {
+  segment: StatusSegment;
+  connection: ConnectionState;
+  leading: boolean;
+}) {
+  const text = leading ? `  ${segment.text}` : segment.text;
+  if (segment.tone === "connection") {
+    return <Text color={colorFor(connection)}>{text}</Text>;
+  }
+  if (segment.tone === "model") {
+    return (
+      <Text color={CLAY} bold>
+        {text}
+      </Text>
+    );
+  }
+  if (segment.tone === "title") {
+    return <Text bold>{text}</Text>;
+  }
+  return <Text dimColor>{text}</Text>;
 }
 
 function colorFor(state: ConnectionState): "green" | "yellow" | "red" {

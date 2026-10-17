@@ -138,6 +138,7 @@ just golem status            # is it up? prints pid, version, protocol, uptime
 
 | Command | What it does |
 |---|---|
+| `just golem --version` | Prints the CLI version. When the daemon is up, prints its version on the next line |
 | `just golem status` | Prints pid, version, protocol, and uptime. Exits 1 if nothing is listening |
 | `just golem daemon install` | Writes `~/Library/LaunchAgents/dev.golem.daemon.plist` and loads it |
 | `just golem daemon start` | Starts the daemon, or restarts it if it is running |
@@ -151,6 +152,8 @@ just tui
 ```
 
 The TUI opens your newest session, or a new one if there is none. Type and press Enter.
+
+The header shows which golem this is. The status line shows the session title, how many messages it holds, and how long the daemon has been up. A narrow window hides uptime first, then the message count, then the folder. The terminal tab is named `golem — <title>`.
 
 ### Slash commands
 

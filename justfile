@@ -47,7 +47,7 @@ test:
     uv run pytest
     pnpm -r --if-present test
 
-# Run the golem CLI (status, daemon install|start|stop|logs).
+# Run the golem CLI (--version, status, daemon install|start|stop|logs).
 golem *args:
     pnpm exec golem {{args}}
 

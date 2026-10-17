@@ -1,7 +1,21 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { fitStatus, modelChip, preferModel, shortCwd, statusLabel } from "./status-label.ts";
+import {
+  fitSegments,
+  formatMessageCount,
+  formatUptime,
+  modelChip,
+  preferModel,
+  sessionTitleLabel,
+  shortCwd,
+  shownSessionTitle,
+  startedAtMs,
+  statusLabel,
+  statusSegments,
+  uptimeRefreshMs,
+  versionLabel,
+} from "./status-label.ts";
 
 test("status bar text follows the connection", () => {
   assert.equal(statusLabel({ status: "connecting" }), "connecting");
@@ -38,12 +52,113 @@ test("the working directory is shortened against home", () => {
   assert.equal(shortCwd("/tmp", "/Users/milan.pavel"), "/tmp");
 });
 
-test("the status line keeps the connection and drops the directory when it does not fit", () => {
-  const fitted = fitStatus(
-    { connection: "connected", model: "qwen3.5:4b · remote", cwd: "~/repos/golem" },
-    24,
+test("a matching daemon version is one number, and a mismatch is a yellow notice", () => {
+  assert.deepEqual(versionLabel("0.0.0", "0.0.0"), { text: "0.0.0", warn: false });
+  assert.deepEqual(versionLabel("0.0.0", ""), { text: "0.0.0", warn: false });
+  assert.deepEqual(versionLabel("0.0.0", "0.1.0"), {
+    text: "tui 0.0.0 · daemon 0.1.0",
+    warn: true,
+  });
+});
+
+test("the session title falls back to untitled", () => {
+  assert.equal(sessionTitleLabel(null), "untitled");
+  assert.equal(sessionTitleLabel("  "), "untitled");
+  assert.equal(sessionTitleLabel("Trip"), "Trip");
+  assert.equal(shownSessionTitle(null, null, "Trip"), "untitled");
+  assert.equal(shownSessionTitle("s", null, "Trip"), "Trip");
+  assert.equal(shownSessionTitle("s", { sessionId: "other", title: "Other" }, "Trip"), "Trip");
+  assert.equal(shownSessionTitle("s", { sessionId: "s", title: "Renamed" }, "Trip"), "Renamed");
+});
+
+test("message count and daemon uptime format for the status line", () => {
+  assert.equal(formatMessageCount(0), "0 msgs");
+  assert.equal(formatMessageCount(1), "1 msg");
+  assert.equal(formatMessageCount(4), "4 msgs");
+  assert.equal(formatUptime(0), "up 0s");
+  assert.equal(formatUptime(59.9), "up 59s");
+  assert.equal(formatUptime(60), "up 1m");
+  assert.equal(formatUptime(180), "up 3m");
+  assert.equal(formatUptime(3_600), "up 1h");
+  assert.equal(formatUptime(3_660), "up 1h 1m");
+  assert.equal(formatUptime(86_400), "up 1d");
+  assert.equal(formatUptime(90_000), "up 1d 1h");
+  assert.equal(formatUptime(Number.NaN), "");
+  assert.equal(startedAtMs(10_000, 2.5), 7_500);
+  assert.equal(startedAtMs(10_000, -1), null);
+  assert.equal(uptimeRefreshMs(12), 1_000);
+  assert.equal(uptimeRefreshMs(60), 60_000);
+  assert.equal(uptimeRefreshMs(null), null);
+});
+
+test("narrowing drops uptime, then the message count, then the folder", () => {
+  const segments = statusSegments({
+    connection: "connected",
+    title: "Trip",
+    model: "qwen · remote",
+    folder: "~/repos/golem",
+    messageCount: 4,
+    uptimeSeconds: 180,
+  });
+  const ids = (columns: number) => fitSegments(segments, columns).map((segment) => segment.id);
+
+  assert.deepEqual(ids(60), ["connection", "title", "model", "folder", "messages", "uptime"]);
+  assert.deepEqual(ids(53), ["connection", "title", "model", "folder", "messages"]);
+  assert.deepEqual(ids(45), ["connection", "title", "model", "folder"]);
+  assert.deepEqual(ids(30), ["connection", "title", "model"]);
+  assert.deepEqual(ids(15), ["connection", "title"]);
+  assert.deepEqual(ids(9), ["connection"]);
+  assert.equal(fitSegments(segments, 4)[0]?.text, "conn");
+  assert.deepEqual(ids(0), []);
+});
+
+test("a long title shrinks instead of leaving the line", () => {
+  const fitted = fitSegments(
+    statusSegments({
+      connection: "connected",
+      title: "x".repeat(60),
+      model: "",
+      folder: "",
+      messageCount: null,
+      uptimeSeconds: null,
+    }),
+    20,
   );
-  assert.equal(fitted.connection, "connected");
-  assert.equal(fitted.cwd, "");
-  assert.ok(fitted.model.length > 0);
+  assert.deepEqual(
+    fitted.map((segment) => segment.id),
+    ["connection", "title"],
+  );
+  assert.equal(fitted[1]?.text, `${"x".repeat(8)}\u2026`);
+  assert.deepEqual(
+    fitSegments(
+      statusSegments({
+        connection: "connected",
+        title: "Trip",
+        model: "",
+        folder: "",
+        messageCount: null,
+        uptimeSeconds: null,
+      }),
+      10,
+    ).map((segment) => segment.id),
+    ["connection"],
+  );
+});
+
+test("an empty model or a missing uptime leaves no gap", () => {
+  const fitted = fitSegments(
+    statusSegments({
+      connection: "connected",
+      title: "untitled",
+      model: "",
+      folder: "",
+      messageCount: null,
+      uptimeSeconds: null,
+    }),
+    40,
+  );
+  assert.deepEqual(
+    fitted.map((segment) => segment.text),
+    ["connected", "untitled"],
+  );
 });

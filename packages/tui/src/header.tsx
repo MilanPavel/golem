@@ -7,12 +7,14 @@ import { CLAY, LOGO_BODY, LOGO_EYE } from "./theme.ts";
 export function Header({
   mode,
   version,
+  versionWarn,
   model,
   cwd,
   columns,
 }: {
   mode: FrameMode;
   version: string;
+  versionWarn: boolean;
   model: string;
   cwd: string;
   columns: number;
@@ -21,11 +23,13 @@ export function Header({
     return null;
   }
   if (mode === "compact") {
-    const text = ["golem", model, cwd].filter((part) => part.length > 0).join("  ");
+    const rest = [model, cwd].filter((part) => part.length > 0).join("  ");
     return (
       <Text wrap="truncate-end">
         <Text color={LOGO_BODY}>█ </Text>
-        {text}
+        golem
+        <VersionText version={version} warn={versionWarn} />
+        {rest.length > 0 ? `  ${rest}` : ""}
       </Text>
     );
   }
@@ -50,9 +54,9 @@ export function Header({
         ))}
       </Box>
       <Box flexDirection="column" width={textWidth}>
-        <Text wrap="truncate-end" bold>
-          golem
-          {version.length > 0 ? <Text dimColor>{` ${version}`}</Text> : null}
+        <Text wrap="truncate-end">
+          <Text bold>golem</Text>
+          <VersionText version={version} warn={versionWarn} />
         </Text>
         <Text wrap="truncate-end" color={CLAY} bold>
           {model.length > 0 ? model : " "}
@@ -62,6 +66,17 @@ export function Header({
         </Text>
       </Box>
     </Box>
+  );
+}
+
+function VersionText({ version, warn }: { version: string; warn: boolean }) {
+  if (version.length === 0) {
+    return null;
+  }
+  return (
+    <Text color={warn ? "yellow" : undefined} dimColor={!warn}>
+      {` ${version}`}
+    </Text>
   );
 }
 

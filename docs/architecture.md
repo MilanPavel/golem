@@ -264,7 +264,7 @@ Adding a message is the same every time. Add a class, run `just gen`, and the cl
 
 *The body is already standing. The brush is still laying on the mark.*
 
-The TUI is `@golem/tui`. `main.tsx` opens one client, takes the alternate screen, and mounts `App`. The screen draws. It does not run the model, and it does not open the socket. `@golem/client` does that. `golem status` uses the same library, asks once, and exits. The TUI asks the client to reconnect.
+The TUI is `@golem/tui`. `main.tsx` opens one client, takes the alternate screen, and mounts `App`. The screen draws. It does not run the model, and it does not open the socket. `@golem/client` does that. `golem status` uses the same library, asks once, and exits. `golem --version` prints the CLI version, and the daemon version when the daemon is up. The TUI asks the client to reconnect.
 
 The picture is rebuilt on every paint. `chrome.ts`, `layout-chat.ts`, and `debug-view.ts` turn memory into rows, and those rows are thrown away. What stays is the conversation, the draft, and a few facts about the link.
 
@@ -310,11 +310,11 @@ flowchart TB
   banner["Banner<br>only for an error or a notice"]
   meter["Meter<br>only while a reply is in progress"]
   composer["Composer<br>the line you are typing"]
-  status["Status<br>connection, model, folder"]
+  status["Status<br>connection, title, model, folder"]
   header --> body --> debug --> banner --> meter --> composer --> status
 ```
 
-A window at least 20 rows tall and 42 columns wide gives the header the logo: 18 columns, 7 rows, because two pixel rows share one cell. Beside it sit the daemon version, the model (`name · profile`), and the folder. A smaller window uses one line: `█ golem`, then the model, then the folder. No rows at all draws nothing.
+A window at least 20 rows tall and 42 columns wide gives the header the logo: 18 columns, 7 rows, because two pixel rows share one cell. Beside it sit the version, the model (`name · profile`), and the folder. The version is the TUI's own, taken from its package when it is built. When that matches the daemon, one number is shown. When it does not, the header shows `tui X · daemon Y` in yellow. The socket still connects: only a different protocol major is refused. A smaller window uses one line: `█ golem`, the version, the model, then the folder. No rows at all draws nothing.
 
 The other bands ask for rows only when they are needed.
 
@@ -322,7 +322,7 @@ The other bands ask for rows only when they are needed.
 - The composer wants up to 5 for a long draft, or 1 while a reply is in progress. That one row is `…`, and typing is ignored.
 - The meter wants 1 while a reply is in progress: `thinking`, then `writing · N chars · Ns`, with a small block that moves.
 - An error wants 1 row in red. A notice wants 1 row in yellow.
-- The status line wants 1: the connection word, the model, the folder. A narrow window drops the folder first, then the model.
+- The status line wants 1. Left to right: the connection word, the session title (`untitled` until one arrives), the model, the folder, the message count, and how long the daemon has been up. A narrow window drops the lowest segment first: uptime, then the message count, then the folder. A long title is shortened so the session name stays. The connection word is never dropped. It is shortened only when it alone is wider than the window. The terminal tab is `golem — <title>`, and the previous title is put back on exit.
 
 A 24×80 terminal becomes a frame 79 columns wide. One column is left unused, because a glyph in the last column would wrap and scroll the header away. With the logo, a one-line composer, and the status line, the chat has 15 rows.
 
@@ -358,7 +358,7 @@ If the socket drops, `busy` stays as it was. The half-written answer stays, stil
 
 The draft is the composer text. Keystrokes add to it. Enter clears it only when the line is sent.
 
-The link is remembered as `connection`: connecting, connected, reconnecting, closed, or rejected. The status line paints that word green, yellow, or red. `sessionId` is this chat on the daemon. `use-session.ts` picks it: on the first connect, the newest session from `session.list`, or a new one when there is none. It is set before the attach, so the replay is drawn. Until it exists, and until the link is connected, typing does nothing. The header's model prefers the session's profile, provider, and name, and fills any hole from `daemon.status`.
+The link is remembered as `connection`: connecting, connected, reconnecting, closed, or rejected. The status line paints that word green, yellow, or red. The session title on that line follows `session.updated`. Until that event is replayed, the title already on the session list is used. Uptime comes from `daemon.status` and then advances on the clock. `sessionId` is this chat on the daemon. `use-session.ts` picks it: on the first connect, the newest session from `session.list`, or a new one when there is none. It is set before the attach, so the replay is drawn. Until it exists, and until the link is connected, typing does nothing. The header's model prefers the session's profile, provider, and name, and fills any hole from `daemon.status`.
 
 `offset` is the transcript scroll. `debugOffset` is the same count inside the debug panel. `tick` increases ten times a second while `busy` is true. The screen never prints it. It exists so the meter block moves.
 
