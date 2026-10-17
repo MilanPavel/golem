@@ -12,6 +12,13 @@ import {
   type DeltaBatcher,
 } from "./chat-state.ts";
 import { applyComposer, closedDebug, COMMANDS, helpLines, toggleDebugTab, type DebugState } from "./commands.ts";
+import {
+  applySuggestion,
+  moveSuggestion,
+  suggest,
+  suggestionWindow,
+  type Suggestion,
+} from "./suggest.ts";
 import { bannerText, frameBudget, frameColumns, layoutComposer } from "./chrome.ts";
 import { holdDebugOffset, layoutDebug, type CheckpointMessage, type DebugTone } from "./debug-view.ts";
 import { Header } from "./header.tsx";
@@ -80,6 +87,8 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   const [helpOpen, setHelpOpen] = useState(false);
   const [keysOpen, setKeysOpen] = useState(false);
   const [keysOffset, setKeysOffset] = useState(0);
+  const [suggestDismissed, setSuggestDismissed] = useState(false);
+  const [suggestPick, setSuggestPick] = useState({ draft: "", index: 0 });
   const draftRef = useRef(draft);
   const busyRef = useRef(chat.busy);
   const chatRef = useRef(chat);
@@ -93,6 +102,11 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   const panelOpen = useRef(false);
   const keysOpenRef = useRef(false);
   const overlayFrame = useRef({ columns: 80, body: 1 });
+  const suggestRef = useRef<{ items: Suggestion[]; selected: number; open: boolean }>({
+    items: [],
+    selected: 0,
+    open: false,
+  });
   const inspectGen = useRef(0);
   const loadCheckpointRef = useRef<(sessionId: string) => void>(() => undefined);
   const debugLines = useRef(0);
@@ -110,6 +124,10 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   const columns = frameColumns(size.columns || 80);
   const rows = size.rows || 24;
   const banner = chat.error ?? chat.notice;
+  const suggestMatches =
+    chat.busy || switcher.open || keysOpen || suggestDismissed ? [] : suggest(draft, COMMANDS);
+  const suggestSelected =
+    suggestPick.draft === draft ? Math.min(suggestPick.index, Math.max(0, suggestMatches.length - 1)) : 0;
   const budget = frameBudget({
     rows,
     columns,
@@ -117,7 +135,13 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
     busy: chat.busy,
     banner: banner !== null && banner.length > 0,
     debug: debug.open,
+    suggestions: suggestMatches.length,
   });
+  suggestRef.current = {
+    items: suggestMatches,
+    selected: suggestSelected,
+    open: budget.suggestions > 0 && suggestMatches.length > 0,
+  };
   overlayFrame.current = { columns, body: budget.body };
   const helpText = helpOpen && !keysOpen && !switcher.open ? helpLines(COMMANDS, columns) : [];
   const helpHeight = Math.min(helpText.length, budget.body);
@@ -331,6 +355,12 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
     applyWindowTitle(titleLabel);
   }, [titleLabel]);
 
+  useEffect(() => {
+    if (!draft.startsWith("/") || draft.startsWith("//")) {
+      setSuggestDismissed(false);
+    }
+  }, [draft]);
+
   // Ink names F1 and then drops it, so the key table never sees that press.
   useEffect(() => {
     const onData = (chunk: Buffer | string) => {
@@ -510,6 +540,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       draftEmpty: draftRef.current.length === 0,
       busy: busyRef.current,
       connected: connectionRef.current.status === "connected" && sessionRef.current !== null,
+      suggestions: suggestRef.current.open,
     };
   }
 
@@ -545,18 +576,12 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       case "close-debug":
         showDebug({ ...debugRef.current, open: false });
         return;
-      case "debug-tab": {
-        const next = toggleDebugTab(debugRef.current);
-        showDebug(next);
-        if (
-          next.tab === "model" &&
-          sessionRef.current !== null &&
-          connectionRef.current.status === "connected"
-        ) {
-          loadCheckpointRef.current(sessionRef.current);
-        }
+      case "debug-tab":
+        switchDebugTab();
         return;
-      }
+      case "suggest":
+        applySuggestKey(effect.key);
+        return;
       case "switcher":
         onSwitcherKey(effect.key);
         return;
@@ -571,6 +596,40 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
         return;
       case "ignore":
         return;
+    }
+  }
+
+  function switchDebugTab(): void {
+    const next = toggleDebugTab(debugRef.current);
+    showDebug(next);
+    if (next.tab === "model" && sessionRef.current !== null && connectionRef.current.status === "connected") {
+      loadCheckpointRef.current(sessionRef.current);
+    }
+  }
+
+  function applySuggestKey(key: "up" | "down" | "tab" | "enter" | "close"): void {
+    if (key === "close") {
+      setSuggestDismissed(true);
+      return;
+    }
+    const current = suggestRef.current;
+    if (key === "up" || key === "down") {
+      setSuggestPick({
+        draft: draftRef.current,
+        index: moveSuggestion(current.selected, key, current.items.length),
+      });
+      return;
+    }
+    const next = applySuggestion(draftRef.current, current.items, current.selected, key);
+    if (next.draft !== draftRef.current) {
+      setDraft(next.draft);
+    }
+    if (next.submit) {
+      submit();
+      return;
+    }
+    if (key === "tab" && next.draft === draftRef.current && debugRef.current.open) {
+      switchDebugTab();
     }
   }
 
@@ -737,6 +796,14 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
           )}
         </Text>
       ) : null}
+      {budget.suggestions > 0 ? (
+        <SuggestionBand
+          items={suggestMatches}
+          selected={suggestSelected}
+          columns={columns}
+          height={budget.suggestions}
+        />
+      ) : null}
       {budget.composer > 0 ? (
         <Box flexDirection="column" width={columns} height={budget.composer} flexShrink={0}>
           {composer.map((line, index) => {
@@ -793,6 +860,34 @@ function LineView({ line }: { line: LayoutLine }) {
         </Text>
       ))}
     </Text>
+  );
+}
+
+function SuggestionBand({
+  items,
+  selected,
+  columns,
+  height,
+}: {
+  items: readonly Suggestion[];
+  selected: number;
+  columns: number;
+  height: number;
+}) {
+  const view = suggestionWindow(items.length, selected, height);
+  const shown = items.slice(view.start, view.start + height);
+  return (
+    <Box flexDirection="column" width={columns} height={height} flexShrink={0} overflow="hidden">
+      {shown.map((item, offset) => {
+        const active = view.start + offset === view.index;
+        return (
+          <Text key={view.start + offset} wrap="truncate-end">
+            <Text bold={active}>{item.label}</Text>
+            {active && item.description.length > 0 ? <Text dimColor>{`  ${item.description}`}</Text> : null}
+          </Text>
+        );
+      })}
+    </Box>
   );
 }
 

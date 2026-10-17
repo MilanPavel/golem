@@ -9,6 +9,7 @@ export type FrameBudget = {
   body: number;
   banner: number;
   meter: number;
+  suggestions: number;
   composer: number;
   status: number;
   debug: number;
@@ -27,6 +28,7 @@ export function frameColumns(terminalColumns: number): number {
 }
 
 const DEBUG_ROWS = 7;
+const SUGGEST_ROWS = 6;
 
 export const HEADER_GAP = 2;
 export const HEADER_PAD_TOP = 1;
@@ -39,6 +41,7 @@ export function frameBudget(input: {
   busy: boolean;
   banner: boolean;
   debug?: boolean;
+  suggestions?: number;
 }): FrameBudget {
   const rows = Math.max(0, Math.floor(input.rows));
   if (rows === 0) {
@@ -48,6 +51,7 @@ export function frameBudget(input: {
       body: 0,
       banner: 0,
       meter: 0,
+      suggestions: 0,
       composer: 0,
       status: 0,
       debug: 0,
@@ -57,10 +61,15 @@ export function frameBudget(input: {
   let composer = input.busy ? 1 : Math.min(5, composerLineCount(input.draft, input.columns));
   let meter = input.busy ? 1 : 0;
   let banner = input.banner ? 1 : 0;
+  let suggestions = Math.min(SUGGEST_ROWS, Math.max(0, Math.floor(input.suggestions ?? 0)));
   let status = 1;
   let debug = input.debug === true ? DEBUG_ROWS : 0;
 
   const shrink = (): boolean => {
+    if (suggestions > 0) {
+      suggestions -= 1;
+      return true;
+    }
     if (debug > 3) {
       debug -= 1;
       return true;
@@ -100,17 +109,18 @@ export function frameBudget(input: {
     return false;
   };
 
-  while (header + banner + meter + composer + status + debug >= rows && shrink()) {
+  while (header + banner + meter + suggestions + composer + status + debug >= rows && shrink()) {
     // Leave at least one row for the transcript when the terminal has a row.
   }
 
-  const used = header + banner + meter + composer + status + debug;
+  const used = header + banner + meter + suggestions + composer + status + debug;
   return {
     mode: header >= HEADER_ROWS ? "full" : header > 0 ? "compact" : "hidden",
     header,
     body: rows - used,
     banner,
     meter,
+    suggestions,
     composer,
     status,
     debug,

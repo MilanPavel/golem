@@ -23,6 +23,7 @@ function place(overrides: Partial<KeyPlace> = {}): KeyPlace {
     draftEmpty: true,
     busy: false,
     connected: true,
+    suggestions: false,
     ...overrides,
   };
 }
@@ -114,6 +115,21 @@ test("keys dispatch through the table", () => {
   assert.deepEqual(pressed("", { return: true }, { switcher: true }), { kind: "switcher", key: "enter" });
   assert.deepEqual(pressed("n", {}, { switcher: true }), { kind: "switcher", key: "new" });
   assert.deepEqual(pressed("n", {}), { kind: "insert", text: "n" });
+  assert.deepEqual(pressed("", { upArrow: true }, { suggestions: true }), { kind: "suggest", key: "up" });
+  assert.deepEqual(pressed("", { downArrow: true }, { suggestions: true }), { kind: "suggest", key: "down" });
+  assert.deepEqual(pressed("", { upArrow: true }, { suggestions: true, switcher: true }), {
+    kind: "switcher",
+    key: "up",
+  });
+  assert.deepEqual(pressed("", { escape: true }, { suggestions: true, help: true, debug: true }), {
+    kind: "suggest",
+    key: "close",
+  });
+  assert.deepEqual(pressed("", { tab: true }, { suggestions: true, debug: true }), { kind: "suggest", key: "tab" });
+  assert.deepEqual(pressed("", { return: true }, { suggestions: true, connected: false }), {
+    kind: "suggest",
+    key: "enter",
+  });
   assert.deepEqual(pressed("", { return: true }), { kind: "submit" });
   assert.deepEqual(pressed("", { return: true }, { connected: false }), { kind: "ignore" });
   assert.deepEqual(pressed("", { backspace: true }), { kind: "backspace" });

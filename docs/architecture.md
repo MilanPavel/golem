@@ -294,7 +294,7 @@ sequenceDiagram
 
 `message.send` only answers that a run started. Your line appears when `message.completed` comes back, and the draft is already cleared. If the send fails, the draft returns and the banner turns red. If the code is `SESSION_NOT_FOUND` (`-32003`), the screen puts the draft back, then creates and attaches to a new session.
 
-`/sessions` shows every session in place of the transcript: a green dot while a run is open, the title, and how long ago it was active. Up and down move, Enter attaches, `n` starts a new session, and Esc closes. `/new` starts a new session directly. `/title <name>` renames the current session, and `/title` alone shows its title. `/fork` copies this session up to its newest finished message into a new session and switches to it. The other session keeps running in the daemon. The slash commands are one table in `commands.ts`. `/help` prints that table in the transcript area. It is not sent and not stored. Any other `/word` says `unknown command — /help lists them`. Keys are one table in `keys.ts`. The input handler dispatches through it. `?` on an empty line, or F1 anywhere, opens the list, grouped by composer, transcript, switcher, and debug. Esc or `?` closes it.
+`/sessions` shows every session in place of the transcript: a green dot while a run is open, the title, and how long ago it was active. Up and down move, Enter attaches, `n` starts a new session, and Esc closes. `/new` starts a new session directly. `/title <name>` renames the current session, and `/title` alone shows its title. `/fork` copies this session up to its newest finished message into a new session and switches to it. The other session keeps running in the daemon. The slash commands are one table in `commands.ts`. `/help` prints that table in the transcript area. It is not sent and not stored. Any other `/word` says `unknown command — /help lists them`. Typing `/` lists those commands above the composer. The list narrows as you type, prefix matches first, then substrings. Up and Down move, Tab fills in the selected row, and Enter fills in a partial name. Esc closes the list and keeps the draft. A space after the name lists that command's argument choices. A line starting with `//` does not open the list. Keys are one table in `keys.ts`. The input handler dispatches through it. `?` on an empty line, or F1 anywhere, opens the list, grouped by composer, transcript, switcher, and debug. Esc or `?` closes it.
 
 `/debug` opens a panel. `/debug wire` and `/debug model` pick a tab. `/debug hold` keeps the next line on the screen and does not send it. `/debug go` sends that held line. Esc closes the panel. Tab swaps the tab.
 
@@ -309,9 +309,10 @@ flowchart TB
   debug["Debug<br>only after /debug"]
   banner["Banner<br>only for an error or a notice"]
   meter["Meter<br>only while a reply is in progress"]
+  suggestions["Suggestions<br>only while the draft is a / command"]
   composer["Composer<br>the line you are typing"]
   status["Status<br>connection, title, model, folder"]
-  header --> body --> debug --> banner --> meter --> composer --> status
+  header --> body --> debug --> banner --> meter --> suggestions --> composer --> status
 ```
 
 A window at least 20 rows tall and 42 columns wide gives the header the logo: 18 columns, 7 rows, because two pixel rows share one cell. Beside it sit the version, the model (`name · profile`), and the folder. The version is the TUI's own, taken from its package when it is built. When that matches the daemon, one number is shown. When it does not, the header shows `tui X · daemon Y` in yellow. The socket still connects: only a different protocol major is refused. A smaller window uses one line: `█ golem`, the version, the model, then the folder. No rows at all draws nothing.
@@ -321,12 +322,13 @@ The other bands ask for rows only when they are needed.
 - The debug panel wants 7.
 - The composer wants up to 5 for a long draft, or 1 while a reply is in progress. That one row is `…`, and typing is ignored.
 - The meter wants 1 while a reply is in progress: `thinking`, then `writing · N chars · Ns`, with a small block that moves.
+- Command suggestions want up to 6, above the composer, and only while the draft is a `/` command.
 - An error wants 1 row in red. A notice wants 1 row in yellow.
 - The status line wants 1. Left to right: the connection word, the session title (`untitled` until one arrives), the model, the folder, the message count, and how long the daemon has been up. A narrow window drops the lowest segment first: uptime, then the message count, then the folder. A long title is shortened so the session name stays. The connection word is never dropped. It is shortened only when it alone is wider than the window. The terminal tab is `golem — <title>`, and the previous title is put back on exit.
 
 A 24×80 terminal becomes a frame 79 columns wide. One column is left unused, because a glyph in the last column would wrap and scroll the header away. With the logo, a one-line composer, and the status line, the chat has 15 rows.
 
-If the window is short, bands give rows back until the chat still has one. In order: the debug panel shrinks toward 3 rows, the composer shrinks to one line, the meter goes away, the logo collapses to one line, the banner goes away, the debug panel goes away, the header goes away, the composer goes away, and last the status line.
+If the window is short, bands give rows back until the chat still has one. In order: the suggestion list goes away, the debug panel shrinks toward 3 rows, the composer shrinks to one line, the meter goes away, the logo collapses to one line, the banner goes away, the debug panel goes away, the header goes away, the composer goes away, and last the status line.
 
 Inside the transcript, messages are painted in order with a blank line between them. Each starts with a bold `you` or `golem`. Your lines sit on a clay background. While `streaming` is set, the text is wrapped as plain characters. When the answer is finished, the same text is drawn as markdown. If the laid-out lines are taller than the band, a scrollbar appears (`│`, with `█` as the thumb) and the text uses one fewer column.
 

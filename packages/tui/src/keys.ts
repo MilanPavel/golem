@@ -51,6 +51,7 @@ export type KeyPlace = {
   draftEmpty: boolean;
   busy: boolean;
   connected: boolean;
+  suggestions: boolean;
 };
 
 export type ScrollToward = "up" | "down" | "start" | "end";
@@ -65,6 +66,7 @@ export type KeyEffect =
   | { kind: "close-debug" }
   | { kind: "debug-tab" }
   | { kind: "switcher"; key: "up" | "down" | "enter" | "new" | "close" }
+  | { kind: "suggest"; key: "up" | "down" | "tab" | "enter" | "close" }
   | { kind: "submit" }
   | { kind: "backspace" }
   | { kind: "insert"; text: string }
@@ -80,6 +82,7 @@ type KeyWhen = {
   draftEmpty?: boolean;
   busy?: boolean;
   connected?: boolean;
+  suggestions?: boolean;
 };
 
 export type KeyBinding = {
@@ -142,6 +145,46 @@ export const KEYS: readonly KeyBinding[] = [
     description: "Closes the key list.",
     when: { name: "question", overlay: true },
     run: () => ({ kind: "close-overlay" }),
+  },
+  {
+    id: "suggest-up",
+    label: "Up",
+    contexts: ["composer"],
+    description: "While suggestions are open, moves the selection up.",
+    when: { name: "up", overlay: false, switcher: false, suggestions: true },
+    run: () => ({ kind: "suggest", key: "up" }),
+  },
+  {
+    id: "suggest-down",
+    label: "Down",
+    contexts: ["composer"],
+    description: "While suggestions are open, moves the selection down.",
+    when: { name: "down", overlay: false, switcher: false, suggestions: true },
+    run: () => ({ kind: "suggest", key: "down" }),
+  },
+  {
+    id: "suggest-close",
+    label: "Esc",
+    contexts: ["composer"],
+    description: "Closes command suggestions and keeps the draft.",
+    when: { name: "escape", overlay: false, suggestions: true },
+    run: () => ({ kind: "suggest", key: "close" }),
+  },
+  {
+    id: "suggest-tab",
+    label: "Tab",
+    contexts: ["composer"],
+    description: "Fills in the selected command or argument.",
+    when: { name: "tab", overlay: false, switcher: false, suggestions: true },
+    run: () => ({ kind: "suggest", key: "tab" }),
+  },
+  {
+    id: "suggest-enter",
+    label: "Enter",
+    contexts: ["composer"],
+    description: "Fills in a partial command, or sends a finished one.",
+    when: { name: "return", overlay: false, switcher: false, suggestions: true },
+    run: () => ({ kind: "suggest", key: "enter" }),
   },
   {
     id: "page-up",
@@ -405,6 +448,9 @@ function whenMatches(when: KeyWhen, place: KeyPlace, press: Press): boolean {
     return false;
   }
   if (when.connected !== undefined && when.connected !== place.connected) {
+    return false;
+  }
+  if (when.suggestions !== undefined && when.suggestions !== place.suggestions) {
     return false;
   }
   return true;

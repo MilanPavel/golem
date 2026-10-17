@@ -106,6 +106,22 @@ test("an open debug panel takes rows from the transcript", () => {
   );
 });
 
+test("suggestions take rows from the transcript and go away before the meter", () => {
+  const idle = frameBudget({ rows: 24, columns: 80, draft: "", busy: false, banner: false });
+  const open = frameBudget({ rows: 24, columns: 80, draft: "/", busy: false, banner: false, suggestions: 6 });
+  assert.equal(open.suggestions, 6);
+  assert.equal(open.body, idle.body - 6);
+  assert.equal(
+    open.header + open.body + open.banner + open.meter + open.suggestions + open.composer + open.status + open.debug,
+    24,
+  );
+
+  const tight = frameBudget({ rows: 5, columns: 80, draft: "", busy: true, banner: false, suggestions: 6 });
+  assert.equal(tight.suggestions, 0);
+  assert.equal(tight.meter, 1);
+  assert.equal(tight.body, 1);
+});
+
 test("banner text stays on one line", () => {
   assert.equal(bannerText("session was not found", 80), "session was not found");
   assert.equal(bannerText("abcdef", 4), "abc…");
