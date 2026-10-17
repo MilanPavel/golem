@@ -7,6 +7,10 @@ export type ChatMessage = {
   streaming: boolean;
   /** The run stopped before the model finished this reply. */
   interrupted?: boolean;
+  /** Event time. Completed messages use `message.completed`; a streaming reply uses `message.started`. */
+  at?: string;
+  /** Milliseconds from `run.started` to this finished answer. */
+  durationMs?: number;
 };
 
 export type ChatState = {
@@ -61,13 +65,14 @@ export function reduceChat(state: ChatState, event: ChatEvent): ChatState {
             role: "assistant",
             text: "",
             streaming: true,
+            at: event.ts,
           },
         ],
       };
     case "message.delta":
       return appendDelta(state, event.data.message_id, event.data.text);
     case "message.completed":
-      return { ...state, messages: upsertCompleted(state.messages, event) };
+      return { ...state, messages: upsertCompleted(state.messages, event, state.runStartedAt) };
     case "run.started":
       return { ...state, busy: true, error: null, runStartedAt: event.ts, runId: event.run_id };
     case "run.completed":
@@ -134,20 +139,40 @@ export function createDeltaBatcher(
   };
 }
 
-function upsertCompleted(messages: readonly ChatMessage[], event: ChatEvent): ChatMessage[] {
+function upsertCompleted(
+  messages: readonly ChatMessage[],
+  event: ChatEvent,
+  runStartedAt: string | null,
+): ChatMessage[] {
   if (event.type !== "message.completed") {
     return [...messages];
   }
+  const durationMs = event.data.role === "assistant" ? answerDuration(runStartedAt, event.ts) : undefined;
   const next: ChatMessage = {
     id: event.data.message_id,
     role: event.data.role,
     text: event.data.text,
     streaming: false,
     interrupted: event.data.interrupted === true,
+    at: event.ts,
+    ...(durationMs === undefined ? {} : { durationMs }),
   };
   const index = messages.findIndex((message) => message.id === next.id);
   if (index < 0) {
     return [...messages, next];
   }
   return messages.map((message, position) => (position === index ? next : message));
+}
+
+/** Absent when either timestamp is missing or the clock went backwards. */
+function answerDuration(startedAt: string | null, finishedAt: string): number | undefined {
+  if (startedAt === null || startedAt.length === 0 || finishedAt.length === 0) {
+    return undefined;
+  }
+  const started = Date.parse(startedAt);
+  const finished = Date.parse(finishedAt);
+  if (Number.isNaN(started) || Number.isNaN(finished) || finished < started) {
+    return undefined;
+  }
+  return finished - started;
 }

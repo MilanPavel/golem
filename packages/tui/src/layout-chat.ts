@@ -1,12 +1,14 @@
 import { Lexer, type Token, type Tokens } from "marked";
 
 import type { ChatMessage } from "./chat-state.ts";
+import { formatDuration, formatMessageTime } from "./transcript.ts";
 
 export type Span = {
   text: string;
   bold?: boolean;
   italic?: boolean;
   code?: boolean;
+  dim?: boolean;
 };
 
 export type LineRole = "user" | "assistant" | "plain";
@@ -24,11 +26,21 @@ export type Viewport = {
 
 export type Transcript = Viewport & {
   gutter: readonly string[] | null;
+  lineCount: number;
+};
+
+export type TranscriptOptions = {
+  times: boolean;
+  now: number;
 };
 
 export const INTERRUPTED_MARK = "· interrupted";
 
-export function layoutMessages(messages: readonly ChatMessage[], columns: number): LayoutLine[] {
+export function layoutMessages(
+  messages: readonly ChatMessage[],
+  columns: number,
+  options?: TranscriptOptions,
+): LayoutLine[] {
   const width = Math.max(1, columns);
   const lines: LayoutLine[] = [];
   for (const message of messages) {
@@ -40,9 +52,13 @@ export function layoutMessages(messages: readonly ChatMessage[], columns: number
     const body = message.streaming
       ? wrapSpans([{ text: message.text }], width)
       : markdownLines(message.text, width);
-    lines.push(paint({ role, spans: [{ text: label, bold: true }] }, width));
+    lines.push(paint({ role, spans: labelSpans(label, message, options) }, width));
     for (const spans of body) {
       lines.push(paint({ role, spans }, width));
+    }
+    const duration = answerDuration(message);
+    if (duration !== null) {
+      lines.push(paint({ role, spans: [{ text: duration, dim: true }] }, width));
     }
     if (message.interrupted === true) {
       lines.push(paint({ role, spans: [{ text: INTERRUPTED_MARK, italic: true }] }, width));
@@ -87,19 +103,20 @@ export function layoutTranscript(
   columns: number,
   bodyRows: number,
   offsetFromBottom: number,
+  options?: TranscriptOptions,
 ): Transcript {
   const width = Math.max(1, columns);
-  const full = layoutMessages(messages, width);
+  const full = layoutMessages(messages, width, options);
   const rows = Math.max(0, bodyRows);
   const overflows = rows > 0 && full.length > rows;
   const contentWidth = overflows ? Math.max(1, width - 1) : width;
-  const lines = overflows ? layoutMessages(messages, contentWidth) : full;
+  const lines = overflows ? layoutMessages(messages, contentWidth, options) : full;
   const fitted = fitViewport(lines, rows, offsetFromBottom);
   const gutter =
     fitted.overflow && fitted.lines.length > 0
       ? gutterColumn(lines.length, fitted.lines.length, fitted.offsetFromBottom)
       : null;
-  return { ...fitted, gutter };
+  return { ...fitted, gutter, lineCount: lines.length };
 }
 
 export function padLine(line: LayoutLine, width: number): LayoutLine {
@@ -108,6 +125,27 @@ export function padLine(line: LayoutLine, width: number): LayoutLine {
     return line;
   }
   return { role: line.role, spans: [...line.spans, { text: " ".repeat(width - used) }] };
+}
+
+function labelSpans(label: string, message: ChatMessage, options: TranscriptOptions | undefined): Span[] {
+  const spans: Span[] = [{ text: label, bold: true }];
+  if (options?.times !== true || message.at === undefined) {
+    return spans;
+  }
+  const stamp = formatMessageTime(message.at, options.now);
+  if (stamp.length === 0) {
+    return spans;
+  }
+  spans.push({ text: `  ${stamp}`, dim: true });
+  return spans;
+}
+
+function answerDuration(message: ChatMessage): string | null {
+  if (message.role !== "assistant" || message.streaming || message.durationMs === undefined) {
+    return null;
+  }
+  const text = formatDuration(message.durationMs);
+  return text.length > 0 ? text : null;
 }
 
 function paint(line: LayoutLine, width: number): LayoutLine {

@@ -157,13 +157,20 @@ just tui
 
 The TUI opens your newest session, or a new one if there is none. Type and press Enter.
 
-The header shows which golem this is. The status line shows the session title, how many messages it holds, and how long the daemon has been up. A narrow window hides uptime first, then the message count, then the folder. The terminal tab is named `golem — <title>`.
+The header shows which golem this is. The status line shows the session title, how many messages it holds, and how long the daemon has been up. While you are scrolled up, it also shows how many new lines arrived. End jumps back. A narrow window hides uptime first, then the message count, then the folder. The terminal tab is named `golem — <title>`.
+
+A finished answer shows how long it took, under the text. `/time` shows the time of each message.
 
 ### Slash commands
 
 | Command | What it does |
 |---|---|
 | `/help` | Lists every command, with its arguments |
+| `/copy` | Copies the last answer |
+| `/copy code` | Copies the last fenced code block |
+| `/export` | Writes this session as markdown, to `~/.golem/exports/<title>.md` |
+| `/export <path>` | Writes that markdown to the path you give |
+| `/time` | Shows or hides the time beside each message |
 | `/sessions` | Opens the session switcher, with live status |
 | `/new` | Starts a new session |
 | `/title` | Shows the current session's title |
@@ -192,7 +199,7 @@ Type `/` and matching commands appear above the composer. Typing narrows them, p
 | `?` | On an empty line, shows every key. `?` or Esc closes the list |
 | F1 | Shows or hides the key list |
 | Ctrl-C | Cancels the answer in progress. A second Ctrl-C quits |
-| Page Up, Page Down, Home, End, mouse wheel | Scroll the chat. The same keys scroll the key list while it is open |
+| Page Up, Page Down, Home, End, mouse wheel | Scroll the chat. End jumps back to new lines. The same keys scroll the key list while it is open |
 | Up, Down | Move through command suggestions while that list is open |
 | Tab | Fills in the selected command or argument. Also switches the debug tab |
 | Up, Down, Enter, `n`, Esc | Move through the session switcher, open a session, start a new one, close the switcher |
@@ -209,6 +216,8 @@ Type `/` and matching commands appear above the composer. Typing narrows them, p
 | `~/.golem/logs/golem.jsonl` | The daemon log. launchd's own output is next to it |
 | `~/.golem/run/golem.sock` | The socket the TUI connects to |
 | `~/.golem/history` | Messages you sent, so a new session can recall them |
+| `~/.golem/exports/` | Sessions written with `/export` |
+| `~/.golem/tui.json` | Whether message times are shown |
 
 Set `GOLEM_HOME` to use another folder, for example a throwaway one for experiments. Both the daemon and the TUI respect it. A daemon started by launchd keeps the folder it was installed with.
 

@@ -45,6 +45,7 @@ import {
   type OverlayLine,
 } from "./keys.ts";
 import { layoutTranscript, type LayoutLine } from "./layout-chat.ts";
+import { loadPrefs, prefsPath, saveTimes } from "./prefs.ts";
 import { assistantChars, elapsedSeconds, meterLine, meterPhase } from "./progress.ts";
 import {
   fitSegments,
@@ -73,6 +74,16 @@ import {
 } from "./switcher.ts";
 import { SwitcherView } from "./switcher.tsx";
 import { CLAY, QUESTION_BG, QUESTION_FG } from "./theme.ts";
+import {
+  copyAnswer,
+  copyCode,
+  copyToClipboard,
+  exportDestination,
+  followTail,
+  sessionMarkdown,
+  writeExport,
+  type TailAnchor,
+} from "./transcript.ts";
 import { useSessionIndex } from "./use-session-index.ts";
 import { useSession } from "./use-session.ts";
 
@@ -87,6 +98,8 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   const [now, setNow] = useState(() => Date.now());
   const [liveTitle, setLiveTitle] = useState<{ sessionId: string; title: string } | null>(null);
   const [offset, setOffset] = useState(0);
+  const [tail, setTail] = useState<TailAnchor | null>(null);
+  const [showTimes, setShowTimes] = useState(false);
   const [tick, setTick] = useState(0);
   const [debug, setDebug] = useState<DebugState>(closedDebug);
   const [debugOffset, setDebugOffset] = useState(0);
@@ -125,8 +138,13 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   const editing = useRef(false);
   const sentHistory = useRef(createHistory(historyPath()));
   const historyCursorRef = useRef(historyCursor);
+  const liveTitleRef = useRef(liveTitle);
+  const showTimesRef = useRef(showTimes);
+  const prefsLoaded = useRef(false);
   draftRef.current = draft;
   historyCursorRef.current = historyCursor;
+  liveTitleRef.current = liveTitle;
+  showTimesRef.current = showTimes;
   busyRef.current = chat.busy;
   chatRef.current = chat;
   runIdRef.current = chat.runId;
@@ -163,7 +181,14 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   const helpText = helpOpen && !keysOpen && !switcher.open ? helpLines(COMMANDS, columns) : [];
   const helpHeight = Math.min(helpText.length, budget.body);
   const chatHeight = budget.body - helpHeight;
-  const transcript = layoutTranscript(chat.messages, columns, chatHeight, offset);
+  const transcriptOptions = { times: showTimes, now };
+  const measured = layoutTranscript(chat.messages, columns, chatHeight, offset, transcriptOptions);
+  const widthKey = measured.overflow ? Math.max(1, columns - 1) : columns;
+  const followed = followTail(tail, measured.lineCount, widthKey, offset);
+  const transcript =
+    followed.offset === offset
+      ? measured
+      : layoutTranscript(chat.messages, columns, chatHeight, followed.offset, transcriptOptions);
   const model = preferModel(sessionModel, daemonModel);
   const chip = modelChip(model.name, model.profile);
   const cwd = shortCwd(process.cwd(), homedir());
@@ -220,6 +245,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       folder: cwd,
       messageCount: sessionId === null ? null : chat.messages.length,
       uptimeSeconds,
+      freshLines: followed.fresh,
     }),
     columns,
   );
@@ -228,6 +254,19 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
 
   useEffect(() => {
     void sentHistory.current.load().catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    void loadPrefs(prefsPath()).then(
+      (prefs) => {
+        if (prefsLoaded.current) {
+          return;
+        }
+        prefsLoaded.current = true;
+        setShowTimes(prefs.times);
+      },
+      () => undefined,
+    );
   }, []);
 
   useEffect(() => {
@@ -262,6 +301,21 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       setOffset(transcript.offsetFromBottom);
     }
   }, [offset, transcript.offsetFromBottom]);
+
+  useEffect(() => {
+    const anchor = followed.anchor;
+    setTail((current) =>
+      current !== null &&
+      current.lines === anchor.lines &&
+      current.columns === anchor.columns &&
+      current.fresh === anchor.fresh
+        ? current
+        : anchor,
+    );
+    if (followed.offset !== offset) {
+      setOffset(followed.offset);
+    }
+  }, [followed.anchor.lines, followed.anchor.columns, followed.anchor.fresh, followed.offset, offset]);
 
   useEffect(() => {
     if (onWheel === undefined) {
@@ -441,6 +495,54 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
     if (outcome.kind === "title") {
       setDraft(draftAt(""));
       retitle(outcome.title);
+      return;
+    }
+    if (outcome.kind === "copy") {
+      setDraft(draftAt(""));
+      const text = outcome.code ? copyCode(chatRef.current.messages) : copyAnswer(chatRef.current.messages);
+      if (text === null) {
+        setChat((current) => ({
+          ...current,
+          notice: outcome.code ? "no code block to copy" : "nothing to copy yet",
+        }));
+        return;
+      }
+      void copyToClipboard(text).then(
+        () => {
+          setChat((current) => ({ ...current, notice: "copied" }));
+        },
+        (error: unknown) => {
+          setChat((current) => ({ ...current, notice: messageOf(error) }));
+        },
+      );
+      return;
+    }
+    if (outcome.kind === "export") {
+      setDraft(draftAt(""));
+      const title = shownSessionTitle(
+        sessionRef.current,
+        liveTitleRef.current,
+        sessionsRef.current.find((summary) => summary.session_id === sessionRef.current)?.title,
+      );
+      const file = exportDestination({ home: homedir(), title, given: outcome.path });
+      void writeExport(file, sessionMarkdown(title, chatRef.current.messages)).then(
+        () => {
+          setChat((current) => ({ ...current, notice: `exported to ${file}` }));
+        },
+        (error: unknown) => {
+          setChat((current) => ({ ...current, notice: messageOf(error) }));
+        },
+      );
+      return;
+    }
+    if (outcome.kind === "time") {
+      setDraft(draftAt(""));
+      prefsLoaded.current = true;
+      const next = !showTimesRef.current;
+      showTimesRef.current = next;
+      setShowTimes(next);
+      setChat((current) => ({ ...current, notice: next ? "timestamps on" : "timestamps off" }));
+      void saveTimes(prefsPath(), next).catch(() => undefined);
       return;
     }
     if (outcome.kind === "local") {
@@ -954,7 +1056,8 @@ function LineView({ line }: { line: LayoutLine }) {
           key={index}
           bold={span.bold}
           italic={span.italic}
-          color={span.code === true && !user ? "cyan" : color}
+          dimColor={span.dim === true}
+          color={span.dim === true ? undefined : span.code === true && !user ? "cyan" : color}
           backgroundColor={backgroundColor}
           wrap="truncate-end"
         >
@@ -1081,6 +1184,9 @@ function StatusSegmentView({
   }
   if (segment.tone === "title") {
     return <Text bold>{text}</Text>;
+  }
+  if (segment.tone === "fresh") {
+    return <Text color="yellow">{text}</Text>;
   }
   return <Text dimColor>{text}</Text>;
 }

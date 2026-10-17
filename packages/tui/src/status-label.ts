@@ -1,5 +1,7 @@
 import type { ConnectionState } from "@golem/client";
 
+import { newLinesLabel } from "./transcript.ts";
+
 export type ModelInfo = {
   profile: string | null;
   provider: string | null;
@@ -61,7 +63,7 @@ export function shortCwd(cwd: string, home: string): string {
   return cwd;
 }
 
-export type StatusTone = "connection" | "title" | "model" | "dim";
+export type StatusTone = "connection" | "title" | "model" | "dim" | "fresh";
 
 export type StatusSegment = {
   id: string;
@@ -75,12 +77,13 @@ export type StatusSegment = {
 
 /**
  * Connection never drops. After that, the right-hand segments leave first:
- * uptime, message count, folder, then model, then the title.
+ * uptime, message count, folder, new lines, then model, then the title.
  */
 export const STATUS_PRIORITY = {
   connection: 100,
   title: 80,
   model: 60,
+  fresh: 55,
   folder: 40,
   messages: 20,
   uptime: 10,
@@ -169,6 +172,7 @@ export function statusSegments(input: {
   folder: string;
   messageCount: number | null;
   uptimeSeconds: number | null;
+  freshLines?: number;
 }): StatusSegment[] {
   return [
     segment("connection", input.connection, STATUS_PRIORITY.connection, "connection", true),
@@ -181,6 +185,7 @@ export function statusSegments(input: {
       STATUS_PRIORITY.messages,
       "dim",
     ),
+    segment("fresh", newLinesLabel(input.freshLines ?? 0), STATUS_PRIORITY.fresh, "fresh"),
     segment(
       "uptime",
       input.uptimeSeconds === null ? "" : formatUptime(input.uptimeSeconds),

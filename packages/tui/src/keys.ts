@@ -261,7 +261,7 @@ export const KEYS: readonly KeyBinding[] = [
     id: "end",
     label: "End",
     contexts: ["transcript", "debug"],
-    description: "Jumps to the newest line, or the end of this list.",
+    description: "Jumps back to the newest line, or the end of this list.",
     when: { name: "end" },
     run: scrollChat("end"),
   },

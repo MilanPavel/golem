@@ -145,6 +145,26 @@ test("a long title shrinks instead of leaving the line", () => {
   );
 });
 
+test("new lines sit on the status line and leave after the folder", () => {
+  const segments = statusSegments({
+    connection: "connected",
+    title: "Trip",
+    model: "qwen",
+    folder: "~/repos/golem",
+    messageCount: 4,
+    uptimeSeconds: 180,
+    freshLines: 3,
+  });
+  assert.equal(segments.find((segment) => segment.id === "fresh")?.text, "\u2193 3 new lines");
+  const ids = (columns: number) => fitSegments(segments, columns).map((segment) => segment.id);
+  assert.equal(ids(80).includes("fresh"), true);
+  assert.equal(ids(80).includes("uptime"), true);
+  assert.equal(ids(60).includes("uptime"), false);
+  assert.equal(ids(60).includes("fresh"), true);
+  assert.equal(ids(30).includes("fresh"), false);
+  assert.equal(ids(30).includes("model"), true);
+});
+
 test("an empty model or a missing uptime leaves no gap", () => {
   const fitted = fitSegments(
     statusSegments({

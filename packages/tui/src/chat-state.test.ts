@@ -241,6 +241,42 @@ test("run.cancelled ends the run and keeps the interrupted reply", () => {
   assert.equal(stopped.notice, SHUTDOWN_NOTICE);
 });
 
+test("a finished answer keeps the event time and how long the run took", () => {
+  const started = "2026-10-17T18:00:00.000Z";
+  const finished = "2026-10-17T18:00:12.400Z";
+  const state = [
+    {
+      seq: 1,
+      session_id: "s",
+      run_id: "r",
+      ts: started,
+      type: "message.completed" as const,
+      data: { message_id: "u", role: "user" as const, text: "hello" },
+    },
+    { seq: 2, session_id: "s", run_id: "r", ts: started, type: "run.started" as const, data: {} },
+    {
+      seq: 3,
+      session_id: "s",
+      run_id: "r",
+      ts: started,
+      type: "message.started" as const,
+      data: { message_id: "a", role: "assistant" as const },
+    },
+    {
+      seq: 4,
+      session_id: "s",
+      run_id: "r",
+      ts: finished,
+      type: "message.completed" as const,
+      data: { message_id: "a", role: "assistant" as const, text: "Hi" },
+    },
+  ].reduce(reduceChat, emptyChat);
+  assert.equal(state.messages[0]?.at, started);
+  assert.equal(state.messages[0]?.durationMs, undefined);
+  assert.equal(state.messages[1]?.at, finished);
+  assert.equal(state.messages[1]?.durationMs, 12_400);
+});
+
 test("forkPoint is the newest finished message with something stored", () => {
   const message = (id: string, streaming: boolean, text = "x", interrupted = false) => ({
     id,

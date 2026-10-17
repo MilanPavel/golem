@@ -26,11 +26,15 @@ type RecallMessage = {
   text: string;
 };
 
+/** `GOLEM_HOME` when it is set, otherwise `~/.golem`. */
+export function golemDir(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
+  const fromEnv = env["GOLEM_HOME"]?.trim() ?? "";
+  return fromEnv.length > 0 ? expandHome(fromEnv, home) : join(home, ".golem");
+}
+
 /** `GOLEM_HOME` when it is set, otherwise `~/.golem`, then `history`. */
 export function historyPath(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
-  const fromEnv = env["GOLEM_HOME"]?.trim() ?? "";
-  const root = fromEnv.length > 0 ? expandHome(fromEnv, home) : join(home, ".golem");
-  return join(root, "history");
+  return join(golemDir(env, home), "history");
 }
 
 /** User lines in the order they were sent. */
@@ -223,7 +227,7 @@ async function writeHistoryFile(file: string, lines: readonly string[]): Promise
   await rename(temporary, file);
 }
 
-function expandHome(input: string, home: string): string {
+export function expandHome(input: string, home: string): string {
   if (input === "~") {
     return home;
   }

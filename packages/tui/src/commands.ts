@@ -23,6 +23,9 @@ export type ComposerOutcome =
   | { kind: "new" }
   | { kind: "fork" }
   | { kind: "title"; title: string | null }
+  | { kind: "copy"; code: boolean }
+  | { kind: "export"; path: string | null }
+  | { kind: "time" }
   | {
       kind: "local";
       debug: DebugState;
@@ -46,11 +49,33 @@ const UNKNOWN = "unknown command \u2014 /help lists them";
 /** Every slash command. A name not in this table is an unknown command, not a message. */
 export const COMMANDS: readonly Command[] = [
   {
+    name: "/copy",
+    args: "[code]",
+    description: "Copies the last answer, or the last code block.",
+    choices: ["code"],
+    run: (_debug, args) => {
+      if (args.length > 1) {
+        return unknown();
+      }
+      const arg = args[0];
+      if (arg === undefined) {
+        return { kind: "copy", code: false };
+      }
+      return arg === "code" ? { kind: "copy", code: true } : unknown();
+    },
+  },
+  {
     name: "/debug",
     args: "[wire|model|hold|go]",
     description: "Opens or closes the debug panel, or picks wire, model, hold, or go.",
     choices: ["wire", "model", "hold", "go"],
     run: debugCommand,
+  },
+  {
+    name: "/export",
+    args: "[path]",
+    description: "Writes this session as markdown.",
+    run: (_debug, args) => ({ kind: "export", path: args.length === 0 ? null : args.join(" ") }),
   },
   {
     name: "/fork",
@@ -75,6 +100,12 @@ export const COMMANDS: readonly Command[] = [
     args: "",
     description: "Opens the session switcher.",
     run: withoutArgs({ kind: "sessions" }),
+  },
+  {
+    name: "/time",
+    args: "",
+    description: "Shows or hides the time beside each message.",
+    run: withoutArgs({ kind: "time" }),
   },
   {
     name: "/title",

@@ -102,3 +102,29 @@ test("an interrupted reply ends with a mark", () => {
   assert.equal(last?.spans[0]?.text.trimEnd(), INTERRUPTED_MARK);
   assert.equal(last?.spans[0]?.italic, true);
 });
+
+test("a finished answer shows how long it took, and times sit beside the label", () => {
+  const now = new Date(2026, 9, 17, 18, 0, 0).getTime();
+  const at = new Date(2026, 9, 17, 14, 2, 0).toISOString();
+  const lines = layoutMessages(
+    [
+      { ...message("u", "user", "hello"), at },
+      { ...message("a", "assistant", "ok"), at, durationMs: 12_400 },
+      { ...message("s", "assistant", "still", true), at, durationMs: 12_400 },
+    ],
+    80,
+    { times: true, now },
+  );
+  const user = lines.find((line) => line.role === "user");
+  assert.equal(user?.spans[0]?.text, "you");
+  assert.equal(user?.spans[1]?.text, "  14:02");
+  assert.equal(user?.spans[1]?.dim, true);
+  const assistant = lines.filter((line) => line.role === "assistant");
+  assert.equal(assistant.some((line) => line.spans[0]?.text === "12.4s" && line.spans[0]?.dim === true), true);
+  const streaming = assistant.find((line) => line.spans.some((span) => span.text === "golem"));
+  assert.equal(streaming?.spans[1]?.text, "  14:02");
+  assert.equal(
+    assistant.filter((line) => line.spans[0]?.text === "12.4s").length,
+    1,
+  );
+});

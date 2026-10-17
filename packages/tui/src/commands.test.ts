@@ -145,6 +145,16 @@ test("/help lists nothing of its own, and every command has a description", () =
   assert.deepEqual(debug?.choices, ["wire", "model", "hold", "go"]);
 });
 
+test("/copy, /export, and /time stay on this machine", () => {
+  assert.deepEqual(applyComposer(closedDebug, "/copy"), { kind: "copy", code: false });
+  assert.deepEqual(applyComposer(closedDebug, "/copy code"), { kind: "copy", code: true });
+  assert.equal(applyComposer(closedDebug, "/copy else").kind, "unknown");
+  assert.deepEqual(applyComposer(closedDebug, "/export"), { kind: "export", path: null });
+  assert.deepEqual(applyComposer(closedDebug, "/export  ~/out/chat.md"), { kind: "export", path: "~/out/chat.md" });
+  assert.deepEqual(applyComposer(closedDebug, "/time"), { kind: "time" });
+  assert.equal(applyComposer(closedDebug, "/time on").kind, "unknown");
+});
+
 test("/fork takes no arguments", () => {
   assert.deepEqual(applyComposer(closedDebug, "/fork"), { kind: "fork" });
   assert.equal(applyComposer(closedDebug, "/fork here").kind, "unknown");
