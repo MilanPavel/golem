@@ -184,6 +184,7 @@ Type `/` and matching commands appear above the composer. Typing narrows them, p
 | Key | What it does |
 |---|---|
 | Enter | Sends the message. Shift-Enter or Alt-Enter inserts a line |
+| Up, Down | On an empty line, Up recalls a message you sent, newest first. Down steps back |
 | Left, Right | Move the cursor. Alt-Left and Alt-Right move by word |
 | Ctrl-A, Ctrl-E | Jump to the start or end of the line |
 | Backspace, Delete, Ctrl-W, Ctrl-U, Ctrl-K | Delete around the cursor |
@@ -196,7 +197,7 @@ Type `/` and matching commands appear above the composer. Typing narrows them, p
 | Tab | Fills in the selected command or argument. Also switches the debug tab |
 | Up, Down, Enter, `n`, Esc | Move through the session switcher, open a session, start a new one, close the switcher |
 | Tab | Switches the debug tab |
-| Esc | Closes suggestions, then the command list, then the debug panel |
+| Esc | While recalling, restores the line you had. Then it closes suggestions, the command list, and the debug panel |
 
 ## Where things live
 
@@ -207,6 +208,7 @@ Type `/` and matching commands appear above the composer. Typing narrows them, p
 | `~/.golem/checkpoints.db` | What the model remembers of each conversation |
 | `~/.golem/logs/golem.jsonl` | The daemon log. launchd's own output is next to it |
 | `~/.golem/run/golem.sock` | The socket the TUI connects to |
+| `~/.golem/history` | Messages you sent, so a new session can recall them |
 
 Set `GOLEM_HOME` to use another folder, for example a throwaway one for experiments. Both the daemon and the TUI respect it. A daemon started by launchd keeps the folder it was installed with.
 

@@ -69,6 +69,8 @@ export type KeyPlace = {
   busy: boolean;
   connected: boolean;
   suggestions: boolean;
+  /** Up has already recalled a message, so Down and Esc stay on that list. */
+  history: boolean;
 };
 
 export type ScrollToward = "up" | "down" | "start" | "end";
@@ -84,6 +86,7 @@ export type KeyEffect =
   | { kind: "debug-tab" }
   | { kind: "switcher"; key: "up" | "down" | "enter" | "new" | "close" }
   | { kind: "suggest"; key: "up" | "down" | "tab" | "enter" | "close" }
+  | { kind: "history"; key: "older" | "newer" | "close" }
   | { kind: "submit" }
   | { kind: "edit"; op: EditOp }
   | { kind: "edit-external" }
@@ -101,6 +104,7 @@ type KeyWhen = {
   busy?: boolean;
   connected?: boolean;
   suggestions?: boolean;
+  history?: boolean;
 };
 
 export type KeyBinding = {
@@ -203,6 +207,31 @@ export const KEYS: readonly KeyBinding[] = [
     description: "Fills in a partial command, or sends a finished one.",
     when: { name: "return", overlay: false, switcher: false, suggestions: true },
     run: () => ({ kind: "suggest", key: "enter" }),
+  },
+  {
+    id: "history-up",
+    label: "Up",
+    contexts: ["composer"],
+    description: "On an empty line, recalls an earlier message, newest first.",
+    when: { name: "up", overlay: false, switcher: false, suggestions: false, busy: false },
+    run: (place) =>
+      place.history || place.draftEmpty ? { kind: "history", key: "older" } : { kind: "ignore" },
+  },
+  {
+    id: "history-down",
+    label: "Down",
+    contexts: ["composer"],
+    description: "Steps back toward the line you had before recalling.",
+    when: { name: "down", overlay: false, switcher: false, suggestions: false, busy: false, history: true },
+    run: () => ({ kind: "history", key: "newer" }),
+  },
+  {
+    id: "history-close",
+    label: "Esc",
+    contexts: ["composer"],
+    description: "Restores the draft from before you recalled a message.",
+    when: { name: "escape", overlay: false, history: true },
+    run: () => ({ kind: "history", key: "close" }),
   },
   {
     id: "page-up",
@@ -541,6 +570,9 @@ function whenMatches(when: KeyWhen, place: KeyPlace, press: Press): boolean {
     return false;
   }
   if (when.suggestions !== undefined && when.suggestions !== place.suggestions) {
+    return false;
+  }
+  if (when.history !== undefined && when.history !== place.history) {
     return false;
   }
   return true;

@@ -14,6 +14,15 @@ import {
 import { applyComposer, closedDebug, COMMANDS, helpLines, toggleDebugTab, type DebugState } from "./commands.ts";
 import { draftAt, edit, editDraft, insertText, type Draft } from "./edit.ts";
 import {
+  browseHistory,
+  createHistory,
+  historyPath,
+  leaveHistory,
+  recallOrder,
+  sessionEntries,
+  type HistoryCursor,
+} from "./history.ts";
+import {
   applySuggestion,
   moveSuggestion,
   suggest,
@@ -90,6 +99,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   const [keysOffset, setKeysOffset] = useState(0);
   const [suggestDismissed, setSuggestDismissed] = useState(false);
   const [suggestPick, setSuggestPick] = useState({ draft: "", index: 0 });
+  const [historyCursor, setHistoryCursor] = useState<HistoryCursor | null>(null);
   const draftRef = useRef(draft);
   const busyRef = useRef(chat.busy);
   const chatRef = useRef(chat);
@@ -113,7 +123,10 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   const debugLines = useRef(0);
   const onF1 = useRef<() => void>(() => undefined);
   const editing = useRef(false);
+  const sentHistory = useRef(createHistory(historyPath()));
+  const historyCursorRef = useRef(historyCursor);
   draftRef.current = draft;
+  historyCursorRef.current = historyCursor;
   busyRef.current = chat.busy;
   chatRef.current = chat;
   runIdRef.current = chat.runId;
@@ -127,7 +140,9 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   const rows = size.rows || 24;
   const banner = chat.error ?? chat.notice;
   const suggestMatches =
-    chat.busy || switcher.open || keysOpen || suggestDismissed ? [] : suggest(draft.text, COMMANDS);
+    chat.busy || switcher.open || keysOpen || suggestDismissed || historyCursor !== null
+      ? []
+      : suggest(draft.text, COMMANDS);
   const suggestSelected =
     suggestPick.draft === draft.text ? Math.min(suggestPick.index, Math.max(0, suggestMatches.length - 1)) : 0;
   const budget = frameBudget({
@@ -170,6 +185,8 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       setLiveTitle(null);
       setHelpOpen(false);
       setKeysOpen(false);
+      historyCursorRef.current = null;
+      setHistoryCursor(null);
       setChat((current) => ({ ...emptyChat, notice: current.notice }));
       setSessionModel(null);
       setModelMessages([]);
@@ -208,6 +225,10 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   );
 
   useEffect(() => () => batcher.current?.stop(), []);
+
+  useEffect(() => {
+    void sentHistory.current.load().catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     return client.onWire((lines) => {
@@ -382,6 +403,13 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
     if (outcome.kind === "idle") {
       return;
     }
+    if (
+      outcome.kind === "send" &&
+      (busyRef.current || sessionRef.current === null || connectionRef.current.status !== "connected")
+    ) {
+      return;
+    }
+    endHistory();
     if (outcome.kind === "help") {
       setDraft(draftAt(""));
       setHelpOpen(true);
@@ -429,26 +457,53 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
     }
     const text = outcome.text;
     const currentSession = sessionRef.current;
-    if (
-      busyRef.current ||
-      currentSession === null ||
-      connectionRef.current.status !== "connected"
-    ) {
+    if (currentSession === null) {
       return;
     }
     showDebug(outcome.debug);
     setDraft(draftAt(""));
     setOffset(0);
     setChat((current) => ({ ...current, notice: null }));
-    void client.sendMessage(currentSession, text).catch((error: unknown) => {
-      setDraft(draftAt(text));
-      if (error instanceof RpcError && error.code === SESSION_NOT_FOUND) {
-        setChat((current) => ({ ...current, notice: "session was not found; started a new one" }));
-        session.startNew();
-        return;
-      }
-      setChat((current) => ({ ...current, busy: false, error: messageOf(error) }));
-    });
+    void client.sendMessage(currentSession, text).then(
+      () => {
+        sentHistory.current.remember(text);
+      },
+      (error: unknown) => {
+        setDraft(draftAt(text));
+        if (error instanceof RpcError && error.code === SESSION_NOT_FOUND) {
+          setChat((current) => ({ ...current, notice: "session was not found; started a new one" }));
+          session.startNew();
+          return;
+        }
+        setChat((current) => ({ ...current, busy: false, error: messageOf(error) }));
+      },
+    );
+  }
+
+  function endHistory(): void {
+    if (historyCursorRef.current === null) {
+      return;
+    }
+    historyCursorRef.current = null;
+    setHistoryCursor(null);
+  }
+
+  function applyHistory(key: "older" | "newer" | "close"): void {
+    const entries = recallOrder(sessionEntries(chatRef.current.messages), sentHistory.current.snapshot());
+    if (key === "close") {
+      const left = leaveHistory(historyCursorRef.current, draftRef.current.text);
+      historyCursorRef.current = null;
+      setHistoryCursor(null);
+      setDraft(draftAt(left.text));
+      return;
+    }
+    const next = browseHistory(historyCursorRef.current, key, entries, draftRef.current.text);
+    if (next.cursor === historyCursorRef.current && next.text === draftRef.current.text) {
+      return;
+    }
+    historyCursorRef.current = next.cursor;
+    setHistoryCursor(next.cursor);
+    setDraft(draftAt(next.text));
   }
 
   function onCtrlC(): void {
@@ -543,6 +598,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       busy: busyRef.current,
       connected: connectionRef.current.status === "connected" && sessionRef.current !== null,
       suggestions: suggestRef.current.open,
+      history: historyCursorRef.current !== null,
     };
   }
 
@@ -583,6 +639,9 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
         return;
       case "suggest":
         applySuggestKey(effect.key);
+        return;
+      case "history":
+        applyHistory(effect.key);
         return;
       case "switcher":
         onSwitcherKey(effect.key);

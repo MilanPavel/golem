@@ -24,6 +24,7 @@ function place(overrides: Partial<KeyPlace> = {}): KeyPlace {
     busy: false,
     connected: true,
     suggestions: false,
+    history: false,
     ...overrides,
   };
 }
@@ -131,6 +132,22 @@ test("keys dispatch through the table", () => {
   assert.deepEqual(pressed("", { return: true }, { suggestions: true, connected: false }), {
     kind: "suggest",
     key: "enter",
+  });
+  assert.deepEqual(pressed("", { upArrow: true }, { draftEmpty: true }), { kind: "history", key: "older" });
+  assert.deepEqual(pressed("", { upArrow: true }, { draftEmpty: false }), { kind: "ignore" });
+  assert.deepEqual(pressed("", { upArrow: true }, { draftEmpty: false, history: true }), {
+    kind: "history",
+    key: "older",
+  });
+  assert.deepEqual(pressed("", { downArrow: true }, { history: true }), { kind: "history", key: "newer" });
+  assert.deepEqual(pressed("", { downArrow: true }), { kind: "ignore" });
+  assert.deepEqual(pressed("", { escape: true }, { history: true, help: true, debug: true }), {
+    kind: "history",
+    key: "close",
+  });
+  assert.deepEqual(pressed("", { upArrow: true }, { suggestions: true, history: true, draftEmpty: true }), {
+    kind: "suggest",
+    key: "up",
   });
   assert.deepEqual(pressed("", { return: true }), { kind: "submit" });
   assert.deepEqual(pressed("", { return: true }, { connected: false }), { kind: "ignore" });
