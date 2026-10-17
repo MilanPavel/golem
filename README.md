@@ -8,6 +8,10 @@ Golem is a personal AI agent that runs on your own machine. It is built first fo
 
 The name comes from the Prague legend. A clay servant, brought to life to work on its maker's behalf.
 
+<p align="center">
+  <img src="docs/images/demo.gif" alt="Chatting in the golem terminal" width="720">
+</p>
+
 ## Why golem
 
 - **Local models as first-class citizens.** Most agent tools assume a large hosted model. Golem is built to get real work out of a model running on a laptop, and to call a hosted model only when the task needs it. Your data stays on your machine by default, and the cost of each answer stays visible.
