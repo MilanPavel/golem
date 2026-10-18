@@ -9,7 +9,7 @@ Golem is a personal AI agent that runs on your own machine. It is built first fo
 The name comes from the Prague legend. A clay servant, brought to life to work on its maker's behalf.
 
 <p align="center">
-  <img src="docs/images/demo.gif" alt="Chatting in the golem terminal" width="960">
+  <img src="docs/images/demo.gif?v=2" alt="Chatting in the golem terminal" width="960">
 </p>
 
 ## Why golem
