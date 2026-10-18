@@ -174,6 +174,7 @@ The daemon keeps its files under one home directory. `resolve_paths` picks it: a
 | `checkpoints.db` | Model memory for a chat. The thread id is the session id. Separate so it can be wiped without deleting the event log | Built |
 | `config.toml` | Settings for this user | Built |
 | `logs/golem.jsonl` | The daemon's own log, one JSON object per line | Built |
+| `cache/` | Hosted model lists (`models-<provider>.json`) and LiteLLM's prices (`litellm-prices.json`), each refreshed after a day. Safe to delete | Built |
 | `golem.db` | The event log, and the `sessions` and `runs` tables derived from it. Costs later | Built |
 | `memory.db` | Long-term memory | Planned |
 | `skills/`, `flows/` | Skills and flows you added on this machine | Planned |
@@ -248,9 +249,19 @@ Each event line is one JSON-RPC 2.0 notification. The fields that matter:
 
 | Commands | Events |
 |---|---|
-| `hello`, `ping`, `daemon.status`, `session.create`, `session.attach`, `session.detach`, `session.list`, `session.rename`, `session.fork`, `session.close`, `message.send`, `run.cancel`, `session.inspect`, `auth.set`, `auth.remove`, `auth.list` | `session.created`, `message.started`, `message.delta`, `message.completed`, `run.started`, `run.completed`, `run.failed`, `run.cancelled`, `session.updated`, `session.closed`; `session.summary` to watchers |
+| `hello`, `ping`, `daemon.status`, `session.create`, `session.attach`, `session.detach`, `session.list`, `session.rename`, `session.fork`, `session.close`, `message.send`, `run.cancel`, `session.inspect`, `auth.set`, `auth.remove`, `auth.list`, `model.list` | `session.created`, `message.started`, `message.delta`, `message.completed`, `run.started`, `run.completed`, `run.failed`, `run.cancelled`, `session.updated`, `session.closed`; `session.summary` to watchers |
 
 After `hello`, a client sends `ping` every few seconds so a half-open socket is noticed. `daemon.status` returns the pid, uptime, and configured model. A new chat sends `session.create`, then `session.attach` with `after_seq` 0, then `message.send`. `session.list` returns sessions newest activity first, each with `idle` or `running`, its title, and its last `seq`. With `watch: true`, the connection also gets a `session.summary` after every change to any session, until it closes. `session.rename` sets a title by hand. `session.fork` copies a session's history up to one message into a new session, and the client attaches to it. `session.detach` stops one session's events. `session.inspect` reads the saved checkpoint messages and does not call the model. `auth.set` stores a provider's API key in the Keychain, `auth.remove` deletes it, and `auth.list` says where each provider's key is without returning it. The client shows `auth.set` in the wire view with the key replaced by `[redacted]`.
+
+`model.list` returns `default`, this machine's `ram_gb`, a list of providers with their status (`ready`, `needs_key`, `server_down`, or `unlisted` when nothing uses one yet), and one entry per model ref.
+- **Where entries come from** (`golem/models/discovery.py`):
+  - installed Ollama models, from `/api/tags`, with `/api/show` filling in what an older Ollama leaves out;
+  - local models to download, from the bundled `local-catalog.toml`;
+  - each keyed provider's own list: Anthropic and OpenAI `/v1/models`, and `<base_url>/models` for an OpenAI-compatible provider;
+  - profiles and `default_model`, so a configured model is always listed.
+- **What an entry carries:** its status (`ready`, `needs_key`, `not_installed`, or `server_down`), the profile names that point at it, context size, tool support, price in USD per million tokens, download size, and whether it fits in memory.
+- **Price and context precedence:** the profile, then the provider's own list (Ollama, OpenRouter), then LiteLLM (`golem/models/prices.py`).
+- **Caching and time limit:** hosted lists are cached for a day under `cache/`. A listing waits at most 2 seconds for the network. A slower fetch keeps running, and its result is used next time, with `stale` set on what was shown meanwhile. `refresh: true` skips the cache.
 
 ### Why a protocol package
 

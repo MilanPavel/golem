@@ -6,6 +6,7 @@ import type { AuthRemoveResult } from "../../protocol/gen/auth-remove-result.ts"
 import type { AuthSetResult } from "../../protocol/gen/auth-set-result.ts";
 import type { DaemonStatus } from "../../protocol/gen/daemon-status.ts";
 import type { MessageSendResult } from "../../protocol/gen/message-send-result.ts";
+import type { ModelListResult } from "../../protocol/gen/model-list-result.ts";
 import type { Params as ChatEvent } from "../../protocol/gen/rpc-notification.ts";
 import type { RunCancelResult } from "../../protocol/gen/run-cancel-result.ts";
 import type { SessionAttachResult } from "../../protocol/gen/session-attach-result.ts";
@@ -26,6 +27,7 @@ import {
   isDaemonStatus,
   isHelloResult,
   isMessageSendResult,
+  isModelListResult,
   isPing,
   isRecord,
   isRunCancelResult,
@@ -122,6 +124,8 @@ export interface GolemClient {
   setKey(provider: string, key: string): Promise<AuthSetResult>;
   removeKey(provider: string): Promise<AuthRemoveResult>;
   listKeys(): Promise<AuthListResult>;
+  /** Every model golem knows of. `refresh` fetches hosted lists and prices again, past their cache. */
+  listModels(refresh?: boolean): Promise<ModelListResult>;
   close(): void;
 }
 
@@ -623,6 +627,14 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("auth.list", {});
       if (!isAuthListResult(result)) {
         throw new Error("invalid auth.list result");
+      }
+      return result;
+    },
+    async listModels(refresh = false): Promise<ModelListResult> {
+      await ready;
+      const result = await call("model.list", refresh ? { refresh: true } : {});
+      if (!isModelListResult(result)) {
+        throw new Error("invalid model.list result");
       }
       return result;
     },

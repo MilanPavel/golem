@@ -87,6 +87,13 @@ model = "anthropic/<model-id>"
 
 `default_model` can also be a `provider/model-id` directly, with no profile. The daemon picks up changes to `[models]`, `[providers]`, and `default_model` without a restart. Switching a running session with `/model` is planned.
 
+`just golem models` shows what you can pick from:
+- **Installed local models:** found through Ollama, so a fresh `ollama pull` shows up at once.
+- **Local models to download:** a short built-in list, each with its download size and whether it fits in this Mac's memory.
+- **Hosted models:** each provider's own list, once that provider has a key.
+- **Prices and context sizes:** from the provider when it says (OpenRouter does), otherwise from [LiteLLM's price list](https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json). A profile's `price` wins over both.
+- **Caching:** hosted lists and LiteLLM's prices are cached for a day in `~/.golem/cache/`. Golem bundles a copy of LiteLLM's prices for the first start and for offline use.
+
 | Provider | Talks to | API key from |
 |---|---|---|
 | `ollama` | Ollama at `http://127.0.0.1:11434`, through its native API | none |
@@ -126,7 +133,7 @@ After uv installs a new Python, macOS may ask once whether Python may use the go
 | Setting | Default | Meaning |
 |---|---|---|
 | `default_model` | `model_profile` | A profile name or a `provider/model-id`. New sessions start on it |
-| `[models.<name>]` | none | A profile: `model` (a `provider/model-id`) and an optional `ctx` |
+| `[models.<name>]` | none | A profile: `model` (a `provider/model-id`), an optional `ctx`, and an optional `price = { input = 3.0, output = 15.0 }` in USD per million tokens |
 | `[providers.<name>]` | built-in presets | `kind` (`anthropic`, `openai`, `ollama`, or `openai_compat`), `base_url`, `api_key_env` |
 | `model_provider`, `model_name`, `model_base_url` | none | Older flat settings for one model, kept working |
 | `model_profile` | `remote` | The profile name the flat settings load as |
@@ -173,6 +180,7 @@ just golem status            # is it up? prints pid, version, protocol, uptime
 | `just golem auth set <provider>` | Saves the provider's API key in the Keychain, from a hidden prompt or stdin |
 | `just golem auth remove <provider>` | Removes that key from the Keychain |
 | `just golem auth list` | Says where each provider's key is: the Keychain, an environment variable, or missing |
+| `just golem models` | Lists every model golem can use or download, with context size, price, size, and whether it fits in memory. `--refresh` skips the one-day cache |
 
 ## Chat
 

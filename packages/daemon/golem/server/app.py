@@ -18,6 +18,7 @@ from golem.config import load_settings
 from golem.graphs.chat import ChatRuntime, open_chat
 from golem.lock import DaemonAlreadyRunning, DaemonLock
 from golem.logging import configure_logging
+from golem.models.discovery import ModelDiscovery
 from golem.models.keys import KeychainStore
 from golem.models.router import ModelRouter
 from golem.paths import GolemPaths, resolve_paths
@@ -72,10 +73,12 @@ class DaemonApp:
         max_connections: int = MAX_CONNECTIONS,
         router: ModelRouter | None = None,
         titles: TitleGenerator | None = None,
+        discovery: Callable[[ModelRouter], ModelDiscovery] | None = None,
     ) -> None:
         self.paths = paths
         self._router = router
         self._titles = titles
+        self._discovery = discovery
         self.state = DaemonState(paths=paths, started_at=time.monotonic())
         methods = standard_methods()
         if extra_methods:
@@ -121,6 +124,10 @@ class DaemonApp:
                 self.state.sessions = await _open_sessions(
                     database, open_chat(router, saver), self._titles
                 )
+                if self._discovery is None:
+                    self.state.models = ModelDiscovery(router, self.paths.cache_dir)
+                else:
+                    self.state.models = self._discovery(router)
                 try:
                     if install_signals:
                         installed = _install_signals(loop, self.request_shutdown)
@@ -136,6 +143,9 @@ class DaemonApp:
                         loop.remove_signal_handler(sig)
                     self._unlink_socket()
         finally:
+            if self.state.models is not None:
+                await self.state.models.aclose()
+            self.state.models = None
             self.state.sessions = None
             self._lock.release()
 

@@ -1,0 +1,32 @@
+{
+  "additionalProperties": false,
+  "description": "``unlisted`` is a provider golem does not ask for models: nothing uses it yet.",
+  "properties": {
+    "provider": {
+      "minLength": 1,
+      "title": "Provider",
+      "type": "string"
+    },
+    "stale": {
+      "default": false,
+      "title": "Stale",
+      "type": "boolean"
+    },
+    "status": {
+      "enum": [
+        "ready",
+        "needs_key",
+        "server_down",
+        "unlisted"
+      ],
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "provider",
+    "status"
+  ],
+  "title": "ListedProvider",
+  "type": "object"
+}

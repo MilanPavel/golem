@@ -48,8 +48,13 @@ from golem_protocol.commands import (
     HelloParams,
     HelloResult,
     InspectMessage,
+    ListedModel,
+    ListedProvider,
     MessageSendParams,
     MessageSendResult,
+    ModelListParams,
+    ModelListResult,
+    ModelPriceInfo,
     PingParams,
     RunCancelParams,
     RunCancelResult,
@@ -279,6 +284,38 @@ async def _auth_list(ctx: RequestContext, params: AuthListParams) -> AuthListRes
     )
 
 
+async def _model_list(ctx: RequestContext, params: ModelListParams) -> ModelListResult:
+    models = ctx.state.models
+    if models is None:
+        raise RpcCallError(INTERNAL_ERROR, "models are not ready")
+    listing = await models.list(refresh=params.refresh)
+    return ModelListResult(
+        default=listing.default,
+        ram_gb=listing.ram_gb,
+        models=[
+            ListedModel(
+                ref=model.ref,
+                label=model.label,
+                provider=model.provider,
+                source=model.source,
+                status=model.status,
+                profiles=list(model.profiles),
+                ctx=model.ctx,
+                tools=model.tools,
+                price=None if model.price is None else ModelPriceInfo(**model.price.model_dump()),
+                size_gb=model.size_gb,
+                fit=model.fit,
+                stale=model.stale,
+            )
+            for model in listing.models
+        ],
+        providers=[
+            ListedProvider(provider=item.provider, status=item.status, stale=item.stale)
+            for item in listing.providers
+        ],
+    )
+
+
 def _key_store(router: ModelRouter, provider_name: str) -> KeyStore:
     provider = router.provider(provider_name)
     if provider is None:
@@ -316,4 +353,5 @@ def standard_methods() -> dict[str, Method]:
         "auth.set": Method("auth.set", AuthSetParams, True, _auth_set),
         "auth.remove": Method("auth.remove", AuthRemoveParams, True, _auth_remove),
         "auth.list": Method("auth.list", AuthListParams, True, _auth_list),
+        "model.list": Method("model.list", ModelListParams, True, _model_list),
     }

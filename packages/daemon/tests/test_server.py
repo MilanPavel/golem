@@ -9,7 +9,7 @@ import os
 import signal
 import stat
 import subprocess
-from collections.abc import AsyncIterator, Mapping
+from collections.abc import AsyncIterator, Callable, Mapping
 from pathlib import Path
 from typing import Any, cast
 
@@ -19,6 +19,7 @@ from support import ServeProcess
 
 from golem.config import load_settings
 from golem.logging import configure_logging
+from golem.models.discovery import ModelDiscovery
 from golem.models.router import ModelRouter
 from golem.paths import resolve_paths
 from golem.server.app import DaemonApp, SocketPathTooLong, assert_socket_path_fits
@@ -211,6 +212,7 @@ async def start_daemon(
     max_connections: int = 32,
     router: ModelRouter | None = None,
     titles: TitleGenerator | None = None,
+    discovery: Callable[[ModelRouter], ModelDiscovery] | None = None,
 ) -> tuple[DaemonApp, asyncio.Task[None]]:
     paths = resolve_paths(home)
     paths.ensure_layout()
@@ -221,6 +223,7 @@ async def start_daemon(
         max_connections=max_connections,
         router=router,
         titles=titles,
+        discovery=discovery,
     )
     task = asyncio.create_task(app.serve(install_signals=False))
     await _wait_listening(paths.socket_path, task)

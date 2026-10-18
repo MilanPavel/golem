@@ -354,6 +354,72 @@ class AuthListResult(BaseModel):
     providers: list[AuthKeyStatus]
 
 
+class ModelListParams(BaseModel):
+    """``model.list``. ``refresh`` fetches hosted model lists and prices again, past their cache."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    refresh: bool = False
+
+
+class ModelPriceInfo(BaseModel):
+    """USD per million tokens. A local model is zero."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    input: float = Field(ge=0)
+    output: float = Field(ge=0)
+    cached_input: float | None = Field(default=None, ge=0)
+
+
+class ListedModel(BaseModel):
+    """One model, by ``provider/model`` ref.
+
+    ``source`` is where golem found it: ``installed`` on a local server,
+    ``catalog`` for a local model to download, ``remote`` from a provider's
+    list, or ``profile`` when only config names it. ``profiles`` are the
+    profile names that point at it. ``fit`` says whether a local model fits
+    in this machine's memory. ``stale`` means a cached list was shown because
+    the provider did not answer in time.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    ref: str = Field(min_length=3)
+    label: str = Field(min_length=1)
+    provider: str = Field(min_length=1)
+    source: Literal["installed", "catalog", "remote", "profile"]
+    status: Literal["ready", "needs_key", "not_installed", "server_down"]
+    profiles: list[str] = Field(default_factory=list)
+    ctx: int | None = Field(default=None, gt=0)
+    tools: bool | None = None
+    price: ModelPriceInfo | None = None
+    size_gb: float | None = Field(default=None, ge=0)
+    fit: Literal["fits", "tight", "too_big"] | None = None
+    stale: bool = False
+
+
+class ListedProvider(BaseModel):
+    """``unlisted`` is a provider golem does not ask for models: nothing uses it yet."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    provider: str = Field(min_length=1)
+    status: Literal["ready", "needs_key", "server_down", "unlisted"]
+    stale: bool = False
+
+
+class ModelListResult(BaseModel):
+    """``default`` is the model a new session gets. ``ram_gb`` is this machine's memory."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    default: str = Field(min_length=1)
+    ram_gb: float | None = Field(default=None, gt=0)
+    models: list[ListedModel]
+    providers: list[ListedProvider]
+
+
 __all__ = [
     "AuthKeyStatus",
     "AuthListParams",
@@ -366,8 +432,13 @@ __all__ = [
     "HelloParams",
     "HelloResult",
     "InspectMessage",
+    "ListedModel",
+    "ListedProvider",
     "MessageSendParams",
     "MessageSendResult",
+    "ModelListParams",
+    "ModelListResult",
+    "ModelPriceInfo",
     "PingParams",
     "RunCancelParams",
     "RunCancelResult",

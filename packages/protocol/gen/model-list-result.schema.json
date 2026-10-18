@@ -1,0 +1,242 @@
+{
+  "$defs": {
+    "ListedModel": {
+      "additionalProperties": false,
+      "description": "One model, by ``provider/model`` ref.\n\n``source`` is where golem found it: ``installed`` on a local server,\n``catalog`` for a local model to download, ``remote`` from a provider's\nlist, or ``profile`` when only config names it. ``profiles`` are the\nprofile names that point at it. ``fit`` says whether a local model fits\nin this machine's memory. ``stale`` means a cached list was shown because\nthe provider did not answer in time.",
+      "properties": {
+        "ctx": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ctx"
+        },
+        "fit": {
+          "anyOf": [
+            {
+              "enum": [
+                "fits",
+                "tight",
+                "too_big"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fit"
+        },
+        "label": {
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "price": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ModelPriceInfo"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "profiles": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Profiles",
+          "type": "array"
+        },
+        "provider": {
+          "minLength": 1,
+          "title": "Provider",
+          "type": "string"
+        },
+        "ref": {
+          "minLength": 3,
+          "title": "Ref",
+          "type": "string"
+        },
+        "size_gb": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Size Gb"
+        },
+        "source": {
+          "enum": [
+            "installed",
+            "catalog",
+            "remote",
+            "profile"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "stale": {
+          "default": false,
+          "title": "Stale",
+          "type": "boolean"
+        },
+        "status": {
+          "enum": [
+            "ready",
+            "needs_key",
+            "not_installed",
+            "server_down"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "tools": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tools"
+        }
+      },
+      "required": [
+        "ref",
+        "label",
+        "provider",
+        "source",
+        "status"
+      ],
+      "title": "ListedModel",
+      "type": "object"
+    },
+    "ListedProvider": {
+      "additionalProperties": false,
+      "description": "``unlisted`` is a provider golem does not ask for models: nothing uses it yet.",
+      "properties": {
+        "provider": {
+          "minLength": 1,
+          "title": "Provider",
+          "type": "string"
+        },
+        "stale": {
+          "default": false,
+          "title": "Stale",
+          "type": "boolean"
+        },
+        "status": {
+          "enum": [
+            "ready",
+            "needs_key",
+            "server_down",
+            "unlisted"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider",
+        "status"
+      ],
+      "title": "ListedProvider",
+      "type": "object"
+    },
+    "ModelPriceInfo": {
+      "additionalProperties": false,
+      "description": "USD per million tokens. A local model is zero.",
+      "properties": {
+        "cached_input": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cached Input"
+        },
+        "input": {
+          "minimum": 0,
+          "title": "Input",
+          "type": "number"
+        },
+        "output": {
+          "minimum": 0,
+          "title": "Output",
+          "type": "number"
+        }
+      },
+      "required": [
+        "input",
+        "output"
+      ],
+      "title": "ModelPriceInfo",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "``default`` is the model a new session gets. ``ram_gb`` is this machine's memory.",
+  "properties": {
+    "default": {
+      "minLength": 1,
+      "title": "Default",
+      "type": "string"
+    },
+    "models": {
+      "items": {
+        "$ref": "#/$defs/ListedModel"
+      },
+      "title": "Models",
+      "type": "array"
+    },
+    "providers": {
+      "items": {
+        "$ref": "#/$defs/ListedProvider"
+      },
+      "title": "Providers",
+      "type": "array"
+    },
+    "ram_gb": {
+      "anyOf": [
+        {
+          "exclusiveMinimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Ram Gb"
+    }
+  },
+  "required": [
+    "default",
+    "models",
+    "providers"
+  ],
+  "title": "ModelListResult",
+  "type": "object"
+}

@@ -255,10 +255,33 @@ class ModelRouter:
 
     def provider(self, name: str) -> Provider | None:
         """The provider called ``name`` after presets and config, or None."""
+        return self.providers().get(name)
+
+    def providers(self) -> dict[str, Provider]:
+        """Every known provider after presets and config, by name."""
         catalog = self._current()
-        if catalog is None:
-            return PRESETS.get(name)
-        return catalog.providers.get(name)
+        return dict(PRESETS if catalog is None else catalog.providers)
+
+    def profiles(self) -> dict[str, ModelSettings]:
+        """Every profile by name, the one from the flat settings included."""
+        catalog = self._current()
+        return {} if catalog is None else dict(catalog.models)
+
+    def api_key(self, name: str) -> str | None:
+        """The key a call to provider ``name`` would use, or None when there is none.
+
+        Raises :class:`~golem.models.keys.KeyStoreError` when the store cannot be read.
+        """
+        provider = self.provider(name)
+        if provider is None or provider.kind == "ollama":
+            return None
+        if provider.api_key_env is not None:
+            key = os.environ.get(provider.api_key_env, "").strip()
+            if key != "":
+                return key
+        if self.keys is None:
+            return None
+        return self.keys.get(name) or None
 
     def key_statuses(self) -> list[KeyStatus]:
         """One entry per known provider, sorted by name.
@@ -285,20 +308,12 @@ class ModelRouter:
         )
 
     def _api_key(self, name: str, provider: Provider) -> str | None:
-        if provider.kind == "ollama":
-            return None
-        if provider.api_key_env is not None:
-            key = os.environ.get(provider.api_key_env, "").strip()
-            if key != "":
-                return key
-        stored: str | None = None
-        if self.keys is not None:
-            try:
-                stored = self.keys.get(name)
-            except KeyStoreError as exc:
-                raise ModelConfigError(str(exc)) from exc
-        if stored:
-            return stored
+        try:
+            key = self.api_key(name)
+        except KeyStoreError as exc:
+            raise ModelConfigError(str(exc)) from exc
+        if key is not None:
+            return key
         if provider.api_key_env is not None:
             raise ModelConfigError(
                 f"needs key: /login {name} in the TUI, or set {provider.api_key_env}"

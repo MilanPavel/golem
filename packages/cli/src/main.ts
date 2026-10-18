@@ -3,14 +3,15 @@ import { spawn } from "node:child_process";
 import { connectGolem, resolveSocketPath } from "@golem/client";
 
 import { formatKeys } from "./format-keys.ts";
+import { formatModels } from "./format-models.ts";
 import { formatStatus } from "./format-status.ts";
 import { formatCliVersion } from "./format-version.ts";
 import { CLI_VERSION } from "./version.ts";
 import { readSecret } from "./read-secret.ts";
 import { findWorkspaceRoot } from "./workspace.ts";
 
-const code = await run(process.argv.slice(2));
-process.exit(code);
+// exitCode, not exit(): exit() drops output a pipe has not read yet.
+process.exitCode = await run(process.argv.slice(2));
 
 async function run(args: string[]): Promise<number> {
   const [command, ...rest] = args;
@@ -26,13 +27,29 @@ async function run(args: string[]): Promise<number> {
   if (command === "auth") {
     return runAuth(rest);
   }
+  if (command === "models" && (rest.length === 0 || (rest.length === 1 && rest[0] === "--refresh"))) {
+    return runModels(rest[0] === "--refresh");
+  }
   process.stderr.write(`${USAGE}\n`);
   return 1;
 }
 
 const USAGE =
   "usage: golem --version | golem status | golem daemon install|start|stop|logs\n" +
-  "       golem auth set|remove <provider> | golem auth list";
+  "       golem auth set|remove <provider> | golem auth list | golem models [--refresh]";
+
+async function runModels(refresh: boolean): Promise<number> {
+  const client = connectOnce();
+  try {
+    process.stdout.write(`${formatModels(await client.listModels(refresh))}\n`);
+    return 0;
+  } catch (error) {
+    process.stderr.write(`${explain(error)}\n`);
+    return 1;
+  } finally {
+    client.close();
+  }
+}
 
 async function runAuth(args: string[]): Promise<number> {
   const [action, provider, ...extra] = args;

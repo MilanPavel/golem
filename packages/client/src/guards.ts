@@ -4,6 +4,7 @@ import type { AuthSetResult } from "../../protocol/gen/auth-set-result.ts";
 import type { DaemonStatus } from "../../protocol/gen/daemon-status.ts";
 import type { HelloResult } from "../../protocol/gen/hello-result.ts";
 import type { MessageSendResult } from "../../protocol/gen/message-send-result.ts";
+import type { ModelListResult } from "../../protocol/gen/model-list-result.ts";
 import type { Ping } from "../../protocol/gen/ping.ts";
 import type { Params as ChatEvent } from "../../protocol/gen/rpc-notification.ts";
 import type { RunCancelResult } from "../../protocol/gen/run-cancel-result.ts";
@@ -55,6 +56,23 @@ export function asChatEvent(value: unknown): ChatEvent | undefined {
     return undefined;
   }
   return value as unknown as ChatEvent;
+}
+
+export function isModelListResult(value: unknown): value is ModelListResult {
+  return (
+    isRecord(value) &&
+    typeof value["default"] === "string" &&
+    Array.isArray(value["providers"]) &&
+    Array.isArray(value["models"]) &&
+    value["models"].every(
+      (model) =>
+        isRecord(model) &&
+        typeof model["ref"] === "string" &&
+        typeof model["label"] === "string" &&
+        typeof model["provider"] === "string" &&
+        typeof model["status"] === "string",
+    )
+  );
 }
 
 export function isAuthSetResult(value: unknown): value is AuthSetResult {

@@ -1,0 +1,13 @@
+{
+  "additionalProperties": false,
+  "description": "``model.list``. ``refresh`` fetches hosted model lists and prices again, past their cache.",
+  "properties": {
+    "refresh": {
+      "default": false,
+      "title": "Refresh",
+      "type": "boolean"
+    }
+  },
+  "title": "ModelListParams",
+  "type": "object"
+}

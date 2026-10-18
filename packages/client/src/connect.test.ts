@@ -613,6 +613,36 @@ test("setKey sends the key to the daemon and never to the wire log", async () =>
   }
 });
 
+test("listModels asks for a refresh only when told to", async () => {
+  const sent: Record<string, unknown>[] = [];
+  const listed = {
+    default: "qwen",
+    ram_gb: 36,
+    models: [{ ref: "ollama/qwen3:8b", label: "Qwen3 8B", provider: "ollama", source: "installed", status: "ready" }],
+    providers: [{ provider: "ollama", status: "ready" }],
+  };
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: { "model.list": listed },
+      onRequest: (_socket, method, params) => {
+        if (method === "model.list") {
+          sent.push(params);
+        }
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "cli", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    assert.equal((await client.listModels()).models[0]?.ref, "ollama/qwen3:8b");
+    await client.listModels(true);
+    assert.deepEqual(sent, [{}, { refresh: true }]);
+  } finally {
+    client.close();
+    await server.close();
+  }
+});
+
 test("forkSession sends the message id and reads the new session", async () => {
   const sent: Record<string, unknown>[] = [];
   const server = await listen((socket) => {

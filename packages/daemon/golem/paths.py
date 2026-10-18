@@ -48,6 +48,10 @@ class GolemPaths:
         return self.logs_dir / "golem.jsonl"
 
     @property
+    def cache_dir(self) -> Path:
+        return self.home / "cache"
+
+    @property
     def run_dir(self) -> Path:
         return self.home / "run"
 
@@ -62,7 +66,13 @@ class GolemPaths:
     def ensure_layout(self) -> None:
         """Create the directories the daemon expects. Existing files stay in place."""
         self.home.mkdir(parents=True, exist_ok=True)
-        for directory in (self.skills_dir, self.flows_dir, self.logs_dir, self.run_dir):
+        for directory in (
+            self.skills_dir,
+            self.flows_dir,
+            self.logs_dir,
+            self.run_dir,
+            self.cache_dir,
+        ):
             directory.mkdir(parents=True, exist_ok=True)
 
 

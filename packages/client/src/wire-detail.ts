@@ -78,6 +78,9 @@ export function resultDetail(method: string, result: unknown): string {
   if (method === "session.list" && Array.isArray(result["sessions"])) {
     return `${result["sessions"].length} sessions`;
   }
+  if (method === "model.list" && Array.isArray(result["models"])) {
+    return `${result["models"].length} models`;
+  }
   if (method === "session.inspect" && typeof result["message_count"] === "number") {
     return `${result["message_count"]} messages`;
   }

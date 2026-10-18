@@ -1,0 +1,35 @@
+{
+  "additionalProperties": false,
+  "description": "USD per million tokens. A local model is zero.",
+  "properties": {
+    "cached_input": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cached Input"
+    },
+    "input": {
+      "minimum": 0,
+      "title": "Input",
+      "type": "number"
+    },
+    "output": {
+      "minimum": 0,
+      "title": "Output",
+      "type": "number"
+    }
+  },
+  "required": [
+    "input",
+    "output"
+  ],
+  "title": "ModelPriceInfo",
+  "type": "object"
+}

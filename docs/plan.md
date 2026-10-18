@@ -91,7 +91,7 @@ Agents use the Graph API, where the model decides control flow. Flows use the Fu
 
 ### Protocol, what is left to add
 
-JSON-RPC 2.0, one JSON object per line, over `~/.golem/run/golem.sock`. Protocol 2.6 is on the wire today (see [architecture.md](architecture.md#what-is-on-the-wire-today)). The phases below add the rest.
+JSON-RPC 2.0, one JSON object per line, over `~/.golem/run/golem.sock`. Protocol 2.7 is on the wire today (see [architecture.md](architecture.md#what-is-on-the-wire-today)). The phases below add the rest.
 
 | Group | New events | Phase |
 |---|---|---|
@@ -174,15 +174,17 @@ Ollama's OpenAI-compatible endpoint runs with a small default context window and
   - The Keychain trusts the program that wrote the item, and from a checkout that program is uv's shared, ad-hoc signed Python interpreter, not golem. Any script run with that same interpreter, including another project's dependencies, can read the keys without a prompt. Until 4.3 fixes this, run other projects on a different Python version than golem's.
   - The Keychain asks again when the interpreter changes, for example after a uv Python upgrade.
 
-### 1.3 Discovery and `model.list`
+### 1.3 Discovery and `model.list` (built)
 
 - **Goal:** golem knows which models you can use, what they cost, and which ones fit on this machine.
-- **You can:** `ollama pull` a model in a terminal and see it in golem without editing config or restarting.
+- **You can:** `ollama pull` a model in a terminal and see it in `golem models` without editing config or restarting.
 - **Build:**
-  - Discovery from the sources in the table above. Remote lists are cached for 24 h under `~/.golem/cache/`. A failed fetch keeps the last cache and marks those entries `stale`, and `model.list` never waits on the network for more than about 2 s.
-  - Prices and context sizes, in order: profile override, live provider data (`/api/show`, OpenRouter), LiteLLM, then the local catalog. Ollama models cost $0. A model with no known price shows `?`.
-  - RAM fit: a pure function `fit(size_gb, ctx, ram_gb)` that returns `fits`, `tight`, or `too_big`, with a KV-cache estimate and headroom. Total RAM comes through a small platform function.
-  - `model.list` returns the default and one entry per model: ref, label, provider, source, status (`ready`, `needs key`, `not installed`, `pulling`, `server down`), ctx, tools, price, size, fit, and the profiles that alias it.
+  - Discovery from the sources in the table above ([discovery.py](../packages/daemon/golem/models/discovery.py)). A hosted provider is asked only once it has a key, and a keyless one (LM Studio, a custom server) only once a profile uses it.
+  - Hosted lists are cached for 24 h under `~/.golem/cache/`. A failed fetch keeps the last cache and marks those entries `stale`, and `model.list` never waits on the network for more than 2 s.
+  - Prices and context sizes, in order: profile override (`ctx`, `price`), live provider data (Ollama, OpenRouter), then LiteLLM ([prices.py](../packages/daemon/golem/models/prices.py), bundled trimmed copy refreshed with `just prices`). Ollama models cost $0. A model with no known price shows `?`.
+  - RAM fit: a pure function `fit(size_gb, ram_gb, ctx)` that returns `fits` (within half of RAM), `tight` (within three quarters), or `too_big`. It adds a KV-cache estimate for the profile's `ctx`, or 8k, not the model's maximum.
+  - `model.list` (protocol 2.7) returns the default, `ram_gb`, provider statuses, and one entry per model: ref, label, provider, source, status (`ready`, `needs_key`, `not_installed`, `server_down`), ctx, tools, price, size, fit, `stale`, and the profiles that alias it. `pulling` comes with 1.5.
+  - `golem models [--refresh]` prints the list.
 - **Done when:** a fresh `ollama pull` shows up in `model.list`, and a newly released Anthropic model appears with its LiteLLM price and no golem release.
 - **Watch out:** LiteLLM's key naming is not consistent across providers. A table-driven test over real keys from the bundled copy catches mapping drift.
 
@@ -208,7 +210,10 @@ Ollama's OpenAI-compatible endpoint runs with a small default context window and
   - `model.pull.progress` and `model.pull.done` go to every connection and are not stored, because they are not session facts. This is the first notification outside a session.
   - A pull continues after the TUI closes, and `model.list` shows `pulling 42%` after reattaching.
   - Free disk space is checked first. A `too_big` model needs a second confirmation. Missing Ollama says `brew install ollama`, and a stopped one says `ollama serve`.
-- **Done when:** choosing a catalog model you don't have downloads it with a progress bar, and the session continues on it.
+  - `/model pull <name>` takes any Ollama name. Before downloading, golem reads its size from the registry manifest and shows the RAM fit, the same way the catalog does.
+  - `just catalog` keeps [local-catalog.toml](../packages/daemon/golem/models/data/local-catalog.toml) current. It checks every entry against the Ollama registry and rewrites `size_gb`. It also probes the next version numbers of each family (for example `qwen3.9` and `qwen4` when the catalog has `qwen3.8`) and prints the tags it finds, so a newer release is noticed. Editing the list stays a human choice.
+- **Done when:** choosing a catalog model you don't have downloads it with a progress bar, and the session continues on it, and `just catalog` reports a family's newer version.
+- **Watch out:** Ollama has no official API for browsing its library, so the catalog only learns about a new model through `just catalog` or by hand. The registry manifest gives sizes but not tool support for newer models, whose chat format is built into Ollama. Tool support of an installed model comes from Ollama.
 
 ### 1.6 Tokens and cost
 

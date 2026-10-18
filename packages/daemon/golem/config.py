@@ -66,13 +66,27 @@ class ProviderSettings(BaseModel):
     api_key_env: str | None = Field(default=None, min_length=1)
 
 
+class ModelPrice(BaseModel):
+    """USD per million tokens."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    input: float = Field(ge=0)
+    output: float = Field(ge=0)
+    cached_input: float | None = Field(default=None, ge=0)
+
+
 class ModelSettings(BaseModel):
-    """``[models.<name>]``, a named alias for a ``provider/model`` ref."""
+    """``[models.<name>]``, a named alias for a ``provider/model`` ref.
+
+    ``price`` overrides the price golem discovers for the model.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     model: str = Field(min_length=3, pattern=r"^[^/\s]+/\S+$")
     ctx: int | None = Field(default=None, gt=0)
+    price: ModelPrice | None = None
 
 
 class GolemSettings(BaseSettings):

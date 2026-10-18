@@ -342,6 +342,7 @@ source = { editable = "packages/daemon" }
 dependencies = [
     { name = "aiosqlite" },
     { name = "golem-protocol" },
+    { name = "httpx" },
     { name = "keyring" },
     { name = "langchain-anthropic" },
     { name = "langchain-core" },
@@ -357,6 +358,7 @@ dependencies = [
 requires-dist = [
     { name = "aiosqlite", specifier = ">=0.22" },
     { name = "golem-protocol", editable = "packages/protocol" },
+    { name = "httpx", specifier = ">=0.28" },
     { name = "keyring", specifier = ">=25" },
     { name = "langchain-anthropic", specifier = ">=1.7.5" },
     { name = "langchain-core", specifier = ">=1.6.7" },
