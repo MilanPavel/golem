@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from golem.models.discovery import ModelDiscovery
+from golem.models.pulls import PullManager
 from golem.paths import GolemPaths
 from golem.sessions.manager import SessionManager
 
@@ -19,3 +20,4 @@ class DaemonState:
     state: Literal["running", "draining"] = "running"
     sessions: SessionManager | None = None
     models: ModelDiscovery | None = None
+    pulls: PullManager | None = None

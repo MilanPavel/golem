@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "``model.pull_cancel``. Stop a download. Ollama keeps what it fetched for the next try.",
+  "properties": {
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "title": "ModelPullCancelParams",
+  "type": "object"
+}

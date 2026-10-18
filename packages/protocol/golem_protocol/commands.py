@@ -377,10 +377,11 @@ class ListedModel(BaseModel):
 
     ``source`` is where golem found it: ``installed`` on a local server,
     ``catalog`` for a local model to download, ``remote`` from a provider's
-    list, or ``profile`` when only config names it. ``profiles`` are the
-    profile names that point at it. ``fit`` says whether a local model fits
-    in this machine's memory. ``stale`` means a cached list was shown because
-    the provider did not answer in time.
+    list, or ``profile`` when only config names it. ``progress`` is set while
+    it is ``pulling``. ``profiles`` are the profile names that point at it.
+    ``fit`` says whether a local model fits in this machine's memory.
+    ``stale`` means a cached list was shown because the provider did not
+    answer in time.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -389,7 +390,8 @@ class ListedModel(BaseModel):
     label: str = Field(min_length=1)
     provider: str = Field(min_length=1)
     source: Literal["installed", "catalog", "remote", "profile"]
-    status: Literal["ready", "needs_key", "not_installed", "server_down"]
+    status: Literal["ready", "needs_key", "not_installed", "server_down", "pulling"]
+    progress: float | None = Field(default=None, ge=0, le=1)
     profiles: list[str] = Field(default_factory=list)
     ctx: int | None = Field(default=None, gt=0)
     tools: bool | None = None
@@ -463,6 +465,108 @@ class ModelSetDefaultResult(BaseModel):
     default: str = Field(min_length=1)
 
 
+class ModelProbeParams(BaseModel):
+    """``model.probe``. Look up a local model before downloading it.
+
+    ``name`` is an Ollama name (``qwen3:8b``) or a ref (``ollama/qwen3:8b``).
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+
+
+class ModelProbeResult(BaseModel):
+    """What a download would be.
+
+    ``exists`` is false when the registry has no such model, and null when
+    it could not be asked. ``disk_free_gb`` is the space where Ollama keeps
+    models, when golem can see that disk.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    ref: str = Field(min_length=3)
+    installed: bool
+    exists: bool | None = None
+    size_gb: float | None = Field(default=None, ge=0)
+    fit: Literal["fits", "tight", "too_big"] | None = None
+    disk_free_gb: float | None = Field(default=None, ge=0)
+
+
+class ModelPullParams(BaseModel):
+    """``model.pull``. Download a local model. Progress arrives as ``model.pull.progress``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+
+
+class ModelPullResult(BaseModel):
+    """``started`` is false when the model was already downloading."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    ref: str = Field(min_length=3)
+    started: bool
+
+
+class ModelPullCancelParams(BaseModel):
+    """``model.pull_cancel``. Stop a download. Ollama keeps what it fetched for the next try."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+
+
+class ModelPullCancelResult(BaseModel):
+    """``cancelled`` is false when nothing was downloading."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    ref: str = Field(min_length=3)
+    cancelled: bool
+
+
+class ModelDeleteParams(BaseModel):
+    """``model.delete``. Remove an installed local model from Ollama."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+
+
+class ModelDeleteResult(BaseModel):
+    """``deleted`` is false when Ollama did not have the model."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    ref: str = Field(min_length=3)
+    deleted: bool
+
+
+class ModelPullProgress(BaseModel):
+    """One step of a download. ``progress`` is the share of bytes fetched, when known."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    ref: str = Field(min_length=3)
+    status: str
+    completed: int | None = Field(default=None, ge=0)
+    total: int | None = Field(default=None, ge=0)
+    progress: float | None = Field(default=None, ge=0, le=1)
+
+
+class ModelPullDone(BaseModel):
+    """A download ended. ``error`` says why when ``ok`` is false; ``cancelled`` for a stop."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    ref: str = Field(min_length=3)
+    ok: bool
+    error: str | None = None
+
+
 __all__ = [
     "AuthKeyStatus",
     "AuthListParams",
@@ -479,9 +583,19 @@ __all__ = [
     "ListedProvider",
     "MessageSendParams",
     "MessageSendResult",
+    "ModelDeleteParams",
+    "ModelDeleteResult",
     "ModelListParams",
     "ModelListResult",
     "ModelPriceInfo",
+    "ModelProbeParams",
+    "ModelProbeResult",
+    "ModelPullCancelParams",
+    "ModelPullCancelResult",
+    "ModelPullDone",
+    "ModelPullParams",
+    "ModelPullProgress",
+    "ModelPullResult",
     "ModelSetDefaultParams",
     "ModelSetDefaultResult",
     "PingParams",

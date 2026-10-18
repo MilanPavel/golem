@@ -5,6 +5,7 @@ const STATUS: Record<ListedModel["status"], string> = {
   needs_key: "needs key",
   not_installed: "download",
   server_down: "server down",
+  pulling: "downloading",
 };
 
 /** One row per model, grouped by provider, then a line per provider that needs something. */
@@ -16,7 +17,9 @@ export function formatModels(listing: ModelListResult): string {
     contextLabel(model.ctx),
     priceLabel(model),
     sizeLabel(model),
-    STATUS[model.status] + (model.stale ? " (cached)" : ""),
+    STATUS[model.status] +
+      (model.status === "pulling" && typeof model.progress === "number" ? ` ${Math.floor(model.progress * 100)}%` : "") +
+      (model.stale ? " (cached)" : ""),
   ]);
   const widths = rows.reduce<number[]>(
     (max, row) => row.map((cell, index) => Math.max(max[index] ?? 0, cell.length)),

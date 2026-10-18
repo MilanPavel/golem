@@ -1,0 +1,33 @@
+{
+  "additionalProperties": false,
+  "description": "A download ended. ``error`` says why when ``ok`` is false; ``cancelled`` for a stop.",
+  "properties": {
+    "error": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Error"
+    },
+    "ok": {
+      "title": "Ok",
+      "type": "boolean"
+    },
+    "ref": {
+      "minLength": 3,
+      "title": "Ref",
+      "type": "string"
+    }
+  },
+  "required": [
+    "ref",
+    "ok"
+  ],
+  "title": "ModelPullDone",
+  "type": "object"
+}

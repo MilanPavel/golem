@@ -126,6 +126,9 @@ test("/model opens the picker or names one model", () => {
     name: "openrouter/qwen/qwen3",
   });
   assert.equal(applyComposer(closedDebug, "/model a b").kind, "unknown");
+  assert.deepEqual(applyComposer(closedDebug, "/model pull qwen3:8b"), { kind: "model-pull", name: "qwen3:8b" });
+  assert.deepEqual(applyComposer(closedDebug, "/model rm ollama/qwen3:8b"), { kind: "model-rm", name: "ollama/qwen3:8b" });
+  assert.equal(applyComposer(closedDebug, "/model pull").kind, "model");
 });
 
 test("/login and /logout take exactly one provider, and the key never goes in the command", () => {

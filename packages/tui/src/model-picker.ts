@@ -2,6 +2,19 @@ import type { ListedModel, ModelListResult } from "@golem/client";
 
 import type { Press } from "./keys.ts";
 
+/** A question the picker asks before it downloads, stops, or removes. */
+export type Confirm = {
+  kind: "pull" | "cancel" | "delete";
+  ref: string;
+  sizeGb: number | null;
+  fit: ListedModel["fit"];
+  /** A model too big for this machine asks twice. */
+  step: 1 | 2;
+  /** Switch the session to it once the download ends. */
+  use: boolean;
+  setDefault: boolean;
+};
+
 /** The selection is a ref, so it stays put while a refreshed list reorders. */
 export type PickerState = {
   open: boolean;
@@ -9,9 +22,13 @@ export type PickerState = {
   query: string;
   /** Opened because no model is configured. Choosing also sets the default. */
   firstRun: boolean;
+  confirm: Confirm | null;
 };
 
-export const closedPicker: PickerState = { open: false, selected: null, query: "", firstRun: false };
+export const closedPicker: PickerState = { open: false, selected: null, query: "", firstRun: false, confirm: null };
+
+/** A download in progress, from `model.pull.progress`. */
+export type PullState = { progress: number | null; status: string };
 
 export type PickerKey =
   | "up"
@@ -24,13 +41,18 @@ export type PickerKey =
   | "clear-query"
   | "close"
   | "refresh"
+  | "remove"
   | { kind: "type"; text: string };
 
 export type PickerAction =
   | { kind: "none" }
   | { kind: "close" }
   | { kind: "refresh" }
-  | { kind: "choose"; model: ListedModel; name: string; setDefault: boolean };
+  | { kind: "notice"; text: string }
+  | { kind: "choose"; model: ListedModel; name: string; setDefault: boolean }
+  | { kind: "pull"; ref: string; use: boolean; setDefault: boolean }
+  | { kind: "cancel-pull"; ref: string }
+  | { kind: "delete"; ref: string };
 
 export type PickerRow =
   | { kind: "header"; text: string }
@@ -51,8 +73,36 @@ type Group = { title: string; models: ListedModel[] };
 const QUERY_MAX = 200;
 const PAGE = 10;
 
-export function openPicker(current: string | null, firstRun = false): PickerState {
-  return { open: true, selected: current, query: "", firstRun };
+export function openPicker(current: string | null, firstRun = false, confirm: Confirm | null = null): PickerState {
+  return { open: true, selected: confirm?.ref ?? current, query: "", firstRun, confirm };
+}
+
+/** The listing with live download progress laid over it. */
+export function withPulls(listing: ModelListResult | null, pulls: Readonly<Record<string, PullState>>): ModelListResult | null {
+  if (listing === null) {
+    return null;
+  }
+  const refs = Object.keys(pulls);
+  if (refs.length === 0) {
+    return listing;
+  }
+  const known = new Set(listing.models.map((model) => model.ref));
+  const models = listing.models.map((model) => {
+    const pull = pulls[model.ref];
+    return pull === undefined ? model : { ...model, status: "pulling" as const, progress: pull.progress };
+  });
+  for (const ref of refs.filter((item) => !known.has(item))) {
+    models.push({
+      ref,
+      label: ref.slice(ref.indexOf("/") + 1),
+      provider: ref.slice(0, ref.indexOf("/")),
+      source: "catalog",
+      status: "pulling",
+      progress: pulls[ref]?.progress ?? null,
+      price: { input: 0, output: 0 },
+    });
+  }
+  return { ...listing, models };
 }
 
 /** The name to send for a model: its first profile, else its ref. */
@@ -100,7 +150,9 @@ export function unusableReason(model: ListedModel): string | null {
     case "needs_key":
       return `needs key: /login ${model.provider}`;
     case "not_installed":
-      return `not installed: run ollama pull ${id} (downloading from here comes next)`;
+      return `not installed: /model pull ${id} downloads it`;
+    case "pulling":
+      return `still downloading ${id}`;
     case "server_down":
       return model.provider === "ollama" ? "Ollama is not answering: run ollama serve" : `${model.provider} is not answering`;
   }
@@ -134,12 +186,34 @@ export function pickerModels(listing: ModelListResult | null, query: string): Li
   return listing === null ? [] : pickerGroups(listing, query).flatMap((group) => group.models);
 }
 
-export function pickerHint(state: PickerState): string {
+export function pickerHint(state: PickerState, ramGb: number | null = null): string {
+  const confirm = state.confirm;
+  if (confirm !== null) {
+    return confirmHint(confirm, ramGb);
+  }
   if (state.query.length > 0) {
     return `filter: ${state.query}  ↑↓ move · Enter use · Esc clear`;
   }
   const head = state.firstRun ? "Pick a model to start. " : "";
-  return `${head}↑↓ move · Enter use for this session · d use and make default · type to filter · Ctrl-R refresh · Esc close`;
+  return `${head}↑↓ move · Enter use or download · d also make default · x stop or remove · type to filter · Ctrl-R refresh · Esc close`;
+}
+
+function confirmHint(confirm: Confirm, ramGb: number | null): string {
+  const name = confirm.ref.slice(confirm.ref.indexOf("/") + 1);
+  if (confirm.kind === "cancel") {
+    return `Stop downloading ${name}? Enter stops · Esc keeps going`;
+  }
+  if (confirm.kind === "delete") {
+    return `Remove ${name} from Ollama? Enter removes · Esc keeps it`;
+  }
+  const size = confirm.sizeGb === null ? "size unknown" : `${confirm.sizeGb} GB`;
+  if (confirm.fit === "too_big" && confirm.step === 1) {
+    const memory = ramGb === null ? "this Mac" : `${ramGb} GB of memory`;
+    return `${name} (${size}) is too big for ${memory}. Enter again to download anyway · Esc cancels`;
+  }
+  const fit = confirm.fit === null || confirm.fit === undefined ? "" : `, ${confirm.fit === "too_big" ? "too big" : confirm.fit}`;
+  const after = confirm.use ? " and use it" : "";
+  return `Download ${name} (${size}${fit})${after}? Enter downloads · Esc cancels`;
 }
 
 /** Map a key press to a picker key. `d` is the default key only while nothing is typed. */
@@ -173,7 +247,47 @@ export function pickerKeyOf(state: PickerState, press: Press): PickerKey | null 
   if (press.input === "d" && state.query.length === 0) {
     return "default";
   }
+  if (press.input === "x" && state.query.length === 0) {
+    return "remove";
+  }
   return { kind: "type", text: press.input };
+}
+
+function onConfirm(state: PickerState, key: PickerKey): { state: PickerState; action: PickerAction } {
+  const confirm = state.confirm;
+  if (confirm === null) {
+    return { state, action: { kind: "none" } };
+  }
+  if (key === "close" || key === "clear-query") {
+    return { state: { ...state, confirm: null }, action: { kind: "none" } };
+  }
+  if (key !== "enter") {
+    return { state, action: { kind: "none" } };
+  }
+  if (confirm.kind === "pull" && confirm.fit === "too_big" && confirm.step === 1) {
+    return { state: { ...state, confirm: { ...confirm, step: 2 } }, action: { kind: "none" } };
+  }
+  const next = { ...state, confirm: null };
+  if (confirm.kind === "cancel") {
+    return { state: next, action: { kind: "cancel-pull", ref: confirm.ref } };
+  }
+  if (confirm.kind === "delete") {
+    return { state: next, action: { kind: "delete", ref: confirm.ref } };
+  }
+  return { state: next, action: { kind: "pull", ref: confirm.ref, use: confirm.use, setDefault: confirm.setDefault } };
+}
+
+/** The question for a model the picker cannot simply use. */
+export function confirmFor(kind: Confirm["kind"], model: ListedModel, setDefault = false): Confirm {
+  return {
+    kind,
+    ref: model.ref,
+    sizeGb: model.size_gb ?? null,
+    fit: model.fit ?? null,
+    step: 1,
+    use: kind === "pull",
+    setDefault,
+  };
 }
 
 export function pressPicker(
@@ -181,6 +295,9 @@ export function pressPicker(
   listing: ModelListResult | null,
   key: PickerKey,
 ): { state: PickerState; action: PickerAction } {
+  if (state.confirm !== null) {
+    return onConfirm(state, key);
+  }
   if (key === "close") {
     return { state: closedPicker, action: { kind: "close" } };
   }
@@ -198,15 +315,28 @@ export function pressPicker(
   }
   const models = pickerModels(listing, state.query);
   const index = selectedIndex(state, models);
-  if (key === "enter" || key === "default") {
+  if (key === "enter" || key === "default" || key === "remove") {
     const chosen = models[index];
     if (chosen === undefined) {
       return { state, action: { kind: "none" } };
     }
-    return {
-      state,
-      action: { kind: "choose", model: chosen, name: pickerName(chosen), setDefault: key === "default" || state.firstRun },
-    };
+    const setDefault = key === "default" || state.firstRun;
+    if (key === "remove") {
+      if (chosen.status === "pulling") {
+        return { state: { ...state, confirm: confirmFor("cancel", chosen) }, action: { kind: "none" } };
+      }
+      if (chosen.source === "installed" && chosen.provider === "ollama") {
+        return { state: { ...state, confirm: confirmFor("delete", chosen) }, action: { kind: "none" } };
+      }
+      return { state, action: { kind: "notice", text: "only a downloaded local model can be removed" } };
+    }
+    if (chosen.status === "not_installed") {
+      return { state: { ...state, confirm: confirmFor("pull", chosen, setDefault) }, action: { kind: "none" } };
+    }
+    if (chosen.status === "pulling") {
+      return { state, action: { kind: "notice", text: "still downloading: x stops it" } };
+    }
+    return { state, action: { kind: "choose", model: chosen, name: pickerName(chosen), setDefault } };
   }
   const step = key === "up" ? -1 : key === "down" ? 1 : key === "page-up" ? -PAGE : PAGE;
   const next = models[Math.min(Math.max(index + step, 0), Math.max(0, models.length - 1))];
@@ -308,6 +438,10 @@ function statusLabel(model: ListedModel): string {
       return "needs key";
     case "not_installed":
       return "download";
+    case "pulling":
+      return model.progress === null || model.progress === undefined
+        ? "downloading"
+        : `downloading ${Math.floor(model.progress * 100)}%`;
     case "server_down":
       return "down";
   }

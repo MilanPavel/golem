@@ -1,0 +1,76 @@
+{
+  "additionalProperties": false,
+  "description": "What a download would be.\n\n``exists`` is false when the registry has no such model, and null when\nit could not be asked. ``disk_free_gb`` is the space where Ollama keeps\nmodels, when golem can see that disk.",
+  "properties": {
+    "disk_free_gb": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Disk Free Gb"
+    },
+    "exists": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Exists"
+    },
+    "fit": {
+      "anyOf": [
+        {
+          "enum": [
+            "fits",
+            "tight",
+            "too_big"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Fit"
+    },
+    "installed": {
+      "title": "Installed",
+      "type": "boolean"
+    },
+    "ref": {
+      "minLength": 3,
+      "title": "Ref",
+      "type": "string"
+    },
+    "size_gb": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Size Gb"
+    }
+  },
+  "required": [
+    "ref",
+    "installed"
+  ],
+  "title": "ModelProbeResult",
+  "type": "object"
+}

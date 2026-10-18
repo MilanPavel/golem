@@ -30,6 +30,10 @@ gen:
 prices:
     uv run python -m golem.models.prices
 
+# Check the local model catalog against the Ollama registry and list newer releases.
+catalog:
+    uv run python -m golem.models.catalog_check
+
 # Lint Python and the TypeScript packages.
 lint:
     uv run ruff check packages

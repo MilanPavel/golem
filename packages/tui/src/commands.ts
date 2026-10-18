@@ -28,6 +28,8 @@ export type ComposerOutcome =
   | { kind: "export"; path: string | null }
   | { kind: "time" }
   | { kind: "model"; name: string | null }
+  | { kind: "model-pull"; name: string }
+  | { kind: "model-rm"; name: string }
   | { kind: "login"; provider: string }
   | { kind: "logout"; provider: string }
   | {
@@ -118,13 +120,17 @@ export const COMMANDS: readonly Command[] = [
   },
   {
     name: "/model",
-    args: "[name]",
-    description: "Opens the model picker, or switches this session to a profile or provider/model.",
+    args: "[pull|rm] [name]",
+    description: "Opens the model picker, switches this session, or downloads or removes a local model.",
     run: (_debug, args) => {
+      const [first, second] = args;
+      if ((first === "pull" || first === "rm") && args.length === 2 && second !== undefined) {
+        return first === "pull" ? { kind: "model-pull", name: second } : { kind: "model-rm", name: second };
+      }
       if (args.length > 1) {
         return unknown();
       }
-      return { kind: "model", name: args[0] ?? null };
+      return { kind: "model", name: first ?? null };
     },
   },
   {

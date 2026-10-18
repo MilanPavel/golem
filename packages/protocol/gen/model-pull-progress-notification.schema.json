@@ -1,0 +1,89 @@
+{
+  "$defs": {
+    "ModelPullProgress": {
+      "additionalProperties": false,
+      "description": "One step of a download. ``progress`` is the share of bytes fetched, when known.",
+      "properties": {
+        "completed": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Completed"
+        },
+        "progress": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Progress"
+        },
+        "ref": {
+          "minLength": 3,
+          "title": "Ref",
+          "type": "string"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "total": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Total"
+        }
+      },
+      "required": [
+        "ref",
+        "status"
+      ],
+      "title": "ModelPullProgress",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Server → every connection: a download moved on. Not stored; at most a few per second.",
+  "properties": {
+    "jsonrpc": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Jsonrpc",
+      "type": "string"
+    },
+    "method": {
+      "const": "model.pull.progress",
+      "default": "model.pull.progress",
+      "title": "Method",
+      "type": "string"
+    },
+    "params": {
+      "$ref": "#/$defs/ModelPullProgress"
+    }
+  },
+  "required": [
+    "params"
+  ],
+  "title": "ModelPullProgressNotification",
+  "type": "object"
+}

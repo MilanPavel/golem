@@ -1,0 +1,21 @@
+{
+  "additionalProperties": false,
+  "description": "``started`` is false when the model was already downloading.",
+  "properties": {
+    "ref": {
+      "minLength": 3,
+      "title": "Ref",
+      "type": "string"
+    },
+    "started": {
+      "title": "Started",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "ref",
+    "started"
+  ],
+  "title": "ModelPullResult",
+  "type": "object"
+}

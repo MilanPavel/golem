@@ -249,7 +249,7 @@ Each event line is one JSON-RPC 2.0 notification. The fields that matter:
 
 | Commands | Events |
 |---|---|
-| `hello`, `ping`, `daemon.status`, `session.create`, `session.attach`, `session.detach`, `session.list`, `session.rename`, `session.fork`, `session.close`, `message.send`, `run.cancel`, `session.inspect`, `auth.set`, `auth.remove`, `auth.list`, `model.list`, `session.set_model`, `model.set_default` | `session.created`, `model.selected`, `message.started`, `message.delta`, `message.completed`, `run.started`, `run.completed`, `run.failed`, `run.cancelled`, `session.updated`, `session.closed`; `session.summary` to watchers |
+| `hello`, `ping`, `daemon.status`, `session.create`, `session.attach`, `session.detach`, `session.list`, `session.rename`, `session.fork`, `session.close`, `message.send`, `run.cancel`, `session.inspect`, `auth.set`, `auth.remove`, `auth.list`, `model.list`, `session.set_model`, `model.set_default`, `model.probe`, `model.pull`, `model.pull_cancel`, `model.delete` | `session.created`, `model.selected`, `message.started`, `message.delta`, `message.completed`, `run.started`, `run.completed`, `run.failed`, `run.cancelled`, `session.updated`, `session.closed`; `session.summary` to watchers; `model.pull.progress` and `model.pull.done` to every connection |
 
 After `hello`, a client sends `ping` every few seconds so a half-open socket is noticed. `daemon.status` returns the pid, uptime, and configured model. A new chat sends `session.create`, then `session.attach` with `after_seq` 0, then `message.send`. `session.list` returns sessions newest activity first, each with `idle` or `running`, its title, and its last `seq`. With `watch: true`, the connection also gets a `session.summary` after every change to any session, until it closes. `session.rename` sets a title by hand. `session.fork` copies a session's history up to one message into a new session, and the client attaches to it. `session.detach` stops one session's events. `session.inspect` reads the saved checkpoint messages and does not call the model. `auth.set` stores a provider's API key in the Keychain, `auth.remove` deletes it, and `auth.list` says where each provider's key is without returning it. The client shows `auth.set` in the wire view with the key replaced by `[redacted]`.
 
@@ -259,6 +259,13 @@ After `hello`, a client sends `ping` every few seconds so a half-open socket is 
 - The switch applies from the next run, and a run in progress keeps its model. Each turn passes the session's current model into graph state.
 - The conversation in the checkpoint carries over unchanged, so the new model sees the whole history.
 - Choosing the model the session already has stores nothing.
+
+Downloads go through Ollama (`golem/models/pulls.py`):
+- **`model.probe`** reports whether a model is installed, whether the Ollama registry has it, its download size (from the registry manifest, `golem/models/registry.py`), whether it fits in memory, and the free disk space.
+- **`model.pull`** starts a daemon task that streams Ollama's `/api/pull`, so it keeps going after the client closes. It refuses a name the registry does not know, or a download the disk cannot hold, with error `-32009` and a message that says what to do.
+- **Progress:** it is summed over layers and goes out as `model.pull.progress` at most four times a second, and `model.pull.done` goes out at the end. Both go to every welcomed connection. They are the first notifications outside a session, and they are not stored, because a download is not a fact about any session.
+- **After reattaching:** `model.list` marks a running download as `pulling` with its progress, so a client that attaches later still sees it.
+- **`model.pull_cancel`** stops the task; Ollama keeps the fetched layers for the next try. **`model.delete`** calls `/api/delete`.
 
 `model.set_default` writes `default_model` into the user's `config.toml` with `tomlkit`, which keeps comments and layout (`golem/config_edit.py`). The router picks the change up on its next read.
 
@@ -318,6 +325,7 @@ sequenceDiagram
 - **Groups:** profiles, installed, download, then one group per provider, with a green dot on the session's current model.
 - **Keys:** Enter switches the session through `session.set_model`, `d` also calls `model.set_default`, typing filters by ref, label, or profile name, Ctrl-R lists again with `refresh`, and Esc clears the filter or closes the picker.
 - **A model that cannot run** is dimmed, and choosing it says what to do instead.
+- **Downloads:** Enter on a model to download asks once with its size and fit, or twice when it is too big, then calls `model.pull`. The row shows the live percentage from `model.pull.progress`, and the session switches to the model on `model.pull.done`. `x` asks, then stops a download or removes an installed model. `/model pull <name>` and `/model rm <name>` probe first and ask in the same way.
 - **`/model <name>`** switches directly, and the suggestions under the composer are the profile names and ready refs from the last listing.
 - **On a first start** whose default resolves to nothing, the TUI uses the only ready model, or opens the picker.
 - **Code:** `model-picker.ts`, which holds the pure state, grouping, and layout, and `model-picker.tsx`.

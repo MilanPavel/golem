@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "``model.pull``. Download a local model. Progress arrives as ``model.pull.progress``.",
+  "properties": {
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "title": "ModelPullParams",
+  "type": "object"
+}

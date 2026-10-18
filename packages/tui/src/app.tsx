@@ -30,6 +30,7 @@ import {
 } from "./commands.ts";
 import {
   closedPicker,
+  confirmFor,
   firstRunChoice,
   layoutPicker,
   modelNames,
@@ -39,7 +40,9 @@ import {
   pickerName,
   pressPicker,
   unusableReason,
+  withPulls,
   type PickerState,
+  type PullState,
 } from "./model-picker.ts";
 import { ModelPickerView } from "./model-picker.tsx";
 import { draftAt, edit, editDraft, insertText, type Draft } from "./edit.ts";
@@ -167,6 +170,12 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   const listingRef = useRef(listing);
   listingRef.current = listing;
   const firstRunChecked = useRef(false);
+  const [pulls, setPulls] = useState<Record<string, PullState>>({});
+  const pullsRef = useRef(pulls);
+  pullsRef.current = pulls;
+  /** Downloads started from the picker switch the session once they end. */
+  const useAfterPull = useRef(new Map<string, { setDefault: boolean }>());
+  const shownListing = withPulls(listing, pulls);
   const draftRef = useRef(draft);
   const busyRef = useRef(chat.busy);
   const chatRef = useRef(chat);
@@ -487,6 +496,42 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   }, [client, connection.status]);
 
   useEffect(() => {
+    return client.onPull((update) => {
+      if (update.kind === "progress") {
+        const { ref, progress, status } = update.progress;
+        setPulls((current) => ({ ...current, [ref]: { progress: progress ?? null, status } }));
+        if (!pickerRef.current.open) {
+          const percent = progress === null || progress === undefined ? "" : ` ${Math.floor(progress * 100)}%`;
+          setChat((current) =>
+            current.notice === null || current.notice.startsWith("downloading ")
+              ? { ...current, notice: `downloading ${ref}${percent}` }
+              : current,
+          );
+        }
+        return;
+      }
+      const { ref, ok, error } = update.done;
+      setPulls((current) => {
+        const next = { ...current };
+        delete next[ref];
+        return next;
+      });
+      const after = useAfterPull.current.get(ref);
+      useAfterPull.current.delete(ref);
+      loadModels(false);
+      if (ok && after !== undefined) {
+        chooseModel(null, ref, after.setDefault, `${ref} downloaded, and this session uses it now`);
+      } else if (ok) {
+        setChat((current) => ({ ...current, notice: `${ref} downloaded` }));
+      } else if (error === "cancelled") {
+        setChat((current) => ({ ...current, notice: `stopped downloading ${ref}` }));
+      } else {
+        setChat((current) => ({ ...current, notice: null, error: `download of ${ref} failed: ${error ?? "unknown error"}` }));
+      }
+    });
+  }, [client]);
+
+  useEffect(() => {
     if (listing === null || sessionId === null || firstRunChecked.current) {
       return;
     }
@@ -579,6 +624,11 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       const name = outcome.name;
       const known = listingRef.current?.models.find((model) => model.ref === name || (model.profiles ?? []).includes(name));
       chooseModel(known ?? null, name, false);
+      return;
+    }
+    if (outcome.kind === "model-pull" || outcome.kind === "model-rm") {
+      setDraft(draftAt(""));
+      confirmFromCommand(outcome.kind === "model-pull" ? "pull" : "delete", outcome.name);
       return;
     }
     if (outcome.kind === "login") {
@@ -746,13 +796,75 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       });
   }
 
+  function startPull(ref: string, use: boolean, setDefault: boolean): void {
+    if (use) {
+      useAfterPull.current.set(ref, { setDefault });
+    }
+    setPulls((current) => ({ ...current, [ref]: { progress: null, status: "starting" } }));
+    void client.pullModel(ref).then(
+      (result) => {
+        setChat((current) => ({
+          ...current,
+          error: null,
+          notice: result.started ? `downloading ${result.ref}` : `${result.ref} is already downloading`,
+        }));
+      },
+      (error: unknown) => {
+        useAfterPull.current.delete(ref);
+        setPulls((current) => {
+          const next = { ...current };
+          delete next[ref];
+          return next;
+        });
+        setChat((current) => ({ ...current, notice: null, error: messageOf(error) }));
+      },
+    );
+  }
+
+  /** `/model pull` and `/model rm`: look the model up, then ask in the picker. */
+  function confirmFromCommand(kind: "pull" | "delete", name: string): void {
+    void client.probeModel(name).then(
+      (probe) => {
+        if (kind === "pull" && probe.installed) {
+          setChat((current) => ({ ...current, notice: `${probe.ref} is already installed` }));
+          return;
+        }
+        if (kind === "pull" && probe.exists === false) {
+          setChat((current) => ({ ...current, notice: `no model named ${name} in the Ollama library` }));
+          return;
+        }
+        if (kind === "delete" && !probe.installed) {
+          setChat((current) => ({ ...current, notice: `${probe.ref} is not installed` }));
+          return;
+        }
+        const confirm = confirmFor(kind, {
+          ref: probe.ref,
+          label: probe.ref,
+          provider: probe.ref.slice(0, probe.ref.indexOf("/")),
+          source: kind === "pull" ? "catalog" : "installed",
+          status: kind === "pull" ? "not_installed" : "ready",
+          size_gb: probe.size_gb ?? null,
+          fit: probe.fit ?? null,
+        });
+        const next = openPicker(currentModelRef(), false, { ...confirm, use: false });
+        pickerRef.current = next;
+        setPicker(next);
+        setSwitcher(closedSwitcher);
+        loadModels(false);
+      },
+      (error: unknown) => {
+        setChat((current) => ({ ...current, error: messageOf(error) }));
+      },
+    );
+  }
+
   function onPickerPress(press: Press): void {
     const state = pickerRef.current;
     const key = pickerKeyOf(state, press);
     if (key === null) {
       return;
     }
-    const pressed = pressPicker(state, listingRef.current, key);
+    const pressed = pressPicker(state, withPulls(listingRef.current, pullsRef.current), key);
     pickerRef.current = pressed.state;
     setPicker(pressed.state);
     const action = pressed.action;
@@ -761,6 +873,28 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       loadModels(true);
     } else if (action.kind === "choose") {
       chooseModel(action.model, action.name, action.setDefault);
+    } else if (action.kind === "notice") {
+      setChat((current) => ({ ...current, notice: action.text }));
+    } else if (action.kind === "pull") {
+      startPull(action.ref, action.use, action.setDefault);
+    } else if (action.kind === "cancel-pull") {
+      void client.cancelPull(action.ref).catch((error: unknown) => {
+        setChat((current) => ({ ...current, error: messageOf(error) }));
+      });
+    } else if (action.kind === "delete") {
+      void client.deleteModel(action.ref).then(
+        (result) => {
+          setChat((current) => ({
+            ...current,
+            error: null,
+            notice: result.deleted ? `removed ${result.ref}` : `${result.ref} was not installed`,
+          }));
+          loadModels(false);
+        },
+        (error: unknown) => {
+          setChat((current) => ({ ...current, error: messageOf(error) }));
+        },
+      );
     } else if (action.kind === "close") {
       setChat((current) => ({ ...current, notice: state.firstRun ? "no model chosen yet: /model to pick one" : null }));
     }
@@ -1181,14 +1315,14 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
         <ModelPickerView
           rows={layoutPicker({
             state: picker,
-            listing,
+            listing: shownListing,
             current: sessionModel?.profile ?? null,
             columns,
             rows: budget.body - 1,
           })}
           columns={columns}
           height={budget.body}
-          hint={pickerHint(picker)}
+          hint={pickerHint(picker, shownListing?.ram_gb ?? null)}
         />
       ) : switcher.open ? (
         <SwitcherView

@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict
 from golem import __version__
 from golem.config_edit import set_default_model
 from golem.models.keys import KeyStore, KeyStoreError
+from golem.models.pulls import PullError, PullManager
 from golem.models.router import ModelConfigError, ModelRouter
 from golem.server.dispatcher import (
     INTERNAL_ERROR,
@@ -19,6 +20,7 @@ from golem.server.dispatcher import (
     KEYCHAIN_UNAVAILABLE,
     MESSAGE_NOT_FOUND,
     MODEL_NOT_CONFIGURED,
+    MODEL_PULL_FAILED,
     PROTOCOL_MISMATCH,
     RUN_NOT_FOUND,
     SESSION_BUSY,
@@ -53,9 +55,17 @@ from golem_protocol.commands import (
     ListedProvider,
     MessageSendParams,
     MessageSendResult,
+    ModelDeleteParams,
+    ModelDeleteResult,
     ModelListParams,
     ModelListResult,
     ModelPriceInfo,
+    ModelProbeParams,
+    ModelProbeResult,
+    ModelPullCancelParams,
+    ModelPullCancelResult,
+    ModelPullParams,
+    ModelPullResult,
     ModelSetDefaultParams,
     ModelSetDefaultResult,
     PingParams,
@@ -304,6 +314,7 @@ async def _model_list(ctx: RequestContext, params: ModelListParams) -> ModelList
                 provider=model.provider,
                 source=model.source,
                 status=model.status,
+                progress=model.progress,
                 profiles=list(model.profiles),
                 ctx=model.ctx,
                 tools=model.tools,
@@ -358,6 +369,54 @@ async def _model_set_default(
     return ModelSetDefaultResult(default=params.model)
 
 
+def _pulls(ctx: RequestContext) -> PullManager:
+    pulls = ctx.state.pulls
+    if pulls is None:
+        raise RpcCallError(INTERNAL_ERROR, "downloads are not ready")
+    return pulls
+
+
+async def _model_probe(ctx: RequestContext, params: ModelProbeParams) -> ModelProbeResult:
+    try:
+        probe = await _pulls(ctx).probe(params.name)
+    except PullError as exc:
+        raise RpcCallError(MODEL_PULL_FAILED, str(exc)) from exc
+    return ModelProbeResult(
+        ref=probe.ref,
+        installed=probe.installed,
+        exists=probe.exists,
+        size_gb=probe.size_gb,
+        fit=probe.fit,
+        disk_free_gb=probe.disk_free_gb,
+    )
+
+
+async def _model_pull(ctx: RequestContext, params: ModelPullParams) -> ModelPullResult:
+    try:
+        ref, started = await _pulls(ctx).start(params.name)
+    except PullError as exc:
+        raise RpcCallError(MODEL_PULL_FAILED, str(exc)) from exc
+    return ModelPullResult(ref=ref, started=started)
+
+
+async def _model_pull_cancel(
+    ctx: RequestContext, params: ModelPullCancelParams
+) -> ModelPullCancelResult:
+    try:
+        ref, cancelled = await _pulls(ctx).cancel(params.name)
+    except PullError as exc:
+        raise RpcCallError(MODEL_PULL_FAILED, str(exc)) from exc
+    return ModelPullCancelResult(ref=ref, cancelled=cancelled)
+
+
+async def _model_delete(ctx: RequestContext, params: ModelDeleteParams) -> ModelDeleteResult:
+    try:
+        ref, deleted = await _pulls(ctx).delete(params.name)
+    except PullError as exc:
+        raise RpcCallError(MODEL_PULL_FAILED, str(exc)) from exc
+    return ModelDeleteResult(ref=ref, deleted=deleted)
+
+
 def _key_store(router: ModelRouter, provider_name: str) -> KeyStore:
     provider = router.provider(provider_name)
     if provider is None:
@@ -396,6 +455,12 @@ def standard_methods() -> dict[str, Method]:
         "auth.remove": Method("auth.remove", AuthRemoveParams, True, _auth_remove),
         "auth.list": Method("auth.list", AuthListParams, True, _auth_list),
         "model.list": Method("model.list", ModelListParams, True, _model_list),
+        "model.probe": Method("model.probe", ModelProbeParams, True, _model_probe),
+        "model.pull": Method("model.pull", ModelPullParams, True, _model_pull),
+        "model.pull_cancel": Method(
+            "model.pull_cancel", ModelPullCancelParams, True, _model_pull_cancel
+        ),
+        "model.delete": Method("model.delete", ModelDeleteParams, True, _model_delete),
         "model.set_default": Method(
             "model.set_default", ModelSetDefaultParams, True, _model_set_default
         ),

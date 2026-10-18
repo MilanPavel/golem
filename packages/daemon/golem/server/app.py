@@ -13,6 +13,7 @@ from collections.abc import Callable, Mapping
 from pathlib import Path
 
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+from pydantic import BaseModel
 
 from golem.config import load_settings
 from golem.graphs.chat import ChatRuntime, open_chat
@@ -20,6 +21,7 @@ from golem.lock import DaemonAlreadyRunning, DaemonLock
 from golem.logging import configure_logging
 from golem.models.discovery import ModelDiscovery
 from golem.models.keys import KeychainStore
+from golem.models.pulls import PullManager
 from golem.models.router import ModelRouter
 from golem.paths import GolemPaths, resolve_paths
 from golem.server.connection import ClientConnection
@@ -74,11 +76,13 @@ class DaemonApp:
         router: ModelRouter | None = None,
         titles: TitleGenerator | None = None,
         discovery: Callable[[ModelRouter], ModelDiscovery] | None = None,
+        pulls: Callable[[ModelRouter, float | None], PullManager] | None = None,
     ) -> None:
         self.paths = paths
         self._router = router
         self._titles = titles
         self._discovery = discovery
+        self._pulls = pulls
         self.state = DaemonState(paths=paths, started_at=time.monotonic())
         methods = standard_methods()
         if extra_methods:
@@ -125,9 +129,17 @@ class DaemonApp:
                     database, open_chat(router, saver), self._titles
                 )
                 if self._discovery is None:
-                    self.state.models = ModelDiscovery(router, self.paths.cache_dir)
+                    models = ModelDiscovery(router, self.paths.cache_dir)
                 else:
-                    self.state.models = self._discovery(router)
+                    models = self._discovery(router)
+                if self._pulls is None:
+                    pulls = PullManager(router, ram_gb=models.ram_gb)
+                else:
+                    pulls = self._pulls(router, models.ram_gb)
+                pulls.broadcast = self._broadcast
+                models.pulling = pulls.pulling
+                self.state.models = models
+                self.state.pulls = pulls
                 try:
                     if install_signals:
                         installed = _install_signals(loop, self.request_shutdown)
@@ -143,11 +155,22 @@ class DaemonApp:
                         loop.remove_signal_handler(sig)
                     self._unlink_socket()
         finally:
+            if self.state.pulls is not None:
+                await self.state.pulls.aclose()
+            self.state.pulls = None
             if self.state.models is not None:
                 await self.state.models.aclose()
             self.state.models = None
             self.state.sessions = None
             self._lock.release()
+
+    def _broadcast(self, notification: BaseModel) -> None:
+        """Queue ``notification`` on every connection that said hello."""
+        for connection in list(self._connections):
+            if not connection.welcomed or connection.closed:
+                continue
+            with contextlib.suppress(ConnectionResetError):
+                connection.enqueue(notification)
 
     def _on_client(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         if self._draining or len(self._clients) >= self._max_connections:

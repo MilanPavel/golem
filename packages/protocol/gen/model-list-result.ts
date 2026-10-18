@@ -8,12 +8,13 @@ export type CachedInput = number | null;
 export type Input = number;
 export type Output = number;
 export type Profiles = string[];
+export type Progress = number | null;
 export type Provider = string;
 export type Ref = string;
 export type SizeGb = number | null;
 export type Source = 'installed' | 'catalog' | 'remote' | 'profile';
 export type Stale = boolean;
-export type Status = 'ready' | 'needs_key' | 'not_installed' | 'server_down';
+export type Status = 'ready' | 'needs_key' | 'not_installed' | 'server_down' | 'pulling';
 export type Tools = boolean | null;
 export type Models = ListedModel[];
 export type Provider1 = string;
@@ -36,10 +37,11 @@ export interface ModelListResult {
  *
  * ``source`` is where golem found it: ``installed`` on a local server,
  * ``catalog`` for a local model to download, ``remote`` from a provider's
- * list, or ``profile`` when only config names it. ``profiles`` are the
- * profile names that point at it. ``fit`` says whether a local model fits
- * in this machine's memory. ``stale`` means a cached list was shown because
- * the provider did not answer in time.
+ * list, or ``profile`` when only config names it. ``progress`` is set while
+ * it is ``pulling``. ``profiles`` are the profile names that point at it.
+ * ``fit`` says whether a local model fits in this machine's memory.
+ * ``stale`` means a cached list was shown because the provider did not
+ * answer in time.
  *
  * This interface was referenced by `ModelListResult`'s JSON-Schema
  * via the `definition` "ListedModel".
@@ -50,6 +52,7 @@ export interface ListedModel {
   label: Label;
   price?: ModelPriceInfo | null;
   profiles?: Profiles;
+  progress?: Progress;
   provider: Provider;
   ref: Ref;
   size_gb?: SizeGb;

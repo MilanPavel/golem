@@ -40,7 +40,7 @@ from golem.models.router import OLLAMA_BASE_URL, ModelConfigError, ModelRouter, 
 log = logging.getLogger(__name__)
 
 Source = Literal["installed", "catalog", "remote", "profile"]
-Status = Literal["ready", "needs_key", "not_installed", "server_down"]
+Status = Literal["ready", "needs_key", "not_installed", "server_down", "pulling"]
 ProviderStatus = Literal["ready", "needs_key", "server_down", "unlisted"]
 
 REMOTE_MAX_AGE_SECONDS = 24 * 3600
@@ -74,6 +74,7 @@ class ListedModel:
     provider: str
     source: Source
     status: Status
+    progress: float | None = None
     profiles: tuple[str, ...] = ()
     ctx: int | None = None
     tools: bool | None = None
@@ -143,8 +144,10 @@ class ModelDiscovery:
         catalog: list[CatalogEntry] | None = None,
         price_book: prices.PriceBook | None = None,
         fetch_prices: bool = True,
+        pulling: Callable[[], dict[str, float | None]] | None = None,
     ) -> None:
         self._fetch_prices_enabled = fetch_prices
+        self.pulling: Callable[[], dict[str, float | None]] = pulling or dict
         self._router = router
         self._cache_dir = cache_dir
         self._transport = transport
@@ -158,6 +161,10 @@ class ModelDiscovery:
         self._fetching: dict[str, asyncio.Task[_Remote]] = {}
         self._price_task: asyncio.Task[None] | None = None
         self._shown: dict[str, tuple[int | None, bool | None]] = {}
+
+    @property
+    def ram_gb(self) -> float | None:
+        return self._ram_gb
 
     async def aclose(self) -> None:
         tasks: list[asyncio.Task[Any]] = [*self._fetching.values()]
@@ -210,7 +217,9 @@ class ModelDiscovery:
             states[name] = ListedProvider(
                 name, "ready" if result.up else "server_down", stale=result.stale
             )
-        models = self._merge(providers, profiles, default, keys, results, states)
+        models = _with_pulls(
+            self._merge(providers, profiles, default, keys, results, states), self.pulling()
+        )
         return ModelListing(
             default=default,
             ram_gb=None if self._ram_gb is None else round(self._ram_gb, 1),
@@ -597,6 +606,34 @@ def _referenced_providers(
     with contextlib.suppress(ModelConfigError):
         names.add(router.resolve(default).provider_name)
     return names
+
+
+def _with_pulls(models: list[ListedModel], pulling: dict[str, float | None]) -> list[ListedModel]:
+    """Mark downloads in progress. A pull of a model nobody listed gets its own entry."""
+    if not pulling:
+        return models
+    shown = {model.ref for model in models}
+    marked = [
+        replace(model, status="pulling", progress=pulling[model.ref])
+        if model.ref in pulling
+        else model
+        for model in models
+    ]
+    for ref, progress in sorted(pulling.items()):
+        if ref not in shown:
+            provider, _, model_id = ref.partition("/")
+            marked.append(
+                ListedModel(
+                    ref=ref,
+                    label=model_id,
+                    provider=provider,
+                    source="catalog",
+                    status="pulling",
+                    progress=progress,
+                    price=_FREE,
+                )
+            )
+    return sorted(marked, key=_order)
 
 
 def _unlisted_status(provider: Provider, key: str | None, state: ListedProvider | None) -> Status:

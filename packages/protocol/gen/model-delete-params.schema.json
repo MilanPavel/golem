@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "``model.delete``. Remove an installed local model from Ollama.",
+  "properties": {
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "title": "ModelDeleteParams",
+  "type": "object"
+}

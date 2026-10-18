@@ -11,9 +11,11 @@ import {
   modelNames,
   openPicker,
   pickerGroups,
+  pickerHint,
   pickerKeyOf,
   pressPicker,
   unusableReason,
+  withPulls,
   type PickerState,
 } from "./model-picker.ts";
 
@@ -152,7 +154,7 @@ test("a long list scrolls to keep the selection on screen", () => {
 
 test("a model that cannot run says what to do", () => {
   assert.equal(unusableReason(LISTING.models[3]!), "needs key: /login anthropic");
-  assert.match(unusableReason(LISTING.models[2]!) ?? "", /ollama pull qwen3:30b-a3b/);
+  assert.match(unusableReason(LISTING.models[2]!) ?? "", /\/model pull qwen3:30b-a3b/);
   assert.equal(unusableReason(model("ollama/x", { status: "server_down" })), "Ollama is not answering: run ollama serve");
   assert.equal(unusableReason(LISTING.models[0]!), null);
 });
@@ -163,6 +165,65 @@ test("first start: a resolving default needs nothing, one ready model is used, e
   assert.deepEqual(firstRunChoice(unset), { kind: "pick" });
   const one = { ...unset, models: [LISTING.models[0]!, LISTING.models[2]!] };
   assert.deepEqual(firstRunChoice(one), { kind: "auto", model: LISTING.models[0] });
+});
+
+function selecting(ref: string): PickerState {
+  return { ...openPicker(null), selected: ref };
+}
+
+test("Enter on a model to download asks first, then downloads and uses it", () => {
+  const asked = pressPicker(selecting("ollama/qwen3:30b-a3b"), LISTING, "enter");
+  assert.equal(asked.action.kind, "none");
+  assert.equal(asked.state.confirm?.kind, "pull");
+  assert.equal(pickerHint(asked.state), "Download qwen3:30b-a3b (18.6 GB, tight) and use it? Enter downloads · Esc cancels");
+  const done = pressPicker(asked.state, LISTING, "enter");
+  assert.deepEqual(done.action, { kind: "pull", ref: "ollama/qwen3:30b-a3b", use: true, setDefault: false });
+  assert.equal(done.state.confirm, null);
+  const dropped = pressPicker(asked.state, LISTING, "close");
+  assert.equal(dropped.state.confirm, null);
+  assert.equal(dropped.state.open, true);
+});
+
+test("d on a model to download also makes it the default once it is in", () => {
+  const asked = pressPicker(selecting("ollama/qwen3:30b-a3b"), LISTING, "default");
+  const done = pressPicker(asked.state, LISTING, "enter");
+  assert.deepEqual(done.action, { kind: "pull", ref: "ollama/qwen3:30b-a3b", use: true, setDefault: true });
+});
+
+test("a model too big for this machine asks twice", () => {
+  const big = { ...LISTING, models: [model("ollama/huge:70b", { source: "catalog", status: "not_installed", size_gb: 40, fit: "too_big" })] };
+  const first = pressPicker(openPicker(null), big, "enter");
+  assert.match(pickerHint(first.state, 36), /too big for 36 GB of memory\. Enter again to download anyway/);
+  const second = pressPicker(first.state, big, "enter");
+  assert.equal(second.action.kind, "none");
+  assert.equal(second.state.confirm?.step, 2);
+  assert.equal(pressPicker(second.state, big, "enter").action.kind, "pull");
+});
+
+test("x stops a download, removes an installed model, and refuses the rest", () => {
+  const pulling = withPulls(LISTING, { "ollama/qwen3:30b-a3b": { progress: 0.42, status: "pulling" } });
+  const stop = pressPicker(selecting("ollama/qwen3:30b-a3b"), pulling, "remove");
+  assert.equal(pickerHint(stop.state), "Stop downloading qwen3:30b-a3b? Enter stops · Esc keeps going");
+  assert.deepEqual(pressPicker(stop.state, pulling, "enter").action, { kind: "cancel-pull", ref: "ollama/qwen3:30b-a3b" });
+  const remove = pressPicker(selecting("ollama/gemma4:e4b"), LISTING, "remove");
+  assert.deepEqual(pressPicker(remove.state, LISTING, "enter").action, { kind: "delete", ref: "ollama/gemma4:e4b" });
+  assert.equal(pressPicker(selecting("openrouter/meta/llama-4"), LISTING, "remove").action.kind, "notice");
+  assert.equal(pickerKeyOf(openPicker(null), press(null, "x")), "remove");
+});
+
+test("live progress shows on the row, and a pull nobody listed gets one", () => {
+  const shown = withPulls(LISTING, {
+    "ollama/qwen3:30b-a3b": { progress: 0.42, status: "pulling" },
+    "ollama/other:1b": { progress: null, status: "starting" },
+  });
+  assert.ok(shown !== null);
+  const rows = layoutPicker({ state: openPicker(null), listing: shown, current: null, columns: 100, rows: 40 });
+  const row = rows.find((item) => item.kind === "model" && item.ref === "ollama/qwen3:30b-a3b");
+  assert.ok(row?.kind === "model" && row.facts.endsWith("downloading 42%"));
+  assert.ok(rows.some((item) => item.kind === "model" && item.ref === "ollama/other:1b"));
+  assert.equal(withPulls(LISTING, {}), LISTING);
+  const busy = pressPicker(selecting("ollama/qwen3:30b-a3b"), shown, "enter");
+  assert.deepEqual(busy.action, { kind: "notice", text: "still downloading: x stops it" });
 });
 
 test("suggested names are profiles, then ready refs", () => {

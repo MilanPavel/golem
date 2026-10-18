@@ -7,6 +7,12 @@ import type { AuthSetResult } from "../../protocol/gen/auth-set-result.ts";
 import type { DaemonStatus } from "../../protocol/gen/daemon-status.ts";
 import type { MessageSendResult } from "../../protocol/gen/message-send-result.ts";
 import type { ModelListResult } from "../../protocol/gen/model-list-result.ts";
+import type { ModelDeleteResult } from "../../protocol/gen/model-delete-result.ts";
+import type { ModelProbeResult } from "../../protocol/gen/model-probe-result.ts";
+import type { ModelPullCancelResult } from "../../protocol/gen/model-pull-cancel-result.ts";
+import type { ModelPullDone } from "../../protocol/gen/model-pull-done.ts";
+import type { ModelPullProgress } from "../../protocol/gen/model-pull-progress.ts";
+import type { ModelPullResult } from "../../protocol/gen/model-pull-result.ts";
 import type { ModelSetDefaultResult } from "../../protocol/gen/model-set-default-result.ts";
 import type { SessionSetModelResult } from "../../protocol/gen/session-set-model-result.ts";
 import type { Params as ChatEvent } from "../../protocol/gen/rpc-notification.ts";
@@ -30,7 +36,11 @@ import {
   isHelloResult,
   isMessageSendResult,
   isModelListResult,
+  isModelProbeResult,
   isModelSetDefaultResult,
+  isPullDone,
+  isPullProgress,
+  isRefResult,
   isSessionSetModelResult,
   isPing,
   isRecord,
@@ -54,6 +64,7 @@ export const MODEL_NOT_CONFIGURED = -32005;
 export const RUN_NOT_FOUND = -32006;
 export const MESSAGE_NOT_FOUND = -32007;
 export const KEYCHAIN_UNAVAILABLE = -32008;
+export const MODEL_PULL_FAILED = -32009;
 
 export type { ChatEvent, SessionSummary };
 const DEFAULT_HEARTBEAT_MS = 5_000;
@@ -134,8 +145,20 @@ export interface GolemClient {
   setSessionModel(sessionId: string, model: string): Promise<SessionSetModelResult>;
   /** Write `default_model` to the user's config.toml. New sessions start on it. */
   setDefaultModel(model: string): Promise<ModelSetDefaultResult>;
+  /** Size, fit, and free disk for a local model before downloading it. */
+  probeModel(name: string): Promise<ModelProbeResult>;
+  /** Start downloading. Progress reaches {@link GolemClient.onPull} on every connection. */
+  pullModel(name: string): Promise<ModelPullResult>;
+  cancelPull(name: string): Promise<ModelPullCancelResult>;
+  deleteModel(name: string): Promise<ModelDeleteResult>;
+  /** `model.pull.progress` and `model.pull.done`, from any client's download. */
+  onPull(listener: (update: PullUpdate) => void): () => void;
   close(): void;
 }
+
+export type PullUpdate =
+  | { kind: "progress"; progress: ModelPullProgress }
+  | { kind: "done"; done: ModelPullDone };
 
 interface Pending {
   method: string;
@@ -154,6 +177,7 @@ export function connectGolem(options: ConnectOptions): GolemClient {
   const eventListeners = new Set<(event: ChatEvent) => void>();
   const summaryListeners = new Set<(summary: SessionSummary) => void>();
   const wireListeners = new Set<(lines: readonly WireLine[]) => void>();
+  const pullListeners = new Set<(update: PullUpdate) => void>();
   const pending = new Map<number, Pending>();
   const attachments = new Attachments();
   let watching = false;
@@ -262,6 +286,27 @@ export function connectGolem(options: ConnectOptions): GolemClient {
         for (const listener of eventListeners) {
           try {
             listener(event);
+          } catch {
+            // A listener must not tear the socket down.
+          }
+        }
+      }
+      return;
+    }
+    if (isRecord(message) && (message["method"] === "model.pull.progress" || message["method"] === "model.pull.done")) {
+      const params = message["params"];
+      const ref = isRecord(params) && typeof params["ref"] === "string" ? params["ref"] : "";
+      record({ direction: "in", kind: message["method"], detail: ref, json: line });
+      let update: PullUpdate | undefined;
+      if (message["method"] === "model.pull.progress" && isPullProgress(params)) {
+        update = { kind: "progress", progress: params };
+      } else if (message["method"] === "model.pull.done" && isPullDone(params)) {
+        update = { kind: "done", done: params };
+      }
+      if (update !== undefined) {
+        for (const listener of pullListeners) {
+          try {
+            listener(update);
           } catch {
             // A listener must not tear the socket down.
           }
@@ -661,6 +706,44 @@ export function connectGolem(options: ConnectOptions): GolemClient {
         throw new Error("invalid model.set_default result");
       }
       return result;
+    },
+    async probeModel(name: string): Promise<ModelProbeResult> {
+      await ready;
+      const result = await call("model.probe", { name });
+      if (!isModelProbeResult(result)) {
+        throw new Error("invalid model.probe result");
+      }
+      return result;
+    },
+    async pullModel(name: string): Promise<ModelPullResult> {
+      await ready;
+      const result = await call("model.pull", { name });
+      if (!isRefResult(result, "started")) {
+        throw new Error("invalid model.pull result");
+      }
+      return result as ModelPullResult;
+    },
+    async cancelPull(name: string): Promise<ModelPullCancelResult> {
+      await ready;
+      const result = await call("model.pull_cancel", { name });
+      if (!isRefResult(result, "cancelled")) {
+        throw new Error("invalid model.pull_cancel result");
+      }
+      return result as ModelPullCancelResult;
+    },
+    async deleteModel(name: string): Promise<ModelDeleteResult> {
+      await ready;
+      const result = await call("model.delete", { name });
+      if (!isRefResult(result, "deleted")) {
+        throw new Error("invalid model.delete result");
+      }
+      return result as ModelDeleteResult;
+    },
+    onPull(listener: (update: PullUpdate) => void): () => void {
+      pullListeners.add(listener);
+      return () => {
+        pullListeners.delete(listener);
+      };
     },
     close(): void {
       if (userClosed) {

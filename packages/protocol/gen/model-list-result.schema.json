@@ -2,7 +2,7 @@
   "$defs": {
     "ListedModel": {
       "additionalProperties": false,
-      "description": "One model, by ``provider/model`` ref.\n\n``source`` is where golem found it: ``installed`` on a local server,\n``catalog`` for a local model to download, ``remote`` from a provider's\nlist, or ``profile`` when only config names it. ``profiles`` are the\nprofile names that point at it. ``fit`` says whether a local model fits\nin this machine's memory. ``stale`` means a cached list was shown because\nthe provider did not answer in time.",
+      "description": "One model, by ``provider/model`` ref.\n\n``source`` is where golem found it: ``installed`` on a local server,\n``catalog`` for a local model to download, ``remote`` from a provider's\nlist, or ``profile`` when only config names it. ``progress`` is set while\nit is ``pulling``. ``profiles`` are the profile names that point at it.\n``fit`` says whether a local model fits in this machine's memory.\n``stale`` means a cached list was shown because the provider did not\nanswer in time.",
       "properties": {
         "ctx": {
           "anyOf": [
@@ -57,6 +57,20 @@
           "title": "Profiles",
           "type": "array"
         },
+        "progress": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Progress"
+        },
         "provider": {
           "minLength": 1,
           "title": "Provider",
@@ -100,7 +114,8 @@
             "ready",
             "needs_key",
             "not_installed",
-            "server_down"
+            "server_down",
+            "pulling"
           ],
           "title": "Status",
           "type": "string"

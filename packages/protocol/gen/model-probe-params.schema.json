@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "``model.probe``. Look up a local model before downloading it.\n\n``name`` is an Ollama name (``qwen3:8b``) or a ref (``ollama/qwen3:8b``).",
+  "properties": {
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "title": "ModelProbeParams",
+  "type": "object"
+}

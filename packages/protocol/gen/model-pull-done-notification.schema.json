@@ -1,0 +1,61 @@
+{
+  "$defs": {
+    "ModelPullDone": {
+      "additionalProperties": false,
+      "description": "A download ended. ``error`` says why when ``ok`` is false; ``cancelled`` for a stop.",
+      "properties": {
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error"
+        },
+        "ok": {
+          "title": "Ok",
+          "type": "boolean"
+        },
+        "ref": {
+          "minLength": 3,
+          "title": "Ref",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ref",
+        "ok"
+      ],
+      "title": "ModelPullDone",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Server → every connection: a download ended. Not stored.",
+  "properties": {
+    "jsonrpc": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Jsonrpc",
+      "type": "string"
+    },
+    "method": {
+      "const": "model.pull.done",
+      "default": "model.pull.done",
+      "title": "Method",
+      "type": "string"
+    },
+    "params": {
+      "$ref": "#/$defs/ModelPullDone"
+    }
+  },
+  "required": [
+    "params"
+  ],
+  "title": "ModelPullDoneNotification",
+  "type": "object"
+}

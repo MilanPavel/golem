@@ -1,0 +1,21 @@
+{
+  "additionalProperties": false,
+  "description": "``deleted`` is false when Ollama did not have the model.",
+  "properties": {
+    "deleted": {
+      "title": "Deleted",
+      "type": "boolean"
+    },
+    "ref": {
+      "minLength": 3,
+      "title": "Ref",
+      "type": "string"
+    }
+  },
+  "required": [
+    "ref",
+    "deleted"
+  ],
+  "title": "ModelDeleteResult",
+  "type": "object"
+}

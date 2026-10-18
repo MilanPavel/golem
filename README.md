@@ -89,6 +89,14 @@ model = "anthropic/<model-id>"
 
 You don't need to write any of this by hand. In the TUI, `/model` opens a picker with every model below. Enter switches the current session from its next message, with the same conversation. `d` also makes the model the default for new sessions, and golem writes `default_model` into `config.toml` without touching your comments. `/model <name>` switches directly to a profile name or a `provider/model-id`. On a first start with no model configured, golem uses the only ready model if there is exactly one, and otherwise opens the picker.
 
+**Downloading a model from the picker**
+- **Download:** Enter on a local model you don't have asks once, showing its size and whether it fits in memory. It then downloads through Ollama with a live percentage, and the session switches to the model when it's done. A model too big for this Mac asks twice.
+- **After you close the TUI:** the download keeps going, and the picker shows it when you open the TUI again.
+- **Stop or remove:** `x` stops a download or removes an installed model, after asking.
+- **Any Ollama model:** `/model pull <name>` downloads one that isn't in the list, after showing its size. `/model rm <name>` removes one.
+- **Disk space:** golem checks the free space first.
+- **When Ollama isn't there:** golem says whether to run `brew install ollama` or `ollama serve`.
+
 `just golem models` shows what you can pick from:
 - **Installed local models:** found through Ollama, so a fresh `ollama pull` shows up at once.
 - **Local models to download:** a short built-in list, each with its download size and whether it fits in this Mac's memory.
@@ -212,8 +220,10 @@ A finished answer shows how long it took, under the text. `/time` shows the time
 | `/title` | Shows the current session's title |
 | `/title <name>` | Renames the current session |
 | `/fork` | Copies the session, up to its newest finished message, into a new session |
-| `/model` | Opens the model picker: Enter uses a model for this session, `d` also makes it the default, typing filters, Ctrl-R refreshes |
+| `/model` | Opens the model picker: Enter uses or downloads a model, `d` also makes it the default, `x` stops a download or removes a model, typing filters, Ctrl-R refreshes |
 | `/model <name>` | Switches this session to a profile or a `provider/model-id`, from the next message |
+| `/model pull <name>` | Downloads any Ollama model, after showing its size and whether it fits |
+| `/model rm <name>` | Removes a downloaded Ollama model, after asking |
 | `/login <provider>` | Asks for the provider's API key in a masked prompt and saves it in the Keychain |
 | `/logout <provider>` | Removes the provider's API key from the Keychain |
 | `/debug` | Opens or closes the debug panel |
@@ -283,6 +293,8 @@ To see the restart for yourself: run `just tui`, then kill the pid from `just go
 | `just test` | pytest and the TypeScript tests |
 | `just fmt` | Formats the Python code |
 | `just gen` | Regenerates the TypeScript types from the Python protocol models |
+| `just catalog` | Checks the local model catalog against the Ollama registry, rewrites sizes that changed, and lists newer releases of each family |
+| `just prices` | Rewrites the bundled copy of LiteLLM's model prices |
 
 ## Documentation
 

@@ -20,6 +20,7 @@ from support import ServeProcess
 from golem.config import load_settings
 from golem.logging import configure_logging
 from golem.models.discovery import ModelDiscovery
+from golem.models.pulls import PullManager
 from golem.models.router import ModelRouter
 from golem.paths import resolve_paths
 from golem.server.app import DaemonApp, SocketPathTooLong, assert_socket_path_fits
@@ -49,6 +50,7 @@ class RpcClient:
         self._orphan: asyncio.Queue[dict[str, object]] = asyncio.Queue()
         self.events: list[dict[str, object]] = []
         self.summaries: list[dict[str, object]] = []
+        self.notices: list[dict[str, object]] = []
         self._pump = asyncio.create_task(self._read_loop())
 
     @classmethod
@@ -119,6 +121,8 @@ class RpcClient:
             self.events.append(payload)
         elif payload.get("method") == "session.summary":
             self.summaries.append(payload)
+        elif isinstance(payload.get("method"), str):
+            self.notices.append(payload)
 
     async def close(self) -> None:
         self._pump.cancel()
@@ -213,6 +217,7 @@ async def start_daemon(
     router: ModelRouter | None = None,
     titles: TitleGenerator | None = None,
     discovery: Callable[[ModelRouter], ModelDiscovery] | None = None,
+    pulls: Callable[[ModelRouter, float | None], PullManager] | None = None,
 ) -> tuple[DaemonApp, asyncio.Task[None]]:
     paths = resolve_paths(home)
     paths.ensure_layout()
@@ -224,6 +229,7 @@ async def start_daemon(
         router=router,
         titles=titles,
         discovery=discovery,
+        pulls=pulls,
     )
     task = asyncio.create_task(app.serve(install_signals=False))
     await _wait_listening(paths.socket_path, task)

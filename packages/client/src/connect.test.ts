@@ -643,6 +643,38 @@ test("listModels asks for a refresh only when told to", async () => {
   }
 });
 
+test("download progress and its end reach onPull", async () => {
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      onHello: (current) => {
+        write(current, {
+          jsonrpc: "2.0",
+          method: "model.pull.progress",
+          params: { ref: "ollama/qwen3:8b", status: "pulling aaa", completed: 5, total: 10, progress: 0.5 },
+        });
+        write(current, { jsonrpc: "2.0", method: "model.pull.done", params: { ref: "ollama/qwen3:8b", ok: true } });
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
+  const updates: string[] = [];
+  const stop = client.onPull((update) => {
+    updates.push(update.kind === "progress" ? `progress ${update.progress.progress}` : `done ${update.done.ok}`);
+  });
+  try {
+    await client.ready;
+    for (let tries = 0; tries < 50 && updates.length < 2; tries += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    assert.deepEqual(updates, ["progress 0.5", "done true"]);
+  } finally {
+    stop();
+    client.close();
+    await server.close();
+  }
+});
+
 test("forkSession sends the message id and reads the new session", async () => {
   const sent: Record<string, unknown>[] = [];
   const server = await listen((socket) => {

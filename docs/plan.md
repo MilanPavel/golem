@@ -13,6 +13,7 @@ This file is about what comes next. How the existing pieces are built is in [arc
 - Streaming chat with named model profiles and `provider/model` refs: Ollama through its native API, Anthropic, OpenAI, and OpenAI-compatible hosts such as OpenRouter.
 - API keys in the macOS Keychain, through `golem auth` or `/login` in the TUI.
 - `/model` picks from installed, downloadable, and hosted models with prices and RAM fit, and switches a session mid-conversation. `golem models` prints the same list.
+- Downloading and removing Ollama models from the picker or with `/model pull` and `/model rm`, with live progress that survives closing the TUI.
 - Sessions, runs, and every event are stored in `~/.golem/golem.db`. They survive a daemon restart and a crash.
 - Detach and reattach. Close the TUI mid-answer, reopen it, and see the text so far plus the rest. Any number of screens can follow one session.
 - Ctrl-C cancels the answer and keeps what it said. Pressing it twice exits.
@@ -92,7 +93,7 @@ Agents use the Graph API, where the model decides control flow. Flows use the Fu
 
 ### Protocol, what is left to add
 
-JSON-RPC 2.0, one JSON object per line, over `~/.golem/run/golem.sock`. Protocol 2.8 is on the wire today (see [architecture.md](architecture.md#what-is-on-the-wire-today)). The phases below add the rest.
+JSON-RPC 2.0, one JSON object per line, over `~/.golem/run/golem.sock`. Protocol 2.9 is on the wire today (see [architecture.md](architecture.md#what-is-on-the-wire-today)). The phases below add the rest.
 
 | Group | New events | Phase |
 |---|---|---|
@@ -207,7 +208,7 @@ Ollama's OpenAI-compatible endpoint runs with a small default context window and
 - **Done when:** switching from a local to a remote model mid-session works, and the model tab in `/debug` shows one conversation across both.
 - **Watch out:** switching providers mid-history is safe for plain text. Tool-call messages are not, so 2.1 adds a cross-provider test.
 
-### 1.5 Download from the picker
+### 1.5 Download from the picker (built)
 
 - **Goal:** trying a new local model takes no terminal.
 - **You can:** pick a model you don't have, see `5.2 GB · fits`, confirm, and watch it download.

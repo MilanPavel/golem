@@ -5,6 +5,9 @@ import type { DaemonStatus } from "../../protocol/gen/daemon-status.ts";
 import type { HelloResult } from "../../protocol/gen/hello-result.ts";
 import type { MessageSendResult } from "../../protocol/gen/message-send-result.ts";
 import type { ModelListResult } from "../../protocol/gen/model-list-result.ts";
+import type { ModelProbeResult } from "../../protocol/gen/model-probe-result.ts";
+import type { ModelPullDone } from "../../protocol/gen/model-pull-done.ts";
+import type { ModelPullProgress } from "../../protocol/gen/model-pull-progress.ts";
 import type { ModelSetDefaultResult } from "../../protocol/gen/model-set-default-result.ts";
 import type { SessionSetModelResult } from "../../protocol/gen/session-set-model-result.ts";
 import type { Ping } from "../../protocol/gen/ping.ts";
@@ -76,6 +79,23 @@ export function isModelListResult(value: unknown): value is ModelListResult {
         typeof model["status"] === "string",
     )
   );
+}
+
+export function isModelProbeResult(value: unknown): value is ModelProbeResult {
+  return isRecord(value) && typeof value["ref"] === "string" && typeof value["installed"] === "boolean";
+}
+
+/** A `{ref, <flag>: boolean}` result, as model.pull, model.pull_cancel, and model.delete return. */
+export function isRefResult(value: unknown, flag: string): boolean {
+  return isRecord(value) && typeof value["ref"] === "string" && typeof value[flag] === "boolean";
+}
+
+export function isPullProgress(value: unknown): value is ModelPullProgress {
+  return isRecord(value) && typeof value["ref"] === "string" && typeof value["status"] === "string";
+}
+
+export function isPullDone(value: unknown): value is ModelPullDone {
+  return isRecord(value) && typeof value["ref"] === "string" && typeof value["ok"] === "boolean";
 }
 
 export function isSessionSetModelResult(value: unknown): value is SessionSetModelResult {

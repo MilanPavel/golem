@@ -1,0 +1,21 @@
+{
+  "additionalProperties": false,
+  "description": "``cancelled`` is false when nothing was downloading.",
+  "properties": {
+    "cancelled": {
+      "title": "Cancelled",
+      "type": "boolean"
+    },
+    "ref": {
+      "minLength": 3,
+      "title": "Ref",
+      "type": "string"
+    }
+  },
+  "required": [
+    "ref",
+    "cancelled"
+  ],
+  "title": "ModelPullCancelResult",
+  "type": "object"
+}

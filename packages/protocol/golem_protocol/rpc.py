@@ -4,7 +4,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
-from golem_protocol.commands import SessionSummary
+from golem_protocol.commands import ModelPullDone, ModelPullProgress, SessionSummary
 from golem_protocol.events import ChatEvent
 
 
@@ -82,7 +82,29 @@ class SessionSummaryNotification(BaseModel):
     params: SessionSummary
 
 
+class ModelPullProgressNotification(BaseModel):
+    """Server → every connection: a download moved on. Not stored; at most a few per second."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    jsonrpc: Literal["2.0"] = "2.0"
+    method: Literal["model.pull.progress"] = "model.pull.progress"
+    params: ModelPullProgress
+
+
+class ModelPullDoneNotification(BaseModel):
+    """Server → every connection: a download ended. Not stored."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    jsonrpc: Literal["2.0"] = "2.0"
+    method: Literal["model.pull.done"] = "model.pull.done"
+    params: ModelPullDone
+
+
 __all__ = [
+    "ModelPullDoneNotification",
+    "ModelPullProgressNotification",
     "RpcErrorBody",
     "RpcFailure",
     "RpcId",
