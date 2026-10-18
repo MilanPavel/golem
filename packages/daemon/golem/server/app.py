@@ -18,6 +18,7 @@ from golem.config import load_settings
 from golem.graphs.chat import ChatRuntime, open_chat
 from golem.lock import DaemonAlreadyRunning, DaemonLock
 from golem.logging import configure_logging
+from golem.models.keys import KeychainStore
 from golem.models.router import ModelRouter
 from golem.paths import GolemPaths, resolve_paths
 from golem.server.connection import ClientConnection
@@ -278,7 +279,7 @@ async def serve_forever() -> int:
     settings = load_settings(home=paths.home, project_dir=paths.home)
     configure_logging(settings, paths)
     paths.ensure_layout()
-    router = ModelRouter(settings, home=paths.home)
+    router = ModelRouter(settings, home=paths.home, keys=KeychainStore())
     titles = ModelTitles(router) if settings.session_titles else None
     app = DaemonApp(paths, router=router, titles=titles)
     try:

@@ -1,6 +1,7 @@
 export { backoffDelayMs } from "./backoff.ts";
 export {
   connectGolem,
+  KEYCHAIN_UNAVAILABLE,
   MESSAGE_NOT_FOUND,
   MODEL_NOT_CONFIGURED,
   RpcError,

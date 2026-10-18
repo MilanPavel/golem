@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "``auth.remove``. Delete the stored key for ``provider``. An environment variable stays.",
+  "properties": {
+    "provider": {
+      "minLength": 1,
+      "title": "Provider",
+      "type": "string"
+    }
+  },
+  "required": [
+    "provider"
+  ],
+  "title": "AuthRemoveParams",
+  "type": "object"
+}

@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from golem.graphs.adapter import PlainMessage, plain_messages
 from golem.graphs.chat import ChatRuntime
 from golem.graphs.state import SCHEMA_VERSION
-from golem.models.router import ModelIdentity
+from golem.models.router import ModelIdentity, ModelRouter
 from golem.sessions.bus import EventTarget, SummaryTarget
 from golem.sessions.ids import new_id
 from golem.sessions.log import SessionLog
@@ -250,6 +250,10 @@ class SessionManager:
             session = await self._resolve(session_id)
             await self._set_title(session, cleaned)
         return cleaned
+
+    @property
+    def router(self) -> ModelRouter:
+        return self._runtime.router
 
     def configured_model(self) -> ModelIdentity:
         """The model ``daemon.status`` reports for this process."""

@@ -1,0 +1,25 @@
+{
+  "additionalProperties": false,
+  "description": "``auth.set``. Store an API key for ``provider`` in the OS credential store.\n\nA client never logs or displays ``key``.",
+  "properties": {
+    "key": {
+      "format": "password",
+      "maxLength": 4096,
+      "minLength": 1,
+      "title": "Key",
+      "type": "string",
+      "writeOnly": true
+    },
+    "provider": {
+      "minLength": 1,
+      "title": "Provider",
+      "type": "string"
+    }
+  },
+  "required": [
+    "provider",
+    "key"
+  ],
+  "title": "AuthSetParams",
+  "type": "object"
+}

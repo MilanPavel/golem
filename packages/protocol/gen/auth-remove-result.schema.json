@@ -1,0 +1,21 @@
+{
+  "additionalProperties": false,
+  "description": "``removed`` is false when no key was stored.",
+  "properties": {
+    "provider": {
+      "minLength": 1,
+      "title": "Provider",
+      "type": "string"
+    },
+    "removed": {
+      "title": "Removed",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "provider",
+    "removed"
+  ],
+  "title": "AuthRemoveResult",
+  "type": "object"
+}

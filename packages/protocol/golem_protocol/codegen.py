@@ -8,6 +8,13 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from golem_protocol.commands import (
+    AuthKeyStatus,
+    AuthListParams,
+    AuthListResult,
+    AuthRemoveParams,
+    AuthRemoveResult,
+    AuthSetParams,
+    AuthSetResult,
     DaemonStatus,
     HelloParams,
     HelloResult,
@@ -95,6 +102,13 @@ MODELS: tuple[type[BaseModel], ...] = (
     SessionRenameResult,
     SessionForkParams,
     SessionForkResult,
+    AuthSetParams,
+    AuthSetResult,
+    AuthRemoveParams,
+    AuthRemoveResult,
+    AuthListParams,
+    AuthKeyStatus,
+    AuthListResult,
     ForkedFrom,
     SessionClosedEvent,
     SessionCreatedData,

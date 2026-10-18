@@ -2,9 +2,11 @@ import { spawn } from "node:child_process";
 
 import { connectGolem, resolveSocketPath } from "@golem/client";
 
+import { formatKeys } from "./format-keys.ts";
 import { formatStatus } from "./format-status.ts";
 import { formatCliVersion } from "./format-version.ts";
 import { CLI_VERSION } from "./version.ts";
+import { readSecret } from "./read-secret.ts";
 import { findWorkspaceRoot } from "./workspace.ts";
 
 const code = await run(process.argv.slice(2));
@@ -21,10 +23,58 @@ async function run(args: string[]): Promise<number> {
   if (command === "daemon") {
     return runDaemon(rest);
   }
-  process.stderr.write(
-    "usage: golem --version | golem status | golem daemon install|start|stop|logs\n",
-  );
+  if (command === "auth") {
+    return runAuth(rest);
+  }
+  process.stderr.write(`${USAGE}\n`);
   return 1;
+}
+
+const USAGE =
+  "usage: golem --version | golem status | golem daemon install|start|stop|logs\n" +
+  "       golem auth set|remove <provider> | golem auth list";
+
+async function runAuth(args: string[]): Promise<number> {
+  const [action, provider, ...extra] = args;
+  const named = provider !== undefined && provider.length > 0 && extra.length === 0;
+  if (!(action === "list" && provider === undefined) && !((action === "set" || action === "remove") && named)) {
+    process.stderr.write(`${USAGE}\n`);
+    return 1;
+  }
+  let key = "";
+  if (action === "set") {
+    try {
+      key = await readSecret(`${provider} API key: `);
+    } catch (error) {
+      process.stderr.write(`${explain(error)}\n`);
+      return 1;
+    }
+    if (key.length === 0) {
+      process.stderr.write("no key given\n");
+      return 1;
+    }
+  }
+  const client = connectOnce();
+  try {
+    if (action === "list") {
+      const listed = await client.listKeys();
+      process.stdout.write(`${formatKeys(listed.providers)}\n`);
+    } else if (action === "set") {
+      await client.setKey(provider ?? "", key);
+      process.stdout.write(`${provider} key saved in the Keychain\n`);
+    } else {
+      const removed = await client.removeKey(provider ?? "");
+      process.stdout.write(
+        removed.removed ? `${provider} key removed from the Keychain\n` : `no ${provider} key was stored\n`,
+      );
+    }
+    return 0;
+  } catch (error) {
+    process.stderr.write(`${explain(error)}\n`);
+    return 1;
+  } finally {
+    client.close();
+  }
 }
 
 async function runVersion(): Promise<number> {

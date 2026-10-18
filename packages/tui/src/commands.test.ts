@@ -118,6 +118,13 @@ test("/sessions and /new are commands without arguments", () => {
   assert.equal(applyComposer(closedDebug, "/session").kind, "unknown");
 });
 
+test("/login and /logout take exactly one provider, and the key never goes in the command", () => {
+  assert.deepEqual(applyComposer(closedDebug, "/login anthropic"), { kind: "login", provider: "anthropic" });
+  assert.deepEqual(applyComposer(closedDebug, "/logout openai"), { kind: "logout", provider: "openai" });
+  assert.equal(applyComposer(closedDebug, "/login").kind, "unknown");
+  assert.equal(applyComposer(closedDebug, "/login anthropic sk-abc").kind, "unknown");
+});
+
 test("/title takes the rest of the line as the name, or nothing to show it", () => {
   assert.deepEqual(applyComposer(closedDebug, "/title  Trip   plans "), { kind: "title", title: "Trip plans" });
   assert.deepEqual(applyComposer(closedDebug, "/title"), { kind: "title", title: null });

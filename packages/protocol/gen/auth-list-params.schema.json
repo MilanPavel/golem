@@ -1,0 +1,7 @@
+{
+  "additionalProperties": false,
+  "description": "``auth.list``. Key status for every known provider. Never returns a key.",
+  "properties": {},
+  "title": "AuthListParams",
+  "type": "object"
+}

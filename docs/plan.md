@@ -11,6 +11,7 @@ This file is about what comes next. How the existing pieces are built is in [arc
 ### Works today
 
 - Streaming chat with named model profiles and `provider/model` refs: Ollama through its native API, Anthropic, OpenAI, and OpenAI-compatible hosts such as OpenRouter.
+- API keys in the macOS Keychain, through `golem auth` or `/login` in the TUI.
 - Sessions, runs, and every event are stored in `~/.golem/golem.db`. They survive a daemon restart and a crash.
 - Detach and reattach. Close the TUI mid-answer, reopen it, and see the text so far plus the rest. Any number of screens can follow one session.
 - Ctrl-C cancels the answer and keeps what it said. Pressing it twice exits.
@@ -90,7 +91,7 @@ Agents use the Graph API, where the model decides control flow. Flows use the Fu
 
 ### Protocol, what is left to add
 
-JSON-RPC 2.0, one JSON object per line, over `~/.golem/run/golem.sock`. Protocol 2.5 is on the wire today (see [architecture.md](architecture.md#what-is-on-the-wire-today)). The phases below add the rest.
+JSON-RPC 2.0, one JSON object per line, over `~/.golem/run/golem.sock`. Protocol 2.6 is on the wire today (see [architecture.md](architecture.md#what-is-on-the-wire-today)). The phases below add the rest.
 
 | Group | New events | Phase |
 |---|---|---|
@@ -159,16 +160,19 @@ Ollama's OpenAI-compatible endpoint runs with a small default context window and
   - Every resolvable session reports its own provider and model id, not only the default one.
 - **Done when:** a session on `ollama/...` and a session on `anthropic/...` both chat, and an old flat config still works.
 
-### 1.2 Keys in the Keychain
+### 1.2 Keys in the Keychain (built)
 
 - **Goal:** no API key in an environment variable or `launchctl setenv`.
 - **You can:** run `golem auth set anthropic` once, or type `/login anthropic` in the TUI, and use Anthropic from the background service.
 - **Build:**
-  - `keyring`, with service `golem` and the provider name as the account. Lookup order: the provider's `api_key_env` variable, then the Keychain, read at call time.
-  - `golem auth set|remove|list <provider>`, with `getpass`.
-  - `/login <provider>` puts the composer into masked input and sends `auth.set`. The key never enters message recall, `/debug wire` redacts `auth.set` parameters, and the daemon log never contains it.
+  - `keyring`, with service `golem` and the provider name as the account ([keys.py](../packages/daemon/golem/models/keys.py)). Lookup order: the provider's `api_key_env` variable, then the Keychain, read at call time and cached in the daemon.
+  - `auth.set`, `auth.remove`, and `auth.list` on the wire (protocol 2.6). The daemon is the only writer, so the Keychain item belongs to its Python and launchd reads it without a prompt.
+  - `golem auth set|remove|list`, over the socket. `set` reads a hidden prompt on a terminal, or stdin from a pipe.
+  - `/login <provider>` opens a masked prompt that is separate from the draft, and sends `auth.set`. `/logout <provider>` removes the key. The key never enters the draft or message recall, `/debug wire` shows `[redacted]`, and the daemon log names only the provider.
 - **Done when:** a remote model works under launchd with no key in the environment, and a missing key shows `needs key: /login anthropic`.
-- **Watch out:** the Keychain asks again when the Python binary changes, for example after a venv rebuild under `uv run`. The frozen daemon from 4.3 makes it stable.
+- **Watch out:**
+  - The Keychain trusts the program that wrote the item, and from a checkout that program is uv's shared, ad-hoc signed Python interpreter, not golem. Any script run with that same interpreter, including another project's dependencies, can read the keys without a prompt. Until 4.3 fixes this, run other projects on a different Python version than golem's.
+  - The Keychain asks again when the interpreter changes, for example after a uv Python upgrade.
 
 ### 1.3 Discovery and `model.list`
 
@@ -472,7 +476,9 @@ Steps 4.1 to 4.7 are macOS only and end with `brew install`. Steps 4.8 to 4.11 a
   - PyInstaller in one-folder mode (one-file mode unpacks on every start, which is slow). The fallback is a standalone Python build with a ready-made virtual environment.
   - `just smoke-dist` starts the built daemon with a temporary `GOLEM_HOME`, sends `hello`, runs one chat against a fake model, and stops it.
 - **Done when:** `just smoke-dist` passes, and the daemon from the archive starts in under 1 s.
-- **Watch out:** LangChain and Pydantic import some modules dynamically, and PyInstaller misses them. The smoke test is what catches it, so it runs in CI from the start.
+- **Watch out:**
+  - LangChain and Pydantic import some modules dynamically, and PyInstaller misses them. The smoke test is what catches it, so it runs in CI from the start.
+  - Keychain trust. The daemon executable must be golem's own binary, not a shared Python, so only golem is trusted to read the stored keys (1.2). Keys stored by a checkout's Python move over once: the new daemon reads them after one Always Allow, then rewrites each item so it owns it.
 
 ### 4.4 Migrations and safe upgrades
 
@@ -492,7 +498,7 @@ Steps 4.1 to 4.7 are macOS only and end with `brew install`. Steps 4.8 to 4.11 a
 - **You can:** push `v0.1.0` and get a GitHub release with the macOS archive and its checksum.
 - **Build:**
   - A GitHub Actions workflow on `v*` tags: `just check`, `just dist`, `just smoke-dist`, then upload `golem-<version>-darwin-arm64.tar.gz` and a `sha256` file.
-  - Ad-hoc code signing. Notarization only matters for direct downloads, so it waits until someone needs it.
+  - Code signing with a stable identity, a self-signed certificate at first and Developer ID later. An ad-hoc signature changes with every build, so the Keychain would ask again after each upgrade (1.2). Notarization only matters for direct downloads, so it waits until someone needs it.
 - **Done when:** a tag produces a release, and the archive from it passes `just smoke-dist` on a clean runner.
 
 ### 4.6 Homebrew tap
@@ -821,7 +827,7 @@ This runs alongside the other phases. It gets a dedicated pass after Phase 7.
 - Crash tests: `kill -9` at random points in flows, then check there are no duplicate side effects and runs resume.
 - A nightly backup of `~/.golem/*.db` with the SQLite backup API.
 - Performance: daemon start under 1 s, first-token latency per profile, and TUI rendering with 10 streams.
-- Security review: socket permissions, sandbox profile coverage, policy defaults (shell has no network by default), skill and MCP trust, and prompt injection through `web_fetch`, files, and MCP output. Content never auto-approves anything.
+- Security review: socket permissions, which programs the Keychain trusts with the golem items (only the signed daemon, see 1.2 and 4.3), that no key reaches a log, the event log, or the wire view, sandbox profile coverage, policy defaults (shell has no network by default), skill and MCP trust, and prompt injection through `web_fetch`, files, and MCP output. Content never auto-approves anything.
 - Upgrade discipline: pinned LangGraph and LangChain versions, a smoke suite before each bump, and the changelogs read.
 
 ---

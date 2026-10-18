@@ -5,8 +5,11 @@ as ``ollama/qwen3:8b`` or ``openrouter/qwen/qwen3-235b-a22b``. A ref splits on
 its first ``/``. The flat settings from before profiles load as one profile
 named ``model_profile``, so sessions that stored that name keep resolving.
 
-A provider with ``api_key_env`` reads its key from the process environment at
-call time. Neither the key nor the base URL is stored in graph state.
+A provider's key comes from the environment variable named by ``api_key_env``,
+then from the key store (the Keychain), at call time. A provider with
+``api_key_env`` must have a key. Other providers, except ``ollama``, use a
+stored key when there is one. Neither the key nor the base URL is stored in
+graph state.
 """
 
 from __future__ import annotations
@@ -15,6 +18,7 @@ import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 from langchain_core.language_models import BaseChatModel
 
@@ -25,9 +29,12 @@ from golem.config import (
     ProviderSettings,
     load_settings,
 )
+from golem.models.keys import KeyStore, KeyStoreError
 from golem.paths import resolve_paths
 
 log = logging.getLogger(__name__)
+
+KeySource = Literal["env", "keychain"]
 
 
 class ModelConfigError(Exception):
@@ -95,6 +102,17 @@ class ResolvedModel:
 
 
 @dataclass(frozen=True, slots=True)
+class KeyStatus:
+    """Whether a provider takes a key, needs one, and where its key was found."""
+
+    provider: str
+    takes_key: bool
+    needs_key: bool
+    env_var: str | None
+    source: KeySource | None
+
+
+@dataclass(frozen=True, slots=True)
 class ModelIdentity:
     """A name the router answers, plus provider and model id when it resolves.
 
@@ -123,6 +141,9 @@ class ModelRouter:
     ``home`` makes the router re-read ``config.toml`` when the file changes,
     so a new profile needs no daemon restart. A file that no longer validates
     keeps the last good settings.
+
+    ``keys`` is the credential store. Without one, keys come only from the
+    environment.
     """
 
     def __init__(
@@ -131,11 +152,13 @@ class ModelRouter:
         *,
         model: BaseChatModel | None = None,
         home: Path | None = None,
+        keys: KeyStore | None = None,
     ) -> None:
         if settings is None and model is None:
             raise ValueError("ModelRouter needs settings or a model")
         self._model = model
         self._home = home
+        self.keys = keys
         self._config_file = resolve_paths(home).config_file if home is not None else None
         self._stamp = self._file_stamp()
         self._catalog = _catalog(settings) if settings is not None else None
@@ -199,7 +222,7 @@ class ModelRouter:
             return self._model
         resolved = self.resolve(profile)
         provider = resolved.provider
-        key = _api_key(provider)
+        key = self._api_key(resolved.provider_name, provider)
         if provider.kind == "anthropic":
             from langchain_anthropic import ChatAnthropic
 
@@ -229,6 +252,58 @@ class ModelRouter:
         return ChatOpenAI.model_validate(
             {"model": resolved.model_id, "base_url": provider.base_url, "api_key": key or "none"},
         )
+
+    def provider(self, name: str) -> Provider | None:
+        """The provider called ``name`` after presets and config, or None."""
+        catalog = self._current()
+        if catalog is None:
+            return PRESETS.get(name)
+        return catalog.providers.get(name)
+
+    def key_statuses(self) -> list[KeyStatus]:
+        """One entry per known provider, sorted by name.
+
+        Raises :class:`~golem.models.keys.KeyStoreError` when the store cannot be read.
+        """
+        catalog = self._current()
+        providers = PRESETS if catalog is None else catalog.providers
+        return [self._status(name, providers[name]) for name in sorted(providers)]
+
+    def _status(self, name: str, provider: Provider) -> KeyStatus:
+        takes_key = provider.kind != "ollama"
+        source: KeySource | None = None
+        if provider.api_key_env is not None and os.environ.get(provider.api_key_env, "").strip():
+            source = "env"
+        elif takes_key and self.keys is not None and self.keys.get(name):
+            source = "keychain"
+        return KeyStatus(
+            provider=name,
+            takes_key=takes_key,
+            needs_key=provider.api_key_env is not None,
+            env_var=provider.api_key_env,
+            source=source,
+        )
+
+    def _api_key(self, name: str, provider: Provider) -> str | None:
+        if provider.kind == "ollama":
+            return None
+        if provider.api_key_env is not None:
+            key = os.environ.get(provider.api_key_env, "").strip()
+            if key != "":
+                return key
+        stored: str | None = None
+        if self.keys is not None:
+            try:
+                stored = self.keys.get(name)
+            except KeyStoreError as exc:
+                raise ModelConfigError(str(exc)) from exc
+        if stored:
+            return stored
+        if provider.api_key_env is not None:
+            raise ModelConfigError(
+                f"needs key: /login {name} in the TUI, or set {provider.api_key_env}"
+            )
+        return None
 
     def _current(self) -> _Catalog | None:
         if self._config_file is not None:
@@ -300,12 +375,3 @@ def _legacy_model(settings: GolemSettings, providers: dict[str, Provider]) -> Mo
         return ModelSettings(model=f"ollama/{name}")
     providers[_LEGACY_PROVIDER] = Provider(kind="openai_compat", base_url=url)
     return ModelSettings(model=f"{_LEGACY_PROVIDER}/{name}")
-
-
-def _api_key(provider: Provider) -> str | None:
-    if provider.api_key_env is None:
-        return None
-    key = os.environ.get(provider.api_key_env, "").strip()
-    if key == "":
-        raise ModelConfigError(f"{provider.api_key_env} is not set")
-    return key

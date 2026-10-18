@@ -27,6 +27,8 @@ export type ComposerOutcome =
   | { kind: "copy"; code: boolean }
   | { kind: "export"; path: string | null }
   | { kind: "time" }
+  | { kind: "login"; provider: string }
+  | { kind: "logout"; provider: string }
   | {
       kind: "local";
       debug: DebugState;
@@ -46,6 +48,9 @@ export type Command = {
 };
 
 const UNKNOWN = "unknown command \u2014 /help lists them";
+
+/** Built-in providers that take an API key. A provider added in config.toml works too. */
+export const KEY_PROVIDERS: readonly string[] = ["anthropic", "groq", "openai", "openrouter", "together"];
 
 /** Every slash command. A name not in this table is an unknown command, not a message. */
 export const COMMANDS: readonly Command[] = [
@@ -95,6 +100,20 @@ export const COMMANDS: readonly Command[] = [
     args: "",
     description: "Lists every command.",
     run: withoutArgs({ kind: "help" }),
+  },
+  {
+    name: "/login",
+    args: "<provider>",
+    description: "Asks for the provider's API key and saves it in the Keychain.",
+    choices: KEY_PROVIDERS,
+    run: providerCommand("login"),
+  },
+  {
+    name: "/logout",
+    args: "<provider>",
+    description: "Removes the provider's API key from the Keychain.",
+    choices: KEY_PROVIDERS,
+    run: providerCommand("logout"),
   },
   {
     name: "/new",
@@ -171,6 +190,16 @@ function applyCommand(debug: DebugState, text: string): ComposerOutcome {
   const [name, ...args] = text.split(/\s+/);
   const command = COMMANDS.find((candidate) => candidate.name === name);
   return command === undefined ? unknown() : command.run(debug, args);
+}
+
+function providerCommand(kind: "login" | "logout"): Command["run"] {
+  return (_debug, args) => {
+    const provider = args[0];
+    if (args.length !== 1 || provider === undefined || provider.length === 0) {
+      return { kind: "unknown", notice: `/${kind} needs a provider, for example /${kind} anthropic` };
+    }
+    return { kind, provider };
+  };
 }
 
 function withoutArgs(outcome: ComposerOutcome): Command["run"] {

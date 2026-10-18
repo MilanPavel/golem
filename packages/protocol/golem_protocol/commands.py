@@ -5,7 +5,7 @@
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
 
 class HelloParams(BaseModel):
@@ -286,7 +286,82 @@ class SessionInspectResult(BaseModel):
     messages: list[InspectMessage]
 
 
+class AuthSetParams(BaseModel):
+    """``auth.set``. Store an API key for ``provider`` in the OS credential store.
+
+    A client never logs or displays ``key``.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    provider: str = Field(min_length=1)
+    key: SecretStr = Field(min_length=1, max_length=4096)
+
+
+class AuthSetResult(BaseModel):
+    """The provider whose key was stored."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    provider: str = Field(min_length=1)
+
+
+class AuthRemoveParams(BaseModel):
+    """``auth.remove``. Delete the stored key for ``provider``. An environment variable stays."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    provider: str = Field(min_length=1)
+
+
+class AuthRemoveResult(BaseModel):
+    """``removed`` is false when no key was stored."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    provider: str = Field(min_length=1)
+    removed: bool
+
+
+class AuthListParams(BaseModel):
+    """``auth.list``. Key status for every known provider. Never returns a key."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+class AuthKeyStatus(BaseModel):
+    """One provider's key.
+
+    ``takes_key`` is false for a provider that never uses one, such as
+    ``ollama``. ``needs_key`` means a model call fails without one.
+    ``source`` is where the key was found, or null when there is none.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    provider: str = Field(min_length=1)
+    takes_key: bool
+    needs_key: bool
+    env_var: str | None = Field(default=None, min_length=1)
+    source: Literal["env", "keychain"] | None = None
+
+
+class AuthListResult(BaseModel):
+    """Providers sorted by name."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    providers: list[AuthKeyStatus]
+
+
 __all__ = [
+    "AuthKeyStatus",
+    "AuthListParams",
+    "AuthListResult",
+    "AuthRemoveParams",
+    "AuthRemoveResult",
+    "AuthSetParams",
+    "AuthSetResult",
     "DaemonStatus",
     "HelloParams",
     "HelloResult",

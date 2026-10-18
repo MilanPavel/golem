@@ -577,6 +577,42 @@ test("renameSession sends the title and reads the stored one", async () => {
   }
 });
 
+test("setKey sends the key to the daemon and never to the wire log", async () => {
+  const sent: Record<string, unknown>[] = [];
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: {
+        "auth.set": { provider: "anthropic" },
+        "auth.list": { providers: [{ provider: "anthropic", takes_key: true, needs_key: true, source: "keychain" }] },
+      },
+      onRequest: (_socket, method, params) => {
+        if (method === "auth.set") {
+          sent.push(params);
+        }
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
+  let shown = "";
+  const stop = client.onWire((lines) => {
+    shown = lines.map(formatWireLine).join("\n");
+  });
+  try {
+    assert.deepEqual(await client.setKey("anthropic", "sk-very-secret"), { provider: "anthropic" });
+    assert.deepEqual(sent, [{ provider: "anthropic", key: "sk-very-secret" }]);
+    assert.ok(shown.includes("auth.set"));
+    assert.ok(shown.includes("[redacted]"));
+    assert.ok(!shown.includes("sk-very-secret"));
+    const listed = await client.listKeys();
+    assert.equal(listed.providers[0]?.source, "keychain");
+  } finally {
+    stop();
+    client.close();
+    await server.close();
+  }
+});
+
 test("forkSession sends the message id and reads the new session", async () => {
   const sent: Record<string, unknown>[] = [];
   const server = await listen((socket) => {

@@ -108,15 +108,18 @@ api_key_env = "VLLM_API_KEY"       # optional
 
 The older flat settings (`model_provider`, `model_name`, `model_base_url`) still work. They load as one profile named after `model_profile` (default `remote`), and an Ollama address there uses the native `ollama` provider.
 
-API keys are read from the environment, never from the config file. When you [run the daemon from the command line](#from-the-command-line), export the key in that shell and you are done.
-
-The launchd job does not see your shell's environment, so for the background service give the key to launchd:
+API keys never go in the config file. Save one in the macOS Keychain, once, while the daemon is running:
 
 ```bash
-launchctl setenv ANTHROPIC_API_KEY "$ANTHROPIC_API_KEY"
+just golem auth set anthropic          # prompts, and echoes nothing
+pbpaste | just golem auth set openai   # or pipe it in
+just golem auth list                   # where each provider's key is
+just golem auth remove anthropic
 ```
 
-Run this again after each reboot, then run `just golem daemon start`. Storing keys in the Keychain is planned.
+In the TUI, `/login anthropic` asks for the key in a masked prompt and `/logout anthropic` removes it. The daemon stores the key and reads it back at each model call, so the background service needs no environment variables and no restart. An environment variable such as `ANTHROPIC_API_KEY` still works, and it wins over the Keychain.
+
+After uv installs a new Python, macOS may ask once whether Python may use the golem Keychain item. Choose Always Allow. From a checkout, the Keychain trusts uv's shared Python interpreter, not golem itself, so another project's scripts on that same interpreter could read the keys. Run other projects on a different Python version until golem ships as its own signed binary (plan step 4.3).
 
 ### All settings
 
@@ -167,6 +170,9 @@ just golem status            # is it up? prints pid, version, protocol, uptime
 | `just golem daemon start` | Starts the daemon, or restarts it if it is running |
 | `just golem daemon stop` | Unloads the job. The daemon stays down until the next `start` |
 | `just golem daemon logs` | Shows the last log lines and follows them. `--no-follow` prints and exits |
+| `just golem auth set <provider>` | Saves the provider's API key in the Keychain, from a hidden prompt or stdin |
+| `just golem auth remove <provider>` | Removes that key from the Keychain |
+| `just golem auth list` | Says where each provider's key is: the Keychain, an environment variable, or missing |
 
 ## Chat
 
@@ -196,6 +202,8 @@ A finished answer shows how long it took, under the text. `/time` shows the time
 | `/title` | Shows the current session's title |
 | `/title <name>` | Renames the current session |
 | `/fork` | Copies the session, up to its newest finished message, into a new session |
+| `/login <provider>` | Asks for the provider's API key in a masked prompt and saves it in the Keychain |
+| `/logout <provider>` | Removes the provider's API key from the Keychain |
 | `/debug` | Opens or closes the debug panel |
 | `/debug wire` / `/debug model` | Shows the protocol messages, or the conversation the model sees |
 | `/debug hold` | Holds back the next message so you can inspect it before sending |
@@ -247,7 +255,8 @@ Set `GOLEM_HOME` to use another folder, for example a throwaway one for experime
 |---|---|
 | The status line says `reconnecting` | Is the daemon up? Run `just golem status`. Then start it from the command line, or with `just golem daemon start` |
 | `daemon already running (pid N)` | The launchd copy is up. Run `just golem daemon stop` before running it from the command line |
-| A red error mentions `model_provider` or an API key | Check `~/.golem/config.toml`. For a remote model, check the `launchctl setenv` step above |
+| A red error says `needs key` | Run `/login <provider>` in the TUI, or `just golem auth set <provider>` |
+| A red error mentions an unknown model or provider | Check `~/.golem/config.toml` |
 | A local model does not answer | Is Ollama running (`ollama serve`), and is the model pulled? |
 | Anything else | Run `just golem daemon logs` |
 

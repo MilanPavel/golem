@@ -24,9 +24,22 @@ export function summaryFrame(params: unknown): WireFrame {
   return { direction: "in", kind: "session.summary", detail: parts.join("  ") };
 }
 
+const REDACTED = "[redacted]";
+
+/** The params as the wire view may show them. A key never leaves the payload sent to the daemon. */
+export function shownParams(method: string, params: Record<string, unknown>): Record<string, unknown> {
+  if (method === "auth.set" && "key" in params) {
+    return { ...params, key: REDACTED };
+  }
+  return params;
+}
+
 export function outgoingDetail(method: string, params: Record<string, unknown>): string {
   if (method === "ping") {
     return "";
+  }
+  if (method.startsWith("auth.") && typeof params["provider"] === "string") {
+    return params["provider"];
   }
   if (method === "message.send" && typeof params["text"] === "string") {
     return flat(params["text"]);

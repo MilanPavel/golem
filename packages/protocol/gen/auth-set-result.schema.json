@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "The provider whose key was stored.",
+  "properties": {
+    "provider": {
+      "minLength": 1,
+      "title": "Provider",
+      "type": "string"
+    }
+  },
+  "required": [
+    "provider"
+  ],
+  "title": "AuthSetResult",
+  "type": "object"
+}

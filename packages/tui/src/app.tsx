@@ -46,6 +46,15 @@ import {
 } from "./keys.ts";
 import { layoutTranscript, type LayoutLine } from "./layout-chat.ts";
 import { loadPrefs, prefsPath, saveTimes } from "./prefs.ts";
+import {
+  maskSecret,
+  openSecret,
+  pasteSecret,
+  pressSecret,
+  secretNotice,
+  type SecretPrompt,
+  type SecretStep,
+} from "./secret.ts";
 import { assistantChars, elapsedSeconds, meterLine, meterPhase } from "./progress.ts";
 import {
   fitSegments,
@@ -115,6 +124,9 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   const [suggestDismissed, setSuggestDismissed] = useState(false);
   const [suggestPick, setSuggestPick] = useState({ draft: "", index: 0 });
   const [historyCursor, setHistoryCursor] = useState<HistoryCursor | null>(null);
+  const [secret, setSecret] = useState<SecretPrompt | null>(null);
+  const secretRef = useRef(secret);
+  secretRef.current = secret;
   const draftRef = useRef(draft);
   const busyRef = useRef(chat.busy);
   const chatRef = useRef(chat);
@@ -160,16 +172,17 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   const rows = size.rows || 24;
   const banner = chat.error ?? chat.notice;
   const suggestMatches =
-    chat.busy || switcher.open || keysOpen || suggestDismissed || historyCursor !== null
+    chat.busy || switcher.open || keysOpen || suggestDismissed || historyCursor !== null || secret !== null
       ? []
       : suggest(draft.text, COMMANDS);
+  const composerText = secret === null ? draft.text : maskSecret(secret.value);
   const suggestSelected =
     suggestPick.draft === draft.text ? Math.min(suggestPick.index, Math.max(0, suggestMatches.length - 1)) : 0;
   const budget = frameBudget({
     rows,
     columns,
-    draft: draft.text,
-    busy: chat.busy,
+    draft: composerText,
+    busy: chat.busy && secret === null,
     banner: banner !== null && banner.length > 0,
     debug: debug.open,
     suggestions: suggestMatches.length,
@@ -484,6 +497,17 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       setSwitcher(openSwitcher(sessionRef.current));
       return;
     }
+    if (outcome.kind === "login") {
+      setDraft(draftAt(""));
+      applySecretStep({ prompt: openSecret(outcome.provider), submit: null });
+      setChat((current) => ({ ...current, error: null, notice: secretNotice(outcome.provider) }));
+      return;
+    }
+    if (outcome.kind === "logout") {
+      setDraft(draftAt(""));
+      removeKey(outcome.provider);
+      return;
+    }
     if (outcome.kind === "new") {
       setDraft(draftAt(""));
       session.startNew();
@@ -588,6 +612,43 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
           return;
         }
         setChat((current) => ({ ...current, busy: false, error: messageOf(error) }));
+      },
+    );
+  }
+
+  function applySecretStep(step: SecretStep): void {
+    secretRef.current = step.prompt;
+    setSecret(step.prompt);
+    if (step.prompt !== null) {
+      return;
+    }
+    const submitted = step.submit;
+    if (submitted === null) {
+      setChat((current) => ({ ...current, notice: null }));
+      return;
+    }
+    setChat((current) => ({ ...current, notice: `saving the ${submitted.provider} key…` }));
+    void client.setKey(submitted.provider, submitted.key).then(
+      () => {
+        setChat((current) => ({ ...current, error: null, notice: `${submitted.provider} key saved in the Keychain` }));
+      },
+      (error: unknown) => {
+        setChat((current) => ({ ...current, notice: null, error: messageOf(error) }));
+      },
+    );
+  }
+
+  function removeKey(provider: string): void {
+    void client.removeKey(provider).then(
+      (result) => {
+        setChat((current) => ({
+          ...current,
+          error: null,
+          notice: result.removed ? `${provider} key removed from the Keychain` : `no ${provider} key was stored`,
+        }));
+      },
+      (error: unknown) => {
+        setChat((current) => ({ ...current, error: messageOf(error) }));
       },
     );
   }
@@ -883,10 +944,21 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
     if (key.eventType === "release") {
       return;
     }
-    applyKeyEffect(pressKey(currentPlace(), classifyPress(input, key)));
+    const press = classifyPress(input, key);
+    const prompt = secretRef.current;
+    if (prompt !== null) {
+      applySecretStep(pressSecret(prompt, press));
+      return;
+    }
+    applyKeyEffect(pressKey(currentPlace(), press));
   });
 
   usePaste((text) => {
+    const prompt = secretRef.current;
+    if (prompt !== null) {
+      applySecretStep({ prompt: pasteSecret(prompt, text), submit: null });
+      return;
+    }
     if (busyRef.current || switcherRef.current.open || keysOpenRef.current) {
       return;
     }
@@ -897,7 +969,10 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   });
 
   const contentWidth = transcript.gutter === null ? columns : Math.max(1, columns - 1);
-  const composer = layoutComposer(draft.text, draft.cursor, columns, budget.composer, chat.busy);
+  const composer =
+    secret === null
+      ? layoutComposer(draft.text, draft.cursor, columns, budget.composer, chat.busy)
+      : layoutComposer(composerText, composerText.length, columns, budget.composer, false);
   const debugLayout = layoutDebug({
     debug,
     rows: budget.debug,

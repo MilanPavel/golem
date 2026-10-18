@@ -1,3 +1,6 @@
+import type { AuthKeyStatus, AuthListResult } from "../../protocol/gen/auth-list-result.ts";
+import type { AuthRemoveResult } from "../../protocol/gen/auth-remove-result.ts";
+import type { AuthSetResult } from "../../protocol/gen/auth-set-result.ts";
 import type { DaemonStatus } from "../../protocol/gen/daemon-status.ts";
 import type { HelloResult } from "../../protocol/gen/hello-result.ts";
 import type { MessageSendResult } from "../../protocol/gen/message-send-result.ts";
@@ -52,6 +55,27 @@ export function asChatEvent(value: unknown): ChatEvent | undefined {
     return undefined;
   }
   return value as unknown as ChatEvent;
+}
+
+export function isAuthSetResult(value: unknown): value is AuthSetResult {
+  return isRecord(value) && typeof value["provider"] === "string";
+}
+
+export function isAuthRemoveResult(value: unknown): value is AuthRemoveResult {
+  return isRecord(value) && typeof value["provider"] === "string" && typeof value["removed"] === "boolean";
+}
+
+export function isAuthListResult(value: unknown): value is AuthListResult {
+  return isRecord(value) && Array.isArray(value["providers"]) && value["providers"].every(isAuthKeyStatus);
+}
+
+function isAuthKeyStatus(value: unknown): value is AuthKeyStatus {
+  return (
+    isRecord(value) &&
+    typeof value["provider"] === "string" &&
+    typeof value["takes_key"] === "boolean" &&
+    typeof value["needs_key"] === "boolean"
+  );
 }
 
 export function isSessionCreateResult(value: unknown): value is SessionCreateResult {

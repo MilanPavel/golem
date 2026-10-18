@@ -1,0 +1,55 @@
+{
+  "additionalProperties": false,
+  "description": "One provider's key.\n\n``takes_key`` is false for a provider that never uses one, such as\n``ollama``. ``needs_key`` means a model call fails without one.\n``source`` is where the key was found, or null when there is none.",
+  "properties": {
+    "env_var": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Env Var"
+    },
+    "needs_key": {
+      "title": "Needs Key",
+      "type": "boolean"
+    },
+    "provider": {
+      "minLength": 1,
+      "title": "Provider",
+      "type": "string"
+    },
+    "source": {
+      "anyOf": [
+        {
+          "enum": [
+            "env",
+            "keychain"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source"
+    },
+    "takes_key": {
+      "title": "Takes Key",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "provider",
+    "takes_key",
+    "needs_key"
+  ],
+  "title": "AuthKeyStatus",
+  "type": "object"
+}

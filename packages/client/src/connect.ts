@@ -1,6 +1,9 @@
 import { randomUUID } from "node:crypto";
 import net from "node:net";
 
+import type { AuthListResult } from "../../protocol/gen/auth-list-result.ts";
+import type { AuthRemoveResult } from "../../protocol/gen/auth-remove-result.ts";
+import type { AuthSetResult } from "../../protocol/gen/auth-set-result.ts";
 import type { DaemonStatus } from "../../protocol/gen/daemon-status.ts";
 import type { MessageSendResult } from "../../protocol/gen/message-send-result.ts";
 import type { Params as ChatEvent } from "../../protocol/gen/rpc-notification.ts";
@@ -17,6 +20,9 @@ import { Attachments } from "./attachments.ts";
 import { backoffDelayMs } from "./backoff.ts";
 import {
   asChatEvent,
+  isAuthListResult,
+  isAuthRemoveResult,
+  isAuthSetResult,
   isDaemonStatus,
   isHelloResult,
   isMessageSendResult,
@@ -33,7 +39,7 @@ import {
   isSessionSummary,
 } from "./guards.ts";
 import { pushWire, type WireFrame, type WireLine } from "./wire.ts";
-import { eventFrame, flat, outgoingDetail, resultDetail, summaryFrame } from "./wire-detail.ts";
+import { eventFrame, flat, outgoingDetail, resultDetail, shownParams, summaryFrame } from "./wire-detail.ts";
 
 const PROTOCOL_MISMATCH = -32001;
 export const SESSION_NOT_FOUND = -32003;
@@ -41,6 +47,7 @@ export const SESSION_BUSY = -32004;
 export const MODEL_NOT_CONFIGURED = -32005;
 export const RUN_NOT_FOUND = -32006;
 export const MESSAGE_NOT_FOUND = -32007;
+export const KEYCHAIN_UNAVAILABLE = -32008;
 
 export type { ChatEvent, SessionSummary };
 const DEFAULT_HEARTBEAT_MS = 5_000;
@@ -111,6 +118,10 @@ export interface GolemClient {
   /** Stop a run. Resolves after `run.cancelled` is in the log; `cancelled` is false when it had ended. */
   cancelRun(runId: string): Promise<RunCancelResult>;
   inspectSession(sessionId: string): Promise<SessionInspectResult>;
+  /** Store a provider's API key in the daemon's credential store. The wire view shows it redacted. */
+  setKey(provider: string, key: string): Promise<AuthSetResult>;
+  removeKey(provider: string): Promise<AuthRemoveResult>;
+  listKeys(): Promise<AuthListResult>;
   close(): void;
 }
 
@@ -210,13 +221,14 @@ export function connectGolem(options: ConnectOptions): GolemClient {
     const id = nextId;
     nextId += 1;
     const payload = JSON.stringify({ jsonrpc: "2.0", method, params, id });
+    const shown = JSON.stringify({ jsonrpc: "2.0", method, params: shownParams(method, params), id });
     return new Promise((resolve, reject) => {
       pending.set(id, { method, resolve, reject });
       record({
         direction: "out",
         kind: method === "ping" ? "ping" : method,
         detail: outgoingDetail(method, params),
-        json: method === "ping" ? "" : payload,
+        json: method === "ping" ? "" : shown,
       });
       current.write(`${payload}\n`);
     });
@@ -587,6 +599,30 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("session.inspect", { session_id: sessionId });
       if (!isSessionInspectResult(result)) {
         throw new Error("invalid session.inspect result");
+      }
+      return result;
+    },
+    async setKey(provider: string, key: string): Promise<AuthSetResult> {
+      await ready;
+      const result = await call("auth.set", { provider, key });
+      if (!isAuthSetResult(result)) {
+        throw new Error("invalid auth.set result");
+      }
+      return result;
+    },
+    async removeKey(provider: string): Promise<AuthRemoveResult> {
+      await ready;
+      const result = await call("auth.remove", { provider });
+      if (!isAuthRemoveResult(result)) {
+        throw new Error("invalid auth.remove result");
+      }
+      return result;
+    },
+    async listKeys(): Promise<AuthListResult> {
+      await ready;
+      const result = await call("auth.list", {});
+      if (!isAuthListResult(result)) {
+        throw new Error("invalid auth.list result");
       }
       return result;
     },

@@ -6,9 +6,22 @@ from fakes import ScriptedChatModel
 from langchain_anthropic import ChatAnthropic
 from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
+from pydantic import SecretStr
 
 from golem.config import GolemSettings, ModelSettings, ProviderSettings, load_settings
+from golem.models.keys import KeyStoreError, MemoryKeyStore
 from golem.models.router import ModelConfigError, ModelIdentity, ModelRouter
+
+
+class _BrokenStore:
+    def get(self, provider: str) -> str | None:
+        raise KeyStoreError("keychain is unavailable: locked")
+
+    def set(self, provider: str, key: str) -> None:
+        raise KeyStoreError("keychain is unavailable: locked")
+
+    def delete(self, provider: str) -> bool:
+        raise KeyStoreError("keychain is unavailable: locked")
 
 
 def test_injected_model_is_returned_for_the_profile() -> None:
@@ -117,6 +130,60 @@ def test_missing_anthropic_key_is_rejected(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     with pytest.raises(ModelConfigError, match="ANTHROPIC_API_KEY"):
         ModelRouter(GolemSettings()).chat_model("anthropic/claude-test")
+
+
+def test_a_stored_key_is_used_when_the_env_has_none(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    router = ModelRouter(GolemSettings(), keys=MemoryKeyStore({"anthropic": "sk-stored"}))
+    model = router.chat_model("anthropic/claude-test")
+    assert isinstance(model, ChatAnthropic)
+    assert model.anthropic_api_key.get_secret_value() == "sk-stored"
+
+
+def test_the_env_wins_over_a_stored_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-env")
+    router = ModelRouter(GolemSettings(), keys=MemoryKeyStore({"anthropic": "sk-stored"}))
+    model = router.chat_model("anthropic/claude-test")
+    assert isinstance(model, ChatAnthropic)
+    assert model.anthropic_api_key.get_secret_value() == "sk-env"
+
+
+def test_a_missing_key_names_login_and_the_env_var(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    router = ModelRouter(GolemSettings(), keys=MemoryKeyStore())
+    with pytest.raises(ModelConfigError, match=r"needs key: /login anthropic .*ANTHROPIC_API_KEY"):
+        router.chat_model("anthropic/claude-test")
+
+
+def test_an_unreadable_store_is_a_config_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    router = ModelRouter(GolemSettings(), keys=_BrokenStore())
+    with pytest.raises(ModelConfigError, match="keychain is unavailable"):
+        router.chat_model("anthropic/claude-test")
+
+
+def test_a_custom_provider_uses_a_stored_key() -> None:
+    settings = GolemSettings(providers={"mine": ProviderSettings(base_url="http://127.0.0.1:9/v1")})
+    router = ModelRouter(settings, keys=MemoryKeyStore({"mine": "sk-mine"}))
+    model = router.chat_model("mine/model-x")
+    assert isinstance(model, ChatOpenAI)
+    assert isinstance(model.openai_api_key, SecretStr)
+    assert model.openai_api_key.get_secret_value() == "sk-mine"
+
+
+def test_key_statuses_report_where_each_key_is(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-env")
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    router = ModelRouter(GolemSettings(), keys=MemoryKeyStore({"anthropic": "sk-stored"}))
+    statuses = {status.provider: status for status in router.key_statuses()}
+    assert statuses["anthropic"].source == "keychain"
+    assert statuses["openai"].source == "env"
+    assert statuses["openrouter"].source is None
+    assert statuses["openrouter"].needs_key
+    assert not statuses["ollama"].takes_key
+    assert not statuses["lmstudio"].needs_key
+    assert list(statuses) == sorted(statuses)
 
 
 def test_missing_openai_key_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:

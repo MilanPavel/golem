@@ -1,7 +1,8 @@
-"""Daemon commands: ``hello``, ``daemon.status``, ``ping``, sessions, chat, and inspect."""
+"""Daemon commands: ``hello``, ``daemon.status``, ``ping``, sessions, chat, inspect, and keys."""
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import time
@@ -9,10 +10,12 @@ import time
 from pydantic import BaseModel, ConfigDict
 
 from golem import __version__
-from golem.models.router import ModelConfigError
+from golem.models.keys import KeyStore, KeyStoreError
+from golem.models.router import ModelConfigError, ModelRouter
 from golem.server.dispatcher import (
     INTERNAL_ERROR,
     INVALID_PARAMS,
+    KEYCHAIN_UNAVAILABLE,
     MESSAGE_NOT_FOUND,
     MODEL_NOT_CONFIGURED,
     PROTOCOL_MISMATCH,
@@ -34,6 +37,13 @@ from golem.sessions.manager import (
 )
 from golem.sessions.summaries import summarize
 from golem_protocol.commands import (
+    AuthKeyStatus,
+    AuthListParams,
+    AuthListResult,
+    AuthRemoveParams,
+    AuthRemoveResult,
+    AuthSetParams,
+    AuthSetResult,
     DaemonStatus,
     HelloParams,
     HelloResult,
@@ -223,6 +233,63 @@ async def _session_inspect(
     )
 
 
+async def _auth_set(ctx: RequestContext, params: AuthSetParams) -> AuthSetResult:
+    router = _sessions(ctx).router
+    store = _key_store(router, params.provider)
+    key = params.key.get_secret_value().strip()
+    if key == "" or any(char.isspace() for char in key):
+        raise RpcCallError(INVALID_PARAMS, "the key is empty or has spaces in it")
+    try:
+        await asyncio.to_thread(store.set, params.provider, key)
+    except KeyStoreError as exc:
+        raise RpcCallError(KEYCHAIN_UNAVAILABLE, str(exc)) from exc
+    log.info("stored key provider=%s", params.provider)
+    return AuthSetResult(provider=params.provider)
+
+
+async def _auth_remove(ctx: RequestContext, params: AuthRemoveParams) -> AuthRemoveResult:
+    router = _sessions(ctx).router
+    store = _key_store(router, params.provider)
+    try:
+        removed = await asyncio.to_thread(store.delete, params.provider)
+    except KeyStoreError as exc:
+        raise RpcCallError(KEYCHAIN_UNAVAILABLE, str(exc)) from exc
+    log.info("removed key provider=%s removed=%s", params.provider, removed)
+    return AuthRemoveResult(provider=params.provider, removed=removed)
+
+
+async def _auth_list(ctx: RequestContext, params: AuthListParams) -> AuthListResult:
+    del params
+    router = _sessions(ctx).router
+    try:
+        statuses = await asyncio.to_thread(router.key_statuses)
+    except KeyStoreError as exc:
+        raise RpcCallError(KEYCHAIN_UNAVAILABLE, str(exc)) from exc
+    return AuthListResult(
+        providers=[
+            AuthKeyStatus(
+                provider=status.provider,
+                takes_key=status.takes_key,
+                needs_key=status.needs_key,
+                env_var=status.env_var,
+                source=status.source,
+            )
+            for status in statuses
+        ]
+    )
+
+
+def _key_store(router: ModelRouter, provider_name: str) -> KeyStore:
+    provider = router.provider(provider_name)
+    if provider is None:
+        raise RpcCallError(INVALID_PARAMS, f"unknown model provider: {provider_name}")
+    if provider.kind == "ollama":
+        raise RpcCallError(INVALID_PARAMS, f"{provider_name} takes no key")
+    if router.keys is None:
+        raise RpcCallError(KEYCHAIN_UNAVAILABLE, "this daemon has no key store")
+    return router.keys
+
+
 def _sessions(ctx: RequestContext) -> SessionManager:
     sessions = ctx.state.sessions
     if sessions is None:
@@ -246,4 +313,7 @@ def standard_methods() -> dict[str, Method]:
         "message.send": Method("message.send", MessageSendParams, True, _message_send),
         "run.cancel": Method("run.cancel", RunCancelParams, True, _run_cancel),
         "session.inspect": Method("session.inspect", SessionInspectParams, True, _session_inspect),
+        "auth.set": Method("auth.set", AuthSetParams, True, _auth_set),
+        "auth.remove": Method("auth.remove", AuthRemoveParams, True, _auth_remove),
+        "auth.list": Method("auth.list", AuthListParams, True, _auth_list),
     }
