@@ -10,6 +10,7 @@ import time
 from pydantic import BaseModel, ConfigDict
 
 from golem import __version__
+from golem.config_edit import set_default_model
 from golem.models.keys import KeyStore, KeyStoreError
 from golem.models.router import ModelConfigError, ModelRouter
 from golem.server.dispatcher import (
@@ -55,6 +56,8 @@ from golem_protocol.commands import (
     ModelListParams,
     ModelListResult,
     ModelPriceInfo,
+    ModelSetDefaultParams,
+    ModelSetDefaultResult,
     PingParams,
     RunCancelParams,
     RunCancelResult,
@@ -74,6 +77,8 @@ from golem_protocol.commands import (
     SessionListResult,
     SessionRenameParams,
     SessionRenameResult,
+    SessionSetModelParams,
+    SessionSetModelResult,
 )
 from golem_protocol.events import Ping
 from golem_protocol.version import PROTOCOL_MAJOR, PROTOCOL_MINOR
@@ -316,6 +321,43 @@ async def _model_list(ctx: RequestContext, params: ModelListParams) -> ModelList
     )
 
 
+async def _session_set_model(
+    ctx: RequestContext, params: SessionSetModelParams
+) -> SessionSetModelResult:
+    try:
+        identity = await _sessions(ctx).set_model(params.session_id, params.model)
+    except SessionNotFoundError as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
+    except SchemaMismatchError as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, str(exc)) from exc
+    except ModelConfigError as exc:
+        raise RpcCallError(MODEL_NOT_CONFIGURED, str(exc)) from exc
+    log.info("session model session=%s model=%s", params.session_id, params.model)
+    return SessionSetModelResult(
+        session_id=params.session_id,
+        model_profile=identity.profile,
+        model_provider=identity.provider,
+        model_name=identity.name,
+    )
+
+
+async def _model_set_default(
+    ctx: RequestContext, params: ModelSetDefaultParams
+) -> ModelSetDefaultResult:
+    router = _sessions(ctx).router
+    try:
+        router.resolve(params.model)
+    except ModelConfigError as exc:
+        raise RpcCallError(MODEL_NOT_CONFIGURED, str(exc)) from exc
+    config_file = ctx.state.paths.config_file
+    try:
+        await asyncio.to_thread(set_default_model, config_file, params.model)
+    except (OSError, ValueError) as exc:
+        raise RpcCallError(INTERNAL_ERROR, f"could not write {config_file}: {exc}") from exc
+    log.info("default model=%s", params.model)
+    return ModelSetDefaultResult(default=params.model)
+
+
 def _key_store(router: ModelRouter, provider_name: str) -> KeyStore:
     provider = router.provider(provider_name)
     if provider is None:
@@ -354,4 +396,10 @@ def standard_methods() -> dict[str, Method]:
         "auth.remove": Method("auth.remove", AuthRemoveParams, True, _auth_remove),
         "auth.list": Method("auth.list", AuthListParams, True, _auth_list),
         "model.list": Method("model.list", ModelListParams, True, _model_list),
+        "model.set_default": Method(
+            "model.set_default", ModelSetDefaultParams, True, _model_set_default
+        ),
+        "session.set_model": Method(
+            "session.set_model", SessionSetModelParams, True, _session_set_model
+        ),
     }

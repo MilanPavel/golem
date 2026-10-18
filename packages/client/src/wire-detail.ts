@@ -118,6 +118,10 @@ function eventDetail(type: string, seq: string, data: Record<string, unknown> | 
     parts.push(data["reason"]);
   } else if (type === "run.failed" && typeof data["message"] === "string") {
     parts.push(flat(data["message"]));
+  } else if (type === "model.selected") {
+    const name = typeof data["model_name"] === "string" ? data["model_name"] : "";
+    const profile = typeof data["model_profile"] === "string" ? data["model_profile"] : "";
+    parts.push([name, profile].filter((part) => part.length > 0).join(" · "));
   } else if (type === "session.created") {
     const name = typeof data["model_name"] === "string" ? data["model_name"] : "";
     const profile = typeof data["model_profile"] === "string" ? data["model_profile"] : "";

@@ -14,6 +14,7 @@ export {
   type GolemClient,
   type SessionSummary,
 } from "./connect.ts";
+export type { ListedModel, ModelListResult } from "../../protocol/gen/model-list-result.ts";
 export { mergeSummary } from "./session-index.ts";
 export { resolveSocketPath } from "./socket-path.ts";
 export {

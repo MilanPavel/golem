@@ -1,0 +1,48 @@
+{
+  "additionalProperties": false,
+  "description": "The model the session's next run uses.\n\n``model_profile`` is the name asked for, a profile or a ``provider/model``\nref. ``model_provider`` and ``model_name`` are what it resolved to when it\nwas chosen. ``reason`` ``user`` is ``session.set_model``.",
+  "properties": {
+    "model_name": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Model Name"
+    },
+    "model_profile": {
+      "minLength": 1,
+      "title": "Model Profile",
+      "type": "string"
+    },
+    "model_provider": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Model Provider"
+    },
+    "reason": {
+      "const": "user",
+      "title": "Reason",
+      "type": "string"
+    }
+  },
+  "required": [
+    "model_profile",
+    "reason"
+  ],
+  "title": "ModelSelectedData",
+  "type": "object"
+}

@@ -5,6 +5,8 @@ import type { DaemonStatus } from "../../protocol/gen/daemon-status.ts";
 import type { HelloResult } from "../../protocol/gen/hello-result.ts";
 import type { MessageSendResult } from "../../protocol/gen/message-send-result.ts";
 import type { ModelListResult } from "../../protocol/gen/model-list-result.ts";
+import type { ModelSetDefaultResult } from "../../protocol/gen/model-set-default-result.ts";
+import type { SessionSetModelResult } from "../../protocol/gen/session-set-model-result.ts";
 import type { Ping } from "../../protocol/gen/ping.ts";
 import type { Params as ChatEvent } from "../../protocol/gen/rpc-notification.ts";
 import type { RunCancelResult } from "../../protocol/gen/run-cancel-result.ts";
@@ -20,6 +22,7 @@ const EVENT_TYPES = new Set([
   "session.created",
   "session.updated",
   "session.closed",
+  "model.selected",
   "message.started",
   "message.delta",
   "message.completed",
@@ -73,6 +76,14 @@ export function isModelListResult(value: unknown): value is ModelListResult {
         typeof model["status"] === "string",
     )
   );
+}
+
+export function isSessionSetModelResult(value: unknown): value is SessionSetModelResult {
+  return isRecord(value) && typeof value["session_id"] === "string" && typeof value["model_profile"] === "string";
+}
+
+export function isModelSetDefaultResult(value: unknown): value is ModelSetDefaultResult {
+  return isRecord(value) && typeof value["default"] === "string";
 }
 
 export function isAuthSetResult(value: unknown): value is AuthSetResult {

@@ -7,6 +7,8 @@ import type { AuthSetResult } from "../../protocol/gen/auth-set-result.ts";
 import type { DaemonStatus } from "../../protocol/gen/daemon-status.ts";
 import type { MessageSendResult } from "../../protocol/gen/message-send-result.ts";
 import type { ModelListResult } from "../../protocol/gen/model-list-result.ts";
+import type { ModelSetDefaultResult } from "../../protocol/gen/model-set-default-result.ts";
+import type { SessionSetModelResult } from "../../protocol/gen/session-set-model-result.ts";
 import type { Params as ChatEvent } from "../../protocol/gen/rpc-notification.ts";
 import type { RunCancelResult } from "../../protocol/gen/run-cancel-result.ts";
 import type { SessionAttachResult } from "../../protocol/gen/session-attach-result.ts";
@@ -28,6 +30,8 @@ import {
   isHelloResult,
   isMessageSendResult,
   isModelListResult,
+  isModelSetDefaultResult,
+  isSessionSetModelResult,
   isPing,
   isRecord,
   isRunCancelResult,
@@ -126,6 +130,10 @@ export interface GolemClient {
   listKeys(): Promise<AuthListResult>;
   /** Every model golem knows of. `refresh` fetches hosted lists and prices again, past their cache. */
   listModels(refresh?: boolean): Promise<ModelListResult>;
+  /** Use `model` (a profile or a ref) from the session's next run. The daemon emits `model.selected`. */
+  setSessionModel(sessionId: string, model: string): Promise<SessionSetModelResult>;
+  /** Write `default_model` to the user's config.toml. New sessions start on it. */
+  setDefaultModel(model: string): Promise<ModelSetDefaultResult>;
   close(): void;
 }
 
@@ -635,6 +643,22 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("model.list", refresh ? { refresh: true } : {});
       if (!isModelListResult(result)) {
         throw new Error("invalid model.list result");
+      }
+      return result;
+    },
+    async setSessionModel(sessionId: string, model: string): Promise<SessionSetModelResult> {
+      await ready;
+      const result = await call("session.set_model", { session_id: sessionId, model });
+      if (!isSessionSetModelResult(result)) {
+        throw new Error("invalid session.set_model result");
+      }
+      return result;
+    },
+    async setDefaultModel(model: string): Promise<ModelSetDefaultResult> {
+      await ready;
+      const result = await call("model.set_default", { model });
+      if (!isModelSetDefaultResult(result)) {
+        throw new Error("invalid model.set_default result");
       }
       return result;
     },

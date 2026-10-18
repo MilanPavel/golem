@@ -34,6 +34,8 @@ test("status bar text follows the connection", () => {
 test("the model chip prefers a name and profile, then either one", () => {
   assert.equal(modelChip("qwen3.5:4b", "remote"), "qwen3.5:4b · remote");
   assert.equal(modelChip(null, "remote"), "remote");
+  assert.equal(modelChip("qwen3:8b", "ollama/qwen3:8b"), "qwen3:8b");
+  assert.equal(modelChip(null, "ollama/qwen3:8b"), "ollama/qwen3:8b");
   assert.equal(modelChip("qwen3.5:4b", null), "qwen3.5:4b");
   assert.equal(modelChip(null, null), "");
 });

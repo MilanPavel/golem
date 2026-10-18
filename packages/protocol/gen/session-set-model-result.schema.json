@@ -1,0 +1,48 @@
+{
+  "additionalProperties": false,
+  "description": "The model the session now uses, and what it resolves to.",
+  "properties": {
+    "model_name": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Model Name"
+    },
+    "model_profile": {
+      "minLength": 1,
+      "title": "Model Profile",
+      "type": "string"
+    },
+    "model_provider": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Model Provider"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "session_id",
+    "model_profile"
+  ],
+  "title": "SessionSetModelResult",
+  "type": "object"
+}

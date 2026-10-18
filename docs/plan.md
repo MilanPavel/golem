@@ -12,6 +12,7 @@ This file is about what comes next. How the existing pieces are built is in [arc
 
 - Streaming chat with named model profiles and `provider/model` refs: Ollama through its native API, Anthropic, OpenAI, and OpenAI-compatible hosts such as OpenRouter.
 - API keys in the macOS Keychain, through `golem auth` or `/login` in the TUI.
+- `/model` picks from installed, downloadable, and hosted models with prices and RAM fit, and switches a session mid-conversation. `golem models` prints the same list.
 - Sessions, runs, and every event are stored in `~/.golem/golem.db`. They survive a daemon restart and a crash.
 - Detach and reattach. Close the TUI mid-answer, reopen it, and see the text so far plus the rest. Any number of screens can follow one session.
 - Ctrl-C cancels the answer and keeps what it said. Pressing it twice exits.
@@ -91,7 +92,7 @@ Agents use the Graph API, where the model decides control flow. Flows use the Fu
 
 ### Protocol, what is left to add
 
-JSON-RPC 2.0, one JSON object per line, over `~/.golem/run/golem.sock`. Protocol 2.7 is on the wire today (see [architecture.md](architecture.md#what-is-on-the-wire-today)). The phases below add the rest.
+JSON-RPC 2.0, one JSON object per line, over `~/.golem/run/golem.sock`. Protocol 2.8 is on the wire today (see [architecture.md](architecture.md#what-is-on-the-wire-today)). The phases below add the rest.
 
 | Group | New events | Phase |
 |---|---|---|
@@ -188,16 +189,21 @@ Ollama's OpenAI-compatible endpoint runs with a small default context window and
 - **Done when:** a fresh `ollama pull` shows up in `model.list`, and a newly released Anthropic model appears with its LiteLLM price and no golem release.
 - **Watch out:** LiteLLM's key naming is not consistent across providers. A table-driven test over real keys from the bundled copy catches mapping drift.
 
-### 1.4 `/model` and switching
+### 1.4 `/model` and switching (built, except `golem config migrate`)
 
 - **Goal:** switching models is one command, and a first start needs no config at all.
 - **You can:** open `/model`, pick Sonnet in the middle of a conversation, and get the next answer from it with the same history.
 - **Build:**
-  - `session.set_model` and `model.set_default`. The latter writes `default_model` with `tomlkit`, which keeps comments.
-  - A `model.selected` session event (`model`, `ref`, `reason`). A switch applies to the next run.
-  - A picker overlay like the session switcher. Groups: this session, profiles, local installed, local to download, then one group per provider. Enter uses a model for this session, `d` also makes it the default, and typing filters. `/model <name>` switches directly, with suggestions from `model.list`.
-  - First start without a default: with exactly one ready model, golem uses it, saves it as the default, and says so. Otherwise the picker opens.
-  - `golem config migrate` (optional) rewrites the flat settings as a profile.
+  - `session.set_model` and `model.set_default` (protocol 2.8). The latter writes `default_model` with `tomlkit`, which keeps comments ([config_edit.py](../packages/daemon/golem/config_edit.py)).
+  - A `model.selected` session event (`model_profile`, `model_provider`, `model_name`, `reason`). The projection updates `sessions.model_profile`, and each turn passes the session's current model into graph state, so a switch applies from the next run.
+  - A picker in place of the transcript, like the session switcher ([model-picker.ts](../packages/tui/src/model-picker.ts)):
+    - Groups: profiles, installed, download, then one group per provider. Provider notes at the bottom say which ones need `/login`.
+    - Enter uses a model for this session, `d` also makes it the default, typing filters, and Ctrl-R refreshes.
+    - A model that cannot run says why (`needs key: /login anthropic`, `ollama pull …`, `ollama serve`).
+    - `/model <name>` switches directly, with suggestions from `model.list`.
+  - First start without a default: with exactly one ready model, golem uses it, saves it as the default, and says so. Otherwise the picker opens with "Pick a model to start". Esc still closes it, so `/login` stays reachable.
+  - The header shows the model the session switched to. For a ref it shows only the model name.
+  - Not done: `golem config migrate`, which would rewrite the flat settings as a profile. It is optional, and the flat settings keep working.
 - **Done when:** switching from a local to a remote model mid-session works, and the model tab in `/debug` shows one conversation across both.
 - **Watch out:** switching providers mid-history is safe for plain text. Tool-call messages are not, so 2.1 adds a cross-provider test.
 

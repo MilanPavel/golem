@@ -26,6 +26,10 @@ export function statusLabel(state: ConnectionState): string {
 }
 
 export function modelChip(name: string | null, profile: string | null): string {
+  // A ref such as ollama/qwen3:8b already ends in the name, so the name alone says it.
+  if (name !== null && name.length > 0 && profile !== null && profile.includes("/")) {
+    return name;
+  }
   if (name !== null && name.length > 0 && profile !== null && profile.length > 0) {
     return `${name} · ${profile}`;
   }

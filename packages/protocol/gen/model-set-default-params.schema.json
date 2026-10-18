@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "``model.set_default``. Write ``default_model`` to the user's ``config.toml``.\n\nNew sessions start on it. Comments and the rest of the file stay as they are.",
+  "properties": {
+    "model": {
+      "minLength": 1,
+      "title": "Model",
+      "type": "string"
+    }
+  },
+  "required": [
+    "model"
+  ],
+  "title": "ModelSetDefaultParams",
+  "type": "object"
+}

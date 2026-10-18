@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "The default as stored.",
+  "properties": {
+    "default": {
+      "minLength": 1,
+      "title": "Default",
+      "type": "string"
+    }
+  },
+  "required": [
+    "default"
+  ],
+  "title": "ModelSetDefaultResult",
+  "type": "object"
+}

@@ -118,6 +118,16 @@ test("/sessions and /new are commands without arguments", () => {
   assert.equal(applyComposer(closedDebug, "/session").kind, "unknown");
 });
 
+test("/model opens the picker or names one model", () => {
+  assert.deepEqual(applyComposer(closedDebug, "/model"), { kind: "model", name: null });
+  assert.deepEqual(applyComposer(closedDebug, "/model  sonnet "), { kind: "model", name: "sonnet" });
+  assert.deepEqual(applyComposer(closedDebug, "/model openrouter/qwen/qwen3"), {
+    kind: "model",
+    name: "openrouter/qwen/qwen3",
+  });
+  assert.equal(applyComposer(closedDebug, "/model a b").kind, "unknown");
+});
+
 test("/login and /logout take exactly one provider, and the key never goes in the command", () => {
   assert.deepEqual(applyComposer(closedDebug, "/login anthropic"), { kind: "login", provider: "anthropic" });
   assert.deepEqual(applyComposer(closedDebug, "/logout openai"), { kind: "logout", provider: "openai" });

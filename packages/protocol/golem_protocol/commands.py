@@ -420,6 +420,49 @@ class ModelListResult(BaseModel):
     providers: list[ListedProvider]
 
 
+class SessionSetModelParams(BaseModel):
+    """``session.set_model``. ``model`` is a profile name or a ``provider/model`` ref.
+
+    The switch applies from the session's next run. The daemon emits
+    ``model.selected``.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    model: str = Field(min_length=1)
+
+
+class SessionSetModelResult(BaseModel):
+    """The model the session now uses, and what it resolves to."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    model_profile: str = Field(min_length=1)
+    model_provider: str | None = Field(default=None, min_length=1)
+    model_name: str | None = Field(default=None, min_length=1)
+
+
+class ModelSetDefaultParams(BaseModel):
+    """``model.set_default``. Write ``default_model`` to the user's ``config.toml``.
+
+    New sessions start on it. Comments and the rest of the file stay as they are.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    model: str = Field(min_length=1)
+
+
+class ModelSetDefaultResult(BaseModel):
+    """The default as stored."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    default: str = Field(min_length=1)
+
+
 __all__ = [
     "AuthKeyStatus",
     "AuthListParams",
@@ -439,6 +482,8 @@ __all__ = [
     "ModelListParams",
     "ModelListResult",
     "ModelPriceInfo",
+    "ModelSetDefaultParams",
+    "ModelSetDefaultResult",
     "PingParams",
     "RunCancelParams",
     "RunCancelResult",
@@ -458,5 +503,7 @@ __all__ = [
     "SessionListResult",
     "SessionRenameParams",
     "SessionRenameResult",
+    "SessionSetModelParams",
+    "SessionSetModelResult",
     "SessionSummary",
 ]

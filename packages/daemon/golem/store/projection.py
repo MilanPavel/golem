@@ -10,6 +10,7 @@ from golem.store.database import Transaction
 from golem_protocol.events import (
     ChatEvent,
     MessageDeltaEvent,
+    ModelSelectedEvent,
     RunCancelledEvent,
     RunCompletedEvent,
     RunFailedEvent,
@@ -41,6 +42,11 @@ async def project(tx: Transaction, event: ChatEvent) -> None:
         await tx.execute(
             "UPDATE sessions SET title = ? WHERE session_id = ?",
             (event.data.title, event.session_id),
+        )
+    elif isinstance(event, ModelSelectedEvent):
+        await tx.execute(
+            "UPDATE sessions SET model_profile = ? WHERE session_id = ?",
+            (event.data.model_profile, event.session_id),
         )
     elif isinstance(event, SessionClosedEvent):
         await tx.execute(

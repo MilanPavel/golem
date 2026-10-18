@@ -27,6 +27,7 @@ export type ComposerOutcome =
   | { kind: "copy"; code: boolean }
   | { kind: "export"; path: string | null }
   | { kind: "time" }
+  | { kind: "model"; name: string | null }
   | { kind: "login"; provider: string }
   | { kind: "logout"; provider: string }
   | {
@@ -116,6 +117,17 @@ export const COMMANDS: readonly Command[] = [
     run: providerCommand("logout"),
   },
   {
+    name: "/model",
+    args: "[name]",
+    description: "Opens the model picker, or switches this session to a profile or provider/model.",
+    run: (_debug, args) => {
+      if (args.length > 1) {
+        return unknown();
+      }
+      return { kind: "model", name: args[0] ?? null };
+    },
+  },
+  {
     name: "/new",
     args: "",
     description: "Starts a new session.",
@@ -140,6 +152,11 @@ export const COMMANDS: readonly Command[] = [
     run: (_debug, args) => ({ kind: "title", title: args.length === 0 ? null : args.join(" ") }),
   },
 ];
+
+/** `commands` with `/model`'s argument choices set to `names`, for suggestions. */
+export function withModelChoices(commands: readonly Command[], names: readonly string[]): Command[] {
+  return commands.map((command) => (command.name === "/model" ? { ...command, choices: names } : command));
+}
 
 /** One row per command. The lines are the table, and nothing is added around it. */
 export function helpLines(commands: readonly Pick<Command, "name" | "args" | "description">[], columns: number): string[] {

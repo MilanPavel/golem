@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { COMMANDS } from "./commands.ts";
+import { COMMANDS, withModelChoices } from "./commands.ts";
 import {
   applySuggestion,
   moveSuggestion,
@@ -16,11 +16,19 @@ const registry: readonly SuggestCommand[] = [
   { name: "/only", description: "Just this" },
 ];
 
+test("/model suggests the names it is given", () => {
+  const names = suggest("/model so", withModelChoices(COMMANDS, ["qwen", "sonnet", "ollama/qwen3:8b"]));
+  assert.deepEqual(
+    names.map((item) => item.completion),
+    ["/model sonnet"],
+  );
+});
+
 test("/de then Tab is /debug, and /debug m then Tab is /debug model", () => {
   const names = suggest("/de", COMMANDS);
   assert.deepEqual(
     names.map((item) => item.label),
-    ["/debug"],
+    ["/debug", "/model"],
   );
   assert.equal(names[0]?.partial, true);
   assert.deepEqual(applySuggestion("/de", names, 0, "tab"), { draft: "/debug ", submit: false });

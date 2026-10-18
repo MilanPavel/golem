@@ -109,6 +109,22 @@ class SessionUpdatedData(BaseModel):
     title: str = Field(min_length=1)
 
 
+class ModelSelectedData(BaseModel):
+    """The model the session's next run uses.
+
+    ``model_profile`` is the name asked for, a profile or a ``provider/model``
+    ref. ``model_provider`` and ``model_name`` are what it resolved to when it
+    was chosen. ``reason`` ``user`` is ``session.set_model``.
+    """
+
+    model_config = _CONFIG
+
+    model_profile: str = Field(min_length=1)
+    model_provider: str | None = Field(default=None, min_length=1)
+    model_name: str | None = Field(default=None, min_length=1)
+    reason: Literal["user"]
+
+
 class SessionCreatedEvent(BaseModel):
     """A session exists. ``run_id`` is null because no run has started."""
 
@@ -149,6 +165,22 @@ class SessionClosedEvent(BaseModel):
     ts: str = Field(min_length=1)
     type: Literal["session.closed"]
     data: EmptyEventData
+
+
+class ModelSelectedEvent(BaseModel):
+    """The session switched models.
+
+    It applies from the next run. A run in progress keeps its model.
+    """
+
+    model_config = _CONFIG
+
+    seq: int = Field(ge=1)
+    session_id: str = Field(min_length=1)
+    run_id: None
+    ts: str = Field(min_length=1)
+    type: Literal["model.selected"]
+    data: ModelSelectedData
 
 
 class MessageStartedEvent(BaseModel):
@@ -246,6 +278,7 @@ EventType = Literal[
     "session.created",
     "session.updated",
     "session.closed",
+    "model.selected",
     "message.started",
     "message.delta",
     "message.completed",
@@ -261,6 +294,7 @@ ChatEvent = Annotated[
     SessionCreatedEvent
     | SessionUpdatedEvent
     | SessionClosedEvent
+    | ModelSelectedEvent
     | MessageStartedEvent
     | MessageDeltaEvent
     | MessageCompletedEvent
@@ -287,6 +321,8 @@ __all__ = [
     "MessageDeltaEvent",
     "MessageStartedData",
     "MessageStartedEvent",
+    "ModelSelectedData",
+    "ModelSelectedEvent",
     "Ping",
     "RunCancelledData",
     "RunCancelledEvent",

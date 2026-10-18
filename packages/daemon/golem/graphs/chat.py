@@ -209,7 +209,8 @@ def _turn_input(
     has_checkpoint: bool,
 ) -> AgentState:
     if has_checkpoint:
-        return cast(AgentState, {"messages": [message]})
+        # model_profile rides along so that session.set_model applies from this turn.
+        return cast(AgentState, {"messages": [message], "model_profile": model_profile})
     return {
         "messages": [message],
         "session_id": session_id,

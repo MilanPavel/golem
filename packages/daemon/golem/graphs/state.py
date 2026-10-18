@@ -1,8 +1,9 @@
 """Checkpointed state for the chat graph.
 
 ``messages`` comes from :class:`langgraph.graph.MessagesState` and uses the
-``add_messages`` reducer. The other fields are set on the first turn and then
-ride along in the checkpoint.
+``add_messages`` reducer. ``session_id`` and ``schema_version`` are set on the
+first turn and then ride along in the checkpoint. ``model_profile`` is set on
+every turn, from the session's current model.
 """
 
 from __future__ import annotations

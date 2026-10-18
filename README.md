@@ -85,7 +85,9 @@ ctx = 32768                        # optional, sent to Ollama as its context siz
 model = "anthropic/<model-id>"
 ```
 
-`default_model` can also be a `provider/model-id` directly, with no profile. The daemon picks up changes to `[models]`, `[providers]`, and `default_model` without a restart. Switching a running session with `/model` is planned.
+`default_model` can also be a `provider/model-id` directly, with no profile. The daemon picks up changes to `[models]`, `[providers]`, and `default_model` without a restart.
+
+You don't need to write any of this by hand. In the TUI, `/model` opens a picker with every model below. Enter switches the current session from its next message, with the same conversation. `d` also makes the model the default for new sessions, and golem writes `default_model` into `config.toml` without touching your comments. `/model <name>` switches directly to a profile name or a `provider/model-id`. On a first start with no model configured, golem uses the only ready model if there is exactly one, and otherwise opens the picker.
 
 `just golem models` shows what you can pick from:
 - **Installed local models:** found through Ollama, so a fresh `ollama pull` shows up at once.
@@ -210,6 +212,8 @@ A finished answer shows how long it took, under the text. `/time` shows the time
 | `/title` | Shows the current session's title |
 | `/title <name>` | Renames the current session |
 | `/fork` | Copies the session, up to its newest finished message, into a new session |
+| `/model` | Opens the model picker: Enter uses a model for this session, `d` also makes it the default, typing filters, Ctrl-R refreshes |
+| `/model <name>` | Switches this session to a profile or a `provider/model-id`, from the next message |
 | `/login <provider>` | Asks for the provider's API key in a masked prompt and saves it in the Keychain |
 | `/logout <provider>` | Removes the provider's API key from the Keychain |
 | `/debug` | Opens or closes the debug panel |

@@ -1,0 +1,93 @@
+{
+  "$defs": {
+    "ModelSelectedData": {
+      "additionalProperties": false,
+      "description": "The model the session's next run uses.\n\n``model_profile`` is the name asked for, a profile or a ``provider/model``\nref. ``model_provider`` and ``model_name`` are what it resolved to when it\nwas chosen. ``reason`` ``user`` is ``session.set_model``.",
+      "properties": {
+        "model_name": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model Name"
+        },
+        "model_profile": {
+          "minLength": 1,
+          "title": "Model Profile",
+          "type": "string"
+        },
+        "model_provider": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model Provider"
+        },
+        "reason": {
+          "const": "user",
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "model_profile",
+        "reason"
+      ],
+      "title": "ModelSelectedData",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The session switched models.\n\nIt applies from the next run. A run in progress keeps its model.",
+  "properties": {
+    "data": {
+      "$ref": "#/$defs/ModelSelectedData"
+    },
+    "run_id": {
+      "title": "Run Id",
+      "type": "null"
+    },
+    "seq": {
+      "minimum": 1,
+      "title": "Seq",
+      "type": "integer"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    },
+    "ts": {
+      "minLength": 1,
+      "title": "Ts",
+      "type": "string"
+    },
+    "type": {
+      "const": "model.selected",
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "seq",
+    "session_id",
+    "run_id",
+    "ts",
+    "type",
+    "data"
+  ],
+  "title": "ModelSelectedEvent",
+  "type": "object"
+}

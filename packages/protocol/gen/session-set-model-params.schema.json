@@ -1,0 +1,22 @@
+{
+  "additionalProperties": false,
+  "description": "``session.set_model``. ``model`` is a profile name or a ``provider/model`` ref.\n\nThe switch applies from the session's next run. The daemon emits\n``model.selected``.",
+  "properties": {
+    "model": {
+      "minLength": 1,
+      "title": "Model",
+      "type": "string"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "session_id",
+    "model"
+  ],
+  "title": "SessionSetModelParams",
+  "type": "object"
+}

@@ -1,7 +1,15 @@
 import { homedir } from "node:os";
 import { useEffect, useRef, useState } from "react";
 import { Box, Text, useApp, useInput, usePaste, useStdin, useWindowSize } from "ink";
-import { RpcError, SESSION_NOT_FOUND, type ConnectionState, type GolemClient, type WireLine } from "@golem/client";
+import {
+  RpcError,
+  SESSION_NOT_FOUND,
+  type ConnectionState,
+  type GolemClient,
+  type ListedModel,
+  type ModelListResult,
+  type WireLine,
+} from "@golem/client";
 
 import {
   createDeltaBatcher,
@@ -11,7 +19,29 @@ import {
   type ChatState,
   type DeltaBatcher,
 } from "./chat-state.ts";
-import { applyComposer, closedDebug, COMMANDS, helpLines, toggleDebugTab, type DebugState } from "./commands.ts";
+import {
+  applyComposer,
+  closedDebug,
+  COMMANDS,
+  helpLines,
+  toggleDebugTab,
+  withModelChoices,
+  type DebugState,
+} from "./commands.ts";
+import {
+  closedPicker,
+  firstRunChoice,
+  layoutPicker,
+  modelNames,
+  openPicker,
+  pickerHint,
+  pickerKeyOf,
+  pickerName,
+  pressPicker,
+  unusableReason,
+  type PickerState,
+} from "./model-picker.ts";
+import { ModelPickerView } from "./model-picker.tsx";
 import { draftAt, edit, editDraft, insertText, type Draft } from "./edit.ts";
 import {
   browseHistory,
@@ -42,6 +72,7 @@ import {
   pressKey,
   type KeyEffect,
   type KeyPlace,
+  type Press,
   type OverlayLine,
 } from "./keys.ts";
 import { layoutTranscript, type LayoutLine } from "./layout-chat.ts";
@@ -103,6 +134,8 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   const [chat, setChat] = useState<ChatState>(emptyChat);
   const [draft, setDraft] = useState<Draft>({ text: "", cursor: 0 });
   const [sessionModel, setSessionModel] = useState<ModelInfo | null>(null);
+  const sessionModelRef = useRef(sessionModel);
+  sessionModelRef.current = sessionModel;
   const [daemonModel, setDaemonModel] = useState<ModelInfo | null>(null);
   const [daemonVersion, setDaemonVersion] = useState("");
   const [daemonStartedAt, setDaemonStartedAt] = useState<number | null>(null);
@@ -127,6 +160,13 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   const [secret, setSecret] = useState<SecretPrompt | null>(null);
   const secretRef = useRef(secret);
   secretRef.current = secret;
+  const [picker, setPicker] = useState<PickerState>(closedPicker);
+  const pickerRef = useRef(picker);
+  pickerRef.current = picker;
+  const [listing, setListing] = useState<ModelListResult | null>(null);
+  const listingRef = useRef(listing);
+  listingRef.current = listing;
+  const firstRunChecked = useRef(false);
   const draftRef = useRef(draft);
   const busyRef = useRef(chat.busy);
   const chatRef = useRef(chat);
@@ -172,9 +212,15 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   const rows = size.rows || 24;
   const banner = chat.error ?? chat.notice;
   const suggestMatches =
-    chat.busy || switcher.open || keysOpen || suggestDismissed || historyCursor !== null || secret !== null
+    chat.busy ||
+    switcher.open ||
+    picker.open ||
+    keysOpen ||
+    suggestDismissed ||
+    historyCursor !== null ||
+    secret !== null
       ? []
-      : suggest(draft.text, COMMANDS);
+      : suggest(draft.text, withModelChoices(COMMANDS, modelNames(listing)));
   const composerText = secret === null ? draft.text : maskSecret(secret.value);
   const suggestSelected =
     suggestPick.draft === draft.text ? Math.min(suggestPick.index, Math.max(0, suggestMatches.length - 1)) : 0;
@@ -405,7 +451,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       if (event.session_id !== sessionRef.current) {
         return;
       }
-      if (event.type === "session.created") {
+      if (event.type === "session.created" || event.type === "model.selected") {
         setSessionModel({
           profile: event.data.model_profile,
           provider: event.data.model_provider ?? null,
@@ -432,6 +478,29 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       }
     });
   }, [client, sessionRef]);
+
+  useEffect(() => {
+    if (connection.status !== "connected") {
+      return;
+    }
+    loadModels(false);
+  }, [client, connection.status]);
+
+  useEffect(() => {
+    if (listing === null || sessionId === null || firstRunChecked.current) {
+      return;
+    }
+    firstRunChecked.current = true;
+    const choice = firstRunChoice(listing);
+    if (choice === null) {
+      return;
+    }
+    if (choice.kind === "pick") {
+      setPicker(openPicker(null, true));
+      return;
+    }
+    chooseModel(choice.model, pickerName(choice.model), true, `Using ${choice.model.ref}, the only model ready. /model to change.`);
+  }, [listing, sessionId]);
 
   useEffect(() => {
     if (uptimeRefresh === null) {
@@ -495,6 +564,21 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
     if (outcome.kind === "sessions") {
       setDraft(draftAt(""));
       setSwitcher(openSwitcher(sessionRef.current));
+      return;
+    }
+    if (outcome.kind === "model") {
+      setDraft(draftAt(""));
+      if (outcome.name === null) {
+        const next = openPicker(currentModelRef());
+        pickerRef.current = next;
+        setPicker(next);
+        setSwitcher(closedSwitcher);
+        loadModels(false);
+        return;
+      }
+      const name = outcome.name;
+      const known = listingRef.current?.models.find((model) => model.ref === name || (model.profiles ?? []).includes(name));
+      chooseModel(known ?? null, name, false);
       return;
     }
     if (outcome.kind === "login") {
@@ -614,6 +698,72 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
         setChat((current) => ({ ...current, busy: false, error: messageOf(error) }));
       },
     );
+  }
+
+  function loadModels(refresh: boolean): void {
+    void client.listModels(refresh).then(
+      (result) => {
+        listingRef.current = result;
+        setListing(result);
+      },
+      (error: unknown) => {
+        setChat((current) => ({ ...current, error: `models: ${messageOf(error)}` }));
+      },
+    );
+  }
+
+  /** Switch this session to `name`, and make it the default when `setDefault`. */
+  function chooseModel(model: ListedModel | null, name: string, setDefault: boolean, notice?: string): void {
+    const reason = model === null ? null : unusableReason(model);
+    if (reason !== null) {
+      setChat((current) => ({ ...current, notice: reason }));
+      return;
+    }
+    const current = sessionRef.current;
+    const switched =
+      current === null ? Promise.resolve(null) : client.setSessionModel(current, name).then((result) => result);
+    void switched
+      .then(async (result) => {
+        if (setDefault) {
+          await client.setDefaultModel(name);
+          setDaemonModel({
+            profile: name,
+            provider: result?.model_provider ?? model?.provider ?? null,
+            name: result?.model_name ?? null,
+          });
+        }
+        pickerRef.current = closedPicker;
+        setPicker(closedPicker);
+        const label = result?.model_name ?? name;
+        setChat((state) => ({
+          ...state,
+          error: null,
+          notice: notice ?? (setDefault ? `${label} for this session and new ones` : `${label} from the next message`),
+        }));
+      })
+      .catch((error: unknown) => {
+        setChat((state) => ({ ...state, notice: null, error: messageOf(error) }));
+      });
+  }
+
+  function onPickerPress(press: Press): void {
+    const state = pickerRef.current;
+    const key = pickerKeyOf(state, press);
+    if (key === null) {
+      return;
+    }
+    const pressed = pressPicker(state, listingRef.current, key);
+    pickerRef.current = pressed.state;
+    setPicker(pressed.state);
+    const action = pressed.action;
+    if (action.kind === "refresh") {
+      setChat((current) => ({ ...current, notice: "refreshing models…" }));
+      loadModels(true);
+    } else if (action.kind === "choose") {
+      chooseModel(action.model, action.name, action.setDefault);
+    } else if (action.kind === "close") {
+      setChat((current) => ({ ...current, notice: state.firstRun ? "no model chosen yet: /model to pick one" : null }));
+    }
   }
 
   function applySecretStep(step: SecretStep): void {
@@ -950,6 +1100,10 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       applySecretStep(pressSecret(prompt, press));
       return;
     }
+    if (pickerRef.current.open && !keysOpenRef.current && press.name !== "f1") {
+      onPickerPress(press);
+      return;
+    }
     applyKeyEffect(pressKey(currentPlace(), press));
   });
 
@@ -959,7 +1113,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       applySecretStep({ prompt: pasteSecret(prompt, text), submit: null });
       return;
     }
-    if (busyRef.current || switcherRef.current.open || keysOpenRef.current) {
+    if (busyRef.current || switcherRef.current.open || pickerRef.current.open || keysOpenRef.current) {
       return;
     }
     if (connectionRef.current.status !== "connected" || sessionRef.current === null) {
@@ -967,6 +1121,14 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
     }
     setDraft(insertText(draftRef.current, text));
   });
+
+  function currentModelRef(): string | null {
+    const name = sessionModelRef.current?.profile ?? null;
+    const found = listingRef.current?.models.find(
+      (model) => name !== null && (model.ref === name || (model.profiles ?? []).includes(name)),
+    );
+    return found?.ref ?? null;
+  }
 
   const contentWidth = transcript.gutter === null ? columns : Math.max(1, columns - 1);
   const composer =
@@ -1014,6 +1176,19 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
           columns={columns}
           height={budget.body}
           offset={keysOffset}
+        />
+      ) : picker.open ? (
+        <ModelPickerView
+          rows={layoutPicker({
+            state: picker,
+            listing,
+            current: sessionModel?.profile ?? null,
+            columns,
+            rows: budget.body - 1,
+          })}
+          columns={columns}
+          height={budget.body}
+          hint={pickerHint(picker)}
         />
       ) : switcher.open ? (
         <SwitcherView

@@ -6,6 +6,7 @@ export type Params =
   | SessionCreatedEvent
   | SessionUpdatedEvent
   | SessionClosedEvent
+  | ModelSelectedEvent
   | MessageStartedEvent
   | MessageDeltaEvent
   | MessageCompletedEvent
@@ -34,51 +35,60 @@ export type Seq2 = number;
 export type SessionId3 = string;
 export type Ts2 = string;
 export type Type2 = 'session.closed';
-export type MessageId1 = string;
-export type Role = 'assistant';
-export type RunId3 = string;
+export type ModelName1 = string | null;
+export type ModelProfile1 = string;
+export type ModelProvider1 = string | null;
+export type Reason = 'user';
+export type RunId3 = null;
 export type Seq3 = number;
 export type SessionId4 = string;
 export type Ts3 = string;
-export type Type3 = 'message.started';
-export type MessageId2 = string;
-export type Text = string;
+export type Type3 = 'model.selected';
+export type MessageId1 = string;
+export type Role = 'assistant';
 export type RunId4 = string;
 export type Seq4 = number;
 export type SessionId5 = string;
 export type Ts4 = string;
-export type Type4 = 'message.delta';
-export type Interrupted = boolean;
-export type MessageId3 = string;
-export type Role1 = 'user' | 'assistant';
-export type Text1 = string;
+export type Type4 = 'message.started';
+export type MessageId2 = string;
+export type Text = string;
 export type RunId5 = string;
 export type Seq5 = number;
 export type SessionId6 = string;
 export type Ts5 = string;
-export type Type5 = 'message.completed';
+export type Type5 = 'message.delta';
+export type Interrupted = boolean;
+export type MessageId3 = string;
+export type Role1 = 'user' | 'assistant';
+export type Text1 = string;
 export type RunId6 = string;
 export type Seq6 = number;
 export type SessionId7 = string;
 export type Ts6 = string;
-export type Type6 = 'run.started';
+export type Type6 = 'message.completed';
 export type RunId7 = string;
 export type Seq7 = number;
 export type SessionId8 = string;
 export type Ts7 = string;
-export type Type7 = 'run.completed';
-export type Message = string;
+export type Type7 = 'run.started';
 export type RunId8 = string;
 export type Seq8 = number;
 export type SessionId9 = string;
 export type Ts8 = string;
-export type Type8 = 'run.failed';
-export type Reason = 'user' | 'shutdown';
+export type Type8 = 'run.completed';
+export type Message = string;
 export type RunId9 = string;
 export type Seq9 = number;
 export type SessionId10 = string;
 export type Ts9 = string;
-export type Type9 = 'run.cancelled';
+export type Type9 = 'run.failed';
+export type Reason1 = 'user' | 'shutdown';
+export type RunId10 = string;
+export type Seq10 = number;
+export type SessionId11 = string;
+export type Ts10 = string;
+export type Type10 = 'run.cancelled';
 
 /**
  * Server → client event. No ``id``; this is not a response to a request.
@@ -176,6 +186,38 @@ export interface SessionClosedEvent {
  */
 export interface EmptyEventData {}
 /**
+ * The session switched models.
+ *
+ * It applies from the next run. A run in progress keeps its model.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "ModelSelectedEvent".
+ */
+export interface ModelSelectedEvent {
+  data: ModelSelectedData;
+  run_id: RunId3;
+  seq: Seq3;
+  session_id: SessionId4;
+  ts: Ts3;
+  type: Type3;
+}
+/**
+ * The model the session's next run uses.
+ *
+ * ``model_profile`` is the name asked for, a profile or a ``provider/model``
+ * ref. ``model_provider`` and ``model_name`` are what it resolved to when it
+ * was chosen. ``reason`` ``user`` is ``session.set_model``.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "ModelSelectedData".
+ */
+export interface ModelSelectedData {
+  model_name?: ModelName1;
+  model_profile: ModelProfile1;
+  model_provider?: ModelProvider1;
+  reason: Reason;
+}
+/**
  * The assistant bubble is open.
  *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
@@ -183,11 +225,11 @@ export interface EmptyEventData {}
  */
 export interface MessageStartedEvent {
   data: MessageStartedData;
-  run_id: RunId3;
-  seq: Seq3;
-  session_id: SessionId4;
-  ts: Ts3;
-  type: Type3;
+  run_id: RunId4;
+  seq: Seq4;
+  session_id: SessionId5;
+  ts: Ts4;
+  type: Type4;
 }
 /**
  * An assistant message is open and tokens may follow.
@@ -207,11 +249,11 @@ export interface MessageStartedData {
  */
 export interface MessageDeltaEvent {
   data: MessageDeltaData;
-  run_id: RunId4;
-  seq: Seq4;
-  session_id: SessionId5;
-  ts: Ts4;
-  type: Type4;
+  run_id: RunId5;
+  seq: Seq5;
+  session_id: SessionId6;
+  ts: Ts5;
+  type: Type5;
 }
 /**
  * One incremental fragment of an assistant message.
@@ -231,11 +273,11 @@ export interface MessageDeltaData {
  */
 export interface MessageCompletedEvent {
   data: MessageCompletedData;
-  run_id: RunId5;
-  seq: Seq5;
-  session_id: SessionId6;
-  ts: Ts5;
-  type: Type5;
+  run_id: RunId6;
+  seq: Seq6;
+  session_id: SessionId7;
+  ts: Ts6;
+  type: Type6;
 }
 /**
  * Full text of a user or assistant message.
@@ -260,11 +302,11 @@ export interface MessageCompletedData {
  */
 export interface RunStartedEvent {
   data: EmptyEventData;
-  run_id: RunId6;
-  seq: Seq6;
-  session_id: SessionId7;
-  ts: Ts6;
-  type: Type6;
+  run_id: RunId7;
+  seq: Seq7;
+  session_id: SessionId8;
+  ts: Ts7;
+  type: Type7;
 }
 /**
  * The graph run finished and the checkpoint is current.
@@ -274,11 +316,11 @@ export interface RunStartedEvent {
  */
 export interface RunCompletedEvent {
   data: EmptyEventData;
-  run_id: RunId7;
-  seq: Seq7;
-  session_id: SessionId8;
-  ts: Ts7;
-  type: Type7;
+  run_id: RunId8;
+  seq: Seq8;
+  session_id: SessionId9;
+  ts: Ts8;
+  type: Type8;
 }
 /**
  * The graph run stopped with an error.
@@ -288,11 +330,11 @@ export interface RunCompletedEvent {
  */
 export interface RunFailedEvent {
   data: RunFailedData;
-  run_id: RunId8;
-  seq: Seq8;
-  session_id: SessionId9;
-  ts: Ts8;
-  type: Type8;
+  run_id: RunId9;
+  seq: Seq9;
+  session_id: SessionId10;
+  ts: Ts9;
+  type: Type9;
 }
 /**
  * Why a run stopped. No traceback.
@@ -311,11 +353,11 @@ export interface RunFailedData {
  */
 export interface RunCancelledEvent {
   data: RunCancelledData;
-  run_id: RunId9;
-  seq: Seq9;
-  session_id: SessionId10;
-  ts: Ts9;
-  type: Type9;
+  run_id: RunId10;
+  seq: Seq10;
+  session_id: SessionId11;
+  ts: Ts10;
+  type: Type10;
 }
 /**
  * Who stopped the run. ``user`` is ``run.cancel``, ``shutdown`` the daemon stopping.
@@ -324,5 +366,5 @@ export interface RunCancelledEvent {
  * via the `definition` "RunCancelledData".
  */
 export interface RunCancelledData {
-  reason: Reason;
+  reason: Reason1;
 }

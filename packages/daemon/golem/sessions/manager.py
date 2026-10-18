@@ -29,6 +29,7 @@ from golem_protocol.events import (
     EmptyEventData,
     ForkedFrom,
     MessageCompletedEvent,
+    ModelSelectedData,
     SessionCreatedData,
     SessionUpdatedData,
 )
@@ -254,6 +255,37 @@ class SessionManager:
     @property
     def router(self) -> ModelRouter:
         return self._runtime.router
+
+    async def set_model(self, session_id: str, model: str) -> ModelIdentity:
+        """Use ``model`` from the session's next run, and store ``model.selected``.
+
+        A run in progress keeps the model it started with. Choosing the
+        model the session already uses stores nothing.
+
+        Raises :class:`SessionNotFoundError`, :class:`SchemaMismatchError`, or
+        :class:`~golem.models.router.ModelConfigError` when ``model`` does not
+        resolve or its provider has no key.
+        """
+        async with self._lock:
+            session = await self._resolve(session_id)
+            router = self._runtime.router
+            router.chat_model(model)
+            identity = router.identity(model)
+            if session.model_profile == model:
+                return identity
+            await self._events.emit(
+                session_id,
+                None,
+                "model.selected",
+                ModelSelectedData(
+                    model_profile=model,
+                    model_provider=identity.provider,
+                    model_name=identity.name,
+                    reason="user",
+                ),
+            )
+            session.model_profile = model
+            return identity
 
     def configured_model(self) -> ModelIdentity:
         """The model ``daemon.status`` reports for this process."""
