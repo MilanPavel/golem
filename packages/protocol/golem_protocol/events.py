@@ -32,10 +32,10 @@ class ForkedFrom(BaseModel):
 class SessionCreatedData(BaseModel):
     """Profile stored for a new session.
 
-    ``model_provider`` and ``model_name`` are set when this profile is the
-    one the daemon is configured to run. They are null for any other profile,
-    and when the provider or name is not configured. ``forked_from`` is set
-    on a session made by ``session.fork``.
+    ``model_profile`` is a profile name or a ``provider/model`` ref.
+    ``model_provider`` and ``model_name`` are set when the daemon can resolve
+    it, and null otherwise. ``forked_from`` is set on a session made by
+    ``session.fork``.
     """
 
     model_config = _CONFIG

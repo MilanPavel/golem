@@ -33,7 +33,7 @@ Golem has two parts:
 
 ### What works today
 
-- Streaming chat with one model: Anthropic, OpenAI, or a local model through Ollama.
+- Streaming chat with named model profiles: a local model through Ollama, Anthropic, OpenAI, or hosted open models through OpenRouter, Groq, or Together.
 - Sessions that survive a daemon restart or a crash.
 - Closing the TUI and coming back, from any number of terminals at once.
 - Cancelling an answer with Ctrl-C, which keeps what it said so far.
@@ -67,30 +67,48 @@ just check                 # optional: lint, typecheck, and tests should pass
 
 ## Choose a model
 
-The daemon reads `~/.golem/config.toml`. Create it with one of the options below.
-
-**A local model through Ollama** needs no API key, so it is the easiest way to start:
+The daemon reads `~/.golem/config.toml`. A model is named `provider/model-id`, for example `ollama/qwen3:8b` or `anthropic/<model-id>`. A profile gives one a short name:
 
 ```bash
-ollama pull qwen3:8b       # or any model you like
+ollama pull qwen3:8b       # a local model needs no API key
 ```
 
 ```toml
 # ~/.golem/config.toml
-model_provider = "openai_compat"
-model_name = "qwen3:8b"
-# model_base_url = "http://127.0.0.1:11434/v1"   # the default, for Ollama
+default_model = "qwen"             # the model a new session starts on
+
+[models.qwen]
+model = "ollama/qwen3:8b"
+ctx = 32768                        # optional, sent to Ollama as its context size
+
+[models.sonnet]
+model = "anthropic/<model-id>"
 ```
 
-**Anthropic or OpenAI:**
+`default_model` can also be a `provider/model-id` directly, with no profile. The daemon picks up changes to `[models]`, `[providers]`, and `default_model` without a restart. Switching a running session with `/model` is planned.
+
+| Provider | Talks to | API key from |
+|---|---|---|
+| `ollama` | Ollama at `http://127.0.0.1:11434`, through its native API | none |
+| `anthropic` | Anthropic | `ANTHROPIC_API_KEY` |
+| `openai` | OpenAI | `OPENAI_API_KEY` |
+| `openrouter`, `groq`, `together` | Their OpenAI-compatible APIs, for hosted open models | `OPENROUTER_API_KEY`, `GROQ_API_KEY`, `TOGETHER_API_KEY` |
+| `lmstudio` | LM Studio at `http://127.0.0.1:1234/v1` | none |
+
+Override a provider's address or key variable, or add any OpenAI-compatible server, under `[providers.<name>]`:
 
 ```toml
-# ~/.golem/config.toml
-model_provider = "anthropic"   # or "openai"
-model_name = "<model-id>"
+[providers.ollama]
+base_url = "http://10.0.0.2:11434"
+
+[providers.vllm]                   # a new name is OpenAI-compatible
+base_url = "http://127.0.0.1:8000/v1"
+api_key_env = "VLLM_API_KEY"       # optional
 ```
 
-The API key is read from `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`, never from the config file. When you [run the daemon from the command line](#from-the-command-line), export the key in that shell and you are done.
+The older flat settings (`model_provider`, `model_name`, `model_base_url`) still work. They load as one profile named after `model_profile` (default `remote`), and an Ollama address there uses the native `ollama` provider.
+
+API keys are read from the environment, never from the config file. When you [run the daemon from the command line](#from-the-command-line), export the key in that shell and you are done.
 
 The launchd job does not see your shell's environment, so for the background service give the key to launchd:
 
@@ -104,14 +122,15 @@ Run this again after each reboot, then run `just golem daemon start`. Storing ke
 
 | Setting | Default | Meaning |
 |---|---|---|
-| `model_provider` | none | `anthropic`, `openai`, or `openai_compat` (Ollama, LM Studio, or any OpenAI-compatible server) |
-| `model_name` | none | The provider's model id |
-| `model_base_url` | Ollama's address | The server address for `openai_compat` |
-| `model_profile` | `remote` | The name shown in the TUI next to the model |
+| `default_model` | `model_profile` | A profile name or a `provider/model-id`. New sessions start on it |
+| `[models.<name>]` | none | A profile: `model` (a `provider/model-id`) and an optional `ctx` |
+| `[providers.<name>]` | built-in presets | `kind` (`anthropic`, `openai`, `ollama`, or `openai_compat`), `base_url`, `api_key_env` |
+| `model_provider`, `model_name`, `model_base_url` | none | Older flat settings for one model, kept working |
+| `model_profile` | `remote` | The profile name the flat settings load as |
 | `session_titles` | `true` | Name each session after its first answer. This costs one extra model call |
 | `log_level` | `INFO` | `DEBUG`, `INFO`, `WARNING`, or `ERROR` |
 
-Each setting can also be set with an environment variable named `GOLEM_` plus the setting in capitals, for example `GOLEM_MODEL_NAME`. The environment wins over the file. The daemon reads its settings only when it starts, so restart it after a change: Ctrl-C and run it again from the command line, or `just golem daemon start` under launchd.
+Each setting can also be set with an environment variable named `GOLEM_` plus the setting in capitals, for example `GOLEM_MODEL_NAME`. The environment wins over the file. Apart from the model settings, the daemon reads its settings only when it starts, so restart it after a change: Ctrl-C and run it again from the command line, or `just golem daemon start` under launchd.
 
 ## Run the daemon
 

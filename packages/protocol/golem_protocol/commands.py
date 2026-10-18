@@ -32,8 +32,8 @@ class DaemonStatus(BaseModel):
     """Result of ``daemon.status``.
 
     ``model_profile``, ``model_provider``, and ``model_name`` describe the
-    model the daemon is configured to use. Provider and name are null when
-    they are not set.
+    model a new session gets. Provider and name are null when that model does
+    not resolve.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -273,7 +273,7 @@ class SessionInspectResult(BaseModel):
     """The conversation stored for this session.
 
     ``message_count`` is the length of ``messages``. Provider and name are
-    null when this profile is not the one the daemon is configured to run.
+    null when the daemon cannot resolve ``model_profile``.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)

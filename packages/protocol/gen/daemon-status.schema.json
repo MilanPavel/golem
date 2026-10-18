@@ -1,6 +1,6 @@
 {
   "additionalProperties": false,
-  "description": "Result of ``daemon.status``.\n\n``model_profile``, ``model_provider``, and ``model_name`` describe the\nmodel the daemon is configured to use. Provider and name are null when\nthey are not set.",
+  "description": "Result of ``daemon.status``.\n\n``model_profile``, ``model_provider``, and ``model_name`` describe the\nmodel a new session gets. Provider and name are null when that model does\nnot resolve.",
   "properties": {
     "model_name": {
       "anyOf": [

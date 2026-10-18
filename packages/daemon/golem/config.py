@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, Literal
 
-from pydantic import BeforeValidator, Field
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
@@ -28,6 +28,7 @@ from golem.paths import resolve_paths
 
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
 ModelProvider = Literal["anthropic", "openai", "openai_compat"]
+ProviderKind = Literal["anthropic", "openai", "ollama", "openai_compat"]
 
 
 def _normalize_log_level(value: object) -> object:
@@ -51,6 +52,29 @@ class _ConfigFiles:
 _config_files: ContextVar[_ConfigFiles | None] = ContextVar("golem_config_files", default=None)
 
 
+class ProviderSettings(BaseModel):
+    """``[providers.<name>]``. For a built-in provider, each set field overrides its preset.
+
+    A new name needs ``base_url``, and ``kind`` defaults to ``openai_compat``.
+    ``api_key_env`` names the environment variable that holds the key.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    kind: ProviderKind | None = None
+    base_url: Annotated[str | None, BeforeValidator(_blank_to_none)] = None
+    api_key_env: str | None = Field(default=None, min_length=1)
+
+
+class ModelSettings(BaseModel):
+    """``[models.<name>]``, a named alias for a ``provider/model`` ref."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    model: str = Field(min_length=3, pattern=r"^[^/\s]+/\S+$")
+    ctx: int | None = Field(default=None, gt=0)
+
+
 class GolemSettings(BaseSettings):
     """Runtime settings for the daemon.
 
@@ -65,6 +89,10 @@ class GolemSettings(BaseSettings):
     )
 
     log_level: Annotated[LogLevel, BeforeValidator(_normalize_log_level)] = "INFO"
+    default_model: str | None = Field(default=None, min_length=1)
+    providers: dict[str, ProviderSettings] = Field(default_factory=dict)
+    models: dict[str, ModelSettings] = Field(default_factory=dict)
+    # The flat settings from before named profiles. They load as one profile named model_profile.
     model_profile: str = Field(default="remote", min_length=1)
     model_provider: ModelProvider | None = None
     model_name: str | None = Field(default=None, min_length=1)

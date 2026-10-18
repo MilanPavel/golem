@@ -28,7 +28,7 @@
     }
   },
   "additionalProperties": false,
-  "description": "The conversation stored for this session.\n\n``message_count`` is the length of ``messages``. Provider and name are\nnull when this profile is not the one the daemon is configured to run.",
+  "description": "The conversation stored for this session.\n\n``message_count`` is the length of ``messages``. Provider and name are\nnull when the daemon cannot resolve ``model_profile``.",
   "properties": {
     "message_count": {
       "minimum": 0,

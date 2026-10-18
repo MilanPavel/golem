@@ -160,7 +160,7 @@ async def test_status_and_session_name_the_configured_model(short_home: Path) ->
         assert "result" in await client.call("hello", HELLO)
         status = rpc_result(await client.call("daemon.status"))
         assert status["model_profile"] == "remote"
-        assert status["model_provider"] == "openai_compat"
+        assert status["model_provider"] == "ollama"
         assert status["model_name"] == "qwen3.5:4b"
         await _open(client)
         await client.wait_for_event("session.created")
@@ -168,8 +168,32 @@ async def test_status_and_session_name_the_configured_model(short_home: Path) ->
         data = _record(params.get("data")) if params else None
         assert data is not None
         assert data["model_profile"] == "remote"
-        assert data["model_provider"] == "openai_compat"
+        assert data["model_provider"] == "ollama"
         assert data["model_name"] == "qwen3.5:4b"
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+
+
+async def test_a_session_pinned_to_another_model_names_it(short_home: Path) -> None:
+    settings = GolemSettings(model_provider="openai_compat", model_name="qwen3.5:4b")
+    app, task = await start_daemon(short_home, router=ModelRouter(settings))
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        created = rpc_result(
+            await client.call("session.create", {"model_profile": "anthropic/claude-test"})
+        )
+        session_id = created["session_id"]
+        assert isinstance(session_id, str)
+        await _attach(client, session_id)
+        await client.wait_for_event("session.created")
+        params = _record(client.events[0].get("params"))
+        data = _record(params.get("data")) if params else None
+        assert data is not None
+        assert data["model_profile"] == "anthropic/claude-test"
+        assert data["model_provider"] == "anthropic"
+        assert data["model_name"] == "claude-test"
     finally:
         await client.close()
         await stop_daemon(app, task)
@@ -469,7 +493,7 @@ def _session_ids(listed: dict[str, object]) -> list[str]:
     sessions = listed.get("sessions")
     if not isinstance(sessions, list):
         return found
-    for item in sessions:
+    for item in cast(list[object], sessions):
         record = _record(item)
         if record is None:
             continue

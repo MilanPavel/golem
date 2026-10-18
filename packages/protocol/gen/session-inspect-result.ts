@@ -13,7 +13,7 @@ export type SessionId = string;
  * The conversation stored for this session.
  *
  * ``message_count`` is the length of ``messages``. Provider and name are
- * null when this profile is not the one the daemon is configured to run.
+ * null when the daemon cannot resolve ``model_profile``.
  */
 export interface SessionInspectResult {
   message_count: MessageCount;

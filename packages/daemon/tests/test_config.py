@@ -116,6 +116,42 @@ def test_unknown_model_provider_is_rejected(tmp_path: Path) -> None:
         load_settings(home=home, project_dir=tmp_path / "project")
 
 
+def test_profiles_and_providers_load_from_toml(tmp_path: Path) -> None:
+    home = tmp_path / "home"
+    _write(
+        home / "config.toml",
+        'default_model = "qwen"\n'
+        "[providers.openrouter]\n"
+        'api_key_env = "MY_OPENROUTER_KEY"\n'
+        "[models.qwen]\n"
+        'model = "ollama/qwen3:8b"\n'
+        "ctx = 32768\n"
+        "[models.sonnet]\n"
+        'model = "anthropic/claude-test"\n',
+    )
+    settings = load_settings(home=home, project_dir=tmp_path / "project")
+    assert settings.default_model == "qwen"
+    assert settings.providers["openrouter"].api_key_env == "MY_OPENROUTER_KEY"
+    assert settings.models["qwen"].model == "ollama/qwen3:8b"
+    assert settings.models["qwen"].ctx == 32768
+    assert settings.models["sonnet"].ctx is None
+
+
+@pytest.mark.parametrize("ref", ["qwen3:8b", "ollama/", "/qwen3:8b", "ollama/qwen 3"])
+def test_a_model_without_a_provider_ref_is_rejected(tmp_path: Path, ref: str) -> None:
+    home = tmp_path / "home"
+    _write(home / "config.toml", f'[models.qwen]\nmodel = "{ref}"\n')
+    with pytest.raises(ValidationError):
+        load_settings(home=home, project_dir=tmp_path / "project")
+
+
+def test_unknown_profile_key_is_rejected(tmp_path: Path) -> None:
+    home = tmp_path / "home"
+    _write(home / "config.toml", '[models.qwen]\nmodel = "ollama/qwen3:8b"\nflavor = "x"\n')
+    with pytest.raises(ValidationError):
+        load_settings(home=home, project_dir=tmp_path / "project")
+
+
 def test_unknown_key_is_rejected(tmp_path: Path) -> None:
     home = tmp_path / "home"
     _write(home / "config.toml", 'nickname = "clay"\n')

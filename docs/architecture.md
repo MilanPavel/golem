@@ -73,7 +73,7 @@ What talks to what, and how:
 
 - **Client to daemon.** A Unix socket file. Each line is one JSON-RPC 2.0 object. No network port is opened.
 - **Inside the daemon.** Ordinary Python calls in one asyncio process. A run is an asyncio task. The graph is a library the session manager calls. It is not a second process.
-- **Daemon to model.** HTTPS to Anthropic or OpenAI, or plain HTTP to an OpenAI-compatible server on this machine, such as Ollama. The model router picks one from the settings.
+- **Daemon to model.** HTTPS to Anthropic, OpenAI, or a hosted OpenAI-compatible API such as OpenRouter, or plain HTTP to Ollama's native API or a local OpenAI-compatible server. The model router resolves each session's model name to one of them.
 - **Daemon to disk.** SQLite files under `~/.golem`. `checkpoints.db` is written by LangGraph's SQLite checkpointer. `golem.db` is ours: the event log and the session and run tables, through one `aiosqlite` connection.
 - **Who starts what.** launchd starts the daemon at login and again after a crash. You start the clients.
 
@@ -83,7 +83,7 @@ Built today:
 
 - The daemon, its socket, the pid lock, and the launchd job.
 - `@golem/client`, the TUI, and `golem status`.
-- Chat sessions. Each one runs a single agent graph against one configured model.
+- Chat sessions. Each one runs a single agent graph against the model it stored when it was created.
 - Checkpoints in `checkpoints.db`. They survive a daemon restart. [ADR-006](adr/006-checkpoint-continuity.md) is that choice.
 - The event log in `golem.db`. Every event is written there before it goes to the socket, so sessions, runs, and `seq` survive a restart. A run left open by a stopped daemon is closed at the next start.
 - `session.attach`. A client gets the stored events after the last `seq` it saw, then the live ones. Any number of clients can follow one session. The TUI opens the newest session at startup. [ADR-007](adr/007-attach-and-fan-out.md) is that choice.
@@ -116,7 +116,7 @@ The socket is only the door. Behind it, these jobs sit in one process:
 | Protocol server | Reads one JSON line at a time. Runs the command. Queues the reply, and the events of attached sessions, for that connection. | Built |
 | Sessions | One chat or one flow run. Each has an id and a row in `golem.db`. | Built |
 | Graph runtime | The agent loop. Its memory is the checkpoint. | Built |
-| Model router | Turns the configured profile into a chat model. | Built |
+| Model router | Resolves a profile name or `provider/model` ref to a chat model. | Built |
 | Event log | The history. Every event, numbered by `seq`, written before it is sent. A client that reconnects will read it and rebuild the screen. | Written. Replay to clients planned |
 
 The graph does not own the rest of the product. It calls ordinary Python for three things that have to stay ours:
@@ -183,13 +183,13 @@ In `golem.db`, `events` is the source. `sessions` and `runs` are written in the 
 Settings come from three places. Each one overrides the one before it: `~/.golem/config.toml`, then `<project>/.golem/config.toml`, then `GOLEM_…` environment variables. An explicit `log_level` passed to `load_settings` wins over all three. The keys read today:
 
 - `log_level`: `DEBUG`, `INFO`, `WARNING`, or `ERROR`. Environment: `GOLEM_LOG_LEVEL`.
-- `model_profile`: default `remote`.
-- `model_provider`: `anthropic`, `openai`, or `openai_compat`. Environment: `GOLEM_MODEL_PROVIDER`.
-- `model_name`. Environment: `GOLEM_MODEL_NAME`.
-- `model_base_url`: only for `openai_compat`. Empty means `http://127.0.0.1:11434/v1`. Environment: `GOLEM_MODEL_BASE_URL`.
+- `default_model`: a profile name or a `provider/model` ref. New sessions store it as their `model_profile`. Defaults to `model_profile`.
+- `[models.<name>]`: a profile with `model` (a ref) and optional `ctx`, which the `ollama` provider sends as `num_ctx`.
+- `[providers.<name>]`: `kind`, `base_url`, and `api_key_env`. Built-in presets are `anthropic`, `openai`, `ollama` (native API), `openrouter`, `groq`, `together`, and `lmstudio`. A new name is `openai_compat` and needs `base_url`.
+- `model_profile`, `model_provider`, `model_name`, `model_base_url`: the flat settings from before profiles. They load as one profile named `model_profile` (default `remote`), so stored sessions keep resolving. An empty or Ollama `model_base_url` maps to the `ollama` provider.
 - `session_titles`: default `true`. Name each session after its first completed run with one model call. Environment: `GOLEM_SESSION_TITLES`.
 
-API keys are never in the file. `anthropic` reads `ANTHROPIC_API_KEY`, and `openai` reads `OPENAI_API_KEY`. `openai_compat` needs no key.
+API keys are never in the file. Each provider reads the environment variable named by `api_key_env` at call time, and a provider without one needs no key. The model router re-reads `config.toml` when its modification time changes, so model edits need no restart. A file that no longer validates keeps the last good models and logs a warning.
 
 Each log record is written twice: a short line on stderr, and a JSON line in `logs/golem.jsonl`.
 

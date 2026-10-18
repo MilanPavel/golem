@@ -110,6 +110,7 @@ class DaemonApp:
         try:
             router = self._router or ModelRouter(
                 load_settings(home=self.paths.home, project_dir=self.paths.home),
+                home=self.paths.home,
             )
             async with (
                 Database.open(self.paths.database_file) as database,
@@ -277,7 +278,7 @@ async def serve_forever() -> int:
     settings = load_settings(home=paths.home, project_dir=paths.home)
     configure_logging(settings, paths)
     paths.ensure_layout()
-    router = ModelRouter(settings)
+    router = ModelRouter(settings, home=paths.home)
     titles = ModelTitles(router) if settings.session_titles else None
     app = DaemonApp(paths, router=router, titles=titles)
     try:

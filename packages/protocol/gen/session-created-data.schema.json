@@ -24,7 +24,7 @@
     }
   },
   "additionalProperties": false,
-  "description": "Profile stored for a new session.\n\n``model_provider`` and ``model_name`` are set when this profile is the\none the daemon is configured to run. They are null for any other profile,\nand when the provider or name is not configured. ``forked_from`` is set\non a session made by ``session.fork``.",
+  "description": "Profile stored for a new session.\n\n``model_profile`` is a profile name or a ``provider/model`` ref.\n``model_provider`` and ``model_name`` are set when the daemon can resolve\nit, and null otherwise. ``forked_from`` is set on a session made by\n``session.fork``.",
   "properties": {
     "forked_from": {
       "anyOf": [

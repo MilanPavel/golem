@@ -14,8 +14,8 @@ export type Version = string;
  * Result of ``daemon.status``.
  *
  * ``model_profile``, ``model_provider``, and ``model_name`` describe the
- * model the daemon is configured to use. Provider and name are null when
- * they are not set.
+ * model a new session gets. Provider and name are null when that model does
+ * not resolve.
  */
 export interface DaemonStatus {
   model_name?: ModelName;
