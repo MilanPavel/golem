@@ -29,6 +29,7 @@ from golem.paths import resolve_paths
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
 ModelProvider = Literal["anthropic", "openai", "openai_compat"]
 ProviderKind = Literal["anthropic", "openai", "ollama", "openai_compat"]
+RuleAction = Literal["allow", "ask", "deny"]
 
 
 def _normalize_log_level(value: object) -> object:
@@ -89,6 +90,25 @@ class ModelSettings(BaseModel):
     price: ModelPrice | None = None
 
 
+class PolicyRule(BaseModel):
+    """One ``[[rule]]``: which tool calls it covers, and what happens to them.
+
+    ``tool`` is a glob on the tool name. ``match`` is a glob on the tool's
+    subject, such as a search pattern or later a shell command, with ``|``
+    between alternatives. ``path`` is a glob on the resolved path the call
+    touches: ``*`` stays inside one folder, ``**`` crosses folders, ``~`` is
+    the home folder, and a relative glob is relative to the session folder.
+    A rule matches when every field it sets matches.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    tool: str = Field(default="*", min_length=1)
+    match: str | None = Field(default=None, min_length=1)
+    path: str | None = Field(default=None, min_length=1)
+    action: RuleAction
+
+
 class GolemSettings(BaseSettings):
     """Runtime settings for the daemon.
 
@@ -112,6 +132,9 @@ class GolemSettings(BaseSettings):
     model_name: str | None = Field(default=None, min_length=1)
     model_base_url: Annotated[str | None, BeforeValidator(_blank_to_none)] = None
     session_titles: bool = True
+    rule: list[PolicyRule] = Field(default_factory=list[PolicyRule])
+    # Project folders whose .golem/policy.toml may allow tools. Ask and deny rules apply anywhere.
+    trusted_projects: list[str] = Field(default_factory=list[str])
 
     @classmethod
     def settings_customise_sources(

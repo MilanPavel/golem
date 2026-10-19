@@ -15,6 +15,9 @@ from golem_protocol.commands import (
     AuthRemoveResult,
     AuthSetParams,
     AuthSetResult,
+    ConfigGetParams,
+    ConfigGetResult,
+    ConfigRule,
     DaemonStatus,
     HelloParams,
     HelloResult,
@@ -196,6 +199,9 @@ MODELS: tuple[type[BaseModel], ...] = (
     ModelPullDone,
     ModelPullProgressNotification,
     ModelPullDoneNotification,
+    ConfigGetParams,
+    ConfigRule,
+    ConfigGetResult,
 )
 
 

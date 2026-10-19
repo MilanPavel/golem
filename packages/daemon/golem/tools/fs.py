@@ -253,24 +253,34 @@ READ_FILE = Tool(
     ),
     args=ReadFileArgs,
     run=_read_file,
+    read_only=True,
+    path_arg="path",
 )
 LIST_DIR = Tool(
     name="list_dir",
     description="List a folder in the project. Folders end with /.",
     args=ListDirArgs,
     run=_list_dir,
+    read_only=True,
+    path_arg="path",
 )
 GLOB = Tool(
     name="glob",
     description="Find files in the project by glob pattern, such as **/*.py.",
     args=GlobArgs,
     run=_glob,
+    read_only=True,
+    path_arg="path",
+    match_arg="pattern",
 )
 GREP = Tool(
     name="grep",
     description="Search file contents in the project with a regular expression.",
     args=GrepArgs,
     run=_grep,
+    read_only=True,
+    path_arg="path",
+    match_arg="pattern",
 )
 
 READ_ONLY_TOOLS = (READ_FILE, LIST_DIR, GLOB, GREP)

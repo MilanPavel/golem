@@ -24,6 +24,7 @@ from golem.models.keys import KeychainStore
 from golem.models.pulls import PullManager
 from golem.models.router import ModelRouter
 from golem.paths import GolemPaths, resolve_paths
+from golem.permissions.policy import Policy
 from golem.server.connection import ClientConnection
 from golem.server.dispatcher import (
     PARSE_ERROR,
@@ -42,6 +43,7 @@ from golem.sessions.titles import ModelTitles, TitleGenerator
 from golem.store.database import Database, DatabaseTooNewError
 from golem.store.events import EventLog
 from golem.store.records import RunRecords, SessionRecords
+from golem.tools import default_registry
 
 log = logging.getLogger("golem.server")
 
@@ -125,8 +127,12 @@ class DaemonApp:
                 AsyncSqliteSaver.from_conn_string(str(self.paths.checkpoints_file)) as saver,
             ):
                 await saver.setup()
+                self.state.policy = Policy(self.paths.config_file)
+                self.state.tools = default_registry()
                 self.state.sessions = await _open_sessions(
-                    database, open_chat(router, saver), self._titles
+                    database,
+                    open_chat(router, saver, self.state.tools, self.state.policy),
+                    self._titles,
                 )
                 if self._discovery is None:
                     models = ModelDiscovery(router, self.paths.cache_dir)

@@ -11,10 +11,12 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict
 
 from golem import __version__
+from golem.config import load_settings
 from golem.config_edit import set_default_model
 from golem.models.keys import KeyStore, KeyStoreError
 from golem.models.pulls import PullError, PullManager
 from golem.models.router import ModelConfigError, ModelRouter
+from golem.permissions.policy import PROJECT_POLICY
 from golem.server.dispatcher import (
     INTERNAL_ERROR,
     INVALID_PARAMS,
@@ -48,6 +50,9 @@ from golem_protocol.commands import (
     AuthRemoveResult,
     AuthSetParams,
     AuthSetResult,
+    ConfigGetParams,
+    ConfigGetResult,
+    ConfigRule,
     DaemonStatus,
     HelloParams,
     HelloResult,
@@ -374,6 +379,42 @@ async def _model_set_default(
     return ModelSetDefaultResult(default=params.model)
 
 
+async def _config_get(ctx: RequestContext, params: ConfigGetParams) -> ConfigGetResult:
+    policy, tools = ctx.state.policy, ctx.state.tools
+    if policy is None or tools is None:
+        raise RpcCallError(INTERNAL_ERROR, "tools are not ready")
+    if params.cwd is not None and not Path(params.cwd).is_absolute():
+        raise RpcCallError(INVALID_PARAMS, "cwd must be an absolute path")
+    paths = ctx.state.paths
+    try:
+        settings = await asyncio.to_thread(load_settings, home=paths.home, project_dir=paths.home)
+    except ValueError as exc:
+        raise RpcCallError(INTERNAL_ERROR, f"{paths.config_file} does not validate: {exc}") from exc
+    root = None if params.cwd is None else Path(params.cwd)
+    rules = await asyncio.to_thread(policy.rules, root, tools)
+    project = None if root is None else root / PROJECT_POLICY
+    return ConfigGetResult(
+        config_file=str(paths.config_file),
+        default_model=_sessions(ctx).router.profile_name,
+        log_level=settings.log_level,
+        session_titles=settings.session_titles,
+        trusted_projects=settings.trusted_projects,
+        project_policy=str(project) if project is not None and project.is_file() else None,
+        project_trusted=None if root is None else policy.trusted(root),
+        rules=[
+            ConfigRule(
+                tool=rule.rule.tool,
+                match=rule.rule.match,
+                path=rule.rule.path,
+                action=rule.rule.action,
+                source=rule.source,
+                ignored=rule.ignored,
+            )
+            for rule in rules
+        ],
+    )
+
+
 def _pulls(ctx: RequestContext) -> PullManager:
     pulls = ctx.state.pulls
     if pulls is None:
@@ -447,6 +488,7 @@ def standard_methods() -> dict[str, Method]:
         "daemon.status": Method("daemon.status", _EmptyParams, True, _status),
         "ping": Method("ping", PingParams, True, _ping),
         "session.create": Method("session.create", SessionCreateParams, True, _session_create),
+        "config.get": Method("config.get", ConfigGetParams, True, _config_get),
         "session.attach": Method("session.attach", SessionAttachParams, True, _session_attach),
         "session.detach": Method("session.detach", SessionDetachParams, True, _session_detach),
         "session.list": Method("session.list", SessionListParams, True, _session_list),

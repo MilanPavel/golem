@@ -19,6 +19,7 @@ from pydantic import BaseModel
 from golem.graphs.chat import MAX_MODEL_CALLS, ChatRuntime, open_chat
 from golem.graphs.tools_node import CANCELLED_RESULT
 from golem.models.router import ModelRouter
+from golem.permissions.policy import Policy
 from golem.sessions.bus import EventBus
 from golem.sessions.log import SessionLog
 from golem.sessions.manager import SessionManager
@@ -188,7 +189,7 @@ def _gated_registry() -> tuple[ToolRegistry, asyncio.Event, asyncio.Event]:
         await release.wait()
         return ToolResult(output="slow done", summary="done")
 
-    slow = Tool(name="slow", description="waits", args=_SlowArgs, run=run)
+    slow = Tool(name="slow", description="waits", args=_SlowArgs, run=run, read_only=True)
     return ToolRegistry([*READ_ONLY_TOOLS, slow]), started, release
 
 
@@ -348,3 +349,27 @@ async def test_a_session_without_a_folder_takes_the_senders(
     await chat.finished(await chat.manager.send(session_id, "again", cwd=str(tmp_path)))
     record = await chat.records.get(session_id)
     assert record is not None and record.cwd == str(project)
+
+
+async def test_a_denied_call_never_runs_and_the_model_hears_why(
+    database: Database, project: Path, tmp_path: Path
+) -> None:
+    (project / ".golem").mkdir()
+    (project / ".golem" / "policy.toml").write_text(
+        '[[rule]]\ntool = "read_file"\npath = "notes.txt"\naction = "deny"\n', encoding="utf-8"
+    )
+    model = ToolCallingChatModel(replies=[[("read_file", {"path": "notes.txt"})], "Denied."])
+    runtime = open_chat(
+        ModelRouter(model=model), InMemorySaver(), policy=Policy(None, home=tmp_path)
+    )
+    chat = _Chat(database, runtime)
+    session_id = await chat.manager.create(None, cwd=str(project))
+    events = await chat.finished(await chat.manager.send(session_id, "read notes"))
+    tool_events = [event for event in events if event.type.startswith("tool.")]
+    assert [event.type for event in tool_events] == ["tool.requested", "tool.failed"]
+    failed = tool_events[1]
+    assert isinstance(failed, ToolFailedEvent)
+    assert failed.data.message == "read_file is denied by ~/project/.golem/policy.toml rule 1"
+    result = model.seen[1][-1]
+    assert isinstance(result, ToolMessage)
+    assert result.text == f"error: {failed.data.message}"

@@ -696,3 +696,44 @@ async def test_fork_returns_a_session_whose_replay_is_the_copied_history(short_h
     finally:
         await client.close()
         await stop_daemon(app, task)
+
+
+async def test_config_get_lists_the_rules_for_a_folder(short_home: Path) -> None:
+    (short_home / "config.toml").write_text(
+        '[[rule]]\ntool = "grep"\nmatch = "*secret*"\naction = "deny"\n', encoding="utf-8"
+    )
+    project = short_home / "project"
+    (project / ".golem").mkdir(parents=True)
+    (project / ".golem" / "policy.toml").write_text(
+        '[[rule]]\ntool = "*"\naction = "allow"\n', encoding="utf-8"
+    )
+    app, task = await start_daemon(
+        short_home, router=ModelRouter(model=ScriptedChatModel(replies=[]))
+    )
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        result = rpc_result(await client.call("config.get", {"cwd": str(project)}))
+        assert isinstance(result, dict)
+        assert result["project_trusted"] is False
+        assert result["project_policy"] == str(project / ".golem" / "policy.toml")
+        rules = cast(list[dict[str, object]], result["rules"])
+        first, second = rules[0], rules[1]
+        assert (first["action"], first["ignored"]) == (
+            "allow",
+            "the project is not in trusted_projects",
+        )
+        assert (second["tool"], second["match"], second["action"]) == ("grep", "*secret*", "deny")
+        assert rules[-1] == {
+            "tool": "*",
+            "match": None,
+            "path": None,
+            "action": "ask",
+            "source": "built-in default",
+            "ignored": None,
+        }
+        relative = await client.call("config.get", {"cwd": "project"})
+        assert error_code(relative) == INVALID_PARAMS
+    finally:
+        await client.close()
+        await stop_daemon(app, task)

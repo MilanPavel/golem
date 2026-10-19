@@ -20,6 +20,7 @@ This file is about what comes next. How the existing pieces are built is in [arc
 - Automatic titles, a live switcher (`/sessions`), `/new`, `/title <name>`, and `/fork`.
 - A debug panel (`/debug`) that shows the wire and the conversation the model sees.
 - Read-only tools: the model reads files, lists folders, and searches with `glob` and `grep`, only inside the folder the session was started in. Each call is one line in the transcript, and Ctrl-O shows its output.
+- Tool rules in `~/.golem/config.toml` and a project's `.golem/policy.toml` allow, ask, or deny a call by tool, subject, and path. `golem config show` lists them in the order they are checked.
 - Slash commands with suggestions, a line editor, recalling a sent message with Up, copy and export, and closing a session from the switcher.
 - It runs from a checkout of this repository (`just golem daemon install`, then `just tui`). Phase 3 makes it installable.
 
@@ -94,7 +95,7 @@ Agents use the Graph API, where the model decides control flow. Flows use the Fu
 
 ### Protocol, what is left to add
 
-JSON-RPC 2.0, one JSON object per line, over `~/.golem/run/golem.sock`. Protocol 2.10 is on the wire today (see [architecture.md](architecture.md#what-is-on-the-wire-today)). The phases below add the rest.
+JSON-RPC 2.0, one JSON object per line, over `~/.golem/run/golem.sock`. Protocol 2.11 is on the wire today (see [architecture.md](architecture.md#what-is-on-the-wire-today)). The phases below add the rest.
 
 | Group | New events | Phase |
 |---|---|---|
@@ -134,7 +135,7 @@ The agent can act, and nothing happens without passing policy. How the tool loop
 - **Done when:** a question about a file in the project folder is answered from its contents, and reading `/etc/hosts` is refused.
 - **Watch out:** `/model` can switch providers mid-session. A history with tool calls from Ollama must still work on Anthropic and the other way round, so write that test with the tools node.
 
-### 1.2 Permission engine
+### 1.2 Permission engine (built)
 
 - **Goal:** one place decides whether a tool call may run.
 - **You can:** write rules in `~/.golem/config.toml` and `<project>/.golem/policy.toml`.
@@ -156,6 +157,9 @@ The agent can act, and nothing happens without passing policy. How the tool loop
     action = "ask"   # default
     ```
   - `permissions.check(call, session_ctx)` is a pure function that returns a decision with a reason.
+  - Built-in defaults come last: read-only tools are allowed, everything else asks.
+  - A project's `allow` rules count only when its folder is in `trusted_projects` in the user's config ([ADR-012](adr/012-permission-rules.md)).
+  - `golem config show` prints the settings and the rules for the current folder, in check order.
   - Until 1.3 lands, `ask` behaves as deny with a clear message to the model.
 - **Done when:** table-driven tests cover the policy matrix, and the read-only tools from 1.1 go through the engine.
 
@@ -796,7 +800,7 @@ These steps were the second half of the model work, after `/model`. They wait un
 
 ### Configuration
 
-Built-in defaults, then `~/.golem/config.toml`, then `<project>/.golem/config.toml`, then session overrides. Everything is validated by Pydantic, and `golem config show --resolved` prints the result (added with the first step that needs project config, 1.2).
+Built-in defaults, then `~/.golem/config.toml`, then `<project>/.golem/config.toml`, then session overrides. Everything is validated by Pydantic, and `golem config show --resolved` prints the settings and the tool rules for the current folder (built in 1.2). The tool rules come from the session folder's `.golem/policy.toml`, not its `config.toml`.
 
 ### Concurrency
 

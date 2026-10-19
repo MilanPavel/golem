@@ -15,7 +15,7 @@ flowchart LR
   toolsNode --> callModel
 ```
 
-Every tool works inside one folder, the session's project folder. The client sends it with `session.create`, and the session keeps it for life. A path is resolved against that folder with symlinks followed, and anything that lands outside is refused. That is the only rule until the permission engine exists, and the engine will sit in the same node.
+Every tool works inside one folder, the session's project folder. The client sends it with `session.create`, and the session keeps it for life. A path is resolved against that folder with symlinks followed, and anything that lands outside is refused. The permission rules ([ADR-012](012-permission-rules.md)) are checked in the same node, before the folder check.
 
 A failed call never ends the run. The model reads why it failed as the tool's result, and the screen gets the same reason in `tool.failed`.
 

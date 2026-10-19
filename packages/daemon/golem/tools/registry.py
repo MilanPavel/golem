@@ -40,10 +40,19 @@ class ToolResult:
 
 @dataclass(frozen=True, slots=True)
 class Tool[A: BaseModel]:
+    """``read_only`` tools change nothing outside golem, so the default policy allows them.
+
+    ``path_arg`` names the argument a rule's ``path`` is matched against, and
+    ``match_arg`` the one its ``match`` is.
+    """
+
     name: str
     description: str
     args: type[A]
     run: Callable[[A, ToolContext], Awaitable[ToolResult]]
+    read_only: bool = False
+    path_arg: str | None = None
+    match_arg: str | None = None
 
     def schema(self) -> dict[str, object]:
         """The OpenAI function format, which every chat model's ``bind_tools`` accepts."""
@@ -73,6 +82,12 @@ class ToolRegistry:
     @property
     def names(self) -> list[str]:
         return list(self._tools)
+
+    def get(self, name: str) -> Tool[Any] | None:
+        return self._tools.get(name)
+
+    def read_only(self) -> list[str]:
+        return [tool.name for tool in self._tools.values() if tool.read_only]
 
     def schemas(self) -> list[dict[str, object]]:
         return [tool.schema() for tool in self._tools.values()]

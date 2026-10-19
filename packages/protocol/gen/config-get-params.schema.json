@@ -1,0 +1,21 @@
+{
+  "additionalProperties": false,
+  "description": "``config.get``. The settings the daemon uses, and the tool rules for ``cwd``.\n\n``cwd`` is an absolute folder. Without it, no project rules are listed.",
+  "properties": {
+    "cwd": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cwd"
+    }
+  },
+  "title": "ConfigGetParams",
+  "type": "object"
+}

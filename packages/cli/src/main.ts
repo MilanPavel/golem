@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 
 import { connectGolem, resolveSocketPath } from "@golem/client";
 
+import { formatConfig } from "./format-config.ts";
 import { formatKeys } from "./format-keys.ts";
 import { formatModels } from "./format-models.ts";
 import { formatStatus } from "./format-status.ts";
@@ -30,13 +31,30 @@ async function run(args: string[]): Promise<number> {
   if (command === "models" && (rest.length === 0 || (rest.length === 1 && rest[0] === "--refresh"))) {
     return runModels(rest[0] === "--refresh");
   }
+  if (command === "config" && rest[0] === "show" && (rest.length === 1 || (rest.length === 2 && rest[1] === "--resolved"))) {
+    return runConfigShow();
+  }
   process.stderr.write(`${USAGE}\n`);
   return 1;
 }
 
 const USAGE =
   "usage: golem --version | golem status | golem daemon install|start|stop|logs\n" +
-  "       golem auth set|remove <provider> | golem auth list | golem models [--refresh]";
+  "       golem auth set|remove <provider> | golem auth list | golem models [--refresh]\n" +
+  "       golem config show [--resolved]";
+
+async function runConfigShow(): Promise<number> {
+  const client = connectOnce();
+  try {
+    process.stdout.write(`${formatConfig(await client.getConfig(process.cwd()))}\n`);
+    return 0;
+  } catch (error) {
+    process.stderr.write(`${explain(error)}\n`);
+    return 1;
+  } finally {
+    client.close();
+  }
+}
 
 async function runModels(refresh: boolean): Promise<number> {
   const client = connectOnce();

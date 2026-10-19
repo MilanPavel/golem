@@ -574,6 +574,54 @@ class ModelPullDone(BaseModel):
     error: str | None = None
 
 
+class ConfigGetParams(BaseModel):
+    """``config.get``. The settings the daemon uses, and the tool rules for ``cwd``.
+
+    ``cwd`` is an absolute folder. Without it, no project rules are listed.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    cwd: str | None = Field(default=None, min_length=1)
+
+
+class ConfigRule(BaseModel):
+    """One tool rule, in the order rules are checked.
+
+    ``source`` names the file and the rule's number in it, or ``built-in
+    default``. ``ignored`` says why a listed rule never matches.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    tool: str = Field(min_length=1)
+    match: str | None = None
+    path: str | None = None
+    action: Literal["allow", "ask", "deny"]
+    source: str = Field(min_length=1)
+    ignored: str | None = None
+
+
+class ConfigGetResult(BaseModel):
+    """Resolved settings. Keys are never included.
+
+    ``project_policy`` is the project's ``.golem/policy.toml`` when it exists,
+    and ``project_trusted`` whether its allow rules count. Both are null
+    without a ``cwd``.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    config_file: str = Field(min_length=1)
+    default_model: str = Field(min_length=1)
+    log_level: str = Field(min_length=1)
+    session_titles: bool
+    trusted_projects: list[str]
+    project_policy: str | None = None
+    project_trusted: bool | None = None
+    rules: list[ConfigRule]
+
+
 __all__ = [
     "AuthKeyStatus",
     "AuthListParams",
@@ -582,6 +630,9 @@ __all__ = [
     "AuthRemoveResult",
     "AuthSetParams",
     "AuthSetResult",
+    "ConfigGetParams",
+    "ConfigGetResult",
+    "ConfigRule",
     "DaemonStatus",
     "HelloParams",
     "HelloResult",

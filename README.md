@@ -40,7 +40,9 @@ Golem has two parts:
 - Automatic titles, a session switcher, new sessions, renaming, and forking.
 - Reading files, listing folders, and searching with `glob` and `grep`, inside the folder you started the TUI in. Ctrl-O shows what each tool returned.
 
-Golem cannot run commands or change files yet, and it does not ask before a tool runs. Permissions and approvals come next. See [docs/plan.md](docs/plan.md).
+- Tool rules: allow, ask, or deny a tool by name, subject, or path, in `~/.golem/config.toml` or a project's `.golem/policy.toml`. `just golem config show` lists them.
+
+Golem cannot run commands or change files yet, and it cannot ask you before a tool runs: a call that needs approval is refused for now. Approvals come next. See [docs/plan.md](docs/plan.md).
 
 Golem runs on macOS only, from a checkout of this repository. There is no installer yet.
 
@@ -192,6 +194,7 @@ just golem status            # is it up? prints pid, version, protocol, uptime
 | `just golem auth remove <provider>` | Removes that key from the Keychain |
 | `just golem auth list` | Says where each provider's key is: the Keychain, an environment variable, or missing |
 | `just golem models` | Lists every model golem can use or download, with context size, price, size, and whether it fits in memory. `--refresh` skips the one-day cache |
+| `just golem config show` | Prints the settings the daemon uses and the tool rules for the current folder, in the order they are checked |
 
 ## Chat
 

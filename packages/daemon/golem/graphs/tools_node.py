@@ -1,9 +1,9 @@
-"""The ``tools`` node: run the last reply's tool calls through the registry.
+"""The ``tools`` node: check each of the last reply's tool calls, then run it.
 
 The prebuilt ``ToolNode`` would run LangChain tools directly. This node keeps
-the tools plain Python, reports each call on the custom stream, and turns
-every failure into a result the model can read, so a bad call never ends
-the run.
+the tools plain Python, asks the permission policy about every call before
+it runs, reports each call on the custom stream, and turns every failure or
+refusal into a result the model can read, so a bad call never ends the run.
 """
 
 from __future__ import annotations
@@ -20,6 +20,7 @@ from langgraph.config import get_stream_writer
 
 from golem.graphs.adapter import STREAM_KEY
 from golem.graphs.state import AgentState
+from golem.permissions.policy import Policy, explain
 from golem.tools.registry import ToolContext, ToolError, ToolRegistry
 
 log = logging.getLogger("golem.graphs")
@@ -34,6 +35,7 @@ CANCELLED_RESULT = "cancelled: the run stopped before this tool call finished"
 
 def tools_node(
     registry: ToolRegistry,
+    policy: Policy,
 ) -> Callable[[AgentState, RunnableConfig], Awaitable[dict[str, list[BaseMessage]]]]:
     async def tools(state: AgentState, config: RunnableConfig) -> dict[str, list[BaseMessage]]:
         last = state["messages"][-1]
@@ -44,6 +46,15 @@ def tools_node(
         results: list[BaseMessage] = []
         for call in last.tool_calls:
             call_id = call_id_of(call)
+            decision = policy.check(registry, call["name"], call["args"], ctx.root)
+            if not decision.allowed:
+                message = explain(decision, call["name"])
+                log.info(
+                    "tool %s refused: %s by %s", call["name"], decision.action, decision.source
+                )
+                write({STREAM_KEY: "tool.failed", "call_id": call_id, "message": message})
+                results.append(_result(call_id, call["name"], f"error: {message}", error=True))
+                continue
             write({STREAM_KEY: "tool.started", "call_id": call_id})
             try:
                 result = await registry.call(call["name"], call["args"], ctx)

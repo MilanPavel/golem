@@ -8,7 +8,9 @@ from typing import Literal
 from golem.models.discovery import ModelDiscovery
 from golem.models.pulls import PullManager
 from golem.paths import GolemPaths
+from golem.permissions.policy import Policy
 from golem.sessions.manager import SessionManager
+from golem.tools.registry import ToolRegistry
 
 
 @dataclass
@@ -21,3 +23,5 @@ class DaemonState:
     sessions: SessionManager | None = None
     models: ModelDiscovery | None = None
     pulls: PullManager | None = None
+    policy: Policy | None = None
+    tools: ToolRegistry | None = None

@@ -4,6 +4,7 @@ import net from "node:net";
 import type { AuthListResult } from "../../protocol/gen/auth-list-result.ts";
 import type { AuthRemoveResult } from "../../protocol/gen/auth-remove-result.ts";
 import type { AuthSetResult } from "../../protocol/gen/auth-set-result.ts";
+import type { ConfigGetResult } from "../../protocol/gen/config-get-result.ts";
 import type { DaemonStatus } from "../../protocol/gen/daemon-status.ts";
 import type { MessageSendResult } from "../../protocol/gen/message-send-result.ts";
 import type { ModelListResult } from "../../protocol/gen/model-list-result.ts";
@@ -53,6 +54,7 @@ import {
   isSessionListResult,
   isSessionRenameResult,
   isSessionSummary,
+  isConfigGetResult,
 } from "./guards.ts";
 import { pushWire, type WireFrame, type WireLine } from "./wire.ts";
 import { eventFrame, flat, outgoingDetail, resultDetail, shownParams, summaryFrame } from "./wire-detail.ts";
@@ -143,6 +145,8 @@ export interface GolemClient {
   setKey(provider: string, key: string): Promise<AuthSetResult>;
   removeKey(provider: string): Promise<AuthRemoveResult>;
   listKeys(): Promise<AuthListResult>;
+  /** Resolved settings, and the tool rules for `cwd` in the order they are checked. */
+  getConfig(cwd?: string): Promise<ConfigGetResult>;
   /** Every model golem knows of. `refresh` fetches hosted lists and prices again, past their cache. */
   listModels(refresh?: boolean): Promise<ModelListResult>;
   /** Use `model` (a profile or a ref) from the session's next run. The daemon emits `model.selected`. */
@@ -677,6 +681,14 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("auth.remove", { provider });
       if (!isAuthRemoveResult(result)) {
         throw new Error("invalid auth.remove result");
+      }
+      return result;
+    },
+    async getConfig(cwd?: string): Promise<ConfigGetResult> {
+      await ready;
+      const result = await call("config.get", cwd === undefined ? {} : { cwd });
+      if (!isConfigGetResult(result)) {
+        throw new Error("invalid config.get result");
       }
       return result;
     },

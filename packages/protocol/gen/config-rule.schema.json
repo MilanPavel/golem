@@ -1,0 +1,68 @@
+{
+  "additionalProperties": false,
+  "description": "One tool rule, in the order rules are checked.\n\n``source`` names the file and the rule's number in it, or ``built-in\ndefault``. ``ignored`` says why a listed rule never matches.",
+  "properties": {
+    "action": {
+      "enum": [
+        "allow",
+        "ask",
+        "deny"
+      ],
+      "title": "Action",
+      "type": "string"
+    },
+    "ignored": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Ignored"
+    },
+    "match": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Match"
+    },
+    "path": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Path"
+    },
+    "source": {
+      "minLength": 1,
+      "title": "Source",
+      "type": "string"
+    },
+    "tool": {
+      "minLength": 1,
+      "title": "Tool",
+      "type": "string"
+    }
+  },
+  "required": [
+    "tool",
+    "action",
+    "source"
+  ],
+  "title": "ConfigRule",
+  "type": "object"
+}

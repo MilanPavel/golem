@@ -28,6 +28,7 @@ from golem.graphs.adapter import STREAM_KEY, message_text
 from golem.graphs.state import AgentState
 from golem.graphs.tools_node import CWD_KEY, cancelled_results, tools_node, unanswered_calls
 from golem.models.router import ModelRouter
+from golem.permissions.policy import Policy
 from golem.sessions.ids import new_id
 from golem.tools import default_registry
 from golem.tools.registry import ToolRegistry
@@ -239,8 +240,13 @@ def open_chat(
     router: ModelRouter,
     checkpointer: BaseCheckpointSaver[str],
     tools: ToolRegistry | None = None,
+    policy: Policy | None = None,
 ) -> ChatRuntime:
-    """Compile the chat graph against ``checkpointer``, with ``tools`` or the default ones."""
+    """Compile the chat graph against ``checkpointer``.
+
+    ``tools`` defaults to the default registry. ``policy`` defaults to the
+    built-in rules only, with no user or project file.
+    """
     registry = default_registry() if tools is None else tools
     binder = _ToolBinder(registry)
 
@@ -263,7 +269,7 @@ def open_chat(
 
     builder = cast(_GraphBuilder, StateGraph(AgentState))
     builder.add_node("call_model", call_model)
-    builder.add_node("tools", tools_node(registry))
+    builder.add_node("tools", tools_node(registry, Policy(None) if policy is None else policy))
     builder.add_edge(START, "call_model")
     builder.add_conditional_edges("call_model", route, {"tools": "tools", "end": END})
     builder.add_edge("tools", "call_model")

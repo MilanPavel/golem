@@ -1,0 +1,143 @@
+{
+  "$defs": {
+    "ConfigRule": {
+      "additionalProperties": false,
+      "description": "One tool rule, in the order rules are checked.\n\n``source`` names the file and the rule's number in it, or ``built-in\ndefault``. ``ignored`` says why a listed rule never matches.",
+      "properties": {
+        "action": {
+          "enum": [
+            "allow",
+            "ask",
+            "deny"
+          ],
+          "title": "Action",
+          "type": "string"
+        },
+        "ignored": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ignored"
+        },
+        "match": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Match"
+        },
+        "path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Path"
+        },
+        "source": {
+          "minLength": 1,
+          "title": "Source",
+          "type": "string"
+        },
+        "tool": {
+          "minLength": 1,
+          "title": "Tool",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tool",
+        "action",
+        "source"
+      ],
+      "title": "ConfigRule",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Resolved settings. Keys are never included.\n\n``project_policy`` is the project's ``.golem/policy.toml`` when it exists,\nand ``project_trusted`` whether its allow rules count. Both are null\nwithout a ``cwd``.",
+  "properties": {
+    "config_file": {
+      "minLength": 1,
+      "title": "Config File",
+      "type": "string"
+    },
+    "default_model": {
+      "minLength": 1,
+      "title": "Default Model",
+      "type": "string"
+    },
+    "log_level": {
+      "minLength": 1,
+      "title": "Log Level",
+      "type": "string"
+    },
+    "project_policy": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Project Policy"
+    },
+    "project_trusted": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Project Trusted"
+    },
+    "rules": {
+      "items": {
+        "$ref": "#/$defs/ConfigRule"
+      },
+      "title": "Rules",
+      "type": "array"
+    },
+    "session_titles": {
+      "title": "Session Titles",
+      "type": "boolean"
+    },
+    "trusted_projects": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Trusted Projects",
+      "type": "array"
+    }
+  },
+  "required": [
+    "config_file",
+    "default_model",
+    "log_level",
+    "session_titles",
+    "trusted_projects",
+    "rules"
+  ],
+  "title": "ConfigGetResult",
+  "type": "object"
+}

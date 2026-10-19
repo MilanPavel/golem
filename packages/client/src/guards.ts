@@ -1,6 +1,7 @@
 import type { AuthKeyStatus, AuthListResult } from "../../protocol/gen/auth-list-result.ts";
 import type { AuthRemoveResult } from "../../protocol/gen/auth-remove-result.ts";
 import type { AuthSetResult } from "../../protocol/gen/auth-set-result.ts";
+import type { ConfigGetResult } from "../../protocol/gen/config-get-result.ts";
 import type { DaemonStatus } from "../../protocol/gen/daemon-status.ts";
 import type { HelloResult } from "../../protocol/gen/hello-result.ts";
 import type { MessageSendResult } from "../../protocol/gen/message-send-result.ts";
@@ -116,6 +117,22 @@ export function isAuthSetResult(value: unknown): value is AuthSetResult {
 
 export function isAuthRemoveResult(value: unknown): value is AuthRemoveResult {
   return isRecord(value) && typeof value["provider"] === "string" && typeof value["removed"] === "boolean";
+}
+
+export function isConfigGetResult(value: unknown): value is ConfigGetResult {
+  return (
+    isRecord(value) &&
+    typeof value["config_file"] === "string" &&
+    typeof value["default_model"] === "string" &&
+    Array.isArray(value["rules"]) &&
+    value["rules"].every(
+      (rule) =>
+        isRecord(rule) &&
+        typeof rule["tool"] === "string" &&
+        typeof rule["action"] === "string" &&
+        typeof rule["source"] === "string",
+    )
+  );
 }
 
 export function isAuthListResult(value: unknown): value is AuthListResult {
