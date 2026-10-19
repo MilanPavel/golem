@@ -48,4 +48,5 @@ MIGRATIONS: tuple[tuple[str, ...], ...] = (
         "CREATE INDEX events_run ON events (run_id) WHERE run_id IS NOT NULL",
     ),
     ("ALTER TABLE sessions ADD COLUMN closed_at TEXT",),
+    ("ALTER TABLE sessions ADD COLUMN cwd TEXT",),
 )

@@ -27,7 +27,7 @@ async def project(tx: Transaction, event: ChatEvent) -> None:
         parent = event.data.forked_from
         await tx.execute(
             "INSERT INTO sessions (session_id, model_profile, created_at, updated_at,"
-            " forked_from_session_id, forked_from_message_id) VALUES (?, ?, ?, ?, ?, ?)",
+            " forked_from_session_id, forked_from_message_id, cwd) VALUES (?, ?, ?, ?, ?, ?, ?)",
             (
                 event.session_id,
                 event.data.model_profile,
@@ -35,14 +35,21 @@ async def project(tx: Transaction, event: ChatEvent) -> None:
                 event.ts,
                 None if parent is None else parent.session_id,
                 None if parent is None else parent.message_id,
+                event.data.cwd,
             ),
         )
         return
     if isinstance(event, SessionUpdatedEvent):
-        await tx.execute(
-            "UPDATE sessions SET title = ? WHERE session_id = ?",
-            (event.data.title, event.session_id),
-        )
+        if event.data.title is not None:
+            await tx.execute(
+                "UPDATE sessions SET title = ? WHERE session_id = ?",
+                (event.data.title, event.session_id),
+            )
+        if event.data.cwd is not None:
+            await tx.execute(
+                "UPDATE sessions SET cwd = ? WHERE session_id = ?",
+                (event.data.cwd, event.session_id),
+            )
     elif isinstance(event, ModelSelectedEvent):
         await tx.execute(
             "UPDATE sessions SET model_profile = ? WHERE session_id = ?",

@@ -24,8 +24,21 @@
     }
   },
   "additionalProperties": false,
-  "description": "Profile stored for a new session.\n\n``model_profile`` is a profile name or a ``provider/model`` ref.\n``model_provider`` and ``model_name`` are set when the daemon can resolve\nit, and null otherwise. ``forked_from`` is set on a session made by\n``session.fork``.",
+  "description": "Profile stored for a new session.\n\n``model_profile`` is a profile name or a ``provider/model`` ref.\n``model_provider`` and ``model_name`` are set when the daemon can resolve\nit, and null otherwise. ``forked_from`` is set on a session made by\n``session.fork``. ``cwd`` is the project folder the file tools work in,\nor null for a session without one.",
   "properties": {
+    "cwd": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cwd"
+    },
     "forked_from": {
       "anyOf": [
         {

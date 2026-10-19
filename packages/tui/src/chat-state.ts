@@ -1,5 +1,22 @@
 import type { ChatEvent } from "@golem/client";
 
+export type ToolStatus = "requested" | "running" | "done" | "failed";
+
+/** One tool call, drawn under the assistant message that asked for it. */
+export type ToolBlock = {
+  callId: string;
+  name: string;
+  args: Readonly<Record<string, unknown>>;
+  status: ToolStatus;
+  /** One short line from `tool.completed`, such as `42 lines`. */
+  summary?: string;
+  /** The start of the output, from `tool.completed`. */
+  preview?: string;
+  truncated?: boolean;
+  /** Why it failed, from `tool.failed`. */
+  error?: string;
+};
+
 export type ChatMessage = {
   id: string;
   role: "user" | "assistant";
@@ -11,6 +28,8 @@ export type ChatMessage = {
   at?: string;
   /** Milliseconds from `run.started` to this finished answer. */
   durationMs?: number;
+  /** Tool calls this reply asked for, in order. */
+  tools?: ToolBlock[];
 };
 
 export type ChatState = {
@@ -87,9 +106,59 @@ export function reduceChat(state: ChatState, event: ChatEvent): ChatState {
         runId: null,
         notice: event.data.reason === "user" ? CANCELLED_NOTICE : SHUTDOWN_NOTICE,
       };
+    case "tool.requested": {
+      const block: ToolBlock = {
+        callId: event.data.call_id,
+        name: event.data.name,
+        args: event.data.args,
+        status: "requested",
+      };
+      return {
+        ...state,
+        messages: state.messages.map((message) =>
+          message.id === event.data.message_id
+            ? { ...message, tools: [...(message.tools ?? []).filter((tool) => tool.callId !== block.callId), block] }
+            : message,
+        ),
+      };
+    }
+    case "tool.started":
+      return updateTool(state, event.data.call_id, (tool) => ({ ...tool, status: "running" }));
+    case "tool.completed":
+      return updateTool(state, event.data.call_id, (tool) => ({
+        ...tool,
+        status: "done",
+        summary: event.data.summary,
+        preview: event.data.preview,
+        truncated: event.data.truncated === true,
+      }));
+    case "tool.failed":
+      return updateTool(state, event.data.call_id, (tool) => ({
+        ...tool,
+        status: "failed",
+        error: event.data.message,
+      }));
     default:
       return state;
   }
+}
+
+function updateTool(state: ChatState, callId: string, change: (tool: ToolBlock) => ToolBlock): ChatState {
+  let index = state.messages.length - 1;
+  while (index >= 0 && state.messages[index]?.tools?.some((tool) => tool.callId === callId) !== true) {
+    index -= 1;
+  }
+  if (index < 0) {
+    return state;
+  }
+  return {
+    ...state,
+    messages: state.messages.map((message, position) =>
+      position === index
+        ? { ...message, tools: message.tools?.map((tool) => (tool.callId === callId ? change(tool) : tool)) }
+        : message,
+    ),
+  };
 }
 
 export function appendDelta(state: ChatState, messageId: string, text: string): ChatState {
@@ -161,7 +230,9 @@ function upsertCompleted(
   if (index < 0) {
     return [...messages, next];
   }
-  return messages.map((message, position) => (position === index ? next : message));
+  return messages.map((message, position) =>
+    position === index ? (message.tools === undefined ? next : { ...next, tools: message.tools }) : message,
+  );
 }
 
 /** Absent when either timestamp is missing or the clock went backwards. */

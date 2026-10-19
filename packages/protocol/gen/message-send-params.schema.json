@@ -1,7 +1,20 @@
 {
   "additionalProperties": false,
-  "description": "``message.send``. Starts one graph run for this session.\n\nThe run's events go to the connections attached to the session.",
+  "description": "``message.send``. Starts one graph run for this session.\n\nThe run's events go to the connections attached to the session.\n``cwd`` is the sender's folder, an absolute path. A session without a\nproject folder takes it, and keeps it. A session with one ignores it.",
   "properties": {
+    "cwd": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cwd"
+    },
     "session_id": {
       "minLength": 1,
       "title": "Session Id",

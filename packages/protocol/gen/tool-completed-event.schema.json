@@ -1,0 +1,77 @@
+{
+  "$defs": {
+    "ToolCompletedData": {
+      "additionalProperties": false,
+      "description": "A tool call finished.\n\n``summary`` is one short line, such as ``42 lines``. ``preview`` is the\nstart of what the model received, cut at a few kilobytes, and\n``truncated`` says whether it was cut.",
+      "properties": {
+        "call_id": {
+          "minLength": 1,
+          "title": "Call Id",
+          "type": "string"
+        },
+        "preview": {
+          "title": "Preview",
+          "type": "string"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "truncated": {
+          "default": false,
+          "title": "Truncated",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "call_id",
+        "summary",
+        "preview"
+      ],
+      "title": "ToolCompletedData",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The tool call finished, and its result went back to the model.",
+  "properties": {
+    "data": {
+      "$ref": "#/$defs/ToolCompletedData"
+    },
+    "run_id": {
+      "minLength": 1,
+      "title": "Run Id",
+      "type": "string"
+    },
+    "seq": {
+      "minimum": 1,
+      "title": "Seq",
+      "type": "integer"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    },
+    "ts": {
+      "minLength": 1,
+      "title": "Ts",
+      "type": "string"
+    },
+    "type": {
+      "const": "tool.completed",
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "seq",
+    "session_id",
+    "run_id",
+    "ts",
+    "type",
+    "data"
+  ],
+  "title": "ToolCompletedEvent",
+  "type": "object"
+}

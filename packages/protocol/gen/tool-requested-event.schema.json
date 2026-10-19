@@ -1,0 +1,80 @@
+{
+  "$defs": {
+    "ToolRequestedData": {
+      "additionalProperties": false,
+      "description": "The model asked for one tool call.\n\n``message_id`` is the assistant message that asked. ``args`` are the\narguments as the model wrote them.",
+      "properties": {
+        "args": {
+          "additionalProperties": true,
+          "title": "Args",
+          "type": "object"
+        },
+        "call_id": {
+          "minLength": 1,
+          "title": "Call Id",
+          "type": "string"
+        },
+        "message_id": {
+          "minLength": 1,
+          "title": "Message Id",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "call_id",
+        "message_id",
+        "name",
+        "args"
+      ],
+      "title": "ToolRequestedData",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The model asked for a tool. Follows the asking message's ``message.completed``.",
+  "properties": {
+    "data": {
+      "$ref": "#/$defs/ToolRequestedData"
+    },
+    "run_id": {
+      "minLength": 1,
+      "title": "Run Id",
+      "type": "string"
+    },
+    "seq": {
+      "minimum": 1,
+      "title": "Seq",
+      "type": "integer"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    },
+    "ts": {
+      "minLength": 1,
+      "title": "Ts",
+      "type": "string"
+    },
+    "type": {
+      "const": "tool.requested",
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "seq",
+    "session_id",
+    "run_id",
+    "ts",
+    "type",
+    "data"
+  ],
+  "title": "ToolRequestedEvent",
+  "type": "object"
+}

@@ -1,7 +1,20 @@
 {
   "additionalProperties": false,
-  "description": "``session.create``. An empty profile uses the daemon's configured one.\n\nThe caller is not attached. ``session.attach`` replays ``session.created``.",
+  "description": "``session.create``. An empty profile uses the daemon's configured one.\n\n``cwd`` is the session's project folder, an absolute path. File tools work\nonly inside it, and a session without one has no file tools.\n\nThe caller is not attached. ``session.attach`` replays ``session.created``.",
   "properties": {
+    "cwd": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cwd"
+    },
     "model_profile": {
       "anyOf": [
         {

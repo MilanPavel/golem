@@ -290,3 +290,41 @@ test("forkPoint is the newest finished message with something stored", () => {
   assert.equal(forkPoint([message("m_1", false), message("m_2", false, "", true)]), "m_1");
   assert.equal(forkPoint([message("m_1", false), message("m_2", false, "Hel", true)]), "m_2");
 });
+
+test("tool events draw blocks under the reply that asked", () => {
+  const base = { session_id: "s", run_id: "r", ts: "t" } as const;
+  const events: ChatEvent[] = [
+    { ...base, seq: 1, type: "message.started", data: { message_id: "a", role: "assistant" } },
+    { ...base, seq: 2, type: "message.completed", data: { message_id: "a", role: "assistant", text: "" } },
+    {
+      ...base,
+      seq: 3,
+      type: "tool.requested",
+      data: { call_id: "c1", message_id: "a", name: "read_file", args: { path: "a.ts" } },
+    },
+    {
+      ...base,
+      seq: 4,
+      type: "tool.requested",
+      data: { call_id: "c2", message_id: "a", name: "read_file", args: { path: "/etc/hosts" } },
+    },
+    { ...base, seq: 5, type: "tool.started", data: { call_id: "c1" } },
+    {
+      ...base,
+      seq: 6,
+      type: "tool.completed",
+      data: { call_id: "c1", summary: "2 lines", preview: "x", truncated: false },
+    },
+    { ...base, seq: 7, type: "tool.failed", data: { call_id: "c2", message: "outside" } },
+    { ...base, seq: 8, type: "tool.started", data: { call_id: "unknown" } },
+  ];
+  const state = events.reduce(reduceChat, emptyChat);
+  const tools = state.messages[0]?.tools ?? [];
+  assert.deepEqual(
+    tools.map((tool) => [tool.callId, tool.status, tool.summary ?? tool.error]),
+    [
+      ["c1", "done", "2 lines"],
+      ["c2", "failed", "outside"],
+    ],
+  );
+});

@@ -33,7 +33,8 @@ export type PressName =
   | "ctrl-w"
   | "ctrl-u"
   | "ctrl-k"
-  | "ctrl-g";
+  | "ctrl-g"
+  | "ctrl-o";
 
 export type Press = {
   name: PressName | null;
@@ -96,6 +97,7 @@ export type KeyEffect =
   | { kind: "submit" }
   | { kind: "edit"; op: EditOp }
   | { kind: "edit-external" }
+  | { kind: "toggle-tools" }
   | { kind: "insert"; text: string }
   | { kind: "ignore" };
 
@@ -391,6 +393,14 @@ export const KEYS: readonly KeyBinding[] = [
     run: () => ({ kind: "debug-tab" }),
   },
   {
+    id: "tool-output",
+    label: "Ctrl-O",
+    contexts: ["transcript"],
+    description: "Shows or hides the output of tool calls.",
+    when: { name: "ctrl-o", overlay: false, switcher: false },
+    run: () => ({ kind: "toggle-tools" }),
+  },
+  {
     id: "show-keys",
     label: "?",
     contexts: ["composer"],
@@ -583,6 +593,9 @@ function ctrlName(input: string): PressName | null {
   }
   if (input === "g") {
     return "ctrl-g";
+  }
+  if (input === "o") {
+    return "ctrl-o";
   }
   return null;
 }

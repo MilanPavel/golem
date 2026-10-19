@@ -2,17 +2,35 @@
   "$defs": {
     "SessionUpdatedData": {
       "additionalProperties": false,
-      "description": "A session attribute changed. Today that is only its title.",
+      "description": "A session attribute changed: its title, or its project folder.\n\nA field left null did not change. ``cwd`` is set once, on a session made\nbefore sessions had a folder, by the first ``message.send`` that names one.",
       "properties": {
+        "cwd": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cwd"
+        },
         "title": {
-          "minLength": 1,
-          "title": "Title",
-          "type": "string"
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
         }
       },
-      "required": [
-        "title"
-      ],
       "title": "SessionUpdatedData",
       "type": "object"
     }

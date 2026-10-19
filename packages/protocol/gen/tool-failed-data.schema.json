@@ -1,0 +1,22 @@
+{
+  "additionalProperties": false,
+  "description": "A tool call did not run, or stopped with an error. The model sees the same message.",
+  "properties": {
+    "call_id": {
+      "minLength": 1,
+      "title": "Call Id",
+      "type": "string"
+    },
+    "message": {
+      "minLength": 1,
+      "title": "Message",
+      "type": "string"
+    }
+  },
+  "required": [
+    "call_id",
+    "message"
+  ],
+  "title": "ToolFailedData",
+  "type": "object"
+}

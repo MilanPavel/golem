@@ -59,6 +59,9 @@ export function sessionMarkdown(title: string, messages: readonly CopyMessage[])
   const heading = title.trim().length > 0 ? title.trim().replace(/\s+/g, " ") : "untitled";
   const parts = [`# ${heading}`, ""];
   for (const message of messages) {
+    if (message.text.length === 0) {
+      continue;
+    }
     const who = message.role === "user" ? "you" : "golem";
     parts.push(`**${who}**`, "", message.text, "");
   }

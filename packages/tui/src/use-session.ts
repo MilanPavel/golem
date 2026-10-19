@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import type { GolemClient } from "@golem/client";
 
-import { openLatest, openNew, openOne } from "./session-open.ts";
+import { openLatest, openNew, openOne, type SessionOpener } from "./session-open.ts";
 
 export type SessionCallbacks = {
   /** The TUI now follows `sessionId`. Clear what belonged to the previous one. */
@@ -25,7 +25,12 @@ export type SessionHandle = {
  * On the first connect it attaches to the session with the newest activity.
  * After a reconnect the client attaches again by itself, so nothing reopens.
  */
-export function useSession(client: GolemClient, connected: boolean, callbacks: SessionCallbacks): SessionHandle {
+export function useSession(
+  client: GolemClient,
+  connected: boolean,
+  cwd: string,
+  callbacks: SessionCallbacks,
+): SessionHandle {
   const [id, setId] = useState<string | null>(null);
   const ref = useRef<string | null>(null);
   const opening = useRef(false);
@@ -40,7 +45,12 @@ export function useSession(client: GolemClient, connected: boolean, callbacks: S
       opening.current = true;
       const previous = ref.current;
       try {
-        await how(client, (sessionId) => {
+        const opener: SessionOpener = {
+          listSessions: (limit) => client.listSessions(limit),
+          attachSession: (sessionId, afterSeq) => client.attachSession(sessionId, afterSeq),
+          createSession: () => client.createSession({ cwd }),
+        };
+        await how(opener, (sessionId) => {
           ref.current = sessionId;
           setId(sessionId);
           latest.current.onSwitch(sessionId);
@@ -56,7 +66,7 @@ export function useSession(client: GolemClient, connected: boolean, callbacks: S
         opening.current = false;
       }
     },
-    [client],
+    [client, cwd],
   );
 
   useEffect(() => {

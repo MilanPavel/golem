@@ -6,6 +6,7 @@ import asyncio
 import logging
 import os
 import time
+from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
 
@@ -147,7 +148,9 @@ async def _ping(ctx: RequestContext, params: PingParams) -> Ping:
 
 async def _session_create(ctx: RequestContext, params: SessionCreateParams) -> SessionCreateResult:
     sessions = _sessions(ctx)
-    session_id = await sessions.create(params.model_profile)
+    if params.cwd is not None and not Path(params.cwd).is_absolute():
+        raise RpcCallError(INVALID_PARAMS, "cwd must be an absolute path")
+    session_id = await sessions.create(params.model_profile, cwd=params.cwd)
     return SessionCreateResult(session_id=session_id)
 
 
@@ -210,8 +213,10 @@ async def _session_rename(ctx: RequestContext, params: SessionRenameParams) -> S
 
 async def _message_send(ctx: RequestContext, params: MessageSendParams) -> MessageSendResult:
     sessions = _sessions(ctx)
+    if params.cwd is not None and not Path(params.cwd).is_absolute():
+        raise RpcCallError(INVALID_PARAMS, "cwd must be an absolute path")
     try:
-        run_id = await sessions.send(params.session_id, params.text)
+        run_id = await sessions.send(params.session_id, params.text, cwd=params.cwd)
     except SessionNotFoundError as exc:
         raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
     except SessionBusyError as exc:

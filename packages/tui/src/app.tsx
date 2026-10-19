@@ -137,6 +137,8 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   const [chat, setChat] = useState<ChatState>(emptyChat);
   const [draft, setDraft] = useState<Draft>({ text: "", cursor: 0 });
   const [sessionModel, setSessionModel] = useState<ModelInfo | null>(null);
+  const [sessionCwd, setSessionCwd] = useState<string | null>(null);
+  const [toolOutput, setToolOutput] = useState(false);
   const sessionModelRef = useRef(sessionModel);
   sessionModelRef.current = sessionModel;
   const [daemonModel, setDaemonModel] = useState<ModelInfo | null>(null);
@@ -251,7 +253,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   const helpText = helpOpen && !keysOpen && !switcher.open ? helpLines(COMMANDS, columns) : [];
   const helpHeight = Math.min(helpText.length, budget.body);
   const chatHeight = budget.body - helpHeight;
-  const transcriptOptions = { times: showTimes, now };
+  const transcriptOptions = { times: showTimes, now, toolOutput };
   const measured = layoutTranscript(chat.messages, columns, chatHeight, offset, transcriptOptions);
   const widthKey = measured.overflow ? Math.max(1, columns - 1) : columns;
   const followed = followTail(tail, measured.lineCount, widthKey, offset);
@@ -261,7 +263,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       : layoutTranscript(chat.messages, columns, chatHeight, followed.offset, transcriptOptions);
   const model = preferModel(sessionModel, daemonModel);
   const chip = modelChip(model.name, model.profile);
-  const cwd = shortCwd(process.cwd(), homedir());
+  const cwd = shortCwd(sessionCwd ?? process.cwd(), homedir());
   const versions = versionLabel(TUI_VERSION, daemonVersion);
   const phase = meterPhase(chat.busy, assistantChars(chat.messages));
   const page = Math.max(1, (keysOpen ? budget.body : Math.max(1, chatHeight)) - 1);
@@ -274,7 +276,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
     });
   }
 
-  const session = useSession(client, connection.status === "connected", {
+  const session = useSession(client, connection.status === "connected", process.cwd(), {
     onSwitch: (next) => {
       batcher.current?.flush();
       setLiveTitle(null);
@@ -284,6 +286,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       setHistoryCursor(null);
       setChat((current) => ({ ...emptyChat, notice: current.notice }));
       setSessionModel(null);
+      setSessionCwd(null);
       setModelMessages([]);
       setModelCount(null);
       setOffset(0);
@@ -460,6 +463,9 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       if (event.session_id !== sessionRef.current) {
         return;
       }
+      if (event.type === "session.created") {
+        setSessionCwd(event.data.cwd ?? null);
+      }
       if (event.type === "session.created" || event.type === "model.selected") {
         setSessionModel({
           profile: event.data.model_profile,
@@ -468,7 +474,13 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
         });
       }
       if (event.type === "session.updated") {
-        setLiveTitle({ sessionId: event.session_id, title: event.data.title });
+        const { title, cwd: folder } = event.data;
+        if (typeof title === "string") {
+          setLiveTitle({ sessionId: event.session_id, title });
+        }
+        if (typeof folder === "string") {
+          setSessionCwd(folder);
+        }
       }
       if (event.type === "message.delta") {
         batcher.current?.push(event.data.message_id, event.data.text);
@@ -734,7 +746,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
     setDraft(draftAt(""));
     setOffset(0);
     setChat((current) => ({ ...current, notice: null }));
-    void client.sendMessage(currentSession, text).then(
+    void client.sendMessage(currentSession, text, { cwd: process.cwd() }).then(
       () => {
         sentHistory.current.remember(text);
       },
@@ -1139,6 +1151,13 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
         return;
       case "edit-external":
         void openEditor();
+        return;
+      case "toggle-tools":
+        setToolOutput((shown) => {
+          const next = !shown;
+          setChat((current) => ({ ...current, notice: next ? "tool output shown" : "tool output hidden" }));
+          return next;
+        });
         return;
       case "insert":
         setDraft(insertText(draftRef.current, effect.text));

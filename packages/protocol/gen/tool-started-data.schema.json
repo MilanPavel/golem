@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "A requested tool call is running.",
+  "properties": {
+    "call_id": {
+      "minLength": 1,
+      "title": "Call Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "call_id"
+  ],
+  "title": "ToolStartedData",
+  "type": "object"
+}

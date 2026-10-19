@@ -13,7 +13,12 @@ export type Params =
   | RunStartedEvent
   | RunCompletedEvent
   | RunFailedEvent
-  | RunCancelledEvent;
+  | RunCancelledEvent
+  | ToolRequestedEvent
+  | ToolStartedEvent
+  | ToolCompletedEvent
+  | ToolFailedEvent;
+export type Cwd = string | null;
 export type MessageId = string;
 export type SessionId = string;
 export type ModelName = string | null;
@@ -24,7 +29,8 @@ export type Seq = number;
 export type SessionId1 = string;
 export type Ts = string;
 export type Type = 'session.created';
-export type Title = string;
+export type Cwd1 = string | null;
+export type Title = string | null;
 export type RunId1 = null;
 export type Seq1 = number;
 export type SessionId2 = string;
@@ -89,6 +95,36 @@ export type Seq10 = number;
 export type SessionId11 = string;
 export type Ts10 = string;
 export type Type10 = 'run.cancelled';
+export type CallId = string;
+export type MessageId4 = string;
+export type Name = string;
+export type RunId11 = string;
+export type Seq11 = number;
+export type SessionId12 = string;
+export type Ts11 = string;
+export type Type11 = 'tool.requested';
+export type CallId1 = string;
+export type RunId12 = string;
+export type Seq12 = number;
+export type SessionId13 = string;
+export type Ts12 = string;
+export type Type12 = 'tool.started';
+export type CallId2 = string;
+export type Preview = string;
+export type Summary = string;
+export type Truncated = boolean;
+export type RunId13 = string;
+export type Seq13 = number;
+export type SessionId14 = string;
+export type Ts13 = string;
+export type Type13 = 'tool.completed';
+export type CallId3 = string;
+export type Message1 = string;
+export type RunId14 = string;
+export type Seq14 = number;
+export type SessionId15 = string;
+export type Ts14 = string;
+export type Type14 = 'tool.failed';
 
 /**
  * Server → client event. No ``id``; this is not a response to a request.
@@ -118,12 +154,14 @@ export interface SessionCreatedEvent {
  * ``model_profile`` is a profile name or a ``provider/model`` ref.
  * ``model_provider`` and ``model_name`` are set when the daemon can resolve
  * it, and null otherwise. ``forked_from`` is set on a session made by
- * ``session.fork``.
+ * ``session.fork``. ``cwd`` is the project folder the file tools work in,
+ * or null for a session without one.
  *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "SessionCreatedData".
  */
 export interface SessionCreatedData {
+  cwd?: Cwd;
   forked_from?: ForkedFrom | null;
   model_name?: ModelName;
   model_profile: ModelProfile;
@@ -154,13 +192,17 @@ export interface SessionUpdatedEvent {
   type: Type1;
 }
 /**
- * A session attribute changed. Today that is only its title.
+ * A session attribute changed: its title, or its project folder.
+ *
+ * A field left null did not change. ``cwd`` is set once, on a session made
+ * before sessions had a folder, by the first ``message.send`` that names one.
  *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "SessionUpdatedData".
  */
 export interface SessionUpdatedData {
-  title: Title;
+  cwd?: Cwd1;
+  title?: Title;
 }
 /**
  * The session left the list. ``run_id`` is null: no run owns the change.
@@ -367,4 +409,113 @@ export interface RunCancelledEvent {
  */
 export interface RunCancelledData {
   reason: Reason1;
+}
+/**
+ * The model asked for a tool. Follows the asking message's ``message.completed``.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "ToolRequestedEvent".
+ */
+export interface ToolRequestedEvent {
+  data: ToolRequestedData;
+  run_id: RunId11;
+  seq: Seq11;
+  session_id: SessionId12;
+  ts: Ts11;
+  type: Type11;
+}
+/**
+ * The model asked for one tool call.
+ *
+ * ``message_id`` is the assistant message that asked. ``args`` are the
+ * arguments as the model wrote them.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "ToolRequestedData".
+ */
+export interface ToolRequestedData {
+  args: Args;
+  call_id: CallId;
+  message_id: MessageId4;
+  name: Name;
+}
+export interface Args {
+  [k: string]: unknown;
+}
+/**
+ * The tool call is running.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "ToolStartedEvent".
+ */
+export interface ToolStartedEvent {
+  data: ToolStartedData;
+  run_id: RunId12;
+  seq: Seq12;
+  session_id: SessionId13;
+  ts: Ts12;
+  type: Type12;
+}
+/**
+ * A requested tool call is running.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "ToolStartedData".
+ */
+export interface ToolStartedData {
+  call_id: CallId1;
+}
+/**
+ * The tool call finished, and its result went back to the model.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "ToolCompletedEvent".
+ */
+export interface ToolCompletedEvent {
+  data: ToolCompletedData;
+  run_id: RunId13;
+  seq: Seq13;
+  session_id: SessionId14;
+  ts: Ts13;
+  type: Type13;
+}
+/**
+ * A tool call finished.
+ *
+ * ``summary`` is one short line, such as ``42 lines``. ``preview`` is the
+ * start of what the model received, cut at a few kilobytes, and
+ * ``truncated`` says whether it was cut.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "ToolCompletedData".
+ */
+export interface ToolCompletedData {
+  call_id: CallId2;
+  preview: Preview;
+  summary: Summary;
+  truncated?: Truncated;
+}
+/**
+ * The tool call was refused, raised, or was cut off by a stopped run.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "ToolFailedEvent".
+ */
+export interface ToolFailedEvent {
+  data: ToolFailedData;
+  run_id: RunId14;
+  seq: Seq14;
+  session_id: SessionId15;
+  ts: Ts14;
+  type: Type14;
+}
+/**
+ * A tool call did not run, or stopped with an error. The model sees the same message.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "ToolFailedData".
+ */
+export interface ToolFailedData {
+  call_id: CallId3;
+  message: Message1;
 }

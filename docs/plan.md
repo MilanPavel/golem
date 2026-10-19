@@ -14,12 +14,12 @@ This file is about what comes next. How the existing pieces are built is in [arc
 - API keys in the macOS Keychain, through `golem auth` or `/login` in the TUI.
 - `/model` picks from installed, downloadable, and hosted models with prices and RAM fit, and switches a session mid-conversation. `golem models` prints the same list.
 - Downloading and removing Ollama models from the picker or with `/model pull` and `/model rm`, with live progress that survives closing the TUI.
-- Tokens and cost per answer, and `/cost` for today, this week, and this session.
 - Sessions, runs, and every event are stored in `~/.golem/golem.db`. They survive a daemon restart and a crash.
 - Detach and reattach. Close the TUI mid-answer, reopen it, and see the text so far plus the rest. Any number of screens can follow one session.
 - Ctrl-C cancels the answer and keeps what it said. Pressing it twice exits.
 - Automatic titles, a live switcher (`/sessions`), `/new`, `/title <name>`, and `/fork`.
 - A debug panel (`/debug`) that shows the wire and the conversation the model sees.
+- Read-only tools: the model reads files, lists folders, and searches with `glob` and `grep`, only inside the folder the session was started in. Each call is one line in the transcript, and Ctrl-O shows its output.
 - Slash commands with suggestions, a line editor, recalling a sent message with Up, copy and export, and closing a session from the switcher.
 - It runs from a checkout of this repository (`just golem daemon install`, then `just tui`). Phase 3 makes it installable.
 
@@ -36,7 +36,7 @@ This file is about what comes next. How the existing pieces are built is in [arc
 | 7. Memory | Long-term memory that you can see and edit | M6 — Remembers |
 | 8. Evals and hardening | Tracing, eval suites, crash tests, backups, a security pass | M6 — Remembers |
 | 9. TUI polish | A render cache for long sessions, themes, and search in the transcript | Later |
-| 10. Model routing and long sessions | A cheap profile for small jobs, budgets, escalation, compaction | Later |
+| 10. Model routing and long sessions | Token and cost display, a cheap profile for small jobs, budgets, escalation, compaction | Later |
 
 ```mermaid
 flowchart LR
@@ -94,13 +94,14 @@ Agents use the Graph API, where the model decides control flow. Flows use the Fu
 
 ### Protocol, what is left to add
 
-JSON-RPC 2.0, one JSON object per line, over `~/.golem/run/golem.sock`. Protocol 2.9 is on the wire today (see [architecture.md](architecture.md#what-is-on-the-wire-today)). The phases below add the rest.
+JSON-RPC 2.0, one JSON object per line, over `~/.golem/run/golem.sock`. Protocol 2.10 is on the wire today (see [architecture.md](architecture.md#what-is-on-the-wire-today)). The phases below add the rest.
 
 | Group | New events | Phase |
 |---|---|---|
-| Tools | `tool.requested`, `tool.started`, `tool.output` (chunked), `tool.completed`, `tool.failed` | 1.1 |
+| Tools | `tool.requested`, `tool.started`, `tool.completed`, `tool.failed` (built); `tool.output` (chunked) | 1.1, 1.4 |
 | Approval | `approval.needed`, `approval.resolved` | 1.3 |
 | Todos | `todos.updated` | 1.7 |
+| Models | `usage.reported` (tokens, cost) | 10.1 |
 | System | `mcp.server.status`, `warning`, `error` | 2.1 |
 | Skills | `skill.activated`, `skill.deactivated` | 4.2 |
 | Runs and flows | `run.step.started`, `run.step.completed`, `run.interrupted` | 5.2, 5.4 |
@@ -117,9 +118,9 @@ Rules:
 
 ## Phase 1 — Tools and approvals
 
-The agent can act, and nothing happens without passing policy. Start read-only, then add permissions, then approvals, then write and execute.
+The agent can act, and nothing happens without passing policy. How the tool loop works is in [ADR-011](adr/011-tools.md). Start read-only, then add permissions, then approvals, then write and execute.
 
-### 1.1 Tool loop with read-only tools
+### 1.1 Tool loop with read-only tools (built)
 
 - **Goal:** the model can look at your files.
 - **You can:** ask "what does `connect.ts` do?" and watch golem read it.
@@ -129,7 +130,7 @@ The agent can act, and nothing happens without passing policy. Start read-only, 
   - A project folder per session: `session.create` gains `cwd`, and the TUI sends its working directory.
   - Tools: `read_file`, `list_dir`, `glob`, `grep`. They are allowed only inside the project folder.
   - `tool.requested`, `tool.started`, `tool.completed`, and `tool.failed` events.
-  - TUI: a collapsed one-line block per tool call (`read_file packages/client/src/connect.ts ✓`). Enter on a selected block expands it.
+  - TUI: a collapsed one-line block per tool call (`read_file packages/client/src/connect.ts ✓`). Ctrl-O shows or hides the output of every block. Expanding one selected block waits for a transcript selection model.
 - **Done when:** a question about a file in the project folder is answered from its contents, and reading `/etc/hosts` is refused.
 - **Watch out:** `/model` can switch providers mid-session. A history with tool calls from Ollama must still work on Anthropic and the other way round, so write that test with the tools node.
 
@@ -223,7 +224,7 @@ The agent can act, and nothing happens without passing policy. Start read-only, 
   - A `todo_write` tool that replaces the session's todo list (id, text, status: pending, in progress, done). It needs no approval, because it has no side effect outside golem.
   - The list lives in graph state, small by design, and each change emits `todos.updated`.
   - TUI: a todo band above the composer, one row per item, collapsed to `todos 2/5` when rows are short. `/todos` toggles it.
-  - Compaction (10.4) keeps open todos.
+  - Compaction (10.5) keeps open todos.
 - **Done when:** a three-step task shows its list, ticks items off in order, and the list is still there after reattaching.
 
 ---
@@ -432,7 +433,7 @@ Agent Skills (`SKILL.md`) compatible with Claude Code, loaded by progressive dis
 - **You can:** `/skill <name>` (with suggestions) and `/skill off <name>`.
 - **Build:**
   - `active_skills: list[str]` in graph state, with a deduping reducer.
-  - Active skill bodies go into the system prompt. Compaction (10.4) always keeps them.
+  - Active skill bodies go into the system prompt. Compaction (10.5) always keeps them.
   - `skill.activated` and `skill.deactivated`. The header shows active skills.
 - **Done when:** a pinned skill changes the answer in the expected way.
 
@@ -630,7 +631,7 @@ Useful long-term memory that you can inspect and edit, and that never surprises 
 
 - **Goal:** you can ask what you decided last week.
 - **You can:** ask "what did we decide about the protocol bump?" and get the answer with a link to the session.
-- **Build:** compaction summaries (10.4) and session titles are indexed in the memory store.
+- **Build:** compaction summaries (10.5) and session titles are indexed in the memory store.
 - **Done when:** a question about an old session finds it.
 
 ---
@@ -717,9 +718,19 @@ A long session is already usable. These steps wait until scrolling feels slow, o
 
 ## Phase 10 — Model routing and long sessions
 
-These steps were the second half of the model work, after `/model` and cost tracking. They wait until tools and approvals exist, because routing, escalation, and compaction matter most once the agent runs long, tool-heavy tasks.
+These steps were the second half of the model work, after `/model`. They wait until tools and approvals exist, because routing, escalation, and compaction matter most once the agent runs long, tool-heavy tasks.
 
-### 10.1 Cheap profile and structured outputs
+### 10.1 Tokens and cost
+
+- **Goal:** you always know what a session has cost.
+- **You can:** see tokens and cost per answer, and `/cost` for today, this week, and this session.
+- **Build:**
+  - `usage.reported` per model call, and a `costs` table. Prices come from `model.list`, and a profile's `price` overrides them.
+  - The meter shows tokens while writing. The finished answer shows `1.2k tok · $0.004` next to its duration.
+  - `/cost` prints a short table.
+- **Done when:** the cost of a day of use matches the provider's dashboard within a few percent.
+
+### 10.2 Cheap profile and structured outputs
 
 - **Goal:** small jobs (titles, classification) stop using the expensive model.
 - **You can:** set `titles = "qwen"` (a profile or a ref) and never pay a remote call for a title again.
@@ -728,7 +739,7 @@ These steps were the second half of the model work, after `/model` and cost trac
   - Structured outputs for anything parsed, with `with_structured_output`, or grammar-constrained decoding where the local server supports it.
 - **Done when:** titles come from the cheap profile, and a malformed structured answer is retried, not crashed on.
 
-### 10.2 Router and budgets
+### 10.3 Router and budgets
 
 - **Goal:** the right model is picked automatically, and spending has a ceiling.
 - **You can:** set daily and per-session caps, and see why a model was picked.
@@ -742,14 +753,14 @@ These steps were the second half of the model work, after `/model` and cost trac
   - Over a cap, the router forces local, or asks for approval (1.3).
 - **Done when:** a day of mixed use stays under budget, and each routing choice is visible.
 
-### 10.3 Escalation
+### 10.4 Escalation
 
 - **Goal:** a weak local model does not stall a task.
 - **You can:** start on a local model and let golem step up when it fails.
 - **Build:** a node wrapper that retries once on a remote profile after N invalid tool calls or failed structured outputs, and logs the escalation as a `warning` event.
 - **Done when:** a recorded failing local tool call escalates once and succeeds.
 
-### 10.4 Compaction and context gauge
+### 10.5 Compaction and context gauge
 
 - **Goal:** long sessions keep working.
 - **You can:** see how full the context is in the status line (`ctx 62%`), and keep chatting past the limit.
@@ -760,7 +771,7 @@ These steps were the second half of the model work, after `/model` and cost trac
   - `session.fork` may need a `before` bound on history reads here ([ADR-010](adr/010-fork.md)).
 - **Done when:** a 200-turn session keeps working after compaction.
 
-### 10.5 Local server management (optional)
+### 10.6 Local server management (optional)
 
 - **Goal:** the local model is running when you need it, and not otherwise.
 - **You can:** forget about starting Ollama.

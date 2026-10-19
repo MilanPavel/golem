@@ -107,8 +107,11 @@ export interface GolemClient {
   onSessionSummary(listener: (summary: SessionSummary) => void): () => void;
   onWire(listener: (lines: readonly WireLine[]) => void): () => void;
   status(): Promise<DaemonStatus>;
-  /** Create a session. Its events arrive only after {@link GolemClient.attachSession}. */
-  createSession(): Promise<SessionCreateResult>;
+  /**
+   * Create a session. Its events arrive only after {@link GolemClient.attachSession}.
+   * `cwd` is its project folder, an absolute path. File tools work only inside it.
+   */
+  createSession(options?: { cwd?: string }): Promise<SessionCreateResult>;
   /**
    * Replay the session's events after `afterSeq`, then stream new ones.
    * The client attaches again after a reconnect, from the last `seq` it saw.
@@ -131,7 +134,8 @@ export interface GolemClient {
   forkSession(sessionId: string, atMessageId: string): Promise<SessionForkResult>;
   /** Set the title by hand. Resolves with the title as stored: one line, at most 60 characters. */
   renameSession(sessionId: string, title: string): Promise<SessionRenameResult>;
-  sendMessage(sessionId: string, text: string): Promise<MessageSendResult>;
+  /** `cwd` gives a session without a project folder this one. A session with a folder keeps its own. */
+  sendMessage(sessionId: string, text: string, options?: { cwd?: string }): Promise<MessageSendResult>;
   /** Stop a run. Resolves after `run.cancelled` is in the log; `cancelled` is false when it had ended. */
   cancelRun(runId: string): Promise<RunCancelResult>;
   inspectSession(sessionId: string): Promise<SessionInspectResult>;
@@ -563,9 +567,9 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       }
       return result;
     },
-    async createSession(): Promise<SessionCreateResult> {
+    async createSession(options?: { cwd?: string }): Promise<SessionCreateResult> {
       await ready;
-      const result = await call("session.create", {});
+      const result = await call("session.create", options?.cwd === undefined ? {} : { cwd: options.cwd });
       if (!isSessionCreateResult(result)) {
         throw new Error("invalid session.create result");
       }
@@ -635,9 +639,10 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       }
       return result;
     },
-    async sendMessage(sessionId: string, text: string): Promise<MessageSendResult> {
+    async sendMessage(sessionId: string, text: string, options?: { cwd?: string }): Promise<MessageSendResult> {
       await ready;
-      const result = await call("message.send", { session_id: sessionId, text });
+      const params = options?.cwd === undefined ? { session_id: sessionId, text } : { session_id: sessionId, text, cwd: options.cwd };
+      const result = await call("message.send", params);
       if (!isMessageSendResult(result)) {
         throw new Error("invalid message.send result");
       }

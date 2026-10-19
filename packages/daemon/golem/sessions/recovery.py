@@ -1,7 +1,8 @@
 """Close the runs a stopped daemon left open.
 
 A run still ``running`` at startup lost its task. Its log gets the end it
-never wrote: the open assistant message completes, then ``run.failed``. The
+never wrote: each tool call still open fails, the open assistant message
+completes, then ``run.failed``. The
 partial reply also goes into the checkpoint, so the model sees what the user
 saw.
 """
@@ -9,7 +10,7 @@ saw.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from golem.graphs.chat import ChatRuntime
 from golem.sessions.interrupted import close_reply
@@ -22,6 +23,10 @@ from golem_protocol.events import (
     MessageDeltaEvent,
     MessageStartedEvent,
     RunFailedData,
+    ToolCompletedEvent,
+    ToolFailedData,
+    ToolFailedEvent,
+    ToolRequestedEvent,
 )
 
 log = logging.getLogger("golem.sessions")
@@ -36,6 +41,7 @@ class OpenTurn:
     user_message_id: str | None
     assistant_message_id: str | None
     partial: str
+    open_calls: list[str] = field(default_factory=list[str])
 
 
 def open_turn(events: list[ChatEvent]) -> OpenTurn:
@@ -44,6 +50,7 @@ def open_turn(events: list[ChatEvent]) -> OpenTurn:
     started: str | None = None
     completed: set[str] = set()
     parts: dict[str, list[str]] = {}
+    calls: list[str] = []
     for event in events:
         if isinstance(event, MessageCompletedEvent):
             if event.data.role == "user":
@@ -53,12 +60,21 @@ def open_turn(events: list[ChatEvent]) -> OpenTurn:
             started = event.data.message_id
         elif isinstance(event, MessageDeltaEvent):
             parts.setdefault(event.data.message_id, []).append(event.data.text)
+        elif isinstance(event, ToolRequestedEvent):
+            calls.append(event.data.call_id)
+        elif (
+            isinstance(event, ToolCompletedEvent | ToolFailedEvent) and event.data.call_id in calls
+        ):
+            calls.remove(event.data.call_id)
     if started is None or started in completed:
-        return OpenTurn(user_message_id=user, assistant_message_id=None, partial="")
+        return OpenTurn(
+            user_message_id=user, assistant_message_id=None, partial="", open_calls=calls
+        )
     return OpenTurn(
         user_message_id=user,
         assistant_message_id=started,
         partial="".join(parts.get(started, [])),
+        open_calls=calls,
     )
 
 
@@ -92,6 +108,13 @@ async def _close(
     runtime: ChatRuntime,
 ) -> None:
     turn = open_turn(await events.for_run(run.run_id))
+    for call_id in turn.open_calls:
+        await session_log.emit(
+            run.session_id,
+            run.run_id,
+            "tool.failed",
+            ToolFailedData(call_id=call_id, message=STOPPED_MESSAGE),
+        )
     if turn.assistant_message_id is not None:
         await close_reply(
             runtime,

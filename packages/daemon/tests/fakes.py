@@ -8,7 +8,7 @@ from typing import Any
 
 from langchain_core.callbacks import AsyncCallbackManagerForLLMRun, CallbackManagerForLLMRun
 from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage
+from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage, ToolCall, ToolMessage
 from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResult
 from pydantic import Field, PrivateAttr
 
@@ -55,6 +55,67 @@ class ScriptedChatModel(BaseChatModel):
         if not self.replies:
             raise RuntimeError("no scripted reply")
         return self.replies.pop(0)
+
+
+Calls = list[tuple[str, dict[str, Any]]]
+
+
+def _no_histories() -> list[list[BaseMessage]]:
+    return []
+
+
+class ToolCallingChatModel(BaseChatModel):
+    """Answers with ``replies`` in order: a string is text, a list is tool calls.
+
+    Like a provider, it refuses a history where a tool call has no result.
+    ``bind_tools`` records the tool names and returns the model itself.
+    """
+
+    replies: list[str | Calls]
+    seen: list[list[BaseMessage]] = Field(default_factory=_no_histories)
+    bound: list[str] = Field(default_factory=list[str])
+    calls_made: int = 0
+
+    @property
+    def _llm_type(self) -> str:
+        return "tool-calling"
+
+    def bind_tools(self, tools: Any, **kwargs: Any) -> Any:
+        del kwargs
+        self.bound = [tool["function"]["name"] for tool in tools]
+        return self
+
+    def _generate(
+        self,
+        messages: list[BaseMessage],
+        stop: list[str] | None = None,
+        run_manager: CallbackManagerForLLMRun | None = None,
+        **kwargs: Any,
+    ) -> ChatResult:
+        del stop, run_manager, kwargs
+        _check_answered(messages)
+        self.seen.append(list(messages))
+        if not self.replies:
+            raise RuntimeError("no scripted reply")
+        reply = self.replies.pop(0)
+        if isinstance(reply, str):
+            message = AIMessage(content=reply)
+        else:
+            calls: list[ToolCall] = []
+            for name, args in reply:
+                self.calls_made += 1
+                calls.append(ToolCall(name=name, args=args, id=f"call_{self.calls_made}"))
+            message = AIMessage(content="", tool_calls=calls)
+        return ChatResult(generations=[ChatGeneration(message=message)])
+
+
+def _check_answered(messages: list[BaseMessage]) -> None:
+    answered = {message.tool_call_id for message in messages if isinstance(message, ToolMessage)}
+    for message in messages:
+        if isinstance(message, AIMessage):
+            for call in message.tool_calls:
+                if call.get("id") not in answered:
+                    raise RuntimeError(f"tool call {call.get('id')} has no result")
 
 
 class GatedChatModel(BaseChatModel):

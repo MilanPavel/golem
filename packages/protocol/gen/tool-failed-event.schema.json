@@ -1,0 +1,68 @@
+{
+  "$defs": {
+    "ToolFailedData": {
+      "additionalProperties": false,
+      "description": "A tool call did not run, or stopped with an error. The model sees the same message.",
+      "properties": {
+        "call_id": {
+          "minLength": 1,
+          "title": "Call Id",
+          "type": "string"
+        },
+        "message": {
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "call_id",
+        "message"
+      ],
+      "title": "ToolFailedData",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The tool call was refused, raised, or was cut off by a stopped run.",
+  "properties": {
+    "data": {
+      "$ref": "#/$defs/ToolFailedData"
+    },
+    "run_id": {
+      "minLength": 1,
+      "title": "Run Id",
+      "type": "string"
+    },
+    "seq": {
+      "minimum": 1,
+      "title": "Seq",
+      "type": "integer"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    },
+    "ts": {
+      "minLength": 1,
+      "title": "Ts",
+      "type": "string"
+    },
+    "type": {
+      "const": "tool.failed",
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "seq",
+    "session_id",
+    "run_id",
+    "ts",
+    "type",
+    "data"
+  ],
+  "title": "ToolFailedEvent",
+  "type": "object"
+}

@@ -1,0 +1,34 @@
+{
+  "additionalProperties": false,
+  "description": "The model asked for one tool call.\n\n``message_id`` is the assistant message that asked. ``args`` are the\narguments as the model wrote them.",
+  "properties": {
+    "args": {
+      "additionalProperties": true,
+      "title": "Args",
+      "type": "object"
+    },
+    "call_id": {
+      "minLength": 1,
+      "title": "Call Id",
+      "type": "string"
+    },
+    "message_id": {
+      "minLength": 1,
+      "title": "Message Id",
+      "type": "string"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    }
+  },
+  "required": [
+    "call_id",
+    "message_id",
+    "name",
+    "args"
+  ],
+  "title": "ToolRequestedData",
+  "type": "object"
+}

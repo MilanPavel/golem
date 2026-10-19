@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import type { ChatMessage } from "./chat-state.ts";
-import { gutterColumn, INTERRUPTED_MARK, layoutMessages, layoutTranscript, type Span } from "./layout-chat.ts";
+import { gutterColumn, INTERRUPTED_MARK, layoutMessages, layoutTranscript, toolLabel, type Span } from "./layout-chat.ts";
 
 function textOf(spans: readonly Span[]): string {
   return spans.map((span) => span.text).join("");
@@ -126,5 +126,54 @@ test("a finished answer shows how long it took, and times sit beside the label",
   assert.equal(
     assistant.filter((line) => line.spans[0]?.text === "12.4s").length,
     1,
+  );
+});
+
+test("tool calls are one line each, with output only while expanded", () => {
+  const reply: ChatMessage = {
+    ...message("a", "assistant", ""),
+    tools: [
+      {
+        callId: "c1",
+        name: "read_file",
+        args: { path: "src/a.ts" },
+        status: "done",
+        summary: "2 lines",
+        preview: "     1|one\n     2|two",
+      },
+      { callId: "c2", name: "grep", args: { pattern: "x" }, status: "failed", error: "bad regex" },
+      { callId: "c3", name: "list_dir", args: {}, status: "running" },
+    ],
+  };
+  const collapsed = layoutMessages([reply], 60).map((line) => textOf(line.spans));
+  assert.deepEqual(collapsed, [
+    "golem",
+    "read_file src/a.ts ✓  2 lines",
+    "grep x ✗  bad regex",
+    "list_dir …",
+  ]);
+  const expanded = layoutMessages([reply], 60, { times: false, now: 0, toolOutput: true }).map((line) =>
+    textOf(line.spans),
+  );
+  assert.deepEqual(expanded.slice(1, 4), ["read_file src/a.ts ✓  2 lines", "  │      1|one", "  │      2|two"]);
+});
+
+test("a tool label prefers string arguments and stays short", () => {
+  assert.equal(toolLabel({ pattern: "**/*.py", path: "." }), "**/*.py .");
+  assert.equal(toolLabel({ offset: 2 }), '{"offset":2}');
+  assert.equal(toolLabel({}), "");
+  assert.equal(toolLabel({ path: "" }), "");
+  assert.equal(toolLabel({ path: "x".repeat(100) }).length, 80);
+});
+
+test("replies of one turn share a single golem label", () => {
+  const asked: ChatMessage = {
+    ...message("a", "assistant", ""),
+    tools: [{ callId: "c1", name: "list_dir", args: { path: "" }, status: "done", summary: "3 entries" }],
+  };
+  const lines = layoutMessages([message("u", "user", "list"), asked, message("b", "assistant", "Three files.")], 40);
+  assert.deepEqual(
+    lines.map((line) => textOf(line.spans).trimEnd()),
+    ["you", "list", "", "golem", "list_dir ✓  3 entries", "Three files."],
   );
 });

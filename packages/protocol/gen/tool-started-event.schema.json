@@ -1,0 +1,62 @@
+{
+  "$defs": {
+    "ToolStartedData": {
+      "additionalProperties": false,
+      "description": "A requested tool call is running.",
+      "properties": {
+        "call_id": {
+          "minLength": 1,
+          "title": "Call Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "call_id"
+      ],
+      "title": "ToolStartedData",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The tool call is running.",
+  "properties": {
+    "data": {
+      "$ref": "#/$defs/ToolStartedData"
+    },
+    "run_id": {
+      "minLength": 1,
+      "title": "Run Id",
+      "type": "string"
+    },
+    "seq": {
+      "minimum": 1,
+      "title": "Seq",
+      "type": "integer"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    },
+    "ts": {
+      "minLength": 1,
+      "title": "Ts",
+      "type": "string"
+    },
+    "type": {
+      "const": "tool.started",
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "seq",
+    "session_id",
+    "run_id",
+    "ts",
+    "type",
+    "data"
+  ],
+  "title": "ToolStartedEvent",
+  "type": "object"
+}

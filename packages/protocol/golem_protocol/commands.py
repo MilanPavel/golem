@@ -60,12 +60,16 @@ class PingParams(BaseModel):
 class SessionCreateParams(BaseModel):
     """``session.create``. An empty profile uses the daemon's configured one.
 
+    ``cwd`` is the session's project folder, an absolute path. File tools work
+    only inside it, and a session without one has no file tools.
+
     The caller is not attached. ``session.attach`` replays ``session.created``.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     model_profile: str | None = Field(default=None, min_length=1)
+    cwd: str | None = Field(default=None, min_length=1)
 
 
 class SessionCreateResult(BaseModel):
@@ -158,12 +162,15 @@ class MessageSendParams(BaseModel):
     """``message.send``. Starts one graph run for this session.
 
     The run's events go to the connections attached to the session.
+    ``cwd`` is the sender's folder, an absolute path. A session without a
+    project folder takes it, and keeps it. A session with one ignores it.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     session_id: str = Field(min_length=1)
     text: str = Field(min_length=1, max_length=100_000)
+    cwd: str | None = Field(default=None, min_length=1)
 
 
 class MessageSendResult(BaseModel):

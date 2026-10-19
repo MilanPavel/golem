@@ -38,8 +38,9 @@ Golem has two parts:
 - Closing the TUI and coming back, from any number of terminals at once.
 - Cancelling an answer with Ctrl-C, which keeps what it said so far.
 - Automatic titles, a session switcher, new sessions, renaming, and forking.
+- Reading files, listing folders, and searching with `glob` and `grep`, inside the folder you started the TUI in. Ctrl-O shows what each tool returned.
 
-Golem cannot use tools yet. It cannot read files or run commands. That is the next large step. See [docs/plan.md](docs/plan.md).
+Golem cannot run commands or change files yet, and it does not ask before a tool runs. Permissions and approvals come next. See [docs/plan.md](docs/plan.md).
 
 Golem runs on macOS only, from a checkout of this repository. There is no installer yet.
 

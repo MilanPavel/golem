@@ -6,7 +6,18 @@ from langchain_core.messages import (
     ToolMessage,
 )
 
-from golem.graphs.adapter import PlainMessage, TextCompleted, TextDelta, plain_messages, translate
+from golem.graphs.adapter import (
+    ModelStarted,
+    PlainMessage,
+    RequestedCall,
+    TextCompleted,
+    TextDelta,
+    ToolErrored,
+    ToolFinished,
+    ToolStarted,
+    plain_messages,
+    translate,
+)
 
 
 def test_message_chunk_becomes_a_delta() -> None:
@@ -69,3 +80,33 @@ def test_plain_messages_are_role_and_text() -> None:
 def test_updates_without_call_model_are_ignored() -> None:
     part = {"type": "updates", "data": {"other": {"messages": [AIMessage(content="no")]}}}
     assert translate(part) is None
+
+
+def test_custom_stream_items_become_tool_facts() -> None:
+    def custom(**data: object) -> dict[str, object]:
+        return {"type": "custom", "data": {"golem": data.pop("kind"), **data}}
+
+    assert translate(custom(kind="model.started", message_id="m_2")) == ModelStarted("m_2")
+    assert translate(custom(kind="tool.started", call_id="c_1")) == ToolStarted("c_1")
+    assert translate(
+        custom(kind="tool.completed", call_id="c_1", summary="2 lines", preview="a", truncated=True)
+    ) == ToolFinished("c_1", "2 lines", "a", True)
+    assert translate(custom(kind="tool.failed", call_id="c_1", message="no")) == ToolErrored(
+        "c_1", "no"
+    )
+    assert translate({"type": "custom", "data": {"other": 1}}) is None
+
+
+def test_a_reply_with_tool_calls_lists_them() -> None:
+    reply = AIMessage(
+        content="",
+        id="m_a",
+        tool_calls=[{"name": "read_file", "args": {"path": "a.py"}, "id": "c_1"}],
+    )
+    part = {"type": "updates", "data": {"call_model": {"messages": [reply]}}}
+    assert translate(part) == TextCompleted(
+        "", "m_a", (RequestedCall("c_1", "read_file", {"path": "a.py"}),)
+    )
+    assert plain_messages({"messages": [reply]}) == [
+        PlainMessage("assistant", '→ read_file(path="a.py")')
+    ]

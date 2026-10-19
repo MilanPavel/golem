@@ -4,9 +4,9 @@
 ``params`` of an ``event`` notification. ``type`` discriminates that union.
 """
 
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, model_validator
 
 _CONFIG = ConfigDict(extra="forbid", frozen=True)
 
@@ -35,7 +35,8 @@ class SessionCreatedData(BaseModel):
     ``model_profile`` is a profile name or a ``provider/model`` ref.
     ``model_provider`` and ``model_name`` are set when the daemon can resolve
     it, and null otherwise. ``forked_from`` is set on a session made by
-    ``session.fork``.
+    ``session.fork``. ``cwd`` is the project folder the file tools work in,
+    or null for a session without one.
     """
 
     model_config = _CONFIG
@@ -44,6 +45,7 @@ class SessionCreatedData(BaseModel):
     model_provider: str | None = Field(default=None, min_length=1)
     model_name: str | None = Field(default=None, min_length=1)
     forked_from: ForkedFrom | None = None
+    cwd: str | None = Field(default=None, min_length=1)
 
 
 class MessageStartedData(BaseModel):
@@ -102,11 +104,22 @@ class RunCancelledData(BaseModel):
 
 
 class SessionUpdatedData(BaseModel):
-    """A session attribute changed. Today that is only its title."""
+    """A session attribute changed: its title, or its project folder.
+
+    A field left null did not change. ``cwd`` is set once, on a session made
+    before sessions had a folder, by the first ``message.send`` that names one.
+    """
 
     model_config = _CONFIG
 
-    title: str = Field(min_length=1)
+    title: str | None = Field(default=None, min_length=1)
+    cwd: str | None = Field(default=None, min_length=1)
+
+    @model_validator(mode="after")
+    def _changes_something(self) -> Self:
+        if self.title is None and self.cwd is None:
+            raise ValueError("session.updated needs a title or a cwd")
+        return self
 
 
 class ModelSelectedData(BaseModel):
@@ -123,6 +136,54 @@ class ModelSelectedData(BaseModel):
     model_provider: str | None = Field(default=None, min_length=1)
     model_name: str | None = Field(default=None, min_length=1)
     reason: Literal["user"]
+
+
+class ToolRequestedData(BaseModel):
+    """The model asked for one tool call.
+
+    ``message_id`` is the assistant message that asked. ``args`` are the
+    arguments as the model wrote them.
+    """
+
+    model_config = _CONFIG
+
+    call_id: str = Field(min_length=1)
+    message_id: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    args: dict[str, Any]
+
+
+class ToolStartedData(BaseModel):
+    """A requested tool call is running."""
+
+    model_config = _CONFIG
+
+    call_id: str = Field(min_length=1)
+
+
+class ToolCompletedData(BaseModel):
+    """A tool call finished.
+
+    ``summary`` is one short line, such as ``42 lines``. ``preview`` is the
+    start of what the model received, cut at a few kilobytes, and
+    ``truncated`` says whether it was cut.
+    """
+
+    model_config = _CONFIG
+
+    call_id: str = Field(min_length=1)
+    summary: str
+    preview: str
+    truncated: bool = False
+
+
+class ToolFailedData(BaseModel):
+    """A tool call did not run, or stopped with an error. The model sees the same message."""
+
+    model_config = _CONFIG
+
+    call_id: str = Field(min_length=1)
+    message: str = Field(min_length=1)
 
 
 class SessionCreatedEvent(BaseModel):
@@ -274,6 +335,58 @@ class RunCancelledEvent(BaseModel):
     data: RunCancelledData
 
 
+class ToolRequestedEvent(BaseModel):
+    """The model asked for a tool. Follows the asking message's ``message.completed``."""
+
+    model_config = _CONFIG
+
+    seq: int = Field(ge=1)
+    session_id: str = Field(min_length=1)
+    run_id: str = Field(min_length=1)
+    ts: str = Field(min_length=1)
+    type: Literal["tool.requested"]
+    data: ToolRequestedData
+
+
+class ToolStartedEvent(BaseModel):
+    """The tool call is running."""
+
+    model_config = _CONFIG
+
+    seq: int = Field(ge=1)
+    session_id: str = Field(min_length=1)
+    run_id: str = Field(min_length=1)
+    ts: str = Field(min_length=1)
+    type: Literal["tool.started"]
+    data: ToolStartedData
+
+
+class ToolCompletedEvent(BaseModel):
+    """The tool call finished, and its result went back to the model."""
+
+    model_config = _CONFIG
+
+    seq: int = Field(ge=1)
+    session_id: str = Field(min_length=1)
+    run_id: str = Field(min_length=1)
+    ts: str = Field(min_length=1)
+    type: Literal["tool.completed"]
+    data: ToolCompletedData
+
+
+class ToolFailedEvent(BaseModel):
+    """The tool call was refused, raised, or was cut off by a stopped run."""
+
+    model_config = _CONFIG
+
+    seq: int = Field(ge=1)
+    session_id: str = Field(min_length=1)
+    run_id: str = Field(min_length=1)
+    ts: str = Field(min_length=1)
+    type: Literal["tool.failed"]
+    data: ToolFailedData
+
+
 EventType = Literal[
     "session.created",
     "session.updated",
@@ -286,6 +399,10 @@ EventType = Literal[
     "run.completed",
     "run.failed",
     "run.cancelled",
+    "tool.requested",
+    "tool.started",
+    "tool.completed",
+    "tool.failed",
 ]
 """The ``type`` of each :data:`ChatEvent` member."""
 
@@ -301,7 +418,11 @@ ChatEvent = Annotated[
     | RunStartedEvent
     | RunCompletedEvent
     | RunFailedEvent
-    | RunCancelledEvent,
+    | RunCancelledEvent
+    | ToolRequestedEvent
+    | ToolStartedEvent
+    | ToolCompletedEvent
+    | ToolFailedEvent,
     Field(discriminator="type"),
 ]
 
@@ -335,4 +456,12 @@ __all__ = [
     "SessionCreatedEvent",
     "SessionUpdatedData",
     "SessionUpdatedEvent",
+    "ToolCompletedData",
+    "ToolCompletedEvent",
+    "ToolFailedData",
+    "ToolFailedEvent",
+    "ToolRequestedData",
+    "ToolRequestedEvent",
+    "ToolStartedData",
+    "ToolStartedEvent",
 ]

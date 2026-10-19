@@ -81,6 +81,7 @@ class _LiveSession:
     session_id: str
     model_profile: str
     schema_version: int
+    cwd: str | None = None
     title: str | None = None
     titling: bool = False
     closed: bool = False
@@ -115,14 +116,18 @@ class SessionManager:
         self._naming: set[asyncio.Task[None]] = set()
         self._lock = asyncio.Lock()
 
-    async def create(self, model_profile: str | None) -> str:
-        """Store a new session and its ``session.created``. Nobody is attached yet."""
+    async def create(self, model_profile: str | None, *, cwd: str | None = None) -> str:
+        """Store a new session and its ``session.created``. Nobody is attached yet.
+
+        ``cwd`` is the folder its file tools work in. None gives it no file tools.
+        """
         profile = self._runtime.router.profile_name if model_profile is None else model_profile
         async with self._lock:
             session = _LiveSession(
                 session_id=new_id("s"),
                 model_profile=profile,
                 schema_version=SCHEMA_VERSION,
+                cwd=cwd,
             )
             await self._announce(session)
             self._sessions[session.session_id] = session
@@ -147,6 +152,7 @@ class SessionManager:
                 session_id=new_id("s"),
                 model_profile=source.model_profile,
                 schema_version=SCHEMA_VERSION,
+                cwd=source.cwd,
             )
             if not await self._runtime.fork(
                 session_id, fork.session_id, at_message_id=at_message_id
@@ -291,10 +297,11 @@ class SessionManager:
         """The model ``daemon.status`` reports for this process."""
         return self._runtime.router.identity()
 
-    async def send(self, session_id: str, text: str) -> str:
+    async def send(self, session_id: str, text: str, *, cwd: str | None = None) -> str:
         """Start one graph run. Returns ``run_id`` before the model finishes.
 
-        The run's events go to the targets attached to ``session_id``.
+        The run's events go to the targets attached to ``session_id``. A
+        session without a folder takes ``cwd`` first, with ``session.updated``.
 
         Raises :class:`SessionNotFoundError`, :class:`SessionBusyError`,
         :class:`SchemaMismatchError`, or :class:`~golem.models.router.ModelConfigError`.
@@ -304,6 +311,11 @@ class SessionManager:
             if session.task is not None and not session.task.done():
                 raise SessionBusyError(session_id)
             self._runtime.router.chat_model(session.model_profile)
+            if session.cwd is None and cwd is not None:
+                await self._events.emit(
+                    session_id, None, "session.updated", SessionUpdatedData(cwd=cwd)
+                )
+                session.cwd = cwd
             turn = Turn(
                 session_id=session.session_id,
                 run_id=new_id("r"),
@@ -312,6 +324,7 @@ class SessionManager:
                 schema_version=session.schema_version,
                 user_message_id=new_id("m"),
                 assistant_message_id=new_id("m"),
+                cwd=session.cwd,
             )
             control = RunControl()
             task = asyncio.create_task(
@@ -422,6 +435,7 @@ class SessionManager:
             model_profile=profile,
             schema_version=SCHEMA_VERSION,
             title=None if record is None else record.title,
+            cwd=None if record is None else record.cwd,
         )
         if record is None:
             await self._announce(session)
@@ -439,6 +453,7 @@ class SessionManager:
                 model_provider=chosen.provider,
                 model_name=chosen.name,
                 forked_from=forked_from,
+                cwd=session.cwd,
             ),
         )
 

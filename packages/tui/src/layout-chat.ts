@@ -1,6 +1,6 @@
 import { Lexer, type Token, type Tokens } from "marked";
 
-import type { ChatMessage } from "./chat-state.ts";
+import type { ChatMessage, ToolBlock } from "./chat-state.ts";
 import { formatDuration, formatMessageTime } from "./transcript.ts";
 
 export type Span = {
@@ -32,6 +32,18 @@ export type Transcript = Viewport & {
 export type TranscriptOptions = {
   times: boolean;
   now: number;
+  /** Ctrl-O: draw each tool call's output under its line. */
+  toolOutput?: boolean;
+};
+
+/** Output rows shown per tool call while Ctrl-O is on. */
+export const TOOL_PREVIEW_ROWS = 12;
+
+const TOOL_MARKS: Record<ToolBlock["status"], string> = {
+  requested: "…",
+  running: "…",
+  done: "✓",
+  failed: "✗",
 };
 
 export const INTERRUPTED_MARK = "· interrupted";
@@ -43,20 +55,34 @@ export function layoutMessages(
 ): LayoutLine[] {
   const width = Math.max(1, columns);
   const lines: LayoutLine[] = [];
+  let previous: ChatMessage | undefined;
   for (const message of messages) {
-    if (lines.length > 0) {
+    const continues = previous?.role === "assistant" && message.role === "assistant";
+    previous = message;
+    if (lines.length > 0 && !continues) {
       lines.push({ role: "plain", spans: [{ text: "" }] });
     }
     const role: LineRole = message.role === "user" ? "user" : "assistant";
     const label = role === "user" ? "you" : "golem";
-    const body = message.streaming
-      ? wrapSpans([{ text: message.text }], width)
-      : markdownLines(message.text, width);
-    lines.push(paint({ role, spans: labelSpans(label, message, options) }, width));
+    const tools = message.tools ?? [];
+    const body =
+      tools.length > 0 && message.text.length === 0
+        ? []
+        : message.streaming
+          ? wrapSpans([{ text: message.text }], width)
+          : markdownLines(message.text, width);
+    if (!continues) {
+      lines.push(paint({ role, spans: labelSpans(label, message, options) }, width));
+    }
     for (const spans of body) {
       lines.push(paint({ role, spans }, width));
     }
-    const duration = answerDuration(message);
+    for (const tool of tools) {
+      for (const spans of toolLines(tool, width, options?.toolOutput === true)) {
+        lines.push({ role, spans });
+      }
+    }
+    const duration = tools.length > 0 ? null : answerDuration(message);
     if (duration !== null) {
       lines.push(paint({ role, spans: [{ text: duration, dim: true }] }, width));
     }
@@ -117,6 +143,53 @@ export function layoutTranscript(
       ? gutterColumn(lines.length, fitted.lines.length, fitted.offsetFromBottom)
       : null;
   return { ...fitted, gutter, lineCount: lines.length };
+}
+
+/** `read_file src/a.ts ✓  12 lines`, then the output while Ctrl-O is on. */
+export function toolLines(tool: ToolBlock, width: number, expanded: boolean): Span[][] {
+  const head: Span[] = [{ text: tool.name, bold: true }];
+  const label = toolLabel(tool.args);
+  if (label.length > 0) {
+    head.push({ text: ` ${label}` });
+  }
+  head.push({ text: ` ${TOOL_MARKS[tool.status]}`, dim: tool.status !== "failed" });
+  if (tool.status === "done" && tool.summary !== undefined && tool.summary.length > 0) {
+    head.push({ text: `  ${tool.summary}`, dim: true });
+  }
+  if (tool.status === "failed" && tool.error !== undefined) {
+    head.push({ text: `  ${tool.error}`, italic: true });
+  }
+  const lines = wrapSpans(head, width);
+  if (!expanded || tool.status !== "done" || tool.preview === undefined) {
+    return lines;
+  }
+  const rows = tool.preview.split("\n");
+  const shown = rows.slice(0, TOOL_PREVIEW_ROWS);
+  for (const row of shown) {
+    lines.push(...wrapSpans([{ text: `  │ ${row}`, dim: true }], width));
+  }
+  if (rows.length > shown.length || tool.truncated === true) {
+    lines.push([{ text: "  │ …", dim: true }]);
+  }
+  return lines;
+}
+
+/** The arguments in one line: string values first, joined by spaces. */
+export function toolLabel(args: Readonly<Record<string, unknown>>): string {
+  const parts: string[] = [];
+  const rest: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(args)) {
+    if (typeof value === "string") {
+      if (value.length > 0) {
+        parts.push(value);
+      }
+    } else {
+      rest[key] = value;
+    }
+  }
+  const text = parts.length > 0 ? parts.join(" ") : Object.keys(rest).length > 0 ? JSON.stringify(rest) : "";
+  const line = text.replace(/\s+/g, " ");
+  return line.length > 80 ? `${line.slice(0, 79)}…` : line;
 }
 
 export function padLine(line: LayoutLine, width: number): LayoutLine {

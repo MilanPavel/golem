@@ -21,6 +21,12 @@ from golem_protocol.events import (
     RunFailedEvent,
     SessionCreatedData,
     SessionCreatedEvent,
+    SessionUpdatedData,
+    ToolCompletedData,
+    ToolCompletedEvent,
+    ToolFailedData,
+    ToolRequestedData,
+    ToolRequestedEvent,
 )
 from golem_protocol.rpc import RpcNotification
 
@@ -117,3 +123,44 @@ def test_chat_event_rejects_the_wrong_payload() -> None:
                 "data": {"message_id": "m_abc"},
             }
         )
+
+
+def test_tool_events_round_trip() -> None:
+    requested = ToolRequestedEvent(
+        seq=5,
+        session_id="s_abc",
+        run_id="r_abc",
+        ts="2026-10-07T10:00:04+00:00",
+        type="tool.requested",
+        data=ToolRequestedData(
+            call_id="c_1", message_id="m_abc", name="read_file", args={"path": "a.txt"}
+        ),
+    )
+    completed = ToolCompletedEvent(
+        seq=6,
+        session_id="s_abc",
+        run_id="r_abc",
+        ts="2026-10-07T10:00:05+00:00",
+        type="tool.completed",
+        data=ToolCompletedData(call_id="c_1", summary="1 line", preview="hi"),
+    )
+    assert _ADAPTER.validate_python(requested.model_dump()) == requested
+    assert _ADAPTER.validate_json(completed.model_dump_json()) == completed
+    assert completed.data.truncated is False
+    with pytest.raises(ValidationError):
+        ToolFailedData(call_id="c_1", message="")
+
+
+def test_session_create_carries_a_folder() -> None:
+    params = SessionCreateParams(cwd="/Users/me/code")
+    assert SessionCreateParams.model_validate_json(params.model_dump_json()) == params
+    assert SessionCreatedData(model_profile="remote", cwd="/Users/me/code").cwd == "/Users/me/code"
+    with pytest.raises(ValidationError):
+        SessionCreateParams(cwd="")
+
+
+def test_session_updated_names_what_changed() -> None:
+    assert SessionUpdatedData(cwd="/Users/me/code").title is None
+    assert SessionUpdatedData(title="Named").cwd is None
+    with pytest.raises(ValidationError):
+        SessionUpdatedData()

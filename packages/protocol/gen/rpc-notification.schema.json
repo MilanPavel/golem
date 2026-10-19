@@ -586,8 +586,21 @@
     },
     "SessionCreatedData": {
       "additionalProperties": false,
-      "description": "Profile stored for a new session.\n\n``model_profile`` is a profile name or a ``provider/model`` ref.\n``model_provider`` and ``model_name`` are set when the daemon can resolve\nit, and null otherwise. ``forked_from`` is set on a session made by\n``session.fork``.",
+      "description": "Profile stored for a new session.\n\n``model_profile`` is a profile name or a ``provider/model`` ref.\n``model_provider`` and ``model_name`` are set when the daemon can resolve\nit, and null otherwise. ``forked_from`` is set on a session made by\n``session.fork``. ``cwd`` is the project folder the file tools work in,\nor null for a session without one.",
       "properties": {
+        "cwd": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cwd"
+        },
         "forked_from": {
           "anyOf": [
             {
@@ -682,17 +695,35 @@
     },
     "SessionUpdatedData": {
       "additionalProperties": false,
-      "description": "A session attribute changed. Today that is only its title.",
+      "description": "A session attribute changed: its title, or its project folder.\n\nA field left null did not change. ``cwd`` is set once, on a session made\nbefore sessions had a folder, by the first ``message.send`` that names one.",
       "properties": {
+        "cwd": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cwd"
+        },
         "title": {
-          "minLength": 1,
-          "title": "Title",
-          "type": "string"
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
         }
       },
-      "required": [
-        "title"
-      ],
       "title": "SessionUpdatedData",
       "type": "object"
     },
@@ -738,6 +769,285 @@
       ],
       "title": "SessionUpdatedEvent",
       "type": "object"
+    },
+    "ToolCompletedData": {
+      "additionalProperties": false,
+      "description": "A tool call finished.\n\n``summary`` is one short line, such as ``42 lines``. ``preview`` is the\nstart of what the model received, cut at a few kilobytes, and\n``truncated`` says whether it was cut.",
+      "properties": {
+        "call_id": {
+          "minLength": 1,
+          "title": "Call Id",
+          "type": "string"
+        },
+        "preview": {
+          "title": "Preview",
+          "type": "string"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "truncated": {
+          "default": false,
+          "title": "Truncated",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "call_id",
+        "summary",
+        "preview"
+      ],
+      "title": "ToolCompletedData",
+      "type": "object"
+    },
+    "ToolCompletedEvent": {
+      "additionalProperties": false,
+      "description": "The tool call finished, and its result went back to the model.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/ToolCompletedData"
+        },
+        "run_id": {
+          "minLength": 1,
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "tool.completed",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "run_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "ToolCompletedEvent",
+      "type": "object"
+    },
+    "ToolFailedData": {
+      "additionalProperties": false,
+      "description": "A tool call did not run, or stopped with an error. The model sees the same message.",
+      "properties": {
+        "call_id": {
+          "minLength": 1,
+          "title": "Call Id",
+          "type": "string"
+        },
+        "message": {
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "call_id",
+        "message"
+      ],
+      "title": "ToolFailedData",
+      "type": "object"
+    },
+    "ToolFailedEvent": {
+      "additionalProperties": false,
+      "description": "The tool call was refused, raised, or was cut off by a stopped run.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/ToolFailedData"
+        },
+        "run_id": {
+          "minLength": 1,
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "tool.failed",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "run_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "ToolFailedEvent",
+      "type": "object"
+    },
+    "ToolRequestedData": {
+      "additionalProperties": false,
+      "description": "The model asked for one tool call.\n\n``message_id`` is the assistant message that asked. ``args`` are the\narguments as the model wrote them.",
+      "properties": {
+        "args": {
+          "additionalProperties": true,
+          "title": "Args",
+          "type": "object"
+        },
+        "call_id": {
+          "minLength": 1,
+          "title": "Call Id",
+          "type": "string"
+        },
+        "message_id": {
+          "minLength": 1,
+          "title": "Message Id",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "call_id",
+        "message_id",
+        "name",
+        "args"
+      ],
+      "title": "ToolRequestedData",
+      "type": "object"
+    },
+    "ToolRequestedEvent": {
+      "additionalProperties": false,
+      "description": "The model asked for a tool. Follows the asking message's ``message.completed``.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/ToolRequestedData"
+        },
+        "run_id": {
+          "minLength": 1,
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "tool.requested",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "run_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "ToolRequestedEvent",
+      "type": "object"
+    },
+    "ToolStartedData": {
+      "additionalProperties": false,
+      "description": "A requested tool call is running.",
+      "properties": {
+        "call_id": {
+          "minLength": 1,
+          "title": "Call Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "call_id"
+      ],
+      "title": "ToolStartedData",
+      "type": "object"
+    },
+    "ToolStartedEvent": {
+      "additionalProperties": false,
+      "description": "The tool call is running.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/ToolStartedData"
+        },
+        "run_id": {
+          "minLength": 1,
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "tool.started",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "run_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "ToolStartedEvent",
+      "type": "object"
     }
   },
   "additionalProperties": false,
@@ -768,7 +1078,11 @@
           "run.started": "#/$defs/RunStartedEvent",
           "session.closed": "#/$defs/SessionClosedEvent",
           "session.created": "#/$defs/SessionCreatedEvent",
-          "session.updated": "#/$defs/SessionUpdatedEvent"
+          "session.updated": "#/$defs/SessionUpdatedEvent",
+          "tool.completed": "#/$defs/ToolCompletedEvent",
+          "tool.failed": "#/$defs/ToolFailedEvent",
+          "tool.requested": "#/$defs/ToolRequestedEvent",
+          "tool.started": "#/$defs/ToolStartedEvent"
         },
         "propertyName": "type"
       },
@@ -805,6 +1119,18 @@
         },
         {
           "$ref": "#/$defs/RunCancelledEvent"
+        },
+        {
+          "$ref": "#/$defs/ToolRequestedEvent"
+        },
+        {
+          "$ref": "#/$defs/ToolStartedEvent"
+        },
+        {
+          "$ref": "#/$defs/ToolCompletedEvent"
+        },
+        {
+          "$ref": "#/$defs/ToolFailedEvent"
         }
       ],
       "title": "Params"

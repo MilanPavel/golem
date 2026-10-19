@@ -131,7 +131,7 @@ async def _titled(events: EventLog, session_id: str) -> list[str]:
     return [
         event.data.title
         for event in await events.after(session_id, 0)
-        if isinstance(event, SessionUpdatedEvent)
+        if isinstance(event, SessionUpdatedEvent) and event.data.title is not None
     ]
 
 

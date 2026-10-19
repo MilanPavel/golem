@@ -27,7 +27,7 @@ In the TUI, `/fork` cuts at the newest finished message on the screen and switch
 
 ## Other shapes that lost
 
-Copying the source's current state and trimming its message list would break once plan step 10.4 compacts history. The trimmed list would no longer be the one the model saw at that point. The checkpoint history keeps that state as it was.
+Copying the source's current state and trimming its message list would break once plan step 10.5 compacts history. The trimmed list would no longer be the one the model saw at that point. The checkpoint history keeps that state as it was.
 
 Copying every event, deltas and `run.*` included, would replay runs the fork never had, and the `runs` table would hold them twice. The completed messages are all the screen needs.
 
@@ -35,7 +35,7 @@ Giving the copied events new run ids would hide where each message came from.
 
 ## What it costs
 
-`aget_state_history` reads checkpoints from newest to oldest. Forking near the start of a long session reads most of its history. That is fine at chat sizes. Compaction (plan step 10.4) may need a `before` bound.
+`aget_state_history` reads checkpoints from newest to oldest. Forking near the start of a long session reads most of its history. That is fine at chat sizes. Compaction (plan step 10.5) may need a `before` bound.
 
 A copied event's `run_id` names a run of the source session. `EventLog.for_run` returns those copies too. Recovery reads it only for runs still open, and the copies are completed messages, which it treats the same way.
 

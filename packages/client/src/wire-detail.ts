@@ -112,11 +112,22 @@ function eventDetail(type: string, seq: string, data: Record<string, unknown> | 
     if (data["interrupted"] === true) {
       parts.push("interrupted");
     }
-  } else if (type === "session.updated" && typeof data["title"] === "string") {
-    parts.push(flat(data["title"]));
+  } else if (type === "session.updated") {
+    if (typeof data["title"] === "string") {
+      parts.push(flat(data["title"]));
+    }
+    if (typeof data["cwd"] === "string") {
+      parts.push(flat(data["cwd"]));
+    }
   } else if (type === "run.cancelled" && typeof data["reason"] === "string") {
     parts.push(data["reason"]);
   } else if (type === "run.failed" && typeof data["message"] === "string") {
+    parts.push(flat(data["message"]));
+  } else if (type === "tool.requested" && typeof data["name"] === "string") {
+    parts.push(data["name"], flat(JSON.stringify(data["args"] ?? {})));
+  } else if (type === "tool.completed" && typeof data["summary"] === "string") {
+    parts.push(flat(data["summary"]));
+  } else if (type === "tool.failed" && typeof data["message"] === "string") {
     parts.push(flat(data["message"]));
   } else if (type === "model.selected") {
     const name = typeof data["model_name"] === "string" ? data["model_name"] : "";
