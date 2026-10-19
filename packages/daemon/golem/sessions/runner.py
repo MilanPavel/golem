@@ -5,6 +5,11 @@ model call is its own assistant message. Each tool call is
 ``tool.requested``, ``tool.started``, then ``tool.completed`` or
 ``tool.failed``.
 
+A tool call that needs approval pauses the run: ``approval.needed`` is the
+last event, the task ends, and the run waits with no task at all, across a
+TUI close or a daemon restart. :func:`resume_turn` starts a new task for the
+same run with the answer: ``approval.resolved``, then the rest of the run.
+
 A cancelled turn still ends in the log. The open reply completes with the
 text streamed so far, marked interrupted, each tool call still open fails,
 and ``run.cancelled`` follows.
@@ -14,7 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncGenerator, Awaitable, Callable, Sequence
 from contextlib import aclosing
 from dataclasses import dataclass, field
 from typing import Literal
@@ -22,6 +27,7 @@ from typing import Literal
 from pydantic import BaseModel
 
 from golem.graphs.adapter import (
+    ApprovalAsked,
     ModelStarted,
     TextCompleted,
     TextDelta,
@@ -34,6 +40,9 @@ from golem.graphs.chat import ChatRuntime
 from golem.sessions.interrupted import close_reply
 from golem.sessions.log import SessionLog
 from golem_protocol.events import (
+    ApprovalDecision,
+    ApprovalNeededData,
+    ApprovalResolvedData,
     EmptyEventData,
     EventType,
     MessageCompletedData,
@@ -66,6 +75,25 @@ class Turn:
     user_message_id: str
     assistant_message_id: str
     cwd: str | None = None
+    allowed_tools: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class Resume:
+    """The answer to the tool call a run waits on, and what the run's events say about it.
+
+    ``open_calls`` are the run's tool calls requested and not finished.
+    """
+
+    session_id: str
+    run_id: str
+    call_id: str
+    name: str
+    decision: ApprovalDecision
+    user_message_id: str | None
+    open_calls: tuple[str, ...]
+    cwd: str | None = None
+    allowed_tools: tuple[str, ...] = ()
 
 
 @dataclass
@@ -93,15 +121,17 @@ class _Progress:
     reply: str | None = None
     parts: list[str] = field(default_factory=list[str])
     calls: list[str] = field(default_factory=list[str])
+    waiting: bool = False
 
 
 async def run_turn(
     runtime: ChatRuntime, events: SessionLog, turn: Turn, control: RunControl
 ) -> str | None:
-    """Run ``turn`` to the end. A failure becomes ``run.failed``, not an exception.
+    """Run ``turn`` until it ends or waits. A failure becomes ``run.failed``, not an exception.
 
-    Returns the reply when the run completed, and None when it failed.
-    Cancellation is re-raised after ``run.cancelled`` is in the log.
+    Returns the reply when the run completed, and None when it failed or
+    waits for an approval. Cancellation is re-raised after ``run.cancelled``
+    is in the log.
     """
     progress = _Progress()
 
@@ -130,20 +160,86 @@ async def run_turn(
             user_message_id=turn.user_message_id,
             assistant_message_id=turn.assistant_message_id,
             cwd=turn.cwd,
+            allowed_tools=turn.allowed_tools,
         )
-        async with aclosing(stream):
-            async for part in stream:
-                await _apply(translate(part), progress, emit)
-        await emit("run.completed", EmptyEventData())
+        return await _finish(stream, progress, emit)
     except asyncio.CancelledError:
-        await _stopped(runtime, events, turn, progress, control.reason or "shutdown")
+        await _stopped(
+            runtime,
+            events,
+            turn.session_id,
+            turn.run_id,
+            turn.user_message_id,
+            progress,
+            control.reason or "shutdown",
+        )
         raise
     except Exception as exc:
-        log.exception("run %s failed", turn.run_id)
-        message = str(exc).strip() or type(exc).__name__
-        await emit("run.failed", RunFailedData(message=message))
+        return await _failed(turn.run_id, exc, emit)
+
+
+async def resume_turn(
+    runtime: ChatRuntime, events: SessionLog, resume: Resume, control: RunControl
+) -> str | None:
+    """Answer the waiting tool call, then run on until the run ends or waits again.
+
+    Returns what :func:`run_turn` returns.
+    """
+    progress = _Progress(run_started=True, calls=list(resume.open_calls))
+
+    async def emit(kind: EventType, data: BaseModel) -> None:
+        await events.emit(resume.session_id, resume.run_id, kind, data)
+
+    try:
+        control.started.set()
+        await emit(
+            "approval.resolved",
+            ApprovalResolvedData(
+                call_id=resume.call_id, name=resume.name, decision=resume.decision
+            ),
+        )
+        stream = runtime.resume(
+            session_id=resume.session_id,
+            decision=resume.decision,
+            cwd=resume.cwd,
+            allowed_tools=resume.allowed_tools,
+        )
+        return await _finish(stream, progress, emit)
+    except asyncio.CancelledError:
+        await _stopped(
+            runtime,
+            events,
+            resume.session_id,
+            resume.run_id,
+            resume.user_message_id,
+            progress,
+            control.reason or "shutdown",
+        )
+        raise
+    except Exception as exc:
+        return await _failed(resume.run_id, exc, emit)
+
+
+async def _finish(
+    stream: AsyncGenerator[object],
+    progress: _Progress,
+    emit: Callable[[EventType, BaseModel], Awaitable[None]],
+) -> str | None:
+    async with aclosing(stream):
+        async for part in stream:
+            await _apply(translate(part), progress, emit)
+    if progress.waiting:
         return None
+    await emit("run.completed", EmptyEventData())
     return "".join(progress.parts) if progress.reply is None else progress.reply
+
+
+async def _failed(
+    run_id: str, exc: Exception, emit: Callable[[EventType, BaseModel], Awaitable[None]]
+) -> None:
+    log.exception("run %s failed", run_id, exc_info=exc)
+    message = str(exc).strip() or type(exc).__name__
+    await emit("run.failed", RunFailedData(message=message))
 
 
 async def _apply(
@@ -196,6 +292,18 @@ async def _apply(
     elif isinstance(fact, ToolErrored):
         _done(progress, fact.call_id)
         await emit("tool.failed", ToolFailedData(call_id=fact.call_id, message=fact.message))
+    elif isinstance(fact, ApprovalAsked):
+        progress.waiting = True
+        await emit(
+            "approval.needed",
+            ApprovalNeededData(
+                call_id=fact.call_id,
+                message_id=fact.message_id,
+                name=fact.name,
+                args=fact.args,
+                source=fact.source,
+            ),
+        )
 
 
 def _done(progress: _Progress, call_id: str) -> None:
@@ -206,36 +314,49 @@ def _done(progress: _Progress, call_id: str) -> None:
 async def _stopped(
     runtime: ChatRuntime,
     events: SessionLog,
-    turn: Turn,
+    session_id: str,
+    run_id: str,
+    user_message_id: str | None,
     progress: _Progress,
     reason: CancelReason,
 ) -> None:
-    log.info("run %s cancelled (%s)", turn.run_id, reason)
+    log.info("run %s cancelled (%s)", run_id, reason)
     try:
         if not progress.run_started:
-            await events.emit(turn.session_id, turn.run_id, "run.started", EmptyEventData())
-        for call_id in progress.calls:
-            await events.emit(
-                turn.session_id,
-                turn.run_id,
-                "tool.failed",
-                ToolFailedData(call_id=call_id, message=CANCELLED_TOOL),
-            )
+            await events.emit(session_id, run_id, "run.started", EmptyEventData())
+        await fail_calls(events, session_id, run_id, progress.calls, CANCELLED_TOOL)
         if progress.open is not None:
             await close_reply(
                 runtime,
                 events,
-                session_id=turn.session_id,
-                run_id=turn.run_id,
-                user_message_id=turn.user_message_id,
+                session_id=session_id,
+                run_id=run_id,
+                user_message_id=user_message_id,
                 assistant_message_id=progress.open,
                 partial="".join(progress.parts),
             )
-        await events.emit(
-            turn.session_id, turn.run_id, "run.cancelled", RunCancelledData(reason=reason)
-        )
+        await events.emit(session_id, run_id, "run.cancelled", RunCancelledData(reason=reason))
     except Exception:
-        log.exception("could not record the end of cancelled run %s", turn.run_id)
+        log.exception("could not record the end of cancelled run %s", run_id)
 
 
-__all__ = ["CancelReason", "RunControl", "Turn", "run_turn"]
+async def fail_calls(
+    events: SessionLog, session_id: str, run_id: str, calls: Sequence[str], message: str
+) -> None:
+    """``tool.failed`` for each of ``calls``."""
+    for call_id in calls:
+        await events.emit(
+            session_id, run_id, "tool.failed", ToolFailedData(call_id=call_id, message=message)
+        )
+
+
+__all__ = [
+    "CANCELLED_TOOL",
+    "CancelReason",
+    "Resume",
+    "RunControl",
+    "Turn",
+    "fail_calls",
+    "resume_turn",
+    "run_turn",
+]

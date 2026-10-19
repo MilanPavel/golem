@@ -1,6 +1,6 @@
 import type { ChatMessage } from "./chat-state.ts";
 
-export type MeterPhase = "thinking" | "writing";
+export type MeterPhase = "thinking" | "writing" | "waiting";
 
 const BLOCK = 3;
 
@@ -14,9 +14,12 @@ export function assistantChars(messages: readonly ChatMessage[]): number {
   return 0;
 }
 
-export function meterPhase(busy: boolean, chars: number): MeterPhase | null {
+export function meterPhase(busy: boolean, chars: number, waiting = false): MeterPhase | null {
   if (!busy) {
     return null;
+  }
+  if (waiting) {
+    return "waiting";
   }
   return chars > 0 ? "writing" : "thinking";
 }
@@ -54,7 +57,9 @@ export function meterLine(
   const label =
     phase === "thinking"
       ? "thinking"
-      : `writing · ${chars.toLocaleString("en-US")} chars · ${elapsed}s`;
+      : phase === "waiting"
+        ? "waiting for your approval"
+        : `writing · ${chars.toLocaleString("en-US")} chars · ${elapsed}s`;
   if (columns <= 0) {
     return "";
   }

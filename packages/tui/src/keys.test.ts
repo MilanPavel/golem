@@ -210,3 +210,20 @@ test("the key list scrolls from the top", () => {
   assert.equal(moveOverlayOffset(30, "start", 40, 10), 0);
   assert.equal(moveOverlayOffset(0, "down", 4, 10), 0);
 });
+
+test("while a tool call waits, a, s, d, Enter, and Esc answer it", () => {
+  const waiting = place({ busy: true, approval: true });
+  const press = (input: string, name: Parameters<typeof pressKey>[1]["name"] = null) =>
+    pressKey(waiting, { name, input, ctrl: false, meta: false });
+  assert.deepEqual(press("a"), { kind: "approve", decision: "allow" });
+  assert.deepEqual(press("", "return"), { kind: "approve", decision: "allow" });
+  assert.deepEqual(press("s"), { kind: "approve", decision: "allow_session" });
+  assert.deepEqual(press("d"), { kind: "approve", decision: "deny" });
+  assert.deepEqual(press("", "escape"), { kind: "approve", decision: "deny" });
+  assert.deepEqual(press("x"), { kind: "ignore" });
+  assert.deepEqual(press("", "ctrl-c"), { kind: "cancel" });
+  assert.deepEqual(pressKey(place(), { name: null, input: "a", ctrl: false, meta: false }), {
+    kind: "insert",
+    text: "a",
+  });
+});

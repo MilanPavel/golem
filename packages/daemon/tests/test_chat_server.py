@@ -8,12 +8,13 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import cast
 
-from fakes import GatedChatModel, ScriptedChatModel
+from fakes import GatedChatModel, ScriptedChatModel, ToolCallingChatModel
 from test_server import HELLO, RpcClient, error_code, rpc_result, start_daemon, stop_daemon
 
 from golem.config import GolemSettings
 from golem.models.router import ModelRouter
 from golem.server.dispatcher import (
+    APPROVAL_NOT_FOUND,
     INVALID_PARAMS,
     MESSAGE_NOT_FOUND,
     MODEL_NOT_CONFIGURED,
@@ -734,6 +735,44 @@ async def test_config_get_lists_the_rules_for_a_folder(short_home: Path) -> None
         }
         relative = await client.call("config.get", {"cwd": "project"})
         assert error_code(relative) == INVALID_PARAMS
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+
+
+async def test_approval_respond_goes_on_with_the_waiting_run(short_home: Path) -> None:
+    (short_home / "config.toml").write_text(
+        '[[rule]]\ntool = "read_file"\naction = "ask"\n', encoding="utf-8"
+    )
+    project = short_home / "project"
+    project.mkdir()
+    (project / "notes.txt").write_text("42\n", encoding="utf-8")
+    model = ToolCallingChatModel(replies=[[("read_file", {"path": "notes.txt"})], "It is 42."])
+    app, task = await start_daemon(short_home, router=ModelRouter(model=model))
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        created = rpc_result(await client.call("session.create", {"cwd": str(project)}))
+        assert isinstance(created, dict)
+        session_id = str(created["session_id"])
+        await _attach(client, session_id)
+        await client.call("message.send", {"session_id": session_id, "text": "read notes"})
+        needed = _event_data(await client.wait_for_event("approval.needed"))
+        assert (needed["name"], needed["args"]) == ("read_file", {"path": "notes.txt"})
+        assert needed["source"].endswith("config.toml rule 1")  # type: ignore[union-attr]
+
+        wrong = await client.call(
+            "approval.respond", {"session_id": session_id, "call_id": "nope", "decision": "allow"}
+        )
+        assert error_code(wrong) == APPROVAL_NOT_FOUND
+        answered = await client.call(
+            "approval.respond",
+            {"session_id": session_id, "call_id": needed["call_id"], "decision": "allow"},
+        )
+        assert isinstance(rpc_result(answered), dict)
+        await client.wait_for_event("run.completed")
+        assert _completed_text(client.events, "assistant")[-1] == "It is 42."
+        assert "tool.completed" in _event_types(client.events)
     finally:
         await client.close()
         await stop_daemon(app, task)

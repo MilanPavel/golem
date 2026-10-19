@@ -41,6 +41,7 @@ export const TOOL_PREVIEW_ROWS = 12;
 
 const TOOL_MARKS: Record<ToolBlock["status"], string> = {
   requested: "…",
+  waiting: "?",
   running: "…",
   done: "✓",
   failed: "✗",

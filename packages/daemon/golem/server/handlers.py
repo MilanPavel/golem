@@ -18,6 +18,7 @@ from golem.models.pulls import PullError, PullManager
 from golem.models.router import ModelConfigError, ModelRouter
 from golem.permissions.policy import PROJECT_POLICY
 from golem.server.dispatcher import (
+    APPROVAL_NOT_FOUND,
     INTERNAL_ERROR,
     INVALID_PARAMS,
     KEYCHAIN_UNAVAILABLE,
@@ -33,6 +34,7 @@ from golem.server.dispatcher import (
     RpcCallError,
 )
 from golem.sessions.manager import (
+    ApprovalNotFoundError,
     BlankTitleError,
     MessageNotFoundError,
     RunNotFoundError,
@@ -43,6 +45,8 @@ from golem.sessions.manager import (
 )
 from golem.sessions.summaries import summarize
 from golem_protocol.commands import (
+    ApprovalRespondParams,
+    ApprovalRespondResult,
     AuthKeyStatus,
     AuthListParams,
     AuthListResult,
@@ -231,6 +235,23 @@ async def _message_send(ctx: RequestContext, params: MessageSendParams) -> Messa
     except ModelConfigError as exc:
         raise RpcCallError(MODEL_NOT_CONFIGURED, str(exc)) from exc
     return MessageSendResult(run_id=run_id)
+
+
+async def _approval_respond(
+    ctx: RequestContext, params: ApprovalRespondParams
+) -> ApprovalRespondResult:
+    sessions = _sessions(ctx)
+    try:
+        run_id = await sessions.respond(params.session_id, params.call_id, params.decision)
+    except ApprovalNotFoundError as exc:
+        raise RpcCallError(APPROVAL_NOT_FOUND, "no run waits on this tool call") from exc
+    except SessionNotFoundError as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
+    except SessionBusyError as exc:
+        raise RpcCallError(SESSION_BUSY, "session is busy") from exc
+    except SchemaMismatchError as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, str(exc)) from exc
+    return ApprovalRespondResult(run_id=run_id)
 
 
 async def _run_cancel(ctx: RequestContext, params: RunCancelParams) -> RunCancelResult:
@@ -496,6 +517,9 @@ def standard_methods() -> dict[str, Method]:
         "session.close": Method("session.close", SessionCloseParams, True, _session_close),
         "session.rename": Method("session.rename", SessionRenameParams, True, _session_rename),
         "message.send": Method("message.send", MessageSendParams, True, _message_send),
+        "approval.respond": Method(
+            "approval.respond", ApprovalRespondParams, True, _approval_respond
+        ),
         "run.cancel": Method("run.cancel", RunCancelParams, True, _run_cancel),
         "session.inspect": Method("session.inspect", SessionInspectParams, True, _session_inspect),
         "auth.set": Method("auth.set", AuthSetParams, True, _auth_set),

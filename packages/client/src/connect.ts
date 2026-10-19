@@ -4,6 +4,7 @@ import net from "node:net";
 import type { AuthListResult } from "../../protocol/gen/auth-list-result.ts";
 import type { AuthRemoveResult } from "../../protocol/gen/auth-remove-result.ts";
 import type { AuthSetResult } from "../../protocol/gen/auth-set-result.ts";
+import type { ApprovalRespondResult } from "../../protocol/gen/approval-respond-result.ts";
 import type { ConfigGetResult } from "../../protocol/gen/config-get-result.ts";
 import type { DaemonStatus } from "../../protocol/gen/daemon-status.ts";
 import type { MessageSendResult } from "../../protocol/gen/message-send-result.ts";
@@ -67,6 +68,7 @@ export const RUN_NOT_FOUND = -32006;
 export const MESSAGE_NOT_FOUND = -32007;
 export const KEYCHAIN_UNAVAILABLE = -32008;
 export const MODEL_PULL_FAILED = -32009;
+export const APPROVAL_NOT_FOUND = -32010;
 
 export type { ChatEvent, SessionSummary };
 const DEFAULT_HEARTBEAT_MS = 5_000;
@@ -147,6 +149,12 @@ export interface GolemClient {
   listKeys(): Promise<AuthListResult>;
   /** Resolved settings, and the tool rules for `cwd` in the order they are checked. */
   getConfig(cwd?: string): Promise<ConfigGetResult>;
+  /** Answer the tool call the session's run waits on. The run goes on in the daemon. */
+  respondApproval(
+    sessionId: string,
+    callId: string,
+    decision: "allow" | "allow_session" | "deny",
+  ): Promise<ApprovalRespondResult>;
   /** Every model golem knows of. `refresh` fetches hosted lists and prices again, past their cache. */
   listModels(refresh?: boolean): Promise<ModelListResult>;
   /** Use `model` (a profile or a ref) from the session's next run. The daemon emits `model.selected`. */
@@ -683,6 +691,18 @@ export function connectGolem(options: ConnectOptions): GolemClient {
         throw new Error("invalid auth.remove result");
       }
       return result;
+    },
+    async respondApproval(
+      sessionId: string,
+      callId: string,
+      decision: "allow" | "allow_session" | "deny",
+    ): Promise<ApprovalRespondResult> {
+      await ready;
+      const result = await call("approval.respond", { session_id: sessionId, call_id: callId, decision });
+      if (!isRecord(result) || typeof result["run_id"] !== "string") {
+        throw new Error("invalid approval.respond result");
+      }
+      return { run_id: result["run_id"] };
     },
     async getConfig(cwd?: string): Promise<ConfigGetResult> {
       await ready;

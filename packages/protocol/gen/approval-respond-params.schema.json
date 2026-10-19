@@ -1,0 +1,32 @@
+{
+  "additionalProperties": false,
+  "description": "``approval.respond``. Answer the tool call a session's run waits on.\n\n``allow`` runs it once, ``allow_session`` runs it and allows the tool for\nthe rest of the session, and ``deny`` tells the model it may not.",
+  "properties": {
+    "call_id": {
+      "minLength": 1,
+      "title": "Call Id",
+      "type": "string"
+    },
+    "decision": {
+      "enum": [
+        "allow",
+        "allow_session",
+        "deny"
+      ],
+      "title": "Decision",
+      "type": "string"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "session_id",
+    "call_id",
+    "decision"
+  ],
+  "title": "ApprovalRespondParams",
+  "type": "object"
+}

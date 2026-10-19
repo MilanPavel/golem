@@ -6,8 +6,13 @@ event they follow, before the event row, so foreign keys hold.
 
 from __future__ import annotations
 
+import json
+from typing import cast
+
 from golem.store.database import Transaction
 from golem_protocol.events import (
+    ApprovalNeededEvent,
+    ApprovalResolvedEvent,
     ChatEvent,
     MessageDeltaEvent,
     ModelSelectedEvent,
@@ -65,6 +70,18 @@ async def project(tx: Transaction, event: ChatEvent) -> None:
             "INSERT INTO runs (run_id, session_id, status, started_at) VALUES (?, ?, 'running', ?)",
             (event.run_id, event.session_id, event.ts),
         )
+    elif isinstance(event, ApprovalNeededEvent):
+        await tx.execute(
+            "UPDATE runs SET status = 'waiting' WHERE run_id = ? AND status = 'running'",
+            (event.run_id,),
+        )
+    elif isinstance(event, ApprovalResolvedEvent):
+        await tx.execute(
+            "UPDATE runs SET status = 'running' WHERE run_id = ? AND status = 'waiting'",
+            (event.run_id,),
+        )
+        if event.data.decision == "allow_session":
+            await _allow_tool(tx, event.session_id, event.data.name)
     elif isinstance(event, RunCompletedEvent):
         await _finish_run(tx, event.run_id, "completed", event.ts, None)
     elif isinstance(event, RunFailedEvent):
@@ -76,6 +93,20 @@ async def project(tx: Transaction, event: ChatEvent) -> None:
             "UPDATE sessions SET updated_at = ? WHERE session_id = ?",
             (event.ts, event.session_id),
         )
+
+
+async def _allow_tool(tx: Transaction, session_id: str, name: str) -> None:
+    rows = await tx.fetch_all(
+        "SELECT allowed_tools FROM sessions WHERE session_id = ?", (session_id,)
+    )
+    raw = rows[0]["allowed_tools"] if rows else None
+    allowed = cast(list[str], json.loads(raw)) if isinstance(raw, str) else []
+    if name not in allowed:
+        allowed.append(name)
+    await tx.execute(
+        "UPDATE sessions SET allowed_tools = ? WHERE session_id = ?",
+        (json.dumps(allowed), session_id),
+    )
 
 
 async def _finish_run(

@@ -1,6 +1,15 @@
 import type { ChatEvent } from "@golem/client";
 
-export type ToolStatus = "requested" | "running" | "done" | "failed";
+export type ToolStatus = "requested" | "waiting" | "running" | "done" | "failed";
+
+/** The tool call the run waits on, from `approval.needed`. */
+export type PendingApproval = {
+  callId: string;
+  name: string;
+  args: Readonly<Record<string, unknown>>;
+  /** The rule that asked, such as `built-in default`. */
+  source: string;
+};
 
 /** One tool call, drawn under the assistant message that asked for it. */
 export type ToolBlock = {
@@ -40,6 +49,8 @@ export type ChatState = {
   runStartedAt: string | null;
   /** The run in progress, for Ctrl-C. */
   runId: string | null;
+  /** Set while the run waits for an answer about a tool call. */
+  approval: PendingApproval | null;
 };
 
 export const emptyChat: ChatState = {
@@ -49,6 +60,7 @@ export const emptyChat: ChatState = {
   notice: null,
   runStartedAt: null,
   runId: null,
+  approval: null,
 };
 
 export const CANCELLED_NOTICE = "cancelled";
@@ -95,15 +107,23 @@ export function reduceChat(state: ChatState, event: ChatEvent): ChatState {
     case "run.started":
       return { ...state, busy: true, error: null, runStartedAt: event.ts, runId: event.run_id };
     case "run.completed":
-      return { ...state, busy: false, runStartedAt: null, runId: null };
+      return { ...state, busy: false, runStartedAt: null, runId: null, approval: null };
     case "run.failed":
-      return { ...state, busy: false, error: event.data.message, runStartedAt: null, runId: null };
+      return {
+        ...state,
+        busy: false,
+        error: event.data.message,
+        runStartedAt: null,
+        runId: null,
+        approval: null,
+      };
     case "run.cancelled":
       return {
         ...state,
         busy: false,
         runStartedAt: null,
         runId: null,
+        approval: null,
         notice: event.data.reason === "user" ? CANCELLED_NOTICE : SHUTDOWN_NOTICE,
       };
     case "tool.requested": {
@@ -121,6 +141,26 @@ export function reduceChat(state: ChatState, event: ChatEvent): ChatState {
             : message,
         ),
       };
+    }
+    case "approval.needed": {
+      const waiting = updateTool(state, event.data.call_id, (tool) => ({ ...tool, status: "waiting" }));
+      return {
+        ...waiting,
+        busy: true,
+        runId: event.run_id,
+        approval: {
+          callId: event.data.call_id,
+          name: event.data.name,
+          args: event.data.args,
+          source: event.data.source,
+        },
+      };
+    }
+    case "approval.resolved": {
+      const answered = updateTool(state, event.data.call_id, (tool) =>
+        tool.status === "waiting" ? { ...tool, status: "requested" } : tool,
+      );
+      return { ...answered, approval: null };
     }
     case "tool.started":
       return updateTool(state, event.data.call_id, (tool) => ({ ...tool, status: "running" }));

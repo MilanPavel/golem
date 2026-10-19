@@ -12,27 +12,41 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from dataclasses import dataclass
+from collections.abc import Coroutine
+from dataclasses import dataclass, field
 
 from golem.graphs.adapter import PlainMessage, plain_messages
 from golem.graphs.chat import ChatRuntime
 from golem.graphs.state import SCHEMA_VERSION
 from golem.models.router import ModelIdentity, ModelRouter
+from golem.sessions.approvals import pending_approval
 from golem.sessions.bus import EventTarget, SummaryTarget
 from golem.sessions.ids import new_id
 from golem.sessions.log import SessionLog
-from golem.sessions.runner import CancelReason, RunControl, Turn, run_turn
+from golem.sessions.runner import (
+    CancelReason,
+    Resume,
+    RunControl,
+    Turn,
+    fail_calls,
+    resume_turn,
+    run_turn,
+)
 from golem.sessions.titles import TitleGenerator, choose_title, clean_title, fork_title
 from golem.store.records import RunRecords, SessionActivity, SessionRecords
 from golem_protocol.events import (
+    ApprovalDecision,
     ChatEvent,
     EmptyEventData,
     ForkedFrom,
     MessageCompletedEvent,
     ModelSelectedData,
+    RunCancelledData,
     SessionCreatedData,
     SessionUpdatedData,
 )
+
+NOT_APPROVED = "cancelled before it was approved"
 
 log = logging.getLogger("golem.sessions")
 
@@ -42,7 +56,11 @@ class SessionNotFoundError(Exception):
 
 
 class SessionBusyError(Exception):
-    """A run is already in progress for this session."""
+    """A run is already in progress for this session, or waits for an approval."""
+
+
+class ApprovalNotFoundError(Exception):
+    """No run of this session waits on this tool call."""
 
 
 class BlankTitleError(Exception):
@@ -82,6 +100,7 @@ class _LiveSession:
     model_profile: str
     schema_version: int
     cwd: str | None = None
+    allowed_tools: set[str] = field(default_factory=set[str])
     title: str | None = None
     titling: bool = False
     closed: bool = False
@@ -234,6 +253,9 @@ class SessionManager:
                     if task.get_name() == f"golem-title-{session_id}" and not task.done()
                 ]
                 if live is None and not naming:
+                    waiting = await self._run_records.waiting(session_id)
+                    if waiting is not None:
+                        await self._cancel_waiting(session_id, waiting.run_id)
                     await self._events.emit(session_id, None, "session.closed", EmptyEventData())
                     self._sessions.pop(session_id, None)
                     return session_id
@@ -310,6 +332,8 @@ class SessionManager:
             session = await self._resolve(session_id)
             if session.task is not None and not session.task.done():
                 raise SessionBusyError(session_id)
+            if await self._run_records.waiting(session_id) is not None:
+                raise SessionBusyError(session_id)
             self._runtime.router.chat_model(session.model_profile)
             if session.cwd is None and cwd is not None:
                 await self._events.emit(
@@ -325,17 +349,64 @@ class SessionManager:
                 user_message_id=new_id("m"),
                 assistant_message_id=new_id("m"),
                 cwd=session.cwd,
+                allowed_tools=tuple(sorted(session.allowed_tools)),
             )
             control = RunControl()
-            task = asyncio.create_task(
-                self._turn(session, turn, control),
-                name=f"golem-run-{turn.run_id}",
-            )
-            session.task = task
-            self._runs[turn.run_id] = _LiveRun(task=task, control=control)
-            task.add_done_callback(lambda done: self._finished(turn.run_id, done))
-            await control.started.wait()
+            await self._start(session, turn.run_id, control, self._turn(session, turn, control))
             return turn.run_id
+
+    async def respond(self, session_id: str, call_id: str, decision: ApprovalDecision) -> str:
+        """Answer the tool call ``session_id``'s run waits on, and go on with that run.
+
+        Returns the run's id once ``approval.resolved`` is in the log.
+
+        Raises :class:`ApprovalNotFoundError`, :class:`SessionNotFoundError`,
+        :class:`SessionBusyError`, or :class:`SchemaMismatchError`.
+        """
+        async with self._lock:
+            session = await self._resolve(session_id)
+            run = await self._run_records.waiting(session_id)
+            live = session.task is not None and not session.task.done()
+            if run is None:
+                if live:
+                    raise SessionBusyError(session_id)
+                raise ApprovalNotFoundError(call_id)
+            if live and session.task is not None:
+                # approval.needed is stored before the paused task has finished closing its stream.
+                await asyncio.wait({session.task})
+            pending = pending_approval(await self._events.for_run(run.run_id))
+            if pending is None or pending.call_id != call_id:
+                raise ApprovalNotFoundError(call_id)
+            if decision == "allow_session":
+                session.allowed_tools.add(pending.name)
+            resume = Resume(
+                session_id=session_id,
+                run_id=run.run_id,
+                call_id=call_id,
+                name=pending.name,
+                decision=decision,
+                user_message_id=pending.user_message_id,
+                open_calls=pending.open_calls,
+                cwd=session.cwd,
+                allowed_tools=tuple(sorted(session.allowed_tools)),
+            )
+            control = RunControl()
+            work = self._resumed(session, resume, control, pending.prompt)
+            await self._start(session, run.run_id, control, work)
+            return run.run_id
+
+    async def _start(
+        self,
+        session: _LiveSession,
+        run_id: str,
+        control: RunControl,
+        work: Coroutine[None, None, None],
+    ) -> None:
+        task = asyncio.create_task(work, name=f"golem-run-{run_id}")
+        session.task = task
+        self._runs[run_id] = _LiveRun(task=task, control=control)
+        task.add_done_callback(lambda done: self._finished(run_id, done))
+        await control.started.wait()
 
     async def cancel(self, run_id: str) -> bool:
         """Stop a run in progress. Returns once ``run.cancelled`` is in the log.
@@ -347,9 +418,26 @@ class SessionManager:
         if live is not None and not live.task.done():
             await self._stop([live], "user")
             return True
-        if await self._run_records.get(run_id) is None:
+        record = await self._run_records.get(run_id)
+        if record is None:
             raise RunNotFoundError(run_id)
+        if record.status == "waiting":
+            async with self._lock:
+                return await self._cancel_waiting(record.session_id, run_id)
         return False
+
+    async def _cancel_waiting(self, session_id: str, run_id: str) -> bool:
+        """End a run that waits for an approval. Its next turn repairs the checkpoint."""
+        current = await self._run_records.get(run_id)
+        if current is None or current.status != "waiting":
+            return False
+        pending = pending_approval(await self._events.for_run(run_id))
+        calls = () if pending is None else pending.open_calls
+        await fail_calls(self._events, session_id, run_id, calls, NOT_APPROVED)
+        await self._events.emit(
+            session_id, run_id, "run.cancelled", RunCancelledData(reason="user")
+        )
+        return True
 
     async def cancel_all(self) -> None:
         """Stop every run in progress, with the reason ``shutdown``, and any title being chosen.
@@ -374,11 +462,21 @@ class SessionManager:
 
     async def _turn(self, session: _LiveSession, turn: Turn, control: RunControl) -> None:
         reply = await run_turn(self._runtime, self._events, turn, control)
+        self._title_after(session, turn.text, reply)
+
+    async def _resumed(
+        self, session: _LiveSession, resume: Resume, control: RunControl, prompt: str | None
+    ) -> None:
+        reply = await resume_turn(self._runtime, self._events, resume, control)
+        if prompt is not None:
+            self._title_after(session, prompt, reply)
+
+    def _title_after(self, session: _LiveSession, prompt: str, reply: str | None) -> None:
         if reply is None or self._titles is None or session.title is not None or session.titling:
             return
         session.titling = True
         task = asyncio.create_task(
-            self._name(session, self._titles, turn.text, reply),
+            self._name(session, self._titles, prompt, reply),
             name=f"golem-title-{session.session_id}",
         )
         self._naming.add(task)
@@ -436,6 +534,7 @@ class SessionManager:
             schema_version=SCHEMA_VERSION,
             title=None if record is None else record.title,
             cwd=None if record is None else record.cwd,
+            allowed_tools=set() if record is None else set(record.allowed_tools),
         )
         if record is None:
             await self._announce(session)
@@ -488,6 +587,7 @@ def _report(task: asyncio.Task[None], message: str) -> None:
 
 
 __all__ = [
+    "ApprovalNotFoundError",
     "BlankTitleError",
     "MessageNotFoundError",
     "RunNotFoundError",

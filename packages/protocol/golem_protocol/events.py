@@ -186,6 +186,34 @@ class ToolFailedData(BaseModel):
     message: str = Field(min_length=1)
 
 
+ApprovalDecision = Literal["allow", "allow_session", "deny"]
+
+
+class ApprovalNeededData(BaseModel):
+    """A tool call waits for the user. The run is paused until ``approval.respond``.
+
+    ``source`` is the rule that asked, such as ``built-in default``.
+    """
+
+    model_config = _CONFIG
+
+    call_id: str = Field(min_length=1)
+    message_id: str | None = Field(default=None, min_length=1)
+    name: str = Field(min_length=1)
+    args: dict[str, Any]
+    source: str = Field(min_length=1)
+
+
+class ApprovalResolvedData(BaseModel):
+    """The user answered. ``allow_session`` also allows ``name`` for the rest of the session."""
+
+    model_config = _CONFIG
+
+    call_id: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    decision: ApprovalDecision
+
+
 class SessionCreatedEvent(BaseModel):
     """A session exists. ``run_id`` is null because no run has started."""
 
@@ -387,6 +415,32 @@ class ToolFailedEvent(BaseModel):
     data: ToolFailedData
 
 
+class ApprovalNeededEvent(BaseModel):
+    """The run is waiting for an answer about one tool call."""
+
+    model_config = _CONFIG
+
+    seq: int = Field(ge=1)
+    session_id: str = Field(min_length=1)
+    run_id: str = Field(min_length=1)
+    ts: str = Field(min_length=1)
+    type: Literal["approval.needed"]
+    data: ApprovalNeededData
+
+
+class ApprovalResolvedEvent(BaseModel):
+    """The waiting tool call was answered, and the run goes on."""
+
+    model_config = _CONFIG
+
+    seq: int = Field(ge=1)
+    session_id: str = Field(min_length=1)
+    run_id: str = Field(min_length=1)
+    ts: str = Field(min_length=1)
+    type: Literal["approval.resolved"]
+    data: ApprovalResolvedData
+
+
 EventType = Literal[
     "session.created",
     "session.updated",
@@ -403,6 +457,8 @@ EventType = Literal[
     "tool.started",
     "tool.completed",
     "tool.failed",
+    "approval.needed",
+    "approval.resolved",
 ]
 """The ``type`` of each :data:`ChatEvent` member."""
 
@@ -422,7 +478,9 @@ ChatEvent = Annotated[
     | ToolRequestedEvent
     | ToolStartedEvent
     | ToolCompletedEvent
-    | ToolFailedEvent,
+    | ToolFailedEvent
+    | ApprovalNeededEvent
+    | ApprovalResolvedEvent,
     Field(discriminator="type"),
 ]
 
@@ -432,6 +490,11 @@ CHAT_EVENT: TypeAdapter[ChatEvent] = TypeAdapter(ChatEvent)
 
 __all__ = [
     "CHAT_EVENT",
+    "ApprovalDecision",
+    "ApprovalNeededData",
+    "ApprovalNeededEvent",
+    "ApprovalResolvedData",
+    "ApprovalResolvedEvent",
     "ChatEvent",
     "EmptyEventData",
     "EventType",

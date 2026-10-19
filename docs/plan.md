@@ -21,6 +21,7 @@ This file is about what comes next. How the existing pieces are built is in [arc
 - A debug panel (`/debug`) that shows the wire and the conversation the model sees.
 - Read-only tools: the model reads files, lists folders, and searches with `glob` and `grep`, only inside the folder the session was started in. Each call is one line in the transcript, and Ctrl-O shows its output.
 - Tool rules in `~/.golem/config.toml` and a project's `.golem/policy.toml` allow, ask, or deny a call by tool, subject, and path. `golem config show` lists them in the order they are checked.
+- Approvals: a call a rule asks about waits for `a` (once), `s` (for the session), or `d` (deny), across closing the TUI and restarting the daemon. A waiting session shows `?` in the switcher.
 - Slash commands with suggestions, a line editor, recalling a sent message with Up, copy and export, and closing a session from the switcher.
 - It runs from a checkout of this repository (`just golem daemon install`, then `just tui`). Phase 3 makes it installable.
 
@@ -95,7 +96,7 @@ Agents use the Graph API, where the model decides control flow. Flows use the Fu
 
 ### Protocol, what is left to add
 
-JSON-RPC 2.0, one JSON object per line, over `~/.golem/run/golem.sock`. Protocol 2.11 is on the wire today (see [architecture.md](architecture.md#what-is-on-the-wire-today)). The phases below add the rest.
+JSON-RPC 2.0, one JSON object per line, over `~/.golem/run/golem.sock`. Protocol 2.12 is on the wire today (see [architecture.md](architecture.md#what-is-on-the-wire-today)). The phases below add the rest.
 
 | Group | New events | Phase |
 |---|---|---|
@@ -163,7 +164,7 @@ The agent can act, and nothing happens without passing policy. How the tool loop
   - Until 1.3 lands, `ask` behaves as deny with a clear message to the model.
 - **Done when:** table-driven tests cover the policy matrix, and the read-only tools from 1.1 go through the engine.
 
-### 1.3 Approvals
+### 1.3 Approvals (built)
 
 - **Goal:** golem asks before doing anything that is not allowed outright, and waits for you even if the TUI is closed.
 - **You can:** approve or deny a tool call from a modal, or choose "allow for this session".
@@ -183,9 +184,9 @@ The agent can act, and nothing happens without passing policy. How the tool loop
         return {"messages": results}
     ```
   - The adapter turns the interrupt into `approval.needed`. `approval.respond` resumes with `graph.astream(Command(resume=answer), cfg)` and emits `approval.resolved`.
-  - Resume re-runs the node, so record executed `tool_call_id`s in state and skip them.
-  - "Allow for this session" is stored in session metadata.
-  - TUI: a modal with allow once, allow for session, and deny. A pending approval shows in the switcher.
+  - Resume re-runs the node, so the node decides about every call first, one interrupt per call that asks, and runs none until the last answer. Nothing runs twice, so no executed ids are needed ([ADR-013](adr/013-approvals.md)).
+  - "Allow for this session" is stored in `sessions.allowed_tools`, from `approval.resolved`.
+  - TUI: an approval band above the composer instead of a modal: `a` allow once, `s` allow for session, `d` deny. A pending approval shows as `?` in the switcher.
 - **Done when:** an approval survives closing the TUI and restarting the daemon, and is answered after reattaching.
 - **Watch out:** several tool calls in one turn with mixed decisions. Write that test before the modal.
 
@@ -199,6 +200,18 @@ The agent can act, and nothing happens without passing policy. How the tool loop
   - `tool.output` streams chunks, so long commands show progress in the tool block.
   - `git_status`, `git_diff`, and `git_log` helpers with structured output.
 - **Done when:** "why does `just check` fail?" is answered from a real run, and Ctrl-C kills a running `sleep 100`.
+
+### 1.4b Always allow, and `/permissions`
+
+- **Goal:** you manage permissions where you meet them, not by editing a file.
+- **You can:** answer an approval with "always allow" and never be asked about that call again, and open `/permissions` to see, change, or delete rules.
+- **Build:**
+  - A fourth answer in the approval band, `w` always allow. It writes a `[[rule]]` with `action = "allow"` for the call's tool and its subject or path (`tool = "shell"`, `match = "git status"`), into `~/.golem/config.toml` by default, with the project's `policy.toml` as a choice. It is written with `tomlkit`, as `model.set_default` is, so comments stay. A new rule goes first, so it wins.
+  - `policy.add` and `policy.remove` on the wire, written by the daemon only.
+  - `/permissions` in place of the transcript, like the session switcher: the rules for this folder in check order, with their source, and the tools allowed for this session. Keys change a rule's action, delete a user or project rule, or revoke a session allowance. Built-in defaults are shown and cannot be deleted.
+  - Session allowances (`s`) key on the tool and its subject, so allowing `git status` for a session does not allow every shell command.
+- **Done when:** "always allow" on `git status` writes one rule, the next `git status` runs without asking, and deleting that rule in `/permissions` makes it ask again.
+- **Watch out:** only the user changes rules. No tool may edit them, and no tool output can approve anything. A refused call can tell the model which rule refused it, so it can suggest a change to you.
 
 ### 1.5 Write tools
 

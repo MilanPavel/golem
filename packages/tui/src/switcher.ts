@@ -35,6 +35,8 @@ export type SwitcherRow = {
   selected: boolean;
   current: boolean;
   running: boolean;
+  /** A run waits for a tool approval. */
+  waiting: boolean;
   title: string;
   age: string;
 };
@@ -152,6 +154,7 @@ export function layoutSwitcher(input: {
       selected: start + offset === index,
       current: summary.session_id === input.current,
       running: summary.status === "running",
+      waiting: summary.status === "waiting",
       title: fit(summary.title ?? UNTITLED, input.columns - ROW_CHROME - age.length),
       age,
     };

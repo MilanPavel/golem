@@ -8,6 +8,8 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from golem_protocol.commands import (
+    ApprovalRespondParams,
+    ApprovalRespondResult,
     AuthKeyStatus,
     AuthListParams,
     AuthListResult,
@@ -65,6 +67,10 @@ from golem_protocol.commands import (
     SessionSummary,
 )
 from golem_protocol.events import (
+    ApprovalNeededData,
+    ApprovalNeededEvent,
+    ApprovalResolvedData,
+    ApprovalResolvedEvent,
     EmptyEventData,
     ForkedFrom,
     MessageCompletedData,
@@ -202,6 +208,12 @@ MODELS: tuple[type[BaseModel], ...] = (
     ConfigGetParams,
     ConfigRule,
     ConfigGetResult,
+    ApprovalNeededData,
+    ApprovalNeededEvent,
+    ApprovalResolvedData,
+    ApprovalResolvedEvent,
+    ApprovalRespondParams,
+    ApprovalRespondResult,
 )
 
 

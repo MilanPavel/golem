@@ -2,19 +2,22 @@
 
 from __future__ import annotations
 
+import json
 import sqlite3
 from dataclasses import dataclass
 from typing import Literal, cast
 
 from golem.store.database import Database
 
-RunStatus = Literal["running", "completed", "failed", "cancelled"]
+RunStatus = Literal["running", "waiting", "completed", "failed", "cancelled"]
 
 _ACTIVITY = (
     "SELECT s.session_id, s.model_profile, s.title, s.created_at, s.updated_at, s.closed_at,"
-    " s.cwd,"
+    " s.cwd, s.allowed_tools,"
     " EXISTS (SELECT 1 FROM runs r"
     "  WHERE r.session_id = s.session_id AND r.status = 'running') AS running,"
+    " EXISTS (SELECT 1 FROM runs r"
+    "  WHERE r.session_id = s.session_id AND r.status = 'waiting') AS waiting,"
     " (SELECT COALESCE(MAX(e.seq), 0) FROM events e"
     "  WHERE e.session_id = s.session_id) AS last_seq"
     " FROM sessions s"
@@ -30,15 +33,17 @@ class SessionRecord:
     updated_at: str
     closed_at: str | None
     cwd: str | None = None
+    allowed_tools: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
 class SessionActivity:
-    """A session row plus whether a run is open and its newest ``seq``."""
+    """A session row, whether a run is open or waits for an approval, and its newest ``seq``."""
 
     session: SessionRecord
     running: bool
     last_seq: int
+    waiting: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,7 +62,8 @@ class SessionRecords:
 
     async def get(self, session_id: str) -> SessionRecord | None:
         row = await self._database.fetch_one(
-            "SELECT session_id, model_profile, title, created_at, updated_at, closed_at, cwd"
+            "SELECT session_id, model_profile, title, created_at, updated_at, closed_at, cwd,"
+            " allowed_tools"
             " FROM sessions WHERE session_id = ?",
             (session_id,),
         )
@@ -90,6 +96,16 @@ class RunRecords:
         )
         return None if row is None else _run(row)
 
+    async def waiting(self, session_id: str) -> RunRecord | None:
+        """The run of ``session_id`` that waits for an approval, if any."""
+        row = await self._database.fetch_one(
+            "SELECT run_id, session_id, status, started_at, ended_at, error"
+            " FROM runs WHERE session_id = ? AND status = 'waiting'"
+            " ORDER BY started_at DESC LIMIT 1",
+            (session_id,),
+        )
+        return None if row is None else _run(row)
+
     async def running(self) -> list[RunRecord]:
         """Runs a stopped daemon left open, oldest first."""
         rows = await self._database.fetch_all(
@@ -97,6 +113,15 @@ class RunRecords:
             " FROM runs WHERE status = 'running' ORDER BY started_at",
         )
         return [_run(row) for row in rows]
+
+
+def _names(raw: object) -> tuple[str, ...]:
+    if not isinstance(raw, str):
+        return ()
+    parsed = json.loads(raw)
+    if not isinstance(parsed, list):
+        return ()
+    return tuple(item for item in cast(list[object], parsed) if isinstance(item, str))
 
 
 def _session(row: sqlite3.Row) -> SessionRecord:
@@ -108,6 +133,7 @@ def _session(row: sqlite3.Row) -> SessionRecord:
         updated_at=row["updated_at"],
         closed_at=row["closed_at"],
         cwd=row["cwd"],
+        allowed_tools=_names(row["allowed_tools"]),
     )
 
 
@@ -116,6 +142,7 @@ def _activity(row: sqlite3.Row) -> SessionActivity:
         session=_session(row),
         running=bool(row["running"]),
         last_seq=int(row["last_seq"]),
+        waiting=bool(row["waiting"]),
     )
 
 

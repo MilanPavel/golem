@@ -38,6 +38,8 @@ const EVENT_TYPES = new Set([
   "tool.started",
   "tool.completed",
   "tool.failed",
+  "approval.needed",
+  "approval.resolved",
 ]);
 
 export function isRecord(value: unknown): value is Record<string, unknown> {

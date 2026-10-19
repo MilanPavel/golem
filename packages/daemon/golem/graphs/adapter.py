@@ -16,6 +16,9 @@ from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage
 STREAM_KEY = "golem"
 """Key of every golem item on the custom stream. The graph writes, the adapter reads."""
 
+APPROVAL_KIND = "approval"
+"""``STREAM_KEY`` value of an interrupt that waits for a tool approval."""
+
 
 @dataclass(frozen=True, slots=True)
 class ModelStarted:
@@ -66,7 +69,26 @@ class ToolErrored:
     message: str
 
 
-Fact = ModelStarted | TextDelta | TextCompleted | ToolStarted | ToolFinished | ToolErrored
+@dataclass(frozen=True, slots=True)
+class ApprovalAsked:
+    """The run paused on a tool call that needs the user's answer."""
+
+    call_id: str
+    name: str
+    args: dict[str, object]
+    source: str
+    message_id: str | None = None
+
+
+Fact = (
+    ModelStarted
+    | TextDelta
+    | TextCompleted
+    | ToolStarted
+    | ToolFinished
+    | ToolErrored
+    | ApprovalAsked
+)
 
 
 def translate(part: object) -> Fact | None:
@@ -169,9 +191,12 @@ def _delta(data: object) -> TextDelta | None:
     return TextDelta(text)
 
 
-def _completed(data: object) -> TextCompleted | None:
+def _completed(data: object) -> TextCompleted | ApprovalAsked | None:
     if not isinstance(data, dict):
         return None
+    paused = cast(dict[object, object], data).get("__interrupt__")
+    if paused is not None:
+        return _approval(paused)
     update = cast(dict[object, object], data).get("call_model")
     if not isinstance(update, dict):
         return None
@@ -189,6 +214,30 @@ def _completed(data: object) -> TextCompleted | None:
                 for call in message.tool_calls
             )
             return TextCompleted(message_text(message), message.id, calls)
+    return None
+
+
+def _approval(paused: object) -> ApprovalAsked | None:
+    items = cast(tuple[object, ...], paused) if isinstance(paused, tuple | list) else ()
+    for item in items:
+        value = getattr(item, "value", None)
+        if not isinstance(value, dict):
+            continue
+        raw = cast(dict[str, object], value)
+        call_id, name, source = raw.get("call_id"), raw.get("name"), raw.get("source")
+        if raw.get(STREAM_KEY) != APPROVAL_KIND or not isinstance(call_id, str):
+            continue
+        if not isinstance(name, str) or not isinstance(source, str):
+            continue
+        args = raw.get("args")
+        message_id = raw.get("message_id")
+        return ApprovalAsked(
+            call_id=call_id,
+            name=name,
+            args=dict(cast(dict[str, object], args)) if isinstance(args, dict) else {},
+            source=source,
+            message_id=message_id if isinstance(message_id, str) else None,
+        )
     return None
 
 
@@ -221,7 +270,9 @@ def _custom(data: object) -> Fact | None:
 
 
 __all__ = [
+    "APPROVAL_KIND",
     "STREAM_KEY",
+    "ApprovalAsked",
     "Fact",
     "ModelStarted",
     "PlainMessage",

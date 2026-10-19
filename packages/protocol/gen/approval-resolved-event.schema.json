@@ -1,0 +1,78 @@
+{
+  "$defs": {
+    "ApprovalResolvedData": {
+      "additionalProperties": false,
+      "description": "The user answered. ``allow_session`` also allows ``name`` for the rest of the session.",
+      "properties": {
+        "call_id": {
+          "minLength": 1,
+          "title": "Call Id",
+          "type": "string"
+        },
+        "decision": {
+          "enum": [
+            "allow",
+            "allow_session",
+            "deny"
+          ],
+          "title": "Decision",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "call_id",
+        "name",
+        "decision"
+      ],
+      "title": "ApprovalResolvedData",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The waiting tool call was answered, and the run goes on.",
+  "properties": {
+    "data": {
+      "$ref": "#/$defs/ApprovalResolvedData"
+    },
+    "run_id": {
+      "minLength": 1,
+      "title": "Run Id",
+      "type": "string"
+    },
+    "seq": {
+      "minimum": 1,
+      "title": "Seq",
+      "type": "integer"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    },
+    "ts": {
+      "minLength": 1,
+      "title": "Ts",
+      "type": "string"
+    },
+    "type": {
+      "const": "approval.resolved",
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "seq",
+    "session_id",
+    "run_id",
+    "ts",
+    "type",
+    "data"
+  ],
+  "title": "ApprovalResolvedEvent",
+  "type": "object"
+}

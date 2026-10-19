@@ -18,4 +18,4 @@ def test_ping_rejects_unknown_fields() -> None:
 
 def test_protocol_version_is_2_4() -> None:
     assert PROTOCOL_MAJOR == 2
-    assert PROTOCOL_MINOR == 11
+    assert PROTOCOL_MINOR == 12

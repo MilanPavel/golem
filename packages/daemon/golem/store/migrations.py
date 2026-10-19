@@ -49,4 +49,5 @@ MIGRATIONS: tuple[tuple[str, ...], ...] = (
     ),
     ("ALTER TABLE sessions ADD COLUMN closed_at TEXT",),
     ("ALTER TABLE sessions ADD COLUMN cwd TEXT",),
+    ("ALTER TABLE sessions ADD COLUMN allowed_tools TEXT",),
 )

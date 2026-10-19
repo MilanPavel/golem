@@ -209,7 +209,7 @@ def test_the_model_hears_why_a_call_did_not_run() -> None:
     deny = check(_call("shell"), [_rule("deny", tool="shell")], home=HOME)
     assert explain(deny, "shell") == "shell is denied by test"
     ask = check(_call("shell"), [], home=HOME)
-    assert "needs the user's approval (built-in default)" in explain(ask, "shell")
+    assert explain(ask, "shell") == "shell needs the user's approval (built-in default)"
 
 
 class _ShellArgs(BaseModel):

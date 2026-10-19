@@ -23,10 +23,17 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.config import get_stream_writer
 from langgraph.errors import GraphRecursionError
 from langgraph.graph import END, START, StateGraph  # pyright: ignore[reportMissingTypeStubs]
+from langgraph.types import Command
 
 from golem.graphs.adapter import STREAM_KEY, message_text
 from golem.graphs.state import AgentState
-from golem.graphs.tools_node import CWD_KEY, cancelled_results, tools_node, unanswered_calls
+from golem.graphs.tools_node import (
+    ALLOWED_KEY,
+    CWD_KEY,
+    cancelled_results,
+    tools_node,
+    unanswered_calls,
+)
 from golem.models.router import ModelRouter
 from golem.permissions.policy import Policy
 from golem.sessions.ids import new_id
@@ -61,7 +68,7 @@ class _Checkpoint(Protocol):
 class _RunningGraph(Protocol):
     def astream(
         self,
-        graph_input: AgentState,
+        graph_input: AgentState | Command[object],
         config: RunnableConfig,
         *,
         stream_mode: list[str],
@@ -121,6 +128,7 @@ class ChatRuntime:
         user_message_id: str,
         assistant_message_id: str,
         cwd: str | None = None,
+        allowed_tools: Sequence[str] = (),
     ) -> AsyncGenerator[object]:
         """Stream one user turn. The first turn writes the state fields.
 
@@ -137,6 +145,7 @@ class ChatRuntime:
                 "thread_id": session_id,
                 _ASSISTANT_ID: assistant_message_id,
                 CWD_KEY: cwd or "",
+                ALLOWED_KEY: list(allowed_tools),
             },
             "recursion_limit": _RECURSION_LIMIT,
         }
@@ -149,6 +158,43 @@ class ChatRuntime:
             schema_version=schema_version,
             has_checkpoint=bool(existing),
         )
+        async with aclosing(self._parts(graph_input, config)) as parts:
+            async for part in parts:
+                yield part
+
+    async def resume(
+        self,
+        *,
+        session_id: str,
+        decision: str,
+        cwd: str | None = None,
+        allowed_tools: Sequence[str] = (),
+    ) -> AsyncGenerator[object]:
+        """Go on with a run paused on a tool approval, with the user's ``decision``.
+
+        Close the generator when you stop early, as with :meth:`stream`.
+        """
+        config: RunnableConfig = {
+            "configurable": {
+                "thread_id": session_id,
+                CWD_KEY: cwd or "",
+                ALLOWED_KEY: list(allowed_tools),
+            },
+            "recursion_limit": _RECURSION_LIMIT,
+        }
+        answer: Command[object] = Command(resume={"decision": decision})
+        async with aclosing(self._parts(answer, config)) as parts:
+            async for part in parts:
+                yield part
+
+    async def waiting(self, session_id: str) -> bool:
+        """Whether the thread is paused on an interrupt."""
+        snapshot = await self._graph.aget_state(self._config(session_id))
+        return bool(getattr(snapshot, "interrupts", ()))
+
+    async def _parts(
+        self, graph_input: AgentState | Command[object], config: RunnableConfig
+    ) -> AsyncGenerator[object]:
         parts = self._graph.astream(
             graph_input,
             config,

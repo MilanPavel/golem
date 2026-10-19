@@ -1,5 +1,172 @@
 {
   "$defs": {
+    "ApprovalNeededData": {
+      "additionalProperties": false,
+      "description": "A tool call waits for the user. The run is paused until ``approval.respond``.\n\n``source`` is the rule that asked, such as ``built-in default``.",
+      "properties": {
+        "args": {
+          "additionalProperties": true,
+          "title": "Args",
+          "type": "object"
+        },
+        "call_id": {
+          "minLength": 1,
+          "title": "Call Id",
+          "type": "string"
+        },
+        "message_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Message Id"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "source": {
+          "minLength": 1,
+          "title": "Source",
+          "type": "string"
+        }
+      },
+      "required": [
+        "call_id",
+        "name",
+        "args",
+        "source"
+      ],
+      "title": "ApprovalNeededData",
+      "type": "object"
+    },
+    "ApprovalNeededEvent": {
+      "additionalProperties": false,
+      "description": "The run is waiting for an answer about one tool call.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/ApprovalNeededData"
+        },
+        "run_id": {
+          "minLength": 1,
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "approval.needed",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "run_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "ApprovalNeededEvent",
+      "type": "object"
+    },
+    "ApprovalResolvedData": {
+      "additionalProperties": false,
+      "description": "The user answered. ``allow_session`` also allows ``name`` for the rest of the session.",
+      "properties": {
+        "call_id": {
+          "minLength": 1,
+          "title": "Call Id",
+          "type": "string"
+        },
+        "decision": {
+          "enum": [
+            "allow",
+            "allow_session",
+            "deny"
+          ],
+          "title": "Decision",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "call_id",
+        "name",
+        "decision"
+      ],
+      "title": "ApprovalResolvedData",
+      "type": "object"
+    },
+    "ApprovalResolvedEvent": {
+      "additionalProperties": false,
+      "description": "The waiting tool call was answered, and the run goes on.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/ApprovalResolvedData"
+        },
+        "run_id": {
+          "minLength": 1,
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "approval.resolved",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "run_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "ApprovalResolvedEvent",
+      "type": "object"
+    },
     "EmptyEventData": {
       "additionalProperties": false,
       "description": "No payload. Used by ``run.started``, ``run.completed``, and ``session.closed``.",
@@ -1068,6 +1235,8 @@
     "params": {
       "discriminator": {
         "mapping": {
+          "approval.needed": "#/$defs/ApprovalNeededEvent",
+          "approval.resolved": "#/$defs/ApprovalResolvedEvent",
           "message.completed": "#/$defs/MessageCompletedEvent",
           "message.delta": "#/$defs/MessageDeltaEvent",
           "message.started": "#/$defs/MessageStartedEvent",
@@ -1131,6 +1300,12 @@
         },
         {
           "$ref": "#/$defs/ToolFailedEvent"
+        },
+        {
+          "$ref": "#/$defs/ApprovalNeededEvent"
+        },
+        {
+          "$ref": "#/$defs/ApprovalResolvedEvent"
         }
       ],
       "title": "Params"

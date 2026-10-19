@@ -174,14 +174,10 @@ def describe(
 
 
 def explain(decision: Decision, name: str) -> str:
-    """What the model reads when a call does not run."""
+    """What the model reads when a rule keeps a call from running."""
     if decision.action == "deny":
         return f"{name} is denied by {decision.source}"
-    return (
-        f"{name} needs the user's approval ({decision.source}), and golem cannot ask "
-        "for approval yet, so it did not run. The user can allow it with a rule in "
-        "~/.golem/config.toml."
-    )
+    return f"{name} needs the user's approval ({decision.source})"
 
 
 def _resolve(raw: str, root: Path | None) -> Path | None:

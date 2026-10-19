@@ -89,6 +89,7 @@ import {
   type SecretPrompt,
   type SecretStep,
 } from "./secret.ts";
+import { APPROVAL_ROWS, approvalLines } from "./approval.ts";
 import { assistantChars, elapsedSeconds, meterLine, meterPhase } from "./progress.ts";
 import {
   fitSegments,
@@ -211,6 +212,8 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   liveTitleRef.current = liveTitle;
   showTimesRef.current = showTimes;
   busyRef.current = chat.busy;
+  const approvalRef = useRef(chat.approval);
+  approvalRef.current = chat.approval;
   chatRef.current = chat;
   runIdRef.current = chat.runId;
   connectionRef.current = connection;
@@ -242,7 +245,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
     busy: chat.busy && secret === null,
     banner: banner !== null && banner.length > 0,
     debug: debug.open,
-    suggestions: suggestMatches.length,
+    suggestions: chat.approval !== null ? APPROVAL_ROWS : suggestMatches.length,
   });
   suggestRef.current = {
     items: suggestMatches,
@@ -265,7 +268,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   const chip = modelChip(model.name, model.profile);
   const cwd = shortCwd(sessionCwd ?? process.cwd(), homedir());
   const versions = versionLabel(TUI_VERSION, daemonVersion);
-  const phase = meterPhase(chat.busy, assistantChars(chat.messages));
+  const phase = meterPhase(chat.busy, assistantChars(chat.messages), chat.approval !== null);
   const page = Math.max(1, (keysOpen ? budget.body : Math.max(1, chatHeight)) - 1);
   const debugPage = Math.max(1, budget.debug - 2);
 
@@ -1096,6 +1099,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       connected: connectionRef.current.status === "connected" && sessionRef.current !== null,
       suggestions: suggestRef.current.open,
       history: historyCursorRef.current !== null,
+      approval: approvalRef.current !== null,
     };
   }
 
@@ -1152,6 +1156,9 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       case "edit-external":
         void openEditor();
         return;
+      case "approve":
+        answerApproval(effect.decision);
+        return;
       case "toggle-tools":
         setToolOutput((shown) => {
           const next = !shown;
@@ -1165,6 +1172,17 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       case "ignore":
         return;
     }
+  }
+
+  function answerApproval(decision: "allow" | "allow_session" | "deny"): void {
+    const pending = approvalRef.current;
+    const current = sessionRef.current;
+    if (pending === null || current === null) {
+      return;
+    }
+    void client.respondApproval(current, pending.callId, decision).catch((error: unknown) => {
+      setChat((state) => ({ ...state, error: messageOf(error) }));
+    });
   }
 
   async function openEditor(): Promise<void> {
@@ -1438,7 +1456,17 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
           )}
         </Text>
       ) : null}
-      {budget.suggestions > 0 ? (
+      {budget.suggestions > 0 && chat.approval !== null ? (
+        <Box flexDirection="column" width={columns} height={budget.suggestions} flexShrink={0} overflow="hidden">
+          {approvalLines(chat.approval, columns)
+            .slice(0, budget.suggestions)
+            .map((line, index) => (
+              <Text key={index} bold={line.bold === true} dimColor={line.dim === true} color={index === 0 ? "yellow" : undefined} wrap="truncate-end">
+                {line.text}
+              </Text>
+            ))}
+        </Box>
+      ) : budget.suggestions > 0 ? (
         <SuggestionBand
           items={suggestMatches}
           selected={suggestSelected}

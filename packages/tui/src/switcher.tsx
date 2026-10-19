@@ -28,8 +28,11 @@ export function SwitcherView({
         return (
           <Text key={row.sessionId} wrap="truncate-end" inverse={row.selected}>
             <Text color={CLAY}>{row.selected ? "›" : " "}</Text>
-            <Text color={row.running ? "green" : undefined} dimColor={!row.running}>
-              {` ${row.running ? "●" : "○"} `}
+            <Text
+              color={row.waiting ? "yellow" : row.running ? "green" : undefined}
+              dimColor={!row.running && !row.waiting}
+            >
+              {` ${row.waiting ? "?" : row.running ? "●" : "○"} `}
             </Text>
             <Text bold={row.current}>{row.title}</Text>
             <Text dimColor>{`${pad}${row.age}`}</Text>

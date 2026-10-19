@@ -17,7 +17,9 @@ export type Params =
   | ToolRequestedEvent
   | ToolStartedEvent
   | ToolCompletedEvent
-  | ToolFailedEvent;
+  | ToolFailedEvent
+  | ApprovalNeededEvent
+  | ApprovalResolvedEvent;
 export type Cwd = string | null;
 export type MessageId = string;
 export type SessionId = string;
@@ -125,6 +127,23 @@ export type Seq14 = number;
 export type SessionId15 = string;
 export type Ts14 = string;
 export type Type14 = 'tool.failed';
+export type CallId4 = string;
+export type MessageId5 = string | null;
+export type Name1 = string;
+export type Source = string;
+export type RunId15 = string;
+export type Seq15 = number;
+export type SessionId16 = string;
+export type Ts15 = string;
+export type Type15 = 'approval.needed';
+export type CallId5 = string;
+export type Decision = 'allow' | 'allow_session' | 'deny';
+export type Name2 = string;
+export type RunId16 = string;
+export type Seq16 = number;
+export type SessionId17 = string;
+export type Ts16 = string;
+export type Type16 = 'approval.resolved';
 
 /**
  * Server → client event. No ``id``; this is not a response to a request.
@@ -518,4 +537,61 @@ export interface ToolFailedEvent {
 export interface ToolFailedData {
   call_id: CallId3;
   message: Message1;
+}
+/**
+ * The run is waiting for an answer about one tool call.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "ApprovalNeededEvent".
+ */
+export interface ApprovalNeededEvent {
+  data: ApprovalNeededData;
+  run_id: RunId15;
+  seq: Seq15;
+  session_id: SessionId16;
+  ts: Ts15;
+  type: Type15;
+}
+/**
+ * A tool call waits for the user. The run is paused until ``approval.respond``.
+ *
+ * ``source`` is the rule that asked, such as ``built-in default``.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "ApprovalNeededData".
+ */
+export interface ApprovalNeededData {
+  args: Args1;
+  call_id: CallId4;
+  message_id?: MessageId5;
+  name: Name1;
+  source: Source;
+}
+export interface Args1 {
+  [k: string]: unknown;
+}
+/**
+ * The waiting tool call was answered, and the run goes on.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "ApprovalResolvedEvent".
+ */
+export interface ApprovalResolvedEvent {
+  data: ApprovalResolvedData;
+  run_id: RunId16;
+  seq: Seq16;
+  session_id: SessionId17;
+  ts: Ts16;
+  type: Type16;
+}
+/**
+ * The user answered. ``allow_session`` also allows ``name`` for the rest of the session.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "ApprovalResolvedData".
+ */
+export interface ApprovalResolvedData {
+  call_id: CallId5;
+  decision: Decision;
+  name: Name2;
 }

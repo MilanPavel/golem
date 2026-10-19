@@ -42,7 +42,9 @@ Golem has two parts:
 
 - Tool rules: allow, ask, or deny a tool by name, subject, or path, in `~/.golem/config.toml` or a project's `.golem/policy.toml`. `just golem config show` lists them.
 
-Golem cannot run commands or change files yet, and it cannot ask you before a tool runs: a call that needs approval is refused for now. Approvals come next. See [docs/plan.md](docs/plan.md).
+- Approvals: a tool call a rule asks about waits for you. Press `a` to allow it once, `s` to allow that tool for the session, or `d` to deny. The question waits across closing the TUI and restarting the daemon.
+
+Golem cannot run commands or change files yet. A sandboxed shell comes next. See [docs/plan.md](docs/plan.md).
 
 Golem runs on macOS only, from a checkout of this repository. There is no installer yet.
 

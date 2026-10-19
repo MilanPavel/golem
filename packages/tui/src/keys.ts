@@ -2,9 +2,9 @@ import { type EditOp } from "./edit.ts";
 import { type SwitcherKey } from "./switcher.ts";
 
 /** Where a binding applies. The overlay groups rows by these names. */
-export type KeyContext = "composer" | "transcript" | "switcher" | "debug";
+export type KeyContext = "composer" | "transcript" | "switcher" | "debug" | "approval";
 
-export const KEY_CONTEXTS: readonly KeyContext[] = ["composer", "transcript", "switcher", "debug"];
+export const KEY_CONTEXTS: readonly KeyContext[] = ["composer", "transcript", "switcher", "debug", "approval"];
 
 export type PressName =
   | "ctrl-c"
@@ -78,6 +78,8 @@ export type KeyPlace = {
   suggestions: boolean;
   /** Up has already recalled a message, so Down and Esc stay on that list. */
   history: boolean;
+  /** The run waits for an answer about a tool call. */
+  approval?: boolean;
 };
 
 export type ScrollToward = "up" | "down" | "start" | "end";
@@ -98,6 +100,7 @@ export type KeyEffect =
   | { kind: "edit"; op: EditOp }
   | { kind: "edit-external" }
   | { kind: "toggle-tools" }
+  | { kind: "approve"; decision: "allow" | "allow_session" | "deny" }
   | { kind: "insert"; text: string }
   | { kind: "ignore" };
 
@@ -115,6 +118,7 @@ type KeyWhen = {
   connected?: boolean;
   suggestions?: boolean;
   history?: boolean;
+  approval?: boolean;
 };
 
 export type KeyBinding = {
@@ -178,6 +182,7 @@ export const KEYS: readonly KeyBinding[] = [
     when: { name: "question", overlay: true },
     run: () => ({ kind: "close-overlay" }),
   },
+  ...approvalKeys(),
   {
     id: "suggest-up",
     label: "Up",
@@ -419,6 +424,36 @@ export const KEYS: readonly KeyBinding[] = [
   ...editKeys(),
 ];
 
+function approvalKeys(): KeyBinding[] {
+  const answer = (
+    id: string,
+    label: string,
+    description: string,
+    press: { name?: PressName; input?: string },
+    decision: "allow" | "allow_session" | "deny",
+  ): KeyBinding => ({
+    id,
+    label,
+    contexts: ["approval"],
+    description,
+    when: { ...press, overlay: false, switcher: false, approval: true },
+    run: () => ({ kind: "approve", decision }),
+  });
+  return [
+    answer("approve-once", "a", "Allows the waiting tool call once. Enter does the same.", { input: "a" }, "allow"),
+    answer("approve-enter", "Enter", "Allows the waiting tool call once.", { name: "return" }, "allow"),
+    answer(
+      "approve-session",
+      "s",
+      "Allows the call, and this tool for the rest of the session.",
+      { input: "s" },
+      "allow_session",
+    ),
+    answer("deny", "d", "Denies the waiting tool call. Esc does the same.", { input: "d" }, "deny"),
+    answer("deny-esc", "Esc", "Denies the waiting tool call.", { name: "escape" }, "deny"),
+  ];
+}
+
 function editKey(
   id: string,
   label: string,
@@ -652,6 +687,9 @@ function whenMatches(when: KeyWhen, place: KeyPlace, press: Press): boolean {
     return false;
   }
   if (when.debug !== undefined && when.debug !== place.debug) {
+    return false;
+  }
+  if (when.approval !== undefined && when.approval !== (place.approval === true)) {
     return false;
   }
   if (when.draftEmpty !== undefined && when.draftEmpty !== place.draftEmpty) {

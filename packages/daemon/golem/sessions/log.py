@@ -73,6 +73,10 @@ class SessionLog:
         self._bus.watch(target)
         return await self._records.recent(limit)
 
+    async def for_run(self, run_id: str) -> list[ChatEvent]:
+        """Every stored event of one run, in order."""
+        return await self._events.for_run(run_id)
+
     async def stored(self, session_id: str) -> list[ChatEvent]:
         """Every stored event of ``session_id``, in order."""
         return await self._events.after(session_id, 0)

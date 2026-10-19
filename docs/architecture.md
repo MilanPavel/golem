@@ -92,10 +92,11 @@ Built today:
 - `session.fork` and `/fork`. A new session with the history up to one message. [ADR-010](adr/010-fork.md).
 - Read-only tools: `read_file`, `list_dir`, `glob`, and `grep`, inside the session's project folder. [ADR-011](adr/011-tools.md).
 - Tool rules: allow, ask, or deny per tool, subject, and path, from `config.toml` and a project's `.golem/policy.toml`, and `golem config show`. [ADR-012](adr/012-permission-rules.md).
+- Approvals: a call a rule asks about pauses the run until you answer in the TUI, across a TUI close or a daemon restart. [ADR-013](adr/013-approvals.md).
 
 Planned next:
 
-- Approvals, then shell and write tools, flows, skills, and long-term memory in `memory.db`.
+- Shell and write tools, flows, skills, and long-term memory in `memory.db`.
 
 ## The daemon
 
@@ -120,7 +121,7 @@ The socket is only the door. Behind it, these jobs sit in one process:
 | Graph runtime | The agent loop. Its memory is the checkpoint. | Built |
 | Model router | Resolves a profile name or `provider/model` ref to a chat model. | Built |
 | Tools | Plain Python functions with a Pydantic argument model, in `golem/tools/`. The graph offers them to the model and runs them in its own `tools` node. | Built (read-only) |
-| Permissions | Rules from the project, the user, and the defaults, checked in order before every tool call (`golem/permissions/`). | Built. `ask` refuses until approvals exist |
+| Permissions | Rules from the project, the user, and the defaults, checked in order before every tool call (`golem/permissions/`). | Built |
 | Event log | The history. Every event, numbered by `seq`, written before it is sent. A client that reconnects will read it and rebuild the screen. | Written. Replay to clients planned |
 
 The graph does not own the rest of the product. It calls ordinary Python for three things that have to stay ours:
@@ -177,6 +178,30 @@ If you quit the TUI halfway through, the daemon still finishes the run and saves
 
 If you press Ctrl-C while the answer streams, the TUI sends `run.cancel`. The daemon cancels the run task. Each tool call still open gets `tool.failed`. The answer gets a `message.completed` with the text streamed so far and `interrupted: true`, then `run.cancelled` with the reason `user`. The same partial text is written into the checkpoint, so "go on" continues from it ([ADR-008](adr/008-cancellation.md)). Stopping the daemon does the same for every open run, with the reason `shutdown`.
 
+A call a rule asks about pauses the run ([ADR-013](adr/013-approvals.md)):
+
+```mermaid
+sequenceDiagram
+  participant You
+  participant TUI
+  participant Daemon
+  participant Graph
+  Graph->>Graph: tools node, interrupt()
+  Daemon-->>TUI: tool.requested, approval.needed
+  Note over Daemon: run waits, no task, survives a restart
+  You->>TUI: a, s, or d
+  TUI->>Daemon: approval.respond
+  Daemon-->>TUI: approval.resolved
+  Daemon->>Graph: resume with the answer
+  Graph->>Graph: tools node again from the top
+  Daemon-->>TUI: tool.started, tool.completed, the rest of the run
+```
+
+- **The pause.** The `tools` node decides about every call of the reply first, and calls `interrupt()` for the first one that asks. The run's task ends after `approval.needed`, and the run row is `waiting`. Nothing is in memory, so closing the TUI or restarting the daemon loses nothing. `session.list` reports the session as `waiting`.
+- **The answer.** `approval.respond` names the session, the call, and `allow`, `allow_session`, or `deny`. The daemon reads the pending call from the run's events, stores `approval.resolved`, and starts a new task that resumes the graph with `Command(resume=...)`. The node runs again from its first line. Earlier answers come back from LangGraph, the next call that asks pauses again, and only after the last answer does any call run. So no call runs twice, and no event is repeated.
+- **For the session.** `allow_session` also allows that tool for the rest of the session (`sessions.allowed_tools`), without asking again. A `deny` rule still wins over it. A denied call ends in `tool.failed`, and the model reads `the user denied this tool call`.
+- **While it waits.** `message.send` answers `SESSION_BUSY`. `run.cancel`, Ctrl-C, or `session.close` ends the run: each open call fails with `cancelled before it was approved`, then `run.cancelled`. A daemon stopping leaves a waiting run as it is.
+
 A run stopped between a reply and its tool results leaves tool calls without a result in the checkpoint, and providers refuse that history. Before the next turn streams, each such call gets a result that says it was cancelled.
 
 If the daemon dies halfway through, the run has no task left to finish it. At the next start the daemon closes it: each open tool call gets `tool.failed`, the open answer gets a `message.completed` with the text streamed so far and `interrupted: true`, then `run.failed`. The same partial text is written into the checkpoint, so the model's next turn sees what the screen showed.
@@ -201,7 +226,7 @@ The daemon keeps its files under one home directory. `resolve_paths` picks it: a
 | `memory.db` | Long-term memory | Planned |
 | `skills/`, `flows/` | Skills and flows you added on this machine | Planned |
 
-In `golem.db`, `events` is the source. `sessions` and `runs` are written in the same transaction as the event they follow: `session.created` adds a session with its project folder (`cwd`), `run.started` opens a run, and `run.completed`, `run.failed`, or `run.cancelled` closes it. `session.updated` sets the title, or the folder of a session that had none. `session.closed` records `closed_at`, which hides the session from `session.list`; the events stay. The schema version is SQLite's `user_version`. Each numbered migration in `golem/store/migrations.py` runs once, and a file from a newer daemon is refused.
+In `golem.db`, `events` is the source. `sessions` and `runs` are written in the same transaction as the event they follow: `session.created` adds a session with its project folder (`cwd`), `run.started` opens a run, `approval.needed` marks it `waiting` and `approval.resolved` marks it running again, and `run.completed`, `run.failed`, or `run.cancelled` closes it. An `approval.resolved` with `allow_session` adds the tool to `sessions.allowed_tools`. `session.updated` sets the title, or the folder of a session that had none. `session.closed` records `closed_at`, which hides the session from `session.list`; the events stay. The schema version is SQLite's `user_version`. Each numbered migration in `golem/store/migrations.py` runs once, and a file from a newer daemon is refused.
 
 Settings come from three places. Each one overrides the one before it: `~/.golem/config.toml`, then `<project>/.golem/config.toml`, then `GOLEM_…` environment variables. An explicit `log_level` passed to `load_settings` wins over all three. The keys read today:
 
@@ -219,7 +244,7 @@ Tool rules are checked in this order, and the first one that matches decides ([A
 2. `[[rule]]` in `~/.golem/config.toml`. A file that stops validating keeps its last good rules.
 3. The defaults: read-only tools are allowed, and everything else asks.
 
-Both files are read again when they change. Until approvals exist, `ask` refuses the call: it ends in `tool.failed`, without `tool.started`, and the model reads why. `golem config show` prints the settings and the rules for the folder it runs in, in that order, through `config.get`.
+Both files are read again when they change. A `deny` ends the call in `tool.failed`, without `tool.started`, and the model reads why. An `ask` waits for you (below). `golem config show` prints the settings and the rules for the folder it runs in, in that order, through `config.get`.
 
 API keys are never in the file. At each model call the router reads the environment variable named by `api_key_env`, then the Keychain item with service `golem` and the provider name as the account (`golem/models/keys.py`, through `keyring`, cached in the daemon). A provider with `api_key_env` fails without a key, and the error names `/login <provider>`. Other providers, except `ollama`, use a stored key when there is one. Only the daemon writes those items, through `auth.set`, so the Keychain lets it read them without a prompt. The model router re-reads `config.toml` when its modification time changes, so model edits need no restart. A file that no longer validates keeps the last good models and logs a warning.
 
@@ -280,9 +305,9 @@ Each event line is one JSON-RPC 2.0 notification. The fields that matter:
 
 | Commands | Events |
 |---|---|
-| `hello`, `ping`, `daemon.status`, `session.create`, `session.attach`, `session.detach`, `session.list`, `session.rename`, `session.fork`, `session.close`, `message.send`, `run.cancel`, `session.inspect`, `config.get`, `auth.set`, `auth.remove`, `auth.list`, `model.list`, `session.set_model`, `model.set_default`, `model.probe`, `model.pull`, `model.pull_cancel`, `model.delete` | `session.created`, `model.selected`, `message.started`, `message.delta`, `message.completed`, `tool.requested`, `tool.started`, `tool.completed`, `tool.failed`, `run.started`, `run.completed`, `run.failed`, `run.cancelled`, `session.updated`, `session.closed`; `session.summary` to watchers; `model.pull.progress` and `model.pull.done` to every connection |
+| `hello`, `ping`, `daemon.status`, `session.create`, `session.attach`, `session.detach`, `session.list`, `session.rename`, `session.fork`, `session.close`, `message.send`, `run.cancel`, `approval.respond`, `session.inspect`, `config.get`, `auth.set`, `auth.remove`, `auth.list`, `model.list`, `session.set_model`, `model.set_default`, `model.probe`, `model.pull`, `model.pull_cancel`, `model.delete` | `session.created`, `model.selected`, `message.started`, `message.delta`, `message.completed`, `tool.requested`, `tool.started`, `tool.completed`, `tool.failed`, `approval.needed`, `approval.resolved`, `run.started`, `run.completed`, `run.failed`, `run.cancelled`, `session.updated`, `session.closed`; `session.summary` to watchers; `model.pull.progress` and `model.pull.done` to every connection |
 
-After `hello`, a client sends `ping` every few seconds so a half-open socket is noticed. `daemon.status` returns the pid, uptime, and configured model. A new chat sends `session.create` with its `cwd`, then `session.attach` with `after_seq` 0, then `message.send`. `session.list` returns sessions newest activity first, each with `idle` or `running`, its title, and its last `seq`. With `watch: true`, the connection also gets a `session.summary` after every change to any session, until it closes. `session.rename` sets a title by hand. `session.fork` copies a session's history up to one message into a new session, and the client attaches to it. `session.detach` stops one session's events. `session.inspect` reads the saved checkpoint messages and does not call the model. A reply that called tools lists each call as `→ name(args)` after its text. `auth.set` stores a provider's API key in the Keychain, `auth.remove` deletes it, and `auth.list` says where each provider's key is without returning it. The client shows `auth.set` in the wire view with the key replaced by `[redacted]`.
+After `hello`, a client sends `ping` every few seconds so a half-open socket is noticed. `daemon.status` returns the pid, uptime, and configured model. A new chat sends `session.create` with its `cwd`, then `session.attach` with `after_seq` 0, then `message.send`. `session.list` returns sessions newest activity first, each with `idle`, `running`, or `waiting` for an approval, its title, and its last `seq`. With `watch: true`, the connection also gets a `session.summary` after every change to any session, until it closes. `session.rename` sets a title by hand. `session.fork` copies a session's history up to one message into a new session, and the client attaches to it. `session.detach` stops one session's events. `session.inspect` reads the saved checkpoint messages and does not call the model. A reply that called tools lists each call as `→ name(args)` after its text. `auth.set` stores a provider's API key in the Keychain, `auth.remove` deletes it, and `auth.list` says where each provider's key is without returning it. The client shows `auth.set` in the wire view with the key replaced by `[redacted]`.
 
 `session.set_model` switches a session to a profile or ref.
 - The daemon checks that the name resolves and that its provider has a key.
@@ -390,6 +415,7 @@ The other bands ask for rows only when they are needed.
 - The composer wants one row per line of the draft, up to 5, or 1 while a reply is in progress. That one row is `…`, and typing is ignored. Extra lines come out of the chat. Scroll is how many lines sit below the window, so the line you were reading stays put.
 - The meter wants 1 while a reply is in progress: `thinking`, then `writing · N chars · Ns`, with a small block that moves.
 - Command suggestions want up to 6, above the composer, and only while the draft is a `/` command.
+- The approval band takes those rows instead, 3 of them, while a run waits on a tool call: `Allow read_file notes.txt?`, the rule that asked, and the keys. `a` or Enter allows once, `s` allows for the session, and `d` or Esc denies. Ctrl-C cancels the run. The meter says `waiting for your approval`, and the switcher shows a yellow `?` for a waiting session.
 - An error wants 1 row in red. A notice wants 1 row in yellow.
 - The status line wants 1. Left to right: the connection word, the session title (`untitled` until one arrives), the model, the folder, the message count, `↓ N new lines` while you are scrolled up and more text has arrived, and how long the daemon has been up. A narrow window drops the lowest segment first: uptime, then the message count, then the folder, then that count. A long title is shortened so the session name stays. The connection word is never dropped. It is shortened only when it alone is wider than the window. The terminal tab is `golem — <title>`, and the previous title is put back on exit.
 
@@ -422,6 +448,8 @@ The debug band keeps its first row for the title. The wire tab lists recent prot
 | `tool.started` | That call is running. |
 | `tool.completed` | That call is done, with its summary and output preview. |
 | `tool.failed` | That call failed, with the reason. |
+| `approval.needed` | That call waits (`?`), and the approval band opens. `busy` stays on. |
+| `approval.resolved` | The band closes. An allowed call goes back to requested until `tool.started`. |
 
 Deltas do not take that path one socket frame at a time. They wait in a small map, grouped by message id, for about 16 milliseconds, then land as one update. When the answer finishes, that map is emptied first, and `message.completed` replaces the text with the full answer. `session.created` does not change `chat`. The screen reads the model and the project folder off that event on its own. The folder in the header and the status line is the session's, or the TUI's working directory for a session without one.
 

@@ -328,3 +328,41 @@ test("tool events draw blocks under the reply that asked", () => {
     ],
   );
 });
+
+test("approval events set and clear the waiting call", () => {
+  const base = { session_id: "s", run_id: "r", ts: "t" } as const;
+  const events: ChatEvent[] = [
+    { ...base, seq: 1, type: "run.started", data: {} },
+    { ...base, seq: 2, type: "message.started", data: { message_id: "a", role: "assistant" } },
+    { ...base, seq: 3, type: "message.completed", data: { message_id: "a", role: "assistant", text: "" } },
+    {
+      ...base,
+      seq: 4,
+      type: "tool.requested",
+      data: { call_id: "c1", message_id: "a", name: "read_file", args: { path: "x" } },
+    },
+    {
+      ...base,
+      seq: 5,
+      type: "approval.needed",
+      data: { call_id: "c1", message_id: "a", name: "read_file", args: { path: "x" }, source: "rule" },
+    },
+  ];
+  const waiting = events.reduce(reduceChat, emptyChat);
+  assert.deepEqual(waiting.approval, { callId: "c1", name: "read_file", args: { path: "x" }, source: "rule" });
+  assert.equal(waiting.busy, true);
+  assert.equal(waiting.messages[0]?.tools?.[0]?.status, "waiting");
+
+  const answered = reduceChat(waiting, {
+    ...base,
+    seq: 6,
+    type: "approval.resolved",
+    data: { call_id: "c1", name: "read_file", decision: "allow" },
+  });
+  assert.equal(answered.approval, null);
+  assert.equal(answered.messages[0]?.tools?.[0]?.status, "requested");
+
+  const cancelled = reduceChat(waiting, { ...base, seq: 6, type: "run.cancelled", data: { reason: "user" } });
+  assert.equal(cancelled.approval, null);
+  assert.equal(cancelled.busy, false);
+});

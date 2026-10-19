@@ -133,8 +133,8 @@ class SessionListParams(BaseModel):
 class SessionSummary(BaseModel):
     """One session as ``session.list`` reports it.
 
-    ``status`` is ``running`` while a run is open, and ``closed`` after
-    ``session.close``. ``last_seq`` is the newest
+    ``status`` is ``running`` while a run is open, ``waiting`` while a run
+    waits for a tool approval, and ``closed`` after ``session.close``. ``last_seq`` is the newest
     stored event, so a client can tell what it has not seen, and which of
     two summaries of one session is newer.
     """
@@ -144,7 +144,7 @@ class SessionSummary(BaseModel):
     session_id: str = Field(min_length=1)
     model_profile: str = Field(min_length=1)
     title: str | None = Field(default=None, min_length=1)
-    status: Literal["idle", "running", "closed"]
+    status: Literal["idle", "running", "waiting", "closed"]
     created_at: str = Field(min_length=1)
     updated_at: str = Field(min_length=1)
     last_seq: int = Field(ge=0)
@@ -622,7 +622,31 @@ class ConfigGetResult(BaseModel):
     rules: list[ConfigRule]
 
 
+class ApprovalRespondParams(BaseModel):
+    """``approval.respond``. Answer the tool call a session's run waits on.
+
+    ``allow`` runs it once, ``allow_session`` runs it and allows the tool for
+    the rest of the session, and ``deny`` tells the model it may not.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    call_id: str = Field(min_length=1)
+    decision: Literal["allow", "allow_session", "deny"]
+
+
+class ApprovalRespondResult(BaseModel):
+    """The run that goes on. Its events go to the attached connections."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    run_id: str = Field(min_length=1)
+
+
 __all__ = [
+    "ApprovalRespondParams",
+    "ApprovalRespondResult",
     "AuthKeyStatus",
     "AuthListParams",
     "AuthListResult",
