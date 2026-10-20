@@ -34,7 +34,7 @@ class TitleGenerator(Protocol):
 
 
 class ModelTitles:
-    """Asks the session's own model. Plan step 1.7 moves this to a cheap profile."""
+    """Asks the session's own model. Plan step 9.2 moves this to a cheap profile."""
 
     def __init__(self, router: ModelRouter) -> None:
         self._router = router
