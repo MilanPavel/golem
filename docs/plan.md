@@ -23,6 +23,7 @@ This file is about what comes next. How the existing pieces are built is in [arc
 - Tool rules in `~/.golem/config.toml` and a project's `.golem/policy.toml` allow, ask, or deny a call by tool, subject, and path. `golem config show` lists them in the order they are checked.
 - A sandboxed shell: the model runs commands in the session folder with no network and no writes outside it, after you approve each one. Output streams into the tool line. `git_status`, `git_diff`, and `git_log` read the repository.
 - "Always allow" (`w`) writes a rule for one exact call, and `/permissions` changes or deletes rules and revokes what a session allows.
+- Write tools: `write_file` and `edit_file` change files in the session folder, never under `.golem/` or `.git/`, after you approve each change.
 - Approvals: a call a rule asks about waits for `a` (once), `s` (for the session), or `d` (deny), across closing the TUI and restarting the daemon. A waiting session shows `?` in the switcher.
 - Slash commands with suggestions, a line editor, recalling a sent message with Up, copy and export, and closing a session from the switcher.
 - It runs from a checkout of this repository (`just golem daemon install`, then `just tui`). Phase 3 makes it installable.

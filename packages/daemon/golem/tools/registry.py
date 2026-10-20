@@ -51,7 +51,9 @@ class Tool[A: BaseModel]:
     """``read_only`` tools change nothing outside golem, so the default policy allows them.
 
     ``path_arg`` names the argument a rule's ``path`` is matched against, and
-    ``match_arg`` the one its ``match`` is.
+    ``match_arg`` the one its ``match`` is. ``subject`` computes the subject
+    from the raw arguments and the session folder instead, for tools whose
+    subject is not one argument as it is.
     """
 
     name: str
@@ -61,6 +63,7 @@ class Tool[A: BaseModel]:
     read_only: bool = False
     path_arg: str | None = None
     match_arg: str | None = None
+    subject: Callable[[Mapping[str, object], Path | None], str | None] | None = None
 
     def schema(self) -> dict[str, object]:
         """The OpenAI function format, which every chat model's ``bind_tools`` accepts."""

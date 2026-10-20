@@ -41,4 +41,22 @@ def relative(root: Path, path: Path) -> str:
     return "." if rel == Path() else rel.as_posix()
 
 
-__all__ = ["NO_FOLDER", "inside", "relative", "session_root"]
+PROTECTED_DIRS = (".golem", ".git")
+"""Folders no tool writes into: the project's rules are the user's, and so is its history."""
+
+
+def writable(root: Path, path: str) -> Path:
+    """:func:`inside`, and not the folder itself or under a :data:`PROTECTED_DIRS` folder."""
+    resolved = inside(root, path)
+    base = root.resolve()
+    if resolved == base:
+        raise ToolError(f"{path} is the project folder, not a file")
+    protected = next(
+        (part for part in resolved.relative_to(base).parts if part in PROTECTED_DIRS), None
+    )
+    if protected is not None:
+        raise ToolError(f"{path} is inside a {protected}/ folder, which golem does not change")
+    return resolved
+
+
+__all__ = ["NO_FOLDER", "PROTECTED_DIRS", "inside", "relative", "session_root", "writable"]

@@ -46,7 +46,7 @@ Golem has two parts:
 
 - A sandboxed shell. The model can run tests or a build in that folder after you approve the command. It has no network and cannot write outside the folder. `git_status`, `git_diff`, and `git_log` need no approval.
 
-Golem cannot change files with its own tools yet, only through an approved shell command. Write tools with a diff to approve come next. See [docs/plan.md](docs/plan.md).
+- Changing files with `write_file` and `edit_file`, inside that folder, after you approve each change. Golem never changes a `.golem/` or `.git/` folder. Ctrl-O shows the diff of each change.
 
 Golem runs on macOS only, from a checkout of this repository. There is no installer yet.
 

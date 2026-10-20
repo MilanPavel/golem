@@ -91,6 +91,7 @@ Built today:
 - Titles, a live session list, and the TUI switcher (`/sessions`, `/new`, `/title`). [ADR-009](adr/009-session-list.md).
 - `session.fork` and `/fork`. A new session with the history up to one message. [ADR-010](adr/010-fork.md).
 - Read-only tools: `read_file`, `list_dir`, `glob`, and `grep`, inside the session's project folder. [ADR-011](adr/011-tools.md).
+- Write tools: `write_file` and `edit_file`, inside the session's project folder and outside its `.golem/` and `.git/`.
 - A sandboxed `shell`, with streamed output, and the read-only `git_status`, `git_diff`, and `git_log`. [ADR-014](adr/014-shell-sandbox.md).
 - Tool rules: allow, ask, or deny per tool, subject, and path, from `config.toml` and a project's `.golem/policy.toml`, and `golem config show`. [ADR-012](adr/012-permission-rules.md).
 - "Always allow" from the approval band, and `/permissions` to change, delete, or revoke rules and session allowances.
@@ -98,7 +99,7 @@ Built today:
 
 Planned next:
 
-- Write tools, flows, skills, and long-term memory in `memory.db`.
+- Flows, skills, and long-term memory in `memory.db`.
 
 ## The daemon
 
@@ -122,7 +123,7 @@ The socket is only the door. Behind it, these jobs sit in one process:
 | Sessions | One chat or one flow run. Each has an id and a row in `golem.db`. | Built |
 | Graph runtime | The agent loop. Its memory is the checkpoint. | Built |
 | Model router | Resolves a profile name or `provider/model` ref to a chat model. | Built |
-| Tools | Plain Python functions with a Pydantic argument model, in `golem/tools/`. The graph offers them to the model and runs them in its own `tools` node. | Built: file reads, `shell`, git |
+| Tools | Plain Python functions with a Pydantic argument model, in `golem/tools/`. The graph offers them to the model and runs them in its own `tools` node. | Built: file reads and writes, `shell`, git |
 | Permissions | Rules from the project, the user, and the defaults, checked in order before every tool call (`golem/permissions/`). | Built |
 | Event log | The history. Every event, numbered by `seq`, written before it is sent. A client that reconnects will read it and rebuild the screen. | Written. Replay to clients planned |
 
@@ -188,6 +189,12 @@ If you press Ctrl-C while the answer streams, the TUI sends `run.cancel`. The da
 - **Where there is no sandbox**, for example inside another sandbox or off macOS, `shell` and the git helpers refuse to run and say why.
 
 `git_status`, `git_diff`, and `git_log` run git directly in the same sandbox, without the network. They switch off the repository settings that run code: `core.fsmonitor`, hooks, external diff drivers, and text conversion. They are read-only, so the default policy allows them.
+
+`write_file` replaces a whole file or creates it, with its folders. `edit_file` replaces exact text, and fails when the text is not in the file, or is there more than once without `replace_all`. Both run in the daemon, not in the sandbox (`golem/tools/write.py`):
+- **Where.** The path resolves inside the session folder with symlinks followed, and nothing under a `.golem/` or `.git/` folder may change, so a tool cannot edit the project's rules or its history.
+- **Plan, then apply.** Each call first works out the new text without writing anything, then writes it through a temp file in the same folder and a rename, keeping the file mode and the line endings. A file over 5 MB, a binary file, or one that is not UTF-8 is refused.
+- **Result.** The summary is `+N -M <path>`, and the output, which the model reads and Ctrl-O shows, is the unified diff.
+- **Policy.** Neither is read-only, so by default every change asks. Their subject is the path relative to the folder, so allowing a change for the session allows changes to that file only, and "always allow" writes a rule with that file's exact `path`.
 
 A call a rule asks about pauses the run ([ADR-013](adr/013-approvals.md)):
 

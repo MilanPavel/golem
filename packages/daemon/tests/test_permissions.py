@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 from golem.config import PolicyRule, RuleAction
 from golem.permissions.engine import DEFAULT_SOURCE, Call, Rule, check, default_rules, path_pattern
-from golem.permissions.policy import UNTRUSTED, Policy, describe, explain
+from golem.permissions.policy import UNTRUSTED, Policy, describe, explain, rule_for
 from golem.tools import default_registry
 from golem.tools.fs import READ_ONLY_TOOLS
 from golem.tools.registry import Tool, ToolContext, ToolRegistry, ToolResult
@@ -133,6 +133,28 @@ def test_describe_reads_the_tools_path_and_subject(tmp_path: Path) -> None:
     assert (shell.subject, shell.path) == ("ls", None)
     unknown = describe(registry, "nope", {"command": "ls"}, tmp_path)
     assert (unknown.subject, unknown.path) == (None, None)
+
+
+def test_a_file_change_is_keyed_on_its_path_relative_to_the_folder(tmp_path: Path) -> None:
+    registry = default_registry()
+    edit = describe(registry, "edit_file", {"path": "./src/../src/a.py"}, tmp_path)
+    assert (edit.subject, edit.path) == ("src/a.py", (tmp_path / "src" / "a.py").resolve())
+    outside = describe(registry, "write_file", {"path": "/etc/hosts"}, tmp_path)
+    assert outside.subject is None
+
+
+def test_always_allow_on_a_file_change_writes_its_exact_path(tmp_path: Path) -> None:
+    registry = default_registry()
+    rule = rule_for(registry, "edit_file", {"path": "src/a.py"}, tmp_path)
+    assert (rule.tool, rule.match, rule.path) == (
+        "edit_file",
+        None,
+        (tmp_path / "src" / "a.py").resolve().as_posix(),
+    )
+    shell = rule_for(registry, "shell", {"command": "git status"}, tmp_path)
+    assert (shell.match, shell.path) == ("git status", None)
+    grep = rule_for(registry, "grep", {"pattern": "TODO", "path": "src"}, tmp_path)
+    assert (grep.match, grep.path) == ("TODO", None)
 
 
 def _write(path: Path, text: str) -> None:

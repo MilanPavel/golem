@@ -216,9 +216,15 @@ class Policy:
 def rule_for(
     registry: ToolRegistry, name: str, args: Mapping[str, object], root: Path | None
 ) -> PolicyRule:
-    """An ``allow`` rule that covers this call: its exact subject, else its exact path."""
+    """An ``allow`` rule that covers this call: its exact subject, else its exact path.
+
+    A tool whose subject is not an argument of its own, such as a file
+    tool's path relative to the folder, gets the exact path instead.
+    """
     call = describe(registry, name, args, root)
-    if call.subject:
+    tool = registry.get(name)
+    by_match = tool is None or tool.match_arg is not None or tool.path_arg is None
+    if call.subject and by_match:
         return PolicyRule(tool=name, match=exact_match(call.subject), action="allow")
     if call.path is not None:
         return PolicyRule(tool=name, path=call.path.as_posix(), action="allow")
@@ -233,7 +239,9 @@ def describe(
     if tool is None:
         return Call(tool=name, root=root)
     subject: str | None = None
-    if tool.match_arg is not None:
+    if tool.subject is not None:
+        subject = tool.subject(args, root)
+    elif tool.match_arg is not None:
         raw = args.get(tool.match_arg)
         subject = raw if isinstance(raw, str) else None
     path: Path | None = None

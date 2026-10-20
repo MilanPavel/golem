@@ -124,8 +124,8 @@ async def test_a_session_without_a_folder_has_no_file_access() -> None:
 async def test_bad_arguments_and_unknown_tools_explain_themselves(project: Path) -> None:
     with pytest.raises(ToolError, match="invalid arguments for read_file: path"):
         await _call(project, "read_file")
-    with pytest.raises(ToolError, match="unknown tool 'write_file'"):
-        await _call(project, "write_file", path="a")
+    with pytest.raises(ToolError, match="unknown tool 'delete_file'"):
+        await _call(project, "delete_file", path="a")
 
 
 async def test_long_output_is_cut_for_the_model() -> None:
@@ -146,6 +146,8 @@ def test_schemas_use_the_function_format() -> None:
         "list_dir",
         "glob",
         "grep",
+        "write_file",
+        "edit_file",
         "shell",
         "git_status",
         "git_diff",
