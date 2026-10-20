@@ -179,6 +179,9 @@ export function toolLines(tool: ToolBlock, width: number, expanded: boolean): Sp
   if (rows.length > shown.length || tool.truncated === true) {
     lines.push([{ text: "  │ …", dim: true }]);
   }
+  if (tool.artifactId !== undefined) {
+    lines.push(...wrapSpans([{ text: `  │ all of it: /artifact ${tool.artifactId}`, dim: true }], width));
+  }
   return lines;
 }
 

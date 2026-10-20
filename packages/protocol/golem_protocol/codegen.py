@@ -10,6 +10,8 @@ from pydantic import BaseModel
 from golem_protocol.commands import (
     ApprovalRespondParams,
     ApprovalRespondResult,
+    ArtifactReadParams,
+    ArtifactReadResult,
     AuthKeyStatus,
     AuthListParams,
     AuthListResult,
@@ -223,6 +225,8 @@ MODELS: tuple[type[BaseModel], ...] = (
     ApprovalResolvedEvent,
     ApprovalRespondParams,
     ApprovalRespondResult,
+    ArtifactReadParams,
+    ArtifactReadResult,
     ToolOutputData,
     ToolOutputEvent,
     SessionAllowance,

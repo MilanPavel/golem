@@ -94,8 +94,16 @@ import {
 } from "./secret.ts";
 import { APPROVAL_ROWS, approvalRows, diffLineCount } from "./approval.ts";
 import { ApprovalBand } from "./approval-band.tsx";
-import { ARGS_EDIT_ROWS, type ArgsEdit, liveArgsEdit, parseArgs, startArgsEdit } from "./approval-edit.ts";
+import {
+  ARGS_EDIT_ROWS,
+  type ArgsEdit,
+  editedArgs,
+  liveArgsEdit,
+  parseArgs,
+  startArgsEdit,
+} from "./approval-edit.ts";
 import { moveDiffOffset } from "./diff-view.ts";
+import { newestArtifact, showInPager } from "./pager.ts";
 import {
   closedPermissions,
   layoutPermissions,
@@ -736,6 +744,22 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       );
       return;
     }
+    if (outcome.kind === "artifact") {
+      setDraft(draftAt(""));
+      const current = sessionRef.current;
+      const id = outcome.id ?? newestArtifact(chatRef.current.messages);
+      if (current === null || id === null) {
+        setChat((state) => ({ ...state, notice: "no tool output was long enough to keep" }));
+        return;
+      }
+      void client
+        .readArtifact(current, id)
+        .then((page) => showInPager(page.text, suspendTerminal))
+        .catch((error: unknown) => {
+          setChat((state) => ({ ...state, notice: messageOf(error) }));
+        });
+      return;
+    }
     if (outcome.kind === "export") {
       setDraft(draftAt(""));
       const title = shownSessionTitle(
@@ -1302,7 +1326,8 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
 
   function onArgsKey(key: ArgsKey): void {
     const current = argsEditRef.current;
-    if (current === null) {
+    const pending = approvalRef.current;
+    if (current === null || pending === null || current.submitting) {
       return;
     }
     if (key.kind === "cancel") {
@@ -1323,9 +1348,10 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
     if (session === null) {
       return;
     }
-    client.respondApproval(session, current.callId, "allow", parsed.args).then(
-      () => setArgsEdit(null),
-      (error: unknown) => setArgsEdit((state) => (state === null ? null : { ...state, error: messageOf(error) })),
+    setArgsEdit({ ...current, submitting: true, error: null });
+    const args = editedArgs(pending, parsed.args) ?? undefined;
+    client.respondApproval(session, current.callId, "allow", args).catch((error: unknown) =>
+      setArgsEdit((state) => (state === null ? null : { ...state, submitting: false, error: messageOf(error) })),
     );
   }
 

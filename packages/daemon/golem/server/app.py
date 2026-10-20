@@ -40,6 +40,7 @@ from golem.sessions.log import SessionLog
 from golem.sessions.manager import SessionManager
 from golem.sessions.recovery import recover_runs
 from golem.sessions.titles import ModelTitles, TitleGenerator
+from golem.store.artifacts import ArtifactStore
 from golem.store.database import Database, DatabaseTooNewError
 from golem.store.events import EventLog
 from golem.store.records import RunRecords, SessionRecords
@@ -129,9 +130,12 @@ class DaemonApp:
                 await saver.setup()
                 self.state.policy = Policy(self.paths.config_file)
                 self.state.tools = default_registry()
+                self.state.artifacts = ArtifactStore(database)
                 self.state.sessions = await _open_sessions(
                     database,
-                    open_chat(router, saver, self.state.tools, self.state.policy),
+                    open_chat(
+                        router, saver, self.state.tools, self.state.policy, self.state.artifacts
+                    ),
                     self._titles,
                 )
                 if self._discovery is None:

@@ -35,3 +35,12 @@ test("the window never scrolls past the end", () => {
     ["c", "d"],
   );
 });
+
+test("escapes in the file cannot drive the terminal, and hunk lines keep their tone", () => {
+  const lines = parseDiff("--- a/x\n+++ b/x\n@@ -1 +1 @@\n--- old\n++x\x1b[2J\r\n");
+  assert.deepEqual(
+    lines.map((line) => line.tone),
+    ["meta", "meta", "hunk", "del", "add"],
+  );
+  assert.equal(lines[4]?.text, "++x␛[2J�");
+});

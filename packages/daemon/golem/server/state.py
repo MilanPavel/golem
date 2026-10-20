@@ -10,6 +10,7 @@ from golem.models.pulls import PullManager
 from golem.paths import GolemPaths
 from golem.permissions.policy import Policy
 from golem.sessions.manager import SessionManager
+from golem.store.artifacts import ArtifactStore
 from golem.tools.registry import ToolRegistry
 
 
@@ -25,3 +26,4 @@ class DaemonState:
     pulls: PullManager | None = None
     policy: Policy | None = None
     tools: ToolRegistry | None = None
+    artifacts: ArtifactStore | None = None

@@ -244,3 +244,38 @@ async def test_fixing_a_failing_test_runs_edits_and_runs_again(
     assert outputs[0].startswith("1 failed")
     assert outputs[-1] == "1 passed"
     assert events[-1].type == "run.completed"
+
+
+async def test_a_deny_rule_written_while_waiting_wins_over_the_answer(
+    database: Database, tmp_path: Path
+) -> None:
+    project = _project(tmp_path)
+    chat = _Chat(database, [[_edit("two", "TWO")], "ok"], tmp_path)
+    session_id = await chat.manager.create(None, cwd=str(project))
+    run_id = await chat.manager.send(session_id, "shout two")
+    asked = _needed(await chat.settled(run_id))[0].data
+
+    rules = project / ".golem" / "policy.toml"
+    rules.parent.mkdir()
+    rules.write_text('[[rule]]\ntool = "edit_file"\naction = "deny"\n', encoding="utf-8")
+    await chat.manager.respond(session_id, asked.call_id, "allow")
+    events = await chat.settled(run_id)
+
+    assert (project / "a.py").read_text(encoding="utf-8") == "one\ntwo\nthree\n"
+    failed = [event for event in events if isinstance(event, ToolFailedEvent)]
+    assert "denied by" in failed[0].data.message
+
+
+async def test_arguments_sent_back_unchanged_are_not_an_edit(
+    database: Database, tmp_path: Path
+) -> None:
+    project = _project(tmp_path)
+    chat = _Chat(database, [[_edit("two", "TWO")], "ok"], tmp_path)
+    session_id = await chat.manager.create(None, cwd=str(project))
+    run_id = await chat.manager.send(session_id, "shout two")
+    asked = _needed(await chat.settled(run_id))[0].data
+
+    await chat.manager.respond(session_id, asked.call_id, "allow", dict(asked.args))
+    events = await chat.settled(run_id)
+    resolved = [event for event in events if isinstance(event, ApprovalResolvedEvent)]
+    assert resolved[0].data.args is None

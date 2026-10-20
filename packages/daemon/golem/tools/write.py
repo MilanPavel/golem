@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import difflib
+import hashlib
 import os
 import re
 import tempfile
@@ -186,11 +187,17 @@ def path_subject(args: Mapping[str, object], root: Path | None) -> str | None:
 
 
 def shown_diff(change: Change) -> str:
-    """The diff as an approval shows it: cut at :data:`DIFF_CHARS`."""
+    """The diff as an approval shows it: cut at :data:`DIFF_CHARS`.
+
+    A cut diff ends with the digest of the whole one, so comparing two shown
+    diffs compares the whole change, not only the part on screen.
+    """
     diff = unified_diff(change)
     if len(diff) <= DIFF_CHARS:
         return diff
-    return f"{diff[:DIFF_CHARS]}\n[diff cut at {DIFF_CHARS} characters]\n"
+    digest = hashlib.sha256(diff.encode()).hexdigest()
+    cut = f"[diff cut at {DIFF_CHARS} of {len(diff)} characters, sha256 {digest}]"
+    return f"{diff[:DIFF_CHARS]}\n{cut}\n"
 
 
 def commit(change: Change, approved_diff: str | None = None) -> ToolResult:

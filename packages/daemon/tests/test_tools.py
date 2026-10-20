@@ -152,6 +152,7 @@ def test_schemas_use_the_function_format() -> None:
         "git_status",
         "git_diff",
         "git_log",
+        "read_artifact",
     ]
     first = schemas[0]["function"]  # type: ignore[index]
     assert first["parameters"]["required"] == ["path"]  # type: ignore[index]

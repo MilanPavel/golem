@@ -1,0 +1,35 @@
+{
+  "additionalProperties": false,
+  "description": "``artifact.read``. ``limit`` characters of a session's artifact, from ``offset``.",
+  "properties": {
+    "artifact_id": {
+      "minLength": 1,
+      "title": "Artifact Id",
+      "type": "string"
+    },
+    "limit": {
+      "default": 1000000,
+      "maximum": 5000000,
+      "minimum": 1,
+      "title": "Limit",
+      "type": "integer"
+    },
+    "offset": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Offset",
+      "type": "integer"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "session_id",
+    "artifact_id"
+  ],
+  "title": "ArtifactReadParams",
+  "type": "object"
+}

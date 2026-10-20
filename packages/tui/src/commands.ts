@@ -26,6 +26,7 @@ export type ComposerOutcome =
   | { kind: "title"; title: string | null }
   | { kind: "close-session" }
   | { kind: "copy"; code: boolean }
+  | { kind: "artifact"; id: string | null }
   | { kind: "export"; path: string | null }
   | { kind: "time" }
   | { kind: "model"; name: string | null }
@@ -58,6 +59,12 @@ export const KEY_PROVIDERS: readonly string[] = ["anthropic", "groq", "openai", 
 
 /** Every slash command. A name not in this table is an unknown command, not a message. */
 export const COMMANDS: readonly Command[] = [
+  {
+    name: "/artifact",
+    args: "[id]",
+    description: "Opens the whole output of a long tool call in $PAGER. The newest one without an id.",
+    run: (_debug, args) => (args.length > 1 ? unknown() : { kind: "artifact", id: args[0] ?? null }),
+  },
   {
     name: "/close",
     args: "",

@@ -41,7 +41,7 @@ from golem.permissions.engine import Allowance
 from golem.permissions.policy import Policy
 from golem.sessions.ids import new_id
 from golem.tools import default_registry
-from golem.tools.registry import ToolRegistry
+from golem.tools.registry import Artifacts, ToolRegistry
 
 log = logging.getLogger("golem.graphs")
 
@@ -302,11 +302,13 @@ def open_chat(
     checkpointer: BaseCheckpointSaver[str],
     tools: ToolRegistry | None = None,
     policy: Policy | None = None,
+    artifacts: Artifacts | None = None,
 ) -> ChatRuntime:
     """Compile the chat graph against ``checkpointer``.
 
     ``tools`` defaults to the default registry. ``policy`` defaults to the
-    built-in rules only, with no user or project file.
+    built-in rules only, with no user or project file. Without ``artifacts``,
+    big tool output is cut instead of stored.
     """
     registry = default_registry() if tools is None else tools
     rules = Policy(None) if policy is None else policy
@@ -331,7 +333,7 @@ def open_chat(
 
     builder = cast(_GraphBuilder, StateGraph(AgentState))
     builder.add_node("call_model", call_model)
-    builder.add_node("tools", tools_node(registry, rules))
+    builder.add_node("tools", tools_node(registry, rules, artifacts))
     builder.add_edge(START, "call_model")
     builder.add_conditional_edges("call_model", route, {"tools": "tools", "end": END})
     builder.add_edge("tools", "call_model")

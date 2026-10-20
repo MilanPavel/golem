@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { argsEditLines, liveArgsEdit, parseArgs, startArgsEdit } from "./approval-edit.ts";
+import { argsEditLines, editedArgs, liveArgsEdit, parseArgs, startArgsEdit } from "./approval-edit.ts";
 import type { PendingApproval } from "./chat-state.ts";
 
 const approval: PendingApproval = {
@@ -39,4 +39,9 @@ test("the band shows the error in place of the rule", () => {
   assert.equal(lines.length, 3);
   assert.equal(lines[1]?.text, "invalid arguments for edit_file: old_string");
   assert.equal(lines[1]?.tone, "del");
+});
+
+test("arguments that were not changed are not sent as edited", () => {
+  assert.equal(editedArgs(approval, { ...approval.args }), null);
+  assert.deepEqual(editedArgs(approval, { path: "b.py" }), { path: "b.py" });
 });

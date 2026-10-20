@@ -161,3 +161,13 @@ def test_a_crlf_file_says_why_old_string_is_missing(project: Path) -> None:
 def test_a_missing_final_newline_is_marked(project: Path) -> None:
     change = plan_write(project, WriteFileArgs(path="src/a.py", content="x = 1"))
     assert unified_diff(change).endswith("+x = 1\n\\ No newline at end of file\n")
+
+
+def test_a_cut_diff_still_tells_two_changes_apart(project: Path) -> None:
+    from golem.tools.write import DIFF_CHARS, shown_diff
+
+    one = plan_write(project, WriteFileArgs(path="big.txt", content="a\n" * DIFF_CHARS + "end 1\n"))
+    two = plan_write(project, WriteFileArgs(path="big.txt", content="a\n" * DIFF_CHARS + "end 2\n"))
+    assert shown_diff(one)[:DIFF_CHARS] == shown_diff(two)[:DIFF_CHARS]
+    assert shown_diff(one) != shown_diff(two)
+    assert "sha256" in shown_diff(one)

@@ -5,6 +5,7 @@ import type { AuthListResult } from "../../protocol/gen/auth-list-result.ts";
 import type { AuthRemoveResult } from "../../protocol/gen/auth-remove-result.ts";
 import type { AuthSetResult } from "../../protocol/gen/auth-set-result.ts";
 import type { ApprovalRespondResult } from "../../protocol/gen/approval-respond-result.ts";
+import type { ArtifactReadResult } from "../../protocol/gen/artifact-read-result.ts";
 import type { ConfigGetResult } from "../../protocol/gen/config-get-result.ts";
 import type { PolicyEditResult } from "../../protocol/gen/policy-edit-result.ts";
 
@@ -73,6 +74,7 @@ export const KEYCHAIN_UNAVAILABLE = -32008;
 export const MODEL_PULL_FAILED = -32009;
 export const APPROVAL_NOT_FOUND = -32010;
 export const INVALID_TOOL_ARGS = -32011;
+export const ARTIFACT_NOT_FOUND = -32012;
 
 export type { ChatEvent, SessionSummary };
 const DEFAULT_HEARTBEAT_MS = 5_000;
@@ -154,6 +156,8 @@ export interface GolemClient {
   /** Resolved settings, and the tool rules for `cwd` in the order they are checked. */
   getConfig(cwd?: string, sessionId?: string): Promise<ConfigGetResult>;
   /** Answer the tool call the session's run waits on. The run goes on in the daemon. */
+  /** `limit` characters of a session's artifact from `offset`, and the artifact's size. */
+  readArtifact(sessionId: string, artifactId: string, offset?: number, limit?: number): Promise<ArtifactReadResult>;
   /** `args` are the call's arguments as the user edited them. They go only with `allow`. */
   respondApproval(
     sessionId: string,
@@ -736,6 +740,19 @@ export function connectGolem(options: ConnectOptions): GolemClient {
         throw new Error("invalid session.revoke result");
       }
       return result["revoked"];
+    },
+    async readArtifact(sessionId: string, artifactId: string, offset = 0, limit = 5_000_000): Promise<ArtifactReadResult> {
+      await ready;
+      const result = await call("artifact.read", { session_id: sessionId, artifact_id: artifactId, offset, limit });
+      if (
+        !isRecord(result) ||
+        typeof result["text"] !== "string" ||
+        typeof result["offset"] !== "number" ||
+        typeof result["size"] !== "number"
+      ) {
+        throw new Error("invalid artifact.read result");
+      }
+      return { text: result["text"], offset: result["offset"], size: result["size"] };
     },
     async respondApproval(
       sessionId: string,

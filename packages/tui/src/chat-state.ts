@@ -24,6 +24,8 @@ export type ToolBlock = {
   /** The start of the output, from `tool.completed`. */
   preview?: string;
   truncated?: boolean;
+  /** Where the whole output is, when it was too long for the model. */
+  artifactId?: string;
   /** Why it failed, from `tool.failed`. */
   error?: string;
   /** The newest output of a running call, from `tool.output`. */
@@ -186,6 +188,7 @@ export function reduceChat(state: ChatState, event: ChatEvent): ChatState {
         summary: event.data.summary,
         preview: event.data.preview,
         truncated: event.data.truncated === true,
+        ...(event.data.artifact_id == null ? {} : { artifactId: event.data.artifact_id }),
       }));
     case "tool.failed":
       return updateTool(state, event.data.call_id, (tool) => ({

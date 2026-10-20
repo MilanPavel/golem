@@ -50,4 +50,18 @@ MIGRATIONS: tuple[tuple[str, ...], ...] = (
     ("ALTER TABLE sessions ADD COLUMN closed_at TEXT",),
     ("ALTER TABLE sessions ADD COLUMN cwd TEXT",),
     ("ALTER TABLE sessions ADD COLUMN allowed_tools TEXT",),
+    (
+        """
+        CREATE TABLE artifacts (
+            artifact_id TEXT PRIMARY KEY,
+            session_id TEXT NOT NULL REFERENCES sessions (session_id),
+            call_id TEXT,
+            kind TEXT NOT NULL,
+            size INTEGER NOT NULL,
+            created_at TEXT NOT NULL,
+            data TEXT NOT NULL
+        )
+        """,
+        "CREATE INDEX artifacts_session ON artifacts (session_id)",
+    ),
 )

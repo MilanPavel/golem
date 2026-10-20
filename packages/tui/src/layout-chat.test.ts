@@ -158,6 +158,28 @@ test("tool calls are one line each, with output only while expanded", () => {
   assert.deepEqual(expanded.slice(1, 4), ["read_file src/a.ts ✓  2 lines", "  │      1|one", "  │      2|two"]);
 });
 
+test("an expanded call whose output was kept says how to open all of it", () => {
+  const reply: ChatMessage = {
+    ...message("a", "assistant", ""),
+    tools: [
+      {
+        callId: "c1",
+        name: "shell",
+        args: { command: "pnpm test" },
+        status: "done",
+        summary: "exit 1",
+        preview: "FAIL",
+        truncated: true,
+        artifactId: "a_1",
+      },
+    ],
+  };
+  const expanded = layoutMessages([reply], 60, { times: false, now: 0, toolOutput: true }).map((line) =>
+    textOf(line.spans),
+  );
+  assert.deepEqual(expanded.slice(2), ["  │ FAIL", "  │ …", "  │ all of it: /artifact a_1"]);
+});
+
 test("a tool label prefers string arguments and stays short", () => {
   assert.equal(toolLabel({ pattern: "**/*.py", path: "." }), "**/*.py .");
   assert.equal(toolLabel({ offset: 2 }), '{"offset":2}');

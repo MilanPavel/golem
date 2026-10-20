@@ -38,7 +38,7 @@ Golem has two parts:
 - Closing the TUI and coming back, from any number of terminals at once.
 - Cancelling an answer with Ctrl-C, which keeps what it said so far.
 - Automatic titles, a session switcher, new sessions, renaming, and forking.
-- Reading files, listing folders, and searching with `glob` and `grep`, inside the folder you started the TUI in. Ctrl-O shows what each tool returned.
+- Reading files, listing folders, and searching with `glob` and `grep`, inside the folder you started the TUI in. Ctrl-O shows what each tool returned. Long output is kept whole: the model reads it in pages, and `/artifact` opens it in your pager.
 
 - Tool rules: allow, ask, or deny a tool by name, subject, or path, in `~/.golem/config.toml` or a project's `.golem/policy.toml`. `just golem config show` lists them, and `/permissions` in the TUI changes or deletes them.
 
@@ -222,6 +222,8 @@ A finished answer shows how long it took, under the text. `/time` shows the time
 | `/export` | Writes this session as markdown, to `~/.golem/exports/<title>.md` |
 | `/export <path>` | Writes that markdown to the path you give |
 | `/time` | Shows or hides the time beside each message |
+| `/artifact` | Opens the whole output of the newest long tool call in `$PAGER` (`less` by default) |
+| `/artifact <id>` | Opens that artifact, named under an expanded tool call |
 | `/sessions` | Opens the session switcher, with live status |
 | `/close` | Closes this session and opens the newest other one |
 | `/new` | Starts a new session |

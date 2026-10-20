@@ -9,12 +9,23 @@ export type DiffLine = {
 
 const TAB = "    ";
 
+/** File text can hold terminal escapes, which must not move the cursor or recolour the band. */
+const CONTROL = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/g;
+
 export function parseDiff(diff: string): DiffLine[] {
   if (diff === "") {
     return [];
   }
   const body = diff.endsWith("\n") ? diff.slice(0, -1) : diff;
-  return body.split("\n").map((row) => ({ text: row.replaceAll("\t", TAB), tone: toneOf(row) }));
+  let inHunk = false;
+  return body.split("\n").map((row) => {
+    inHunk ||= row.startsWith("@@");
+    return { text: visible(row), tone: toneOf(row, inHunk) };
+  });
+}
+
+function visible(row: string): string {
+  return row.replaceAll("\t", TAB).replace(CONTROL, (char) => (char === "\u001b" ? "␛" : "�"));
 }
 
 /** Rows that fit `rows` from `offset`, each cut to `columns`. */
@@ -43,8 +54,8 @@ export function moveDiffOffset(
   return clampDiffOffset(next, total, rows);
 }
 
-function toneOf(row: string): DiffTone {
-  if (row.startsWith("+++") || row.startsWith("---") || row.startsWith("\\")) {
+function toneOf(row: string, inHunk: boolean): DiffTone {
+  if (row.startsWith("\\") || (!inHunk && (row.startsWith("+++") || row.startsWith("---")))) {
     return "meta";
   }
   if (row.startsWith("@@")) {

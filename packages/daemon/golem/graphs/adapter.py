@@ -67,6 +67,7 @@ class ToolFinished:
     summary: str
     preview: str
     truncated: bool
+    artifact_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -273,11 +274,13 @@ def _custom(data: object) -> Fact | None:
     if kind == "tool.completed":
         summary = item.get("summary")
         preview = item.get("preview")
+        artifact_id = item.get("artifact_id")
         return ToolFinished(
             call_id,
             summary if isinstance(summary, str) else "",
             preview if isinstance(preview, str) else "",
             item.get("truncated") is True,
+            artifact_id if isinstance(artifact_id, str) else None,
         )
     if kind == "tool.failed":
         message = item.get("message")

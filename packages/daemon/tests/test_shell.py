@@ -160,7 +160,11 @@ async def test_output_streams_while_the_command_runs(root: Path) -> None:
 
 
 @needs_sandbox
-async def test_long_output_keeps_its_head_and_tail(root: Path) -> None:
+async def test_long_output_keeps_its_head_and_tail(
+    root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(sandbox, "HEAD_CHARS", 20_000)
+    monkeypatch.setattr(sandbox, "TAIL_CHARS", 78_000)
     done = await _run(root, "seq 1 60000")
     assert done.cut
     assert done.output.startswith("1\n2\n")

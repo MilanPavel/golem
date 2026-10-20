@@ -49,8 +49,8 @@ SECRET_DIRS = (
 CACHE_DIRS = (".cache", "Library/Caches", ".npm", "Library/pnpm", ".cargo/registry")
 """Under the home folder. Builds write here, so a command may too."""
 
-HEAD_CHARS = 20_000
-TAIL_CHARS = 78_000
+HEAD_CHARS = 1_000_000
+TAIL_CHARS = 4_000_000
 STREAM_LIMIT = 64_000
 FLUSH_CHARS = 2_000
 FLUSH_SECONDS = 0.2

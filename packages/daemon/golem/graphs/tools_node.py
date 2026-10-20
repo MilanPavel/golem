@@ -38,7 +38,7 @@ from golem.graphs.adapter import APPROVAL_KIND, STREAM_KEY
 from golem.graphs.state import AgentState
 from golem.permissions.engine import Allowance, session_allows
 from golem.permissions.policy import Policy, describe, explain
-from golem.tools.registry import Preview, ToolContext, ToolError, ToolRegistry
+from golem.tools.registry import Artifacts, Preview, ToolContext, ToolError, ToolRegistry
 
 log = logging.getLogger("golem.graphs")
 
@@ -52,6 +52,13 @@ ASKED_KEY = "golem_asked_calls"
 """``configurable`` key for the call ids this run has already asked about, in order."""
 
 PREVIEW_CHARS = 4_000
+
+ARTIFACT_CHARS = 20_000
+"""Output longer than this goes to an artifact, and the model gets its head and tail."""
+HEAD_CHARS = 12_000
+TAIL_CHARS = 4_000
+CUT_CHARS = 100_000
+"""Without an artifact store, what the model gets of one call at most."""
 
 CANCELLED_RESULT = "cancelled: the run stopped before this tool call finished"
 DENIED_RESULT = "the user denied this tool call"
@@ -102,12 +109,19 @@ class Answer:
 def tools_node(
     registry: ToolRegistry,
     policy: Policy,
+    artifacts: Artifacts | None = None,
 ) -> Callable[[AgentState, RunnableConfig], Awaitable[dict[str, list[BaseMessage]]]]:
     async def tools(state: AgentState, config: RunnableConfig) -> dict[str, list[BaseMessage]]:
         last = state["messages"][-1]
         if not isinstance(last, AIMessage):
             return {"messages": []}
-        base = ToolContext(root=_root(config), shell=policy.shell())
+        session_id = state.get("session_id")
+        base = ToolContext(
+            root=_root(config),
+            shell=policy.shell(),
+            session_id=session_id,
+            artifacts=artifacts,
+        )
         allowed = _allowed(config)
         asked = _asked(config)
         ids = [call_id_of(call) for call in last.tool_calls]
@@ -163,6 +177,7 @@ def tools_node(
                 write({STREAM_KEY: "tool.failed", "call_id": call_id, "message": message})
                 results.append(_result(call_id, call["name"], f"error: {message}", error=True))
                 continue
+            output, artifact_id = await _for_model(artifacts, session_id, call_id, result.output)
             preview = result.output[:PREVIEW_CHARS]
             write(
                 {
@@ -171,9 +186,11 @@ def tools_node(
                     "summary": result.summary,
                     "preview": preview,
                     "truncated": len(preview) < len(result.output),
+                    "artifact_id": artifact_id,
                 }
             )
-            output = result.output if verdict.args is None else _edited(verdict.args, result.output)
+            if verdict.args is not None:
+                output = _edited(verdict.args, output)
             results.append(_result(call_id, call["name"], output))
         return {"messages": results}
 
@@ -222,6 +239,9 @@ def _decide(
             }
         )
     )
+    if decision.action == "deny" and answer.decision != "deny":
+        log.info("tool %s denied by %s after it was approved", name, decision.source)
+        return _Verdict(run=False, message=explain(decision, name))
     if answer.decision == "allow_session":
         allowed.add((name, subject))
         return _Verdict(run=True, approved_diff=answer.diff)
@@ -240,6 +260,29 @@ async def _preview(
         return await registry.preview(call["name"], call["args"], ctx)
     except ToolError as exc:
         return str(exc) or type(exc).__name__
+
+
+async def _for_model(
+    artifacts: Artifacts | None, session_id: str | None, call_id: str, output: str
+) -> tuple[str, str | None]:
+    """What the model reads of ``output``, and the artifact that holds all of it.
+
+    Long output is stored whole, and the model gets its head and its tail,
+    where a failing command prints the part that matters.
+    """
+    if len(output) <= ARTIFACT_CHARS:
+        return output, None
+    if artifacts is None or session_id is None:
+        if len(output) <= CUT_CHARS:
+            return output, None
+        return f"{output[:CUT_CHARS]}\n[output cut at {CUT_CHARS} characters]", None
+    artifact_id = await artifacts.put(session_id, call_id, "tool_output", output)
+    skipped = len(output) - HEAD_CHARS - TAIL_CHARS
+    note = (
+        f"[{skipped} characters cut; the whole output is {len(output)} characters in artifact "
+        f"{artifact_id}. Read it with read_artifact(artifact_id, offset, limit).]"
+    )
+    return f"{output[:HEAD_CHARS]}\n{note}\n{output[-TAIL_CHARS:]}", artifact_id
 
 
 def _edited(args: Mapping[str, object], output: str) -> str:
@@ -321,6 +364,7 @@ def _root(config: RunnableConfig) -> Path | None:
 
 __all__ = [
     "ALLOWED_KEY",
+    "ARTIFACT_CHARS",
     "ASKED_KEY",
     "CANCELLED_RESULT",
     "CHANGED_RESULT",

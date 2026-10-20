@@ -686,6 +686,27 @@ class SessionRevokeResult(BaseModel):
     revoked: bool
 
 
+class ArtifactReadParams(BaseModel):
+    """``artifact.read``. ``limit`` characters of a session's artifact, from ``offset``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    artifact_id: str = Field(min_length=1)
+    offset: int = Field(default=0, ge=0)
+    limit: int = Field(default=1_000_000, ge=1, le=5_000_000)
+
+
+class ArtifactReadResult(BaseModel):
+    """``text`` starts at ``offset`` of an artifact ``size`` characters long."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    text: str
+    offset: int = Field(ge=0)
+    size: int = Field(ge=0)
+
+
 class ApprovalRespondParams(BaseModel):
     """``approval.respond``. Answer the tool call a session's run waits on.
 
@@ -723,6 +744,8 @@ class ApprovalRespondResult(BaseModel):
 __all__ = [
     "ApprovalRespondParams",
     "ApprovalRespondResult",
+    "ArtifactReadParams",
+    "ArtifactReadResult",
     "AuthKeyStatus",
     "AuthListParams",
     "AuthListResult",

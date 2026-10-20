@@ -42,7 +42,7 @@ A failed call never ends the run. The model reads why it failed as the tool's re
 
 ## What it costs
 
-A tool result lives in the checkpoint in full until artifacts arrive (plan step 1.6), so a large read grows `checkpoints.db`.
+A tool result over 20 000 characters is an artifact, and the checkpoint keeps its head and tail ([ADR-016](016-artifacts.md)).
 
 A model that switches mid-session must read tool calls from another provider. LangChain's message formats carry them across. A test converts a stored tool history for Anthropic, OpenAI, and Ollama.
 

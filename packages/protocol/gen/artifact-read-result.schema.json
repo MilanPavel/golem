@@ -1,0 +1,27 @@
+{
+  "additionalProperties": false,
+  "description": "``text`` starts at ``offset`` of an artifact ``size`` characters long.",
+  "properties": {
+    "offset": {
+      "minimum": 0,
+      "title": "Offset",
+      "type": "integer"
+    },
+    "size": {
+      "minimum": 0,
+      "title": "Size",
+      "type": "integer"
+    },
+    "text": {
+      "title": "Text",
+      "type": "string"
+    }
+  },
+  "required": [
+    "text",
+    "offset",
+    "size"
+  ],
+  "title": "ArtifactReadResult",
+  "type": "object"
+}

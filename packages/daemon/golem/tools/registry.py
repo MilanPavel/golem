@@ -11,18 +11,37 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 from pydantic import BaseModel, ValidationError
 
 from golem.config import ShellSettings
 
-MAX_OUTPUT_CHARS = 100_000
-"""What the model receives from one call, at most."""
+MAX_OUTPUT_CHARS = 5_000_000
+"""What one call may return, at most. Output this big goes to an artifact, not the model."""
 
 
 class ToolError(Exception):
     """A tool call that did not work. The message goes to the model as the result."""
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactPage:
+    """``text`` starts at character ``offset`` of an artifact ``size`` characters long."""
+
+    text: str
+    offset: int
+    size: int
+
+
+class Artifacts(Protocol):
+    """Where big output is kept, read one session at a time."""
+
+    async def put(self, session_id: str, call_id: str | None, kind: str, text: str) -> str: ...
+
+    async def read(
+        self, session_id: str, artifact_id: str, offset: int, limit: int
+    ) -> ArtifactPage | None: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,7 +54,8 @@ class ToolContext:
     ``planned`` holds the text files will have once the earlier calls of the
     same reply have run, so a preview builds on them. ``approved_diff`` is the
     diff the user approved for this call: a file tool applies its change only
-    when it still makes exactly that diff.
+    when it still makes exactly that diff. ``artifacts`` holds the big output
+    of ``session_id``.
     """
 
     root: Path | None
@@ -43,6 +63,8 @@ class ToolContext:
     shell: ShellSettings = field(default_factory=ShellSettings)
     planned: Mapping[Path, str] = field(default_factory=dict[Path, str])
     approved_diff: str | None = None
+    session_id: str | None = None
+    artifacts: Artifacts | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -139,9 +161,9 @@ class ToolRegistry:
         """What tool ``name`` would change with ``raw``. Raises :class:`ToolError`."""
         return await self._tool(name).preview_call(raw, ctx)
 
-    def validate(self, name: str, raw: Mapping[str, object]) -> None:
-        """Raises :class:`ToolError` when ``raw`` are not valid arguments for ``name``."""
-        self._tool(name).validate(raw)
+    def validate(self, name: str, raw: Mapping[str, object]) -> dict[str, object]:
+        """``raw`` as tool ``name`` reads them. Raises :class:`ToolError` when invalid."""
+        return self._tool(name).validate(raw).model_dump(mode="json", exclude_unset=True)
 
     async def call(self, name: str, raw: Mapping[str, object], ctx: ToolContext) -> ToolResult:
         """Validate ``raw`` and run tool ``name``. Raises :class:`ToolError`."""
@@ -171,6 +193,8 @@ def _problems(exc: ValidationError) -> str:
 
 __all__ = [
     "MAX_OUTPUT_CHARS",
+    "ArtifactPage",
+    "Artifacts",
     "Preview",
     "Tool",
     "ToolContext",

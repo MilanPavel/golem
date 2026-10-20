@@ -20,6 +20,7 @@ from golem.models.router import ModelConfigError, ModelRouter
 from golem.permissions.policy import PROJECT_POLICY
 from golem.server.dispatcher import (
     APPROVAL_NOT_FOUND,
+    ARTIFACT_NOT_FOUND,
     INTERNAL_ERROR,
     INVALID_PARAMS,
     INVALID_TOOL_ARGS,
@@ -51,6 +52,8 @@ from golem.sessions.summaries import summarize
 from golem_protocol.commands import (
     ApprovalRespondParams,
     ApprovalRespondResult,
+    ArtifactReadParams,
+    ArtifactReadResult,
     AuthKeyStatus,
     AuthListParams,
     AuthListResult,
@@ -268,6 +271,16 @@ async def _approval_respond(
     except SchemaMismatchError as exc:
         raise RpcCallError(SESSION_NOT_FOUND, str(exc)) from exc
     return ApprovalRespondResult(run_id=run_id)
+
+
+async def _artifact_read(ctx: RequestContext, params: ArtifactReadParams) -> ArtifactReadResult:
+    artifacts = ctx.state.artifacts
+    if artifacts is None:
+        raise RpcCallError(INTERNAL_ERROR, "artifacts are not ready")
+    page = await artifacts.read(params.session_id, params.artifact_id, params.offset, params.limit)
+    if page is None:
+        raise RpcCallError(ARTIFACT_NOT_FOUND, "no such artifact in this session")
+    return ArtifactReadResult(text=page.text, offset=page.offset, size=page.size)
 
 
 async def _run_cancel(ctx: RequestContext, params: RunCancelParams) -> RunCancelResult:
@@ -592,6 +605,7 @@ def standard_methods() -> dict[str, Method]:
             "approval.respond", ApprovalRespondParams, True, _approval_respond
         ),
         "run.cancel": Method("run.cancel", RunCancelParams, True, _run_cancel),
+        "artifact.read": Method("artifact.read", ArtifactReadParams, True, _artifact_read),
         "session.inspect": Method("session.inspect", SessionInspectParams, True, _session_inspect),
         "auth.set": Method("auth.set", AuthSetParams, True, _auth_set),
         "auth.remove": Method("auth.remove", AuthRemoveParams, True, _auth_remove),

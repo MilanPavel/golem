@@ -402,8 +402,10 @@ class SessionManager:
             pending = pending_approval(await self._events.for_run(run.run_id))
             if pending is None or pending.call_id != call_id:
                 raise ApprovalNotFoundError(call_id)
+            if args is not None and args == pending.args:
+                args = None
             if args is not None:
-                self._check_edited(session, pending.name, decision, args)
+                args = self._check_edited(session, pending.name, decision, args)
             rule: str | None = None
             if decision == "allow_always":
                 rule = await self._remember(session, pending.name, pending.args)
@@ -458,18 +460,24 @@ class SessionManager:
 
     def _check_edited(
         self, session: _LiveSession, name: str, decision: ApprovalDecision, args: dict[str, object]
-    ) -> None:
+    ) -> dict[str, object]:
+        """The edited arguments as the tool reads them, once the tool and the rules accept them.
+
+        The folder checks run when the call does: an earlier call of the same
+        reply may create the file this one edits.
+        """
         if decision != "allow":
             raise InvalidToolArgsError("edited arguments run once, so the answer must be allow")
         root = None if session.cwd is None else Path(session.cwd)
         tools, policy = self._runtime.tools, self._runtime.policy
         try:
-            tools.validate(name, args)
+            checked = tools.validate(name, args)
         except ToolError as exc:
             raise InvalidToolArgsError(str(exc)) from exc
-        verdict = policy.check(tools, name, args, root)
+        verdict = policy.check(tools, name, checked, root)
         if verdict.action == "deny":
             raise InvalidToolArgsError(explain(verdict, name))
+        return checked
 
     async def _remember(self, session: _LiveSession, name: str, args: dict[str, object]) -> str:
         root = None if session.cwd is None else Path(session.cwd)
