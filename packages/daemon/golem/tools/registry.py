@@ -83,10 +83,15 @@ class ToolContext:
 
 @dataclass(frozen=True, slots=True)
 class ToolResult:
-    """``output`` goes to the model. ``summary`` is one short line for the screen."""
+    """``output`` goes to the model. ``summary`` is one short line for the screen.
+
+    ``update`` is graph state the call changes, such as ``todos``. The tools
+    node applies only the keys it knows, so a tool never reaches the rest.
+    """
 
     output: str
     summary: str
+    update: Mapping[str, object] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -104,6 +109,8 @@ class Preview:
 @dataclass(frozen=True, slots=True)
 class Tool[A: BaseModel]:
     """``read_only`` tools change nothing outside golem, so the default policy allows them.
+    ``internal`` tools change only golem's own state, such as the todo list, and
+    are allowed by default too.
 
     ``path_arg`` names the argument a rule's ``path`` is matched against, and
     ``match_arg`` the one its ``match`` is. ``subject`` computes the subject
@@ -117,6 +124,7 @@ class Tool[A: BaseModel]:
     args: type[A]
     run: Callable[[A, ToolContext], Awaitable[ToolResult]]
     read_only: bool = False
+    internal: bool = False
     path_arg: str | None = None
     match_arg: str | None = None
     subject: Callable[[Mapping[str, object], Path | None], str | None] | None = None
@@ -163,8 +171,9 @@ class ToolRegistry:
     def get(self, name: str) -> Tool[Any] | None:
         return self._tools.get(name)
 
-    def read_only(self) -> list[str]:
-        return [tool.name for tool in self._tools.values() if tool.read_only]
+    def default_allowed(self) -> list[str]:
+        """Tools the built-in rules allow without asking: read-only or internal ones."""
+        return [tool.name for tool in self._tools.values() if tool.read_only or tool.internal]
 
     def schemas(self) -> list[dict[str, object]]:
         return [tool.schema() for tool in self._tools.values()]

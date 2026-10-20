@@ -1,0 +1,67 @@
+{
+  "$defs": {
+    "Todo": {
+      "additionalProperties": false,
+      "description": "One step of the agent's plan.",
+      "properties": {
+        "id": {
+          "maxLength": 40,
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "in_progress",
+            "done"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "text": {
+          "maxLength": 300,
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "text",
+        "status"
+      ],
+      "title": "Todo",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The agent's todo list, whole, after ``todo_write`` replaced it.\n\n``call_id`` is the call that wrote it. It is null for a list a fork copied.\nAn empty list clears it.",
+  "properties": {
+    "call_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Call Id"
+    },
+    "todos": {
+      "items": {
+        "$ref": "#/$defs/Todo"
+      },
+      "title": "Todos",
+      "type": "array"
+    }
+  },
+  "required": [
+    "todos"
+  ],
+  "title": "TodosUpdatedData",
+  "type": "object"
+}

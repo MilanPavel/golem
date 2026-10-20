@@ -94,7 +94,7 @@ class _GraphBuilder(Protocol):
     def add_node(
         self,
         name: str,
-        action: Callable[[AgentState, RunnableConfig], Awaitable[dict[str, list[BaseMessage]]]],
+        action: Callable[[AgentState, RunnableConfig], Awaitable[Mapping[str, object]]],
     ) -> None: ...
 
     def add_edge(self, start: object, end: object) -> None: ...

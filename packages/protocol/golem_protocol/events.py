@@ -210,6 +210,31 @@ class ToolFailedData(BaseModel):
 
 ApprovalDecision = Literal["allow", "allow_session", "allow_always", "deny"]
 
+TodoStatus = Literal["pending", "in_progress", "done"]
+
+
+class Todo(BaseModel):
+    """One step of the agent's plan."""
+
+    model_config = _CONFIG
+
+    id: str = Field(min_length=1, max_length=40)
+    text: str = Field(min_length=1, max_length=300)
+    status: TodoStatus
+
+
+class TodosUpdatedData(BaseModel):
+    """The agent's todo list, whole, after ``todo_write`` replaced it.
+
+    ``call_id`` is the call that wrote it. It is null for a list a fork copied.
+    An empty list clears it.
+    """
+
+    model_config = _CONFIG
+
+    call_id: str | None = Field(default=None, min_length=1)
+    todos: list[Todo]
+
 
 class ApprovalNeededData(BaseModel):
     """A tool call waits for the user. The run is paused until ``approval.respond``.
@@ -490,6 +515,19 @@ class ApprovalResolvedEvent(BaseModel):
     data: ApprovalResolvedData
 
 
+class TodosUpdatedEvent(BaseModel):
+    """The agent's todo list changed. ``run_id`` is null for a list a fork copied."""
+
+    model_config = _CONFIG
+
+    seq: int = Field(ge=1)
+    session_id: str = Field(min_length=1)
+    run_id: str | None = Field(min_length=1)
+    ts: str = Field(min_length=1)
+    type: Literal["todos.updated"]
+    data: TodosUpdatedData
+
+
 EventType = Literal[
     "session.created",
     "session.updated",
@@ -509,6 +547,7 @@ EventType = Literal[
     "tool.failed",
     "approval.needed",
     "approval.resolved",
+    "todos.updated",
 ]
 """The ``type`` of each :data:`ChatEvent` member."""
 
@@ -531,7 +570,8 @@ ChatEvent = Annotated[
     | ToolCompletedEvent
     | ToolFailedEvent
     | ApprovalNeededEvent
-    | ApprovalResolvedEvent,
+    | ApprovalResolvedEvent
+    | TodosUpdatedEvent,
     Field(discriminator="type"),
 ]
 
@@ -571,6 +611,10 @@ __all__ = [
     "SessionCreatedEvent",
     "SessionUpdatedData",
     "SessionUpdatedEvent",
+    "Todo",
+    "TodoStatus",
+    "TodosUpdatedData",
+    "TodosUpdatedEvent",
     "ToolCompletedData",
     "ToolCompletedEvent",
     "ToolFailedData",

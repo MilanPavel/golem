@@ -1,0 +1,34 @@
+{
+  "additionalProperties": false,
+  "description": "One step of the agent's plan.",
+  "properties": {
+    "id": {
+      "maxLength": 40,
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "pending",
+        "in_progress",
+        "done"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "text": {
+      "maxLength": 300,
+      "minLength": 1,
+      "title": "Text",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "text",
+    "status"
+  ],
+  "title": "Todo",
+  "type": "object"
+}

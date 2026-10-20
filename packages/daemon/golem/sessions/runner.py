@@ -31,6 +31,7 @@ from golem.graphs.adapter import (
     ModelStarted,
     TextCompleted,
     TextDelta,
+    TodosChanged,
     ToolErrored,
     ToolFinished,
     ToolOutput,
@@ -53,6 +54,7 @@ from golem_protocol.events import (
     MessageStartedData,
     RunCancelledData,
     RunFailedData,
+    TodosUpdatedData,
     ToolCompletedData,
     ToolFailedData,
     ToolOutputData,
@@ -314,6 +316,11 @@ async def _apply(
     elif isinstance(fact, ToolErrored):
         _done(progress, fact.call_id)
         await emit("tool.failed", ToolFailedData(call_id=fact.call_id, message=fact.message))
+    elif isinstance(fact, TodosChanged):
+        await emit(
+            "todos.updated",
+            TodosUpdatedData.model_validate({"call_id": fact.call_id, "todos": list(fact.todos)}),
+        )
     elif isinstance(fact, ApprovalAsked):
         progress.waiting = True
         await emit(

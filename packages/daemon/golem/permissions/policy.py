@@ -7,7 +7,7 @@ Order, first match wins:
    so a cloned repository cannot allow itself anything. Its ``ask`` and
    ``deny`` rules always apply.
 2. ``[[rule]]`` in the user's ``config.toml``.
-3. The built-in defaults: read-only tools are allowed, the rest asks.
+3. The built-in defaults: read-only and internal tools are allowed, the rest asks.
 
 Each file is read again when it changes. A user file that stops validating
 keeps its last good rules. A project file that does not validate makes every
@@ -85,7 +85,7 @@ class Policy:
             Rule(rule, f"{label} rule {index}", file="user", index=index)
             for index, rule in enumerate(user.rule, start=1)
         )
-        found.extend(default_rules(registry.read_only()))
+        found.extend(default_rules(registry.default_allowed()))
         return found
 
     def check(

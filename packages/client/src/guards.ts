@@ -37,6 +37,7 @@ const EVENT_TYPES = new Set([
   "tool.requested",
   "tool.started",
   "tool.output",
+  "todos.updated",
   "tool.completed",
   "tool.failed",
   "approval.needed",

@@ -3,10 +3,13 @@
 ``messages`` comes from :class:`langgraph.graph.MessagesState` and uses the
 ``add_messages`` reducer. ``session_id`` and ``schema_version`` are set on the
 first turn and then ride along in the checkpoint. ``model_profile`` is set on
-every turn, from the session's current model.
+every turn, from the session's current model. ``todos`` is replaced whole by
+each ``todo_write``, and small by design.
 """
 
 from __future__ import annotations
+
+from typing import NotRequired
 
 from langgraph.graph import MessagesState  # pyright: ignore[reportMissingTypeStubs]
 
@@ -19,3 +22,5 @@ class AgentState(MessagesState):
     session_id: str
     model_profile: str
     schema_version: int
+    todos: NotRequired[list[dict[str, str]]]
+    """The agent's plan, from ``todo_write``. Missing in checkpoints from before it."""

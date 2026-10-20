@@ -21,7 +21,8 @@ An Architecture Decision Record (ADR) is a short note of one choice: what was de
 | [015](015-write-tools.md) | A file change is planned, shown as a diff, and applied only as shown | accepted | 2026-10-20 |
 | [016](016-artifacts.md) | Big tool output is an artifact in golem.db, and the model reads it in pages | accepted | 2026-10-20 |
 | [017](017-web-fetch.md) | web_fetch asks per host, refuses private addresses, and returns data | accepted | 2026-10-20 |
+| [018](018-tool-state-updates.md) | A tool returns a state update, and the node applies only the keys it allows | accepted | 2026-10-20 |
 
 How the running code fits together is in [../architecture.md](../architecture.md).
 
-New records use [template.md](template.md). Number the next file `018-….md` and add a row here.
+New records use [template.md](template.md). Number the next file `019-….md` and add a row here.

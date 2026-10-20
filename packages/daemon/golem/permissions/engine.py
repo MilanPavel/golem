@@ -72,9 +72,9 @@ class Decision:
         return self.action == "allow"
 
 
-def default_rules(read_only: Iterable[str]) -> list[Rule]:
-    """Read-only tools run without asking. Anything else asks."""
-    rules = [Rule(PolicyRule(tool=name, action="allow"), DEFAULT_SOURCE) for name in read_only]
+def default_rules(allowed: Iterable[str]) -> list[Rule]:
+    """``allowed`` tools, read-only or internal, run without asking. Anything else asks."""
+    rules = [Rule(PolicyRule(tool=name, action="allow"), DEFAULT_SOURCE) for name in allowed]
     rules.append(Rule(PolicyRule(tool="*", action="ask"), DEFAULT_SOURCE))
     return rules
 

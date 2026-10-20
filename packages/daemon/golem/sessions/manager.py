@@ -49,6 +49,7 @@ from golem_protocol.events import (
     SessionAllowance,
     SessionCreatedData,
     SessionUpdatedData,
+    TodosUpdatedData,
 )
 
 NOT_APPROVED = "cancelled before it was approved"
@@ -194,6 +195,14 @@ class SessionManager:
             for event in history:
                 await self._events.emit(
                     fork.session_id, event.run_id, "message.completed", event.data
+                )
+            todos = (await self._runtime.values(fork.session_id)).get("todos")
+            if isinstance(todos, list) and todos:
+                await self._events.emit(
+                    fork.session_id,
+                    None,
+                    "todos.updated",
+                    TodosUpdatedData.model_validate({"todos": todos}),
                 )
             if source.title is not None:
                 await self._set_title(fork, fork_title(source.title))

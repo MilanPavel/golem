@@ -154,6 +154,7 @@ def test_schemas_use_the_function_format() -> None:
         "git_log",
         "web_fetch",
         "read_artifact",
+        "todo_write",
     ]
     first = schemas[0]["function"]  # type: ignore[index]
     assert first["parameters"]["required"] == ["path"]  # type: ignore[index]

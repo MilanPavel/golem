@@ -20,7 +20,8 @@ export type Params =
   | ToolCompletedEvent
   | ToolFailedEvent
   | ApprovalNeededEvent
-  | ApprovalResolvedEvent;
+  | ApprovalResolvedEvent
+  | TodosUpdatedEvent;
 export type Cwd = string | null;
 export type MessageId = string;
 export type SessionId = string;
@@ -163,6 +164,16 @@ export type Seq17 = number;
 export type SessionId18 = string;
 export type Ts17 = string;
 export type Type17 = 'approval.resolved';
+export type CallId7 = string | null;
+export type Id = string;
+export type Status = 'pending' | 'in_progress' | 'done';
+export type Text3 = string;
+export type Todos = Todo[];
+export type RunId18 = string | null;
+export type Seq18 = number;
+export type SessionId19 = string;
+export type Ts18 = string;
+export type Type18 = 'todos.updated';
 
 /**
  * Server → client event. No ``id``; this is not a response to a request.
@@ -664,4 +675,42 @@ export interface ApprovalResolvedData {
   name: Name2;
   rule?: Rule;
   subject?: Subject2;
+}
+/**
+ * The agent's todo list changed. ``run_id`` is null for a list a fork copied.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "TodosUpdatedEvent".
+ */
+export interface TodosUpdatedEvent {
+  data: TodosUpdatedData;
+  run_id: RunId18;
+  seq: Seq18;
+  session_id: SessionId19;
+  ts: Ts18;
+  type: Type18;
+}
+/**
+ * The agent's todo list, whole, after ``todo_write`` replaced it.
+ *
+ * ``call_id`` is the call that wrote it. It is null for a list a fork copied.
+ * An empty list clears it.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "TodosUpdatedData".
+ */
+export interface TodosUpdatedData {
+  call_id?: CallId7;
+  todos: Todos;
+}
+/**
+ * One step of the agent's plan.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "Todo".
+ */
+export interface Todo {
+  id: Id;
+  status: Status;
+  text: Text3;
 }

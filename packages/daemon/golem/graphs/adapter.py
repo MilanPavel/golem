@@ -77,6 +77,14 @@ class ToolErrored:
 
 
 @dataclass(frozen=True, slots=True)
+class TodosChanged:
+    """``todo_write`` replaced the agent's todo list."""
+
+    call_id: str
+    todos: tuple[dict[str, object], ...]
+
+
+@dataclass(frozen=True, slots=True)
 class ApprovalAsked:
     """The run paused on a tool call that needs the user's answer."""
 
@@ -98,6 +106,7 @@ Fact = (
     | ToolFinished
     | ToolErrored
     | ApprovalAsked
+    | TodosChanged
 )
 
 
@@ -282,6 +291,16 @@ def _custom(data: object) -> Fact | None:
             item.get("truncated") is True,
             artifact_id if isinstance(artifact_id, str) else None,
         )
+    if kind == "todos.updated":
+        todos = item.get("todos")
+        if not isinstance(todos, list):
+            return None
+        rows = tuple(
+            dict(cast(dict[str, object], row))
+            for row in cast(list[object], todos)
+            if isinstance(row, dict)
+        )
+        return TodosChanged(call_id, rows)
     if kind == "tool.failed":
         message = item.get("message")
         return ToolErrored(call_id, message if isinstance(message, str) and message else "failed")
@@ -298,6 +317,7 @@ __all__ = [
     "RequestedCall",
     "TextCompleted",
     "TextDelta",
+    "TodosChanged",
     "ToolErrored",
     "ToolFinished",
     "ToolOutput",

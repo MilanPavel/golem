@@ -60,6 +60,9 @@ TAIL_CHARS = 4_000
 CUT_CHARS = 100_000
 """Without an artifact store, what the model gets of one call at most."""
 
+STATE_KEYS = frozenset({"todos"})
+"""Graph state a tool may change through ``ToolResult.update``. Anything else is dropped."""
+
 CANCELLED_RESULT = "cancelled: the run stopped before this tool call finished"
 DENIED_RESULT = "the user denied this tool call"
 CHANGED_RESULT = "the rules changed while the run waited, so this call did not run"
@@ -110,8 +113,8 @@ def tools_node(
     registry: ToolRegistry,
     policy: Policy,
     artifacts: Artifacts | None = None,
-) -> Callable[[AgentState, RunnableConfig], Awaitable[dict[str, list[BaseMessage]]]]:
-    async def tools(state: AgentState, config: RunnableConfig) -> dict[str, list[BaseMessage]]:
+) -> Callable[[AgentState, RunnableConfig], Awaitable[dict[str, object]]]:
+    async def tools(state: AgentState, config: RunnableConfig) -> dict[str, object]:
         last = state["messages"][-1]
         if not isinstance(last, AIMessage):
             return {"messages": []}
@@ -152,6 +155,7 @@ def tools_node(
             verdicts.append(verdict)
         write = get_stream_writer()
         results: list[BaseMessage] = []
+        updates: dict[str, object] = {}
         for call, verdict in zip(last.tool_calls, verdicts, strict=True):
             call_id = call_id_of(call)
             if not verdict.run:
@@ -193,7 +197,11 @@ def tools_node(
             if verdict.args is not None:
                 output = _edited(verdict.args, output)
             results.append(_result(call_id, call["name"], output))
-        return {"messages": results}
+            changed = {k: v for k, v in (result.update or {}).items() if k in STATE_KEYS}
+            if "todos" in changed:
+                write({STREAM_KEY: "todos.updated", "call_id": call_id, "todos": changed["todos"]})
+            updates.update(changed)
+        return {"messages": results, **updates}
 
     return tools
 
@@ -372,6 +380,7 @@ __all__ = [
     "CWD_KEY",
     "DENIED_RESULT",
     "PREVIEW_CHARS",
+    "STATE_KEYS",
     "Answer",
     "call_id_of",
     "cancelled_results",
