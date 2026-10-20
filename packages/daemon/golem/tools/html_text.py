@@ -26,9 +26,25 @@ VOID = frozenset({"br", "hr", "img", "input", "meta", "link", "source", "wbr"})
 def html_to_text(html: str, base_url: str) -> tuple[str, str | None]:
     """The page as text, and its ``<title>``."""
     parser = _Parser(base_url)
-    parser.feed(html)
+    parser.feed(_closed_title(html))
     parser.close()
     return parser.text(), parser.title
+
+
+_TITLE_OPEN = re.compile(r"<title\b[^>]*>[^<]*", re.IGNORECASE)
+_TITLE_CLOSE = re.compile(r"</title\s*>", re.IGNORECASE)
+
+
+def _closed_title(html: str) -> str:
+    """``html`` with an unclosed ``<title>`` ended at the next tag.
+
+    From Python 3.13 the parser reads everything after ``<title>`` as its text
+    until ``</title>``, so a page that never closes it would lose its body.
+    """
+    opened = _TITLE_OPEN.search(html)
+    if opened is None or _TITLE_CLOSE.search(html, opened.end()) is not None:
+        return html
+    return f"{html[: opened.end()]}</title>{html[opened.end() :]}"
 
 
 class _Parser(HTMLParser):
