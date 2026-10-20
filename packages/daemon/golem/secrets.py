@@ -6,7 +6,7 @@ On macOS that is the login Keychain, through ``keyring``, under the service
 - ``provider/<name>``: a model provider's API key. Its Keychain account is
   the provider name alone, as before namespaces, so stored keys keep working.
 - ``mcp/<server>``: an MCP server's token (Phase 2).
-- ``hook``: the token of the hook endpoint (step 6.5).
+- ``hook/<name>``: a hook endpoint's token, such as ``hook/token`` (step 6.5).
 
 A setting that needs a secret holds a :data:`SecretRef`, ``keychain:<name>``,
 and the daemon resolves it when it uses it. A config file never holds the
@@ -23,7 +23,8 @@ from pydantic import AfterValidator
 SERVICE = "golem"
 KEYCHAIN_PREFIX = "keychain:"
 
-_NAME = re.compile(r"^(provider|mcp)/[A-Za-z0-9][A-Za-z0-9._-]*$|^hook$")
+_NAME = re.compile(r"^(provider|mcp|hook)/[A-Za-z0-9][A-Za-z0-9._-]*$")
+"""Provider accounts have no ``/``, so they never meet the other namespaces' accounts."""
 
 
 class SecretStoreError(Exception):
@@ -35,10 +36,10 @@ class SecretMissingError(Exception):
 
 
 def check_name(name: str) -> str:
-    """``name`` when it is ``provider/<name>``, ``mcp/<server>``, or ``hook``."""
+    """``name`` when it is ``provider/<name>``, ``mcp/<server>``, or ``hook/<name>``."""
     if _NAME.fullmatch(name) is None:
         raise ValueError(
-            f"{name!r} is not a secret name: use provider/<name>, mcp/<server>, or hook"
+            f"{name!r} is not a secret name: use provider/<name>, mcp/<server>, or hook/<name>"
         )
     return name
 

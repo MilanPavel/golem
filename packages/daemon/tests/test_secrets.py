@@ -57,17 +57,17 @@ def test_provider_keys_keep_their_old_keychain_account(backend: _Backend) -> Non
     keys.set("anthropic", "sk-a")
     secrets = KeychainSecrets()
     secrets.set("mcp/github", "ghp-1")
-    secrets.set("hook", "h-1")
+    secrets.set("hook/token", "h-1")
     assert backend.items == {
         ("golem", "anthropic"): "sk-a",
         ("golem", "mcp/github"): "ghp-1",
-        ("golem", "hook"): "h-1",
+        ("golem", "hook/token"): "h-1",
     }
     assert keys.delete("anthropic") is True
     assert keys.delete("anthropic") is False
 
 
-@pytest.mark.parametrize("name", ["anthropic", "mcp/", "provider/a b", "hooks", "../x"])
+@pytest.mark.parametrize("name", ["anthropic", "mcp/", "provider/a b", "hook", "../x"])
 def test_a_name_outside_the_namespaces_is_refused(name: str) -> None:
     with pytest.raises(ValueError, match="not a secret name"):
         account(name)

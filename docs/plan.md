@@ -11,7 +11,7 @@ This file is about what comes next. How the existing pieces are built is in [arc
 ### Works today
 
 - Streaming chat with named model profiles and `provider/model` refs: Ollama through its native API, Anthropic, OpenAI, and OpenAI-compatible hosts such as OpenRouter.
-- API keys in the macOS Keychain, through `golem auth` or `/login` in the TUI. Every secret golem keeps goes in that one store, named `provider/<name>`, `mcp/<server>`, or `hook`, and a config file that holds a key does not load.
+- API keys in the macOS Keychain, through `golem auth` or `/login` in the TUI. Every secret golem keeps goes in that one store, named `provider/<name>`, `mcp/<server>`, or `hook/<name>`, and a config file that holds a key does not load.
 - `/model` picks from installed, downloadable, and hosted models with prices and RAM fit, and switches a session mid-conversation. `golem models` prints the same list.
 - Downloading and removing Ollama models from the picker or with `/model pull` and `/model rm`, with live progress that survives closing the TUI.
 - Sessions, runs, and every event are stored in `~/.golem/golem.db`. They survive a daemon restart and a crash.
