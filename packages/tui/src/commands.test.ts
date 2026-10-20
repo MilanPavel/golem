@@ -184,3 +184,10 @@ test("/fork takes no arguments", () => {
   assert.deepEqual(applyComposer(closedDebug, "/fork"), { kind: "fork" });
   assert.equal(applyComposer(closedDebug, "/fork here").kind, "unknown");
 });
+
+test("/todos toggles the todo list and /artifact takes an optional id", () => {
+  assert.deepEqual(applyComposer(closedDebug, "/todos"), { kind: "todos" });
+  assert.deepEqual(applyComposer(closedDebug, "/artifact"), { kind: "artifact", id: null });
+  assert.deepEqual(applyComposer(closedDebug, "/artifact a_1"), { kind: "artifact", id: "a_1" });
+  assert.equal(applyComposer(closedDebug, "/artifact a b").kind, "unknown");
+});

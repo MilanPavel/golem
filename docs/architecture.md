@@ -98,6 +98,7 @@ Built today:
 - Tool rules: allow, ask, or deny per tool, subject, and path, from `config.toml` and a project's `.golem/policy.toml`, and `golem config show`. [ADR-012](adr/012-permission-rules.md).
 - "Always allow" from the approval band, and `/permissions` to change, delete, or revoke rules and session allowances.
 - Approvals: a call a rule asks about pauses the run until you answer in the TUI, across a TUI close or a daemon restart. [ADR-013](adr/013-approvals.md).
+- An agent todo list: `todo_write`, `todos.updated`, and the todo band. [ADR-018](adr/018-tool-state-updates.md).
 
 Planned next:
 
@@ -431,10 +432,11 @@ flowchart TB
   debug["Debug<br>only after /debug"]
   banner["Banner<br>only for an error or a notice"]
   meter["Meter<br>only while a reply is in progress"]
-  suggestions["Suggestions<br>only while the draft is a / command"]
+  todos["Todos<br>only while the agent keeps a todo list"]
+  suggestions["Suggestions or approval<br>a / command, or a call that waits"]
   composer["Composer<br>the line you are typing"]
   status["Status<br>connection, title, model, folder"]
-  header --> body --> debug --> banner --> meter --> suggestions --> composer --> status
+  header --> body --> debug --> banner --> meter --> todos --> suggestions --> composer --> status
 ```
 
 A window at least 20 rows tall and 42 columns wide gives the header the logo: 18 columns, 7 rows, because two pixel rows share one cell. Beside it sit the version, the model (`name · profile`), and the folder. The version is the TUI's own, taken from its package when it is built. When that matches the daemon, one number is shown. When it does not, the header shows `tui X · daemon Y` in yellow. The socket still connects: only a different protocol major is refused. A smaller window uses one line: `█ golem`, the version, the model, then the folder. No rows at all draws nothing.
@@ -445,6 +447,7 @@ The other bands ask for rows only when they are needed.
 - The composer wants one row per line of the draft, up to 5, or 1 while a reply is in progress. That one row is `…`, and typing is ignored. Extra lines come out of the chat. Scroll is how many lines sit below the window, so the line you were reading stays put.
 - The meter wants 1 while a reply is in progress: `thinking`, then `writing · N chars · Ns`, with a small block that moves.
 - Command suggestions want up to 6, above the composer, and only while the draft is a `/` command.
+- The todo band wants one row per item of the agent's todo list: `[ ]` pending, `[~]` in progress (bold, clay), `[x]` done (dim). A finished list, a list longer than 6, or a short window shows one row instead: `todos 2/5 · <the current step>`. An empty list takes no rows, and `/todos` hides or shows the band, remembered in `tui.json`.
 - A running tool call shows its newest output line under its line, or up to 12 lines while Ctrl-O is on.
 - The approval band takes those rows instead while a run waits on a tool call: `Allow read_file notes.txt?`, the rule that asked, and the keys. A file change also shows its diff between the question and the rule, coloured by line, in up to half the screen; Up and Down scroll it a line, Page Up and Page Down a page. `a` or Enter allows once, `s` allows the same call for the session, `w` allows it always by writing a rule, `e` opens its arguments as JSON in the composer's place (Enter allows once with them, Esc goes back), and `d` or Esc denies. Ctrl-C cancels the run. The meter says `waiting for your approval`, and the switcher shows a yellow `?` for a waiting session.
 - An error wants 1 row in red. A notice wants 1 row in yellow.
@@ -452,7 +455,7 @@ The other bands ask for rows only when they are needed.
 
 A 24×80 terminal becomes a frame 79 columns wide. One column is left unused, because a glyph in the last column would wrap and scroll the header away. With the logo, a one-line composer, and the status line, the chat has 15 rows.
 
-If the window is short, bands give rows back until the chat still has one. In order: the suggestion list goes away, the debug panel shrinks toward 3 rows, the composer shrinks to one line, the meter goes away, the logo collapses to one line, the banner goes away, the debug panel goes away, the header goes away, the composer goes away, and last the status line.
+If the window is short, bands give rows back until the chat still has one. In order: the suggestion list goes away, the approval band's diff shrinks to its three rows, the todo band collapses to one row, the debug panel shrinks toward 3 rows, the composer shrinks to one line, the meter goes away, the logo collapses to one line, the banner goes away, the debug panel goes away, the header goes away, the todo band goes away, the approval band goes away, the composer goes away, and last the status line.
 
 Inside the transcript, messages are painted in order with a blank line between them. A reply that called tools has one line per call under its text: the tool name, its string arguments, then `…` while it runs, `✓` and a summary (`12 lines`) when it finished, or `✗` and the reason when it failed. A reply that only called tools shows those lines and no text, and has no duration under it. Ctrl-O shows or hides each finished call's output, up to 12 lines, under its line. Each starts with a bold `you` or `golem`. With `/time` on, a dimmed time follows the label (`14:02`, or the date when the message is from another day). A finished answer has its duration dimmed underneath (`12.4s`). Your lines sit on a clay background. While `streaming` is set, the text is wrapped as plain characters. When the answer is finished, the same text is drawn as markdown. If the laid-out lines are taller than the band, a scrollbar appears (`│`, with `█` as the thumb) and the text uses one fewer column.
 
@@ -462,7 +465,7 @@ The debug band keeps its first row for the title. The wire tab lists recent prot
 
 ### What the screen keeps
 
-`chat` is the conversation: a list of messages, plus four fields. Each message has an id, a role, the text so far, `streaming`, the event time, for a finished answer how long it took, and the tool calls it asked for. A tool call keeps its id, name, arguments, status (requested, running, done, or failed), and the summary, preview, or error that ended it. `busy` is true while the model works. `error` is the red line. `notice` is the yellow line. `runStartedAt` is the timestamp the meter uses for seconds.
+`chat` is the conversation: a list of messages, the waiting approval, the agent's todo list, plus four fields. Each message has an id, a role, the text so far, `streaming`, the event time, for a finished answer how long it took, and the tool calls it asked for. A tool call keeps its id, name, arguments, status (requested, running, done, or failed), and the summary, preview, or error that ended it. `busy` is true while the model works. `error` is the red line. `notice` is the yellow line. `runStartedAt` is the timestamp the meter uses for seconds.
 
 `reduceChat` folds one event at a time. It does not keep the events.
 
@@ -481,7 +484,8 @@ The debug band keeps its first row for the title. The wire tab lists recent prot
 | `tool.completed` | That call is done, with its summary and output preview. |
 | `tool.failed` | That call failed, with the reason. |
 | `approval.needed` | That call waits (`?`), and the approval band opens. `busy` stays on. |
-| `approval.resolved` | The band closes. An allowed call goes back to requested until `tool.started`. |
+| `approval.resolved` | The band closes. An allowed call goes back to requested until `tool.started`, with the edited arguments when there are any. |
+| `todos.updated` | The todo list is that list, whole. |
 
 Deltas do not take that path one socket frame at a time. They wait in a small map, grouped by message id, for about 16 milliseconds, then land as one update. When the answer finishes, that map is emptied first, and `message.completed` replaces the text with the full answer. `session.created` does not change `chat`. The screen reads the model and the project folder off that event on its own. The folder in the header and the status line is the session's, or the TUI's working directory for a session without one.
 

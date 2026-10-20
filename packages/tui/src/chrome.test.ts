@@ -181,3 +181,11 @@ test("banner text stays on one line", () => {
   assert.equal(bannerText("session was not found", 80), "session was not found");
   assert.equal(bannerText("abcdef", 4), "abc…");
 });
+
+test("the todo list collapses to one row before the composer shrinks", () => {
+  const room = frameBudget({ rows: 30, columns: 80, draft: "", busy: false, banner: false, todos: 3 });
+  assert.equal(room.todos, 3);
+  const tight = frameBudget({ rows: 8, columns: 80, draft: "a\nb\nc", busy: false, banner: false, todos: 3 });
+  assert.equal(tight.todos, 1);
+  assert.equal(tight.composer, 3);
+});

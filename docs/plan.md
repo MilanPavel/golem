@@ -24,6 +24,7 @@ This file is about what comes next. How the existing pieces are built is in [arc
 - A sandboxed shell: the model runs commands in the session folder with no network and no writes outside it, after you approve each one. Output streams into the tool line. `git_status`, `git_diff`, and `git_log` read the repository.
 - "Always allow" (`w`) writes a rule for one exact call, and `/permissions` changes or deletes rules and revokes what a session allows.
 - `web_fetch` reads a page as text, asks per host, and refuses private addresses unless `[web] allow_private` is set ([ADR-017](adr/017-web-fetch.md)).
+- An agent todo list: `todo_write` keeps the plan in the session, `todos.updated` carries it, and a band above the composer shows it, `/todos` to hide it ([ADR-018](adr/018-tool-state-updates.md)).
 - Artifacts: tool output over 20 000 characters is stored in `golem.db`, the model gets its head and tail and reads more with `read_artifact`, and `/artifact` opens all of it ([ADR-016](adr/016-artifacts.md)).
 - Write tools: `write_file` and `edit_file` change files in the session folder, never under `.golem/` or `.git/`. The approval shows the diff, only that change is applied, and `e` edits a call's arguments before allowing it once ([ADR-015](adr/015-write-tools.md)).
 - Approvals: a call a rule asks about waits for `a` (once), `s` (for the session), or `d` (deny), across closing the TUI and restarting the daemon. A waiting session shows `?` in the switcher.
@@ -34,7 +35,7 @@ This file is about what comes next. How the existing pieces are built is in [arc
 
 | Phase | What you get | Milestone |
 |---|---|---|
-| 1. Tools and approvals | The agent reads and edits files and runs commands, and asks first | M2 — Acts |
+| 1. Tools and approvals (built) | The agent reads and edits files and runs commands, and asks first | M2 — Acts |
 | 2. MCP | MCP servers as tool providers, under the same permissions | M2 — Acts |
 | 3. Install and platforms | `brew install`, safe upgrades, `golem doctor`, then Linux and Windows | M3 — Installable |
 | 4. Skills | Claude Code compatible `SKILL.md` skills | M4 — Skilled |
@@ -106,14 +107,14 @@ JSON-RPC 2.0, one JSON object per line, over `~/.golem/run/golem.sock`. Protocol
 | Group | New events | Phase |
 |---|---|---|
 | Tools | `tool.requested`, `tool.started`, `tool.output`, `tool.completed`, `tool.failed` (built) | 1.1, 1.4 |
-| Approval | `approval.needed`, `approval.resolved` | 1.3 |
-| Todos | `todos.updated` | 1.7 |
+| Approval | `approval.needed`, `approval.resolved` (built) | 1.3 |
+| Todos | `todos.updated` (built) | 1.7 |
 | Models | `usage.reported` (tokens, cost) | 10.1 |
 | System | `mcp.server.status`, `warning`, `error` | 2.1 |
 | Skills | `skill.activated`, `skill.deactivated` | 4.2 |
 | Runs and flows | `run.step.started`, `run.step.completed`, `run.interrupted` | 5.2, 5.4 |
 
-New commands: `approval.respond` (1.3), `mcp.list` (2.1), `skill.list | pin | unpin` (4.1, 4.2), `flow.list | start | status` (5.1), `config.get` (when a step needs it).
+New commands: `approval.respond` (1.3, built), `artifact.read` (1.6, built), `mcp.list` (2.1), `skill.list | pin | unpin` (4.1, 4.2), `flow.list | start | status` (5.1), `config.get` (when a step needs it).
 
 Rules:
 
@@ -125,7 +126,7 @@ Rules:
 
 ## Phase 1 — Tools and approvals
 
-The agent can act, and nothing happens without passing policy. How the tool loop works is in [ADR-011](adr/011-tools.md). Start read-only, then add permissions, then approvals, then write and execute.
+Built. The agent can act, and nothing happens without passing policy. How the tool loop works is in [ADR-011](adr/011-tools.md). Start read-only, then add permissions, then approvals, then write and execute.
 
 ### 1.1 Tool loop with read-only tools (built)
 
@@ -240,7 +241,7 @@ The agent can act, and nothing happens without passing policy. How the tool loop
   - Other secrets (MCP server tokens, the hook token from 6.5) use the same Keychain store as provider keys.
 - **Done when:** a 5 MB tool output leaves the checkpoint small, and no API key is in any file under `~/.golem`.
 
-### 1.7 Agent todo list
+### 1.7 Agent todo list (built)
 
 - **Goal:** on a multi-step task, you can see the agent's plan and where it is.
 - **You can:** watch a checklist update as golem works through "add a flag, wire it up, write a test".

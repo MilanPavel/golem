@@ -406,3 +406,18 @@ test("tool output appends to the running call and keeps only its newest part", (
   state = reduceChat(state, { ...base, seq: 7, type: "tool.output", data: { call_id: "c1", text: "x".repeat(5000) } });
   assert.equal(state.messages[0]?.tools?.[0]?.output?.length, 4000);
 });
+
+test("the todo list is the newest todos.updated", () => {
+  const base = { session_id: "s", run_id: "r", ts: "t" } as const;
+  const plan = (status: "pending" | "done") => ({
+    ...base,
+    seq: 1,
+    type: "todos.updated" as const,
+    data: { call_id: "c1", todos: [{ id: "1", text: "add a flag", status }] },
+  });
+  const first = reduceChat(emptyChat, plan("pending"));
+  assert.deepEqual(first.todos, [{ id: "1", text: "add a flag", status: "pending" }]);
+  assert.equal(reduceChat(first, plan("done")).todos[0]?.status, "done");
+  const cleared = reduceChat(first, { ...base, seq: 2, type: "todos.updated", data: { todos: [] } });
+  assert.deepEqual(cleared.todos, []);
+});

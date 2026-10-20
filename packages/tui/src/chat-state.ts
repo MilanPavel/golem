@@ -1,5 +1,7 @@
 import type { ChatEvent } from "@golem/client";
 
+import type { TodoItem } from "./todos.ts";
+
 export type ToolStatus = "requested" | "waiting" | "running" | "done" | "failed";
 
 /** The tool call the run waits on, from `approval.needed`. */
@@ -60,6 +62,8 @@ export type ChatState = {
   runId: string | null;
   /** Set while the run waits for an answer about a tool call. */
   approval: PendingApproval | null;
+  /** The agent's todo list, from the newest `todos.updated`. */
+  todos: TodoItem[];
 };
 
 export const emptyChat: ChatState = {
@@ -70,6 +74,7 @@ export const emptyChat: ChatState = {
   runStartedAt: null,
   runId: null,
   approval: null,
+  todos: [],
 };
 
 export const CANCELLED_NOTICE = "cancelled";
@@ -174,6 +179,8 @@ export function reduceChat(state: ChatState, event: ChatEvent): ChatState {
       });
       return { ...answered, approval: null };
     }
+    case "todos.updated":
+      return { ...state, todos: event.data.todos.map((todo) => ({ id: todo.id, text: todo.text, status: todo.status })) };
     case "tool.started":
       return updateTool(state, event.data.call_id, (tool) => ({ ...tool, status: "running" }));
     case "tool.output":

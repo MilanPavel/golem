@@ -29,6 +29,7 @@ export type ComposerOutcome =
   | { kind: "artifact"; id: string | null }
   | { kind: "export"; path: string | null }
   | { kind: "time" }
+  | { kind: "todos" }
   | { kind: "model"; name: string | null }
   | { kind: "model-pull"; name: string }
   | { kind: "model-rm"; name: string }
@@ -170,6 +171,12 @@ export const COMMANDS: readonly Command[] = [
     args: "[name]",
     description: "Shows the title, or sets it.",
     run: (_debug, args) => ({ kind: "title", title: args.length === 0 ? null : args.join(" ") }),
+  },
+  {
+    name: "/todos",
+    args: "",
+    description: "Shows or hides the agent's todo list above the composer.",
+    run: withoutArgs({ kind: "todos" }),
   },
 ];
 

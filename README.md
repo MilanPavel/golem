@@ -46,6 +46,8 @@ Golem has two parts:
 
 - Fetching a web page with `web_fetch`, after you approve the host. The page comes back as text marked as untrusted, and addresses on your own machine or network are refused unless you allow them in `[web]`.
 
+- A todo list for multi-step tasks: the agent writes its plan with `todo_write`, and a band above the composer shows each step as it goes from `[ ]` to `[~]` to `[x]`. It needs no approval, and it is still there after you reattach.
+
 - A sandboxed shell. The model can run tests or a build in that folder after you approve the command. It has no network and cannot write outside the folder. `git_status`, `git_diff`, and `git_log` need no approval.
 
 - Changing files with `write_file` and `edit_file`, inside that folder. The approval shows the diff, Up and Down scroll it, and only that change is made: a file that changed while you decided is left alone. Golem never changes a `.golem/` or `.git/` folder. Ctrl-O shows the diff of each change.
@@ -226,6 +228,7 @@ A finished answer shows how long it took, under the text. `/time` shows the time
 | `/export` | Writes this session as markdown, to `~/.golem/exports/<title>.md` |
 | `/export <path>` | Writes that markdown to the path you give |
 | `/time` | Shows or hides the time beside each message |
+| `/todos` | Shows or hides the agent's todo list above the composer, and remembers the choice |
 | `/artifact` | Opens the whole output of the newest long tool call in `$PAGER` (`less` by default) |
 | `/artifact <id>` | Opens that artifact, named under an expanded tool call |
 | `/sessions` | Opens the session switcher, with live status |

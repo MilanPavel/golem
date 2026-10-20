@@ -82,7 +82,9 @@ import {
   type OverlayLine,
 } from "./keys.ts";
 import { layoutTranscript, type LayoutLine } from "./layout-chat.ts";
-import { loadPrefs, prefsPath, saveTimes } from "./prefs.ts";
+import { DEFAULT_PREFS, loadPrefs, prefsPath, savePref } from "./prefs.ts";
+import { TodoBand } from "./todo-band.tsx";
+import { todoRows } from "./todos.ts";
 import {
   maskSecret,
   openSecret,
@@ -177,6 +179,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   const [offset, setOffset] = useState(0);
   const [tail, setTail] = useState<TailAnchor | null>(null);
   const [showTimes, setShowTimes] = useState(false);
+  const [showTodos, setShowTodos] = useState(DEFAULT_PREFS.todos);
   const [tick, setTick] = useState(0);
   const [debug, setDebug] = useState<DebugState>(closedDebug);
   const [debugOffset, setDebugOffset] = useState(0);
@@ -235,6 +238,8 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   const historyCursorRef = useRef(historyCursor);
   const liveTitleRef = useRef(liveTitle);
   const showTimesRef = useRef(showTimes);
+  const showTodosRef = useRef(showTodos);
+  showTodosRef.current = showTodos;
   const prefsLoaded = useRef(false);
   draftRef.current = draft;
   historyCursorRef.current = historyCursor;
@@ -281,6 +286,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
     suggestions: suggestMatches.length,
     approval: chat.approval === null ? 0 : argsEdit !== null ? APPROVAL_ROWS : approvalRows(chat.approval, rows),
     composerMax: argsEdit !== null ? ARGS_EDIT_ROWS : undefined,
+    todos: showTodos ? todoRows(chat.todos) : 0,
   });
   suggestRef.current = {
     items: suggestMatches,
@@ -376,6 +382,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
         }
         prefsLoaded.current = true;
         setShowTimes(prefs.times);
+        setShowTodos(prefs.todos);
       },
       () => undefined,
     );
@@ -785,7 +792,17 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       showTimesRef.current = next;
       setShowTimes(next);
       setChat((current) => ({ ...current, notice: next ? "timestamps on" : "timestamps off" }));
-      void saveTimes(prefsPath(), next).catch(() => undefined);
+      void savePref(prefsPath(), "times", next).catch(() => undefined);
+      return;
+    }
+    if (outcome.kind === "todos") {
+      setDraft(draftAt(""));
+      prefsLoaded.current = true;
+      const next = !showTodosRef.current;
+      showTodosRef.current = next;
+      setShowTodos(next);
+      setChat((current) => ({ ...current, notice: next ? "todo list shown" : "todo list hidden" }));
+      void savePref(prefsPath(), "todos", next).catch(() => undefined);
       return;
     }
     if (outcome.kind === "local") {
@@ -1640,6 +1657,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
           )}
         </Text>
       ) : null}
+      {budget.todos > 0 ? <TodoBand todos={chat.todos} columns={columns} height={budget.todos} /> : null}
       {budget.approval > 0 && chat.approval !== null ? (
         <ApprovalBand
           approval={chat.approval}
