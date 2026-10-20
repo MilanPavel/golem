@@ -25,9 +25,10 @@ flowchart LR
 
 - **The tool** is `golem/tools/web.py`. It takes `url`, and returns the page as text inside `<web_content url=… title=…>`, after a line that says the page is data, not instructions.
 - **Policy.** It is not read-only, so it asks by default. `Tool.subject` makes the host (lowercased) the subject, so "allow for this session" covers one host, and "always allow" writes `tool = "web_fetch"`, `match = "<host>"`. A rule such as `match = "docs.python.org|*.readthedocs.io"` allows those hosts.
-- **Addresses.** Before each request, and again before each redirect hop, the host is resolved, and any loopback, private, link-local, reserved, or multicast address refuses the call, IPv4 mapped into IPv6 included. `[web] allow_private = true` turns this off, for a dev server on `localhost`.
-- **Requests.** `httpx`, no automatic redirects (golem follows at most 5 itself), a `golem/<version>` user agent, `[web] timeout_seconds` (default 20), and at most `[web] max_bytes` (default 5 MB) of the body. URLs with a user name or password are refused.
-- **Content.** HTML becomes text through `golem/tools/html_text.py`, which uses the standard library's parser: scripts, styles, frames, and the head are dropped, headings become `#`, list items `-`, links `[text](absolute url)`, and `<pre>` a fenced block. Other `text/*`, JSON, and XML pass through. Anything else, such as an image, is refused. A long page becomes an artifact ([ADR-016](016-artifacts.md)).
+- **Addresses.** Before each request, and again before each redirect hop, the host is resolved, and any loopback, private, link-local, site-local, reserved, or multicast address refuses the call, IPv4 inside IPv6 (mapped, NAT64, or compatible) included. `[web] allow_private = true` turns this off, for a dev server on `localhost`.
+- **Redirects** are followed only on the same host, at most 5. A redirect to another host comes back to the model as `redirects to <url>, on another host`, so its next `web_fetch` asks about that host.
+- **Requests.** `httpx` with the environment's proxy settings ignored, a `golem/<version>` user agent, `Accept-Encoding: identity` (a compressed body is refused, so nothing can expand past the cap), `[web] timeout_seconds` (default 20) for the whole fetch, and at most `[web] max_bytes` (default 5 MB) of the body. URLs with a user name or password are refused.
+- **Content.** HTML becomes text through `golem/tools/html_text.py`, which uses the standard library's parser. Comments are removed and at most 1 MB is parsed first, because that parser slows down badly on hostile markup. Scripts, styles, and frames are dropped, headings become `#`, list items `-`, links `[text](absolute url)`, and `<pre>` a fenced block. Other `text/*`, JSON, and XML pass through. Anything else, such as an image, is refused. A long page becomes an artifact of kind `untrusted`, and every page `read_artifact` returns of it is wrapped the same way ([ADR-016](016-artifacts.md)). The page's own `<web_content` tags are defused, so it cannot end the wrapper early.
 - **Settings.** `[web]` is read only from the user's `config.toml`, like `[shell]` ([ADR-014](014-shell-sandbox.md)). A project file cannot widen it.
 - **Tests** swap the transport and the resolver through `ToolContext.network`, so nothing reaches the network.
 
@@ -39,7 +40,7 @@ flowchart LR
 
 **The full URL as the subject.** Every page of a site would ask again, and "always allow" would cover one page.
 
-**Let httpx follow redirects.** The address check would run only for the first host, and a public page could redirect to `http://169.254.169.254/`.
+**Let httpx follow redirects.** The address check would run only for the first host, and a public page could redirect to `http://169.254.169.254/`. Following cross-host redirects ourselves would still skip the per-host question.
 
 ## What it costs
 

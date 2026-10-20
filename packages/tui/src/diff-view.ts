@@ -1,5 +1,7 @@
 /** A unified diff as rows for the approval band: one tone per row, cut to the width. */
 
+import { visibleText } from "./sanitize.ts";
+
 export type DiffTone = "add" | "del" | "hunk" | "meta" | "context";
 
 export type DiffLine = {
@@ -8,9 +10,6 @@ export type DiffLine = {
 };
 
 const TAB = "    ";
-
-/** File text can hold terminal escapes, which must not move the cursor or recolour the band. */
-const CONTROL = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/g;
 
 export function parseDiff(diff: string): DiffLine[] {
   if (diff === "") {
@@ -25,7 +24,7 @@ export function parseDiff(diff: string): DiffLine[] {
 }
 
 function visible(row: string): string {
-  return row.replaceAll("\t", TAB).replace(CONTROL, (char) => (char === "\u001b" ? "␛" : "�"));
+  return visibleText(row.replaceAll("\t", TAB));
 }
 
 /** Rows that fit `rows` from `offset`, each cut to `columns`. */

@@ -182,7 +182,11 @@ def tools_node(
                 write({STREAM_KEY: "tool.failed", "call_id": call_id, "message": message})
                 results.append(_result(call_id, call["name"], f"error: {message}", error=True))
                 continue
-            output, artifact_id = await _for_model(artifacts, session_id, call_id, result.output)
+            tool = registry.get(call["name"])
+            kind = "untrusted" if tool is not None and tool.untrusted else "tool_output"
+            output, artifact_id = await _for_model(
+                artifacts, session_id, call_id, result.output, kind
+            )
             preview = result.output[:PREVIEW_CHARS]
             write(
                 {
@@ -272,7 +276,11 @@ async def _preview(
 
 
 async def _for_model(
-    artifacts: Artifacts | None, session_id: str | None, call_id: str, output: str
+    artifacts: Artifacts | None,
+    session_id: str | None,
+    call_id: str,
+    output: str,
+    kind: str = "tool_output",
 ) -> tuple[str, str | None]:
     """What the model reads of ``output``, and the artifact that holds all of it.
 
@@ -285,7 +293,7 @@ async def _for_model(
         if len(output) <= CUT_CHARS:
             return output, None
         return f"{output[:CUT_CHARS]}\n[output cut at {CUT_CHARS} characters]", None
-    artifact_id = await artifacts.put(session_id, call_id, "tool_output", output)
+    artifact_id = await artifacts.put(session_id, call_id, kind, output)
     skipped = len(output) - HEAD_CHARS - TAIL_CHARS
     note = (
         f"[{skipped} characters cut; the whole output is {len(output)} characters in artifact "

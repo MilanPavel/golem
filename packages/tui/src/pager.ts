@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import type { ChatMessage } from "./chat-state.ts";
+import { visibleText } from "./sanitize.ts";
 
 /** `$PAGER`, split on spaces, or `less` when it is unset. */
 export function pagerCommand(env: NodeJS.ProcessEnv = process.env): string[] {
@@ -34,7 +35,7 @@ export async function showInPager(
   const dir = await mkdtemp(join(tmpdir(), "golem-artifact-"));
   const file = join(dir, "artifact.txt");
   try {
-    await writeFile(file, text, "utf8");
+    await writeFile(file, visibleText(text), { encoding: "utf8", mode: 0o600 });
     let code = 1;
     await suspend(async () => {
       code = await run(pagerCommand(env), file);

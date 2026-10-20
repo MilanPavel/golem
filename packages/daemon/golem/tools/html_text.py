@@ -11,7 +11,8 @@ import re
 from html.parser import HTMLParser
 from urllib.parse import urljoin
 
-SKIPPED = frozenset({"script", "style", "noscript", "svg", "iframe", "template", "head", "object"})
+SKIPPED = frozenset({"script", "style", "noscript", "svg", "iframe", "template", "object"})
+TITLE_CHARS = 300
 BLOCKS = frozenset(
     {
         "p", "div", "section", "article", "main", "header", "footer", "aside", "nav",
@@ -43,13 +44,14 @@ class _Parser(HTMLParser):
 
     @property
     def title(self) -> str | None:
-        title = " ".join("".join(self._title).split())
+        title = " ".join("".join(self._title).split())[:TITLE_CHARS]
         return title or None
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        if tag == "title":
+        if tag == "title" and not self._skip and not self._title:
             self._in_title = True
             return
+        self._in_title = False
         if tag in SKIPPED:
             if tag not in VOID:
                 self._skip += 1
@@ -96,7 +98,8 @@ class _Parser(HTMLParser):
 
     def handle_data(self, data: str) -> None:
         if self._in_title:
-            self._title.append(data)
+            if sum(map(len, self._title)) < TITLE_CHARS:
+                self._title.append(data)
             return
         if self._skip:
             return

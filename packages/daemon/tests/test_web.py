@@ -83,12 +83,48 @@ async def test_refused_urls_say_why(url: str, error: str) -> None:
         await _fetch(ctx, url)
 
 
-async def test_a_redirect_to_a_private_address_is_refused() -> None:
+async def test_a_redirect_to_another_host_goes_back_to_the_model() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(302, headers={"location": "http://inside.example.com/admin"})
+        if request.url.path == "/old":
+            return httpx.Response(301, headers={"location": "/new"})
+        if request.url.path == "/new":
+            return httpx.Response(302, headers={"location": "http://inside.example.com/admin"})
+        raise AssertionError(request.url)
 
+    result = await _fetch(_ctx(handler), "https://docs.example.com/old")
+    assert result.summary == "redirect to inside.example.com"
+    assert "was not followed" in result.output
     with pytest.raises(ToolError, match=r"inside\.example\.com is a private address"):
-        await _fetch(_ctx(handler), "https://docs.example.com/")
+        await _fetch(_ctx(handler), "http://inside.example.com/admin")
+
+
+async def test_compressed_bodies_are_refused() -> None:
+    gzipped = _ctx(
+        lambda request: httpx.Response(200, content=b"x", headers={"content-encoding": "gzip"})
+    )
+    with pytest.raises(ToolError, match="gzip-compressed"):
+        await _fetch(gzipped, "https://docs.example.com/")
+
+
+@pytest.mark.parametrize("address", ["64:ff9b::a00:1", "::10.0.0.1", "fec0::1"])
+async def test_ipv6_forms_of_private_addresses_are_refused(address: str) -> None:
+    async def resolve(host: str) -> list[str]:
+        return [address]
+
+    ctx = ToolContext(
+        root=None,
+        network=Network(
+            transport=httpx.MockTransport(lambda r: httpx.Response(200)), resolve=resolve
+        ),
+    )
+    with pytest.raises(ToolError, match="private address"):
+        await _fetch(ctx, "https://tricky.example.com/")
+
+
+def test_an_unclosed_head_or_title_keeps_the_body() -> None:
+    text, title = html_to_text("<head><title>T<body><p>body text</p>", "https://x/")
+    assert "body text" in text
+    assert title == "T"
 
 
 async def test_private_addresses_are_allowed_when_the_user_says_so() -> None:

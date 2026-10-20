@@ -45,7 +45,10 @@ def _blank_to_none(value: object) -> object:
     return value
 
 
-_SECRET_KEY = re.compile(r"(^|_)(api_?key|key|token|password|passwd|secret)$", re.IGNORECASE)
+_SECRET_KEY = re.compile(
+    r"(^|_)(api_?key|key|token|password|passwd|secret|credentials?|authorization|bearer)$",
+    re.IGNORECASE,
+)
 INLINE_SECRET = (
     "{key} looks like a secret, and golem keeps secrets out of config files: "
     "store a provider key with `golem auth set` or /login, and name an environment "

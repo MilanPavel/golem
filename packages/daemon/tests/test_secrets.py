@@ -90,7 +90,9 @@ def test_a_setting_names_a_secret_and_never_holds_one() -> None:
     assert store.secrets["provider/openai"] == "sk-o"
 
 
-@pytest.mark.parametrize("field", ["api_key", "apikey", "token", "password", "client_secret"])
+@pytest.mark.parametrize(
+    "field", ["api_key", "apikey", "token", "password", "client_secret", "apiKey", "authorization"]
+)
 def test_a_secret_written_into_a_config_table_is_refused(field: str) -> None:
     with pytest.raises(ValidationError, match="golem auth set"):
         ProviderSettings.model_validate({field: "sk-inline"})
@@ -116,3 +118,10 @@ async def test_no_file_under_the_golem_home_holds_a_stored_key(short_home: Path)
     for path in short_home.rglob("*"):
         if path.is_file():
             assert key.encode() not in path.read_bytes(), path
+
+
+def test_a_provider_name_the_keychain_cannot_hold_is_a_store_error() -> None:
+    from golem.models.keys import KeyStoreError
+
+    with pytest.raises(KeyStoreError, match="cannot hold a key"):
+        ProviderKeys(MemorySecrets()).get("my provider")

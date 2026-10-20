@@ -20,9 +20,10 @@ flowchart LR
 
 ## What the code does today
 
-- **The table** is migration 5 in `golem/store/migrations.py`: `artifact_id`, `session_id`, `call_id`, `kind` (`tool_output`), `size` in characters, `created_at`, and the text. `ArtifactStore` (`golem/store/artifacts.py`) puts one and reads a page with SQL `substr`, always by session and id together.
+- **The table** is migration 5 in `golem/store/migrations.py`: `artifact_id`, `session_id`, `call_id`, `kind` (`tool_output`, or `untrusted` for a tool that returns outside content, such as `web_fetch`), `size` in characters, `created_at`, and the text. `ArtifactStore` (`golem/store/artifacts.py`) puts one and reads a page with SQL `substr`, always by session and id together.
 - **The cut** happens in the `tools` node's run phase, after every approval, so nothing is stored twice on a resume. Output up to 20 000 characters goes to the model whole. Longer output is stored, and the model gets the first 12 000 characters, a note with the id and the total, and the last 4 000, where a failing command prints its summary.
-- **`read_artifact`** is read-only and needs no approval. It reads up to 20 000 characters from an offset, only from the session's own artifacts.
+- **`read_artifact`** is read-only and needs no approval. It reads up to 20 000 characters from an offset, only from the session's own artifacts. A page of an `untrusted` artifact comes back inside the same `<web_content>` wrapper as the page it came from.
+- **On screen**, artifact text in the pager, like tool previews and diffs, has its control characters shown as `␛` and `�`, so it cannot drive the terminal.
 - **On the wire**, `tool.completed` carries `artifact_id`, and `artifact.read` returns a page (`text`, `offset`, `size`) of a session's artifact, `-32012` for an unknown one. The TUI shows `all of it: /artifact <id>` under an expanded block, and `/artifact` (the newest one, or an id) opens the text in `$PAGER`.
 - **Limits.** One call returns at most 5 MB, and `shell` now captures up to 5 MB (the first 1 MB and the last 4 MB) instead of about 100 000 characters. Without an artifact store, as in some tests, output is cut at 100 000 characters as before.
 

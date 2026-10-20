@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from golem.secrets import SERVICE, KeychainSecrets, SecretStore, SecretStoreError
+from golem.secrets import SERVICE, KeychainSecrets, SecretStore, SecretStoreError, check_name
 
 KeyStoreError = SecretStoreError
 
@@ -30,13 +30,20 @@ class ProviderKeys:
         self._secrets = secrets
 
     def get(self, provider: str) -> str | None:
-        return self._secrets.get(f"provider/{provider}")
+        return self._secrets.get(_name(provider))
 
     def set(self, provider: str, key: str) -> None:
-        self._secrets.set(f"provider/{provider}", key)
+        self._secrets.set(_name(provider), key)
 
     def delete(self, provider: str) -> bool:
-        return self._secrets.delete(f"provider/{provider}")
+        return self._secrets.delete(_name(provider))
+
+
+def _name(provider: str) -> str:
+    try:
+        return check_name(f"provider/{provider}")
+    except ValueError as exc:
+        raise KeyStoreError(f"{provider!r} cannot hold a key in the Keychain: {exc}") from exc
 
 
 class KeychainStore(ProviderKeys):

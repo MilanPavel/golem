@@ -42,13 +42,18 @@ class ArtifactStore:
     ) -> ArtifactPage | None:
         """``limit`` characters from ``offset``, or None for an artifact of another session."""
         row = await self._database.fetch_one(
-            "SELECT size, substr(data, ?, ?) AS page FROM artifacts"
+            "SELECT size, kind, substr(data, ?, ?) AS page FROM artifacts"
             " WHERE artifact_id = ? AND session_id = ?",
             (max(0, offset) + 1, max(0, limit), artifact_id, session_id),
         )
         if row is None:
             return None
-        return ArtifactPage(text=str(row["page"]), offset=max(0, offset), size=int(row["size"]))
+        return ArtifactPage(
+            text=str(row["page"]),
+            offset=max(0, offset),
+            size=int(row["size"]),
+            kind=str(row["kind"]),
+        )
 
 
 __all__ = ["ArtifactStore"]

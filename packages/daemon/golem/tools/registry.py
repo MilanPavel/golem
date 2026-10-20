@@ -28,11 +28,15 @@ class ToolError(Exception):
 
 @dataclass(frozen=True, slots=True)
 class ArtifactPage:
-    """``text`` starts at character ``offset`` of an artifact ``size`` characters long."""
+    """``text`` starts at character ``offset`` of an artifact ``size`` characters long.
+
+    ``kind`` is ``untrusted`` for outside content, such as a web page.
+    """
 
     text: str
     offset: int
     size: int
+    kind: str = "tool_output"
 
 
 @dataclass(frozen=True, slots=True)
@@ -110,7 +114,8 @@ class Preview:
 class Tool[A: BaseModel]:
     """``read_only`` tools change nothing outside golem, so the default policy allows them.
     ``internal`` tools change only golem's own state, such as the todo list, and
-    are allowed by default too.
+    are allowed by default too. ``untrusted`` tools return outside content, such
+    as a web page, so the rest of their output stays marked as data.
 
     ``path_arg`` names the argument a rule's ``path`` is matched against, and
     ``match_arg`` the one its ``match`` is. ``subject`` computes the subject
@@ -125,6 +130,7 @@ class Tool[A: BaseModel]:
     run: Callable[[A, ToolContext], Awaitable[ToolResult]]
     read_only: bool = False
     internal: bool = False
+    untrusted: bool = False
     path_arg: str | None = None
     match_arg: str | None = None
     subject: Callable[[Mapping[str, object], Path | None], str | None] | None = None

@@ -1,6 +1,7 @@
 import { Lexer, type Token, type Tokens } from "marked";
 
 import type { ChatMessage, ToolBlock } from "./chat-state.ts";
+import { visibleText } from "./sanitize.ts";
 import { formatDuration, formatMessageTime } from "./transcript.ts";
 
 export type Span = {
@@ -164,7 +165,7 @@ export function toolLines(tool: ToolBlock, width: number, expanded: boolean): Sp
   if (tool.status === "running" && tool.output !== undefined && tool.output.length > 0) {
     const live = tool.output.replace(/\n+$/, "").split("\n");
     for (const row of live.slice(expanded ? -TOOL_PREVIEW_ROWS : -1)) {
-      lines.push(...wrapSpans([{ text: `  │ ${row}`, dim: true }], width));
+      lines.push(...wrapSpans([{ text: `  │ ${visibleText(row)}`, dim: true }], width));
     }
     return lines;
   }
@@ -174,7 +175,7 @@ export function toolLines(tool: ToolBlock, width: number, expanded: boolean): Sp
   const rows = tool.preview.split("\n");
   const shown = rows.slice(0, TOOL_PREVIEW_ROWS);
   for (const row of shown) {
-    lines.push(...wrapSpans([{ text: `  │ ${row}`, dim: true }], width));
+    lines.push(...wrapSpans([{ text: `  │ ${visibleText(row)}`, dim: true }], width));
   }
   if (rows.length > shown.length || tool.truncated === true) {
     lines.push([{ text: "  │ …", dim: true }]);

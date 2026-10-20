@@ -5,6 +5,9 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict, Field
 
 from golem.tools.registry import Tool, ToolContext, ToolError, ToolResult
+from golem.tools.untrusted import wrap
+
+UNTRUSTED_KIND = "untrusted"
 
 PAGE_CHARS = 20_000
 
@@ -27,7 +30,10 @@ async def _read_artifact(args: ReadArtifactArgs, ctx: ToolContext) -> ToolResult
         raise ToolError(f"{args.artifact_id} has {page.size} characters; offset is past the end")
     end = page.offset + len(page.text)
     more = f"\n[characters {page.offset}-{end} of {page.size}]" if end < page.size else ""
-    return ToolResult(output=f"{page.text}{more}", summary=f"{page.offset}-{end} of {page.size}")
+    output = f"{page.text}{more}"
+    if page.kind == UNTRUSTED_KIND:
+        output = wrap(output, artifact=args.artifact_id)
+    return ToolResult(output=output, summary=f"{page.offset}-{end} of {page.size}")
 
 
 READ_ARTIFACT = Tool(
@@ -41,4 +47,4 @@ READ_ARTIFACT = Tool(
     read_only=True,
 )
 
-__all__ = ["PAGE_CHARS", "READ_ARTIFACT", "ReadArtifactArgs"]
+__all__ = ["PAGE_CHARS", "READ_ARTIFACT", "UNTRUSTED_KIND", "ReadArtifactArgs"]
