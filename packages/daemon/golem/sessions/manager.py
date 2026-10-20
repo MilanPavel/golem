@@ -406,6 +406,7 @@ class SessionManager:
                 asked=pending.asked,
                 subject=pending.subject,
                 rule=rule,
+                diff=pending.diff,
             )
             control = RunControl()
             work = self._resumed(session, resume, control, pending.prompt)

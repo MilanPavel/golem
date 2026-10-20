@@ -1,6 +1,6 @@
 {
   "additionalProperties": false,
-  "description": "A tool call waits for the user. The run is paused until ``approval.respond``.\n\n``source`` is the rule that asked, such as ``built-in default``.\n``subject`` is what rules match for this tool, such as the shell command.",
+  "description": "A tool call waits for the user. The run is paused until ``approval.respond``.\n\n``source`` is the rule that asked, such as ``built-in default``.\n``subject`` is what rules match for this tool, such as the shell command.\n``diff`` is the change a file tool would make, as a unified diff, when it\nhas one. Approving the call approves that change and no other.",
   "properties": {
     "args": {
       "additionalProperties": true,
@@ -11,6 +11,18 @@
       "minLength": 1,
       "title": "Call Id",
       "type": "string"
+    },
+    "diff": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Diff"
     },
     "message_id": {
       "anyOf": [

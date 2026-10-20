@@ -167,6 +167,16 @@ test("suggestions take rows from the transcript and go away before the meter", (
   assert.equal(tight.body, 1);
 });
 
+test("the approval band replaces the suggestions and keeps its three rows longest", () => {
+  const open = frameBudget({ rows: 30, columns: 80, draft: "", busy: true, banner: false, approval: 12, suggestions: 6 });
+  assert.equal(open.approval, 12);
+  assert.equal(open.suggestions, 0);
+  assert.equal(open.header + open.body + open.meter + open.approval + open.composer + open.status, 30);
+  const tight = frameBudget({ rows: 8, columns: 80, draft: "", busy: true, banner: false, approval: 12 });
+  assert.equal(tight.approval, 3);
+  assert.equal(tight.body, 1);
+});
+
 test("banner text stays on one line", () => {
   assert.equal(bannerText("session was not found", 80), "session was not found");
   assert.equal(bannerText("abcdef", 4), "abc…");

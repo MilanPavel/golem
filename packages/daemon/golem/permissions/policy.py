@@ -259,12 +259,15 @@ def explain(decision: Decision, name: str) -> str:
 
 
 def _resolve(raw: str, root: Path | None) -> Path | None:
-    path = Path(raw).expanduser() if raw.strip() else Path()
-    if not path.is_absolute():
-        if root is None:
-            return None
-        path = root / path
-    return path.resolve()
+    try:
+        path = Path(raw).expanduser() if raw.strip() else Path()
+        if not path.is_absolute():
+            if root is None:
+                return None
+            path = root / path
+        return path.resolve()
+    except (OSError, RuntimeError, ValueError):
+        return None
 
 
 def _stamp(path: Path) -> _Stamp | None:

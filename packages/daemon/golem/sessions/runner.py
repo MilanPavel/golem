@@ -38,6 +38,7 @@ from golem.graphs.adapter import (
     translate,
 )
 from golem.graphs.chat import ChatRuntime
+from golem.graphs.tools_node import Answer
 from golem.permissions.engine import Allowance
 from golem.sessions.interrupted import close_reply
 from golem.sessions.log import SessionLog
@@ -87,7 +88,8 @@ class Resume:
 
     ``open_calls`` are the run's tool calls requested and not finished, and
     ``asked`` the ones it asked about, in order, this one included. ``rule``
-    is the rule an ``allow_always`` wrote.
+    is the rule an ``allow_always`` wrote. ``diff`` is the change the user
+    was shown, which is the only one the call may make.
     """
 
     session_id: str
@@ -102,6 +104,7 @@ class Resume:
     asked: tuple[str, ...] = ()
     subject: str | None = None
     rule: str | None = None
+    diff: str | None = None
 
 
 @dataclass
@@ -212,7 +215,7 @@ async def resume_turn(
         )
         stream = runtime.resume(
             session_id=resume.session_id,
-            decision=resume.decision,
+            answer=Answer(decision=resume.decision, diff=resume.diff),
             cwd=resume.cwd,
             allowed_tools=resume.allowed_tools,
             asked=resume.asked,
@@ -318,6 +321,7 @@ async def _apply(
                 args=fact.args,
                 source=fact.source,
                 subject=fact.subject,
+                diff=fact.diff,
             ),
         )
 

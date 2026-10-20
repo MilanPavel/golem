@@ -139,6 +139,7 @@ export type SessionId16 = string;
 export type Ts15 = string;
 export type Type15 = 'tool.failed';
 export type CallId5 = string;
+export type Diff = string | null;
 export type MessageId5 = string | null;
 export type Name1 = string;
 export type Source = string;
@@ -607,6 +608,8 @@ export interface ApprovalNeededEvent {
  *
  * ``source`` is the rule that asked, such as ``built-in default``.
  * ``subject`` is what rules match for this tool, such as the shell command.
+ * ``diff`` is the change a file tool would make, as a unified diff, when it
+ * has one. Approving the call approves that change and no other.
  *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "ApprovalNeededData".
@@ -614,6 +617,7 @@ export interface ApprovalNeededEvent {
 export interface ApprovalNeededData {
   args: Args1;
   call_id: CallId5;
+  diff?: Diff;
   message_id?: MessageId5;
   name: Name1;
   source: Source;

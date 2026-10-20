@@ -214,6 +214,8 @@ class ApprovalNeededData(BaseModel):
 
     ``source`` is the rule that asked, such as ``built-in default``.
     ``subject`` is what rules match for this tool, such as the shell command.
+    ``diff`` is the change a file tool would make, as a unified diff, when it
+    has one. Approving the call approves that change and no other.
     """
 
     model_config = _CONFIG
@@ -224,6 +226,7 @@ class ApprovalNeededData(BaseModel):
     args: dict[str, Any]
     source: str = Field(min_length=1)
     subject: str | None = None
+    diff: str | None = None
 
 
 class ApprovalResolvedData(BaseModel):

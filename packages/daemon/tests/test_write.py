@@ -121,6 +121,43 @@ async def test_the_file_mode_and_line_endings_are_kept(project: Path) -> None:
     assert sorted(p.name for p in project.iterdir()) == ["run.sh", "src"]
 
 
+@pytest.mark.parametrize("path", [".GIT/hooks/pre-commit", ".Golem/policy.toml"])
+def test_protected_folders_match_without_case(project: Path, path: str) -> None:
+    with pytest.raises(ToolError, match="which golem does not change"):
+        plan_write(project, WriteFileArgs(path=path, content="x"))
+
+
+@pytest.mark.parametrize("path", ["a\0b", "~nobody-golem-test/x"])
+def test_an_unusable_path_is_a_tool_error(project: Path, path: str) -> None:
+    with pytest.raises(ToolError):
+        plan_write(project, WriteFileArgs(path=path, content="x"))
+
+
+def test_counts_and_lines_follow_the_diff_not_its_text(project: Path) -> None:
+    (project / "q.sql").write_text("-- note\nselect 1;\n\x0cpage\n", encoding="utf-8")
+    change = plan_edit(project, EditFileArgs(path="q.sql", old_string="-- note\n", new_string=""))
+    diff = unified_diff(change)
+    assert diff_counts(diff) == (0, 1)
+    assert "No newline" not in diff
+
+
+async def test_a_new_file_gets_the_umask_mode_and_an_unchanged_write_does_nothing(
+    project: Path,
+) -> None:
+    await _call(project, "write_file", path="new.txt", content="x\n")
+    assert stat.S_IMODE((project / "new.txt").stat().st_mode) != 0o600
+    before = (project / "src" / "a.py").stat().st_mtime_ns
+    result = await _call(project, "write_file", path="src/a.py", content="x = 1\ny = 2\nx = 1\n")
+    assert result.summary == "unchanged"
+    assert (project / "src" / "a.py").stat().st_mtime_ns == before
+
+
+def test_a_crlf_file_says_why_old_string_is_missing(project: Path) -> None:
+    (project / "w.txt").write_bytes(b"one\r\ntwo\r\n")
+    with pytest.raises(ToolError, match="CRLF"):
+        plan_edit(project, EditFileArgs(path="w.txt", old_string="one\ntwo", new_string="x"))
+
+
 def test_a_missing_final_newline_is_marked(project: Path) -> None:
     change = plan_write(project, WriteFileArgs(path="src/a.py", content="x = 1"))
     assert unified_diff(change).endswith("+x = 1\n\\ No newline at end of file\n")

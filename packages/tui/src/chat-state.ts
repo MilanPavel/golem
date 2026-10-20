@@ -9,6 +9,8 @@ export type PendingApproval = {
   args: Readonly<Record<string, unknown>>;
   /** The rule that asked, such as `built-in default`. */
   source: string;
+  /** The change a file tool would make, as a unified diff. */
+  diff: string | null;
 };
 
 /** One tool call, drawn under the assistant message that asked for it. */
@@ -158,6 +160,7 @@ export function reduceChat(state: ChatState, event: ChatEvent): ChatState {
           name: event.data.name,
           args: event.data.args,
           source: event.data.source,
+          diff: event.data.diff ?? null,
         },
       };
     }

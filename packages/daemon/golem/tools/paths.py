@@ -26,10 +26,13 @@ def inside(root: Path, path: str) -> Path:
     the result is outside ``root``, including through a symlink or ``..``.
     """
     base = root.resolve()
-    candidate = Path(path).expanduser()
-    if not candidate.is_absolute():
-        candidate = base / candidate
-    resolved = candidate.resolve()
+    try:
+        candidate = Path(path).expanduser()
+        if not candidate.is_absolute():
+            candidate = base / candidate
+        resolved = candidate.resolve()
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise ToolError(f"{path!r} is not a usable path: {exc}") from exc
     if resolved != base and base not in resolved.parents:
         raise ToolError(f"{path} is outside the project folder {base}")
     return resolved
@@ -42,7 +45,10 @@ def relative(root: Path, path: Path) -> str:
 
 
 PROTECTED_DIRS = (".golem", ".git")
-"""Folders no tool writes into: the project's rules are the user's, and so is its history."""
+"""Folders no tool writes into: the project's rules are the user's, and so is its history.
+
+Matched without case, because the default macOS file system ignores it.
+"""
 
 
 def writable(root: Path, path: str) -> Path:
@@ -51,9 +57,8 @@ def writable(root: Path, path: str) -> Path:
     base = root.resolve()
     if resolved == base:
         raise ToolError(f"{path} is the project folder, not a file")
-    protected = next(
-        (part for part in resolved.relative_to(base).parts if part in PROTECTED_DIRS), None
-    )
+    parts = resolved.relative_to(base).parts
+    protected = next((part for part in parts if part.casefold() in PROTECTED_DIRS), None)
     if protected is not None:
         raise ToolError(f"{path} is inside a {protected}/ folder, which golem does not change")
     return resolved

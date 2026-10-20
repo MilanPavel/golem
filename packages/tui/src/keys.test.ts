@@ -227,3 +227,13 @@ test("while a tool call waits, a, s, d, Enter, and Esc answer it", () => {
     text: "a",
   });
 });
+
+test("a waiting change scrolls its diff with the arrows and Page keys", () => {
+  const press = (where: ReturnType<typeof place>, name: Parameters<typeof pressKey>[1]["name"]) =>
+    pressKey(where, { name, input: "", ctrl: false, meta: false });
+  const withDiff = place({ busy: true, approval: true, approvalDiff: true });
+  assert.deepEqual(press(withDiff, "down"), { kind: "scroll-diff", toward: "down", line: true });
+  assert.deepEqual(press(withDiff, "page-up"), { kind: "scroll-diff", toward: "up", line: false });
+  const without = place({ busy: true, approval: true });
+  assert.notEqual(press(without, "page-up").kind, "scroll-diff");
+});

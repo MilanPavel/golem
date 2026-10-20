@@ -31,6 +31,7 @@ from golem.graphs.tools_node import (
     ALLOWED_KEY,
     ASKED_KEY,
     CWD_KEY,
+    Answer,
     cancelled_results,
     tools_node,
     unanswered_calls,
@@ -176,12 +177,12 @@ class ChatRuntime:
         self,
         *,
         session_id: str,
-        decision: str,
+        answer: Answer,
         cwd: str | None = None,
         allowed_tools: Sequence[Allowance] = (),
         asked: Sequence[str] = (),
     ) -> AsyncGenerator[object]:
-        """Go on with a run paused on a tool approval, with the user's ``decision``.
+        """Go on with a run paused on a tool approval, with the user's ``answer``.
 
         ``asked`` are the call ids the run already asked about, this one included.
 
@@ -196,8 +197,8 @@ class ChatRuntime:
             },
             "recursion_limit": _RECURSION_LIMIT,
         }
-        answer: Command[object] = Command(resume={"decision": decision})
-        async with aclosing(self._parts(answer, config)) as parts:
+        command: Command[object] = Command(resume=answer.to_resume())
+        async with aclosing(self._parts(command, config)) as parts:
             async for part in parts:
                 yield part
 

@@ -349,7 +349,20 @@ test("approval events set and clear the waiting call", () => {
     },
   ];
   const waiting = events.reduce(reduceChat, emptyChat);
-  assert.deepEqual(waiting.approval, { callId: "c1", name: "read_file", args: { path: "x" }, source: "rule" });
+  assert.deepEqual(waiting.approval, {
+    callId: "c1",
+    name: "read_file",
+    args: { path: "x" },
+    source: "rule",
+    diff: null,
+  });
+  const withDiff = reduceChat(waiting, {
+    ...base,
+    seq: 6,
+    type: "approval.needed",
+    data: { call_id: "c1", name: "edit_file", args: { path: "x" }, source: "rule", diff: "-a\n+b\n" },
+  });
+  assert.equal(withDiff.approval?.diff, "-a\n+b\n");
   assert.equal(waiting.busy, true);
   assert.equal(waiting.messages[0]?.tools?.[0]?.status, "waiting");
 

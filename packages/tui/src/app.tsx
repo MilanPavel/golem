@@ -91,7 +91,9 @@ import {
   type SecretPrompt,
   type SecretStep,
 } from "./secret.ts";
-import { APPROVAL_ROWS, approvalLines } from "./approval.ts";
+import { APPROVAL_ROWS, approvalRows, diffLineCount } from "./approval.ts";
+import { ApprovalBand } from "./approval-band.tsx";
+import { moveDiffOffset } from "./diff-view.ts";
 import {
   closedPermissions,
   layoutPermissions,
@@ -175,6 +177,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   const [helpOpen, setHelpOpen] = useState(false);
   const [keysOpen, setKeysOpen] = useState(false);
   const [keysOffset, setKeysOffset] = useState(0);
+  const [diffScroll, setDiffScroll] = useState({ callId: "", offset: 0 });
   const [suggestDismissed, setSuggestDismissed] = useState(false);
   const [suggestPick, setSuggestPick] = useState({ draft: "", index: 0 });
   const [historyCursor, setHistoryCursor] = useState<HistoryCursor | null>(null);
@@ -261,7 +264,8 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
     busy: chat.busy && secret === null,
     banner: banner !== null && banner.length > 0,
     debug: debug.open,
-    suggestions: chat.approval !== null ? APPROVAL_ROWS : suggestMatches.length,
+    suggestions: suggestMatches.length,
+    approval: chat.approval !== null ? approvalRows(chat.approval, rows) : 0,
   });
   suggestRef.current = {
     items: suggestMatches,
@@ -269,6 +273,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
     open: budget.suggestions > 0 && suggestMatches.length > 0,
   };
   overlayFrame.current = { columns, body: budget.body };
+  const diffOffset = chat.approval !== null && diffScroll.callId === chat.approval.callId ? diffScroll.offset : 0;
   const helpText = helpOpen && !keysOpen && !switcher.open ? helpLines(COMMANDS, columns) : [];
   const helpHeight = Math.min(helpText.length, budget.body);
   const chatHeight = budget.body - helpHeight;
@@ -1175,6 +1180,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       suggestions: suggestRef.current.open,
       history: historyCursorRef.current !== null,
       approval: approvalRef.current !== null,
+      approvalDiff: approvalRef.current !== null && approvalRef.current.diff !== null,
     };
   }
 
@@ -1234,6 +1240,24 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       case "approve":
         answerApproval(effect.decision);
         return;
+      case "scroll-diff": {
+        const pending = approvalRef.current;
+        const window = Math.max(0, budget.approval - APPROVAL_ROWS);
+        if (pending !== null) {
+          const total = diffLineCount(pending);
+          setDiffScroll((current) => ({
+            callId: pending.callId,
+            offset: moveDiffOffset(
+              current.callId === pending.callId ? current.offset : 0,
+              effect.toward,
+              effect.line,
+              total,
+              window,
+            ),
+          }));
+        }
+        return;
+      }
       case "toggle-tools":
         setToolOutput((shown) => {
           const next = !shown;
@@ -1543,16 +1567,8 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
           )}
         </Text>
       ) : null}
-      {budget.suggestions > 0 && chat.approval !== null ? (
-        <Box flexDirection="column" width={columns} height={budget.suggestions} flexShrink={0} overflow="hidden">
-          {approvalLines(chat.approval, columns)
-            .slice(0, budget.suggestions)
-            .map((line, index) => (
-              <Text key={index} bold={line.bold === true} dimColor={line.dim === true} color={index === 0 ? "yellow" : undefined} wrap="truncate-end">
-                {line.text}
-              </Text>
-            ))}
-        </Box>
+      {budget.approval > 0 && chat.approval !== null ? (
+        <ApprovalBand approval={chat.approval} columns={columns} height={budget.approval} offset={diffOffset} />
       ) : budget.suggestions > 0 ? (
         <SuggestionBand
           items={suggestMatches}

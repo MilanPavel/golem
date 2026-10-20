@@ -37,7 +37,7 @@ from golem.graphs.adapter import APPROVAL_KIND, STREAM_KEY
 from golem.graphs.state import AgentState
 from golem.permissions.engine import Allowance, session_allows
 from golem.permissions.policy import Policy, describe, explain
-from golem.tools.registry import ToolContext, ToolError, ToolRegistry
+from golem.tools.registry import Preview, ToolContext, ToolError, ToolRegistry
 
 log = logging.getLogger("golem.graphs")
 
@@ -59,8 +59,36 @@ CHANGED_RESULT = "the rules changed while the run waited, so this call did not r
 
 @dataclass(frozen=True, slots=True)
 class _Verdict:
+    """Whether a call runs. ``approved_diff`` is the change the user approved for it."""
+
     run: bool
     message: str = ""
+    approved_diff: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class Answer:
+    """The user's answer to one approval, as the interrupt gets it back.
+
+    ``diff`` is the change the user was shown, read from ``approval.needed``.
+    """
+
+    decision: str
+    diff: str | None = None
+
+    def to_resume(self) -> dict[str, object]:
+        return {"decision": self.decision, "diff": self.diff}
+
+    @staticmethod
+    def parse(raw: object) -> Answer:
+        if not isinstance(raw, dict):
+            return Answer(decision="deny")
+        value = cast(dict[str, object], raw)
+        decision, diff = value.get("decision"), value.get("diff")
+        return Answer(
+            decision=decision if isinstance(decision, str) else "deny",
+            diff=diff if isinstance(diff, str) else None,
+        )
 
 
 def tools_node(
@@ -78,19 +106,24 @@ def tools_node(
         last_asked = max(
             (index for index, call_id in enumerate(ids) if call_id in asked), default=-1
         )
-        verdicts = [
-            _decide(
+        planned: dict[Path, str] = {}
+        verdicts: list[_Verdict] = []
+        for index, call in enumerate(last.tool_calls):
+            preview = await _preview(registry, call, replace(base, planned=dict(planned)))
+            verdict = _decide(
                 registry,
                 policy,
                 call,
                 base,
                 allowed,
                 last.id,
+                preview,
                 asked=ids[index] in asked,
                 before_last_asked=index < last_asked,
             )
-            for index, call in enumerate(last.tool_calls)
-        ]
+            if verdict.run and isinstance(preview, Preview):
+                planned[preview.path] = preview.after
+            verdicts.append(verdict)
         write = get_stream_writer()
         results: list[BaseMessage] = []
         for call, verdict in zip(last.tool_calls, verdicts, strict=True):
@@ -102,7 +135,9 @@ def tools_node(
                 )
                 continue
             write({STREAM_KEY: "tool.started", "call_id": call_id})
-            ctx = replace(base, output=_streamer(write, call_id))
+            ctx = replace(
+                base, output=_streamer(write, call_id), approved_diff=verdict.approved_diff
+            )
             try:
                 result = await registry.call(call["name"], call["args"], ctx)
             except ToolError as exc:
@@ -139,10 +174,12 @@ def _decide(
     ctx: ToolContext,
     allowed: set[Allowance],
     message_id: str | None,
+    preview: Preview | str | None,
     *,
     asked: bool,
     before_last_asked: bool,
 ) -> _Verdict:
+    """``preview`` is what the call would change, or why it cannot, or None."""
     name = call["name"]
     subject = describe(registry, name, call["args"], ctx.root).subject
     decision = policy.check(registry, name, call["args"], ctx.root)
@@ -156,24 +193,38 @@ def _decide(
             return _Verdict(run=True)
         if before_last_asked:
             return _Verdict(run=False, message=CHANGED_RESULT)
-    answer = interrupt(
-        {
-            STREAM_KEY: APPROVAL_KIND,
-            "call_id": call_id_of(call),
-            "message_id": message_id,
-            "name": name,
-            "args": dict(call["args"]),
-            "source": decision.source,
-            "subject": subject,
-        }
+        if isinstance(preview, str):
+            return _Verdict(run=False, message=preview)
+    answer = Answer.parse(
+        interrupt(
+            {
+                STREAM_KEY: APPROVAL_KIND,
+                "call_id": call_id_of(call),
+                "message_id": message_id,
+                "name": name,
+                "args": dict(call["args"]),
+                "source": decision.source,
+                "subject": subject,
+                "diff": preview.diff if isinstance(preview, Preview) else None,
+            }
+        )
     )
-    choice = cast(dict[str, object], answer).get("decision") if isinstance(answer, dict) else None
-    if choice == "allow_session":
+    if answer.decision == "allow_session":
         allowed.add((name, subject))
-        return _Verdict(run=True)
-    if choice in ("allow", "allow_always"):
-        return _Verdict(run=True)
+        return _Verdict(run=True, approved_diff=answer.diff)
+    if answer.decision in ("allow", "allow_always"):
+        return _Verdict(run=True, approved_diff=answer.diff)
     return _Verdict(run=False, message=DENIED_RESULT)
+
+
+async def _preview(
+    registry: ToolRegistry, call: ToolCall, ctx: ToolContext
+) -> Preview | str | None:
+    """What ``call`` would change, the reason it cannot run, or None for a tool without one."""
+    try:
+        return await registry.preview(call["name"], call["args"], ctx)
+    except ToolError as exc:
+        return str(exc) or type(exc).__name__
 
 
 def call_id_of(call: ToolCall) -> str:
@@ -256,6 +307,7 @@ __all__ = [
     "CWD_KEY",
     "DENIED_RESULT",
     "PREVIEW_CHARS",
+    "Answer",
     "call_id_of",
     "cancelled_results",
     "tools_node",

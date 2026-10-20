@@ -26,6 +26,7 @@ class Pending:
     name: str
     args: dict[str, object]
     subject: str | None
+    diff: str | None
     user_message_id: str | None
     prompt: str | None
     open_calls: tuple[str, ...]
@@ -54,6 +55,7 @@ def pending_approval(events: list[ChatEvent]) -> Pending | None:
         name=waiting.data.name,
         args=dict(waiting.data.args),
         subject=waiting.data.subject,
+        diff=waiting.data.diff,
         user_message_id=turn.user_message_id,
         prompt=prompt,
         open_calls=tuple(turn.open_calls),

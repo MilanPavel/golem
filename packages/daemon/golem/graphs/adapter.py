@@ -85,6 +85,7 @@ class ApprovalAsked:
     source: str
     message_id: str | None = None
     subject: str | None = None
+    diff: str | None = None
 
 
 Fact = (
@@ -240,6 +241,7 @@ def _approval(paused: object) -> ApprovalAsked | None:
         args = raw.get("args")
         message_id = raw.get("message_id")
         subject = raw.get("subject")
+        diff = raw.get("diff")
         return ApprovalAsked(
             call_id=call_id,
             name=name,
@@ -247,6 +249,7 @@ def _approval(paused: object) -> ApprovalAsked | None:
             source=source,
             message_id=message_id if isinstance(message_id, str) else None,
             subject=subject if isinstance(subject, str) else None,
+            diff=diff if isinstance(diff, str) else None,
         )
     return None
 

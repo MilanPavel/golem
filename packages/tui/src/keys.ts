@@ -80,6 +80,8 @@ export type KeyPlace = {
   history: boolean;
   /** The run waits for an answer about a tool call. */
   approval?: boolean;
+  /** That call comes with a diff, which the arrows and Page keys scroll. */
+  approvalDiff?: boolean;
 };
 
 export type ScrollToward = "up" | "down" | "start" | "end";
@@ -101,6 +103,7 @@ export type KeyEffect =
   | { kind: "edit-external" }
   | { kind: "toggle-tools" }
   | { kind: "approve"; decision: "allow" | "allow_session" | "allow_always" | "deny" }
+  | { kind: "scroll-diff"; toward: ScrollToward; line: boolean }
   | { kind: "insert"; text: string }
   | { kind: "ignore" };
 
@@ -119,6 +122,7 @@ type KeyWhen = {
   suggestions?: boolean;
   history?: boolean;
   approval?: boolean;
+  approvalDiff?: boolean;
 };
 
 export type KeyBinding = {
@@ -439,7 +443,26 @@ function approvalKeys(): KeyBinding[] {
     when: { ...press, overlay: false, switcher: false, approval: true },
     run: () => ({ kind: "approve", decision }),
   });
+  const scroll = (
+    id: string,
+    label: string,
+    description: string,
+    name: PressName,
+    toward: ScrollToward,
+    line: boolean,
+  ): KeyBinding => ({
+    id,
+    label,
+    contexts: ["approval"],
+    description,
+    when: { name, overlay: false, switcher: false, approval: true, approvalDiff: true },
+    run: () => ({ kind: "scroll-diff", toward, line }),
+  });
   return [
+    scroll("diff-line-up", "Up", "Scrolls the diff of the waiting change up a line.", "up", "up", true),
+    scroll("diff-line-down", "Down", "Scrolls the diff down a line.", "down", "down", true),
+    scroll("diff-page-up", "Page Up", "Scrolls the diff up a page.", "page-up", "up", false),
+    scroll("diff-page-down", "Page Down", "Scrolls the diff down a page.", "page-down", "down", false),
     answer("approve-once", "a", "Allows the waiting tool call once. Enter does the same.", { input: "a" }, "allow"),
     answer("approve-enter", "Enter", "Allows the waiting tool call once.", { name: "return" }, "allow"),
     answer(
@@ -697,6 +720,9 @@ function whenMatches(when: KeyWhen, place: KeyPlace, press: Press): boolean {
     return false;
   }
   if (when.approval !== undefined && when.approval !== (place.approval === true)) {
+    return false;
+  }
+  if (when.approvalDiff !== undefined && when.approvalDiff !== (place.approvalDiff === true)) {
     return false;
   }
   if (when.draftEmpty !== undefined && when.draftEmpty !== place.draftEmpty) {

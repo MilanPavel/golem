@@ -18,7 +18,8 @@ An Architecture Decision Record (ADR) is a short note of one choice: what was de
 | [012](012-permission-rules.md) | Tool rules: first match wins, and a project cannot allow itself | accepted | 2026-10-19 |
 | [013](013-approvals.md) | An approval is an interrupt, and the waiting run has no task | accepted | 2026-10-19 |
 | [014](014-shell-sandbox.md) | The shell runs under sandbox-exec, or not at all | accepted | 2026-10-19 |
+| [015](015-write-tools.md) | A file change is planned, shown as a diff, and applied only as shown | accepted | 2026-10-20 |
 
 How the running code fits together is in [../architecture.md](../architecture.md).
 
-New records use [template.md](template.md). Number the next file `015-….md` and add a row here.
+New records use [template.md](template.md). Number the next file `016-….md` and add a row here.
