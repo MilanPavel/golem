@@ -20,7 +20,7 @@ test("the approval band names the call, the rule, and the keys", () => {
     [
       "Allow read_file notes.txt?",
       "asked by ~/.golem/config.toml rule 1",
-      "a once · s this session · w always (saves a rule) · d deny",
+      "a once · s this session · w always (saves a rule) · e edit · d deny",
     ],
   );
   const narrow = approvalLines(pending({ name: "grep", args: { pattern: "x".repeat(50) } }), 20);

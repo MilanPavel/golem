@@ -22,6 +22,7 @@ from golem.server.dispatcher import (
     APPROVAL_NOT_FOUND,
     INTERNAL_ERROR,
     INVALID_PARAMS,
+    INVALID_TOOL_ARGS,
     KEYCHAIN_UNAVAILABLE,
     MESSAGE_NOT_FOUND,
     MODEL_NOT_CONFIGURED,
@@ -37,6 +38,7 @@ from golem.server.dispatcher import (
 from golem.sessions.manager import (
     ApprovalNotFoundError,
     BlankTitleError,
+    InvalidToolArgsError,
     MessageNotFoundError,
     RuleWriteError,
     RunNotFoundError,
@@ -250,9 +252,13 @@ async def _approval_respond(
 ) -> ApprovalRespondResult:
     sessions = _sessions(ctx)
     try:
-        run_id = await sessions.respond(params.session_id, params.call_id, params.decision)
+        run_id = await sessions.respond(
+            params.session_id, params.call_id, params.decision, params.args
+        )
     except ApprovalNotFoundError as exc:
         raise RpcCallError(APPROVAL_NOT_FOUND, "no run waits on this tool call") from exc
+    except InvalidToolArgsError as exc:
+        raise RpcCallError(INVALID_TOOL_ARGS, str(exc)) from exc
     except RuleWriteError as exc:
         raise RpcCallError(INTERNAL_ERROR, f"could not write the rule: {exc}") from exc
     except SessionNotFoundError as exc:

@@ -33,6 +33,15 @@ flowchart LR
 - **Result.** `tool.completed` has `+N -M <path>` as its summary and the diff as its preview, so Ctrl-O shows it.
 - **The screen.** The approval band shows the diff between the question and the rule, coloured by line, with at most half the screen. Up and Down move it a line and Page Up and Page Down a page.
 
+## Edited arguments
+
+Any approval, not only a file change, can be answered with edited arguments. `e` in the approval band opens the call's arguments as JSON in the composer's place. Enter sends `approval.respond` with `decision: "allow"` and `args`; Esc goes back to the question.
+
+- **Once only.** `args` goes only with `allow`. An edited call is not one you have seen before, so it does not become a session allowance or a rule.
+- **Checked before the run goes on.** The daemon validates the arguments against the tool's model and checks the rules again with them. Invalid arguments, or a rule that denies the edited call, are error `-32011` with the reason, and the run keeps waiting, so the editor stays open with the message.
+- **What ran is on record.** `approval.resolved` carries `args`, so a replay shows the edited call. The model's own reply keeps the arguments it asked for, so its tool result starts with `note: the user edited the arguments before it ran: {...}`.
+- **No diff check.** You approved the arguments you typed, not the diff shown for the old ones, so an edited file change is applied as planned when it runs. A later edit of the same file in the same reply is planned on top of the edited one.
+
 ## Other shapes that lost
 
 **Show the arguments, not a diff.** An `edit_file` call's `old_string` and `new_string` do not say where in the file the change lands, or whether `replace_all` touches ten places.
@@ -40,6 +49,8 @@ flowchart LR
 **Apply what the call asks for, whatever the file holds now.** An approval can wait for hours. A file edited in that time would get a change you never saw.
 
 **Hash the file instead of comparing diffs.** It would refuse a second edit of a file in the same reply, because the first one changed it. Comparing the diff against the planned text of the earlier calls lets both run.
+
+**Edit arguments in `$EDITOR`.** Ctrl-G already opens a draft there, but an approval is a small fix to a short JSON object, and leaving the screen for it loses the question and its diff.
 
 **Write tools inside the sandbox.** The sandbox exists to contain a shell command. A write tool's only effect is one checked path, and a `sandbox-exec` process per edit would add a dependency for no gain.
 

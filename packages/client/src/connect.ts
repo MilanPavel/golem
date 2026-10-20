@@ -72,6 +72,7 @@ export const MESSAGE_NOT_FOUND = -32007;
 export const KEYCHAIN_UNAVAILABLE = -32008;
 export const MODEL_PULL_FAILED = -32009;
 export const APPROVAL_NOT_FOUND = -32010;
+export const INVALID_TOOL_ARGS = -32011;
 
 export type { ChatEvent, SessionSummary };
 const DEFAULT_HEARTBEAT_MS = 5_000;
@@ -153,7 +154,13 @@ export interface GolemClient {
   /** Resolved settings, and the tool rules for `cwd` in the order they are checked. */
   getConfig(cwd?: string, sessionId?: string): Promise<ConfigGetResult>;
   /** Answer the tool call the session's run waits on. The run goes on in the daemon. */
-  respondApproval(sessionId: string, callId: string, decision: ApprovalChoice): Promise<ApprovalRespondResult>;
+  /** `args` are the call's arguments as the user edited them. They go only with `allow`. */
+  respondApproval(
+    sessionId: string,
+    callId: string,
+    decision: ApprovalChoice,
+    args?: Readonly<Record<string, unknown>>,
+  ): Promise<ApprovalRespondResult>;
   /** Set the action of rule `index` in the user's or the project's file. `cwd` names the project. */
   updateRule(
     target: "user" | "project",
@@ -730,9 +737,15 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       }
       return result["revoked"];
     },
-    async respondApproval(sessionId: string, callId: string, decision: ApprovalChoice): Promise<ApprovalRespondResult> {
+    async respondApproval(
+      sessionId: string,
+      callId: string,
+      decision: ApprovalChoice,
+      args?: Readonly<Record<string, unknown>>,
+    ): Promise<ApprovalRespondResult> {
       await ready;
-      const result = await call("approval.respond", { session_id: sessionId, call_id: callId, decision });
+      const params = { session_id: sessionId, call_id: callId, decision, ...(args === undefined ? {} : { args }) };
+      const result = await call("approval.respond", params);
       if (!isRecord(result) || typeof result["run_id"] !== "string") {
         throw new Error("invalid approval.respond result");
       }

@@ -149,6 +149,9 @@ export type Seq16 = number;
 export type SessionId17 = string;
 export type Ts16 = string;
 export type Type16 = 'approval.needed';
+export type Args2 = {
+  [k: string]: unknown;
+} | null;
 export type CallId6 = string;
 export type Decision = 'allow' | 'allow_session' | 'allow_always' | 'deny';
 export type Name2 = string;
@@ -645,12 +648,14 @@ export interface ApprovalResolvedEvent {
  *
  * ``allow_session`` also allows ``name`` with this ``subject`` for the rest of
  * the session, or every call of ``name`` when ``subject`` is null.
- * ``allow_always`` wrote an allow rule, and ``rule`` names it.
+ * ``allow_always`` wrote an allow rule, and ``rule`` names it. ``args`` are
+ * the arguments the user edited the call to, when they did.
  *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "ApprovalResolvedData".
  */
 export interface ApprovalResolvedData {
+  args?: Args2;
   call_id: CallId6;
   decision: Decision;
   name: Name2;

@@ -82,9 +82,14 @@ export type KeyPlace = {
   approval?: boolean;
   /** That call comes with a diff, which the arrows and Page keys scroll. */
   approvalDiff?: boolean;
+  /** Its arguments are open in the editor. */
+  approvalEdit?: boolean;
 };
 
 export type ScrollToward = "up" | "down" | "start" | "end";
+
+/** A key while the waiting call's arguments are open in the editor. */
+export type ArgsKey = { kind: "edit"; op: EditOp } | { kind: "insert"; text: string } | { kind: "submit" } | { kind: "cancel" };
 
 export type KeyEffect =
   | { kind: "cancel" }
@@ -104,6 +109,8 @@ export type KeyEffect =
   | { kind: "toggle-tools" }
   | { kind: "approve"; decision: "allow" | "allow_session" | "allow_always" | "deny" }
   | { kind: "scroll-diff"; toward: ScrollToward; line: boolean }
+  | { kind: "edit-args" }
+  | { kind: "args"; key: ArgsKey }
   | { kind: "insert"; text: string }
   | { kind: "ignore" };
 
@@ -123,6 +130,7 @@ type KeyWhen = {
   history?: boolean;
   approval?: boolean;
   approvalDiff?: boolean;
+  approvalEdit?: boolean;
 };
 
 export type KeyBinding = {
@@ -186,6 +194,7 @@ export const KEYS: readonly KeyBinding[] = [
     when: { name: "question", overlay: true },
     run: () => ({ kind: "close-overlay" }),
   },
+  ...argsEditKeys(),
   ...approvalKeys(),
   {
     id: "suggest-up",
@@ -440,7 +449,7 @@ function approvalKeys(): KeyBinding[] {
     label,
     contexts: ["approval"],
     description,
-    when: { ...press, overlay: false, switcher: false, approval: true },
+    when: { ...press, overlay: false, switcher: false, approval: true, approvalEdit: false },
     run: () => ({ kind: "approve", decision }),
   });
   const scroll = (
@@ -455,7 +464,7 @@ function approvalKeys(): KeyBinding[] {
     label,
     contexts: ["approval"],
     description,
-    when: { name, overlay: false, switcher: false, approval: true, approvalDiff: true },
+    when: { name, overlay: false, switcher: false, approval: true, approvalDiff: true, approvalEdit: false },
     run: () => ({ kind: "scroll-diff", toward, line }),
   });
   return [
@@ -480,7 +489,30 @@ function approvalKeys(): KeyBinding[] {
       "allow_always",
     ),
     answer("deny", "d", "Denies the waiting tool call. Esc does the same.", { input: "d" }, "deny"),
+    {
+      id: "approve-edit",
+      label: "e",
+      contexts: ["approval"],
+      description: "Opens the call's arguments as JSON to edit, then allow once.",
+      when: { input: "e", overlay: false, switcher: false, approval: true, approvalEdit: false },
+      run: () => ({ kind: "edit-args" }),
+    },
     answer("deny-esc", "Esc", "Denies the waiting tool call.", { name: "escape" }, "deny"),
+  ];
+}
+
+function argsEditKeys(): KeyBinding[] {
+  const key = (id: string, label: string, description: string, name: PressName, run: ArgsKey): KeyBinding => ({
+    id,
+    label,
+    contexts: ["approval"],
+    description,
+    when: { name, overlay: false, switcher: false, approval: true, approvalEdit: true },
+    run: () => ({ kind: "args", key: run }),
+  });
+  return [
+    key("args-submit", "Enter", "While editing arguments, allows the call once with them.", "return", { kind: "submit" }),
+    key("args-cancel", "Esc", "While editing arguments, goes back to the question.", "escape", { kind: "cancel" }),
   ];
 }
 
@@ -526,6 +558,8 @@ function editKeys(): KeyBinding[] {
   ];
 }
 
+const EDIT_KEYS = editKeys();
+
 export type OverlayLine = {
   text: string;
   dim: boolean;
@@ -567,6 +601,9 @@ export function pressKey(place: KeyPlace, press: Press): KeyEffect {
   ) {
     return { kind: "switcher", key: { kind: "type", text: press.input } };
   }
+  if (place.approvalEdit === true && !place.overlay) {
+    return argsPress(place, press);
+  }
   if (
     press.input.length > 0 &&
     !press.ctrl &&
@@ -577,6 +614,19 @@ export function pressKey(place: KeyPlace, press: Press): KeyEffect {
     !place.switcher
   ) {
     return { kind: "insert", text: press.input };
+  }
+  return { kind: "ignore" };
+}
+
+/** The composer's edit keys, applied to the arguments open in the editor. */
+function argsPress(place: KeyPlace, press: Press): KeyEffect {
+  const editing = { ...place, busy: false, connected: true };
+  const effect = EDIT_KEYS.find((key) => whenMatches(key.when, editing, press))?.run(editing);
+  if (effect?.kind === "edit") {
+    return { kind: "args", key: { kind: "edit", op: effect.op } };
+  }
+  if (press.input.length > 0 && !press.ctrl && !press.meta && press.name === null) {
+    return { kind: "args", key: { kind: "insert", text: press.input } };
   }
   return { kind: "ignore" };
 }
@@ -723,6 +773,9 @@ function whenMatches(when: KeyWhen, place: KeyPlace, press: Press): boolean {
     return false;
   }
   if (when.approvalDiff !== undefined && when.approvalDiff !== (place.approvalDiff === true)) {
+    return false;
+  }
+  if (when.approvalEdit !== undefined && when.approvalEdit !== (place.approvalEdit === true)) {
     return false;
   }
   if (when.draftEmpty !== undefined && when.draftEmpty !== place.draftEmpty) {

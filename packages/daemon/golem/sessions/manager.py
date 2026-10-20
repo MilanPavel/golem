@@ -21,6 +21,7 @@ from golem.graphs.chat import ChatRuntime
 from golem.graphs.state import SCHEMA_VERSION
 from golem.models.router import ModelIdentity, ModelRouter
 from golem.permissions.engine import Allowance
+from golem.permissions.policy import explain
 from golem.sessions.approvals import pending_approval
 from golem.sessions.bus import EventTarget, SummaryTarget
 from golem.sessions.ids import new_id
@@ -36,6 +37,7 @@ from golem.sessions.runner import (
 )
 from golem.sessions.titles import TitleGenerator, choose_title, clean_title, fork_title
 from golem.store.records import RunRecords, SessionActivity, SessionRecords
+from golem.tools.registry import ToolError
 from golem_protocol.events import (
     ApprovalDecision,
     ChatEvent,
@@ -68,6 +70,10 @@ class ApprovalNotFoundError(Exception):
 
 class RuleWriteError(Exception):
     """An "always allow" answer could not write its rule."""
+
+
+class InvalidToolArgsError(Exception):
+    """Edited arguments that the tool does not accept, or that a rule denies."""
 
 
 class BlankTitleError(Exception):
@@ -362,17 +368,25 @@ class SessionManager:
             await self._start(session, turn.run_id, control, self._turn(session, turn, control))
             return turn.run_id
 
-    async def respond(self, session_id: str, call_id: str, decision: ApprovalDecision) -> str:
+    async def respond(
+        self,
+        session_id: str,
+        call_id: str,
+        decision: ApprovalDecision,
+        args: dict[str, object] | None = None,
+    ) -> str:
         """Answer the tool call ``session_id``'s run waits on, and go on with that run.
 
         Returns the run's id once ``approval.resolved`` is in the log.
 
         ``allow_always`` writes an allow rule for exactly this call first in
-        the user's ``config.toml`` before the run goes on.
+        the user's ``config.toml`` before the run goes on. ``args`` are the
+        call's arguments as the user edited them, with ``allow``: the tool must
+        accept them, and no rule may deny the edited call.
 
         Raises :class:`ApprovalNotFoundError`, :class:`SessionNotFoundError`,
-        :class:`SessionBusyError`, :class:`RuleWriteError`, or
-        :class:`SchemaMismatchError`.
+        :class:`SessionBusyError`, :class:`RuleWriteError`,
+        :class:`InvalidToolArgsError`, or :class:`SchemaMismatchError`.
         """
         async with self._lock:
             session = await self._resolve(session_id)
@@ -388,6 +402,8 @@ class SessionManager:
             pending = pending_approval(await self._events.for_run(run.run_id))
             if pending is None or pending.call_id != call_id:
                 raise ApprovalNotFoundError(call_id)
+            if args is not None:
+                self._check_edited(session, pending.name, decision, args)
             rule: str | None = None
             if decision == "allow_always":
                 rule = await self._remember(session, pending.name, pending.args)
@@ -407,6 +423,7 @@ class SessionManager:
                 subject=pending.subject,
                 rule=rule,
                 diff=pending.diff,
+                args=args,
             )
             control = RunControl()
             work = self._resumed(session, resume, control, pending.prompt)
@@ -438,6 +455,21 @@ class SessionManager:
                 session_id, None, "session.updated", SessionUpdatedData(allowed_tools=left)
             )
             return True
+
+    def _check_edited(
+        self, session: _LiveSession, name: str, decision: ApprovalDecision, args: dict[str, object]
+    ) -> None:
+        if decision != "allow":
+            raise InvalidToolArgsError("edited arguments run once, so the answer must be allow")
+        root = None if session.cwd is None else Path(session.cwd)
+        tools, policy = self._runtime.tools, self._runtime.policy
+        try:
+            tools.validate(name, args)
+        except ToolError as exc:
+            raise InvalidToolArgsError(str(exc)) from exc
+        verdict = policy.check(tools, name, args, root)
+        if verdict.action == "deny":
+            raise InvalidToolArgsError(explain(verdict, name))
 
     async def _remember(self, session: _LiveSession, name: str, args: dict[str, object]) -> str:
         root = None if session.cwd is None else Path(session.cwd)
@@ -645,6 +677,7 @@ def _report(task: asyncio.Task[None], message: str) -> None:
 __all__ = [
     "ApprovalNotFoundError",
     "BlankTitleError",
+    "InvalidToolArgsError",
     "MessageNotFoundError",
     "RuleWriteError",
     "RunNotFoundError",

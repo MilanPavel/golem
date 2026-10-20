@@ -7,22 +7,29 @@ from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any
 
+import pytest
 from fakes import ToolCallingChatModel
+from langchain_core.messages import ToolMessage
 from langgraph.checkpoint.memory import InMemorySaver
+from pydantic import BaseModel
 
 from golem.graphs.chat import open_chat
 from golem.models.router import ModelRouter
 from golem.permissions.policy import Policy
 from golem.sessions.bus import EventBus
 from golem.sessions.log import SessionLog
-from golem.sessions.manager import SessionManager
+from golem.sessions.manager import InvalidToolArgsError, SessionManager
 from golem.store.database import Database
 from golem.store.events import EventLog
 from golem.store.records import RunRecords, SessionRecords
 from golem.tools import default_registry
-from golem.tools.write import CHANGED_SINCE_APPROVAL
+from golem.tools.fs import READ_FILE
+from golem.tools.paths import session_root
+from golem.tools.registry import Tool, ToolContext, ToolRegistry, ToolResult
+from golem.tools.write import CHANGED_SINCE_APPROVAL, EDIT_FILE
 from golem_protocol.events import (
     ApprovalNeededEvent,
+    ApprovalResolvedEvent,
     ChatEvent,
     ToolCompletedEvent,
     ToolFailedEvent,
@@ -32,11 +39,18 @@ Reply = str | list[tuple[str, dict[str, Any]]]
 
 
 class _Chat:
-    def __init__(self, database: Database, replies: list[Reply], home: Path) -> None:
+    def __init__(
+        self,
+        database: Database,
+        replies: list[Reply],
+        home: Path,
+        registry: ToolRegistry | None = None,
+    ) -> None:
+        self.model = ToolCallingChatModel(replies=replies)
         runtime = open_chat(
-            ModelRouter(model=ToolCallingChatModel(replies=replies)),
+            ModelRouter(model=self.model),
             InMemorySaver(),
-            default_registry(),
+            registry or default_registry(),
             Policy(None, home=home),
         )
         self.events = EventLog(database)
@@ -150,3 +164,83 @@ async def test_an_edit_that_cannot_apply_fails_without_asking(
     assert _needed(events) == []
     failed = [event for event in events if isinstance(event, ToolFailedEvent)]
     assert "old_string is not in a.py" in failed[0].data.message
+
+
+async def test_edited_arguments_run_once_and_the_model_is_told(
+    database: Database, tmp_path: Path
+) -> None:
+    project = _project(tmp_path)
+    chat = _Chat(database, [[_edit("two", "2")], "done"], tmp_path)
+    session_id = await chat.manager.create(None, cwd=str(project))
+    run_id = await chat.manager.send(session_id, "fix two")
+    asked = _needed(await chat.settled(run_id))[0].data
+
+    edited: dict[str, object] = {"path": "a.py", "old_string": "two", "new_string": "TWO"}
+    await chat.manager.respond(session_id, asked.call_id, "allow", edited)
+    events = await chat.settled(run_id)
+
+    assert (project / "a.py").read_text(encoding="utf-8") == "one\nTWO\nthree\n"
+    resolved = [event for event in events if isinstance(event, ApprovalResolvedEvent)]
+    assert resolved[0].data.args == edited
+    result = chat.model.seen[1][-1]
+    assert isinstance(result, ToolMessage)
+    assert result.text.startswith("note: the user edited the arguments before it ran: ")
+    assert '"new_string": "TWO"' in result.text
+
+
+@pytest.mark.parametrize(
+    ("decision", "args", "error"),
+    [
+        ("allow", {"path": "a.py"}, "invalid arguments for edit_file"),
+        ("allow_session", {"path": "a.py", "old_string": "a", "new_string": "b"}, "run once"),
+    ],
+)
+async def test_edited_arguments_the_tool_refuses_keep_the_run_waiting(
+    database: Database, tmp_path: Path, decision: str, args: dict[str, Any], error: str
+) -> None:
+    project = _project(tmp_path)
+    chat = _Chat(database, [[_edit("two", "2")], "done"], tmp_path)
+    session_id = await chat.manager.create(None, cwd=str(project))
+    run_id = await chat.manager.send(session_id, "fix two")
+    asked = _needed(await chat.settled(run_id))[0].data
+
+    with pytest.raises(InvalidToolArgsError, match=error):
+        await chat.manager.respond(session_id, asked.call_id, decision, args)  # type: ignore[arg-type]
+    run = await chat.runs.get(run_id)
+    assert run is not None and run.status == "waiting"
+
+
+class _NoArgs(BaseModel):
+    pass
+
+
+async def _run_tests(args: _NoArgs, ctx: ToolContext) -> ToolResult:
+    del args
+    source = (session_root(ctx) / "calc.py").read_text(encoding="utf-8")
+    passed = "return a + b" in source
+    return ToolResult(output="1 passed" if passed else "1 failed: add(1, 2) == -1", summary="ran")
+
+
+async def test_fixing_a_failing_test_runs_edits_and_runs_again(
+    database: Database, tmp_path: Path
+) -> None:
+    project = tmp_path / "project"
+    project.mkdir()
+    (project / "calc.py").write_text("def add(a, b):\n    return a - b\n", encoding="utf-8")
+    tests = Tool(name="run_tests", description="", args=_NoArgs, run=_run_tests, read_only=True)
+    registry = ToolRegistry([READ_FILE, EDIT_FILE, tests])
+    fix = ("edit_file", {"path": "calc.py", "old_string": "a - b", "new_string": "a + b"})
+    replies: list[Reply] = [[("run_tests", {})], [fix], [("run_tests", {})], "fixed"]
+    chat = _Chat(database, replies, tmp_path, registry)
+    session_id = await chat.manager.create(None, cwd=str(project))
+    run_id = await chat.manager.send(session_id, "fix the failing test")
+
+    asked = _needed(await chat.settled(run_id))[0].data
+    assert asked.name == "edit_file"
+    await chat.manager.respond(session_id, asked.call_id, "allow")
+    events = await chat.settled(run_id)
+
+    outputs = [event.data.preview for event in events if isinstance(event, ToolCompletedEvent)]
+    assert outputs[0].startswith("1 failed")
+    assert outputs[-1] == "1 passed"
+    assert events[-1].type == "run.completed"

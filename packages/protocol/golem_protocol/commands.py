@@ -3,9 +3,9 @@
 ``Ping`` in :mod:`golem_protocol.events` is the result of ``ping``.
 """
 
-from typing import Literal
+from typing import Any, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, SecretStr
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
 
 
 class HelloParams(BaseModel):
@@ -693,6 +693,9 @@ class ApprovalRespondParams(BaseModel):
     for the rest of the session, ``allow_always`` runs it and writes an allow
     rule for it first in the user's ``config.toml``, and ``deny`` tells the
     model it may not.
+
+    ``args`` replaces the call's arguments, edited by the user, and goes only
+    with ``allow``: an edited call runs once.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -700,6 +703,13 @@ class ApprovalRespondParams(BaseModel):
     session_id: str = Field(min_length=1)
     call_id: str = Field(min_length=1)
     decision: Literal["allow", "allow_session", "allow_always", "deny"]
+    args: dict[str, Any] | None = None
+
+    @model_validator(mode="after")
+    def _edited_runs_once(self) -> Self:
+        if self.args is not None and self.decision != "allow":
+            raise ValueError("edited args go only with decision allow")
+        return self
 
 
 class ApprovalRespondResult(BaseModel):

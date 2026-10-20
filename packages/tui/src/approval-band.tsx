@@ -1,24 +1,28 @@
 import { Box, Text } from "ink";
 
 import { type ApprovalLine, approvalLines } from "./approval.ts";
+import { type ArgsEdit, argsEditLines } from "./approval-edit.ts";
 import type { PendingApproval } from "./chat-state.ts";
 import { DIFF_ADD, DIFF_DEL, DIFF_HUNK } from "./theme.ts";
 
 /** The waiting tool call above the composer, with its diff when it changes a file. */
 export function ApprovalBand({
   approval,
+  edit,
   columns,
   height,
   offset,
 }: {
   approval: PendingApproval;
+  /** The call's arguments open in the editor, which replaces the diff. */
+  edit: ArgsEdit | null;
   columns: number;
   height: number;
   offset: number;
 }) {
   return (
     <Box flexDirection="column" width={columns} height={height} flexShrink={0} overflow="hidden">
-      {approvalLines(approval, columns, height, offset)
+      {(edit === null ? approvalLines(approval, columns, height, offset) : argsEditLines(approval, edit, columns))
         .slice(0, height)
         .map((line, index) => (
           <Text

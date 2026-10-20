@@ -75,6 +75,7 @@ import {
   keyOverlayLines,
   moveOverlayOffset,
   pressKey,
+  type ArgsKey,
   type KeyEffect,
   type KeyPlace,
   type Press,
@@ -93,6 +94,7 @@ import {
 } from "./secret.ts";
 import { APPROVAL_ROWS, approvalRows, diffLineCount } from "./approval.ts";
 import { ApprovalBand } from "./approval-band.tsx";
+import { ARGS_EDIT_ROWS, type ArgsEdit, liveArgsEdit, parseArgs, startArgsEdit } from "./approval-edit.ts";
 import { moveDiffOffset } from "./diff-view.ts";
 import {
   closedPermissions,
@@ -178,6 +180,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   const [keysOpen, setKeysOpen] = useState(false);
   const [keysOffset, setKeysOffset] = useState(0);
   const [diffScroll, setDiffScroll] = useState({ callId: "", offset: 0 });
+  const [argsEditState, setArgsEdit] = useState<ArgsEdit | null>(null);
   const [suggestDismissed, setSuggestDismissed] = useState(false);
   const [suggestPick, setSuggestPick] = useState({ draft: "", index: 0 });
   const [historyCursor, setHistoryCursor] = useState<HistoryCursor | null>(null);
@@ -232,6 +235,9 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   busyRef.current = chat.busy;
   const approvalRef = useRef(chat.approval);
   approvalRef.current = chat.approval;
+  const argsEdit = liveArgsEdit(argsEditState, chat.approval);
+  const argsEditRef = useRef(argsEdit);
+  argsEditRef.current = argsEdit;
   chatRef.current = chat;
   runIdRef.current = chat.runId;
   connectionRef.current = connection;
@@ -260,12 +266,13 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   const budget = frameBudget({
     rows,
     columns,
-    draft: composerText,
-    busy: chat.busy && secret === null,
+    draft: argsEdit !== null ? argsEdit.draft.text : composerText,
+    busy: chat.busy && secret === null && argsEdit === null,
     banner: banner !== null && banner.length > 0,
     debug: debug.open,
     suggestions: suggestMatches.length,
-    approval: chat.approval !== null ? approvalRows(chat.approval, rows) : 0,
+    approval: chat.approval === null ? 0 : argsEdit !== null ? APPROVAL_ROWS : approvalRows(chat.approval, rows),
+    composerMax: argsEdit !== null ? ARGS_EDIT_ROWS : undefined,
   });
   suggestRef.current = {
     items: suggestMatches,
@@ -1181,6 +1188,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       history: historyCursorRef.current !== null,
       approval: approvalRef.current !== null,
       approvalDiff: approvalRef.current !== null && approvalRef.current.diff !== null,
+      approvalEdit: argsEditRef.current !== null,
     };
   }
 
@@ -1240,6 +1248,14 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       case "approve":
         answerApproval(effect.decision);
         return;
+      case "edit-args":
+        if (approvalRef.current !== null) {
+          setArgsEdit(startArgsEdit(approvalRef.current));
+        }
+        return;
+      case "args":
+        onArgsKey(effect.key);
+        return;
       case "scroll-diff": {
         const pending = approvalRef.current;
         const window = Math.max(0, budget.approval - APPROVAL_ROWS);
@@ -1282,6 +1298,35 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
     void client.respondApproval(current, pending.callId, decision).catch((error: unknown) => {
       setChat((state) => ({ ...state, error: messageOf(error) }));
     });
+  }
+
+  function onArgsKey(key: ArgsKey): void {
+    const current = argsEditRef.current;
+    if (current === null) {
+      return;
+    }
+    if (key.kind === "cancel") {
+      setArgsEdit(null);
+      return;
+    }
+    if (key.kind === "edit" || key.kind === "insert") {
+      const draft = key.kind === "edit" ? edit(current.draft, key.op) : insertText(current.draft, key.text);
+      setArgsEdit({ ...current, draft, error: null });
+      return;
+    }
+    const parsed = parseArgs(current.draft.text);
+    const session = sessionRef.current;
+    if (!parsed.ok) {
+      setArgsEdit({ ...current, error: parsed.error });
+      return;
+    }
+    if (session === null) {
+      return;
+    }
+    client.respondApproval(session, current.callId, "allow", parsed.args).then(
+      () => setArgsEdit(null),
+      (error: unknown) => setArgsEdit((state) => (state === null ? null : { ...state, error: messageOf(error) })),
+    );
   }
 
   async function openEditor(): Promise<void> {
@@ -1406,9 +1451,11 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
 
   const contentWidth = transcript.gutter === null ? columns : Math.max(1, columns - 1);
   const composer =
-    secret === null
-      ? layoutComposer(draft.text, draft.cursor, columns, budget.composer, chat.busy)
-      : layoutComposer(composerText, composerText.length, columns, budget.composer, false);
+    argsEdit !== null
+      ? layoutComposer(argsEdit.draft.text, argsEdit.draft.cursor, columns, budget.composer, false)
+      : secret === null
+        ? layoutComposer(draft.text, draft.cursor, columns, budget.composer, chat.busy)
+        : layoutComposer(composerText, composerText.length, columns, budget.composer, false);
   const debugLayout = layoutDebug({
     debug,
     rows: budget.debug,
@@ -1568,7 +1615,13 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
         </Text>
       ) : null}
       {budget.approval > 0 && chat.approval !== null ? (
-        <ApprovalBand approval={chat.approval} columns={columns} height={budget.approval} offset={diffOffset} />
+        <ApprovalBand
+          approval={chat.approval}
+          edit={argsEdit}
+          columns={columns}
+          height={budget.approval}
+          offset={diffOffset}
+        />
       ) : budget.suggestions > 0 ? (
         <SuggestionBand
           items={suggestMatches}

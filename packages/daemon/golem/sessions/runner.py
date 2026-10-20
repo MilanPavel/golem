@@ -89,7 +89,8 @@ class Resume:
     ``open_calls`` are the run's tool calls requested and not finished, and
     ``asked`` the ones it asked about, in order, this one included. ``rule``
     is the rule an ``allow_always`` wrote. ``diff`` is the change the user
-    was shown, which is the only one the call may make.
+    was shown, which is the only one the call may make. ``args`` are the
+    arguments the user edited the call to.
     """
 
     session_id: str
@@ -105,6 +106,7 @@ class Resume:
     subject: str | None = None
     rule: str | None = None
     diff: str | None = None
+    args: dict[str, object] | None = None
 
 
 @dataclass
@@ -211,11 +213,12 @@ async def resume_turn(
                 decision=resume.decision,
                 subject=resume.subject,
                 rule=resume.rule,
+                args=resume.args,
             ),
         )
         stream = runtime.resume(
             session_id=resume.session_id,
-            answer=Answer(decision=resume.decision, diff=resume.diff),
+            answer=Answer(decision=resume.decision, diff=resume.diff, args=resume.args),
             cwd=resume.cwd,
             allowed_tools=resume.allowed_tools,
             asked=resume.asked,

@@ -374,6 +374,13 @@ test("approval events set and clear the waiting call", () => {
   });
   assert.equal(answered.approval, null);
   assert.equal(answered.messages[0]?.tools?.[0]?.status, "requested");
+  const edited = reduceChat(waiting, {
+    ...base,
+    seq: 6,
+    type: "approval.resolved",
+    data: { call_id: "c1", name: "read_file", decision: "allow", args: { path: "y" } },
+  });
+  assert.deepEqual(edited.messages[0]?.tools?.[0]?.args, { path: "y" });
 
   const cancelled = reduceChat(waiting, { ...base, seq: 6, type: "run.cancelled", data: { reason: "user" } });
   assert.equal(cancelled.approval, null);

@@ -21,6 +21,7 @@ changed is refused, rather than asked out of turn.
 
 from __future__ import annotations
 
+import json
 import logging
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
@@ -59,11 +60,15 @@ CHANGED_RESULT = "the rules changed while the run waited, so this call did not r
 
 @dataclass(frozen=True, slots=True)
 class _Verdict:
-    """Whether a call runs. ``approved_diff`` is the change the user approved for it."""
+    """Whether a call runs. ``approved_diff`` is the change the user approved for it.
+
+    ``args`` are the arguments the user edited the call to, which it runs with.
+    """
 
     run: bool
     message: str = ""
     approved_diff: str | None = None
+    args: dict[str, object] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,23 +76,26 @@ class Answer:
     """The user's answer to one approval, as the interrupt gets it back.
 
     ``diff`` is the change the user was shown, read from ``approval.needed``.
+    ``args`` are the arguments the user edited the call to, when they did.
     """
 
     decision: str
     diff: str | None = None
+    args: dict[str, object] | None = None
 
     def to_resume(self) -> dict[str, object]:
-        return {"decision": self.decision, "diff": self.diff}
+        return {"decision": self.decision, "diff": self.diff, "args": self.args}
 
     @staticmethod
     def parse(raw: object) -> Answer:
         if not isinstance(raw, dict):
             return Answer(decision="deny")
         value = cast(dict[str, object], raw)
-        decision, diff = value.get("decision"), value.get("diff")
+        decision, diff, args = value.get("decision"), value.get("diff"), value.get("args")
         return Answer(
             decision=decision if isinstance(decision, str) else "deny",
             diff=diff if isinstance(diff, str) else None,
+            args=dict(cast(dict[str, object], args)) if isinstance(args, dict) else None,
         )
 
 
@@ -121,6 +129,9 @@ def tools_node(
                 asked=ids[index] in asked,
                 before_last_asked=index < last_asked,
             )
+            if verdict.run and verdict.args is not None:
+                edited = cast(ToolCall, {**call, "args": verdict.args})
+                preview = await _preview(registry, edited, replace(base, planned=dict(planned)))
             if verdict.run and isinstance(preview, Preview):
                 planned[preview.path] = preview.after
             verdicts.append(verdict)
@@ -138,8 +149,9 @@ def tools_node(
             ctx = replace(
                 base, output=_streamer(write, call_id), approved_diff=verdict.approved_diff
             )
+            args = call["args"] if verdict.args is None else verdict.args
             try:
-                result = await registry.call(call["name"], call["args"], ctx)
+                result = await registry.call(call["name"], args, ctx)
             except ToolError as exc:
                 message = str(exc) or type(exc).__name__
                 write({STREAM_KEY: "tool.failed", "call_id": call_id, "message": message})
@@ -161,7 +173,8 @@ def tools_node(
                     "truncated": len(preview) < len(result.output),
                 }
             )
-            results.append(_result(call_id, call["name"], result.output))
+            output = result.output if verdict.args is None else _edited(verdict.args, result.output)
+            results.append(_result(call_id, call["name"], output))
         return {"messages": results}
 
     return tools
@@ -212,6 +225,8 @@ def _decide(
     if answer.decision == "allow_session":
         allowed.add((name, subject))
         return _Verdict(run=True, approved_diff=answer.diff)
+    if answer.decision == "allow" and answer.args is not None:
+        return _Verdict(run=True, args=answer.args)
     if answer.decision in ("allow", "allow_always"):
         return _Verdict(run=True, approved_diff=answer.diff)
     return _Verdict(run=False, message=DENIED_RESULT)
@@ -225,6 +240,11 @@ async def _preview(
         return await registry.preview(call["name"], call["args"], ctx)
     except ToolError as exc:
         return str(exc) or type(exc).__name__
+
+
+def _edited(args: Mapping[str, object], output: str) -> str:
+    edited = json.dumps(args, ensure_ascii=False)
+    return f"note: the user edited the arguments before it ran: {edited}\n\n{output}"
 
 
 def call_id_of(call: ToolCall) -> str:

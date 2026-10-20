@@ -234,7 +234,8 @@ class ApprovalResolvedData(BaseModel):
 
     ``allow_session`` also allows ``name`` with this ``subject`` for the rest of
     the session, or every call of ``name`` when ``subject`` is null.
-    ``allow_always`` wrote an allow rule, and ``rule`` names it.
+    ``allow_always`` wrote an allow rule, and ``rule`` names it. ``args`` are
+    the arguments the user edited the call to, when they did.
     """
 
     model_config = _CONFIG
@@ -244,6 +245,7 @@ class ApprovalResolvedData(BaseModel):
     decision: ApprovalDecision
     subject: str | None = None
     rule: str | None = None
+    args: dict[str, Any] | None = None
 
 
 class SessionCreatedEvent(BaseModel):

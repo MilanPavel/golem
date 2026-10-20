@@ -23,7 +23,7 @@ This file is about what comes next. How the existing pieces are built is in [arc
 - Tool rules in `~/.golem/config.toml` and a project's `.golem/policy.toml` allow, ask, or deny a call by tool, subject, and path. `golem config show` lists them in the order they are checked.
 - A sandboxed shell: the model runs commands in the session folder with no network and no writes outside it, after you approve each one. Output streams into the tool line. `git_status`, `git_diff`, and `git_log` read the repository.
 - "Always allow" (`w`) writes a rule for one exact call, and `/permissions` changes or deletes rules and revokes what a session allows.
-- Write tools: `write_file` and `edit_file` change files in the session folder, never under `.golem/` or `.git/`, after you approve each change.
+- Write tools: `write_file` and `edit_file` change files in the session folder, never under `.golem/` or `.git/`. The approval shows the diff, only that change is applied, and `e` edits a call's arguments before allowing it once ([ADR-015](adr/015-write-tools.md)).
 - Approvals: a call a rule asks about waits for `a` (once), `s` (for the session), or `d` (deny), across closing the TUI and restarting the daemon. A waiting session shows `?` in the switcher.
 - Slash commands with suggestions, a line editor, recalling a sent message with Up, copy and export, and closing a session from the switcher.
 - It runs from a checkout of this repository (`just golem daemon install`, then `just tui`). Phase 3 makes it installable.
@@ -99,7 +99,7 @@ Agents use the Graph API, where the model decides control flow. Flows use the Fu
 
 ### Protocol, what is left to add
 
-JSON-RPC 2.0, one JSON object per line, over `~/.golem/run/golem.sock`. Protocol 2.15 is on the wire today (see [architecture.md](architecture.md#what-is-on-the-wire-today)). The phases below add the rest.
+JSON-RPC 2.0, one JSON object per line, over `~/.golem/run/golem.sock`. Protocol 2.16 is on the wire today (see [architecture.md](architecture.md#what-is-on-the-wire-today)). The phases below add the rest.
 
 | Group | New events | Phase |
 |---|---|---|
@@ -218,7 +218,7 @@ The agent can act, and nothing happens without passing policy. How the tool loop
 - **Done when:** "always allow" on `git status` writes one rule, the next `git status` runs without asking, and deleting that rule in `/permissions` makes it ask again.
 - **Watch out:** only the user changes rules. No tool may edit them, and no tool output can approve anything. A refused call can tell the model which rule refused it, so it can suggest a change to you.
 
-### 1.5 Write tools
+### 1.5 Write tools (built)
 
 - **Goal:** golem can change files, and you see exactly what changes before it happens.
 - **You can:** ask for an edit, review the diff, and approve it.

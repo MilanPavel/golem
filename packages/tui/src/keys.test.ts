@@ -237,3 +237,17 @@ test("a waiting change scrolls its diff with the arrows and Page keys", () => {
   const without = place({ busy: true, approval: true });
   assert.notEqual(press(without, "page-up").kind, "scroll-diff");
 });
+
+test("while the arguments are open, keys edit them and Enter or Esc leave", () => {
+  const editing = place({ busy: true, approval: true, approvalEdit: true });
+  const press = (input: string, name: Parameters<typeof pressKey>[1]["name"] = null) =>
+    pressKey(editing, { name, input, ctrl: false, meta: false });
+  assert.deepEqual(press("a"), { kind: "args", key: { kind: "insert", text: "a" } });
+  assert.deepEqual(press("", "backspace"), { kind: "args", key: { kind: "edit", op: "backspace" } });
+  assert.deepEqual(press("", "alt-return"), { kind: "args", key: { kind: "edit", op: "newline" } });
+  assert.deepEqual(press("", "return"), { kind: "args", key: { kind: "submit" } });
+  assert.deepEqual(press("", "escape"), { kind: "args", key: { kind: "cancel" } });
+  assert.deepEqual(press("", "ctrl-c"), { kind: "cancel" });
+  const asking = place({ busy: true, approval: true });
+  assert.deepEqual(pressKey(asking, { name: null, input: "e", ctrl: false, meta: false }), { kind: "edit-args" });
+});

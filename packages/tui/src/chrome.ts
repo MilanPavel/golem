@@ -32,6 +32,7 @@ export function frameColumns(terminalColumns: number): number {
 const DEBUG_ROWS = 7;
 const SUGGEST_ROWS = 6;
 const APPROVAL_MIN_ROWS = 3;
+const COMPOSER_ROWS = 5;
 
 export const HEADER_GAP = 2;
 export const HEADER_PAD_TOP = 1;
@@ -46,6 +47,8 @@ export function frameBudget(input: {
   debug?: boolean;
   suggestions?: number;
   approval?: number;
+  /** The most rows the composer may grow to. */
+  composerMax?: number;
 }): FrameBudget {
   const rows = Math.max(0, Math.floor(input.rows));
   if (rows === 0) {
@@ -63,7 +66,7 @@ export function frameBudget(input: {
     };
   }
   let header = input.rows >= 20 && input.columns >= LOGO_WIDTH + HEADER_GAP + 24 ? HEADER_ROWS : 1;
-  let composer = input.busy ? 1 : Math.min(5, composerLineCount(input.draft, input.columns));
+  let composer = input.busy ? 1 : Math.min(input.composerMax ?? COMPOSER_ROWS, composerLineCount(input.draft, input.columns));
   let meter = input.busy ? 1 : 0;
   let banner = input.banner ? 1 : 0;
   let approval = Math.max(0, Math.floor(input.approval ?? 0));

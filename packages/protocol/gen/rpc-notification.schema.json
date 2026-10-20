@@ -117,8 +117,21 @@
     },
     "ApprovalResolvedData": {
       "additionalProperties": false,
-      "description": "The user answered.\n\n``allow_session`` also allows ``name`` with this ``subject`` for the rest of\nthe session, or every call of ``name`` when ``subject`` is null.\n``allow_always`` wrote an allow rule, and ``rule`` names it.",
+      "description": "The user answered.\n\n``allow_session`` also allows ``name`` with this ``subject`` for the rest of\nthe session, or every call of ``name`` when ``subject`` is null.\n``allow_always`` wrote an allow rule, and ``rule`` names it. ``args`` are\nthe arguments the user edited the call to, when they did.",
       "properties": {
+        "args": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Args"
+        },
         "call_id": {
           "minLength": 1,
           "title": "Call Id",

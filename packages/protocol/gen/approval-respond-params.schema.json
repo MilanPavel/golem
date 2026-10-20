@@ -1,7 +1,20 @@
 {
   "additionalProperties": false,
-  "description": "``approval.respond``. Answer the tool call a session's run waits on.\n\n``allow`` runs it once, ``allow_session`` runs it and allows the same call\nfor the rest of the session, ``allow_always`` runs it and writes an allow\nrule for it first in the user's ``config.toml``, and ``deny`` tells the\nmodel it may not.",
+  "description": "``approval.respond``. Answer the tool call a session's run waits on.\n\n``allow`` runs it once, ``allow_session`` runs it and allows the same call\nfor the rest of the session, ``allow_always`` runs it and writes an allow\nrule for it first in the user's ``config.toml``, and ``deny`` tells the\nmodel it may not.\n\n``args`` replaces the call's arguments, edited by the user, and goes only\nwith ``allow``: an edited call runs once.",
   "properties": {
+    "args": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Args"
+    },
     "call_id": {
       "minLength": 1,
       "title": "Call Id",

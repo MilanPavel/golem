@@ -40,7 +40,7 @@ export function approvalLines(
   const diffRows = Math.max(0, rows - APPROVAL_ROWS);
   const shown = diffWindow(diff, offset, diffRows, width);
   const scrolls = diff.length > diffRows && diffRows > 0;
-  const keys = "a once · s this session · w always (saves a rule) · d deny";
+  const keys = "a once · s this session · w always (saves a rule) · e edit · d deny";
   return [
     { text: fit(`Allow ${call}?`, width), bold: true, tone: "question" },
     ...shown.map((line) => ({ text: line.text, tone: line.tone })),

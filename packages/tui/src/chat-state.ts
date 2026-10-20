@@ -165,9 +165,11 @@ export function reduceChat(state: ChatState, event: ChatEvent): ChatState {
       };
     }
     case "approval.resolved": {
-      const answered = updateTool(state, event.data.call_id, (tool) =>
-        tool.status === "waiting" ? { ...tool, status: "requested" } : tool,
-      );
+      const edited = event.data.args ?? null;
+      const answered = updateTool(state, event.data.call_id, (tool) => {
+        const args = edited === null ? tool.args : edited;
+        return tool.status === "waiting" ? { ...tool, status: "requested", args } : { ...tool, args };
+      });
       return { ...answered, approval: null };
     }
     case "tool.started":
