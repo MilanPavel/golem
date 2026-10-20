@@ -1,20 +1,16 @@
-"""API keys in the OS credential store.
+"""Model providers' API keys: the ``provider/<name>`` part of the secret store.
 
-On macOS that is the login Keychain, through ``keyring``. Each key is a
-generic password with the service ``golem`` and the provider name as the
-account. The daemon is the only writer, so the Keychain lets it read its own
-items without a prompt.
+The secrets themselves live in :mod:`golem.secrets`. This is the view the
+model router needs, by provider name.
 """
 
 from __future__ import annotations
 
 from typing import Protocol
 
-SERVICE = "golem"
+from golem.secrets import SERVICE, KeychainSecrets, SecretStore, SecretStoreError
 
-
-class KeyStoreError(Exception):
-    """The credential store could not be read or written."""
+KeyStoreError = SecretStoreError
 
 
 class KeyStore(Protocol):
@@ -27,49 +23,27 @@ class KeyStore(Protocol):
         ...
 
 
-class KeychainStore:
-    """``keyring`` with a read cache. Golem changes keys only through this object."""
+class ProviderKeys:
+    """Provider keys in a :class:`~golem.secrets.SecretStore`, under ``provider/<name>``."""
 
-    def __init__(self, service: str = SERVICE) -> None:
-        self._service = service
-        self._cache: dict[str, str | None] = {}
+    def __init__(self, secrets: SecretStore) -> None:
+        self._secrets = secrets
 
     def get(self, provider: str) -> str | None:
-        if provider in self._cache:
-            return self._cache[provider]
-        import keyring
-        from keyring.errors import KeyringError
-
-        try:
-            key = keyring.get_password(self._service, provider)
-        except KeyringError as exc:
-            raise KeyStoreError(f"keychain is unavailable: {exc}") from exc
-        self._cache[provider] = key
-        return key
+        return self._secrets.get(f"provider/{provider}")
 
     def set(self, provider: str, key: str) -> None:
-        import keyring
-        from keyring.errors import KeyringError
-
-        try:
-            keyring.set_password(self._service, provider, key)
-        except KeyringError as exc:
-            raise KeyStoreError(f"keychain is unavailable: {exc}") from exc
-        self._cache[provider] = key
+        self._secrets.set(f"provider/{provider}", key)
 
     def delete(self, provider: str) -> bool:
-        import keyring
-        from keyring.errors import KeyringError, PasswordDeleteError
+        return self._secrets.delete(f"provider/{provider}")
 
-        try:
-            keyring.delete_password(self._service, provider)
-        except PasswordDeleteError:
-            self._cache[provider] = None
-            return False
-        except KeyringError as exc:
-            raise KeyStoreError(f"keychain is unavailable: {exc}") from exc
-        self._cache[provider] = None
-        return True
+
+class KeychainStore(ProviderKeys):
+    """Provider keys in the Keychain."""
+
+    def __init__(self, service: str = SERVICE) -> None:
+        super().__init__(KeychainSecrets(service))
 
 
 class MemoryKeyStore:
@@ -86,3 +60,13 @@ class MemoryKeyStore:
 
     def delete(self, provider: str) -> bool:
         return self.keys.pop(provider, None) is not None
+
+
+__all__ = [
+    "SERVICE",
+    "KeyStore",
+    "KeyStoreError",
+    "KeychainStore",
+    "MemoryKeyStore",
+    "ProviderKeys",
+]

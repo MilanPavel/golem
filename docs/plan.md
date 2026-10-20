@@ -11,7 +11,7 @@ This file is about what comes next. How the existing pieces are built is in [arc
 ### Works today
 
 - Streaming chat with named model profiles and `provider/model` refs: Ollama through its native API, Anthropic, OpenAI, and OpenAI-compatible hosts such as OpenRouter.
-- API keys in the macOS Keychain, through `golem auth` or `/login` in the TUI.
+- API keys in the macOS Keychain, through `golem auth` or `/login` in the TUI. Every secret golem keeps goes in that one store, named `provider/<name>`, `mcp/<server>`, or `hook`, and a config file that holds a key does not load.
 - `/model` picks from installed, downloadable, and hosted models with prices and RAM fit, and switches a session mid-conversation. `golem models` prints the same list.
 - Downloading and removing Ollama models from the picker or with `/model pull` and `/model rm`, with live progress that survives closing the TUI.
 - Sessions, runs, and every event are stored in `~/.golem/golem.db`. They survive a daemon restart and a crash.
@@ -230,7 +230,7 @@ The agent can act, and nothing happens without passing policy. How the tool loop
   - "Edit arguments" in the modal, for small fixes to the model's proposal.
 - **Done when:** "fix the failing test in repo X" works end to end with approvals: golem runs the test, edits the file, and runs the test again.
 
-### 1.6 Artifacts, web, and secrets
+### 1.6 Artifacts, web, and secrets (built)
 
 - **Goal:** big outputs and outside content do not bloat state or leak secrets.
 - **You can:** fetch a web page into the conversation, and keep every token out of config files.

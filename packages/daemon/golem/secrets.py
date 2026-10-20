@@ -1,0 +1,157 @@
+"""Every secret golem keeps, in the OS credential store and nowhere else.
+
+On macOS that is the login Keychain, through ``keyring``, under the service
+``golem``. A secret has a name in a namespace:
+
+- ``provider/<name>``: a model provider's API key. Its Keychain account is
+  the provider name alone, as before namespaces, so stored keys keep working.
+- ``mcp/<server>``: an MCP server's token (Phase 2).
+- ``hook``: the token of the hook endpoint (step 6.5).
+
+A setting that needs a secret holds a :data:`SecretRef`, ``keychain:<name>``,
+and the daemon resolves it when it uses it. A config file never holds the
+secret itself.
+"""
+
+from __future__ import annotations
+
+import re
+from typing import Annotated, Protocol
+
+from pydantic import AfterValidator
+
+SERVICE = "golem"
+KEYCHAIN_PREFIX = "keychain:"
+
+_NAME = re.compile(r"^(provider|mcp)/[A-Za-z0-9][A-Za-z0-9._-]*$|^hook$")
+
+
+class SecretStoreError(Exception):
+    """The credential store could not be read or written."""
+
+
+class SecretMissingError(Exception):
+    """A setting names a secret the store does not have."""
+
+
+def check_name(name: str) -> str:
+    """``name`` when it is ``provider/<name>``, ``mcp/<server>``, or ``hook``."""
+    if _NAME.fullmatch(name) is None:
+        raise ValueError(
+            f"{name!r} is not a secret name: use provider/<name>, mcp/<server>, or hook"
+        )
+    return name
+
+
+def account(name: str) -> str:
+    """The Keychain account for ``name``. A provider key keeps its provider name."""
+    check_name(name)
+    return name.removeprefix("provider/")
+
+
+def _ref(value: str) -> str:
+    if not value.startswith(KEYCHAIN_PREFIX):
+        raise ValueError(
+            f"a secret is set as {KEYCHAIN_PREFIX}<name>, never inline; store it with golem auth"
+        )
+    check_name(value.removeprefix(KEYCHAIN_PREFIX))
+    return value
+
+
+SecretRef = Annotated[str, AfterValidator(_ref)]
+"""A setting that points at a secret: ``keychain:mcp/github``."""
+
+
+class SecretStore(Protocol):
+    def get(self, name: str) -> str | None: ...
+
+    def set(self, name: str, value: str) -> None: ...
+
+    def delete(self, name: str) -> bool:
+        """Remove the secret. Returns False when there was none."""
+        ...
+
+
+def resolve(ref: str, store: SecretStore) -> str:
+    """The secret a :data:`SecretRef` names. Raises :class:`SecretMissingError`."""
+    name = _ref(ref).removeprefix(KEYCHAIN_PREFIX)
+    value = store.get(name)
+    if not value:
+        raise SecretMissingError(f"no secret {name} in the Keychain")
+    return value
+
+
+class KeychainSecrets:
+    """``keyring`` with a read cache. Golem changes secrets only through this object."""
+
+    def __init__(self, service: str = SERVICE) -> None:
+        self._service = service
+        self._cache: dict[str, str | None] = {}
+
+    def get(self, name: str) -> str | None:
+        if name in self._cache:
+            return self._cache[name]
+        import keyring
+        from keyring.errors import KeyringError
+
+        try:
+            value = keyring.get_password(self._service, account(name))
+        except KeyringError as exc:
+            raise SecretStoreError(f"keychain is unavailable: {exc}") from exc
+        self._cache[name] = value
+        return value
+
+    def set(self, name: str, value: str) -> None:
+        import keyring
+        from keyring.errors import KeyringError
+
+        try:
+            keyring.set_password(self._service, account(name), value)
+        except KeyringError as exc:
+            raise SecretStoreError(f"keychain is unavailable: {exc}") from exc
+        self._cache[name] = value
+
+    def delete(self, name: str) -> bool:
+        import keyring
+        from keyring.errors import KeyringError, PasswordDeleteError
+
+        try:
+            keyring.delete_password(self._service, account(name))
+        except PasswordDeleteError:
+            self._cache[name] = None
+            return False
+        except KeyringError as exc:
+            raise SecretStoreError(f"keychain is unavailable: {exc}") from exc
+        self._cache[name] = None
+        return True
+
+
+class MemorySecrets:
+    """A store that lives in this process. For tests."""
+
+    def __init__(self, secrets: dict[str, str] | None = None) -> None:
+        self.secrets: dict[str, str] = dict(secrets or {})
+
+    def get(self, name: str) -> str | None:
+        return self.secrets.get(check_name(name))
+
+    def set(self, name: str, value: str) -> None:
+        self.secrets[check_name(name)] = value
+
+    def delete(self, name: str) -> bool:
+        return self.secrets.pop(check_name(name), None) is not None
+
+
+__all__ = [
+    "KEYCHAIN_PREFIX",
+    "SERVICE",
+    "KeychainSecrets",
+    "MemorySecrets",
+    "SecretMissingError",
+    "SecretRef",
+    "SecretStore",
+    "SecretStoreError",
+    "account",
+    "check_name",
+    "resolve",
+]

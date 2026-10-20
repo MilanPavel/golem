@@ -11,12 +11,13 @@ Precedence, highest first:
 
 from __future__ import annotations
 
+import re
 from contextvars import ContextVar
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Annotated, Literal, cast
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, model_validator
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
@@ -44,6 +45,23 @@ def _blank_to_none(value: object) -> object:
     return value
 
 
+_SECRET_KEY = re.compile(r"(^|_)(api_?key|key|token|password|passwd|secret)$", re.IGNORECASE)
+INLINE_SECRET = (
+    "{key} looks like a secret, and golem keeps secrets out of config files: "
+    "store a provider key with `golem auth set` or /login, and name an environment "
+    "variable with api_key_env"
+)
+
+
+def _no_inline_secrets(data: object) -> object:
+    """Refuse a table with a key such as ``api_key`` or ``token`` before anything else."""
+    if isinstance(data, dict):
+        for key in cast(dict[object, object], data):
+            if isinstance(key, str) and _SECRET_KEY.search(key):
+                raise ValueError(INLINE_SECRET.format(key=key))
+    return cast(object, data)
+
+
 @dataclass(frozen=True, slots=True)
 class _ConfigFiles:
     user_config: Path
@@ -61,6 +79,8 @@ class ProviderSettings(BaseModel):
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
+
+    _no_secrets = model_validator(mode="before")(_no_inline_secrets)
 
     kind: ProviderKind | None = None
     base_url: Annotated[str | None, BeforeValidator(_blank_to_none)] = None
@@ -168,6 +188,8 @@ class GolemSettings(BaseSettings):
     trusted_projects: list[str] = Field(default_factory=list[str])
     shell: ShellSettings = Field(default_factory=ShellSettings)
     web: WebSettings = Field(default_factory=WebSettings)
+
+    _no_secrets = model_validator(mode="before")(_no_inline_secrets)
 
     @classmethod
     def settings_customise_sources(
