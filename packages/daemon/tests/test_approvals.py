@@ -14,7 +14,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 from pydantic import BaseModel
 
 from golem.graphs.chat import open_chat
-from golem.graphs.tools_node import DENIED_RESULT
+from golem.graphs.tools_node import CHANGED_RESULT, DENIED_RESULT
 from golem.models.router import ModelRouter
 from golem.permissions.policy import Policy
 from golem.sessions.bus import EventBus
@@ -204,7 +204,7 @@ async def test_allow_for_the_session_covers_later_calls(
     resolved = [event for event in events if isinstance(event, ApprovalResolvedEvent)]
     assert resolved[0].data.decision == "allow_session"
     record = await daemon.records.get(session_id)
-    assert record is not None and record.allowed_tools == ("risky_a",)
+    assert record is not None and record.allowed_tools == (("risky_a", None),)
 
     later = await daemon.settled(await daemon.manager.send(session_id, "again"))
     assert _needed(later) == []
@@ -299,3 +299,152 @@ async def test_an_answer_right_after_the_question_is_not_busy(
     assert await daemon.manager.respond(session_id, call_id, "allow") == run_id
     events = await daemon.settled(run_id)
     assert events[-1].type == "run.completed"
+
+
+class _CmdArgs(BaseModel):
+    command: str
+
+
+class _Commands:
+    """A tool whose rules match its command, like ``shell``, that records what ran."""
+
+    def __init__(self) -> None:
+        self.ran: list[str] = []
+
+    def registry(self) -> ToolRegistry:
+        async def run(args: _CmdArgs, ctx: ToolContext) -> ToolResult:
+            del ctx
+            self.ran.append(args.command)
+            return ToolResult(output=f"ran {args.command}", summary="ran")
+
+        cmd = Tool(name="cmd", description="runs", args=_CmdArgs, run=run, match_arg="command")
+        return ToolRegistry([cmd])
+
+
+def _commands_daemon(
+    database: Database, replies: list[Reply], commands: _Commands, config: Path
+) -> _Daemon:
+    daemon = _Daemon.__new__(_Daemon)
+    runtime = open_chat(
+        ModelRouter(model=ToolCallingChatModel(replies=replies)),
+        InMemorySaver(),
+        commands.registry(),
+        Policy(config, home=config.parent),
+    )
+    daemon.events = EventLog(database)
+    daemon.runs = RunRecords(database)
+    daemon.records = SessionRecords(database)
+    daemon.manager = SessionManager(
+        runtime, SessionLog(daemon.events, EventBus(), daemon.records), daemon.records, daemon.runs
+    )
+    return daemon
+
+
+def _cmd(*commands: str) -> list[tuple[str, dict[str, Any]]]:
+    return [("cmd", {"command": command}) for command in commands]
+
+
+async def test_always_allow_writes_one_rule_and_the_command_stops_asking(
+    database: Database, tmp_path: Path
+) -> None:
+    config = tmp_path / "config.toml"
+    commands = _Commands()
+    replies: list[Reply] = [_cmd("git status"), "one", _cmd("git status"), "two", _cmd("ls"), "x"]
+    daemon = _commands_daemon(database, replies, commands, config)
+    session_id = await daemon.manager.create(None)
+    run_id = await daemon.manager.send(session_id, "go")
+    asked = _needed(await daemon.settled(run_id))[0].data
+    assert asked.subject == "git status"
+
+    await daemon.manager.respond(session_id, asked.call_id, "allow_always")
+    events = await daemon.settled(run_id)
+    resolved = next(event for event in events if isinstance(event, ApprovalResolvedEvent))
+    assert resolved.data.rule == "~/config.toml rule 1"
+    assert 'match = "git status"' in config.read_text(encoding="utf-8")
+
+    second = await daemon.settled(await daemon.manager.send(session_id, "again"))
+    assert _needed(second) == []
+    third = await daemon.settled(await daemon.manager.send(session_id, "other"))
+    assert [event.data.subject for event in _needed(third)] == ["ls"]
+    assert commands.ran == ["git status", "git status"]
+
+
+async def test_a_rule_written_mid_reply_never_answers_a_later_question(
+    database: Database, tmp_path: Path
+) -> None:
+    config = tmp_path / "config.toml"
+    commands = _Commands()
+    replies: list[Reply] = [_cmd("make", "make", "rm -rf build"), "done"]
+    daemon = _commands_daemon(database, replies, commands, config)
+    session_id = await daemon.manager.create(None)
+    run_id = await daemon.manager.send(session_id, "go")
+    first = _needed(await daemon.settled(run_id))
+    assert [event.data.subject for event in first] == ["make"]
+
+    await daemon.manager.respond(session_id, first[0].data.call_id, "allow_always")
+    second = _needed(await daemon.settled(run_id))
+    assert [event.data.subject for event in second] == ["make", "rm -rf build"]
+    assert commands.ran == []
+
+    await daemon.manager.respond(session_id, second[-1].data.call_id, "deny")
+    events = await daemon.settled(run_id)
+    assert events[-1].type == "run.completed"
+    assert commands.ran == ["make", "make"]
+
+
+async def test_a_call_that_would_ask_out_of_turn_is_refused(
+    database: Database, tmp_path: Path
+) -> None:
+    config = tmp_path / "config.toml"
+    config.write_text(
+        '[[rule]]\ntool = "cmd"\nmatch = "lint"\naction = "allow"\n', encoding="utf-8"
+    )
+    commands = _Commands()
+    replies: list[Reply] = [_cmd("lint", "deploy"), "done"]
+    daemon = _commands_daemon(database, replies, commands, config)
+    session_id = await daemon.manager.create(None)
+    run_id = await daemon.manager.send(session_id, "go")
+    asked = _needed(await daemon.settled(run_id))
+    assert [event.data.subject for event in asked] == ["deploy"]
+
+    config.write_text("", encoding="utf-8")
+    await daemon.manager.respond(session_id, asked[0].data.call_id, "allow")
+    events = await daemon.settled(run_id)
+    failed = [event for event in events if isinstance(event, ToolFailedEvent)]
+    assert [event.data.message for event in failed] == [CHANGED_RESULT]
+    assert commands.ran == ["deploy"]
+
+
+async def test_allow_for_the_session_keys_on_the_command_and_can_be_revoked(
+    database: Database, tmp_path: Path
+) -> None:
+    commands = _Commands()
+    replies: list[Reply] = [
+        _cmd("git status"),
+        "a",
+        _cmd("git status"),
+        "b",
+        _cmd("ls"),
+        _cmd("git status"),
+        "d",
+    ]
+    daemon = _commands_daemon(database, replies, commands, tmp_path / "config.toml")
+    session_id = await daemon.manager.create(None)
+    run_id = await daemon.manager.send(session_id, "go")
+    call_id = _needed(await daemon.settled(run_id))[0].data.call_id
+    await daemon.manager.respond(session_id, call_id, "allow_session")
+    await daemon.settled(run_id)
+    assert await daemon.manager.allowances(session_id) == [("cmd", "git status")]
+
+    again = await daemon.settled(await daemon.manager.send(session_id, "again"))
+    assert _needed(again) == []
+    other = await daemon.settled(await daemon.manager.send(session_id, "other"))
+    assert [event.data.subject for event in _needed(other)] == ["ls"]
+    await daemon.manager.cancel(other[-1].run_id or "")
+
+    assert await daemon.manager.revoke(session_id, "cmd", "git status") is True
+    assert await daemon.manager.revoke(session_id, "cmd", "git status") is False
+    record = await daemon.records.get(session_id)
+    assert record is not None and record.allowed_tools == ()
+    revoked = await daemon.settled(await daemon.manager.send(session_id, "once more"))
+    assert [event.data.subject for event in _needed(revoked)] == ["git status"]

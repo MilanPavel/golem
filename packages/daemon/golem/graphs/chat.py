@@ -29,12 +29,14 @@ from golem.graphs.adapter import STREAM_KEY, message_text
 from golem.graphs.state import AgentState
 from golem.graphs.tools_node import (
     ALLOWED_KEY,
+    ASKED_KEY,
     CWD_KEY,
     cancelled_results,
     tools_node,
     unanswered_calls,
 )
 from golem.models.router import ModelRouter
+from golem.permissions.engine import Allowance
 from golem.permissions.policy import Policy
 from golem.sessions.ids import new_id
 from golem.tools import default_registry
@@ -104,11 +106,19 @@ class _GraphBuilder(Protocol):
 
 
 class ChatRuntime:
-    """A compiled chat graph plus the router its node calls."""
+    """A compiled chat graph plus the router, tools, and policy its nodes use."""
 
-    def __init__(self, graph: _RunningGraph, router: ModelRouter) -> None:
+    def __init__(
+        self,
+        graph: _RunningGraph,
+        router: ModelRouter,
+        tools: ToolRegistry | None = None,
+        policy: Policy | None = None,
+    ) -> None:
         self._graph = graph
         self.router = router
+        self.tools = default_registry() if tools is None else tools
+        self.policy = Policy(None) if policy is None else policy
 
     async def values(self, session_id: str) -> Mapping[str, object]:
         """Checkpoint values for ``session_id``, or an empty mapping."""
@@ -128,7 +138,7 @@ class ChatRuntime:
         user_message_id: str,
         assistant_message_id: str,
         cwd: str | None = None,
-        allowed_tools: Sequence[str] = (),
+        allowed_tools: Sequence[Allowance] = (),
     ) -> AsyncGenerator[object]:
         """Stream one user turn. The first turn writes the state fields.
 
@@ -145,7 +155,7 @@ class ChatRuntime:
                 "thread_id": session_id,
                 _ASSISTANT_ID: assistant_message_id,
                 CWD_KEY: cwd or "",
-                ALLOWED_KEY: list(allowed_tools),
+                ALLOWED_KEY: [list(pair) for pair in allowed_tools],
             },
             "recursion_limit": _RECURSION_LIMIT,
         }
@@ -168,9 +178,12 @@ class ChatRuntime:
         session_id: str,
         decision: str,
         cwd: str | None = None,
-        allowed_tools: Sequence[str] = (),
+        allowed_tools: Sequence[Allowance] = (),
+        asked: Sequence[str] = (),
     ) -> AsyncGenerator[object]:
         """Go on with a run paused on a tool approval, with the user's ``decision``.
+
+        ``asked`` are the call ids the run already asked about, this one included.
 
         Close the generator when you stop early, as with :meth:`stream`.
         """
@@ -178,7 +191,8 @@ class ChatRuntime:
             "configurable": {
                 "thread_id": session_id,
                 CWD_KEY: cwd or "",
-                ALLOWED_KEY: list(allowed_tools),
+                ALLOWED_KEY: [list(pair) for pair in allowed_tools],
+                ASKED_KEY: list(asked),
             },
             "recursion_limit": _RECURSION_LIMIT,
         }
@@ -294,6 +308,7 @@ def open_chat(
     built-in rules only, with no user or project file.
     """
     registry = default_registry() if tools is None else tools
+    rules = Policy(None) if policy is None else policy
     binder = _ToolBinder(registry)
 
     async def call_model(state: AgentState, config: RunnableConfig) -> dict[str, list[BaseMessage]]:
@@ -315,11 +330,11 @@ def open_chat(
 
     builder = cast(_GraphBuilder, StateGraph(AgentState))
     builder.add_node("call_model", call_model)
-    builder.add_node("tools", tools_node(registry, Policy(None) if policy is None else policy))
+    builder.add_node("tools", tools_node(registry, rules))
     builder.add_edge(START, "call_model")
     builder.add_conditional_edges("call_model", route, {"tools": "tools", "end": END})
     builder.add_edge("tools", "call_model")
-    return ChatRuntime(builder.compile(checkpointer=checkpointer), router)
+    return ChatRuntime(builder.compile(checkpointer=checkpointer), router, registry, rules)
 
 
 class _ToolBinder:

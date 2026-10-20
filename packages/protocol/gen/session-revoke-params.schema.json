@@ -1,0 +1,34 @@
+{
+  "additionalProperties": false,
+  "description": "``session.revoke``. Stop allowing ``tool`` (with ``subject``) for the rest of the session.",
+  "properties": {
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    },
+    "subject": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Subject"
+    },
+    "tool": {
+      "minLength": 1,
+      "title": "Tool",
+      "type": "string"
+    }
+  },
+  "required": [
+    "session_id",
+    "tool"
+  ],
+  "title": "SessionRevokeParams",
+  "type": "object"
+}

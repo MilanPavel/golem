@@ -6,10 +6,8 @@ event they follow, before the event row, so foreign keys hold.
 
 from __future__ import annotations
 
-import json
-from typing import cast
-
 from golem.store.database import Transaction
+from golem.store.records import decode_allowances, encode_allowances
 from golem_protocol.events import (
     ApprovalNeededEvent,
     ApprovalResolvedEvent,
@@ -56,6 +54,12 @@ async def project(tx: Transaction, event: ChatEvent) -> None:
                 "UPDATE sessions SET cwd = ? WHERE session_id = ?",
                 (event.data.cwd, event.session_id),
             )
+        if event.data.allowed_tools is not None:
+            pairs = [(item.tool, item.subject) for item in event.data.allowed_tools]
+            await tx.execute(
+                "UPDATE sessions SET allowed_tools = ? WHERE session_id = ?",
+                (encode_allowances(pairs), event.session_id),
+            )
     elif isinstance(event, ModelSelectedEvent):
         await tx.execute(
             "UPDATE sessions SET model_profile = ? WHERE session_id = ?",
@@ -82,7 +86,7 @@ async def project(tx: Transaction, event: ChatEvent) -> None:
             (event.run_id,),
         )
         if event.data.decision == "allow_session":
-            await _allow_tool(tx, event.session_id, event.data.name)
+            await _allow_tool(tx, event.session_id, event.data.name, event.data.subject)
     elif isinstance(event, RunCompletedEvent):
         await _finish_run(tx, event.run_id, "completed", event.ts, None)
     elif isinstance(event, RunFailedEvent):
@@ -96,17 +100,16 @@ async def project(tx: Transaction, event: ChatEvent) -> None:
         )
 
 
-async def _allow_tool(tx: Transaction, session_id: str, name: str) -> None:
+async def _allow_tool(tx: Transaction, session_id: str, name: str, subject: str | None) -> None:
     rows = await tx.fetch_all(
         "SELECT allowed_tools FROM sessions WHERE session_id = ?", (session_id,)
     )
-    raw = rows[0]["allowed_tools"] if rows else None
-    allowed = cast(list[str], json.loads(raw)) if isinstance(raw, str) else []
-    if name not in allowed:
-        allowed.append(name)
+    allowed = decode_allowances(rows[0]["allowed_tools"] if rows else None)
+    if (name, subject) not in allowed:
+        allowed.append((name, subject))
     await tx.execute(
         "UPDATE sessions SET allowed_tools = ? WHERE session_id = ?",
-        (json.dumps(allowed), session_id),
+        (encode_allowances(allowed), session_id),
     )
 
 

@@ -13,7 +13,7 @@ test("the approval band names the call, the rule, and the keys", () => {
     [
       "Allow read_file notes.txt?",
       "asked by ~/.golem/config.toml rule 1",
-      "a allow once · s allow for this session · d deny",
+      "a once · s this session · w always (saves a rule) · d deny",
     ],
   );
   const narrow = approvalLines({ callId: "c1", name: "grep", args: { pattern: "x".repeat(50) }, source: "s" }, 20);

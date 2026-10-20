@@ -653,7 +653,7 @@ async def test_rename_sets_the_title_a_watcher_sees(short_home: Path) -> None:
         assert rpc_result(renamed) == {"title": "Plans"}
         await _summaries_until(client, lambda found: any(s.get("title") == "Plans" for s in found))
         updated = await client.wait_for_event("session.updated")
-        assert _event_data(updated) == {"title": "Plans", "cwd": None}
+        assert _event_data(updated) == {"title": "Plans", "cwd": None, "allowed_tools": None}
 
         blank = await client.call("session.rename", {"session_id": session_id, "title": " "})
         assert error_code(blank) == INVALID_PARAMS
@@ -732,6 +732,8 @@ async def test_config_get_lists_the_rules_for_a_folder(short_home: Path) -> None
             "action": "ask",
             "source": "built-in default",
             "ignored": None,
+            "file": "default",
+            "index": None,
         }
         relative = await client.call("config.get", {"cwd": "project"})
         assert error_code(relative) == INVALID_PARAMS
@@ -773,6 +775,48 @@ async def test_approval_respond_goes_on_with_the_waiting_run(short_home: Path) -
         await client.wait_for_event("run.completed")
         assert _completed_text(client.events, "assistant")[-1] == "It is 42."
         assert "tool.completed" in _event_types(client.events)
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+
+
+async def test_policy_update_and_remove_edit_the_user_rules(short_home: Path) -> None:
+    config = short_home / "config.toml"
+    config.write_text(
+        '# my rules\n[[rule]]\ntool = "grep"\naction = "deny"\n\n'
+        '[[rule]]\ntool = "shell"\nmatch = "ls"\naction = "allow"\n',
+        encoding="utf-8",
+    )
+    app, task = await start_daemon(
+        short_home, router=ModelRouter(model=ScriptedChatModel(replies=[]))
+    )
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        updated = await client.call(
+            "policy.update", {"target": "user", "index": 1, "action": "ask"}
+        )
+        assert rpc_result(updated) == {"file": str(config)}
+        await client.call("policy.remove", {"target": "user", "index": 2})
+        text = config.read_text(encoding="utf-8")
+        assert text.startswith("# my rules\n")
+        assert 'action = "ask"' in text and "shell" not in text
+
+        session_id = await _open(client)
+        listed = rpc_result(await client.call("config.get", {"session_id": session_id}))
+        assert isinstance(listed, dict)
+        rules = cast(list[dict[str, object]], listed["rules"])
+        assert (rules[0]["file"], rules[0]["index"], rules[0]["action"]) == ("user", 1, "ask")
+        assert listed["session_allowed"] == []
+
+        missing = await client.call("policy.remove", {"target": "user", "index": 9})
+        assert error_code(missing) == INVALID_PARAMS
+        no_folder = await client.call("policy.remove", {"target": "project", "index": 1})
+        assert error_code(no_folder) == INVALID_PARAMS
+        revoked = await client.call(
+            "session.revoke", {"session_id": session_id, "tool": "shell", "subject": "ls"}
+        )
+        assert rpc_result(revoked) == {"revoked": False}
     finally:
         await client.close()
         await stop_daemon(app, task)

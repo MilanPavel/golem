@@ -4,6 +4,8 @@ import { Box, Text, useApp, useInput, usePaste, useStdin, useWindowSize } from "
 import {
   RpcError,
   SESSION_NOT_FOUND,
+  type ApprovalChoice,
+  type ConfigGetResult,
   type ConnectionState,
   type GolemClient,
   type ListedModel,
@@ -90,6 +92,14 @@ import {
   type SecretStep,
 } from "./secret.ts";
 import { APPROVAL_ROWS, approvalLines } from "./approval.ts";
+import {
+  closedPermissions,
+  layoutPermissions,
+  openPermissions,
+  permissionsKeyOf,
+  pressPermissions,
+  type PermissionsState,
+} from "./permissions.ts";
 import { assistantChars, elapsedSeconds, meterLine, meterPhase } from "./progress.ts";
 import {
   fitSegments,
@@ -139,6 +149,11 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   const [draft, setDraft] = useState<Draft>({ text: "", cursor: 0 });
   const [sessionModel, setSessionModel] = useState<ModelInfo | null>(null);
   const [sessionCwd, setSessionCwd] = useState<string | null>(null);
+  const sessionCwdRef = useRef(sessionCwd);
+  sessionCwdRef.current = sessionCwd;
+  const [perms, setPerms] = useState<PermissionsState>(closedPermissions);
+  const permsRef = useRef(perms);
+  permsRef.current = perms;
   const [toolOutput, setToolOutput] = useState(false);
   const sessionModelRef = useRef(sessionModel);
   sessionModelRef.current = sessionModel;
@@ -228,6 +243,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   const suggestMatches =
     chat.busy ||
     switcher.open ||
+    perms.open ||
     picker.open ||
     keysOpen ||
     suggestDismissed ||
@@ -621,6 +637,14 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       setChat((current) => ({ ...current, notice: outcome.notice }));
       return;
     }
+    if (outcome.kind === "permissions") {
+      setDraft(draftAt(""));
+      const opened = openPermissions();
+      permsRef.current = opened;
+      setPerms(opened);
+      loadPermissions();
+      return;
+    }
     if (outcome.kind === "sessions") {
       setDraft(draftAt(""));
       setSwitcher(openSwitcher(sessionRef.current));
@@ -871,6 +895,57 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
         setChat((current) => ({ ...current, error: messageOf(error) }));
       },
     );
+  }
+
+  function loadPermissions(): void {
+    const current = sessionRef.current;
+    client.getConfig(sessionCwdRef.current ?? process.cwd(), current ?? undefined).then(
+      (config: ConfigGetResult) => {
+        setPerms((state) => (state.open ? { ...state, config } : state));
+      },
+      (error: unknown) => {
+        setChat((state) => ({ ...state, error: messageOf(error) }));
+      },
+    );
+  }
+
+  function onPermissionsPress(press: Press): void {
+    const key = permissionsKeyOf(press);
+    if (key === null) {
+      return;
+    }
+    const pressed = pressPermissions(permsRef.current, key);
+    permsRef.current = pressed.state;
+    setPerms(pressed.state);
+    const action = pressed.action;
+    const folder = sessionCwdRef.current ?? process.cwd();
+    const done = (notice: string) => () => {
+      setChat((state) => ({ ...state, error: null, notice }));
+      loadPermissions();
+    };
+    const failed = (error: unknown) => {
+      setChat((state) => ({ ...state, error: messageOf(error) }));
+    };
+    if (action.kind === "refresh") {
+      loadPermissions();
+    } else if (action.kind === "notice") {
+      setChat((state) => ({ ...state, notice: action.text }));
+    } else if (action.kind === "update") {
+      const where = action.target === "project" ? folder : undefined;
+      void client
+        .updateRule(action.target, action.index, action.action, where)
+        .then(done(`rule ${action.index} now ${action.action}s`), failed);
+    } else if (action.kind === "remove") {
+      const where = action.target === "project" ? folder : undefined;
+      void client.removeRule(action.target, action.index, where).then(done(`rule ${action.index} removed`), failed);
+    } else if (action.kind === "revoke") {
+      const current = sessionRef.current;
+      if (current !== null) {
+        void client
+          .revokeAllowance(current, action.tool, action.subject)
+          .then(done(`${action.tool} is no longer allowed for this session`), failed);
+      }
+    }
   }
 
   function onPickerPress(press: Press): void {
@@ -1174,7 +1249,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
     }
   }
 
-  function answerApproval(decision: "allow" | "allow_session" | "deny"): void {
+  function answerApproval(decision: ApprovalChoice): void {
     const pending = approvalRef.current;
     const current = sessionRef.current;
     if (pending === null || current === null) {
@@ -1275,6 +1350,10 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       onPickerPress(press);
       return;
     }
+    if (permsRef.current.open && !keysOpenRef.current && press.name !== "f1" && press.name !== "ctrl-c") {
+      onPermissionsPress(press);
+      return;
+    }
     applyKeyEffect(pressKey(currentPlace(), press));
   });
 
@@ -1284,7 +1363,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       applySecretStep({ prompt: pasteSecret(prompt, text), submit: null });
       return;
     }
-    if (busyRef.current || switcherRef.current.open || pickerRef.current.open || keysOpenRef.current) {
+    if (busyRef.current || switcherRef.current.open || pickerRef.current.open || permsRef.current.open || keysOpenRef.current) {
       return;
     }
     if (connectionRef.current.status !== "connected" || sessionRef.current === null) {
@@ -1361,6 +1440,14 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
           height={budget.body}
           hint={pickerHint(picker, shownListing?.ram_gb ?? null)}
         />
+      ) : perms.open ? (
+        <Box flexDirection="column" width={columns} height={budget.body} flexShrink={0} overflow="hidden">
+          {layoutPermissions(perms, columns, budget.body).map((line, index) => (
+            <Text key={index} wrap="truncate-end" inverse={line.selected} dimColor={line.dim && !line.selected}>
+              {line.text}
+            </Text>
+          ))}
+        </Box>
       ) : switcher.open ? (
         <SwitcherView
           rows={layoutSwitcher({

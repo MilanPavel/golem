@@ -1,0 +1,38 @@
+{
+  "additionalProperties": false,
+  "description": "``policy.remove``. Delete rule ``index`` from the user's or the project's file.",
+  "properties": {
+    "cwd": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cwd"
+    },
+    "index": {
+      "minimum": 1,
+      "title": "Index",
+      "type": "integer"
+    },
+    "target": {
+      "enum": [
+        "user",
+        "project"
+      ],
+      "title": "Target",
+      "type": "string"
+    }
+  },
+  "required": [
+    "target",
+    "index"
+  ],
+  "title": "PolicyRemoveParams",
+  "type": "object"
+}

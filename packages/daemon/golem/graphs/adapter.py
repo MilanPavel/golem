@@ -84,6 +84,7 @@ class ApprovalAsked:
     args: dict[str, object]
     source: str
     message_id: str | None = None
+    subject: str | None = None
 
 
 Fact = (
@@ -238,12 +239,14 @@ def _approval(paused: object) -> ApprovalAsked | None:
             continue
         args = raw.get("args")
         message_id = raw.get("message_id")
+        subject = raw.get("subject")
         return ApprovalAsked(
             call_id=call_id,
             name=name,
             args=dict(cast(dict[str, object], args)) if isinstance(args, dict) else {},
             source=source,
             message_id=message_id if isinstance(message_id, str) else None,
+            subject=subject if isinstance(subject, str) else None,
         )
     return None
 

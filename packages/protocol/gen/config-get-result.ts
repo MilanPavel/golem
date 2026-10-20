@@ -6,12 +6,17 @@ export type LogLevel = string;
 export type ProjectPolicy = string | null;
 export type ProjectTrusted = boolean | null;
 export type Action = 'allow' | 'ask' | 'deny';
+export type File = 'user' | 'project' | 'default';
 export type Ignored = string | null;
+export type Index = number | null;
 export type Match = string | null;
 export type Path = string | null;
 export type Source = string;
 export type Tool = string;
 export type Rules = ConfigRule[];
+export type Subject = string | null;
+export type Tool1 = string;
+export type SessionAllowed = ConfigAllowance[];
 export type SessionTitles = boolean;
 export type TrustedProjects = string[];
 
@@ -29,6 +34,7 @@ export interface ConfigGetResult {
   project_policy?: ProjectPolicy;
   project_trusted?: ProjectTrusted;
   rules: Rules;
+  session_allowed?: SessionAllowed;
   session_titles: SessionTitles;
   trusted_projects: TrustedProjects;
 }
@@ -36,16 +42,29 @@ export interface ConfigGetResult {
  * One tool rule, in the order rules are checked.
  *
  * ``source`` names the file and the rule's number in it, or ``built-in
- * default``. ``ignored`` says why a listed rule never matches.
+ * default``. ``ignored`` says why a listed rule never matches. ``file`` and
+ * ``index`` are what ``policy.update`` and ``policy.remove`` take.
  *
  * This interface was referenced by `ConfigGetResult`'s JSON-Schema
  * via the `definition` "ConfigRule".
  */
 export interface ConfigRule {
   action: Action;
+  file?: File;
   ignored?: Ignored;
+  index?: Index;
   match?: Match;
   path?: Path;
   source: Source;
   tool: Tool;
+}
+/**
+ * A tool allowed for the rest of the session asked about.
+ *
+ * This interface was referenced by `ConfigGetResult`'s JSON-Schema
+ * via the `definition` "ConfigAllowance".
+ */
+export interface ConfigAllowance {
+  subject?: Subject;
+  tool: Tool1;
 }

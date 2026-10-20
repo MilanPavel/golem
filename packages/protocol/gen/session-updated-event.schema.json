@@ -1,9 +1,52 @@
 {
   "$defs": {
+    "SessionAllowance": {
+      "additionalProperties": false,
+      "description": "A tool allowed for the rest of a session. ``subject`` null allows every call of it.",
+      "properties": {
+        "subject": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Subject"
+        },
+        "tool": {
+          "minLength": 1,
+          "title": "Tool",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tool"
+      ],
+      "title": "SessionAllowance",
+      "type": "object"
+    },
     "SessionUpdatedData": {
       "additionalProperties": false,
-      "description": "A session attribute changed: its title, or its project folder.\n\nA field left null did not change. ``cwd`` is set once, on a session made\nbefore sessions had a folder, by the first ``message.send`` that names one.",
+      "description": "A session attribute changed: its title, its project folder, or its allowed tools.\n\nA field left null did not change. ``cwd`` is set once, on a session made\nbefore sessions had a folder, by the first ``message.send`` that names one.\n``allowed_tools`` is the whole list after ``session.revoke``.",
       "properties": {
+        "allowed_tools": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/SessionAllowance"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Allowed Tools"
+        },
         "cwd": {
           "anyOf": [
             {

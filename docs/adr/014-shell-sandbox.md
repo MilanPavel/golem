@@ -52,4 +52,4 @@ Reads are allowed outside the denied folders, so an approved command can still r
 
 Tools that need the network (`pnpm install`, `uv sync` with new packages) fail until you set `[shell] network = true`, and that setting applies to every command.
 
-"Allow for session" on `shell` allows every command until step 1.4b keys it on the command.
+"Allow for session" and "always allow" on `shell` cover one exact command. A command that changes by one character asks again.

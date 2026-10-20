@@ -7,6 +7,7 @@ import sqlite3
 from dataclasses import dataclass
 from typing import Literal, cast
 
+from golem.permissions.engine import Allowance
 from golem.store.database import Database
 
 RunStatus = Literal["running", "waiting", "completed", "failed", "cancelled"]
@@ -33,7 +34,7 @@ class SessionRecord:
     updated_at: str
     closed_at: str | None
     cwd: str | None = None
-    allowed_tools: tuple[str, ...] = ()
+    allowed_tools: tuple[Allowance, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -115,13 +116,29 @@ class RunRecords:
         return [_run(row) for row in rows]
 
 
-def _names(raw: object) -> tuple[str, ...]:
+def decode_allowances(raw: object) -> list[Allowance]:
+    """``sessions.allowed_tools``: ``[tool, subject]`` pairs.
+
+    A bare name, as older rows hold, is a tool with no subject.
+    """
     if not isinstance(raw, str):
-        return ()
+        return []
     parsed = json.loads(raw)
     if not isinstance(parsed, list):
-        return ()
-    return tuple(item for item in cast(list[object], parsed) if isinstance(item, str))
+        return []
+    found: list[Allowance] = []
+    for item in cast(list[object], parsed):
+        if isinstance(item, str):
+            found.append((item, None))
+        elif isinstance(item, list) and len(cast(list[object], item)) == 2:
+            tool, subject = cast(list[object], item)
+            if isinstance(tool, str) and (subject is None or isinstance(subject, str)):
+                found.append((tool, subject))
+    return found
+
+
+def encode_allowances(allowed: list[Allowance]) -> str:
+    return json.dumps([[tool, subject] for tool, subject in allowed])
 
 
 def _session(row: sqlite3.Row) -> SessionRecord:
@@ -133,7 +150,7 @@ def _session(row: sqlite3.Row) -> SessionRecord:
         updated_at=row["updated_at"],
         closed_at=row["closed_at"],
         cwd=row["cwd"],
-        allowed_tools=_names(row["allowed_tools"]),
+        allowed_tools=tuple(decode_allowances(row["allowed_tools"])),
     )
 
 

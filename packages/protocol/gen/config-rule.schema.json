@@ -1,6 +1,6 @@
 {
   "additionalProperties": false,
-  "description": "One tool rule, in the order rules are checked.\n\n``source`` names the file and the rule's number in it, or ``built-in\ndefault``. ``ignored`` says why a listed rule never matches.",
+  "description": "One tool rule, in the order rules are checked.\n\n``source`` names the file and the rule's number in it, or ``built-in\ndefault``. ``ignored`` says why a listed rule never matches. ``file`` and\n``index`` are what ``policy.update`` and ``policy.remove`` take.",
   "properties": {
     "action": {
       "enum": [
@@ -9,6 +9,16 @@
         "deny"
       ],
       "title": "Action",
+      "type": "string"
+    },
+    "file": {
+      "default": "default",
+      "enum": [
+        "user",
+        "project",
+        "default"
+      ],
+      "title": "File",
       "type": "string"
     },
     "ignored": {
@@ -22,6 +32,19 @@
       ],
       "default": null,
       "title": "Ignored"
+    },
+    "index": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Index"
     },
     "match": {
       "anyOf": [

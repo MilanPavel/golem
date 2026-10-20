@@ -38,6 +38,7 @@ from golem.graphs.adapter import (
     translate,
 )
 from golem.graphs.chat import ChatRuntime
+from golem.permissions.engine import Allowance
 from golem.sessions.interrupted import close_reply
 from golem.sessions.log import SessionLog
 from golem_protocol.events import (
@@ -77,14 +78,16 @@ class Turn:
     user_message_id: str
     assistant_message_id: str
     cwd: str | None = None
-    allowed_tools: tuple[str, ...] = ()
+    allowed_tools: tuple[Allowance, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
 class Resume:
     """The answer to the tool call a run waits on, and what the run's events say about it.
 
-    ``open_calls`` are the run's tool calls requested and not finished.
+    ``open_calls`` are the run's tool calls requested and not finished, and
+    ``asked`` the ones it asked about, in order, this one included. ``rule``
+    is the rule an ``allow_always`` wrote.
     """
 
     session_id: str
@@ -95,7 +98,10 @@ class Resume:
     user_message_id: str | None
     open_calls: tuple[str, ...]
     cwd: str | None = None
-    allowed_tools: tuple[str, ...] = ()
+    allowed_tools: tuple[Allowance, ...] = ()
+    asked: tuple[str, ...] = ()
+    subject: str | None = None
+    rule: str | None = None
 
 
 @dataclass
@@ -197,7 +203,11 @@ async def resume_turn(
         await emit(
             "approval.resolved",
             ApprovalResolvedData(
-                call_id=resume.call_id, name=resume.name, decision=resume.decision
+                call_id=resume.call_id,
+                name=resume.name,
+                decision=resume.decision,
+                subject=resume.subject,
+                rule=resume.rule,
             ),
         )
         stream = runtime.resume(
@@ -205,6 +215,7 @@ async def resume_turn(
             decision=resume.decision,
             cwd=resume.cwd,
             allowed_tools=resume.allowed_tools,
+            asked=resume.asked,
         )
         return await _finish(stream, progress, emit)
     except asyncio.CancelledError:
@@ -306,6 +317,7 @@ async def _apply(
                 name=fact.name,
                 args=fact.args,
                 source=fact.source,
+                subject=fact.subject,
             ),
         )
 

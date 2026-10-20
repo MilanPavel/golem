@@ -10,6 +10,7 @@ export {
   RUN_NOT_FOUND,
   SESSION_BUSY,
   SESSION_NOT_FOUND,
+  type ApprovalChoice,
   type ChatEvent,
   type ConnectionState,
   type ConnectOptions,
@@ -18,6 +19,7 @@ export {
   type SessionSummary,
 } from "./connect.ts";
 export type { ModelProbeResult } from "../../protocol/gen/model-probe-result.ts";
+export type { ConfigGetResult, ConfigRule } from "../../protocol/gen/config-get-result.ts";
 export type { ListedModel, ModelListResult } from "../../protocol/gen/model-list-result.ts";
 export { mergeSummary } from "./session-index.ts";
 export { resolveSocketPath } from "./socket-path.ts";

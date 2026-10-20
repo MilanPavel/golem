@@ -2,7 +2,7 @@
   "$defs": {
     "ApprovalNeededData": {
       "additionalProperties": false,
-      "description": "A tool call waits for the user. The run is paused until ``approval.respond``.\n\n``source`` is the rule that asked, such as ``built-in default``.",
+      "description": "A tool call waits for the user. The run is paused until ``approval.respond``.\n\n``source`` is the rule that asked, such as ``built-in default``.\n``subject`` is what rules match for this tool, such as the shell command.",
       "properties": {
         "args": {
           "additionalProperties": true,
@@ -36,6 +36,18 @@
           "minLength": 1,
           "title": "Source",
           "type": "string"
+        },
+        "subject": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Subject"
         }
       },
       "required": [

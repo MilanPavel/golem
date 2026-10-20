@@ -24,18 +24,24 @@ class Pending:
 
     call_id: str
     name: str
+    args: dict[str, object]
+    subject: str | None
     user_message_id: str | None
     prompt: str | None
     open_calls: tuple[str, ...]
+    asked: tuple[str, ...]
 
 
 def pending_approval(events: list[ChatEvent]) -> Pending | None:
     """The newest ``approval.needed`` without an ``approval.resolved`` after it, or None."""
     waiting: ApprovalNeededEvent | None = None
     prompt: str | None = None
+    asked: list[str] = []
     for event in events:
         if isinstance(event, ApprovalNeededEvent):
             waiting = event
+            if event.data.call_id not in asked:
+                asked.append(event.data.call_id)
         elif isinstance(event, ApprovalResolvedEvent):
             waiting = None
         elif isinstance(event, MessageCompletedEvent) and event.data.role == "user":
@@ -46,9 +52,12 @@ def pending_approval(events: list[ChatEvent]) -> Pending | None:
     return Pending(
         call_id=waiting.data.call_id,
         name=waiting.data.name,
+        args=dict(waiting.data.args),
+        subject=waiting.data.subject,
         user_message_id=turn.user_message_id,
         prompt=prompt,
         open_calls=tuple(turn.open_calls),
+        asked=tuple(asked),
     )
 
 

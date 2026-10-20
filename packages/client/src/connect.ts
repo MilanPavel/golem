@@ -6,6 +6,9 @@ import type { AuthRemoveResult } from "../../protocol/gen/auth-remove-result.ts"
 import type { AuthSetResult } from "../../protocol/gen/auth-set-result.ts";
 import type { ApprovalRespondResult } from "../../protocol/gen/approval-respond-result.ts";
 import type { ConfigGetResult } from "../../protocol/gen/config-get-result.ts";
+import type { PolicyEditResult } from "../../protocol/gen/policy-edit-result.ts";
+
+export type ApprovalChoice = "allow" | "allow_session" | "allow_always" | "deny";
 import type { DaemonStatus } from "../../protocol/gen/daemon-status.ts";
 import type { MessageSendResult } from "../../protocol/gen/message-send-result.ts";
 import type { ModelListResult } from "../../protocol/gen/model-list-result.ts";
@@ -148,13 +151,20 @@ export interface GolemClient {
   removeKey(provider: string): Promise<AuthRemoveResult>;
   listKeys(): Promise<AuthListResult>;
   /** Resolved settings, and the tool rules for `cwd` in the order they are checked. */
-  getConfig(cwd?: string): Promise<ConfigGetResult>;
+  getConfig(cwd?: string, sessionId?: string): Promise<ConfigGetResult>;
   /** Answer the tool call the session's run waits on. The run goes on in the daemon. */
-  respondApproval(
-    sessionId: string,
-    callId: string,
-    decision: "allow" | "allow_session" | "deny",
-  ): Promise<ApprovalRespondResult>;
+  respondApproval(sessionId: string, callId: string, decision: ApprovalChoice): Promise<ApprovalRespondResult>;
+  /** Set the action of rule `index` in the user's or the project's file. `cwd` names the project. */
+  updateRule(
+    target: "user" | "project",
+    index: number,
+    action: "allow" | "ask" | "deny",
+    cwd?: string,
+  ): Promise<PolicyEditResult>;
+  /** Delete rule `index` from the user's or the project's file. */
+  removeRule(target: "user" | "project", index: number, cwd?: string): Promise<PolicyEditResult>;
+  /** Stop allowing `tool` (with `subject`) for the rest of the session. Resolves whether it was allowed. */
+  revokeAllowance(sessionId: string, tool: string, subject: string | null): Promise<boolean>;
   /** Every model golem knows of. `refresh` fetches hosted lists and prices again, past their cache. */
   listModels(refresh?: boolean): Promise<ModelListResult>;
   /** Use `model` (a profile or a ref) from the session's next run. The daemon emits `model.selected`. */
@@ -180,6 +190,13 @@ interface Pending {
   method: string;
   resolve: (value: unknown) => void;
   reject: (error: Error) => void;
+}
+
+function policyEdit(result: unknown): PolicyEditResult {
+  if (!isRecord(result) || typeof result["file"] !== "string") {
+    throw new Error("invalid policy edit result");
+  }
+  return { file: result["file"] };
 }
 
 export function connectGolem(options: ConnectOptions): GolemClient {
@@ -692,11 +709,28 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       }
       return result;
     },
-    async respondApproval(
-      sessionId: string,
-      callId: string,
-      decision: "allow" | "allow_session" | "deny",
-    ): Promise<ApprovalRespondResult> {
+    async updateRule(
+      target: "user" | "project",
+      index: number,
+      action: "allow" | "ask" | "deny",
+      cwd?: string,
+    ): Promise<PolicyEditResult> {
+      await ready;
+      return policyEdit(await call("policy.update", { target, index, action, ...(cwd === undefined ? {} : { cwd }) }));
+    },
+    async removeRule(target: "user" | "project", index: number, cwd?: string): Promise<PolicyEditResult> {
+      await ready;
+      return policyEdit(await call("policy.remove", { target, index, ...(cwd === undefined ? {} : { cwd }) }));
+    },
+    async revokeAllowance(sessionId: string, tool: string, subject: string | null): Promise<boolean> {
+      await ready;
+      const result = await call("session.revoke", { session_id: sessionId, tool, subject });
+      if (!isRecord(result) || typeof result["revoked"] !== "boolean") {
+        throw new Error("invalid session.revoke result");
+      }
+      return result["revoked"];
+    },
+    async respondApproval(sessionId: string, callId: string, decision: ApprovalChoice): Promise<ApprovalRespondResult> {
       await ready;
       const result = await call("approval.respond", { session_id: sessionId, call_id: callId, decision });
       if (!isRecord(result) || typeof result["run_id"] !== "string") {
@@ -704,9 +738,12 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       }
       return { run_id: result["run_id"] };
     },
-    async getConfig(cwd?: string): Promise<ConfigGetResult> {
+    async getConfig(cwd?: string, sessionId?: string): Promise<ConfigGetResult> {
       await ready;
-      const result = await call("config.get", cwd === undefined ? {} : { cwd });
+      const result = await call("config.get", {
+        ...(cwd === undefined ? {} : { cwd }),
+        ...(sessionId === undefined ? {} : { session_id: sessionId }),
+      });
       if (!isConfigGetResult(result)) {
         throw new Error("invalid config.get result");
       }

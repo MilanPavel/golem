@@ -1,0 +1,48 @@
+{
+  "additionalProperties": false,
+  "description": "``policy.update``. Set the ``action`` of rule ``index``.\n\n``target`` is the user's ``config.toml`` or the project's ``policy.toml``.",
+  "properties": {
+    "action": {
+      "enum": [
+        "allow",
+        "ask",
+        "deny"
+      ],
+      "title": "Action",
+      "type": "string"
+    },
+    "cwd": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cwd"
+    },
+    "index": {
+      "minimum": 1,
+      "title": "Index",
+      "type": "integer"
+    },
+    "target": {
+      "enum": [
+        "user",
+        "project"
+      ],
+      "title": "Target",
+      "type": "string"
+    }
+  },
+  "required": [
+    "target",
+    "index",
+    "action"
+  ],
+  "title": "PolicyUpdateParams",
+  "type": "object"
+}

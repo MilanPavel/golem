@@ -21,13 +21,13 @@ A resumed node runs again from its first line, and that is the trap. If the node
 
 ## What the code does today
 
-- **The node** is `golem/graphs/tools_node.py`. `_decide` runs the policy. `allow` runs the call. `deny` fails it with the rule's reason. A tool already allowed for the session runs. Anything else interrupts with the call id, tool name, arguments, the asking message, and the rule (`source`). The answer is `allow`, `allow_session`, or `deny`. `allow_session` also covers later calls of the same tool in that pass.
+- **The node** is `golem/graphs/tools_node.py`. `_decide` runs the policy. `allow` runs the call. `deny` fails it with the rule's reason. A tool already allowed for the session runs. Anything else interrupts with the call id, tool name, arguments, the asking message, and the rule (`source`). The answer is `allow`, `allow_session`, `allow_always`, or `deny`. `allow_session` covers later calls of the same tool and subject in that pass, and the session after it. `allow_always` runs the call after the daemon has written an allow rule for it.
 - **Events.** The adapter turns the `__interrupt__` update into `approval.needed`. The runner stops after it, without `run.completed`. `approval.respond` is answered with the run id once `approval.resolved` is stored. `resume_turn` then streams the rest of the run through the same event handling as a new turn.
 - **Store.** The projection marks the run `waiting` on `approval.needed` and `running` again on `approval.resolved`. `allow_session` adds the tool to `sessions.allowed_tools`, and the next turn passes that list to the graph in `configurable`. Recovery at startup closes only `running` runs, so a waiting run survives. A daemon stopping cancels running tasks, and a waiting run has none.
 - **The pending call** is read from the run's events each time (`golem/sessions/approvals.py`): the newest `approval.needed` without an `approval.resolved`, the calls still open, and the prompt for a title once the run completes. An answer for any other call is `-32010`.
 - **While it waits.** `message.send` is `SESSION_BUSY`. Cancelling fails every open call with `cancelled before it was approved` and stores `run.cancelled`. The checkpoint keeps the reply's unanswered calls, and the next turn gives them cancelled results before it streams ([ADR-011](011-tools.md)).
 - **A quick answer.** `approval.needed` is stored a moment before the paused task has finished closing its stream. An answer that arrives in that moment waits for the task to end, rather than being refused as busy.
-- **The TUI** draws a three-row band where command suggestions go: `Allow read_file notes.txt?`, the rule that asked, and the keys. `a` or Enter allows once, `s` allows for the session, `d` or Esc denies, and Ctrl-C cancels the run. The tool line shows `?`, the meter says `waiting for your approval`, and the switcher marks the session with a yellow `?`.
+- **The TUI** draws a three-row band where command suggestions go: `Allow read_file notes.txt?`, the rule that asked, and the keys. `a` or Enter allows once, `s` allows the same call for the session, `w` writes a rule and allows it always, `d` or Esc denies, and Ctrl-C cancels the run. The tool line shows `?`, the meter says `waiting for your approval`, and the switcher marks the session with a yellow `?`.
 
 ## Other shapes that lost
 
@@ -41,7 +41,7 @@ A resumed node runs again from its first line, and that is the trap. If the node
 
 ## What it costs
 
-`allow_session` allows a tool by name. Once there is a shell, allowing it for a session allows every command. Step 1.4 may need the subject in that key.
+Answers are matched to interrupts by their order. A rule written or changed while a run waits must not shift that order, so the resume passes the ids of the calls already asked about, and an earlier call that would now ask out of turn is refused (`the rules changed while the run waited`). Refusing is the safe side: rerunning the turn asks again.
 
 A reply that asks about several calls asks one at a time. You cannot answer them all at once.
 

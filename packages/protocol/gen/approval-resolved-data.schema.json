@@ -1,6 +1,6 @@
 {
   "additionalProperties": false,
-  "description": "The user answered. ``allow_session`` also allows ``name`` for the rest of the session.",
+  "description": "The user answered.\n\n``allow_session`` also allows ``name`` with this ``subject`` for the rest of\nthe session, or every call of ``name`` when ``subject`` is null.\n``allow_always`` wrote an allow rule, and ``rule`` names it.",
   "properties": {
     "call_id": {
       "minLength": 1,
@@ -11,6 +11,7 @@
       "enum": [
         "allow",
         "allow_session",
+        "allow_always",
         "deny"
       ],
       "title": "Decision",
@@ -20,6 +21,30 @@
       "minLength": 1,
       "title": "Name",
       "type": "string"
+    },
+    "rule": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Rule"
+    },
+    "subject": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Subject"
     }
   },
   "required": [

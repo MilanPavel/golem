@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "The file that was written.",
+  "properties": {
+    "file": {
+      "minLength": 1,
+      "title": "File",
+      "type": "string"
+    }
+  },
+  "required": [
+    "file"
+  ],
+  "title": "PolicyEditResult",
+  "type": "object"
+}

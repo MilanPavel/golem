@@ -4,6 +4,7 @@ export type CallId = string;
 export type MessageId = string | null;
 export type Name = string;
 export type Source = string;
+export type Subject = string | null;
 export type RunId = string;
 export type Seq = number;
 export type SessionId = string;
@@ -25,6 +26,7 @@ export interface ApprovalNeededEvent {
  * A tool call waits for the user. The run is paused until ``approval.respond``.
  *
  * ``source`` is the rule that asked, such as ``built-in default``.
+ * ``subject`` is what rules match for this tool, such as the shell command.
  *
  * This interface was referenced by `ApprovalNeededEvent`'s JSON-Schema
  * via the `definition` "ApprovalNeededData".
@@ -35,6 +37,7 @@ export interface ApprovalNeededData {
   message_id?: MessageId;
   name: Name;
   source: Source;
+  subject?: Subject;
 }
 export interface Args {
   [k: string]: unknown;

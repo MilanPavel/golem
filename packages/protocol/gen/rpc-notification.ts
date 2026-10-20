@@ -32,6 +32,9 @@ export type Seq = number;
 export type SessionId1 = string;
 export type Ts = string;
 export type Type = 'session.created';
+export type AllowedTools = SessionAllowance[] | null;
+export type Subject = string | null;
+export type Tool = string;
 export type Cwd1 = string | null;
 export type Title = string | null;
 export type RunId1 = null;
@@ -139,14 +142,17 @@ export type CallId5 = string;
 export type MessageId5 = string | null;
 export type Name1 = string;
 export type Source = string;
+export type Subject1 = string | null;
 export type RunId16 = string;
 export type Seq16 = number;
 export type SessionId17 = string;
 export type Ts16 = string;
 export type Type16 = 'approval.needed';
 export type CallId6 = string;
-export type Decision = 'allow' | 'allow_session' | 'deny';
+export type Decision = 'allow' | 'allow_session' | 'allow_always' | 'deny';
 export type Name2 = string;
+export type Rule = string | null;
+export type Subject2 = string | null;
 export type RunId17 = string;
 export type Seq17 = number;
 export type SessionId18 = string;
@@ -219,17 +225,29 @@ export interface SessionUpdatedEvent {
   type: Type1;
 }
 /**
- * A session attribute changed: its title, or its project folder.
+ * A session attribute changed: its title, its project folder, or its allowed tools.
  *
  * A field left null did not change. ``cwd`` is set once, on a session made
  * before sessions had a folder, by the first ``message.send`` that names one.
+ * ``allowed_tools`` is the whole list after ``session.revoke``.
  *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "SessionUpdatedData".
  */
 export interface SessionUpdatedData {
+  allowed_tools?: AllowedTools;
   cwd?: Cwd1;
   title?: Title;
+}
+/**
+ * A tool allowed for the rest of a session. ``subject`` null allows every call of it.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "SessionAllowance".
+ */
+export interface SessionAllowance {
+  subject?: Subject;
+  tool: Tool;
 }
 /**
  * The session left the list. ``run_id`` is null: no run owns the change.
@@ -588,6 +606,7 @@ export interface ApprovalNeededEvent {
  * A tool call waits for the user. The run is paused until ``approval.respond``.
  *
  * ``source`` is the rule that asked, such as ``built-in default``.
+ * ``subject`` is what rules match for this tool, such as the shell command.
  *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "ApprovalNeededData".
@@ -598,6 +617,7 @@ export interface ApprovalNeededData {
   message_id?: MessageId5;
   name: Name1;
   source: Source;
+  subject?: Subject1;
 }
 export interface Args1 {
   [k: string]: unknown;
@@ -617,7 +637,11 @@ export interface ApprovalResolvedEvent {
   type: Type17;
 }
 /**
- * The user answered. ``allow_session`` also allows ``name`` for the rest of the session.
+ * The user answered.
+ *
+ * ``allow_session`` also allows ``name`` with this ``subject`` for the rest of
+ * the session, or every call of ``name`` when ``subject`` is null.
+ * ``allow_always`` wrote an allow rule, and ``rule`` names it.
  *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "ApprovalResolvedData".
@@ -626,4 +650,6 @@ export interface ApprovalResolvedData {
   call_id: CallId6;
   decision: Decision;
   name: Name2;
+  rule?: Rule;
+  subject?: Subject2;
 }

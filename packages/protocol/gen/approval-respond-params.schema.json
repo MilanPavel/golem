@@ -1,6 +1,6 @@
 {
   "additionalProperties": false,
-  "description": "``approval.respond``. Answer the tool call a session's run waits on.\n\n``allow`` runs it once, ``allow_session`` runs it and allows the tool for\nthe rest of the session, and ``deny`` tells the model it may not.",
+  "description": "``approval.respond``. Answer the tool call a session's run waits on.\n\n``allow`` runs it once, ``allow_session`` runs it and allows the same call\nfor the rest of the session, ``allow_always`` runs it and writes an allow\nrule for it first in the user's ``config.toml``, and ``deny`` tells the\nmodel it may not.",
   "properties": {
     "call_id": {
       "minLength": 1,
@@ -11,6 +11,7 @@
       "enum": [
         "allow",
         "allow_session",
+        "allow_always",
         "deny"
       ],
       "title": "Decision",

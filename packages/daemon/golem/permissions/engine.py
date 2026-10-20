@@ -12,19 +12,39 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from fnmatch import fnmatchcase
 from pathlib import Path
+from typing import Literal
 
 from golem.config import PolicyRule, RuleAction
 
 DEFAULT_SOURCE = "built-in default"
 
 
+RuleFile = Literal["user", "project", "default"]
+
+Allowance = tuple[str, str | None]
+"""A tool allowed for the rest of a session, and the subject it is allowed with.
+
+A null subject allows every call of the tool, as for tools that have no subject.
+"""
+
+
+def session_allows(allowed: Iterable[Allowance], tool: str, subject: str | None) -> bool:
+    keys = set(allowed)
+    return (tool, None) in keys or (subject is not None and (tool, subject) in keys)
+
+
 @dataclass(frozen=True, slots=True)
 class Rule:
-    """A rule and where it came from. An ``ignored`` rule is listed and never matches."""
+    """A rule and where it came from. An ``ignored`` rule is listed and never matches.
+
+    ``file`` and ``index`` (from 1) say which ``[[rule]]`` to edit. Defaults have no index.
+    """
 
     rule: PolicyRule
     source: str
     ignored: str | None = None
+    file: RuleFile = "default"
+    index: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,8 +93,7 @@ def matches(rule: PolicyRule, call: Call, *, home: Path) -> bool:
     if rule.match is not None:
         if call.subject is None:
             return False
-        alternatives = [part.strip() for part in rule.match.split("|")]
-        if not any(fnmatchcase(call.subject, part) for part in alternatives if part):
+        if not any(fnmatchcase(call.subject, part) for part in alternatives(rule.match) if part):
             return False
     if rule.path is not None:
         if call.path is None:
@@ -83,6 +102,17 @@ def matches(rule: PolicyRule, call: Call, *, home: Path) -> bool:
         if pattern is None or pattern.fullmatch(call.path.as_posix()) is None:
             return False
     return True
+
+
+def alternatives(match: str) -> list[str]:
+    """``match`` split on ``|``. ``\\|`` is a literal bar, as in a piped command."""
+    return [part.strip().replace("\\|", "|") for part in re.split(r"(?<!\\)\|", match)]
+
+
+def exact_match(subject: str) -> str:
+    """A ``match`` glob that matches ``subject`` and nothing else."""
+    escaped = re.sub(r"([*?\[])", r"[\1]", subject)
+    return escaped.replace("|", "\\|")
 
 
 def path_pattern(glob: str, *, root: Path | None, home: Path) -> re.Pattern[str] | None:
@@ -135,11 +165,16 @@ def _glob(text: str) -> str:
 
 __all__ = [
     "DEFAULT_SOURCE",
+    "Allowance",
     "Call",
     "Decision",
     "Rule",
+    "RuleFile",
+    "alternatives",
     "check",
     "default_rules",
+    "exact_match",
     "matches",
     "path_pattern",
+    "session_allows",
 ]

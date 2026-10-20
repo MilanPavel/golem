@@ -4,11 +4,13 @@ export type CallId = string;
 export type MessageId = string | null;
 export type Name = string;
 export type Source = string;
+export type Subject = string | null;
 
 /**
  * A tool call waits for the user. The run is paused until ``approval.respond``.
  *
  * ``source`` is the rule that asked, such as ``built-in default``.
+ * ``subject`` is what rules match for this tool, such as the shell command.
  */
 export interface ApprovalNeededData {
   args: Args;
@@ -16,6 +18,7 @@ export interface ApprovalNeededData {
   message_id?: MessageId;
   name: Name;
   source: Source;
+  subject?: Subject;
 }
 export interface Args {
   [k: string]: unknown;

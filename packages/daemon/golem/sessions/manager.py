@@ -14,11 +14,13 @@ import asyncio
 import logging
 from collections.abc import Coroutine
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from golem.graphs.adapter import PlainMessage, plain_messages
 from golem.graphs.chat import ChatRuntime
 from golem.graphs.state import SCHEMA_VERSION
 from golem.models.router import ModelIdentity, ModelRouter
+from golem.permissions.engine import Allowance
 from golem.sessions.approvals import pending_approval
 from golem.sessions.bus import EventTarget, SummaryTarget
 from golem.sessions.ids import new_id
@@ -42,6 +44,7 @@ from golem_protocol.events import (
     MessageCompletedEvent,
     ModelSelectedData,
     RunCancelledData,
+    SessionAllowance,
     SessionCreatedData,
     SessionUpdatedData,
 )
@@ -61,6 +64,10 @@ class SessionBusyError(Exception):
 
 class ApprovalNotFoundError(Exception):
     """No run of this session waits on this tool call."""
+
+
+class RuleWriteError(Exception):
+    """An "always allow" answer could not write its rule."""
 
 
 class BlankTitleError(Exception):
@@ -100,7 +107,7 @@ class _LiveSession:
     model_profile: str
     schema_version: int
     cwd: str | None = None
-    allowed_tools: set[str] = field(default_factory=set[str])
+    allowed_tools: set[Allowance] = field(default_factory=set[Allowance])
     title: str | None = None
     titling: bool = False
     closed: bool = False
@@ -349,7 +356,7 @@ class SessionManager:
                 user_message_id=new_id("m"),
                 assistant_message_id=new_id("m"),
                 cwd=session.cwd,
-                allowed_tools=tuple(sorted(session.allowed_tools)),
+                allowed_tools=_ordered(session.allowed_tools),
             )
             control = RunControl()
             await self._start(session, turn.run_id, control, self._turn(session, turn, control))
@@ -360,8 +367,12 @@ class SessionManager:
 
         Returns the run's id once ``approval.resolved`` is in the log.
 
+        ``allow_always`` writes an allow rule for exactly this call first in
+        the user's ``config.toml`` before the run goes on.
+
         Raises :class:`ApprovalNotFoundError`, :class:`SessionNotFoundError`,
-        :class:`SessionBusyError`, or :class:`SchemaMismatchError`.
+        :class:`SessionBusyError`, :class:`RuleWriteError`, or
+        :class:`SchemaMismatchError`.
         """
         async with self._lock:
             session = await self._resolve(session_id)
@@ -377,8 +388,11 @@ class SessionManager:
             pending = pending_approval(await self._events.for_run(run.run_id))
             if pending is None or pending.call_id != call_id:
                 raise ApprovalNotFoundError(call_id)
+            rule: str | None = None
+            if decision == "allow_always":
+                rule = await self._remember(session, pending.name, pending.args)
             if decision == "allow_session":
-                session.allowed_tools.add(pending.name)
+                session.allowed_tools.add((pending.name, pending.subject))
             resume = Resume(
                 session_id=session_id,
                 run_id=run.run_id,
@@ -388,12 +402,49 @@ class SessionManager:
                 user_message_id=pending.user_message_id,
                 open_calls=pending.open_calls,
                 cwd=session.cwd,
-                allowed_tools=tuple(sorted(session.allowed_tools)),
+                allowed_tools=_ordered(session.allowed_tools),
+                asked=pending.asked,
+                subject=pending.subject,
+                rule=rule,
             )
             control = RunControl()
             work = self._resumed(session, resume, control, pending.prompt)
             await self._start(session, run.run_id, control, work)
             return run.run_id
+
+    async def allowances(self, session_id: str) -> list[Allowance]:
+        """What ``session_id`` allows for the rest of the session."""
+        async with self._lock:
+            session = await self._resolve(session_id)
+            return list(_ordered(session.allowed_tools))
+
+    async def revoke(self, session_id: str, tool: str, subject: str | None) -> bool:
+        """Stop allowing ``tool`` with ``subject`` for the rest of the session.
+
+        Stores ``session.updated`` with the list that is left. Returns False
+        when it was not allowed.
+        """
+        async with self._lock:
+            session = await self._resolve(session_id)
+            if (tool, subject) not in session.allowed_tools:
+                return False
+            session.allowed_tools.discard((tool, subject))
+            left = [
+                SessionAllowance(tool=name, subject=item)
+                for name, item in _ordered(session.allowed_tools)
+            ]
+            await self._events.emit(
+                session_id, None, "session.updated", SessionUpdatedData(allowed_tools=left)
+            )
+            return True
+
+    async def _remember(self, session: _LiveSession, name: str, args: dict[str, object]) -> str:
+        root = None if session.cwd is None else Path(session.cwd)
+        policy = self._runtime.policy
+        try:
+            return await asyncio.to_thread(policy.remember, self._runtime.tools, name, args, root)
+        except (OSError, ValueError) as exc:
+            raise RuleWriteError(str(exc)) from exc
 
     async def _start(
         self,
@@ -565,6 +616,10 @@ class SessionManager:
         _report(task, "title task failed")
 
 
+def _ordered(allowed: set[Allowance]) -> tuple[Allowance, ...]:
+    return tuple(sorted(allowed, key=lambda pair: (pair[0], pair[1] or "")))
+
+
 def _completed_through(
     events: list[ChatEvent], message_id: str
 ) -> list[MessageCompletedEvent] | None:
@@ -590,6 +645,7 @@ __all__ = [
     "ApprovalNotFoundError",
     "BlankTitleError",
     "MessageNotFoundError",
+    "RuleWriteError",
     "RunNotFoundError",
     "SchemaMismatchError",
     "SessionBusyError",

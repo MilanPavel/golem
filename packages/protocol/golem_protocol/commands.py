@@ -583,13 +583,15 @@ class ConfigGetParams(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     cwd: str | None = Field(default=None, min_length=1)
+    session_id: str | None = Field(default=None, min_length=1)
 
 
 class ConfigRule(BaseModel):
     """One tool rule, in the order rules are checked.
 
     ``source`` names the file and the rule's number in it, or ``built-in
-    default``. ``ignored`` says why a listed rule never matches.
+    default``. ``ignored`` says why a listed rule never matches. ``file`` and
+    ``index`` are what ``policy.update`` and ``policy.remove`` take.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -600,6 +602,17 @@ class ConfigRule(BaseModel):
     action: Literal["allow", "ask", "deny"]
     source: str = Field(min_length=1)
     ignored: str | None = None
+    file: Literal["user", "project", "default"] = "default"
+    index: int | None = Field(default=None, ge=1)
+
+
+class ConfigAllowance(BaseModel):
+    """A tool allowed for the rest of the session asked about."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    tool: str = Field(min_length=1)
+    subject: str | None = None
 
 
 class ConfigGetResult(BaseModel):
@@ -620,20 +633,73 @@ class ConfigGetResult(BaseModel):
     project_policy: str | None = None
     project_trusted: bool | None = None
     rules: list[ConfigRule]
+    session_allowed: list[ConfigAllowance] = Field(default_factory=list[ConfigAllowance])
+
+
+class PolicyUpdateParams(BaseModel):
+    """``policy.update``. Set the ``action`` of rule ``index``.
+
+    ``target`` is the user's ``config.toml`` or the project's ``policy.toml``.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    target: Literal["user", "project"]
+    cwd: str | None = Field(default=None, min_length=1)
+    index: int = Field(ge=1)
+    action: Literal["allow", "ask", "deny"]
+
+
+class PolicyRemoveParams(BaseModel):
+    """``policy.remove``. Delete rule ``index`` from the user's or the project's file."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    target: Literal["user", "project"]
+    cwd: str | None = Field(default=None, min_length=1)
+    index: int = Field(ge=1)
+
+
+class PolicyEditResult(BaseModel):
+    """The file that was written."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    file: str = Field(min_length=1)
+
+
+class SessionRevokeParams(BaseModel):
+    """``session.revoke``. Stop allowing ``tool`` (with ``subject``) for the rest of the session."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    tool: str = Field(min_length=1)
+    subject: str | None = None
+
+
+class SessionRevokeResult(BaseModel):
+    """Whether that allowance was there."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    revoked: bool
 
 
 class ApprovalRespondParams(BaseModel):
     """``approval.respond``. Answer the tool call a session's run waits on.
 
-    ``allow`` runs it once, ``allow_session`` runs it and allows the tool for
-    the rest of the session, and ``deny`` tells the model it may not.
+    ``allow`` runs it once, ``allow_session`` runs it and allows the same call
+    for the rest of the session, ``allow_always`` runs it and writes an allow
+    rule for it first in the user's ``config.toml``, and ``deny`` tells the
+    model it may not.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     session_id: str = Field(min_length=1)
     call_id: str = Field(min_length=1)
-    decision: Literal["allow", "allow_session", "deny"]
+    decision: Literal["allow", "allow_session", "allow_always", "deny"]
 
 
 class ApprovalRespondResult(BaseModel):
@@ -654,6 +720,7 @@ __all__ = [
     "AuthRemoveResult",
     "AuthSetParams",
     "AuthSetResult",
+    "ConfigAllowance",
     "ConfigGetParams",
     "ConfigGetResult",
     "ConfigRule",
@@ -681,6 +748,9 @@ __all__ = [
     "ModelSetDefaultParams",
     "ModelSetDefaultResult",
     "PingParams",
+    "PolicyEditResult",
+    "PolicyRemoveParams",
+    "PolicyUpdateParams",
     "RunCancelParams",
     "RunCancelResult",
     "SessionAttachParams",
@@ -699,6 +769,8 @@ __all__ = [
     "SessionListResult",
     "SessionRenameParams",
     "SessionRenameResult",
+    "SessionRevokeParams",
+    "SessionRevokeResult",
     "SessionSetModelParams",
     "SessionSetModelResult",
     "SessionSummary",

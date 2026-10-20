@@ -1,0 +1,15 @@
+{
+  "additionalProperties": false,
+  "description": "Whether that allowance was there.",
+  "properties": {
+    "revoked": {
+      "title": "Revoked",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "revoked"
+  ],
+  "title": "SessionRevokeResult",
+  "type": "object"
+}

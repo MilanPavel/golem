@@ -20,6 +20,7 @@ export type ComposerOutcome =
   | { kind: "help" }
   | { kind: "send"; text: string; debug: DebugState }
   | { kind: "sessions" }
+  | { kind: "permissions" }
   | { kind: "new" }
   | { kind: "fork" }
   | { kind: "title"; title: string | null }
@@ -138,6 +139,12 @@ export const COMMANDS: readonly Command[] = [
     args: "",
     description: "Starts a new session.",
     run: withoutArgs({ kind: "new" }),
+  },
+  {
+    name: "/permissions",
+    args: "",
+    description: "Shows the tool rules for this folder and what this session allows.",
+    run: withoutArgs({ kind: "permissions" }),
   },
   {
     name: "/sessions",

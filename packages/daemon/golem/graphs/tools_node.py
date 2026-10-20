@@ -10,6 +10,13 @@ resumed run starts this node again from the top, so it works in two passes:
 first every decision, with one interrupt per call that asks, and only then
 the calls themselves and their stream items. Nothing has run or been
 reported before the last answer, so starting over repeats nothing.
+
+LangGraph hands the answers back in the order the interrupts were made. A
+rule written while the run waited ("always allow") must not change that
+order, so a call that was already asked about (``ASKED_KEY``, from the run's
+events) asks again and gets its stored answer, whatever the rules say now.
+A call before the last asked one that would ask only because the rules
+changed is refused, rather than asked out of turn.
 """
 
 from __future__ import annotations
@@ -28,7 +35,8 @@ from langgraph.types import interrupt
 
 from golem.graphs.adapter import APPROVAL_KIND, STREAM_KEY
 from golem.graphs.state import AgentState
-from golem.permissions.policy import Policy, explain
+from golem.permissions.engine import Allowance, session_allows
+from golem.permissions.policy import Policy, describe, explain
 from golem.tools.registry import ToolContext, ToolError, ToolRegistry
 
 log = logging.getLogger("golem.graphs")
@@ -37,12 +45,16 @@ CWD_KEY = "golem_cwd"
 """``configurable`` key for the session folder. It is not checkpointed."""
 
 ALLOWED_KEY = "golem_allowed_tools"
-"""``configurable`` key for the tools allowed for the rest of the session."""
+"""``configurable`` key for the ``[tool, subject]`` pairs allowed for the rest of the session."""
+
+ASKED_KEY = "golem_asked_calls"
+"""``configurable`` key for the call ids this run has already asked about, in order."""
 
 PREVIEW_CHARS = 4_000
 
 CANCELLED_RESULT = "cancelled: the run stopped before this tool call finished"
 DENIED_RESULT = "the user denied this tool call"
+CHANGED_RESULT = "the rules changed while the run waited, so this call did not run"
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,8 +73,23 @@ def tools_node(
             return {"messages": []}
         base = ToolContext(root=_root(config), shell=policy.shell())
         allowed = _allowed(config)
+        asked = _asked(config)
+        ids = [call_id_of(call) for call in last.tool_calls]
+        last_asked = max(
+            (index for index, call_id in enumerate(ids) if call_id in asked), default=-1
+        )
         verdicts = [
-            _decide(registry, policy, call, base, allowed, last.id) for call in last.tool_calls
+            _decide(
+                registry,
+                policy,
+                call,
+                base,
+                allowed,
+                last.id,
+                asked=ids[index] in asked,
+                before_last_asked=index < last_asked,
+            )
+            for index, call in enumerate(last.tool_calls)
         ]
         write = get_stream_writer()
         results: list[BaseMessage] = []
@@ -110,18 +137,25 @@ def _decide(
     policy: Policy,
     call: ToolCall,
     ctx: ToolContext,
-    allowed: set[str],
+    allowed: set[Allowance],
     message_id: str | None,
+    *,
+    asked: bool,
+    before_last_asked: bool,
 ) -> _Verdict:
     name = call["name"]
+    subject = describe(registry, name, call["args"], ctx.root).subject
     decision = policy.check(registry, name, call["args"], ctx.root)
-    if decision.allowed:
-        return _Verdict(run=True)
-    if decision.action == "deny":
-        log.info("tool %s denied by %s", name, decision.source)
-        return _Verdict(run=False, message=explain(decision, name))
-    if name in allowed:
-        return _Verdict(run=True)
+    if not asked:
+        if decision.allowed:
+            return _Verdict(run=True)
+        if decision.action == "deny":
+            log.info("tool %s denied by %s", name, decision.source)
+            return _Verdict(run=False, message=explain(decision, name))
+        if session_allows(allowed, name, subject):
+            return _Verdict(run=True)
+        if before_last_asked:
+            return _Verdict(run=False, message=CHANGED_RESULT)
     answer = interrupt(
         {
             STREAM_KEY: APPROVAL_KIND,
@@ -130,13 +164,14 @@ def _decide(
             "name": name,
             "args": dict(call["args"]),
             "source": decision.source,
+            "subject": subject,
         }
     )
     choice = cast(dict[str, object], answer).get("decision") if isinstance(answer, dict) else None
     if choice == "allow_session":
-        allowed.add(name)
+        allowed.add((name, subject))
         return _Verdict(run=True)
-    if choice == "allow":
+    if choice in ("allow", "allow_always"):
         return _Verdict(run=True)
     return _Verdict(run=False, message=DENIED_RESULT)
 
@@ -185,9 +220,23 @@ def _streamer(write: Callable[[object], None], call_id: str) -> Callable[[str], 
     return output
 
 
-def _allowed(config: RunnableConfig) -> set[str]:
+def _allowed(config: RunnableConfig) -> set[Allowance]:
     configurable = cast(Mapping[str, object], config.get("configurable", {}))
     raw = configurable.get(ALLOWED_KEY)
+    if not isinstance(raw, list | tuple):
+        return set()
+    found: set[Allowance] = set()
+    for item in cast(Sequence[object], raw):
+        if isinstance(item, list | tuple) and len(cast(Sequence[object], item)) == 2:
+            tool, subject = cast(Sequence[object], item)
+            if isinstance(tool, str) and (subject is None or isinstance(subject, str)):
+                found.add((tool, subject))
+    return found
+
+
+def _asked(config: RunnableConfig) -> set[str]:
+    configurable = cast(Mapping[str, object], config.get("configurable", {}))
+    raw = configurable.get(ASKED_KEY)
     if not isinstance(raw, list | tuple):
         return set()
     return {item for item in cast(Sequence[object], raw) if isinstance(item, str)}
@@ -201,7 +250,9 @@ def _root(config: RunnableConfig) -> Path | None:
 
 __all__ = [
     "ALLOWED_KEY",
+    "ASKED_KEY",
     "CANCELLED_RESULT",
+    "CHANGED_RESULT",
     "CWD_KEY",
     "DENIED_RESULT",
     "PREVIEW_CHARS",

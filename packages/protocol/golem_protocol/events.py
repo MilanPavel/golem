@@ -103,22 +103,33 @@ class RunCancelledData(BaseModel):
     reason: Literal["user", "shutdown"]
 
 
+class SessionAllowance(BaseModel):
+    """A tool allowed for the rest of a session. ``subject`` null allows every call of it."""
+
+    model_config = _CONFIG
+
+    tool: str = Field(min_length=1)
+    subject: str | None = None
+
+
 class SessionUpdatedData(BaseModel):
-    """A session attribute changed: its title, or its project folder.
+    """A session attribute changed: its title, its project folder, or its allowed tools.
 
     A field left null did not change. ``cwd`` is set once, on a session made
     before sessions had a folder, by the first ``message.send`` that names one.
+    ``allowed_tools`` is the whole list after ``session.revoke``.
     """
 
     model_config = _CONFIG
 
     title: str | None = Field(default=None, min_length=1)
     cwd: str | None = Field(default=None, min_length=1)
+    allowed_tools: list[SessionAllowance] | None = None
 
     @model_validator(mode="after")
     def _changes_something(self) -> Self:
-        if self.title is None and self.cwd is None:
-            raise ValueError("session.updated needs a title or a cwd")
+        if self.title is None and self.cwd is None and self.allowed_tools is None:
+            raise ValueError("session.updated needs a title, a cwd, or allowed_tools")
         return self
 
 
@@ -195,13 +206,14 @@ class ToolFailedData(BaseModel):
     message: str = Field(min_length=1)
 
 
-ApprovalDecision = Literal["allow", "allow_session", "deny"]
+ApprovalDecision = Literal["allow", "allow_session", "allow_always", "deny"]
 
 
 class ApprovalNeededData(BaseModel):
     """A tool call waits for the user. The run is paused until ``approval.respond``.
 
     ``source`` is the rule that asked, such as ``built-in default``.
+    ``subject`` is what rules match for this tool, such as the shell command.
     """
 
     model_config = _CONFIG
@@ -211,16 +223,24 @@ class ApprovalNeededData(BaseModel):
     name: str = Field(min_length=1)
     args: dict[str, Any]
     source: str = Field(min_length=1)
+    subject: str | None = None
 
 
 class ApprovalResolvedData(BaseModel):
-    """The user answered. ``allow_session`` also allows ``name`` for the rest of the session."""
+    """The user answered.
+
+    ``allow_session`` also allows ``name`` with this ``subject`` for the rest of
+    the session, or every call of ``name`` when ``subject`` is null.
+    ``allow_always`` wrote an allow rule, and ``rule`` names it.
+    """
 
     model_config = _CONFIG
 
     call_id: str = Field(min_length=1)
     name: str = Field(min_length=1)
     decision: ApprovalDecision
+    subject: str | None = None
+    rule: str | None = None
 
 
 class SessionCreatedEvent(BaseModel):
@@ -538,6 +558,7 @@ __all__ = [
     "RunFailedData",
     "RunFailedEvent",
     "RunStartedEvent",
+    "SessionAllowance",
     "SessionClosedEvent",
     "SessionCreatedData",
     "SessionCreatedEvent",

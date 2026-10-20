@@ -1,0 +1,28 @@
+{
+  "additionalProperties": false,
+  "description": "A tool allowed for the rest of the session asked about.",
+  "properties": {
+    "subject": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Subject"
+    },
+    "tool": {
+      "minLength": 1,
+      "title": "Tool",
+      "type": "string"
+    }
+  },
+  "required": [
+    "tool"
+  ],
+  "title": "ConfigAllowance",
+  "type": "object"
+}

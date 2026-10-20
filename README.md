@@ -40,9 +40,9 @@ Golem has two parts:
 - Automatic titles, a session switcher, new sessions, renaming, and forking.
 - Reading files, listing folders, and searching with `glob` and `grep`, inside the folder you started the TUI in. Ctrl-O shows what each tool returned.
 
-- Tool rules: allow, ask, or deny a tool by name, subject, or path, in `~/.golem/config.toml` or a project's `.golem/policy.toml`. `just golem config show` lists them.
+- Tool rules: allow, ask, or deny a tool by name, subject, or path, in `~/.golem/config.toml` or a project's `.golem/policy.toml`. `just golem config show` lists them, and `/permissions` in the TUI changes or deletes them.
 
-- Approvals: a tool call a rule asks about waits for you. Press `a` to allow it once, `s` to allow that tool for the session, or `d` to deny. The question waits across closing the TUI and restarting the daemon.
+- Approvals: a tool call a rule asks about waits for you. Press `a` to allow it once, `s` to allow the same call for the session, `w` to always allow it (golem saves a rule in your config), or `d` to deny. The question waits across closing the TUI and restarting the daemon.
 
 - A sandboxed shell. The model can run tests or a build in that folder after you approve the command. It has no network and cannot write outside the folder. `git_status`, `git_diff`, and `git_log` need no approval.
 

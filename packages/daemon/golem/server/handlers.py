@@ -7,12 +7,13 @@ import logging
 import os
 import time
 from pathlib import Path
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
 from golem import __version__
 from golem.config import load_settings
-from golem.config_edit import set_default_model
+from golem.config_edit import RuleIndexError, set_default_model
 from golem.models.keys import KeyStore, KeyStoreError
 from golem.models.pulls import PullError, PullManager
 from golem.models.router import ModelConfigError, ModelRouter
@@ -37,6 +38,7 @@ from golem.sessions.manager import (
     ApprovalNotFoundError,
     BlankTitleError,
     MessageNotFoundError,
+    RuleWriteError,
     RunNotFoundError,
     SchemaMismatchError,
     SessionBusyError,
@@ -54,6 +56,7 @@ from golem_protocol.commands import (
     AuthRemoveResult,
     AuthSetParams,
     AuthSetResult,
+    ConfigAllowance,
     ConfigGetParams,
     ConfigGetResult,
     ConfigRule,
@@ -79,6 +82,9 @@ from golem_protocol.commands import (
     ModelSetDefaultParams,
     ModelSetDefaultResult,
     PingParams,
+    PolicyEditResult,
+    PolicyRemoveParams,
+    PolicyUpdateParams,
     RunCancelParams,
     RunCancelResult,
     SessionAttachParams,
@@ -97,6 +103,8 @@ from golem_protocol.commands import (
     SessionListResult,
     SessionRenameParams,
     SessionRenameResult,
+    SessionRevokeParams,
+    SessionRevokeResult,
     SessionSetModelParams,
     SessionSetModelResult,
 )
@@ -245,6 +253,8 @@ async def _approval_respond(
         run_id = await sessions.respond(params.session_id, params.call_id, params.decision)
     except ApprovalNotFoundError as exc:
         raise RpcCallError(APPROVAL_NOT_FOUND, "no run waits on this tool call") from exc
+    except RuleWriteError as exc:
+        raise RpcCallError(INTERNAL_ERROR, f"could not write the rule: {exc}") from exc
     except SessionNotFoundError as exc:
         raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
     except SessionBusyError as exc:
@@ -414,6 +424,13 @@ async def _config_get(ctx: RequestContext, params: ConfigGetParams) -> ConfigGet
     root = None if params.cwd is None else Path(params.cwd)
     rules = await asyncio.to_thread(policy.rules, root, tools)
     project = None if root is None else root / PROJECT_POLICY
+    allowed: list[ConfigAllowance] = []
+    if params.session_id is not None:
+        try:
+            pairs = await _sessions(ctx).allowances(params.session_id)
+        except SessionNotFoundError as exc:
+            raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
+        allowed = [ConfigAllowance(tool=tool, subject=subject) for tool, subject in pairs]
     return ConfigGetResult(
         config_file=str(paths.config_file),
         default_model=_sessions(ctx).router.profile_name,
@@ -430,10 +447,55 @@ async def _config_get(ctx: RequestContext, params: ConfigGetParams) -> ConfigGet
                 action=rule.rule.action,
                 source=rule.source,
                 ignored=rule.ignored,
+                file=rule.file,
+                index=rule.index,
             )
             for rule in rules
         ],
+        session_allowed=allowed,
     )
+
+
+async def _policy_update(ctx: RequestContext, params: PolicyUpdateParams) -> PolicyEditResult:
+    return await _edit_policy(ctx, params.target, params.cwd, params.index, params.action)
+
+
+async def _policy_remove(ctx: RequestContext, params: PolicyRemoveParams) -> PolicyEditResult:
+    return await _edit_policy(ctx, params.target, params.cwd, params.index, None)
+
+
+async def _edit_policy(
+    ctx: RequestContext,
+    target: Literal["user", "project"],
+    cwd: str | None,
+    index: int,
+    action: Literal["allow", "ask", "deny"] | None,
+) -> PolicyEditResult:
+    policy = ctx.state.policy
+    if policy is None:
+        raise RpcCallError(INTERNAL_ERROR, "tools are not ready")
+    if cwd is not None and not Path(cwd).is_absolute():
+        raise RpcCallError(INVALID_PARAMS, "cwd must be an absolute path")
+    root = None if cwd is None else Path(cwd)
+    try:
+        path = policy.file(target, root)
+        await asyncio.to_thread(policy.edit, target, root, index, action)
+    except RuleIndexError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+    except ValueError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+    except OSError as exc:
+        raise RpcCallError(INTERNAL_ERROR, f"could not write the rules: {exc}") from exc
+    log.info("rule %d in %s: %s", index, path, action or "removed")
+    return PolicyEditResult(file=str(path))
+
+
+async def _session_revoke(ctx: RequestContext, params: SessionRevokeParams) -> SessionRevokeResult:
+    try:
+        revoked = await _sessions(ctx).revoke(params.session_id, params.tool, params.subject)
+    except SessionNotFoundError as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
+    return SessionRevokeResult(revoked=revoked)
 
 
 def _pulls(ctx: RequestContext) -> PullManager:
@@ -510,6 +572,9 @@ def standard_methods() -> dict[str, Method]:
         "ping": Method("ping", PingParams, True, _ping),
         "session.create": Method("session.create", SessionCreateParams, True, _session_create),
         "config.get": Method("config.get", ConfigGetParams, True, _config_get),
+        "policy.update": Method("policy.update", PolicyUpdateParams, True, _policy_update),
+        "policy.remove": Method("policy.remove", PolicyRemoveParams, True, _policy_remove),
+        "session.revoke": Method("session.revoke", SessionRevokeParams, True, _session_revoke),
         "session.attach": Method("session.attach", SessionAttachParams, True, _session_attach),
         "session.detach": Method("session.detach", SessionDetachParams, True, _session_detach),
         "session.list": Method("session.list", SessionListParams, True, _session_list),

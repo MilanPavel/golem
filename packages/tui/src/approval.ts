@@ -17,7 +17,7 @@ export function approvalLines(approval: PendingApproval, columns: number): Appro
   return [
     { text: fit(`Allow ${call}?`, width), bold: true },
     { text: fit(`asked by ${approval.source}`, width), dim: true },
-    { text: fit("a allow once · s allow for this session · d deny", width) },
+    { text: fit("a once · s this session · w always (saves a rule) · d deny", width) },
   ];
 }
 

@@ -21,11 +21,20 @@ import tomllib
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from golem.config import PolicyRule, ShellSettings
-from golem.permissions.engine import Call, Decision, Rule, check, default_rules
+from golem.config import PolicyRule, RuleAction, ShellSettings
+from golem.config_edit import add_rule, remove_rule, set_rule_action
+from golem.permissions.engine import (
+    Call,
+    Decision,
+    Rule,
+    check,
+    default_rules,
+    exact_match,
+)
 from golem.tools.registry import ToolRegistry
 
 log = logging.getLogger("golem.permissions")
@@ -72,7 +81,8 @@ class Policy:
             found.extend(self._project_rules(root.resolve(), user))
         label = self._label(self._user_config) if self._user_config is not None else "config.toml"
         found.extend(
-            Rule(rule, f"{label} rule {index}") for index, rule in enumerate(user.rule, start=1)
+            Rule(rule, f"{label} rule {index}", file="user", index=index)
+            for index, rule in enumerate(user.rule, start=1)
         )
         found.extend(default_rules(registry.read_only()))
         return found
@@ -92,6 +102,46 @@ class Policy:
         """The user's ``[shell]`` settings. A project file cannot change them."""
         return self._load_user().shell
 
+    def file(self, target: Literal["user", "project"], root: Path | None) -> Path:
+        """The file rules for ``target`` are written to. ``project`` needs ``root``."""
+        if target == "user":
+            if self._user_config is None:
+                raise ValueError("this daemon has no config file")
+            return self._user_config
+        if root is None:
+            raise ValueError("project rules need a session folder")
+        return root.resolve() / PROJECT_POLICY
+
+    def remember(
+        self,
+        registry: ToolRegistry,
+        name: str,
+        args: Mapping[str, object],
+        root: Path | None,
+        target: Literal["user", "project"] = "user",
+    ) -> str:
+        """Write an ``allow`` rule for exactly this call, first in ``target``.
+
+        Returns the new rule's source.
+        """
+        path = self.file(target, root)
+        add_rule(path, rule_for(registry, name, args, root))
+        return f"{self._label(path)} rule 1"
+
+    def edit(
+        self,
+        target: Literal["user", "project"],
+        root: Path | None,
+        index: int,
+        action: RuleAction | None,
+    ) -> None:
+        """Set rule ``index``'s action, or delete it when ``action`` is None."""
+        path = self.file(target, root)
+        if action is None:
+            remove_rule(path, index)
+        else:
+            set_rule_action(path, index, action)
+
     def trusted(self, root: Path) -> bool:
         return root.resolve() in self._trusted(self._load_user())
 
@@ -107,7 +157,9 @@ class Policy:
         if root in self._trusted(user):
             return rules
         return [
-            Rule(rule.rule, rule.source, UNTRUSTED) if rule.rule.action == "allow" else rule
+            Rule(rule.rule, rule.source, UNTRUSTED, rule.file, rule.index)
+            if rule.rule.action == "allow"
+            else rule
             for rule in rules
         ]
 
@@ -121,7 +173,8 @@ class Policy:
             log.warning("ignoring the rules in %s: %s", path, _first_line(exc))
             return [Rule(PolicyRule(tool="*", action="ask"), f"{label} (invalid)")]
         return [
-            Rule(rule, f"{label} rule {index}") for index, rule in enumerate(parsed.rule, start=1)
+            Rule(rule, f"{label} rule {index}", file="project", index=index)
+            for index, rule in enumerate(parsed.rule, start=1)
         ]
 
     def _load_user(self) -> _UserFile:
@@ -158,6 +211,18 @@ class Policy:
             return f"~/{path.resolve().relative_to(self.home).as_posix()}"
         except ValueError:
             return path.as_posix()
+
+
+def rule_for(
+    registry: ToolRegistry, name: str, args: Mapping[str, object], root: Path | None
+) -> PolicyRule:
+    """An ``allow`` rule that covers this call: its exact subject, else its exact path."""
+    call = describe(registry, name, args, root)
+    if call.subject:
+        return PolicyRule(tool=name, match=exact_match(call.subject), action="allow")
+    if call.path is not None:
+        return PolicyRule(tool=name, path=call.path.as_posix(), action="allow")
+    return PolicyRule(tool=name, action="allow")
 
 
 def describe(
@@ -206,4 +271,4 @@ def _first_line(exc: Exception) -> str:
     return str(exc).strip().splitlines()[0] if str(exc).strip() else type(exc).__name__
 
 
-__all__ = ["PROJECT_POLICY", "UNTRUSTED", "Policy", "describe", "explain"]
+__all__ = ["PROJECT_POLICY", "UNTRUSTED", "Policy", "describe", "explain", "rule_for"]

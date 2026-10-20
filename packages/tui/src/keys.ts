@@ -100,7 +100,7 @@ export type KeyEffect =
   | { kind: "edit"; op: EditOp }
   | { kind: "edit-external" }
   | { kind: "toggle-tools" }
-  | { kind: "approve"; decision: "allow" | "allow_session" | "deny" }
+  | { kind: "approve"; decision: "allow" | "allow_session" | "allow_always" | "deny" }
   | { kind: "insert"; text: string }
   | { kind: "ignore" };
 
@@ -430,7 +430,7 @@ function approvalKeys(): KeyBinding[] {
     label: string,
     description: string,
     press: { name?: PressName; input?: string },
-    decision: "allow" | "allow_session" | "deny",
+    decision: "allow" | "allow_session" | "allow_always" | "deny",
   ): KeyBinding => ({
     id,
     label,
@@ -448,6 +448,13 @@ function approvalKeys(): KeyBinding[] {
       "Allows the call, and this tool for the rest of the session.",
       { input: "s" },
       "allow_session",
+    ),
+    answer(
+      "approve-always",
+      "w",
+      "Allows the call, and writes a rule to ~/.golem/config.toml so it never asks again.",
+      { input: "w" },
+      "allow_always",
     ),
     answer("deny", "d", "Denies the waiting tool call. Esc does the same.", { input: "d" }, "deny"),
     answer("deny-esc", "Esc", "Denies the waiting tool call.", { name: "escape" }, "deny"),
