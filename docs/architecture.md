@@ -91,6 +91,7 @@ Built today:
 - Titles, a live session list, and the TUI switcher (`/sessions`, `/new`, `/title`). [ADR-009](adr/009-session-list.md).
 - `session.fork` and `/fork`. A new session with the history up to one message. [ADR-010](adr/010-fork.md).
 - Read-only tools: `read_file`, `list_dir`, `glob`, and `grep`, inside the session's project folder. [ADR-011](adr/011-tools.md).
+- `web_fetch`: one page as text, asked per host, never from a private address. [ADR-017](adr/017-web-fetch.md).
 - Artifacts: tool output over 20 000 characters in `golem.db`, read in pages with `read_artifact` and `artifact.read`. [ADR-016](adr/016-artifacts.md).
 - Write tools: `write_file` and `edit_file`, inside the session's project folder and outside its `.golem/` and `.git/`, with the diff in the approval. [ADR-015](adr/015-write-tools.md).
 - A sandboxed `shell`, with streamed output, and the read-only `git_status`, `git_diff`, and `git_log`. [ADR-014](adr/014-shell-sandbox.md).
@@ -124,7 +125,7 @@ The socket is only the door. Behind it, these jobs sit in one process:
 | Sessions | One chat or one flow run. Each has an id and a row in `golem.db`. | Built |
 | Graph runtime | The agent loop. Its memory is the checkpoint. | Built |
 | Model router | Resolves a profile name or `provider/model` ref to a chat model. | Built |
-| Tools | Plain Python functions with a Pydantic argument model, in `golem/tools/`. The graph offers them to the model and runs them in its own `tools` node. | Built: file reads and writes, `shell`, git |
+| Tools | Plain Python functions with a Pydantic argument model, in `golem/tools/`. The graph offers them to the model and runs them in its own `tools` node. | Built: file reads and writes, `shell`, git, `web_fetch` |
 | Permissions | Rules from the project, the user, and the defaults, checked in order before every tool call (`golem/permissions/`). | Built |
 | Event log | The history. Every event, numbered by `seq`, written before it is sent. A client that reconnects will read it and rebuild the screen. | Written. Replay to clients planned |
 
@@ -261,6 +262,7 @@ Settings come from three places. Each one overrides the one before it: `~/.golem
 - `[[rule]]`: a tool rule with `tool` (a glob on the tool name, default `*`), optional `match` (a glob on the tool's subject, such as a `grep` or `glob` pattern, with `|` between alternatives), optional `path` (a glob on the resolved path the call touches), and `action`: `allow`, `ask`, or `deny`.
 - `trusted_projects`: folders whose `.golem/policy.toml` may allow tools.
 - `[shell]`: `network` (default `false`) lets commands use the network, `writable` adds folders they may write to, and `timeout_seconds` (default 120) is the longest a command runs. Only the user's file sets these; a project file cannot.
+- `[web]`: `allow_private` (default `false`) lets `web_fetch` reach loopback, private, and link-local addresses, `max_bytes` (default 5 000 000) is the most of a page it reads, and `timeout_seconds` (default 20) the longest it waits. Only the user's file sets these.
 
 Tool rules are checked in this order, and the first one that matches decides ([ADR-012](adr/012-permission-rules.md)):
 1. `<session folder>/.golem/policy.toml`, which holds only `[[rule]]` entries. Its `allow` rules count only when the folder is in `trusted_projects`. Its `ask` and `deny` rules always apply. A file that does not validate makes every call in that folder ask.

@@ -119,6 +119,7 @@ def tools_node(
         base = ToolContext(
             root=_root(config),
             shell=policy.shell(),
+            web=policy.web(),
             session_id=session_id,
             artifacts=artifacts,
         )

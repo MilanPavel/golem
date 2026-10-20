@@ -13,9 +13,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol
 
+import httpx
 from pydantic import BaseModel, ValidationError
 
-from golem.config import ShellSettings
+from golem.config import ShellSettings, WebSettings
 
 MAX_OUTPUT_CHARS = 5_000_000
 """What one call may return, at most. Output this big goes to an artifact, not the model."""
@@ -34,6 +35,17 @@ class ArtifactPage:
     size: int
 
 
+@dataclass(frozen=True, slots=True)
+class Network:
+    """How a web tool reaches the network. Tests replace the transport and the resolver.
+
+    ``resolve`` returns the addresses a host name resolves to.
+    """
+
+    transport: httpx.AsyncBaseTransport | None = None
+    resolve: Callable[[str], Awaitable[list[str]]] | None = None
+
+
 class Artifacts(Protocol):
     """Where big output is kept, read one session at a time."""
 
@@ -48,8 +60,8 @@ class Artifacts(Protocol):
 class ToolContext:
     """What a call may touch. ``root`` is the session folder, or None without one.
 
-    ``output`` streams text to the screen while the call runs. ``shell`` is the
-    user's ``[shell]`` settings.
+    ``output`` streams text to the screen while the call runs. ``shell`` and
+    ``web`` are the user's ``[shell]`` and ``[web]`` settings.
 
     ``planned`` holds the text files will have once the earlier calls of the
     same reply have run, so a preview builds on them. ``approved_diff`` is the
@@ -61,10 +73,12 @@ class ToolContext:
     root: Path | None
     output: Callable[[str], None] | None = None
     shell: ShellSettings = field(default_factory=ShellSettings)
+    web: WebSettings = field(default_factory=WebSettings)
     planned: Mapping[Path, str] = field(default_factory=dict[Path, str])
     approved_diff: str | None = None
     session_id: str | None = None
     artifacts: Artifacts | None = None
+    network: Network = field(default_factory=Network)
 
 
 @dataclass(frozen=True, slots=True)
@@ -195,6 +209,7 @@ __all__ = [
     "MAX_OUTPUT_CHARS",
     "ArtifactPage",
     "Artifacts",
+    "Network",
     "Preview",
     "Tool",
     "ToolContext",

@@ -25,7 +25,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from golem.config import PolicyRule, RuleAction, ShellSettings
+from golem.config import PolicyRule, RuleAction, ShellSettings, WebSettings
 from golem.config_edit import add_rule, remove_rule, set_rule_action
 from golem.permissions.engine import (
     Call,
@@ -49,6 +49,7 @@ class _UserFile(BaseModel):
     rule: list[PolicyRule] = Field(default_factory=list[PolicyRule])
     trusted_projects: list[str] = Field(default_factory=list[str])
     shell: ShellSettings = Field(default_factory=ShellSettings)
+    web: WebSettings = Field(default_factory=WebSettings)
 
 
 class _ProjectFile(BaseModel):
@@ -101,6 +102,10 @@ class Policy:
     def shell(self) -> ShellSettings:
         """The user's ``[shell]`` settings. A project file cannot change them."""
         return self._load_user().shell
+
+    def web(self) -> WebSettings:
+        """The user's ``[web]`` settings. A project file cannot change them."""
+        return self._load_user().web
 
     def file(self, target: Literal["user", "project"], root: Path | None) -> Path:
         """The file rules for ``target`` are written to. ``project`` needs ``root``."""

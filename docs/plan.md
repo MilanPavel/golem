@@ -23,6 +23,7 @@ This file is about what comes next. How the existing pieces are built is in [arc
 - Tool rules in `~/.golem/config.toml` and a project's `.golem/policy.toml` allow, ask, or deny a call by tool, subject, and path. `golem config show` lists them in the order they are checked.
 - A sandboxed shell: the model runs commands in the session folder with no network and no writes outside it, after you approve each one. Output streams into the tool line. `git_status`, `git_diff`, and `git_log` read the repository.
 - "Always allow" (`w`) writes a rule for one exact call, and `/permissions` changes or deletes rules and revokes what a session allows.
+- `web_fetch` reads a page as text, asks per host, and refuses private addresses unless `[web] allow_private` is set ([ADR-017](adr/017-web-fetch.md)).
 - Artifacts: tool output over 20 000 characters is stored in `golem.db`, the model gets its head and tail and reads more with `read_artifact`, and `/artifact` opens all of it ([ADR-016](adr/016-artifacts.md)).
 - Write tools: `write_file` and `edit_file` change files in the session folder, never under `.golem/` or `.git/`. The approval shows the diff, only that change is applied, and `e` edits a call's arguments before allowing it once ([ADR-015](adr/015-write-tools.md)).
 - Approvals: a call a rule asks about waits for `a` (once), `s` (for the session), or `d` (deny), across closing the TUI and restarting the daemon. A waiting session shows `?` in the switcher.

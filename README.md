@@ -44,6 +44,8 @@ Golem has two parts:
 
 - Approvals: a tool call a rule asks about waits for you. Press `a` to allow it once, `s` to allow the same call for the session, `w` to always allow it (golem saves a rule in your config), `e` to edit its arguments as JSON and allow it once, or `d` to deny. The question waits across closing the TUI and restarting the daemon.
 
+- Fetching a web page with `web_fetch`, after you approve the host. The page comes back as text marked as untrusted, and addresses on your own machine or network are refused unless you allow them in `[web]`.
+
 - A sandboxed shell. The model can run tests or a build in that folder after you approve the command. It has no network and cannot write outside the folder. `git_status`, `git_diff`, and `git_log` need no approval.
 
 - Changing files with `write_file` and `edit_file`, inside that folder. The approval shows the diff, Up and Down scroll it, and only that change is made: a file that changed while you decided is left alone. Golem never changes a `.golem/` or `.git/` folder. Ctrl-O shows the diff of each change.
@@ -156,6 +158,8 @@ After uv installs a new Python, macOS may ask once whether Python may use the go
 | `model_profile` | `remote` | The profile name the flat settings load as |
 | `session_titles` | `true` | Name each session after its first answer. This costs one extra model call |
 | `log_level` | `INFO` | `DEBUG`, `INFO`, `WARNING`, or `ERROR` |
+| `[shell]` | as shown | `network = false`, `writable = []`, `timeout_seconds = 120` for the sandboxed shell |
+| `[web]` | as shown | `allow_private = false` (set `true` to fetch from `localhost` or your network), `max_bytes = 5000000`, `timeout_seconds = 20` for `web_fetch` |
 
 Each setting can also be set with an environment variable named `GOLEM_` plus the setting in capitals, for example `GOLEM_MODEL_NAME`. The environment wins over the file. Apart from the model settings, the daemon reads its settings only when it starts, so restart it after a change: Ctrl-C and run it again from the command line, or `just golem daemon start` under launchd.
 

@@ -125,6 +125,21 @@ class ShellSettings(BaseModel):
     timeout_seconds: int = Field(default=120, gt=0, le=3600)
 
 
+class WebSettings(BaseModel):
+    """``[web]``. What ``web_fetch`` may reach and how much it reads.
+
+    ``allow_private`` lets it reach loopback, private, and link-local
+    addresses, such as a dev server on ``localhost``. ``max_bytes`` is the most
+    of a response it reads, and ``timeout_seconds`` the longest it waits.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    allow_private: bool = False
+    max_bytes: int = Field(default=5_000_000, gt=0, le=50_000_000)
+    timeout_seconds: int = Field(default=20, gt=0, le=300)
+
+
 class GolemSettings(BaseSettings):
     """Runtime settings for the daemon.
 
@@ -152,6 +167,7 @@ class GolemSettings(BaseSettings):
     # Project folders whose .golem/policy.toml may allow tools. Ask and deny rules apply anywhere.
     trusted_projects: list[str] = Field(default_factory=list[str])
     shell: ShellSettings = Field(default_factory=ShellSettings)
+    web: WebSettings = Field(default_factory=WebSettings)
 
     @classmethod
     def settings_customise_sources(
