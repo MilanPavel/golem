@@ -121,7 +121,16 @@ async def test_the_model_reads_a_file_then_answers(database: Database, project: 
     assert isinstance(final, MessageCompletedEvent)
     assert (final.data.message_id, final.data.text) == (second.data.message_id, "It says 42.")
 
-    assert model.bound == ["read_file", "list_dir", "glob", "grep"]
+    assert model.bound == [
+        "read_file",
+        "list_dir",
+        "glob",
+        "grep",
+        "shell",
+        "git_status",
+        "git_diff",
+        "git_log",
+    ]
     tool_result = model.seen[1][-1]
     assert isinstance(tool_result, ToolMessage)
     assert "the answer is 42" in tool_result.text
@@ -373,3 +382,33 @@ async def test_a_denied_call_never_runs_and_the_model_hears_why(
     result = model.seen[1][-1]
     assert isinstance(result, ToolMessage)
     assert result.text == f"error: {failed.data.message}"
+
+
+async def test_tool_output_streams_and_leaves_the_log_when_the_call_ends(
+    database: Database, project: Path
+) -> None:
+    seen: list[ChatEvent] = []
+
+    async def run(args: _SlowArgs, ctx: ToolContext) -> ToolResult:
+        del args
+        assert ctx.output is not None
+        ctx.output("step 1\n")
+        ctx.output("step 2\n")
+        return ToolResult(output="step 1\nstep 2\n", summary="2 steps")
+
+    noisy = Tool(name="noisy", description="prints", args=_SlowArgs, run=run, read_only=True)
+    model = ToolCallingChatModel(replies=[[("noisy", {})], "done"])
+    chat = _chat(database, model, ToolRegistry([*READ_ONLY_TOOLS, noisy]))
+    session_id = await chat.manager.create(None, cwd=str(project))
+
+    class _Target:
+        def deliver(self, event: ChatEvent) -> None:
+            seen.append(event)
+
+    await chat.manager.attach(session_id, 0, _Target())  # type: ignore[arg-type]
+    events = await chat.finished(await chat.manager.send(session_id, "go"))
+
+    live = [event.data.text for event in seen if event.type == "tool.output"]  # type: ignore[union-attr]
+    assert live == ["step 1\n", "step 2\n"]
+    assert "tool.output" not in [event.type for event in events]
+    assert events[-1].type == "run.completed"

@@ -16,6 +16,7 @@ export type Params =
   | RunCancelledEvent
   | ToolRequestedEvent
   | ToolStartedEvent
+  | ToolOutputEvent
   | ToolCompletedEvent
   | ToolFailedEvent
   | ApprovalNeededEvent
@@ -112,38 +113,45 @@ export type SessionId13 = string;
 export type Ts12 = string;
 export type Type12 = 'tool.started';
 export type CallId2 = string;
-export type Preview = string;
-export type Summary = string;
-export type Truncated = boolean;
+export type Text2 = string;
 export type RunId13 = string;
 export type Seq13 = number;
 export type SessionId14 = string;
 export type Ts13 = string;
-export type Type13 = 'tool.completed';
+export type Type13 = 'tool.output';
 export type CallId3 = string;
-export type Message1 = string;
+export type Preview = string;
+export type Summary = string;
+export type Truncated = boolean;
 export type RunId14 = string;
 export type Seq14 = number;
 export type SessionId15 = string;
 export type Ts14 = string;
-export type Type14 = 'tool.failed';
+export type Type14 = 'tool.completed';
 export type CallId4 = string;
-export type MessageId5 = string | null;
-export type Name1 = string;
-export type Source = string;
+export type Message1 = string;
 export type RunId15 = string;
 export type Seq15 = number;
 export type SessionId16 = string;
 export type Ts15 = string;
-export type Type15 = 'approval.needed';
+export type Type15 = 'tool.failed';
 export type CallId5 = string;
-export type Decision = 'allow' | 'allow_session' | 'deny';
-export type Name2 = string;
+export type MessageId5 = string | null;
+export type Name1 = string;
+export type Source = string;
 export type RunId16 = string;
 export type Seq16 = number;
 export type SessionId17 = string;
 export type Ts16 = string;
-export type Type16 = 'approval.resolved';
+export type Type16 = 'approval.needed';
+export type CallId6 = string;
+export type Decision = 'allow' | 'allow_session' | 'deny';
+export type Name2 = string;
+export type RunId17 = string;
+export type Seq17 = number;
+export type SessionId18 = string;
+export type Ts17 = string;
+export type Type17 = 'approval.resolved';
 
 /**
  * Server → client event. No ``id``; this is not a response to a request.
@@ -485,6 +493,30 @@ export interface ToolStartedData {
   call_id: CallId1;
 }
 /**
+ * More output from a running call. ``tool.completed`` or ``tool.failed`` replaces it.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "ToolOutputEvent".
+ */
+export interface ToolOutputEvent {
+  data: ToolOutputData;
+  run_id: RunId13;
+  seq: Seq13;
+  session_id: SessionId14;
+  ts: Ts13;
+  type: Type13;
+}
+/**
+ * Text a running tool call printed. Stored only until the call ends.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "ToolOutputData".
+ */
+export interface ToolOutputData {
+  call_id: CallId2;
+  text: Text2;
+}
+/**
  * The tool call finished, and its result went back to the model.
  *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
@@ -492,11 +524,11 @@ export interface ToolStartedData {
  */
 export interface ToolCompletedEvent {
   data: ToolCompletedData;
-  run_id: RunId13;
-  seq: Seq13;
-  session_id: SessionId14;
-  ts: Ts13;
-  type: Type13;
+  run_id: RunId14;
+  seq: Seq14;
+  session_id: SessionId15;
+  ts: Ts14;
+  type: Type14;
 }
 /**
  * A tool call finished.
@@ -509,7 +541,7 @@ export interface ToolCompletedEvent {
  * via the `definition` "ToolCompletedData".
  */
 export interface ToolCompletedData {
-  call_id: CallId2;
+  call_id: CallId3;
   preview: Preview;
   summary: Summary;
   truncated?: Truncated;
@@ -522,11 +554,11 @@ export interface ToolCompletedData {
  */
 export interface ToolFailedEvent {
   data: ToolFailedData;
-  run_id: RunId14;
-  seq: Seq14;
-  session_id: SessionId15;
-  ts: Ts14;
-  type: Type14;
+  run_id: RunId15;
+  seq: Seq15;
+  session_id: SessionId16;
+  ts: Ts15;
+  type: Type15;
 }
 /**
  * A tool call did not run, or stopped with an error. The model sees the same message.
@@ -535,7 +567,7 @@ export interface ToolFailedEvent {
  * via the `definition` "ToolFailedData".
  */
 export interface ToolFailedData {
-  call_id: CallId3;
+  call_id: CallId4;
   message: Message1;
 }
 /**
@@ -546,11 +578,11 @@ export interface ToolFailedData {
  */
 export interface ApprovalNeededEvent {
   data: ApprovalNeededData;
-  run_id: RunId15;
-  seq: Seq15;
-  session_id: SessionId16;
-  ts: Ts15;
-  type: Type15;
+  run_id: RunId16;
+  seq: Seq16;
+  session_id: SessionId17;
+  ts: Ts16;
+  type: Type16;
 }
 /**
  * A tool call waits for the user. The run is paused until ``approval.respond``.
@@ -562,7 +594,7 @@ export interface ApprovalNeededEvent {
  */
 export interface ApprovalNeededData {
   args: Args1;
-  call_id: CallId4;
+  call_id: CallId5;
   message_id?: MessageId5;
   name: Name1;
   source: Source;
@@ -578,11 +610,11 @@ export interface Args1 {
  */
 export interface ApprovalResolvedEvent {
   data: ApprovalResolvedData;
-  run_id: RunId16;
-  seq: Seq16;
-  session_id: SessionId17;
-  ts: Ts16;
-  type: Type16;
+  run_id: RunId17;
+  seq: Seq17;
+  session_id: SessionId18;
+  ts: Ts17;
+  type: Type17;
 }
 /**
  * The user answered. ``allow_session`` also allows ``name`` for the rest of the session.
@@ -591,7 +623,7 @@ export interface ApprovalResolvedEvent {
  * via the `definition` "ApprovalResolvedData".
  */
 export interface ApprovalResolvedData {
-  call_id: CallId5;
+  call_id: CallId6;
   decision: Decision;
   name: Name2;
 }

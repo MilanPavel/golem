@@ -366,3 +366,23 @@ test("approval events set and clear the waiting call", () => {
   assert.equal(cancelled.approval, null);
   assert.equal(cancelled.busy, false);
 });
+
+test("tool output appends to the running call and keeps only its newest part", () => {
+  const base = { session_id: "s", run_id: "r", ts: "t" } as const;
+  let state = [
+    { ...base, seq: 1, type: "message.started", data: { message_id: "a", role: "assistant" } },
+    { ...base, seq: 2, type: "message.completed", data: { message_id: "a", role: "assistant", text: "" } },
+    {
+      ...base,
+      seq: 3,
+      type: "tool.requested",
+      data: { call_id: "c1", message_id: "a", name: "shell", args: { command: "x" } },
+    },
+    { ...base, seq: 4, type: "tool.started", data: { call_id: "c1" } },
+    { ...base, seq: 5, type: "tool.output", data: { call_id: "c1", text: "a\n" } },
+    { ...base, seq: 6, type: "tool.output", data: { call_id: "c1", text: "b\n" } },
+  ].reduce((current, event) => reduceChat(current, event as ChatEvent), emptyChat);
+  assert.equal(state.messages[0]?.tools?.[0]?.output, "a\nb\n");
+  state = reduceChat(state, { ...base, seq: 7, type: "tool.output", data: { call_id: "c1", text: "x".repeat(5000) } });
+  assert.equal(state.messages[0]?.tools?.[0]?.output?.length, 4000);
+});

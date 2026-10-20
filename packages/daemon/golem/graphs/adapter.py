@@ -56,6 +56,12 @@ class ToolStarted:
 
 
 @dataclass(frozen=True, slots=True)
+class ToolOutput:
+    call_id: str
+    text: str
+
+
+@dataclass(frozen=True, slots=True)
 class ToolFinished:
     call_id: str
     summary: str
@@ -85,6 +91,7 @@ Fact = (
     | TextDelta
     | TextCompleted
     | ToolStarted
+    | ToolOutput
     | ToolFinished
     | ToolErrored
     | ApprovalAsked
@@ -254,6 +261,9 @@ def _custom(data: object) -> Fact | None:
         return None
     if kind == "tool.started":
         return ToolStarted(call_id)
+    if kind == "tool.output":
+        text = item.get("text")
+        return ToolOutput(call_id, text) if isinstance(text, str) and text else None
     if kind == "tool.completed":
         summary = item.get("summary")
         preview = item.get("preview")
@@ -281,6 +291,7 @@ __all__ = [
     "TextDelta",
     "ToolErrored",
     "ToolFinished",
+    "ToolOutput",
     "ToolStarted",
     "message_text",
     "plain_messages",

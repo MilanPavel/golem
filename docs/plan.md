@@ -21,6 +21,7 @@ This file is about what comes next. How the existing pieces are built is in [arc
 - A debug panel (`/debug`) that shows the wire and the conversation the model sees.
 - Read-only tools: the model reads files, lists folders, and searches with `glob` and `grep`, only inside the folder the session was started in. Each call is one line in the transcript, and Ctrl-O shows its output.
 - Tool rules in `~/.golem/config.toml` and a project's `.golem/policy.toml` allow, ask, or deny a call by tool, subject, and path. `golem config show` lists them in the order they are checked.
+- A sandboxed shell: the model runs commands in the session folder with no network and no writes outside it, after you approve each one. Output streams into the tool line. `git_status`, `git_diff`, and `git_log` read the repository.
 - Approvals: a call a rule asks about waits for `a` (once), `s` (for the session), or `d` (deny), across closing the TUI and restarting the daemon. A waiting session shows `?` in the switcher.
 - Slash commands with suggestions, a line editor, recalling a sent message with Up, copy and export, and closing a session from the switcher.
 - It runs from a checkout of this repository (`just golem daemon install`, then `just tui`). Phase 3 makes it installable.
@@ -96,11 +97,11 @@ Agents use the Graph API, where the model decides control flow. Flows use the Fu
 
 ### Protocol, what is left to add
 
-JSON-RPC 2.0, one JSON object per line, over `~/.golem/run/golem.sock`. Protocol 2.12 is on the wire today (see [architecture.md](architecture.md#what-is-on-the-wire-today)). The phases below add the rest.
+JSON-RPC 2.0, one JSON object per line, over `~/.golem/run/golem.sock`. Protocol 2.13 is on the wire today (see [architecture.md](architecture.md#what-is-on-the-wire-today)). The phases below add the rest.
 
 | Group | New events | Phase |
 |---|---|---|
-| Tools | `tool.requested`, `tool.started`, `tool.completed`, `tool.failed` (built); `tool.output` (chunked) | 1.1, 1.4 |
+| Tools | `tool.requested`, `tool.started`, `tool.output`, `tool.completed`, `tool.failed` (built) | 1.1, 1.4 |
 | Approval | `approval.needed`, `approval.resolved` | 1.3 |
 | Todos | `todos.updated` | 1.7 |
 | Models | `usage.reported` (tokens, cost) | 10.1 |
@@ -190,7 +191,7 @@ The agent can act, and nothing happens without passing policy. How the tool loop
 - **Done when:** an approval survives closing the TUI and restarting the daemon, and is answered after reattaching.
 - **Watch out:** several tool calls in one turn with mixed decisions. Write that test before the modal.
 
-### 1.4 Shell, sandboxed
+### 1.4 Shell, sandboxed (built)
 
 - **Goal:** golem can run commands without being able to wreck the machine.
 - **You can:** ask golem to run the tests and explain the failures.
@@ -199,6 +200,8 @@ The agent can act, and nothing happens without passing policy. How the tool loop
   - Timeouts, output caps, and a process-group kill on cancel.
   - `tool.output` streams chunks, so long commands show progress in the tool block.
   - `git_status`, `git_diff`, and `git_log` helpers with structured output.
+  - `[shell]` in the user's config: `network`, `writable`, and `timeout_seconds`. Credentials are removed from the environment, and secret folders cannot be read ([ADR-014](adr/014-shell-sandbox.md)).
+  - Without a usable sandbox (off macOS, or inside another sandbox) the shell refuses to run. Phase 3 adds the platform seam.
 - **Done when:** "why does `just check` fail?" is answered from a real run, and Ctrl-C kills a running `sleep 100`.
 
 ### 1.4b Always allow, and `/permissions`

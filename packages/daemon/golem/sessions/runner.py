@@ -33,6 +33,7 @@ from golem.graphs.adapter import (
     TextDelta,
     ToolErrored,
     ToolFinished,
+    ToolOutput,
     ToolStarted,
     translate,
 )
@@ -52,6 +53,7 @@ from golem_protocol.events import (
     RunFailedData,
     ToolCompletedData,
     ToolFailedData,
+    ToolOutputData,
     ToolRequestedData,
     ToolStartedData,
 )
@@ -278,6 +280,8 @@ async def _apply(
             )
     elif isinstance(fact, ToolStarted):
         await emit("tool.started", ToolStartedData(call_id=fact.call_id))
+    elif isinstance(fact, ToolOutput):
+        await emit("tool.output", ToolOutputData(call_id=fact.call_id, text=fact.text))
     elif isinstance(fact, ToolFinished):
         _done(progress, fact.call_id)
         await emit(

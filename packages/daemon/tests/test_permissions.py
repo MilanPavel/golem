@@ -129,7 +129,9 @@ def test_describe_reads_the_tools_path_and_subject(tmp_path: Path) -> None:
     assert (call.subject, call.path) == ("TODO", (tmp_path / "src").resolve())
     listed = describe(registry, "list_dir", {}, tmp_path)
     assert listed.path == tmp_path.resolve()
-    unknown = describe(registry, "shell", {"command": "ls"}, tmp_path)
+    shell = describe(registry, "shell", {"command": "ls"}, tmp_path)
+    assert (shell.subject, shell.path) == ("ls", None)
+    unknown = describe(registry, "nope", {"command": "ls"}, tmp_path)
     assert (unknown.subject, unknown.path) == (None, None)
 
 

@@ -125,6 +125,8 @@ function eventDetail(type: string, seq: string, data: Record<string, unknown> | 
     parts.push(flat(data["message"]));
   } else if (type === "tool.requested" && typeof data["name"] === "string") {
     parts.push(data["name"], flat(JSON.stringify(data["args"] ?? {})));
+  } else if (type === "tool.output" && typeof data["text"] === "string") {
+    parts.push(`${data["text"].length} chars`);
   } else if (type === "tool.completed" && typeof data["summary"] === "string") {
     parts.push(flat(data["summary"]));
   } else if (type === "tool.failed" && typeof data["message"] === "string") {

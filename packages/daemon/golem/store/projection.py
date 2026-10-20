@@ -23,6 +23,7 @@ from golem_protocol.events import (
     SessionClosedEvent,
     SessionCreatedEvent,
     SessionUpdatedEvent,
+    ToolOutputEvent,
 )
 
 
@@ -88,7 +89,7 @@ async def project(tx: Transaction, event: ChatEvent) -> None:
         await _finish_run(tx, event.run_id, "failed", event.ts, event.data.message)
     elif isinstance(event, RunCancelledEvent):
         await _finish_run(tx, event.run_id, "cancelled", event.ts, None)
-    if not isinstance(event, MessageDeltaEvent):
+    if not isinstance(event, MessageDeltaEvent | ToolOutputEvent):
         await tx.execute(
             "UPDATE sessions SET updated_at = ? WHERE session_id = ?",
             (event.ts, event.session_id),

@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Awaitable, Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import cast
 
@@ -59,10 +59,10 @@ def tools_node(
         last = state["messages"][-1]
         if not isinstance(last, AIMessage):
             return {"messages": []}
-        ctx = ToolContext(root=_root(config))
+        base = ToolContext(root=_root(config), shell=policy.shell())
         allowed = _allowed(config)
         verdicts = [
-            _decide(registry, policy, call, ctx, allowed, last.id) for call in last.tool_calls
+            _decide(registry, policy, call, base, allowed, last.id) for call in last.tool_calls
         ]
         write = get_stream_writer()
         results: list[BaseMessage] = []
@@ -75,6 +75,7 @@ def tools_node(
                 )
                 continue
             write({STREAM_KEY: "tool.started", "call_id": call_id})
+            ctx = replace(base, output=_streamer(write, call_id))
             try:
                 result = await registry.call(call["name"], call["args"], ctx)
             except ToolError as exc:
@@ -174,6 +175,14 @@ def _result(call_id: str, name: str, content: str, *, error: bool = False) -> To
         id=f"t_{call_id}",
         status="error" if error else "success",
     )
+
+
+def _streamer(write: Callable[[object], None], call_id: str) -> Callable[[str], None]:
+    def output(text: str) -> None:
+        if text:
+            write({STREAM_KEY: "tool.output", "call_id": call_id, "text": text})
+
+    return output
 
 
 def _allowed(config: RunnableConfig) -> set[str]:

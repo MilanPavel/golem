@@ -97,6 +97,8 @@ from golem_protocol.events import (
     ToolCompletedEvent,
     ToolFailedData,
     ToolFailedEvent,
+    ToolOutputData,
+    ToolOutputEvent,
     ToolRequestedData,
     ToolRequestedEvent,
     ToolStartedData,
@@ -214,6 +216,8 @@ MODELS: tuple[type[BaseModel], ...] = (
     ApprovalResolvedEvent,
     ApprovalRespondParams,
     ApprovalRespondResult,
+    ToolOutputData,
+    ToolOutputEvent,
 )
 
 

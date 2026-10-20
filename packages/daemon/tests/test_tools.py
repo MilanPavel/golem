@@ -141,7 +141,16 @@ async def test_long_output_is_cut_for_the_model() -> None:
 def test_schemas_use_the_function_format() -> None:
     schemas = default_registry().schemas()
     names = [schema["function"]["name"] for schema in schemas]  # type: ignore[index]
-    assert names == ["read_file", "list_dir", "glob", "grep"]
+    assert names == [
+        "read_file",
+        "list_dir",
+        "glob",
+        "grep",
+        "shell",
+        "git_status",
+        "git_diff",
+        "git_log",
+    ]
     first = schemas[0]["function"]  # type: ignore[index]
     assert first["parameters"]["required"] == ["path"]  # type: ignore[index]
 

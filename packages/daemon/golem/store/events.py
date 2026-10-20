@@ -2,6 +2,8 @@
 
 ``message.delta`` rows live only while their message is open. The
 ``message.completed`` for that message deletes them in the same transaction.
+``tool.output`` rows live only while their tool call runs, and the call's
+``tool.completed`` or ``tool.failed`` deletes them.
 """
 
 from __future__ import annotations
@@ -17,6 +19,9 @@ from golem_protocol.events import (
     MessageCompletedEvent,
     MessageDeltaEvent,
     MessageStartedEvent,
+    ToolCompletedEvent,
+    ToolFailedEvent,
+    ToolOutputEvent,
 )
 
 _COLUMNS = "session_id, seq, ts, type, run_id, data"
@@ -52,6 +57,12 @@ class EventLog:
                     " WHERE session_id = ? AND message_id = ? AND type = 'message.delta'",
                     (event.session_id, message_id),
                 )
+            elif isinstance(event, ToolCompletedEvent | ToolFailedEvent):
+                await tx.execute(
+                    "DELETE FROM events"
+                    " WHERE session_id = ? AND message_id = ? AND type = 'tool.output'",
+                    (event.session_id, event.data.call_id),
+                )
 
     async def after(self, session_id: str, after_seq: int = 0) -> list[ChatEvent]:
         """Events for ``session_id`` with ``seq > after_seq``, in order."""
@@ -81,6 +92,8 @@ class EventLog:
 def _message_id(event: ChatEvent) -> str | None:
     if isinstance(event, MessageStartedEvent | MessageDeltaEvent | MessageCompletedEvent):
         return event.data.message_id
+    if isinstance(event, ToolOutputEvent):
+        return event.data.call_id
     return None
 
 

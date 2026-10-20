@@ -161,6 +161,15 @@ class ToolStartedData(BaseModel):
     call_id: str = Field(min_length=1)
 
 
+class ToolOutputData(BaseModel):
+    """Text a running tool call printed. Stored only until the call ends."""
+
+    model_config = _CONFIG
+
+    call_id: str = Field(min_length=1)
+    text: str = Field(min_length=1)
+
+
 class ToolCompletedData(BaseModel):
     """A tool call finished.
 
@@ -389,6 +398,19 @@ class ToolStartedEvent(BaseModel):
     data: ToolStartedData
 
 
+class ToolOutputEvent(BaseModel):
+    """More output from a running call. ``tool.completed`` or ``tool.failed`` replaces it."""
+
+    model_config = _CONFIG
+
+    seq: int = Field(ge=1)
+    session_id: str = Field(min_length=1)
+    run_id: str = Field(min_length=1)
+    ts: str = Field(min_length=1)
+    type: Literal["tool.output"]
+    data: ToolOutputData
+
+
 class ToolCompletedEvent(BaseModel):
     """The tool call finished, and its result went back to the model."""
 
@@ -455,6 +477,7 @@ EventType = Literal[
     "run.cancelled",
     "tool.requested",
     "tool.started",
+    "tool.output",
     "tool.completed",
     "tool.failed",
     "approval.needed",
@@ -477,6 +500,7 @@ ChatEvent = Annotated[
     | RunCancelledEvent
     | ToolRequestedEvent
     | ToolStartedEvent
+    | ToolOutputEvent
     | ToolCompletedEvent
     | ToolFailedEvent
     | ApprovalNeededEvent
@@ -523,6 +547,8 @@ __all__ = [
     "ToolCompletedEvent",
     "ToolFailedData",
     "ToolFailedEvent",
+    "ToolOutputData",
+    "ToolOutputEvent",
     "ToolRequestedData",
     "ToolRequestedEvent",
     "ToolStartedData",

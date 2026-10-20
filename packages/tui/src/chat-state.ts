@@ -24,7 +24,12 @@ export type ToolBlock = {
   truncated?: boolean;
   /** Why it failed, from `tool.failed`. */
   error?: string;
+  /** The newest output of a running call, from `tool.output`. */
+  output?: string;
 };
+
+/** Characters of live output kept per tool call. */
+export const LIVE_OUTPUT_CHARS = 4_000;
 
 export type ChatMessage = {
   id: string;
@@ -164,6 +169,11 @@ export function reduceChat(state: ChatState, event: ChatEvent): ChatState {
     }
     case "tool.started":
       return updateTool(state, event.data.call_id, (tool) => ({ ...tool, status: "running" }));
+    case "tool.output":
+      return updateTool(state, event.data.call_id, (tool) => ({
+        ...tool,
+        output: ((tool.output ?? "") + event.data.text).slice(-LIVE_OUTPUT_CHARS),
+      }));
     case "tool.completed":
       return updateTool(state, event.data.call_id, (tool) => ({
         ...tool,

@@ -24,7 +24,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from golem.config import PolicyRule
+from golem.config import PolicyRule, ShellSettings
 from golem.permissions.engine import Call, Decision, Rule, check, default_rules
 from golem.tools.registry import ToolRegistry
 
@@ -39,6 +39,7 @@ class _UserFile(BaseModel):
 
     rule: list[PolicyRule] = Field(default_factory=list[PolicyRule])
     trusted_projects: list[str] = Field(default_factory=list[str])
+    shell: ShellSettings = Field(default_factory=ShellSettings)
 
 
 class _ProjectFile(BaseModel):
@@ -86,6 +87,10 @@ class Policy:
         """The decision for tool ``name`` called with ``args`` in ``root``."""
         call = describe(registry, name, args, root)
         return check(call, self.rules(root, registry), home=self.home)
+
+    def shell(self) -> ShellSettings:
+        """The user's ``[shell]`` settings. A project file cannot change them."""
+        return self._load_user().shell
 
     def trusted(self, root: Path) -> bool:
         return root.resolve() in self._trusted(self._load_user())

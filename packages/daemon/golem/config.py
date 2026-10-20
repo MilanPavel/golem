@@ -109,6 +109,22 @@ class PolicyRule(BaseModel):
     action: RuleAction
 
 
+class ShellSettings(BaseModel):
+    """``[shell]``. What a ``shell`` command may reach besides the session folder.
+
+    ``network`` lets commands use the network. ``writable`` adds folders they
+    may write to, with ``~`` for the home folder. ``timeout_seconds`` is the
+    longest a command may run before it is killed, unless the call asks for
+    less.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    network: bool = False
+    writable: list[str] = Field(default_factory=list[str])
+    timeout_seconds: int = Field(default=120, gt=0, le=3600)
+
+
 class GolemSettings(BaseSettings):
     """Runtime settings for the daemon.
 
@@ -135,6 +151,7 @@ class GolemSettings(BaseSettings):
     rule: list[PolicyRule] = Field(default_factory=list[PolicyRule])
     # Project folders whose .golem/policy.toml may allow tools. Ask and deny rules apply anywhere.
     trusted_projects: list[str] = Field(default_factory=list[str])
+    shell: ShellSettings = Field(default_factory=ShellSettings)
 
     @classmethod
     def settings_customise_sources(

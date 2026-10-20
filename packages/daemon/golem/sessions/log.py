@@ -108,7 +108,7 @@ class SessionLog:
             await self._events.append(event)
             self._seq[session_id] = event.seq
             self._bus.publish(event)
-            if event.type != "message.delta" and self._bus.watched:
+            if event.type not in ("message.delta", "tool.output") and self._bus.watched:
                 activity = await self._records.activity(session_id)
                 if activity is not None:
                     self._bus.publish_summary(summarize(activity))

@@ -1,0 +1,22 @@
+{
+  "additionalProperties": false,
+  "description": "Text a running tool call printed. Stored only until the call ends.",
+  "properties": {
+    "call_id": {
+      "minLength": 1,
+      "title": "Call Id",
+      "type": "string"
+    },
+    "text": {
+      "minLength": 1,
+      "title": "Text",
+      "type": "string"
+    }
+  },
+  "required": [
+    "call_id",
+    "text"
+  ],
+  "title": "ToolOutputData",
+  "type": "object"
+}

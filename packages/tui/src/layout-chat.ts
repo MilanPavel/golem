@@ -161,6 +161,13 @@ export function toolLines(tool: ToolBlock, width: number, expanded: boolean): Sp
     head.push({ text: `  ${tool.error}`, italic: true });
   }
   const lines = wrapSpans(head, width);
+  if (tool.status === "running" && tool.output !== undefined && tool.output.length > 0) {
+    const live = tool.output.replace(/\n+$/, "").split("\n");
+    for (const row of live.slice(expanded ? -TOOL_PREVIEW_ROWS : -1)) {
+      lines.push(...wrapSpans([{ text: `  │ ${row}`, dim: true }], width));
+    }
+    return lines;
+  }
   if (!expanded || tool.status !== "done" || tool.preview === undefined) {
     return lines;
   }

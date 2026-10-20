@@ -44,7 +44,9 @@ Golem has two parts:
 
 - Approvals: a tool call a rule asks about waits for you. Press `a` to allow it once, `s` to allow that tool for the session, or `d` to deny. The question waits across closing the TUI and restarting the daemon.
 
-Golem cannot run commands or change files yet. A sandboxed shell comes next. See [docs/plan.md](docs/plan.md).
+- A sandboxed shell. The model can run tests or a build in that folder after you approve the command. It has no network and cannot write outside the folder. `git_status`, `git_diff`, and `git_log` need no approval.
+
+Golem cannot change files with its own tools yet, only through an approved shell command. Write tools with a diff to approve come next. See [docs/plan.md](docs/plan.md).
 
 Golem runs on macOS only, from a checkout of this repository. There is no installer yet.
 

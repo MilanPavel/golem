@@ -1078,6 +1078,72 @@
       "title": "ToolFailedEvent",
       "type": "object"
     },
+    "ToolOutputData": {
+      "additionalProperties": false,
+      "description": "Text a running tool call printed. Stored only until the call ends.",
+      "properties": {
+        "call_id": {
+          "minLength": 1,
+          "title": "Call Id",
+          "type": "string"
+        },
+        "text": {
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "call_id",
+        "text"
+      ],
+      "title": "ToolOutputData",
+      "type": "object"
+    },
+    "ToolOutputEvent": {
+      "additionalProperties": false,
+      "description": "More output from a running call. ``tool.completed`` or ``tool.failed`` replaces it.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/ToolOutputData"
+        },
+        "run_id": {
+          "minLength": 1,
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "tool.output",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "run_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "ToolOutputEvent",
+      "type": "object"
+    },
     "ToolRequestedData": {
       "additionalProperties": false,
       "description": "The model asked for one tool call.\n\n``message_id`` is the assistant message that asked. ``args`` are the\narguments as the model wrote them.",
@@ -1250,6 +1316,7 @@
           "session.updated": "#/$defs/SessionUpdatedEvent",
           "tool.completed": "#/$defs/ToolCompletedEvent",
           "tool.failed": "#/$defs/ToolFailedEvent",
+          "tool.output": "#/$defs/ToolOutputEvent",
           "tool.requested": "#/$defs/ToolRequestedEvent",
           "tool.started": "#/$defs/ToolStartedEvent"
         },
@@ -1294,6 +1361,9 @@
         },
         {
           "$ref": "#/$defs/ToolStartedEvent"
+        },
+        {
+          "$ref": "#/$defs/ToolOutputEvent"
         },
         {
           "$ref": "#/$defs/ToolCompletedEvent"

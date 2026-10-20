@@ -177,3 +177,18 @@ test("replies of one turn share a single golem label", () => {
     ["you", "list", "", "golem", "list_dir ✓  3 entries", "Three files."],
   );
 });
+
+test("a running command shows its newest output line, or more with Ctrl-O", () => {
+  const reply: ChatMessage = {
+    ...message("a", "assistant", ""),
+    tools: [
+      { callId: "c1", name: "shell", args: { command: "just check" }, status: "running", output: "one\ntwo\nthree\n" },
+    ],
+  };
+  const collapsed = layoutMessages([reply], 60).map((line) => textOf(line.spans));
+  assert.deepEqual(collapsed, ["golem", "shell just check …", "  │ three"]);
+  const expanded = layoutMessages([reply], 60, { times: false, now: 0, toolOutput: true }).map((line) =>
+    textOf(line.spans),
+  );
+  assert.deepEqual(expanded.slice(2), ["  │ one", "  │ two", "  │ three"]);
+});

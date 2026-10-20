@@ -17,7 +17,8 @@ An Architecture Decision Record (ADR) is a short note of one choice: what was de
 | [011](011-tools.md) | Tools run in golem's own node, inside the session folder | accepted | 2026-10-19 |
 | [012](012-permission-rules.md) | Tool rules: first match wins, and a project cannot allow itself | accepted | 2026-10-19 |
 | [013](013-approvals.md) | An approval is an interrupt, and the waiting run has no task | accepted | 2026-10-19 |
+| [014](014-shell-sandbox.md) | The shell runs under sandbox-exec, or not at all | accepted | 2026-10-19 |
 
 How the running code fits together is in [../architecture.md](../architecture.md).
 
-New records use [template.md](template.md). Number the next file `014-….md` and add a row here.
+New records use [template.md](template.md). Number the next file `015-….md` and add a row here.

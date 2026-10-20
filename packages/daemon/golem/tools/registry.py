@@ -9,11 +9,13 @@ and calls :meth:`ToolRegistry.call`.
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, ValidationError
+
+from golem.config import ShellSettings
 
 MAX_OUTPUT_CHARS = 100_000
 """What the model receives from one call, at most."""
@@ -25,9 +27,15 @@ class ToolError(Exception):
 
 @dataclass(frozen=True, slots=True)
 class ToolContext:
-    """What a call may touch. ``root`` is the session folder, or None without one."""
+    """What a call may touch. ``root`` is the session folder, or None without one.
+
+    ``output`` streams text to the screen while the call runs. ``shell`` is the
+    user's ``[shell]`` settings.
+    """
 
     root: Path | None
+    output: Callable[[str], None] | None = None
+    shell: ShellSettings = field(default_factory=ShellSettings)
 
 
 @dataclass(frozen=True, slots=True)
