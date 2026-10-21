@@ -324,4 +324,5 @@ To see the restart for yourself: run `just tui`, then kill the pid from `just go
 - [docs/architecture.md](docs/architecture.md) explains how the daemon, the protocol, and the TUI fit together.
 - [docs/plan.md](docs/plan.md) is what comes next, step by step.
 - [docs/monorepo.md](docs/monorepo.md) explains the Python and TypeScript workspace setup.
+- [docs/sre.md](docs/sre.md) covers build, CI, install, running the daemon, data, and what is planned for each.
 - [docs/adr/](docs/adr/README.md) records why things are built the way they are.
