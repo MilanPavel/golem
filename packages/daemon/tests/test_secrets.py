@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -31,11 +32,13 @@ class _Backend(KeyringBackend):
     def __init__(self) -> None:
         super().__init__()
         self.items: dict[tuple[str, str], str] = {}
+        self.writes: list[str] = []
 
     def get_password(self, service: str, username: str) -> str | None:
         return self.items.get((service, username))
 
     def set_password(self, service: str, username: str, password: str) -> None:
+        self.writes.append(username)
         self.items[(service, username)] = password
 
     def delete_password(self, service: str, username: str) -> None:
@@ -65,6 +68,35 @@ def test_provider_keys_keep_their_old_keychain_account(backend: _Backend) -> Non
     }
     assert keys.delete("anthropic") is True
     assert keys.delete("anthropic") is False
+
+
+def test_a_frozen_daemon_rewrites_each_key_once(
+    backend: _Backend,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("GOLEM_HOME", str(tmp_path))
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    backend.items[("golem", "anthropic")] = "sk-a"
+    assert KeychainSecrets().get("provider/anthropic") == "sk-a"
+    assert backend.writes == ["anthropic"]
+    marker = tmp_path / "run" / "keychain-migrated"
+    assert marker.read_text(encoding="utf-8") == "provider/anthropic\n"
+    assert KeychainSecrets().get("provider/anthropic") == "sk-a"
+    assert backend.writes == ["anthropic"]
+
+
+def test_an_unfrozen_daemon_leaves_keychain_items_alone(
+    backend: _Backend,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delattr(sys, "frozen", raising=False)
+    monkeypatch.setenv("GOLEM_HOME", str(tmp_path))
+    backend.items[("golem", "anthropic")] = "sk-a"
+    assert KeychainSecrets().get("provider/anthropic") == "sk-a"
+    assert backend.writes == []
+    assert not (tmp_path / "run" / "keychain-migrated").exists()
 
 
 @pytest.mark.parametrize("name", ["anthropic", "mcp/", "provider/a b", "hook", "../x"])

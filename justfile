@@ -63,6 +63,14 @@ golem *args:
 tui:
     pnpm --filter @golem/tui start
 
+# Build dist/golem-<version>-<os>-<arch>: a frozen daemon and one golem binary.
+dist:
+    sh scripts/dist.sh
+
+# Chat once against a built tree. Pass a path, or use the newest tree under dist/.
+smoke-dist tree="":
+    .venv/bin/python scripts/smoke_dist.py {{tree}}
+
 # Lint, typecheck, test, and fail if generated protocol files drift.
 check:
     #!/usr/bin/env bash

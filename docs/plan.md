@@ -29,7 +29,7 @@ This file is about what comes next. How the existing pieces are built is in [arc
 - Write tools: `write_file` and `edit_file` change files in the session folder, never under `.golem/` or `.git/`. The approval shows the diff, only that change is applied, and `e` edits a call's arguments before allowing it once ([ADR-015](adr/015-write-tools.md)).
 - Approvals: a call a rule asks about waits for `a` (once), `s` (for the session), or `d` (deny), across closing the TUI and restarting the daemon. A waiting session shows `?` in the switcher.
 - Slash commands with suggestions, a line editor, recalling a sent message with Up, copy and export, and closing a session from the switcher.
-- It runs from a checkout of this repository (`just golem daemon install`, then `just tui`). Phase 1 makes it installable.
+- `golem` with no arguments opens the TUI. `just dist` compiles that command to one file, `bin/golem`, with bun ([ADR-019](adr/019-single-binary.md)). It does not need Node. The same build has `libexec/golem-daemon/golem-daemon`, a PyInstaller one-folder daemon that needs no uv or system Python. The CLI finds it next to `bin/golem`, and `GOLEM_DAEMON` points `golem daemon install` at another copy. `just smoke-dist` starts that daemon against a stub model, checks one chat, and checks that it starts in under 1 s; the first start of a fresh copy takes a few seconds while macOS checks its libraries. CI builds and smoke-tests it on macOS. A built daemon takes over the Keychain items a checkout stored, after one Always Allow. A checkout reports `0.0.0-dev`; a build reports the git tag. Signed releases and `brew install` are still ahead in Phase 1.
 
 ### Next, in order
 

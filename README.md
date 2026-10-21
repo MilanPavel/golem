@@ -148,7 +148,9 @@ just golem auth remove anthropic
 
 In the TUI, `/login anthropic` asks for the key in a masked prompt and `/logout anthropic` removes it. The daemon stores the key and reads it back at each model call, so the background service needs no environment variables and no restart. An environment variable such as `ANTHROPIC_API_KEY` still works, and it wins over the Keychain.
 
-After uv installs a new Python, macOS may ask once whether Python may use the golem Keychain item. Choose Always Allow. From a checkout, the Keychain trusts uv's shared Python interpreter, not golem itself, so another project's scripts on that same interpreter could read the keys. Run other projects on a different Python version until golem ships as its own signed binary (plan step 1.3).
+After uv installs a new Python, macOS may ask once whether Python may use the golem Keychain item. Choose Always Allow. From a checkout, the Keychain trusts uv's shared Python interpreter, not golem itself, so another project's scripts on that same interpreter could read the keys. Run other projects on a different Python version, or use the built daemon.
+
+The daemon from `just dist` is its own executable. The first time it reads a key that a checkout stored, macOS asks once; choose Always Allow. It then rewrites that item so the Keychain trusts only the built daemon, and records it in `~/.golem/run/keychain-migrated`. A checkout's Python asks again after that.
 
 ### All settings
 

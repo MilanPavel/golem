@@ -15,10 +15,15 @@ secret itself.
 
 from __future__ import annotations
 
+import contextlib
 import re
+import sys
+from pathlib import Path
 from typing import Annotated, Protocol
 
 from pydantic import AfterValidator
+
+from golem.paths import resolve_paths
 
 SERVICE = "golem"
 KEYCHAIN_PREFIX = "keychain:"
@@ -100,6 +105,8 @@ class KeychainSecrets:
         except KeyringError as exc:
             raise SecretStoreError(f"keychain is unavailable: {exc}") from exc
         self._cache[name] = value
+        if value:
+            self._claim(name, value)
         return value
 
     def set(self, name: str, value: str) -> None:
@@ -125,6 +132,44 @@ class KeychainSecrets:
             raise SecretStoreError(f"keychain is unavailable: {exc}") from exc
         self._cache[name] = None
         return True
+
+    def _claim(self, name: str, value: str) -> None:
+        """A frozen build rewrites the item once so this binary owns it.
+
+        The first read may prompt. Deleting and storing again makes the new
+        executable the owner, and ``run/keychain-migrated`` records the name.
+        """
+        if not getattr(sys, "frozen", False):
+            return
+        marker = resolve_paths().run_dir / "keychain-migrated"
+        claimed = _read_claimed(marker)
+        if name in claimed:
+            return
+        import keyring
+        from keyring.errors import KeyringError, PasswordDeleteError
+
+        try:
+            with contextlib.suppress(PasswordDeleteError):
+                keyring.delete_password(self._service, account(name))
+            keyring.set_password(self._service, account(name), value)
+        except KeyringError as exc:
+            raise SecretStoreError(f"keychain is unavailable: {exc}") from exc
+        claimed.add(name)
+        _write_claimed(marker, claimed)
+        self._cache[name] = value
+
+
+def _read_claimed(path: Path) -> set[str]:
+    try:
+        text = path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return set()
+    return {line for line in text.splitlines() if line}
+
+
+def _write_claimed(path: Path, names: set[str]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("".join(f"{name}\n" for name in sorted(names)), encoding="utf-8")
 
 
 class MemorySecrets:
