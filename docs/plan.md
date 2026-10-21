@@ -28,6 +28,7 @@ This file is about what comes next. How the existing pieces are built is in [arc
 - Artifacts: tool output over 20 000 characters is stored in `golem.db`, the model gets its head and tail and reads more with `read_artifact`, and `/artifact` opens all of it ([ADR-016](adr/016-artifacts.md)).
 - Write tools: `write_file` and `edit_file` change files in the session folder, never under `.golem/` or `.git/`. The approval shows the diff, only that change is applied, and `e` edits a call's arguments before allowing it once ([ADR-015](adr/015-write-tools.md)).
 - Approvals: a call a rule asks about waits for `a` (once), `s` (for the session), or `d` (deny), across closing the TUI and restarting the daemon. A waiting session shows `?` in the switcher.
+- Safe upgrades: a daemon that upgrades `golem.db` copies it to `golem.db.bak-<schema>` first and records each migration with its golem version in `schema_version`. A daemon refuses a newer file and names the golem it needs and the copy it can still open. `checkpoints.db` is copied to `checkpoints.db.bak-<langgraph version>` when the LangGraph packages change. `golem daemon restart` swaps the running daemon and prints the new version, `golem daemon uninstall` removes the launchd job and keeps `~/.golem`, and the TUI's version notice says to restart.
 - Slash commands with suggestions, a line editor, recalling a sent message with Up, copy and export, and closing a session from the switcher.
 - `golem` with no arguments opens the TUI. `just dist` compiles that command to one file, `bin/golem`, with bun ([ADR-019](adr/019-single-binary.md)). It does not need Node. The same build has `libexec/golem-daemon/golem-daemon`, a PyInstaller one-folder daemon that needs no uv or system Python. The CLI finds it next to `bin/golem`, and `GOLEM_DAEMON` points `golem daemon install` at another copy. `just smoke-dist` starts that daemon against a stub model, checks one chat, and checks that it starts in under 1 s; the first start of a fresh copy takes a few seconds while macOS checks its libraries. CI builds and smoke-tests it on macOS. A built daemon takes over the Keychain items a checkout stored, after one Always Allow. A checkout reports `0.0.0-dev`; a build reports the git tag. Signed releases and `brew install` are still ahead in Phase 1.
 
@@ -187,11 +188,11 @@ Steps 1.1 to 1.7 are macOS only and end with `brew install`. Steps 1.8 to 1.11 a
 - **Goal:** a new release never breaks the data of an old one.
 - **You can:** upgrade golem and keep every session.
 - **Build:**
-  - Numbered SQL migrations for `golem.db`, with the current version in a `schema_version` table. This moves forward from 7.4, because installed users need it first.
-  - Before migrating, the daemon copies the database to `golem.db.bak-<version>` with the SQLite backup API.
-  - The daemon refuses to start on a database newer than it knows, and says which version it needs.
-  - `checkpoints.db` is backed up before a LangGraph upgrade. Chats can survive losing it, because the event log is the real history ([ADR-006](adr/006-checkpoint-continuity.md)).
-  - `golem daemon restart`. Its version mismatch with the TUI already shows as a yellow notice, and the notice now says to run it.
+  - Numbered SQL migrations for `golem.db`. SQLite's `user_version` stays the number a daemon checks, and a `schema_version` table records which golem applied each migration and when. This moves forward from 7.4, because installed users need it first.
+  - Before migrating, the daemon copies the database to `golem.db.bak-<schema>` with the SQLite backup API. The name is the schema it holds, so a daemon that reads that schema can open it.
+  - The daemon refuses to start on a database newer than it knows, says which golem version it needs (from `schema_version`), and names the copy it can still open.
+  - `checkpoints.db` is backed up to `checkpoints.db.bak-<langgraph version>` when `langgraph`, `langgraph-checkpoint`, or `langgraph-checkpoint-sqlite` differ from the versions in `golem.db`'s `library_versions`. Chats can survive losing it, because the event log is the real history ([ADR-006](adr/006-checkpoint-continuity.md)).
+  - `golem daemon restart` and `golem daemon uninstall`. The version mismatch with the TUI already shows as a yellow notice, and the notice now says to run `restart`.
 - **Done when:** a test upgrades a database made by the previous release and every session is still there.
 
 ### 1.5 Release pipeline

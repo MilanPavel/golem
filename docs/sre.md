@@ -238,6 +238,8 @@ stateDiagram-v2
 | `golem daemon install` | Writes the launchd file and starts the daemon. Run it again after moving or upgrading golem |
 | `golem daemon start` | Starts the daemon, or restarts it if it is running |
 | `golem daemon stop` | Stops it and keeps it stopped until `start` |
+| `golem daemon restart` | Swaps the running daemon for the one the launchd file names, after an upgrade. Waits until the new one answers and prints its version. Warns when the launchd file names a different golem than the one you ran: then run `install` |
+| `golem daemon uninstall` | Stops it and deletes the launchd file. Your data in `~/.golem` stays |
 | `golem daemon logs` | Shows the log and follows new lines |
 | `golem status` | Shows pid, version, and uptime. Exits with code 1 if the daemon is not running |
 
@@ -263,7 +265,7 @@ The daemon locks the file `~/.golem/run/golem.pid` for as long as it runs ([ADR-
 ```mermaid
 flowchart LR
   subgraph startup [Start]
-    s1[read settings] --> s2[take the lock] --> s3["open the databases<br/>(upgrade them if needed)"] --> s4[recover chats that<br/>were cut off] --> s5["open the socket<br/>= ready"]
+    s1[read settings] --> s2[take the lock] --> s3["open the databases<br/>(copy, then upgrade them if needed)"] --> s4[recover chats that<br/>were cut off] --> s5["open the socket<br/>= ready"]
   end
   subgraph shutdown [Stop]
     t1[stop taking<br/>new connections] --> t2["cancel running answers<br/>(keep what they said)"] --> t3[finish open requests] --> t4[remove the socket,<br/>release the lock] --> t5[exit 0]
@@ -291,7 +293,9 @@ Everything is in one folder: `~/.golem`, or whatever `GOLEM_HOME` points to.
 
 **Backing up:** both `.db` files are SQLite databases. Copy them while the daemon is stopped. While it runs, use `sqlite3 ~/.golem/golem.db ".backup /path/to/copy.db"`.
 
-**Upgrades:** each database has a version number. A newer daemon upgrades an older database once, at start. An older daemon refuses a database from a newer version and says which version it needs, rather than damaging it. Automatic backups before an upgrade come in step 1.4.
+**Upgrades:** `golem.db` has a schema number. A newer daemon upgrades an older file once, at start, after copying it to `golem.db.bak-<schema>`, for example `golem.db.bak-5`. An older daemon refuses a file from a newer version rather than damaging it, and says which golem it needs and which copy it can still open. `checkpoints.db` is copied to `checkpoints.db.bak-<langgraph version>` when golem starts with different LangGraph packages. The copies are not deleted for you; remove old ones when you no longer need them.
+
+**Going back a version:** stop the daemon, move `golem.db` aside, rename the copy the error names to `golem.db`, and start the older golem. What happened after the upgrade is only in the file you moved aside.
 
 ---
 
@@ -389,11 +393,11 @@ Homebrew keeps each version in its own folder under `Cellar/`, and keeps two lin
 
 ```bash
 brew upgrade golem          # download the new version
-golem daemon restart        # switch the running daemon to it (restart comes in step 1.4)
+golem daemon restart        # switch the running daemon to it
 ```
 
 ```bash
-golem daemon uninstall      # remove the launchd service (comes in step 1.4)
+golem daemon uninstall      # remove the launchd service
 brew uninstall golem        # remove the program
 ```
 
@@ -478,7 +482,7 @@ Remember: under launchd, `GOLEM_...` variables from your terminal do not apply. 
 |---|---|
 | The chat screen says `reconnecting` | Run `golem status`. If it is down, run `golem daemon start`, then look at `~/.golem/logs/launchd.stderr.log` |
 | `daemon already running (pid N)` | The background copy is running. Run `golem daemon stop` before starting one by hand |
-| The daemon keeps restarting | Read `launchd.stderr.log`. Common causes: the database is from a newer golem version; `GOLEM_HOME` is too long (a socket path must be under 104 characters on macOS); golem was moved (run `golem daemon install` again) |
+| The daemon keeps restarting | Read `launchd.stderr.log`. Common causes: the database is from a newer golem version (the message names the golem it needs and the copy that still opens); `GOLEM_HOME` is too long (a socket path must be under 104 characters on macOS); golem was moved (run `golem daemon install` again) |
 | `needs key` | `golem auth set <provider>`, or `/login <provider>` in the chat screen |
 | macOS asks about the Keychain on every start | The daemon was rebuilt or moved. Choose Always Allow. Proper signing (step 1.5) fixes this for good |
 | A build crashes with `ModuleNotFoundError` | PyInstaller missed a module. Add it to `golem-daemon.spec`, then run `just dist && just smoke-dist` |
@@ -494,12 +498,11 @@ The rest of Phase 1, in order:
 
 ```mermaid
 flowchart LR
-  done["1.1–1.3 ✓<br/>one version,<br/>one golem file,<br/>packed daemon"] --> s14["1.4<br/>safe upgrades"] --> s15["1.5<br/>releases<br/>and signing"] --> s16["1.6<br/>brew install"] --> s17["1.7<br/>golem doctor"] --> s18["1.8<br/>platform<br/>layer"] --> s19["1.9<br/>Linux"] --> s110["1.10–1.11<br/>Windows"]
+  done["1.1–1.4 ✓<br/>one version,<br/>one golem file,<br/>packed daemon,<br/>safe upgrades"] --> s15["1.5<br/>releases<br/>and signing"] --> s16["1.6<br/>brew install"] --> s17["1.7<br/>golem doctor"] --> s18["1.8<br/>platform<br/>layer"] --> s19["1.9<br/>Linux"] --> s110["1.10–1.11<br/>Windows"]
 ```
 
 | Step | What you will get |
 |---|---|
-| **1.4 Safe upgrades** | Before upgrading a database, golem copies it to `golem.db.bak-<version>`. New `golem daemon restart` and `golem daemon uninstall`. A test proves the previous release's data survives an upgrade |
 | **1.5 Releases** | Pushing a tag such as `v0.3.0` makes GitHub check, build, sign, and smoke-test golem, then publish the archive and its checksum. Signed with a stable identity, so the Keychain stops asking after upgrades |
 | **1.6 Homebrew** | `brew install <owner>/golem/golem`, as described in section 10 |
 | **1.7 `golem doctor`** | One command that checks everything (daemon found, service set up, versions match, settings valid, models reachable, disk space) and says how to fix each problem |

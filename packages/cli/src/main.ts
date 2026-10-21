@@ -3,6 +3,9 @@ import { existsSync } from "node:fs";
 
 import { connectGolem, GOLEM_VERSION, resolveSocketPath } from "@golem/client";
 
+import type { DaemonStatus } from "../../protocol/gen/daemon-status.ts";
+
+import { awaitRestart, formatRestarted } from "./await-restart.ts";
 import { locateDaemon } from "./daemon-locator.ts";
 
 import { formatConfig } from "./format-config.ts";
@@ -13,10 +16,13 @@ import { formatCliVersion } from "./format-version.ts";
 import { readSecret } from "./read-secret.ts";
 import { findWorkspaceRoot } from "./workspace.ts";
 
+// The first start of a fresh build takes a few seconds while macOS checks its libraries.
+const RESTART_TIMEOUT_MS = 15_000;
+
 const USAGE =
   "usage: golem\n" +
   "       golem --version | golem --help | golem status\n" +
-  "       golem daemon install|start|stop|logs\n" +
+  "       golem daemon install|start|stop|restart|uninstall|logs\n" +
   "       golem auth set|remove <provider> | golem auth list | golem models [--refresh]\n" +
   "       golem config show [--resolved]";
 
@@ -129,10 +135,13 @@ async function runVersion(): Promise<number> {
 }
 
 async function readDaemonVersion(): Promise<string | null> {
+  return (await readDaemonStatus())?.version ?? null;
+}
+
+async function readDaemonStatus(): Promise<DaemonStatus | null> {
   const client = connectOnce();
   try {
-    const status = await client.status();
-    return status.version;
+    return await client.status();
   } catch {
     return null;
   } finally {
@@ -184,7 +193,30 @@ async function runDaemon(args: string[]): Promise<number> {
     process.stderr.write(`${explain(error)}\n`);
     return 1;
   }
-  const child = spawn(located.command, [...located.args, "daemon", ...args], { stdio: "inherit" });
+  const restarting = args.length === 1 && args[0] === "restart";
+  const previous = restarting ? await readDaemonStatus() : null;
+  const exitCode = await runLocated(located.command, [...located.args, "daemon", ...args]);
+  if (!restarting || exitCode !== 0) {
+    return exitCode;
+  }
+  const restarted = await awaitRestart(previous?.pid ?? null, {
+    readStatus: readDaemonStatus,
+    sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+    now: () => Date.now(),
+    timeoutMs: RESTART_TIMEOUT_MS,
+    pollMs: 200,
+  });
+  const report = formatRestarted(restarted, RESTART_TIMEOUT_MS);
+  if (restarted === null) {
+    process.stderr.write(`${report}\n`);
+    return 1;
+  }
+  process.stdout.write(`${report}\n`);
+  return 0;
+}
+
+async function runLocated(command: string, args: string[]): Promise<number> {
+  const child = spawn(command, args, { stdio: "inherit" });
   return await new Promise((resolve) => {
     child.on("error", (error) => {
       process.stderr.write(`${error.message}\n`);

@@ -1,6 +1,9 @@
 """Schema for ``golem.db``, one tuple of statements per ``user_version``.
 
 Append a migration. Never edit one that has shipped.
+
+``schema_version`` (6) is read by every later daemon, including one that is
+too old for the file, so its columns never change.
 """
 
 from __future__ import annotations
@@ -63,5 +66,21 @@ MIGRATIONS: tuple[tuple[str, ...], ...] = (
         )
         """,
         "CREATE INDEX artifacts_session ON artifacts (session_id)",
+    ),
+    (
+        """
+        CREATE TABLE schema_version (
+            version INTEGER PRIMARY KEY,
+            golem_version TEXT NOT NULL,
+            applied_at TEXT NOT NULL
+        )
+        """,
+        """
+        CREATE TABLE library_versions (
+            name TEXT PRIMARY KEY,
+            version TEXT NOT NULL,
+            recorded_at TEXT NOT NULL
+        )
+        """,
     ),
 )

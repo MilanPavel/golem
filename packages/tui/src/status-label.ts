@@ -102,7 +102,7 @@ export function versionLabel(
   if (daemonVersion.length === 0 || tuiVersion === daemonVersion) {
     return { text: tuiVersion, warn: false };
   }
-  return { text: `tui ${tuiVersion} · daemon ${daemonVersion}`, warn: true };
+  return { text: `tui ${tuiVersion} · daemon ${daemonVersion} · run golem daemon restart`, warn: true };
 }
 
 export function sessionTitleLabel(title: string | null | undefined): string {

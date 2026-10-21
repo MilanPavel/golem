@@ -58,7 +58,7 @@ test("a matching daemon version is one number, and a mismatch is a yellow notice
   assert.deepEqual(versionLabel("0.0.0", "0.0.0"), { text: "0.0.0", warn: false });
   assert.deepEqual(versionLabel("0.0.0", ""), { text: "0.0.0", warn: false });
   assert.deepEqual(versionLabel("0.0.0", "0.1.0"), {
-    text: "tui 0.0.0 · daemon 0.1.0",
+    text: "tui 0.0.0 · daemon 0.1.0 · run golem daemon restart",
     warn: true,
   });
 });

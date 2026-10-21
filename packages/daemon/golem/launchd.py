@@ -3,6 +3,8 @@
 ``install`` writes ``~/Library/LaunchAgents/dev.golem.daemon.plist`` and
 bootstraps it. ``stop`` unloads the job, so launchd does not restart it.
 A kill leaves the job loaded, and launchd starts the daemon again.
+``restart`` swaps the running daemon for the one the plist names, after an
+upgrade. ``uninstall`` unloads the job and deletes the plist; data stays.
 """
 
 from __future__ import annotations
@@ -12,7 +14,7 @@ import plistlib
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from golem.paths import GolemPaths, resolve_paths
 
@@ -85,6 +87,62 @@ def install() -> None:
     if job_loaded():
         subprocess.run(["launchctl", "bootout", service_target()], check=False)
     _run(["launchctl", "bootstrap", domain(), str(destination)])
+
+
+def restart() -> None:
+    """Stop the running daemon and start the one the plist names.
+
+    launchd sends SIGTERM, so the old daemon cancels running answers, keeps
+    what they said, and releases the lock before the new one takes it. When the
+    plist names another daemon than this one, it says so: ``install`` switches.
+    """
+    require_darwin()
+    destination = plist_path()
+    if not destination.is_file():
+        raise LaunchdError("plist missing; run golem daemon install")
+    named = installed_program(destination)
+    if named is not None and not same_program(named, serve_command()):
+        print(
+            f"launchd runs {named[0]}, not this golem; run golem daemon install to switch",
+            file=sys.stderr,
+        )
+    start()
+
+
+def uninstall() -> None:
+    """Unload the job and delete the plist. ``GOLEM_HOME`` and its data stay."""
+    require_darwin()
+    if job_loaded():
+        _run(["launchctl", "bootout", service_target()])
+    destination = plist_path()
+    if not destination.is_file():
+        print("daemon is not installed", file=sys.stderr)
+        return
+    destination.unlink()
+
+
+def installed_program(destination: Path) -> list[str] | None:
+    """``ProgramArguments`` from the plist, or ``None`` when it has none."""
+    try:
+        payload: object = plistlib.loads(destination.read_bytes())
+    except (OSError, plistlib.InvalidFileException):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    program = cast(dict[str, object], payload).get("ProgramArguments")
+    if not isinstance(program, list) or not program:
+        return None
+    return [str(part) for part in cast(list[object], program)]
+
+
+def same_program(left: list[str], right: list[str]) -> bool:
+    """Equal commands, with the executable compared after resolving symlinks.
+
+    Homebrew's ``opt`` link and a venv's ``python`` are links to the real file.
+    """
+    if left[1:] != right[1:]:
+        return False
+    return Path(left[0]).resolve() == Path(right[0]).resolve()
 
 
 def start() -> None:

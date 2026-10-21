@@ -1,9 +1,11 @@
 import plistlib
+import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 
+from golem import launchd
 from golem.cli import main
 from golem.launchd import LaunchdError, install, plist_payload, render_plist, serve_command
 from golem.paths import resolve_paths
@@ -96,3 +98,115 @@ def test_logs_missing_file(
     monkeypatch.setenv("GOLEM_HOME", str(short_home))
     assert main(["daemon", "logs", "--no-follow"]) == 1
     assert "log file not found" in capsys.readouterr().err
+
+
+class _Launchctl:
+    """Records launchctl calls. ``print`` answers whether the job is loaded."""
+
+    def __init__(self, *, loaded: bool) -> None:
+        self.loaded = loaded
+        self.calls: list[list[str]] = []
+
+    def __call__(self, args: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        self.calls.append(args)
+        code = 0 if args[1] != "print" or self.loaded else 113
+        return subprocess.CompletedProcess(args, code, "", "")
+
+    def verbs(self) -> list[str]:
+        return [call[1] for call in self.calls if call[1] != "print"]
+
+
+@pytest.fixture
+def agents(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    monkeypatch.setattr(sys, "platform", "darwin")
+    directory = tmp_path / "LaunchAgents"
+    directory.mkdir()
+    monkeypatch.setattr(launchd, "launch_agents_dir", lambda: directory)
+    return directory
+
+
+def _launchctl(monkeypatch: pytest.MonkeyPatch, *, loaded: bool) -> _Launchctl:
+    fake = _Launchctl(loaded=loaded)
+    monkeypatch.setattr(subprocess, "run", fake)
+    return fake
+
+
+def _write_plist(tmp_path: Path, program: list[str]) -> None:
+    launchd.plist_path().write_bytes(render_plist(resolve_paths(tmp_path / "home"), program))
+
+
+def test_restart_kickstarts_the_loaded_job(
+    agents: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _write_plist(tmp_path, serve_command())
+    fake = _launchctl(monkeypatch, loaded=True)
+    assert main(["daemon", "restart"]) == 0
+    assert fake.verbs() == ["kickstart"]
+    assert fake.calls[-1][2] == "-k"
+    assert capsys.readouterr().err == ""
+
+
+def test_restart_loads_a_stopped_job_first(
+    agents: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_plist(tmp_path, serve_command())
+    fake = _launchctl(monkeypatch, loaded=False)
+    assert main(["daemon", "restart"]) == 0
+    assert fake.verbs() == ["bootstrap", "kickstart"]
+
+
+def test_restart_says_when_the_plist_names_another_daemon(
+    agents: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _write_plist(tmp_path, ["/old/golem-daemon", "serve"])
+    _launchctl(monkeypatch, loaded=True)
+    assert main(["daemon", "restart"]) == 0
+    assert "launchd runs /old/golem-daemon" in capsys.readouterr().err
+
+
+def test_restart_without_a_plist_asks_for_install(
+    agents: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    fake = _launchctl(monkeypatch, loaded=False)
+    assert main(["daemon", "restart"]) == 1
+    assert "run golem daemon install" in capsys.readouterr().err
+    assert fake.calls == []
+
+
+def test_the_same_program_through_a_link(tmp_path: Path) -> None:
+    real = tmp_path / "Cellar" / "golem-daemon"
+    real.parent.mkdir()
+    real.write_text("", encoding="utf-8")
+    link = tmp_path / "opt-golem-daemon"
+    link.symlink_to(real)
+    assert launchd.same_program([str(link), "serve"], [str(real), "serve"])
+    assert not launchd.same_program([str(link), "serve"], [str(real), "other"])
+
+
+def test_uninstall_unloads_and_deletes_the_plist_and_keeps_data(
+    agents: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    home = tmp_path / "home"
+    resolve_paths(home).ensure_layout()
+    (home / "golem.db").write_bytes(b"history")
+    _write_plist(tmp_path, serve_command())
+    fake = _launchctl(monkeypatch, loaded=True)
+    assert main(["daemon", "uninstall"]) == 0
+    assert fake.verbs() == ["bootout"]
+    assert not launchd.plist_path().exists()
+    assert (home / "golem.db").read_bytes() == b"history"
+
+
+def test_uninstall_twice_says_it_is_not_installed(
+    agents: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    fake = _launchctl(monkeypatch, loaded=False)
+    assert main(["daemon", "uninstall"]) == 0
+    assert fake.verbs() == []
+    assert "not installed" in capsys.readouterr().err

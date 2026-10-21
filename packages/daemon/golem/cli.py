@@ -1,6 +1,6 @@
 """``python -m golem`` command line.
 
-``serve`` runs the daemon. ``daemon install|start|stop`` talk to launchd.
+``serve`` runs the daemon. ``daemon install|start|stop|restart|uninstall`` talk to launchd.
 ``daemon logs`` prints ``logs/golem.jsonl``. The user-facing ``golem`` bin is
 the TypeScript package; it delegates these subcommands here.
 """
@@ -15,7 +15,7 @@ import time
 from pathlib import Path
 
 from golem import __version__
-from golem.launchd import LaunchdError, install, start, stop
+from golem.launchd import LaunchdError, install, restart, start, stop, uninstall
 from golem.paths import resolve_paths
 
 _LOG_TAIL = 50
@@ -56,6 +56,14 @@ def _parser() -> argparse.ArgumentParser:
     stop_cmd = daemon_sub.add_parser("stop", help="unload the agent so it stays down")
     stop_cmd.set_defaults(func=_stop)
 
+    restart_cmd = daemon_sub.add_parser(
+        "restart", help="replace the running daemon, after an upgrade"
+    )
+    restart_cmd.set_defaults(func=_restart)
+
+    uninstall_cmd = daemon_sub.add_parser("uninstall", help="unload the agent and delete the plist")
+    uninstall_cmd.set_defaults(func=_uninstall)
+
     logs = daemon_sub.add_parser("logs", help="show the daemon log")
     group = logs.add_mutually_exclusive_group()
     group.add_argument("--follow", action="store_true", help="keep streaming the log")
@@ -82,6 +90,16 @@ def _start(_args: argparse.Namespace) -> int:
 
 def _stop(_args: argparse.Namespace) -> int:
     stop()
+    return 0
+
+
+def _restart(_args: argparse.Namespace) -> int:
+    restart()
+    return 0
+
+
+def _uninstall(_args: argparse.Namespace) -> int:
+    uninstall()
     return 0
 
 

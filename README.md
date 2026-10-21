@@ -204,6 +204,8 @@ just golem status            # is it up? prints pid, version, protocol, uptime
 | `just golem daemon install` | Writes `~/Library/LaunchAgents/dev.golem.daemon.plist` and loads it |
 | `just golem daemon start` | Starts the daemon, or restarts it if it is running |
 | `just golem daemon stop` | Unloads the job. The daemon stays down until the next `start` |
+| `just golem daemon restart` | Replaces the running daemon, for example after an upgrade, and prints the new version once it answers |
+| `just golem daemon uninstall` | Unloads the job and deletes the plist. `~/.golem` stays |
 | `just golem daemon logs` | Shows the last log lines and follows them. `--no-follow` prints and exits |
 | `just golem auth set <provider>` | Saves the provider's API key in the Keychain, from a hidden prompt or stdin |
 | `just golem auth remove <provider>` | Removes that key from the Keychain |
@@ -286,6 +288,7 @@ Type `/` and matching commands appear above the composer. Typing narrows them, p
 | `~/.golem/config.toml` | Your settings |
 | `~/.golem/golem.db` | Sessions, runs, and every event |
 | `~/.golem/checkpoints.db` | What the model remembers of each conversation |
+| `~/.golem/*.db.bak-<version>` | Copies taken before an upgrade changed a database |
 | `~/.golem/logs/golem.jsonl` | The daemon log. launchd's own output is next to it |
 | `~/.golem/run/golem.sock` | The socket the TUI connects to |
 | `~/.golem/history` | Messages you sent, so a new session can recall them |

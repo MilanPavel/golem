@@ -12,7 +12,6 @@ import time
 from collections.abc import Callable, Mapping
 from pathlib import Path
 
-from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from pydantic import BaseModel
 
 from golem.config import load_settings
@@ -41,6 +40,7 @@ from golem.sessions.manager import SessionManager
 from golem.sessions.recovery import recover_runs
 from golem.sessions.titles import ModelTitles, TitleGenerator
 from golem.store.artifacts import ArtifactStore
+from golem.store.checkpoints import open_checkpoints
 from golem.store.database import Database, DatabaseTooNewError
 from golem.store.events import EventLog
 from golem.store.records import RunRecords, SessionRecords
@@ -125,9 +125,8 @@ class DaemonApp:
             )
             async with (
                 Database.open(self.paths.database_file) as database,
-                AsyncSqliteSaver.from_conn_string(str(self.paths.checkpoints_file)) as saver,
+                open_checkpoints(database, self.paths.checkpoints_file) as saver,
             ):
-                await saver.setup()
                 self.state.policy = Policy(self.paths.config_file)
                 self.state.tools = default_registry()
                 self.state.artifacts = ArtifactStore(database)
