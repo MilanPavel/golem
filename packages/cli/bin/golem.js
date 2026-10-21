@@ -2,12 +2,9 @@
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
+// Node does not compile JSX. bun runs the TypeScript entry, including the TUI.
 const entry = fileURLToPath(new URL("../src/main.ts", import.meta.url));
-const child = spawn(
-  process.execPath,
-  ["--experimental-strip-types", entry, ...process.argv.slice(2)],
-  { stdio: "inherit" },
-);
+const child = spawn("bun", [entry, ...process.argv.slice(2)], { stdio: "inherit" });
 child.on("exit", (code, signal) => {
   if (signal) {
     process.kill(process.pid, signal);

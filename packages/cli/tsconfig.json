@@ -11,6 +11,7 @@
     "noImplicitOverride": true,
     "isolatedModules": true,
     "allowImportingTsExtensions": true,
+    "jsx": "react-jsx",
     "types": ["node"],
     "resolveJsonModule": true
   },

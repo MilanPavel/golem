@@ -63,6 +63,7 @@ Golem runs on macOS only, from a checkout of this repository. There is no instal
 | macOS | any recent | Needed for the launchd background service |
 | [uv](https://docs.astral.sh/uv/) | latest | `brew install uv`. It also installs Python 3.12, pinned in `.python-version` |
 | Node.js | 24 | `brew install node` |
+| [bun](https://bun.sh) | 1.3 | `brew install oven-sh/bun/bun`. Runs `golem` from a checkout, and `just dist` compiles it |
 | pnpm | 10 (pinned in `package.json`) | `corepack enable` |
 | [just](https://just.systems) | latest | `brew install just` |
 | [Ollama](https://ollama.com) | optional | `brew install ollama`. Needed only for local models |
@@ -188,7 +189,9 @@ just golem daemon install    # write the launchd job and start it; run once
 just golem status            # is it up? prints pid, version, protocol, uptime
 ```
 
-`install` records this checkout's virtualenv, so run it again if you move the repository. To switch back to the command line, run `just golem daemon stop` first.
+`install` records the Python it found: this checkout's virtualenv, unless `GOLEM_DAEMON` points at a daemon from `just dist`. Run it again after a move or an upgrade. To switch back to the command line, run `just golem daemon stop` first.
+
+`just golem --version` prints `0.0.0-dev` from a checkout. A built tree prints the git tag it was built from.
 
 ### Daemon commands
 
@@ -209,7 +212,8 @@ just golem status            # is it up? prints pid, version, protocol, uptime
 ## Chat
 
 ```bash
-just tui
+just golem    # no arguments opens the TUI
+just tui      # the same screen, started with tsx
 ```
 
 The TUI opens your newest session, or a new one if there is none. Type and press Enter.

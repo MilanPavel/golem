@@ -12,7 +12,8 @@
     "test": "node --experimental-strip-types --test src/*.test.ts"
   },
   "dependencies": {
-    "@golem/client": "workspace:*"
+    "@golem/client": "workspace:*",
+    "@golem/tui": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",

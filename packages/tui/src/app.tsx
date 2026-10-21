@@ -11,6 +11,7 @@ import {
   type ListedModel,
   type ModelListResult,
   type WireLine,
+  GOLEM_VERSION,
 } from "@golem/client";
 
 import {
@@ -129,7 +130,6 @@ import {
   type ModelInfo,
   type StatusSegment,
 } from "./status-label.ts";
-import { TUI_VERSION } from "./version.ts";
 import { applyWindowTitle } from "./window-title.ts";
 import { nextOffset, WHEEL_LINES, type WheelSubscribe } from "./screen.ts";
 import {
@@ -309,7 +309,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   const model = preferModel(sessionModel, daemonModel);
   const chip = modelChip(model.name, model.profile);
   const cwd = shortCwd(sessionCwd ?? process.cwd(), homedir());
-  const versions = versionLabel(TUI_VERSION, daemonVersion);
+  const versions = versionLabel(GOLEM_VERSION, daemonVersion);
   const phase = meterPhase(chat.busy, assistantChars(chat.messages), chat.approval !== null);
   const page = Math.max(1, (keysOpen ? budget.body : Math.max(1, chatHeight)) - 1);
   const debugPage = Math.max(1, budget.debug - 2);

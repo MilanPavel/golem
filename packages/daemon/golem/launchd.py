@@ -44,11 +44,21 @@ def require_darwin() -> None:
         raise LaunchdError("launchd is macOS-only")
 
 
-def plist_payload(paths: GolemPaths, python: str) -> dict[str, Any]:
-    """The job launchd should run. ``python`` is an absolute interpreter path."""
+def serve_command() -> list[str]:
+    """How launchd should start this daemon.
+
+    A frozen build is its own executable. A checkout or a venv still runs the module.
+    """
+    if getattr(sys, "frozen", False):
+        return [sys.executable, "serve"]
+    return [sys.executable, "-m", "golem", "serve"]
+
+
+def plist_payload(paths: GolemPaths, program: list[str]) -> dict[str, Any]:
+    """The job launchd should run. ``program`` is an absolute command."""
     return {
         "Label": LABEL,
-        "ProgramArguments": [python, "-m", "golem", "serve"],
+        "ProgramArguments": program,
         "RunAtLoad": True,
         "KeepAlive": True,
         "ThrottleInterval": 2,
@@ -60,8 +70,8 @@ def plist_payload(paths: GolemPaths, python: str) -> dict[str, Any]:
     }
 
 
-def render_plist(paths: GolemPaths, python: str) -> bytes:
-    return plistlib.dumps(plist_payload(paths, python), fmt=plistlib.FMT_XML)
+def render_plist(paths: GolemPaths, program: list[str]) -> bytes:
+    return plistlib.dumps(plist_payload(paths, program), fmt=plistlib.FMT_XML)
 
 
 def install() -> None:
@@ -71,7 +81,7 @@ def install() -> None:
     paths.ensure_layout()
     destination = plist_path()
     destination.parent.mkdir(parents=True, exist_ok=True)
-    destination.write_bytes(render_plist(paths, sys.executable))
+    destination.write_bytes(render_plist(paths, serve_command()))
     if job_loaded():
         subprocess.run(["launchctl", "bootout", service_target()], check=False)
     _run(["launchctl", "bootstrap", domain(), str(destination)])

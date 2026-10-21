@@ -19,6 +19,9 @@ dependencies = [
   "tomlkit>=0.13",
 ]
 
+[project.scripts]
+golem-daemon = "golem.cli:main"
+
 [tool.uv.sources]
 golem-protocol = { workspace = true }
 

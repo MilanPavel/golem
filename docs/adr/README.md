@@ -22,6 +22,7 @@ An Architecture Decision Record (ADR) is a short note of one choice: what was de
 | [016](016-artifacts.md) | Big tool output is an artifact in golem.db, and the model reads it in pages | accepted | 2026-10-20 |
 | [017](017-web-fetch.md) | web_fetch asks per host, refuses private addresses, and returns data | accepted | 2026-10-20 |
 | [018](018-tool-state-updates.md) | A tool returns a state update, and the node applies only the keys it allows | accepted | 2026-10-20 |
+| [019](019-single-binary.md) | The `golem` command is one bun binary | accepted | 2026-10-20 |
 
 How the running code fits together is in [../architecture.md](../architecture.md).
 

@@ -3,6 +3,9 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "exports": {
+    ".": "./src/main.tsx"
+  },
   "scripts": {
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",
@@ -12,6 +15,7 @@
   "dependencies": {
     "@golem/client": "workspace:*",
     "ink": "^8.0.0",
+    "react-devtools-core": "file:../../scripts/react-devtools-core",
     "marked": "^18.1.0",
     "react": "^19.3.0"
   },

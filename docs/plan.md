@@ -730,4 +730,4 @@ Each one gets an ADR when it is decided.
 2. Are memory writes always confirmed, or auto-saved for some namespaces? (Needed by 6.3.)
 3. Flows in Python only, or also a YAML format for simple ones? (Recommendation: Python only until it hurts.)
 4. Windows transport: a named pipe or loopback TCP with a token file? (Needed by 1.10. Named pipe first, TCP if asyncio's pipe server proves fragile.)
-5. `bun build --compile` or Node's single executable feature for `bin/golem`? (Needed by 1.2. Decided by a one-day spike.)
+5. `bun build --compile` or Node's single executable feature for `bin/golem`? Decided in [ADR-019](adr/019-single-binary.md): bun.

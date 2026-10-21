@@ -12,6 +12,9 @@ htmlcov/
 node_modules/
 dist/
 
+# Stamped by `just dist`, then packaged. A checkout has no version file.
+packages/daemon/golem/_build.py
+
 # OS
 .DS_Store
 

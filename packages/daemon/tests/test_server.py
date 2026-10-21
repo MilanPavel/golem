@@ -17,6 +17,7 @@ import pytest
 from pydantic import BaseModel, ConfigDict
 from support import ServeProcess
 
+from golem import __version__
 from golem.config import load_settings
 from golem.logging import configure_logging
 from golem.models.discovery import ModelDiscovery
@@ -248,11 +249,11 @@ async def test_hello_status_and_ping(running: DaemonApp) -> None:
         hello = rpc_result(await client.call("hello", HELLO))
         assert hello["protocol_major"] == PROTOCOL_MAJOR
         assert hello["protocol_minor"] == PROTOCOL_MINOR
-        assert hello["daemon_version"] == "0.0.0"
+        assert hello["daemon_version"] == __version__
         status = rpc_result(await client.call("daemon.status"))
         assert status["pid"] == os.getpid()
         assert status["state"] == "running"
-        assert status["version"] == "0.0.0"
+        assert status["version"] == __version__
         assert status["model_profile"] == "remote"
         assert status["model_provider"] is None
         assert status["model_name"] is None

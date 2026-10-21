@@ -14,6 +14,7 @@ import sys
 import time
 from pathlib import Path
 
+from golem import __version__
 from golem.launchd import LaunchdError, install, start, stop
 from golem.paths import resolve_paths
 
@@ -33,6 +34,11 @@ def main(argv: list[str] | None = None) -> int:
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="golem")
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"golem-daemon {__version__}",
+    )
     sub = parser.add_subparsers(dest="command", required=True)
 
     serve = sub.add_parser("serve", help="run the daemon in the foreground")

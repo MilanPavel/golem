@@ -25,6 +25,7 @@ export type { ConfigGetResult, ConfigRule } from "../../protocol/gen/config-get-
 export type { ListedModel, ModelListResult } from "../../protocol/gen/model-list-result.ts";
 export { mergeSummary } from "./session-index.ts";
 export { resolveSocketPath } from "./socket-path.ts";
+export { VERSION as GOLEM_VERSION } from "./version.ts";
 export {
   formatWireLine,
   pingTotal,

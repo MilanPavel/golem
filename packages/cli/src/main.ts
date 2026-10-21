@@ -1,21 +1,37 @@
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
 
-import { connectGolem, resolveSocketPath } from "@golem/client";
+import { connectGolem, GOLEM_VERSION, resolveSocketPath } from "@golem/client";
+
+import { locateDaemon } from "./daemon-locator.ts";
 
 import { formatConfig } from "./format-config.ts";
 import { formatKeys } from "./format-keys.ts";
 import { formatModels } from "./format-models.ts";
 import { formatStatus } from "./format-status.ts";
 import { formatCliVersion } from "./format-version.ts";
-import { CLI_VERSION } from "./version.ts";
 import { readSecret } from "./read-secret.ts";
 import { findWorkspaceRoot } from "./workspace.ts";
+
+const USAGE =
+  "usage: golem\n" +
+  "       golem --version | golem --help | golem status\n" +
+  "       golem daemon install|start|stop|logs\n" +
+  "       golem auth set|remove <provider> | golem auth list | golem models [--refresh]\n" +
+  "       golem config show [--resolved]";
 
 // exitCode, not exit(): exit() drops output a pipe has not read yet.
 process.exitCode = await run(process.argv.slice(2));
 
 async function run(args: string[]): Promise<number> {
   const [command, ...rest] = args;
+  if (command === undefined) {
+    return openTui();
+  }
+  if (command === "--help" || command === "-h") {
+    process.stdout.write(`${USAGE}\n`);
+    return 0;
+  }
   if (command === "--version") {
     return runVersion();
   }
@@ -37,11 +53,6 @@ async function run(args: string[]): Promise<number> {
   process.stderr.write(`${USAGE}\n`);
   return 1;
 }
-
-const USAGE =
-  "usage: golem --version | golem status | golem daemon install|start|stop|logs\n" +
-  "       golem auth set|remove <provider> | golem auth list | golem models [--refresh]\n" +
-  "       golem config show [--resolved]";
 
 async function runConfigShow(): Promise<number> {
   const client = connectOnce();
@@ -113,7 +124,7 @@ async function runAuth(args: string[]): Promise<number> {
 }
 
 async function runVersion(): Promise<number> {
-  process.stdout.write(`${formatCliVersion(CLI_VERSION, await readDaemonVersion())}\n`);
+  process.stdout.write(`${formatCliVersion(GOLEM_VERSION, await readDaemonVersion())}\n`);
   return 0;
 }
 
@@ -154,12 +165,26 @@ async function runStatus(): Promise<number> {
 }
 
 async function runDaemon(args: string[]): Promise<number> {
-  const root = findWorkspaceRoot(import.meta.dirname);
-  const child = spawn(
-    "uv",
-    ["run", "--project", root, "python", "-m", "golem", "daemon", ...args],
-    { stdio: "inherit" },
-  );
+  let located;
+  try {
+    located = locateDaemon({
+      golemDaemon: process.env["GOLEM_DAEMON"],
+      execPath: process.execPath,
+      startDir: import.meta.dirname,
+      exists: existsSync,
+      workspaceRoot: (start) => {
+        try {
+          return findWorkspaceRoot(start);
+        } catch {
+          return null;
+        }
+      },
+    });
+  } catch (error) {
+    process.stderr.write(`${explain(error)}\n`);
+    return 1;
+  }
+  const child = spawn(located.command, [...located.args, "daemon", ...args], { stdio: "inherit" });
   return await new Promise((resolve) => {
     child.on("error", (error) => {
       process.stderr.write(`${error.message}\n`);
@@ -169,6 +194,12 @@ async function runDaemon(args: string[]): Promise<number> {
       resolve(exitCode ?? 1);
     });
   });
+}
+
+async function openTui(): Promise<number> {
+  const tui = await import("@golem/tui");
+  await tui.runTui();
+  return 0;
 }
 
 function explain(error: unknown): string {

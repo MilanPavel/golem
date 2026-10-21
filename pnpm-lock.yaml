@@ -20,6 +20,9 @@ importers:
       '@golem/client':
         specifier: workspace:*
         version: link:../client
+      '@golem/tui':
+        specifier: workspace:*
+        version: link:../tui
     devDependencies:
       '@types/node':
         specifier: ^24.10.1
@@ -56,13 +59,16 @@ importers:
         version: link:../client
       ink:
         specifier: ^8.0.0
-        version: 8.0.0(@types/react@19.3.0)(react@19.3.0)
+        version: 8.0.0(@types/react@19.3.0)(react-devtools-core@file:scripts/react-devtools-core)(react@19.3.0)
       marked:
         specifier: ^18.1.0
         version: 18.1.0
       react:
         specifier: ^19.3.0
         version: 19.3.0
+      react-devtools-core:
+        specifier: file:../../scripts/react-devtools-core
+        version: file:scripts/react-devtools-core
     devDependencies:
       '@types/node':
         specifier: ^24.19.1
@@ -642,6 +648,7 @@ packages:
 
   ink@8.0.0:
     resolution: {integrity: sha512-M2aFwZOqmkFxCwedy6xrP4E+DGoK57iahAFnfTqNyOyJ54O7DZzu027z/NI8EGy44Sw9O9BcbTF4QEUS2GHAtg==}
+    version: 8.0.0
     engines: {node: '>=22'}
     peerDependencies:
       '@types/react': '>=19.3.0'
@@ -785,6 +792,9 @@ packages:
   quick-lru@7.3.0:
     resolution: {integrity: sha512-k9lSsjl36EJdK7I06v7APZCbyGT2vMTsYSRX1Q2nbYmnkBqgUhRkAuzH08Ciotteu/PLJmIF2+tti7o3C/ts2g==}
     engines: {node: '>=18'}
+
+  react-devtools-core@file:scripts/react-devtools-core:
+    resolution: {directory: scripts/react-devtools-core, type: directory}
 
   react-reconciler@0.34.0:
     resolution: {integrity: sha512-eVibvB1fc9j5Qf1KRkiM3GzRPBdjg2P6G6QV2f3P6Eb3OGMxRBhdg2rrUwjbV5JrQaJj8nOa8uajmmJA5tJWjQ==}
@@ -1429,7 +1439,7 @@ snapshots:
 
   indent-string@5.0.0: {}
 
-  ink@8.0.0(@types/react@19.3.0)(react@19.3.0):
+  ink@8.0.0(@types/react@19.3.0)(react-devtools-core@file:scripts/react-devtools-core)(react@19.3.0):
     dependencies:
       '@alcalzone/ansi-tokenize': 0.3.1
       ansi-escapes: 7.3.0
@@ -1457,6 +1467,7 @@ snapshots:
       yoga-layout: 3.2.1
     optionalDependencies:
       '@types/react': 19.3.0
+      react-devtools-core: file:scripts/react-devtools-core
 
   is-extglob@2.1.1: {}
 
@@ -1569,6 +1580,8 @@ snapshots:
   punycode@2.3.1: {}
 
   quick-lru@7.3.0: {}
+
+  react-devtools-core@file:scripts/react-devtools-core: {}
 
   react-reconciler@0.34.0(react@19.3.0):
     dependencies:
