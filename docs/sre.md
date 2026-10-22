@@ -190,6 +190,7 @@ flowchart LR
     v1["download the draft"] --> v2["checksum,<br/>signatures,<br/>--version"] --> v3["smoke test"]
   end
   verify --> publish["publish the release"]
+  publish --> tap["pull request on the<br/>Homebrew tap<br/>(stable versions only)"]
 ```
 
 - The release has `golem-<version>-darwin-arm64.tar.gz` and `golem-<version>-darwin-arm64.tar.gz.sha256`. The archive unpacks to one folder, `golem-<version>-darwin-arm64/`.
@@ -286,7 +287,7 @@ bin/golem: dev.golem.cli, golem release signing
    ```
 
    It writes `~/golem-signing/golem-signing.p12`: an RSA 3072 key, valid for code signing only, for 20 years. An expired certificate would force the same re-approval as a new one. The script deletes the loose key file, and prints the certificate's SHA-1 and a random password for the `.p12`.
-2. In GitHub, go to **Settings > Secrets and variables > Actions** and add:
+2. In the golem repository on GitHub, open the **Settings** tab, then **Secrets and variables > Actions** in the left sidebar. Add each secret on the **Secrets** tab with **New repository secret**, and the variable on the **Variables** tab with **New repository variable**. Do not use **Environment secrets**: the release workflow names no environment, so it cannot see them.
 
    | Kind | Name | Value |
    |---|---|---|
@@ -320,7 +321,16 @@ just check-signature "" --identity-hash <sha1>
 
 ## 6. Installing today
 
-There are three ways today. `brew install` is not ready yet (see section 10).
+There are four ways. Homebrew is the one to give a colleague. The others are for working on golem, or for a Mac without Homebrew.
+
+### With Homebrew
+
+```bash
+brew install milanpavel/golem/golem
+golem daemon install
+```
+
+Section 10 explains upgrading, removing, and how the tap is kept up to date.
 
 ### From the source code (for developers)
 
@@ -342,7 +352,7 @@ dist/golem-<version>-darwin-arm64/bin/golem
 
 The build folder can be moved anywhere on the same Mac. Run `golem daemon install` again after moving it.
 
-**Limitation:** a local build is signed ad-hoc, so it is meant for the Mac that built it. To give golem to someone else, use a release archive: unpack it anywhere and run `bin/golem daemon install`. Homebrew comes in step 1.6.
+**Limitation:** a local build is signed ad-hoc, so it is meant for the Mac that built it. To give golem to someone else, use Homebrew, or a release archive: unpack it anywhere and run `bin/golem daemon install`.
 
 ### From a release
 
@@ -488,51 +498,52 @@ When a built daemon first reads a key saved by the source-code version, macOS as
 
 ---
 
-## 10. How `brew install` will work
+## 10. Homebrew
 
-**Status: the release archive is built (step 1.5, section 5). The Homebrew tap is step 1.6, not built yet.**
+**Status: built (step 1.6). It is live once the tap repository and its token exist (below), and the first stable tag has been released and its tap pull request merged.** The decisions are in [ADR-022](adr/022-homebrew-tap.md).
 
-### What it will look like for a user
+### What it looks like for a user
 
-Say a colleague wants golem on their Mac. They will run:
+A colleague with an Apple Silicon Mac runs:
 
 ```bash
-brew install <owner>/golem/golem     # download and install
-golem daemon install                 # start the background service
-golem auth set anthropic             # save an API key (or use Ollama, no key needed)
-golem                                # open the chat screen
+brew install milanpavel/golem/golem   # download and install
+golem daemon install                  # start the background service, now and at every login
+golem auth set anthropic              # save an API key (or use Ollama, no key needed)
+golem                                 # open the chat screen
 ```
 
-That's all. They don't need Python, Node, uv, bun, or the source code.
+That's all. They don't need Python, Node, uv, bun, or the source code. After the install, Homebrew prints the three `golem daemon` commands a user needs, so they don't have to remember them.
 
 ### What happens behind the scenes
 
-Three things have to exist:
+Three things work together:
 
-1. **A GitHub release.** Each version tag (for example `v0.3.0`) makes GitHub Actions build golem and upload a ready-made archive, `golem-0.3.0-darwin-arm64.tar.gz`, plus its checksum (a fingerprint that proves the file was not changed).
-2. **A "tap".** A tap is a small extra GitHub repository that Homebrew can read, named `homebrew-golem`. It holds one file, `golem.rb`, called a **formula**. The formula says: "version 0.3.0 is at this URL, its checksum is this; copy `bin/` and `libexec/` into place."
-3. **The formula updates itself.** After each release, the release workflow opens a pull request on the tap with the new version and checksum.
+1. **A GitHub release.** Each version tag (for example `v0.3.0`) makes GitHub Actions build golem and upload `golem-0.3.0-darwin-arm64.tar.gz`, plus its checksum (a fingerprint that proves the file was not changed). See section 5.
+2. **A "tap".** A tap is a small extra GitHub repository that Homebrew can read: `MilanPavel/homebrew-golem`. It holds one formula, `Formula/golem.rb`. The formula says: "version 0.3.0 is at this URL, its checksum is this; copy `bin/` and `libexec/` into place."
+3. **The tap updates itself.** After each stable release, the release workflow opens a pull request on the tap with the new version and checksum. A workflow in the tap installs that formula on a fresh Mac and tests it. You merge the pull request when it passes. Prereleases (tags with a `-`) never go to the tap.
 
 ```mermaid
 sequenceDiagram
   participant Dev as Maintainer
-  participant GH as GitHub Actions
+  participant GH as golem release workflow
   participant Rel as GitHub release
-  participant Tap as homebrew-golem tap
+  participant Tap as homebrew-golem
   participant User as Colleague's Mac
   Dev->>GH: push tag v0.3.0
-  GH->>GH: check, build, sign, smoke test
-  GH->>Rel: upload golem-0.3.0-darwin-arm64.tar.gz and checksum
+  GH->>Rel: build, sign, check, publish the archive and checksum
   GH->>Tap: pull request: golem.rb now points at 0.3.0
+  Tap->>Tap: test workflow: install, compare, smoke test, uninstall
   Dev->>Tap: merge
-  User->>Tap: brew install owner/golem/golem
+  User->>Tap: brew install / brew upgrade
   Tap-->>User: formula: URL and checksum
   User->>Rel: download the archive
-  User->>User: check the checksum, unpack into Homebrew's folder
-  User->>User: golem daemon install
+  User->>User: check the checksum, copy bin/ and libexec/
 ```
 
 Nothing is compiled on the user's Mac. Homebrew only downloads, checks, and copies.
+
+**The golem repository owns every file in the tap.** The formula is made from `packaging/homebrew/golem.rb.in` by `scripts/render_formula.sh`. The tap's README and test workflow are copied from `packaging/homebrew/tap/`. Change them there. Every release pull request replaces whatever is in the tap.
 
 ### Where the files end up
 
@@ -545,7 +556,9 @@ Nothing is compiled on the user's Mac. Homebrew only downloads, checks, and copi
    └─ libexec/golem-daemon/...
 ```
 
-Homebrew keeps each version in its own folder under `Cellar/`, and keeps two links that always point at the current one. `golem daemon install` writes the `opt/golem/...` path into the launchd file, **not** the `Cellar/golem/0.3.0/...` path. So after an upgrade, launchd automatically uses the new version, and the old folder can be deleted safely.
+Homebrew keeps each version in its own folder under `Cellar/`, plus two links that always point at the current one. `golem daemon install` writes the `opt/golem/...` path into the launchd file, **not** the `Cellar/golem/0.3.0/...` path. So after an upgrade, launchd starts the new version, and the old folder can be deleted safely.
+
+**The files are exactly the released ones.** By default, Homebrew edits programs after installing them: it rewrites each library's name to an absolute path and signs it again, ad-hoc. It also deletes some Python package metadata. golem's formula turns both off (`preserve_rpath` and `skip_clean "libexec"`). So the libraries keep golem's signature, and the tap's test checks that the installed `bin/` and `libexec/` are identical to the archive.
 
 ### Upgrading and removing
 
@@ -554,29 +567,57 @@ brew upgrade golem          # download the new version
 golem daemon restart        # switch the running daemon to it
 ```
 
+The running daemon keeps using the old version's files until you restart it. `brew upgrade` may delete the old folder straight away. The daemon then fails on the next thing it loads from disk, and launchd starts the new version. So restart right after the upgrade. The chat screen also shows a yellow notice when the daemon's version differs from its own.
+
 ```bash
-golem daemon uninstall      # remove the launchd service
-brew uninstall golem        # remove the program
+golem daemon uninstall      # first: remove the launchd service
+brew uninstall golem        # then: remove the program
 ```
 
 Your chats and settings in `~/.golem` stay, on purpose. Delete that folder yourself if you want them gone.
 
+**The order matters.** After `brew uninstall`, the `golem` command is gone, so `golem daemon uninstall` can no longer run. launchd keeps trying to start a program that does not exist. To clean up by hand:
+
+```bash
+launchctl bootout gui/$(id -u)/dev.golem.daemon
+rm ~/Library/LaunchAgents/dev.golem.daemon.plist
+```
+
 ### Why Homebrew does not start the daemon itself
 
-Homebrew can run background services (`brew services`). Golem's formula will **not** use that. If both Homebrew and `golem daemon install` started a daemon, the second would hit the lock and exit, launchd would start it again, and it would fail forever. So only `golem daemon install` manages the service, and it works the same way whether golem came from Homebrew or from a downloaded archive. After install, Homebrew prints a short note telling the user to run it.
+Homebrew can run background services (`brew services`). golem's formula does **not** use that. If both Homebrew and `golem daemon install` started a daemon, the second would hit the lock and exit, launchd would start it again, and it would fail forever. So only `golem daemon install` manages the service, and it works the same way whether golem came from Homebrew or from a downloaded archive. For the same reason, `brew upgrade` does not restart the daemon. It would cut off an answer in progress whenever someone upgrades all their Homebrew packages.
+
+### Setting up the tap (once)
+
+1. **Make the golem repository public.** Homebrew downloads the release and `brew audit` checks the homepage without logging in.
+2. **Create the tap repository.** On GitHub: new repository, owner `MilanPavel`, name exactly `homebrew-golem`, **Public**, and tick **Add a README file**. The name must start with `homebrew-`: that is how `brew install milanpavel/golem/golem` finds it. The README gives it a `main` branch. Leave everything else empty: the first release fills it.
+3. **Create a token for the release workflow.** GitHub, your profile, **Settings > Developer settings > Personal access tokens > Fine-grained tokens > Generate new token**:
+
+   | Field | Value |
+   |---|---|
+   | Name | `golem release to homebrew-golem` |
+   | Expiration | up to 1 year; put a reminder in your calendar |
+   | Repository access | **Only select repositories**: `MilanPavel/homebrew-golem` |
+   | Permissions | **Contents**: Read and write. **Pull requests**: Read and write. **Workflows**: Read and write (the release copies the tap's test workflow) |
+
+4. **Store it in the golem repository**, not the tap: open the **Settings** tab, then **Secrets and variables > Actions** in the left sidebar. On the **Secrets** tab, click **New repository secret**, name it `HOMEBREW_TAP_TOKEN`, and paste the token. Use **Repository secrets**, not **Environment secrets**: no environment is needed.
+5. **Optional, recommended:** in `homebrew-golem`, under **Settings > Branches**, protect `main` and require the `formula` check before merging.
+6. **Release a stable version**, for example `git tag v0.1.0 && git push origin v0.1.0`. When the release is published, the `tap` job opens the pull request `golem 0.1.0` on the tap. The first one also adds the README and the test workflow. Merge it when `test` passes.
+
+If the token is missing or has expired, the release is still published, and only the `tap` job fails. Renew the token, then re-run that job.
 
 ### What must be true before a colleague can use it
 
 | Requirement | Why |
 |---|---|
-| The GitHub repository and its releases are **public** | Homebrew downloads the archive without logging in. A private repository needs a token on every Mac, which is awkward |
-| The build is **signed with a stable identity** (step 1.5) | Without it, the Keychain asks again after every upgrade |
-| The Mac is **Apple Silicon** (M1 or newer) | Only a `darwin-arm64` build is planned. An Intel Mac needs a separate `darwin-x64` build, which is not planned yet |
-| **Notarization** (Apple's malware scan) is not needed for Homebrew | Homebrew downloads with `curl`, which does not mark files as "downloaded from the internet", so Gatekeeper does not block them. Notarization only matters for people who download the archive in a browser |
+| Both repositories are **public** | Homebrew downloads the formula and the archive without logging in |
+| The build is **signed with a stable identity** (section 5) | Without it, the Keychain asks again after every upgrade |
+| The Mac is **Apple Silicon** (M1 or newer) | Only a `darwin-arm64` build exists. The formula refuses to install on an Intel Mac |
+| **Notarization** (Apple's malware scan) is not needed | Homebrew downloads formulae with `curl`, which does not mark files as "downloaded from the internet", so Gatekeeper does not block them |
 
 ### Linux and Windows later
 
-The same Homebrew formula will work on Linux (step 1.9), with a systemd service instead of launchd. Windows will use **Scoop**, a similar tool for Windows, from its own "bucket" repository (step 1.11).
+The same formula will work on Linux (step 1.9), with a systemd service instead of launchd. Windows will use **Scoop**, a similar tool for Windows, from its own "bucket" repository (step 1.11).
 
 ---
 
@@ -644,6 +685,10 @@ Remember: under launchd, `GOLEM_...` variables from your terminal do not apply. 
 | `needs key` | `golem auth set <provider>`, or `/login <provider>` in the chat screen |
 | macOS asks about the Keychain on every start | A local build is signed ad-hoc, so every rebuild asks. Choose Always Allow, or sign local builds with the release certificate (section 5). A release asks once, after the first upgrade from a local or ad-hoc build |
 | A release workflow fails at "Import the signing certificate" | The secrets or the `MACOS_SIGN_IDENTITY` variable are missing. See section 5 |
+| The release's `tap` job fails | The `HOMEBREW_TAP_TOKEN` secret is missing or expired, or `homebrew-golem` does not exist. The release itself is published. Fix the token (section 10), then re-run the job |
+| The tap's `test` workflow fails at "Homebrew installed the archive unchanged" | Homebrew edited a file after install. A new library in the daemon may have a non-`@rpath` install name (`otool -D`), or a newer Homebrew may edit kegs in a new way. Do not merge |
+| `brew upgrade golem` does not offer the new version | The tap pull request is not merged yet. Then run `brew update` |
+| launchd keeps failing to start golem after `brew uninstall` | The service was not removed first. See "The order matters" in section 10 |
 | A build crashes with `ModuleNotFoundError` | PyInstaller missed a module. Add it to `golem-daemon.spec`, then run `just dist && just smoke-dist` |
 | The first start of a new build is slow | Expected: macOS checks the new files once |
 
@@ -657,12 +702,11 @@ The rest of Phase 1, in order:
 
 ```mermaid
 flowchart LR
-  done["1.1–1.5 ✓<br/>one version,<br/>one golem file,<br/>packed daemon,<br/>safe upgrades,<br/>signed releases"] --> s16["1.6<br/>brew install"] --> s17["1.7<br/>golem doctor"] --> s18["1.8<br/>platform<br/>layer"] --> s19["1.9<br/>Linux"] --> s110["1.10–1.11<br/>Windows"]
+  done["1.1–1.6 ✓<br/>one version,<br/>one golem file,<br/>packed daemon,<br/>safe upgrades,<br/>signed releases,<br/>brew install"] --> s17["1.7<br/>golem doctor"] --> s18["1.8<br/>platform<br/>layer"] --> s19["1.9<br/>Linux"] --> s110["1.10–1.11<br/>Windows"]
 ```
 
 | Step | What you will get |
 |---|---|
-| **1.6 Homebrew** | `brew install <owner>/golem/golem`, as described in section 10 |
 | **1.7 `golem doctor`** | One command that checks everything (daemon found, service set up, versions match, settings valid, models reachable, disk space) and says how to fix each problem |
 | **1.8 Platform layer** | Everything that differs between macOS, Linux, and Windows moves behind one interface, so the next steps are additions, not rewrites |
 | **1.9 Linux** | Linux builds, a systemd service, CI on Ubuntu. No shell sandbox at first, so shell commands always ask |

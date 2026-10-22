@@ -52,7 +52,14 @@ Golem has two parts:
 
 - Changing files with `write_file` and `edit_file`, inside that folder. The approval shows the diff, Up and Down scroll it, and only that change is made: a file that changed while you decided is left alone. Golem never changes a `.golem/` or `.git/` folder. Ctrl-O shows the diff of each change.
 
-Golem runs on macOS only, from a checkout of this repository. There is no installer yet.
+Golem runs on Apple Silicon Macs. Install it with Homebrew, or run it from a checkout of this repository (below):
+
+```bash
+brew install milanpavel/golem/golem
+golem daemon install
+```
+
+Upgrading, removing, and the other ways to install are in [docs/sre.md](docs/sre.md#6-installing-today).
 
 ## Set up
 

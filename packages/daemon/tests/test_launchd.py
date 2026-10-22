@@ -38,6 +38,47 @@ def test_serve_command_is_the_module_until_the_build_is_frozen(
     assert serve_command() == [sys.executable, "serve"]
 
 
+def _keg(prefix: Path, version: str) -> Path:
+    """A Homebrew keg with a daemon, and ``opt/golem`` pointing at it."""
+    daemon = prefix / "Cellar" / "golem" / version / "libexec" / "golem-daemon" / "golem-daemon"
+    daemon.parent.mkdir(parents=True)
+    daemon.write_text("", encoding="utf-8")
+    opt = prefix / "opt" / "golem"
+    opt.parent.mkdir(exist_ok=True)
+    opt.unlink(missing_ok=True)
+    opt.symlink_to(Path("..") / "Cellar" / "golem" / version)
+    return daemon
+
+
+def test_a_frozen_daemon_in_a_keg_is_named_by_its_opt_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    prefix = tmp_path.resolve() / "homebrew"
+    daemon = _keg(prefix, "0.1.0")
+    opt_daemon = prefix / "opt" / "golem" / "libexec" / "golem-daemon" / "golem-daemon"
+    assert launchd.stable_path(daemon) == opt_daemon
+    assert launchd.stable_path(opt_daemon) == opt_daemon
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(sys, "executable", str(daemon))
+    assert serve_command() == [str(opt_daemon), "serve"]
+
+
+def test_a_keg_that_opt_no_longer_points_at_keeps_its_own_path(tmp_path: Path) -> None:
+    prefix = tmp_path.resolve() / "homebrew"
+    old = _keg(prefix, "0.1.0")
+    _keg(prefix, "0.2.0")
+    assert launchd.stable_path(old) == old
+
+
+def test_paths_outside_a_keg_are_kept(tmp_path: Path) -> None:
+    unlinked = tmp_path / "homebrew" / "Cellar" / "golem" / "0.1.0" / "bin" / "golem-daemon"
+    unlinked.parent.mkdir(parents=True)
+    unlinked.write_text("", encoding="utf-8")
+    elsewhere = tmp_path / "Applications" / "golem" / "libexec" / "golem-daemon" / "golem-daemon"
+    assert launchd.stable_path(unlinked) == unlinked
+    assert launchd.stable_path(elsewhere) == elsewhere
+
+
 def test_version_flag(capsys: pytest.CaptureFixture[str]) -> None:
     from golem import __version__
 

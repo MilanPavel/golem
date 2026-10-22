@@ -49,11 +49,32 @@ def require_darwin() -> None:
 def serve_command() -> list[str]:
     """How launchd should start this daemon.
 
-    A frozen build is its own executable. A checkout or a venv still runs the module.
+    A frozen build is its own executable, named by its stable path. A checkout or
+    a venv still runs the module.
     """
     if getattr(sys, "frozen", False):
-        return [sys.executable, "serve"]
+        return [str(stable_path(Path(sys.executable))), "serve"]
     return [sys.executable, "-m", "golem", "serve"]
+
+
+def stable_path(executable: Path) -> Path:
+    """``executable`` through Homebrew's ``opt`` link when it is in a keg.
+
+    Homebrew installs each version in ``<prefix>/Cellar/<formula>/<version>/``
+    and points ``<prefix>/opt/<formula>`` at the current one. A plist that named
+    the version folder would keep starting the old daemon after ``brew upgrade``
+    and fail once ``brew cleanup`` deletes it. Any other path is kept as is.
+    """
+    real = executable.resolve()
+    parts = real.parts
+    for index in range(len(parts) - 4, 0, -1):
+        if parts[index] != "Cellar":
+            continue
+        formula, rest = parts[index + 1], parts[index + 3 :]
+        candidate = Path(*parts[:index], "opt", formula, *rest)
+        if candidate.resolve() == real:
+            return candidate
+    return executable
 
 
 def plist_payload(paths: GolemPaths, program: list[str]) -> dict[str, Any]:

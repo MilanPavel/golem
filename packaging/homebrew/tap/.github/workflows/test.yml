@@ -1,0 +1,94 @@
+# Copied from packaging/homebrew/tap/ in the golem repository by its release
+# workflow. Change it there: the next release replaces this file.
+#
+# Installs the formula the way a user would, checks that Homebrew kept the
+# signed archive byte for byte, smoke-tests the installed daemon, and checks
+# that golem daemon install names the stable opt path.
+name: test
+
+on:
+  pull_request:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  HOMEBREW_NO_AUTO_UPDATE: "1"
+  HOMEBREW_NO_ENV_HINTS: "1"
+
+jobs:
+  formula:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Tap this checkout
+        run: |
+          set -eu
+          owner=$(printf '%s' "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')
+          taps="$(brew --repository)/Library/Taps/$owner"
+          mkdir -p "$taps"
+          ln -s "$GITHUB_WORKSPACE" "$taps/homebrew-golem"
+          echo "FORMULA=$owner/golem/golem" >> "$GITHUB_ENV"
+
+      - name: Audit
+        run: brew audit --strict --online "$FORMULA"
+
+      - name: Install
+        run: |
+          set -eu
+          brew install --formula "$FORMULA"
+          echo "VERSION=$(brew list --versions golem | awk '{print $2}')" >> "$GITHUB_ENV"
+          echo "KEG=$(brew --prefix)/opt/golem" >> "$GITHUB_ENV"
+
+      - name: brew test
+        run: brew test "$FORMULA"
+
+      - name: Homebrew installed the archive unchanged
+        run: |
+          set -eu
+          unpacked="$RUNNER_TEMP/archive"
+          mkdir "$unpacked"
+          tar -xzf "$(brew --cache --formula "$FORMULA")" -C "$unpacked" --strip-components 1
+          diff -r "$unpacked/bin" "$KEG/bin"
+          diff -r "$unpacked/libexec" "$KEG/libexec"
+
+      - uses: actions/checkout@v7
+        with:
+          repository: ${{ github.repository_owner }}/golem
+          ref: v${{ env.VERSION }}
+          path: golem
+          sparse-checkout: |
+            scripts/smoke_dist.py
+            packages/protocol/golem_protocol/version.py
+          sparse-checkout-cone-mode: false
+
+      - name: Smoke the installed golem
+        run: /usr/bin/python3 golem/scripts/smoke_dist.py "$KEG"
+
+      - name: golem daemon install names the opt path
+        run: |
+          set -eu
+          golem daemon install
+          plist="$HOME/Library/LaunchAgents/dev.golem.daemon.plist"
+          program=$(/usr/libexec/PlistBuddy -c 'Print :ProgramArguments:0' "$plist")
+          if [ "$program" != "$KEG/libexec/golem-daemon/golem-daemon" ]; then
+            echo "the plist names $program" >&2
+            exit 1
+          fi
+          for _ in $(seq 1 30); do
+            if golem status; then break; fi
+            sleep 1
+          done
+          golem status
+          golem daemon uninstall
+          test ! -e "$plist"
+
+      - name: Uninstall
+        run: |
+          set -eu
+          brew uninstall --formula "$FORMULA"
+          test ! -e "$(brew --prefix)/bin/golem"

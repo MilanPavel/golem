@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 
 import { connectGolem, GOLEM_VERSION, resolveSocketPath } from "@golem/client";
 
@@ -178,7 +178,8 @@ async function runDaemon(args: string[]): Promise<number> {
   try {
     located = locateDaemon({
       golemDaemon: process.env["GOLEM_DAEMON"],
-      execPath: process.execPath,
+      // Homebrew's bin/golem is a link into the keg, where libexec/ sits.
+      execPath: realpathSync(process.execPath),
       startDir: import.meta.dirname,
       exists: existsSync,
       workspaceRoot: (start) => {
