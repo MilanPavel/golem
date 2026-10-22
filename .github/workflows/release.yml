@@ -1,0 +1,157 @@
+name: release
+
+# A version tag builds, signs, and smoke-tests golem, and uploads the archive
+# and its checksum to a draft release. A fresh runner downloads that draft,
+# checks it with no build tools installed, and only then publishes it.
+#
+# Needs the secrets MACOS_SIGN_P12_BASE64 and MACOS_SIGN_P12_PASSWORD and the
+# variable MACOS_SIGN_IDENTITY (the certificate's SHA-1).
+# scripts/make_signing_cert.sh makes them.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  TAG: ${{ github.ref_name }}
+  GH_TOKEN: ${{ github.token }}
+  GH_REPO: ${{ github.repository }}
+
+jobs:
+  build:
+    runs-on: macos-14
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: The tag is the version
+        run: |
+          version=$(sh scripts/version.sh)
+          if [ "$version" != "${TAG#v}" ]; then
+            echo "scripts/version.sh says $version, the tag is $TAG" >&2
+            exit 1
+          fi
+
+      - uses: ./.github/actions/setup
+        with:
+          bun: "true"
+
+      - name: Check
+        run: just check
+
+      - name: Import the signing certificate
+        env:
+          MACOS_SIGN_P12_BASE64: ${{ secrets.MACOS_SIGN_P12_BASE64 }}
+          MACOS_SIGN_P12_PASSWORD: ${{ secrets.MACOS_SIGN_P12_PASSWORD }}
+          MACOS_SIGN_IDENTITY: ${{ vars.MACOS_SIGN_IDENTITY }}
+        run: |
+          set -eu
+          if [ -z "$MACOS_SIGN_P12_BASE64" ] || [ -z "$MACOS_SIGN_IDENTITY" ]; then
+            echo "a release must be signed; see scripts/make_signing_cert.sh" >&2
+            exit 1
+          fi
+          keychain="$RUNNER_TEMP/golem-signing.keychain-db"
+          password=$(openssl rand -hex 16)
+          printf '%s' "$MACOS_SIGN_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/signing.p12"
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          security import "$RUNNER_TEMP/signing.p12" -k "$keychain" -P "$MACOS_SIGN_P12_PASSWORD" -T /usr/bin/codesign
+          rm -f "$RUNNER_TEMP/signing.p12"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$password" "$keychain" > /dev/null
+          # codesign finds an identity only in the search list, even with --keychain.
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          echo "GOLEM_SIGN_KEYCHAIN=$keychain" >> "$GITHUB_ENV"
+          echo "GOLEM_SIGN_IDENTITY=$MACOS_SIGN_IDENTITY" >> "$GITHUB_ENV"
+
+      - name: Build, sign, and smoke
+        run: |
+          set -euo pipefail
+          tree=$(just dist | tail -n 1)
+          just check-signature "$tree" --identity-hash "$GOLEM_SIGN_IDENTITY"
+          just smoke-dist "$tree"
+          archive=$(just package "$tree" | tail -n 1)
+          echo "ARCHIVE=$archive" >> "$GITHUB_ENV"
+
+      - name: Upload to a draft release
+        run: |
+          set -eu
+          state=$(gh release view "$TAG" --json isDraft --jq .isDraft 2>/dev/null || echo missing)
+          case "$state" in
+            missing)
+              prerelease=""
+              case "$TAG" in *-*) prerelease="--prerelease" ;; esac
+              gh release create "$TAG" --draft --verify-tag $prerelease \
+                --title "golem ${TAG#v}" --generate-notes \
+                "$ARCHIVE" "$ARCHIVE.sha256"
+              ;;
+            true)
+              gh release upload "$TAG" --clobber "$ARCHIVE" "$ARCHIVE.sha256"
+              ;;
+            *)
+              echo "release $TAG is already published; tag a new version" >&2
+              exit 1
+              ;;
+          esac
+
+      - name: Remove the signing keychain
+        if: always()
+        run: |
+          if [ -n "${GOLEM_SIGN_KEYCHAIN:-}" ]; then
+            security delete-keychain "$GOLEM_SIGN_KEYCHAIN" || true
+          fi
+
+  verify:
+    # A fresh runner with no uv, pnpm, or bun: only what a user's Mac has.
+    needs: build
+    runs-on: macos-14
+    permissions:
+      # A draft release is visible only with write access.
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            scripts/smoke_dist.py
+            scripts/sign_dist.py
+            packages/protocol/golem_protocol/version.py
+          sparse-checkout-cone-mode: false
+
+      - name: Download the draft release
+        run: gh release download "$TAG" --pattern 'golem-*.tar.gz*' --dir "$RUNNER_TEMP/release"
+
+      - name: Check the archive
+        env:
+          MACOS_SIGN_IDENTITY: ${{ vars.MACOS_SIGN_IDENTITY }}
+        run: |
+          set -eu
+          cd "$RUNNER_TEMP/release"
+          shasum -a 256 -c ./*.sha256
+          mkdir unpacked
+          tar -xzf ./*.tar.gz -C unpacked
+          tree=$(ls -d "$PWD"/unpacked/golem-*)
+          echo "TREE=$tree" >> "$GITHUB_ENV"
+          /usr/bin/python3 "$GITHUB_WORKSPACE/scripts/sign_dist.py" check "$tree" --identity-hash "$MACOS_SIGN_IDENTITY"
+          "$tree/bin/golem" --version | grep -qx "golem ${TAG#v}"
+
+      - name: Smoke the archive
+        run: /usr/bin/python3 scripts/smoke_dist.py "$TREE"
+
+  publish:
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Publish the release
+        run: gh release edit "$TAG" --draft=false

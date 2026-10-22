@@ -117,6 +117,7 @@ flowchart TB
 
 - **The daemon** is packed by PyInstaller as a folder, not a single file. A single file would have to unpack itself every time it starts, which is slow. The recipe is in `packages/daemon/golem-daemon.spec`. It lists a few modules that PyInstaller cannot find on its own, because some libraries load them in a roundabout way.
 - **`golem`** is compiled by bun into one file ([ADR-019](adr/019-single-binary.md)).
+- **Signing.** Last, `scripts/sign_dist.py` signs every program file in the folder: ad-hoc by default, or with the certificate named by `GOLEM_SIGN_IDENTITY` (section 5). `just check-signature` checks the result, and `just package` packs the folder into the `.tar.gz` and `.sha256` a release ships.
 
 ### The smoke test
 
@@ -168,13 +169,158 @@ flowchart LR
 3. Type checks (pyright, tsc).
 4. All tests (pytest, plus the TypeScript tests).
 
-**Not there yet:** CI does not publish anything. There is no release download. That comes in step 1.5 (section 11).
+The `dist` job also runs `just check-signature`. CI builds are signed ad-hoc, which is enough for the checks.
+
+### Releases
+
+Pushing a version tag publishes a release ([ADR-021](adr/021-release-signing.md)):
+
+```bash
+git tag v0.1.0 && git push origin v0.1.0
+```
+
+```mermaid
+flowchart LR
+  tag["push tag v0.1.0"] --> build
+  subgraph build ["build — Mac"]
+    b1["tag = version?"] --> b2["just check"] --> b3["just dist<br/>(signed)"] --> b4["check-signature,<br/>smoke-dist"] --> b5["just package"] --> b6["draft release"]
+  end
+  build --> verify
+  subgraph verify ["verify — a fresh Mac, no build tools"]
+    v1["download the draft"] --> v2["checksum,<br/>signatures,<br/>--version"] --> v3["smoke test"]
+  end
+  verify --> publish["publish the release"]
+```
+
+- The release has `golem-<version>-darwin-arm64.tar.gz` and `golem-<version>-darwin-arm64.tar.gz.sha256`. The archive unpacks to one folder, `golem-<version>-darwin-arm64/`.
+- A tag with a `-`, such as `v0.2.0-rc.1`, makes a prerelease.
+- Nothing is published until a clean runner has checked the exact files users download. If a job fails, the draft stays. Fix the cause, then re-run the workflow: the build replaces the draft's files. A published release is never replaced; tag a new version.
+
+### Signing
+
+#### Why golem is signed
+
+golem keeps its secrets in the macOS Keychain (section 9): API keys today, and later MCP server and hook tokens. This section says "key" for all of them. The Keychain protects each key from other programs on your Mac:
+- The program that saved a key can read it without asking.
+- Any other program can read it only after macOS shows a password dialog and you click Allow.
+
+So macOS has to decide one thing every time the daemon asks for a key: *is this the same program that saved it?*
+
+macOS answers this with the program's **code signature**, a seal stamped on the program file. What the seal says depends on how it was made:
+- **Without a certificate** (an *ad-hoc* signature), the seal says only "this exact file". Every new build is a slightly different file. So after each upgrade, macOS sees a stranger and asks about every key again.
+- **With a certificate**, the seal says "a program called `dev.golem.daemon`, signed by this certificate". Every release carries the same name and the same certificate. So after an upgrade, macOS sees the same program and does not ask.
+
+Without signing, a password dialog would appear after every upgrade, once for every saved key. The daemon runs in the background, so these dialogs would pop up at random times, and the daemon would wait until someone answered. Signing makes upgrades silent.
+
+That is the reason for the certificate. There is one more, smaller reason to sign at all: on Apple Silicon, macOS refuses to run a program file without a valid signature, even an ad-hoc one. `bun build --compile` leaves `bin/golem` with a broken signature, so every build is re-signed just so it starts.
+
+Neither reason is about proving to Apple who made golem. That needs a paid Apple Developer ID and notarization, which come later. Until then, golem uses a **self-signed** certificate: one we made ourselves. macOS does not have to trust it. It only has to recognise it again on the next release. So every release must be signed with the **same** certificate ([ADR-021](adr/021-release-signing.md)).
+
+#### What it means for users
+
+Users never see or install the certificate. There are no extra steps for signing itself. What they notice:
+
+| Situation | What the user sees | What to do |
+|---|---|---|
+| New user installs a release and saves a key with `golem auth set` | Nothing. The daemon saved the key, so it owns it. | Nothing |
+| Upgrade to a newer release | Nothing. Same name, same certificate. | Nothing |
+| First start of a release, with keys saved earlier by a source-code run or a local ad-hoc build | One Keychain dialog per key: "golem-daemon wants to use your confidential information" | Enter the Mac password and click **Always Allow**, once. The daemon then saves the key again as its own (section 9), so it never asks again. |
+| Archive downloaded in a browser instead of `curl` | macOS refuses to open `golem`, because a self-signed program is not notarized | Download with `curl` (section 6), or run `xattr -dr com.apple.quarantine <the unpacked folder>` |
+| We ever have to replace the certificate | One Keychain dialog per key after that upgrade | **Always Allow** once, as above |
+
+Homebrew downloads with `curl`, so a `brew install` user (section 10) sees none of the dialogs above, except after a certificate change.
+
+#### How the seal decides
+
+For the curious: the rule inside the signature is called the *designated requirement*.
+
+| Signed with | The rule says | After an upgrade |
+|---|---|---|
+| Nothing, or ad-hoc (`-`) | "the file with this exact hash" | A new hash, so a new program. macOS asks about every key again. |
+| golem's certificate | `identifier "dev.golem.daemon" and certificate leaf = H"<sha1>"` | Same identifier, same certificate, so the same program. No prompt. |
+
+**What gets signed.** `scripts/sign_dist.py sign` runs at the end of every `just dist` on macOS:
+
+1. It finds every Mach-O file (compiled program or library) in the tree: 17 today, mostly PyInstaller's libraries under `_internal/`.
+2. It signs the libraries first, deepest folder first, then the two programs, each with a fixed identifier:
+
+   | File | Identifier |
+   |---|---|
+   | `libexec/golem-daemon/golem-daemon` | `dev.golem.daemon` |
+   | `bin/golem` | `dev.golem.cli` |
+
+3. It then runs the same checks as `just check-signature`.
+
+Two environment variables choose the certificate:
+
+| Variable | Meaning | Default |
+|---|---|---|
+| `GOLEM_SIGN_IDENTITY` | The certificate's SHA-1 (or its name) | `-`, which means ad-hoc |
+| `GOLEM_SIGN_KEYCHAIN` | Look for the certificate only in this keychain | every keychain in the search list |
+
+A local build is ad-hoc unless you set them. Even then it is re-signed, because `bun build --compile` leaves `bin/golem` with a signature that does not match the file.
+
+**What is left out, on purpose.**
+- No *hardened runtime*. Apple needs it only for notarization, and with a certificate that has no Apple team it makes macOS refuse to load PyInstaller's libraries. This is also why golem does not use PyInstaller's own signing option: it turns the hardened runtime on.
+- No timestamp (`--timestamp=none`). A timestamp needs Apple's server and only matters for notarization.
+- No notarization. Gatekeeper ignores a self-signed certificate. `curl` and Homebrew downloads are not checked by Gatekeeper, but an archive downloaded in a browser is blocked until the user allows it (section 6). Developer ID and notarization come later. Switching changes the rule once, so users approve the daemon once more.
+
+**Checking a tree.** `just check-signature [tree] [--identity-hash <sha1>]` fails if any of these is false:
+- every Mach-O file passes `codesign --verify --strict`;
+- both programs carry their identifiers;
+- with `--identity-hash`, both are signed by that certificate.
+
+It prints one line per program, with the signer or `ad-hoc`:
+
+```
+libexec/golem-daemon/golem-daemon: dev.golem.daemon, golem release signing
+bin/golem: dev.golem.cli, golem release signing
+```
+
+#### One-time setup (before the first tag)
+
+1. Make the certificate on your Mac:
+
+   ```bash
+   sh scripts/make_signing_cert.sh ~/golem-signing
+   ```
+
+   It writes `~/golem-signing/golem-signing.p12`: an RSA 3072 key, valid for code signing only, for 20 years. An expired certificate would force the same re-approval as a new one. The script deletes the loose key file, and prints the certificate's SHA-1 and a random password for the `.p12`.
+2. In GitHub, go to **Settings > Secrets and variables > Actions** and add:
+
+   | Kind | Name | Value |
+   |---|---|---|
+   | Secret | `MACOS_SIGN_P12_BASE64` | `base64 < ~/golem-signing/golem-signing.p12 \| pbcopy`, then paste |
+   | Secret | `MACOS_SIGN_P12_PASSWORD` | the printed password |
+   | Variable | `MACOS_SIGN_IDENTITY` | the printed SHA-1 (not secret: it is in every signature) |
+
+3. Store the `.p12` and its password in a password manager, then delete `~/golem-signing`.
+
+Without these settings a release fails at "Import the signing certificate". It never falls back to an ad-hoc build.
+
+#### What the release does with it
+
+The `build` job decodes the `.p12` into a temporary keychain with a random password, and allows only `codesign` to use the key. It adds that keychain to the search list: codesign does not find a certificate outside the list, even with `--keychain`. It then sets `GOLEM_SIGN_IDENTITY` and `GOLEM_SIGN_KEYCHAIN` for `just dist`. The keychain is deleted at the end, even when the job fails. Both `build` and `verify` run `check-signature --identity-hash "$MACOS_SIGN_IDENTITY"`, so a release signed by any other certificate, or ad-hoc, is never published.
+
+#### Signing a local build the same way
+
+Do this when you want a local daemon to keep the Keychain's trust across rebuilds:
+
+```bash
+security import golem-signing.p12 -k ~/Library/Keychains/login.keychain-db -P '<password>' -T /usr/bin/codesign
+GOLEM_SIGN_IDENTITY=<sha1> just dist
+just check-signature "" --identity-hash <sha1>
+```
+
+#### Losing or replacing the certificate
+
+**Never replace the certificate unless you have to.** A new certificate, a lost `.p12`, or an expired certificate all change the rule. Every user then gets a Keychain prompt for each key after their next upgrade, and must choose Always Allow again. Data is not lost, only the trust. If you must rotate it, run the one-time setup again and say so in the release notes.
 
 ---
 
 ## 6. Installing today
 
-There are two ways today. `brew install` is not ready yet (see section 10).
+There are three ways today. `brew install` is not ready yet (see section 10).
 
 ### From the source code (for developers)
 
@@ -196,7 +342,19 @@ dist/golem-<version>-darwin-arm64/bin/golem
 
 The build folder can be moved anywhere on the same Mac. Run `golem daemon install` again after moving it.
 
-**Limitation:** today's builds have only a temporary signature, so they are meant for the Mac that built them. Giving one to someone else needs proper signing (step 1.5).
+**Limitation:** a local build is signed ad-hoc, so it is meant for the Mac that built it. To give golem to someone else, use a release archive: unpack it anywhere and run `bin/golem daemon install`. Homebrew comes in step 1.6.
+
+### From a release
+
+```bash
+curl -LO https://github.com/MilanPavel/golem/releases/download/v<version>/golem-<version>-darwin-arm64.tar.gz
+curl -LO https://github.com/MilanPavel/golem/releases/download/v<version>/golem-<version>-darwin-arm64.tar.gz.sha256
+shasum -a 256 -c golem-<version>-darwin-arm64.tar.gz.sha256
+tar -xzf golem-<version>-darwin-arm64.tar.gz -C ~/Applications
+~/Applications/golem-<version>-darwin-arm64/bin/golem daemon install
+```
+
+Download with `curl`, not a browser. A browser marks the files as downloaded, and Gatekeeper blocks a program that is not notarized. If you already used a browser, run `xattr -dr com.apple.quarantine ~/Applications/golem-<version>-darwin-arm64` to remove the mark. To upgrade, unpack the new version, run its `golem daemon install`, and delete the old folder.
 
 ### How `golem` finds the daemon
 
@@ -326,13 +484,13 @@ flowchart TB
 
 When a built daemon first reads a key saved by the source-code version, macOS asks once. Choose **Always Allow**. The daemon then deletes the key and saves it again, so from then on only the daemon is trusted. It writes the key's name to `~/.golem/run/keychain-migrated`, so this happens only once per key.
 
-**Today's limitation:** each build has a new temporary signature, so macOS treats each rebuild as a new program and asks again. Proper signing (step 1.5) fixes this.
+**Releases keep the trust.** Releases are signed with one certificate, so after you choose Always Allow once, later releases read the keys without asking. A local build is signed ad-hoc unless you give it the certificate, so macOS treats each rebuild as a new program and asks again.
 
 ---
 
 ## 10. How `brew install` will work
 
-**Status: planned for steps 1.5 and 1.6. Not built yet.**
+**Status: the release archive is built (step 1.5, section 5). The Homebrew tap is step 1.6, not built yet.**
 
 ### What it will look like for a user
 
@@ -484,7 +642,8 @@ Remember: under launchd, `GOLEM_...` variables from your terminal do not apply. 
 | `daemon already running (pid N)` | The background copy is running. Run `golem daemon stop` before starting one by hand |
 | The daemon keeps restarting | Read `launchd.stderr.log`. Common causes: the database is from a newer golem version (the message names the golem it needs and the copy that still opens); `GOLEM_HOME` is too long (a socket path must be under 104 characters on macOS); golem was moved (run `golem daemon install` again) |
 | `needs key` | `golem auth set <provider>`, or `/login <provider>` in the chat screen |
-| macOS asks about the Keychain on every start | The daemon was rebuilt or moved. Choose Always Allow. Proper signing (step 1.5) fixes this for good |
+| macOS asks about the Keychain on every start | A local build is signed ad-hoc, so every rebuild asks. Choose Always Allow, or sign local builds with the release certificate (section 5). A release asks once, after the first upgrade from a local or ad-hoc build |
+| A release workflow fails at "Import the signing certificate" | The secrets or the `MACOS_SIGN_IDENTITY` variable are missing. See section 5 |
 | A build crashes with `ModuleNotFoundError` | PyInstaller missed a module. Add it to `golem-daemon.spec`, then run `just dist && just smoke-dist` |
 | The first start of a new build is slow | Expected: macOS checks the new files once |
 
@@ -498,12 +657,11 @@ The rest of Phase 1, in order:
 
 ```mermaid
 flowchart LR
-  done["1.1–1.4 ✓<br/>one version,<br/>one golem file,<br/>packed daemon,<br/>safe upgrades"] --> s15["1.5<br/>releases<br/>and signing"] --> s16["1.6<br/>brew install"] --> s17["1.7<br/>golem doctor"] --> s18["1.8<br/>platform<br/>layer"] --> s19["1.9<br/>Linux"] --> s110["1.10–1.11<br/>Windows"]
+  done["1.1–1.5 ✓<br/>one version,<br/>one golem file,<br/>packed daemon,<br/>safe upgrades,<br/>signed releases"] --> s16["1.6<br/>brew install"] --> s17["1.7<br/>golem doctor"] --> s18["1.8<br/>platform<br/>layer"] --> s19["1.9<br/>Linux"] --> s110["1.10–1.11<br/>Windows"]
 ```
 
 | Step | What you will get |
 |---|---|
-| **1.5 Releases** | Pushing a tag such as `v0.3.0` makes GitHub check, build, sign, and smoke-test golem, then publish the archive and its checksum. Signed with a stable identity, so the Keychain stops asking after upgrades |
 | **1.6 Homebrew** | `brew install <owner>/golem/golem`, as described in section 10 |
 | **1.7 `golem doctor`** | One command that checks everything (daemon found, service set up, versions match, settings valid, models reachable, disk space) and says how to fix each problem |
 | **1.8 Platform layer** | Everything that differs between macOS, Linux, and Windows moves behind one interface, so the next steps are additions, not rewrites |

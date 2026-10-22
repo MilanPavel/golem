@@ -1,6 +1,7 @@
 #!/bin/sh
 # Build a relocatable tree: dist/golem-<version>-<os>-<arch>/.
 # libexec/golem-daemon is a PyInstaller one-folder build. bin/golem is the compiled CLI.
+# GOLEM_SIGN_IDENTITY (and GOLEM_SIGN_KEYCHAIN) sign it with a certificate; unset is ad-hoc.
 set -eu
 
 root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
@@ -60,5 +61,9 @@ bun build "$root/packages/cli/src/main.ts" \
   --compile \
   --outfile "$dest/bin/golem" \
   --define "GOLEM_VERSION=${define_value}"
+
+if [ "$os" = darwin ]; then
+  python3 "$root/scripts/sign_dist.py" sign "$dest" >&2
+fi
 
 printf '%s\n' "$dest"

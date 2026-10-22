@@ -321,6 +321,10 @@ To see the restart for yourself: run `just tui`, then kill the pid from `just go
 | `just gen` | Regenerates the TypeScript types from the Python protocol models |
 | `just catalog` | Checks the local model catalog against the Ollama registry, rewrites sizes that changed, and lists newer releases of each family |
 | `just prices` | Rewrites the bundled copy of LiteLLM's model prices |
+| `just dist` | Builds `dist/golem-<version>-<os>-<arch>/`: `bin/golem` and the frozen daemon, signed ad-hoc or with `GOLEM_SIGN_IDENTITY` |
+| `just smoke-dist` | Starts that daemon against a stub model and checks one chat |
+| `just check-signature` | Verifies every signature in a built tree and shows who signed it |
+| `just package` | Packs a built tree into `.tar.gz` and `.sha256`, as a release ships it |
 
 ## Documentation
 

@@ -67,6 +67,15 @@ tui:
 dist:
     sh scripts/dist.sh
 
+# Pack a built tree into a .tar.gz and its .sha256. Pass a path, or use the newest tree under dist/.
+package tree="":
+    sh scripts/package.sh {{tree}}
+
+# Verify every signature in a built tree. Pass a path, or use the newest tree under dist/.
+# `--identity-hash <sha1>` also requires that certificate.
+check-signature tree="" *flags:
+    python3 scripts/sign_dist.py check {{ if tree == "" { `ls -td dist/golem-*/ 2>/dev/null | head -n 1` } else { tree } }} {{flags}}
+
 # Chat once against a built tree. Pass a path, or use the newest tree under dist/.
 smoke-dist tree="":
     .venv/bin/python scripts/smoke_dist.py {{tree}}
