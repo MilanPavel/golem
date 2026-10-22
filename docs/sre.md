@@ -131,18 +131,20 @@ sequenceDiagram
   T->>F: start a fake server that always answers "smoke-ok"
   T->>D: start once, then stop (warm-up)
   T->>D: start again
-  Note over T,D: must be ready in under 1 second
   T->>D: hello, new chat, send "ping"
   D->>F: ask the "model"
   F-->>D: "smoke-ok"
   D-->>T: the answer is "smoke-ok"
   T->>D: stop (SIGTERM)
   D-->>T: exits cleanly (code 0)
+  T->>D: start and stop twice more
+  Note over T,D: the fastest of these three starts must be under 1 second
 ```
 
 Notes:
 - It uses a temporary folder for its data, so it never touches your real chats.
 - **Why the warm-up start?** The first time a new build runs, macOS checks every library in it, which takes 2–4 seconds. This happens once per copy. After that, the daemon starts in about half a second.
+- **Why the fastest of three?** CI runs on shared machines that sometimes stall a single start. One slow start says more about the machine than about golem. Every start must still exit cleanly.
 - The smoke test catches modules PyInstaller missed. Without it, you would only find out when a user starts the program and it crashes.
 
 ---
