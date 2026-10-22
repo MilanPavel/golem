@@ -59,7 +59,7 @@ brew install milanpavel/golem/golem
 golem daemon install
 ```
 
-Upgrading, removing, and the other ways to install are in [docs/sre.md](docs/sre.md#6-installing-today).
+[docs/install.md](docs/install.md) walks a new user through it, from Homebrew to the first chat, then upgrading and removing. The other ways to install are in [docs/sre.md](docs/sre.md#6-installing-today).
 
 ## Set up
 
@@ -335,6 +335,7 @@ To see the restart for yourself: run `just tui`, then kill the pid from `just go
 
 ## Documentation
 
+- [docs/install.md](docs/install.md) installs golem with Homebrew, step by step.
 - [docs/architecture.md](docs/architecture.md) explains how the daemon, the protocol, and the TUI fit together.
 - [docs/plan.md](docs/plan.md) is what comes next, step by step.
 - [docs/monorepo.md](docs/monorepo.md) explains the Python and TypeScript workspace setup.

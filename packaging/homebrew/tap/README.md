@@ -9,6 +9,8 @@ golem auth set anthropic    # optional: save an API key, or use Ollama
 golem                       # open the chat
 ```
 
+The [install guide](https://github.com/MilanPavel/golem/blob/main/docs/install.md) explains each step.
+
 Upgrade:
 
 ```bash
