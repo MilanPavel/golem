@@ -667,13 +667,20 @@ These steps were the second half of the model work, after `/model`. Tools and ap
   - `session.fork` may need a `before` bound on history reads here ([ADR-010](adr/010-fork.md)).
 - **Done when:** a 200-turn session keeps working after compaction.
 
-### 9.6 Local server management (optional)
+### 9.6 Local server management
 
-- **Goal:** the local model is running when you need it, and not otherwise.
-- **You can:** forget about starting Ollama.
-- **Build:** the daemon starts and stops the local server on demand, and `daemon.status` reports its memory use.
-- **Done when:** the first local request after a reboot works without a manual start.
-- **Watch out:** on 36 GB, a large chat model, an embedding model, and an IDE are tight. Prefer one resident chat model.
+- **Goal:** the local model is running when you need it, and not otherwise. A new user never has to install or start Ollama by hand.
+- **You can:** forget about installing and starting Ollama.
+- **Build:**
+  - The daemon starts and stops the local server on demand, and `daemon.status` reports its memory use.
+  - A server that is already running, for example from `brew services start ollama` or the Ollama app, is used as it is. The daemon stops only a server it started itself.
+  - When Ollama is not installed, the model picker asks once: "Ollama isn't installed. Run `brew install ollama` now?" Yes runs it and shows its output, then continues with the model the user picked. Without Homebrew, the picker shows the download link from ollama.com instead.
+  - The TUI runs `brew install`, not the daemon: it needs the user's terminal and `PATH`, and launchd gives the daemon neither.
+  - `golem doctor` (1.7) and `docs/install.md` drop the manual start step once this ships.
+- **Done when:** on a Mac without Ollama, choosing a local model in the picker installs Ollama after one question, downloads the model, and answers. The first local request after a reboot works without a manual start.
+- **Watch out:**
+  - On 36 GB, a large chat model, an embedding model, and an IDE are tight. Prefer one resident chat model.
+  - Never install anything without asking. A user who only uses hosted models never sees the question.
 
 ---
 
