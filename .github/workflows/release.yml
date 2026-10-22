@@ -56,8 +56,12 @@ jobs:
           MACOS_SIGN_IDENTITY: ${{ vars.MACOS_SIGN_IDENTITY }}
         run: |
           set -eu
-          if [ -z "$MACOS_SIGN_P12_BASE64" ] || [ -z "$MACOS_SIGN_IDENTITY" ]; then
-            echo "a release must be signed; see scripts/make_signing_cert.sh" >&2
+          missing=""
+          [ -n "$MACOS_SIGN_P12_BASE64" ] || missing="$missing the secret MACOS_SIGN_P12_BASE64;"
+          [ -n "$MACOS_SIGN_P12_PASSWORD" ] || missing="$missing the secret MACOS_SIGN_P12_PASSWORD;"
+          [ -n "$MACOS_SIGN_IDENTITY" ] || missing="$missing the variable (not secret) MACOS_SIGN_IDENTITY;"
+          if [ -n "$missing" ]; then
+            echo "a release must be signed, and the repository has no$missing see docs/sre.md, section 5" >&2
             exit 1
           fi
           keychain="$RUNNER_TEMP/golem-signing.keychain-db"
