@@ -30,13 +30,32 @@
 
 ## Why golem
 
-🏺 **Local models are first-class.** Most agent tools assume a huge hosted model. Golem is built to get real work out of a model running on your laptop, and to call a hosted one only when the task needs it. You always see what each answer costs.
-
-🔬 **A lab for agent techniques.** Golem is where the interesting ideas get tried for real: context compaction, routing between models, escalating when a small model struggles, and memory and skills the agent writes for itself, so each task makes the next one easier.
-
-🛠️ **Built, not wrapped.** The goal is to understand what makes an agent production quality by building each part: runs that survive a crash, approvals before anything risky, a sandboxed shell, a typed protocol, observability, and evals.
-
-🔌 **Connected to your tools.** Files, the shell, git, and the web are built in. Every tool call passes one permission layer, so golem asks before it does something that matters.
+<table>
+<tr>
+<td width="50%" valign="top">
+<img src="docs/images/why-local.svg" alt="The golem works inside your Mac; a hosted model in the cloud is called only when needed, and each answer shows its cost" width="100%">
+<h3>Local models first</h3>
+Most agent tools assume a huge hosted model. Golem gets real work out of the model on your laptop, and calls a hosted one only when the task needs it. You always see what each answer costs.
+</td>
+<td width="50%" valign="top">
+<img src="docs/images/why-lab.svg" alt="A three-panel story: task 1 takes nine steps, the golem writes down a skill, and task 2 takes three" width="100%">
+<h3>Learns as it goes</h3>
+Memory and skills the agent writes for itself, so each task makes the next one easier. Golem is also a lab for context compaction, routing between models, and stepping up when a small model struggles.
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+<img src="docs/images/why-built.svg" alt="A blueprint of the golem in a circle and a square, with its parts labelled: memory, protocol, crash recovery, permissions, sandbox, evals" width="100%">
+<h3>Built from scratch</h3>
+Golem builds the hard parts itself, to learn what a reliable agent really needs: it survives a crash, asks before risky steps, runs commands in a safe shell, and tests its own answers.
+</td>
+<td width="50%" valign="top">
+<img src="docs/images/why-tools.svg" alt="The golem asks before it acts: a prompt reads 'May I run pytest -q?' with allow and deny buttons, above its tools: files, shell, git, web" width="100%">
+<h3>Asks before it acts</h3>
+Files, the shell, git, and the web are built in. Every tool call passes one permission layer, so golem asks before it does anything that matters.
+</td>
+</tr>
+</table>
 
 Much of this is still the road ahead. [docs/plan.md](docs/plan.md) lists what comes next, step by step.
 
@@ -238,10 +257,13 @@ Set `GOLEM_HOME` to use another folder, for example a throwaway one for experime
 
 ## Hacking on golem
 
+<p align="center">
+  <img src="docs/images/hacking.svg" alt="Half clay, half code: the golem stands across a torn page, parchment sketch on the left and falling green code on the right" width="100%">
+</p>
+
 Golem is a Python daemon and a TypeScript terminal app in one repository. From a checkout, `just golem` runs the same CLI as `golem`.
 
-<details>
-<summary><b>Set up a checkout</b></summary>
+### What you need
 
 | Tool | Install |
 |---|---|
@@ -251,6 +273,8 @@ Golem is a Python daemon and a TypeScript terminal app in one repository. From a
 | pnpm 10 | `corepack enable` |
 | [just](https://just.systems) | `brew install just` |
 
+### Get the code
+
 ```bash
 git clone https://github.com/MilanPavel/golem.git && cd golem
 uv sync --all-packages      # Python packages and dev tools
@@ -258,9 +282,13 @@ pnpm install                # TypeScript packages
 just check                  # lint, typecheck, and tests
 ```
 
+### Run it
+
 Run the daemon in a terminal with `uv run python -m golem serve`, or in the background with `just golem daemon install`. Only one daemon runs at a time, so uninstall a Homebrew one first. Then open the chat with `just golem`.
 
 From a checkout, the Keychain trusts uv's shared Python rather than golem itself, so macOS asks once to allow it. A Homebrew golem is signed, so its trust carries over across upgrades.
+
+### Everyday commands
 
 | Command | What it does |
 |---|---|
@@ -270,8 +298,6 @@ From a checkout, the Keychain trusts uv's shared Python rather than golem itself
 | `just gen` | Regenerates the TypeScript protocol types from Python |
 | `just dist` | Builds a standalone golem into `dist/` |
 | `just smoke-dist` | Starts that build against a fake model and checks one chat |
-
-</details>
 
 ## Learn more
 
