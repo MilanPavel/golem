@@ -182,6 +182,7 @@ flowchart LR
 |---|---|
 | `golem` | Opens the chat |
 | `golem status` | Is the daemon up? Prints its pid, version, and uptime |
+| `golem doctor` | Checks the whole install and says how to fix each problem |
 | `golem daemon install` / `uninstall` | Sets up or removes the background service. `~/.golem` stays |
 | `golem daemon start` / `stop` / `restart` | Controls the daemon. `restart` after an upgrade |
 | `golem daemon logs` | Follows the daemon's log |
@@ -244,6 +245,8 @@ Set `GOLEM_HOME` to use another folder, for example a throwaway one for experime
 
 <details>
 <summary><b>When something is wrong</b></summary>
+
+Start with `golem doctor`. It checks the service, the running daemon's version, your settings, each model's server or API key, and disk space, and prints a fix under each problem.
 
 | What you see | What to do |
 |---|---|

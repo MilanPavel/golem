@@ -27,6 +27,7 @@ The daemon is the part of golem that talks to the model and keeps your chats. Th
 ```bash
 golem daemon install
 golem status                # prints pid, version, and uptime
+golem doctor                # checks the whole install
 ```
 
 ## 3. Choose a model
@@ -88,6 +89,22 @@ brew untap milanpavel/golem
 Your chats and settings stay in `~/.golem`. To delete them too, run `rm -rf ~/.golem`. API keys stay in the Keychain until you remove them: run `golem auth remove <provider>` before you uninstall.
 
 ## When something is wrong
+
+Run `golem doctor` first. It checks the install from top to bottom and prints a fix under each problem:
+
+```text
+✓ daemon   /opt/homebrew/opt/golem/libexec/golem-daemon/golem-daemon
+✓ service  launchd runs /opt/homebrew/opt/golem/libexec/golem-daemon/golem-daemon
+✓ running  version 0.2.0, pid 4242
+✓ socket   only you can open it (0600)
+✓ config   /Users/you/.golem/config.toml is valid
+✓ model    new chats start on ollama/qwen3:8b
+✗ ollama   not answering at http://127.0.0.1:11434
+           fix: brew services start ollama, or open the Ollama app
+✓ disk     154.6 GB free
+
+1 problem.
+```
 
 | What you see | What to do |
 |---|---|

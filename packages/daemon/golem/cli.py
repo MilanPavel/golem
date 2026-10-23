@@ -1,7 +1,8 @@
 """``python -m golem`` command line.
 
 ``serve`` runs the daemon. ``daemon install|start|stop|restart|uninstall`` talk to launchd.
-``daemon logs`` prints ``logs/golem.jsonl``. The user-facing ``golem`` bin is
+``daemon logs`` prints ``logs/golem.jsonl``. ``doctor`` prints the install
+checks as JSON for ``golem doctor``. The user-facing ``golem`` bin is
 the TypeScript package; it delegates these subcommands here.
 """
 
@@ -9,9 +10,11 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import os
 import sys
 import time
+from dataclasses import asdict
 from pathlib import Path
 
 from golem import __version__
@@ -69,6 +72,9 @@ def _parser() -> argparse.ArgumentParser:
     group.add_argument("--follow", action="store_true", help="keep streaming the log")
     group.add_argument("--no-follow", action="store_true", help="print the last lines and exit")
     logs.set_defaults(func=_logs)
+
+    doctor = sub.add_parser("doctor", help="check this install, as JSON for `golem doctor`")
+    doctor.set_defaults(func=_doctor)
     return parser
 
 
@@ -100,6 +106,16 @@ def _restart(_args: argparse.Namespace) -> int:
 
 def _uninstall(_args: argparse.Namespace) -> int:
     uninstall()
+    return 0
+
+
+def _doctor(_args: argparse.Namespace) -> int:
+    """Print the checks as one JSON array. The CLI decides the exit code."""
+    from golem.doctor import MacPlatform, run_checks
+    from golem.models.keys import KeychainStore
+
+    checks = run_checks(resolve_paths(), MacPlatform(), KeychainStore())
+    print(json.dumps([asdict(check) for check in checks]))
     return 0
 
 

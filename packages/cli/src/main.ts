@@ -6,7 +6,8 @@ import { connectGolem, GOLEM_VERSION, resolveSocketPath } from "@golem/client";
 import type { DaemonStatus } from "../../protocol/gen/daemon-status.ts";
 
 import { awaitRestart, formatRestarted } from "./await-restart.ts";
-import { locateDaemon } from "./daemon-locator.ts";
+import { type DaemonCommand, locateDaemon } from "./daemon-locator.ts";
+import { doctorExitCode, formatDoctor, parseChecks, runDoctor } from "./doctor.ts";
 
 import { formatConfig } from "./format-config.ts";
 import { formatKeys } from "./format-keys.ts";
@@ -21,7 +22,7 @@ const RESTART_TIMEOUT_MS = 15_000;
 
 const USAGE =
   "usage: golem\n" +
-  "       golem --version | golem --help | golem status\n" +
+  "       golem --version | golem --help | golem status | golem doctor\n" +
   "       golem daemon install|start|stop|restart|uninstall|logs\n" +
   "       golem auth set|remove <provider> | golem auth list | golem models [--refresh]\n" +
   "       golem config show [--resolved]";
@@ -43,6 +44,9 @@ async function run(args: string[]): Promise<number> {
   }
   if (command === "status") {
     return runStatus();
+  }
+  if (command === "doctor" && rest.length === 0) {
+    return runDoctorCommand();
   }
   if (command === "daemon") {
     return runDaemon(rest);
@@ -173,23 +177,45 @@ async function runStatus(): Promise<number> {
   }
 }
 
+async function runDoctorCommand(): Promise<number> {
+  let located: DaemonCommand | { error: string };
+  try {
+    located = locate();
+  } catch (error) {
+    located = { error: explain(error) };
+  }
+  const checks = await runDoctor({
+    cliVersion: GOLEM_VERSION,
+    located,
+    daemonChecks: async (daemon) =>
+      parseChecks(await captureLocated(daemon.command, [...daemon.args, "doctor"])),
+    readStatus: readDaemonStatus,
+  });
+  process.stdout.write(`${formatDoctor(checks)}\n`);
+  return doctorExitCode(checks);
+}
+
+function locate(): DaemonCommand {
+  return locateDaemon({
+    golemDaemon: process.env["GOLEM_DAEMON"],
+    // Homebrew's bin/golem is a link into the keg, where libexec/ sits.
+    execPath: realpathSync(process.execPath),
+    startDir: import.meta.dirname,
+    exists: existsSync,
+    workspaceRoot: (start) => {
+      try {
+        return findWorkspaceRoot(start);
+      } catch {
+        return null;
+      }
+    },
+  });
+}
+
 async function runDaemon(args: string[]): Promise<number> {
   let located;
   try {
-    located = locateDaemon({
-      golemDaemon: process.env["GOLEM_DAEMON"],
-      // Homebrew's bin/golem is a link into the keg, where libexec/ sits.
-      execPath: realpathSync(process.execPath),
-      startDir: import.meta.dirname,
-      exists: existsSync,
-      workspaceRoot: (start) => {
-        try {
-          return findWorkspaceRoot(start);
-        } catch {
-          return null;
-        }
-      },
-    });
+    located = locate();
   } catch (error) {
     process.stderr.write(`${explain(error)}\n`);
     return 1;
@@ -227,6 +253,26 @@ async function runLocated(command: string, args: string[]): Promise<number> {
       resolve(exitCode ?? 1);
     });
   });
+}
+
+/** Run the daemon executable and return what it printed. Throws when it fails. */
+async function captureLocated(command: string, args: string[]): Promise<string> {
+  const child = spawn(command, args, { stdio: ["ignore", "pipe", "pipe"] });
+  const out: Buffer[] = [];
+  const err: Buffer[] = [];
+  child.stdout.on("data", (chunk: Buffer) => out.push(chunk));
+  child.stderr.on("data", (chunk: Buffer) => err.push(chunk));
+  const exitCode = await new Promise<number>((resolve, reject) => {
+    child.on("error", reject);
+    child.on("close", (code) => {
+      resolve(code ?? 1);
+    });
+  });
+  if (exitCode !== 0) {
+    const detail = Buffer.concat(err).toString("utf8").trim().split("\n").at(-1) ?? "";
+    throw new Error(detail.length > 0 ? detail : `exit code ${exitCode}`);
+  }
+  return Buffer.concat(out).toString("utf8");
 }
 
 async function openTui(): Promise<number> {

@@ -412,6 +412,7 @@ stateDiagram-v2
 | `golem daemon uninstall` | Stops it and deletes the launchd file. Your data in `~/.golem` stays |
 | `golem daemon logs` | Shows the log and follows new lines |
 | `golem status` | Shows pid, version, and uptime. Exits with code 1 if the daemon is not running |
+| `golem doctor` | Checks the install and prints a fix under each problem (section 12). Exits with code 1 if anything failed |
 
 `kill` is not a way to stop it: launchd starts it again within seconds. Use `golem daemon stop`.
 
@@ -660,6 +661,21 @@ Remember: under launchd, `GOLEM_...` variables from your terminal do not apply. 
 
 - **Logs:** `golem daemon logs`. The log file is `~/.golem/logs/golem.jsonl`, one JSON record per line. If the daemon fails before it can write its log, look in `~/.golem/logs/launchd.stderr.log`.
 - **Is it running?** `golem status` shows the pid, version, uptime, state (`running`, or `draining` while it shuts down), and the default model.
+- **Is the install healthy?** `golem doctor` prints a checklist, with a fix under each line that is not ok. It exits with code 1 when a check fails, and 0 when there are only warnings.
+
+| Check | Fails when | Fix it prints |
+|---|---|---|
+| `daemon` | `golem` cannot find the daemon program (section 6) | `brew reinstall golem`, or set `GOLEM_DAEMON` |
+| `service` | launchd has no golem job, runs another copy of golem, or the job is stopped | `golem daemon install`, or `golem daemon start` |
+| `running` | The daemon does not answer, or runs another version than `golem` | `golem daemon start`, or `golem daemon restart` |
+| `socket` | Someone other than you could open the socket | `golem daemon restart` |
+| `config` | `config.toml` does not load. The line names the setting | Edit the file |
+| `model` | No model is chosen yet (a warning), or the default does not resolve | `/model` in the chat |
+| `ollama` | Ollama does not answer, or a profile's model is not downloaded. One line, however many profiles use it | `brew services start ollama`, or `ollama pull <model>` |
+| A hosted provider, such as `anthropic` | Its API key is not in the Keychain. A key only in your shell is a warning, because launchd does not pass it to the daemon | `golem auth set <provider>` |
+| `disk` | Less than 1 GB is free | Free some space |
+
+`golem` checks the first and the third itself. The daemon program checks the rest (`golem-daemon doctor` prints them as JSON), because it reads the same launchd file, settings, Keychain items, and model servers that the running daemon does. That also works when the daemon is down.
 - **What is it doing?** In the chat screen, `/debug wire` shows every message between `golem` and the daemon, and `/debug model` shows what the model sees.
 - **Not there yet:** log rotation (the log grows forever), metrics, tracing, and cost tracking.
 
@@ -681,6 +697,7 @@ Remember: under launchd, `GOLEM_...` variables from your terminal do not apply. 
 
 | What you see | What to do |
 |---|---|
+| Anything | Run `golem doctor` first. It prints a fix under each problem it finds |
 | The chat screen says `reconnecting` | Run `golem status`. If it is down, run `golem daemon start`, then look at `~/.golem/logs/launchd.stderr.log` |
 | `daemon already running (pid N)` | The background copy is running. Run `golem daemon stop` before starting one by hand |
 | The daemon keeps restarting | Read `launchd.stderr.log`. Common causes: the database is from a newer golem version (the message names the golem it needs and the copy that still opens); `GOLEM_HOME` is too long (a socket path must be under 104 characters on macOS); golem was moved (run `golem daemon install` again) |
@@ -704,12 +721,11 @@ The rest of Phase 1, in order:
 
 ```mermaid
 flowchart LR
-  done["1.1–1.6 ✓<br/>one version,<br/>one golem file,<br/>packed daemon,<br/>safe upgrades,<br/>signed releases,<br/>brew install"] --> s17["1.7<br/>golem doctor"] --> s18["1.8<br/>platform<br/>layer"] --> s19["1.9<br/>Linux"] --> s110["1.10–1.11<br/>Windows"]
+  done["1.1–1.7 ✓<br/>one version,<br/>one golem file,<br/>packed daemon,<br/>safe upgrades,<br/>signed releases,<br/>brew install,<br/>golem doctor"] --> s18["1.8<br/>platform<br/>layer"] --> s19["1.9<br/>Linux"] --> s110["1.10–1.11<br/>Windows"]
 ```
 
 | Step | What you will get |
 |---|---|
-| **1.7 `golem doctor`** | One command that checks everything (daemon found, service set up, versions match, settings valid, models reachable, disk space) and says how to fix each problem |
 | **1.8 Platform layer** | Everything that differs between macOS, Linux, and Windows moves behind one interface, so the next steps are additions, not rewrites |
 | **1.9 Linux** | Linux builds, a systemd service, CI on Ubuntu. No shell sandbox at first, so shell commands always ask |
 | **1.10 Windows: running** | A Windows "named pipe" instead of the socket file, Task Scheduler instead of launchd, CI on Windows |
