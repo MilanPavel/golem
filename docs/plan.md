@@ -4,56 +4,29 @@
 
 ## Read this first
 
-Golem is a background program on your computer (macOS today, Linux and Windows from Phase 1), the **daemon**, that talks to language models for you. You talk to it through a chat screen in the terminal, the **TUI**. Closing the screen does not stop the work. Open it again and the conversation is still there, including an answer that kept streaming while you were away.
+Golem is a background program on your computer (macOS today, Linux and Windows in Phase 8), the **daemon**, that talks to language models for you. You talk to it through a chat screen in the terminal, the **TUI**. Closing the screen does not stop the work. Open it again and the conversation is still there, including an answer that kept streaming while you were away.
 
 This file is about what comes next. How the existing pieces are built is in [architecture.md](architecture.md), and why they are built that way is in the [ADRs](adr/README.md).
-
-### Works today
-
-- Streaming chat with named model profiles and `provider/model` refs: Ollama through its native API, Anthropic, OpenAI, and OpenAI-compatible hosts such as OpenRouter.
-- API keys in the macOS Keychain, through `golem auth` or `/login` in the TUI. Every secret golem keeps goes in that one store, named `provider/<name>`, `mcp/<server>`, or `hook/<name>`, and a config file that holds a key does not load.
-- `/model` picks from installed, downloadable, and hosted models with prices and RAM fit, and switches a session mid-conversation. `golem models` prints the same list.
-- Downloading and removing Ollama models from the picker or with `/model pull` and `/model rm`, with live progress that survives closing the TUI.
-- Sessions, runs, and every event are stored in `~/.golem/golem.db`. They survive a daemon restart and a crash.
-- Detach and reattach. Close the TUI mid-answer, reopen it, and see the text so far plus the rest. Any number of screens can follow one session.
-- Ctrl-C cancels the answer and keeps what it said. Pressing it twice exits.
-- Automatic titles, a live switcher (`/sessions`), `/new`, `/title <name>`, and `/fork`.
-- A debug panel (`/debug`) that shows the wire and the conversation the model sees.
-- Read-only tools: the model reads files, lists folders, and searches with `glob` and `grep`, only inside the folder the session was started in. Each call is one line in the transcript, and Ctrl-O shows its output.
-- Tool rules in `~/.golem/config.toml` and a project's `.golem/policy.toml` allow, ask, or deny a call by tool, subject, and path. `golem config show` lists them in the order they are checked.
-- A sandboxed shell: the model runs commands in the session folder with no network and no writes outside it, after you approve each one. Output streams into the tool line. `git_status`, `git_diff`, and `git_log` read the repository.
-- "Always allow" (`w`) writes a rule for one exact call, and `/permissions` changes or deletes rules and revokes what a session allows.
-- `web_fetch` reads a page as text, asks per host, and refuses private addresses unless `[web] allow_private` is set ([ADR-017](adr/017-web-fetch.md)).
-- An agent todo list: `todo_write` keeps the plan in the session, `todos.updated` carries it, and a band above the composer shows it, `/todos` to hide it ([ADR-018](adr/018-tool-state-updates.md)).
-- Artifacts: tool output over 20 000 characters is stored in `golem.db`, the model gets its head and tail and reads more with `read_artifact`, and `/artifact` opens all of it ([ADR-016](adr/016-artifacts.md)).
-- Write tools: `write_file` and `edit_file` change files in the session folder, never under `.golem/` or `.git/`. The approval shows the diff, only that change is applied, and `e` edits a call's arguments before allowing it once ([ADR-015](adr/015-write-tools.md)).
-- Approvals: a call a rule asks about waits for `a` (once), `s` (for the session), or `d` (deny), across closing the TUI and restarting the daemon. A waiting session shows `?` in the switcher.
-- Releases: a `v*` tag runs `.github/workflows/release.yml`. It checks, builds, signs with golem's self-signed certificate, smoke-tests, and uploads `golem-<version>-darwin-arm64.tar.gz` and its `.sha256` to a draft release. A fresh runner downloads the draft, checks the checksum and signatures, and smoke-tests it, and then the release is published ([ADR-021](adr/021-release-signing.md)).
-- Homebrew: a stable release opens a pull request on the `homebrew-golem` tap with the new formula. The tap's workflow installs it, checks that Homebrew kept the signed files unchanged, and smoke-tests the daemon. `brew install milanpavel/golem/golem` copies `bin/` and `libexec/` as released, and `golem daemon install` names the keg's stable `opt` path, so `brew upgrade` plus `golem daemon restart` switches versions ([ADR-022](adr/022-homebrew-tap.md)).
-- Safe upgrades: a daemon that upgrades `golem.db` copies it to `golem.db.bak-<schema>` first and records each migration with its golem version in `schema_version`. A daemon refuses a newer file and names the golem it needs and the copy it can still open. `checkpoints.db` is copied to `checkpoints.db.bak-<langgraph version>` when the LangGraph packages change. `golem daemon restart` swaps the running daemon and prints the new version, `golem daemon uninstall` removes the launchd job and keeps `~/.golem`, and the TUI's version notice says to restart.
-- `golem doctor` checks the install and prints a fix under each problem: the daemon program, the launchd job, the running daemon's version, socket permissions, `config.toml`, the default model, each provider the profiles use (Ollama up and its models downloaded, or an API key in the Keychain), and free disk space. The daemon program runs most checks (`golem-daemon doctor`, JSON) so they work while the daemon is down.
-- Slash commands with suggestions, a line editor, recalling a sent message with Up, copy and export, and closing a session from the switcher.
-- `golem` with no arguments opens the TUI. `just dist` compiles that command to one file, `bin/golem`, with bun ([ADR-019](adr/019-single-binary.md)). It does not need Node. The same build has `libexec/golem-daemon/golem-daemon`, a PyInstaller one-folder daemon that needs no uv or system Python. The CLI finds it next to `bin/golem`, and `GOLEM_DAEMON` points `golem daemon install` at another copy. `just smoke-dist` starts that daemon against a stub model, checks one chat, and checks that it starts in under 1 s; the first start of a fresh copy takes a few seconds while macOS checks its libraries. CI builds and smoke-tests it on macOS. A built daemon takes over the Keychain items a checkout stored, after one Always Allow. A checkout reports `0.0.0-dev`; a build reports the git tag. `just dist` signs every file in the tree, ad-hoc or with `GOLEM_SIGN_IDENTITY`.
 
 ### Next, in order
 
 | Phase | What you get | Milestone |
 |---|---|---|
-| 1. Install and platforms | `brew install`, safe upgrades, `golem doctor`, then Linux and Windows | M3 — Installable |
-| 2. MCP | MCP servers as tool providers, under the same permissions | M2 — Acts |
-| 3. Skills | Claude Code compatible `SKILL.md` skills | M4 — Skilled |
-| 4. Flows | Durable workflows written in Python, resumable after a crash | M5 — Works alone |
-| 5. Triggers | Schedules, file watchers, and notifications | M5 — Works alone |
-| 6. Memory | Long-term memory that you can see and edit | M6 — Remembers |
-| 7. Evals and hardening | Tracing, eval suites, crash tests, backups, a security pass | M6 — Remembers |
-| 8. TUI polish | A render cache for long sessions, themes, and search in the transcript | Later |
+| 1. MCP | MCP servers as tool providers, under the same permissions | M2 — Acts |
+| 2. Skills | Claude Code compatible `SKILL.md` skills | M4 — Skilled |
+| 3. Flows | Durable workflows written in Python, resumable after a crash | M5 — Works alone |
+| 4. Triggers | Schedules, file watchers, and notifications | M5 — Works alone |
+| 5. Memory | Long-term memory that you can see and edit | M6 — Remembers |
+| 6. Evals and hardening | Tracing, eval suites, crash tests, backups, a security pass | M6 — Remembers |
+| 7. TUI polish | A render cache for long sessions, themes, and search in the transcript | Later |
+| 8. Platforms | One interface for everything OS-specific, then Linux and Windows | Later |
 | 9. Model routing and long sessions | Token and cost display, a cheap profile for small jobs, budgets, escalation, compaction | Later |
 
-Tools and approvals, the first phase, is built: the agent reads and edits files, runs commands in a sandbox, fetches web pages, and keeps a todo list, and asks first. What it does is under "Works today", and how it works is in [architecture.md](architecture.md) and ADRs 011 to 018. MCP finishes milestone M2 after the install work.
+What is built is in [architecture.md](architecture.md) and the ADRs, and how to install, run, and release it is in [sre.md](sre.md). MCP is next, and it finishes milestone M2.
 
 ```mermaid
 flowchart LR
-  p1[1 Install and platforms] --> p2[2 MCP] --> p3[3 Skills] --> p4[4 Flows] --> p5[5 Triggers] --> p6[6 Memory] --> p7[7 Evals and hardening] --> p8[8 TUI polish] --> p9[9 Model routing and long sessions]
+  p1[1 MCP] --> p2[2 Skills] --> p3[3 Flows] --> p4[4 Triggers] --> p5[5 Memory] --> p6[6 Evals and hardening] --> p7[7 TUI polish] --> p8[8 Platforms] --> p9[9 Model routing and long sessions]
 ```
 
 ### How to read a phase
@@ -112,11 +85,11 @@ JSON-RPC 2.0, one JSON object per line, over `~/.golem/run/golem.sock`. Protocol
 | Group | New events | Phase |
 |---|---|---|
 | Models | `usage.reported` (tokens, cost) | 9.1 |
-| System | `mcp.server.status`, `warning`, `error` | 2.1 |
-| Skills | `skill.activated`, `skill.deactivated` | 3.2 |
-| Runs and flows | `run.step.started`, `run.step.completed`, `run.interrupted` | 4.2, 4.4 |
+| System | `mcp.server.status`, `warning`, `error` | 1.1 |
+| Skills | `skill.activated`, `skill.deactivated` | 2.2 |
+| Runs and flows | `run.step.started`, `run.step.completed`, `run.interrupted` | 3.2, 3.4 |
 
-New commands: `mcp.list` (2.1), `skill.list | pin | unpin` (3.1, 3.2), `flow.list | start | status` (4.1), and `daemon.shutdown` (1.8).
+New commands: `mcp.list` (1.1), `skill.list | pin | unpin` (2.1, 2.2), `flow.list | start | status` (3.1), and `daemon.shutdown` (8.1).
 
 Rules:
 
@@ -126,159 +99,11 @@ Rules:
 
 ---
 
-## Phase 1 — Install and platforms
-
-Today golem runs only from a checkout of this repository. `golem daemon …` looks for the repository root and calls `uv run python -m golem daemon`, the TUI starts through `tsx`, and the launchd job points into the checkout. This phase makes golem something you install with `brew install`, upgrade without losing data, and, at the end of the phase, run on Linux and Windows.
-
-The shape of a release:
-
-```
-golem-<version>-<os>-<arch>.tar.gz   (.zip on Windows)
-├─ bin/golem                 # one executable: the CLI and the TUI
-└─ libexec/golem-daemon/     # the daemon with its own Python, no system Python needed
-```
-
-GitHub Actions builds one archive per platform on each version tag. Homebrew (and later Scoop) only downloads an archive. Nothing is compiled on your machine.
-
-```mermaid
-flowchart LR
-  tag[Version tag] --> ci[GitHub Actions matrix]
-  ci --> mac[darwin-arm64 archive]
-  ci --> linux[linux-x64 archive]
-  ci --> win[windows-x64 archive]
-  mac --> brew[Homebrew tap]
-  linux --> brew
-  win --> scoop[Scoop bucket]
-```
-
-Steps 1.1 to 1.7 are macOS only and end with `brew install`. Steps 1.8 to 1.11 add the platform seams, prove them on Linux, then add Windows.
-
-### 1.1 One version, no repository needed
-
-- **Goal:** golem runs from any folder on disk, not only from the checkout.
-- **You can:** copy a built tree somewhere else and use it, with `golem daemon install` pointing launchd at that copy.
-- **Build:**
-  - One version for the whole project, taken from the git tag and stamped into the Python package, the CLI, and the TUI at build time. The header already shows it.
-  - The CLI finds the daemon in this order: `GOLEM_DAEMON` if set, then `../libexec/golem-daemon/` next to its own executable, then the checkout (`uv run`), which keeps development working.
-  - `golem daemon install` writes the launchd plist with the absolute path it found, not `uv run`. Running it again after a move or an upgrade rewrites the plist.
-- **Done when:** a built tree outside the repository installs the launchd job, survives a reboot, and chats.
-
-### 1.2 One `golem` executable
-
-- **Goal:** the CLI and the TUI are one file with no Node install needed.
-- **You can:** type `golem` to open the TUI, and `golem status`, `golem daemon …`, or `golem --version` for the rest.
-- **Build:**
-  - Merge the CLI and TUI entry points. No arguments opens the TUI.
-  - Compile with `bun build --compile`. If that fails, fall back to Node's single executable application feature.
-  - `just dist` builds `bin/golem` for the current platform.
-- **Done when:** `bin/golem` runs on a Mac without Node or pnpm installed.
-- **Watch out:** Ink's layout engine ships as WebAssembly, and some dependencies are ESM only. Try the compile on day one, before the rest of the step.
-
-### 1.3 Self-contained daemon
-
-- **Goal:** the daemon runs without uv or a system Python.
-- **You can:** start `libexec/golem-daemon/golem-daemon` on a Mac that has never seen Python.
-- **Build:**
-  - PyInstaller in one-folder mode (one-file mode unpacks on every start, which is slow). The fallback is a standalone Python build with a ready-made virtual environment.
-  - `just smoke-dist` starts the built daemon with a temporary `GOLEM_HOME`, sends `hello`, runs one chat against a fake model, and stops it.
-- **Done when:** `just smoke-dist` passes, and the daemon from the archive starts in under 1 s.
-- **Watch out:**
-  - LangChain and Pydantic import some modules dynamically, and PyInstaller misses them. The smoke test is what catches it, so it runs in CI from the start.
-  - Keychain trust. The daemon executable must be golem's own binary, not a shared Python, so only golem is trusted to read the stored keys. Keys stored by a checkout's Python move over once: the new daemon reads them after one Always Allow, then rewrites each item so it owns it.
-
-### 1.4 Migrations and safe upgrades
-
-- **Goal:** a new release never breaks the data of an old one.
-- **You can:** upgrade golem and keep every session.
-- **Build:**
-  - Numbered SQL migrations for `golem.db`. SQLite's `user_version` stays the number a daemon checks, and a `schema_version` table records which golem applied each migration and when. This moves forward from 7.4, because installed users need it first.
-  - Before migrating, the daemon copies the database to `golem.db.bak-<schema>` with the SQLite backup API. The name is the schema it holds, so a daemon that reads that schema can open it.
-  - The daemon refuses to start on a database newer than it knows, says which golem version it needs (from `schema_version`), and names the copy it can still open.
-  - `checkpoints.db` is backed up to `checkpoints.db.bak-<langgraph version>` when `langgraph`, `langgraph-checkpoint`, or `langgraph-checkpoint-sqlite` differ from the versions in `golem.db`'s `library_versions`. Chats can survive losing it, because the event log is the real history ([ADR-006](adr/006-checkpoint-continuity.md)).
-  - `golem daemon restart` and `golem daemon uninstall`. The version mismatch with the TUI already shows as a yellow notice, and the notice now says to run `restart`.
-- **Done when:** a test upgrades a database made by the previous release and every session is still there.
-
-### 1.5 Release pipeline
-
-- **Goal:** a version tag produces a downloadable release with no manual steps.
-- **You can:** push `v0.1.0` and get a GitHub release with the macOS archive and its checksum.
-- **Build:**
-  - A GitHub Actions workflow on `v*` tags: `just check`, `just dist`, `just smoke-dist`, then upload `golem-<version>-darwin-arm64.tar.gz` and a `sha256` file.
-  - Code signing with a stable identity, a self-signed certificate at first and Developer ID later. An ad-hoc signature changes with every build, so the Keychain would ask again after each upgrade. Notarization only matters for direct downloads, so it waits until someone needs it.
-- **Done when:** a tag produces a release, and the archive from it passes `just smoke-dist` on a clean runner.
-
-### 1.6 Homebrew tap
-
-- **Goal:** `brew install` is the way to get golem on a Mac.
-- **You can:** run `brew install <you>/golem/golem`, then `golem daemon install`, then `golem`.
-- **Build:**
-  - A `homebrew-golem` tap repository with a `golem.rb` formula that downloads the release archive and installs `bin/` and `libexec/`. `brew test` runs `golem --version`.
-  - The release workflow (1.5) opens a pull request to the tap with the new version and checksum.
-  - The formula has no `service` block. `golem daemon install` stays the one owner of the launchd job, so a non-brew install works the same way. The formula's caveats print the command.
-  - `golem daemon install` points at the stable `opt` path (`$(brew --prefix)/opt/golem/...`), so `brew upgrade` does not leave the plist on an old version folder.
-- **Done when:** on a clean macOS user account, install, chat, `brew upgrade` plus `golem daemon restart`, and `brew uninstall` plus `golem daemon uninstall` all work, and only `~/.golem` is left.
-- **Watch out:** if both `brew services` and `golem daemon install` started the daemon, the second copy would fail on the pid lock and launchd would keep restarting it. One owner prevents that.
-
-### 1.7 `golem doctor`
-
-- **Goal:** when something is wrong after an install, one command says what.
-- **You can:** run `golem doctor` and get a checklist with a fix for each failure.
-- **Build:** checks that the daemon executable was found, that the service is installed and points at it, that the running daemon has the same version, socket permissions, that the config is valid, that each model profile is reachable (Ollama up, API key present in the credential store), and free disk space.
-- **Done when:** each check has a test with a fake platform, and a stopped Ollama shows as one failed line with a fix.
-
-### 1.8 Platform seams
-
-- **Goal:** everything that depends on the operating system sits behind one small interface, so Linux and Windows are additions, not rewrites.
-- **You can:** nothing new yet. This step makes the next three cheap.
-- **Build:** a `platform` module in the daemon and one in `@golem/client`, each with one implementation per OS:
-  - **Endpoint:** where the daemon listens (`unix:` path or `pipe:` name). `resolveSocketPath` becomes `resolveEndpoint`.
-  - **Service manager:** launchd, systemd user units, or Task Scheduler, behind `golem daemon install|uninstall|start|stop|restart|logs`.
-  - **Paths:** `~/.golem` on macOS and Linux, `%LOCALAPPDATA%\golem` on Windows, and `GOLEM_HOME` everywhere.
-  - **Clipboard:** OSC 52 first, which works in most terminals on all three systems, then `pbcopy`, `wl-copy` or `xclip`, or `clip.exe`. `/copy` already uses `pbcopy`.
-  - **Notifications (5.1):** `terminal-notifier`, `notify-send`, or Windows toasts.
-  - **Sandbox** ([ADR-014](adr/014-shell-sandbox.md)): a capability, `sandbox-exec` or none. `daemon.status` reports it. Without a sandbox, a shell rule that says `allow` is treated as `ask`, and the TUI shows `no sandbox`.
-  - **Stopping the daemon:** a `daemon.shutdown` request, so stopping does not depend on Unix signals.
-- **Done when:** no code outside the `platform` modules checks the OS, and the tests run against a fake platform.
-
-### 1.9 Linux
-
-- **Goal:** prove the seams on the easiest second platform.
-- **You can:** install golem on Linux with the same Homebrew formula, or by unpacking the archive.
-- **Build:**
-  - `linux-x64` and `linux-arm64` archives in the release matrix. CI runs the tests and `just smoke-dist` on Ubuntu.
-  - A systemd user unit, written by `golem daemon install`.
-  - No sandbox at first. `bubblewrap` can come later behind the same capability.
-- **Done when:** on a fresh Ubuntu VM, install, chat, log out and back in, and reattach all work.
-
-### 1.10 Windows: transport and service
-
-- **Goal:** the daemon runs on Windows and the TUI can reach it.
-- **You can:** run the daemon and the TUI on Windows 11, from the archive.
-- **Build:**
-  - Python's asyncio has no Unix socket server on Windows. The daemon serves a named pipe, `\\.\pipe\golem-<user>`, readable only by the current user. Node's `net.connect` already accepts that path, so the client only changes in `resolveEndpoint`.
-  - A Task Scheduler task that starts the daemon at logon and restarts it on failure, written by `golem daemon install`.
-  - The pid lock uses a Windows file lock.
-  - CI runs the tests on `windows-latest`.
-- **Done when:** on Windows 11, `golem daemon install`, chat, reboot, and reattach all work.
-- **Watch out:** the named pipe server in asyncio is not a public API. If it proves fragile, the fallback is loopback TCP with a random port and a token in a file only you can read. That choice gets an ADR.
-
-### 1.11 Windows: packaging
-
-- **Goal:** installing on Windows is one command, like on a Mac.
-- **You can:** run `scoop install golem`.
-- **Build:**
-  - A `windows-x64` zip in the release matrix, and a Scoop bucket updated by the release workflow. A winget manifest comes later.
-  - Check the TUI in Windows Terminal: the alternate screen, the mouse wheel, and colors.
-  - The shell tool runs without a sandbox (1.8), and the approval modal says so.
-- **Done when:** on a clean Windows 11 machine, `scoop install golem`, `golem daemon install`, and `golem` give a working chat.
-
----
-
-## Phase 2 — MCP
+## Phase 1 — MCP
 
 MCP servers become tool providers, under the same permission engine.
 
-### 2.1 One stdio server
+### 1.1 One stdio server
 
 - **Goal:** golem can use an MCP server.
 - **You can:** configure one stdio server (for example git) and use its tools in chat. `/mcp` shows its status.
@@ -288,7 +113,7 @@ MCP servers become tool providers, under the same permission engine.
   - `mcp.server.status` events, `mcp.list`, and `/mcp` in the TUI.
 - **Done when:** a tool from the server runs from chat after an approval.
 
-### 2.2 Namespaces and scoping
+### 1.2 Namespaces and scoping
 
 - **Goal:** many servers without flooding every prompt.
 - **You can:** enable a server for one session or one project, and write policy rules for it.
@@ -297,7 +122,7 @@ MCP servers become tool providers, under the same permission engine.
   - Servers are enabled per session (`/mcp enable <name>`) or per project config. Nothing is on by default.
 - **Done when:** two servers are configured, only the enabled one's tools reach the model.
 
-### 2.3 Health and HTTP servers
+### 1.3 Health and HTTP servers
 
 - **Goal:** servers stay up, and their cost in prompt tokens is visible.
 - **You can:** connect HTTP servers, and see a crashed server come back on its own.
@@ -310,11 +135,11 @@ MCP servers become tool providers, under the same permission engine.
 
 ---
 
-## Phase 3 — Skills
+## Phase 2 — Skills
 
 Agent Skills (`SKILL.md`) compatible with Claude Code, loaded by progressive disclosure.
 
-### 3.1 Registry and `/skills`
+### 2.1 Registry and `/skills`
 
 - **Goal:** golem knows which skills exist.
 - **You can:** run `/skills` and see each skill with its source and description.
@@ -324,7 +149,7 @@ Agent Skills (`SKILL.md`) compatible with Claude Code, loaded by progressive dis
   - Hot reload with `watchfiles`. `skill.list` on the wire.
 - **Done when:** an existing Claude Code skill shows up, and editing it updates the list without a restart.
 
-### 3.2 Pinned skills
+### 2.2 Pinned skills
 
 - **Goal:** you can turn a skill on by hand.
 - **You can:** `/skill <name>` (with suggestions) and `/skill off <name>`.
@@ -334,21 +159,21 @@ Agent Skills (`SKILL.md`) compatible with Claude Code, loaded by progressive dis
   - `skill.activated` and `skill.deactivated`. The header shows active skills.
 - **Done when:** a pinned skill changes the answer in the expected way.
 
-### 3.3 Model-driven loading
+### 2.3 Model-driven loading
 
 - **Goal:** the model picks up a skill when it needs one.
 - **You can:** ask for a task a skill covers, and see it activate on its own.
 - **Build:** a short index of skill descriptions in the system prompt, and a `load_skill(name)` tool. Files bundled with a skill resolve inside its folder.
 - **Done when:** an existing Claude Code skill works unchanged, triggered by the model.
 
-### 3.4 Pre-selection by embeddings
+### 2.4 Pre-selection by embeddings
 
 - **Goal:** local models, which are bad at picking from a long list, still get the right skill.
 - **You can:** use skills reliably on a local model.
 - **Build:** a `select_skills` node before `call_model` that embeds the user turn and puts only the top-k descriptions above a threshold into the index.
-- **Done when:** the skill-trigger eval (7.2) passes for your top 10 skills on a local and a remote model.
+- **Done when:** the skill-trigger eval (6.2) passes for your top 10 skills on a local and a remote model.
 
-### 3.5 Trust and scoped permissions
+### 2.5 Trust and scoped permissions
 
 - **Goal:** a skill can never widen what golem is allowed to do.
 - **You can:** see which skills are trusted, and approve a skill's script once.
@@ -358,7 +183,7 @@ Agent Skills (`SKILL.md`) compatible with Claude Code, loaded by progressive dis
   - `model: remote` in frontmatter makes the router escalate while the skill is active.
 - **Done when:** editing a trusted skill's script triggers a new approval.
 
-### 3.6 Self-authored skills
+### 2.6 Self-authored skills
 
 - **Goal:** golem can turn a repeated task into a skill.
 - **You can:** ask golem to write a skill, review the draft, and accept it.
@@ -367,7 +192,7 @@ Agent Skills (`SKILL.md`) compatible with Claude Code, loaded by progressive dis
 
 ---
 
-## Phase 4 — Flows
+## Phase 3 — Flows
 
 Durable, inspectable, resumable workflows written as plain Python with the Functional API.
 
@@ -398,7 +223,7 @@ async def pr_digest(inputs: dict) -> dict:
 
 The exact `@entrypoint` and `@task` signatures change between versions, so check the docs. The structure is the point.
 
-### 4.1 Registry and `golem run`
+### 3.1 Registry and `golem run`
 
 - **Goal:** golem can find and run a flow.
 - **You can:** `golem run hello --name x` for a flow with no LLM calls.
@@ -408,14 +233,14 @@ The exact `@entrypoint` and `@task` signatures change between versions, so check
   - `golem runs` lists runs.
 - **Done when:** a trivial flow runs from the CLI, and its result is in `golem runs`.
 
-### 4.2 Step events and the runs view
+### 3.2 Step events and the runs view
 
 - **Goal:** you can watch a flow work.
 - **You can:** open `/runs` in the TUI and see each step's status and duration.
 - **Build:** a stream writer inside tasks, mapped to `run.step.started` and `run.step.completed`. A runs view in the TUI, and `golem runs show <id>`.
 - **Done when:** a three-step flow shows three steps, live.
 
-### 4.3 Resume after a restart
+### 3.3 Resume after a restart
 
 - **Goal:** a crash does not lose a flow.
 - **You can:** kill the daemon mid-flow and see the run continue after it restarts.
@@ -426,14 +251,14 @@ The exact `@entrypoint` and `@task` signatures change between versions, so check
 - **Done when:** after `kill -9` mid-flow, the run finishes without repeating completed steps.
 - **Watch out:** code in the entrypoint body re-runs on resume, so keep it pure.
 
-### 4.4 Review interrupts
+### 3.4 Review interrupts
 
 - **Goal:** a flow can stop and wait for you, for days if needed.
 - **You can:** review a draft in the TUI and approve or edit it.
 - **Build:** `interrupt()` in a flow emits `run.interrupted`, and answering reuses the approval band ([ADR-013](adr/013-approvals.md)) with an editable text field, like editing a call's arguments. Pending reviews show in `/runs`.
 - **Done when:** a flow waits overnight on a review and finishes after you answer.
 
-### 4.5 Idempotency and retries
+### 3.5 Idempotency and retries
 
 - **Goal:** no step does a real-world action twice.
 - **You can:** trust a flow that posts somewhere to post once.
@@ -442,14 +267,14 @@ The exact `@entrypoint` and `@task` signatures change between versions, so check
   - A retry policy per task with backoff for transient errors. The final failure emits `run.failed` with the step and the error.
 - **Done when:** a crash test between "write" and "checkpoint" produces exactly one write.
 
-### 4.6 An agent as a step
+### 3.6 An agent as a step
 
 - **Goal:** deterministic flows can contain agentic steps.
 - **You can:** write a flow step that says "fix this" and let the agent do it with a restricted tool set.
 - **Build:** a task invokes the agent graph on its own thread (`thread_id = f"{run_id}:{step}"`) with the flow's allowed tools. `/runs` can jump into that thread.
 - **Done when:** a flow step runs a tool-using agent, and its tool calls go through the permission engine.
 
-### 4.7 Flow versioning
+### 3.7 Flow versioning
 
 - **Goal:** changing a flow's code does not corrupt runs in flight.
 - **You can:** edit a flow while an old run waits on a review.
@@ -458,39 +283,39 @@ The exact `@entrypoint` and `@task` signatures change between versions, so check
 
 ---
 
-## Phase 5 — Triggers and notifications
+## Phase 4 — Triggers and notifications
 
 The golem acts without you sitting in the terminal.
 
-### 5.1 Notifications
+### 4.1 Notifications
 
 - **Goal:** you hear about what needs you.
 - **You can:** get a macOS notification for `approval.needed` and `run.failed`, and click it to open the TUI on that session or run.
 - **Build:** notifications through `terminal-notifier` or `osascript`. `run.completed` notifications are opt-in per flow. A `golem open <id>` deep link.
 - **Done when:** an approval in a detached session produces a notification that opens the right screen.
 
-### 5.2 Scheduler
+### 4.2 Scheduler
 
 - **Goal:** flows run on a schedule.
 - **You can:** have `pr-digest` run every weekday at 9:00.
 - **Build:** APScheduler (async) with schedules from flow metadata, and a missed-run policy per flow.
 - **Done when:** a scheduled flow runs at 9:00, needs approval, notifies you, and you approve from a TUI opened later.
 
-### 5.3 File watchers
+### 4.3 File watchers
 
 - **Goal:** files arriving can start work.
 - **You can:** say "on a new PDF in `~/Downloads`, run `file-receipt`".
 - **Build:** `watchfiles` rules in config, debounced, each starting a flow with the path as input.
 - **Done when:** dropping a file starts exactly one run.
 
-### 5.4 Pause and quiet hours
+### 4.4 Pause and quiet hours
 
 - **Goal:** golem stays quiet when you want it to.
 - **You can:** `golem pause` and `golem resume`, and set quiet hours.
 - **Build:** a global pause that holds triggers (not running chats), and quiet hours that delay notifications. The TUI status line shows `paused`.
 - **Done when:** a scheduled run during pause waits and runs once after resume.
 
-### 5.5 Hook endpoint (optional)
+### 4.5 Hook endpoint (optional)
 
 - **Goal:** git hooks, Raycast, and Shortcuts can start flows.
 - **You can:** start a flow from a keyboard shortcut.
@@ -499,32 +324,32 @@ The golem acts without you sitting in the terminal.
 
 ---
 
-## Phase 6 — Memory
+## Phase 5 — Memory
 
 Useful long-term memory that you can inspect and edit, and that never surprises you.
 
-### 6.1 Explicit memory and a browser
+### 5.1 Explicit memory and a browser
 
 - **Goal:** golem can remember what you tell it to.
 - **You can:** say "remember that I prefer pnpm", and see it later in `/memory`.
 - **Build:** a SQLite-backed `BaseStore` in `memory.db`, with namespaces such as `("user","prefs")` and `("project", <name>)`. `remember` and `recall` tools. A TUI browser to view, edit, delete, and export.
 - **Done when:** every stored item is visible and deletable, and a new session uses a remembered preference.
 
-### 6.2 Semantic recall
+### 5.2 Semantic recall
 
 - **Goal:** relevant memories show up without being asked for.
 - **You can:** get answers that use what you said weeks ago.
 - **Build:** a `recall` node before `call_model`, using `sqlite-vec` and a local embedding model, limited to relevant namespaces, with a token cap.
-- **Done when:** the repeat-task eval (7.2) improves with memory on.
+- **Done when:** the repeat-task eval (6.2) improves with memory on.
 
-### 6.3 Confirmed extraction
+### 5.3 Confirmed extraction
 
 - **Goal:** golem proposes what to remember, and you decide.
 - **You can:** accept or reject proposed memories at the end of a session.
 - **Build:** an end-of-session node that proposes memories. They need confirmation in the TUI by default.
 - **Done when:** nothing is stored without a confirmation unless the namespace is configured otherwise.
 
-### 6.4 Searchable session summaries
+### 5.4 Searchable session summaries
 
 - **Goal:** you can ask what you decided last week.
 - **You can:** ask "what did we decide about the protocol bump?" and get the answer with a link to the session.
@@ -533,17 +358,17 @@ Useful long-term memory that you can inspect and edit, and that never surprises 
 
 ---
 
-## Phase 7 — Evals and hardening
+## Phase 6 — Evals and hardening
 
-This runs alongside the other phases. It gets a dedicated pass after Phase 5.
+This runs alongside the other phases. It gets a dedicated pass after Phase 4.
 
-### 7.1 Tracing
+### 6.1 Tracing
 
 - **Goal:** you can answer what happened, why, and what it cost.
 - **Build:** OpenTelemetry spans per run, node or task, model call, and tool call. Export to self-hosted Langfuse, or to JSONL for zero infrastructure. A cost dashboard in the TUI by model and by flow.
 - **Done when:** one slow answer can be broken down into its spans.
 
-### 7.2 Eval harness
+### 6.2 Eval harness
 
 - **Goal:** prove that a change did not make things worse.
 - **Build:** `evals/`, run with `just eval` (`pytest -m eval`):
@@ -558,27 +383,27 @@ This runs alongside the other phases. It gets a dedicated pass after Phase 5.
 
 - **Done when:** a model swap or prompt change produces a comparable scorecard diff.
 
-### 7.3 Replay
+### 6.3 Replay
 
 - **Goal:** debug a run without paying for it again.
 - **Build:** record a run's model and tool I/O, and replay it deterministically.
 - **Done when:** a recorded run replays to the same events.
 
-### 7.4 Hardening
+### 6.4 Hardening
 
 - Crash tests: `kill -9` at random points in flows, then check there are no duplicate side effects and runs resume.
 - A nightly backup of `~/.golem/*.db` with the SQLite backup API.
 - Performance: daemon start under 1 s, first-token latency per profile, and TUI rendering with 10 streams.
-- Security review: socket permissions, which programs the Keychain trusts with the golem items (only the signed daemon, see 1.3), that no key reaches a log, the event log, or the wire view, sandbox profile coverage, policy defaults (shell has no network by default), skill and MCP trust, and prompt injection through `web_fetch`, files, and MCP output. Content never auto-approves anything.
+- Security review: socket permissions, which programs the Keychain trusts with the golem items (only the signed daemon, see [ADR-021](adr/021-release-signing.md)), that no key reaches a log, the event log, or the wire view, sandbox profile coverage, policy defaults (shell has no network by default), skill and MCP trust, and prompt injection through `web_fetch`, files, and MCP output. Content never auto-approves anything.
 - Upgrade discipline: pinned LangGraph and LangChain versions, a smoke suite before each bump, and the changelogs read.
 
 ---
 
-## Phase 8 — TUI polish
+## Phase 7 — TUI polish
 
 A long session is already usable. These steps wait until scrolling feels slow, or until themes and search start to matter.
 
-### 8.1 Render cache
+### 7.1 Render cache
 
 - **Goal:** a long session stays smooth.
 - **You can:** scroll and stream in a session with hundreds of messages without the screen lagging.
@@ -587,7 +412,7 @@ A long session is already usable. These steps wait until scrolling feels slow, o
   - Only the streaming message is re-wrapped on each paint. A resize clears the cache.
 - **Done when:** a test session with 500 messages paints in under 16 ms per tick on your machine.
 
-### 8.2 Themes
+### 7.2 Themes
 
 - **Goal:** the screen is readable on a light terminal as well as a dark one.
 - **You can:** run `/theme light`, `/theme dark`, or `/theme auto`, and have the choice remembered.
@@ -598,18 +423,87 @@ A long session is already usable. These steps wait until scrolling feels slow, o
   - The choice is saved in `~/.golem/tui.json`.
 - **Done when:** both palettes look right in a light and a dark terminal, and no component imports a color constant directly.
 
-### 8.3 Search in the transcript
+### 7.3 Search in the transcript
 
 - **Goal:** find something said earlier without scrolling for it.
 - **You can:** press Ctrl-F, type a word, and jump between matches with Enter and Shift-Enter (or Ctrl-N and Ctrl-P).
 - **Build:**
   - A search bar takes the composer row while it is open. It shows `3/12` for the current match and the total.
-  - Matches are found in the message text, then mapped to wrapped rows through the render cache (8.1), so a match scrolls into view in the right place.
-  - Matches are highlighted in the transcript. The current one has a stronger color from the theme (8.2).
+  - Matches are found in the message text, then mapped to wrapped rows through the render cache (7.1), so a match scrolls into view in the right place.
+  - Matches are highlighted in the transcript. The current one has a stronger color from the theme (7.2).
   - Search is case-insensitive unless the query has a capital letter. Esc closes it and returns to where you were scrolled.
   - Finding matches and mapping them to rows are pure functions, with unit tests.
 - **Done when:** in a 500-message session, Ctrl-F finds a word from the first message and scrolls it into view, and Esc puts the view back.
 - **Watch out:** a match inside a streaming message moves as text arrives. Search finished messages only, and say so in the bar while a reply is streaming.
+
+---
+
+## Phase 8 — Platforms
+
+golem installs with `brew install` on macOS, upgrades without losing data, and `golem doctor` says what is wrong. This phase puts everything that depends on the operating system behind one interface, proves it on Linux, then adds Windows. Each platform gets the same archive as macOS:
+
+```
+golem-<version>-<os>-<arch>.tar.gz   (.zip on Windows)
+├─ bin/golem                 # one executable: the CLI and the TUI
+└─ libexec/golem-daemon/     # the daemon with its own Python, no system Python needed
+```
+
+```mermaid
+flowchart LR
+  tag[Version tag] --> ci[GitHub Actions matrix]
+  ci --> mac[darwin-arm64 archive]
+  ci --> linux[linux-x64 archive]
+  ci --> win[windows-x64 archive]
+  mac --> brew[Homebrew tap]
+  linux --> brew
+  win --> scoop[Scoop bucket]
+```
+
+### 8.1 Platform seams
+
+- **Goal:** everything that depends on the operating system sits behind one small interface, so Linux and Windows are additions, not rewrites.
+- **You can:** nothing new yet. This step makes the next three cheap.
+- **Build:** a `platform` module in the daemon and one in `@golem/client`, each with one implementation per OS:
+  - **Endpoint:** where the daemon listens (`unix:` path or `pipe:` name). `resolveSocketPath` becomes `resolveEndpoint`.
+  - **Service manager:** launchd, systemd user units, or Task Scheduler, behind `golem daemon install|uninstall|start|stop|restart|logs`. The `Platform` protocol in `golem/doctor.py` folds into it, so `golem doctor` checks whichever service the OS uses, and its Ollama fix stops assuming Homebrew.
+  - **Paths:** `~/.golem` on macOS and Linux, `%LOCALAPPDATA%\golem` on Windows, and `GOLEM_HOME` everywhere.
+  - **Clipboard:** OSC 52 first, which works in most terminals on all three systems, then `pbcopy`, `wl-copy` or `xclip`, or `clip.exe`. `/copy` already uses `pbcopy`.
+  - **Notifications (4.1):** `terminal-notifier`, `notify-send`, or Windows toasts.
+  - **Sandbox** ([ADR-014](adr/014-shell-sandbox.md)): a capability, `sandbox-exec` or none. `daemon.status` reports it. Without a sandbox, a shell rule that says `allow` is treated as `ask`, and the TUI shows `no sandbox`.
+  - **Stopping the daemon:** a `daemon.shutdown` request, so stopping does not depend on Unix signals.
+- **Done when:** no code outside the `platform` modules checks the OS, and the tests run against a fake platform.
+
+### 8.2 Linux
+
+- **Goal:** prove the seams on the easiest second platform.
+- **You can:** install golem on Linux with the same Homebrew formula, or by unpacking the archive.
+- **Build:**
+  - `linux-x64` and `linux-arm64` archives in the release matrix. CI runs the tests and `just smoke-dist` on Ubuntu.
+  - A systemd user unit, written by `golem daemon install`.
+  - No sandbox at first. `bubblewrap` can come later behind the same capability.
+- **Done when:** on a fresh Ubuntu VM, install, chat, log out and back in, and reattach all work.
+
+### 8.3 Windows: transport and service
+
+- **Goal:** the daemon runs on Windows and the TUI can reach it.
+- **You can:** run the daemon and the TUI on Windows 11, from the archive.
+- **Build:**
+  - Python's asyncio has no Unix socket server on Windows. The daemon serves a named pipe, `\\.\pipe\golem-<user>`, readable only by the current user. Node's `net.connect` already accepts that path, so the client only changes in `resolveEndpoint`.
+  - A Task Scheduler task that starts the daemon at logon and restarts it on failure, written by `golem daemon install`.
+  - The pid lock uses a Windows file lock.
+  - CI runs the tests on `windows-latest`.
+- **Done when:** on Windows 11, `golem daemon install`, chat, reboot, and reattach all work.
+- **Watch out:** the named pipe server in asyncio is not a public API. If it proves fragile, the fallback is loopback TCP with a random port and a token in a file only you can read. That choice gets an ADR.
+
+### 8.4 Windows: packaging
+
+- **Goal:** installing on Windows is one command, like on a Mac.
+- **You can:** run `scoop install golem`.
+- **Build:**
+  - A `windows-x64` zip in the release matrix, and a Scoop bucket updated by the release workflow. A winget manifest comes later.
+  - Check the TUI in Windows Terminal: the alternate screen, the mouse wheel, and colors.
+  - The shell tool runs without a sandbox (8.1), and the approval modal says so.
+- **Done when:** on a clean Windows 11 machine, `scoop install golem`, `golem daemon install`, and `golem` give a working chat.
 
 ---
 
@@ -677,7 +571,7 @@ These steps were the second half of the model work, after `/model`. Tools and ap
   - A server that is already running, for example from `brew services start ollama` or the Ollama app, is used as it is. The daemon stops only a server it started itself.
   - When Ollama is not installed, the model picker asks once: "Ollama isn't installed. Run `brew install ollama` now?" Yes runs it and shows its output, then continues with the model the user picked. Without Homebrew, the picker shows the download link from ollama.com instead.
   - The TUI runs `brew install`, not the daemon: it needs the user's terminal and `PATH`, and launchd gives the daemon neither.
-  - `golem doctor` (1.7) and `docs/install.md` drop the manual start step once this ships.
+  - `golem doctor` and `docs/install.md` drop the manual start step once this ships.
 - **Done when:** on a Mac without Ollama, choosing a local model in the picker installs Ollama after one question, downloads the model, and answers. The first local request after a reboot works without a manual start.
 - **Watch out:**
   - On 36 GB, a large chat model, an embedding model, and an IDE are tight. Prefer one resident chat model.
@@ -731,14 +625,14 @@ Built-in defaults, then `~/.golem/config.toml`, then `<project>/.golem/config.to
 | Scope explosion | Never finishing | Small steps with exit checks, daily use of what already ships |
 | Prompt injection through tools or MCP | Unsafe actions | No auto-approve from content, the sandbox, minimal default permissions |
 | A frozen daemon misses a dynamic import | A release that does not start | `just smoke-dist` on every platform in CI, before upload |
-| macOS-only code spreads before Phase 1 | A costly Windows port | New OS-specific code goes behind a small function from the start, so 1.8 only moves it |
+| macOS-only code spreads before Phase 8 | A costly Windows port | New OS-specific code goes behind a small function from the start, so 8.1 only moves it |
 
 ## Open questions
 
 Each one gets an ADR when it is decided.
 
 1. ACP or AG-UI compatibility for the protocol: adopt it, mirror it, or ignore it?
-2. Are memory writes always confirmed, or auto-saved for some namespaces? (Needed by 6.3.)
+2. Are memory writes always confirmed, or auto-saved for some namespaces? (Needed by 5.3.)
 3. Flows in Python only, or also a YAML format for simple ones? (Recommendation: Python only until it hurts.)
-4. Windows transport: a named pipe or loopback TCP with a token file? (Needed by 1.10. Named pipe first, TCP if asyncio's pipe server proves fragile.)
+4. Windows transport: a named pipe or loopback TCP with a token file? (Needed by 8.3. Named pipe first, TCP if asyncio's pipe server proves fragile.)
 5. `bun build --compile` or Node's single executable feature for `bin/golem`? Decided in [ADR-019](adr/019-single-binary.md): bun.

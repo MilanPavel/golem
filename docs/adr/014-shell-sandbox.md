@@ -42,7 +42,7 @@ flowchart LR
 
 **A container per command.** It needs Docker or a VM on every machine, starts slowly, and sees a different toolchain than yours.
 
-**Run unsandboxed where no sandbox exists, but ask every time.** One approval of a wrong command would be unrecoverable. Phase 1 (step 1.9) can add Linux sandboxing (for example `bubblewrap`) behind the same check.
+**Run unsandboxed where no sandbox exists, but ask every time.** One approval of a wrong command would be unrecoverable. Phase 8 (step 8.2) can add Linux sandboxing (for example `bubblewrap`) behind the same check.
 
 ## What it costs
 

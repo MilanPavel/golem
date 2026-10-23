@@ -29,4 +29,4 @@ When `user_version` is above what the daemon knows, it raises `DatabaseTooNewErr
 
 ## What it costs
 
-Each upgrade that migrates leaves a full copy next to the database, and nothing deletes old copies yet. Phase 7's nightly backups can take over pruning. A file at schema 5 or older has no `schema_version` history for that time, so a too-new error for those schemas cannot name a golem version. Only releases from schema 6 on can.
+Each upgrade that migrates leaves a full copy next to the database, and nothing deletes old copies yet. Phase 6's nightly backups can take over pruning. A file at schema 5 or older has no `schema_version` history for that time, so a too-new error for those schemas cannot name a golem version. Only releases from schema 6 on can.

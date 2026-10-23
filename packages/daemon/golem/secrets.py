@@ -5,8 +5,8 @@ On macOS that is the login Keychain, through ``keyring``, under the service
 
 - ``provider/<name>``: a model provider's API key. Its Keychain account is
   the provider name alone, as before namespaces, so stored keys keep working.
-- ``mcp/<server>``: an MCP server's token (Phase 2).
-- ``hook/<name>``: a hook endpoint's token, such as ``hook/token`` (plan step 5.5).
+- ``mcp/<server>``: an MCP server's token (Phase 1).
+- ``hook/<name>``: a hook endpoint's token, such as ``hook/token`` (plan step 4.5).
 
 A setting that needs a secret holds a :data:`SecretRef`, ``keychain:<name>``,
 and the daemon resolves it when it uses it. A config file never holds the

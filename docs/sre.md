@@ -503,7 +503,7 @@ When a built daemon first reads a key saved by the source-code version, macOS as
 
 ## 10. Homebrew
 
-**Status: built (step 1.6). It is live once the tap repository and its token exist (below), and the first stable tag has been released and its tap pull request merged.** The decisions are in [ADR-022](adr/022-homebrew-tap.md).
+**Status: built. It is live once the tap repository and its token exist (below), and the first stable tag has been released and its tap pull request merged.** The decisions are in [ADR-022](adr/022-homebrew-tap.md).
 
 ### What it looks like for a user
 
@@ -620,7 +620,7 @@ If the token is missing or has expired, the release is still published, and only
 
 ### Linux and Windows later
 
-The same formula will work on Linux (step 1.9), with a systemd service instead of launchd. Windows will use **Scoop**, a similar tool for Windows, from its own "bucket" repository (step 1.11).
+The same formula will work on Linux (plan step 8.2), with a systemd service instead of launchd. Windows will use **Scoop**, a similar tool for Windows, from its own "bucket" repository (plan step 8.4).
 
 ---
 
@@ -717,25 +717,22 @@ Remember: under launchd, `GOLEM_...` variables from your terminal do not apply. 
 
 ## 15. What is planned
 
-The rest of Phase 1, in order:
+The phases that matter for running golem, in the order of [the plan](plan.md):
 
 ```mermaid
 flowchart LR
-  done["1.1–1.7 ✓<br/>one version,<br/>one golem file,<br/>packed daemon,<br/>safe upgrades,<br/>signed releases,<br/>brew install,<br/>golem doctor"] --> s18["1.8<br/>platform<br/>layer"] --> s19["1.9<br/>Linux"] --> s110["1.10–1.11<br/>Windows"]
+  p1["Phase 1<br/>MCP"] --> p4["Phase 4<br/>Triggers"] --> p6["Phase 6<br/>Hardening"] --> p8["Phase 8<br/>Linux and<br/>Windows"] --> p9["Phase 9<br/>Costs"]
 ```
 
-| Step | What you will get |
+| Phase | What you will get |
 |---|---|
-| **1.8 Platform layer** | Everything that differs between macOS, Linux, and Windows moves behind one interface, so the next steps are additions, not rewrites |
-| **1.9 Linux** | Linux builds, a systemd service, CI on Ubuntu. No shell sandbox at first, so shell commands always ask |
-| **1.10 Windows: running** | A Windows "named pipe" instead of the socket file, Task Scheduler instead of launchd, CI on Windows |
-| **1.11 Windows: installing** | `scoop install golem` |
-
-Later phases that matter for running golem:
-
-- **Phase 2, MCP:** the daemon starts and watches extra tool programs (MCP servers).
-- **Phase 5, Triggers:** the daemon does work on a schedule or when files change, with no chat screen open.
-- **Phase 7, Hardening:** tracing (a timeline of where each answer spent its time), nightly database backups, crash tests, speed checks, and a security review.
-- **Phase 9:** token and cost display, and spending limits.
+| **1. MCP** (next) | The daemon starts and watches extra tool programs (MCP servers) |
+| **4. Triggers** | The daemon does work on a schedule or when files change, with no chat screen open |
+| **6. Hardening** | Tracing (a timeline of where each answer spent its time), nightly database backups, crash tests, speed checks, and a security review |
+| **8.1 Platform layer** | Everything that differs between macOS, Linux, and Windows moves behind one interface, so the next steps are additions, not rewrites |
+| **8.2 Linux** | Linux builds, a systemd service, CI on Ubuntu. No shell sandbox at first, so shell commands always ask |
+| **8.3 Windows: running** | A Windows "named pipe" instead of the socket file, Task Scheduler instead of launchd, CI on Windows |
+| **8.4 Windows: installing** | `scoop install golem` |
+| **9. Model routing** | Token and cost display, and spending limits |
 
 **Not planned yet:** log rotation, metrics export, Intel Mac builds, and access from other computers or other users. Golem is meant to run for one person, on one computer.
