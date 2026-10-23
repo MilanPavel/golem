@@ -574,6 +574,40 @@ class ModelPullDone(BaseModel):
     error: str | None = None
 
 
+class McpListParams(BaseModel):
+    """``mcp.list``. Every configured MCP server and its state."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+McpServerState = Literal["starting", "running", "failed", "disabled"]
+
+
+class McpServer(BaseModel):
+    """One MCP server from ``[mcp.<name>]``.
+
+    ``command`` is the command line golem runs. ``tools`` are the tool names
+    the model sees, ``mcp__<server>__<tool>``, while it is ``running``.
+    ``error`` says why it is ``failed``.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    state: McpServerState
+    command: str
+    tools: list[str] = Field(default_factory=list[str])
+    error: str | None = None
+
+
+class McpListResult(BaseModel):
+    """The servers, sorted by name."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    servers: list[McpServer]
+
+
 class ConfigGetParams(BaseModel):
     """``config.get``. The settings the daemon uses, and the tool rules for ``cwd``.
 
@@ -763,6 +797,10 @@ __all__ = [
     "InspectMessage",
     "ListedModel",
     "ListedProvider",
+    "McpListParams",
+    "McpListResult",
+    "McpServer",
+    "McpServerState",
     "MessageSendParams",
     "MessageSendResult",
     "ModelDeleteParams",

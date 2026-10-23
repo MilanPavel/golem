@@ -29,6 +29,9 @@ from golem_protocol.commands import (
     InspectMessage,
     ListedModel,
     ListedProvider,
+    McpListParams,
+    McpListResult,
+    McpServer,
     MessageSendParams,
     MessageSendResult,
     ModelDeleteParams,
@@ -117,6 +120,7 @@ from golem_protocol.events import (
     ToolStartedEvent,
 )
 from golem_protocol.rpc import (
+    McpServerStatusNotification,
     ModelPullDoneNotification,
     ModelPullProgressNotification,
     RpcErrorBody,
@@ -242,6 +246,10 @@ MODELS: tuple[type[BaseModel], ...] = (
     PolicyEditResult,
     SessionRevokeParams,
     SessionRevokeResult,
+    McpListParams,
+    McpServer,
+    McpListResult,
+    McpServerStatusNotification,
 )
 
 

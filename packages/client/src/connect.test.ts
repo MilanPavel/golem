@@ -675,6 +675,39 @@ test("download progress and its end reach onPull", async () => {
   }
 });
 
+test("mcp.list reads the servers, and mcp.server.status reaches onMcpStatus", async () => {
+  const git = { name: "git", state: "running", command: "uvx mcp-server-git", tools: ["mcp__git__git_status"], error: null };
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: { "mcp.list": { servers: [git] } },
+      onHello: (current) => {
+        write(current, {
+          jsonrpc: "2.0",
+          method: "mcp.server.status",
+          params: { ...git, state: "failed", tools: [], error: "the server exited with code 1" },
+        });
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
+  const seen: string[] = [];
+  const stop = client.onMcpStatus((status) => {
+    seen.push(`${status.name} ${status.state}`);
+  });
+  try {
+    assert.deepEqual(await client.listMcp(), { servers: [git] });
+    for (let tries = 0; tries < 50 && seen.length < 1; tries += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    assert.deepEqual(seen, ["git failed"]);
+  } finally {
+    stop();
+    client.close();
+    await server.close();
+  }
+});
+
 test("forkSession sends the message id and reads the new session", async () => {
   const sent: Record<string, unknown>[] = [];
   const server = await listen((socket) => {

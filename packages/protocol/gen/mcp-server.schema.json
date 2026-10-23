@@ -1,0 +1,51 @@
+{
+  "additionalProperties": false,
+  "description": "One MCP server from ``[mcp.<name>]``.\n\n``command`` is the command line golem runs. ``tools`` are the tool names\nthe model sees, ``mcp__<server>__<tool>``, while it is ``running``.\n``error`` says why it is ``failed``.",
+  "properties": {
+    "command": {
+      "title": "Command",
+      "type": "string"
+    },
+    "error": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Error"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "state": {
+      "enum": [
+        "starting",
+        "running",
+        "failed",
+        "disabled"
+      ],
+      "title": "State",
+      "type": "string"
+    },
+    "tools": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Tools",
+      "type": "array"
+    }
+  },
+  "required": [
+    "name",
+    "state",
+    "command"
+  ],
+  "title": "McpServer",
+  "type": "object"
+}

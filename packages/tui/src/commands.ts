@@ -18,6 +18,7 @@ export type ComposerOutcome =
   | { kind: "idle" }
   | { kind: "unknown"; notice: string }
   | { kind: "help" }
+  | { kind: "mcp" }
   | { kind: "send"; text: string; debug: DebugState }
   | { kind: "sessions" }
   | { kind: "permissions" }
@@ -126,6 +127,12 @@ export const COMMANDS: readonly Command[] = [
     description: "Removes the provider's API key from the Keychain.",
     choices: KEY_PROVIDERS,
     run: providerCommand("logout"),
+  },
+  {
+    name: "/mcp",
+    args: "",
+    description: "Shows the MCP servers, their state, and their tools.",
+    run: withoutArgs({ kind: "mcp" }),
   },
   {
     name: "/model",
@@ -290,7 +297,7 @@ function debugCommand(debug: DebugState, args: readonly string[]): ComposerOutco
   return unknown();
 }
 
-function fitLine(text: string, columns: number): string {
+export function fitLine(text: string, columns: number): string {
   if (columns <= 0) {
     return "";
   }

@@ -1,4 +1,4 @@
-"""Daemon commands: ``hello``, ``daemon.status``, ``ping``, sessions, chat, inspect, and keys."""
+"""Daemon commands: hello, status, ping, sessions, chat, keys, models, and MCP."""
 
 from __future__ import annotations
 
@@ -71,6 +71,8 @@ from golem_protocol.commands import (
     InspectMessage,
     ListedModel,
     ListedProvider,
+    McpListParams,
+    McpListResult,
     MessageSendParams,
     MessageSendResult,
     ModelDeleteParams,
@@ -517,6 +519,12 @@ async def _session_revoke(ctx: RequestContext, params: SessionRevokeParams) -> S
     return SessionRevokeResult(revoked=revoked)
 
 
+async def _mcp_list(ctx: RequestContext, params: McpListParams) -> McpListResult:
+    del params
+    mcp = ctx.state.mcp
+    return McpListResult(servers=[] if mcp is None else mcp.statuses())
+
+
 def _pulls(ctx: RequestContext) -> PullManager:
     pulls = ctx.state.pulls
     if pulls is None:
@@ -611,6 +619,7 @@ def standard_methods() -> dict[str, Method]:
         "auth.remove": Method("auth.remove", AuthRemoveParams, True, _auth_remove),
         "auth.list": Method("auth.list", AuthListParams, True, _auth_list),
         "model.list": Method("model.list", ModelListParams, True, _model_list),
+        "mcp.list": Method("mcp.list", McpListParams, True, _mcp_list),
         "model.probe": Method("model.probe", ModelProbeParams, True, _model_probe),
         "model.pull": Method("model.pull", ModelPullParams, True, _model_pull),
         "model.pull_cancel": Method(

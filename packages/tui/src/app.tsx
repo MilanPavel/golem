@@ -115,6 +115,7 @@ import {
   pressPermissions,
   type PermissionsState,
 } from "./permissions.ts";
+import { type McpPanel, mcpLines, mergeMcp } from "./mcp.ts";
 import { assistantChars, elapsedSeconds, meterLine, meterPhase } from "./progress.ts";
 import {
   fitSegments,
@@ -187,7 +188,8 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   const [modelMessages, setModelMessages] = useState<CheckpointMessage[]>([]);
   const [modelCount, setModelCount] = useState<number | null>(null);
   const [switcher, setSwitcher] = useState<SwitcherState>(closedSwitcher);
-  const [helpOpen, setHelpOpen] = useState(false);
+  const [panel, setPanel] = useState<"help" | McpPanel | null>(null);
+  const helpOpen = panel !== null;
   const [keysOpen, setKeysOpen] = useState(false);
   const [keysOffset, setKeysOffset] = useState(0);
   const [diffScroll, setDiffScroll] = useState({ callId: "", offset: 0 });
@@ -295,7 +297,8 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   };
   overlayFrame.current = { columns, body: budget.body };
   const diffOffset = chat.approval !== null && diffScroll.callId === chat.approval.callId ? diffScroll.offset : 0;
-  const helpText = helpOpen && !keysOpen && !switcher.open ? helpLines(COMMANDS, columns) : [];
+  const panelLines = panel === "help" ? helpLines(COMMANDS, columns) : panel === null ? [] : mcpLines(panel, columns);
+  const helpText = !keysOpen && !switcher.open ? panelLines : [];
   const helpHeight = Math.min(helpText.length, budget.body);
   const chatHeight = budget.body - helpHeight;
   const transcriptOptions = { times: showTimes, now, toolOutput };
@@ -325,7 +328,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
     onSwitch: (next) => {
       batcher.current?.flush();
       setLiveTitle(null);
-      setHelpOpen(false);
+      setPanel(null);
       setKeysOpen(false);
       historyCursorRef.current = null;
       setHistoryCursor(null);
@@ -554,6 +557,16 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   }, [client, connection.status]);
 
   useEffect(() => {
+    return client.onMcpStatus((server) => {
+      setPanel((current) =>
+        current === null || current === "help" || current.servers === null
+          ? current
+          : { servers: mergeMcp(current.servers, server), error: null },
+      );
+    });
+  }, [client]);
+
+  useEffect(() => {
     return client.onPull((update) => {
       if (update.kind === "progress") {
         const { ref, progress, status } = update.progress;
@@ -653,13 +666,29 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
     endHistory();
     if (outcome.kind === "help") {
       setDraft(draftAt(""));
-      setHelpOpen(true);
+      setPanel("help");
       setKeysOpen(false);
       setSwitcher(closedSwitcher);
       setChat((current) => ({ ...current, notice: null }));
       return;
     }
-    setHelpOpen(false);
+    setPanel(null);
+    if (outcome.kind === "mcp") {
+      setDraft(draftAt(""));
+      setKeysOpen(false);
+      setSwitcher(closedSwitcher);
+      setPanel({ servers: null, error: null });
+      client.listMcp().then(
+        (listed) => {
+          setPanel((current) => (current === null || current === "help" ? current : { servers: listed.servers, error: null }));
+        },
+        (error: unknown) => {
+          const message = error instanceof Error ? error.message : String(error);
+          setPanel((current) => (current === null || current === "help" ? current : { servers: null, error: message }));
+        },
+      );
+      return;
+    }
     if (outcome.kind === "unknown") {
       setChat((current) => ({ ...current, notice: outcome.notice }));
       return;
@@ -1247,7 +1276,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
         setKeysOffset(0);
         return;
       case "close-help":
-        setHelpOpen(false);
+        setPanel(null);
         return;
       case "scroll-overlay":
         setKeysOffset((current) =>

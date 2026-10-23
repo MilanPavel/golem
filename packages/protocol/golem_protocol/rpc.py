@@ -4,7 +4,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
-from golem_protocol.commands import ModelPullDone, ModelPullProgress, SessionSummary
+from golem_protocol.commands import McpServer, ModelPullDone, ModelPullProgress, SessionSummary
 from golem_protocol.events import ChatEvent
 
 
@@ -102,7 +102,18 @@ class ModelPullDoneNotification(BaseModel):
     params: ModelPullDone
 
 
+class McpServerStatusNotification(BaseModel):
+    """Server → every connection: an MCP server started, failed, or changed tools. Not stored."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    jsonrpc: Literal["2.0"] = "2.0"
+    method: Literal["mcp.server.status"] = "mcp.server.status"
+    params: McpServer
+
+
 __all__ = [
+    "McpServerStatusNotification",
     "ModelPullDoneNotification",
     "ModelPullProgressNotification",
     "RpcErrorBody",

@@ -18,6 +18,7 @@ from golem.config import load_settings
 from golem.graphs.chat import ChatRuntime, open_chat
 from golem.lock import DaemonAlreadyRunning, DaemonLock
 from golem.logging import configure_logging
+from golem.mcp import McpSupervisor
 from golem.models.discovery import ModelDiscovery
 from golem.models.keys import KeychainStore
 from golem.models.pulls import PullManager
@@ -80,12 +81,14 @@ class DaemonApp:
         titles: TitleGenerator | None = None,
         discovery: Callable[[ModelRouter], ModelDiscovery] | None = None,
         pulls: Callable[[ModelRouter, float | None], PullManager] | None = None,
+        mcp: McpSupervisor | None = None,
     ) -> None:
         self.paths = paths
         self._router = router
         self._titles = titles
         self._discovery = discovery
         self._pulls = pulls
+        self._mcp = mcp
         self.state = DaemonState(paths=paths, started_at=time.monotonic())
         methods = standard_methods()
         if extra_methods:
@@ -119,16 +122,17 @@ class DaemonApp:
         loop = asyncio.get_running_loop()
         installed: list[signal.Signals] = []
         try:
-            router = self._router or ModelRouter(
-                load_settings(home=self.paths.home, project_dir=self.paths.home),
-                home=self.paths.home,
-            )
+            settings = load_settings(home=self.paths.home, project_dir=self.paths.home)
+            router = self._router or ModelRouter(settings, home=self.paths.home)
+            mcp = self._mcp or McpSupervisor(settings.mcp)
+            mcp.broadcast = self._broadcast
+            self.state.mcp = mcp
             async with (
                 Database.open(self.paths.database_file) as database,
                 open_checkpoints(database, self.paths.checkpoints_file) as saver,
             ):
                 self.state.policy = Policy(self.paths.config_file)
-                self.state.tools = default_registry()
+                self.state.tools = default_registry(mcp.tools)
                 self.state.artifacts = ArtifactStore(database)
                 self.state.sessions = await _open_sessions(
                     database,
@@ -156,6 +160,7 @@ class DaemonApp:
                     self._server = await self._listen()
                     os.chmod(self.paths.socket_path, 0o600)
                     log.info("listening on %s", self.paths.socket_path)
+                    mcp.start()
                     await self._stop.wait()
                     log.info("shutting down")
                     await self._shutdown()
@@ -164,6 +169,9 @@ class DaemonApp:
                         loop.remove_signal_handler(sig)
                     self._unlink_socket()
         finally:
+            if self.state.mcp is not None:
+                await self.state.mcp.aclose()
+            self.state.mcp = None
             if self.state.pulls is not None:
                 await self.state.pulls.aclose()
             self.state.pulls = None

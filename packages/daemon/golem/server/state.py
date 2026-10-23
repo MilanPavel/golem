@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
+from golem.mcp import McpSupervisor
 from golem.models.discovery import ModelDiscovery
 from golem.models.pulls import PullManager
 from golem.paths import GolemPaths
@@ -27,3 +28,4 @@ class DaemonState:
     policy: Policy | None = None
     tools: ToolRegistry | None = None
     artifacts: ArtifactStore | None = None
+    mcp: McpSupervisor | None = None

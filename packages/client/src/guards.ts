@@ -1,3 +1,5 @@
+import type { McpListResult } from "../../protocol/gen/mcp-list-result.ts";
+import type { McpServer } from "../../protocol/gen/mcp-server.ts";
 import type { AuthKeyStatus, AuthListResult } from "../../protocol/gen/auth-list-result.ts";
 import type { AuthRemoveResult } from "../../protocol/gen/auth-remove-result.ts";
 import type { AuthSetResult } from "../../protocol/gen/auth-set-result.ts";
@@ -88,6 +90,19 @@ export function isModelListResult(value: unknown): value is ModelListResult {
         typeof model["status"] === "string",
     )
   );
+}
+
+export function isMcpServer(value: unknown): value is McpServer {
+  return (
+    isRecord(value) &&
+    typeof value["name"] === "string" &&
+    typeof value["state"] === "string" &&
+    typeof value["command"] === "string"
+  );
+}
+
+export function isMcpListResult(value: unknown): value is McpListResult {
+  return isRecord(value) && Array.isArray(value["servers"]) && value["servers"].every(isMcpServer);
 }
 
 export function isModelProbeResult(value: unknown): value is ModelProbeResult {

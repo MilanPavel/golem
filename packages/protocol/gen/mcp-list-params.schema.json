@@ -1,0 +1,7 @@
+{
+  "additionalProperties": false,
+  "description": "``mcp.list``. Every configured MCP server and its state.",
+  "properties": {},
+  "title": "McpListParams",
+  "type": "object"
+}

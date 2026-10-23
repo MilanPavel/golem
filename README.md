@@ -160,12 +160,47 @@ Tool rules (allow, ask, or deny a tool by name or path) live in the same file, o
 
 </details>
 
+## Add tools with MCP
+
+Any [MCP](https://modelcontextprotocol.io) server that runs on your Mac gives golem new tools. Add one to `~/.golem/config.toml`:
+
+```toml
+[mcp.git]
+command = "uvx"
+args = ["mcp-server-git", "--repository", "/path/to/your/repo"]
+```
+
+Run `golem daemon restart`, then type **`/mcp`** in the chat to see it running with its tools. The model sees them as `mcp__git__<tool>`. Golem asks before every call, because only the server knows what a tool really does. A rule can allow the ones you trust:
+
+```toml
+[[rule]]
+tool = "mcp__git__git_status"
+action = "allow"
+```
+
+<details>
+<summary><b>Server settings</b></summary>
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `command` | required | The program, on your `PATH` or as a full path. Homebrew's folders and `~/.local/bin` are searched too |
+| `args` | `[]` | Its arguments |
+| `env` | `{}` | Extra environment variables. A server sees only these, plus `HOME`, `PATH`, and a few basics. A name that looks like a secret, such as `GITHUB_TOKEN`, is refused |
+| `cwd` | your home folder | Where the server runs |
+| `enabled` | `true` | `false` keeps the settings but doesn't start it |
+| `timeout_seconds` | `120` | The longest one tool call may take |
+
+A server name may use letters, digits, and `-`. A server that exits shows as `failed` in `/mcp`, with the last thing it printed, until the next `golem daemon restart`.
+
+</details>
+
 ## How it works
 
 ```mermaid
 flowchart LR
   tui["golem<br/>(the chat in your terminal)"] <-->|local socket| daemon["daemon<br/>(runs in the background)"]
   daemon <--> models["Ollama, Anthropic,<br/>OpenAI, ..."]
+  daemon <--> mcp["MCP servers<br/>(more tools)"]
   daemon <--> data[("~/.golem<br/>chats, settings")]
 ```
 
@@ -207,6 +242,7 @@ Type `/` and suggestions appear. `/help` lists everything.
 | `/export [path]` | Save this chat as markdown |
 | `/artifact` | Open the full output of the last long tool call in your pager |
 | `/permissions` | Review and change tool rules |
+| `/mcp` | See your MCP servers, their state, and their tools |
 | `/login`, `/logout <provider>` | Save or remove an API key |
 | `/todos`, `/time` | Show or hide the agent's todo list, or message times |
 | `/debug` | Look under the hood: protocol messages, and what the model sees |

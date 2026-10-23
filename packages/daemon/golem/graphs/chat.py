@@ -349,15 +349,17 @@ class _ToolBinder:
     """
 
     def __init__(self, registry: ToolRegistry) -> None:
-        self._schemas = registry.schemas()
+        self._registry = registry
         self._refused: set[str] = set()
 
     async def invoke(
         self, profile: str, model: BaseChatModel, messages: Sequence[BaseMessage]
     ) -> AIMessage:
-        if self._schemas and profile not in self._refused:
+        # Asked on each call: an MCP server that started since the last one adds its tools.
+        schemas = self._registry.schemas()
+        if schemas and profile not in self._refused:
             try:
-                bound = model.bind_tools(self._schemas)
+                bound = model.bind_tools(schemas)
             except NotImplementedError:
                 bound = None
             if bound is not None:

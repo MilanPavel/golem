@@ -11,6 +11,8 @@ import type { PolicyEditResult } from "../../protocol/gen/policy-edit-result.ts"
 
 export type ApprovalChoice = "allow" | "allow_session" | "allow_always" | "deny";
 import type { DaemonStatus } from "../../protocol/gen/daemon-status.ts";
+import type { McpListResult } from "../../protocol/gen/mcp-list-result.ts";
+import type { McpServer } from "../../protocol/gen/mcp-server.ts";
 import type { MessageSendResult } from "../../protocol/gen/message-send-result.ts";
 import type { ModelListResult } from "../../protocol/gen/model-list-result.ts";
 import type { ModelDeleteResult } from "../../protocol/gen/model-delete-result.ts";
@@ -40,6 +42,8 @@ import {
   isAuthSetResult,
   isDaemonStatus,
   isHelloResult,
+  isMcpListResult,
+  isMcpServer,
   isMessageSendResult,
   isModelListResult,
   isModelProbeResult,
@@ -190,6 +194,10 @@ export interface GolemClient {
   deleteModel(name: string): Promise<ModelDeleteResult>;
   /** `model.pull.progress` and `model.pull.done`, from any client's download. */
   onPull(listener: (update: PullUpdate) => void): () => void;
+  /** Every MCP server from config.toml, with its state and tools. */
+  listMcp(): Promise<McpListResult>;
+  /** `mcp.server.status`: a server started, failed, or changed its tools. */
+  onMcpStatus(listener: (server: McpServer) => void): () => void;
   close(): void;
 }
 
@@ -222,6 +230,7 @@ export function connectGolem(options: ConnectOptions): GolemClient {
   const summaryListeners = new Set<(summary: SessionSummary) => void>();
   const wireListeners = new Set<(lines: readonly WireLine[]) => void>();
   const pullListeners = new Set<(update: PullUpdate) => void>();
+  const mcpListeners = new Set<(server: McpServer) => void>();
   const pending = new Map<number, Pending>();
   const attachments = new Attachments();
   let watching = false;
@@ -351,6 +360,21 @@ export function connectGolem(options: ConnectOptions): GolemClient {
         for (const listener of pullListeners) {
           try {
             listener(update);
+          } catch {
+            // A listener must not tear the socket down.
+          }
+        }
+      }
+      return;
+    }
+    if (isRecord(message) && message["method"] === "mcp.server.status") {
+      const params = message["params"];
+      const name = isRecord(params) && typeof params["name"] === "string" ? params["name"] : "";
+      record({ direction: "in", kind: "mcp.server.status", detail: name, json: line });
+      if (isMcpServer(params)) {
+        for (const listener of mcpListeners) {
+          try {
+            listener(params);
           } catch {
             // A listener must not tear the socket down.
           }
@@ -847,6 +871,20 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       pullListeners.add(listener);
       return () => {
         pullListeners.delete(listener);
+      };
+    },
+    async listMcp(): Promise<McpListResult> {
+      await ready;
+      const result = await call("mcp.list", {});
+      if (!isMcpListResult(result)) {
+        throw new Error("invalid mcp.list result");
+      }
+      return result;
+    },
+    onMcpStatus(listener: (server: McpServer) => void): () => void {
+      mcpListeners.add(listener);
+      return () => {
+        mcpListeners.delete(listener);
       };
     },
     close(): void {

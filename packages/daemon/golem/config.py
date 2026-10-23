@@ -163,6 +163,37 @@ class WebSettings(BaseModel):
     timeout_seconds: int = Field(default=20, gt=0, le=300)
 
 
+class McpServerSettings(BaseModel):
+    """``[mcp.<name>]``. An MCP server that golem starts and talks to over stdio.
+
+    ``command`` is a program on ``PATH`` or an absolute path, and ``args`` its
+    arguments. ``env`` adds environment variables, and a variable that looks
+    like a secret does not load. ``cwd`` is where the server runs, home by
+    default, with ``~`` for the home folder. ``timeout_seconds`` is the
+    longest one tool call may take.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    _no_secrets = model_validator(mode="before")(_no_inline_secrets)
+
+    command: str = Field(min_length=1)
+    args: list[str] = Field(default_factory=list[str])
+    env: dict[str, str] = Field(default_factory=dict[str, str])
+    cwd: str | None = Field(default=None, min_length=1)
+    enabled: bool = True
+    timeout_seconds: int = Field(default=120, gt=0, le=3600)
+
+    @model_validator(mode="after")
+    def _no_secret_env(self) -> McpServerSettings:
+        _no_inline_secrets(self.env)
+        return self
+
+
+MCP_SERVER_NAME = r"^[A-Za-z0-9][A-Za-z0-9-]{0,31}$"
+"""Server names go into tool names, ``mcp__<server>__<tool>``, so no ``_`` and no dots."""
+
+
 class GolemSettings(BaseSettings):
     """Runtime settings for the daemon.
 
@@ -191,6 +222,9 @@ class GolemSettings(BaseSettings):
     trusted_projects: list[str] = Field(default_factory=list[str])
     shell: ShellSettings = Field(default_factory=ShellSettings)
     web: WebSettings = Field(default_factory=WebSettings)
+    mcp: dict[Annotated[str, Field(pattern=MCP_SERVER_NAME)], McpServerSettings] = Field(
+        default_factory=dict
+    )
 
     _no_secrets = model_validator(mode="before")(_no_inline_secrets)
 

@@ -122,6 +122,10 @@ class Tool[A: BaseModel]:
     from the raw arguments and the session folder instead, for tools whose
     subject is not one argument as it is. ``preview`` works out what a call
     would change, so the user can see it before approving the call.
+
+    ``parameters`` is the JSON Schema of the arguments when it does not come
+    from ``args``, as for an MCP server's tool. ``args`` then only checks
+    that the arguments are an object, and the server checks the rest.
     """
 
     name: str
@@ -135,10 +139,14 @@ class Tool[A: BaseModel]:
     match_arg: str | None = None
     subject: Callable[[Mapping[str, object], Path | None], str | None] | None = None
     preview: Callable[[A, ToolContext], Awaitable[Preview]] | None = None
+    parameters: Mapping[str, object] | None = None
 
     def schema(self) -> dict[str, object]:
         """The OpenAI function format, which every chat model's ``bind_tools`` accepts."""
-        parameters = self.args.model_json_schema()
+        if self.parameters is not None:
+            parameters = dict(self.parameters)
+        else:
+            parameters = self.args.model_json_schema()
         parameters.pop("title", None)
         return {
             "type": "function",
@@ -167,22 +175,36 @@ class Tool[A: BaseModel]:
 
 
 class ToolRegistry:
-    def __init__(self, tools: Iterable[Tool[Any]]) -> None:
+    """golem's own tools, plus the ones ``extra`` returns at the time of asking.
+
+    ``extra`` is how tools that come and go, such as an MCP server's, join:
+    a server that starts after the daemon adds its tools to the next model
+    call. A built-in tool keeps its name if an extra one has it too.
+    """
+
+    def __init__(
+        self,
+        tools: Iterable[Tool[Any]],
+        extra: Callable[[], Iterable[Tool[Any]]] | None = None,
+    ) -> None:
         self._tools = {tool.name: tool for tool in tools}
+        self._extra = extra
+        self._schemas = [tool.schema() for tool in self._tools.values()]
 
     @property
     def names(self) -> list[str]:
-        return list(self._tools)
+        return list(self._all())
 
     def get(self, name: str) -> Tool[Any] | None:
-        return self._tools.get(name)
+        return self._tools.get(name) or self._all().get(name)
 
     def default_allowed(self) -> list[str]:
         """Tools the built-in rules allow without asking: read-only or internal ones."""
-        return [tool.name for tool in self._tools.values() if tool.read_only or tool.internal]
+        return [tool.name for tool in self._all().values() if tool.read_only or tool.internal]
 
     def schemas(self) -> list[dict[str, object]]:
-        return [tool.schema() for tool in self._tools.values()]
+        extra = [tool.schema() for name, tool in self._all().items() if name not in self._tools]
+        return [*self._schemas, *extra]
 
     async def preview(
         self, name: str, raw: Mapping[str, object], ctx: ToolContext
@@ -206,10 +228,16 @@ class ToolRegistry:
         return result
 
     def _tool(self, name: str) -> Tool[Any]:
-        tool = self._tools.get(name)
+        tool = self.get(name)
         if tool is None:
-            raise ToolError(f"unknown tool {name!r}; the tools are {', '.join(self._tools)}")
+            raise ToolError(f"unknown tool {name!r}; the tools are {', '.join(self.names)}")
         return tool
+
+    def _all(self) -> dict[str, Tool[Any]]:
+        if self._extra is None:
+            return self._tools
+        found = {tool.name: tool for tool in self._extra() if tool.name not in self._tools}
+        return {**self._tools, **found}
 
 
 def _problems(exc: ValidationError) -> str:

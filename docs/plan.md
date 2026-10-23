@@ -80,16 +80,16 @@ Agents use the Graph API, where the model decides control flow. Flows use the Fu
 
 ### Protocol, what is left to add
 
-JSON-RPC 2.0, one JSON object per line, over `~/.golem/run/golem.sock`. Protocol 2.18 is on the wire today (see [architecture.md](architecture.md#what-is-on-the-wire-today)). The phases below add the rest.
+JSON-RPC 2.0, one JSON object per line, over `~/.golem/run/golem.sock`. Protocol 2.19 is on the wire today (see [architecture.md](architecture.md#what-is-on-the-wire-today)). The phases below add the rest.
 
 | Group | New events | Phase |
 |---|---|---|
 | Models | `usage.reported` (tokens, cost) | 9.1 |
-| System | `mcp.server.status`, `warning`, `error` | 1.1 |
+| System | `warning`, `error` | 9.4 |
 | Skills | `skill.activated`, `skill.deactivated` | 2.2 |
 | Runs and flows | `run.step.started`, `run.step.completed`, `run.interrupted` | 3.2, 3.4 |
 
-New commands: `mcp.list` (1.1), `skill.list | pin | unpin` (2.1, 2.2), `flow.list | start | status` (3.1), and `daemon.shutdown` (8.1).
+New commands: `mcp.enable | disable` (1.2), `skill.list | pin | unpin` (2.1, 2.2), `flow.list | start | status` (3.1), and `daemon.shutdown` (8.1).
 
 Rules:
 
@@ -101,35 +101,29 @@ Rules:
 
 ## Phase 1 — MCP
 
-MCP servers become tool providers, under the same permission engine.
+MCP servers are tool providers under the same permission engine. Golem starts stdio servers from `[mcp.<name>]` in the user's `config.toml` with its own client, and their tools, `mcp__<server>__<tool>`, ask before every call ([ADR-023](adr/023-mcp-client.md)). What is left: choosing which servers a session gets, keeping them up, and HTTP servers.
 
-### 1.1 One stdio server
-
-- **Goal:** golem can use an MCP server.
-- **You can:** configure one stdio server (for example git) and use its tools in chat. `/mcp` shows its status.
-- **Build:**
-  - An MCP supervisor that starts stdio servers from config, through `langchain-mcp-adapters` or the `mcp` SDK.
-  - Every MCP call goes through the `tools` node ([ADR-011](adr/011-tools.md)), so the rules and approvals apply.
-  - `mcp.server.status` events, `mcp.list`, and `/mcp` in the TUI.
-- **Done when:** a tool from the server runs from chat after an approval.
-
-### 1.2 Namespaces and scoping
+### 1.2 Scoping
 
 - **Goal:** many servers without flooding every prompt.
-- **You can:** enable a server for one session or one project, and write policy rules for it.
+- **You can:** enable a server for one session or one project, and keep the rest out of the prompt.
 - **Build:**
-  - Tool names become `mcp.<server>.<tool>`, and policy rules can match on them.
-  - Servers are enabled per session (`/mcp enable <name>`) or per project config. Nothing is on by default.
-- **Done when:** two servers are configured, only the enabled one's tools reach the model.
+  - `[mcp.<name>]` in a project's `.golem/config.toml` too. A project server starts only for a trusted project (`trusted_projects`), because it is a program the project names.
+  - `enabled = "on_demand"` keeps a server out of every session until `/mcp enable <name>` (with suggestions), stored as `session.updated`, so it survives a restart. `/mcp disable <name>` takes it out again.
+  - The tools node refuses a call to a server the session has not enabled, even when an old reply asks for it.
+- **Done when:** two servers are configured, and only the enabled one's tools reach the model.
 
-### 1.3 Health and HTTP servers
+### 1.3 Health, tokens, and HTTP servers
 
-- **Goal:** servers stay up, and their cost in prompt tokens is visible.
-- **You can:** connect HTTP servers, and see a crashed server come back on its own.
+- **Goal:** servers stay up, and what they cost in prompt tokens is visible.
+- **You can:** connect HTTP servers, give a server a token from the Keychain, and see a crashed server come back on its own.
 - **Build:**
-  - HTTP transport. Health checks, and restart with backoff.
+  - Restart with backoff when a server exits, and pick up changes to `[mcp.*]` without a daemon restart.
+  - Streamable HTTP as a second transport under the same client, over `httpx`.
+  - `env` and HTTP headers take `keychain:mcp/<server>`, stored with `golem auth set mcp/<server>` or `/login`, so a token never sits in `config.toml`.
   - The TUI status line shows a red marker when an enabled server is down.
   - `/mcp` shows how many prompt tokens each server's tool schemas cost.
+  - `golem doctor` checks that each server's command is found.
 - **Done when:** killing a server process makes it restart, and the TUI shows the outage and the recovery.
 - **Watch out:** tool-schema bloat hurts local models badly.
 

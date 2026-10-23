@@ -702,6 +702,9 @@ Remember: under launchd, `GOLEM_...` variables from your terminal do not apply. 
 | `daemon already running (pid N)` | The background copy is running. Run `golem daemon stop` before starting one by hand |
 | The daemon keeps restarting | Read `launchd.stderr.log`. Common causes: the database is from a newer golem version (the message names the golem it needs and the copy that still opens); `GOLEM_HOME` is too long (a socket path must be under 104 characters on macOS); golem was moved (run `golem daemon install` again) |
 | `needs key` | `golem auth set <provider>`, or `/login <provider>` in the chat screen |
+| `/mcp` shows a server as `failed: command not found` | The daemon runs under launchd, with a short `PATH`. Golem also looks in `/opt/homebrew/bin`, `/usr/local/bin`, and `~/.local/bin`. Anywhere else, give `command` as a full path |
+| `/mcp` shows a server as `failed: the server exited with code N: …` | The text after the code is the last line the server printed. Run its command in a terminal to see more, fix it, then `golem daemon restart`. `golem daemon logs` has everything it printed, at `DEBUG` |
+| An MCP server's tools are missing after editing `[mcp.*]` | MCP settings are read when the daemon starts. Run `golem daemon restart` |
 | macOS asks about the Keychain on every start | A local build is signed ad-hoc, so every rebuild asks. Choose Always Allow, or sign local builds with the release certificate (section 5). A release asks once, after the first upgrade from a local or ad-hoc build |
 | A release workflow fails at "Import the signing certificate" | The secrets or the `MACOS_SIGN_IDENTITY` variable are missing. See section 5 |
 | The release's `tap` job fails | The `HOMEBREW_TAP_TOKEN` secret is missing or expired, or `homebrew-golem` does not exist. The release itself is published. Fix the token (section 10), then re-run the job |
@@ -726,7 +729,7 @@ flowchart LR
 
 | Phase | What you will get |
 |---|---|
-| **1. MCP** (next) | The daemon starts and watches extra tool programs (MCP servers) |
+| **1. MCP** (next) | Stdio MCP servers already run as child processes of the daemon. Next: servers per session or project, restarting a server that crashes, HTTP servers, and tokens from the Keychain |
 | **4. Triggers** | The daemon does work on a schedule or when files change, with no chat screen open |
 | **6. Hardening** | Tracing (a timeline of where each answer spent its time), nightly database backups, crash tests, speed checks, and a security review |
 | **8.1 Platform layer** | Everything that differs between macOS, Linux, and Windows moves behind one interface, so the next steps are additions, not rewrites |
