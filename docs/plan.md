@@ -12,6 +12,7 @@ This file is about what comes next. How the existing pieces are built is in [arc
 
 | Phase | What you get | Milestone |
 |---|---|---|
+| 1. Engineering workflow | Conventional commits, pull requests, a changelog, and `/setup` and `/ship` skills for the repo | M3 — Ready for contributors |
 | 2. Skills | Claude Code compatible `SKILL.md` skills | M4 — Skilled |
 | 3. Flows | Durable workflows written in Python, resumable after a crash | M5 — Works alone |
 | 4. Triggers | Schedules, file watchers, and notifications | M5 — Works alone |
@@ -21,11 +22,11 @@ This file is about what comes next. How the existing pieces are built is in [arc
 | 8. Platforms | One interface for everything OS-specific, then Linux and Windows | Later |
 | 9. Model routing and long sessions | Token and cost display, a cheap profile for small jobs, budgets, escalation, compaction | Later |
 
-What is built is in [architecture.md](architecture.md) and the ADRs, and how to install, run, and release it is in [sre.md](sre.md). Skills are next.
+What is built is in [architecture.md](architecture.md) and the ADRs, and how to install, run, and release it is in [sre.md](sre.md). The engineering workflow is next, then skills.
 
 ```mermaid
 flowchart LR
-  p2[2 Skills] --> p3[3 Flows] --> p4[4 Triggers] --> p5[5 Memory] --> p6[6 Evals and hardening] --> p7[7 TUI polish] --> p8[8 Platforms] --> p9[9 Model routing and long sessions]
+  p1[1 Engineering workflow] --> p2[2 Skills] --> p3[3 Flows] --> p4[4 Triggers] --> p5[5 Memory] --> p6[6 Evals and hardening] --> p7[7 TUI polish] --> p8[8 Platforms] --> p9[9 Model routing and long sessions]
 ```
 
 ### How to read a phase
@@ -95,6 +96,82 @@ Rules:
 - A breaking change bumps `protocol_major`, and the daemon refuses a mismatched client with a clear error.
 - Events are append-only facts. Clients derive all UI state from them, so replaying equals rebuilding.
 - Every event is stored before it is sent. `message.delta` is coalesced into `message.completed` in the log.
+
+---
+
+## Phase 1 — Engineering workflow
+
+Changes reach `main` only through pull requests. Commits follow [Conventional Commits](https://www.conventionalcommits.org/), release notes are generated from them, and two skills in the repo set up a fresh clone and ship a change.
+
+Choices that hold for the whole phase:
+
+- **Squash merge only.** The PR title becomes the one commit on `main`, so one PR is one line in the changelog.
+- **Scopes follow the old prefixes:** `daemon`, `tui`, `cli`, `client`, `protocol`, `models`, `sessions`, `tools`, `mcp`, `secrets`, `install`, `release`, `ci`, `docs`, `plan`, `deps`. `MCP - servers per session` becomes `feat(mcp): servers per session`.
+- **[git-cliff](https://git-cliff.org) writes the changelog.** The git tag stays the version (`scripts/version.sh`), and a human still pushes the tag. release-please was the alternative. It needs a personal token, because a tag pushed with `GITHUB_TOKEN` does not start `release.yml`.
+- **Skills are thin.** They live in `.claude/skills/` and call scripts and `just` recipes, so `just setup` works without Claude Code too. golem's own skills (2.1) can read the same folder later.
+
+### 1.1 Conventional commits
+
+- **Goal:** every commit on `main` can be read by a tool.
+- **You can:** write `feat(mcp): …`, and a hook refuses `MCP - …` before it is committed.
+- **Build:**
+  - `CONTRIBUTING.md`: types, scopes, breaking changes (`!` and `BREAKING CHANGE:`), with examples from the real history.
+  - `.githooks/commit-msg`, plain POSIX `sh` with a regex. Merge, revert, and fixup commits pass.
+  - `just hooks` runs `git config core.hooksPath .githooks`.
+  - ADR-024, commits, pull requests, and release notes.
+- **Done when:** a bad message is refused locally, with an example of a good one.
+
+### 1.2 Pull requests and branch protection
+
+- **Goal:** code reaches `main` only through a green pull request.
+- **You can:** open a PR, see the template, see its title checked, and squash-merge it.
+- **Build:**
+  - `.github/pull_request_template.md`: summary, why, changes, how it was tested (`just check`, `just dist` and the smoke test when packaging changed, a manual TUI check), protocol bump and regenerated types, ADR, breaking change. A hidden `<!-- shipped-by: … -->` line that `/ship` (1.5) fills in.
+  - `.github/workflows/pr.yml`: a `pr-title` job that runs `.githooks/commit-msg` on the title, so the types and scopes live in one place.
+  - A ruleset on `main`, kept in `scripts/github_ruleset.json` and applied by `just protect` through `gh api`: a PR is required (no approvals, there is one maintainer), the checks `check`, `dist`, and `pr-title` must pass, history stays linear, no force-push or delete, and the admin can bypass in an emergency. Repo settings: squash only, the PR title is the squash message, branches are deleted on merge.
+  - [sre.md](sre.md), section 5, describes the PR flow.
+- **Done when:** `git push origin main` is refused, and a PR with a bad title cannot merge.
+- **Watch out:** required checks match job names exactly. `dist` runs on macOS for every PR, which is free on a public repo but slow.
+
+### 1.3 Changelog and release notes
+
+- **Goal:** every release has notes a person can read, generated from the commits.
+- **You can:** `just changelog` to see what is unreleased, and `just release` to open a release PR.
+- **Build:**
+  - `cliff.toml`: group by type (Features, Fixes, Performance, Docs), hide `chore`, `ci`, and `test`, show the scope, link the PR.
+  - `CHANGELOG.md`, filled back to v0.1.0. A `commit_parsers` regex maps the old `Scope - text` commits, so that history is not lost.
+  - `just release [version]` works out the next version (`git cliff --bumped-version`), regenerates `CHANGELOG.md` on `release/vX.Y.Z`, and opens a `chore(release): vX.Y.Z` PR. `just tag` tags the merged commit and pushes the tag.
+  - `release.yml` uses `git cliff --latest --strip all` as the notes instead of `--generate-notes`, and fails if `CHANGELOG.md` has no section for the tag.
+  - A pinned git-cliff in `.github/actions/setup`.
+- **Done when:** a `v0.2.0-rc.1` tag publishes a draft whose notes match its `CHANGELOG.md` section.
+
+### 1.4 `/setup` skill
+
+- **Goal:** a fresh clone is ready for development with one command.
+- **You can:** clone, run `/setup` in Claude Code (or `just setup`), and end with `just check` green.
+- **Build:**
+  - `scripts/setup.sh`, safe to run again. Each check says how to fix a failure, like `golem doctor`:
+    - just, uv, pnpm (through corepack), Node 24, bun, git-cliff, and gh, at the versions in `.github/actions/setup`. It offers `brew install` for a missing one.
+    - `uv sync --all-packages`, `pnpm install --frozen-lockfile`, `just hooks`.
+    - `gh auth status`, which `/ship` needs.
+    - `just check` at the end, if you want it.
+  - `just setup` runs the script.
+  - `.claude/skills/setup/SKILL.md` runs the script, explains each failure, and asks before it installs anything.
+  - README, "From the source code", points to `/setup` and `just setup`.
+- **Done when:** in a fresh clone in a temporary folder, `/setup` ends with `just check` passing.
+
+### 1.5 `/ship` skill
+
+- **Goal:** one command takes local changes to an open pull request that follows the rules above.
+- **You can:** `/ship`, or `/ship fix the mcp restart` with a hint, and get the PR link back.
+- **Build:** `.claude/skills/ship/SKILL.md`, which:
+  1. On `main`, creates a `<type>/<slug>` branch first.
+  2. Reads the diff and the untracked files. It flags secrets, stray files, a protocol change without regenerated `gen/` files, and a non-obvious choice without an ADR.
+  3. Runs `just check` and stops with the output if it fails.
+  4. Proposes a commit message (type and scope from the changed paths), and a PR title and body from the template, and asks you to confirm.
+  5. Commits, pushes, and runs `gh pr create`, or `gh pr edit` if the branch already has a PR. It fills the hidden line with `<!-- shipped-by: claude-code /ship -->` and adds a visible footer, "🤖 Opened with `/ship` in Claude Code".
+  6. Prints the PR link and the CI link. It does not merge. You review and merge on GitHub.
+- **Done when:** the PR for 1.5 is opened by `/ship` itself and carries the marker.
 
 ---
 

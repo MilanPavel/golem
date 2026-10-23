@@ -8,6 +8,10 @@ set shell := ["env", "-u", "VIRTUAL_ENV", "bash", "-cu"]
 default:
     @just --list
 
+# Use the repository's git hooks (.githooks/), which check commit messages.
+hooks:
+    git config core.hooksPath .githooks
+
 # Export protocol JSON Schema and generate TypeScript from it.
 gen:
     #!/usr/bin/env bash

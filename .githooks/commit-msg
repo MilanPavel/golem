@@ -1,0 +1,47 @@
+#!/bin/sh
+# Refuse a commit whose first line is not a Conventional Commit header.
+# `just hooks` turns this on. CI checks PR titles with the same script, so the
+# types and scopes below are the only list. CONTRIBUTING.md explains them.
+#
+# Usage: commit-msg <file>   (git passes the message file)
+set -eu
+
+types='feat|fix|perf|refactor|docs|test|build|ci|chore|revert|style'
+scopes='daemon|tui|cli|client|protocol|models|sessions|tools|mcp|secrets|install|release|ci|docs|plan|deps'
+max=100
+
+# The first line that is not blank and not a comment.
+header=$(grep -v -e '^#' -e '^[[:space:]]*$' "$1" | head -n 1 || true)
+
+case "$header" in
+  'Merge '* | 'Revert "'* | 'fixup! '* | 'squash! '* | 'amend! '*) exit 0 ;;
+esac
+
+problem=""
+if ! printf '%s\n' "$header" | grep -Eq "^($types)(\(($scopes)\))?!?: [^ ]"; then
+  if printf '%s\n' "$header" | grep -Eq "^($types)\([^)]*\)!?: "; then
+    problem="the scope is not one of: $(printf '%s' "$scopes" | sed 's/|/, /g')"
+  else
+    problem="it does not start with <type>(<scope>): or <type>:"
+  fi
+elif [ "${#header}" -gt "$max" ]; then
+  problem="it is ${#header} characters long, and the limit is $max"
+fi
+
+if [ -n "$problem" ]; then
+  cat >&2 <<EOF
+commit-msg: this message is not a Conventional Commit, because $problem.
+
+  $header
+
+Write it as <type>(<scope>): <what changed>, for example:
+
+  feat(mcp): servers per session or project, and a /mcp manager
+  fix(tools): web_fetch keeps the body of a page with an unclosed title
+  docs: an operations guide for build, CI, and install
+
+Types: $(printf '%s' "$types" | sed 's/|/, /g'). The scope is optional.
+A breaking change adds ! before the colon. See CONTRIBUTING.md.
+EOF
+  exit 1
+fi
