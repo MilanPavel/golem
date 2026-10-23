@@ -1,5 +1,7 @@
 import type { McpListResult } from "../../protocol/gen/mcp-list-result.ts";
 import type { McpServer } from "../../protocol/gen/mcp-server.ts";
+import type { McpToggleResult } from "../../protocol/gen/mcp-toggle-result.ts";
+import type { McpToolsResult } from "../../protocol/gen/mcp-tools-result.ts";
 import type { AuthKeyStatus, AuthListResult } from "../../protocol/gen/auth-list-result.ts";
 import type { AuthRemoveResult } from "../../protocol/gen/auth-remove-result.ts";
 import type { AuthSetResult } from "../../protocol/gen/auth-set-result.ts";
@@ -103,6 +105,26 @@ export function isMcpServer(value: unknown): value is McpServer {
 
 export function isMcpListResult(value: unknown): value is McpListResult {
   return isRecord(value) && Array.isArray(value["servers"]) && value["servers"].every(isMcpServer);
+}
+
+export function isMcpToggleResult(value: unknown): value is McpToggleResult {
+  return (
+    isRecord(value) &&
+    typeof value["session_id"] === "string" &&
+    Array.isArray(value["mcp_servers"]) &&
+    value["mcp_servers"].every((name) => typeof name === "string")
+  );
+}
+
+export function isMcpToolsResult(value: unknown): value is McpToolsResult {
+  return (
+    isRecord(value) &&
+    typeof value["name"] === "string" &&
+    Array.isArray(value["tools"]) &&
+    value["tools"].every(
+      (tool) => isRecord(tool) && typeof tool["name"] === "string" && typeof tool["description"] === "string",
+    )
+  );
 }
 
 export function isModelProbeResult(value: unknown): value is ModelProbeResult {

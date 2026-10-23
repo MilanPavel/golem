@@ -1,0 +1,29 @@
+{
+  "additionalProperties": false,
+  "description": "``mcp.tools`` and ``mcp.restart``: one server, as ``session_id``'s project sees it.",
+  "properties": {
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "session_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Session Id"
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "title": "McpServerParams",
+  "type": "object"
+}

@@ -2,14 +2,17 @@
 
 Tools: ``echo`` answers with its text, ``fail`` is a tool error, ``weird.name``
 has a name providers do not take, ``slow`` never answers in time, ``crash``
-exits, ``grow`` adds a tool and says the list changed, and ``replies`` shows
-what golem answered to the server's own requests. ``tools/list`` comes in
-pages of two. ``--exit-at-start`` exits before the handshake.
+exits, ``grow`` adds a tool and says the list changed, ``replies`` shows
+what golem answered to the server's own requests, ``pid`` is the process id,
+and ``env`` reads an environment variable. ``tools/list`` comes in
+pages of two. ``--exit-at-start`` exits before the handshake, and ``--deaf``
+never answers ``ping``.
 """
 
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
 from typing import Any
@@ -31,6 +34,8 @@ TOOLS: list[dict[str, Any]] = [
     {"name": "crash", "description": "Exits.", "inputSchema": {"type": "object"}},
     {"name": "grow", "description": "Adds a tool.", "inputSchema": {"type": "object"}},
     {"name": "replies", "description": "What golem answered.", "inputSchema": {"type": "object"}},
+    {"name": "pid", "description": "The process id.", "inputSchema": {"type": "object"}},
+    {"name": "env", "description": "One environment variable.", "inputSchema": {"type": "object"}},
 ]
 replies: list[dict[str, Any]] = []
 
@@ -64,6 +69,10 @@ def call(name: str, arguments: dict[str, Any]) -> dict[str, Any] | None:
         return text("grown")
     if name == "replies":
         return text(json.dumps(replies))
+    if name == "pid":
+        return text(str(os.getpid()))
+    if name == "env":
+        return text(os.environ.get(str(arguments.get("name")), "(unset)"))
     return None
 
 
@@ -85,6 +94,10 @@ def handle(message: dict[str, Any]) -> None:
             "capabilities": {"tools": {"listChanged": True}},
             "serverInfo": {"name": "fake", "version": "1"},
         }
+    elif method == "ping":
+        if "--deaf" in sys.argv:
+            return
+        result = {}
     elif method == "tools/list":
         start = int(params.get("cursor") or 0)
         result = {"tools": TOOLS[start : start + 2]}

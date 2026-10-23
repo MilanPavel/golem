@@ -115,7 +115,17 @@ import {
   pressPermissions,
   type PermissionsState,
 } from "./permissions.ts";
-import { type McpPanel, mcpLines, mergeMcp } from "./mcp.ts";
+import { type McpList, mcpAlert, mergeMcp } from "./mcp.ts";
+import {
+  closedMcpManager,
+  layoutMcpManager,
+  type McpManagerLine,
+  mcpManagerKeyOf,
+  type McpManagerState,
+  type McpTone,
+  openMcpManager,
+  pressMcpManager,
+} from "./mcp-manager.ts";
 import { assistantChars, elapsedSeconds, meterLine, meterPhase } from "./progress.ts";
 import {
   fitSegments,
@@ -188,7 +198,13 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   const [modelMessages, setModelMessages] = useState<CheckpointMessage[]>([]);
   const [modelCount, setModelCount] = useState<number | null>(null);
   const [switcher, setSwitcher] = useState<SwitcherState>(closedSwitcher);
-  const [panel, setPanel] = useState<"help" | McpPanel | null>(null);
+  const [panel, setPanel] = useState<"help" | null>(null);
+  const [mcpManager, setMcpManager] = useState<McpManagerState>(closedMcpManager);
+  const mcpManagerRef = useRef(mcpManager);
+  mcpManagerRef.current = mcpManager;
+  const mcpRef = useRef<McpList>({ servers: null, error: null });
+  const [mcp, setMcp] = useState<McpList>({ servers: null, error: null });
+  mcpRef.current = mcp;
   const helpOpen = panel !== null;
   const [keysOpen, setKeysOpen] = useState(false);
   const [keysOffset, setKeysOffset] = useState(0);
@@ -268,6 +284,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
     chat.busy ||
     switcher.open ||
     perms.open ||
+    mcpManager.open ||
     picker.open ||
     keysOpen ||
     suggestDismissed ||
@@ -297,7 +314,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   };
   overlayFrame.current = { columns, body: budget.body };
   const diffOffset = chat.approval !== null && diffScroll.callId === chat.approval.callId ? diffScroll.offset : 0;
-  const panelLines = panel === "help" ? helpLines(COMMANDS, columns) : panel === null ? [] : mcpLines(panel, columns);
+  const panelLines = panel === "help" ? helpLines(COMMANDS, columns) : [];
   const helpText = !keysOpen && !switcher.open ? panelLines : [];
   const helpHeight = Math.min(helpText.length, budget.body);
   const chatHeight = budget.body - helpHeight;
@@ -367,6 +384,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       messageCount: sessionId === null ? null : chat.messages.length,
       uptimeSeconds,
       freshLines: followed.fresh,
+      alert: mcpAlert(mcp.servers),
     }),
     columns,
   );
@@ -557,11 +575,15 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   }, [client, connection.status]);
 
   useEffect(() => {
+    if (connection.status === "connected") {
+      loadMcp();
+    }
+  }, [client, connection.status, sessionId]);
+
+  useEffect(() => {
     return client.onMcpStatus((server) => {
-      setPanel((current) =>
-        current === null || current === "help" || current.servers === null
-          ? current
-          : { servers: mergeMcp(current.servers, server), error: null },
+      setMcp((current) =>
+        current.servers === null ? current : { servers: mergeMcp(current.servers, server), error: null },
       );
     });
   }, [client]);
@@ -652,6 +674,18 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
     };
   }, [stdin]);
 
+  /** Ask for this session's MCP servers again. The panel and the status line read them. */
+  function loadMcp(): void {
+    client.listMcp(sessionRef.current ?? undefined).then(
+      (listed) => {
+        setMcp({ servers: listed.servers, error: null });
+      },
+      (error: unknown) => {
+        setMcp({ servers: null, error: error instanceof Error ? error.message : String(error) });
+      },
+    );
+  }
+
   function submit(): void {
     const outcome = applyComposer(debugRef.current, draftRef.current.text);
     if (outcome.kind === "idle") {
@@ -677,14 +711,29 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       setDraft(draftAt(""));
       setKeysOpen(false);
       setSwitcher(closedSwitcher);
-      setPanel({ servers: null, error: null });
-      client.listMcp().then(
-        (listed) => {
-          setPanel((current) => (current === null || current === "help" ? current : { servers: listed.servers, error: null }));
+      const opened = openMcpManager();
+      mcpManagerRef.current = opened;
+      setMcpManager(opened);
+      loadMcp();
+      return;
+    }
+    if (outcome.kind === "mcp-toggle") {
+      setDraft(draftAt(""));
+      const current = sessionRef.current;
+      if (current === null) {
+        setChat((state) => ({ ...state, notice: "open a session first" }));
+        return;
+      }
+      const toggle = outcome.on ? client.enableMcp(current, outcome.name) : client.disableMcp(current, outcome.name);
+      toggle.then(
+        () => {
+          const notice = `${outcome.name} is ${outcome.on ? "on" : "off"} for this session`;
+          setChat((state) => ({ ...state, notice }));
+          loadMcp();
         },
         (error: unknown) => {
-          const message = error instanceof Error ? error.message : String(error);
-          setPanel((current) => (current === null || current === "help" ? current : { servers: null, error: message }));
+          const notice = error instanceof Error ? error.message : String(error);
+          setChat((state) => ({ ...state, notice }));
         },
       );
       return;
@@ -1027,6 +1076,43 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
           .revokeAllowance(current, action.tool, action.subject)
           .then(done(`${action.tool} is no longer allowed for this session`), failed);
       }
+    }
+  }
+
+  function onMcpManagerPress(press: Press): void {
+    const key = mcpManagerKeyOf(press);
+    if (key === null) {
+      return;
+    }
+    const pressed = pressMcpManager(mcpManagerRef.current, mcpRef.current.servers ?? [], key);
+    mcpManagerRef.current = pressed.state;
+    setMcpManager(pressed.state);
+    const action = pressed.action;
+    const session = sessionRef.current ?? undefined;
+    const done = (notice: string) => () => {
+      setChat((state) => ({ ...state, error: null, notice }));
+      loadMcp();
+    };
+    const failed = (error: unknown) => {
+      setChat((state) => ({ ...state, notice: messageOf(error) }));
+    };
+    if (action.kind === "load-tools") {
+      client.mcpTools(action.name, session).then((tools) => {
+        setMcpManager((state) => (state.view.kind === "tools" && state.view.name === action.name ? { ...state, tools } : state));
+      }, failed);
+    } else if (action.kind === "session") {
+      if (session === undefined) {
+        setChat((state) => ({ ...state, notice: "open a session first" }));
+        return;
+      }
+      const toggle = action.on ? client.enableMcp(session, action.name) : client.disableMcp(session, action.name);
+      toggle.then(done(`${action.name} is ${action.on ? "on" : "off"} for this session`), failed);
+    } else if (action.kind === "restart") {
+      client.restartMcp(action.name, session).then(done(`reconnecting ${action.name}…`), failed);
+    } else if (action.kind === "set-enabled") {
+      const what =
+        action.enabled === false ? "disabled everywhere" : action.enabled === true ? "on for every chat" : "on demand";
+      client.setMcpEnabled(action.name, action.enabled, session).then(done(`${action.name} is ${what}`), failed);
     }
   }
 
@@ -1495,6 +1581,10 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       onPermissionsPress(press);
       return;
     }
+    if (mcpManagerRef.current.open && !keysOpenRef.current && press.name !== "f1" && press.name !== "ctrl-c") {
+      onMcpManagerPress(press);
+      return;
+    }
     applyKeyEffect(pressKey(currentPlace(), press));
   });
 
@@ -1504,7 +1594,14 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       applySecretStep({ prompt: pasteSecret(prompt, text), submit: null });
       return;
     }
-    if (busyRef.current || switcherRef.current.open || pickerRef.current.open || permsRef.current.open || keysOpenRef.current) {
+    if (
+      busyRef.current ||
+      switcherRef.current.open ||
+      pickerRef.current.open ||
+      permsRef.current.open ||
+      mcpManagerRef.current.open ||
+      keysOpenRef.current
+    ) {
       return;
     }
     if (connectionRef.current.status !== "connected" || sessionRef.current === null) {
@@ -1583,6 +1680,19 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
           height={budget.body}
           hint={pickerHint(picker, shownListing?.ram_gb ?? null)}
         />
+      ) : mcpManager.open ? (
+        <Box flexDirection="column" width={columns} height={budget.body} flexShrink={0} overflow="hidden">
+          {layoutMcpManager({
+            state: mcpManager,
+            servers: mcp.servers,
+            error: mcp.error,
+            home: homedir(),
+            columns,
+            rows: budget.body,
+          }).map((line, index) => (
+            <McpManagerRow key={index} line={line} />
+          ))}
+        </Box>
       ) : perms.open ? (
         <Box flexDirection="column" width={columns} height={budget.body} flexShrink={0} overflow="hidden">
           {layoutPermissions(perms, columns, budget.body).map((line, index) => (
@@ -1888,7 +1998,30 @@ function StatusSegmentView({
   if (segment.tone === "fresh") {
     return <Text color="yellow">{text}</Text>;
   }
+  if (segment.tone === "alert") {
+    return <Text color="red">{text}</Text>;
+  }
   return <Text dimColor>{text}</Text>;
+}
+
+function McpManagerRow({ line }: { line: McpManagerLine }) {
+  return (
+    <Text wrap="truncate-end" bold={line.bold === true || line.selected === true} dimColor={line.dim === true}>
+      {line.prefix ?? ""}
+      {line.mark ? <Text color={mcpToneColor(line.mark.tone)}>{`${line.mark.text} `}</Text> : null}
+      {line.text}
+    </Text>
+  );
+}
+
+function mcpToneColor(tone: McpTone): "green" | "red" | "yellow" | "gray" {
+  if (tone === "ok") {
+    return "green";
+  }
+  if (tone === "bad") {
+    return "red";
+  }
+  return tone === "wait" ? "yellow" : "gray";
 }
 
 function colorFor(state: ConnectionState): "green" | "yellow" | "red" {

@@ -184,3 +184,19 @@ test("an empty model or a missing uptime leaves no gap", () => {
     ["connected", "untitled"],
   );
 });
+
+test("an alert sits after the connection and is the last to leave", () => {
+  const segments = statusSegments({
+    connection: "connected",
+    title: "Trip",
+    model: "qwen",
+    folder: "~/repos/golem",
+    messageCount: null,
+    uptimeSeconds: null,
+    alert: "mcp ✗ git",
+  });
+  const ids = (columns: number) => fitSegments(segments, columns).map((segment) => segment.id);
+  assert.deepEqual(ids(80), ["connection", "alert", "title", "model", "folder"]);
+  assert.deepEqual(ids(22), ["connection", "alert"]);
+  assert.equal(segments.find((segment) => segment.id === "alert")?.tone, "alert");
+});

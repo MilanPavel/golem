@@ -72,7 +72,9 @@ async def test_a_previous_release_database_keeps_every_session(tmp_path: Path) -
         page = await ArtifactStore(database).read(str(artifact[1]), str(artifact[0]), 0, 20)
         assert page is not None and page.size == artifact[2]
 
-    assert _rows(path, "SELECT version, golem_version FROM schema_version") == [(6, "0.4.0")]
+    assert _rows(path, "SELECT version, golem_version FROM schema_version") == [
+        (version, "0.4.0") for version in range(6, len(MIGRATIONS) + 1)
+    ]
 
 
 async def test_the_old_file_is_copied_before_it_is_upgraded(tmp_path: Path) -> None:
@@ -101,8 +103,9 @@ async def test_a_fresh_file_records_the_version_that_made_it(tmp_path: Path) -> 
     path = tmp_path / "golem.db"
     async with Database.open(path, golem_version="0.3.0"):
         pass
+    # The history table arrives with schema 6, and each schema after it adds its row.
     assert _rows(path, "SELECT version, golem_version FROM schema_version") == [
-        (len(MIGRATIONS), "0.3.0")
+        (version, "0.3.0") for version in range(6, len(MIGRATIONS) + 1)
     ]
 
 

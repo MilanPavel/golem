@@ -67,7 +67,7 @@ export function shortCwd(cwd: string, home: string): string {
   return cwd;
 }
 
-export type StatusTone = "connection" | "title" | "model" | "dim" | "fresh";
+export type StatusTone = "connection" | "title" | "model" | "dim" | "fresh" | "alert";
 
 export type StatusSegment = {
   id: string;
@@ -81,10 +81,11 @@ export type StatusSegment = {
 
 /**
  * Connection never drops. After that, the right-hand segments leave first:
- * uptime, message count, folder, new lines, then model, then the title.
+ * uptime, message count, folder, new lines, then model, then the title, then an alert.
  */
 export const STATUS_PRIORITY = {
   connection: 100,
+  alert: 90,
   title: 80,
   model: 60,
   fresh: 55,
@@ -177,9 +178,12 @@ export function statusSegments(input: {
   messageCount: number | null;
   uptimeSeconds: number | null;
   freshLines?: number;
+  /** Something the session uses is down, such as an MCP server. */
+  alert?: string;
 }): StatusSegment[] {
   return [
     segment("connection", input.connection, STATUS_PRIORITY.connection, "connection", true),
+    segment("alert", input.alert ?? "", STATUS_PRIORITY.alert, "alert"),
     segment("title", input.title, STATUS_PRIORITY.title, "title"),
     segment("model", input.model, STATUS_PRIORITY.model, "model"),
     segment("folder", input.folder, STATUS_PRIORITY.folder, "dim"),

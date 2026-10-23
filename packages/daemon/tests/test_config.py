@@ -157,3 +157,21 @@ def test_unknown_key_is_rejected(tmp_path: Path) -> None:
     _write(home / "config.toml", 'nickname = "clay"\n')
     with pytest.raises(ValidationError):
         load_settings(home=home, project_dir=tmp_path / "project")
+
+
+def test_an_mcp_server_is_turned_off_and_on_with_comments_kept(tmp_path: Path) -> None:
+    from golem.config_edit import McpTableError, set_mcp_enabled
+
+    path = tmp_path / "config.toml"
+    path.write_text('# mine\n[mcp.git]\ncommand = "uvx"  # keep\n', encoding="utf-8")
+    set_mcp_enabled(path, "git", False)
+    assert (
+        path.read_text(encoding="utf-8")
+        == '# mine\n[mcp.git]\ncommand = "uvx"  # keep\nenabled = false\n'
+    )
+    set_mcp_enabled(path, "git", "on_demand")
+    assert 'enabled = "on_demand"' in path.read_text(encoding="utf-8")
+    set_mcp_enabled(path, "git", True)
+    assert path.read_text(encoding="utf-8") == '# mine\n[mcp.git]\ncommand = "uvx"  # keep\n'
+    with pytest.raises(McpTableError, match=r"no \[mcp\.web\]"):
+        set_mcp_enabled(path, "web", False)

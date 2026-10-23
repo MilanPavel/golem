@@ -677,10 +677,22 @@ test("download progress and its end reach onPull", async () => {
 
 test("mcp.list reads the servers, and mcp.server.status reaches onMcpStatus", async () => {
   const git = { name: "git", state: "running", command: "uvx mcp-server-git", tools: ["mcp__git__git_status"], error: null };
+  const sent: Record<string, unknown>[] = [];
   const server = await listen((socket) => {
     attach(socket, {
       answerPing: true,
-      results: { "mcp.list": { servers: [git] } },
+      results: {
+        "mcp.list": { servers: [git] },
+        "mcp.enable": { session_id: "s_1", mcp_servers: ["git"] },
+        "mcp.tools": { name: "git", tools: [{ name: "mcp__git__git_log", description: "Shows the log." }] },
+        "mcp.restart": { ...git, state: "starting" },
+        "mcp.set_enabled": { ...git, state: "disabled" },
+      },
+      onRequest: (_socket, method, params) => {
+        if (method.startsWith("mcp.")) {
+          sent.push({ method, ...params });
+        }
+      },
       onHello: (current) => {
         write(current, {
           jsonrpc: "2.0",
@@ -697,6 +709,19 @@ test("mcp.list reads the servers, and mcp.server.status reaches onMcpStatus", as
   });
   try {
     assert.deepEqual(await client.listMcp(), { servers: [git] });
+    await client.listMcp("s_1");
+    assert.deepEqual(await client.enableMcp("s_1", "git"), { session_id: "s_1", mcp_servers: ["git"] });
+    assert.equal((await client.mcpTools("git")).tools[0]?.name, "mcp__git__git_log");
+    assert.equal((await client.restartMcp("git", "s_1")).state, "starting");
+    assert.equal((await client.setMcpEnabled("git", false)).state, "disabled");
+    assert.deepEqual(sent, [
+      { method: "mcp.list" },
+      { method: "mcp.list", session_id: "s_1" },
+      { method: "mcp.enable", session_id: "s_1", name: "git" },
+      { method: "mcp.tools", name: "git" },
+      { method: "mcp.restart", name: "git", session_id: "s_1" },
+      { method: "mcp.set_enabled", name: "git", enabled: false },
+    ]);
     for (let tries = 0; tries < 50 && seen.length < 1; tries += 1) {
       await new Promise((resolve) => setTimeout(resolve, 10));
     }

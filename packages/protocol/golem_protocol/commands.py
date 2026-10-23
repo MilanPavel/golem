@@ -575,20 +575,32 @@ class ModelPullDone(BaseModel):
 
 
 class McpListParams(BaseModel):
-    """``mcp.list``. Every configured MCP server and its state."""
+    """``mcp.list``. The user's MCP servers and their state.
+
+    With ``session_id``, also the servers of that session's trusted project,
+    and whether each one is on for the session.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
+    session_id: str | None = Field(default=None, min_length=1)
 
-McpServerState = Literal["starting", "running", "failed", "disabled"]
+
+McpServerState = Literal["idle", "starting", "running", "failed", "disabled"]
 
 
 class McpServer(BaseModel):
     """One MCP server from ``[mcp.<name>]``.
 
-    ``command`` is the command line golem runs. ``tools`` are the tool names
-    the model sees, ``mcp__<server>__<tool>``, while it is ``running``.
-    ``error`` says why it is ``failed``.
+    ``command`` is the command line golem runs, or the URL it reaches.
+    ``project`` is the folder whose ``.golem/config.toml`` names the server,
+    or null for the user's own. ``on_demand`` servers are ``idle`` until a
+    session turns one on, and ``enabled`` says whether the asking session
+    has it, when ``mcp.list`` named one. ``tools`` are the names the model
+    sees, ``mcp__<server>__<tool>``, while it is ``running``, and
+    ``schema_tokens`` roughly what their schemas cost in each prompt.
+    ``error`` says why it is ``failed``, and ``retry_seconds`` when golem
+    tries again. ``config`` is the file that names the server.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -598,6 +610,71 @@ class McpServer(BaseModel):
     command: str
     tools: list[str] = Field(default_factory=list[str])
     error: str | None = None
+    project: str | None = None
+    on_demand: bool = False
+    enabled: bool | None = None
+    schema_tokens: int | None = Field(default=None, ge=0)
+    retry_seconds: float | None = Field(default=None, ge=0)
+    config: str | None = None
+
+
+class McpServerParams(BaseModel):
+    """``mcp.tools`` and ``mcp.restart``: one server, as ``session_id``'s project sees it."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    session_id: str | None = Field(default=None, min_length=1)
+
+
+class McpToolInfo(BaseModel):
+    """One of a server's tools: the name the model sees, and what it says it does."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    description: str
+
+
+class McpToolsResult(BaseModel):
+    """The running server's tools, in its order. Empty while it is not running."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    tools: list[McpToolInfo]
+
+
+class McpSetEnabledParams(BaseModel):
+    """``mcp.set_enabled``. Write ``enabled`` into the file that names the server.
+
+    ``true`` is for every session, ``"on_demand"`` for the sessions that turn it
+    on, and ``false`` stops it everywhere. The change applies at once.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    enabled: bool | Literal["on_demand"]
+    session_id: str | None = Field(default=None, min_length=1)
+
+
+class McpToggleParams(BaseModel):
+    """``mcp.enable`` and ``mcp.disable``: an on-demand server, for one session."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+
+
+class McpToggleResult(BaseModel):
+    """The on-demand servers the session has on now, sorted."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    mcp_servers: list[str]
 
 
 class McpListResult(BaseModel):
@@ -800,7 +877,13 @@ __all__ = [
     "McpListParams",
     "McpListResult",
     "McpServer",
+    "McpServerParams",
     "McpServerState",
+    "McpSetEnabledParams",
+    "McpToggleParams",
+    "McpToggleResult",
+    "McpToolInfo",
+    "McpToolsResult",
     "MessageSendParams",
     "MessageSendResult",
     "ModelDeleteParams",

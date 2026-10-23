@@ -32,6 +32,12 @@ from golem_protocol.commands import (
     McpListParams,
     McpListResult,
     McpServer,
+    McpServerParams,
+    McpSetEnabledParams,
+    McpToggleParams,
+    McpToggleResult,
+    McpToolInfo,
+    McpToolsResult,
     MessageSendParams,
     MessageSendResult,
     ModelDeleteParams,
@@ -250,6 +256,12 @@ MODELS: tuple[type[BaseModel], ...] = (
     McpServer,
     McpListResult,
     McpServerStatusNotification,
+    McpToggleParams,
+    McpToggleResult,
+    McpServerParams,
+    McpToolInfo,
+    McpToolsResult,
+    McpSetEnabledParams,
 )
 
 

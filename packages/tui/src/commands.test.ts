@@ -191,3 +191,15 @@ test("/todos toggles the todo list and /artifact takes an optional id", () => {
   assert.deepEqual(applyComposer(closedDebug, "/artifact a_1"), { kind: "artifact", id: "a_1" });
   assert.equal(applyComposer(closedDebug, "/artifact a b").kind, "unknown");
 });
+
+test("/mcp shows the servers, and enable or disable takes one name", () => {
+  assert.deepEqual(applyComposer(closedDebug, "/mcp"), { kind: "mcp" });
+  assert.deepEqual(applyComposer(closedDebug, "/mcp enable git"), { kind: "mcp-toggle", on: true, name: "git" });
+  assert.deepEqual(applyComposer(closedDebug, "/mcp disable git"), { kind: "mcp-toggle", on: false, name: "git" });
+  for (const wrong of ["/mcp enable", "/mcp restart git", "/mcp enable a b"]) {
+    assert.deepEqual(applyComposer(closedDebug, wrong), {
+      kind: "unknown",
+      notice: "/mcp, /mcp enable <name>, or /mcp disable <name>",
+    });
+  }
+});

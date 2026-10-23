@@ -12,12 +12,14 @@ Precedence, highest first:
 from __future__ import annotations
 
 import re
+import shlex
+import tomllib
 from contextvars import ContextVar
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, Literal, cast
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, model_validator
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, TypeAdapter, model_validator
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
@@ -163,35 +165,91 @@ class WebSettings(BaseModel):
     timeout_seconds: int = Field(default=20, gt=0, le=300)
 
 
-class McpServerSettings(BaseModel):
-    """``[mcp.<name>]``. An MCP server that golem starts and talks to over stdio.
+MCP_SECRET = re.compile(r"keychain:(mcp/[A-Za-z0-9][A-Za-z0-9._-]*)")
+"""A secret an MCP setting names. Only ``mcp/…``: a server never gets a model provider's key."""
 
-    ``command`` is a program on ``PATH`` or an absolute path, and ``args`` its
-    arguments. ``env`` adds environment variables, and a variable that looks
-    like a secret does not load. ``cwd`` is where the server runs, home by
-    default, with ``~`` for the home folder. ``timeout_seconds`` is the
-    longest one tool call may take.
+McpEnabled = bool | Literal["on_demand"]
+
+
+class McpServerSettings(BaseModel):
+    """``[mcp.<name>]``. An MCP server golem starts over stdio, or reaches over HTTP.
+
+    A stdio server has ``command``, a program on ``PATH`` or an absolute path,
+    with ``args``, ``env``, and ``cwd`` (home by default, ``~`` for home). An
+    HTTP server has ``url`` and ``headers``. A value in ``env`` or ``headers``
+    can name a secret, ``keychain:mcp/<name>``, alone or inside the text, as in
+    ``Bearer keychain:mcp/github``. A variable or header whose name looks like a
+    secret must name one, so a token never sits in the file.
+
+    ``enabled`` is ``true`` for every session, ``"on_demand"`` for the sessions
+    that turn it on with ``/mcp enable``, or ``false``. ``timeout_seconds`` is
+    the longest one tool call may take.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     _no_secrets = model_validator(mode="before")(_no_inline_secrets)
 
-    command: str = Field(min_length=1)
+    command: str | None = Field(default=None, min_length=1)
     args: list[str] = Field(default_factory=list[str])
     env: dict[str, str] = Field(default_factory=dict[str, str])
     cwd: str | None = Field(default=None, min_length=1)
-    enabled: bool = True
+    url: str | None = Field(default=None, pattern=r"^https?://\S+$")
+    headers: dict[str, str] = Field(default_factory=dict[str, str])
+    enabled: McpEnabled = True
     timeout_seconds: int = Field(default=120, gt=0, le=3600)
 
     @model_validator(mode="after")
-    def _no_secret_env(self) -> McpServerSettings:
-        _no_inline_secrets(self.env)
+    def _one_transport(self) -> McpServerSettings:
+        if (self.command is None) == (self.url is None):
+            raise ValueError("an MCP server needs either command (stdio) or url (HTTP)")
+        if self.url is not None and (self.args or self.env or self.cwd):
+            raise ValueError("args, env, and cwd are for a command; an HTTP server takes headers")
+        if self.command is not None and self.headers:
+            raise ValueError("headers are for an HTTP server; a command takes env")
+        for table in (self.env, self.headers):
+            for key, value in table.items():
+                if _SECRET_KEY.search(key) and MCP_SECRET.search(value) is None:
+                    raise ValueError(
+                        f"{key} looks like a secret: set it to keychain:mcp/<name> and store "
+                        "the value with golem auth set mcp/<name>"
+                    )
+                if "keychain:" in value and MCP_SECRET.search(value) is None:
+                    raise ValueError(f"{key} names a secret outside mcp/: use keychain:mcp/<name>")
         return self
+
+    @property
+    def secrets(self) -> list[str]:
+        """The secrets this server needs, as ``mcp/<name>``."""
+        values = [*self.env.values(), *self.headers.values()]
+        return sorted({found for value in values for found in MCP_SECRET.findall(value)})
+
+    @property
+    def target(self) -> str:
+        """What golem runs or reaches: the command line, or the URL."""
+        if self.url is not None:
+            return self.url
+        return shlex.join([self.command or "", *self.args])
 
 
 MCP_SERVER_NAME = r"^[A-Za-z0-9][A-Za-z0-9-]{0,31}$"
 """Server names go into tool names, ``mcp__<server>__<tool>``, so no ``_`` and no dots."""
+
+McpServers = dict[Annotated[str, Field(pattern=MCP_SERVER_NAME)], McpServerSettings]
+_MCP_SERVERS: TypeAdapter[McpServers] = TypeAdapter(McpServers)
+
+
+def load_mcp(path: Path) -> McpServers:
+    """The ``[mcp.*]`` tables of one TOML file, and nothing else of it.
+
+    A missing file has none. Raises ``ValueError`` when the file or a table
+    does not validate.
+    """
+    try:
+        data = tomllib.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return {}
+    return _MCP_SERVERS.validate_python(data.get("mcp", {}))
 
 
 class GolemSettings(BaseSettings):
@@ -222,9 +280,7 @@ class GolemSettings(BaseSettings):
     trusted_projects: list[str] = Field(default_factory=list[str])
     shell: ShellSettings = Field(default_factory=ShellSettings)
     web: WebSettings = Field(default_factory=WebSettings)
-    mcp: dict[Annotated[str, Field(pattern=MCP_SERVER_NAME)], McpServerSettings] = Field(
-        default_factory=dict
-    )
+    mcp: McpServers = Field(default_factory=dict)
 
     _no_secrets = model_validator(mode="before")(_no_inline_secrets)
 

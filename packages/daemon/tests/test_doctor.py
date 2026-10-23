@@ -11,6 +11,7 @@ from golem.doctor import (
     Check,
     config_check,
     disk_check,
+    mcp_checks,
     model_checks,
     run_checks,
     service_check,
@@ -18,6 +19,7 @@ from golem.doctor import (
 )
 from golem.models.keys import KeyStoreError, MemoryKeyStore
 from golem.paths import GolemPaths, resolve_paths
+from golem.secrets import MemorySecrets, SecretStoreError
 
 THIS = ["/opt/homebrew/opt/golem/libexec/golem-daemon/golem-daemon", "serve"]
 
@@ -49,6 +51,9 @@ class FakePlatform:
 
     def has_command(self, name: str) -> bool:
         return name in self.commands
+
+    def mcp_command(self, command: str) -> str | None:
+        return f"/opt/homebrew/bin/{command}" if command in self.commands else None
 
 
 class BrokenKeys(MemoryKeyStore):
@@ -282,7 +287,7 @@ def test_golem_doctor_prints_the_checks_as_json(
 ) -> None:
     monkeypatch.setenv("GOLEM_HOME", str(tmp_path / "home"))
     monkeypatch.setattr("golem.doctor.MacPlatform", FakePlatform)
-    monkeypatch.setattr("golem.models.keys.KeychainStore", MemoryKeyStore)
+    monkeypatch.setattr("golem.secrets.KeychainSecrets", MemorySecrets)
     assert main(["doctor"]) == 0
     printed = json.loads(capsys.readouterr().out)
     assert [check["name"] for check in printed] == ["service", "config", "model", "disk"]
@@ -292,3 +297,47 @@ def test_golem_doctor_prints_the_checks_as_json(
         "detail": f"launchd runs {THIS[0]}",
         "fix": None,
     }
+
+
+def test_each_mcp_server_that_may_start_is_found_with_its_secrets(tmp_path: Path) -> None:
+    config = (
+        '[mcp.git]\ncommand = "uvx"\n'
+        '[mcp.missing]\ncommand = "nope"\n'
+        '[mcp.off]\ncommand = "nope"\nenabled = false\n'
+        '[mcp.github]\nurl = "https://api.example.com/mcp"\n'
+        'headers = { Authorization = "Bearer keychain:mcp/github" }\n'
+    )
+    settings, check = config_check(_home(tmp_path, config))
+    assert settings is not None, check
+    platform = FakePlatform(commands={"uvx"})
+    assert mcp_checks(settings, platform, lambda _name: None) == [
+        Check("mcp git", "ok", "runs /opt/homebrew/bin/uvx"),
+        Check(
+            "mcp github",
+            "fail",
+            "no secret mcp/github in the Keychain",
+            "golem auth set mcp/github",
+        ),
+        Check(
+            "mcp missing",
+            "fail",
+            "command not found: nope",
+            "install it, or set command to its full path in config.toml",
+        ),
+    ]
+    stored = {"mcp/github": "ghp"}
+    assert mcp_checks(settings, platform, stored.get)[1] == Check(
+        "mcp github", "ok", "reaches https://api.example.com/mcp"
+    )
+
+
+def test_a_locked_keychain_fails_the_servers_that_need_a_secret(tmp_path: Path) -> None:
+    config = '[mcp.gh]\ncommand = "uvx"\nenv = { GH_TOKEN = "keychain:mcp/gh" }\n'
+    settings, _ = config_check(_home(tmp_path, config))
+    assert settings is not None
+
+    def locked(name: str) -> str | None:
+        raise SecretStoreError("keychain is unavailable: locked")
+
+    [check] = mcp_checks(settings, FakePlatform(commands={"uvx"}), locked)
+    assert (check.status, check.detail) == ("fail", "keychain is unavailable: locked")

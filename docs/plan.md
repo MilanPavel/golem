@@ -12,7 +12,6 @@ This file is about what comes next. How the existing pieces are built is in [arc
 
 | Phase | What you get | Milestone |
 |---|---|---|
-| 1. MCP | MCP servers as tool providers, under the same permissions | M2 — Acts |
 | 2. Skills | Claude Code compatible `SKILL.md` skills | M4 — Skilled |
 | 3. Flows | Durable workflows written in Python, resumable after a crash | M5 — Works alone |
 | 4. Triggers | Schedules, file watchers, and notifications | M5 — Works alone |
@@ -22,11 +21,11 @@ This file is about what comes next. How the existing pieces are built is in [arc
 | 8. Platforms | One interface for everything OS-specific, then Linux and Windows | Later |
 | 9. Model routing and long sessions | Token and cost display, a cheap profile for small jobs, budgets, escalation, compaction | Later |
 
-What is built is in [architecture.md](architecture.md) and the ADRs, and how to install, run, and release it is in [sre.md](sre.md). MCP is next, and it finishes milestone M2.
+What is built is in [architecture.md](architecture.md) and the ADRs, and how to install, run, and release it is in [sre.md](sre.md). Skills are next.
 
 ```mermaid
 flowchart LR
-  p1[1 MCP] --> p2[2 Skills] --> p3[3 Flows] --> p4[4 Triggers] --> p5[5 Memory] --> p6[6 Evals and hardening] --> p7[7 TUI polish] --> p8[8 Platforms] --> p9[9 Model routing and long sessions]
+  p2[2 Skills] --> p3[3 Flows] --> p4[4 Triggers] --> p5[5 Memory] --> p6[6 Evals and hardening] --> p7[7 TUI polish] --> p8[8 Platforms] --> p9[9 Model routing and long sessions]
 ```
 
 ### How to read a phase
@@ -80,7 +79,7 @@ Agents use the Graph API, where the model decides control flow. Flows use the Fu
 
 ### Protocol, what is left to add
 
-JSON-RPC 2.0, one JSON object per line, over `~/.golem/run/golem.sock`. Protocol 2.19 is on the wire today (see [architecture.md](architecture.md#what-is-on-the-wire-today)). The phases below add the rest.
+JSON-RPC 2.0, one JSON object per line, over `~/.golem/run/golem.sock`. Protocol 2.20 is on the wire today (see [architecture.md](architecture.md#what-is-on-the-wire-today)). The phases below add the rest.
 
 | Group | New events | Phase |
 |---|---|---|
@@ -89,43 +88,13 @@ JSON-RPC 2.0, one JSON object per line, over `~/.golem/run/golem.sock`. Protocol
 | Skills | `skill.activated`, `skill.deactivated` | 2.2 |
 | Runs and flows | `run.step.started`, `run.step.completed`, `run.interrupted` | 3.2, 3.4 |
 
-New commands: `mcp.enable | disable` (1.2), `skill.list | pin | unpin` (2.1, 2.2), `flow.list | start | status` (3.1), and `daemon.shutdown` (8.1).
+New commands: `skill.list | pin | unpin` (2.1, 2.2), `flow.list | start | status` (3.1), and `daemon.shutdown` (8.1).
 
 Rules:
 
 - A breaking change bumps `protocol_major`, and the daemon refuses a mismatched client with a clear error.
 - Events are append-only facts. Clients derive all UI state from them, so replaying equals rebuilding.
 - Every event is stored before it is sent. `message.delta` is coalesced into `message.completed` in the log.
-
----
-
-## Phase 1 — MCP
-
-MCP servers are tool providers under the same permission engine. Golem starts stdio servers from `[mcp.<name>]` in the user's `config.toml` with its own client, and their tools, `mcp__<server>__<tool>`, ask before every call ([ADR-023](adr/023-mcp-client.md)). What is left: choosing which servers a session gets, keeping them up, and HTTP servers.
-
-### 1.2 Scoping
-
-- **Goal:** many servers without flooding every prompt.
-- **You can:** enable a server for one session or one project, and keep the rest out of the prompt.
-- **Build:**
-  - `[mcp.<name>]` in a project's `.golem/config.toml` too. A project server starts only for a trusted project (`trusted_projects`), because it is a program the project names.
-  - `enabled = "on_demand"` keeps a server out of every session until `/mcp enable <name>` (with suggestions), stored as `session.updated`, so it survives a restart. `/mcp disable <name>` takes it out again.
-  - The tools node refuses a call to a server the session has not enabled, even when an old reply asks for it.
-- **Done when:** two servers are configured, and only the enabled one's tools reach the model.
-
-### 1.3 Health, tokens, and HTTP servers
-
-- **Goal:** servers stay up, and what they cost in prompt tokens is visible.
-- **You can:** connect HTTP servers, give a server a token from the Keychain, and see a crashed server come back on its own.
-- **Build:**
-  - Restart with backoff when a server exits, and pick up changes to `[mcp.*]` without a daemon restart.
-  - Streamable HTTP as a second transport under the same client, over `httpx`.
-  - `env` and HTTP headers take `keychain:mcp/<server>`, stored with `golem auth set mcp/<server>` or `/login`, so a token never sits in `config.toml`.
-  - The TUI status line shows a red marker when an enabled server is down.
-  - `/mcp` shows how many prompt tokens each server's tool schemas cost.
-  - `golem doctor` checks that each server's command is found.
-- **Done when:** killing a server process makes it restart, and the TUI shows the outage and the recovery.
-- **Watch out:** tool-schema bloat hurts local models badly.
 
 ---
 

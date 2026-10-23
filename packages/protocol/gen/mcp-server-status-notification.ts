@@ -3,9 +3,15 @@
 export type Jsonrpc = '2.0';
 export type Method = 'mcp.server.status';
 export type Command = string;
+export type Config = string | null;
+export type Enabled = boolean | null;
 export type Error = string | null;
 export type Name = string;
-export type State = 'starting' | 'running' | 'failed' | 'disabled';
+export type OnDemand = boolean;
+export type Project = string | null;
+export type RetrySeconds = number | null;
+export type SchemaTokens = number | null;
+export type State = 'idle' | 'starting' | 'running' | 'failed' | 'disabled';
 export type Tools = string[];
 
 /**
@@ -19,17 +25,29 @@ export interface McpServerStatusNotification {
 /**
  * One MCP server from ``[mcp.<name>]``.
  *
- * ``command`` is the command line golem runs. ``tools`` are the tool names
- * the model sees, ``mcp__<server>__<tool>``, while it is ``running``.
- * ``error`` says why it is ``failed``.
+ * ``command`` is the command line golem runs, or the URL it reaches.
+ * ``project`` is the folder whose ``.golem/config.toml`` names the server,
+ * or null for the user's own. ``on_demand`` servers are ``idle`` until a
+ * session turns one on, and ``enabled`` says whether the asking session
+ * has it, when ``mcp.list`` named one. ``tools`` are the names the model
+ * sees, ``mcp__<server>__<tool>``, while it is ``running``, and
+ * ``schema_tokens`` roughly what their schemas cost in each prompt.
+ * ``error`` says why it is ``failed``, and ``retry_seconds`` when golem
+ * tries again. ``config`` is the file that names the server.
  *
  * This interface was referenced by `McpServerStatusNotification`'s JSON-Schema
  * via the `definition` "McpServer".
  */
 export interface McpServer {
   command: Command;
+  config?: Config;
+  enabled?: Enabled;
   error?: Error;
   name: Name;
+  on_demand?: OnDemand;
+  project?: Project;
+  retry_seconds?: RetrySeconds;
+  schema_tokens?: SchemaTokens;
   state: State;
   tools?: Tools;
 }

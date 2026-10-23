@@ -162,7 +162,7 @@ Tool rules (allow, ask, or deny a tool by name or path) live in the same file, o
 
 ## Add tools with MCP
 
-Any [MCP](https://modelcontextprotocol.io) server that runs on your Mac gives golem new tools. Add one to `~/.golem/config.toml`:
+Any [MCP](https://modelcontextprotocol.io) server gives golem new tools. Add one to `~/.golem/config.toml`:
 
 ```toml
 [mcp.git]
@@ -170,7 +170,7 @@ command = "uvx"
 args = ["mcp-server-git", "--repository", "/path/to/your/repo"]
 ```
 
-Run `golem daemon restart`, then type **`/mcp`** in the chat to see it running with its tools. The model sees them as `mcp__git__<tool>`. Golem asks before every call, because only the server knows what a tool really does. A rule can allow the ones you trust:
+Golem notices the change and starts it. Type **`/mcp`** in the chat to manage your servers: see which are running, what their tools cost in each prompt, open one to view its tools, reconnect it, or turn it off. The model sees them as `mcp__git__<tool>`. Golem asks before every call, because only the server knows what a tool really does. A rule can allow the ones you trust:
 
 ```toml
 [[rule]]
@@ -178,19 +178,37 @@ tool = "mcp__git__git_status"
 action = "allow"
 ```
 
+**Only when you need it.** Every server's tools go into every prompt, which costs tokens and confuses small local models. Set `enabled = "on_demand"`, and a server stays out until you type `/mcp enable git` in a chat. Only that chat gets it, and it stays on after a restart.
+
+**Servers on the web, with a token.** Golem never keeps a token in the file. Name it, then store it in the Keychain:
+
+```toml
+[mcp.github]
+url = "https://api.githubcopilot.com/mcp/"
+headers = { Authorization = "Bearer keychain:mcp/github" }
+```
+
+```bash
+golem auth set mcp/github     # prompts for the token
+```
+
+**Per project.** A project's `.golem/config.toml` can add servers for chats in that folder, once you list the folder in `trusted_projects`. A server that crashes or stops answering starts again on its own, and the status line shows `mcp ✗ <name>` in red while it is down.
+
 <details>
 <summary><b>Server settings</b></summary>
 
 | Setting | Default | Meaning |
 |---|---|---|
-| `command` | required | The program, on your `PATH` or as a full path. Homebrew's folders and `~/.local/bin` are searched too |
+| `command` | | A program to run, on your `PATH` or as a full path. Homebrew's folders and `~/.local/bin` are searched too |
 | `args` | `[]` | Its arguments |
-| `env` | `{}` | Extra environment variables. A server sees only these, plus `HOME`, `PATH`, and a few basics. A name that looks like a secret, such as `GITHUB_TOKEN`, is refused |
-| `cwd` | your home folder | Where the server runs |
-| `enabled` | `true` | `false` keeps the settings but doesn't start it |
+| `env` | `{}` | Extra environment variables. A server sees only these, plus `HOME`, `PATH`, and a few basics |
+| `cwd` | your home, or the project | Where the server runs |
+| `url` | | An HTTP server's address, instead of `command` |
+| `headers` | `{}` | Headers sent with every request to `url` |
+| `enabled` | `true` | `"on_demand"` for chats that run `/mcp enable`, or `false` to keep the settings without starting it |
 | `timeout_seconds` | `120` | The longest one tool call may take |
 
-A server name may use letters, digits, and `-`. A server that exits shows as `failed` in `/mcp`, with the last thing it printed, until the next `golem daemon restart`.
+A value in `env` or `headers` can name a Keychain secret, `keychain:mcp/<name>`, alone or inside the text. A name that looks like a secret, such as `GITHUB_TOKEN`, must. A server name may use letters, digits, and `-`. `golem doctor` checks that each server's command is found and its secrets are stored.
 
 </details>
 
@@ -221,7 +239,7 @@ flowchart LR
 | `golem daemon install` / `uninstall` | Sets up or removes the background service. `~/.golem` stays |
 | `golem daemon start` / `stop` / `restart` | Controls the daemon. `restart` after an upgrade |
 | `golem daemon logs` | Follows the daemon's log |
-| `golem auth set` / `remove` / `list` | Manages API keys in the Keychain |
+| `golem auth set` / `remove` / `list` | Manages API keys, and MCP tokens (`mcp/<name>`), in the Keychain |
 | `golem models` | Every model you can use or download, with size, price, and context |
 | `golem config show` | The settings and tool rules in effect for this folder |
 
@@ -242,7 +260,7 @@ Type `/` and suggestions appear. `/help` lists everything.
 | `/export [path]` | Save this chat as markdown |
 | `/artifact` | Open the full output of the last long tool call in your pager |
 | `/permissions` | Review and change tool rules |
-| `/mcp` | See your MCP servers, their state, and their tools |
+| `/mcp` | Manage MCP servers: view tools, reconnect, turn on or off. `/mcp enable <name>` and `/mcp disable <name>` are shortcuts |
 | `/login`, `/logout <provider>` | Save or remove an API key |
 | `/todos`, `/time` | Show or hide the agent's todo list, or message times |
 | `/debug` | Look under the hood: protocol messages, and what the model sees |

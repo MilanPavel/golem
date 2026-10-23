@@ -112,9 +112,11 @@ def _uninstall(_args: argparse.Namespace) -> int:
 def _doctor(_args: argparse.Namespace) -> int:
     """Print the checks as one JSON array. The CLI decides the exit code."""
     from golem.doctor import MacPlatform, run_checks
-    from golem.models.keys import KeychainStore
+    from golem.models.keys import ProviderKeys
+    from golem.secrets import KeychainSecrets
 
-    checks = run_checks(resolve_paths(), MacPlatform(), KeychainStore())
+    secrets = KeychainSecrets()
+    checks = run_checks(resolve_paths(), MacPlatform(), ProviderKeys(secrets), secrets.get)
     print(json.dumps([asdict(check) for check in checks]))
     return 0
 

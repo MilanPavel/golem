@@ -1,41 +1,28 @@
-"""A small MCP client over stdio: start a server, list its tools, and call them.
+"""A small MCP client: the handshake, listing tools, calling them, and ``ping``.
 
-MCP is JSON-RPC 2.0 with one message per line on the server's stdin and
-stdout (ADR-023). golem only uses
-tools, so it declares no client capabilities and a server has no reason to
-ask it anything. A request it sends anyway gets "method not found", except
-``ping``, which gets an empty result. The server's stderr goes to the log,
-and its last lines explain an exit.
+MCP is JSON-RPC 2.0 (ADR-023). The messages travel over a
+:class:`~golem.mcp.transport.Transport`, a child process's stdio or HTTP.
+golem only uses tools, so it declares no client capabilities and a server
+has no reason to ask it anything. A request it sends anyway gets "method not
+found", except ``ping``, which gets an empty result.
 """
 
 from __future__ import annotations
 
 import asyncio
 import contextlib
-import json
 import logging
-import os
-import signal
-from collections import deque
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass, field
-from pathlib import Path
+from dataclasses import dataclass
 from typing import Any, cast
 
 from golem import __version__
+from golem.mcp.transport import Launch, McpError, StdioTransport, Transport
 
 log = logging.getLogger(__name__)
 
 PROTOCOL_VERSION = "2025-06-18"
-MAX_LINE_BYTES = 16 * 1024 * 1024
-"""The longest message golem reads. A tool result is one line, and it can be big."""
-STDERR_LINES = 20
-STOP_SECONDS = 2.0
 METHOD_NOT_FOUND = -32601
-
-
-class McpError(Exception):
-    """The server did not start, broke the protocol, exited, or answered with an error."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,67 +43,34 @@ class CallResult:
     structured: object = None
 
 
-@dataclass(frozen=True, slots=True)
-class Launch:
-    """The server's process: an absolute ``argv``, its whole environment, and its folder."""
-
-    argv: list[str]
-    env: Mapping[str, str] = field(default_factory=dict[str, str])
-    cwd: Path | None = None
-
-
 class McpClient:
-    """One running server. :meth:`start` it, then list and call its tools.
+    """One server. :meth:`start` it, then list and call its tools.
 
     ``on_tools_changed`` runs when the server says its tool list changed.
-    ``stop_seconds`` is how long :meth:`close` waits after each step.
     """
 
     def __init__(
-        self,
-        launch: Launch,
-        *,
-        on_tools_changed: Callable[[], None] | None = None,
-        stop_seconds: float = STOP_SECONDS,
+        self, transport: Transport, *, on_tools_changed: Callable[[], None] | None = None
     ) -> None:
-        self._launch = launch
-        self._stop_seconds = stop_seconds
+        self._transport = transport
         self._on_tools_changed = on_tools_changed
-        self._process: asyncio.subprocess.Process | None = None
         self._pending: dict[int, asyncio.Future[dict[str, Any]]] = {}
         self._next_id = 0
-        self._stderr: deque[str] = deque(maxlen=STDERR_LINES)
-        self._tasks: list[asyncio.Task[None]] = []
-        self._closed = asyncio.Event()
         self._failure: str | None = None
+        self._watch: asyncio.Task[None] | None = None
 
     async def start(self, timeout: float) -> None:
-        """Start the process and finish MCP's handshake. Raises :class:`McpError`."""
-        try:
-            self._process = await asyncio.create_subprocess_exec(
-                *self._launch.argv,
-                stdin=asyncio.subprocess.PIPE,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                env=dict(self._launch.env),
-                cwd=self._launch.cwd,
-                limit=MAX_LINE_BYTES,
-                # Its own process group: stopping it also stops what it started, such as node.
-                start_new_session=True,
-            )
-        except OSError as exc:
-            raise McpError(f"cannot start {self._launch.argv[0]}: {exc.strerror or exc}") from exc
-        self._tasks = [
-            asyncio.create_task(self._read_stdout(), name="mcp-stdout"),
-            asyncio.create_task(self._read_stderr(), name="mcp-stderr"),
-        ]
+        """Open the transport and finish MCP's handshake. Raises :class:`McpError`."""
+        await self._transport.open(self._handle)
+        self._watch = asyncio.create_task(self._watch_transport(), name="mcp-watch")
         params = {
             "protocolVersion": PROTOCOL_VERSION,
             "capabilities": {},
             "clientInfo": {"name": "golem", "version": __version__},
         }
         result = await self._request("initialize", params, timeout)
-        log.info("mcp server %s speaks %s", self._launch.argv[0], result.get("protocolVersion"))
+        version = result.get("protocolVersion")
+        self._transport.protocol_version = version if isinstance(version, str) else PROTOCOL_VERSION
         await self._send({"jsonrpc": "2.0", "method": "notifications/initialized"})
 
     async def list_tools(self, timeout: float) -> list[McpTool]:
@@ -150,40 +104,28 @@ class McpClient:
         self, name: str, arguments: Mapping[str, object], timeout: float
     ) -> CallResult:
         """Run one tool. Raises :class:`McpError` when there is no answer in time."""
-        result = await self._request(
-            "tools/call", {"name": name, "arguments": dict(arguments)}, timeout
-        )
+        params = {"name": name, "arguments": dict(arguments)}
+        result = await self._request("tools/call", params, timeout)
         return CallResult(
             content=_list(result.get("content")),
             is_error=result.get("isError") is True,
             structured=result.get("structuredContent"),
         )
 
+    async def ping(self, timeout: float) -> None:
+        """Ask whether the server still answers. Raises :class:`McpError`."""
+        await self._request("ping", {}, timeout)
+
     async def wait_closed(self) -> str:
         """Wait until the server is gone, and say why."""
-        await self._closed.wait()
-        return self._failure or "stopped"
+        return await self._transport.wait_closed()
 
     async def close(self) -> None:
-        """Close stdin, then SIGTERM, then SIGKILL, as the stdio transport asks."""
         self._fail("stopped")
-        process = self._process
-        if process is not None and process.returncode is None:
-            if process.stdin is not None:
-                with contextlib.suppress(OSError):
-                    process.stdin.close()
-            for sig in (None, signal.SIGTERM, signal.SIGKILL):
-                if sig is not None:
-                    with contextlib.suppress(ProcessLookupError, PermissionError):
-                        os.killpg(process.pid, sig)
-                try:
-                    await asyncio.wait_for(process.wait(), self._stop_seconds)
-                    break
-                except TimeoutError:
-                    continue
-        for task in self._tasks:
-            task.cancel()
-        await asyncio.gather(*self._tasks, return_exceptions=True)
+        await self._transport.close()
+        if self._watch is not None:
+            self._watch.cancel()
+            await asyncio.gather(self._watch, return_exceptions=True)
 
     async def _request(
         self, method: str, params: Mapping[str, object], timeout: float
@@ -195,9 +137,8 @@ class McpClient:
         future: asyncio.Future[dict[str, Any]] = asyncio.get_running_loop().create_future()
         self._pending[request_id] = future
         try:
-            await self._send(
-                {"jsonrpc": "2.0", "id": request_id, "method": method, "params": dict(params)}
-            )
+            message = {"jsonrpc": "2.0", "id": request_id, "method": method, "params": dict(params)}
+            await self._send(message)
             return await asyncio.wait_for(future, timeout)
         except TimeoutError:
             if method == "tools/call":
@@ -211,53 +152,17 @@ class McpClient:
             self._pending.pop(request_id, None)
 
     async def _send(self, message: Mapping[str, object]) -> None:
-        process = self._process
-        if process is None or process.stdin is None:
-            raise McpError("the server is not running")
-        try:
-            process.stdin.write(json.dumps(message, ensure_ascii=False).encode() + b"\n")
-            await process.stdin.drain()
-        except (BrokenPipeError, ConnectionResetError) as exc:
-            raise McpError(self._exit_reason()) from exc
+        await self._transport.send(message)
 
-    async def _read_stdout(self) -> None:
-        process = self._process
-        assert process is not None and process.stdout is not None
-        try:
-            while line := await process.stdout.readline():
-                await self._handle(line)
-        except ValueError:
-            self._fail(f"the server sent a message over {MAX_LINE_BYTES // (1024 * 1024)} MB")
-            return
-        await process.wait()
-        self._fail(self._exit_reason())
+    async def _watch_transport(self) -> None:
+        self._fail(await self._transport.wait_closed())
 
-    async def _read_stderr(self) -> None:
-        process = self._process
-        assert process is not None and process.stderr is not None
-        with contextlib.suppress(ValueError):
-            while line := await process.stderr.readline():
-                text = line.decode(errors="replace").rstrip()
-                if text:
-                    self._stderr.append(text)
-                    log.debug("mcp %s: %s", self._launch.argv[0], text)
-
-    async def _handle(self, line: bytes) -> None:
-        try:
-            message: object = json.loads(line)
-        except ValueError:
-            log.debug("mcp %s wrote a line that is not JSON", self._launch.argv[0])
-            return
-        if not isinstance(message, dict):
-            return
-        message = cast(dict[str, Any], message)
+    async def _handle(self, message: dict[str, Any]) -> None:
         method = message.get("method")
         if isinstance(method, str):
             if "id" in message:
                 await self._answer(message["id"], method)
-            elif (
-                method == "notifications/tools/list_changed" and self._on_tools_changed is not None
-            ):
+            elif method == "notifications/tools/list_changed" and self._on_tools_changed:
                 self._on_tools_changed()
             return
         future = self._pending.get(message.get("id"))  # pyright: ignore[reportArgumentType]
@@ -266,9 +171,8 @@ class McpClient:
         error = message.get("error")
         if isinstance(error, dict):
             text = cast(dict[str, Any], error).get("message")
-            future.set_exception(
-                McpError(text if isinstance(text, str) and text else "the server returned an error")
-            )
+            reason = text if isinstance(text, str) and text else "the server returned an error"
+            future.set_exception(McpError(reason))
             return
         result = message.get("result")
         future.set_result(cast(dict[str, Any], result) if isinstance(result, dict) else {})
@@ -288,24 +192,21 @@ class McpClient:
         for future in self._pending.values():
             if not future.done():
                 future.set_exception(McpError(self._failure))
-        self._closed.set()
-
-    def _exit_reason(self) -> str:
-        process = self._process
-        code = None if process is None else process.returncode
-        said = self._stderr[-1] if self._stderr else ""
-        reason = "the server exited" if code is None else f"the server exited with code {code}"
-        return f"{reason}: {said}" if said else reason
 
 
 def _list(value: object) -> list[Mapping[str, object]]:
     if not isinstance(value, list):
         return []
-    return [
-        cast(dict[str, object], item)
-        for item in cast(list[object], value)
-        if isinstance(item, dict)
-    ]
+    items = cast(list[object], value)
+    return [cast(dict[str, object], item) for item in items if isinstance(item, dict)]
 
 
-__all__ = ["PROTOCOL_VERSION", "CallResult", "Launch", "McpClient", "McpError", "McpTool"]
+__all__ = [
+    "PROTOCOL_VERSION",
+    "CallResult",
+    "Launch",
+    "McpClient",
+    "McpError",
+    "McpTool",
+    "StdioTransport",
+]

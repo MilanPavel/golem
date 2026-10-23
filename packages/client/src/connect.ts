@@ -13,6 +13,8 @@ export type ApprovalChoice = "allow" | "allow_session" | "allow_always" | "deny"
 import type { DaemonStatus } from "../../protocol/gen/daemon-status.ts";
 import type { McpListResult } from "../../protocol/gen/mcp-list-result.ts";
 import type { McpServer } from "../../protocol/gen/mcp-server.ts";
+import type { McpToggleResult } from "../../protocol/gen/mcp-toggle-result.ts";
+import type { McpToolsResult } from "../../protocol/gen/mcp-tools-result.ts";
 import type { MessageSendResult } from "../../protocol/gen/message-send-result.ts";
 import type { ModelListResult } from "../../protocol/gen/model-list-result.ts";
 import type { ModelDeleteResult } from "../../protocol/gen/model-delete-result.ts";
@@ -44,6 +46,8 @@ import {
   isHelloResult,
   isMcpListResult,
   isMcpServer,
+  isMcpToggleResult,
+  isMcpToolsResult,
   isMessageSendResult,
   isModelListResult,
   isModelProbeResult,
@@ -194,8 +198,20 @@ export interface GolemClient {
   deleteModel(name: string): Promise<ModelDeleteResult>;
   /** `model.pull.progress` and `model.pull.done`, from any client's download. */
   onPull(listener: (update: PullUpdate) => void): () => void;
-  /** Every MCP server from config.toml, with its state and tools. */
-  listMcp(): Promise<McpListResult>;
+  /**
+   * The MCP servers, with their state and tools. With `sessionId`, also the
+   * servers of that session's trusted project, and whether each is on for it.
+   */
+  listMcp(sessionId?: string): Promise<McpListResult>;
+  /** Turn an on-demand MCP server on for a session. Resolves with the servers it has on. */
+  enableMcp(sessionId: string, name: string): Promise<McpToggleResult>;
+  disableMcp(sessionId: string, name: string): Promise<McpToggleResult>;
+  /** A running server's tools, with what each says it does. `sessionId` picks its project's server. */
+  mcpTools(name: string, sessionId?: string): Promise<McpToolsResult>;
+  /** Start a server again now. Resolves with its state, usually `starting`. */
+  restartMcp(name: string, sessionId?: string): Promise<McpServer>;
+  /** Write `enabled` into the file that names the server. It applies at once. */
+  setMcpEnabled(name: string, enabled: boolean | "on_demand", sessionId?: string): Promise<McpServer>;
   /** `mcp.server.status`: a server started, failed, or changed its tools. */
   onMcpStatus(listener: (server: McpServer) => void): () => void;
   close(): void;
@@ -216,6 +232,10 @@ function policyEdit(result: unknown): PolicyEditResult {
     throw new Error("invalid policy edit result");
   }
   return { file: result["file"] };
+}
+
+function withSession(params: Record<string, unknown>, sessionId: string | undefined): Record<string, unknown> {
+  return sessionId === undefined ? params : { ...params, session_id: sessionId };
 }
 
 export function connectGolem(options: ConnectOptions): GolemClient {
@@ -300,6 +320,24 @@ export function connectGolem(options: ConnectOptions): GolemClient {
         // A listener must not tear the socket down.
       }
     }
+  }
+
+  async function mcpServerCall(method: string, params: Record<string, unknown>): Promise<McpServer> {
+    await ready;
+    const result = await call(method, params);
+    if (!isMcpServer(result)) {
+      throw new Error(`invalid ${method} result`);
+    }
+    return result;
+  }
+
+  async function toggleMcp(method: "mcp.enable" | "mcp.disable", sessionId: string, name: string) {
+    await ready;
+    const result = await call(method, { session_id: sessionId, name });
+    if (!isMcpToggleResult(result)) {
+      throw new Error(`invalid ${method} result`);
+    }
+    return result;
   }
 
   function call(method: string, params: Record<string, unknown>): Promise<unknown> {
@@ -873,13 +911,33 @@ export function connectGolem(options: ConnectOptions): GolemClient {
         pullListeners.delete(listener);
       };
     },
-    async listMcp(): Promise<McpListResult> {
+    async listMcp(sessionId?: string): Promise<McpListResult> {
       await ready;
-      const result = await call("mcp.list", {});
+      const result = await call("mcp.list", sessionId === undefined ? {} : { session_id: sessionId });
       if (!isMcpListResult(result)) {
         throw new Error("invalid mcp.list result");
       }
       return result;
+    },
+    async enableMcp(sessionId: string, name: string): Promise<McpToggleResult> {
+      return toggleMcp("mcp.enable", sessionId, name);
+    },
+    async disableMcp(sessionId: string, name: string): Promise<McpToggleResult> {
+      return toggleMcp("mcp.disable", sessionId, name);
+    },
+    async mcpTools(name: string, sessionId?: string): Promise<McpToolsResult> {
+      await ready;
+      const result = await call("mcp.tools", withSession({ name }, sessionId));
+      if (!isMcpToolsResult(result)) {
+        throw new Error("invalid mcp.tools result");
+      }
+      return result;
+    },
+    async restartMcp(name: string, sessionId?: string): Promise<McpServer> {
+      return mcpServerCall("mcp.restart", withSession({ name }, sessionId));
+    },
+    async setMcpEnabled(name: string, enabled: boolean | "on_demand", sessionId?: string): Promise<McpServer> {
+      return mcpServerCall("mcp.set_enabled", withSession({ name, enabled }, sessionId));
     },
     onMcpStatus(listener: (server: McpServer) => void): () => void {
       mcpListeners.add(listener);

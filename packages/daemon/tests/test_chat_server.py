@@ -653,7 +653,12 @@ async def test_rename_sets_the_title_a_watcher_sees(short_home: Path) -> None:
         assert rpc_result(renamed) == {"title": "Plans"}
         await _summaries_until(client, lambda found: any(s.get("title") == "Plans" for s in found))
         updated = await client.wait_for_event("session.updated")
-        assert _event_data(updated) == {"title": "Plans", "cwd": None, "allowed_tools": None}
+        assert _event_data(updated) == {
+            "title": "Plans",
+            "cwd": None,
+            "allowed_tools": None,
+            "mcp_servers": None,
+        }
 
         blank = await client.call("session.rename", {"session_id": session_id, "title": " "})
         assert error_code(blank) == INVALID_PARAMS

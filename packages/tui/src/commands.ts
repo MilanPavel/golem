@@ -19,6 +19,7 @@ export type ComposerOutcome =
   | { kind: "unknown"; notice: string }
   | { kind: "help" }
   | { kind: "mcp" }
+  | { kind: "mcp-toggle"; on: boolean; name: string }
   | { kind: "send"; text: string; debug: DebugState }
   | { kind: "sessions" }
   | { kind: "permissions" }
@@ -130,9 +131,19 @@ export const COMMANDS: readonly Command[] = [
   },
   {
     name: "/mcp",
-    args: "",
-    description: "Shows the MCP servers, their state, and their tools.",
-    run: withoutArgs({ kind: "mcp" }),
+    args: "[enable|disable <name>]",
+    description: "Manages the MCP servers: tools, reconnect, on or off. enable|disable <name> is a shortcut.",
+    choices: ["enable", "disable"],
+    run: (_debug, args) => {
+      const [action, name, ...extra] = args;
+      if (action === undefined) {
+        return { kind: "mcp" };
+      }
+      if ((action === "enable" || action === "disable") && name !== undefined && extra.length === 0) {
+        return { kind: "mcp-toggle", on: action === "enable", name };
+      }
+      return { kind: "unknown", notice: "/mcp, /mcp enable <name>, or /mcp disable <name>" };
+    },
   },
   {
     name: "/model",

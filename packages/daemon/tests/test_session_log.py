@@ -185,3 +185,16 @@ async def test_a_closed_target_stops_watching(database: Database) -> None:
     assert not bus.watched
     await _session(log, "s_a")
     assert watcher.summaries == []
+
+
+async def test_a_sessions_mcp_servers_are_kept_in_its_row(database: Database) -> None:
+    log = _log(database)
+    await _session(log, "s_a")
+    await log.emit("s_a", None, "session.updated", SessionUpdatedData(mcp_servers=["git", "web"]))
+    record = await SessionRecords(database).get("s_a")
+    assert record is not None and record.mcp_servers == ("git", "web")
+    await log.emit("s_a", None, "session.updated", SessionUpdatedData(title="Plans"))
+    record = await SessionRecords(database).get("s_a")
+    assert record is not None and (record.title, record.mcp_servers) == ("Plans", ("git", "web"))
+    with pytest.raises(ValidationError, match="mcp_servers"):
+        SessionUpdatedData()

@@ -4,6 +4,7 @@ export type AllowedTools = SessionAllowance[] | null;
 export type Subject = string | null;
 export type Tool = string;
 export type Cwd = string | null;
+export type McpServers = string[] | null;
 export type Title = string | null;
 export type RunId = null;
 export type Seq = number;
@@ -23,11 +24,13 @@ export interface SessionUpdatedEvent {
   type: Type;
 }
 /**
- * A session attribute changed: its title, its project folder, or its allowed tools.
+ * A session attribute changed: its title, folder, allowed tools, or MCP servers.
  *
  * A field left null did not change. ``cwd`` is set once, on a session made
  * before sessions had a folder, by the first ``message.send`` that names one.
- * ``allowed_tools`` is the whole list after ``session.revoke``.
+ * ``allowed_tools`` is the whole list after ``session.revoke``, and
+ * ``mcp_servers`` the on-demand MCP servers the session turned on, after
+ * ``mcp.enable`` or ``mcp.disable``.
  *
  * This interface was referenced by `SessionUpdatedEvent`'s JSON-Schema
  * via the `definition` "SessionUpdatedData".
@@ -35,6 +38,7 @@ export interface SessionUpdatedEvent {
 export interface SessionUpdatedData {
   allowed_tools?: AllowedTools;
   cwd?: Cwd;
+  mcp_servers?: McpServers;
   title?: Title;
 }
 /**

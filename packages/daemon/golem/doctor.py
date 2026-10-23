@@ -23,6 +23,7 @@ from pydantic import ValidationError
 
 from golem import launchd
 from golem.config import GolemSettings, load_settings
+from golem.mcp.launch import Secrets, find_command
 from golem.models.keys import KeyStore, KeyStoreError
 from golem.models.router import (
     OLLAMA_BASE_URL,
@@ -32,6 +33,7 @@ from golem.models.router import (
     ResolvedModel,
 )
 from golem.paths import GolemPaths
+from golem.secrets import SecretStoreError
 
 Status = Literal["ok", "warn", "fail"]
 
@@ -67,6 +69,10 @@ class Platform(Protocol):
         ...
 
     def has_command(self, name: str) -> bool: ...
+
+    def mcp_command(self, command: str) -> str | None:
+        """Where an MCP server's command is, searched as the daemon searches, or None."""
+        ...
 
 
 class MacPlatform:
@@ -110,9 +116,20 @@ class MacPlatform:
     def has_command(self, name: str) -> bool:
         return shutil.which(name) is not None
 
+    def mcp_command(self, command: str) -> str | None:
+        return find_command(command, os.environ)
 
-def run_checks(paths: GolemPaths, platform: Platform, keys: KeyStore) -> list[Check]:
-    """Every check, in the order the checklist shows them."""
+
+def run_checks(
+    paths: GolemPaths,
+    platform: Platform,
+    keys: KeyStore,
+    secrets: Secrets = lambda _name: None,
+) -> list[Check]:
+    """Every check, in the order the checklist shows them.
+
+    ``secrets`` reads the ``mcp/…`` secrets MCP servers name.
+    """
     checks = [service_check(platform)]
     socket = socket_check(paths)
     if socket is not None:
@@ -121,6 +138,7 @@ def run_checks(paths: GolemPaths, platform: Platform, keys: KeyStore) -> list[Ch
     checks.append(config)
     if settings is not None:
         checks.extend(model_checks(settings, platform, keys))
+        checks.extend(mcp_checks(settings, platform, secrets))
     checks.append(disk_check(paths, platform))
     return checks
 
@@ -194,6 +212,42 @@ def model_checks(settings: GolemSettings, platform: Platform, keys: KeyStore) ->
             checks.extend(_ollama_checks(provider_name, provider, models, platform))
         else:
             checks.append(_key_check(provider_name, provider, keys))
+    return checks
+
+
+def mcp_checks(settings: GolemSettings, platform: Platform, secrets: Secrets) -> list[Check]:
+    """One line per MCP server that may start: its command is found, and its secrets stored."""
+    checks: list[Check] = []
+    for name, server in sorted(settings.mcp.items()):
+        if server.enabled is False:
+            continue
+        label = f"mcp {name}"
+        try:
+            missing = [secret for secret in server.secrets if not secrets(secret)]
+        except SecretStoreError as exc:
+            checks.append(
+                Check(label, "fail", str(exc), "unlock the login Keychain, then try again")
+            )
+            continue
+        if missing:
+            checks.append(
+                Check(
+                    label,
+                    "fail",
+                    f"no secret {missing[0]} in the Keychain",
+                    f"golem auth set {missing[0]}",
+                )
+            )
+            continue
+        if server.command is None:
+            checks.append(Check(label, "ok", f"reaches {server.url}"))
+            continue
+        found = platform.mcp_command(server.command)
+        if found is None:
+            fix = "install it, or set command to its full path in config.toml"
+            checks.append(Check(label, "fail", f"command not found: {server.command}", fix))
+            continue
+        checks.append(Check(label, "ok", f"runs {found}"))
     return checks
 
 

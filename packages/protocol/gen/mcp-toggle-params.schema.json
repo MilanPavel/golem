@@ -1,0 +1,22 @@
+{
+  "additionalProperties": false,
+  "description": "``mcp.enable`` and ``mcp.disable``: an on-demand server, for one session.",
+  "properties": {
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "session_id",
+    "name"
+  ],
+  "title": "McpToggleParams",
+  "type": "object"
+}

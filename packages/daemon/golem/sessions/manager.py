@@ -37,7 +37,7 @@ from golem.sessions.runner import (
 )
 from golem.sessions.titles import TitleGenerator, choose_title, clean_title, fork_title
 from golem.store.records import RunRecords, SessionActivity, SessionRecords
-from golem.tools.registry import ToolError
+from golem.tools.registry import ToolError, ToolScope
 from golem_protocol.events import (
     ApprovalDecision,
     ChatEvent,
@@ -115,6 +115,7 @@ class _LiveSession:
     schema_version: int
     cwd: str | None = None
     allowed_tools: set[Allowance] = field(default_factory=set[Allowance])
+    mcp_servers: set[str] = field(default_factory=set[str])
     title: str | None = None
     titling: bool = False
     closed: bool = False
@@ -372,6 +373,7 @@ class SessionManager:
                 assistant_message_id=new_id("m"),
                 cwd=session.cwd,
                 allowed_tools=_ordered(session.allowed_tools),
+                mcp_servers=tuple(sorted(session.mcp_servers)),
             )
             control = RunControl()
             await self._start(session, turn.run_id, control, self._turn(session, turn, control))
@@ -435,6 +437,7 @@ class SessionManager:
                 rule=rule,
                 diff=pending.diff,
                 args=args,
+                mcp_servers=tuple(sorted(session.mcp_servers)),
             )
             control = RunControl()
             work = self._resumed(session, resume, control, pending.prompt)
@@ -467,6 +470,33 @@ class SessionManager:
             )
             return True
 
+    async def tool_scope(self, session_id: str) -> ToolScope:
+        """The outside tools ``session_id`` sees: its folder and its enabled MCP servers."""
+        async with self._lock:
+            return _scope(await self._resolve(session_id))
+
+    async def set_mcp(self, session_id: str, name: str, enabled: bool) -> list[str]:
+        """Turn the on-demand MCP server ``name`` on or off for the session.
+
+        Stores ``session.updated`` with the whole list when it changed, so it
+        survives a restart. Returns the list. Whether ``name`` is an
+        on-demand server is the caller's check.
+        """
+        async with self._lock:
+            session = await self._resolve(session_id)
+            if (name in session.mcp_servers) != enabled:
+                if enabled:
+                    session.mcp_servers.add(name)
+                else:
+                    session.mcp_servers.discard(name)
+                await self._events.emit(
+                    session_id,
+                    None,
+                    "session.updated",
+                    SessionUpdatedData(mcp_servers=sorted(session.mcp_servers)),
+                )
+            return sorted(session.mcp_servers)
+
     def _check_edited(
         self, session: _LiveSession, name: str, decision: ApprovalDecision, args: dict[str, object]
     ) -> dict[str, object]:
@@ -478,7 +508,7 @@ class SessionManager:
         if decision != "allow":
             raise InvalidToolArgsError("edited arguments run once, so the answer must be allow")
         root = None if session.cwd is None else Path(session.cwd)
-        tools, policy = self._runtime.tools, self._runtime.policy
+        tools, policy = self._runtime.tools.scoped(_scope(session)), self._runtime.policy
         try:
             checked = tools.validate(name, args)
         except ToolError as exc:
@@ -490,9 +520,9 @@ class SessionManager:
 
     async def _remember(self, session: _LiveSession, name: str, args: dict[str, object]) -> str:
         root = None if session.cwd is None else Path(session.cwd)
-        policy = self._runtime.policy
+        policy, tools = self._runtime.policy, self._runtime.tools.scoped(_scope(session))
         try:
-            return await asyncio.to_thread(policy.remember, self._runtime.tools, name, args, root)
+            return await asyncio.to_thread(policy.remember, tools, name, args, root)
         except (OSError, ValueError) as exc:
             raise RuleWriteError(str(exc)) from exc
 
@@ -636,6 +666,7 @@ class SessionManager:
             title=None if record is None else record.title,
             cwd=None if record is None else record.cwd,
             allowed_tools=set() if record is None else set(record.allowed_tools),
+            mcp_servers=set() if record is None else set(record.mcp_servers),
         )
         if record is None:
             await self._announce(session)
@@ -664,6 +695,11 @@ class SessionManager:
     def _named(self, task: asyncio.Task[None]) -> None:
         self._naming.discard(task)
         _report(task, "title task failed")
+
+
+def _scope(session: _LiveSession) -> ToolScope:
+    root = None if session.cwd is None else Path(session.cwd)
+    return ToolScope(root=root, enabled=frozenset(session.mcp_servers))
 
 
 def _ordered(allowed: set[Allowance]) -> tuple[Allowance, ...]:

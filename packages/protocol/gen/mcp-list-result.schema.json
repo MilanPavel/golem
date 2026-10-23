@@ -2,11 +2,35 @@
   "$defs": {
     "McpServer": {
       "additionalProperties": false,
-      "description": "One MCP server from ``[mcp.<name>]``.\n\n``command`` is the command line golem runs. ``tools`` are the tool names\nthe model sees, ``mcp__<server>__<tool>``, while it is ``running``.\n``error`` says why it is ``failed``.",
+      "description": "One MCP server from ``[mcp.<name>]``.\n\n``command`` is the command line golem runs, or the URL it reaches.\n``project`` is the folder whose ``.golem/config.toml`` names the server,\nor null for the user's own. ``on_demand`` servers are ``idle`` until a\nsession turns one on, and ``enabled`` says whether the asking session\nhas it, when ``mcp.list`` named one. ``tools`` are the names the model\nsees, ``mcp__<server>__<tool>``, while it is ``running``, and\n``schema_tokens`` roughly what their schemas cost in each prompt.\n``error`` says why it is ``failed``, and ``retry_seconds`` when golem\ntries again. ``config`` is the file that names the server.",
       "properties": {
         "command": {
           "title": "Command",
           "type": "string"
+        },
+        "config": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Config"
+        },
+        "enabled": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Enabled"
         },
         "error": {
           "anyOf": [
@@ -25,8 +49,52 @@
           "title": "Name",
           "type": "string"
         },
+        "on_demand": {
+          "default": false,
+          "title": "On Demand",
+          "type": "boolean"
+        },
+        "project": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Project"
+        },
+        "retry_seconds": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Retry Seconds"
+        },
+        "schema_tokens": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Schema Tokens"
+        },
         "state": {
           "enum": [
+            "idle",
             "starting",
             "running",
             "failed",

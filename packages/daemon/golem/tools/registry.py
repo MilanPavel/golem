@@ -174,37 +174,72 @@ class Tool[A: BaseModel]:
             raise ToolError(f"invalid arguments for {self.name}: {_problems(exc)}") from exc
 
 
-class ToolRegistry:
-    """golem's own tools, plus the ones ``extra`` returns at the time of asking.
+@dataclass(frozen=True, slots=True)
+class ToolScope:
+    """Which outside tools one session sees.
 
-    ``extra`` is how tools that come and go, such as an MCP server's, join:
-    a server that starts after the daemon adds its tools to the next model
-    call. A built-in tool keeps its name if an extra one has it too.
+    ``root`` is its folder, which may bring a trusted project's MCP servers,
+    and ``enabled`` the on-demand servers it turned on with ``/mcp enable``.
     """
 
-    def __init__(
-        self,
-        tools: Iterable[Tool[Any]],
-        extra: Callable[[], Iterable[Tool[Any]]] | None = None,
-    ) -> None:
+    root: Path | None = None
+    enabled: frozenset[str] = frozenset()
+
+
+class ToolSource(Protocol):
+    """Tools that come and go, such as MCP servers', by session."""
+
+    def tools(self, scope: ToolScope) -> Iterable[Tool[Any]]:
+        """The tools ``scope`` sees right now."""
+        ...
+
+    async def prepare(self, scope: ToolScope) -> None:
+        """Start what ``scope`` needs, and wait a little for it to be ready."""
+        ...
+
+
+class ToolRegistry:
+    """golem's own tools, plus a session's outside tools once :meth:`scoped`.
+
+    The registry built with a ``source`` has only golem's own tools. Each
+    model call and each tool call asks :meth:`scoped` for the session's view,
+    so a server that started since the last call adds its tools, and a
+    session never reaches a server it does not have. A built-in tool keeps
+    its name if an outside one has it too.
+    """
+
+    def __init__(self, tools: Iterable[Tool[Any]], source: ToolSource | None = None) -> None:
         self._tools = {tool.name: tool for tool in tools}
-        self._extra = extra
+        self._source = source
         self._schemas = [tool.schema() for tool in self._tools.values()]
+        self._extra: dict[str, Tool[Any]] = {}
+
+    def scoped(self, scope: ToolScope) -> ToolRegistry:
+        """This registry with the outside tools ``scope`` sees."""
+        view = ToolRegistry.__new__(ToolRegistry)
+        view._tools, view._source, view._schemas = self._tools, self._source, self._schemas
+        found: Iterable[Tool[Any]] = () if self._source is None else self._source.tools(scope)
+        view._extra = {tool.name: tool for tool in found if tool.name not in self._tools}
+        return view
+
+    async def prepare(self, scope: ToolScope) -> None:
+        if self._source is not None:
+            await self._source.prepare(scope)
 
     @property
     def names(self) -> list[str]:
-        return list(self._all())
+        return [*self._tools, *self._extra]
 
     def get(self, name: str) -> Tool[Any] | None:
-        return self._tools.get(name) or self._all().get(name)
+        return self._tools.get(name) or self._extra.get(name)
 
     def default_allowed(self) -> list[str]:
         """Tools the built-in rules allow without asking: read-only or internal ones."""
-        return [tool.name for tool in self._all().values() if tool.read_only or tool.internal]
+        tools = [*self._tools.values(), *self._extra.values()]
+        return [tool.name for tool in tools if tool.read_only or tool.internal]
 
     def schemas(self) -> list[dict[str, object]]:
-        extra = [tool.schema() for name, tool in self._all().items() if name not in self._tools]
-        return [*self._schemas, *extra]
+        return [*self._schemas, *(tool.schema() for tool in self._extra.values())]
 
     async def preview(
         self, name: str, raw: Mapping[str, object], ctx: ToolContext
@@ -233,12 +268,6 @@ class ToolRegistry:
             raise ToolError(f"unknown tool {name!r}; the tools are {', '.join(self.names)}")
         return tool
 
-    def _all(self) -> dict[str, Tool[Any]]:
-        if self._extra is None:
-            return self._tools
-        found = {tool.name: tool for tool in self._extra() if tool.name not in self._tools}
-        return {**self._tools, **found}
-
 
 def _problems(exc: ValidationError) -> str:
     parts: list[str] = []
@@ -259,4 +288,6 @@ __all__ = [
     "ToolError",
     "ToolRegistry",
     "ToolResult",
+    "ToolScope",
+    "ToolSource",
 ]

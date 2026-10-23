@@ -20,11 +20,12 @@ from golem.lock import DaemonAlreadyRunning, DaemonLock
 from golem.logging import configure_logging
 from golem.mcp import McpSupervisor
 from golem.models.discovery import ModelDiscovery
-from golem.models.keys import KeychainStore
+from golem.models.keys import ProviderKeys
 from golem.models.pulls import PullManager
 from golem.models.router import ModelRouter
 from golem.paths import GolemPaths, resolve_paths
 from golem.permissions.policy import Policy
+from golem.secrets import KeychainSecrets, SecretStore
 from golem.server.connection import ClientConnection
 from golem.server.dispatcher import (
     PARSE_ERROR,
@@ -82,6 +83,7 @@ class DaemonApp:
         discovery: Callable[[ModelRouter], ModelDiscovery] | None = None,
         pulls: Callable[[ModelRouter, float | None], PullManager] | None = None,
         mcp: McpSupervisor | None = None,
+        secrets: SecretStore | None = None,
     ) -> None:
         self.paths = paths
         self._router = router
@@ -89,7 +91,7 @@ class DaemonApp:
         self._discovery = discovery
         self._pulls = pulls
         self._mcp = mcp
-        self.state = DaemonState(paths=paths, started_at=time.monotonic())
+        self.state = DaemonState(paths=paths, started_at=time.monotonic(), secrets=secrets)
         methods = standard_methods()
         if extra_methods:
             methods.update(extra_methods)
@@ -124,15 +126,21 @@ class DaemonApp:
         try:
             settings = load_settings(home=self.paths.home, project_dir=self.paths.home)
             router = self._router or ModelRouter(settings, home=self.paths.home)
-            mcp = self._mcp or McpSupervisor(settings.mcp)
+            policy = Policy(self.paths.config_file)
+            mcp = self._mcp or McpSupervisor(
+                settings.mcp,
+                user_config=self.paths.config_file,
+                trusted=policy.trusted,
+                secrets=self._secret,
+            )
             mcp.broadcast = self._broadcast
             self.state.mcp = mcp
             async with (
                 Database.open(self.paths.database_file) as database,
                 open_checkpoints(database, self.paths.checkpoints_file) as saver,
             ):
-                self.state.policy = Policy(self.paths.config_file)
-                self.state.tools = default_registry(mcp.tools)
+                self.state.policy = policy
+                self.state.tools = default_registry(mcp)
                 self.state.artifacts = ArtifactStore(database)
                 self.state.sessions = await _open_sessions(
                     database,
@@ -180,6 +188,11 @@ class DaemonApp:
             self.state.models = None
             self.state.sessions = None
             self._lock.release()
+
+    def _secret(self, name: str) -> str | None:
+        """An MCP server's secret, ``mcp/<name>``, from the daemon's store."""
+        secrets = self.state.secrets
+        return None if secrets is None else secrets.get(name)
 
     def _broadcast(self, notification: BaseModel) -> None:
         """Queue ``notification`` on every connection that said hello."""
@@ -329,9 +342,10 @@ async def serve_forever() -> int:
     settings = load_settings(home=paths.home, project_dir=paths.home)
     configure_logging(settings, paths)
     paths.ensure_layout()
-    router = ModelRouter(settings, home=paths.home, keys=KeychainStore())
+    secrets = KeychainSecrets()
+    router = ModelRouter(settings, home=paths.home, keys=ProviderKeys(secrets))
     titles = ModelTitles(router) if settings.session_titles else None
-    app = DaemonApp(paths, router=router, titles=titles)
+    app = DaemonApp(paths, router=router, titles=titles, secrets=secrets)
     try:
         await app.serve()
     except DaemonAlreadyRunning as exc:

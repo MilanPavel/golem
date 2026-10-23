@@ -1,0 +1,42 @@
+{
+  "additionalProperties": false,
+  "description": "``mcp.set_enabled``. Write ``enabled`` into the file that names the server.\n\n``true`` is for every session, ``\"on_demand\"`` for the sessions that turn it\non, and ``false`` stops it everywhere. The change applies at once.",
+  "properties": {
+    "enabled": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "const": "on_demand",
+          "type": "string"
+        }
+      ],
+      "title": "Enabled"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "session_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Session Id"
+    }
+  },
+  "required": [
+    "name",
+    "enabled"
+  ],
+  "title": "McpSetEnabledParams",
+  "type": "object"
+}

@@ -82,6 +82,7 @@ class Turn:
     assistant_message_id: str
     cwd: str | None = None
     allowed_tools: tuple[Allowance, ...] = ()
+    mcp_servers: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -109,6 +110,7 @@ class Resume:
     rule: str | None = None
     diff: str | None = None
     args: dict[str, object] | None = None
+    mcp_servers: tuple[str, ...] = ()
 
 
 @dataclass
@@ -176,6 +178,7 @@ async def run_turn(
             assistant_message_id=turn.assistant_message_id,
             cwd=turn.cwd,
             allowed_tools=turn.allowed_tools,
+            mcp_servers=turn.mcp_servers,
         )
         return await _finish(stream, progress, emit)
     except asyncio.CancelledError:
@@ -224,6 +227,7 @@ async def resume_turn(
             cwd=resume.cwd,
             allowed_tools=resume.allowed_tools,
             asked=resume.asked,
+            mcp_servers=resume.mcp_servers,
         )
         return await _finish(stream, progress, emit)
     except asyncio.CancelledError:

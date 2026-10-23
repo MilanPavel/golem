@@ -83,4 +83,5 @@ MIGRATIONS: tuple[tuple[str, ...], ...] = (
         )
         """,
     ),
+    ("ALTER TABLE sessions ADD COLUMN mcp_servers TEXT",),
 )

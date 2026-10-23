@@ -38,7 +38,14 @@ from golem.graphs.adapter import APPROVAL_KIND, STREAM_KEY
 from golem.graphs.state import AgentState
 from golem.permissions.engine import Allowance, session_allows
 from golem.permissions.policy import Policy, describe, explain
-from golem.tools.registry import Artifacts, Preview, ToolContext, ToolError, ToolRegistry
+from golem.tools.registry import (
+    Artifacts,
+    Preview,
+    ToolContext,
+    ToolError,
+    ToolRegistry,
+    ToolScope,
+)
 
 log = logging.getLogger("golem.graphs")
 
@@ -50,6 +57,9 @@ ALLOWED_KEY = "golem_allowed_tools"
 
 ASKED_KEY = "golem_asked_calls"
 """``configurable`` key for the call ids this run has already asked about, in order."""
+
+MCP_KEY = "golem_mcp_servers"
+"""``configurable`` key for the on-demand MCP servers the session turned on."""
 
 PREVIEW_CHARS = 4_000
 
@@ -118,6 +128,7 @@ def tools_node(
         last = state["messages"][-1]
         if not isinstance(last, AIMessage):
             return {"messages": []}
+        session_tools = registry.scoped(scope_of(config))
         session_id = state.get("session_id")
         base = ToolContext(
             root=_root(config),
@@ -135,9 +146,12 @@ def tools_node(
         planned: dict[Path, str] = {}
         verdicts: list[_Verdict] = []
         for index, call in enumerate(last.tool_calls):
-            preview = await _preview(registry, call, replace(base, planned=dict(planned)))
+            if session_tools.get(call["name"]) is None:
+                verdicts.append(_Verdict(run=False, message=unavailable(call["name"])))
+                continue
+            preview = await _preview(session_tools, call, replace(base, planned=dict(planned)))
             verdict = _decide(
-                registry,
+                session_tools,
                 policy,
                 call,
                 base,
@@ -149,7 +163,9 @@ def tools_node(
             )
             if verdict.run and verdict.args is not None:
                 edited = cast(ToolCall, {**call, "args": verdict.args})
-                preview = await _preview(registry, edited, replace(base, planned=dict(planned)))
+                preview = await _preview(
+                    session_tools, edited, replace(base, planned=dict(planned))
+                )
             if verdict.run and isinstance(preview, Preview):
                 planned[preview.path] = preview.after
             verdicts.append(verdict)
@@ -170,7 +186,7 @@ def tools_node(
             )
             args = call["args"] if verdict.args is None else verdict.args
             try:
-                result = await registry.call(call["name"], args, ctx)
+                result = await session_tools.call(call["name"], args, ctx)
             except ToolError as exc:
                 message = str(exc) or type(exc).__name__
                 write({STREAM_KEY: "tool.failed", "call_id": call_id, "message": message})
@@ -182,7 +198,7 @@ def tools_node(
                 write({STREAM_KEY: "tool.failed", "call_id": call_id, "message": message})
                 results.append(_result(call_id, call["name"], f"error: {message}", error=True))
                 continue
-            tool = registry.get(call["name"])
+            tool = session_tools.get(call["name"])
             kind = "untrusted" if tool is not None and tool.untrusted else "tool_output"
             output, artifact_id = await _for_model(
                 artifacts, session_id, call_id, result.output, kind
@@ -373,6 +389,27 @@ def _asked(config: RunnableConfig) -> set[str]:
     return {item for item in cast(Sequence[object], raw) if isinstance(item, str)}
 
 
+def unavailable(name: str) -> str:
+    """Why a call to a tool the session does not have did not run."""
+    if name.startswith("mcp__"):
+        server = name.removeprefix("mcp__").split("__", 1)[0]
+        return (
+            f"{name} is not available in this session: the MCP server {server} is not "
+            f"running, or not enabled here (/mcp enable {server})"
+        )
+    return f"unknown tool {name!r}"
+
+
+def scope_of(config: RunnableConfig) -> ToolScope:
+    """The outside tools this run's session sees: its folder and its enabled servers."""
+    configurable = cast(Mapping[str, object], config.get("configurable", {}))
+    raw = configurable.get(MCP_KEY)
+    names = cast(Sequence[object], raw) if isinstance(raw, list | tuple) else ()
+    return ToolScope(
+        root=_root(config), enabled=frozenset(name for name in names if isinstance(name, str))
+    )
+
+
 def _root(config: RunnableConfig) -> Path | None:
     configurable = cast(Mapping[str, object], config.get("configurable", {}))
     raw = configurable.get(CWD_KEY)
@@ -387,11 +424,14 @@ __all__ = [
     "CHANGED_RESULT",
     "CWD_KEY",
     "DENIED_RESULT",
+    "MCP_KEY",
     "PREVIEW_CHARS",
     "STATE_KEYS",
     "Answer",
     "call_id_of",
     "cancelled_results",
+    "scope_of",
     "tools_node",
     "unanswered_calls",
+    "unavailable",
 ]

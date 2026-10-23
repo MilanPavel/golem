@@ -1,7 +1,21 @@
 {
   "additionalProperties": false,
-  "description": "``mcp.list``. Every configured MCP server and its state.",
-  "properties": {},
+  "description": "``mcp.list``. The user's MCP servers and their state.\n\nWith ``session_id``, also the servers of that session's trusted project,\nand whether each one is on for the session.",
+  "properties": {
+    "session_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Session Id"
+    }
+  },
   "title": "McpListParams",
   "type": "object"
 }

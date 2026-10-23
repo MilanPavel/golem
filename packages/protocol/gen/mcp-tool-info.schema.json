@@ -1,0 +1,21 @@
+{
+  "additionalProperties": false,
+  "description": "One of a server's tools: the name the model sees, and what it says it does.",
+  "properties": {
+    "description": {
+      "title": "Description",
+      "type": "string"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "description"
+  ],
+  "title": "McpToolInfo",
+  "type": "object"
+}

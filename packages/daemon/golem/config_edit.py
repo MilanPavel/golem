@@ -14,11 +14,30 @@ import tomlkit
 from tomlkit.items import AoT, Table
 from tomlkit.toml_document import TOMLDocument
 
-from golem.config import PolicyRule, RuleAction
+from golem.config import McpEnabled, PolicyRule, RuleAction
 
 
 class RuleIndexError(ValueError):
     """The file has no ``[[rule]]`` with this number."""
+
+
+class McpTableError(ValueError):
+    """The file has no ``[mcp.<name>]`` table."""
+
+
+def set_mcp_enabled(config_file: Path, name: str, enabled: McpEnabled) -> None:
+    """Set ``enabled`` in ``[mcp.<name>]``. ``true`` is the default, so it removes the key."""
+    document = _read(config_file)
+    servers = cast(object, document.get("mcp"))  # pyright: ignore[reportUnknownMemberType]
+    table = cast(object, servers.get(name)) if isinstance(servers, Table) else None  # pyright: ignore[reportUnknownMemberType]
+    if not isinstance(table, Table):
+        raise McpTableError(f"{config_file} has no [mcp.{name}]")
+    if enabled is True:
+        if "enabled" in table:
+            del table["enabled"]
+    else:
+        table["enabled"] = enabled
+    _write(config_file, document)
 
 
 def set_default_model(config_file: Path, model: str) -> None:

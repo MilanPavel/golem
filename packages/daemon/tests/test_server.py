@@ -24,6 +24,7 @@ from golem.models.discovery import ModelDiscovery
 from golem.models.pulls import PullManager
 from golem.models.router import ModelRouter
 from golem.paths import resolve_paths
+from golem.secrets import SecretStore
 from golem.server.app import DaemonApp, SocketPathTooLong, assert_socket_path_fits
 from golem.server.dispatcher import (
     HELLO_REQUIRED,
@@ -219,6 +220,7 @@ async def start_daemon(
     titles: TitleGenerator | None = None,
     discovery: Callable[[ModelRouter], ModelDiscovery] | None = None,
     pulls: Callable[[ModelRouter, float | None], PullManager] | None = None,
+    secrets: SecretStore | None = None,
 ) -> tuple[DaemonApp, asyncio.Task[None]]:
     paths = resolve_paths(home)
     paths.ensure_layout()
@@ -231,6 +233,7 @@ async def start_daemon(
         titles=titles,
         discovery=discovery,
         pulls=pulls,
+        secrets=secrets,
     )
     task = asyncio.create_task(app.serve(install_signals=False))
     await _wait_listening(paths.socket_path, task)

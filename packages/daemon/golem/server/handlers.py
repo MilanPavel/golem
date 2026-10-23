@@ -6,6 +6,7 @@ import asyncio
 import logging
 import os
 import time
+from dataclasses import replace
 from pathlib import Path
 from typing import Literal
 
@@ -13,11 +14,13 @@ from pydantic import BaseModel, ConfigDict
 
 from golem import __version__
 from golem.config import load_settings
-from golem.config_edit import RuleIndexError, set_default_model
+from golem.config_edit import McpTableError, RuleIndexError, set_default_model, set_mcp_enabled
+from golem.mcp import McpServerError, McpSupervisor
 from golem.models.keys import KeyStore, KeyStoreError
 from golem.models.pulls import PullError, PullManager
 from golem.models.router import ModelConfigError, ModelRouter
 from golem.permissions.policy import PROJECT_POLICY
+from golem.secrets import SecretStore, SecretStoreError, check_name
 from golem.server.dispatcher import (
     APPROVAL_NOT_FOUND,
     ARTIFACT_NOT_FOUND,
@@ -49,6 +52,7 @@ from golem.sessions.manager import (
     SessionNotFoundError,
 )
 from golem.sessions.summaries import summarize
+from golem.tools.registry import ToolScope
 from golem_protocol.commands import (
     ApprovalRespondParams,
     ApprovalRespondResult,
@@ -73,6 +77,13 @@ from golem_protocol.commands import (
     ListedProvider,
     McpListParams,
     McpListResult,
+    McpServer,
+    McpServerParams,
+    McpSetEnabledParams,
+    McpToggleParams,
+    McpToggleResult,
+    McpToolInfo,
+    McpToolsResult,
     MessageSendParams,
     MessageSendResult,
     ModelDeleteParams,
@@ -119,6 +130,8 @@ from golem_protocol.events import Ping
 from golem_protocol.version import PROTOCOL_MAJOR, PROTOCOL_MINOR
 
 log = logging.getLogger("golem.server")
+
+MCP_PREFIX = "mcp/"
 
 
 class _EmptyParams(BaseModel):
@@ -316,11 +329,21 @@ async def _session_inspect(
 
 
 async def _auth_set(ctx: RequestContext, params: AuthSetParams) -> AuthSetResult:
-    router = _sessions(ctx).router
-    store = _key_store(router, params.provider)
     key = params.key.get_secret_value().strip()
     if key == "" or any(char.isspace() for char in key):
         raise RpcCallError(INVALID_PARAMS, "the key is empty or has spaces in it")
+    if params.provider.startswith(MCP_PREFIX):
+        secrets = _mcp_secrets(ctx, params.provider)
+        try:
+            await asyncio.to_thread(secrets.set, params.provider, key)
+        except SecretStoreError as exc:
+            raise RpcCallError(KEYCHAIN_UNAVAILABLE, str(exc)) from exc
+        log.info("stored secret %s", params.provider)
+        if ctx.state.mcp is not None:
+            ctx.state.mcp.secret_changed(params.provider)
+        return AuthSetResult(provider=params.provider)
+    router = _sessions(ctx).router
+    store = _key_store(router, params.provider)
     try:
         await asyncio.to_thread(store.set, params.provider, key)
     except KeyStoreError as exc:
@@ -330,6 +353,14 @@ async def _auth_set(ctx: RequestContext, params: AuthSetParams) -> AuthSetResult
 
 
 async def _auth_remove(ctx: RequestContext, params: AuthRemoveParams) -> AuthRemoveResult:
+    if params.provider.startswith(MCP_PREFIX):
+        secrets = _mcp_secrets(ctx, params.provider)
+        try:
+            removed = await asyncio.to_thread(secrets.delete, params.provider)
+        except SecretStoreError as exc:
+            raise RpcCallError(KEYCHAIN_UNAVAILABLE, str(exc)) from exc
+        log.info("removed secret %s removed=%s", params.provider, removed)
+        return AuthRemoveResult(provider=params.provider, removed=removed)
     router = _sessions(ctx).router
     store = _key_store(router, params.provider)
     try:
@@ -340,25 +371,50 @@ async def _auth_remove(ctx: RequestContext, params: AuthRemoveParams) -> AuthRem
     return AuthRemoveResult(provider=params.provider, removed=removed)
 
 
+def _mcp_secrets(ctx: RequestContext, name: str) -> SecretStore:
+    """The store for an MCP server's secret, once ``name`` is ``mcp/<name>``."""
+    try:
+        check_name(name)
+    except ValueError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+    if ctx.state.secrets is None:
+        raise RpcCallError(KEYCHAIN_UNAVAILABLE, "this daemon has no secret store")
+    return ctx.state.secrets
+
+
 async def _auth_list(ctx: RequestContext, params: AuthListParams) -> AuthListResult:
     del params
     router = _sessions(ctx).router
     try:
         statuses = await asyncio.to_thread(router.key_statuses)
+        stored = await asyncio.to_thread(_mcp_stored, ctx)
     except KeyStoreError as exc:
         raise RpcCallError(KEYCHAIN_UNAVAILABLE, str(exc)) from exc
-    return AuthListResult(
-        providers=[
-            AuthKeyStatus(
-                provider=status.provider,
-                takes_key=status.takes_key,
-                needs_key=status.needs_key,
-                env_var=status.env_var,
-                source=status.source,
-            )
-            for status in statuses
-        ]
-    )
+    keys = [
+        AuthKeyStatus(
+            provider=status.provider,
+            takes_key=status.takes_key,
+            needs_key=status.needs_key,
+            env_var=status.env_var,
+            source=status.source,
+        )
+        for status in statuses
+    ]
+    secrets = [
+        AuthKeyStatus(
+            provider=name, takes_key=True, needs_key=True, source="keychain" if found else None
+        )
+        for name, found in stored
+    ]
+    return AuthListResult(providers=[*keys, *secrets])
+
+
+def _mcp_stored(ctx: RequestContext) -> list[tuple[str, bool]]:
+    """Each ``mcp/…`` secret the MCP servers name, and whether the store has it."""
+    mcp, secrets = ctx.state.mcp, ctx.state.secrets
+    if mcp is None or secrets is None:
+        return []
+    return [(name, bool(secrets.get(name))) for name in mcp.secret_names()]
 
 
 async def _model_list(ctx: RequestContext, params: ModelListParams) -> ModelListResult:
@@ -520,9 +576,87 @@ async def _session_revoke(ctx: RequestContext, params: SessionRevokeParams) -> S
 
 
 async def _mcp_list(ctx: RequestContext, params: McpListParams) -> McpListResult:
-    del params
     mcp = ctx.state.mcp
-    return McpListResult(servers=[] if mcp is None else mcp.statuses())
+    if mcp is None:
+        return McpListResult(servers=[])
+    if params.session_id is None:
+        return McpListResult(servers=mcp.statuses())
+    scope = await _tool_scope(ctx, params.session_id)
+    return McpListResult(servers=mcp.statuses(scope))
+
+
+async def _mcp_enable(ctx: RequestContext, params: McpToggleParams) -> McpToggleResult:
+    return await _mcp_toggle(ctx, params, True)
+
+
+async def _mcp_disable(ctx: RequestContext, params: McpToggleParams) -> McpToggleResult:
+    return await _mcp_toggle(ctx, params, False)
+
+
+async def _mcp_toggle(ctx: RequestContext, params: McpToggleParams, on: bool) -> McpToggleResult:
+    mcp = ctx.state.mcp
+    if mcp is None:
+        raise RpcCallError(INTERNAL_ERROR, "MCP servers are not ready")
+    scope = await _tool_scope(ctx, params.session_id)
+    try:
+        mcp.check_toggle(scope, params.name)
+    except McpServerError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+    names = await _sessions(ctx).set_mcp(params.session_id, params.name, on)
+    if on:
+        mcp.start_for(replace(scope, enabled=frozenset(names)))
+    return McpToggleResult(session_id=params.session_id, mcp_servers=names)
+
+
+async def _mcp_tools(ctx: RequestContext, params: McpServerParams) -> McpToolsResult:
+    mcp = _mcp(ctx)
+    scope = await _optional_scope(ctx, params.session_id)
+    try:
+        listed = mcp.tool_list(scope, params.name)
+    except McpServerError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+    tools = [McpToolInfo(name=name, description=text) for name, text in listed]
+    return McpToolsResult(name=params.name, tools=tools)
+
+
+async def _mcp_restart(ctx: RequestContext, params: McpServerParams) -> McpServer:
+    mcp = _mcp(ctx)
+    scope = await _optional_scope(ctx, params.session_id)
+    try:
+        return mcp.restart(scope, params.name)
+    except McpServerError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+
+
+async def _mcp_set_enabled(ctx: RequestContext, params: McpSetEnabledParams) -> McpServer:
+    mcp = _mcp(ctx)
+    scope = await _optional_scope(ctx, params.session_id)
+    try:
+        path = mcp.config_file(scope, params.name)
+        await asyncio.to_thread(set_mcp_enabled, path, params.name, params.enabled)
+        mcp.reload(path)
+        return mcp.status(scope, params.name)
+    except (McpServerError, McpTableError) as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+    except OSError as exc:
+        raise RpcCallError(INTERNAL_ERROR, f"could not write the config file: {exc}") from exc
+
+
+def _mcp(ctx: RequestContext) -> McpSupervisor:
+    if ctx.state.mcp is None:
+        raise RpcCallError(INTERNAL_ERROR, "MCP servers are not ready")
+    return ctx.state.mcp
+
+
+async def _optional_scope(ctx: RequestContext, session_id: str | None) -> ToolScope:
+    return ToolScope() if session_id is None else await _tool_scope(ctx, session_id)
+
+
+async def _tool_scope(ctx: RequestContext, session_id: str) -> ToolScope:
+    try:
+        return await _sessions(ctx).tool_scope(session_id)
+    except SessionNotFoundError as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, f"session not found: {session_id}") from exc
 
 
 def _pulls(ctx: RequestContext) -> PullManager:
@@ -620,6 +754,11 @@ def standard_methods() -> dict[str, Method]:
         "auth.list": Method("auth.list", AuthListParams, True, _auth_list),
         "model.list": Method("model.list", ModelListParams, True, _model_list),
         "mcp.list": Method("mcp.list", McpListParams, True, _mcp_list),
+        "mcp.enable": Method("mcp.enable", McpToggleParams, True, _mcp_enable),
+        "mcp.disable": Method("mcp.disable", McpToggleParams, True, _mcp_disable),
+        "mcp.tools": Method("mcp.tools", McpServerParams, True, _mcp_tools),
+        "mcp.restart": Method("mcp.restart", McpServerParams, True, _mcp_restart),
+        "mcp.set_enabled": Method("mcp.set_enabled", McpSetEnabledParams, True, _mcp_set_enabled),
         "model.probe": Method("model.probe", ModelProbeParams, True, _model_probe),
         "model.pull": Method("model.pull", ModelPullParams, True, _model_pull),
         "model.pull_cancel": Method(

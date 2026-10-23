@@ -113,11 +113,13 @@ class SessionAllowance(BaseModel):
 
 
 class SessionUpdatedData(BaseModel):
-    """A session attribute changed: its title, its project folder, or its allowed tools.
+    """A session attribute changed: its title, folder, allowed tools, or MCP servers.
 
     A field left null did not change. ``cwd`` is set once, on a session made
     before sessions had a folder, by the first ``message.send`` that names one.
-    ``allowed_tools`` is the whole list after ``session.revoke``.
+    ``allowed_tools`` is the whole list after ``session.revoke``, and
+    ``mcp_servers`` the on-demand MCP servers the session turned on, after
+    ``mcp.enable`` or ``mcp.disable``.
     """
 
     model_config = _CONFIG
@@ -125,11 +127,13 @@ class SessionUpdatedData(BaseModel):
     title: str | None = Field(default=None, min_length=1)
     cwd: str | None = Field(default=None, min_length=1)
     allowed_tools: list[SessionAllowance] | None = None
+    mcp_servers: list[str] | None = None
 
     @model_validator(mode="after")
     def _changes_something(self) -> Self:
-        if self.title is None and self.cwd is None and self.allowed_tools is None:
-            raise ValueError("session.updated needs a title, a cwd, or allowed_tools")
+        fields = (self.title, self.cwd, self.allowed_tools, self.mcp_servers)
+        if all(field is None for field in fields):
+            raise ValueError("session.updated needs a title, a cwd, allowed_tools, or mcp_servers")
         return self
 
 

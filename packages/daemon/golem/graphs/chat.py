@@ -31,8 +31,10 @@ from golem.graphs.tools_node import (
     ALLOWED_KEY,
     ASKED_KEY,
     CWD_KEY,
+    MCP_KEY,
     Answer,
     cancelled_results,
+    scope_of,
     tools_node,
     unanswered_calls,
 )
@@ -140,12 +142,14 @@ class ChatRuntime:
         assistant_message_id: str,
         cwd: str | None = None,
         allowed_tools: Sequence[Allowance] = (),
+        mcp_servers: Sequence[str] = (),
     ) -> AsyncGenerator[object]:
         """Stream one user turn. The first turn writes the state fields.
 
         Tool calls a stopped run left without results get a cancelled result
         first, so the provider accepts the history. ``cwd`` is the folder the
-        file tools work in. Raises :class:`TooManyStepsError` when the model
+        file tools work in, and ``mcp_servers`` the on-demand MCP servers the
+        session turned on. Raises :class:`TooManyStepsError` when the model
         keeps calling tools.
 
         Close the generator (``contextlib.aclosing``) when you stop early, so
@@ -157,6 +161,7 @@ class ChatRuntime:
                 _ASSISTANT_ID: assistant_message_id,
                 CWD_KEY: cwd or "",
                 ALLOWED_KEY: [list(pair) for pair in allowed_tools],
+                MCP_KEY: list(mcp_servers),
             },
             "recursion_limit": _RECURSION_LIMIT,
         }
@@ -181,6 +186,7 @@ class ChatRuntime:
         cwd: str | None = None,
         allowed_tools: Sequence[Allowance] = (),
         asked: Sequence[str] = (),
+        mcp_servers: Sequence[str] = (),
     ) -> AsyncGenerator[object]:
         """Go on with a run paused on a tool approval, with the user's ``answer``.
 
@@ -194,6 +200,7 @@ class ChatRuntime:
                 CWD_KEY: cwd or "",
                 ALLOWED_KEY: [list(pair) for pair in allowed_tools],
                 ASKED_KEY: list(asked),
+                MCP_KEY: list(mcp_servers),
             },
             "recursion_limit": _RECURSION_LIMIT,
         }
@@ -312,14 +319,17 @@ def open_chat(
     """
     registry = default_registry() if tools is None else tools
     rules = Policy(None) if policy is None else policy
-    binder = _ToolBinder(registry)
+    binder = _ToolBinder()
 
     async def call_model(state: AgentState, config: RunnableConfig) -> dict[str, list[BaseMessage]]:
         messages = list(state["messages"])
         message_id = _reply_id(messages, config)
         get_stream_writer()({STREAM_KEY: "model.started", "message_id": message_id})
         profile = state["model_profile"]
-        response = await binder.invoke(profile, router.chat_model(profile), messages)
+        scope = scope_of(config)
+        await registry.prepare(scope)
+        tools = registry.scoped(scope)
+        response = await binder.invoke(profile, router.chat_model(profile), messages, tools)
         update: dict[str, object] = {"id": message_id}
         if response.tool_calls:
             update["tool_calls"] = _with_ids(response.tool_calls)
@@ -341,22 +351,24 @@ def open_chat(
 
 
 class _ToolBinder:
-    """Offers the registry's tools to each model that takes them.
+    """Offers the session's tools to each model that takes them, on every call.
 
     A chat model class without ``bind_tools`` gets none. A model whose server
     refuses tools (Ollama: "does not support tools") is asked again without
     them, and that profile is not offered tools again in this process.
     """
 
-    def __init__(self, registry: ToolRegistry) -> None:
-        self._registry = registry
+    def __init__(self) -> None:
         self._refused: set[str] = set()
 
     async def invoke(
-        self, profile: str, model: BaseChatModel, messages: Sequence[BaseMessage]
+        self,
+        profile: str,
+        model: BaseChatModel,
+        messages: Sequence[BaseMessage],
+        tools: ToolRegistry,
     ) -> AIMessage:
-        # Asked on each call: an MCP server that started since the last one adds its tools.
-        schemas = self._registry.schemas()
+        schemas = tools.schemas()
         if schemas and profile not in self._refused:
             try:
                 bound = model.bind_tools(schemas)

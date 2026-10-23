@@ -1,0 +1,47 @@
+{
+  "$defs": {
+    "McpToolInfo": {
+      "additionalProperties": false,
+      "description": "One of a server's tools: the name the model sees, and what it says it does.",
+      "properties": {
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "description"
+      ],
+      "title": "McpToolInfo",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The running server's tools, in its order. Empty while it is not running.",
+  "properties": {
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "tools": {
+      "items": {
+        "$ref": "#/$defs/McpToolInfo"
+      },
+      "title": "Tools",
+      "type": "array"
+    }
+  },
+  "required": [
+    "name",
+    "tools"
+  ],
+  "title": "McpToolsResult",
+  "type": "object"
+}

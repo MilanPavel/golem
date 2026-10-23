@@ -952,7 +952,7 @@
     },
     "SessionUpdatedData": {
       "additionalProperties": false,
-      "description": "A session attribute changed: its title, its project folder, or its allowed tools.\n\nA field left null did not change. ``cwd`` is set once, on a session made\nbefore sessions had a folder, by the first ``message.send`` that names one.\n``allowed_tools`` is the whole list after ``session.revoke``.",
+      "description": "A session attribute changed: its title, folder, allowed tools, or MCP servers.\n\nA field left null did not change. ``cwd`` is set once, on a session made\nbefore sessions had a folder, by the first ``message.send`` that names one.\n``allowed_tools`` is the whole list after ``session.revoke``, and\n``mcp_servers`` the on-demand MCP servers the session turned on, after\n``mcp.enable`` or ``mcp.disable``.",
       "properties": {
         "allowed_tools": {
           "anyOf": [
@@ -981,6 +981,21 @@
           ],
           "default": null,
           "title": "Cwd"
+        },
+        "mcp_servers": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Mcp Servers"
         },
         "title": {
           "anyOf": [

@@ -6,6 +6,8 @@ event they follow, before the event row, so foreign keys hold.
 
 from __future__ import annotations
 
+import json
+
 from golem.store.database import Transaction
 from golem.store.records import decode_allowances, encode_allowances
 from golem_protocol.events import (
@@ -59,6 +61,11 @@ async def project(tx: Transaction, event: ChatEvent) -> None:
             await tx.execute(
                 "UPDATE sessions SET allowed_tools = ? WHERE session_id = ?",
                 (encode_allowances(pairs), event.session_id),
+            )
+        if event.data.mcp_servers is not None:
+            await tx.execute(
+                "UPDATE sessions SET mcp_servers = ? WHERE session_id = ?",
+                (json.dumps(event.data.mcp_servers), event.session_id),
             )
     elif isinstance(event, ModelSelectedEvent):
         await tx.execute(
