@@ -87,6 +87,12 @@ Old messages, rewritten:
 
 Keep the first line under 100 characters. Merge, revert, `fixup!`, and `squash!` commits are let through as git writes them.
 
+## Pull requests
+
+Nothing is pushed to `main` directly. Work on a branch, open a pull request, and fill in the template. The PR title is checked like a commit message (job `pr-title`), because it becomes the one commit on `main` when the pull request is squash-merged. The commits on the branch can say anything.
+
+A pull request merges when `check`, `dist`, and `pr-title` pass. How the rules are set up is in [docs/sre.md](docs/sre.md), section 5.
+
 ## Decisions
 
 A non-obvious choice gets a short ADR in [docs/adr/](docs/adr/README.md), in the same change.

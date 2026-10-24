@@ -12,6 +12,23 @@ default:
 hooks:
     git config core.hooksPath .githooks
 
+# Protect main on GitHub with scripts/github_ruleset.json and squash-only merges (gh as an admin).
+protect:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    repo=$(gh repo view --json nameWithOwner --jq .nameWithOwner)
+    gh api --method PATCH "repos/$repo" --silent \
+      -F allow_squash_merge=true -F allow_merge_commit=false -F allow_rebase_merge=false \
+      -F delete_branch_on_merge=true -F allow_update_branch=true \
+      -f squash_merge_commit_title=PR_TITLE -f squash_merge_commit_message=BLANK
+    id=$(gh api "repos/$repo/rulesets" --jq '.[] | select(.name == "main") | .id')
+    if [ -n "$id" ]; then
+      gh api --method PUT "repos/$repo/rulesets/$id" --input scripts/github_ruleset.json --silent
+    else
+      gh api --method POST "repos/$repo/rulesets" --input scripts/github_ruleset.json --silent
+    fi
+    printf 'main on %s: pull requests only, squash merge, checks check, dist, pr-title.\n' "$repo"
+
 # Export protocol JSON Schema and generate TypeScript from it.
 gen:
     #!/usr/bin/env bash

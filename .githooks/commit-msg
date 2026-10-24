@@ -3,7 +3,9 @@
 # `just hooks` turns this on. CI checks PR titles with the same script, so the
 # types and scopes below are the only list. CONTRIBUTING.md explains them.
 #
-# Usage: commit-msg <file>   (git passes the message file)
+# Usage: commit-msg <file>           (git passes the message file)
+#        commit-msg <file> --title   (CI, for a PR title: only GitHub's own
+#                                     `Revert "…"` skips the check)
 set -eu
 
 types='feat|fix|perf|refactor|docs|test|build|ci|chore|revert|style'
@@ -14,7 +16,8 @@ max=100
 header=$(grep -v -e '^#' -e '^[[:space:]]*$' "$1" | head -n 1 || true)
 
 case "$header" in
-  'Merge '* | 'Revert "'* | 'fixup! '* | 'squash! '* | 'amend! '*) exit 0 ;;
+  'Revert "'*) exit 0 ;;
+  'Merge '* | 'fixup! '* | 'squash! '* | 'amend! '*) [ "${2:-}" = --title ] || exit 0 ;;
 esac
 
 problem=""

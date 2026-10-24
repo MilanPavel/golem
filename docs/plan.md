@@ -128,7 +128,7 @@ Choices that hold for the whole phase:
 - **Build:**
   - `.github/pull_request_template.md`: summary, why, changes, how it was tested (`just check`, `just dist` and the smoke test when packaging changed, a manual TUI check), protocol bump and regenerated types, ADR, breaking change. A hidden `<!-- shipped-by: … -->` line that `/ship` (1.5) fills in.
   - `.github/workflows/pr.yml`: a `pr-title` job that runs `.githooks/commit-msg` on the title, so the types and scopes live in one place.
-  - A ruleset on `main`, kept in `scripts/github_ruleset.json` and applied by `just protect` through `gh api`: a PR is required (no approvals, there is one maintainer), the checks `check`, `dist`, and `pr-title` must pass, history stays linear, no force-push or delete, and the admin can bypass in an emergency. Repo settings: squash only, the PR title is the squash message, branches are deleted on merge.
+  - A ruleset on `main`, kept in `scripts/github_ruleset.json` and applied by `just protect` through `gh api`: a PR is required (no approvals, there is one maintainer), the checks `check`, `dist`, and `pr-title` must pass, history stays linear, no force-push or delete. In an emergency the admin can merge a PR without waiting for checks, but cannot push directly. Repo settings: squash only, the PR title is the squash commit with an empty body, branches are deleted on merge. A new push to a PR cancels its older CI run.
   - [sre.md](sre.md), section 5, describes the PR flow.
 - **Done when:** `git push origin main` is refused, and a PR with a bad title cannot merge.
 - **Watch out:** required checks match job names exactly. `dist` runs on macOS for every PR, which is free on a public repo but slow.
