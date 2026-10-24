@@ -193,6 +193,19 @@ The `main` ruleset (`scripts/github_ruleset.json`) refuses a direct push, a forc
 
 `just protect` applies the ruleset and the repository's merge settings: squash only, the PR title as the commit title, an empty commit body, and the branch deleted on merge. It needs `gh auth login` as an admin, and it is safe to run again. Run it after changing the JSON, or after renaming a CI job, because a required check is matched by its job name.
 
+`/ship` (`.agents/skills/ship/SKILL.md`) opens the pull request for you:
+
+```mermaid
+flowchart LR
+  diff["review the diff"] --> check["just check"]
+  check --> propose["commit message,<br/>PR title and body"]
+  propose --> yes{"your yes"}
+  yes --> push["commit, push,<br/>gh pr create"]
+  push --> url["PR link"]
+```
+
+Up to your yes, nothing leaves your machine. It doesn't merge, force-push, or link issues. Every PR it opens ends with the hidden line `<!-- shipped-by: /ship -->`, so a search for that line finds them.
+
 ### Releases
 
 A release is two things: its **notes**, a section in `CHANGELOG.md`, and its **files**, built and published by `release.yml` when a version tag is pushed. The notes come first, because `CHANGELOG.md` is a file on `main`, and `main` changes only through a pull request. The tag then goes on the commit that has the notes ([ADR-024](adr/024-commits-prs-releases.md)).
@@ -440,7 +453,7 @@ Two warnings don't stop setup:
 - **gh not signed in to github.com.** You need gh only to open pull requests and to release. Fix it with `gh auth login`.
 - **The checkout's path is too long.** The daemon tests create sockets inside the checkout, and macOS allows a socket path of 103 bytes. That leaves 67 characters for the checkout's own path.
 
-`/setup` in Claude Code (`.claude/skills/setup/SKILL.md`) runs the same script and asks before it installs anything.
+`/setup` in Claude Code (`.agents/skills/setup/SKILL.md`) runs the same script and asks before it installs anything. `.claude/skills` is a symlink to `.agents/skills`, so Claude Code and other agents read the same skills.
 
 ### From a build folder
 

@@ -35,7 +35,7 @@ Lines under a `!` or `✗` start with `fix:` and say how to fix it.
 
 | Warning | What to tell the user |
 |---|---|
-| `gh` not signed in | They need it for `/ship` and `just release`. It's interactive, so they run `! gh auth login --hostname github.com` themselves |
+| `gh` not signed in | They need it for `/ship` and `just release`. It's interactive, so ask them to run `gh auth login --hostname github.com` in their own terminal |
 | `bun` version | CI uses 1.3. A different version may build differently |
 | `path` too long | The daemon tests create sockets under the checkout, and macOS allows 103 bytes. Suggest a clone in a shorter folder |
 

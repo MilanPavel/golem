@@ -341,7 +341,9 @@ claude
 
 `/setup` checks your tools against the versions CI uses, and tells you how to fix anything missing. It asks before it installs anything. Then it installs the packages and the git hooks, and can run `just check` at the end. You can run it again at any time; it only does what is missing.
 
-#### Without Claude Code
+The skills are in `.agents/skills/`, so other coding agents that read Agent Skills find them too. [AGENTS.md](AGENTS.md) lists them.
+
+#### Without an agent
 
 The skill runs a plain script, so you get the same result without it:
 
@@ -378,6 +380,16 @@ From a checkout, the Keychain trusts uv's shared Python rather than golem itself
 | `just gen` | Regenerates the TypeScript protocol types from Python |
 | `just dist` | Builds a standalone golem into `dist/` |
 | `just smoke-dist` | Starts that build against a fake model and checks one chat |
+
+### Ship a change
+
+In Claude Code, `/ship` takes your changes to a pull request:
+
+1. It reviews the diff and runs `just check`.
+2. It writes the commit message and fills in the PR template.
+3. It asks you before it commits and pushes.
+
+It stops at the PR link. You review and merge it on GitHub. Without an agent, follow [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Learn more
 
