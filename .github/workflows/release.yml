@@ -1,7 +1,8 @@
 name: release
 
 # A version tag builds, signs, and smoke-tests golem, and uploads the archive
-# and its checksum to a draft release. A fresh runner downloads that draft,
+# and its checksum to a draft release, with the tag's CHANGELOG.md section as
+# its notes (`just release`, then `just tag`). A fresh runner downloads that draft,
 # checks it with no build tools installed, and only then publishes it. A stable
 # version then opens a pull request on the Homebrew tap, <owner>/homebrew-golem.
 #
@@ -43,6 +44,11 @@ jobs:
             echo "scripts/version.sh says $version, the tag is $TAG" >&2
             exit 1
           fi
+
+      # `just release` wrote this section and `just tag` checked it. A tag pushed
+      # by hand without one stops here, before anything is built.
+      - name: The changelog has this version
+        run: sh scripts/changelog.sh notes "$TAG" > "$RUNNER_TEMP/notes.md"
 
       - uses: ./.github/actions/setup
 
@@ -96,11 +102,12 @@ jobs:
               prerelease=""
               case "$TAG" in *-*) prerelease="--prerelease" ;; esac
               gh release create "$TAG" --draft --verify-tag $prerelease \
-                --title "golem ${TAG#v}" --generate-notes \
+                --title "golem ${TAG#v}" --notes-file "$RUNNER_TEMP/notes.md" \
                 "$ARCHIVE" "$ARCHIVE.sha256"
               ;;
             true)
               gh release upload "$TAG" --clobber "$ARCHIVE" "$ARCHIVE.sha256"
+              gh release edit "$TAG" --notes-file "$RUNNER_TEMP/notes.md"
               ;;
             *)
               echo "release $TAG is already published; tag a new version" >&2

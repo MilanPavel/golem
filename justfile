@@ -101,6 +101,66 @@ check-signature tree="" *flags:
 smoke-dist tree="":
     .venv/bin/python scripts/smoke_dist.py {{tree}}
 
+# Show what the next release's notes would say, from the commits since the last tag.
+changelog:
+    uv run git-cliff --unreleased --strip all
+
+# Open the release PR: CHANGELOG.md gets the new version's section. No version: work it out from the commits.
+release version="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    unset VIRTUAL_ENV
+    fail() { printf 'just release: %s\n' "$1" >&2; exit 1; }
+    git fetch --quiet --tags origin
+    [ "$(git rev-parse --abbrev-ref HEAD)" = main ] || fail "switch to main first"
+    [ -z "$(git status --porcelain --untracked-files=no)" ] || fail "commit or stash your changes first"
+    [ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] || fail "main is not origin/main: git pull first"
+    version="{{ version }}"
+    [ -n "$version" ] || version=$(uv run git-cliff --bumped-version 2>/dev/null)
+    version=${version#v}
+    printf '%s\n' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$' \
+      || fail "$version is not a version like 0.2.0 or 0.2.0-rc.1"
+    tag="v$version"
+    ! git rev-parse --quiet --verify "refs/tags/$tag" > /dev/null || fail "$tag already exists"
+    branch="release/$tag"
+    git switch --quiet -c "$branch"
+    if ! sh scripts/changelog.sh add "$version"; then
+      git switch --quiet main && git branch --quiet -D "$branch"
+      exit 1
+    fi
+    git add CHANGELOG.md
+    git commit --quiet -m "chore(release): $tag"
+    git push --quiet -u origin "$branch"
+    gh pr create --base main --head "$branch" --title "chore(release): $tag" --body "$(printf '%s\n' \
+      "The release notes for golem $version: the new section in \`CHANGELOG.md\`. Edit them on this branch if they need it." \
+      "" \
+      "After this merges, run \`just tag\` on an up-to-date \`main\`. The tag starts the release (docs/sre.md, section 5).")"
+    git switch --quiet main
+    printf 'Review and merge the PR, then: git pull && just tag\n'
+
+# Tag the merged release commit on main and push it, which starts the release. A version retries one on a fixed main.
+tag version="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    fail() { printf 'just tag: %s\n' "$1" >&2; exit 1; }
+    git fetch --quiet --tags origin
+    [ "$(git rev-parse --abbrev-ref HEAD)" = main ] || fail "switch to main first"
+    [ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] || fail "main is not origin/main: git pull first"
+    tag="{{ version }}"
+    if [ -n "$tag" ]; then
+      tag="v${tag#v}"
+    else
+      subject=$(git log -1 --format=%s)
+      tag=$(printf '%s\n' "$subject" | sed -nE 's/^chore\(release\): (v[^ ]+)( \(#[0-9]+\))?$/\1/p')
+      [ -n "$tag" ] || fail "the last commit on main is not a release ($subject). Run just release and merge its PR first"
+    fi
+    ! git rev-parse --quiet --verify "refs/tags/$tag" > /dev/null || fail "$tag already exists"
+    sh scripts/changelog.sh notes "$tag" > /dev/null
+    git tag -a "$tag" -m "golem ${tag#v}"
+    git push --quiet origin "$tag"
+    printf '%s pushed. The release runs at %s/actions/workflows/release.yml\n' \
+      "$tag" "$(gh repo view --json url --jq .url)"
+
 # Lint, typecheck, test, and fail if generated protocol files drift.
 check:
     #!/usr/bin/env bash

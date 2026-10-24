@@ -23,7 +23,9 @@ flowchart LR
 
 The `pr-title` job (`.github/workflows/pr.yml`) runs the same script on a pull request's title with `--title`, which refuses `Merge …` and `fixup! …` titles too. `scripts/github_ruleset.json` is the ruleset on `main`, and `just protect` applies it with the repository's merge settings ([sre.md](../sre.md), section 5). The squashed commit has the PR title and an empty body, so the template's checklist stays on the pull request and out of `git log`.
 
-Plan step 1.3 adds `cliff.toml` and the release notes.
+`cliff.toml` says how a commit becomes a line in the notes. git-cliff is a Python dev dependency, pinned in `uv.lock`, so CI and every checkout run the same version. `scripts/changelog.sh add` writes the commits since the last stable tag as a new section above the newest one, and `notes` prints one section back. `just release` runs `add` on a `release/vX.Y.Z` branch and opens the PR. After it merges, `just tag` tags that commit. `release.yml` stops before building when the tag has no section, and uses the section as the release's notes ([sre.md](../sre.md), section 5).
+
+Each section is written once and then left alone. git-cliff could regenerate the whole file from git every time, but then an edit made in a release PR would be lost at the next release. Only stable tags count as releases for git-cliff, so a prerelease does not split the notes of the stable version after it.
 
 ## Other shapes that lost
 
@@ -37,8 +39,10 @@ Plan step 1.3 adds `cliff.toml` and the release notes.
 
 **A hook framework (husky, lefthook, pre-commit).** It is one more tool to install for one regex. A POSIX `sh` script runs everywhere git does.
 
+**Release notes on the GitHub release page only, with no `CHANGELOG.md`.** Releasing would be just a tag, with no release PR. But the history would live only on GitHub, and the notes could not be reviewed and edited like code before they are published.
+
 **Use the old `Scope - text` style.** It is close, but it has no type, so a tool cannot tell a feature from a fix.
 
 ## What it costs
 
-The hook is opt-in per clone (`just hooks`), so a message can still slip through locally. CI checking the PR title is what holds the line. Squashing loses the branch's individual commits on `main`, though the pull request keeps them. Commits before this ADR use the old style. git-cliff maps them with a pattern, and the few that do not match land under "Other".
+The hook is opt-in per clone (`just hooks`), so a message can still slip through locally. CI checking the PR title is what holds the line. Squashing loses the branch's individual commits on `main`, though the pull request keeps them. Commits before this ADR use the old style. git-cliff maps them with a pattern, and the few that do not match land under "Other". v0.1.0's section was written by hand. A release takes two steps, a PR and then a tag, and a commit merged in between makes `just tag` refuse until you choose a version again.
