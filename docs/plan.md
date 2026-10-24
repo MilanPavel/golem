@@ -138,11 +138,13 @@ Choices that hold for the whole phase:
 - **Goal:** every release has notes a person can read, generated from the commits.
 - **You can:** `just changelog` to see what is unreleased, and `just release` to open a release PR.
 - **Build:**
-  - `cliff.toml`: group by type (Features, Fixes, Performance, Docs), hide `chore`, `ci`, and `test`, show the scope, link the PR.
-  - `CHANGELOG.md`, filled back to v0.1.0. A `commit_parsers` regex maps the old `Scope - text` commits, so that history is not lost.
-  - `just release [version]` works out the next version (`git cliff --bumped-version`), regenerates `CHANGELOG.md` on `release/vX.Y.Z`, and opens a `chore(release): vX.Y.Z` PR. `just tag` tags the merged commit and pushes the tag.
-  - `release.yml` uses `git cliff --latest --strip all` as the notes instead of `--generate-notes`, and fails if `CHANGELOG.md` has no section for the tag.
-  - A pinned git-cliff in `.github/actions/setup`.
+  - `cliff.toml`: group by type (Features, Fixes, Performance, Reverts, Docs), hide `refactor`, `test`, `build`, `ci`, `chore`, and `docs(plan)`, show the scope, link the PR. Preprocessors read the old `Scope - text` commits as `feat(scope): text`. Only stable tags start a section, so a prerelease does not split the next stable version's notes.
+  - `CHANGELOG.md`, with v0.1.0's section written by hand.
+  - `scripts/changelog.sh add <version>` writes one new section above the newest one, so earlier sections and their edits stay. `notes <version>` prints one section.
+  - `just changelog` previews. `just release [version]` works out the next version (`git cliff --bumped-version`), adds its section on `release/vX.Y.Z`, and opens a `chore(release): vX.Y.Z` PR. `just tag` tags the merged release commit and pushes the tag. `just tag <version>` retries a failed release on a fixed `main`.
+  - `release.yml` stops before building when the tag has no section, and uses the section as the notes instead of `--generate-notes`.
+  - git-cliff as a Python dev dependency, pinned in `uv.lock`, so `uv sync` installs it everywhere.
+  - [sre.md](sre.md), section 5, explains the release step by step, with what to do when it goes wrong.
 - **Done when:** a `v0.2.0-rc.1` tag publishes a draft whose notes match its `CHANGELOG.md` section.
 
 ### 1.4 `/setup` skill
@@ -151,7 +153,7 @@ Choices that hold for the whole phase:
 - **You can:** clone, run `/setup` in Claude Code (or `just setup`), and end with `just check` green.
 - **Build:**
   - `scripts/setup.sh`, safe to run again. Each check says how to fix a failure, like `golem doctor`:
-    - just, uv, pnpm (through corepack), Node 24, bun, git-cliff, and gh, at the versions in `.github/actions/setup`. It offers `brew install` for a missing one.
+    - just, uv, pnpm (through corepack), Node 24, bun, and gh, at the versions in `.github/actions/setup`. It offers `brew install` for a missing one.
     - `uv sync --all-packages`, `pnpm install --frozen-lockfile`, `just hooks`.
     - `gh auth status`, which `/ship` needs.
     - `just check` at the end, if you want it.

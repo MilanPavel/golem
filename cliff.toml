@@ -1,0 +1,80 @@
+# git-cliff turns commit messages into one CHANGELOG.md section (ADR-024).
+# `scripts/changelog.sh add` puts it above the newest section, so earlier
+# sections, edited or not, stay as they are. The file's header lives in the file.
+# Reference: https://git-cliff.org/docs/configuration
+
+[changelog]
+header = ""
+body = """
+{% if version -%}
+## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else -%}
+## [Unreleased]
+{% endif -%}
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group | striptags | trim }}
+{% for commit in commits %}
+- {% if commit.scope %}**{{ commit.scope }}:** {% endif %}\
+{% if commit.breaking %}**Breaking:** {% endif %}\
+{{ commit.message | split(pat="\n") | first | trim }}\
+{% if commit.breaking and commit.breaking_description != commit.message %}\
+ {{ commit.breaking_description | split(pat="\n") | first | trim }}\
+{% endif %}\
+{% endfor %}
+{% endfor %}
+"""
+trim = true
+footer = ""
+
+[git]
+conventional_commits = true
+# Commits from before ADR-024 are rewritten below, and anything left lands under "Other".
+filter_unconventional = false
+split_commits = false
+protect_breaking_commits = true
+filter_commits = false
+topo_order = false
+sort_commits = "oldest"
+# Only stable tags start a section. A prerelease is not one, so v0.2.0 lists
+# everything since v0.1.0, including what v0.2.0-rc.1 had, and the next version
+# is worked out from v0.1.0.
+tag_pattern = "^v[0-9]+\\.[0-9]+\\.[0-9]+$"
+
+commit_preprocessors = [
+  # The PR number GitHub adds to a squashed title becomes a link.
+  { pattern = '\(#([0-9]+)\)', replace = "([#${1}](https://github.com/MilanPavel/golem/pull/${1}))" },
+  # The old `Scope - text` style.
+  { pattern = '^"', replace = "" },
+  { pattern = '^MCP - ', replace = "feat(mcp): " },
+  { pattern = '^CLI - ', replace = "feat(cli): " },
+  { pattern = '^TUI - ', replace = "feat(tui): " },
+  { pattern = '^Tools - ', replace = "feat(tools): " },
+  { pattern = '^Models - ', replace = "feat(models): " },
+  { pattern = '^Sessions - ', replace = "feat(sessions): " },
+  { pattern = '^Secrets - ', replace = "feat(secrets): " },
+  { pattern = '^Install - ', replace = "feat(install): " },
+  { pattern = '^Release - ', replace = "feat(release): " },
+  { pattern = '^CI - ', replace = "ci: " },
+  { pattern = '^(Docs|README) - ', replace = "docs: " },
+  { pattern = '^(Plan|PLAN) - ', replace = "docs(plan): " },
+  { pattern = '^[Uu]pdate ', replace = "chore: update " },
+]
+
+# The first match wins. The number in each comment orders the groups.
+commit_parsers = [
+  { message = "^chore\\(release\\)", skip = true },
+  { message = "^docs\\(plan\\)", skip = true },
+  { message = "^feat", group = "<!-- 0 -->Features" },
+  { message = "^fix", group = "<!-- 1 -->Fixes" },
+  { message = "^perf", group = "<!-- 2 -->Performance" },
+  { message = "^revert", group = "<!-- 3 -->Reverts" },
+  { message = "^docs", group = "<!-- 4 -->Docs" },
+  { message = "^(refactor|test|build|ci|chore|style)", skip = true },
+  { message = ".*", group = "<!-- 9 -->Other" },
+]
+
+[bump]
+# While golem is 0.x: a feature bumps the minor version, and so does a
+# breaking change. From 1.0 on, a breaking change bumps the major.
+features_always_bump_minor = true
+breaking_always_bump_major = false

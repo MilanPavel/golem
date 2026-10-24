@@ -85,6 +85,10 @@ Old messages, rewritten:
 | `Docs - a step-by-step guide for installing golem with Homebrew` | `docs(install): a step-by-step guide for installing golem with Homebrew` |
 | `Update plan md file.` | `docs(plan): Phase 1, the engineering workflow` |
 
+### Release notes
+
+The first lines of the commits on `main` are the first draft of the release notes. `just release` groups them into a new section of [CHANGELOG.md](CHANGELOG.md), and the release PR is where that draft gets edited ([docs/sre.md](docs/sre.md), section 5). So write the line for someone using golem: `fix(tui): the composer keeps its text after a resize`, not `fix(tui): handle SIGWINCH`.
+
 Keep the first line under 100 characters. Merge, revert, `fixup!`, and `squash!` commits are let through as git writes them.
 
 ## Pull requests

@@ -58,6 +58,8 @@ Tools a developer needs:
 | **bun** | Runs `golem` from the source code, and turns it into a single program file |
 | **PyInstaller** | Packs the daemon and its own copy of Python into one folder |
 | **just** | Runs every task: `just check`, `just dist`, and so on |
+| **git-cliff** | Writes the release notes in `CHANGELOG.md` from the commit messages. It comes with the Python dev tools, so `uv sync` installs it |
+| **gh** | The GitHub command line. `just release`, `just tag`, and `just protect` use it |
 
 Exact versions are pinned in two lock files, `uv.lock` and `pnpm-lock.yaml`. Everyone, including CI, installs the same versions.
 
@@ -78,6 +80,7 @@ flowchart LR
 
 - Running from the source code always shows `0.0.0-dev`.
 - A build shows the tag it was built from.
+- You do not type the tag. `just tag` creates it from the merged release commit (section 5, "Releases").
 - `golem --version` prints its own version and, if the daemon is running, the daemon's version.
 - If the two differ, the chat screen shows both in yellow. They still work together. Only a big protocol change (a new **major** version) stops them from connecting.
 
@@ -137,14 +140,14 @@ sequenceDiagram
   D-->>T: the answer is "smoke-ok"
   T->>D: stop (SIGTERM)
   D-->>T: exits cleanly (code 0)
-  T->>D: start and stop twice more
-  Note over T,D: the fastest of these three starts must be under 1 second
+  T->>D: start and stop four more times
+  Note over T,D: the fastest of these five starts must be under 1.5 seconds
 ```
 
 Notes:
 - It uses a temporary folder for its data, so it never touches your real chats.
 - **Why the warm-up start?** The first time a new build runs, macOS checks every library in it, which takes 2–4 seconds. This happens once per copy. After that, the daemon starts in about half a second.
-- **Why the fastest of three?** CI runs on shared machines that sometimes stall a single start. One slow start says more about the machine than about golem. Every start must still exit cleanly.
+- **Why the fastest of five, under 1.5 seconds?** CI runs on shared Macs, and the same build starts in anything from 0.5 to 1.4 seconds there, depending on the machine. One slow start says more about the machine than about golem. The budget still fails a change that makes every start twice as slow, and every start must exit cleanly.
 - The smoke test catches modules PyInstaller missed. Without it, you would only find out when a user starts the program and it crashes.
 
 ---
@@ -192,17 +195,67 @@ The `main` ruleset (`scripts/github_ruleset.json`) refuses a direct push, a forc
 
 ### Releases
 
-Pushing a version tag publishes a release ([ADR-021](adr/021-release-signing.md)):
+A release is two things: its **notes**, a section in `CHANGELOG.md`, and its **files**, built and published by `release.yml` when a version tag is pushed. The notes come first, because `CHANGELOG.md` is a file on `main`, and `main` changes only through a pull request. The tag then goes on the commit that has the notes ([ADR-024](adr/024-commits-prs-releases.md)).
 
-```bash
-git tag v0.1.0 && git push origin v0.1.0
+Nothing is released when a pull request merges. Merged changes wait on `main` until you decide to release them.
+
+<p align="center">
+  <img src="images/release-flow.gif" alt="An animation of a release in eight steps: commits land on main; just changelog sorts them into Features, Fixes, Docs, and left out; just release opens a PR that adds a 0.2.0 section on top of CHANGELOG.md; the PR is edited, checked, and squash-merged; just tag puts v0.2.0 on that commit; release.yml checks the notes, builds, signs, verifies, and publishes; the GitHub release shows the same section as CHANGELOG.md; and the whole loop" width="900">
+</p>
+
+The animation walks through a release of 0.2.0. The steps below say the same in words.
+
+#### Step by step
+
+```mermaid
+flowchart LR
+  c["just changelog<br/>(preview)"] --> r["just release"]
+  r --> pr["release PR:<br/>CHANGELOG.md<br/>gets v0.2.0"]
+  pr -->|"review, edit,<br/>squash merge"| main["main: chore(release): v0.2.0"]
+  main --> t["git pull<br/>just tag"]
+  t -->|"push tag v0.2.0"| wf["release.yml:<br/>build, sign, check,<br/>publish"]
 ```
+
+All of it runs on `main` in your main checkout, up to date with GitHub.
+
+1. **See what is waiting.** `just changelog` prints the notes the next release would get. It changes nothing.
+2. **Open the release PR.** `just release` works out the next version from the commits since the last tag (below), or takes one: `just release 0.3.0`, `just release 0.2.0-rc.1`. It creates the branch `release/v0.2.0`, puts a new `## [0.2.0] - <date>` section at the top of `CHANGELOG.md`, commits it as `chore(release): v0.2.0`, pushes, opens the PR, and switches back to `main`. It refuses when `main` has local changes, is behind GitHub, the tag exists, or there is nothing user-facing to release.
+3. **Edit the notes if they need it.** The PR is the place. Reword a line, merge two, drop an internal one, or add a sentence on top. Commit on the release branch and push. The commit messages are a first draft, and what is in `CHANGELOG.md` when the PR merges is what users read.
+4. **Merge** once the checks are green (squash, like every PR).
+5. **Tag.** `git pull`, then `just tag`. It checks that the newest commit on `main` is a `chore(release): vX.Y.Z` commit, that the tag does not exist yet, and that `CHANGELOG.md` has its section. Then it creates the tag `vX.Y.Z`, pushes it, and prints the link to the workflow run.
+6. **Watch the workflow** (below). When it ends, the release is on GitHub with the `CHANGELOG.md` section as its notes, and a stable version has a pull request on the Homebrew tap.
+
+If something is merged to `main` between steps 4 and 5, `just tag` refuses, because the newest commit is no longer the release. Release again with `just release`, which writes a new version.
+
+#### Which version comes next
+
+`just release` with no version reads the commit types since the last stable tag ([CONTRIBUTING.md](../CONTRIBUTING.md)):
+
+| Since the last release there is at least one… | 0.x (today) | 1.0 and later |
+|---|---|---|
+| breaking change (`feat!:`, `BREAKING CHANGE:`) | minor: 0.1.0 → 0.2.0 | major: 1.4.2 → 2.0.0 |
+| `feat` | minor: 0.1.0 → 0.2.0 | minor: 1.4.2 → 1.5.0 |
+| only `fix`, `perf`, … | patch: 0.1.0 → 0.1.1 | patch: 1.4.2 → 1.4.3 |
+
+Leaving 0.x is a choice: `just release 1.0.0`.
+
+#### What goes into the notes
+
+`cliff.toml` decides. Each commit's first line becomes one bullet, with its scope in bold and the PR number as a link, under **Features** (`feat`), **Fixes** (`fix`), **Performance** (`perf`), **Reverts**, or **Docs**. `refactor`, `test`, `build`, `ci`, `chore`, `style`, `docs(plan)`, and the release commits themselves are left out. A commit that is not conventional lands under **Other**. Older `Scope - text` commits are read as `feat(scope): text`.
+
+A section, once written, is never written again. `just release` only adds a new one above it, so an edit in a release PR stays.
+
+#### Prereleases
+
+A version with a `-`, such as `0.2.0-rc.1`, makes a prerelease: the same steps, a GitHub release marked as a prerelease, and no Homebrew update. It gets its own `CHANGELOG.md` section. A prerelease tag does not count as "the last release": `0.2.0-rc.2` and then `0.2.0` each list everything since `0.1.0`, and the version worked out next is still `0.2.0`.
+
+#### What the workflow does with the tag
 
 ```mermaid
 flowchart LR
   tag["push tag v0.1.0"] --> build
   subgraph build ["build — Mac"]
-    b1["tag = version?"] --> b2["just check"] --> b3["just dist<br/>(signed)"] --> b4["check-signature,<br/>smoke-dist"] --> b5["just package"] --> b6["draft release"]
+    b1["tag = version?<br/>notes in CHANGELOG.md?"] --> b2["just check"] --> b3["just dist<br/>(signed)"] --> b4["check-signature,<br/>smoke-dist"] --> b5["just package"] --> b6["draft release"]
   end
   build --> verify
   subgraph verify ["verify — a fresh Mac, no build tools"]
@@ -213,8 +266,20 @@ flowchart LR
 ```
 
 - The release has `golem-<version>-darwin-arm64.tar.gz` and `golem-<version>-darwin-arm64.tar.gz.sha256`. The archive unpacks to one folder, `golem-<version>-darwin-arm64/`.
+- The notes are the tag's `CHANGELOG.md` section, printed by `scripts/changelog.sh notes`. A tag pushed by hand, without a section, fails in the first step, before anything is built.
 - A tag with a `-`, such as `v0.2.0-rc.1`, makes a prerelease.
-- Nothing is published until a clean runner has checked the exact files users download. If a job fails, the draft stays. Fix the cause, then re-run the workflow: the build replaces the draft's files. A published release is never replaced; tag a new version.
+- Nothing is published until a clean runner has checked the exact files users download. If a job fails, the draft stays. Fix the cause, then re-run the workflow. The build replaces the draft's files, and its notes with the current `CHANGELOG.md` section of the tagged commit. A published release is never replaced; release a new version.
+
+#### When something goes wrong
+
+| What happened | What to do |
+|---|---|
+| The release PR's notes are wrong | Edit `CHANGELOG.md` on the release branch and push, before merging |
+| You merged, and want different notes | If the tag is not pushed yet: a normal PR that edits the section, then `just release` again for a new version. If the release is published: edit the notes on GitHub's release page, and fix `CHANGELOG.md` in a normal PR so the two agree |
+| `just tag` says the last commit is not a release | Something merged after the release PR. Either run `just release` again for a new version, or `just tag 0.2.0` to tag `main` as it is now with the notes already written for 0.2.0 |
+| The workflow failed, and the cause is the runner or a secret | Re-run the failed jobs on GitHub. The tag stays |
+| The workflow failed, and the code needs a fix | The draft stays, unpublished. Delete the tag (`git push --delete origin v0.2.0 && git tag -d v0.2.0`) and the draft on GitHub. Merge the fix as a normal PR, then `git pull` and `just tag 0.2.0`. The tag goes on the commit with the fix, and the notes are the same section |
+| You want to try the release process | `just release 0.2.0-rc.1`: a prerelease does not reach Homebrew. Delete it on GitHub afterwards |
 
 ### Signing
 
