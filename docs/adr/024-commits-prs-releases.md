@@ -21,7 +21,9 @@ flowchart LR
 
 `.githooks/commit-msg` checks the first line of a message: a known type, an optional known scope, an optional `!`, a colon and a space, and at most 100 characters. Merge, revert, `fixup!`, `squash!`, and `amend!` messages pass as git writes them. `just hooks` points `core.hooksPath` at `.githooks/`. The script is the one list of types and scopes, and [CONTRIBUTING.md](../../CONTRIBUTING.md) explains them.
 
-Plan steps 1.2 and 1.3 add the rest: the PR title check in CI (the same script, run on the title), the ruleset on `main`, `cliff.toml`, and the release notes.
+The `pr-title` job (`.github/workflows/pr.yml`) runs the same script on a pull request's title with `--title`, which refuses `Merge …` and `fixup! …` titles too. `scripts/github_ruleset.json` is the ruleset on `main`, and `just protect` applies it with the repository's merge settings ([sre.md](../sre.md), section 5). The squashed commit has the PR title and an empty body, so the template's checklist stays on the pull request and out of `git log`.
+
+Plan step 1.3 adds `cliff.toml` and the release notes.
 
 ## Other shapes that lost
 

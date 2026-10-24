@@ -173,6 +173,23 @@ flowchart LR
 
 The `dist` job also runs `just check-signature`. CI builds are signed ad-hoc, which is enough for the checks.
 
+A pull request also runs `pr-title` (`.github/workflows/pr.yml`). The title becomes the commit on `main`, so it goes through the same check as a local commit message, `.githooks/commit-msg` ([ADR-024](adr/024-commits-prs-releases.md)). A new push to a pull request cancels that PR's older run.
+
+### Pull requests
+
+Changes reach `main` only through a pull request:
+
+```mermaid
+flowchart LR
+  branch["branch"] --> pr["pull request<br/>(the template)"]
+  pr --> checks["check, dist, pr-title<br/>all green"]
+  checks -->|squash merge| main["one commit on main:<br/>the PR title"]
+```
+
+The `main` ruleset (`scripts/github_ruleset.json`) refuses a direct push, a force-push, and deleting the branch. It needs the three checks to pass, allows squash merge only, and keeps history linear. No review is required, because there is one maintainer. A repository admin can merge a pull request without waiting for the checks, but cannot push to `main` directly.
+
+`just protect` applies the ruleset and the repository's merge settings: squash only, the PR title as the commit title, an empty commit body, and the branch deleted on merge. It needs `gh auth login` as an admin, and it is safe to run again. Run it after changing the JSON, or after renaming a CI job, because a required check is matched by its job name.
+
 ### Releases
 
 Pushing a version tag publishes a release ([ADR-021](adr/021-release-signing.md)):
