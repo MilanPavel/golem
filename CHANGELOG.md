@@ -2,6 +2,27 @@
 
 What changed in each release of golem, newest first. `just release` writes each section from the commit messages on `main` ([CONTRIBUTING.md](CONTRIBUTING.md)), and the release pull request is the place to edit it. The GitHub release shows the same section. How a release is made is in [docs/sre.md](docs/sre.md), section 5.
 
+## [0.2.0] - 2026-10-24
+
+### Features
+
+- **release:** when signing settings are missing, say which ones and where they belong
+- **cli:** golem doctor checks the install and says how to fix each problem
+- **mcp:** golem runs stdio MCP servers from config.toml
+- **mcp:** servers per session or project, restarts, HTTP and Keychain tokens, and a /mcp manager
+- **ci:** conventional commits, checked by a commit-msg hook
+- **ci:** pull requests, a PR template, and a ruleset on main ([#1](https://github.com/MilanPavel/golem/pull/1))
+- **release:** CHANGELOG.md and release notes from the commits, with … ([#2](https://github.com/MilanPavel/golem/pull/2))
+
+### Fixes
+
+- **mcp:** the launch test finds sh in /bin first, so it passes on Linux too
+
+### Docs
+
+- a step-by-step guide for installing golem with Homebrew, from setup to the first chat
+- a shorter, friendlier front page: the pixel golem, the legend in an old typeface, and brew install first
+
 ## [0.1.0] - 2026-10-22
 
 The first release: a daemon that keeps your chats running, and a chat screen in the terminal that attaches to it.
