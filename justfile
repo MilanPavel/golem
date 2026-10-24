@@ -8,6 +8,10 @@ set shell := ["env", "-u", "VIRTUAL_ENV", "bash", "-cu"]
 default:
     @just --list
 
+# Make this checkout ready: check the tools, install the packages and hooks. Flags: --install, --check.
+setup *flags:
+    scripts/setup.sh {{flags}}
+
 # Use the repository's git hooks (.githooks/), which check commit messages.
 hooks:
     git config core.hooksPath .githooks

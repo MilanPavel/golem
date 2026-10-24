@@ -1,6 +1,6 @@
 # Contributing to golem
 
-How to set up a checkout, build, and test is in [docs/sre.md](docs/sre.md), section 6. This file is about how a change gets written down.
+To set up a checkout, run `scripts/setup.sh`, or `/setup` in Claude Code. It also turns on the commit check below. Building and testing are in [docs/sre.md](docs/sre.md), section 6. This file is about how a change gets written down.
 
 ## Commit messages
 
