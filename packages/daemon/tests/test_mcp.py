@@ -257,14 +257,15 @@ def test_secrets_are_named_and_targets_shown() -> None:
 
 
 def test_a_server_gets_a_small_environment_and_a_longer_path(tmp_path: Path) -> None:
-    environ = {"HOME": str(tmp_path), "PATH": "/usr/bin:/bin", "ANTHROPIC_API_KEY": "sk-ant"}
+    # /bin first: sh is there on macOS and Linux, and Linux also has /usr/bin/sh.
+    environ = {"HOME": str(tmp_path), "PATH": "/bin:/usr/bin", "ANTHROPIC_API_KEY": "sk-ant"}
     settings = McpServerSettings(command="sh", args=["-c", "true"], env={"MODE": "x"})
     launched = launch(settings, environ, lambda _name: None)
     assert launched.argv == ["/bin/sh", "-c", "true"]
     assert launched.cwd == tmp_path
     assert "ANTHROPIC_API_KEY" not in launched.env
     assert launched.env["MODE"] == "x"
-    assert launched.env["PATH"].split(":")[:3] == ["/usr/bin", "/bin", "/opt/homebrew/bin"]
+    assert launched.env["PATH"].split(":")[:3] == ["/bin", "/usr/bin", "/opt/homebrew/bin"]
     with pytest.raises(McpError, match="no such folder"):
         launch(
             McpServerSettings(command="sh", cwd=str(tmp_path / "nope")), environ, lambda _n: None
