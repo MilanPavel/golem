@@ -420,11 +420,27 @@ Section 10 explains upgrading, removing, and how the tap is kept up to date.
 
 ```bash
 git clone <repo-url> golem && cd golem
-uv sync --all-packages       # Python packages
-pnpm install                 # TypeScript packages
+scripts/setup.sh             # tools, packages, and git hooks (or /setup in Claude Code)
 just golem daemon install    # set up the background service and start it
 just golem                   # open the chat screen
 ```
+
+`scripts/setup.sh` is safe to run again. It works in two parts:
+
+1. **Tools.** It checks just, uv, Node 24, pnpm, bun, and gh against the versions CI uses (`.github/actions/setup`). Each line is `✓` (ready), `!` (a warning), or `✗` (a problem), with a `fix:` line under a problem. A missing tool stops it here, before anything is installed.
+2. **Packages.** It runs `uv sync --all-packages --frozen`, `pnpm install --frozen-lockfile`, and `just hooks`. The lock files are never changed.
+
+| Flag | Adds |
+|---|---|
+| `--install` | `brew install` for each missing tool, and `corepack enable` for pnpm |
+| `--check` | `just check` at the end |
+
+Two warnings don't stop setup:
+
+- **gh not signed in to github.com.** You need gh only to open pull requests and to release. Fix it with `gh auth login`.
+- **The checkout's path is too long.** The daemon tests create sockets inside the checkout, and macOS allows a socket path of 103 bytes. That leaves 67 characters for the checkout's own path.
+
+`/setup` in Claude Code (`.claude/skills/setup/SKILL.md`) runs the same script and asks before it installs anything.
 
 ### From a build folder
 

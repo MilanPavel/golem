@@ -329,13 +329,36 @@ Golem is a Python daemon and a TypeScript terminal app in one repository. From a
 | [bun](https://bun.sh) 1.3 | `brew install oven-sh/bun/bun` |
 | pnpm 10 | `corepack enable` |
 | [just](https://just.systems) | `brew install just` |
+| [gh](https://cli.github.com) | `brew install gh`. Only to open pull requests and to release |
 
 ### Get the code
 
 ```bash
 git clone https://github.com/MilanPavel/golem.git && cd golem
+claude
+> /setup
+```
+
+`/setup` checks your tools against the versions CI uses, and tells you how to fix anything missing. It asks before it installs anything. Then it installs the packages and the git hooks, and can run `just check` at the end. You can run it again at any time; it only does what is missing.
+
+#### Without Claude Code
+
+The skill runs a plain script, so you get the same result without it:
+
+```bash
+scripts/setup.sh            # check the tools, install the packages and the hooks
+scripts/setup.sh --install  # also brew install the tools that are missing
+scripts/setup.sh --check    # also run just check at the end
+```
+
+#### By hand
+
+The script does these steps once the tools are in place:
+
+```bash
 uv sync --all-packages      # Python packages and dev tools
 pnpm install                # TypeScript packages
+just hooks                  # check commit messages before each commit
 just check                  # lint, typecheck, and tests
 ```
 
