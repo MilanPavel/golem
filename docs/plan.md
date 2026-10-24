@@ -108,7 +108,8 @@ Choices that hold for the whole phase:
 - **Squash merge only.** The PR title becomes the one commit on `main`, so one PR is one line in the changelog.
 - **Scopes follow the old prefixes:** `daemon`, `tui`, `cli`, `client`, `protocol`, `models`, `sessions`, `tools`, `mcp`, `secrets`, `install`, `release`, `ci`, `docs`, `plan`, `deps`. `MCP - servers per session` becomes `feat(mcp): servers per session`.
 - **[git-cliff](https://git-cliff.org) writes the changelog.** The git tag stays the version (`scripts/version.sh`), and a human still pushes the tag. release-please was the alternative. It needs a personal token, because a tag pushed with `GITHUB_TOKEN` does not start `release.yml`.
-- **Skills are thin.** They live in `.claude/skills/` and call scripts and `just` recipes, so `just setup` works without Claude Code too. golem's own skills (2.1) can read the same folder later.
+- **Skills are thin.** They call scripts and `just` recipes, so `just setup` works without an agent too.
+- **Skills live in `.agents/skills/`.** That is the shared folder of the Agent Skills format, so any agent can find them. `.claude/skills` is a symlink to it for Claude Code, and `AGENTS.md` points agents without skill support to the scripts. golem's own skills (2.1) read the same folder.
 
 ### 1.1 Conventional commits
 
@@ -166,13 +167,17 @@ Choices that hold for the whole phase:
 
 - **Goal:** one command takes local changes to an open pull request that follows the rules above.
 - **You can:** `/ship`, or `/ship fix the mcp restart` with a hint, and get the PR link back.
-- **Build:** `.claude/skills/ship/SKILL.md`, which:
-  1. On `main`, creates a `<type>/<slug>` branch first.
-  2. Reads the diff and the untracked files. It flags secrets, stray files, a protocol change without regenerated `gen/` files, and a non-obvious choice without an ADR.
-  3. Runs `just check` and stops with the output if it fails.
-  4. Proposes a commit message (type and scope from the changed paths), and a PR title and body from the template, and asks you to confirm.
-  5. Commits, pushes, and runs `gh pr create`, or `gh pr edit` if the branch already has a PR. It fills the hidden line with `<!-- shipped-by: claude-code /ship -->` and adds a visible footer, "🤖 Opened with `/ship` in Claude Code".
-  6. Prints the PR link and the CI link. It does not merge. You review and merge on GitHub.
+- **Build:**
+  - Move `/setup` to `.agents/skills/setup/`, make `.claude/skills` a symlink to `../.agents/skills`, and add a short `AGENTS.md`. Word the skills for any agent: no Claude Code-only syntax.
+  - `.agents/skills/ship/SKILL.md`, which:
+    1. On `main`, creates a `<type>/<slug>` branch first. On another branch, it stays there.
+    2. Reads the diff against `main` and the untracked files. It flags secrets, stray files, a protocol change without regenerated `gen/` files, a non-obvious choice without an ADR, and docs that may need an update.
+    3. Runs `just check` and stops with the failing lines if it fails.
+    4. Proposes a commit message (type and scope from the changed paths), and a PR title and body from the template. The title is checked with `.githooks/commit-msg --title`, the rule CI uses.
+    5. Waits for your yes. You can change any of it first.
+    6. Commits, pushes, and runs `gh pr create`, or `gh pr edit` if the branch already has a PR. A branch with an open PR always gets a new commit: never an amend or a force-push. The hidden line becomes `<!-- shipped-by: /ship -->`, with no visible footer and no agent named.
+    7. Prints the PR link and the CI link. It does not merge, and it does not link or close issues. You do that on GitHub.
+  - `CONTRIBUTING.md`, README, and `docs/sre.md` §5 say what `/ship` does.
 - **Done when:** the PR for 1.5 is opened by `/ship` itself and carries the marker.
 
 ---
@@ -186,7 +191,7 @@ Agent Skills (`SKILL.md`) compatible with Claude Code, loaded by progressive dis
 - **Goal:** golem knows which skills exist.
 - **You can:** run `/skills` and see each skill with its source and description.
 - **Build:**
-  - Scan `~/.golem/skills`, `<project>/.golem/skills`, and optionally `~/.claude/skills`. On a name collision, project wins, then user, then bundled.
+  - Scan `~/.golem/skills`, `<project>/.golem/skills`, `<project>/.agents/skills`, and optionally `~/.claude/skills`. On a name collision, project wins, then user, then bundled.
   - Parse and validate frontmatter: `name`, `description`, optional `allowed-tools`, and golem's own `model`.
   - Hot reload with `watchfiles`. `skill.list` on the wire.
 - **Done when:** an existing Claude Code skill shows up, and editing it updates the list without a restart.
