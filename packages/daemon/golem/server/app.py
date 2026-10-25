@@ -41,6 +41,7 @@ from golem.sessions.log import SessionLog
 from golem.sessions.manager import SessionManager
 from golem.sessions.recovery import recover_runs
 from golem.sessions.titles import ModelTitles, TitleGenerator
+from golem.skills.registry import SkillRegistry
 from golem.store.artifacts import ArtifactStore
 from golem.store.checkpoints import open_checkpoints
 from golem.store.database import Database, DatabaseTooNewError
@@ -135,6 +136,7 @@ class DaemonApp:
             )
             mcp.broadcast = self._broadcast
             self.state.mcp = mcp
+            self.state.skills = SkillRegistry(settings.skills, golem_skills=self.paths.skills_dir)
             async with (
                 Database.open(self.paths.database_file) as database,
                 open_checkpoints(database, self.paths.checkpoints_file) as saver,
