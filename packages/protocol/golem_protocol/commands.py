@@ -574,6 +574,19 @@ class ModelPullDone(BaseModel):
     error: str | None = None
 
 
+class SkillRegistryChanged(BaseModel):
+    """Skills changed on disk. List them again for the folders it covers.
+
+    ``root`` is the session folder whose project skills changed. ``None`` means
+    the user's or golem's skills, or ``[skills]`` in ``config.toml``, changed,
+    which every folder sees.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    root: str | None = None
+
+
 class McpListParams(BaseModel):
     """``mcp.list``. The user's MCP servers and their state.
 
@@ -928,4 +941,5 @@ __all__ = [
     "SessionSetModelParams",
     "SessionSetModelResult",
     "SessionSummary",
+    "SkillRegistryChanged",
 ]

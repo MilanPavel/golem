@@ -1,0 +1,48 @@
+{
+  "$defs": {
+    "SkillRegistryChanged": {
+      "additionalProperties": false,
+      "description": "Skills changed on disk. List them again for the folders it covers.\n\n``root`` is the session folder whose project skills changed. ``None`` means\nthe user's or golem's skills, or ``[skills]`` in ``config.toml``, changed,\nwhich every folder sees.",
+      "properties": {
+        "root": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Root"
+        }
+      },
+      "title": "SkillRegistryChanged",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Server → every connection: a skill or ``[skills]`` changed on disk. Not stored.",
+  "properties": {
+    "jsonrpc": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Jsonrpc",
+      "type": "string"
+    },
+    "method": {
+      "const": "skill.registry.changed",
+      "default": "skill.registry.changed",
+      "title": "Method",
+      "type": "string"
+    },
+    "params": {
+      "$ref": "#/$defs/SkillRegistryChanged"
+    }
+  },
+  "required": [
+    "params"
+  ],
+  "title": "SkillRegistryChangedNotification",
+  "type": "object"
+}

@@ -136,7 +136,14 @@ class DaemonApp:
             )
             mcp.broadcast = self._broadcast
             self.state.mcp = mcp
-            self.state.skills = SkillRegistry(settings.skills, golem_skills=self.paths.skills_dir)
+            home = self.paths.home
+            self.state.skills = SkillRegistry(
+                settings.skills,
+                golem_skills=self.paths.skills_dir,
+                config_file=self.paths.config_file,
+                load_settings=lambda: load_settings(home=home, project_dir=home).skills,
+                broadcast=self._broadcast,
+            )
             async with (
                 Database.open(self.paths.database_file) as database,
                 open_checkpoints(database, self.paths.checkpoints_file) as saver,
@@ -171,6 +178,7 @@ class DaemonApp:
                     os.chmod(self.paths.socket_path, 0o600)
                     log.info("listening on %s", self.paths.socket_path)
                     mcp.start()
+                    self.state.skills.start()
                     await self._stop.wait()
                     log.info("shutting down")
                     await self._shutdown()
@@ -182,6 +190,9 @@ class DaemonApp:
             if self.state.mcp is not None:
                 await self.state.mcp.aclose()
             self.state.mcp = None
+            if self.state.skills is not None:
+                await self.state.skills.aclose()
+            self.state.skills = None
             if self.state.pulls is not None:
                 await self.state.pulls.aclose()
             self.state.pulls = None

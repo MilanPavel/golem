@@ -17,12 +17,14 @@ class _Layout:
     golem_skills: Path
     project: Path
 
-    def registry(self, settings: SkillSettings | None = None, **kwargs: Path) -> SkillRegistry:
+    def registry(
+        self, settings: SkillSettings | None = None, *, bundled: Path | None = None
+    ) -> SkillRegistry:
         return SkillRegistry(
             settings or SkillSettings(),
             golem_skills=self.golem_skills,
             user_home=self.home,
-            **kwargs,
+            bundled=bundled,
         )
 
 

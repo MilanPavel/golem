@@ -82,6 +82,7 @@ from golem_protocol.commands import (
     SessionSetModelParams,
     SessionSetModelResult,
     SessionSummary,
+    SkillRegistryChanged,
 )
 from golem_protocol.events import (
     ApprovalNeededData,
@@ -135,6 +136,7 @@ from golem_protocol.rpc import (
     RpcRequest,
     RpcSuccess,
     SessionSummaryNotification,
+    SkillRegistryChangedNotification,
 )
 from golem_protocol.version import PROTOCOL_MAJOR, PROTOCOL_MINOR
 
@@ -262,6 +264,8 @@ MODELS: tuple[type[BaseModel], ...] = (
     McpToolInfo,
     McpToolsResult,
     McpSetEnabledParams,
+    SkillRegistryChanged,
+    SkillRegistryChangedNotification,
 )
 
 
