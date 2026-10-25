@@ -89,6 +89,7 @@ It runs lint, typecheck, tests, and `just gen`, and it fails if the generated fi
 | Paths | Scope |
 |---|---|
 | `packages/daemon/golem/mcp/` | `mcp` |
+| `packages/daemon/golem/skills/`, `packages/tui/src/skills-*` | `skills` |
 | `packages/daemon/golem/tools/`, `permissions/` | `tools` |
 | `packages/daemon/golem/models/` | `models` |
 | `packages/daemon/golem/sessions/`, `store/` | `sessions` |
