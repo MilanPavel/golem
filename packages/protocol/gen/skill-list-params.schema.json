@@ -1,0 +1,21 @@
+{
+  "additionalProperties": false,
+  "description": "``skill.list``. The skills a session in ``cwd`` sees, or only the user's without it.",
+  "properties": {
+    "cwd": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cwd"
+    }
+  },
+  "title": "SkillListParams",
+  "type": "object"
+}

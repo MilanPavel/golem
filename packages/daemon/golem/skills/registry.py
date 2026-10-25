@@ -38,7 +38,7 @@ from pydantic import BaseModel
 from golem.config import SkillSettings
 from golem.skills.model import SKILL_FILE, Skill
 from golem.skills.parse import parse_skill
-from golem_protocol.commands import SkillRegistryChanged
+from golem_protocol.commands import ListedSkill, SkillRegistryChanged
 from golem_protocol.rpc import SkillRegistryChangedNotification
 
 log = logging.getLogger(__name__)
@@ -267,6 +267,27 @@ class SkillRegistry:
             log.debug("broadcast failed", exc_info=True)
 
 
+def listed_skill(entry: Listed) -> ListedSkill:
+    """One entry of a view, as ``skill.list`` sends it."""
+    skill = entry.skill
+    return ListedSkill(
+        name=skill.name,
+        description=skill.description,
+        source=entry.origin,
+        path=str(skill.path),
+        usable=entry.usable,
+        shadowed_by=None if entry.shadowed_by is None else str(entry.shadowed_by),
+        disabled=entry.disabled,
+        errors=list(skill.errors),
+        warnings=list(skill.warnings),
+        user_invocable=skill.user_invocable,
+        model_invocable=skill.model_invocable,
+        argument_hint=skill.argument_hint,
+        allowed_tools=list(skill.allowed_tools),
+        model=skill.model,
+    )
+
+
 def _entries(folder: Path) -> list[tuple[Path, Stamp]]:
     """Each skill folder directly inside ``folder``, by name, with its ``SKILL.md`` stamp.
 
@@ -298,4 +319,4 @@ def _stamp(path: Path) -> Stamp | None:
     return info.st_mtime_ns, info.st_size
 
 
-__all__ = ["Listed", "Origin", "SkillRegistry", "SkillView", "Source"]
+__all__ = ["Listed", "Origin", "SkillRegistry", "SkillView", "Source", "listed_skill"]

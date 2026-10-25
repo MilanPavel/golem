@@ -29,6 +29,7 @@ from golem_protocol.commands import (
     InspectMessage,
     ListedModel,
     ListedProvider,
+    ListedSkill,
     McpListParams,
     McpListResult,
     McpServer,
@@ -82,6 +83,8 @@ from golem_protocol.commands import (
     SessionSetModelParams,
     SessionSetModelResult,
     SessionSummary,
+    SkillListParams,
+    SkillListResult,
     SkillRegistryChanged,
 )
 from golem_protocol.events import (
@@ -266,6 +269,9 @@ MODELS: tuple[type[BaseModel], ...] = (
     McpSetEnabledParams,
     SkillRegistryChanged,
     SkillRegistryChangedNotification,
+    SkillListParams,
+    ListedSkill,
+    SkillListResult,
 )
 
 

@@ -587,6 +587,53 @@ class SkillRegistryChanged(BaseModel):
     root: str | None = None
 
 
+class SkillListParams(BaseModel):
+    """``skill.list``. The skills a session in ``cwd`` sees, or only the user's without it."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    cwd: str | None = Field(default=None, min_length=1)
+
+
+SkillSource = Literal["project", "user", "bundled"]
+
+
+class ListedSkill(BaseModel):
+    """One skill folder, valid or not.
+
+    ``usable`` is false when the skill has ``errors``, is in ``[skills]
+    disabled``, or lost its name to another skill, whose folder
+    ``shadowed_by`` names. ``model_invocable`` is false for
+    ``disable-model-invocation: true``. ``allowed_tools`` and ``model`` are
+    the frontmatter as written.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    description: str
+    source: SkillSource
+    path: str
+    usable: bool
+    shadowed_by: str | None = None
+    disabled: bool = False
+    errors: list[str] = Field(default_factory=list[str])
+    warnings: list[str] = Field(default_factory=list[str])
+    user_invocable: bool = True
+    model_invocable: bool = True
+    argument_hint: str | None = None
+    allowed_tools: list[str] = Field(default_factory=list[str])
+    model: str | None = None
+
+
+class SkillListResult(BaseModel):
+    """Every skill found, highest source first, winners and losers."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    skills: list[ListedSkill]
+
+
 class McpListParams(BaseModel):
     """``mcp.list``. The user's MCP servers and their state.
 
@@ -887,6 +934,7 @@ __all__ = [
     "InspectMessage",
     "ListedModel",
     "ListedProvider",
+    "ListedSkill",
     "McpListParams",
     "McpListResult",
     "McpServer",
@@ -941,5 +989,8 @@ __all__ = [
     "SessionSetModelParams",
     "SessionSetModelResult",
     "SessionSummary",
+    "SkillListParams",
+    "SkillListResult",
     "SkillRegistryChanged",
+    "SkillSource",
 ]

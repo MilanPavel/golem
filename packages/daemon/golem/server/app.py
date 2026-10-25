@@ -85,8 +85,10 @@ class DaemonApp:
         pulls: Callable[[ModelRouter, float | None], PullManager] | None = None,
         mcp: McpSupervisor | None = None,
         secrets: SecretStore | None = None,
+        user_home: Path | None = None,
     ) -> None:
         self.paths = paths
+        self._user_home = user_home
         self._router = router
         self._titles = titles
         self._discovery = discovery
@@ -140,6 +142,7 @@ class DaemonApp:
             self.state.skills = SkillRegistry(
                 settings.skills,
                 golem_skills=self.paths.skills_dir,
+                user_home=self._user_home,
                 config_file=self.paths.config_file,
                 load_settings=lambda: load_settings(home=home, project_dir=home).skills,
                 broadcast=self._broadcast,

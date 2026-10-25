@@ -13,6 +13,7 @@ export type ApprovalChoice = "allow" | "allow_session" | "allow_always" | "deny"
 import type { DaemonStatus } from "../../protocol/gen/daemon-status.ts";
 import type { McpListResult } from "../../protocol/gen/mcp-list-result.ts";
 import type { McpServer } from "../../protocol/gen/mcp-server.ts";
+import type { SkillListResult } from "../../protocol/gen/skill-list-result.ts";
 import type { McpToggleResult } from "../../protocol/gen/mcp-toggle-result.ts";
 import type { McpToolsResult } from "../../protocol/gen/mcp-tools-result.ts";
 import type { MessageSendResult } from "../../protocol/gen/message-send-result.ts";
@@ -55,6 +56,7 @@ import {
   isPullDone,
   isPullProgress,
   isRefResult,
+  isSkillListResult,
   isSessionSetModelResult,
   isPing,
   isRecord,
@@ -214,6 +216,16 @@ export interface GolemClient {
   setMcpEnabled(name: string, enabled: boolean | "on_demand", sessionId?: string): Promise<McpServer>;
   /** `mcp.server.status`: a server started, failed, or changed its tools. */
   onMcpStatus(listener: (server: McpServer) => void): () => void;
+  /**
+   * The skills a session in `cwd` sees, highest source first, with the ones
+   * that lost their name or are broken. Without `cwd`, only the user's.
+   */
+  listSkills(cwd?: string): Promise<SkillListResult>;
+  /**
+   * `skill.registry.changed`: skills changed on disk. `root` is the folder
+   * whose project skills changed, or `null` when every folder's did.
+   */
+  onSkillsChanged(listener: (root: string | null) => void): () => void;
   close(): void;
 }
 
@@ -251,6 +263,7 @@ export function connectGolem(options: ConnectOptions): GolemClient {
   const wireListeners = new Set<(lines: readonly WireLine[]) => void>();
   const pullListeners = new Set<(update: PullUpdate) => void>();
   const mcpListeners = new Set<(server: McpServer) => void>();
+  const skillListeners = new Set<(root: string | null) => void>();
   const pending = new Map<number, Pending>();
   const attachments = new Attachments();
   let watching = false;
@@ -416,6 +429,19 @@ export function connectGolem(options: ConnectOptions): GolemClient {
           } catch {
             // A listener must not tear the socket down.
           }
+        }
+      }
+      return;
+    }
+    if (isRecord(message) && message["method"] === "skill.registry.changed") {
+      const params = message["params"];
+      const root = isRecord(params) && typeof params["root"] === "string" ? params["root"] : null;
+      record({ direction: "in", kind: "skill.registry.changed", detail: root ?? "all", json: line });
+      for (const listener of skillListeners) {
+        try {
+          listener(root);
+        } catch {
+          // A listener must not tear the socket down.
         }
       }
       return;
@@ -943,6 +969,20 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       mcpListeners.add(listener);
       return () => {
         mcpListeners.delete(listener);
+      };
+    },
+    async listSkills(cwd?: string): Promise<SkillListResult> {
+      await ready;
+      const result = await call("skill.list", cwd === undefined ? {} : { cwd });
+      if (!isSkillListResult(result)) {
+        throw new Error("invalid skill.list result");
+      }
+      return result;
+    },
+    onSkillsChanged(listener: (root: string | null) => void): () => void {
+      skillListeners.add(listener);
+      return () => {
+        skillListeners.delete(listener);
       };
     },
     close(): void {
