@@ -2,7 +2,8 @@
 
 ``serve`` runs the daemon. ``daemon install|start|stop|restart|uninstall`` talk to launchd.
 ``daemon logs`` prints ``logs/golem.jsonl``. ``doctor`` prints the install
-checks as JSON for ``golem doctor``. The user-facing ``golem`` bin is
+checks as JSON for ``golem doctor``. ``skills check <path>`` validates skills
+without a daemon. The user-facing ``golem`` bin is
 the TypeScript package; it delegates these subcommands here.
 """
 
@@ -16,6 +17,7 @@ import sys
 import time
 from dataclasses import asdict
 from pathlib import Path
+from typing import cast
 
 from golem import __version__
 from golem.launchd import LaunchdError, install, restart, start, stop, uninstall
@@ -75,7 +77,23 @@ def _parser() -> argparse.ArgumentParser:
 
     doctor = sub.add_parser("doctor", help="check this install, as JSON for `golem doctor`")
     doctor.set_defaults(func=_doctor)
+
+    skills = sub.add_parser("skills", help="work with skills")
+    skills_sub = skills.add_subparsers(dest="action", required=True)
+    check = skills_sub.add_parser(
+        "check", help="validate a skill folder, its SKILL.md, or a folder of skills"
+    )
+    check.add_argument("path", type=Path)
+    check.set_defaults(func=_skills_check)
     return parser
+
+
+def _skills_check(args: argparse.Namespace) -> int:
+    from golem.skills.check import check_skills
+
+    report, ok = check_skills(cast(Path, args.path).expanduser())
+    print(report)
+    return 0 if ok else 1
 
 
 def _serve(_args: argparse.Namespace) -> int:

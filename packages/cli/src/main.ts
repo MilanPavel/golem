@@ -1,5 +1,7 @@
 import { spawn } from "node:child_process";
 import { existsSync, realpathSync } from "node:fs";
+import { homedir } from "node:os";
+import { resolve } from "node:path";
 
 import { connectGolem, GOLEM_VERSION, resolveSocketPath } from "@golem/client";
 
@@ -12,6 +14,7 @@ import { doctorExitCode, formatDoctor, parseChecks, runDoctor } from "./doctor.t
 import { formatConfig } from "./format-config.ts";
 import { formatKeys } from "./format-keys.ts";
 import { formatModels } from "./format-models.ts";
+import { formatSkills } from "./format-skills.ts";
 import { formatStatus } from "./format-status.ts";
 import { formatCliVersion } from "./format-version.ts";
 import { readSecret } from "./read-secret.ts";
@@ -25,7 +28,7 @@ const USAGE =
   "       golem --version | golem --help | golem status | golem doctor\n" +
   "       golem daemon install|start|stop|restart|uninstall|logs\n" +
   "       golem auth set|remove <provider> | golem auth list | golem models [--refresh]\n" +
-  "       golem config show [--resolved]";
+  "       golem config show [--resolved] | golem skills [list] | golem skills check <path>";
 
 // exitCode, not exit(): exit() drops output a pipe has not read yet.
 process.exitCode = await run(process.argv.slice(2));
@@ -57,6 +60,12 @@ async function run(args: string[]): Promise<number> {
   if (command === "models" && (rest.length === 0 || (rest.length === 1 && rest[0] === "--refresh"))) {
     return runModels(rest[0] === "--refresh");
   }
+  if (command === "skills" && (rest.length === 0 || (rest.length === 1 && rest[0] === "list"))) {
+    return runSkillsList();
+  }
+  if (command === "skills" && rest[0] === "check" && rest.length === 2 && rest[1] !== undefined) {
+    return runSkillsCheck(rest[1]);
+  }
   if (command === "config" && rest[0] === "show" && (rest.length === 1 || (rest.length === 2 && rest[1] === "--resolved"))) {
     return runConfigShow();
   }
@@ -75,6 +84,33 @@ async function runConfigShow(): Promise<number> {
   } finally {
     client.close();
   }
+}
+
+async function runSkillsList(): Promise<number> {
+  const client = connectOnce();
+  try {
+    const listed = await client.listSkills(process.cwd());
+    const columns = process.stdout.isTTY ? process.stdout.columns : undefined;
+    process.stdout.write(`${formatSkills(listed.skills, homedir(), columns)}\n`);
+    return 0;
+  } catch (error) {
+    process.stderr.write(`${explain(error)}\n`);
+    return 1;
+  } finally {
+    client.close();
+  }
+}
+
+/** Run by the daemon executable, so it works with no daemon running. */
+async function runSkillsCheck(path: string): Promise<number> {
+  let located;
+  try {
+    located = locate();
+  } catch (error) {
+    process.stderr.write(`${explain(error)}\n`);
+    return 1;
+  }
+  return runLocated(located.command, [...located.args, "skills", "check", resolve(path)]);
 }
 
 async function runModels(refresh: boolean): Promise<number> {
