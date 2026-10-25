@@ -1,5 +1,6 @@
 import type { McpListResult } from "../../protocol/gen/mcp-list-result.ts";
 import type { McpServer } from "../../protocol/gen/mcp-server.ts";
+import type { ListedSkill, SkillListResult } from "../../protocol/gen/skill-list-result.ts";
 import type { McpToggleResult } from "../../protocol/gen/mcp-toggle-result.ts";
 import type { McpToolsResult } from "../../protocol/gen/mcp-tools-result.ts";
 import type { AuthKeyStatus, AuthListResult } from "../../protocol/gen/auth-list-result.ts";
@@ -105,6 +106,21 @@ export function isMcpServer(value: unknown): value is McpServer {
 
 export function isMcpListResult(value: unknown): value is McpListResult {
   return isRecord(value) && Array.isArray(value["servers"]) && value["servers"].every(isMcpServer);
+}
+
+export function isListedSkill(value: unknown): value is ListedSkill {
+  return (
+    isRecord(value) &&
+    typeof value["name"] === "string" &&
+    typeof value["description"] === "string" &&
+    typeof value["source"] === "string" &&
+    typeof value["path"] === "string" &&
+    typeof value["usable"] === "boolean"
+  );
+}
+
+export function isSkillListResult(value: unknown): value is SkillListResult {
+  return isRecord(value) && Array.isArray(value["skills"]) && value["skills"].every(isListedSkill);
 }
 
 export function isMcpToggleResult(value: unknown): value is McpToggleResult {

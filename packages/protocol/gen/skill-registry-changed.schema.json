@@ -1,0 +1,20 @@
+{
+  "additionalProperties": false,
+  "description": "Skills changed on disk. List them again for the folders it covers.\n\n``root`` is the session folder whose project skills changed. ``None`` means\nthe user's or golem's skills, or ``[skills]`` in ``config.toml``, changed,\nwhich every folder sees.",
+  "properties": {
+    "root": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Root"
+    }
+  },
+  "title": "SkillRegistryChanged",
+  "type": "object"
+}

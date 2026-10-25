@@ -4,7 +4,13 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
-from golem_protocol.commands import McpServer, ModelPullDone, ModelPullProgress, SessionSummary
+from golem_protocol.commands import (
+    McpServer,
+    ModelPullDone,
+    ModelPullProgress,
+    SessionSummary,
+    SkillRegistryChanged,
+)
 from golem_protocol.events import ChatEvent
 
 
@@ -112,6 +118,16 @@ class McpServerStatusNotification(BaseModel):
     params: McpServer
 
 
+class SkillRegistryChangedNotification(BaseModel):
+    """Server → every connection: a skill or ``[skills]`` changed on disk. Not stored."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    jsonrpc: Literal["2.0"] = "2.0"
+    method: Literal["skill.registry.changed"] = "skill.registry.changed"
+    params: SkillRegistryChanged
+
+
 __all__ = [
     "McpServerStatusNotification",
     "ModelPullDoneNotification",
@@ -123,4 +139,5 @@ __all__ = [
     "RpcRequest",
     "RpcSuccess",
     "SessionSummaryNotification",
+    "SkillRegistryChangedNotification",
 ]

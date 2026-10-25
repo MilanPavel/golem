@@ -22,6 +22,7 @@ export type ComposerOutcome =
   | { kind: "mcp-toggle"; on: boolean; name: string }
   | { kind: "send"; text: string; debug: DebugState }
   | { kind: "sessions" }
+  | { kind: "skills" }
   | { kind: "permissions" }
   | { kind: "new" }
   | { kind: "fork" }
@@ -177,6 +178,12 @@ export const COMMANDS: readonly Command[] = [
     args: "",
     description: "Opens the session switcher.",
     run: withoutArgs({ kind: "sessions" }),
+  },
+  {
+    name: "/skills",
+    args: "",
+    description: "Lists the skills this folder sees, with broken and hidden ones and why.",
+    run: withoutArgs({ kind: "skills" }),
   },
   {
     name: "/time",

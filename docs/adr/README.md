@@ -28,7 +28,8 @@ An Architecture Decision Record (ADR) is a short note of one choice: what was de
 | [022](022-homebrew-tap.md) | Homebrew installs the signed release unchanged, from a tap the release workflow keeps up to date | accepted | 2026-10-22 |
 | [023](023-mcp-client.md) | MCP servers run under golem's own small client, and their tools ask first | accepted | 2026-10-23 |
 | [024](024-commits-prs-releases.md) | Conventional commits reach main as squashed pull requests, and git-cliff turns them into the release notes | accepted | 2026-10-23 |
+| [025](025-skill-sources.md) | Skills come from the project, then the user, then golem, and a broken one never wins a name | accepted | 2026-10-25 |
 
 How the running code fits together is in [../architecture.md](../architecture.md).
 
-New records use [template.md](template.md). Number the next file `025-….md` and add a row here.
+New records use [template.md](template.md). Number the next file `026-….md` and add a row here.

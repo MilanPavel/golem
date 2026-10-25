@@ -31,6 +31,7 @@ The **protocol** is the only language between them. The daemon is Python. The cl
 | Checkpoint | The model's saved memory for a session, stored after each step. |
 | Graph | The agent loop. A LangGraph library call inside the daemon, not a separate service. |
 | Flow | A graph whose steps our Python picks, and whose expensive steps are saved. Planned. |
+| Skill | A folder with a `SKILL.md`: what one job is for, and how to do it. Found and listed today; used by the model next. |
 
 ## The system on one machine
 
@@ -101,9 +102,11 @@ Built today:
 - An agent todo list: `todo_write`, `todos.updated`, and the todo band. [ADR-018](adr/018-tool-state-updates.md).
 - MCP servers over stdio or HTTP, from `[mcp.<name>]` in the user's file or a trusted project's. Their tools are `mcp__<server>__<tool>`, ask before every call, and reach the model marked as data. A server is on for every session, on demand per session (`/mcp enable`), or off. Servers restart with backoff when they exit or stop answering `ping`, and pick up config changes without a daemon restart. Tokens come from the Keychain as `keychain:mcp/<name>`. [ADR-023](adr/023-mcp-client.md).
 
+- Skills: `SKILL.md` folders from the project, the user, and golem, checked, listed with `/skills`, `golem skills`, and `skill.list`, and reloaded within two seconds of a change. Using them comes next. [ADR-025](adr/025-skill-sources.md), and [Skills](#skills) below.
+
 Planned next:
 
-- Flows, skills, and long-term memory in `memory.db`.
+- Running, pinning, and loading skills, then flows and long-term memory in `memory.db`.
 
 ## The daemon
 
@@ -130,13 +133,14 @@ The socket is only the door. Behind it, these jobs sit in one process:
 | Tools | Plain Python functions with a Pydantic argument model, in `golem/tools/`. The graph offers them to the model and runs them in its own `tools` node. | Built: file reads and writes, `shell`, git, `web_fetch` |
 | MCP servers | Child processes or HTTP endpoints from `[mcp.<name>]`, started in the background, watched with `ping`, and restarted with backoff. Each session's tools come from `ToolRegistry.scoped` (`golem/mcp/`). | Built |
 | Permissions | Rules from the project, the user, and the defaults, checked in order before every tool call (`golem/permissions/`). | Built |
+| Skills | The `SKILL.md` folders a session's folder sees, and which one each name means (`golem/skills/`). | Built: finding and listing. Using them planned |
 | Event log | The history. Every event, numbered by `seq`, written before it is sent. A client that reconnects will read it and rebuild the screen. | Written. Replay to clients planned |
 
 The graph does not own the rest of the product. It calls ordinary Python for three things that have to stay ours:
 
 - **Which model** answers this step, and whether the budget allows it.
 - **Whether a tool may run.** Every tool call asks the same permission check before it runs. Flows and skills will ask it too. File tools also refuse any path outside the session's project folder, whatever the rules say.
-- **Which skills** are active. A skill is a `SKILL.md` the model can be given. The registry lives in the daemon. Planned.
+- **Which skills** exist and which are active. A skill is a `SKILL.md` the model can be given. The registry lives in the daemon, and the graph will only ever hold skill names ([Skills](#skills)).
 
 LangChain message objects stay inside the graph. The protocol server never sends them out. An adapter turns the graph's stream into protocol events first. [ADR-002](adr/002-langgraph-boundary.md) is that boundary.
 
@@ -251,7 +255,8 @@ The daemon keeps its files under one home directory. `resolve_paths` picks it: a
 | `cache/` | Hosted model lists (`models-<provider>.json`) and LiteLLM's prices (`litellm-prices.json`), each refreshed after a day. Safe to delete | Built |
 | `golem.db` | The event log, the `sessions` and `runs` tables derived from it, and `artifacts`, the long tool output. Costs later | Built |
 | `memory.db` | Long-term memory | Planned |
-| `skills/`, `flows/` | Skills and flows you added on this machine | Planned |
+| `skills/` | Skills you added on this machine, one folder each | Built |
+| `flows/` | Flows you added on this machine | Planned |
 
 In `golem.db`, `events` is the source. `sessions` and `runs` are written in the same transaction as the event they follow: `session.created` adds a session with its project folder (`cwd`), `run.started` opens a run, `approval.needed` marks it `waiting` and `approval.resolved` marks it running again, and `run.completed`, `run.failed`, or `run.cancelled` closes it. An `approval.resolved` with `allow_session` adds the tool to `sessions.allowed_tools`. `session.updated` sets the title, or the folder of a session that had none. `session.closed` records `closed_at`, which hides the session from `session.list`; the events stay. `artifacts` is not derived from events: the `tools` node writes a row for each long tool output, by session. The schema version is SQLite's `user_version`. Each numbered migration in `golem/store/migrations.py` runs once, in its own transaction, with a row in `schema_version` (the schema, the golem version that applied it, and when). Before the first pending migration, `golem/store/backup.py` copies the file to `golem.db.bak-<schema>` with SQLite's backup API, under a temporary name until the copy is complete, with the original's permissions. A file from a newer daemon is refused and left as it is; the error names the golem version that `schema_version` says wrote it, and `golem.db.bak-<schema>` when this daemon's schema has a copy. `library_versions` holds the LangGraph package versions that last opened `checkpoints.db`. `golem/store/checkpoints.py` compares them at start and, when they differ, copies that file to `checkpoints.db.bak-<langgraph version>` and records the new versions before LangGraph's saver opens it.
 
@@ -267,6 +272,7 @@ Settings come from three places. Each one overrides the one before it: `~/.golem
 - `trusted_projects`: folders whose `.golem/policy.toml` may allow tools.
 - `[shell]`: `network` (default `false`) lets commands use the network, `writable` adds folders they may write to, and `timeout_seconds` (default 120) is the longest a command runs. Only the user's file sets these; a project file cannot.
 - `[web]`: `allow_private` (default `false`) lets `web_fetch` reach loopback, private, and link-local addresses, `max_bytes` (default 5 000 000) is the most of a page it reads, and `timeout_seconds` (default 20) the longest a whole fetch takes. A redirect to another host is not followed: the model gets the new URL and asks again. Only the user's file sets these.
+- `[skills]`: `disabled` (names listed but never used), `claude_dirs` (default `true`, read both `.claude/skills` folders), and `extra_dirs` (more folders of skills, after the user's own). Only the user's file sets these, and the daemon reads them again when the file changes ([ADR-025](adr/025-skill-sources.md)).
 - `[mcp.<name>]`: an MCP server. A stdio one has `command`, optional `args`, `env`, and `cwd`. An HTTP one has `url` and optional `headers`. A value in `env` or `headers` may name `keychain:mcp/<name>`, and a name that looks like a secret must. `enabled` is `true` (default), `"on_demand"`, or `false`, and `timeout_seconds` (default 120) bounds one tool call. The name may use letters, digits, and `-`. The daemon reads the user's file and, for sessions in a folder in `trusted_projects`, the project's `.golem/config.toml`, again whenever they change ([ADR-023](adr/023-mcp-client.md)).
 
 Tool rules are checked in this order, and the first one that matches decides ([ADR-012](adr/012-permission-rules.md)):
@@ -279,6 +285,84 @@ Both files are read again when they change. A `deny` ends the call in `tool.fail
 API keys are never in the file, and a table with a key such as `api_key`, `token`, `password`, or `secret` does not load: the error points to `golem auth set`. Every secret golem keeps is in one store, `golem/secrets.py`: the Keychain, service `golem`, through `keyring`, cached in the daemon, with names in namespaces. `provider/<name>` is a model provider's key, stored with the provider name alone as the account, `mcp/<server>` an MCP server's token, and `hook/<name>` a hook endpoint's token. A setting that needs a secret names it as `keychain:<name>` and the daemon resolves it when it uses it. At each model call the router reads the environment variable named by `api_key_env`, then the provider's key from that store (`golem/models/keys.py`). A provider with `api_key_env` fails without a key, and the error names `/login <provider>`. Other providers, except `ollama`, use a stored key when there is one. Only the daemon writes those items, through `auth.set`, so the Keychain lets it read them without a prompt. A frozen daemon from `just dist` is a different executable from a checkout's Python. After its first successful read of each item, it deletes the item and writes it again so it owns it, and lists the name in `run/keychain-migrated` so this happens once. The model router re-reads `config.toml` when its modification time changes, so model edits need no restart. A file that no longer validates keeps the last good models and logs a warning.
 
 Each log record is written twice: a short line on stderr, and a JSON line in `logs/golem.jsonl`.
+
+## Skills
+
+A skill is a folder with a `SKILL.md`: a short YAML header (`name`, `description`) and then the instructions, in markdown. Scripts and reference notes can sit next to it. Golem reads the [Agent Skills](https://agentskills.io) format that Claude Code uses, so a skill written for another agent works here unchanged. How to write one and where to put it is in the [README](../README.md#use-skills).
+
+<p align="center">
+  <img src="images/skills.gif" alt="An animation in seven steps: a skill is a folder with a SKILL.md, a header and instructions; the model sees one line per skill, the body when it is used, and its files when needed; golem looks in the project's .golem, .agents, and .claude skill folders, then the user's, then its own; the first working skill of a name wins and the rest are listed with why; saving a skill sends skill.registry.changed and /skills updates without a restart; golem skills and golem skills check in a shell; and next, three ways to use a skill: /name, pin, and the model loading it" width="900">
+</p>
+
+### The idea: cheap until it is used
+
+A model's context is small, and most skills are not needed in most turns. So a skill reaches the model in three levels, each only when it is needed. This is what the Agent Skills format calls progressive disclosure:
+
+| Level | What the model sees | When | Status |
+|---|---|---|---|
+| 1. Index | One line per skill: its `name` and `description` | Every model call | Planned (2.4) |
+| 2. Body | The instructions in `SKILL.md` | When the skill is used | Planned (2.2 to 2.4) |
+| 3. Files | `references/`, script output | When the body says to read or run them | Planned (2.2) |
+
+A skill can be used in three ways, and all three need the registry below:
+
+| Way | Who decides | Where the body goes | Status |
+|---|---|---|---|
+| `/ship fix the mcp restart` | You | Your message, with your words filled in | Planned (2.2) |
+| `/skill pin ship` | You | The system prompt, until you unpin it | Planned (2.3) |
+| `load_skill("ship")` | The model | A tool result | Planned (2.4) |
+
+The daemon owns the skills, as it owns sessions and rules. Graph state will hold only skill names, never bodies, so checkpoints stay small. A skill can never do more than the rules allow: whatever it asks for goes through the same permission check and approvals as any tool call (2.6).
+
+### What happens today
+
+Step 2.1 finds, checks, and lists skills. Nothing reaches the model yet.
+
+```mermaid
+flowchart LR
+  folders["skill folders<br/>project, user, bundled"] -->|"parse the header"| registry["SkillRegistry<br/>view(folder)"]
+  registry -->|skill.list| clients["/skills in the TUI<br/>golem skills"]
+  watch["every 2 s: did a SKILL.md<br/>or config.toml change?"] --> registry
+  watch -->|skill.registry.changed| clients
+  check["golem skills check"] -->|"parse, no daemon"| folders
+```
+
+**1. Reading one skill** (`golem/skills/parse.py`). Only the header is read, at most 64 KB, and the body is read later, when the skill is used. A problem never stops golem: the skill is kept with its `errors`, and is never used, or with `warnings`, and is used anyway. The Agent Skills rules apply: `name` is lowercase letters, digits, and single hyphens, it matches the folder, and `description` is at most 1024 characters. Where Claude Code is looser, golem follows it: `name` may be left out, a missing `description` falls back to the first paragraph of the body, and a file may have no header at all. A `SKILL.md` over 1 MB is an error. Claude Code fields that golem does not use yet (`context`, `agent`, `hooks`) give a warning.
+
+**2. Where it looks** (`golem/skills/registry.py`). A session's own folder first, then the user's folders, then golem's own skills:
+
+1. `<folder>/.golem/skills`, `<folder>/.agents/skills`, `<folder>/.claude/skills`
+2. `~/.golem/skills`, `~/.agents/skills`, `~/.claude/skills`, then `[skills] extra_dirs`
+3. Bundled with golem (2.7)
+
+Each source is read one level deep. A folder with a `SKILL.md` is a skill, and a name that starts with `.` or `_` is skipped. Symlinks are followed, and a folder reached twice counts once, so this repository's `.claude/skills`, which links to `.agents/skills`, lists each skill once.
+
+**3. Who wins a name.** The daemon serves every session, and each session has its own folder, so there is no single list. `SkillRegistry.view(folder)` builds the list one folder sees. The first valid skill of a name wins. A broken skill never wins, so a broken copy in a project does not hide your working one. Every skill that lost stays in the list with `shadowed_by`, the folder of the winner, and `[skills] disabled` marks a skill that is listed but never used. Trust plays no part here: a skill is text, like any file in the project. What a skill may do without asking is decided in 2.6.
+
+**4. Kept current.** A parsed skill is cached until the stamp of its `SKILL.md`, its modification time and size, changes. Every two seconds, `SkillRegistry.check` compares the stamps of the user's folders, and of each session folder the registry was asked about, with what it saw last. It also reads `[skills]` again when `config.toml` changes, and a file that does not validate keeps the last good settings. A change sends `skill.registry.changed` to every connection, with `root` set to the session folder, or `null` when every folder is affected. Golem polls instead of using a file watcher, the same way it reloads rules, models, and MCP servers ([ADR-025](adr/025-skill-sources.md)).
+
+**5. Seeing them.** `skill.list {cwd}` returns every skill found, winners first, each with its `source`, `path`, `usable`, `shadowed_by`, `errors`, `warnings`, and header flags. `/skills` in the TUI shows them by source, and opens one with its details. `golem skills` prints the same list. `golem skills check <path>` runs the parser in the daemon executable without a running daemon, prints every error and warning, and exits with 1 on an error.
+
+| File | What it does |
+|---|---|
+| `golem/skills/model.py` | `Skill`, what golem knows about one folder |
+| `golem/skills/parse.py` | Reads and checks one `SKILL.md`. `read_body` reads the instructions |
+| `golem/skills/registry.py` | Sources, winners, the per-folder view, the cache, and the watch |
+| `golem/skills/check.py` | `golem skills check` |
+| `golem/server/handlers.py` | `skill.list` |
+| `packages/tui/src/skills-manager.ts` | `/skills` |
+| `packages/cli/src/format-skills.ts` | `golem skills` |
+
+### What comes next
+
+| Step | What you get |
+|---|---|
+| [2.2](https://github.com/MilanPavel/golem/issues/21) | Run a skill with `/name args`, and let it read its own files and run its scripts |
+| [2.3](https://github.com/MilanPavel/golem/issues/5) | Pin a skill for a chat. Golem gets a system prompt, built for each model call and never stored |
+| [2.4](https://github.com/MilanPavel/golem/issues/6) | The index in the system prompt, and a `load_skill` tool, so the model picks a skill itself |
+| [2.5](https://github.com/MilanPavel/golem/issues/7) | A short list chosen by embeddings, for local models |
+| [2.6](https://github.com/MilanPavel/golem/issues/8) | Trust: a skill's scripts ask first, and `allowed-tools` lets a trusted skill skip the ask, never past a deny rule |
+| [2.7](https://github.com/MilanPavel/golem/issues/9) | Golem writes a skill for you to review |
 
 ## The protocol
 
@@ -337,7 +421,7 @@ Each event line is one JSON-RPC 2.0 notification. The fields that matter:
 
 | Commands | Events |
 |---|---|
-| `hello`, `ping`, `daemon.status`, `session.create`, `session.attach`, `session.detach`, `session.list`, `session.rename`, `session.fork`, `session.close`, `message.send`, `run.cancel`, `approval.respond`, `session.inspect`, `config.get`, `policy.update`, `policy.remove`, `session.revoke`, `auth.set`, `auth.remove`, `auth.list`, `model.list`, `session.set_model`, `model.set_default`, `model.probe`, `model.pull`, `model.pull_cancel`, `model.delete`, `artifact.read`, `mcp.list`, `mcp.enable`, `mcp.disable`, `mcp.tools`, `mcp.restart`, `mcp.set_enabled` | `session.created`, `model.selected`, `message.started`, `message.delta`, `message.completed`, `tool.requested`, `tool.started`, `tool.output`, `tool.completed`, `tool.failed`, `approval.needed`, `approval.resolved`, `todos.updated`, `run.started`, `run.completed`, `run.failed`, `run.cancelled`, `session.updated`, `session.closed`; `session.summary` to watchers; `model.pull.progress`, `model.pull.done`, and `mcp.server.status` to every connection |
+| `hello`, `ping`, `daemon.status`, `session.create`, `session.attach`, `session.detach`, `session.list`, `session.rename`, `session.fork`, `session.close`, `message.send`, `run.cancel`, `approval.respond`, `session.inspect`, `config.get`, `policy.update`, `policy.remove`, `session.revoke`, `auth.set`, `auth.remove`, `auth.list`, `model.list`, `session.set_model`, `model.set_default`, `model.probe`, `model.pull`, `model.pull_cancel`, `model.delete`, `artifact.read`, `mcp.list`, `mcp.enable`, `mcp.disable`, `mcp.tools`, `mcp.restart`, `mcp.set_enabled`, `skill.list` | `session.created`, `model.selected`, `message.started`, `message.delta`, `message.completed`, `tool.requested`, `tool.started`, `tool.output`, `tool.completed`, `tool.failed`, `approval.needed`, `approval.resolved`, `todos.updated`, `run.started`, `run.completed`, `run.failed`, `run.cancelled`, `session.updated`, `session.closed`; `session.summary` to watchers; `model.pull.progress`, `model.pull.done`, `mcp.server.status`, and `skill.registry.changed` to every connection |
 
 After `hello`, a client sends `ping` every few seconds so a half-open socket is noticed. `daemon.status` returns the pid, uptime, and configured model. A new chat sends `session.create` with its `cwd`, then `session.attach` with `after_seq` 0, then `message.send`. `session.list` returns sessions newest activity first, each with `idle`, `running`, or `waiting` for an approval, its title, and its last `seq`. With `watch: true`, the connection also gets a `session.summary` after every change to any session, until it closes. `session.rename` sets a title by hand. `session.fork` copies a session's history up to one message into a new session, and the client attaches to it. `session.detach` stops one session's events. `session.inspect` reads the saved checkpoint messages and does not call the model. A reply that called tools lists each call as `→ name(args)` after its text. `auth.set` stores a provider's API key in the Keychain, `auth.remove` deletes it, and `auth.list` says where each provider's key is without returning it. The client shows `auth.set` in the wire view with the key replaced by `[redacted]`.
 

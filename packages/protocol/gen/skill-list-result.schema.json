@@ -1,0 +1,133 @@
+{
+  "$defs": {
+    "ListedSkill": {
+      "additionalProperties": false,
+      "description": "One skill folder, valid or not.\n\n``usable`` is false when the skill has ``errors``, is in ``[skills]\ndisabled``, or lost its name to another skill, whose folder\n``shadowed_by`` names. ``model_invocable`` is false for\n``disable-model-invocation: true``. ``allowed_tools`` and ``model`` are\nthe frontmatter as written.",
+      "properties": {
+        "allowed_tools": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowed Tools",
+          "type": "array"
+        },
+        "argument_hint": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Argument Hint"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "disabled": {
+          "default": false,
+          "title": "Disabled",
+          "type": "boolean"
+        },
+        "errors": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Errors",
+          "type": "array"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
+        },
+        "model_invocable": {
+          "default": true,
+          "title": "Model Invocable",
+          "type": "boolean"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "shadowed_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Shadowed By"
+        },
+        "source": {
+          "enum": [
+            "project",
+            "user",
+            "bundled"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "usable": {
+          "title": "Usable",
+          "type": "boolean"
+        },
+        "user_invocable": {
+          "default": true,
+          "title": "User Invocable",
+          "type": "boolean"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "description",
+        "source",
+        "path",
+        "usable"
+      ],
+      "title": "ListedSkill",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Every skill found, highest source first, winners and losers.",
+  "properties": {
+    "skills": {
+      "items": {
+        "$ref": "#/$defs/ListedSkill"
+      },
+      "title": "Skills",
+      "type": "array"
+    }
+  },
+  "required": [
+    "skills"
+  ],
+  "title": "SkillListResult",
+  "type": "object"
+}

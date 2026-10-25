@@ -53,6 +53,7 @@ The scope is optional. Use it when a change sits in one part of golem.
 | `sessions` | Sessions, the event log, checkpoints, forks |
 | `tools` | Built-in tools, rules, approvals, the sandbox |
 | `mcp` | MCP servers and their tools |
+| `skills` | Skills: the registry, `/skills`, loading, trust |
 | `secrets` | API keys and the Keychain |
 | `install` | `golem daemon install`, upgrades, Homebrew |
 | `release` | Versioning, signing, the release workflow |

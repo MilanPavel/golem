@@ -212,6 +212,54 @@ A value in `env` or `headers` can name a Keychain secret, `keychain:mcp/<name>`,
 
 </details>
 
+## Use skills
+
+A **skill** teaches golem one job, such as "open a pull request the way this project likes it". It is a folder with a `SKILL.md`: a short header that says what it is for, then the instructions, in plain markdown. Scripts and notes can sit next to it.
+
+```markdown
+---
+name: release-notes
+description: Write release notes from the merged pull requests. Use when the user asks for release notes or a changelog entry.
+---
+
+# Write release notes
+
+1. List the pull requests merged since the last tag.
+2. Group them into Features and Fixes, one line each.
+```
+
+Golem uses the same format as Claude Code and other agents ([agentskills.io](https://agentskills.io)), so the skills you already have work unchanged. It finds them in these folders, the project's first:
+
+| Where | Folders |
+|---|---|
+| The project you chat in | `.golem/skills/`, `.agents/skills/`, `.claude/skills/` |
+| Yours, on this machine | `~/.golem/skills/`, `~/.agents/skills/`, `~/.claude/skills/` |
+
+Put each skill in its own folder, named like the skill: `~/.golem/skills/release-notes/SKILL.md`. Type **`/skills`** in the chat to see every skill golem found, and why one is not used: it is broken, turned off, or a skill of the same name in the project hides it. Save a change and the list follows within two seconds, with no restart.
+
+```bash
+golem skills                                  # the same list, in a shell
+golem skills check ~/.golem/skills/release-notes   # find mistakes before you share one
+```
+
+**What works today, and what is next.** Golem finds, checks, and lists skills. Running one with `/release-notes`, keeping one on for a whole chat, and letting the model pick one when the task fits are the next steps of [Phase 2](docs/plan.md#phase-2--skills). How it works inside, with an animation, is in [architecture.md](docs/architecture.md#skills).
+
+<details>
+<summary><b>Skill settings</b></summary>
+
+In `~/.golem/config.toml`:
+
+```toml
+[skills]
+disabled = ["release-notes"]   # listed, but never used
+claude_dirs = true             # read .claude/skills folders (the default)
+extra_dirs = ["~/team-skills"] # more folders of skills, after your own
+```
+
+A header field golem does not know yet is kept and shown as a warning, never an error. The fields it reads are `name`, `description`, `argument-hint`, `disable-model-invocation`, `user-invocable`, `allowed-tools`, and `model`.
+
+</details>
+
 ## How it works
 
 ```mermaid
@@ -242,6 +290,8 @@ flowchart LR
 | `golem auth set` / `remove` / `list` | Manages API keys, and MCP tokens (`mcp/<name>`), in the Keychain |
 | `golem models` | Every model you can use or download, with size, price, and context |
 | `golem config show` | The settings and tool rules in effect for this folder |
+| `golem skills` | The skills this folder sees, and why one is not used |
+| `golem skills check <path>` | Checks a skill, its `SKILL.md`, or a folder of skills. Needs no daemon |
 
 </details>
 
@@ -260,6 +310,7 @@ Type `/` and suggestions appear. `/help` lists everything.
 | `/export [path]` | Save this chat as markdown |
 | `/artifact` | Open the full output of the last long tool call in your pager |
 | `/permissions` | Review and change tool rules |
+| `/skills` | See the skills this folder has, and open one to see why it is or is not used |
 | `/mcp` | Manage MCP servers: view tools, reconnect, turn on or off. `/mcp enable <name>` and `/mcp disable <name>` are shortcuts |
 | `/login`, `/logout <provider>` | Save or remove an API key |
 | `/todos`, `/time` | Show or hide the agent's todo list, or message times |
@@ -291,6 +342,7 @@ Type `/` and suggestions appear. `/help` lists everything.
 | `~/.golem/golem.db`, `checkpoints.db` | Your chats, and what the model remembers of them |
 | `~/.golem/*.db.bak-<version>` | Copies taken before an upgrade changed a database |
 | `~/.golem/logs/` | The daemon's log |
+| `~/.golem/skills/` | Your own skills |
 | `~/.golem/exports/` | Chats saved with `/export` |
 
 Set `GOLEM_HOME` to use another folder, for example a throwaway one for experiments.

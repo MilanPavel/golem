@@ -221,6 +221,7 @@ async def start_daemon(
     discovery: Callable[[ModelRouter], ModelDiscovery] | None = None,
     pulls: Callable[[ModelRouter, float | None], PullManager] | None = None,
     secrets: SecretStore | None = None,
+    user_home: Path | None = None,
 ) -> tuple[DaemonApp, asyncio.Task[None]]:
     paths = resolve_paths(home)
     paths.ensure_layout()
@@ -234,6 +235,7 @@ async def start_daemon(
         discovery=discovery,
         pulls=pulls,
         secrets=secrets,
+        user_home=user_home if user_home is not None else home,
     )
     task = asyncio.create_task(app.serve(install_signals=False))
     await _wait_listening(paths.socket_path, task)

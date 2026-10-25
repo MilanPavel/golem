@@ -12,6 +12,7 @@ from golem.paths import GolemPaths
 from golem.permissions.policy import Policy
 from golem.secrets import SecretStore
 from golem.sessions.manager import SessionManager
+from golem.skills.registry import SkillRegistry
 from golem.store.artifacts import ArtifactStore
 from golem.tools.registry import ToolRegistry
 
@@ -31,3 +32,4 @@ class DaemonState:
     artifacts: ArtifactStore | None = None
     mcp: McpSupervisor | None = None
     secrets: SecretStore | None = None
+    skills: SkillRegistry | None = None

@@ -733,6 +733,44 @@ test("mcp.list reads the servers, and mcp.server.status reaches onMcpStatus", as
   }
 });
 
+test("skill.list reads the skills, and skill.registry.changed reaches onSkillsChanged", async () => {
+  const ship = { name: "ship", description: "Ship it.", source: "project", path: "/repo/.agents/skills/ship", usable: true };
+  const sent: Record<string, unknown>[] = [];
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: { "skill.list": { skills: [ship] } },
+      onRequest: (_socket, method, params) => {
+        if (method.startsWith("skill.")) {
+          sent.push({ method, ...params });
+        }
+      },
+      onHello: (current) => {
+        write(current, { jsonrpc: "2.0", method: "skill.registry.changed", params: { root: "/repo" } });
+        write(current, { jsonrpc: "2.0", method: "skill.registry.changed", params: { root: null } });
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
+  const seen: (string | null)[] = [];
+  const stop = client.onSkillsChanged((root) => {
+    seen.push(root);
+  });
+  try {
+    assert.deepEqual(await client.listSkills("/repo"), { skills: [ship] });
+    await client.listSkills();
+    assert.deepEqual(sent, [{ method: "skill.list", cwd: "/repo" }, { method: "skill.list" }]);
+    for (let tries = 0; tries < 50 && seen.length < 2; tries += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    assert.deepEqual(seen, ["/repo", null]);
+  } finally {
+    stop();
+    client.close();
+    await server.close();
+  }
+});
+
 test("forkSession sends the message id and reads the new session", async () => {
   const sent: Record<string, unknown>[] = [];
   const server = await listen((socket) => {

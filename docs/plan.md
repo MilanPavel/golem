@@ -80,16 +80,16 @@ Agents use the Graph API, where the model decides control flow. Flows use the Fu
 
 ### Protocol, what is left to add
 
-JSON-RPC 2.0, one JSON object per line, over `~/.golem/run/golem.sock`. Protocol 2.20 is on the wire today (see [architecture.md](architecture.md#what-is-on-the-wire-today)). The phases below add the rest.
+JSON-RPC 2.0, one JSON object per line, over `~/.golem/run/golem.sock`. Protocol 2.22 is on the wire today (see [architecture.md](architecture.md#what-is-on-the-wire-today)). The phases below add the rest.
 
 | Group | New events | Phase |
 |---|---|---|
 | Models | `usage.reported` (tokens, cost) | 9.1 |
 | System | `warning`, `error` | 9.4 |
-| Skills | `skill.activated`, `skill.deactivated` | 2.2 |
+| Skills | `skill.activated`, `skill.deactivated`, and the `skill.registry.changed` notification | 2.1–2.3 |
 | Runs and flows | `run.step.started`, `run.step.completed`, `run.interrupted` | 3.2, 3.4 |
 
-New commands: `skill.list | pin | unpin` (2.1, 2.2), `flow.list | start | status` (3.1), and `daemon.shutdown` (8.1).
+New commands: `skill.list` (2.1), `session.set_skills` (2.3), `skill.trust | untrust` (2.6), `flow.list | start | status` (3.1), and `daemon.shutdown` (8.1).
 
 Rules:
 
@@ -184,58 +184,82 @@ Choices that hold for the whole phase:
 
 ## Phase 2 — Skills
 
-Agent Skills (`SKILL.md`) compatible with Claude Code, loaded by progressive disclosure.
+Agent Skills (`SKILL.md`) compatible with Claude Code, loaded by progressive disclosure. The details and the use cases are in the milestone, tracked by [#10](https://github.com/MilanPavel/golem/issues/10). Each step is one PR, and each of its tickets is one commit in it. This section keeps the why.
 
-### 2.1 Registry and `/skills`
+A skill becomes active in one of three ways:
 
-- **Goal:** golem knows which skills exist.
-- **You can:** run `/skills` and see each skill with its source and description.
-- **Build:**
-  - Scan `~/.golem/skills`, `<project>/.golem/skills`, `<project>/.agents/skills`, and optionally `~/.claude/skills`. On a name collision, project wins, then user, then bundled.
-  - Parse and validate frontmatter: `name`, `description`, optional `allowed-tools`, and golem's own `model`.
-  - Hot reload with `watchfiles`. `skill.list` on the wire.
-- **Done when:** an existing Claude Code skill shows up, and editing it updates the list without a restart.
+| Way | Who | Where the body goes | How long |
+|---|---|---|---|
+| **Invoke** `/ship fix the mcp restart` | You | The turn's user message, arguments substituted | That turn |
+| **Pin** `/skill pin <name>` | You | The system prompt, re-read every model call | Until unpinned. Survives a restart, and a fork copies it |
+| **Load** `load_skill(name)` | The model | A tool result in history | The rest of the session |
 
-### 2.2 Pinned skills
+Choices that hold for the whole phase:
 
-- **Goal:** you can turn a skill on by hand.
-- **You can:** `/skill <name>` (with suggestions) and `/skill off <name>`.
-- **Build:**
-  - `active_skills: list[str]` in graph state, with a deduping reducer.
-  - Active skill bodies go into the system prompt. Compaction (9.5) always keeps them.
-  - `skill.activated` and `skill.deactivated`. The header shows active skills.
-- **Done when:** a pinned skill changes the answer in the expected way.
+- **The daemon owns the registry, and graph state holds only skill names.** Bodies are read from disk when the prompt is built.
+- **The system prompt is built per model call and never checkpointed.** golem has none today, so 2.3 adds it.
+- **`allowed-tools` pre-approves, as in Claude Code, but only for a trusted skill**, and a deny rule always wins. The earlier plan said it only narrows.
+- **A skill from an untrusted project works like a user skill.** Only its scripts and `` !`cmd` `` always ask, and its `allowed-tools` is ignored until the project is trusted ([ADR-012](adr/012-permission-rules.md)).
+- **`~/.claude/skills` and `<project>/.claude/skills` are read by default.** Legacy `.claude/commands/*.md` is not.
+- **Invoking comes before pinning.** It is the most-used Claude Code feature, and it needs no system prompt.
 
-### 2.3 Model-driven loading
+```mermaid
+flowchart LR
+  s1[2.1 Registry] --> s2[2.2 Invoke /name] --> s3[2.3 Pin + system prompt] --> s4[2.4 Model-driven loading]
+  s4 --> s5[2.5 Embeddings]
+  s4 --> s6[2.6 Trust] --> s7[2.7 Self-authored]
+```
+
+### 2.1 Registry, `/skills`, and `golem skills` — [#4](https://github.com/MilanPavel/golem/issues/4)
+
+- **Goal:** golem knows which skills exist, for each session's folder.
+- **You can:** run `/skills` or `golem skills` and see each skill with its source, description, and any error.
+- **Build:** a `SKILL.md` parser and validator, sources with precedence (project, then user, then bundled) and a view per session folder, reload by polling file stamps, `skill.list`, `/skills`, and `golem skills list|check`.
+- **Done when:** an existing Claude Code skill, reached through a symlink, shows up, and editing it updates the list without a restart.
+
+### 2.2 Invoke a skill with `/name` — [#21](https://github.com/MilanPavel/golem/issues/21)
+
+- **Goal:** you can run a skill once, with arguments, the way Claude Code does.
+- **You can:** `/ship fix the mcp restart`.
+- **Build:** body expansion (`$ARGUMENTS`, `${CLAUDE_SKILL_DIR}`, …), `message.send` with a skill, `/name` in the composer, a collapsed transcript line, and skill folders as read roots for the read tools and the sandbox.
+- **Done when:** `/ship` in golem on this repo behaves like `/ship` in Claude Code.
+
+### 2.3 Pinned skills and the system prompt — [#5](https://github.com/MilanPavel/golem/issues/5)
+
+- **Goal:** you can turn a skill on for the whole session.
+- **You can:** `/skill pin <name>`, `/skill unpin <name>`, and see active skills in the status line and the system prompt in `/debug model`.
+- **Build:** a system prompt builder, `active_skills` in graph state with `session.set_skills`, `skill.activated` and `skill.deactivated`, handling of a pinned skill that is edited or deleted, and a fork that copies pins.
+- **Done when:** a pinned skill changes the answer, and is still pinned after `kill -9` and a reattach.
+
+### 2.4 Model-driven loading — [#6](https://github.com/MilanPavel/golem/issues/6)
 
 - **Goal:** the model picks up a skill when it needs one.
 - **You can:** ask for a task a skill covers, and see it activate on its own.
-- **Build:** a short index of skill descriptions in the system prompt, and a `load_skill(name)` tool. Files bundled with a skill resolve inside its folder.
-- **Done when:** an existing Claude Code skill works unchanged, triggered by the model.
+- **Build:** an index of descriptions in the system prompt, within a size budget and without `disable-model-invocation` skills, and a `load_skill(name)` tool.
+- **Done when:** an existing Claude Code skill that reads a reference file works unchanged, triggered by the model.
 
-### 2.4 Pre-selection by embeddings
+### 2.5 Pre-selection by embeddings — [#7](https://github.com/MilanPavel/golem/issues/7)
 
 - **Goal:** local models, which are bad at picking from a long list, still get the right skill.
 - **You can:** use skills reliably on a local model.
-- **Build:** a `select_skills` node before `call_model` that embeds the user turn and puts only the top-k descriptions above a threshold into the index.
-- **Done when:** the skill-trigger eval (6.2) passes for your top 10 skills on a local and a remote model.
+- **Build:** embeddings through the router, and a `select_skills` node before `call_model`, on per profile.
+- **Done when:** the hand-check list from 2.4 scores better or equal on a local model. The skill-trigger eval (6.2) replaces it later.
 
-### 2.5 Trust and scoped permissions
+### 2.6 Trust and scoped permissions — [#8](https://github.com/MilanPavel/golem/issues/8)
 
-- **Goal:** a skill can never widen what golem is allowed to do.
+- **Goal:** a skill can pre-approve only what you trusted, and never past a deny rule.
 - **You can:** see which skills are trusted, and approve a skill's script once.
-- **Build:**
-  - The first run of a script from an untrusted skill needs approval. A content hash is stored per trusted skill, and a change asks again.
-  - `allowed-tools` narrows the tool set while the skill is active. It never widens global policy.
-  - `model: remote` in frontmatter makes the router escalate while the skill is active.
+- **Build:** a trust store keyed by a hash of the skill folder, approvals for scripts, `allowed-tools`, and `` !`cmd` `` dynamic context.
 - **Done when:** editing a trusted skill's script triggers a new approval.
 
-### 2.6 Self-authored skills
+### 2.7 Self-authored skills — [#9](https://github.com/MilanPavel/golem/issues/9)
 
 - **Goal:** golem can turn a repeated task into a skill.
-- **You can:** ask golem to write a skill, review the draft, and accept it.
-- **Build:** a `propose_skill` tool that writes into `~/.golem/skills/_proposed/`. Accepting moves it into place.
+- **You can:** ask golem to write or improve a skill, review the draft, and accept it.
+- **Build:** bundled skills (with a skill-authoring skill), a `propose_skill` tool that writes into `~/.golem/skills/_proposed/`, and edits to a skill shown as a diff.
 - **Done when:** a proposed skill is accepted and then triggers in a new session.
+
+Later phases pick up the rest: `model:` frontmatter (9.3), `context: fork` (3.6), and compaction (9.5), which keeps pinned skills for free because they live in the system prompt.
 
 ---
 

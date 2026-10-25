@@ -1,4 +1,4 @@
-"""Daemon commands: hello, status, ping, sessions, chat, keys, models, and MCP."""
+"""Daemon commands: hello, status, ping, sessions, chat, keys, models, MCP, and skills."""
 
 from __future__ import annotations
 
@@ -52,6 +52,7 @@ from golem.sessions.manager import (
     SessionNotFoundError,
 )
 from golem.sessions.summaries import summarize
+from golem.skills.registry import listed_skill
 from golem.tools.registry import ToolScope
 from golem_protocol.commands import (
     ApprovalRespondParams,
@@ -125,6 +126,8 @@ from golem_protocol.commands import (
     SessionRevokeResult,
     SessionSetModelParams,
     SessionSetModelResult,
+    SkillListParams,
+    SkillListResult,
 )
 from golem_protocol.events import Ping
 from golem_protocol.version import PROTOCOL_MAJOR, PROTOCOL_MINOR
@@ -585,6 +588,16 @@ async def _mcp_list(ctx: RequestContext, params: McpListParams) -> McpListResult
     return McpListResult(servers=mcp.statuses(scope))
 
 
+async def _skill_list(ctx: RequestContext, params: SkillListParams) -> SkillListResult:
+    if params.cwd is not None and not Path(params.cwd).is_absolute():
+        raise RpcCallError(INVALID_PARAMS, "cwd must be an absolute path")
+    skills = ctx.state.skills
+    if skills is None:
+        return SkillListResult(skills=[])
+    view = skills.view(None if params.cwd is None else Path(params.cwd))
+    return SkillListResult(skills=[listed_skill(entry) for entry in view.listed])
+
+
 async def _mcp_enable(ctx: RequestContext, params: McpToggleParams) -> McpToggleResult:
     return await _mcp_toggle(ctx, params, True)
 
@@ -759,6 +772,7 @@ def standard_methods() -> dict[str, Method]:
         "mcp.tools": Method("mcp.tools", McpServerParams, True, _mcp_tools),
         "mcp.restart": Method("mcp.restart", McpServerParams, True, _mcp_restart),
         "mcp.set_enabled": Method("mcp.set_enabled", McpSetEnabledParams, True, _mcp_set_enabled),
+        "skill.list": Method("skill.list", SkillListParams, True, _skill_list),
         "model.probe": Method("model.probe", ModelProbeParams, True, _model_probe),
         "model.pull": Method("model.pull", ModelPullParams, True, _model_pull),
         "model.pull_cancel": Method(

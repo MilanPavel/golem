@@ -150,6 +150,22 @@ class ShellSettings(BaseModel):
     timeout_seconds: int = Field(default=120, gt=0, le=3600)
 
 
+class SkillSettings(BaseModel):
+    """``[skills]``. Which skill folders golem reads, and which skills it leaves off.
+
+    ``disabled`` names skills that are listed but never used. ``claude_dirs``
+    reads Claude Code's ``.claude/skills`` folders, in the project and in the
+    home folder. ``extra_dirs`` adds folders of skills, with ``~`` for the home
+    folder, after the user's own.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    disabled: list[str] = Field(default_factory=list[str])
+    claude_dirs: bool = True
+    extra_dirs: list[str] = Field(default_factory=list[str])
+
+
 class WebSettings(BaseModel):
     """``[web]``. What ``web_fetch`` may reach and how much it reads.
 
@@ -281,6 +297,7 @@ class GolemSettings(BaseSettings):
     shell: ShellSettings = Field(default_factory=ShellSettings)
     web: WebSettings = Field(default_factory=WebSettings)
     mcp: McpServers = Field(default_factory=dict)
+    skills: SkillSettings = Field(default_factory=SkillSettings)
 
     _no_secrets = model_validator(mode="before")(_no_inline_secrets)
 

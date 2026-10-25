@@ -126,6 +126,15 @@ import {
   openMcpManager,
   pressMcpManager,
 } from "./mcp-manager.ts";
+import {
+  closedSkillsManager,
+  layoutSkillsManager,
+  openSkillsManager,
+  pressSkillsManager,
+  type SkillList,
+  skillsManagerKeyOf,
+  type SkillsManagerState,
+} from "./skills-manager.ts";
 import { assistantChars, elapsedSeconds, meterLine, meterPhase } from "./progress.ts";
 import {
   fitSegments,
@@ -205,6 +214,12 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   const mcpRef = useRef<McpList>({ servers: null, error: null });
   const [mcp, setMcp] = useState<McpList>({ servers: null, error: null });
   mcpRef.current = mcp;
+  const [skillsManager, setSkillsManager] = useState<SkillsManagerState>(closedSkillsManager);
+  const skillsManagerRef = useRef(skillsManager);
+  skillsManagerRef.current = skillsManager;
+  const [skillList, setSkillList] = useState<SkillList>({ skills: null, error: null });
+  const skillListRef = useRef(skillList);
+  skillListRef.current = skillList;
   const helpOpen = panel !== null;
   const [keysOpen, setKeysOpen] = useState(false);
   const [keysOffset, setKeysOffset] = useState(0);
@@ -285,6 +300,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
     switcher.open ||
     perms.open ||
     mcpManager.open ||
+    skillsManager.open ||
     picker.open ||
     keysOpen ||
     suggestDismissed ||
@@ -581,6 +597,20 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   }, [client, connection.status, sessionId]);
 
   useEffect(() => {
+    if (connection.status === "connected") {
+      loadSkills();
+    }
+  }, [client, connection.status, sessionCwd]);
+
+  useEffect(() => {
+    return client.onSkillsChanged((root) => {
+      if (root === null || root === skillsFolder()) {
+        loadSkills();
+      }
+    });
+  }, [client]);
+
+  useEffect(() => {
     return client.onMcpStatus((server) => {
       setMcp((current) =>
         current.servers === null ? current : { servers: mergeMcp(current.servers, server), error: null },
@@ -686,6 +716,23 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
     );
   }
 
+  /** The folder whose skills this screen shows: the session's, or where the TUI started. */
+  function skillsFolder(): string {
+    return sessionCwdRef.current ?? process.cwd();
+  }
+
+  /** Ask for this folder's skills again. `/skills` reads them. */
+  function loadSkills(): void {
+    client.listSkills(skillsFolder()).then(
+      (listed) => {
+        setSkillList({ skills: listed.skills, error: null });
+      },
+      (error: unknown) => {
+        setSkillList({ skills: null, error: messageOf(error) });
+      },
+    );
+  }
+
   function submit(): void {
     const outcome = applyComposer(debugRef.current, draftRef.current.text);
     if (outcome.kind === "idle") {
@@ -715,6 +762,16 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       mcpManagerRef.current = opened;
       setMcpManager(opened);
       loadMcp();
+      return;
+    }
+    if (outcome.kind === "skills") {
+      setDraft(draftAt(""));
+      setKeysOpen(false);
+      setSwitcher(closedSwitcher);
+      const opened = openSkillsManager();
+      skillsManagerRef.current = opened;
+      setSkillsManager(opened);
+      loadSkills();
       return;
     }
     if (outcome.kind === "mcp-toggle") {
@@ -1114,6 +1171,16 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
         action.enabled === false ? "disabled everywhere" : action.enabled === true ? "on for every chat" : "on demand";
       client.setMcpEnabled(action.name, action.enabled, session).then(done(`${action.name} is ${what}`), failed);
     }
+  }
+
+  function onSkillsManagerPress(press: Press): void {
+    const key = skillsManagerKeyOf(press);
+    if (key === null) {
+      return;
+    }
+    const pressed = pressSkillsManager(skillsManagerRef.current, skillListRef.current.skills ?? [], key);
+    skillsManagerRef.current = pressed.state;
+    setSkillsManager(pressed.state);
   }
 
   function onPickerPress(press: Press): void {
@@ -1585,6 +1652,10 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       onMcpManagerPress(press);
       return;
     }
+    if (skillsManagerRef.current.open && !keysOpenRef.current && press.name !== "f1" && press.name !== "ctrl-c") {
+      onSkillsManagerPress(press);
+      return;
+    }
     applyKeyEffect(pressKey(currentPlace(), press));
   });
 
@@ -1600,6 +1671,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       pickerRef.current.open ||
       permsRef.current.open ||
       mcpManagerRef.current.open ||
+      skillsManagerRef.current.open ||
       keysOpenRef.current
     ) {
       return;
@@ -1686,6 +1758,20 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
             state: mcpManager,
             servers: mcp.servers,
             error: mcp.error,
+            home: homedir(),
+            columns,
+            rows: budget.body,
+          }).map((line, index) => (
+            <McpManagerRow key={index} line={line} />
+          ))}
+        </Box>
+      ) : skillsManager.open ? (
+        <Box flexDirection="column" width={columns} height={budget.body} flexShrink={0} overflow="hidden">
+          {layoutSkillsManager({
+            state: skillsManager,
+            skills: skillList.skills,
+            error: skillList.error,
+            cwd: sessionCwd ?? process.cwd(),
             home: homedir(),
             columns,
             rows: budget.body,

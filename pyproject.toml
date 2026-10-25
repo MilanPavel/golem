@@ -20,6 +20,7 @@ dev = [
   "pytest-asyncio>=0.25",
   "pyright>=1.1.400",
   "ruff>=0.15",
+  "types-pyyaml>=6.0",
   "git-cliff>=2.14.2",
 ]
 
