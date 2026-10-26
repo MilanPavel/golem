@@ -668,12 +668,51 @@
     },
     "RunFailedData": {
       "additionalProperties": false,
-      "description": "Why a run stopped. No traceback.",
+      "description": "Why a run stopped. No traceback.\n\n``code`` names a failure a client can act on. ``model_unreachable``: the\nmodel's server did not answer. ``provider`` is the provider whose server\nit was, and ``hint`` says how to fix it, such as ``run ollama serve``.",
       "properties": {
+        "code": {
+          "anyOf": [
+            {
+              "const": "model_unreachable",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Code"
+        },
+        "hint": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Hint"
+        },
         "message": {
           "minLength": 1,
           "title": "Message",
           "type": "string"
+        },
+        "provider": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Provider"
         }
       },
       "required": [
