@@ -12,7 +12,7 @@ This file is about what comes next. How the existing pieces are built is in [arc
 
 | Phase | What you get | Milestone |
 |---|---|---|
-| 1. Engineering workflow | Conventional commits, pull requests, a changelog, and `/setup` and `/ship` skills for the repo | M3 — Ready for contributors |
+| 1. First run and terminal UX | Ollama started and installed for you, a clearer input field, select to copy, and the state in the terminal tab | M3 — Smooth first run |
 | 2. Skills | Claude Code compatible `SKILL.md` skills | M4 — Skilled |
 | 3. Flows | Durable workflows written in Python, resumable after a crash | M5 — Works alone |
 | 4. Triggers | Schedules, file watchers, and notifications | M5 — Works alone |
@@ -22,11 +22,11 @@ This file is about what comes next. How the existing pieces are built is in [arc
 | 8. Platforms | One interface for everything OS-specific, then Linux and Windows | Later |
 | 9. Model routing and long sessions | Token and cost display, a cheap profile for small jobs, budgets, escalation, compaction | Later |
 
-What is built is in [architecture.md](architecture.md) and the ADRs, and how to install, run, and release it is in [sre.md](sre.md). The engineering workflow is next, then skills.
+What is built is in [architecture.md](architecture.md) and the ADRs, and how to install, run, and release it is in [sre.md](sre.md). The first-run and terminal work is next, then the rest of skills.
 
 ```mermaid
 flowchart LR
-  p1[1 Engineering workflow] --> p2[2 Skills] --> p3[3 Flows] --> p4[4 Triggers] --> p5[5 Memory] --> p6[6 Evals and hardening] --> p7[7 TUI polish] --> p8[8 Platforms] --> p9[9 Model routing and long sessions]
+  p1[1 First run and terminal UX] --> p2[2 Skills] --> p3[3 Flows] --> p4[4 Triggers] --> p5[5 Memory] --> p6[6 Evals and hardening] --> p7[7 TUI polish] --> p8[8 Platforms] --> p9[9 Model routing and long sessions]
 ```
 
 ### How to read a phase
@@ -84,12 +84,14 @@ JSON-RPC 2.0, one JSON object per line, over `~/.golem/run/golem.sock`. Protocol
 
 | Group | New events | Phase |
 |---|---|---|
+| Models | `code`, `provider`, and `hint` on `run.failed` | 1.1 |
+| Models | the `model.server` notification (`starting`, `ready`, `failed`), and the local server in `daemon.status` | 1.2 |
 | Models | `usage.reported` (tokens, cost) | 9.1 |
 | System | `warning`, `error` | 9.4 |
-| Skills | `skill.activated`, `skill.deactivated`, and the `skill.registry.changed` notification | 2.1–2.3 |
+| Skills | `skill.activated`, `skill.deactivated` | 2.3 |
 | Runs and flows | `run.step.started`, `run.step.completed`, `run.interrupted` | 3.2, 3.4 |
 
-New commands: `skill.list` (2.1), `session.set_skills` (2.3), `skill.trust | untrust` (2.6), `flow.list | start | status` (3.1), and `daemon.shutdown` (8.1).
+New commands: `session.set_skills` (2.3), `skill.trust | untrust` (2.6), `flow.list | start | status` (3.1), and `daemon.shutdown` (8.1).
 
 Rules:
 
@@ -99,86 +101,100 @@ Rules:
 
 ---
 
-## Phase 1 — Engineering workflow
+## Phase 1 — First run and terminal UX
 
-Changes reach `main` only through pull requests. Commits follow [Conventional Commits](https://www.conventionalcommits.org/), release notes are generated from them, and two skills in the repo set up a fresh clone and ship a change.
+A new user picks a local model and gets an answer, even with no Ollama on the Mac. The screen feels like a modern terminal app: an input field with a hint row, select to copy, and the state in the terminal tab. It is tracked by [#62](https://github.com/MilanPavel/golem/issues/62). Each step is one PR, and each of its tickets is one commit in it.
 
 Choices that hold for the whole phase:
 
-- **Squash merge only.** The PR title becomes the one commit on `main`, so one PR is one line in the changelog.
-- **Scopes follow the old prefixes:** `daemon`, `tui`, `cli`, `client`, `protocol`, `models`, `sessions`, `tools`, `mcp`, `secrets`, `install`, `release`, `ci`, `docs`, `plan`, `deps`. `MCP - servers per session` becomes `feat(mcp): servers per session`.
-- **[git-cliff](https://git-cliff.org) writes the changelog.** The git tag stays the version (`scripts/version.sh`), and a human still pushes the tag. release-please was the alternative. It needs a personal token, because a tag pushed with `GITHUB_TOKEN` does not start `release.yml`.
-- **Skills are thin.** They call scripts and `just` recipes, so `just setup` works without an agent too.
-- **Skills live in `.agents/skills/`.** That is the shared folder of the Agent Skills format, so any agent can find them. `.claude/skills` is a symlink to it for Claude Code, and `AGENTS.md` points agents without skill support to the scripts. golem's own skills (2.1) read the same folder.
+- **Never a dead end.** Every failure says what to do next, and the TUI offers that step where it can.
+- **Never install anything without asking.** A user who only uses hosted models never sees an Ollama question.
+- **OS-specific code goes behind one small function from the start**, so 8.1 only moves it. That covers the Ollama binary, Homebrew, and the clipboard.
+- **The TUI runs `brew install`, not the daemon.** It needs the user's terminal and `PATH`, and launchd gives the daemon neither.
 
-### 1.1 Conventional commits
+```mermaid
+flowchart LR
+  s1[1.1 Local model down] --> s2[1.2 Start Ollama on demand] --> s3[1.3 Install Ollama from the picker]
+  s4[1.4 Status in the tab] --> s5[1.5 Composer and hint row] --> s6[1.6 Select to copy]
+```
 
-- **Goal:** every commit on `main` can be read by a tool.
-- **You can:** write `feat(mcp): …`, and a hook refuses `MCP - …` before it is committed.
+The Ollama track (1.1 to 1.3) and the TUI track (1.4 to 1.6) do not depend on each other.
+
+### 1.1 A local model that is down says so — [#56](https://github.com/MilanPavel/golem/issues/56)
+
+- **Goal:** a stopped or missing Ollama is never a raw httpx error.
+- **You can:** send to a local model with Ollama stopped, and read `Ollama isn't running · /model to switch` with the fix, instead of `All connection attempts failed`.
 - **Build:**
-  - `CONTRIBUTING.md`: types, scopes, breaking changes (`!` and `BREAKING CHANGE:`), with examples from the real history.
-  - `.githooks/commit-msg`, plain POSIX `sh` with a regex. Merge, revert, and fixup commits pass.
-  - `just hooks` runs `git config core.hooksPath .githooks`.
-  - ADR-024, commits, pull requests, and release notes.
-- **Done when:** a bad message is refused locally, with an example of a good one.
+  - The runner turns an `httpx.ConnectError` or `ConnectTimeout` from an Ollama model call into a failure with `code: "model_unreachable"`, the provider, and a hint. Today any exception becomes `run.failed` with `str(exc)` ([runner.py](../packages/daemon/golem/sessions/runner.py)).
+  - The hint comes from `_down_hint` and `_ollama_installed` in [pulls.py](../packages/daemon/golem/models/pulls.py), moved to a shared `golem/models/ollama.py`: `ollama serve` when it is installed, `brew install ollama` when it is not.
+  - `run.failed` gains optional `code`, `provider`, and `hint`. A protocol minor bump, and `just gen`.
+  - The banner shows the message and the hint. For `model_unreachable` it adds `/model to switch`, and the model in the status line turns red until the next answer or a model change.
+- **Done when:** with Ollama stopped, a message to a local model shows the new banner, and `/model` switches to a hosted model in two keys.
 
-### 1.2 Pull requests and branch protection
+### 1.2 Start Ollama on demand — [#57](https://github.com/MilanPavel/golem/issues/57)
 
-- **Goal:** code reaches `main` only through a green pull request.
-- **You can:** open a PR, see the template, see its title checked, and squash-merge it.
+- **Goal:** an installed Ollama is running when you need it, and not otherwise.
+- **You can:** reboot, open golem, send to a local model, and get an answer without starting anything.
 - **Build:**
-  - `.github/pull_request_template.md`: summary, why, changes, how it was tested (`just check`, `just dist` and the smoke test when packaging changed, a manual TUI check), protocol bump and regenerated types, ADR, breaking change. A hidden `<!-- shipped-by: … -->` line that `/ship` (1.5) fills in.
-  - `.github/workflows/pr.yml`: a `pr-title` job that runs `.githooks/commit-msg` on the title, so the types and scopes live in one place.
-  - A ruleset on `main`, kept in `scripts/github_ruleset.json` and applied by `just protect` through `gh api`: a PR is required (no approvals, there is one maintainer), the checks `check`, `dist`, and `pr-title` must pass, history stays linear, no force-push or delete. In an emergency the admin can merge a PR without waiting for checks, but cannot push directly. Repo settings: squash only, the PR title is the squash commit with an empty body, branches are deleted on merge. A new push to a PR cancels its older CI run.
-  - [sre.md](sre.md), section 5, describes the PR flow.
-- **Done when:** `git push origin main` is refused, and a PR with a bad title cannot merge.
-- **Watch out:** required checks match job names exactly. `dist` runs on macOS for every PR, which is free on a public repo but slow.
+  - A `LocalServer` in `golem/models/ollama.py`. `ensure_running()` asks `GET /api/tags`. When nothing answers and the binary exists, it starts `ollama serve`, logs to `~/.golem/logs/ollama.log`, and waits for it to answer, with a timeout and a clear error. The binary is found by its known paths, because the daemon has no `PATH` under launchd.
+  - It runs before a local model call, and when `model.list` looks for local models.
+  - A `model.server` notification (`starting`, `ready`, `failed`). The meter shows `starting ollama` while it waits.
+  - A server that is already running, for example from `brew services start ollama` or the Ollama app, is used as it is. The daemon stops only a server it started itself: when the daemon stops, and after it has been idle for `ollama.idle_stop_minutes` (default 30).
+  - `daemon.status` reports the local server: who started it, its PID, and its memory use.
+  - An ADR on who owns the Ollama process and when it stops.
+  - `golem doctor` drops the manual start step.
+- **Done when:** after `brew services stop ollama`, the first local request starts Ollama and answers, and the server stops after the idle time.
+- **Watch out:**
+  - Two daemons, for example a dev build next to the installed one, must not both start a server. Use a lock file.
+  - On 36 GB, a large chat model, an embedding model, and an IDE are tight. Prefer one resident chat model.
 
-### 1.3 Changelog and release notes
+### 1.3 Install Ollama from the model picker — [#58](https://github.com/MilanPavel/golem/issues/58)
 
-- **Goal:** every release has notes a person can read, generated from the commits.
-- **You can:** `just changelog` to see what is unreleased, and `just release` to open a release PR.
+- **Goal:** a new user never installs Ollama by hand.
+- **You can:** choose a local model on a Mac without Ollama, answer one question, and chat.
 - **Build:**
-  - `cliff.toml`: group by type (Features, Fixes, Performance, Reverts, Docs), hide `refactor`, `test`, `build`, `ci`, `chore`, and `docs(plan)`, show the scope, link the PR. Preprocessors read the old `Scope - text` commits as `feat(scope): text`. Only stable tags start a section, so a prerelease does not split the next stable version's notes.
-  - `CHANGELOG.md`, with v0.1.0's section written by hand.
-  - `scripts/changelog.sh add <version>` writes one new section above the newest one, so earlier sections and their edits stay. `notes <version>` prints one section.
-  - `just changelog` previews. `just release [version]` works out the next version (`git cliff --bumped-version`), adds its section on `release/vX.Y.Z`, and opens a `chore(release): vX.Y.Z` PR. `just tag` tags the merged release commit and pushes the tag. `just tag <version>` retries a failed release on a fixed `main`.
-  - `release.yml` stops before building when the tag has no section, and uses the section as the notes instead of `--generate-notes`.
-  - git-cliff as a Python dev dependency, pinned in `uv.lock`, so `uv sync` installs it everywhere.
-  - [sre.md](sre.md), section 5, explains the release step by step, with what to do when it goes wrong.
-- **Done when:** a `v0.2.0-rc.1` tag publishes a draft whose notes match its `CHANGELOG.md` section.
+  - When the provider binary is missing, the model picker asks once: "Ollama isn't installed. Run `brew install ollama` now?" The 1.1 banner for a missing Ollama offers the same question.
+  - Yes runs `brew install ollama` from the TUI and shows its output in a band. Then the existing pull downloads the model, 1.2 starts the server, and the message is sent.
+  - Without Homebrew, the picker shows the download link from ollama.com and the `/model` hint.
+  - `docs/install.md` and `golem doctor` drop the manual install step.
+- **Done when:** on a Mac without Ollama, choosing a local model in the picker installs Ollama after one question, downloads the model, and answers.
 
-### 1.4 `/setup` skill
+### 1.4 Status in the terminal tab — [#59](https://github.com/MilanPavel/golem/issues/59)
 
-- **Goal:** a fresh clone is ready for development with one command.
-- **You can:** clone, run `/setup` in Claude Code (or `just setup`), and end with `just check` green.
+- **Goal:** you can see from another tab whether golem is working or needs you.
+- **You can:** glance at the tab and see idle, working, waiting for your approval, an error, or disconnected.
 - **Build:**
-  - `scripts/setup.sh`, safe to run again. Each check says how to fix a failure, like `golem doctor`:
-    - just, uv, pnpm (through corepack), Node 24, bun, and gh, at the versions in `.github/actions/setup`. It offers `brew install` for a missing one.
-    - `uv sync --all-packages`, `pnpm install --frozen-lockfile`, `just hooks`.
-    - `gh auth status`, which `/ship` needs.
-    - `just check` at the end, if you want it.
-  - `just setup` runs the script.
-  - `.claude/skills/setup/SKILL.md` runs the script, explains each failure, and asks before it installs anything.
-  - README, "From the source code", points to `/setup` and `just setup`.
-- **Done when:** in a fresh clone in a temporary folder, `/setup` ends with `just check` passing.
+  - A pure `windowTitle({ title, phase, approval, error, connection })` in [window-title.ts](../packages/tui/src/window-title.ts). It puts a state mark before `golem — <title>`: `✳` when idle, a spinner frame while working (at most one change a second, so the tab does not flicker), `!` for an approval, and `✗` for an error. The phase comes from `meterPhase` in [progress.ts](../packages/tui/src/progress.ts).
+  - OSC `9;4` progress while a run is working, cleared when it ends. Terminals that know it show a tab or dock indicator, and the others ignore it.
+  - First, record what Claude Code writes to the terminal (`script -q /tmp/cc.log claude`), to learn which sequence makes the `Idle` subtitle and the coloured dot in the tab, and match it.
+  - Unit tests in `window-title.test.ts`.
+- **Done when:** the tab shows idle, working, and approval correctly, and the original title is back after exit.
 
-### 1.5 `/ship` skill
+### 1.5 A composer with a hint row — [#60](https://github.com/MilanPavel/golem/issues/60)
 
-- **Goal:** one command takes local changes to an open pull request that follows the rules above.
-- **You can:** `/ship`, or `/ship fix the mcp restart` with a hint, and get the PR link back.
+- **Goal:** the input looks like an input field, and short-lived hints have their own place.
+- **You can:** type after `❯` between two thin rules, see a dim placeholder in an empty draft, and see hints on the right above the input.
 - **Build:**
-  - Move `/setup` to `.agents/skills/setup/`, make `.claude/skills` a symlink to `../.agents/skills`, and add a short `AGENTS.md`. Word the skills for any agent: no Claude Code-only syntax.
-  - `.agents/skills/ship/SKILL.md`, which:
-    1. On `main`, creates a `<type>/<slug>` branch first. On another branch, it stays there.
-    2. Reads the diff against `main` and the untracked files. It flags secrets, stray files, a protocol change without regenerated `gen/` files, a non-obvious choice without an ADR, and docs that may need an update.
-    3. Runs `just check` and stops with the failing lines if it fails.
-    4. Proposes a commit message (type and scope from the changed paths), and a PR title and body from the template. The title is checked with `.githooks/commit-msg --title`, the rule CI uses.
-    5. Waits for your yes. You can change any of it first.
-    6. Commits, pushes, and runs `gh pr create`, or `gh pr edit` if the branch already has a PR. A branch with an open PR always gets a new commit: never an amend or a force-push. The hidden line becomes `<!-- shipped-by: /ship -->`, with no visible footer and no agent named.
-    7. Prints the PR link and the CI link. It does not merge, and it does not link or close issues. You do that on GitHub.
-  - `CONTRIBUTING.md`, README, and `docs/sre.md` §5 say what `/ship` does.
-- **Done when:** the PR for 1.5 is opened by `/ship` itself and carries the marker.
+  - `layoutComposer` in [chrome.ts](../packages/tui/src/chrome.ts) gets the `❯ ` prefix and a placeholder. A dim `─` rule above and below replaces the dark background. The colours get names in [theme.ts](../packages/tui/src/theme.ts), ready for 7.2.
+  - `frameBudget` gets the two rule rows and a hint row. On a short window the rules give their rows back before the composer shrinks.
+  - A hint is text with an end time, right-aligned above the top rule. The exit hint, `/copy` results, and `copied N chars to clipboard` (1.6) move there. Errors stay in the banner on the left.
+  - Tests in `chrome.test.ts` for the layout and the order in which bands give rows back.
+- **Done when:** the composer looks right at 80 and 200 columns, and a short window still leaves the chat one row.
+- **Watch out:** "Image in clipboard · ctrl+v to paste" waits for image input. A hint for something golem cannot do yet would only mislead.
+
+### 1.6 Select to copy — [#61](https://github.com/MilanPavel/golem/issues/61)
+
+- **Goal:** selecting text copies it, and the mouse wheel still scrolls.
+- **You can:** drag over the transcript, see the selection, let go, and find the text on the clipboard, with `copied N chars to clipboard` in the hint row.
+- **Build:**
+  - [screen.ts](../packages/tui/src/screen.ts) turns on `?1002h`, so the terminal reports a drag. `bindPointer` reports press, drag, and release with their cell, not only the wheel.
+  - A pure `selection.ts`: the start and end of a selection, in transcript rows and columns (the wrapped rows that are painted, plus the scroll offset). `selectedText` joins the rows and trims trailing spaces. Unit tests.
+  - The transcript draws the selection inverse. A click, Esc, or new output clears it. Dragging past the top or bottom edge scrolls.
+  - A `clipboard.ts` that writes OSC 52 first, then falls back to `pbcopy`. `/copy` uses it too. 8.1 adds the other systems to it.
+- **Done when:** dragging across two wrapped lines copies exactly the text you see, the wheel still scrolls, and Option-drag still selects the terminal's way.
+- **Watch out:**
+  - The scrollbar column and the composer are not part of the selection.
+  - In tmux, OSC 52 needs `set-clipboard on`. The `pbcopy` fallback covers the rest.
 
 ---
 
@@ -203,19 +219,14 @@ Choices that hold for the whole phase:
 - **`~/.claude/skills` and `<project>/.claude/skills` are read by default.** Legacy `.claude/commands/*.md` is not.
 - **Invoking comes before pinning.** It is the most-used Claude Code feature, and it needs no system prompt.
 
+The registry, `/skills`, and `golem skills` are built ([#4](https://github.com/MilanPavel/golem/issues/4)).
+
 ```mermaid
 flowchart LR
-  s1[2.1 Registry] --> s2[2.2 Invoke /name] --> s3[2.3 Pin + system prompt] --> s4[2.4 Model-driven loading]
+  s2[2.2 Invoke /name] --> s3[2.3 Pin + system prompt] --> s4[2.4 Model-driven loading]
   s4 --> s5[2.5 Embeddings]
   s4 --> s6[2.6 Trust] --> s7[2.7 Self-authored]
 ```
-
-### 2.1 Registry, `/skills`, and `golem skills` — [#4](https://github.com/MilanPavel/golem/issues/4)
-
-- **Goal:** golem knows which skills exist, for each session's folder.
-- **You can:** run `/skills` or `golem skills` and see each skill with its source, description, and any error.
-- **Build:** a `SKILL.md` parser and validator, sources with precedence (project, then user, then bundled) and a view per session folder, reload by polling file stamps, `skill.list`, `/skills`, and `golem skills list|check`.
-- **Done when:** an existing Claude Code skill, reached through a symlink, shows up, and editing it updates the list without a restart.
 
 ### 2.2 Invoke a skill with `/name` — [#21](https://github.com/MilanPavel/golem/issues/21)
 
@@ -538,7 +549,8 @@ flowchart LR
   - **Endpoint:** where the daemon listens (`unix:` path or `pipe:` name). `resolveSocketPath` becomes `resolveEndpoint`.
   - **Service manager:** launchd, systemd user units, or Task Scheduler, behind `golem daemon install|uninstall|start|stop|restart|logs`. The `Platform` protocol in `golem/doctor.py` folds into it, so `golem doctor` checks whichever service the OS uses, and its Ollama fix stops assuming Homebrew.
   - **Paths:** `~/.golem` on macOS and Linux, `%LOCALAPPDATA%\golem` on Windows, and `GOLEM_HOME` everywhere.
-  - **Clipboard:** OSC 52 first, which works in most terminals on all three systems, then `pbcopy`, `wl-copy` or `xclip`, or `clip.exe`. `/copy` already uses `pbcopy`.
+  - **Clipboard:** `clipboard.ts` (1.6) already writes OSC 52, then falls back to `pbcopy`. Add `wl-copy` or `xclip`, and `clip.exe`.
+  - **Local model server (1.2, 1.3):** the Ollama binary paths and `brew install` become per-OS.
   - **Notifications (4.1):** `terminal-notifier`, `notify-send`, or Windows toasts.
   - **Sandbox** ([ADR-014](adr/014-shell-sandbox.md)): a capability, `sandbox-exec` or none. `daemon.status` reports it. Without a sandbox, a shell rule that says `allow` is treated as `ask`, and the TUI shows `no sandbox`.
   - **Stopping the daemon:** a `daemon.shutdown` request, so stopping does not depend on Unix signals.
@@ -632,21 +644,6 @@ These steps were the second half of the model work, after `/model`. Tools and ap
   - The screen keeps the full transcript. The model tab in `/debug` shows the compacted one, as [ADR-006](adr/006-checkpoint-continuity.md) intends.
   - `session.fork` may need a `before` bound on history reads here ([ADR-010](adr/010-fork.md)).
 - **Done when:** a 200-turn session keeps working after compaction.
-
-### 9.6 Local server management
-
-- **Goal:** the local model is running when you need it, and not otherwise. A new user never has to install or start Ollama by hand.
-- **You can:** forget about installing and starting Ollama.
-- **Build:**
-  - The daemon starts and stops the local server on demand, and `daemon.status` reports its memory use.
-  - A server that is already running, for example from `brew services start ollama` or the Ollama app, is used as it is. The daemon stops only a server it started itself.
-  - When Ollama is not installed, the model picker asks once: "Ollama isn't installed. Run `brew install ollama` now?" Yes runs it and shows its output, then continues with the model the user picked. Without Homebrew, the picker shows the download link from ollama.com instead.
-  - The TUI runs `brew install`, not the daemon: it needs the user's terminal and `PATH`, and launchd gives the daemon neither.
-  - `golem doctor` and `docs/install.md` drop the manual start step once this ships.
-- **Done when:** on a Mac without Ollama, choosing a local model in the picker installs Ollama after one question, downloads the model, and answers. The first local request after a reboot works without a manual start.
-- **Watch out:**
-  - On 36 GB, a large chat model, an embedding model, and an IDE are tight. Prefer one resident chat model.
-  - Never install anything without asking. A user who only uses hosted models never sees the question.
 
 ---
 
