@@ -432,6 +432,8 @@ After `hello`, a client sends `ping` every few seconds so a half-open socket is 
 - The conversation in the checkpoint carries over unchanged, so the new model sees the whole history.
 - Choosing the model the session already has stores nothing.
 
+A run ends in `run.failed` with a `message` and no traceback. A failure a client can act on also has a `code`. The only code today is `model_unreachable`: the model's server did not answer. It comes with the `provider` and a `hint` that says how to fix it, such as `run ollama serve`.
+
 Downloads go through Ollama (`golem/models/pulls.py`):
 - **`model.probe`** reports whether a model is installed, whether the Ollama registry has it, its download size (from the registry manifest, `golem/models/registry.py`), whether it fits in memory, and the free disk space.
 - **`model.pull`** starts a daemon task that streams Ollama's `/api/pull`, so it keeps going after the client closes. It refuses a name the registry does not know, or a download the disk cannot hold, with error `-32009` and a message that says what to do.

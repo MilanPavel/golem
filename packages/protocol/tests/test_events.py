@@ -94,6 +94,22 @@ def test_chat_event_union_round_trip() -> None:
     assert EmptyEventData().model_dump() == {}
 
 
+def test_run_failed_says_which_server_did_not_answer() -> None:
+    plain = RunFailedData.model_validate({"message": "boom"})
+    assert (plain.code, plain.provider, plain.hint) == (None, None, None)
+    down = RunFailedData(
+        message="Ollama isn't running",
+        code="model_unreachable",
+        provider="ollama",
+        hint="run ollama serve",
+    )
+    assert RunFailedData.model_validate_json(down.model_dump_json()) == down
+    with pytest.raises(ValidationError):
+        RunFailedData.model_validate({"message": "boom", "code": "teapot"})
+    with pytest.raises(ValidationError):
+        RunFailedData(message="boom", hint="")
+
+
 def test_session_created_names_the_configured_model() -> None:
     data = SessionCreatedData(
         model_profile="remote",
