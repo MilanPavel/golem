@@ -6,11 +6,19 @@ from golem_protocol.commands import (
     HelloParams,
     HelloResult,
     InspectMessage,
+    LocalServer,
+    ModelServerStatus,
     PingParams,
     SessionInspectResult,
 )
 from golem_protocol.events import Ping
-from golem_protocol.rpc import RpcErrorBody, RpcFailure, RpcRequest, RpcSuccess
+from golem_protocol.rpc import (
+    ModelServerStatusNotification,
+    RpcErrorBody,
+    RpcFailure,
+    RpcRequest,
+    RpcSuccess,
+)
 
 
 def test_hello_round_trip() -> None:
@@ -44,6 +52,46 @@ def test_daemon_status_state() -> None:
         )
     with pytest.raises(ValidationError):
         DaemonStatus.model_validate({**status.model_dump(), "model_name": ""})
+
+
+def test_daemon_status_lists_local_servers() -> None:
+    bare = DaemonStatus.model_validate(
+        {
+            "pid": 1,
+            "version": "0.0.0",
+            "protocol_major": 2,
+            "protocol_minor": 23,
+            "uptime_seconds": 1,
+            "state": "running",
+        }
+    )
+    assert bare.local_servers == []
+    ours = LocalServer(
+        provider="ollama",
+        base_url="http://127.0.0.1:11434",
+        owner="golem",
+        pid=49080,
+        memory_mb=5324.8,
+    )
+    status = bare.model_copy(update={"local_servers": [ours]})
+    assert DaemonStatus.model_validate_json(status.model_dump_json()) == status
+    with pytest.raises(ValidationError):
+        LocalServer.model_validate({**ours.model_dump(), "owner": "someone"})
+
+
+def test_model_server_status_notification_round_trip() -> None:
+    failed = ModelServerStatusNotification(
+        params=ModelServerStatus(
+            provider="ollama",
+            base_url="http://127.0.0.1:11434",
+            state="failed",
+            message="ollama serve exited with code 1",
+        )
+    )
+    assert failed.method == "model.server.status"
+    assert ModelServerStatusNotification.model_validate_json(failed.model_dump_json()) == failed
+    with pytest.raises(ValidationError):
+        ModelServerStatus.model_validate({**failed.params.model_dump(), "state": "asleep"})
 
 
 def test_ping_params() -> None:

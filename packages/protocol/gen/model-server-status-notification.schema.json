@@ -1,0 +1,74 @@
+{
+  "$defs": {
+    "ModelServerStatus": {
+      "additionalProperties": false,
+      "description": "A local model server changed state. ``message`` says why it ``failed``.",
+      "properties": {
+        "base_url": {
+          "minLength": 1,
+          "title": "Base Url",
+          "type": "string"
+        },
+        "message": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Message"
+        },
+        "provider": {
+          "minLength": 1,
+          "title": "Provider",
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "starting",
+            "ready",
+            "failed",
+            "stopped"
+          ],
+          "title": "State",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider",
+        "base_url",
+        "state"
+      ],
+      "title": "ModelServerStatus",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Server → every connection: a local model server started, failed, or stopped. Not stored.",
+  "properties": {
+    "jsonrpc": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Jsonrpc",
+      "type": "string"
+    },
+    "method": {
+      "const": "model.server.status",
+      "default": "model.server.status",
+      "title": "Method",
+      "type": "string"
+    },
+    "params": {
+      "$ref": "#/$defs/ModelServerStatus"
+    }
+  },
+  "required": [
+    "params"
+  ],
+  "title": "ModelServerStatusNotification",
+  "type": "object"
+}

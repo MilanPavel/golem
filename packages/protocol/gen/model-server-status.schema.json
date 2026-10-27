@@ -1,0 +1,46 @@
+{
+  "additionalProperties": false,
+  "description": "A local model server changed state. ``message`` says why it ``failed``.",
+  "properties": {
+    "base_url": {
+      "minLength": 1,
+      "title": "Base Url",
+      "type": "string"
+    },
+    "message": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Message"
+    },
+    "provider": {
+      "minLength": 1,
+      "title": "Provider",
+      "type": "string"
+    },
+    "state": {
+      "enum": [
+        "starting",
+        "ready",
+        "failed",
+        "stopped"
+      ],
+      "title": "State",
+      "type": "string"
+    }
+  },
+  "required": [
+    "provider",
+    "base_url",
+    "state"
+  ],
+  "title": "ModelServerStatus",
+  "type": "object"
+}

@@ -16,6 +16,7 @@ from golem import __version__
 from golem.config import load_settings
 from golem.config_edit import McpTableError, RuleIndexError, set_default_model, set_mcp_enabled
 from golem.mcp import McpServerError, McpSupervisor
+from golem.models import ollama
 from golem.models.keys import KeyStore, KeyStoreError
 from golem.models.pulls import PullError, PullManager
 from golem.models.router import ModelConfigError, ModelRouter
@@ -76,6 +77,7 @@ from golem_protocol.commands import (
     InspectMessage,
     ListedModel,
     ListedProvider,
+    LocalServer,
     McpListParams,
     McpListResult,
     McpServer,
@@ -170,7 +172,29 @@ async def _status(ctx: RequestContext, params: _EmptyParams) -> DaemonStatus:
         model_profile=profile,
         model_provider=provider,
         model_name=name,
+        local_servers=await _local_servers(ctx),
     )
+
+
+async def _local_servers(ctx: RequestContext) -> list[LocalServer]:
+    local = ctx.state.local_servers
+    if local is None:
+        return []
+    servers: list[LocalServer] = []
+    for status in local.statuses():
+        memory = None
+        if status.owner == "golem" and status.pid is not None:
+            memory = await asyncio.to_thread(ollama.memory_mb, status.pid)
+        servers.append(
+            LocalServer(
+                provider=status.provider,
+                base_url=status.base_url,
+                owner=status.owner,
+                pid=status.pid,
+                memory_mb=memory,
+            )
+        )
+    return servers
 
 
 def _configured_model(ctx: RequestContext) -> tuple[str | None, str | None, str | None]:
