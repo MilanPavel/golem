@@ -255,6 +255,16 @@ class ModelRouter:
             {"model": resolved.model_id, "base_url": provider.base_url, "api_key": key or "none"},
         )
 
+    def ollama_server(self, profile: str) -> tuple[str, str] | None:
+        """``(provider, base URL)`` when ``profile`` runs on Ollama, or None."""
+        try:
+            resolved = self.resolve(profile)
+        except ModelConfigError:
+            return None
+        if resolved.provider.kind != "ollama":
+            return None
+        return resolved.provider_name, _ollama_url(resolved.provider.base_url)
+
     def unreachable(self, profile: str, exc: BaseException) -> ModelUnreachable | None:
         """``exc`` from a call to ``profile`` as :class:`ModelUnreachable`, or None.
 

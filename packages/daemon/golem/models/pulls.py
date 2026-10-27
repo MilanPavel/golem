@@ -11,6 +11,7 @@ later still sees it.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
 import os
@@ -26,6 +27,7 @@ import httpx
 from pydantic import BaseModel
 
 from golem.models import hardware, ollama, registry
+from golem.models.errors import ModelUnreachable
 from golem.models.router import OLLAMA_BASE_URL, ModelRouter, Provider
 from golem_protocol.commands import ModelPullDone, ModelPullProgress
 from golem_protocol.rpc import ModelPullDoneNotification, ModelPullProgressNotification
@@ -112,6 +114,8 @@ class PullManager:
         self._ollama_installed = ollama_installed or ollama.installed
         self._client: httpx.AsyncClient | None = None
         self._pulls: dict[str, _Pull] = {}
+        # Starts a local Ollama that does not answer, and keeps it up while a download runs.
+        self.local: ollama.LocalServers | None = None
 
     def pulling(self) -> dict[str, float | None]:
         """Refs being downloaded, with their progress when known."""
@@ -130,6 +134,8 @@ class PullManager:
     async def probe(self, name: str) -> Probe:
         """Whether ``name`` is installed, exists in the registry, and how big it is."""
         target = self._target(name)
+        with contextlib.suppress(PullError):
+            await self._start_server(target)
         installed = await self._installed(target)
         exists: bool | None = None
         size: float | None = None
@@ -156,6 +162,7 @@ class PullManager:
         existing = self._pulls.get(target.ref)
         if existing is not None:
             return target.ref, False
+        await self._start_server(target)
         if await self._installed(target) is None:
             raise PullError(self._down_hint())
         parsed = registry.parse_name(target.model_id)
@@ -188,6 +195,7 @@ class PullManager:
         target = self._target(name)
         if target.ref in self._pulls:
             raise PullError(f"{target.model_id} is still downloading: stop it first")
+        await self._start_server(target)
         try:
             response = await self._http().request(
                 "DELETE",
@@ -222,6 +230,23 @@ class PullManager:
         base = (provider.base_url or OLLAMA_BASE_URL).rstrip("/").removesuffix("/v1")
         return _Target(provider_name=provider_name, base_url=base, model_id=model_id)
 
+    def _server(self, target: _Target) -> ollama.LocalServer | None:
+        return None if self.local is None else self.local.get(target.provider_name, target.base_url)
+
+    async def _start_server(self, target: _Target) -> None:
+        """Start the local Ollama when it does not answer. Raises :class:`PullError` if it fails."""
+        server = self._server(target)
+        if server is None:
+            return
+        try:
+            await server.ensure_running()
+        except ModelUnreachable as exc:
+            raise PullError(f"{exc.message}: {exc.hint}") from exc
+
+    def _held(self, target: _Target) -> contextlib.AbstractAsyncContextManager[None]:
+        server = self._server(target)
+        return contextlib.nullcontext() if server is None else server.hold()
+
     async def _installed(self, target: _Target) -> bool | None:
         """True or False from Ollama's list, None when Ollama does not answer."""
         try:
@@ -238,12 +263,15 @@ class PullManager:
     async def _run(self, target: _Target, pull: _Pull) -> None:
         error: str | None = None
         try:
-            async with self._http().stream(
-                "POST",
-                f"{target.base_url}/api/pull",
-                json={"model": target.model_id, "stream": True},
-                timeout=httpx.Timeout(None, connect=_OLLAMA_TIMEOUT),
-            ) as response:
+            async with (
+                self._held(target),
+                self._http().stream(
+                    "POST",
+                    f"{target.base_url}/api/pull",
+                    json={"model": target.model_id, "stream": True},
+                    timeout=httpx.Timeout(None, connect=_OLLAMA_TIMEOUT),
+                ) as response,
+            ):
                 if response.status_code >= 400:
                     await response.aread()
                     error = _ollama_error(response)
@@ -258,6 +286,8 @@ class PullManager:
             error = "cancelled"
         except httpx.HTTPError as exc:
             error = f"{self._down_hint()} ({exc})"
+        except ModelUnreachable as exc:
+            error = f"{exc.message}: {exc.hint}"
         finally:
             self._pulls.pop(target.ref, None)
             done = ModelPullDone(ref=target.ref, ok=error is None, error=error)

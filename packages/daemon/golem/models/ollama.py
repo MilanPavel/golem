@@ -182,6 +182,10 @@ class LocalServer:
         self._used = self._clock()
         if self._process is not None and self._process.returncode is None:
             return True
+        # Shielded: a caller that goes away mid-start must not leave a server nobody owns.
+        return await asyncio.shield(self._ensure())
+
+    async def _ensure(self) -> bool:
         async with self._lock:
             if await self._answers():
                 if self._owner is None:

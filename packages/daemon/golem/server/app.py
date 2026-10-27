@@ -21,6 +21,7 @@ from golem.logging import configure_logging
 from golem.mcp import McpSupervisor
 from golem.models.discovery import ModelDiscovery
 from golem.models.keys import ProviderKeys
+from golem.models.ollama import LocalServers
 from golem.models.pulls import PullManager
 from golem.models.router import ModelRouter
 from golem.paths import GolemPaths, resolve_paths
@@ -55,6 +56,7 @@ MAX_CONNECTIONS = 32
 FLUSH_TIMEOUT_SECONDS = 1.0
 # sockaddr_un.sun_path is 104 bytes on macOS, including the trailing NUL.
 _MAX_SOCKET_BYTES = 103
+_IDLE_CHECK_SECONDS = 60.0
 
 
 class SocketPathTooLong(Exception):
@@ -86,6 +88,7 @@ class DaemonApp:
         mcp: McpSupervisor | None = None,
         secrets: SecretStore | None = None,
         user_home: Path | None = None,
+        local_servers: LocalServers | None = None,
     ) -> None:
         self.paths = paths
         self._user_home = user_home
@@ -94,6 +97,7 @@ class DaemonApp:
         self._discovery = discovery
         self._pulls = pulls
         self._mcp = mcp
+        self._local = local_servers
         self.state = DaemonState(paths=paths, started_at=time.monotonic(), secrets=secrets)
         methods = standard_methods()
         if extra_methods:
@@ -138,6 +142,10 @@ class DaemonApp:
             )
             mcp.broadcast = self._broadcast
             self.state.mcp = mcp
+            local = self._local or LocalServers(
+                settings.ollama, log_file=self.paths.ollama_log_file, run_dir=self.paths.run_dir
+            )
+            self.state.local_servers = local
             home = self.paths.home
             self.state.skills = SkillRegistry(
                 settings.skills,
@@ -157,7 +165,12 @@ class DaemonApp:
                 self.state.sessions = await _open_sessions(
                     database,
                     open_chat(
-                        router, saver, self.state.tools, self.state.policy, self.state.artifacts
+                        router,
+                        saver,
+                        self.state.tools,
+                        self.state.policy,
+                        self.state.artifacts,
+                        local,
                     ),
                     self._titles,
                 )
@@ -170,7 +183,9 @@ class DaemonApp:
                 else:
                     pulls = self._pulls(router, models.ram_gb)
                 pulls.broadcast = self._broadcast
+                pulls.local = local
                 models.pulling = pulls.pulling
+                models.local = local
                 self.state.models = models
                 self.state.pulls = pulls
                 try:
@@ -182,8 +197,10 @@ class DaemonApp:
                     log.info("listening on %s", self.paths.socket_path)
                     mcp.start()
                     self.state.skills.start()
+                    idle = asyncio.create_task(_stop_idle(local), name="golem-ollama-idle")
                     await self._stop.wait()
                     log.info("shutting down")
+                    idle.cancel()
                     await self._shutdown()
                 finally:
                     for sig in installed:
@@ -202,6 +219,10 @@ class DaemonApp:
             if self.state.models is not None:
                 await self.state.models.aclose()
             self.state.models = None
+            # Last, once no run or download holds it: stop the Ollama golem started.
+            if self.state.local_servers is not None:
+                await self.state.local_servers.aclose()
+            self.state.local_servers = None
             self.state.sessions = None
             self._lock.release()
 
@@ -373,3 +394,13 @@ async def serve_forever() -> int:
         print(exc, file=sys.stderr)
         return 1
     return 0
+
+
+async def _stop_idle(local: LocalServers) -> None:
+    """Stop each Ollama golem started once it has been unused for ``idle_stop_minutes``."""
+    while True:
+        await asyncio.sleep(_IDLE_CHECK_SECONDS)
+        try:
+            await local.stop_idle()
+        except Exception:
+            log.exception("stopping an idle ollama failed")

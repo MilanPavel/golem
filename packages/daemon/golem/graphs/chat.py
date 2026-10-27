@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable, Mapping, Sequence
-from contextlib import aclosing
+from contextlib import AbstractAsyncContextManager, aclosing, nullcontext
 from typing import Literal, Protocol, cast
 
 from langchain_core.language_models import BaseChatModel
@@ -38,6 +38,7 @@ from golem.graphs.tools_node import (
     tools_node,
     unanswered_calls,
 )
+from golem.models.ollama import LocalServers
 from golem.models.router import ModelRouter
 from golem.permissions.engine import Allowance
 from golem.permissions.policy import Policy
@@ -310,12 +311,14 @@ def open_chat(
     tools: ToolRegistry | None = None,
     policy: Policy | None = None,
     artifacts: Artifacts | None = None,
+    local: LocalServers | None = None,
 ) -> ChatRuntime:
     """Compile the chat graph against ``checkpointer``.
 
     ``tools`` defaults to the default registry. ``policy`` defaults to the
     built-in rules only, with no user or project file. Without ``artifacts``,
-    big tool output is cut instead of stored.
+    big tool output is cut instead of stored. With ``local``, a model call to
+    an Ollama on this machine starts it first, and holds it while it answers.
     """
     registry = default_registry() if tools is None else tools
     rules = Policy(None) if policy is None else policy
@@ -329,13 +332,14 @@ def open_chat(
         scope = scope_of(config)
         await registry.prepare(scope)
         tools = registry.scoped(scope)
-        try:
-            response = await binder.invoke(profile, router.chat_model(profile), messages, tools)
-        except Exception as exc:
-            down = router.unreachable(profile, exc)
-            if down is None:
-                raise
-            raise down from exc
+        async with _held(router, local, profile):
+            try:
+                response = await binder.invoke(profile, router.chat_model(profile), messages, tools)
+            except Exception as exc:
+                down = router.unreachable(profile, exc)
+                if down is None:
+                    raise
+                raise down from exc
         update: dict[str, object] = {"id": message_id}
         if response.tool_calls:
             update["tool_calls"] = _with_ids(response.tool_calls)
@@ -389,6 +393,15 @@ class _ToolBinder:
                     log.info("profile %s does not take tools; asking without them", profile)
                     self._refused.add(profile)
         return _ai(await model.ainvoke(list(messages)))
+
+
+def _held(
+    router: ModelRouter, local: LocalServers | None, profile: str
+) -> AbstractAsyncContextManager[None]:
+    """Hold the local Ollama that ``profile`` runs on, or nothing for any other model."""
+    target = None if local is None else router.ollama_server(profile)
+    server = None if local is None or target is None else local.get(*target)
+    return nullcontext() if server is None else server.hold()
 
 
 def _ai(message: BaseMessage) -> AIMessage:
