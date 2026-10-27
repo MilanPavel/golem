@@ -34,7 +34,9 @@ import httpx
 from golem.config import ModelPrice, ModelSettings
 from golem.models import hardware, prices
 from golem.models.catalog import CatalogEntry, load_local_catalog
+from golem.models.errors import ModelUnreachable
 from golem.models.keys import KeyStoreError
+from golem.models.ollama import LocalServers
 from golem.models.router import OLLAMA_BASE_URL, ModelConfigError, ModelRouter, Provider
 
 log = logging.getLogger(__name__)
@@ -148,6 +150,8 @@ class ModelDiscovery:
     ) -> None:
         self._fetch_prices_enabled = fetch_prices
         self.pulling: Callable[[], dict[str, float | None]] = pulling or dict
+        # Starts a local Ollama that does not answer before listing its models.
+        self.local: LocalServers | None = None
         self._router = router
         self._cache_dir = cache_dir
         self._transport = transport
@@ -197,7 +201,7 @@ class ModelDiscovery:
         for name, provider in sorted(providers.items()):
             if provider.kind == "ollama":
                 if name == "ollama" or name in referenced:
-                    probes[name] = asyncio.create_task(self._ollama(provider))
+                    probes[name] = asyncio.create_task(self._ollama(name, provider))
                 else:
                     states[name] = ListedProvider(name, "unlisted")
             elif keys.get(name) is not None or (
@@ -336,8 +340,15 @@ class ModelDiscovery:
             self._client = httpx.AsyncClient(transport=self._transport, follow_redirects=True)
         return self._client
 
-    async def _ollama(self, provider: Provider) -> _ProviderResult:
+    async def _ollama(self, name: str, provider: Provider) -> _ProviderResult:
         base = (provider.base_url or OLLAMA_BASE_URL).rstrip("/").removesuffix("/v1")
+        server = None if self.local is None else self.local.get(name, base)
+        if server is not None:
+            try:
+                await server.ensure_running()
+            except ModelUnreachable as exc:
+                log.info("ollama at %s did not start: %s", base, exc)
+                return _ProviderResult(up=False)
         client = self._http()
         try:
             response = await client.get(f"{base}/api/tags", timeout=_OLLAMA_TIMEOUT)

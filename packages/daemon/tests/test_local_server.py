@@ -4,68 +4,16 @@ from __future__ import annotations
 
 import asyncio
 import signal
-from collections.abc import Callable
 from pathlib import Path
 
-import httpx
 import pytest
+from serve_fakes import FakeProcess, FakeServe
 
 from golem.config import OllamaSettings
 from golem.models.errors import ModelUnreachable
-from golem.models.ollama import LocalServer, LocalServers, Process, ServerState
+from golem.models.ollama import LocalServer, LocalServers, ServerState
 
 URL = "http://127.0.0.1:11434"
-
-
-class _Ollama:
-    """A fake server that answers ``/api/tags`` while ``up``, and fake ``ollama serve``."""
-
-    def __init__(self) -> None:
-        self.up = False
-        self.spawned: list[tuple[str, dict[str, str]]] = []
-        self.processes: list[_Process] = []
-        self.on_spawn: Callable[[_Process], None] = lambda _process: setattr(self, "up", True)
-
-    def transport(self) -> httpx.MockTransport:
-        def answer(request: httpx.Request) -> httpx.Response:
-            if not self.up:
-                raise httpx.ConnectError("All connection attempts failed", request=request)
-            return httpx.Response(200, json={"models": []})
-
-        return httpx.MockTransport(answer)
-
-    async def spawn(self, path: str, env: dict[str, str], log_file: Path) -> Process:
-        del log_file
-        self.spawned.append((path, env))
-        process = _Process(4000 + len(self.processes))
-        self.processes.append(process)
-        self.on_spawn(process)
-        return process
-
-
-class _Process:
-    def __init__(self, pid: int) -> None:
-        self.pid = pid
-        self.returncode: int | None = None
-        self.signals: list[str] = []
-        self._done = asyncio.Event()
-
-    def exit(self, code: int) -> None:
-        self.returncode = code
-        self._done.set()
-
-    async def wait(self) -> int:
-        await self._done.wait()
-        assert self.returncode is not None
-        return self.returncode
-
-    def terminate(self) -> None:
-        self.signals.append("term")
-        self.exit(-15)
-
-    def kill(self) -> None:
-        self.signals.append("kill")
-        self.exit(-9)
 
 
 class _Clock:
@@ -77,12 +25,12 @@ class _Clock:
 
 
 @pytest.fixture
-def ollama() -> _Ollama:
-    return _Ollama()
+def ollama() -> FakeServe:
+    return FakeServe()
 
 
 def _server(
-    ollama: _Ollama,
+    ollama: FakeServe,
     tmp_path: Path,
     *,
     settings: OllamaSettings | None = None,
@@ -106,7 +54,7 @@ def _server(
 
 
 async def test_a_server_that_already_answers_is_used_and_never_stopped(
-    ollama: _Ollama, tmp_path: Path
+    ollama: FakeServe, tmp_path: Path
 ) -> None:
     ollama.up = True
     server, heard = _server(ollama, tmp_path)
@@ -120,7 +68,7 @@ async def test_a_server_that_already_answers_is_used_and_never_stopped(
 
 
 async def test_nothing_answers_so_golem_starts_ollama_serve(
-    ollama: _Ollama, tmp_path: Path
+    ollama: FakeServe, tmp_path: Path
 ) -> None:
     server, heard = _server(ollama, tmp_path)
     assert await server.ensure_running() is True
@@ -133,13 +81,13 @@ async def test_nothing_answers_so_golem_starts_ollama_serve(
     assert heard == [("starting", None), ("ready", None)]
 
 
-async def test_two_callers_at_once_start_one_server(ollama: _Ollama, tmp_path: Path) -> None:
+async def test_two_callers_at_once_start_one_server(ollama: FakeServe, tmp_path: Path) -> None:
     server, _ = _server(ollama, tmp_path)
     assert await asyncio.gather(server.ensure_running(), server.ensure_running()) == [True, True]
     assert len(ollama.spawned) == 1
 
 
-async def test_a_server_that_exits_says_where_its_log_is(ollama: _Ollama, tmp_path: Path) -> None:
+async def test_a_server_that_exits_says_where_its_log_is(ollama: FakeServe, tmp_path: Path) -> None:
     ollama.on_spawn = lambda process: process.exit(1)
     server, heard = _server(ollama, tmp_path)
     with pytest.raises(ModelUnreachable) as caught:
@@ -151,7 +99,7 @@ async def test_a_server_that_exits_says_where_its_log_is(ollama: _Ollama, tmp_pa
     assert server.owner is None
 
 
-async def test_a_server_that_never_answers_is_stopped(ollama: _Ollama, tmp_path: Path) -> None:
+async def test_a_server_that_never_answers_is_stopped(ollama: FakeServe, tmp_path: Path) -> None:
     ollama.on_spawn = lambda _process: None
     server, _ = _server(ollama, tmp_path, start_timeout=0.05)
     with pytest.raises(ModelUnreachable, match=r"did not answer within 0\.05 s"):
@@ -160,9 +108,9 @@ async def test_a_server_that_never_answers_is_stopped(ollama: _Ollama, tmp_path:
 
 
 async def test_losing_the_port_to_another_daemon_uses_its_server(
-    ollama: _Ollama, tmp_path: Path
+    ollama: FakeServe, tmp_path: Path
 ) -> None:
-    def lost(process: _Process) -> None:
+    def lost(process: FakeProcess) -> None:
         process.exit(1)
         ollama.up = True
 
@@ -173,7 +121,7 @@ async def test_losing_the_port_to_another_daemon_uses_its_server(
 
 
 async def test_without_a_binary_or_with_start_off_nothing_starts(
-    ollama: _Ollama, tmp_path: Path
+    ollama: FakeServe, tmp_path: Path
 ) -> None:
     missing, _ = _server(ollama, tmp_path, binary=None)
     assert await missing.ensure_running() is False
@@ -182,7 +130,7 @@ async def test_without_a_binary_or_with_start_off_nothing_starts(
     assert ollama.spawned == []
 
 
-async def test_stop_ends_the_server_golem_started(ollama: _Ollama, tmp_path: Path) -> None:
+async def test_stop_ends_the_server_golem_started(ollama: FakeServe, tmp_path: Path) -> None:
     server, heard = _server(ollama, tmp_path)
     await server.ensure_running()
     await server.stop()
@@ -193,7 +141,7 @@ async def test_stop_ends_the_server_golem_started(ollama: _Ollama, tmp_path: Pat
 
 
 async def test_a_restarted_daemon_takes_back_the_server_it_started(
-    ollama: _Ollama, tmp_path: Path
+    ollama: FakeServe, tmp_path: Path
 ) -> None:
     ollama.up = True
     pid_file = tmp_path / "run" / "ollama-11434.pid"
@@ -220,7 +168,7 @@ async def test_a_restarted_daemon_takes_back_the_server_it_started(
 
 
 async def test_a_pid_file_for_another_process_is_not_golems(
-    ollama: _Ollama, tmp_path: Path
+    ollama: FakeServe, tmp_path: Path
 ) -> None:
     ollama.up = True
     pid_file = tmp_path / "run" / "ollama-11434.pid"
@@ -238,7 +186,7 @@ async def test_a_pid_file_for_another_process_is_not_golems(
 
 
 async def test_the_idle_stop_waits_until_nothing_holds_the_server(
-    ollama: _Ollama, tmp_path: Path
+    ollama: FakeServe, tmp_path: Path
 ) -> None:
     clock = _Clock()
     server, _ = _server(
@@ -254,7 +202,7 @@ async def test_the_idle_stop_waits_until_nothing_holds_the_server(
     assert server.owner is None
 
 
-async def test_idle_stop_minutes_0_keeps_it_running(ollama: _Ollama, tmp_path: Path) -> None:
+async def test_idle_stop_minutes_0_keeps_it_running(ollama: FakeServe, tmp_path: Path) -> None:
     clock = _Clock()
     server, _ = _server(ollama, tmp_path, clock=clock, settings=OllamaSettings(idle_stop_minutes=0))
     await server.ensure_running()

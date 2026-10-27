@@ -18,9 +18,10 @@ from pydantic import BaseModel, ConfigDict
 from support import ServeProcess
 
 from golem import __version__
-from golem.config import load_settings
+from golem.config import OllamaSettings, load_settings
 from golem.logging import configure_logging
 from golem.models.discovery import ModelDiscovery
+from golem.models.ollama import LocalServers
 from golem.models.pulls import PullManager
 from golem.models.router import ModelRouter
 from golem.paths import resolve_paths
@@ -222,9 +223,15 @@ async def start_daemon(
     pulls: Callable[[ModelRouter, float | None], PullManager] | None = None,
     secrets: SecretStore | None = None,
     user_home: Path | None = None,
+    local_servers: LocalServers | None = None,
 ) -> tuple[DaemonApp, asyncio.Task[None]]:
+    """Serve in this process. Unless a test passes ``local_servers``, golem never starts Ollama."""
     paths = resolve_paths(home)
     paths.ensure_layout()
+    if local_servers is None:
+        local_servers = LocalServers(
+            OllamaSettings(start=False), log_file=paths.ollama_log_file, run_dir=paths.run_dir
+        )
     configure_logging(load_settings(home=paths.home, project_dir=paths.home), paths)
     app = DaemonApp(
         paths,
@@ -236,6 +243,7 @@ async def start_daemon(
         pulls=pulls,
         secrets=secrets,
         user_home=user_home if user_home is not None else home,
+        local_servers=local_servers,
     )
     task = asyncio.create_task(app.serve(install_signals=False))
     await _wait_listening(paths.socket_path, task)

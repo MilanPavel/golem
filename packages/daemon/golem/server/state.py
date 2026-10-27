@@ -7,6 +7,7 @@ from typing import Literal
 
 from golem.mcp import McpSupervisor
 from golem.models.discovery import ModelDiscovery
+from golem.models.ollama import LocalServers
 from golem.models.pulls import PullManager
 from golem.paths import GolemPaths
 from golem.permissions.policy import Policy
@@ -33,3 +34,4 @@ class DaemonState:
     mcp: McpSupervisor | None = None
     secrets: SecretStore | None = None
     skills: SkillRegistry | None = None
+    local_servers: LocalServers | None = None
