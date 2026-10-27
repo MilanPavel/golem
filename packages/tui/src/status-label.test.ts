@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  alertLabel,
   fitSegments,
   formatMessageCount,
   formatUptime,
@@ -16,6 +17,13 @@ import {
   uptimeRefreshMs,
   versionLabel,
 } from "./status-label.ts";
+
+test("the alert names a model server that is down before any MCP server", () => {
+  assert.equal(alertLabel(null, ""), "");
+  assert.equal(alertLabel("ollama", ""), "ollama ✗");
+  assert.equal(alertLabel(null, "mcp ✗ github"), "mcp ✗ github");
+  assert.equal(alertLabel("ollama", "mcp ✗ github"), "ollama ✗  mcp ✗ github");
+});
 
 test("status bar text follows the connection", () => {
   assert.equal(statusLabel({ status: "connecting" }), "connecting");

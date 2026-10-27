@@ -10,6 +10,7 @@ import {
   SHUTDOWN_NOTICE,
   createDeltaBatcher,
   emptyChat,
+  failureText,
   reduceChat,
 } from "./chat-state.ts";
 
@@ -116,6 +117,70 @@ test("run.failed unlocks input and keeps the reason", () => {
   assert.equal(failed.busy, false);
   assert.equal(failed.runStartedAt, null);
   assert.equal(failed.error, "model exploded");
+  assert.equal(failed.down, null);
+});
+
+test("a model server that did not answer says how to fix it, until a run completes", () => {
+  const down = reduceChat(emptyChat, {
+    seq: 2,
+    session_id: "s",
+    run_id: "r",
+    ts: "t",
+    type: "run.failed",
+    data: {
+      message: "Ollama is not running",
+      code: "model_unreachable",
+      provider: "ollama",
+      hint: "run ollama serve",
+    },
+  });
+  assert.equal(down.error, "Ollama is not running · run ollama serve · /model to switch");
+  assert.equal(down.down, "ollama");
+
+  const other = reduceChat(down, {
+    seq: 3,
+    session_id: "s",
+    run_id: "r2",
+    ts: "t",
+    type: "run.failed",
+    data: { message: "model exploded" },
+  });
+  assert.equal(other.error, "model exploded");
+  assert.equal(other.down, "ollama");
+
+  const completed = reduceChat(other, {
+    seq: 4,
+    session_id: "s",
+    run_id: "r3",
+    ts: "t",
+    type: "run.completed",
+    data: {},
+  });
+  assert.equal(completed.down, null);
+});
+
+test("choosing a model clears the server that was down", () => {
+  const down = { ...emptyChat, down: "ollama" };
+  const switched = reduceChat(down, {
+    seq: 5,
+    session_id: "s",
+    run_id: null,
+    ts: "t",
+    type: "model.selected",
+    data: { model_profile: "anthropic/claude-sonnet-5-5", reason: "user" },
+  });
+  assert.equal(switched.down, null);
+});
+
+test("a failure without a code shows the hint and no /model", () => {
+  assert.equal(
+    failureText({ message: "Ollama is not answering", hint: "check that it is running" }),
+    "Ollama is not answering · check that it is running",
+  );
+  assert.equal(
+    failureText({ message: "the model's server did not answer", code: "model_unreachable" }),
+    "the model's server did not answer · /model to switch",
+  );
 });
 
 test("a replay of stored events rebuilds the transcript without deltas", () => {

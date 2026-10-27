@@ -567,7 +567,7 @@ The debug band keeps its first row for the title. The wire tab lists recent prot
 | `message.started` | Append an empty assistant message, streaming on, with the event time. |
 | `message.delta` | Append text to that id. An unknown id changes nothing. |
 | `run.completed` | `busy` off. |
-| `run.failed` | `busy` off, and `error` is the daemon's message. |
+| `run.failed` | `busy` off, and `error` is the daemon's message, then its `hint`. For `model_unreachable` it adds `/model to switch`, and the status line shows `<provider> ✗` until a run completes or the session changes model. |
 | `run.cancelled` | `busy` off, and the notice says why: you cancelled it, or the daemon stopped. |
 | `tool.requested` | Add a tool call to the message with that `message_id`. |
 | `tool.started` | That call is running. |
