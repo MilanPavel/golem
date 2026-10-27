@@ -166,6 +166,21 @@ class SkillSettings(BaseModel):
     extra_dirs: list[str] = Field(default_factory=list[str])
 
 
+class OllamaSettings(BaseModel):
+    """``[ollama]``. Whether golem starts a local Ollama, and when it stops it.
+
+    ``start`` lets golem run ``ollama serve`` when a local model is needed and
+    nothing answers. ``idle_stop_minutes`` stops a server golem started after
+    that long unused, and 0 keeps it running. A server golem did not start is
+    never stopped.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    start: bool = True
+    idle_stop_minutes: int = Field(default=30, ge=0)
+
+
 class WebSettings(BaseModel):
     """``[web]``. What ``web_fetch`` may reach and how much it reads.
 
@@ -298,6 +313,7 @@ class GolemSettings(BaseSettings):
     web: WebSettings = Field(default_factory=WebSettings)
     mcp: McpServers = Field(default_factory=dict)
     skills: SkillSettings = Field(default_factory=SkillSettings)
+    ollama: OllamaSettings = Field(default_factory=OllamaSettings)
 
     _no_secrets = model_validator(mode="before")(_no_inline_secrets)
 

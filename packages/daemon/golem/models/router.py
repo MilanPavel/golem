@@ -30,6 +30,7 @@ from golem.config import (
     load_settings,
 )
 from golem.models import ollama
+from golem.models.errors import ModelUnreachable
 from golem.models.keys import KeyStore, KeyStoreError
 from golem.paths import resolve_paths
 
@@ -40,16 +41,6 @@ KeySource = Literal["env", "keychain"]
 
 class ModelConfigError(Exception):
     """The model name, provider, or API key is missing or unknown."""
-
-
-class ModelUnreachable(Exception):
-    """The model's server did not answer. ``hint`` says how to fix it."""
-
-    def __init__(self, message: str, *, provider: str | None, hint: str) -> None:
-        super().__init__(message)
-        self.message = message
-        self.provider = provider
-        self.hint = hint
 
 
 @dataclass(frozen=True, slots=True)

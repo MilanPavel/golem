@@ -48,6 +48,11 @@ class GolemPaths:
         return self.logs_dir / "golem.jsonl"
 
     @property
+    def ollama_log_file(self) -> Path:
+        """What an ``ollama serve`` that golem started prints."""
+        return self.logs_dir / "ollama.log"
+
+    @property
     def cache_dir(self) -> Path:
         return self.home / "cache"
 
