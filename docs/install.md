@@ -38,8 +38,9 @@ Pick at least one. You can use both.
 
 ```bash
 brew install ollama
-brew services start ollama  # keeps Ollama running, now and at every login
 ```
+
+golem starts Ollama when a local model needs it, and stops it after 30 minutes unused. If you want Ollama running all the time, run `brew services start ollama`. golem uses that one and never stops it.
 
 You choose and download the model in the next step, from inside golem.
 
@@ -99,8 +100,8 @@ Run `golem doctor` first. It checks the install from top to bottom and prints a 
 ✓ socket   only you can open it (0600)
 ✓ config   /Users/you/.golem/config.toml is valid
 ✓ model    new chats start on ollama/qwen3:8b
-✗ ollama   not answering at http://127.0.0.1:11434
-           fix: brew services start ollama, or open the Ollama app
+✗ ollama   Ollama is not installed
+           fix: brew install ollama
 ✓ disk     154.6 GB free
 
 1 problem.
@@ -112,7 +113,7 @@ Run `golem doctor` first. It checks the install from top to bottom and prints a 
 | `golem: command not found` | Homebrew isn't in your terminal's path. Run the "Next steps" commands the Homebrew installer printed, then open a new terminal |
 | The chat says `reconnecting` | The daemon isn't running. Run `golem status`, then `golem daemon start` |
 | `needs key` in red | Run `golem auth set <provider>`, or `/login <provider>` in the chat |
-| A local model doesn't answer | Is Ollama running? Run `brew services start ollama` |
+| A local model doesn't answer | Run `golem doctor`. golem starts Ollama itself. If it doesn't start, look in `~/.golem/logs/ollama.log` |
 | macOS asks whether golem may use a Keychain item | Choose Always Allow. It asks once, for keys saved by an older copy of golem |
 | Anything else | Run `golem daemon logs` |
 
