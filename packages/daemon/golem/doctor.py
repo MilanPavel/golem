@@ -24,6 +24,7 @@ from pydantic import ValidationError
 from golem import launchd
 from golem.config import GolemSettings, load_settings
 from golem.mcp.launch import Secrets, find_command
+from golem.models import ollama
 from golem.models.keys import KeyStore, KeyStoreError
 from golem.models.router import (
     OLLAMA_BASE_URL,
@@ -68,7 +69,7 @@ class Platform(Protocol):
         """The models an Ollama server has, or None when it does not answer."""
         ...
 
-    def has_command(self, name: str) -> bool: ...
+    def ollama_installed(self) -> bool: ...
 
     def mcp_command(self, command: str) -> str | None:
         """Where an MCP server's command is, searched as the daemon searches, or None."""
@@ -113,8 +114,8 @@ class MacPlatform:
             and isinstance(name := cast(dict[str, object], item).get("name"), str)
         ]
 
-    def has_command(self, name: str) -> bool:
-        return shutil.which(name) is not None
+    def ollama_installed(self) -> bool:
+        return ollama.installed()
 
     def mcp_command(self, command: str) -> str | None:
         return find_command(command, os.environ)
@@ -190,7 +191,8 @@ def config_check(paths: GolemPaths) -> tuple[GolemSettings | None, Check]:
 def model_checks(settings: GolemSettings, platform: Platform, keys: KeyStore) -> list[Check]:
     """The default model, then one line per provider the profiles use.
 
-    A stopped Ollama is one line however many profiles need it.
+    A stopped Ollama is one line however many profiles need it. It is ok when
+    it is installed here and golem may start it.
     """
     router = ModelRouter(settings, keys=keys)
     checks: list[Check] = []
@@ -209,7 +211,9 @@ def model_checks(settings: GolemSettings, platform: Platform, keys: KeyStore) ->
         models = used[provider_name]
         provider = models[0].provider
         if provider.kind == "ollama":
-            checks.extend(_ollama_checks(provider_name, provider, models, platform))
+            checks.extend(
+                _ollama_checks(provider_name, provider, models, platform, settings.ollama.start)
+            )
         else:
             checks.append(_key_check(provider_name, provider, keys))
     return checks
@@ -272,16 +276,16 @@ def _unresolved(name: str, default: bool, settings: GolemSettings, exc: ModelCon
 
 
 def _ollama_checks(
-    name: str, provider: Provider, models: list[ResolvedModel], platform: Platform
+    name: str,
+    provider: Provider,
+    models: list[ResolvedModel],
+    platform: Platform,
+    start: bool,
 ) -> list[Check]:
     base = (provider.base_url or OLLAMA_BASE_URL).strip().rstrip("/").removesuffix("/v1")
     pulled = platform.ollama_models(base)
     if pulled is None:
-        if platform.has_command("ollama"):
-            fix = "brew services start ollama, or open the Ollama app"
-        else:
-            fix = "brew install ollama && brew services start ollama"
-        return [Check(name, "fail", f"not answering at {base}", fix)]
+        return [_ollama_down(name, base, platform, start)]
     have = {_with_tag(model) for model in pulled}
     missing = sorted({model.model_id for model in models if _with_tag(model.model_id) not in have})
     count = f"{len(pulled)} model" + ("" if len(pulled) == 1 else "s")
@@ -293,6 +297,25 @@ def _ollama_checks(
         for model in missing
     )
     return checks
+
+
+def _ollama_down(name: str, base: str, platform: Platform, start: bool) -> Check:
+    """A server that does not answer. golem starts a local one it can find."""
+    if not ollama.is_local(base):
+        return Check(name, "fail", f"not answering at {base}", f"start Ollama at {base}")
+    if not platform.ollama_installed():
+        fix = (
+            "brew install ollama" if start else "brew install ollama && brew services start ollama"
+        )
+        return Check(name, "fail", "Ollama is not installed", fix)
+    if start:
+        return Check(name, "ok", "not running, golem starts it when a local model needs it")
+    return Check(
+        name,
+        "fail",
+        f"not answering at {base}, and [ollama] start is false",
+        "brew services start ollama, or open the Ollama app",
+    )
 
 
 def _key_check(name: str, provider: Provider, keys: KeyStore) -> Check:

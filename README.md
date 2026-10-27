@@ -71,7 +71,7 @@ golem daemon install                  # start golem's background service, now an
 Give it a brain, local or hosted:
 
 ```bash
-brew install ollama && brew services start ollama   # a free, private model on your Mac
+brew install ollama                                 # a free, private model on your Mac
 golem auth set anthropic                            # or a hosted one: paste your API key
 ```
 
@@ -149,6 +149,7 @@ api_key_env = "VLLM_API_KEY"       # optional
 | `default_model` | picked on first start | A profile name, or a `provider/model-id` |
 | `[models.<name>]` | none | `model`, optional `ctx`, optional `price = { input = 3.0, output = 15.0 }` in USD per million tokens |
 | `[providers.<name>]` | built-in | `kind` (`anthropic`, `openai`, `ollama`, `openai_compat`), `base_url`, `api_key_env` |
+| `[ollama]` | | `start = true` lets golem start a local Ollama, `idle_stop_minutes = 30` stops the one it started (0 never) |
 | `session_titles` | `true` | Name each chat after its first answer, with one extra model call |
 | `log_level` | `INFO` | `DEBUG`, `INFO`, `WARNING`, or `ERROR` |
 | `[shell]` | | `network = false`, `writable = []`, `timeout_seconds = 120` |
@@ -358,7 +359,7 @@ Start with `golem doctor`. It checks the service, the running daemon's version, 
 |---|---|
 | The chat says `reconnecting` | Run `golem status`, then `golem daemon start` |
 | `needs key` in red | `/login <provider>`, or `golem auth set <provider>` |
-| A local model doesn't answer | Is Ollama running? `brew services start ollama` |
+| A local model doesn't answer | `golem doctor`. golem starts Ollama itself, and logs it in `~/.golem/logs/ollama.log` |
 | An unknown model or provider | Check `~/.golem/config.toml` |
 | Anything else | `golem daemon logs` |
 

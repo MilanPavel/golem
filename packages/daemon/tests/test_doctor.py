@@ -49,8 +49,8 @@ class FakePlatform:
         self.asked.append(base_url)
         return self.ollama
 
-    def has_command(self, name: str) -> bool:
-        return name in self.commands
+    def ollama_installed(self) -> bool:
+        return "ollama" in self.commands
 
     def mcp_command(self, command: str) -> str | None:
         return f"/opt/homebrew/bin/{command}" if command in self.commands else None
@@ -196,28 +196,60 @@ def test_a_running_ollama_with_the_model_is_ok(tmp_path: Path) -> None:
     assert platform.asked == ["http://127.0.0.1:11434"]
 
 
-def test_a_stopped_ollama_is_one_failed_line_with_a_fix(tmp_path: Path) -> None:
+def test_a_stopped_ollama_is_ok_because_golem_starts_it(tmp_path: Path) -> None:
     config = (
         "default_model = 'local'\n"
         "[models.local]\nmodel = 'ollama/qwen3:8b'\n"
         "[models.big]\nmodel = 'ollama/qwen3:32b'\n"
     )
     checks = _models(tmp_path, config, FakePlatform(ollama=None))
-    assert [check for check in checks if check.status != "ok"] == [
-        Check(
-            "ollama",
-            "fail",
-            "not answering at http://127.0.0.1:11434",
-            "brew services start ollama, or open the Ollama app",
-        )
-    ]
-
-
-def test_without_ollama_installed_the_fix_installs_it(tmp_path: Path) -> None:
-    checks = _models(
-        tmp_path, "default_model = 'ollama/qwen3:8b'\n", FakePlatform(ollama=None, commands=set())
+    assert checks[-1] == Check(
+        "ollama", "ok", "not running, golem starts it when a local model needs it"
     )
-    assert checks[-1].fix == "brew install ollama && brew services start ollama"
+    assert [check.name for check in checks] == ["model", "ollama"]
+
+
+def test_a_stopped_ollama_golem_may_not_start_fails_with_a_fix(tmp_path: Path) -> None:
+    config = "default_model = 'ollama/qwen3:8b'\n[ollama]\nstart = false\n"
+    checks = _models(tmp_path, config, FakePlatform(ollama=None))
+    assert checks[-1] == Check(
+        "ollama",
+        "fail",
+        "not answering at http://127.0.0.1:11434, and [ollama] start is false",
+        "brew services start ollama, or open the Ollama app",
+    )
+
+
+@pytest.mark.parametrize(
+    ("config", "fix"),
+    [
+        ("", "brew install ollama"),
+        ("[ollama]\nstart = false\n", "brew install ollama && brew services start ollama"),
+    ],
+)
+def test_without_ollama_installed_the_fix_installs_it(
+    tmp_path: Path, config: str, fix: str
+) -> None:
+    checks = _models(
+        tmp_path,
+        "default_model = 'ollama/qwen3:8b'\n" + config,
+        FakePlatform(ollama=None, commands=set()),
+    )
+    assert checks[-1] == Check("ollama", "fail", "Ollama is not installed", fix)
+
+
+def test_an_ollama_on_another_machine_is_not_started(tmp_path: Path) -> None:
+    config = (
+        "default_model = 'ollama/qwen3:8b'\n"
+        "[providers.ollama]\nkind = 'ollama'\nbase_url = 'http://gpu.lan:11434'\n"
+    )
+    checks = _models(tmp_path, config, FakePlatform(ollama=None))
+    assert checks[-1] == Check(
+        "ollama",
+        "fail",
+        "not answering at http://gpu.lan:11434",
+        "start Ollama at http://gpu.lan:11434",
+    )
 
 
 def test_a_model_ollama_has_not_downloaded_fails(tmp_path: Path) -> None:

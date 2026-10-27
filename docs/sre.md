@@ -570,8 +570,8 @@ Everything is in one folder: `~/.golem`, or whatever `GOLEM_HOME` points to.
 | `history` | Messages you typed, for Up-arrow recall | Optional |
 | `tui.json`, `exports/` | Screen preferences, and chats you exported | Optional |
 | `cache/` | Model lists and prices, refreshed daily | No, safe to delete |
-| `logs/` | Log files | No |
-| `run/` | The socket, the lock, and the Keychain record | No |
+| `logs/` | Log files, and `ollama.log` from an Ollama golem started | No |
+| `run/` | The socket, the lock, the Keychain record, and `ollama-<port>.pid` for an Ollama golem started | No |
 
 **Backing up:** both `.db` files are SQLite databases. Copy them while the daemon is stopped. While it runs, use `sqlite3 ~/.golem/golem.db ".backup /path/to/copy.db"`.
 
@@ -770,8 +770,8 @@ Remember: under launchd, `GOLEM_...` variables from your terminal do not apply. 
 
 ## 12. Logs and health checks
 
-- **Logs:** `golem daemon logs`. The log file is `~/.golem/logs/golem.jsonl`, one JSON record per line. If the daemon fails before it can write its log, look in `~/.golem/logs/launchd.stderr.log`.
-- **Is it running?** `golem status` shows the pid, version, uptime, state (`running`, or `draining` while it shuts down), and the default model.
+- **Logs:** `golem daemon logs`. The log file is `~/.golem/logs/golem.jsonl`, one JSON record per line. If the daemon fails before it can write its log, look in `~/.golem/logs/launchd.stderr.log`. An Ollama that golem started writes to `~/.golem/logs/ollama.log`.
+- **Is it running?** `golem status` shows the pid, version, uptime, state (`running`, or `draining` while it shuts down), the default model, and each local model server golem has used: started by golem with its pid and memory, or running without golem.
 - **Is the install healthy?** `golem doctor` prints a checklist, with a fix under each line that is not ok. It exits with code 1 when a check fails, and 0 when there are only warnings.
 
 | Check | Fails when | Fix it prints |
@@ -782,7 +782,7 @@ Remember: under launchd, `GOLEM_...` variables from your terminal do not apply. 
 | `socket` | Someone other than you could open the socket | `golem daemon restart` |
 | `config` | `config.toml` does not load. The line names the setting | Edit the file |
 | `model` | No model is chosen yet (a warning), or the default does not resolve | `/model` in the chat |
-| `ollama` | Ollama does not answer, or a profile's model is not downloaded. One line, however many profiles use it | `brew services start ollama`, or `ollama pull <model>` |
+| `ollama` | Ollama is not installed, a remote Ollama does not answer, `[ollama] start = false` and it does not answer, or a profile's model is not downloaded. One line, however many profiles use it. A stopped local Ollama is ok, because golem starts it | `brew install ollama`, or `ollama pull <model>` |
 | A hosted provider, such as `anthropic` | Its API key is not in the Keychain. A key only in your shell is a warning, because launchd does not pass it to the daemon | `golem auth set <provider>` |
 | `disk` | Less than 1 GB is free | Free some space |
 
