@@ -329,7 +329,13 @@ def open_chat(
         scope = scope_of(config)
         await registry.prepare(scope)
         tools = registry.scoped(scope)
-        response = await binder.invoke(profile, router.chat_model(profile), messages, tools)
+        try:
+            response = await binder.invoke(profile, router.chat_model(profile), messages, tools)
+        except Exception as exc:
+            down = router.unreachable(profile, exc)
+            if down is None:
+                raise
+            raise down from exc
         update: dict[str, object] = {"id": message_id}
         if response.tool_calls:
             update["tool_calls"] = _with_ids(response.tool_calls)

@@ -29,6 +29,7 @@ from golem.config import (
     ProviderSettings,
     load_settings,
 )
+from golem.models import ollama
 from golem.models.keys import KeyStore, KeyStoreError
 from golem.paths import resolve_paths
 
@@ -39,6 +40,16 @@ KeySource = Literal["env", "keychain"]
 
 class ModelConfigError(Exception):
     """The model name, provider, or API key is missing or unknown."""
+
+
+class ModelUnreachable(Exception):
+    """The model's server did not answer. ``hint`` says how to fix it."""
+
+    def __init__(self, message: str, *, provider: str | None, hint: str) -> None:
+        super().__init__(message)
+        self.message = message
+        self.provider = provider
+        self.hint = hint
 
 
 @dataclass(frozen=True, slots=True)
@@ -253,6 +264,40 @@ class ModelRouter:
             {"model": resolved.model_id, "base_url": provider.base_url, "api_key": key or "none"},
         )
 
+    def unreachable(self, profile: str, exc: BaseException) -> ModelUnreachable | None:
+        """``exc`` from a call to ``profile`` as :class:`ModelUnreachable`, or None.
+
+        Only a failure to connect counts. A server that answered with an error,
+        or stopped answering halfway, is something else.
+        """
+        if not _connect_failure(exc):
+            return None
+        try:
+            resolved = self.resolve(profile)
+        except ModelConfigError:
+            return ModelUnreachable(
+                "the model's server did not answer", provider=None, hint="check that it is running"
+            )
+        name = resolved.provider_name
+        provider = resolved.provider
+        if provider.kind == "ollama":
+            url = _ollama_url(provider.base_url)
+            if ollama.is_local(url):
+                message, hint = ollama.down(ollama.installed())
+                return ModelUnreachable(message, provider=name, hint=hint)
+            return ModelUnreachable(
+                f"Ollama at {url} is not answering", provider=name, hint="check that it is running"
+            )
+        if provider.base_url is not None and ollama.is_local(provider.base_url):
+            return ModelUnreachable(
+                f"{name} at {provider.base_url} is not answering",
+                provider=name,
+                hint="check that it is running",
+            )
+        return ModelUnreachable(
+            f"{name} is not answering", provider=name, hint="check your network connection"
+        )
+
     def provider(self, name: str) -> Provider | None:
         """The provider called ``name`` after presets and config, or None."""
         return self.providers().get(name)
@@ -371,6 +416,37 @@ def _merge(preset: Provider | None, configured: ProviderSettings) -> Provider:
         base_url=configured.base_url or preset.base_url,
         api_key_env=configured.api_key_env or preset.api_key_env,
     )
+
+
+_CONNECT_ERRORS = frozenset({"ConnectError", "ConnectTimeout"})
+_HTTP_LIBRARIES = frozenset({"httpx", "httpx2", "httpcore", "httpcore2"})
+
+
+def _connect_failure(exc: BaseException) -> bool:
+    """True when ``exc``, or an exception it was raised from, is a failed connect.
+
+    The Ollama client raises ``httpx.ConnectError`` while it streams and a bare
+    ``ConnectionError`` otherwise. The OpenAI and Anthropic clients raise
+    ``APIConnectionError`` from their own copy of httpx (``httpx2``), so the
+    httpx errors match by name. A read timeout is not a failed connect, and
+    neither is a connection reset halfway through.
+    """
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if isinstance(current, ConnectionRefusedError) or type(current) is ConnectionError:
+            return True
+        kind = type(current)
+        if kind.__name__ in _CONNECT_ERRORS and kind.__module__.split(".")[0] in _HTTP_LIBRARIES:
+            return True
+        if current.__cause__ is not None:
+            current = current.__cause__
+        elif current.__suppress_context__:
+            current = None
+        else:
+            current = current.__context__
+    return False
 
 
 def _ollama_url(base_url: str | None) -> str:

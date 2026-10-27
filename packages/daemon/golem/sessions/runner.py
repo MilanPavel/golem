@@ -40,6 +40,7 @@ from golem.graphs.adapter import (
 )
 from golem.graphs.chat import ChatRuntime
 from golem.graphs.tools_node import Answer
+from golem.models.router import ModelUnreachable
 from golem.permissions.engine import Allowance
 from golem.sessions.interrupted import close_reply
 from golem.sessions.log import SessionLog
@@ -262,6 +263,13 @@ async def _finish(
 async def _failed(
     run_id: str, exc: Exception, emit: Callable[[EventType, BaseModel], Awaitable[None]]
 ) -> None:
+    if isinstance(exc, ModelUnreachable):
+        log.warning("run %s failed: %s (%s)", run_id, exc.message, exc.__cause__)
+        data = RunFailedData(
+            message=exc.message, code="model_unreachable", provider=exc.provider, hint=exc.hint
+        )
+        await emit("run.failed", data)
+        return
     log.exception("run %s failed", run_id, exc_info=exc)
     message = str(exc).strip() or type(exc).__name__
     await emit("run.failed", RunFailedData(message=message))
