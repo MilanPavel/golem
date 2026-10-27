@@ -28,12 +28,42 @@ class HelloResult(BaseModel):
     daemon_version: str
 
 
+class LocalServer(BaseModel):
+    """A model server on this machine that answers, such as Ollama.
+
+    ``owner`` ``golem`` started it and stops it when it is unused, and
+    ``external`` runs on its own, for example from ``brew services`` or the
+    Ollama app. ``pid`` and ``memory_mb`` (the server and its model processes)
+    are known only for one golem started.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    provider: str = Field(min_length=1)
+    base_url: str = Field(min_length=1)
+    owner: Literal["golem", "external"]
+    pid: int | None = None
+    memory_mb: float | None = Field(default=None, ge=0)
+
+
+class ModelServerStatus(BaseModel):
+    """A local model server changed state. ``message`` says why it ``failed``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    provider: str = Field(min_length=1)
+    base_url: str = Field(min_length=1)
+    state: Literal["starting", "ready", "failed", "stopped"]
+    message: str | None = Field(default=None, min_length=1)
+
+
 class DaemonStatus(BaseModel):
     """Result of ``daemon.status``.
 
     ``model_profile``, ``model_provider``, and ``model_name`` describe the
     model a new session gets. Provider and name are null when that model does
-    not resolve.
+    not resolve. ``local_servers`` are the local model servers golem has
+    used since it started, while they run.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -47,6 +77,7 @@ class DaemonStatus(BaseModel):
     model_profile: str | None = Field(default=None, min_length=1)
     model_provider: str | None = Field(default=None, min_length=1)
     model_name: str | None = Field(default=None, min_length=1)
+    local_servers: list[LocalServer] = Field(default_factory=list[LocalServer])
 
 
 class PingParams(BaseModel):

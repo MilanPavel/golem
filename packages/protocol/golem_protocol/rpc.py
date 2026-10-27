@@ -8,6 +8,7 @@ from golem_protocol.commands import (
     McpServer,
     ModelPullDone,
     ModelPullProgress,
+    ModelServerStatus,
     SessionSummary,
     SkillRegistryChanged,
 )
@@ -118,6 +119,16 @@ class McpServerStatusNotification(BaseModel):
     params: McpServer
 
 
+class ModelServerStatusNotification(BaseModel):
+    """Server → every connection: a local model server started, failed, or stopped. Not stored."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    jsonrpc: Literal["2.0"] = "2.0"
+    method: Literal["model.server.status"] = "model.server.status"
+    params: ModelServerStatus
+
+
 class SkillRegistryChangedNotification(BaseModel):
     """Server → every connection: a skill or ``[skills]`` changed on disk. Not stored."""
 
@@ -132,6 +143,7 @@ __all__ = [
     "McpServerStatusNotification",
     "ModelPullDoneNotification",
     "ModelPullProgressNotification",
+    "ModelServerStatusNotification",
     "RpcErrorBody",
     "RpcFailure",
     "RpcId",

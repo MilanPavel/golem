@@ -1,7 +1,72 @@
 {
+  "$defs": {
+    "LocalServer": {
+      "additionalProperties": false,
+      "description": "A model server on this machine that answers, such as Ollama.\n\n``owner`` ``golem`` started it and stops it when it is unused, and\n``external`` runs on its own, for example from ``brew services`` or the\nOllama app. ``pid`` and ``memory_mb`` (the server and its model processes)\nare known only for one golem started.",
+      "properties": {
+        "base_url": {
+          "minLength": 1,
+          "title": "Base Url",
+          "type": "string"
+        },
+        "memory_mb": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Memory Mb"
+        },
+        "owner": {
+          "enum": [
+            "golem",
+            "external"
+          ],
+          "title": "Owner",
+          "type": "string"
+        },
+        "pid": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pid"
+        },
+        "provider": {
+          "minLength": 1,
+          "title": "Provider",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider",
+        "base_url",
+        "owner"
+      ],
+      "title": "LocalServer",
+      "type": "object"
+    }
+  },
   "additionalProperties": false,
-  "description": "Result of ``daemon.status``.\n\n``model_profile``, ``model_provider``, and ``model_name`` describe the\nmodel a new session gets. Provider and name are null when that model does\nnot resolve.",
+  "description": "Result of ``daemon.status``.\n\n``model_profile``, ``model_provider``, and ``model_name`` describe the\nmodel a new session gets. Provider and name are null when that model does\nnot resolve. ``local_servers`` are the local model servers golem has\nused since it started, while they run.",
   "properties": {
+    "local_servers": {
+      "items": {
+        "$ref": "#/$defs/LocalServer"
+      },
+      "title": "Local Servers",
+      "type": "array"
+    },
     "model_name": {
       "anyOf": [
         {

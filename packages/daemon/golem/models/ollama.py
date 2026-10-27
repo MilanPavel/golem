@@ -168,7 +168,10 @@ class LocalServer:
         return self._owner
 
     def status(self) -> LocalServerStatus | None:
+        """Who runs the server, or None before a probe and after the one golem started exits."""
         if self._owner is None:
+            return None
+        if self._process is not None and self._process.returncode is not None:
             return None
         return LocalServerStatus(self.provider, self.base_url, self._owner, self._pid)
 
@@ -420,6 +423,47 @@ async def _spawn(path: str, env: dict[str, str], log_file: Path) -> Process:
             stderr=subprocess.STDOUT,
             start_new_session=True,
         )
+
+
+def memory_mb(pid: int) -> float | None:
+    """Resident memory of ``pid`` and the processes under it, in MB, or None.
+
+    Ollama runs each loaded model in a child process, so the server alone
+    says little.
+    """
+    try:
+        result = subprocess.run(
+            ["ps", "-A", "-o", "pid=,ppid=,rss="],
+            capture_output=True,
+            text=True,
+            timeout=2,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    kb = tree_rss_kb(result.stdout, pid)
+    return None if kb is None else round(kb / 1024, 1)
+
+
+def tree_rss_kb(table: str, pid: int) -> int | None:
+    """Sum the ``rss`` column of ``pid`` and its descendants in ``ps -o pid=,ppid=,rss=`` text."""
+    rss: dict[int, int] = {}
+    children: dict[int, list[int]] = {}
+    for line in table.splitlines():
+        parts = line.split()
+        if len(parts) != 3 or not all(part.isdigit() for part in parts):
+            continue
+        child, parent, kb = (int(part) for part in parts)
+        rss[child] = kb
+        children.setdefault(parent, []).append(child)
+    if pid not in rss:
+        return None
+    total, pending = 0, [pid]
+    while pending:
+        current = pending.pop()
+        total += rss.get(current, 0)
+        pending.extend(children.get(current, []))
+    return total
 
 
 def _is_ollama(pid: int) -> bool:

@@ -5,9 +5,10 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Awaitable, Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import httpx
+import pytest
 from fakes import ToolCallingChatModel
 from langchain_core.callbacks import CallbackManagerForLLMRun
 from langchain_core.messages import BaseMessage
@@ -15,10 +16,11 @@ from langchain_core.outputs import ChatResult
 from langgraph.checkpoint.memory import InMemorySaver
 from pydantic import Field
 from serve_fakes import FakeServe
-from test_server import start_daemon, stop_daemon
+from test_server import HELLO, RpcClient, rpc_result, start_daemon, stop_daemon
 
 from golem.config import GolemSettings
 from golem.graphs.chat import open_chat
+from golem.models import ollama
 from golem.models.discovery import ModelDiscovery
 from golem.models.ollama import LocalServers
 from golem.models.pulls import PullManager
@@ -156,3 +158,61 @@ async def test_the_daemon_stops_the_ollama_it_started(short_home: Path, tmp_path
     finally:
         await stop_daemon(app, task)
     assert serve.processes[0].signals == ["term"]
+
+
+async def test_clients_see_the_server_start_and_who_runs_it(
+    short_home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def memory(pid: int) -> float | None:
+        return 5324.8 if pid == 4000 else None
+
+    monkeypatch.setattr(ollama, "memory_mb", memory)
+    serve = FakeServe()
+    app, task = await start_daemon(short_home, local_servers=serve.servers(tmp_path))
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        assert rpc_result(await client.call("daemon.status"))["local_servers"] == []
+        local = app.state.local_servers
+        assert local is not None
+        server = local.get("ollama", URL)
+        assert server is not None and await server.ensure_running()
+
+        for _ in range(100):
+            await client.take_events()
+            if len(client.notices) >= 2:
+                break
+            await asyncio.sleep(0.01)
+        assert [
+            (n["method"], cast(dict[str, object], n["params"])["state"]) for n in client.notices
+        ] == [
+            ("model.server.status", "starting"),
+            ("model.server.status", "ready"),
+        ]
+        status = rpc_result(await client.call("daemon.status"))
+        assert status["local_servers"] == [
+            {
+                "provider": "ollama",
+                "base_url": URL,
+                "owner": "golem",
+                "pid": 4000,
+                "memory_mb": 5324.8,
+            }
+        ]
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+
+
+def test_memory_counts_the_server_and_its_model_processes() -> None:
+    table = "\n".join(
+        [
+            "    1     0   100",
+            " 4000     1  60000",
+            " 4001  4000  5000000",
+            " 4002  4001  1000",
+            " 5000     1  999999",
+        ]
+    )
+    assert ollama.tree_rss_kb(table, 4000) == 5_061_000
+    assert ollama.tree_rss_kb(table, 4242) is None

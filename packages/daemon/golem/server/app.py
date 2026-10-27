@@ -21,7 +21,7 @@ from golem.logging import configure_logging
 from golem.mcp import McpSupervisor
 from golem.models.discovery import ModelDiscovery
 from golem.models.keys import ProviderKeys
-from golem.models.ollama import LocalServers
+from golem.models.ollama import LocalServer, LocalServers, ServerState
 from golem.models.pulls import PullManager
 from golem.models.router import ModelRouter
 from golem.paths import GolemPaths, resolve_paths
@@ -49,6 +49,8 @@ from golem.store.database import Database, DatabaseTooNewError
 from golem.store.events import EventLog
 from golem.store.records import RunRecords, SessionRecords
 from golem.tools import default_registry
+from golem_protocol.commands import ModelServerStatus
+from golem_protocol.rpc import ModelServerStatusNotification
 
 log = logging.getLogger("golem.server")
 
@@ -145,6 +147,7 @@ class DaemonApp:
             local = self._local or LocalServers(
                 settings.ollama, log_file=self.paths.ollama_log_file, run_dir=self.paths.run_dir
             )
+            local.listener = self._server_changed
             self.state.local_servers = local
             home = self.paths.home
             self.state.skills = SkillRegistry(
@@ -230,6 +233,12 @@ class DaemonApp:
         """An MCP server's secret, ``mcp/<name>``, from the daemon's store."""
         secrets = self.state.secrets
         return None if secrets is None else secrets.get(name)
+
+    def _server_changed(self, server: LocalServer, state: ServerState, message: str | None) -> None:
+        status = ModelServerStatus(
+            provider=server.provider, base_url=server.base_url, state=state, message=message
+        )
+        self._broadcast(ModelServerStatusNotification(params=status))
 
     def _broadcast(self, notification: BaseModel) -> None:
         """Queue ``notification`` on every connection that said hello."""
