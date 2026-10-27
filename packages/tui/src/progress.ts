@@ -47,16 +47,20 @@ export function shuttle(tick: number, width: number): string {
   return `${"░".repeat(start)}${"█".repeat(BLOCK)}${"░".repeat(track - start - BLOCK)}`;
 }
 
+/** `starting` names a local model server that is starting, such as `ollama`, while nothing is written yet. */
 export function meterLine(
   phase: MeterPhase,
   chars: number,
   elapsed: number,
   tick: number,
   columns: number,
+  starting: string | null = null,
 ): string {
   const label =
     phase === "thinking"
-      ? "thinking"
+      ? starting === null
+        ? "thinking"
+        : `starting ${starting}`
       : phase === "waiting"
         ? "waiting for your approval"
         : `writing · ${chars.toLocaleString("en-US")} chars · ${elapsed}s`;

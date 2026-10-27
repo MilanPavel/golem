@@ -18,6 +18,11 @@ test("writing names the characters and the seconds, thinking does not invent a p
   assert.notEqual(shuttle(0, 10), shuttle(1, 10));
 });
 
+test("while a local server starts, the meter says so instead of thinking", () => {
+  assert.match(meterLine("thinking", 0, 0, 0, 40, "ollama"), /^starting ollama {2}█/);
+  assert.match(meterLine("writing", 12, 1, 0, 48, "ollama"), /^writing · 12 chars/);
+});
+
 test("elapsed seconds come from the run timestamp", () => {
   assert.equal(elapsedSeconds(null, 1_000), 0);
   assert.equal(elapsedSeconds("not-a-date", 1_000), 0);

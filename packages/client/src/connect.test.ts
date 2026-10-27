@@ -733,6 +733,35 @@ test("mcp.list reads the servers, and mcp.server.status reaches onMcpStatus", as
   }
 });
 
+test("model.server.status reaches onModelServer, and a malformed one does not", async () => {
+  const base = { provider: "ollama", base_url: "http://127.0.0.1:11434" };
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      onHello: (current) => {
+        write(current, { jsonrpc: "2.0", method: "model.server.status", params: { ...base, state: "asleep" } });
+        write(current, { jsonrpc: "2.0", method: "model.server.status", params: { ...base, state: "starting" } });
+        write(current, { jsonrpc: "2.0", method: "model.server.status", params: { ...base, state: "ready" } });
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
+  const seen: string[] = [];
+  const stop = client.onModelServer((status) => {
+    seen.push(`${status.provider} ${status.state}`);
+  });
+  try {
+    for (let tries = 0; tries < 50 && seen.length < 2; tries += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    assert.deepEqual(seen, ["ollama starting", "ollama ready"]);
+  } finally {
+    stop();
+    client.close();
+    await server.close();
+  }
+});
+
 test("skill.list reads the skills, and skill.registry.changed reaches onSkillsChanged", async () => {
   const ship = { name: "ship", description: "Ship it.", source: "project", path: "/repo/.agents/skills/ship", usable: true };
   const sent: Record<string, unknown>[] = [];

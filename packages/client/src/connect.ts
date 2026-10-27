@@ -13,6 +13,7 @@ export type ApprovalChoice = "allow" | "allow_session" | "allow_always" | "deny"
 import type { DaemonStatus } from "../../protocol/gen/daemon-status.ts";
 import type { McpListResult } from "../../protocol/gen/mcp-list-result.ts";
 import type { McpServer } from "../../protocol/gen/mcp-server.ts";
+import type { ModelServerStatus } from "../../protocol/gen/model-server-status.ts";
 import type { SkillListResult } from "../../protocol/gen/skill-list-result.ts";
 import type { McpToggleResult } from "../../protocol/gen/mcp-toggle-result.ts";
 import type { McpToolsResult } from "../../protocol/gen/mcp-tools-result.ts";
@@ -52,6 +53,7 @@ import {
   isMessageSendResult,
   isModelListResult,
   isModelProbeResult,
+  isModelServerStatus,
   isModelSetDefaultResult,
   isPullDone,
   isPullProgress,
@@ -216,6 +218,8 @@ export interface GolemClient {
   setMcpEnabled(name: string, enabled: boolean | "on_demand", sessionId?: string): Promise<McpServer>;
   /** `mcp.server.status`: a server started, failed, or changed its tools. */
   onMcpStatus(listener: (server: McpServer) => void): () => void;
+  /** `model.server.status`: a local model server such as Ollama started, failed, or stopped. */
+  onModelServer(listener: (status: ModelServerStatus) => void): () => void;
   /**
    * The skills a session in `cwd` sees, highest source first, with the ones
    * that lost their name or are broken. Without `cwd`, only the user's.
@@ -264,6 +268,7 @@ export function connectGolem(options: ConnectOptions): GolemClient {
   const pullListeners = new Set<(update: PullUpdate) => void>();
   const mcpListeners = new Set<(server: McpServer) => void>();
   const skillListeners = new Set<(root: string | null) => void>();
+  const serverListeners = new Set<(status: ModelServerStatus) => void>();
   const pending = new Map<number, Pending>();
   const attachments = new Attachments();
   let watching = false;
@@ -424,6 +429,21 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       record({ direction: "in", kind: "mcp.server.status", detail: name, json: line });
       if (isMcpServer(params)) {
         for (const listener of mcpListeners) {
+          try {
+            listener(params);
+          } catch {
+            // A listener must not tear the socket down.
+          }
+        }
+      }
+      return;
+    }
+    if (isRecord(message) && message["method"] === "model.server.status") {
+      const params = message["params"];
+      const detail = isModelServerStatus(params) ? `${params.provider} ${params.state}` : "";
+      record({ direction: "in", kind: "model.server.status", detail, json: line });
+      if (isModelServerStatus(params)) {
+        for (const listener of serverListeners) {
           try {
             listener(params);
           } catch {
@@ -969,6 +989,12 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       mcpListeners.add(listener);
       return () => {
         mcpListeners.delete(listener);
+      };
+    },
+    onModelServer(listener: (status: ModelServerStatus) => void): () => void {
+      serverListeners.add(listener);
+      return () => {
+        serverListeners.delete(listener);
       };
     },
     async listSkills(cwd?: string): Promise<SkillListResult> {

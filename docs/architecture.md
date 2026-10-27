@@ -536,7 +536,7 @@ The other bands ask for rows only when they are needed.
 
 - The debug panel wants 7.
 - The composer wants one row per line of the draft, up to 5, or 1 while a reply is in progress. That one row is `…`, and typing is ignored. Extra lines come out of the chat. Scroll is how many lines sit below the window, so the line you were reading stays put.
-- The meter wants 1 while a reply is in progress: `thinking`, then `writing · N chars · Ns`, with a small block that moves.
+- The meter wants 1 while a reply is in progress: `thinking` (or `starting ollama` while golem starts the session model's local server, from `model.server.status`), then `writing · N chars · Ns`, with a small block that moves.
 - Command suggestions want up to 6, above the composer, and only while the draft is a `/` command.
 - The todo band wants one row per item of the agent's todo list: `[ ]` pending, `[~]` in progress (bold, clay), `[x]` done (dim). A finished list, a list longer than 6, or a short window shows one row instead: `todos 2/5 · <the current step>`. An empty list takes no rows, and `/todos` hides or shows the band, remembered in `tui.json`.
 - A running tool call shows its newest output line under its line, or up to 12 lines while Ctrl-O is on.
