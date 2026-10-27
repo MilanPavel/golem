@@ -106,6 +106,11 @@ export function versionLabel(
   return { text: `tui ${tuiVersion} · daemon ${daemonVersion} · run golem daemon restart`, warn: true };
 }
 
+/** For the status line: the provider whose server did not answer, then any other alert, or "". */
+export function alertLabel(down: string | null, other: string): string {
+  return [down === null ? "" : `${down} ✗`, other].filter((part) => part.length > 0).join("  ");
+}
+
 export function sessionTitleLabel(title: string | null | undefined): string {
   if (title === undefined || title === null || title.trim().length === 0) {
     return "untitled";

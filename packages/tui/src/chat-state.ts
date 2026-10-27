@@ -64,6 +64,11 @@ export type ChatState = {
   approval: PendingApproval | null;
   /** The agent's todo list, from the newest `todos.updated`. */
   todos: TodoItem[];
+  /**
+   * The provider whose server did not answer, from `run.failed` with
+   * `model_unreachable`. Cleared when a run completes or the model changes.
+   */
+  down: string | null;
 };
 
 export const emptyChat: ChatState = {
@@ -75,7 +80,25 @@ export const emptyChat: ChatState = {
   runId: null,
   approval: null,
   todos: [],
+  down: null,
 };
+
+/** What to do after a model server did not answer, besides fixing it. */
+export const SWITCH_HINT = "/model to switch";
+
+type RunFailure = Extract<ChatEvent, { type: "run.failed" }>["data"];
+
+/** The banner for a failed run: the message, then how to fix it. */
+export function failureText(data: RunFailure): string {
+  const parts = [data.message];
+  if (data.hint != null) {
+    parts.push(data.hint);
+  }
+  if (data.code === "model_unreachable") {
+    parts.push(SWITCH_HINT);
+  }
+  return parts.join(" · ");
+}
 
 export const CANCELLED_NOTICE = "cancelled";
 export const SHUTDOWN_NOTICE = "the daemon stopped, so the run was cancelled";
@@ -99,6 +122,8 @@ export function reduceChat(state: ChatState, event: ChatEvent): ChatState {
     case "session.created":
     case "session.updated":
       return state;
+    case "model.selected":
+      return { ...state, down: null };
     case "message.started":
       return {
         ...state,
@@ -121,12 +146,13 @@ export function reduceChat(state: ChatState, event: ChatEvent): ChatState {
     case "run.started":
       return { ...state, busy: true, error: null, runStartedAt: event.ts, runId: event.run_id };
     case "run.completed":
-      return { ...state, busy: false, runStartedAt: null, runId: null, approval: null };
+      return { ...state, busy: false, runStartedAt: null, runId: null, approval: null, down: null };
     case "run.failed":
       return {
         ...state,
         busy: false,
-        error: event.data.message,
+        error: failureText(event.data),
+        down: event.data.code === "model_unreachable" ? (event.data.provider ?? "model") : state.down,
         runStartedAt: null,
         runId: null,
         approval: null,

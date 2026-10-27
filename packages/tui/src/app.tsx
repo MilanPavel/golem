@@ -137,6 +137,7 @@ import {
 } from "./skills-manager.ts";
 import { assistantChars, elapsedSeconds, meterLine, meterPhase } from "./progress.ts";
 import {
+  alertLabel,
   fitSegments,
   modelChip,
   preferModel,
@@ -400,7 +401,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       messageCount: sessionId === null ? null : chat.messages.length,
       uptimeSeconds,
       freshLines: followed.fresh,
-      alert: mcpAlert(mcp.servers),
+      alert: alertLabel(chat.down, mcpAlert(mcp.servers)),
     }),
     columns,
   );
