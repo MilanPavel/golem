@@ -115,6 +115,7 @@ import {
   pressPermissions,
   type PermissionsState,
 } from "./permissions.ts";
+import { applyServerStatus, type ServerStates, serverFailedNotice, startingServer } from "./local-servers.ts";
 import { type McpList, mcpAlert, mergeMcp } from "./mcp.ts";
 import {
   closedMcpManager,
@@ -183,6 +184,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   const [chat, setChat] = useState<ChatState>(emptyChat);
   const [draft, setDraft] = useState<Draft>({ text: "", cursor: 0 });
   const [sessionModel, setSessionModel] = useState<ModelInfo | null>(null);
+  const [servers, setServers] = useState<ServerStates>({});
   const [sessionCwd, setSessionCwd] = useState<string | null>(null);
   const sessionCwdRef = useRef(sessionCwd);
   sessionCwdRef.current = sessionCwd;
@@ -616,6 +618,17 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       setMcp((current) =>
         current.servers === null ? current : { servers: mergeMcp(current.servers, server), error: null },
       );
+    });
+  }, [client]);
+
+  useEffect(() => {
+    return client.onModelServer((status) => {
+      setServers((current) => applyServerStatus(current, status));
+      const notice = serverFailedNotice(status);
+      if (notice !== null) {
+        // A run that needed the server fails on its own, with the same reason and a hint.
+        setChat((current) => (current.busy ? current : { ...current, notice }));
+      }
     });
   }, [client]);
 
@@ -1880,6 +1893,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
             elapsedSeconds(chat.runStartedAt, Date.now()),
             tick,
             columns,
+            startingServer(servers, model.provider),
           )}
         </Text>
       ) : null}
