@@ -25,7 +25,7 @@ from urllib.parse import urlparse
 import httpx
 from pydantic import BaseModel
 
-from golem.models import hardware, registry
+from golem.models import hardware, ollama, registry
 from golem.models.router import OLLAMA_BASE_URL, ModelRouter, Provider
 from golem_protocol.commands import ModelPullDone, ModelPullProgress
 from golem_protocol.rpc import ModelPullDoneNotification, ModelPullProgressNotification
@@ -37,11 +37,6 @@ Broadcast = Callable[[BaseModel], None]
 _SEND_EVERY_SECONDS = 0.25
 _SPACE_MARGIN = 1.1
 _OLLAMA_TIMEOUT = 5.0
-_OLLAMA_BINARIES = (
-    "/opt/homebrew/bin/ollama",
-    "/usr/local/bin/ollama",
-    "/Applications/Ollama.app/Contents/Resources/ollama",
-)
 
 
 class PullError(Exception):
@@ -114,7 +109,7 @@ class PullManager:
         self._ram_gb = ram_gb
         self._models_dir = models_dir if models_dir is not None else _ollama_models_dir()
         self._clock = clock
-        self._ollama_installed = ollama_installed or _ollama_installed
+        self._ollama_installed = ollama_installed or ollama.installed
         self._client: httpx.AsyncClient | None = None
         self._pulls: dict[str, _Pull] = {}
 
@@ -327,20 +322,12 @@ class PullManager:
             return None
 
     def _down_hint(self) -> str:
-        if self._ollama_installed():
-            return "Ollama is not running: run ollama serve"
-        return "Ollama is not installed: run brew install ollama"
+        return ollama.down_text(self._ollama_installed())
 
 
 def _ollama_models_dir() -> Path:
     configured = os.environ.get("OLLAMA_MODELS", "").strip()
     return Path(configured).expanduser() if configured else Path.home() / ".ollama" / "models"
-
-
-def _ollama_installed() -> bool:
-    return shutil.which("ollama") is not None or any(
-        Path(path).exists() for path in _OLLAMA_BINARIES
-    )
 
 
 def _ollama_error(response: httpx.Response) -> str:
