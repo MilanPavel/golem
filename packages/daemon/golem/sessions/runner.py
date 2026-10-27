@@ -40,7 +40,7 @@ from golem.graphs.adapter import (
 )
 from golem.graphs.chat import ChatRuntime
 from golem.graphs.tools_node import Answer
-from golem.models.router import ModelUnreachable
+from golem.models.errors import ModelUnreachable
 from golem.permissions.engine import Allowance
 from golem.sessions.interrupted import close_reply
 from golem.sessions.log import SessionLog
