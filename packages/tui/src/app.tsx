@@ -157,7 +157,15 @@ import {
   type ModelInfo,
   type StatusSegment,
 } from "./status-label.ts";
-import { applyProgress, applyWindowTitle, tabProgress, windowTitle } from "./window-title.ts";
+import {
+  applyProgress,
+  applyTabStatus,
+  applyWindowTitle,
+  TAB_STATUS_ON,
+  tabProgress,
+  tabState,
+  windowTitle,
+} from "./window-title.ts";
 import { nextOffset, WHEEL_LINES, type WheelSubscribe } from "./screen.ts";
 import {
   closedSwitcher,
@@ -407,13 +415,16 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   const indexedTitle = sessions.find((summary) => summary.session_id === sessionId)?.title;
   const titleLabel = shownSessionTitle(sessionId, liveTitle, indexedTitle);
   // The meter ticks every 100 ms. The tab changes at most once a second.
-  const tabTitle = windowTitle({
+  const titleState = {
     title: titleLabel,
     phase,
     error: chat.error !== null,
     connection: connection.status,
     frame: Math.floor(tick / 10),
-  });
+  };
+  // In iTerm2 the tab status shows the state, so the title has no mark, as for Claude Code.
+  const tabTitle = windowTitle(titleState, !TAB_STATUS_ON);
+  const shownTabState = tabState(titleState);
   const uptimeSeconds =
     connection.status !== "connected" || daemonStartedAt === null
       ? null
@@ -737,6 +748,10 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   useEffect(() => {
     applyProgress(progress);
   }, [progress]);
+
+  useEffect(() => {
+    applyTabStatus(shownTabState);
+  }, [shownTabState]);
 
   useEffect(() => {
     if (!draft.text.startsWith("/") || draft.text.startsWith("//")) {
