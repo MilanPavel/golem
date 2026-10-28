@@ -12,7 +12,7 @@ This file is about what comes next. How the existing pieces are built is in [arc
 
 | Phase | What you get | Milestone |
 |---|---|---|
-| 1. First run and terminal UX | The state in the terminal tab, a clearer input field, and select to copy | M3 — Smooth first run |
+| 1. First run and terminal UX | A clearer input field, and select to copy | M3 — Smooth first run |
 | 2. Skills | Claude Code compatible `SKILL.md` skills | M4 — Skilled |
 | 3. Flows | Durable workflows written in Python, resumable after a crash | M5 — Works alone |
 | 4. Triggers | Schedules, file watchers, and notifications | M5 — Works alone |
@@ -101,7 +101,7 @@ Rules:
 
 ## Phase 1 — First run and terminal UX
 
-The screen feels like a modern terminal app: the state in the terminal tab, an input field with a hint row, and select to copy. Steps 1.1 to 1.3 are built: a clear error when Ollama is down, Ollama started on demand, and Ollama installed from the picker. [architecture.md](architecture.md) and [ADR-026](adr/026-local-model-server.md) describe them. It is tracked by [#62](https://github.com/MilanPavel/golem/issues/62). Each step is one PR, and each of its tickets is one commit in it.
+The screen feels like a modern terminal app: an input field with a hint row, and select to copy. Steps 1.1 to 1.4 are built: a clear error when Ollama is down, Ollama started on demand, Ollama installed from the picker, and the state in the terminal tab. [architecture.md](architecture.md), [ADR-026](adr/026-local-model-server.md), and [ADR-027](adr/027-terminal-tab-status.md) describe them. It is tracked by [#62](https://github.com/MilanPavel/golem/issues/62). Each step is one PR, and each of its tickets is one commit in it.
 
 Choices that hold for the whole phase:
 
@@ -110,17 +110,8 @@ Choices that hold for the whole phase:
 
 ```mermaid
 flowchart LR
-  s4[1.4 Status in the tab] --> s5[1.5 Composer and hint row] --> s6[1.6 Select to copy]
+  s5[1.5 Composer and hint row] --> s6[1.6 Select to copy]
 ```
-
-### 1.4 Status in the terminal tab — [#59](https://github.com/MilanPavel/golem/issues/59)
-
-- **Goal:** you can see from another tab whether golem is working or needs you.
-- **You can:** glance at the tab and see idle, working, waiting for your approval, an error, or disconnected.
-- **Build:**
-  - OSC `9;4` progress while a run is working, cleared when it ends. Terminals that know it show a tab or dock indicator, and the others ignore it. Ticket [#123](https://github.com/MilanPavel/golem/issues/123).
-  - In iTerm2, the coloured dot and the `Idle` text under the title, as Claude Code shows them. They come from iTerm2's OSC `21337` tab status (`indicator=#rrggbb;status=…;status-color=#rrggbb`). Terminal.app ignores it. Send it only when `TERM_PROGRAM=iTerm.app` or `LC_TERMINAL=iTerm2`, and clear it on exit. Ticket [#124](https://github.com/MilanPavel/golem/issues/124), with an ADR.
-- **Done when:** the tab shows idle, working, and approval correctly, and the original title is back after exit.
 
 ### 1.5 A composer with a hint row — [#60](https://github.com/MilanPavel/golem/issues/60)
 

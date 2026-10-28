@@ -27,30 +27,94 @@ export type TitleState = {
 export const SAVE_WINDOW_TITLE = `${ESC}[22;0t`;
 export const RESTORE_WINDOW_TITLE = `${ESC}[23;0t`;
 
-/** What golem is doing, as one mark: no daemon, an approval, working, an error, or idle. */
-export function titleMark(state: Omit<TitleState, "title">): string {
+/** What golem is doing, in the order the tab shows it: no daemon, an approval, working, an error, or idle. */
+export type TabState = "offline" | "waiting" | "working" | "error" | "idle";
+
+export function tabState(state: Pick<TitleState, "phase" | "error" | "connection">): TabState {
   if (state.connection !== "connected") {
-    return OFFLINE_MARK;
+    return "offline";
   }
   if (state.phase === "waiting") {
-    return APPROVAL_MARK;
+    return "waiting";
   }
   if (state.phase !== null) {
-    const frames = TITLE_SPINNER.length;
-    return TITLE_SPINNER[((state.frame % frames) + frames) % frames] ?? IDLE_MARK;
+    return "working";
   }
-  return state.error ? ERROR_MARK : IDLE_MARK;
+  return state.error ? "error" : "idle";
+}
+
+/** The state as one mark before the title. */
+export function titleMark(state: Omit<TitleState, "title">): string {
+  switch (tabState(state)) {
+    case "offline":
+      return OFFLINE_MARK;
+    case "waiting":
+      return APPROVAL_MARK;
+    case "working": {
+      const frames = TITLE_SPINNER.length;
+      return TITLE_SPINNER[((state.frame % frames) + frames) % frames] ?? IDLE_MARK;
+    }
+    case "error":
+      return ERROR_MARK;
+    case "idle":
+      return IDLE_MARK;
+  }
 }
 
 /**
  * The tab title: the mark, the session title, then `(golem)`, as Claude Code
  * shows `(claude)`. The title comes first, so a narrow tab keeps what tells
- * sessions apart. A session with no title yet is only `golem`.
+ * sessions apart. A session with no title yet is only `golem`. Without
+ * `mark`, as in iTerm2 where the tab status shows the state, the mark is left out.
  */
-export function windowTitle(state: TitleState): string {
+export function windowTitle(state: TitleState, mark = true): string {
   const title = state.title.trim();
   const named = title.length > 0 && title !== UNTITLED;
-  return `${titleMark(state)} ${named ? `${title} (golem)` : "golem"}`;
+  const text = named ? `${title} (golem)` : "golem";
+  return mark ? `${titleMark(state)} ${text}` : text;
+}
+
+/**
+ * iTerm2's tab status (OSC 21337): a coloured dot by the title and a word
+ * under it. Other terminals do not know it, so it is sent only to iTerm2.
+ * tmux would need passthrough, so inside tmux it is not sent.
+ */
+export function hasTabStatus(env: NodeJS.ProcessEnv): boolean {
+  if ((env.TMUX !== undefined && env.TMUX !== "") || env.TERM_PROGRAM === "tmux") {
+    return false;
+  }
+  return env.TERM_PROGRAM === "iTerm.app" || env.LC_TERMINAL === "iTerm2";
+}
+
+/** The dot, the word, and the word's colour for each state. */
+export const TAB_STATUS: Record<TabState, { dot: string; text: string; color: string }> = {
+  idle: { dot: "#00d75f", text: "idle", color: "#888888" },
+  working: { dot: "#ff9500", text: "working", color: "#ff9500" },
+  waiting: { dot: "#5f87ff", text: "waiting for you", color: "#5f87ff" },
+  error: { dot: "#ff5f5f", text: "failed", color: "#ff5f5f" },
+  offline: { dot: "#888888", text: "disconnected", color: "#888888" },
+};
+
+export function oscTabStatus(state: TabState): string {
+  const { dot, text, color } = TAB_STATUS[state];
+  return `${ESC}]21337;indicator=${dot};status=${text};status-color=${color}\u0007`;
+}
+
+/** Empty values take the dot and the word away. */
+export const CLEAR_TAB_STATUS = `${ESC}]21337;indicator=;status=;status-color=\u0007`;
+
+export const TAB_STATUS_ON = hasTabStatus(process.env);
+
+export function applyTabStatus(state: TabState): void {
+  if (TAB_STATUS_ON) {
+    write(oscTabStatus(state));
+  }
+}
+
+export function clearTabStatus(): void {
+  if (TAB_STATUS_ON) {
+    write(CLEAR_TAB_STATUS);
+  }
 }
 
 /** OSC 0 sets the icon and window title. Controls in the name are dropped. */
