@@ -12,7 +12,7 @@ This file is about what comes next. How the existing pieces are built is in [arc
 
 | Phase | What you get | Milestone |
 |---|---|---|
-| 1. First run and terminal UX | Ollama started and installed for you, a clearer input field, select to copy, and the state in the terminal tab | M3 — Smooth first run |
+| 1. First run and terminal UX | The state in the terminal tab, a clearer input field, and select to copy | M3 — Smooth first run |
 | 2. Skills | Claude Code compatible `SKILL.md` skills | M4 — Skilled |
 | 3. Flows | Durable workflows written in Python, resumable after a crash | M5 — Works alone |
 | 4. Triggers | Schedules, file watchers, and notifications | M5 — Works alone |
@@ -22,7 +22,7 @@ This file is about what comes next. How the existing pieces are built is in [arc
 | 8. Platforms | One interface for everything OS-specific, then Linux and Windows | Later |
 | 9. Model routing and long sessions | Token and cost display, a cheap profile for small jobs, budgets, escalation, compaction | Later |
 
-What is built is in [architecture.md](architecture.md) and the ADRs, and how to install, run, and release it is in [sre.md](sre.md). The first-run and terminal work is next, then the rest of skills.
+What is built is in [architecture.md](architecture.md) and the ADRs, and how to install, run, and release it is in [sre.md](sre.md). The terminal work of Phase 1 is next, then the rest of skills.
 
 ```mermaid
 flowchart LR
@@ -84,9 +84,6 @@ JSON-RPC 2.0, one JSON object per line, over `~/.golem/run/golem.sock`. Protocol
 
 | Group | New events | Phase |
 |---|---|---|
-| Models | `code`, `provider`, and `hint` on `run.failed` | 1.1 |
-| Models | the `model.server` notification (`starting`, `ready`, `failed`), and the local server in `daemon.status` | 1.2 |
-| Models | `not_installed` as a provider status in `model.list` and as a `run.failed` code | 1.3 |
 | Models | `usage.reported` (tokens, cost) | 9.1 |
 | System | `warning`, `error` | 9.4 |
 | Skills | `skill.activated`, `skill.deactivated` | 2.3 |
@@ -104,61 +101,17 @@ Rules:
 
 ## Phase 1 — First run and terminal UX
 
-A new user picks a local model and gets an answer, even with no Ollama on the Mac. The screen feels like a modern terminal app: an input field with a hint row, select to copy, and the state in the terminal tab. It is tracked by [#62](https://github.com/MilanPavel/golem/issues/62). Each step is one PR, and each of its tickets is one commit in it.
+The screen feels like a modern terminal app: the state in the terminal tab, an input field with a hint row, and select to copy. Steps 1.1 to 1.3 are built: a clear error when Ollama is down, Ollama started on demand, and Ollama installed from the picker. [architecture.md](architecture.md) and [ADR-026](adr/026-local-model-server.md) describe them. It is tracked by [#62](https://github.com/MilanPavel/golem/issues/62). Each step is one PR, and each of its tickets is one commit in it.
 
 Choices that hold for the whole phase:
 
 - **Never a dead end.** Every failure says what to do next, and the TUI offers that step where it can.
-- **Never install anything without asking.** A user who only uses hosted models never sees an Ollama question.
-- **OS-specific code goes behind one small function from the start**, so 8.1 only moves it. That covers the Ollama binary, Homebrew, and the clipboard.
-- **The TUI runs `brew install`, not the daemon.** It needs the user's terminal and `PATH`, and launchd gives the daemon neither.
+- **OS-specific code goes behind one small function from the start**, so 8.1 only moves it. That covers the clipboard and the terminal's escape sequences.
 
 ```mermaid
 flowchart LR
-  s1[1.1 Local model down] --> s2[1.2 Start Ollama on demand] --> s3[1.3 Install Ollama from the picker]
   s4[1.4 Status in the tab] --> s5[1.5 Composer and hint row] --> s6[1.6 Select to copy]
 ```
-
-The Ollama track (1.1 to 1.3) and the TUI track (1.4 to 1.6) do not depend on each other.
-
-### 1.1 A local model that is down says so — [#56](https://github.com/MilanPavel/golem/issues/56)
-
-- **Goal:** a stopped or missing Ollama is never a raw httpx error.
-- **You can:** send to a local model with Ollama stopped, and read `Ollama isn't running · /model to switch` with the fix, instead of `All connection attempts failed`.
-- **Build:**
-  - The runner turns an `httpx.ConnectError` or `ConnectTimeout` from an Ollama model call into a failure with `code: "model_unreachable"`, the provider, and a hint. Today any exception becomes `run.failed` with `str(exc)` ([runner.py](../packages/daemon/golem/sessions/runner.py)).
-  - The hint comes from `_down_hint` and `_ollama_installed` in [pulls.py](../packages/daemon/golem/models/pulls.py), moved to a shared `golem/models/ollama.py`: `ollama serve` when it is installed, `brew install ollama` when it is not.
-  - `run.failed` gains optional `code`, `provider`, and `hint`. A protocol minor bump, and `just gen`.
-  - The banner shows the message and the hint. For `model_unreachable` it adds `/model to switch`, and the model in the status line turns red until the next answer or a model change.
-- **Done when:** with Ollama stopped, a message to a local model shows the new banner, and `/model` switches to a hosted model in two keys.
-
-### 1.2 Start Ollama on demand — [#57](https://github.com/MilanPavel/golem/issues/57)
-
-- **Goal:** an installed Ollama is running when you need it, and not otherwise.
-- **You can:** reboot, open golem, send to a local model, and get an answer without starting anything.
-- **Build:**
-  - A `LocalServer` in `golem/models/ollama.py`. `ensure_running()` asks `GET /api/tags`. When nothing answers and the binary exists, it starts `ollama serve`, logs to `~/.golem/logs/ollama.log`, and waits for it to answer, with a timeout and a clear error. The binary is found by its known paths, because the daemon has no `PATH` under launchd.
-  - It runs before a local model call, and when `model.list` looks for local models.
-  - A `model.server` notification (`starting`, `ready`, `failed`). The meter shows `starting ollama` while it waits.
-  - A server that is already running, for example from `brew services start ollama` or the Ollama app, is used as it is. The daemon stops only a server it started itself: when the daemon stops, and after it has been idle for `ollama.idle_stop_minutes` (default 30).
-  - `daemon.status` reports the local server: who started it, its PID, and its memory use.
-  - An ADR on who owns the Ollama process and when it stops.
-  - `golem doctor` drops the manual start step.
-- **Done when:** after `brew services stop ollama`, the first local request starts Ollama and answers, and the server stops after the idle time.
-- **Watch out:**
-  - Two daemons, for example a dev build next to the installed one, must not both start a server. Use a lock file.
-  - On 36 GB, a large chat model, an embedding model, and an IDE are tight. Prefer one resident chat model.
-
-### 1.3 Install Ollama from the model picker — [#58](https://github.com/MilanPavel/golem/issues/58)
-
-- **Goal:** a new user never installs Ollama by hand.
-- **You can:** choose a local model on a Mac without Ollama, answer one question, and chat.
-- **Build:**
-  - When the provider binary is missing, the model picker asks once: "Ollama isn't installed. Run `brew install ollama` now?" The 1.1 banner for a missing Ollama offers the same question.
-  - Yes runs `brew install ollama` from the TUI and shows its output in a band. Then the existing pull downloads the model, 1.2 starts the server, and the message is sent.
-  - Without Homebrew, the picker shows the download link from ollama.com and the `/model` hint.
-  - `docs/install.md` and `golem doctor` drop the manual install step.
-- **Done when:** on a Mac without Ollama, choosing a local model in the picker installs Ollama after one question, downloads the model, and answers.
 
 ### 1.4 Status in the terminal tab — [#59](https://github.com/MilanPavel/golem/issues/59)
 
@@ -549,7 +502,7 @@ flowchart LR
   - **Service manager:** launchd, systemd user units, or Task Scheduler, behind `golem daemon install|uninstall|start|stop|restart|logs`. The `Platform` protocol in `golem/doctor.py` folds into it, so `golem doctor` checks whichever service the OS uses, and its Ollama fix stops assuming Homebrew.
   - **Paths:** `~/.golem` on macOS and Linux, `%LOCALAPPDATA%\golem` on Windows, and `GOLEM_HOME` everywhere.
   - **Clipboard:** `clipboard.ts` (1.6) already writes OSC 52, then falls back to `pbcopy`. Add `wl-copy` or `xclip`, and `clip.exe`.
-  - **Local model server (1.2, 1.3):** the Ollama binary paths and `brew install` become per-OS.
+  - **Local model server ([ADR-026](adr/026-local-model-server.md)):** the Ollama binary paths and `brew install` become per-OS.
   - **Notifications (4.1):** `terminal-notifier`, `notify-send`, or Windows toasts.
   - **Sandbox** ([ADR-014](adr/014-shell-sandbox.md)): a capability, `sandbox-exec` or none. `daemon.status` reports it. Without a sandbox, a shell rule that says `allow` is treated as `ask`, and the TUI shows `no sandbox`.
   - **Stopping the daemon:** a `daemon.shutdown` request, so stopping does not depend on Unix signals.
