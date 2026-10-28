@@ -223,7 +223,7 @@ def test_a_stopped_ollama_golem_may_not_start_fails_with_a_fix(tmp_path: Path) -
 @pytest.mark.parametrize(
     ("config", "fix"),
     [
-        ("", "brew install ollama"),
+        ("", "pick a local model in /model, and golem installs it, or brew install ollama"),
         ("[ollama]\nstart = false\n", "brew install ollama && brew services start ollama"),
     ],
 )

@@ -68,11 +68,10 @@ brew install milanpavel/golem/golem   # install
 golem daemon install                  # start golem's background service, now and at every login
 ```
 
-Give it a brain, local or hosted:
+Give it a brain, local or hosted. A local model needs nothing here: golem installs Ollama when you pick one. A hosted one needs your API key:
 
 ```bash
-brew install ollama                                 # a free, private model on your Mac
-golem auth set anthropic                            # or a hosted one: paste your API key
+golem auth set anthropic                            # paste your API key
 ```
 
 Then open the chat in any project folder:

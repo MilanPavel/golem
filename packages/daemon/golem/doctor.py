@@ -304,8 +304,11 @@ def _ollama_down(name: str, base: str, platform: Platform, start: bool) -> Check
     if not ollama.is_local(base):
         return Check(name, "fail", f"not answering at {base}", f"start Ollama at {base}")
     if not platform.ollama_installed():
+        # The TUI installs Ollama from the picker. golem only starts it when it may.
         fix = (
-            "brew install ollama" if start else "brew install ollama && brew services start ollama"
+            "pick a local model in /model, and golem installs it, or brew install ollama"
+            if start
+            else "brew install ollama && brew services start ollama"
         )
         return Check(name, "fail", "Ollama is not installed", fix)
     if start:
