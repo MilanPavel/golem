@@ -19,6 +19,7 @@ import {
   emptyChat,
   forkPoint,
   reduceChat,
+  serverUp,
   type ChatState,
   type DeltaBatcher,
 } from "./chat-state.ts";
@@ -32,6 +33,7 @@ import {
   type DebugState,
 } from "./commands.ts";
 import {
+  afterInstall,
   closedPicker,
   confirmFor,
   firstRunChoice,
@@ -85,6 +87,8 @@ import {
 import { layoutTranscript, type LayoutLine } from "./layout-chat.ts";
 import { DEFAULT_PREFS, loadPrefs, prefsPath, savePref } from "./prefs.ts";
 import { TodoBand } from "./todo-band.tsx";
+import { InstallBand } from "./install-band.tsx";
+import { findBrew, type InstallState, installRows, reduceInstall, runInstall, startedInstall } from "./ollama-install.ts";
 import { todoRows } from "./todos.ts";
 import {
   maskSecret,
@@ -179,6 +183,8 @@ import {
 import { useSessionIndex } from "./use-session-index.ts";
 import { useSession } from "./use-session.ts";
 
+type Install = { state: InstallState; ref: string; setDefault: boolean };
+
 export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelSubscribe }) {
   const [connection, setConnection] = useState<ConnectionState>(client.state);
   const [chat, setChat] = useState<ChatState>(emptyChat);
@@ -246,6 +252,11 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   pullsRef.current = pulls;
   /** Downloads started from the picker switch the session once they end. */
   const useAfterPull = useRef(new Map<string, { setDefault: boolean }>());
+  /** `brew install ollama` from the picker, and the model to download after it. */
+  const [install, setInstall] = useState<Install | null>(null);
+  const installRef = useRef(install);
+  installRef.current = install;
+  const stopInstall = useRef<(() => void) | null>(null);
   const shownListing = withPulls(listing, pulls);
   const draftRef = useRef(draft);
   const busyRef = useRef(chat.busy);
@@ -325,6 +336,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
     approval: chat.approval === null ? 0 : argsEdit !== null ? APPROVAL_ROWS : approvalRows(chat.approval, rows),
     composerMax: argsEdit !== null ? ARGS_EDIT_ROWS : undefined,
     todos: showTodos ? todoRows(chat.todos) : 0,
+    install: install === null ? 0 : installRows(install.state),
   });
   suggestRef.current = {
     items: suggestMatches,
@@ -409,6 +421,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   );
 
   useEffect(() => () => batcher.current?.stop(), []);
+  useEffect(() => () => stopInstall.current?.(), []);
 
   useEffect(() => {
     void sentHistory.current.load().catch(() => undefined);
@@ -624,6 +637,9 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   useEffect(() => {
     return client.onModelServer((status) => {
       setServers((current) => applyServerStatus(current, status));
+      if (status.state === "ready") {
+        setChat((current) => serverUp(current, status.provider));
+      }
       const notice = serverFailedNotice(status);
       if (notice !== null) {
         // A run that needed the server fails on its own, with the same reason and a hint.
@@ -1037,6 +1053,67 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       });
   }
 
+  function showInstall(next: Install | null): void {
+    installRef.current = next;
+    setInstall(next);
+  }
+
+  /** Install Ollama with Homebrew, then offer to download `ref` and use it. */
+  function startInstall(ref: string, setDefault: boolean): void {
+    pickerRef.current = closedPicker;
+    setPicker(closedPicker);
+    const brew = findBrew(process.env.PATH);
+    if (brew === null) {
+      showInstall({ state: { phase: "no_brew" }, ref, setDefault });
+      return;
+    }
+    showInstall({ state: startedInstall, ref, setDefault });
+    const run = runInstall(brew, (event) => {
+      const current = installRef.current;
+      if (current === null) {
+        return;
+      }
+      const state = reduceInstall(current.state, event);
+      showInstall({ ...current, state });
+      if (state.phase !== "running") {
+        stopInstall.current = null;
+      }
+      if (state.phase === "done") {
+        onInstalled(ref, setDefault);
+      }
+    });
+    if (installRef.current?.state.phase === "running") {
+      stopInstall.current = run.stop;
+    }
+  }
+
+  /** The daemon finds the new binary on its next look, and starts Ollama for the listing. */
+  function onInstalled(ref: string, setDefault: boolean): void {
+    const provider = ref.slice(0, ref.indexOf("/"));
+    setChat((current) => ({ ...serverUp(current, provider), error: null, notice: "Ollama is installed" }));
+    void client.listModels(true).then(
+      (result) => {
+        listingRef.current = result;
+        setListing(result);
+        showInstall(null);
+        const next = afterInstall(result, ref, setDefault);
+        if (next.kind === "confirm") {
+          const opened = openPicker(currentModelRef(), false, next.confirm);
+          pickerRef.current = opened;
+          setPicker(opened);
+        } else if (next.kind === "choose") {
+          chooseModel(next.model, next.name, next.setDefault);
+        } else {
+          setChat((current) => ({ ...current, notice: next.text }));
+        }
+      },
+      (error: unknown) => {
+        showInstall(null);
+        setChat((current) => ({ ...current, error: `models: ${messageOf(error)}` }));
+      },
+    );
+  }
+
   function startPull(ref: string, use: boolean, setDefault: boolean): void {
     if (use) {
       useAfterPull.current.set(ref, { setDefault });
@@ -1216,6 +1293,8 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       setChat((current) => ({ ...current, notice: action.text }));
     } else if (action.kind === "pull") {
       startPull(action.ref, action.use, action.setDefault);
+    } else if (action.kind === "install") {
+      startInstall(action.ref, action.setDefault);
     } else if (action.kind === "cancel-pull") {
       void client.cancelPull(action.ref).catch((error: unknown) => {
         setChat((current) => ({ ...current, error: messageOf(error) }));
@@ -1670,6 +1749,16 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       onSkillsManagerPress(press);
       return;
     }
+    const installing = installRef.current;
+    if (installing !== null && press.name === "escape" && !keysOpenRef.current) {
+      // Esc stops brew while it runs, and puts the band away after.
+      if (installing.state.phase === "running") {
+        stopInstall.current?.();
+      } else {
+        showInstall(null);
+      }
+      return;
+    }
     applyKeyEffect(pressKey(currentPlace(), press));
   });
 
@@ -1896,6 +1985,9 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
             startingServer(servers, model.provider),
           )}
         </Text>
+      ) : null}
+      {budget.install > 0 && install !== null ? (
+        <InstallBand state={install.state} columns={columns} height={budget.install} />
       ) : null}
       {budget.todos > 0 ? <TodoBand todos={chat.todos} columns={columns} height={budget.todos} /> : null}
       {budget.approval > 0 && chat.approval !== null ? (

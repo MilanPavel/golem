@@ -12,6 +12,7 @@ import {
   emptyChat,
   failureText,
   reduceChat,
+  serverUp,
 } from "./chat-state.ts";
 
 function event(partial: ChatEvent): ChatEvent {
@@ -159,6 +160,13 @@ test("a model server that did not answer says how to fix it, until a run complet
   assert.equal(completed.down, null);
 });
 
+test("a server that answers again is no longer marked down", () => {
+  const down = { ...emptyChat, down: "ollama" };
+  assert.equal(serverUp(down, "ollama").down, null);
+  assert.equal(serverUp(down, "lmstudio"), down);
+  assert.equal(serverUp(emptyChat, "ollama"), emptyChat);
+});
+
 test("choosing a model clears the server that was down", () => {
   const down = { ...emptyChat, down: "ollama" };
   const switched = reduceChat(down, {
@@ -183,7 +191,7 @@ test("a failure without a code shows the hint and no /model", () => {
   );
 });
 
-test("an Ollama that is not installed marks the model down and offers /model", () => {
+test("an Ollama that is not installed marks the model down and offers /model to install it", () => {
   const missing = reduceChat(emptyChat, {
     seq: 2,
     session_id: "s",
@@ -197,7 +205,7 @@ test("an Ollama that is not installed marks the model down and offers /model", (
       hint: "run brew install ollama",
     },
   });
-  assert.equal(missing.error, "Ollama is not installed · run brew install ollama · /model to switch");
+  assert.equal(missing.error, "Ollama is not installed · /model to install it or switch");
   assert.equal(missing.down, "ollama");
 });
 

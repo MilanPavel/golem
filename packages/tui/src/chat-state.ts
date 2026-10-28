@@ -86,11 +86,21 @@ export const emptyChat: ChatState = {
 
 /** What to do after a model server did not answer, besides fixing it. */
 export const SWITCH_HINT = "/model to switch";
+/** The picker installs a missing Ollama, so that beats the daemon's brew hint. */
+export const INSTALL_HINT = "/model to install it or switch";
+
+/** The chat once `provider`'s server answers again: it is no longer marked down. */
+export function serverUp(state: ChatState, provider: string): ChatState {
+  return state.down === provider ? { ...state, down: null } : state;
+}
 
 type RunFailure = Extract<ChatEvent, { type: "run.failed" }>["data"];
 
 /** The banner for a failed run: the message, then how to fix it. */
 export function failureText(data: RunFailure): string {
+  if (data.code === "not_installed") {
+    return `${data.message} · ${INSTALL_HINT}`;
+  }
   const parts = [data.message];
   if (data.hint != null) {
     parts.push(data.hint);

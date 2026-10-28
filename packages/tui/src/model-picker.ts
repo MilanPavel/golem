@@ -2,9 +2,9 @@ import type { ListedModel, ModelListResult } from "@golem/client";
 
 import type { Press } from "./keys.ts";
 
-/** A question the picker asks before it downloads, stops, or removes. */
+/** A question the picker asks before it installs Ollama, downloads, stops, or removes. */
 export type Confirm = {
-  kind: "pull" | "cancel" | "delete";
+  kind: "install" | "pull" | "cancel" | "delete";
   ref: string;
   sizeGb: number | null;
   fit: ListedModel["fit"];
@@ -51,6 +51,7 @@ export type PickerAction =
   | { kind: "notice"; text: string }
   | { kind: "choose"; model: ListedModel; name: string; setDefault: boolean }
   | { kind: "pull"; ref: string; use: boolean; setDefault: boolean }
+  | { kind: "install"; ref: string; setDefault: boolean }
   | { kind: "cancel-pull"; ref: string }
   | { kind: "delete"; ref: string };
 
@@ -141,6 +142,39 @@ export function firstRunChoice(listing: ModelListResult): { kind: "auto"; model:
   return { kind: "pick" };
 }
 
+/** True when the listing says `provider` is a local server that is not installed. */
+export function providerMissing(listing: ModelListResult | null, provider: string): boolean {
+  return listing?.providers.some((item) => item.provider === provider && item.status === "not_installed") ?? false;
+}
+
+/** What follows a finished install, once the model list is fresh: download, use, or say why not. */
+export type AfterInstall =
+  | { kind: "confirm"; confirm: Confirm }
+  | { kind: "choose"; model: ListedModel; name: string; setDefault: boolean }
+  | { kind: "notice"; text: string };
+
+export function afterInstall(listing: ModelListResult, ref: string, setDefault: boolean): AfterInstall {
+  const model = listing.models.find((item) => item.ref === ref);
+  const provider = ref.slice(0, ref.indexOf("/"));
+  if (providerMissing(listing, provider)) {
+    return { kind: "notice", text: "Ollama is installed, but golem does not find it yet: Ctrl-R in /model looks again" };
+  }
+  if (model === undefined) {
+    return { kind: "notice", text: "Ollama is installed: /model to pick a model" };
+  }
+  switch (model.status) {
+    case "not_installed":
+      return { kind: "confirm", confirm: confirmFor("pull", model, setDefault) };
+    case "ready":
+      return { kind: "choose", model, name: pickerName(model), setDefault };
+    case "pulling":
+      return { kind: "notice", text: `Ollama is installed, and ${ref} is downloading` };
+    case "needs_key":
+    case "server_down":
+      return { kind: "notice", text: "Ollama is installed, but it did not start: see ~/.golem/logs/ollama.log" };
+  }
+}
+
 /** Why a model cannot be used yet, or null when it can. */
 export function unusableReason(model: ListedModel): string | null {
   const id = model.ref.slice(model.ref.indexOf("/") + 1);
@@ -200,6 +234,9 @@ export function pickerHint(state: PickerState, ramGb: number | null = null): str
 
 function confirmHint(confirm: Confirm, ramGb: number | null): string {
   const name = confirm.ref.slice(confirm.ref.indexOf("/") + 1);
+  if (confirm.kind === "install") {
+    return `Ollama isn't installed. Run brew install ollama now, then download ${name}? Enter installs · Esc cancels`;
+  }
   if (confirm.kind === "cancel") {
     return `Stop downloading ${name}? Enter stops · Esc keeps going`;
   }
@@ -268,6 +305,9 @@ function onConfirm(state: PickerState, key: PickerKey): { state: PickerState; ac
     return { state: { ...state, confirm: { ...confirm, step: 2 } }, action: { kind: "none" } };
   }
   const next = { ...state, confirm: null };
+  if (confirm.kind === "install") {
+    return { state: next, action: { kind: "install", ref: confirm.ref, setDefault: confirm.setDefault } };
+  }
   if (confirm.kind === "cancel") {
     return { state: next, action: { kind: "cancel-pull", ref: confirm.ref } };
   }
@@ -330,6 +370,9 @@ export function pressPicker(
       }
       return { state, action: { kind: "notice", text: "only a downloaded local model can be removed" } };
     }
+    if (chosen.status !== "ready" && providerMissing(listing, chosen.provider)) {
+      return { state: { ...state, confirm: confirmFor("install", chosen, setDefault) }, action: { kind: "none" } };
+    }
     if (chosen.status === "not_installed") {
       return { state: { ...state, confirm: confirmFor("pull", chosen, setDefault) }, action: { kind: "none" } };
     }
@@ -377,7 +420,7 @@ export function layoutPicker(input: {
     } else if (provider.status === "server_down") {
       lines.push({ kind: "note", text: `${provider.provider}: not answering` });
     } else if (provider.status === "not_installed") {
-      lines.push({ kind: "note", text: `${provider.provider}: not installed` });
+      lines.push({ kind: "note", text: `${provider.provider}: not installed · Enter on one of its models installs it` });
     }
   }
   const at = lines.findIndex((line) => line.kind === "model" && line.selected);
