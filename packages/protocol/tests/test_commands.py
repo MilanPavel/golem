@@ -6,6 +6,7 @@ from golem_protocol.commands import (
     HelloParams,
     HelloResult,
     InspectMessage,
+    ListedProvider,
     LocalServer,
     ModelServerStatus,
     PingParams,
@@ -92,6 +93,13 @@ def test_model_server_status_notification_round_trip() -> None:
     assert ModelServerStatusNotification.model_validate_json(failed.model_dump_json()) == failed
     with pytest.raises(ValidationError):
         ModelServerStatus.model_validate({**failed.params.model_dump(), "state": "asleep"})
+
+
+def test_a_listed_provider_can_be_not_installed() -> None:
+    missing = ListedProvider(provider="ollama", status="not_installed")
+    assert ListedProvider.model_validate_json(missing.model_dump_json()) == missing
+    with pytest.raises(ValidationError):
+        ListedProvider.model_validate({"provider": "ollama", "status": "asleep"})
 
 
 def test_ping_params() -> None:

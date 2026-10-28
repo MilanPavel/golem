@@ -32,7 +32,7 @@ from typing import Any, Literal, cast
 import httpx
 
 from golem.config import ModelPrice, ModelSettings
-from golem.models import hardware, prices
+from golem.models import hardware, ollama, prices
 from golem.models.catalog import CatalogEntry, load_local_catalog
 from golem.models.errors import ModelUnreachable
 from golem.models.keys import KeyStoreError
@@ -43,7 +43,7 @@ log = logging.getLogger(__name__)
 
 Source = Literal["installed", "catalog", "remote", "profile"]
 Status = Literal["ready", "needs_key", "not_installed", "server_down", "pulling"]
-ProviderStatus = Literal["ready", "needs_key", "server_down", "unlisted"]
+ProviderStatus = Literal["ready", "needs_key", "server_down", "not_installed", "unlisted"]
 
 REMOTE_MAX_AGE_SECONDS = 24 * 3600
 _OLLAMA_TIMEOUT = 1.5
@@ -124,6 +124,8 @@ class _ProviderResult:
     found: list[_Found] = field(default_factory=lambda: [])
     up: bool = True
     stale: bool = False
+    # A local server whose program is not on this machine.
+    missing: bool = False
 
 
 class ModelDiscovery:
@@ -147,8 +149,10 @@ class ModelDiscovery:
         price_book: prices.PriceBook | None = None,
         fetch_prices: bool = True,
         pulling: Callable[[], dict[str, float | None]] | None = None,
+        ollama_installed: Callable[[], bool] | None = None,
     ) -> None:
         self._fetch_prices_enabled = fetch_prices
+        self._ollama_installed = ollama_installed or ollama.installed
         self.pulling: Callable[[], dict[str, float | None]] = pulling or dict
         # Starts a local Ollama that does not answer before listing its models.
         self.local: LocalServers | None = None
@@ -218,9 +222,10 @@ class ModelDiscovery:
         for name, task in probes.items():
             result = await task
             results[name] = result
-            states[name] = ListedProvider(
-                name, "ready" if result.up else "server_down", stale=result.stale
+            status: ProviderStatus = (
+                "ready" if result.up else "not_installed" if result.missing else "server_down"
             )
+            states[name] = ListedProvider(name, status, stale=result.stale)
         models = _with_pulls(
             self._merge(providers, profiles, default, keys, results, states), self.pulling()
         )
@@ -356,7 +361,8 @@ class ModelDiscovery:
             items = _list(_dict(response.json()).get("models"))
         except (httpx.HTTPError, ValueError) as exc:
             log.debug("ollama at %s is not answering: %s", base, exc)
-            return _ProviderResult(up=False)
+            missing = ollama.is_local(base) and not self._ollama_installed()
+            return _ProviderResult(up=False, missing=missing)
         found = await asyncio.gather(*(self._ollama_model(client, base, item) for item in items))
         return _ProviderResult(found=[model for model in found if model is not None])
 

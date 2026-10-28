@@ -284,8 +284,10 @@ class ModelRouter:
         if provider.kind == "ollama":
             url = _ollama_url(provider.base_url)
             if ollama.is_local(url):
-                message, hint = ollama.down(ollama.installed())
-                return ModelUnreachable(message, provider=name, hint=hint)
+                found = ollama.installed()
+                message, hint = ollama.down(found)
+                code = "model_unreachable" if found else "not_installed"
+                return ModelUnreachable(message, provider=name, hint=hint, code=code)
             return ModelUnreachable(
                 f"Ollama at {url} is not answering", provider=name, hint="check that it is running"
             )

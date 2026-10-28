@@ -376,6 +376,8 @@ export function layoutPicker(input: {
       lines.push({ kind: "note", text: `${provider.provider}: /login ${provider.provider} to list its models` });
     } else if (provider.status === "server_down") {
       lines.push({ kind: "note", text: `${provider.provider}: not answering` });
+    } else if (provider.status === "not_installed") {
+      lines.push({ kind: "note", text: `${provider.provider}: not installed` });
     }
   }
   const at = lines.findIndex((line) => line.kind === "model" && line.selected);

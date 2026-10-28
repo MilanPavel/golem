@@ -12,7 +12,7 @@ import httpx
 import pytest
 from test_server import HELLO, RpcClient, rpc_result, start_daemon, stop_daemon
 
-from golem.config import GolemSettings, ModelPrice, ModelSettings
+from golem.config import GolemSettings, ModelPrice, ModelSettings, ProviderSettings
 from golem.models.catalog import CatalogEntry
 from golem.models.discovery import ListedModel, ModelDiscovery, openai_chat_model
 from golem.models.keys import MemoryKeyStore
@@ -98,6 +98,7 @@ def _discovery(
     *,
     clock: Callable[[], float] = lambda: 1000.0,
     budget: float = 2.0,
+    ollama_installed: bool = True,
 ) -> ModelDiscovery:
     return ModelDiscovery(
         router,
@@ -109,6 +110,7 @@ def _discovery(
         catalog=CATALOG,
         price_book=PRICES,
         fetch_prices=False,
+        ollama_installed=lambda: ollama_installed,
     )
 
 
@@ -156,6 +158,28 @@ async def test_a_stopped_ollama_marks_its_models(tmp_path: Path) -> None:
     listing = await discovery.list()
     assert _by_ref(listing.models)["ollama/qwen3:8b"].status == "server_down"
     assert {p.provider: p.status for p in listing.providers}["ollama"] == "server_down"
+    await discovery.aclose()
+
+
+async def test_an_ollama_that_is_not_installed_says_so(tmp_path: Path) -> None:
+    discovery = _discovery(
+        ModelRouter(GolemSettings()), Network({}), tmp_path, ollama_installed=False
+    )
+    listing = await discovery.list()
+    assert {p.provider: p.status for p in listing.providers}["ollama"] == "not_installed"
+    assert _by_ref(listing.models)["ollama/qwen3:8b"].status == "server_down"
+    await discovery.aclose()
+
+
+async def test_a_remote_ollama_is_down_not_missing(tmp_path: Path) -> None:
+    settings = GolemSettings(
+        default_model="far/llama3",
+        providers={"far": ProviderSettings(kind="ollama", base_url="http://gpu-box:11434")},
+    )
+    discovery = _discovery(ModelRouter(settings), Network({}), tmp_path, ollama_installed=False)
+    listing = await discovery.list()
+    states = {p.provider: p.status for p in listing.providers}
+    assert (states["far"], states["ollama"]) == ("server_down", "not_installed")
     await discovery.aclose()
 
 

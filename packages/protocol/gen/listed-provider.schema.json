@@ -1,6 +1,6 @@
 {
   "additionalProperties": false,
-  "description": "``unlisted`` is a provider golem does not ask for models: nothing uses it yet.",
+  "description": "``unlisted`` is a provider golem does not ask for models: nothing uses it yet.\n\n``not_installed`` is a local server whose program is missing, such as an\nOllama with no ``ollama`` binary on this machine.",
   "properties": {
     "provider": {
       "minLength": 1,
@@ -17,6 +17,7 @@
         "ready",
         "needs_key",
         "server_down",
+        "not_installed",
         "unlisted"
       ],
       "title": "Status",

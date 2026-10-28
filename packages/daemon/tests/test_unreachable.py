@@ -130,6 +130,10 @@ def test_the_hint_fits_where_the_server_is(installed: Callable[[bool], None]) ->
         "ollama",
         "run brew install ollama",
     )
+    missing = router.unreachable("ollama/qwen3:8b", _connect_error())
+    assert missing is not None and missing.code == "not_installed"
+    far = router.unreachable("gpu", _connect_error())
+    assert far is not None and far.code == "model_unreachable"
     assert says("gpu") == (
         "Ollama at http://gpu-box:11434 is not answering",
         "far",
@@ -240,7 +244,7 @@ async def test_a_resumed_run_with_ollama_down_says_so_too(
     await daemon.manager.respond(session_id, asked[0].data.call_id, "allow")
     failed = _failed(await daemon.settled(run_id))
     assert (failed.data.code, failed.data.message, failed.data.hint) == (
-        "model_unreachable",
+        "not_installed",
         "Ollama is not installed",
         "run brew install ollama",
     )

@@ -91,7 +91,7 @@ export type Seq8 = number;
 export type SessionId9 = string;
 export type Ts8 = string;
 export type Type8 = 'run.completed';
-export type Code = 'model_unreachable' | null;
+export type Code = ('model_unreachable' | 'not_installed') | null;
 export type Hint = string | null;
 export type Message = string;
 export type Provider = string | null;
@@ -450,8 +450,10 @@ export interface RunFailedEvent {
  * Why a run stopped. No traceback.
  *
  * ``code`` names a failure a client can act on. ``model_unreachable``: the
- * model's server did not answer. ``provider`` is the provider whose server
- * it was, and ``hint`` says how to fix it, such as ``run ollama serve``.
+ * model's server did not answer. ``not_installed``: the model needs a local
+ * server that is not installed, such as Ollama. ``provider`` is the provider
+ * whose server it was, and ``hint`` says how to fix it, such as
+ * ``run ollama serve``.
  *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "RunFailedData".
