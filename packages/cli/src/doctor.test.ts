@@ -106,7 +106,7 @@ test("parseChecks takes the daemon's JSON and refuses anything else", () => {
 test("the checklist aligns details and shows a fix under each problem", () => {
   const checks: Check[] = [
     { name: "service", status: "ok", detail: "launchd runs golem-daemon", fix: null },
-    { name: "ollama", status: "fail", detail: "Ollama is not installed", fix: "brew install ollama" },
+    { name: "ollama", status: "fail", detail: "Ollama is not installed", fix: "pick a local model in /model, and golem installs it, or brew install ollama" },
     { name: "model", status: "warn", detail: "no model chosen yet", fix: "open golem and pick one with /model" },
   ];
   assert.equal(
@@ -114,7 +114,7 @@ test("the checklist aligns details and shows a fix under each problem", () => {
     [
       "✓ service  launchd runs golem-daemon",
       "✗ ollama   Ollama is not installed",
-      "           fix: brew install ollama",
+      "           fix: pick a local model in /model, and golem installs it, or brew install ollama",
       "! model    no model chosen yet",
       "           fix: open golem and pick one with /model",
       "",

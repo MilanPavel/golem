@@ -34,15 +34,11 @@ golem doctor                # checks the whole install
 
 Pick at least one. You can use both.
 
-**A local model.** It's free and private, and it needs no account. It needs a few GB of disk and memory.
+**A local model.** It's free and private, and it needs no account. It needs a few GB of disk and memory. There is nothing to install now. When you pick a local model in golem and Ollama is missing, golem asks once, then installs it with Homebrew and downloads the model. Without Homebrew, it gives you the download link from ollama.com.
 
-```bash
-brew install ollama
-```
+golem starts Ollama when a local model needs it, and stops it after 30 minutes unused. If you want Ollama running all the time, run `brew install ollama` and `brew services start ollama`. golem uses that one and never stops it.
 
-golem starts Ollama when a local model needs it, and stops it after 30 minutes unused. If you want Ollama running all the time, run `brew services start ollama`. golem uses that one and never stops it.
-
-You choose and download the model in the next step, from inside golem.
+You choose the model in the next step, from inside golem.
 
 **A hosted model** (Anthropic, OpenAI, OpenRouter, Groq, or Together). You need an API key from that provider. golem saves it in the macOS Keychain, never in a file:
 
@@ -101,7 +97,7 @@ Run `golem doctor` first. It checks the install from top to bottom and prints a 
 ✓ config   /Users/you/.golem/config.toml is valid
 ✓ model    new chats start on ollama/qwen3:8b
 ✗ ollama   Ollama is not installed
-           fix: brew install ollama
+           fix: pick a local model in /model, and golem installs it, or brew install ollama
 ✓ disk     154.6 GB free
 
 1 problem.

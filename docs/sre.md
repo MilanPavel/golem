@@ -782,7 +782,7 @@ Remember: under launchd, `GOLEM_...` variables from your terminal do not apply. 
 | `socket` | Someone other than you could open the socket | `golem daemon restart` |
 | `config` | `config.toml` does not load. The line names the setting | Edit the file |
 | `model` | No model is chosen yet (a warning), or the default does not resolve | `/model` in the chat |
-| `ollama` | Ollama is not installed, a remote Ollama does not answer, `[ollama] start = false` and it does not answer, or a profile's model is not downloaded. One line, however many profiles use it. A stopped local Ollama is ok, because golem starts it | `brew install ollama`, or `ollama pull <model>` |
+| `ollama` | Ollama is not installed, a remote Ollama does not answer, `[ollama] start = false` and it does not answer, or a profile's model is not downloaded. One line, however many profiles use it. A stopped local Ollama is ok, because golem starts it | Pick a local model in `/model` (golem installs Ollama), `brew install ollama`, or `ollama pull <model>` |
 | A hosted provider, such as `anthropic` | Its API key is not in the Keychain. A key only in your shell is a warning, because launchd does not pass it to the daemon | `golem auth set <provider>` |
 | `disk` | Less than 1 GB is free | Free some space |
 
