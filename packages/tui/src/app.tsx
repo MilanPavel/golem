@@ -157,7 +157,7 @@ import {
   type ModelInfo,
   type StatusSegment,
 } from "./status-label.ts";
-import { applyWindowTitle } from "./window-title.ts";
+import { applyWindowTitle, windowTitle } from "./window-title.ts";
 import { nextOffset, WHEEL_LINES, type WheelSubscribe } from "./screen.ts";
 import {
   closedSwitcher,
@@ -406,6 +406,14 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   sessionsRef.current = sessions;
   const indexedTitle = sessions.find((summary) => summary.session_id === sessionId)?.title;
   const titleLabel = shownSessionTitle(sessionId, liveTitle, indexedTitle);
+  // The meter ticks every 100 ms. The tab changes at most once a second.
+  const tabTitle = windowTitle({
+    title: titleLabel,
+    phase,
+    error: chat.error !== null,
+    connection: connection.status,
+    frame: Math.floor(tick / 10),
+  });
   const uptimeSeconds =
     connection.status !== "connected" || daemonStartedAt === null
       ? null
@@ -721,8 +729,8 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   }, [uptimeRefresh]);
 
   useEffect(() => {
-    applyWindowTitle(titleLabel);
-  }, [titleLabel]);
+    applyWindowTitle(tabTitle);
+  }, [tabTitle]);
 
   useEffect(() => {
     if (!draft.text.startsWith("/") || draft.text.startsWith("//")) {
