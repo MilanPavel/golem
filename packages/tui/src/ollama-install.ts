@@ -14,6 +14,8 @@ export const BREW_PATHS = ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"] as c
 export const OLLAMA_DOWNLOAD = "https://ollama.com/download";
 /** Output lines kept for the band. Older ones are dropped. */
 export const INSTALL_KEPT_LINES = 200;
+/** The band's height while brew runs: the title and five lines of output. */
+export const INSTALL_BAND_ROWS = 6;
 
 export type InstallState =
   | { phase: "running"; lines: string[]; partial: string }
@@ -66,6 +68,21 @@ export function reduceInstall(state: InstallState, event: InstallEvent): Install
     }
     case "error":
       return { phase: "failed", lines: withPartial(state), reason: event.message };
+  }
+}
+
+/** Rows the band wants: room for output while brew runs or after it failed, one line otherwise. */
+export function installRows(state: InstallState): number {
+  switch (state.phase) {
+    case "running":
+      return INSTALL_BAND_ROWS;
+    case "failed":
+      return Math.min(INSTALL_BAND_ROWS, 2 + state.lines.length);
+    case "no_brew":
+      return 2;
+    case "done":
+    case "stopped":
+      return 1;
   }
 }
 

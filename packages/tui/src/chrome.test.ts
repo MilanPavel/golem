@@ -189,3 +189,10 @@ test("the todo list collapses to one row before the composer shrinks", () => {
   assert.equal(tight.todos, 1);
   assert.equal(tight.composer, 3);
 });
+
+test("the install band gives up rows before the composer shrinks, and keeps the chat a row", () => {
+  const room = frameBudget({ rows: 30, columns: 80, draft: "", busy: false, banner: false, install: 6 });
+  assert.equal(room.install, 6);
+  const tight = frameBudget({ rows: 8, columns: 80, draft: "a\nb\nc", busy: false, banner: false, install: 6 });
+  assert.deepEqual([tight.install, tight.composer, tight.body], [2, 3, 1]);
+});

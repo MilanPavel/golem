@@ -5,6 +5,7 @@ import type { ListedModel, ModelListResult } from "@golem/client";
 
 import type { Press, PressName } from "./keys.ts";
 import {
+  afterInstall,
   closedPicker,
   firstRunChoice,
   layoutPicker,
@@ -14,6 +15,7 @@ import {
   pickerHint,
   pickerKeyOf,
   pressPicker,
+  providerMissing,
   unusableReason,
   withPulls,
   type PickerState,
@@ -148,7 +150,7 @@ test("rows show profiles, facts, the current model, and provider notes", () => {
 test("a provider that is not installed says so", () => {
   const listing = { ...LISTING, providers: [{ provider: "ollama", status: "not_installed" as const }] };
   const rows = layoutPicker({ state: openPicker(null), listing, current: "qwen", columns: 100, rows: 40 });
-  assert.deepEqual(rows.at(-1), { kind: "note", text: "ollama: not installed" });
+  assert.deepEqual(rows.at(-1), { kind: "note", text: "ollama: not installed · Enter on one of its models installs it" });
 });
 
 test("a long list scrolls to keep the selection on screen", () => {
@@ -242,4 +244,76 @@ test("suggested names are profiles, then ready refs", () => {
     "openrouter/meta/llama-4",
   ]);
   assert.deepEqual(modelNames(null), []);
+});
+
+const NO_OLLAMA: ModelListResult = {
+  default: "anthropic/claude-x",
+  ram_gb: 36,
+  models: [
+    model("ollama/qwen3:8b", { source: "catalog", status: "server_down", size_gb: 5.2, fit: "fits" }),
+    model("anthropic/claude-x"),
+  ],
+  providers: [
+    { provider: "anthropic", status: "ready" },
+    { provider: "ollama", status: "not_installed" },
+  ],
+};
+
+test("a local model asks to install Ollama first when it is not installed", () => {
+  assert.ok(providerMissing(NO_OLLAMA, "ollama"));
+  assert.ok(!providerMissing(LISTING, "ollama"));
+  const state = { ...openPicker(null), selected: "ollama/qwen3:8b" };
+  const asked = pressPicker(state, NO_OLLAMA, "default");
+  assert.equal(asked.action.kind, "none");
+  assert.equal(asked.state.confirm?.kind, "install");
+  assert.equal(
+    pickerHint(asked.state),
+    "Ollama isn't installed. Run brew install ollama now, then download qwen3:8b? Enter installs · Esc cancels",
+  );
+  const yes = pressPicker(asked.state, NO_OLLAMA, "enter");
+  assert.deepEqual(yes.action, { kind: "install", ref: "ollama/qwen3:8b", setDefault: true });
+  assert.equal(yes.state.confirm, null);
+  const no = pressPicker(asked.state, NO_OLLAMA, "close");
+  assert.deepEqual([no.action.kind, no.state.confirm, no.state.open], ["none", null, true]);
+});
+
+test("a hosted model never asks about Ollama", () => {
+  const state = { ...openPicker(null), selected: "anthropic/claude-x" };
+  assert.equal(pressPicker(state, NO_OLLAMA, "enter").action.kind, "choose");
+});
+
+test("after the install the picker asks to download, uses a ready model, or says why not", () => {
+  const fresh: ModelListResult = {
+    ...NO_OLLAMA,
+    models: [model("ollama/qwen3:8b", { source: "catalog", status: "not_installed", size_gb: 5.2, fit: "fits" })],
+    providers: [{ provider: "ollama", status: "ready" }],
+  };
+  const next = afterInstall(fresh, "ollama/qwen3:8b", true);
+  assert.ok(next.kind === "confirm");
+  assert.deepEqual(
+    [next.confirm.kind, next.confirm.ref, next.confirm.use, next.confirm.setDefault],
+    ["pull", "ollama/qwen3:8b", true, true],
+  );
+
+  const ready = { ...fresh, models: [model("ollama/qwen3:8b", { source: "installed" })] };
+  assert.deepEqual(afterInstall(ready, "ollama/qwen3:8b", false), {
+    kind: "choose",
+    model: ready.models[0],
+    name: "ollama/qwen3:8b",
+    setDefault: false,
+  });
+
+  const down = { ...fresh, models: [model("ollama/qwen3:8b", { source: "catalog", status: "server_down" })] };
+  assert.deepEqual(afterInstall(down, "ollama/qwen3:8b", false), {
+    kind: "notice",
+    text: "Ollama is installed, but it did not start: see ~/.golem/logs/ollama.log",
+  });
+  assert.deepEqual(afterInstall(NO_OLLAMA, "ollama/qwen3:8b", false), {
+    kind: "notice",
+    text: "Ollama is installed, but golem does not find it yet: Ctrl-R in /model looks again",
+  });
+  assert.deepEqual(afterInstall(fresh, "ollama/gone:1b", false), {
+    kind: "notice",
+    text: "Ollama is installed: /model to pick a model",
+  });
 });

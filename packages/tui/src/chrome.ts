@@ -13,6 +13,8 @@ export type FrameBudget = {
   approval: number;
   /** The agent's todo list, above the approval band and the suggestions. */
   todos: number;
+  /** `brew install ollama`, above the todo list. */
+  install: number;
   composer: number;
   status: number;
   debug: number;
@@ -50,6 +52,7 @@ export function frameBudget(input: {
   suggestions?: number;
   approval?: number;
   todos?: number;
+  install?: number;
   /** The most rows the composer may grow to. */
   composerMax?: number;
 }): FrameBudget {
@@ -64,6 +67,7 @@ export function frameBudget(input: {
       suggestions: 0,
       approval: 0,
       todos: 0,
+      install: 0,
       composer: 0,
       status: 0,
       debug: 0,
@@ -75,6 +79,7 @@ export function frameBudget(input: {
   let banner = input.banner ? 1 : 0;
   let approval = Math.max(0, Math.floor(input.approval ?? 0));
   let todos = Math.max(0, Math.floor(input.todos ?? 0));
+  let install = Math.max(0, Math.floor(input.install ?? 0));
   let suggestions = approval > 0 ? 0 : Math.min(SUGGEST_ROWS, Math.max(0, Math.floor(input.suggestions ?? 0)));
   let status = 1;
   let debug = input.debug === true ? DEBUG_ROWS : 0;
@@ -90,6 +95,10 @@ export function frameBudget(input: {
     }
     if (todos > 1) {
       todos = 1;
+      return true;
+    }
+    if (install > 1) {
+      install -= 1;
       return true;
     }
     if (debug > 3) {
@@ -124,6 +133,10 @@ export function frameBudget(input: {
       todos = 0;
       return true;
     }
+    if (install > 0) {
+      install = 0;
+      return true;
+    }
     if (approval > 0) {
       approval -= 1;
       return true;
@@ -139,11 +152,11 @@ export function frameBudget(input: {
     return false;
   };
 
-  while (header + banner + meter + suggestions + approval + todos + composer + status + debug >= rows && shrink()) {
+  while (header + banner + meter + suggestions + approval + todos + install + composer + status + debug >= rows && shrink()) {
     // Leave at least one row for the transcript when the terminal has a row.
   }
 
-  const used = header + banner + meter + suggestions + approval + todos + composer + status + debug;
+  const used = header + banner + meter + suggestions + approval + todos + install + composer + status + debug;
   return {
     mode: header >= HEADER_ROWS ? "full" : header > 0 ? "compact" : "hidden",
     header,
@@ -153,6 +166,7 @@ export function frameBudget(input: {
     suggestions,
     approval,
     todos,
+    install,
     composer,
     status,
     debug,

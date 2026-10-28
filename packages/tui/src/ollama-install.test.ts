@@ -5,11 +5,13 @@ import { test } from "node:test";
 
 import {
   findBrew,
+  INSTALL_BAND_ROWS,
   INSTALL_KEPT_LINES,
   type InstallEvent,
   type InstallProcess,
   type InstallState,
   installLines,
+  installRows,
   OLLAMA_DOWNLOAD,
   reduceInstall,
   runInstall,
@@ -157,4 +159,12 @@ test("a brew that cannot start fails with the reason", () => {
     { kind: "error", message: "spawn brew ENOENT" },
     { kind: "error", message: "spawn brew EACCES" },
   ]);
+});
+
+test("the band is tall while brew runs or after it failed, and short otherwise", () => {
+  assert.equal(installRows(startedInstall), INSTALL_BAND_ROWS);
+  assert.equal(installRows({ phase: "failed", lines: ["Error"], reason: "x" }), 3);
+  assert.equal(installRows({ phase: "failed", lines: Array.from({ length: 9 }, () => "e"), reason: "x" }), INSTALL_BAND_ROWS);
+  assert.equal(installRows({ phase: "no_brew" }), 2);
+  assert.equal(installRows({ phase: "stopped", lines: [] }), 1);
 });
