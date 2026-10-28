@@ -19,6 +19,7 @@ import {
   emptyChat,
   forkPoint,
   reduceChat,
+  RETRY_QUESTION,
   serverUp,
   type ChatState,
   type DeltaBatcher,
@@ -183,7 +184,8 @@ import {
 import { useSessionIndex } from "./use-session-index.ts";
 import { useSession } from "./use-session.ts";
 
-type Install = { state: InstallState; ref: string; setDefault: boolean };
+/** `resend` is the failed message to send again once Ollama and the model are there. */
+type Install = { state: InstallState; ref: string; setDefault: boolean; resend: string | null };
 
 export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelSubscribe }) {
   const [connection, setConnection] = useState<ConnectionState>(client.state);
@@ -252,6 +254,8 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   pullsRef.current = pulls;
   /** Downloads started from the picker switch the session once they end. */
   const useAfterPull = useRef(new Map<string, { setDefault: boolean }>());
+  /** Messages to send again once their model has downloaded, after an install from the banner. */
+  const sendAfterPull = useRef(new Map<string, string>());
   /** `brew install ollama` from the picker, and the model to download after it. */
   const [install, setInstall] = useState<Install | null>(null);
   const installRef = useRef(install);
@@ -308,7 +312,8 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   const size = useWindowSize();
   const columns = frameColumns(size.columns || 80);
   const rows = size.rows || 24;
-  const banner = chat.error ?? chat.notice;
+  const asking = retryOffer() !== null;
+  const banner = asking ? RETRY_QUESTION : (chat.error ?? chat.notice);
   const suggestMatches =
     chat.busy ||
     switcher.open ||
@@ -671,8 +676,13 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       });
       const after = useAfterPull.current.get(ref);
       useAfterPull.current.delete(ref);
+      const resend = sendAfterPull.current.get(ref);
+      sendAfterPull.current.delete(ref);
       loadModels(false);
-      if (ok && after !== undefined) {
+      if (ok && resend !== undefined) {
+        setChat((current) => ({ ...current, notice: `${ref} downloaded` }));
+        sendText(resend);
+      } else if (ok && after !== undefined) {
         chooseModel(null, ref, after.setDefault, `${ref} downloaded, and this session uses it now`);
       } else if (ok) {
         setChat((current) => ({ ...current, notice: `${ref} downloaded` }));
@@ -982,13 +992,21 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       }
       return;
     }
-    const text = outcome.text;
-    const currentSession = sessionRef.current;
-    if (currentSession === null) {
+    if (sessionRef.current === null) {
       return;
     }
     showDebug(outcome.debug);
     setDraft(draftAt(""));
+    sendText(outcome.text);
+  }
+
+  /** Send `text` to this session. On an error it goes back into the composer. */
+  function sendText(text: string): void {
+    const currentSession = sessionRef.current;
+    if (currentSession === null || busyRef.current || connectionRef.current.status !== "connected") {
+      setDraft(draftAt(text));
+      return;
+    }
     setOffset(0);
     setChat((current) => ({ ...current, notice: null }));
     void client.sendMessage(currentSession, text, { cwd: process.cwd() }).then(
@@ -1058,16 +1076,19 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
     setInstall(next);
   }
 
-  /** Install Ollama with Homebrew, then offer to download `ref` and use it. */
-  function startInstall(ref: string, setDefault: boolean): void {
+  /**
+   * Install Ollama with Homebrew, then offer to download `ref` and use it.
+   * With `resend`, download it without asking and send that message again.
+   */
+  function startInstall(ref: string, setDefault: boolean, resend: string | null = null): void {
     pickerRef.current = closedPicker;
     setPicker(closedPicker);
     const brew = findBrew(process.env.PATH);
     if (brew === null) {
-      showInstall({ state: { phase: "no_brew" }, ref, setDefault });
+      showInstall({ state: { phase: "no_brew" }, ref, setDefault, resend });
       return;
     }
-    showInstall({ state: startedInstall, ref, setDefault });
+    showInstall({ state: startedInstall, ref, setDefault, resend });
     const run = runInstall(brew, (event) => {
       const current = installRef.current;
       if (current === null) {
@@ -1079,7 +1100,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
         stopInstall.current = null;
       }
       if (state.phase === "done") {
-        onInstalled(ref, setDefault);
+        onInstalled(ref, setDefault, resend);
       }
     });
     if (installRef.current?.state.phase === "running") {
@@ -1088,7 +1109,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   }
 
   /** The daemon finds the new binary on its next look, and starts Ollama for the listing. */
-  function onInstalled(ref: string, setDefault: boolean): void {
+  function onInstalled(ref: string, setDefault: boolean, resend: string | null): void {
     const provider = ref.slice(0, ref.indexOf("/"));
     setChat((current) => ({ ...serverUp(current, provider), error: null, notice: "Ollama is installed" }));
     void client.listModels(true).then(
@@ -1097,7 +1118,13 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
         setListing(result);
         showInstall(null);
         const next = afterInstall(result, ref, setDefault);
-        if (next.kind === "confirm") {
+        if (resend !== null && next.kind === "confirm") {
+          // The answer in the banner covered the download too.
+          sendAfterPull.current.set(ref, resend);
+          startPull(ref, false, setDefault);
+        } else if (resend !== null && next.kind === "choose") {
+          sendText(resend);
+        } else if (next.kind === "confirm") {
           const opened = openPicker(currentModelRef(), false, next.confirm);
           pickerRef.current = opened;
           setPicker(opened);
@@ -1129,6 +1156,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       },
       (error: unknown) => {
         useAfterPull.current.delete(ref);
+        sendAfterPull.current.delete(ref);
         setPulls((current) => {
           const next = { ...current };
           delete next[ref];
@@ -1759,8 +1787,31 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       }
       return;
     }
+    const retry = retryOffer();
+    if (retry !== null && !keysOpenRef.current && (press.name === "return" || press.name === "escape")) {
+      const enter = press.name === "return";
+      // Esc leaves the banner as it was; Enter swaps it for the install band.
+      setChat((current) => ({ ...current, retry: null, error: enter ? null : current.error }));
+      if (enter) {
+        startInstall(retry.ref, false, retry.text);
+      }
+      return;
+    }
     applyKeyEffect(pressKey(currentPlace(), press));
   });
+
+  /** The banner's install question: after a missing Ollama stopped a message, with an empty composer. */
+  function retryOffer(): { ref: string; text: string } | null {
+    const retry = chatRef.current.retry;
+    const ref = currentModelRef();
+    if (retry === null || ref === null || !ref.startsWith(`${retry.provider}/`)) {
+      return null;
+    }
+    if (draftRef.current.text !== "" || busyRef.current || installRef.current !== null || switcherRef.current.open) {
+      return null;
+    }
+    return { ref, text: retry.text };
+  }
 
   usePaste((text) => {
     const prompt = secretRef.current;
@@ -1970,7 +2021,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
         </Box>
       ) : null}
       {budget.banner > 0 && banner !== null ? (
-        <Text color={chat.error !== null ? "red" : "yellow"} wrap="truncate-end">
+        <Text color={chat.error !== null && !asking ? "red" : "yellow"} wrap="truncate-end">
           {bannerText(banner, columns)}
         </Text>
       ) : null}

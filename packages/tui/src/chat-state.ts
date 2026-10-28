@@ -70,6 +70,11 @@ export type ChatState = {
    * the model changes.
    */
   down: string | null;
+  /**
+   * The message a missing Ollama stopped, from `run.failed` with
+   * `not_installed`. The banner offers to install Ollama and send it again.
+   */
+  retry: { text: string; provider: string } | null;
 };
 
 export const emptyChat: ChatState = {
@@ -82,12 +87,17 @@ export const emptyChat: ChatState = {
   approval: null,
   todos: [],
   down: null,
+  retry: null,
 };
 
 /** What to do after a model server did not answer, besides fixing it. */
 export const SWITCH_HINT = "/model to switch";
 /** The picker installs a missing Ollama, so that beats the daemon's brew hint. */
 export const INSTALL_HINT = "/model to install it or switch";
+
+/** The banner while `retry` waits: the picker's install question, and the way out. */
+export const RETRY_QUESTION =
+  "Ollama is not installed. Install it with Homebrew and send your message again? Enter installs · Esc dismisses · /model to switch";
 
 /** The chat once `provider`'s server answers again: it is no longer marked down. */
 export function serverUp(state: ChatState, provider: string): ChatState {
@@ -128,13 +138,22 @@ export function forkPoint(messages: readonly ChatMessage[]): string | null {
   return null;
 }
 
+/** The newest user message, when a missing Ollama stopped it. */
+function retryFor(messages: readonly ChatMessage[], data: RunFailure): ChatState["retry"] {
+  if (data.code !== "not_installed") {
+    return null;
+  }
+  const sent = [...messages].reverse().find((message) => message.role === "user");
+  return sent === undefined || sent.text.trim() === "" ? null : { text: sent.text, provider: data.provider ?? "ollama" };
+}
+
 export function reduceChat(state: ChatState, event: ChatEvent): ChatState {
   switch (event.type) {
     case "session.created":
     case "session.updated":
       return state;
     case "model.selected":
-      return { ...state, down: null };
+      return { ...state, down: null, retry: null };
     case "message.started":
       return {
         ...state,
@@ -155,15 +174,16 @@ export function reduceChat(state: ChatState, event: ChatEvent): ChatState {
     case "message.completed":
       return { ...state, messages: upsertCompleted(state.messages, event, state.runStartedAt) };
     case "run.started":
-      return { ...state, busy: true, error: null, runStartedAt: event.ts, runId: event.run_id };
+      return { ...state, busy: true, error: null, retry: null, runStartedAt: event.ts, runId: event.run_id };
     case "run.completed":
-      return { ...state, busy: false, runStartedAt: null, runId: null, approval: null, down: null };
+      return { ...state, busy: false, runStartedAt: null, runId: null, approval: null, down: null, retry: null };
     case "run.failed":
       return {
         ...state,
         busy: false,
         error: failureText(event.data),
         down: event.data.code != null ? (event.data.provider ?? "model") : state.down,
+        retry: retryFor(state.messages, event.data),
         runStartedAt: null,
         runId: null,
         approval: null,

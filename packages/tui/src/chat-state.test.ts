@@ -209,6 +209,65 @@ test("an Ollama that is not installed marks the model down and offers /model to 
   assert.equal(missing.down, "ollama");
 });
 
+test("a message a missing Ollama stopped waits to be sent again, until the next run or model", () => {
+  const notInstalled: ChatEvent = {
+    seq: 4,
+    session_id: "s",
+    run_id: "r",
+    ts: "t",
+    type: "run.failed",
+    data: { message: "Ollama is not installed", code: "not_installed", provider: "ollama" },
+  };
+  const sent = [
+    { seq: 1, session_id: "s", run_id: "r", ts: "t", type: "message.completed", data: { message_id: "u1", role: "user", text: "first" } },
+    { seq: 2, session_id: "s", run_id: "r", ts: "t", type: "message.completed", data: { message_id: "u2", role: "user", text: "hello" } },
+    { seq: 3, session_id: "s", run_id: "r", ts: "t", type: "run.started", data: {} },
+  ] satisfies ChatEvent[];
+  const failed = [...sent, notInstalled].reduce(reduceChat, emptyChat);
+  assert.deepEqual(failed.retry, { text: "hello", provider: "ollama" });
+
+  const again = reduceChat(failed, { seq: 5, session_id: "s", run_id: "r2", ts: "t", type: "run.started", data: {} });
+  assert.equal(again.retry, null);
+  const switched = reduceChat(failed, {
+    seq: 5,
+    session_id: "s",
+    run_id: null,
+    ts: "t",
+    type: "model.selected",
+    data: { model_profile: "anthropic/claude-sonnet-5-5", reason: "user" },
+  });
+  assert.equal(switched.retry, null);
+});
+
+test("only a missing Ollama offers to send again", () => {
+  const withMessage = reduceChat(emptyChat, {
+    seq: 1,
+    session_id: "s",
+    run_id: "r",
+    ts: "t",
+    type: "message.completed",
+    data: { message_id: "u1", role: "user", text: "hello" },
+  });
+  const stopped = reduceChat(withMessage, {
+    seq: 2,
+    session_id: "s",
+    run_id: "r",
+    ts: "t",
+    type: "run.failed",
+    data: { message: "Ollama is not running", code: "model_unreachable", provider: "ollama" },
+  });
+  assert.equal(stopped.retry, null);
+  const nothingSent = reduceChat(emptyChat, {
+    seq: 2,
+    session_id: "s",
+    run_id: "r",
+    ts: "t",
+    type: "run.failed",
+    data: { message: "Ollama is not installed", code: "not_installed", provider: "ollama" },
+  });
+  assert.equal(nothingSent.retry, null);
+});
+
 test("a replay of stored events rebuilds the transcript without deltas", () => {
   const stored: ChatEvent[] = [
     { seq: 2, session_id: "s", run_id: "r", ts: "t", type: "run.started", data: {} },
