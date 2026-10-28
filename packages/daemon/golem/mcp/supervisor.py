@@ -119,6 +119,8 @@ class McpSupervisor:
         self._projects: set[Path] = set()
         self._stamps: dict[Path, tuple[int, int] | None] = {}
         self._background: set[asyncio.Task[None]] = set()
+        # Servers being stopped. Shutdown waits for these instead of cancelling them.
+        self._stopping: set[asyncio.Task[None]] = set()
         self._started = False
         if user_config is not None:
             self._stamps[user_config] = _stamp(user_config)
@@ -226,6 +228,8 @@ class McpSupervisor:
         for task in tasks:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
+        # A stop cancelled halfway leaves its server running, with nobody to wait for it.
+        await asyncio.gather(*self._stopping, return_exceptions=True)
         clients = [server.client for server in self._servers.values() if server.client]
         await asyncio.gather(*(client.close() for client in clients), return_exceptions=True)
 
@@ -331,7 +335,7 @@ class McpSupervisor:
                 await client.close()
 
         if task is not None or client is not None:
-            self._spawn(stop(), f"mcp-{server.name}-stop")
+            self._spawn(stop(), f"mcp-{server.name}-stop", stopping=True)
 
     async def _run(self, server: _Server) -> None:
         delay = self._timing.backoff_first
@@ -434,10 +438,11 @@ class McpSupervisor:
         except Exception:
             log.debug("broadcast failed", exc_info=True)
 
-    def _spawn(self, work: Any, name: str) -> None:
+    def _spawn(self, work: Any, name: str, *, stopping: bool = False) -> None:
         task: asyncio.Task[None] = asyncio.create_task(work, name=name)
-        self._background.add(task)
-        task.add_done_callback(self._background.discard)
+        tasks = self._stopping if stopping else self._background
+        tasks.add(task)
+        task.add_done_callback(tasks.discard)
 
 
 def _idle_state(settings: McpServerSettings) -> McpServerState:

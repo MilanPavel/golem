@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import sys
 from collections.abc import AsyncIterator, Callable
 from pathlib import Path
@@ -244,6 +245,20 @@ async def test_a_server_waits_for_its_secret_and_restarts_when_it_is_stored(
     supervisor.secret_changed("mcp/fake")
     await supervisor.prepare(EVERYONE)
     assert await _call(supervisor, EVERYONE, "mcp__fake__env", name="API_TOKEN") == "s3cret"
+
+
+async def test_shutdown_right_after_a_restart_still_stops_the_old_server() -> None:
+    stored = {"mcp/fake": "one"}
+    settings = _settings(env={"API_TOKEN": "keychain:mcp/fake"})
+    supervisor = McpSupervisor({"fake": settings}, secrets=stored.get, timing=FAST)
+    supervisor.start()
+    await supervisor.prepare(EVERYONE)
+    old = int(await _call(supervisor, EVERYONE, "mcp__fake__pid"))
+    supervisor.secret_changed("mcp/fake")
+    await supervisor.aclose()
+    # Reaped, not only signalled: a stop cut short leaves the process behind.
+    with pytest.raises(ProcessLookupError):
+        os.kill(old, 0)
 
 
 async def test_prepare_does_not_wait_forever_for_a_slow_start(running: list[McpSupervisor]) -> None:
