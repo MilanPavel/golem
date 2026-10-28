@@ -267,6 +267,7 @@ Settings come from three places. Each one overrides the one before it: `~/.golem
 - `[models.<name>]`: a profile with `model` (a ref) and optional `ctx`, which the `ollama` provider sends as `num_ctx`.
 - `[providers.<name>]`: `kind`, `base_url`, and `api_key_env`. Built-in presets are `anthropic`, `openai`, `ollama` (native API), `openrouter`, `groq`, `together`, and `lmstudio`. A new name is `openai_compat` and needs `base_url`.
 - `model_profile`, `model_provider`, `model_name`, `model_base_url`: the flat settings from before profiles. They load as one profile named `model_profile` (default `remote`), so stored sessions keep resolving. An empty or Ollama `model_base_url` maps to the `ollama` provider.
+- `[ollama]`: `start` (default `true`) lets the daemon run `ollama serve` when a local model is needed and nothing answers. `idle_stop_minutes` (default 30, 0 never) stops a server it started after that long unused.
 - `session_titles`: default `true`. Name each session after its first completed run with one model call. Environment: `GOLEM_SESSION_TITLES`.
 - `[[rule]]`: a tool rule with `tool` (a glob on the tool name, default `*`), optional `match` (a glob on the tool's subject, such as a `grep` or `glob` pattern, with `|` between alternatives), optional `path` (a glob on the resolved path the call touches), and `action`: `allow`, `ask`, or `deny`.
 - `trusted_projects`: folders whose `.golem/policy.toml` may allow tools.
@@ -433,6 +434,8 @@ After `hello`, a client sends `ping` every few seconds so a half-open socket is 
 - Choosing the model the session already has stores nothing.
 
 A run ends in `run.failed` with a `message` and no traceback. A failure a client can act on also has a `code`. `model_unreachable`: the model's server did not answer. `not_installed`: the model needs a local Ollama, and no `ollama` binary is on `PATH` or at a known install path. Either comes with the `provider` and a `hint` that says how to fix it, such as `run ollama serve`.
+
+The daemon starts a local Ollama when a model call, `model.list`, or a download needs it and nothing answers (`LocalServer` in `golem/models/ollama.py`, [ADR-026](adr/026-local-model-server.md)). It looks for the `ollama` binary on `PATH` and at the Homebrew and app paths, runs `ollama serve` with its output in `logs/ollama.log`, and waits up to 15 s for `/api/tags` to answer. A server that already answered is `external` and is never stopped. One golem started has its pid in `run/ollama-<port>.pid`, so a restarted daemon takes it back. It stops when the daemon stops, and after `[ollama] idle_stop_minutes` with nothing holding it. Each change goes out as `model.server.status`. A start that fails ends the run with `model_unreachable` and the log file in `hint`.
 
 Downloads go through Ollama (`golem/models/pulls.py`):
 - **`model.probe`** reports whether a model is installed, whether the Ollama registry has it, its download size (from the registry manifest, `golem/models/registry.py`), whether it fits in memory, and the free disk space.
