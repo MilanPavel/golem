@@ -91,14 +91,16 @@ class RunFailedData(BaseModel):
     """Why a run stopped. No traceback.
 
     ``code`` names a failure a client can act on. ``model_unreachable``: the
-    model's server did not answer. ``provider`` is the provider whose server
-    it was, and ``hint`` says how to fix it, such as ``run ollama serve``.
+    model's server did not answer. ``not_installed``: the model needs a local
+    server that is not installed, such as Ollama. ``provider`` is the provider
+    whose server it was, and ``hint`` says how to fix it, such as
+    ``run ollama serve``.
     """
 
     model_config = _CONFIG
 
     message: str = Field(min_length=1)
-    code: Literal["model_unreachable"] | None = None
+    code: Literal["model_unreachable", "not_installed"] | None = None
     provider: str | None = Field(default=None, min_length=1)
     hint: str | None = Field(default=None, min_length=1)
 

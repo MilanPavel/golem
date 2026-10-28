@@ -2,10 +2,13 @@
 
 export type Provider = string;
 export type Stale = boolean;
-export type Status = 'ready' | 'needs_key' | 'server_down' | 'unlisted';
+export type Status = 'ready' | 'needs_key' | 'server_down' | 'not_installed' | 'unlisted';
 
 /**
  * ``unlisted`` is a provider golem does not ask for models: nothing uses it yet.
+ *
+ * ``not_installed`` is a local server whose program is missing, such as an
+ * Ollama with no ``ollama`` binary on this machine.
  */
 export interface ListedProvider {
   provider: Provider;

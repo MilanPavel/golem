@@ -266,7 +266,7 @@ async def _failed(
     if isinstance(exc, ModelUnreachable):
         log.warning("run %s failed: %s (%s)", run_id, exc.message, exc.__cause__)
         data = RunFailedData(
-            message=exc.message, code="model_unreachable", provider=exc.provider, hint=exc.hint
+            message=exc.message, code=exc.code, provider=exc.provider, hint=exc.hint
         )
         await emit("run.failed", data)
         return

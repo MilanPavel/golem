@@ -145,6 +145,12 @@ test("rows show profiles, facts, the current model, and provider notes", () => {
   assert.deepEqual(rows.at(-1), { kind: "note", text: "groq: /login groq to list its models" });
 });
 
+test("a provider that is not installed says so", () => {
+  const listing = { ...LISTING, providers: [{ provider: "ollama", status: "not_installed" as const }] };
+  const rows = layoutPicker({ state: openPicker(null), listing, current: "qwen", columns: 100, rows: 40 });
+  assert.deepEqual(rows.at(-1), { kind: "note", text: "ollama: not installed" });
+});
+
 test("a long list scrolls to keep the selection on screen", () => {
   const state = keyed(openPicker(null), press("page-down"));
   const rows = layoutPicker({ state, listing: LISTING, current: null, columns: 100, rows: 3 });

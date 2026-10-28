@@ -2,12 +2,15 @@
   "$defs": {
     "RunFailedData": {
       "additionalProperties": false,
-      "description": "Why a run stopped. No traceback.\n\n``code`` names a failure a client can act on. ``model_unreachable``: the\nmodel's server did not answer. ``provider`` is the provider whose server\nit was, and ``hint`` says how to fix it, such as ``run ollama serve``.",
+      "description": "Why a run stopped. No traceback.\n\n``code`` names a failure a client can act on. ``model_unreachable``: the\nmodel's server did not answer. ``not_installed``: the model needs a local\nserver that is not installed, such as Ollama. ``provider`` is the provider\nwhose server it was, and ``hint`` says how to fix it, such as\n``run ollama serve``.",
       "properties": {
         "code": {
           "anyOf": [
             {
-              "const": "model_unreachable",
+              "enum": [
+                "model_unreachable",
+                "not_installed"
+              ],
               "type": "string"
             },
             {

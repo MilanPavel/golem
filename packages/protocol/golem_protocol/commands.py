@@ -440,12 +440,16 @@ class ListedModel(BaseModel):
 
 
 class ListedProvider(BaseModel):
-    """``unlisted`` is a provider golem does not ask for models: nothing uses it yet."""
+    """``unlisted`` is a provider golem does not ask for models: nothing uses it yet.
+
+    ``not_installed`` is a local server whose program is missing, such as an
+    Ollama with no ``ollama`` binary on this machine.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     provider: str = Field(min_length=1)
-    status: Literal["ready", "needs_key", "server_down", "unlisted"]
+    status: Literal["ready", "needs_key", "server_down", "not_installed", "unlisted"]
     stale: bool = False
 
 

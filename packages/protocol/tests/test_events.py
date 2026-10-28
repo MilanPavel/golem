@@ -104,6 +104,8 @@ def test_run_failed_says_which_server_did_not_answer() -> None:
         hint="run ollama serve",
     )
     assert RunFailedData.model_validate_json(down.model_dump_json()) == down
+    missing = down.model_copy(update={"code": "not_installed"})
+    assert RunFailedData.model_validate_json(missing.model_dump_json()) == missing
     with pytest.raises(ValidationError):
         RunFailedData.model_validate({"message": "boom", "code": "teapot"})
     with pytest.raises(ValidationError):

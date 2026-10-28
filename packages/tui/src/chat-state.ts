@@ -66,7 +66,8 @@ export type ChatState = {
   todos: TodoItem[];
   /**
    * The provider whose server did not answer, from `run.failed` with
-   * `model_unreachable`. Cleared when a run completes or the model changes.
+   * `model_unreachable` or `not_installed`. Cleared when a run completes or
+   * the model changes.
    */
   down: string | null;
 };
@@ -94,7 +95,7 @@ export function failureText(data: RunFailure): string {
   if (data.hint != null) {
     parts.push(data.hint);
   }
-  if (data.code === "model_unreachable") {
+  if (data.code != null) {
     parts.push(SWITCH_HINT);
   }
   return parts.join(" · ");
@@ -152,7 +153,7 @@ export function reduceChat(state: ChatState, event: ChatEvent): ChatState {
         ...state,
         busy: false,
         error: failureText(event.data),
-        down: event.data.code === "model_unreachable" ? (event.data.provider ?? "model") : state.down,
+        down: event.data.code != null ? (event.data.provider ?? "model") : state.down,
         runStartedAt: null,
         runId: null,
         approval: null,

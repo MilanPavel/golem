@@ -19,7 +19,7 @@ export type Tools = boolean | null;
 export type Models = ListedModel[];
 export type Provider1 = string;
 export type Stale1 = boolean;
-export type Status1 = 'ready' | 'needs_key' | 'server_down' | 'unlisted';
+export type Status1 = 'ready' | 'needs_key' | 'server_down' | 'not_installed' | 'unlisted';
 export type Providers = ListedProvider[];
 export type RamGb = number | null;
 
@@ -74,6 +74,9 @@ export interface ModelPriceInfo {
 }
 /**
  * ``unlisted`` is a provider golem does not ask for models: nothing uses it yet.
+ *
+ * ``not_installed`` is a local server whose program is missing, such as an
+ * Ollama with no ``ollama`` binary on this machine.
  *
  * This interface was referenced by `ModelListResult`'s JSON-Schema
  * via the `definition` "ListedProvider".

@@ -183,6 +183,24 @@ test("a failure without a code shows the hint and no /model", () => {
   );
 });
 
+test("an Ollama that is not installed marks the model down and offers /model", () => {
+  const missing = reduceChat(emptyChat, {
+    seq: 2,
+    session_id: "s",
+    run_id: "r",
+    ts: "t",
+    type: "run.failed",
+    data: {
+      message: "Ollama is not installed",
+      code: "not_installed",
+      provider: "ollama",
+      hint: "run brew install ollama",
+    },
+  });
+  assert.equal(missing.error, "Ollama is not installed · run brew install ollama · /model to switch");
+  assert.equal(missing.down, "ollama");
+});
+
 test("a replay of stored events rebuilds the transcript without deltas", () => {
   const stored: ChatEvent[] = [
     { seq: 2, session_id: "s", run_id: "r", ts: "t", type: "run.started", data: {} },

@@ -432,7 +432,7 @@ After `hello`, a client sends `ping` every few seconds so a half-open socket is 
 - The conversation in the checkpoint carries over unchanged, so the new model sees the whole history.
 - Choosing the model the session already has stores nothing.
 
-A run ends in `run.failed` with a `message` and no traceback. A failure a client can act on also has a `code`. The only code today is `model_unreachable`: the model's server did not answer. It comes with the `provider` and a `hint` that says how to fix it, such as `run ollama serve`.
+A run ends in `run.failed` with a `message` and no traceback. A failure a client can act on also has a `code`. `model_unreachable`: the model's server did not answer. `not_installed`: the model needs a local Ollama, and no `ollama` binary is on `PATH` or at a known install path. Either comes with the `provider` and a `hint` that says how to fix it, such as `run ollama serve`.
 
 Downloads go through Ollama (`golem/models/pulls.py`):
 - **`model.probe`** reports whether a model is installed, whether the Ollama registry has it, its download size (from the registry manifest, `golem/models/registry.py`), whether it fits in memory, and the free disk space.
@@ -445,7 +445,7 @@ MCP servers are listed with `mcp.list`: each one's name, state (`idle`, `startin
 
 `model.set_default` writes `default_model` into the user's `config.toml` with `tomlkit`, which keeps comments and layout (`golem/config_edit.py`). The router picks the change up on its next read.
 
-`model.list` returns `default`, this machine's `ram_gb`, a list of providers with their status (`ready`, `needs_key`, `server_down`, or `unlisted` when nothing uses one yet), and one entry per model ref.
+`model.list` returns `default`, this machine's `ram_gb`, a list of providers with their status (`ready`, `needs_key`, `server_down`, `not_installed` for a local Ollama with no binary, or `unlisted` when nothing uses one yet), and one entry per model ref.
 - **Where entries come from** (`golem/models/discovery.py`):
   - installed Ollama models, from `/api/tags`, with `/api/show` filling in what an older Ollama leaves out;
   - local models to download, from the bundled `local-catalog.toml`;

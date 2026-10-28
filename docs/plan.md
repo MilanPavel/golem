@@ -80,12 +80,13 @@ Agents use the Graph API, where the model decides control flow. Flows use the Fu
 
 ### Protocol, what is left to add
 
-JSON-RPC 2.0, one JSON object per line, over `~/.golem/run/golem.sock`. Protocol 2.24 is on the wire today (see [architecture.md](architecture.md#what-is-on-the-wire-today)). The phases below add the rest.
+JSON-RPC 2.0, one JSON object per line, over `~/.golem/run/golem.sock`. Protocol 2.25 is on the wire today (see [architecture.md](architecture.md#what-is-on-the-wire-today)). The phases below add the rest.
 
 | Group | New events | Phase |
 |---|---|---|
 | Models | `code`, `provider`, and `hint` on `run.failed` | 1.1 |
 | Models | the `model.server` notification (`starting`, `ready`, `failed`), and the local server in `daemon.status` | 1.2 |
+| Models | `not_installed` as a provider status in `model.list` and as a `run.failed` code | 1.3 |
 | Models | `usage.reported` (tokens, cost) | 9.1 |
 | System | `warning`, `error` | 9.4 |
 | Skills | `skill.activated`, `skill.deactivated` | 2.3 |
