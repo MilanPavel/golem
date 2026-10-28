@@ -99,9 +99,19 @@ export const INSTALL_HINT = "/model to install it or switch";
 export const RETRY_QUESTION =
   "Ollama is not installed. Install it with Homebrew and send your message again? Enter installs · Esc dismisses · /model to switch";
 
-/** The chat once `provider`'s server answers again: it is no longer marked down. */
+/**
+ * The chat once `provider`'s server answers again: it is no longer marked
+ * down, and the question about installing it goes away.
+ */
 export function serverUp(state: ChatState, provider: string): ChatState {
-  return state.down === provider ? { ...state, down: null } : state;
+  const down = state.down === provider ? null : state.down;
+  const retry = state.retry?.provider === provider ? null : state.retry;
+  return down === state.down && retry === state.retry ? state : { ...state, down, retry };
+}
+
+/** The chat after a model listing: each provider the listing calls ready is up. */
+export function providersUp(state: ChatState, providers: readonly { provider: string; status: string }[]): ChatState {
+  return providers.reduce((next, entry) => (entry.status === "ready" ? serverUp(next, entry.provider) : next), state);
 }
 
 type RunFailure = Extract<ChatEvent, { type: "run.failed" }>["data"];

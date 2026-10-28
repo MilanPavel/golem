@@ -18,6 +18,7 @@ import {
   createDeltaBatcher,
   emptyChat,
   forkPoint,
+  providersUp,
   reduceChat,
   RETRY_QUESTION,
   serverUp,
@@ -1059,6 +1060,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       (result) => {
         listingRef.current = result;
         setListing(result);
+        setChat((current) => providersUp(current, result.providers));
       },
       (error: unknown) => {
         setChat((current) => ({ ...current, error: `models: ${messageOf(error)}` }));
@@ -1145,6 +1147,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       (result) => {
         listingRef.current = result;
         setListing(result);
+        setChat((current) => providersUp(current, result.providers));
         showInstall(null);
         const next = afterInstall(result, ref, setDefault);
         if (resend !== null && next.kind === "confirm") {
@@ -1836,7 +1839,13 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
     if (retry === null || ref === null || !ref.startsWith(`${retry.provider}/`)) {
       return null;
     }
-    if (draftRef.current.text !== "" || busyRef.current || installRef.current !== null || switcherRef.current.open) {
+    if (
+      draftRef.current.text !== "" ||
+      busyRef.current ||
+      installRef.current !== null ||
+      switcherRef.current.open ||
+      pickerRef.current.open
+    ) {
       return null;
     }
     return { ref, text: retry.text };

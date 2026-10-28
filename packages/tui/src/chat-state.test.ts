@@ -11,6 +11,7 @@ import {
   createDeltaBatcher,
   emptyChat,
   failureText,
+  providersUp,
   reduceChat,
   serverUp,
 } from "./chat-state.ts";
@@ -165,6 +166,25 @@ test("a server that answers again is no longer marked down", () => {
   assert.equal(serverUp(down, "ollama").down, null);
   assert.equal(serverUp(down, "lmstudio"), down);
   assert.equal(serverUp(emptyChat, "ollama"), emptyChat);
+});
+
+test("a server that answers again takes back the question about installing it", () => {
+  const asking = { ...emptyChat, down: "ollama", retry: { text: "hi", provider: "ollama" } };
+  const up = serverUp(asking, "ollama");
+  assert.equal(up.down, null);
+  assert.equal(up.retry, null);
+  assert.equal(serverUp(asking, "lmstudio"), asking);
+});
+
+test("a listing that calls a provider ready marks it up", () => {
+  const asking = { ...emptyChat, down: "ollama", retry: { text: "hi", provider: "ollama" } };
+  const listed = providersUp(asking, [
+    { provider: "openai", status: "ready" },
+    { provider: "ollama", status: "ready" },
+  ]);
+  assert.equal(listed.down, null);
+  assert.equal(listed.retry, null);
+  assert.equal(providersUp(asking, [{ provider: "ollama", status: "not_installed" }]), asking);
 });
 
 test("choosing a model clears the server that was down", () => {
