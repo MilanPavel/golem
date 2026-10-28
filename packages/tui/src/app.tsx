@@ -157,7 +157,7 @@ import {
   type ModelInfo,
   type StatusSegment,
 } from "./status-label.ts";
-import { applyWindowTitle, windowTitle } from "./window-title.ts";
+import { applyProgress, applyWindowTitle, tabProgress, windowTitle } from "./window-title.ts";
 import { nextOffset, WHEEL_LINES, type WheelSubscribe } from "./screen.ts";
 import {
   closedSwitcher,
@@ -731,6 +731,12 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   useEffect(() => {
     applyWindowTitle(tabTitle);
   }, [tabTitle]);
+
+  // Written only when it changes: the phase does not change on every frame.
+  const progress = tabProgress(phase);
+  useEffect(() => {
+    applyProgress(progress);
+  }, [progress]);
 
   useEffect(() => {
     if (!draft.text.startsWith("/") || draft.text.startsWith("//")) {

@@ -7,7 +7,7 @@ import { connectGolem, resolveSocketPath } from "@golem/client";
 
 import { App } from "./app.tsx";
 import { bindPointer } from "./screen.ts";
-import { popWindowTitle, pushWindowTitle } from "./window-title.ts";
+import { clearProgress, popWindowTitle, pushWindowTitle } from "./window-title.ts";
 
 /** Open the chat screen. Returns when the screen exits. */
 export async function runTui(): Promise<void> {
@@ -35,6 +35,7 @@ export async function runTui(): Promise<void> {
       return;
     }
     titleRestored = true;
+    clearProgress();
     popWindowTitle();
   };
   process.on("exit", pointer.restore);

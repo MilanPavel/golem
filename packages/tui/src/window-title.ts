@@ -59,6 +59,36 @@ export function oscWindowTitle(title: string): string {
   return `${ESC}]0;${safe}\u0007`;
 }
 
+/**
+ * OSC 9;4 progress, which some terminals show on the tab or the dock:
+ * `busy` while a run works, `paused` while it waits for an approval, and
+ * `none` to clear it. Terminals that do not know it ignore it.
+ */
+export type TabProgress = "none" | "busy" | "paused";
+
+export function tabProgress(phase: MeterPhase | null): TabProgress {
+  if (phase === null) {
+    return "none";
+  }
+  return phase === "waiting" ? "paused" : "busy";
+}
+
+const PROGRESS_STATE: Record<TabProgress, string> = { none: "0", busy: "3", paused: "4;0" };
+
+export function oscProgress(progress: TabProgress): string {
+  return `${ESC}]9;4;${PROGRESS_STATE[progress]}\u0007`;
+}
+
+export const CLEAR_PROGRESS = oscProgress("none");
+
+export function applyProgress(progress: TabProgress): void {
+  write(oscProgress(progress));
+}
+
+export function clearProgress(): void {
+  write(CLEAR_PROGRESS);
+}
+
 export function pushWindowTitle(): void {
   write(SAVE_WINDOW_TITLE);
 }

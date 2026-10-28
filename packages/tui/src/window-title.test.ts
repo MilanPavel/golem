@@ -2,9 +2,12 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  CLEAR_PROGRESS,
+  oscProgress,
   oscWindowTitle,
   RESTORE_WINDOW_TITLE,
   SAVE_WINDOW_TITLE,
+  tabProgress,
   type TitleState,
   TITLE_SPINNER,
   titleMark,
@@ -37,4 +40,14 @@ test("the title sequence cannot close itself", () => {
   assert.equal(oscWindowTitle("a\u001bb\u0007c"), "\u001b]0;abc\u0007");
   assert.equal(SAVE_WINDOW_TITLE, "\u001b[22;0t");
   assert.equal(RESTORE_WINDOW_TITLE, "\u001b[23;0t");
+});
+
+test("the tab shows progress while a run works, paused for an approval, and none when idle", () => {
+  assert.equal(tabProgress(null), "none");
+  assert.equal(tabProgress("thinking"), "busy");
+  assert.equal(tabProgress("writing"), "busy");
+  assert.equal(tabProgress("waiting"), "paused");
+  assert.equal(oscProgress("busy"), "\u001b]9;4;3\u0007");
+  assert.equal(oscProgress("paused"), "\u001b]9;4;4;0\u0007");
+  assert.equal(CLEAR_PROGRESS, "\u001b]9;4;0\u0007");
 });
