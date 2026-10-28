@@ -136,10 +136,12 @@ class StdioTransport:
         """Close stdin, then SIGTERM, then SIGKILL, as the stdio transport asks."""
         self._state.fail("stopped")
         process = self._process
+        # Closed even when the server already exited: an open pipe is left to
+        # the garbage collector, which may run after the event loop closed.
+        if process is not None and process.stdin is not None:
+            with contextlib.suppress(OSError):
+                process.stdin.close()
         if process is not None and process.returncode is None:
-            if process.stdin is not None:
-                with contextlib.suppress(OSError):
-                    process.stdin.close()
             for sig in (None, signal.SIGTERM, signal.SIGKILL):
                 if sig is not None:
                     with contextlib.suppress(ProcessLookupError, PermissionError):

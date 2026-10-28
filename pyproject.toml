@@ -46,3 +46,5 @@ testpaths = ["packages/protocol/tests", "packages/daemon/tests"]
 pythonpath = ["packages/daemon/tests"]
 addopts = ["--strict-markers", "--strict-config"]
 asyncio_mode = "auto"
+# A subprocess or socket left to the garbage collector after its event loop closed fails the test run.
+filterwarnings = ["error::pytest.PytestUnraisableExceptionWarning"]
