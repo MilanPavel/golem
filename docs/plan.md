@@ -165,10 +165,8 @@ The Ollama track (1.1 to 1.3) and the TUI track (1.4 to 1.6) do not depend on ea
 - **Goal:** you can see from another tab whether golem is working or needs you.
 - **You can:** glance at the tab and see idle, working, waiting for your approval, an error, or disconnected.
 - **Build:**
-  - A pure `windowTitle({ title, phase, approval, error, connection })` in [window-title.ts](../packages/tui/src/window-title.ts). It puts a state mark before `golem — <title>`: `✳` when idle, a spinner frame while working (at most one change a second, so the tab does not flicker), `!` for an approval, and `✗` for an error. The phase comes from `meterPhase` in [progress.ts](../packages/tui/src/progress.ts).
-  - OSC `9;4` progress while a run is working, cleared when it ends. Terminals that know it show a tab or dock indicator, and the others ignore it.
-  - First, record what Claude Code writes to the terminal (`script -q /tmp/cc.log claude`), to learn which sequence makes the `Idle` subtitle and the coloured dot in the tab, and match it.
-  - Unit tests in `window-title.test.ts`.
+  - OSC `9;4` progress while a run is working, cleared when it ends. Terminals that know it show a tab or dock indicator, and the others ignore it. Ticket [#123](https://github.com/MilanPavel/golem/issues/123).
+  - In iTerm2, the coloured dot and the `Idle` text under the title, as Claude Code shows them. They come from iTerm2's OSC `21337` tab status (`indicator=#rrggbb;status=…;status-color=#rrggbb`). Terminal.app ignores it. Send it only when `TERM_PROGRAM=iTerm.app` or `LC_TERMINAL=iTerm2`, and clear it on exit. Ticket [#124](https://github.com/MilanPavel/golem/issues/124), with an ADR.
 - **Done when:** the tab shows idle, working, and approval correctly, and the original title is back after exit.
 
 ### 1.5 A composer with a hint row — [#60](https://github.com/MilanPavel/golem/issues/60)

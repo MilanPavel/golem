@@ -1,11 +1,36 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { oscWindowTitle, RESTORE_WINDOW_TITLE, SAVE_WINDOW_TITLE, windowTitle } from "./window-title.ts";
+import {
+  oscWindowTitle,
+  RESTORE_WINDOW_TITLE,
+  SAVE_WINDOW_TITLE,
+  type TitleState,
+  TITLE_SPINNER,
+  titleMark,
+  windowTitle,
+} from "./window-title.ts";
 
-test("the terminal title is the session name", () => {
-  assert.equal(windowTitle("untitled"), "golem \u2014 untitled");
-  assert.equal(windowTitle("Trip"), "golem \u2014 Trip");
+const idle: TitleState = { title: "Trip", phase: null, error: false, connection: "connected", frame: 0 };
+
+test("the terminal title is a mark, the session name, then golem", () => {
+  assert.equal(windowTitle(idle), "✳ Trip (golem)");
+  assert.equal(windowTitle({ ...idle, title: "untitled", error: true }), "✗ golem");
+  assert.equal(windowTitle({ ...idle, title: "  " }), "✳ golem");
+});
+
+test("a working run spins once a second, and an approval shows !", () => {
+  assert.equal(titleMark({ ...idle, phase: "thinking", frame: 0 }), TITLE_SPINNER[0]);
+  assert.equal(titleMark({ ...idle, phase: "writing", frame: 1 }), TITLE_SPINNER[1]);
+  assert.equal(titleMark({ ...idle, phase: "writing", frame: TITLE_SPINNER.length + 2 }), TITLE_SPINNER[2]);
+  assert.equal(titleMark({ ...idle, phase: "waiting", frame: 3 }), "!");
+});
+
+test("without the daemon the mark says so, before anything else", () => {
+  for (const connection of ["connecting", "reconnecting", "closed", "rejected"] as const) {
+    assert.equal(titleMark({ ...idle, connection, phase: "waiting", error: true }), "○");
+  }
+  assert.equal(titleMark({ ...idle, phase: "thinking", error: true }), TITLE_SPINNER[0]);
 });
 
 test("the title sequence cannot close itself", () => {
