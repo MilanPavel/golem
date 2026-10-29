@@ -1,4 +1,3 @@
-import { spawn } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
@@ -157,28 +156,6 @@ export function followTail(
   const added = Math.max(0, count - anchor.lines);
   const fresh = anchor.fresh + added;
   return { anchor: { lines: count, columns: width, fresh }, offset: place + added, fresh };
-}
-
-export function copyToClipboard(text: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const child = spawn("pbcopy", [], { stdio: ["pipe", "ignore", "pipe"] });
-    let stderr = "";
-    child.stderr?.on("data", (chunk: Buffer | string) => {
-      stderr += typeof chunk === "string" ? chunk : chunk.toString("utf8");
-    });
-    child.on("error", () => {
-      reject(new Error("clipboard is not available"));
-    });
-    child.on("close", (code) => {
-      if (code === 0) {
-        resolve();
-        return;
-      }
-      const detail = stderr.trim();
-      reject(new Error(detail.length > 0 ? detail : "clipboard is not available"));
-    });
-    child.stdin?.end(text);
-  });
 }
 
 export async function writeExport(file: string, markdown: string): Promise<void> {

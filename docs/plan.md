@@ -116,16 +116,17 @@ flowchart LR
 ### 1.6 Select to copy — [#61](https://github.com/MilanPavel/golem/issues/61)
 
 - **Goal:** selecting text copies it, and the mouse wheel still scrolls.
-- **You can:** drag over the transcript, see the selection, let go, and find the text on the clipboard, with the hint `copied N chars to clipboard` (`packages/tui/src/hint.ts`).
+- **You can:** drag over the chat or anywhere else on the screen, see the selection, let go, and find the text on the clipboard, with the hint `copied N chars to clipboard` (`packages/tui/src/hint.ts`).
 - **Build:**
   - [screen.ts](../packages/tui/src/screen.ts) turns on `?1002h`, so the terminal reports a drag. `bindPointer` reports press, drag, and release with their cell, not only the wheel.
   - A pure `selection.ts`: the start and end of a selection, in transcript rows and columns (the wrapped rows that are painted, plus the scroll offset). `selectedText` joins the rows and trims trailing spaces. Unit tests.
   - The transcript draws the selection inverse. A click, Esc, or new output clears it. Dragging past the top or bottom edge scrolls.
-  - A `clipboard.ts` that writes OSC 52 first, then falls back to `pbcopy`. `/copy` uses it too. 8.1 adds the other systems to it.
+  - `clipboard.ts` is built (1.6.1): `pbcopy`, and OSC 52 over SSH or when `pbcopy` fails. The selection copies through it.
+  - Then the rest of the screen (1.6.4): each band reports the text of the rows it drew, so the header, the banner and hints, the status line, and open panels such as the model picker can be selected too, as visible rows that do not scroll.
 - **Done when:** dragging across two wrapped lines copies exactly the text you see, the wheel still scrolls, and Option-drag still selects the terminal's way.
 - **Watch out:**
-  - The scrollbar column and the composer are not part of the selection.
-  - In tmux, OSC 52 needs `set-clipboard on`. The `pbcopy` fallback covers the rest.
+  - The scrollbar column is not part of the selection.
+  - In tmux over SSH, OSC 52 needs `set-clipboard on`.
 
 ---
 
@@ -480,7 +481,7 @@ flowchart LR
   - **Endpoint:** where the daemon listens (`unix:` path or `pipe:` name). `resolveSocketPath` becomes `resolveEndpoint`.
   - **Service manager:** launchd, systemd user units, or Task Scheduler, behind `golem daemon install|uninstall|start|stop|restart|logs`. The `Platform` protocol in `golem/doctor.py` folds into it, so `golem doctor` checks whichever service the OS uses, and its Ollama fix stops assuming Homebrew.
   - **Paths:** `~/.golem` on macOS and Linux, `%LOCALAPPDATA%\golem` on Windows, and `GOLEM_HOME` everywhere.
-  - **Clipboard:** `clipboard.ts` (1.6) already writes OSC 52, then falls back to `pbcopy`. Add `wl-copy` or `xclip`, and `clip.exe`.
+  - **Clipboard:** `clipboardCommand` in `clipboard.ts` (1.6) returns `pbcopy` on a Mac. Add `wl-copy` or `xclip`, and `clip.exe`. OSC 52 already covers SSH.
   - **Local model server ([ADR-026](adr/026-local-model-server.md)):** the Ollama binary paths and `brew install` become per-OS.
   - **Notifications (4.1):** `terminal-notifier`, `notify-send`, or Windows toasts.
   - **Sandbox** ([ADR-014](adr/014-shell-sandbox.md)): a capability, `sandbox-exec` or none. `daemon.status` reports it. Without a sandbox, a shell rule that says `allow` is treated as `ask`, and the TUI shows `no sandbox`.
