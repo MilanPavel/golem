@@ -72,7 +72,7 @@ import {
   suggestionWindow,
   type Suggestion,
 } from "./suggest.ts";
-import { frameBudget, frameColumns, layoutComposer, placeholderFor } from "./chrome.ts";
+import { frameBudget, frameColumns, layoutComposer, moveRow, placeholderFor } from "./chrome.ts";
 import { bannerRow, EXPORT_HINT_MS, hintFor, liveHint, type BannerRow, type Hint } from "./hint.ts";
 import { holdDebugOffset, layoutDebug, type CheckpointMessage, type DebugTone } from "./debug-view.ts";
 import { Header } from "./header.tsx";
@@ -353,6 +353,8 @@ export function App({
   argsEditRef.current = argsEdit;
   // Long pastes behind the tokens in the draft. Sending swaps them back.
   const pastesRef = useRef<Pastes>(noPastes);
+  // The column Up and Down aim for, while the draft is the one they left. Any edit makes a new draft.
+  const rowGoal = useRef<{ draft: Draft; goal: number | null } | null>(null);
   chatRef.current = chat;
   runIdRef.current = chat.runId;
   connectionRef.current = connection;
@@ -1727,6 +1729,15 @@ export function App({
             edit(draftRef.current, effect.op),
         );
         return;
+      case "move-row": {
+        const current = draftRef.current;
+        const goal = rowGoal.current?.draft === current ? rowGoal.current.goal : null;
+        const moved = moveRow(current.text, current.cursor, columns, effect.direction, goal);
+        const next = { text: current.text, cursor: moved.cursor };
+        rowGoal.current = { draft: next, goal: moved.goal };
+        setDraft(next);
+        return;
+      }
       case "edit-external":
         void openEditor();
         return;

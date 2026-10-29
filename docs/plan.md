@@ -12,7 +12,6 @@ This file is about what comes next. How the existing pieces are built is in [arc
 
 | Phase | What you get | Milestone |
 |---|---|---|
-| 1. First run and terminal UX | A clearer input field, and select to copy | M3 — Smooth first run |
 | 2. Skills | Claude Code compatible `SKILL.md` skills | M4 — Skilled |
 | 3. Flows | Durable workflows written in Python, resumable after a crash | M5 — Works alone |
 | 4. Triggers | Schedules, file watchers, and notifications | M5 — Works alone |
@@ -22,11 +21,11 @@ This file is about what comes next. How the existing pieces are built is in [arc
 | 8. Platforms | One interface for everything OS-specific, then Linux and Windows | Later |
 | 9. Model routing and long sessions | Token and cost display, a cheap profile for small jobs, budgets, escalation, compaction | Later |
 
-What is built is in [architecture.md](architecture.md) and the ADRs, and how to install, run, and release it is in [sre.md](sre.md). The terminal work of Phase 1 is next, then the rest of skills.
+What is built is in [architecture.md](architecture.md) and the ADRs, and how to install, run, and release it is in [sre.md](sre.md). Phase 1, the first run and the terminal UX, is built ([#62](https://github.com/MilanPavel/golem/issues/62)), so skills are next.
 
 ```mermaid
 flowchart LR
-  p1[1 First run and terminal UX] --> p2[2 Skills] --> p3[3 Flows] --> p4[4 Triggers] --> p5[5 Memory] --> p6[6 Evals and hardening] --> p7[7 TUI polish] --> p8[8 Platforms] --> p9[9 Model routing and long sessions]
+  p2[2 Skills] --> p3[3 Flows] --> p4[4 Triggers] --> p5[5 Memory] --> p6[6 Evals and hardening] --> p7[7 TUI polish] --> p8[8 Platforms] --> p9[9 Model routing and long sessions]
 ```
 
 ### How to read a phase
@@ -96,38 +95,6 @@ Rules:
 - A breaking change bumps `protocol_major`, and the daemon refuses a mismatched client with a clear error.
 - Events are append-only facts. Clients derive all UI state from them, so replaying equals rebuilding.
 - Every event is stored before it is sent. `message.delta` is coalesced into `message.completed` in the log.
-
----
-
-## Phase 1 — First run and terminal UX
-
-The screen feels like a modern terminal app. Steps 1.1 to 1.5 are built: a clear error when Ollama is down, Ollama started on demand, Ollama installed from the picker, the state in the terminal tab, and an input between two rules with hints on the right. Select to copy is left. [architecture.md](architecture.md), [ADR-026](adr/026-local-model-server.md), and [ADR-027](adr/027-terminal-tab-status.md) describe them. It is tracked by [#62](https://github.com/MilanPavel/golem/issues/62). Each step is one PR, and each of its tickets is one commit in it.
-
-Choices that hold for the whole phase:
-
-- **Never a dead end.** Every failure says what to do next, and the TUI offers that step where it can.
-- **OS-specific code goes behind one small function from the start**, so 8.1 only moves it. That covers the clipboard and the terminal's escape sequences.
-
-```mermaid
-flowchart LR
-  s6[1.6 Select to copy]
-```
-
-### 1.6 Select to copy — [#61](https://github.com/MilanPavel/golem/issues/61)
-
-- **Goal:** selecting text copies it, and the mouse wheel still scrolls.
-- **You can:** drag over the chat, see the selection, let go, and find the text on the clipboard, with the hint `copied N chars to clipboard` (`packages/tui/src/hint.ts`).
-- **Build:**
-  - [screen.ts](../packages/tui/src/screen.ts) reports press, drag, and release with their cell (1.6.2).
-  - Selecting in the chat is built (1.6.3): [selection.ts](../packages/tui/src/selection.ts).
-  - `clipboard.ts` is built (1.6.1): `pbcopy`, and OSC 52 over SSH or when `pbcopy` fails. The selection copies through it.
-  - A long paste shows as `[Pasted text #N +M lines]` in the input (1.6.5): [paste.ts](../packages/tui/src/paste.ts).
-  - Next, Up and Down move between the rows of a multiline draft ([#141](https://github.com/MilanPavel/golem/issues/141)). The cursor keeps its column, and history stays on an empty draft.
-  - Not planned: selecting outside the chat ([#137](https://github.com/MilanPavel/golem/issues/137)). Mirroring the whole screen would mean following every sequence Ink writes. Option-drag in iTerm2 covers the rare copy from the header, the status line, or a panel.
-- **Done when:** dragging across two wrapped lines copies exactly the text you see, the wheel still scrolls, and Option-drag still selects the terminal's way.
-- **Watch out:**
-  - The scrollbar column is not part of the selection.
-  - In tmux over SSH, OSC 52 needs `set-clipboard on`.
 
 ---
 
@@ -482,7 +449,7 @@ flowchart LR
   - **Endpoint:** where the daemon listens (`unix:` path or `pipe:` name). `resolveSocketPath` becomes `resolveEndpoint`.
   - **Service manager:** launchd, systemd user units, or Task Scheduler, behind `golem daemon install|uninstall|start|stop|restart|logs`. The `Platform` protocol in `golem/doctor.py` folds into it, so `golem doctor` checks whichever service the OS uses, and its Ollama fix stops assuming Homebrew.
   - **Paths:** `~/.golem` on macOS and Linux, `%LOCALAPPDATA%\golem` on Windows, and `GOLEM_HOME` everywhere.
-  - **Clipboard:** `clipboardCommand` in `clipboard.ts` (1.6) returns `pbcopy` on a Mac. Add `wl-copy` or `xclip`, and `clip.exe`. OSC 52 already covers SSH.
+  - **Clipboard:** `clipboardCommand` in `clipboard.ts` returns `pbcopy` on a Mac. Add `wl-copy` or `xclip`, and `clip.exe`. OSC 52 already covers SSH.
   - **Local model server ([ADR-026](adr/026-local-model-server.md)):** the Ollama binary paths and `brew install` become per-OS.
   - **Notifications (4.1):** `terminal-notifier`, `notify-send`, or Windows toasts.
   - **Sandbox** ([ADR-014](adr/014-shell-sandbox.md)): a capability, `sandbox-exec` or none. `daemon.status` reports it. Without a sandbox, a shell rule that says `allow` is treated as `ask`, and the TUI shows `no sandbox`.

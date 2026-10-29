@@ -105,6 +105,7 @@ export type KeyEffect =
   | { kind: "history"; key: "older" | "newer" | "close" }
   | { kind: "submit" }
   | { kind: "edit"; op: EditOp }
+  | { kind: "move-row"; direction: -1 | 1 }
   | { kind: "edit-external" }
   | { kind: "toggle-tools" }
   | { kind: "approve"; decision: "allow" | "allow_session" | "allow_always" | "deny" }
@@ -235,6 +236,22 @@ export const KEYS: readonly KeyBinding[] = [
     description: "Fills in a partial command, or sends a finished one.",
     when: { name: "return", overlay: false, switcher: false, suggestions: true },
     run: () => ({ kind: "suggest", key: "enter" }),
+  },
+  {
+    id: "row-up",
+    label: "Up",
+    contexts: ["composer"],
+    description: "In a draft with text, moves the cursor up a row, or to the start on the first row.",
+    when: { name: "up", overlay: false, switcher: false, suggestions: false, busy: false, history: false, draftEmpty: false },
+    run: () => ({ kind: "move-row", direction: -1 }),
+  },
+  {
+    id: "row-down",
+    label: "Down",
+    contexts: ["composer"],
+    description: "In a draft with text, moves the cursor down a row, or to the end on the last row.",
+    when: { name: "down", overlay: false, switcher: false, suggestions: false, busy: false, history: false, draftEmpty: false },
+    run: () => ({ kind: "move-row", direction: 1 }),
   },
   {
     id: "history-up",
