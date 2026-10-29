@@ -6,7 +6,7 @@ import type { ChatEvent } from "@golem/client";
 import {
   appendDelta,
   forkPoint,
-  CANCELLED_NOTICE,
+  downloadEnded,
   SHUTDOWN_NOTICE,
   createDeltaBatcher,
   emptyChat,
@@ -395,7 +395,8 @@ test("run.cancelled ends the run and keeps the interrupted reply", () => {
   });
   assert.equal(cancelled.busy, false);
   assert.equal(cancelled.runId, null);
-  assert.equal(cancelled.notice, CANCELLED_NOTICE);
+  // The TUI shows a cancel you asked for as a hint, so the banner keeps what it had.
+  assert.equal(cancelled.notice, null);
   assert.deepEqual(
     cancelled.messages.map((message) => [message.text, message.streaming, message.interrupted]),
     [["Hel", false, true]],
@@ -590,4 +591,22 @@ test("the todo list is the newest todos.updated", () => {
   assert.equal(reduceChat(first, plan("done")).todos[0]?.status, "done");
   const cleared = reduceChat(first, { ...base, seq: 2, type: "todos.updated", data: { todos: [] } });
   assert.deepEqual(cleared.todos, []);
+});
+
+test("a daemon shutdown keeps its notice in the banner", () => {
+  const stopped = reduceChat({ ...emptyChat, busy: true, runId: "r" }, {
+    seq: 1,
+    session_id: "s",
+    run_id: "r",
+    ts: "t",
+    type: "run.cancelled",
+    data: { reason: "shutdown" },
+  });
+  assert.equal(stopped.notice, SHUTDOWN_NOTICE);
+});
+
+test("a finished download takes its progress out of the banner, and nothing else", () => {
+  assert.equal(downloadEnded({ ...emptyChat, notice: "downloading ollama/qwen3.5:4b 40%" }).notice, null);
+  const other = { ...emptyChat, notice: "open a session first" };
+  assert.equal(downloadEnded(other), other);
 });

@@ -101,7 +101,7 @@ Rules:
 
 ## Phase 1 — First run and terminal UX
 
-The screen feels like a modern terminal app: an input field with a hint row, and select to copy. Steps 1.1 to 1.4 are built: a clear error when Ollama is down, Ollama started on demand, Ollama installed from the picker, and the state in the terminal tab. [architecture.md](architecture.md), [ADR-026](adr/026-local-model-server.md), and [ADR-027](adr/027-terminal-tab-status.md) describe them. It is tracked by [#62](https://github.com/MilanPavel/golem/issues/62). Each step is one PR, and each of its tickets is one commit in it.
+The screen feels like a modern terminal app. Steps 1.1 to 1.5 are built: a clear error when Ollama is down, Ollama started on demand, Ollama installed from the picker, the state in the terminal tab, and an input between two rules with hints on the right. Select to copy is left. [architecture.md](architecture.md), [ADR-026](adr/026-local-model-server.md), and [ADR-027](adr/027-terminal-tab-status.md) describe them. It is tracked by [#62](https://github.com/MilanPavel/golem/issues/62). Each step is one PR, and each of its tickets is one commit in it.
 
 Choices that hold for the whole phase:
 
@@ -110,25 +110,13 @@ Choices that hold for the whole phase:
 
 ```mermaid
 flowchart LR
-  s5[1.5 Composer and hint row] --> s6[1.6 Select to copy]
+  s6[1.6 Select to copy]
 ```
-
-### 1.5 A composer with a hint row — [#60](https://github.com/MilanPavel/golem/issues/60)
-
-- **Goal:** the input looks like an input field, and short-lived hints have their own place.
-- **You can:** type after `❯` between two thin rules, see a dim placeholder in an empty draft, and see hints on the right above the input.
-- **Build:**
-  - `layoutComposer` in [chrome.ts](../packages/tui/src/chrome.ts) gets the `❯ ` prefix and a placeholder. A dim `─` rule above and below replaces the dark background. The colours get names in [theme.ts](../packages/tui/src/theme.ts), ready for 7.2.
-  - `frameBudget` gets the two rule rows and a hint row. On a short window the rules give their rows back before the composer shrinks.
-  - A hint is text with an end time, right-aligned above the top rule. The exit hint, `/copy` results, and `copied N chars to clipboard` (1.6) move there. Errors stay in the banner on the left.
-  - Tests in `chrome.test.ts` for the layout and the order in which bands give rows back.
-- **Done when:** the composer looks right at 80 and 200 columns, and a short window still leaves the chat one row.
-- **Watch out:** "Image in clipboard · ctrl+v to paste" waits for image input. A hint for something golem cannot do yet would only mislead.
 
 ### 1.6 Select to copy — [#61](https://github.com/MilanPavel/golem/issues/61)
 
 - **Goal:** selecting text copies it, and the mouse wheel still scrolls.
-- **You can:** drag over the transcript, see the selection, let go, and find the text on the clipboard, with `copied N chars to clipboard` in the hint row.
+- **You can:** drag over the transcript, see the selection, let go, and find the text on the clipboard, with the hint `copied N chars to clipboard` (`packages/tui/src/hint.ts`).
 - **Build:**
   - [screen.ts](../packages/tui/src/screen.ts) turns on `?1002h`, so the terminal reports a drag. `bindPointer` reports press, drag, and release with their cell, not only the wheel.
   - A pure `selection.ts`: the start and end of a selection, in transcript rows and columns (the wrapped rows that are painted, plus the scroll offset). `selectedText` joins the rows and trims trailing spaces. Unit tests.

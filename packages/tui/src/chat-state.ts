@@ -132,6 +132,11 @@ export function failureText(data: RunFailure): string {
 }
 
 export const CANCELLED_NOTICE = "cancelled";
+
+/** The chat once a download ends: its progress leaves the banner. */
+export function downloadEnded(state: ChatState): ChatState {
+  return state.notice?.startsWith("downloading ") === true ? { ...state, notice: null } : state;
+}
 export const SHUTDOWN_NOTICE = "the daemon stopped, so the run was cancelled";
 
 /**
@@ -205,7 +210,8 @@ export function reduceChat(state: ChatState, event: ChatEvent): ChatState {
         runStartedAt: null,
         runId: null,
         approval: null,
-        notice: event.data.reason === "user" ? CANCELLED_NOTICE : SHUTDOWN_NOTICE,
+        // A cancel you asked for shows as a hint. One from a daemon shutdown stays in the banner.
+        notice: event.data.reason === "user" ? state.notice : SHUTDOWN_NOTICE,
       };
     case "tool.requested": {
       const block: ToolBlock = {

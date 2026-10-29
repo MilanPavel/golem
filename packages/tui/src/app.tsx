@@ -16,6 +16,8 @@ import {
 
 import {
   createDeltaBatcher,
+  CANCELLED_NOTICE,
+  downloadEnded,
   emptyChat,
   forkPoint,
   providersUp,
@@ -69,7 +71,8 @@ import {
   suggestionWindow,
   type Suggestion,
 } from "./suggest.ts";
-import { bannerText, frameBudget, frameColumns, layoutComposer, placeholderFor } from "./chrome.ts";
+import { frameBudget, frameColumns, layoutComposer, placeholderFor } from "./chrome.ts";
+import { bannerRow, EXPORT_HINT_MS, hintFor, liveHint, type BannerRow, type Hint } from "./hint.ts";
 import { holdDebugOffset, layoutDebug, type CheckpointMessage, type DebugTone } from "./debug-view.ts";
 import { Header } from "./header.tsx";
 import { EXIT_HINT, EXIT_WINDOW_MS, idleInterrupt, pressCtrlC } from "./interrupt.ts";
@@ -179,7 +182,7 @@ import {
   type SwitcherState,
 } from "./switcher.ts";
 import { SwitcherView } from "./switcher.tsx";
-import { CLAY, COMPOSER_RULE, PLACEHOLDER, QUESTION_BG, QUESTION_FG } from "./theme.ts";
+import { CLAY, COMPOSER_RULE, HINT, PLACEHOLDER, QUESTION_BG, QUESTION_FG } from "./theme.ts";
 import {
   copyAnswer,
   copyCode,
@@ -199,6 +202,17 @@ type Install = { state: InstallState; ref: string; setDefault: boolean; resend: 
 export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelSubscribe }) {
   const [connection, setConnection] = useState<ConnectionState>(client.state);
   const [chat, setChat] = useState<ChatState>(emptyChat);
+  const [hint, setHint] = useState<Hint | null>(null);
+  useEffect(() => {
+    if (hint === null) {
+      return;
+    }
+    const timer = setTimeout(
+      () => setHint((current) => (current === hint ? null : current)),
+      Math.max(0, hint.until - Date.now()),
+    );
+    return () => clearTimeout(timer);
+  }, [hint]);
   const [draft, setDraft] = useState<Draft>({ text: "", cursor: 0 });
   const [sessionModel, setSessionModel] = useState<ModelInfo | null>(null);
   const [servers, setServers] = useState<ServerStates>({});
@@ -323,6 +337,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   const rows = size.rows || 24;
   const asking = retryOffer() !== null;
   const banner = asking ? RETRY_QUESTION : (chat.error ?? chat.notice);
+  const hintText = liveHint(hint, Date.now())?.text ?? null;
   const suggestMatches =
     chat.busy ||
     switcher.open ||
@@ -344,7 +359,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
     columns,
     draft: argsEdit !== null ? argsEdit.draft.text : composerText,
     busy: chat.busy && secret === null && argsEdit === null,
-    banner: banner !== null && banner.length > 0,
+    banner: (banner !== null && banner.length > 0) || hintText !== null,
     debug: debug.open,
     suggestions: suggestMatches.length,
     approval: chat.approval === null ? 0 : argsEdit !== null ? APPROVAL_ROWS : approvalRows(chat.approval, rows),
@@ -618,6 +633,9 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
         batcher.current?.flush();
       }
       setChat((current) => reduceChat(current, event));
+      if (event.type === "run.cancelled" && event.data.reason === "user") {
+        showHint(CANCELLED_NOTICE);
+      }
       if (event.type === "run.completed" && panelOpen.current) {
         loadCheckpointRef.current(event.session_id);
       }
@@ -700,14 +718,17 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       sendAfterPull.current.delete(ref);
       loadModels(false);
       if (ok && resend !== undefined) {
-        setChat((current) => ({ ...current, notice: `${ref} downloaded` }));
+        setChat(downloadEnded);
+        showHint(`${ref} downloaded`);
         sendText(resend);
       } else if (ok && after !== undefined) {
         chooseModel(null, ref, after.setDefault, `${ref} downloaded, and this session uses it now`);
       } else if (ok) {
-        setChat((current) => ({ ...current, notice: `${ref} downloaded` }));
+        setChat(downloadEnded);
+        showHint(`${ref} downloaded`);
       } else if (error === "cancelled") {
-        setChat((current) => ({ ...current, notice: `stopped downloading ${ref}` }));
+        setChat(downloadEnded);
+        showHint(`stopped downloading ${ref}`);
       } else {
         setChat((current) => ({ ...current, notice: null, error: `download of ${ref} failed: ${error ?? "unknown error"}` }));
       }
@@ -940,15 +961,12 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       setDraft(draftAt(""));
       const text = outcome.code ? copyCode(chatRef.current.messages) : copyAnswer(chatRef.current.messages);
       if (text === null) {
-        setChat((current) => ({
-          ...current,
-          notice: outcome.code ? "no code block to copy" : "nothing to copy yet",
-        }));
+        showHint(outcome.code ? "no code block to copy" : "nothing to copy yet");
         return;
       }
       void copyToClipboard(text).then(
         () => {
-          setChat((current) => ({ ...current, notice: "copied" }));
+          showHint("copied");
         },
         (error: unknown) => {
           setChat((current) => ({ ...current, notice: messageOf(error) }));
@@ -961,7 +979,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       const current = sessionRef.current;
       const id = outcome.id ?? newestArtifact(chatRef.current.messages);
       if (current === null || id === null) {
-        setChat((state) => ({ ...state, notice: "no tool output was long enough to keep" }));
+        showHint("no tool output was long enough to keep");
         return;
       }
       void client
@@ -982,7 +1000,8 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       const file = exportDestination({ home: homedir(), title, given: outcome.path });
       void writeExport(file, sessionMarkdown(title, chatRef.current.messages)).then(
         () => {
-          setChat((current) => ({ ...current, notice: `exported to ${file}` }));
+          // Longer than other hints: it names a file you may want to open.
+          showHint(`exported to ${file}`, EXPORT_HINT_MS);
         },
         (error: unknown) => {
           setChat((current) => ({ ...current, notice: messageOf(error) }));
@@ -996,7 +1015,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       const next = !showTimesRef.current;
       showTimesRef.current = next;
       setShowTimes(next);
-      setChat((current) => ({ ...current, notice: next ? "timestamps on" : "timestamps off" }));
+      showHint(next ? "timestamps on" : "timestamps off");
       void savePref(prefsPath(), "times", next).catch(() => undefined);
       return;
     }
@@ -1006,7 +1025,7 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       const next = !showTodosRef.current;
       showTodosRef.current = next;
       setShowTodos(next);
-      setChat((current) => ({ ...current, notice: next ? "todo list shown" : "todo list hidden" }));
+      showHint(next ? "todo list shown" : "todo list hidden");
       void savePref(prefsPath(), "todos", next).catch(() => undefined);
       return;
     }
@@ -1100,6 +1119,11 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       .catch((error: unknown) => {
         setChat((state) => ({ ...state, notice: null, error: messageOf(error) }));
       });
+  }
+
+  /** A short message on the right of the banner's row, gone after `ms`. */
+  function showHint(text: string, ms?: number): void {
+    setHint(hintFor(text, Date.now(), ms));
   }
 
   function showInstall(next: Install | null): void {
@@ -1451,13 +1475,10 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       return;
     }
     if (action.kind === "arm") {
-      setChat((current) => ({ ...current, notice: EXIT_HINT }));
-      setTimeout(() => {
-        setChat((current) => (current.notice === EXIT_HINT ? { ...current, notice: null } : current));
-      }, EXIT_WINDOW_MS);
+      showHint(EXIT_HINT, EXIT_WINDOW_MS);
       return;
     }
-    setChat((current) => ({ ...current, notice: "cancelling…" }));
+    showHint("cancelling…", EXIT_WINDOW_MS);
     void client.cancelRun(action.runId).catch((error: unknown) => {
       setChat((current) => ({ ...current, notice: null, error: messageOf(error) }));
     });
@@ -2059,10 +2080,11 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
           })}
         </Box>
       ) : null}
-      {budget.banner > 0 && banner !== null ? (
-        <Text color={chat.error !== null && !asking ? "red" : "yellow"} wrap="truncate-end">
-          {bannerText(banner, columns)}
-        </Text>
+      {budget.banner > 0 && (banner !== null || hintText !== null) ? (
+        <BannerLine
+          row={bannerRow(banner, hintText, columns)}
+          color={chat.error !== null && !asking ? "red" : "yellow"}
+        />
       ) : null}
       {budget.meter > 0 && phase !== null ? (
         <Text wrap="truncate-end">
@@ -2134,6 +2156,17 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
         </Text>
       ) : null}
     </Box>
+  );
+}
+
+/** The banner's row: the banner on the left, a hint on the right. */
+function BannerLine({ row, color }: { row: BannerRow; color: string }) {
+  return (
+    <Text wrap="truncate-end">
+      <Text color={color}>{row.left}</Text>
+      {row.gap}
+      <Text color={HINT}>{row.right}</Text>
+    </Text>
   );
 }
 
