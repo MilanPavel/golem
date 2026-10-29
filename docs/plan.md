@@ -116,12 +116,14 @@ flowchart LR
 ### 1.6 Select to copy — [#61](https://github.com/MilanPavel/golem/issues/61)
 
 - **Goal:** selecting text copies it, and the mouse wheel still scrolls.
-- **You can:** drag over the chat or anywhere else on the screen, see the selection, let go, and find the text on the clipboard, with the hint `copied N chars to clipboard` (`packages/tui/src/hint.ts`).
+- **You can:** drag over the chat, see the selection, let go, and find the text on the clipboard, with the hint `copied N chars to clipboard` (`packages/tui/src/hint.ts`).
 - **Build:**
   - [screen.ts](../packages/tui/src/screen.ts) reports press, drag, and release with their cell (1.6.2).
   - Selecting in the chat is built (1.6.3): [selection.ts](../packages/tui/src/selection.ts).
   - `clipboard.ts` is built (1.6.1): `pbcopy`, and OSC 52 over SSH or when `pbcopy` fails. The selection copies through it.
-  - Then the rest of the screen (1.6.4): each band reports the text of the rows it drew, so the header, the banner and hints, the status line, and open panels such as the model picker can be selected too, as visible rows that do not scroll.
+  - A long paste shows as `[Pasted text #N +M lines]` in the input (1.6.5): [paste.ts](../packages/tui/src/paste.ts).
+  - Next, Up and Down move between the rows of a multiline draft ([#141](https://github.com/MilanPavel/golem/issues/141)). The cursor keeps its column, and history stays on an empty draft.
+  - Not planned: selecting outside the chat ([#137](https://github.com/MilanPavel/golem/issues/137)). Mirroring the whole screen would mean following every sequence Ink writes. Option-drag in iTerm2 covers the rare copy from the header, the status line, or a panel.
 - **Done when:** dragging across two wrapped lines copies exactly the text you see, the wheel still scrolls, and Option-drag still selects the terminal's way.
 - **Watch out:**
   - The scrollbar column is not part of the selection.
