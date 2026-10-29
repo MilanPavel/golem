@@ -14,9 +14,14 @@ export type Span = {
 
 export type LineRole = "user" | "assistant" | "plain";
 
+/** What a wrap took out between a row and the one above it: a space, or nothing in a cut word. */
+export type Joint = " " | "";
+
 export type LayoutLine = {
   role: LineRole;
   spans: readonly Span[];
+  /** Set when this row only continues the line above, so a copy joins them with this. */
+  joins?: Joint;
 };
 
 export type Viewport = {
@@ -28,6 +33,8 @@ export type Viewport = {
 export type Transcript = Viewport & {
   gutter: readonly string[] | null;
   lineCount: number;
+  /** Every row at the width shown, top to bottom. `lines` is the window onto it. */
+  all: readonly LayoutLine[];
 };
 
 export type TranscriptOptions = {
@@ -77,11 +84,11 @@ export function layoutMessages(
       lines.push(paint({ role, spans: labelSpans(label, message, options) }, width));
     }
     for (const spans of body) {
-      lines.push(paint({ role, spans }, width));
+      lines.push(paint(wrappedLine(role, spans), width));
     }
     for (const tool of tools) {
       for (const spans of toolLines(tool, width, options?.toolOutput === true)) {
-        lines.push({ role, spans });
+        lines.push(wrappedLine(role, spans));
       }
     }
     const duration = tools.length > 0 ? null : answerDuration(message);
@@ -144,7 +151,7 @@ export function layoutTranscript(
     fitted.overflow && fitted.lines.length > 0
       ? gutterColumn(lines.length, fitted.lines.length, fitted.offsetFromBottom)
       : null;
-  return { ...fitted, gutter, lineCount: lines.length };
+  return { ...fitted, gutter, lineCount: lines.length, all: lines };
 }
 
 /** `read_file src/a.ts ✓  12 lines`, then the output while Ctrl-O is on. */
@@ -209,7 +216,7 @@ export function padLine(line: LayoutLine, width: number): LayoutLine {
   if (used >= width) {
     return line;
   }
-  return { role: line.role, spans: [...line.spans, { text: " ".repeat(width - used) }] };
+  return { ...line, spans: [...line.spans, { text: " ".repeat(width - used) }] };
 }
 
 function labelSpans(label: string, message: ChatMessage, options: TranscriptOptions | undefined): Span[] {
@@ -326,16 +333,28 @@ function inlineSpans(tokens: Token[] | undefined): Span[] {
   return spans;
 }
 
+// The rows wrapSpans made by wrapping, and what each wrap took out. Kept apart, so a row is still a plain array.
+const JOINTS = new WeakMap<readonly Span[], Joint>();
+
+/** A row from wrapSpans as a line, marked when it only continues the row above. */
+function wrappedLine(role: LineRole, spans: readonly Span[]): LayoutLine {
+  const joins = JOINTS.get(spans);
+  return joins === undefined ? { role, spans } : { role, spans, joins };
+}
+
 export function wrapSpans(spans: readonly Span[], width: number): Span[][] {
   const widthSafe = Math.max(1, width);
   const lines: Span[][] = [];
   let current: Span[] = [];
   let used = 0;
 
-  function breakLine(): void {
+  function breakLine(joins?: Joint): void {
     lines.push(current);
     current = [];
     used = 0;
+    if (joins !== undefined) {
+      JOINTS.set(current, joins);
+    }
   }
 
   for (const span of spans) {
@@ -348,7 +367,7 @@ export function wrapSpans(spans: readonly Span[], width: number): Span[][] {
       while (rest.length > 0) {
         const room = widthSafe - used;
         if (room <= 0) {
-          breakLine();
+          breakLine("");
           continue;
         }
         if (rest.length <= room) {
@@ -364,10 +383,12 @@ export function wrapSpans(spans: readonly Span[], width: number): Span[][] {
         }
         current.push({ ...span, text: rest.slice(0, take) });
         rest = rest.slice(take);
+        let joins: Joint = "";
         if (rest.startsWith(" ")) {
           rest = rest.slice(1);
+          joins = " ";
         }
-        breakLine();
+        breakLine(joins);
       }
     }
   }
