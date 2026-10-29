@@ -2,6 +2,21 @@
 
 What changed in each release of golem, newest first. `just release` writes each section from the commit messages on `main` ([CONTRIBUTING.md](CONTRIBUTING.md)), and the release pull request is the place to edit it. The GitHub release shows the same section. How a release is made is in [docs/sre.md](docs/sre.md), section 5.
 
+## [0.4.0] - 2026-10-29
+
+### Features
+
+- **tui:** the composer has a ❯ prompt between two thin rules, and a placeholder ([#132](https://github.com/MilanPavel/golem/pull/132))
+- **tui:** short hints such as copied or Ctrl-C again to exit show on the right and go away ([#133](https://github.com/MilanPavel/golem/pull/133))
+- **tui:** copies say how many characters, and over SSH they ask the terminal to copy ([#138](https://github.com/MilanPavel/golem/pull/138))
+- **tui:** drag over the chat to select text, and it is copied when you let go ([#142](https://github.com/MilanPavel/golem/pull/142))
+- **tui:** a long paste shows as [Pasted text #N +M lines] in the input, and sends in full ([#143](https://github.com/MilanPavel/golem/pull/143))
+- **tui:** Up and Down move between the rows of a multiline draft ([#144](https://github.com/MilanPavel/golem/pull/144))
+
+### Fixes
+
+- **tui:** the install question goes away once Ollama answers, and stays out of the model picker ([#129](https://github.com/MilanPavel/golem/pull/129))
+
 ## [0.3.0] - 2026-10-28
 
 ### Features
