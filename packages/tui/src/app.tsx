@@ -69,7 +69,7 @@ import {
   suggestionWindow,
   type Suggestion,
 } from "./suggest.ts";
-import { bannerText, frameBudget, frameColumns, layoutComposer } from "./chrome.ts";
+import { bannerText, frameBudget, frameColumns, layoutComposer, placeholderFor } from "./chrome.ts";
 import { holdDebugOffset, layoutDebug, type CheckpointMessage, type DebugTone } from "./debug-view.ts";
 import { Header } from "./header.tsx";
 import { EXIT_HINT, EXIT_WINDOW_MS, idleInterrupt, pressCtrlC } from "./interrupt.ts";
@@ -179,7 +179,7 @@ import {
   type SwitcherState,
 } from "./switcher.ts";
 import { SwitcherView } from "./switcher.tsx";
-import { CLAY, QUESTION_BG, QUESTION_FG } from "./theme.ts";
+import { CLAY, COMPOSER_RULE, PLACEHOLDER, QUESTION_BG, QUESTION_FG } from "./theme.ts";
 import {
   copyAnswer,
   copyCode,
@@ -1883,11 +1883,12 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   }
 
   const contentWidth = transcript.gutter === null ? columns : Math.max(1, columns - 1);
+  const placeholder = placeholderFor(sessionId ?? "");
   const composer =
     argsEdit !== null
       ? layoutComposer(argsEdit.draft.text, argsEdit.draft.cursor, columns, budget.composer, false)
       : secret === null
-        ? layoutComposer(draft.text, draft.cursor, columns, budget.composer, chat.busy)
+        ? layoutComposer(draft.text, draft.cursor, columns, budget.composer, chat.busy, placeholder)
         : layoutComposer(composerText, composerText.length, columns, budget.composer, false);
   const debugLayout = layoutDebug({
     debug,
@@ -2095,29 +2096,31 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
           height={budget.suggestions}
         />
       ) : null}
+      {budget.rules > 0 ? <ComposerRule columns={columns} /> : null}
       {budget.composer > 0 ? (
         <Box flexDirection="column" width={columns} height={budget.composer} flexShrink={0}>
           {composer.map((line, index) => {
             const at = line.cursorAt;
             const after = at !== null && at >= line.text.length;
             const point = at !== null && !after ? codePointSize(line.text, at) : 0;
-            const used = line.prefix.length + line.text.length + (after ? 1 : 0);
-            const pad = " ".repeat(Math.max(0, columns - used));
+            const dim = line.placeholder === true;
             return (
-              <Box key={index} width={columns} height={1} backgroundColor={QUESTION_BG} overflow="hidden">
-                <Text color={QUESTION_FG} wrap="truncate-end">
+              <Box key={index} width={columns} height={1} overflow="hidden">
+                <Text wrap="truncate-end">
                   {line.prefix}
-                  {at === null ? line.text : line.text.slice(0, at)}
-                  {at !== null && after ? <Text inverse> </Text> : null}
-                  {at !== null && !after ? <Text inverse>{line.text.slice(at, at + point)}</Text> : null}
-                  {at !== null && !after ? line.text.slice(at + point) : null}
-                  {pad}
+                  <Text color={dim ? PLACEHOLDER : undefined}>
+                    {at === null ? line.text : line.text.slice(0, at)}
+                    {at !== null && after ? <Text inverse> </Text> : null}
+                    {at !== null && !after ? <Text inverse>{line.text.slice(at, at + point)}</Text> : null}
+                    {at !== null && !after ? line.text.slice(at + point) : null}
+                  </Text>
                 </Text>
               </Box>
             );
           })}
         </Box>
       ) : null}
+      {budget.rules > 1 ? <ComposerRule columns={columns} /> : null}
       {budget.status > 0 ? (
         <Text wrap="truncate-end">
           {status.map((segment, index) => (
@@ -2131,6 +2134,15 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
         </Text>
       ) : null}
     </Box>
+  );
+}
+
+/** A dim rule above or below the composer. */
+function ComposerRule({ columns }: { columns: number }) {
+  return (
+    <Text color={COMPOSER_RULE} wrap="truncate-end">
+      {"─".repeat(Math.max(0, columns))}
+    </Text>
   );
 }
 

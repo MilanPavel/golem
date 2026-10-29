@@ -1,7 +1,34 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { bannerText, frameBudget, frameColumns, layoutComposer } from "./chrome.ts";
+import {
+  bannerText,
+  frameBudget,
+  frameColumns,
+  layoutComposer,
+  PLACEHOLDERS,
+  placeholderFor,
+  PROMPT,
+  type FrameBudget,
+} from "./chrome.ts";
+
+/** Every row the frame hands out, so a test can check they fill the terminal. */
+function total(budget: FrameBudget): number {
+  return (
+    budget.header +
+    budget.body +
+    budget.banner +
+    budget.meter +
+    budget.suggestions +
+    budget.approval +
+    budget.todos +
+    budget.install +
+    budget.rules +
+    budget.composer +
+    budget.status +
+    budget.debug
+  );
+}
 
 test("the frame leaves the last column empty", () => {
   assert.equal(frameColumns(80), 79);
@@ -17,13 +44,14 @@ test("frame rows add up to the terminal", () => {
   assert.equal(idle.composer, 1);
   assert.equal(idle.meter, 0);
   assert.equal(idle.status, 1);
-  assert.equal(idle.body, 17);
-  assert.equal(idle.header + idle.body + idle.banner + idle.meter + idle.composer + idle.status, 24);
+  assert.equal(idle.rules, 2);
+  assert.equal(idle.body, 15);
+  assert.equal(total(idle), 24);
 
   const busy = frameBudget({ rows: 24, columns: 80, draft: "", busy: true, banner: false });
   assert.equal(busy.meter, 1);
-  assert.equal(busy.body, 16);
-  assert.equal(busy.header + busy.body + busy.banner + busy.meter + busy.composer + busy.status, 24);
+  assert.equal(busy.body, 14);
+  assert.equal(total(busy), 24);
 });
 
 test("a short terminal drops the logo and keeps one transcript row", () => {
@@ -36,7 +64,7 @@ test("a short terminal drops the logo and keeps one transcript row", () => {
   });
   assert.equal(budget.mode, "compact");
   assert.equal(budget.header, 1);
-  assert.equal(budget.header + budget.body + budget.composer + budget.status, 8);
+  assert.equal(total(budget), 8);
 
   const cramped = frameBudget({
     rows: 4,
@@ -46,16 +74,13 @@ test("a short terminal drops the logo and keeps one transcript row", () => {
     banner: false,
   });
   assert.equal(cramped.body, 1);
-  assert.equal(
-    cramped.header + cramped.body + cramped.banner + cramped.meter + cramped.composer + cramped.status,
-    4,
-  );
+  assert.equal(total(cramped), 4);
 });
 
 test("the composer wraps the draft and keeps the cursor on the tail", () => {
   const rows = layoutComposer("hello", 5, 20, 1, false);
   assert.equal(rows.length, 1);
-  assert.equal(rows[0]?.prefix, "> ");
+  assert.equal(rows[0]?.prefix, PROMPT);
   assert.equal(rows[0]?.text, "hello");
   assert.equal(rows[0]?.cursorAt, 5);
 
@@ -80,7 +105,7 @@ test("the composer wraps the draft and keeps the cursor on the tail", () => {
   assert.deepEqual(busy, [{ prefix: "", text: "…", cursorAt: null }]);
 
   const grown = layoutComposer("hello\n", 6, 40, 2, false);
-  assert.equal(grown[0]?.prefix, "> ");
+  assert.equal(grown[0]?.prefix, PROMPT);
   assert.equal(grown[0]?.text, "hello");
   assert.equal(grown[0]?.cursorAt, null);
   assert.equal(grown[1]?.prefix, "  ");
@@ -99,7 +124,7 @@ test("a new line grows the composer and the chat gives up that row", () => {
   assert.equal(one.composer, 1);
   assert.equal(two.composer, 2);
   assert.equal(two.body, one.body - 1);
-  assert.equal(two.header + two.body + two.banner + two.meter + two.composer + two.status, 24);
+  assert.equal(total(two), 24);
 
   const capped = frameBudget({
     rows: 24,
@@ -110,7 +135,7 @@ test("a new line grows the composer and the chat gives up that row", () => {
   });
   assert.equal(capped.composer, 5);
   assert.equal(capped.body, one.body - 4);
-  assert.equal(capped.header + capped.body + capped.banner + capped.meter + capped.composer + capped.status, 24);
+  assert.equal(total(capped), 24);
 });
 
 test("a wrapped question takes rows from the transcript", () => {
@@ -138,17 +163,11 @@ test("an open debug panel takes rows from the transcript", () => {
   });
   assert.equal(open.debug, 7);
   assert.equal(open.body, idle.body - 7);
-  assert.equal(
-    open.header + open.body + open.banner + open.meter + open.composer + open.status + open.debug,
-    24,
-  );
+  assert.equal(total(open), 24);
 
   const cramped = frameBudget({ rows: 6, columns: 80, draft: "", busy: false, banner: false, debug: true });
   assert.ok(cramped.body >= 1);
-  assert.equal(
-    cramped.header + cramped.body + cramped.banner + cramped.meter + cramped.composer + cramped.status + cramped.debug,
-    6,
-  );
+  assert.equal(total(cramped), 6);
 });
 
 test("suggestions take rows from the transcript and go away before the meter", () => {
@@ -156,10 +175,7 @@ test("suggestions take rows from the transcript and go away before the meter", (
   const open = frameBudget({ rows: 24, columns: 80, draft: "/", busy: false, banner: false, suggestions: 6 });
   assert.equal(open.suggestions, 6);
   assert.equal(open.body, idle.body - 6);
-  assert.equal(
-    open.header + open.body + open.banner + open.meter + open.suggestions + open.composer + open.status + open.debug,
-    24,
-  );
+  assert.equal(total(open), 24);
 
   const tight = frameBudget({ rows: 5, columns: 80, draft: "", busy: true, banner: false, suggestions: 6 });
   assert.equal(tight.suggestions, 0);
@@ -171,7 +187,7 @@ test("the approval band replaces the suggestions and keeps its three rows longes
   const open = frameBudget({ rows: 30, columns: 80, draft: "", busy: true, banner: false, approval: 12, suggestions: 6 });
   assert.equal(open.approval, 12);
   assert.equal(open.suggestions, 0);
-  assert.equal(open.header + open.body + open.meter + open.approval + open.composer + open.status, 30);
+  assert.equal(total(open), 30);
   const tight = frameBudget({ rows: 8, columns: 80, draft: "", busy: true, banner: false, approval: 12 });
   assert.equal(tight.approval, 3);
   assert.equal(tight.body, 1);
@@ -195,4 +211,31 @@ test("the install band gives up rows before the composer shrinks, and keeps the 
   assert.equal(room.install, 6);
   const tight = frameBudget({ rows: 8, columns: 80, draft: "a\nb\nc", busy: false, banner: false, install: 6 });
   assert.deepEqual([tight.install, tight.composer, tight.body], [2, 3, 1]);
+});
+
+test("an empty draft shows a placeholder with the cursor on its first letter", () => {
+  assert.deepEqual(layoutComposer("", 0, 40, 1, false, 'Try "explain this repo"'), [
+    { prefix: PROMPT, text: 'Try "explain this repo"', cursorAt: 0, placeholder: true },
+  ]);
+  assert.equal(layoutComposer("", 0, 12, 1, false, 'Try "explain this repo"')[0]?.text, "Try \"expl…");
+  assert.equal(layoutComposer("a", 1, 40, 1, false, "hint")[0]?.placeholder, undefined);
+  assert.deepEqual(layoutComposer("", 0, 40, 1, true, "hint"), [{ prefix: "", text: "…", cursorAt: null }]);
+  assert.deepEqual(layoutComposer("", 0, 40, 1, false), [{ prefix: PROMPT, text: "", cursorAt: 0 }]);
+});
+
+test("a session keeps its placeholder", () => {
+  assert.equal(placeholderFor("s_1"), placeholderFor("s_1"));
+  assert.ok((PLACEHOLDERS as readonly string[]).includes(placeholderFor("")));
+  const seen = new Set(["s_1", "s_2", "s_3", "s_4", "s_5", "s_6"].map(placeholderFor));
+  assert.ok(seen.size > 1);
+});
+
+test("the rules frame the composer and give their rows back first", () => {
+  const room = frameBudget({ rows: 24, columns: 80, draft: "", busy: false, banner: false });
+  assert.equal(room.rules, 2);
+  const one = frameBudget({ rows: 5, columns: 80, draft: "", busy: false, banner: false });
+  assert.deepEqual([one.rules, one.composer, one.body], [1, 1, 1]);
+  const none = frameBudget({ rows: 8, columns: 80, draft: "a\nb\nc", busy: false, banner: false, todos: 3 });
+  assert.deepEqual([none.rules, none.todos, none.composer], [0, 1, 3]);
+  assert.equal(total(none), 8);
 });

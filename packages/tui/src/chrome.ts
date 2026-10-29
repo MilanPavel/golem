@@ -15,6 +15,8 @@ export type FrameBudget = {
   todos: number;
   /** `brew install ollama`, above the todo list. */
   install: number;
+  /** The thin rules around the composer: 2 is above and below, 1 is above only. */
+  rules: number;
   composer: number;
   status: number;
   debug: number;
@@ -25,7 +27,31 @@ export type ComposerRow = {
   text: string;
   /** Index in `text` of the block cursor. `text.length` means the block sits after the line. */
   cursorAt: number | null;
+  /** The row shows the placeholder of an empty draft, to draw dim. */
+  placeholder?: boolean;
 };
+
+/** The composer's prompt, and the indent of the rows after the first. */
+export const PROMPT = "❯ ";
+const INDENT = "  ";
+const COMPOSER_RULES = 2;
+
+/** What an empty draft shows, one per session. */
+export const PLACEHOLDERS = [
+  'Try "explain this repo"',
+  'Try "fix the failing test"',
+  'Try "/model" to switch models',
+  'Try "what changed since yesterday?"',
+] as const;
+
+/** The placeholder for `key`, such as a session id: the same key always gets the same one. */
+export function placeholderFor(key: string): string {
+  let hash = 0;
+  for (const char of key) {
+    hash = (hash * 31 + (char.codePointAt(0) ?? 0)) >>> 0;
+  }
+  return PLACEHOLDERS[hash % PLACEHOLDERS.length] ?? PLACEHOLDERS[0];
+}
 
 // A glyph in the last column wraps before the newline, so the frame grows and the header scrolls away.
 export function frameColumns(terminalColumns: number): number {
@@ -68,6 +94,7 @@ export function frameBudget(input: {
       approval: 0,
       todos: 0,
       install: 0,
+      rules: 0,
       composer: 0,
       status: 0,
       debug: 0,
@@ -83,8 +110,14 @@ export function frameBudget(input: {
   let suggestions = approval > 0 ? 0 : Math.min(SUGGEST_ROWS, Math.max(0, Math.floor(input.suggestions ?? 0)));
   let status = 1;
   let debug = input.debug === true ? DEBUG_ROWS : 0;
+  let rules = COMPOSER_RULES;
 
   const shrink = (): boolean => {
+    // The rules only frame the composer, so they go before anything with content.
+    if (rules > 0) {
+      rules -= 1;
+      return true;
+    }
     if (suggestions > 0) {
       suggestions -= 1;
       return true;
@@ -152,11 +185,13 @@ export function frameBudget(input: {
     return false;
   };
 
-  while (header + banner + meter + suggestions + approval + todos + install + composer + status + debug >= rows && shrink()) {
+  const total = (): number =>
+    header + banner + meter + suggestions + approval + todos + install + rules + composer + status + debug;
+  while (total() >= rows && shrink()) {
     // Leave at least one row for the transcript when the terminal has a row.
   }
 
-  const used = header + banner + meter + suggestions + approval + todos + install + composer + status + debug;
+  const used = total();
   return {
     mode: header >= HEADER_ROWS ? "full" : header > 0 ? "compact" : "hidden",
     header,
@@ -167,6 +202,7 @@ export function frameBudget(input: {
     approval,
     todos,
     install,
+    rules,
     composer,
     status,
     debug,
@@ -185,6 +221,7 @@ export function layoutComposer(
   columns: number,
   rows: number,
   busy: boolean,
+  placeholder?: string,
 ): ComposerRow[] {
   if (rows <= 0) {
     return [];
@@ -193,6 +230,12 @@ export function layoutComposer(
     return [{ prefix: "", text: "…", cursorAt: null }];
   }
   const measure = draftWidth(Math.max(1, columns));
+  if (draft === "" && placeholder !== undefined && placeholder.length > 0) {
+    // The cursor sits on the first letter, so the line reads as the place to type and needs no cell after it.
+    const width = measure.text + (measure.cursor ? 1 : 0);
+    const text = bannerText(placeholder, width);
+    return [{ prefix: measure.prefix === 0 ? "" : PROMPT, text, cursorAt: 0, placeholder: true }];
+  }
   const lines = composerLines(draft, measure.text);
   const at = Math.max(0, Math.min(cursor, draft.length));
   const cursorRow = lines.findIndex((line, index) => {
@@ -204,7 +247,7 @@ export function layoutComposer(
   const visible = lines.slice(start, start + rows);
   const showingTail = start > 0;
   return visible.map((line, index) => {
-    const prefix = measure.prefix === 0 ? "" : index === 0 && !showingTail ? "> " : "  ";
+    const prefix = measure.prefix === 0 ? "" : index === 0 && !showingTail ? PROMPT : INDENT;
     const active = start + index === row;
     return { prefix, text: line.text, cursorAt: active ? cursorColumn(line, at) : null };
   });
