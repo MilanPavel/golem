@@ -55,6 +55,7 @@ import {
 } from "./model-picker.ts";
 import { ModelPickerView } from "./model-picker.tsx";
 import { draftAt, edit, editDraft, insertText, type Draft } from "./edit.ts";
+import { collapsePaste, deleteToken, expandPastes, noPastes, type Pastes } from "./paste.ts";
 import {
   browseHistory,
   createHistory,
@@ -350,6 +351,8 @@ export function App({
   const argsEdit = liveArgsEdit(argsEditState, chat.approval);
   const argsEditRef = useRef(argsEdit);
   argsEditRef.current = argsEdit;
+  // Long pastes behind the tokens in the draft. Sending swaps them back.
+  const pastesRef = useRef<Pastes>(noPastes);
   chatRef.current = chat;
   runIdRef.current = chat.runId;
   connectionRef.current = connection;
@@ -894,7 +897,7 @@ export function App({
   }
 
   function submit(): void {
-    const outcome = applyComposer(debugRef.current, draftRef.current.text);
+    const outcome = applyComposer(debugRef.current, expandPastes(draftRef.current.text, pastesRef.current));
     if (outcome.kind === "idle") {
       return;
     }
@@ -1115,6 +1118,8 @@ export function App({
     }
     showDebug(outcome.debug);
     setDraft(draftAt(""));
+    // The draft is gone, so its pastes are too. The numbers keep counting.
+    pastesRef.current = { next: pastesRef.current.next, texts: new Map() };
     sendText(outcome.text);
   }
 
@@ -1717,7 +1722,10 @@ export function App({
         submit();
         return;
       case "edit":
-        setDraft(edit(draftRef.current, effect.op));
+        setDraft(
+          (effect.op === "backspace" ? deleteToken(draftRef.current, pastesRef.current) : null) ??
+            edit(draftRef.current, effect.op),
+        );
         return;
       case "edit-external":
         void openEditor();
@@ -1817,7 +1825,7 @@ export function App({
     }
     editing.current = true;
     try {
-      const saved = await editDraft(draftRef.current.text, suspendTerminal);
+      const saved = await editDraft(expandPastes(draftRef.current.text, pastesRef.current), suspendTerminal);
       if (saved !== null) {
         setDraft(draftAt(saved));
       }
@@ -1976,7 +1984,13 @@ export function App({
     if (connectionRef.current.status !== "connected" || sessionRef.current === null) {
       return;
     }
-    setDraft(insertText(draftRef.current, text));
+    if (argsEditRef.current !== null) {
+      setDraft(insertText(draftRef.current, text));
+      return;
+    }
+    const pasted = collapsePaste(pastesRef.current, text);
+    pastesRef.current = pasted.pastes;
+    setDraft(insertText(draftRef.current, pasted.insert));
   });
 
   function currentModelRef(): string | null {
