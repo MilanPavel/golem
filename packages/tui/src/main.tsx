@@ -43,7 +43,7 @@ export async function runTui(): Promise<void> {
   process.on("exit", restoreTitle);
 
   try {
-    const instance = render(<App client={client} onWheel={pointer.subscribe} />, {
+    const instance = render(<App client={client} onWheel={pointer.subscribe} onPointer={pointer.subscribePointer} />, {
       stdin: pointer.stdin,
       alternateScreen: true,
       exitOnCtrlC: false,

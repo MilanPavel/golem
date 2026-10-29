@@ -119,8 +119,7 @@ flowchart LR
 - **You can:** drag over the chat or anywhere else on the screen, see the selection, let go, and find the text on the clipboard, with the hint `copied N chars to clipboard` (`packages/tui/src/hint.ts`).
 - **Build:**
   - [screen.ts](../packages/tui/src/screen.ts) reports press, drag, and release with their cell (1.6.2).
-  - A pure `selection.ts`: the start and end of a selection, in transcript rows and columns (the wrapped rows that are painted, plus the scroll offset). `selectedText` joins the rows and trims trailing spaces. Unit tests.
-  - The transcript draws the selection inverse. A click, Esc, or new output clears it. Dragging past the top or bottom edge scrolls.
+  - Selecting in the chat is built (1.6.3): [selection.ts](../packages/tui/src/selection.ts).
   - `clipboard.ts` is built (1.6.1): `pbcopy`, and OSC 52 over SSH or when `pbcopy` fails. The selection copies through it.
   - Then the rest of the screen (1.6.4): each band reports the text of the rows it drew, so the header, the banner and hints, the status line, and open panels such as the model picker can be selected too, as visible rows that do not scroll.
 - **Done when:** dragging across two wrapped lines copies exactly the text you see, the wheel still scrolls, and Option-drag still selects the terminal's way.

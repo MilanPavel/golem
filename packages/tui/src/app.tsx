@@ -170,7 +170,17 @@ import {
   tabState,
   windowTitle,
 } from "./window-title.ts";
-import { nextOffset, WHEEL_LINES, type WheelSubscribe } from "./screen.ts";
+import { nextOffset, WHEEL_LINES, type PointerSubscribe, type WheelSubscribe } from "./screen.ts";
+import {
+  dragTo,
+  isClick,
+  markSpans,
+  pointAt,
+  selectedColumns,
+  selectedText,
+  type ChatView,
+  type Selection,
+} from "./selection.ts";
 import {
   closedSwitcher,
   layoutSwitcher,
@@ -199,7 +209,15 @@ import { useSession } from "./use-session.ts";
 /** `resend` is the failed message to send again once Ollama and the model are there. */
 type Install = { state: InstallState; ref: string; setDefault: boolean; resend: string | null };
 
-export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelSubscribe }) {
+export function App({
+  client,
+  onWheel,
+  onPointer,
+}: {
+  client: GolemClient;
+  onWheel?: WheelSubscribe;
+  onPointer?: PointerSubscribe;
+}) {
   const [connection, setConnection] = useState<ConnectionState>(client.state);
   const [chat, setChat] = useState<ChatState>(emptyChat);
   const [hint, setHint] = useState<Hint | null>(null);
@@ -231,6 +249,13 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
   const [now, setNow] = useState(() => Date.now());
   const [liveTitle, setLiveTitle] = useState<{ sessionId: string; title: string } | null>(null);
   const [offset, setOffset] = useState(0);
+  // A selection belongs to one layout: a new message or another width ends it.
+  const [chatSelection, setChatSelection] = useState<{ selection: Selection; width: number; messages: number } | null>(
+    null,
+  );
+  const selectionRef = useRef<Selection | null>(null);
+  const dragging = useRef(false);
+  const selectFrame = useRef<{ view: ChatView; all: readonly LayoutLine[]; shown: boolean } | null>(null);
   const [tail, setTail] = useState<TailAnchor | null>(null);
   const [showTimes, setShowTimes] = useState(false);
   const [showTodos, setShowTodos] = useState(DEFAULT_PREFS.todos);
@@ -528,6 +553,50 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       setOffset(followed.offset);
     }
   }, [followed.anchor.lines, followed.anchor.columns, followed.anchor.fresh, followed.offset, offset]);
+
+  useEffect(() => {
+    if (onPointer === undefined) {
+      return;
+    }
+    return onPointer((event) => {
+      const frame = selectFrame.current;
+      if (frame === null) {
+        return;
+      }
+      if (event.kind === "down") {
+        const point = frame.shown ? pointAt(frame.view, event.row, event.column) : null;
+        dragging.current = point !== null;
+        showSelection(point === null ? null : { anchor: point, head: point });
+        return;
+      }
+      const current = selectionRef.current;
+      if (!dragging.current || current === null) {
+        dragging.current = false;
+        return;
+      }
+      if (event.kind === "drag") {
+        const { point, scroll } = dragTo(frame.view, event.row, event.column);
+        if (scroll !== 0) {
+          setOffset((value) => Math.max(0, value + scroll));
+        }
+        showSelection({ anchor: current.anchor, head: point });
+        return;
+      }
+      dragging.current = false;
+      if (isClick(current)) {
+        showSelection(null);
+        return;
+      }
+      const text = selectedText(frame.all, current);
+      if (text.length === 0) {
+        return;
+      }
+      void copyText(text).then(
+        (way) => showHint(copiedHint(way, text)),
+        (error: unknown) => setChat((state) => ({ ...state, notice: messageOf(error) })),
+      );
+    });
+  }, [onPointer]);
 
   useEffect(() => {
     if (onWheel === undefined) {
@@ -1119,6 +1188,17 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       .catch((error: unknown) => {
         setChat((state) => ({ ...state, notice: null, error: messageOf(error) }));
       });
+  }
+
+  /** Select in the chat at the current width and message count, or clear it. */
+  function showSelection(next: Selection | null): void {
+    selectionRef.current = next;
+    const frame = selectFrame.current;
+    setChatSelection(
+      next === null || frame === null
+        ? null
+        : { selection: next, width: frame.view.width, messages: chatRef.current.messages.length },
+    );
   }
 
   /** A short message on the right of the banner's row, gone after `ms`. */
@@ -1809,6 +1889,10 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
       return;
     }
     const press = classifyPress(input, key);
+    if (selectionRef.current !== null && press.name === "escape") {
+      showSelection(null);
+      return;
+    }
     const prompt = secretRef.current;
     if (prompt !== null) {
       applySecretStep(pressSecret(prompt, press));
@@ -1905,6 +1989,17 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
 
   const contentWidth = transcript.gutter === null ? columns : Math.max(1, columns - 1);
   const placeholder = placeholderFor(sessionId ?? "");
+  const firstShown = transcript.lineCount - transcript.offsetFromBottom - transcript.lines.length;
+  const selection =
+    chatSelection !== null && chatSelection.width === contentWidth && chatSelection.messages === chat.messages.length
+      ? chatSelection.selection
+      : null;
+  selectionRef.current = selection;
+  selectFrame.current = {
+    view: { top: budget.header, rows: transcript.lines.length, first: firstShown, count: transcript.lineCount, width: contentWidth },
+    all: transcript.all,
+    shown: !keysOpen && !picker.open && !mcpManager.open && !skillsManager.open && !perms.open && !switcher.open,
+  };
   const composer =
     argsEdit !== null
       ? layoutComposer(argsEdit.draft.text, argsEdit.draft.cursor, columns, budget.composer, false)
@@ -2027,7 +2122,10 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
                 height={1}
                 backgroundColor={line.role === "user" ? QUESTION_BG : undefined}
               >
-                <LineView line={line} />
+                <LineView
+                  line={line}
+                  columns={selection === null ? null : selectedColumns(selection, firstShown + index)}
+                />
               </Box>
               {transcript.gutter !== null ? (
                 <Text dimColor>{transcript.gutter[index] ?? " "}</Text>
@@ -2179,7 +2277,7 @@ function ComposerRule({ columns }: { columns: number }) {
   );
 }
 
-function LineView({ line }: { line: LayoutLine }) {
+function LineView({ line, columns }: { line: LayoutLine; columns: [number, number] | null }) {
   const user = line.role === "user";
   const backgroundColor = user ? QUESTION_BG : undefined;
   const color = user ? QUESTION_FG : undefined;
@@ -2188,7 +2286,7 @@ function LineView({ line }: { line: LayoutLine }) {
   }
   return (
     <Text wrap="truncate-end">
-      {line.spans.map((span, index) => (
+      {markSpans(line.spans, columns).map(({ span, selected }, index) => (
         <Text
           key={index}
           bold={span.bold}
@@ -2196,6 +2294,7 @@ function LineView({ line }: { line: LayoutLine }) {
           dimColor={span.dim === true}
           color={span.dim === true ? undefined : span.code === true && !user ? "cyan" : color}
           backgroundColor={backgroundColor}
+          inverse={selected}
           wrap="truncate-end"
         >
           {span.text}
