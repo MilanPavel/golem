@@ -156,7 +156,9 @@ test("keys dispatch through the table", () => {
     key: "enter",
   });
   assert.deepEqual(pressed("", { upArrow: true }, { draftEmpty: true }), { kind: "history", key: "older" });
-  assert.deepEqual(pressed("", { upArrow: true }, { draftEmpty: false }), { kind: "ignore" });
+  assert.deepEqual(pressed("", { upArrow: true }, { draftEmpty: false }), { kind: "move-row", direction: -1 });
+  assert.deepEqual(pressed("", { downArrow: true }, { draftEmpty: false }), { kind: "move-row", direction: 1 });
+  assert.deepEqual(pressed("", { upArrow: true }, { draftEmpty: false, busy: true }), { kind: "ignore" });
   assert.deepEqual(pressed("", { upArrow: true }, { draftEmpty: false, history: true }), {
     kind: "history",
     key: "older",

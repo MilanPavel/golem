@@ -253,6 +253,34 @@ export function layoutComposer(
   });
 }
 
+/**
+ * The cursor one composer row up (-1) or down (1), on the rows as drawn,
+ * wrapped ones included. `goal` is the column to aim for, kept across short
+ * rows so Up then Down comes back to it. Past the first row the cursor goes to
+ * the start, and past the last row to the end.
+ */
+export function moveRow(
+  draft: string,
+  cursor: number,
+  columns: number,
+  direction: -1 | 1,
+  goal: number | null = null,
+): { cursor: number; goal: number | null } {
+  const lines = composerLines(draft, draftWidth(Math.max(1, columns)).text);
+  const at = Math.max(0, Math.min(cursor, draft.length));
+  const found = lines.findIndex((line, index) => index === lines.length - 1 || at <= line.end);
+  const row = found === -1 ? 0 : found;
+  const current = lines[row];
+  const target = lines[row + direction];
+  if (current === undefined || target === undefined) {
+    return { cursor: direction < 0 ? 0 : draft.length, goal: null };
+  }
+  const column = goal ?? cursorColumn(current, at);
+  // A row cut inside a word ends before the next row starts, so stay on its last character.
+  const end = row + direction === lines.length - 1 ? draft.length : target.end;
+  return { cursor: Math.min(target.start + Math.min(column, target.text.length), end), goal: column };
+}
+
 type ComposerLine = {
   text: string;
   start: number;

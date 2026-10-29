@@ -6,6 +6,7 @@ import {
   frameBudget,
   frameColumns,
   layoutComposer,
+  moveRow,
   PLACEHOLDERS,
   placeholderFor,
   PROMPT,
@@ -238,4 +239,21 @@ test("the rules frame the composer and give their rows back first", () => {
   const none = frameBudget({ rows: 8, columns: 80, draft: "a\nb\nc", busy: false, banner: false, todos: 3 });
   assert.deepEqual([none.rules, none.todos, none.composer], [0, 1, 3]);
   assert.equal(total(none), 8);
+});
+
+test("Up and Down move the cursor a row, on hard and wrapped rows", () => {
+  const draft = "one\nfour\nsix66";
+  // From the end of "four", up keeps column 4 but "one" is shorter, so the cursor sits at its end.
+  assert.deepEqual(moveRow(draft, 8, 40, -1), { cursor: 3, goal: 4 });
+  // Down again with the kept column comes back to the end of "four".
+  assert.deepEqual(moveRow(draft, 3, 40, 1, 4), { cursor: 8, goal: 4 });
+  assert.deepEqual(moveRow(draft, 6, 40, 1), { cursor: 11, goal: 2 });
+  // The first row goes to the start, and the last row to the end.
+  assert.deepEqual(moveRow(draft, 2, 40, -1), { cursor: 0, goal: null });
+  assert.deepEqual(moveRow(draft, 10, 40, 1), { cursor: draft.length, goal: null });
+  // Eight columns leave five for text, so "aaaa bbbb cccc" wraps into three rows.
+  const wrapped = "aaaa bbbb cccc";
+  assert.deepEqual(moveRow(wrapped, 12, 8, -1), { cursor: 7, goal: 2 });
+  assert.deepEqual(moveRow(wrapped, 7, 8, -1, 2), { cursor: 2, goal: 2 });
+  assert.deepEqual(moveRow(wrapped, 2, 8, 1, 2), { cursor: 7, goal: 2 });
 });
