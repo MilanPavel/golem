@@ -1,43 +1,60 @@
 import { Readable } from "node:stream";
 
 const ESC = "\u001b";
-const ENABLE_MOUSE = `${ESC}[?1006h${ESC}[?1000h`;
-const DISABLE_MOUSE = `${ESC}[?1000l${ESC}[?1006l`;
+// 1000 reports presses, releases, and the wheel. 1002 adds motion while a button is held, for a drag.
+const ENABLE_MOUSE = `${ESC}[?1006h${ESC}[?1000h${ESC}[?1002h`;
+const DISABLE_MOUSE = `${ESC}[?1002l${ESC}[?1000l${ESC}[?1006l`;
 const HOLD_MS = 30;
 
 export const WHEEL_LINES = 3;
 
 export type WheelSubscribe = (listener: (steps: number) => void) => () => void;
 
+/** A press, a drag, or a release of the left button, at a 0-based screen cell. */
+export type PointerEvent = { kind: "down" | "drag" | "up"; row: number; column: number };
+
+export type PointerSubscribe = (listener: (event: PointerEvent) => void) => () => void;
+
+// SGR button bits: the low two pick the button, then shift, meta, and ctrl, then motion, then the wheel.
+const MODIFIERS = 0b11100;
+const MOTION = 32;
+const WHEEL = 64;
+
 export function nextOffset(offset: number, steps: number): number {
   return Math.max(0, offset + steps * WHEEL_LINES);
 }
 
-export function drainPointer(input: string): { steps: number[]; forward: string; rest: string } {
+export type Drained = { steps: number[]; pointer: PointerEvent[]; forward: string; rest: string };
+
+export function drainPointer(input: string): Drained {
   const steps: number[] = [];
+  const pointer: PointerEvent[] = [];
   let forward = "";
   let index = 0;
   while (index < input.length) {
     const start = input.indexOf(ESC, index);
     if (start === -1) {
       forward += input.slice(index);
-      return { steps, forward, rest: "" };
+      return { steps, pointer, forward, rest: "" };
     }
     forward += input.slice(index, start);
     const mouse = readMouse(input, start);
     if (mouse.kind === "more") {
-      return { steps, forward, rest: input.slice(start) };
+      return { steps, pointer, forward, rest: input.slice(start) };
     }
     if (mouse.kind === "event") {
       if (mouse.steps !== 0) {
         steps.push(mouse.steps);
+      }
+      if (mouse.pointer !== null) {
+        pointer.push(mouse.pointer);
       }
       index = mouse.next;
       continue;
     }
     const shiftEnter = readShiftEnter(input, start);
     if (shiftEnter === "more") {
-      return { steps, forward, rest: input.slice(start) };
+      return { steps, pointer, forward, rest: input.slice(start) };
     }
     if (typeof shiftEnter === "number") {
       // xterm modifyOtherKeys. Ink already understands the kitty form as Shift-Enter.
@@ -48,13 +65,13 @@ export function drainPointer(input: string): { steps: number[]; forward: string;
     forward += ESC;
     index = start + 1;
   }
-  return { steps, forward, rest: "" };
+  return { steps, pointer, forward, rest: "" };
 }
 
 type MouseRead =
   | { kind: "more" }
   | { kind: "no" }
-  | { kind: "event"; next: number; steps: number };
+  | { kind: "event"; next: number; steps: number; pointer: PointerEvent | null };
 
 const SHIFT_ENTER = `${ESC}[27;2;13~`;
 
@@ -131,24 +148,38 @@ function readMouse(input: string, start: number): MouseRead {
   if (end !== "M" && end !== "m") {
     return { kind: "no" };
   }
-  const base = button & ~0b11100;
-  const steps = end === "M" && base === 64 ? 1 : end === "M" && base === 65 ? -1 : 0;
-  return { kind: "event", next: index + 1, steps };
+  const base = button & ~MODIFIERS;
+  const steps = end === "M" && base === WHEEL ? 1 : end === "M" && base === WHEEL + 1 ? -1 : 0;
+  return { kind: "event", next: index + 1, steps, pointer: pointerEvent(button, end, row, column) };
+}
+
+/** The left button with no modifier, or null: other buttons and modified clicks are not golem's. */
+function pointerEvent(button: number, end: string, row: number, column: number): PointerEvent | null {
+  if ((button & (MODIFIERS | WHEEL)) !== 0 || (button & 0b11) !== 0) {
+    return null;
+  }
+  const cell = { row: Math.max(0, row - 1), column: Math.max(0, column - 1) };
+  if (end === "m") {
+    return { kind: "up", ...cell };
+  }
+  return { kind: (button & MOTION) !== 0 ? "drag" : "down", ...cell };
 }
 
 export function bindPointer(
   stdin: NodeJS.ReadStream,
   write: (data: string) => void,
   tty: boolean,
-): { stdin: NodeJS.ReadStream; subscribe: WheelSubscribe; restore: () => void } {
+): { stdin: NodeJS.ReadStream; subscribe: WheelSubscribe; subscribePointer: PointerSubscribe; restore: () => void } {
   if (!tty) {
     return {
       stdin,
       subscribe: () => () => undefined,
+      subscribePointer: () => () => undefined,
       restore: () => undefined,
     };
   }
   const listeners = new Set<(steps: number) => void>();
+  const pointerListeners = new Set<(event: PointerEvent) => void>();
   const proxy = new Readable({ read() {} });
   const stream = proxy as NodeJS.ReadStream;
   const setProxyEncoding = stream.setEncoding.bind(stream);
@@ -187,6 +218,11 @@ export function bindPointer(
     pending = parsed.rest;
     for (const steps of parsed.steps) {
       publish(steps);
+    }
+    for (const event of parsed.pointer) {
+      for (const listener of pointerListeners) {
+        listener(event);
+      }
     }
     if (parsed.forward.length > 0) {
       proxy.push(parsed.forward);
@@ -247,6 +283,12 @@ export function bindPointer(
       listeners.add(listener);
       return () => {
         listeners.delete(listener);
+      };
+    },
+    subscribePointer(listener) {
+      pointerListeners.add(listener);
+      return () => {
+        pointerListeners.delete(listener);
       };
     },
     restore() {

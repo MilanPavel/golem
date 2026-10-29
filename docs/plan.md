@@ -118,7 +118,7 @@ flowchart LR
 - **Goal:** selecting text copies it, and the mouse wheel still scrolls.
 - **You can:** drag over the chat or anywhere else on the screen, see the selection, let go, and find the text on the clipboard, with the hint `copied N chars to clipboard` (`packages/tui/src/hint.ts`).
 - **Build:**
-  - [screen.ts](../packages/tui/src/screen.ts) turns on `?1002h`, so the terminal reports a drag. `bindPointer` reports press, drag, and release with their cell, not only the wheel.
+  - [screen.ts](../packages/tui/src/screen.ts) reports press, drag, and release with their cell (1.6.2).
   - A pure `selection.ts`: the start and end of a selection, in transcript rows and columns (the wrapped rows that are painted, plus the scroll offset). `selectedText` joins the rows and trims trailing spaces. Unit tests.
   - The transcript draws the selection inverse. A click, Esc, or new output clears it. Dragging past the top or bottom edge scrolls.
   - `clipboard.ts` is built (1.6.1): `pbcopy`, and OSC 52 over SSH or when `pbcopy` fails. The selection copies through it.
