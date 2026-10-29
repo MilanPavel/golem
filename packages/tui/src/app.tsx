@@ -183,10 +183,10 @@ import {
 } from "./switcher.ts";
 import { SwitcherView } from "./switcher.tsx";
 import { CLAY, COMPOSER_RULE, HINT, PLACEHOLDER, QUESTION_BG, QUESTION_FG } from "./theme.ts";
+import { copiedHint, copyText } from "./clipboard.ts";
 import {
   copyAnswer,
   copyCode,
-  copyToClipboard,
   exportDestination,
   followTail,
   sessionMarkdown,
@@ -964,9 +964,9 @@ export function App({ client, onWheel }: { client: GolemClient; onWheel?: WheelS
         showHint(outcome.code ? "no code block to copy" : "nothing to copy yet");
         return;
       }
-      void copyToClipboard(text).then(
-        () => {
-          showHint("copied");
+      void copyText(text).then(
+        (way) => {
+          showHint(copiedHint(way, text));
         },
         (error: unknown) => {
           setChat((current) => ({ ...current, notice: messageOf(error) }));
