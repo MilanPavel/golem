@@ -31,6 +31,8 @@ An Architecture Decision Record (ADR) is a short note of one choice: what was de
 | [025](025-skill-sources.md) | Skills come from the project, then the user, then golem, and a broken one never wins a name | accepted | 2026-10-25 |
 | [026](026-local-model-server.md) | golem starts a local Ollama when it needs one, and stops only the one it started | accepted | 2026-10-27 |
 | [027](027-terminal-tab-status.md) | The tab shows golem's state with escape sequences, and iTerm2 gets its own | accepted | 2026-10-28 |
+| [028](028-web-gateway.md) | A browser reaches the daemon only through a strict gateway in the golem binary | accepted | 2026-10-31 |
+| [029](029-web-stack.md) | The web UI is React and Vite, styled only through golem's own Tailwind tokens | accepted | 2026-10-31 |
 
 How the running code fits together is in [../architecture.md](../architecture.md).
 
