@@ -1,0 +1,23 @@
+{
+  "additionalProperties": false,
+  "description": "A skill run once by name, with what was typed after it.",
+  "properties": {
+    "args": {
+      "default": "",
+      "maxLength": 100000,
+      "title": "Args",
+      "type": "string"
+    },
+    "name": {
+      "maxLength": 64,
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "title": "SkillCall",
+  "type": "object"
+}

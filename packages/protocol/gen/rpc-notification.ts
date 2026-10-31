@@ -21,7 +21,8 @@ export type Params =
   | ToolFailedEvent
   | ApprovalNeededEvent
   | ApprovalResolvedEvent
-  | TodosUpdatedEvent;
+  | TodosUpdatedEvent
+  | SkillActivatedEvent;
 export type Cwd = string | null;
 export type MessageId = string;
 export type SessionId = string;
@@ -75,6 +76,8 @@ export type Type5 = 'message.delta';
 export type Interrupted = boolean;
 export type MessageId3 = string;
 export type Role1 = 'user' | 'assistant';
+export type Args = string;
+export type Name = string;
 export type Text1 = string;
 export type RunId6 = string;
 export type Seq6 = number;
@@ -108,7 +111,7 @@ export type Ts10 = string;
 export type Type10 = 'run.cancelled';
 export type CallId = string;
 export type MessageId4 = string;
-export type Name = string;
+export type Name1 = string;
 export type RunId11 = string;
 export type Seq11 = number;
 export type SessionId12 = string;
@@ -147,7 +150,7 @@ export type Type15 = 'tool.failed';
 export type CallId5 = string;
 export type Diff = string | null;
 export type MessageId5 = string | null;
-export type Name1 = string;
+export type Name2 = string;
 export type Source = string;
 export type Subject1 = string | null;
 export type RunId16 = string;
@@ -155,12 +158,12 @@ export type Seq16 = number;
 export type SessionId17 = string;
 export type Ts16 = string;
 export type Type16 = 'approval.needed';
-export type Args2 = {
+export type Args3 = {
   [k: string]: unknown;
 } | null;
 export type CallId6 = string;
 export type Decision = 'allow' | 'allow_session' | 'allow_always' | 'deny';
-export type Name2 = string;
+export type Name3 = string;
 export type Rule = string | null;
 export type Subject2 = string | null;
 export type RunId17 = string;
@@ -178,6 +181,16 @@ export type Seq18 = number;
 export type SessionId19 = string;
 export type Ts18 = string;
 export type Type18 = 'todos.updated';
+export type Hash = string;
+export type How = 'invoked';
+export type Name4 = string;
+export type Path = string;
+export type Source1 = 'project' | 'user' | 'bundled';
+export type RunId19 = string;
+export type Seq19 = number;
+export type SessionId20 = string;
+export type Ts19 = string;
+export type Type19 = 'skill.activated';
 
 /**
  * Server → client event. No ``id``; this is not a response to a request.
@@ -393,7 +406,10 @@ export interface MessageCompletedEvent {
  * Full text of a user or assistant message.
  *
  * ``interrupted`` is true when the run stopped before the model finished.
- * ``text`` is then what had streamed so far.
+ * ``text`` is then what had streamed so far. ``skill`` is set on a user
+ * message that invoked a skill: ``text`` is then the skill body the model
+ * got, with the arguments filled in, and a client can show the skill's name
+ * and arguments instead.
  *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "MessageCompletedData".
@@ -402,7 +418,18 @@ export interface MessageCompletedData {
   interrupted?: Interrupted;
   message_id: MessageId3;
   role: Role1;
+  skill?: SkillCall | null;
   text: Text1;
+}
+/**
+ * A skill run once by name, with what was typed after it.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "SkillCall".
+ */
+export interface SkillCall {
+  args?: Args;
+  name: Name;
 }
 /**
  * A graph run is in progress for this session.
@@ -511,12 +538,12 @@ export interface ToolRequestedEvent {
  * via the `definition` "ToolRequestedData".
  */
 export interface ToolRequestedData {
-  args: Args;
+  args: Args1;
   call_id: CallId;
   message_id: MessageId4;
-  name: Name;
+  name: Name1;
 }
-export interface Args {
+export interface Args1 {
   [k: string]: unknown;
 }
 /**
@@ -648,15 +675,15 @@ export interface ApprovalNeededEvent {
  * via the `definition` "ApprovalNeededData".
  */
 export interface ApprovalNeededData {
-  args: Args1;
+  args: Args2;
   call_id: CallId5;
   diff?: Diff;
   message_id?: MessageId5;
-  name: Name1;
+  name: Name2;
   source: Source;
   subject?: Subject1;
 }
-export interface Args1 {
+export interface Args2 {
   [k: string]: unknown;
 }
 /**
@@ -685,10 +712,10 @@ export interface ApprovalResolvedEvent {
  * via the `definition` "ApprovalResolvedData".
  */
 export interface ApprovalResolvedData {
-  args?: Args2;
+  args?: Args3;
   call_id: CallId6;
   decision: Decision;
-  name: Name2;
+  name: Name3;
   rule?: Rule;
   subject?: Subject2;
 }
@@ -729,4 +756,35 @@ export interface Todo {
   id: Id;
   status: Status;
   text: Text3;
+}
+/**
+ * A skill became active. It comes just before the user message that invoked it.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "SkillActivatedEvent".
+ */
+export interface SkillActivatedEvent {
+  data: SkillActivatedData;
+  run_id: RunId19;
+  seq: Seq19;
+  session_id: SessionId20;
+  ts: Ts19;
+  type: Type19;
+}
+/**
+ * A skill is active in the session.
+ *
+ * ``how`` is ``invoked`` for a skill run once by name: its body is that
+ * turn's user message. ``source`` is where it was found, ``path`` its folder,
+ * and ``hash`` the sha256 of its ``SKILL.md``.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "SkillActivatedData".
+ */
+export interface SkillActivatedData {
+  hash: Hash;
+  how: How;
+  name: Name4;
+  path: Path;
+  source: Source1;
 }

@@ -36,6 +36,7 @@ from golem.server.dispatcher import (
     RUN_NOT_FOUND,
     SESSION_BUSY,
     SESSION_NOT_FOUND,
+    SKILL_NOT_FOUND,
     Method,
     RequestContext,
     RpcCallError,
@@ -53,6 +54,7 @@ from golem.sessions.manager import (
     SessionNotFoundError,
 )
 from golem.sessions.summaries import summarize
+from golem.skills.invoke import SkillInvokeError
 from golem.skills.registry import listed_skill
 from golem.tools.registry import ToolScope
 from golem_protocol.commands import (
@@ -280,7 +282,9 @@ async def _message_send(ctx: RequestContext, params: MessageSendParams) -> Messa
     if params.cwd is not None and not Path(params.cwd).is_absolute():
         raise RpcCallError(INVALID_PARAMS, "cwd must be an absolute path")
     try:
-        run_id = await sessions.send(params.session_id, params.text, cwd=params.cwd)
+        run_id = await sessions.send(
+            params.session_id, params.text, cwd=params.cwd, skill=params.skill
+        )
     except SessionNotFoundError as exc:
         raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
     except SessionBusyError as exc:
@@ -289,6 +293,8 @@ async def _message_send(ctx: RequestContext, params: MessageSendParams) -> Messa
         raise RpcCallError(SESSION_NOT_FOUND, str(exc)) from exc
     except ModelConfigError as exc:
         raise RpcCallError(MODEL_NOT_CONFIGURED, str(exc)) from exc
+    except SkillInvokeError as exc:
+        raise RpcCallError(SKILL_NOT_FOUND, str(exc)) from exc
     return MessageSendResult(run_id=run_id)
 
 

@@ -1,0 +1,43 @@
+{
+  "additionalProperties": false,
+  "description": "A skill is active in the session.\n\n``how`` is ``invoked`` for a skill run once by name: its body is that\nturn's user message. ``source`` is where it was found, ``path`` its folder,\nand ``hash`` the sha256 of its ``SKILL.md``.",
+  "properties": {
+    "hash": {
+      "title": "Hash",
+      "type": "string"
+    },
+    "how": {
+      "const": "invoked",
+      "title": "How",
+      "type": "string"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "path": {
+      "minLength": 1,
+      "title": "Path",
+      "type": "string"
+    },
+    "source": {
+      "enum": [
+        "project",
+        "user",
+        "bundled"
+      ],
+      "title": "Source",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "source",
+    "how",
+    "path",
+    "hash"
+  ],
+  "title": "SkillActivatedData",
+  "type": "object"
+}

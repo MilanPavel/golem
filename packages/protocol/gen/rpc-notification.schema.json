@@ -260,7 +260,7 @@
     },
     "MessageCompletedData": {
       "additionalProperties": false,
-      "description": "Full text of a user or assistant message.\n\n``interrupted`` is true when the run stopped before the model finished.\n``text`` is then what had streamed so far.",
+      "description": "Full text of a user or assistant message.\n\n``interrupted`` is true when the run stopped before the model finished.\n``text`` is then what had streamed so far. ``skill`` is set on a user\nmessage that invoked a skill: ``text`` is then the skill body the model\ngot, with the arguments filled in, and a client can show the skill's name\nand arguments instead.",
       "properties": {
         "interrupted": {
           "default": false,
@@ -279,6 +279,17 @@
           ],
           "title": "Role",
           "type": "string"
+        },
+        "skill": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SkillCall"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "text": {
           "title": "Text",
@@ -1099,6 +1110,116 @@
       "title": "SessionUpdatedEvent",
       "type": "object"
     },
+    "SkillActivatedData": {
+      "additionalProperties": false,
+      "description": "A skill is active in the session.\n\n``how`` is ``invoked`` for a skill run once by name: its body is that\nturn's user message. ``source`` is where it was found, ``path`` its folder,\nand ``hash`` the sha256 of its ``SKILL.md``.",
+      "properties": {
+        "hash": {
+          "title": "Hash",
+          "type": "string"
+        },
+        "how": {
+          "const": "invoked",
+          "title": "How",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "source": {
+          "enum": [
+            "project",
+            "user",
+            "bundled"
+          ],
+          "title": "Source",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "source",
+        "how",
+        "path",
+        "hash"
+      ],
+      "title": "SkillActivatedData",
+      "type": "object"
+    },
+    "SkillActivatedEvent": {
+      "additionalProperties": false,
+      "description": "A skill became active. It comes just before the user message that invoked it.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/SkillActivatedData"
+        },
+        "run_id": {
+          "minLength": 1,
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "skill.activated",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "run_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "SkillActivatedEvent",
+      "type": "object"
+    },
+    "SkillCall": {
+      "additionalProperties": false,
+      "description": "A skill run once by name, with what was typed after it.",
+      "properties": {
+        "args": {
+          "default": "",
+          "maxLength": 100000,
+          "title": "Args",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "SkillCall",
+      "type": "object"
+    },
     "Todo": {
       "additionalProperties": false,
       "description": "One step of the agent's plan.",
@@ -1605,6 +1726,7 @@
           "session.closed": "#/$defs/SessionClosedEvent",
           "session.created": "#/$defs/SessionCreatedEvent",
           "session.updated": "#/$defs/SessionUpdatedEvent",
+          "skill.activated": "#/$defs/SkillActivatedEvent",
           "todos.updated": "#/$defs/TodosUpdatedEvent",
           "tool.completed": "#/$defs/ToolCompletedEvent",
           "tool.failed": "#/$defs/ToolFailedEvent",
@@ -1671,6 +1793,9 @@
         },
         {
           "$ref": "#/$defs/TodosUpdatedEvent"
+        },
+        {
+          "$ref": "#/$defs/SkillActivatedEvent"
         }
       ],
       "title": "Params"

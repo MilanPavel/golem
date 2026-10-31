@@ -3,6 +3,8 @@
 export type Interrupted = boolean;
 export type MessageId = string;
 export type Role = 'user' | 'assistant';
+export type Args = string;
+export type Name = string;
 export type Text = string;
 export type RunId = string;
 export type Seq = number;
@@ -25,7 +27,10 @@ export interface MessageCompletedEvent {
  * Full text of a user or assistant message.
  *
  * ``interrupted`` is true when the run stopped before the model finished.
- * ``text`` is then what had streamed so far.
+ * ``text`` is then what had streamed so far. ``skill`` is set on a user
+ * message that invoked a skill: ``text`` is then the skill body the model
+ * got, with the arguments filled in, and a client can show the skill's name
+ * and arguments instead.
  *
  * This interface was referenced by `MessageCompletedEvent`'s JSON-Schema
  * via the `definition` "MessageCompletedData".
@@ -34,5 +39,16 @@ export interface MessageCompletedData {
   interrupted?: Interrupted;
   message_id: MessageId;
   role: Role;
+  skill?: SkillCall | null;
   text: Text;
+}
+/**
+ * A skill run once by name, with what was typed after it.
+ *
+ * This interface was referenced by `MessageCompletedEvent`'s JSON-Schema
+ * via the `definition` "SkillCall".
+ */
+export interface SkillCall {
+  args?: Args;
+  name: Name;
 }
