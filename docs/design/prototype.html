@@ -1,0 +1,1008 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Golem Web Prototype</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;1,7..72,400&family=Silkscreen&display=swap">
+<style>
+/* Layout: a three-pane workbench. Sessions by folder | a reading column | a drawer for todos and wire.
+   Light theme "slip" (limestone paper), dark theme "kiln" (fired clay at night). One accent: clay. */
+:root {
+  --bg: #F3F2EF;        /* limestone */
+  --surface: #FBFAF8;
+  --sunken: #EAE8E3;
+  --ink: #1D1A17;
+  --muted: #57524C;
+  --faint: #6C665F;
+  --line: #DEDAD3;
+  --line-strong: #C9C3BA;
+  --clay: #C4783A;      /* brand: fills, pixels, seal */
+  --clay-ink: #94501E;  /* clay that passes AA as text on --bg */
+  --clay-soft: #F1E2D4;
+  --slip: #ECE3D8;      /* your messages */
+  --golem-body: #9C6B3C;
+  --golem-eye: #2A1408;
+  --allow: #3F7342;
+  --allow-soft: #DFEBDD;
+  --deny: #A8402F;
+  --deny-soft: #F4DED9;
+  --wait: #96690F;
+  --wait-soft: #F3E7C9;
+  --code-bg: #EFEDE9;
+  --shadow: 0 1px 0 rgba(29,26,23,.04), 0 8px 24px -12px rgba(29,26,23,.18);
+
+  --font-ui: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-prose: "Literata", "Iowan Old Style", Georgia, serif;
+  --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --font-pixel: "Silkscreen", var(--font-mono);
+
+  --r-sm: 6px; --r-md: 10px; --r-lg: 16px;
+  --sidebar: 268px; --drawer: 320px; --column: 46rem;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #15120F; --surface: #1D1915; --sunken: #110E0C; --ink: #EEE7DF; --muted: #B5ACA2; --faint: #8F877E;
+    --line: #2C2621; --line-strong: #3B332C; --clay: #D08549; --clay-ink: #E6A06A; --clay-soft: #2E2118;
+    --slip: #2A221B; --golem-body: #A8733F; --golem-eye: #0E0704;
+    --allow: #86B57F; --allow-soft: #1F2B1E; --deny: #E58474; --deny-soft: #33201C; --wait: #E2B655; --wait-soft: #30271A;
+    --code-bg: #191512; --shadow: 0 1px 0 rgba(0,0,0,.3), 0 10px 30px -12px rgba(0,0,0,.6);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #15120F; --surface: #1D1915; --sunken: #110E0C; --ink: #EEE7DF; --muted: #B5ACA2; --faint: #8F877E;
+  --line: #2C2621; --line-strong: #3B332C; --clay: #D08549; --clay-ink: #E6A06A; --clay-soft: #2E2118;
+  --slip: #2A221B; --golem-body: #A8733F; --golem-eye: #0E0704;
+  --allow: #86B57F; --allow-soft: #1F2B1E; --deny: #E58474; --deny-soft: #33201C; --wait: #E2B655; --wait-soft: #30271A;
+  --code-bg: #191512; --shadow: 0 1px 0 rgba(0,0,0,.3), 0 10px 30px -12px rgba(0,0,0,.6);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--bg); color: var(--ink);
+  font: 14px/1.5 var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--clay); outline-offset: 2px; border-radius: var(--r-sm); }
+kbd {
+  font: 500 11px/1 var(--font-mono); color: var(--muted);
+  border: 1px solid var(--line-strong); border-bottom-width: 2px; border-radius: 4px;
+  padding: 2px 5px; background: var(--surface);
+}
+.mono { font-family: var(--font-mono); }
+
+/* ---------- shell ---------- */
+.app {
+  height: 100%;
+  display: grid;
+  grid-template-columns: var(--sidebar) minmax(0, 1fr) var(--drawer);
+}
+.app.no-drawer { grid-template-columns: var(--sidebar) minmax(0, 1fr) 0; }
+.app.no-drawer .drawer { display: none; }
+
+/* ---------- sidebar ---------- */
+.sidebar {
+  background: var(--sunken);
+  border-right: 1px solid var(--line);
+  display: flex; flex-direction: column; min-height: 0;
+  padding: 14px 10px 10px max(10px, env(safe-area-inset-left, 0px));
+  gap: 10px;
+}
+.brand { display: flex; align-items: center; gap: 10px; padding: 4px 6px; }
+.brand .word { font: 600 17px/1 var(--font-ui); letter-spacing: -.03em; }
+[data-wordmark="serif"] .brand .word { font: italic 500 20px/1 var(--font-prose); letter-spacing: -.01em; }
+[data-wordmark="mono"] .brand .word { font: 500 15px/1 var(--font-mono); letter-spacing: -.02em; }
+[data-wordmark="pixel"] .brand .word { font: 400 14px/1 var(--font-pixel); letter-spacing: .02em; }
+.brand .state { margin-left: auto; font: 500 11px/1 var(--font-mono); color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.new-btn {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 8px 10px; border-radius: var(--r-md);
+  border: 1px solid var(--line-strong); background: var(--surface);
+  font-weight: 500;
+}
+.new-btn:hover { border-color: var(--clay); }
+.new-btn kbd { margin-left: auto; }
+.search {
+  display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: var(--r-md);
+  color: var(--faint); font-size: 13px;
+}
+.search:hover { background: var(--line); color: var(--muted); }
+.search kbd { margin-left: auto; }
+.sessions { overflow-y: auto; min-height: 0; flex: 1; display: flex; flex-direction: column; gap: 14px; padding-right: 2px; }
+.group h3 {
+  margin: 0 0 4px; padding: 0 10px;
+  font: 500 11px/1.6 var(--font-mono); color: var(--faint); letter-spacing: .02em;
+  display: flex; align-items: center; gap: 6px;
+}
+.group ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; }
+.sess {
+  width: 100%; text-align: left;
+  display: grid; grid-template-columns: 14px minmax(0,1fr) auto; align-items: center; gap: 8px;
+  padding: 7px 10px; border-radius: var(--r-md); color: var(--muted);
+}
+.sess:hover { background: var(--line); color: var(--ink); }
+.sess.active { background: var(--surface); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+.sess .t { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sess .ago { font: 11px/1 var(--font-mono); color: var(--faint); }
+.sess.fork { padding-left: 26px; grid-template-columns: 14px minmax(0,1fr) auto; }
+.sess.fork .t::before { content: "⑂ "; color: var(--faint); }
+.dot { width: 8px; height: 8px; border-radius: 2px; justify-self: center; background: transparent; box-shadow: inset 0 0 0 1.5px var(--line-strong); }
+.dot.running { background: var(--clay); box-shadow: none; animation: pulse 1.6s ease-in-out infinite; }
+.dot.waiting { background: var(--wait); box-shadow: none; }
+.dot.failed { background: var(--deny); box-shadow: none; }
+.sidebar-foot {
+  border-top: 1px solid var(--line); padding: 10px 8px 2px;
+  display: flex; align-items: center; gap: 8px; font: 11px/1.4 var(--font-mono); color: var(--muted);
+}
+.conn { display: inline-flex; align-items: center; gap: 6px; }
+.conn i { width: 7px; height: 7px; border-radius: 50%; background: var(--allow); }
+.icon-btn {
+  width: 30px; height: 30px; border-radius: var(--r-sm);
+  display: inline-grid; place-items: center; color: var(--muted);
+}
+.icon-btn:hover { background: var(--line); color: var(--ink); }
+.icon-btn svg { width: 16px; height: 16px; }
+.sidebar-foot .icon-btn { margin-left: auto; }
+
+/* ---------- main ---------- */
+.main { display: flex; flex-direction: column; min-width: 0; min-height: 0; position: relative; }
+.topbar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px max(16px, env(safe-area-inset-right, 0px)) 10px 16px;
+  border-bottom: 1px solid var(--line);
+  min-height: 52px;
+}
+.topbar .menu { display: none; }
+.topbar h1 { margin: 0; font: 600 14px/1.3 var(--font-ui); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+  font: 500 12px/1 var(--font-mono); color: var(--muted);
+  padding: 6px 9px; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--surface);
+}
+button.chip:hover { border-color: var(--line-strong); color: var(--ink); }
+.chip .sw { width: 6px; height: 6px; border-radius: 50%; background: var(--allow); }
+.topbar .spacer { flex: 1; }
+.topbar .chips { display: flex; gap: 6px; min-width: 0; }
+
+.scroll { flex: 1; overflow-y: auto; min-height: 0; }
+.column {
+  max-width: var(--column); margin: 0 auto;
+  padding: 28px max(20px, env(safe-area-inset-right, 0px)) 24px max(20px, env(safe-area-inset-left, 0px));
+  display: flex; flex-direction: column; gap: 26px;
+}
+
+/* messages */
+.msg-you {
+  align-self: flex-end; max-width: min(36rem, 92%);
+  background: var(--slip); border-radius: var(--r-lg) var(--r-lg) 4px var(--r-lg);
+  padding: 10px 14px; font-size: 14.5px; line-height: 1.55;
+}
+.msg-you .meta { display: block; text-align: right; margin-top: 4px; font: 11px/1 var(--font-mono); color: var(--muted); }
+.msg-golem { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.who { display: flex; align-items: center; gap: 8px; font: 11px/1 var(--font-mono); color: var(--faint); }
+.who { height: 14px; }
+.who time { opacity: 0; transition: opacity .15s; }
+.msg-golem:hover .who time, .msg-golem:focus-within .who time { opacity: 1; }
+/* The message golem: still when done, clay eyes while it writes, amber while it waits on you */
+.msg-golem.live .who .golem .e { fill: var(--clay); animation: glow 1.4s ease-in-out infinite; }
+.msg-golem.waiting .who .golem .e { fill: var(--wait); animation: wink 2.4s steps(1) infinite; }
+.prose { font: 16px/1.68 var(--font-prose); font-optical-sizing: auto; max-width: 40rem; }
+.prose p { margin: 0 0 .7em; }
+.prose p:last-child { margin-bottom: 0; }
+.prose code { font: 13.5px/1 var(--font-mono); background: var(--code-bg); border: 1px solid var(--line); padding: 1px 5px; border-radius: 5px; }
+.prose ul { margin: 0 0 .7em; padding-left: 1.2em; }
+.prose li { margin: .2em 0; }
+.prose li::marker { color: var(--clay); }
+pre.code {
+  margin: 0; overflow-x: auto; background: var(--code-bg); border: 1px solid var(--line);
+  border-radius: var(--r-md); padding: 12px 14px; font: 12.5px/1.6 var(--font-mono);
+}
+.code .k { color: var(--clay-ink); }
+.code .s { color: var(--allow); }
+.code .c { color: var(--faint); font-style: italic; }
+.foot { font: 11px/1 var(--font-mono); color: var(--faint); display: flex; gap: 10px; }
+
+/* streaming cursor: one clay pixel from the golem's own grid */
+.cursor { display: inline-block; width: .55em; height: .55em; background: var(--clay); margin-left: 3px; vertical-align: .05em; animation: blink 1s steps(2, jump-none) infinite; }
+
+/* tool lines and the tablet */
+.tools { display: flex; flex-direction: column; gap: 2px; font: 12.5px/1.4 var(--font-mono); }
+.tool {
+  display: grid; grid-template-columns: 14px auto minmax(0,1fr) auto; align-items: center; gap: 8px;
+  padding: 5px 8px; border-radius: var(--r-sm); color: var(--muted); width: 100%; text-align: left;
+}
+.tool:hover { background: var(--sunken); }
+.tool .name { color: var(--ink); font-weight: 500; }
+.tool .arg { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tool .res { color: var(--faint); white-space: nowrap; }
+.tool .res.ok::before { content: "✓ "; color: var(--allow); }
+.tool .res.wait { color: var(--wait); }
+.tool .chev { color: var(--faint); transition: transform .15s; }
+.tool[aria-expanded="true"] .chev { transform: rotate(90deg); }
+.tablet {
+  margin: 2px 0 6px 22px; border: 1px solid var(--line); border-radius: var(--r-md);
+  background: var(--code-bg); padding: 10px 12px; font: 12px/1.6 var(--font-mono); color: var(--muted);
+  overflow-x: auto; white-space: pre;
+}
+
+/* ---------- the shem: an approval ---------- */
+.shem {
+  position: relative; border: 1px solid var(--line-strong); border-radius: var(--r-lg);
+  background: var(--surface); box-shadow: var(--shadow); overflow: hidden;
+}
+.shem-head { display: flex; gap: 12px; padding: 14px 16px 12px; align-items: flex-start; }
+.seal {
+  flex: none; width: 30px; height: 30px; border-radius: 7px; background: var(--clay);
+  display: grid; place-items: center; color: #fff;
+  box-shadow: inset 0 -2px 0 rgba(0,0,0,.18);
+}
+.seal svg { width: 16px; height: 16px; }
+.shem h2 { margin: 0; font: 600 15px/1.35 var(--font-ui); }
+.shem h2 code { font: 500 13.5px/1 var(--font-mono); background: var(--clay-soft); color: var(--clay-ink); padding: 2px 6px; border-radius: 5px; }
+.shem .why { margin-top: 4px; font: 12px/1.4 var(--font-mono); color: var(--muted); }
+.shem .why b { color: var(--ink); font-weight: 500; }
+.shem-tabs { margin-left: auto; display: inline-flex; border: 1px solid var(--line); border-radius: 8px; padding: 2px; background: var(--bg); flex: none; }
+.shem-tabs button { font: 500 12px/1 var(--font-ui); padding: 6px 9px; border-radius: 6px; color: var(--muted); }
+.shem-tabs button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 0 0 1px var(--line); }
+.diff { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); font: 12.5px/1.65 var(--font-mono); overflow-x: auto; background: var(--bg); }
+.diff .file { padding: 7px 16px; color: var(--muted); border-bottom: 1px solid var(--line); display: flex; gap: 10px; }
+.diff .file .add { color: var(--allow); } .diff .file .del { color: var(--deny); }
+.diff table { border-collapse: collapse; width: 100%; min-width: 34rem; }
+.diff td { padding: 0 12px; white-space: pre; vertical-align: top; }
+.diff td.n { width: 1%; color: var(--faint); text-align: right; user-select: none; padding: 0 8px; }
+.diff tr.hunk td { color: var(--faint); background: var(--sunken); padding-block: 3px; }
+.diff .a { background: var(--allow-soft); }
+.diff .d { background: var(--deny-soft); }
+.diff .a .sig { color: var(--allow); } .diff .d .sig { color: var(--deny); }
+.split td.half { width: 50%; }
+.split td + td.n { border-left: 1px solid var(--line); }
+.shem-actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 16px 14px; align-items: center; }
+.btn {
+  display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: var(--r-md);
+  font-weight: 500; border: 1px solid var(--line-strong); background: var(--surface); white-space: nowrap;
+}
+.btn:hover { border-color: var(--ink); }
+.btn kbd { padding: 1px 4px; }
+.btn.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.btn.primary kbd { background: transparent; color: var(--bg); border-color: color-mix(in srgb, var(--bg) 40%, transparent); }
+.btn.deny { color: var(--deny); }
+.btn.deny:hover { border-color: var(--deny); }
+.shem-actions .sp { flex: 1; }
+.shem.resolved .shem-actions, .shem.resolved .diff { display: none; }
+.shem.resolved { box-shadow: none; }
+.shem .verdict { display: none; padding: 0 16px 14px 58px; font: 12px/1.4 var(--font-mono); color: var(--allow); }
+.shem.resolved .verdict { display: block; }
+
+/* ---------- meter + composer ---------- */
+.dock {
+  padding: 0 max(20px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(20px, env(safe-area-inset-left, 0px));
+}
+.dock-inner { max-width: var(--column); margin: 0 auto; display: flex; flex-direction: column; gap: 8px; }
+.meter { display: flex; align-items: center; gap: 10px; font: 12px/1 var(--font-mono); color: var(--muted); padding: 0 4px; min-height: 18px; }
+.meter .sp { flex: 1; }
+.composer {
+  border: 1px solid var(--line-strong); border-radius: 18px; background: var(--surface);
+  box-shadow: var(--shadow); padding: 12px 12px 10px 16px; display: flex; flex-direction: column; gap: 10px;
+}
+.composer:focus-within { border-color: var(--clay); }
+.composer textarea {
+  border: 0; outline: 0; resize: none; background: transparent; color: var(--ink);
+  font: 15px/1.5 var(--font-ui); min-height: 24px; max-height: 40vh; width: 100%;
+}
+.composer textarea::placeholder { color: var(--faint); }
+.composer-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.composer-row .sp { flex: 1; }
+.send {
+  width: 34px; height: 34px; border-radius: 10px; background: var(--clay); color: #fff;
+  display: grid; place-items: center; flex: none;
+}
+.send:hover { filter: brightness(1.06); }
+.send svg { width: 16px; height: 16px; }
+.send.stop { background: var(--ink); color: var(--bg); }
+.hint { font: 11px/1 var(--font-mono); color: var(--faint); padding: 0 4px; display: flex; gap: 14px; flex-wrap: wrap; }
+
+/* ---------- drawer ---------- */
+.drawer {
+  border-left: 1px solid var(--line); background: var(--surface);
+  display: flex; flex-direction: column; min-height: 0; min-width: 0;
+  padding-right: env(safe-area-inset-right, 0px);
+}
+.drawer-tabs { display: flex; gap: 2px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.drawer-tabs button { font: 500 12.5px/1 var(--font-ui); padding: 8px 10px; border-radius: 8px; color: var(--muted); }
+.drawer-tabs button[aria-selected="true"] { background: var(--sunken); color: var(--ink); }
+.drawer-body { padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
+.todos { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.todo { display: grid; grid-template-columns: 18px minmax(0,1fr); gap: 10px; padding: 7px 8px; border-radius: var(--r-sm); align-items: start; }
+.todo .box { width: 14px; height: 14px; margin-top: 3px; border-radius: 3px; border: 1.5px solid var(--line-strong); }
+.todo.doing { background: var(--clay-soft); }
+.todo.doing .box { border-color: var(--clay); background: repeating-linear-gradient(135deg, var(--clay) 0 2px, transparent 2px 4px); }
+.todo.doing .txt { font-weight: 500; }
+.todo.done .box { background: var(--allow); border-color: var(--allow); position: relative; }
+.todo.done .box::after { content: ""; position: absolute; left: 3.5px; top: 0.5px; width: 3px; height: 7px; border: solid var(--surface); border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); }
+.todo.done .txt { color: var(--faint); text-decoration: line-through; text-decoration-color: var(--line-strong); }
+.drawer h4 { margin: 0; font: 500 11px/1 var(--font-mono); color: var(--faint); letter-spacing: .04em; text-transform: uppercase; }
+.progress { display: flex; align-items: center; gap: 10px; font: 12px/1 var(--font-mono); color: var(--muted); }
+.progress .bar { flex: 1; height: 4px; border-radius: 2px; background: var(--sunken); overflow: hidden; display: flex; gap: 2px; }
+.progress .bar span { flex: 1; background: var(--line-strong); }
+.progress .bar span.on { background: var(--allow); }
+.progress .bar span.cur { background: var(--clay); }
+.kv { display: grid; grid-template-columns: auto minmax(0,1fr); gap: 6px 14px; font: 12px/1.4 var(--font-mono); }
+.kv dt { color: var(--faint); } .kv dd { margin: 0; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wire { font: 11.5px/1.55 var(--font-mono); color: var(--muted); white-space: pre; overflow-x: auto; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-md); padding: 10px; }
+.wire .in { color: var(--allow); } .wire .out { color: var(--clay-ink); }
+
+/* ---------- the pixel golem ---------- */
+.golem { display: block; image-rendering: pixelated; }
+.golem .b { fill: var(--golem-body); }
+.golem .e { fill: var(--golem-eye); transition: fill .2s; }
+[data-state="idle"] .golem .e { fill: var(--golem-eye); }
+[data-state="thinking"] .golem .e { fill: var(--clay); animation: glow 1.4s ease-in-out infinite; }
+[data-state="waiting"] .golem .e { fill: var(--wait); animation: wink 2.4s steps(1) infinite; }
+[data-state="failed"] .golem .e { fill: var(--deny); }
+[data-state="failed"] .golem .b { fill: color-mix(in srgb, var(--golem-body) 70%, var(--faint)); }
+[data-state="disconnected"] .golem .b { fill: var(--line-strong); }
+[data-state="disconnected"] .golem .e { fill: var(--faint); }
+
+/* ---------- empty state + full-screen states ---------- */
+.center-stage {
+  flex: 1; display: grid; place-items: center; overflow-y: auto; min-height: 0;
+  padding: 24px max(20px, env(safe-area-inset-right, 0px)) 24px max(20px, env(safe-area-inset-left, 0px));
+  background-image:
+    linear-gradient(var(--line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--line) 1px, transparent 1px);
+  background-size: 20px 20px;
+  background-position: center;
+  -webkit-mask-image: radial-gradient(ellipse 60% 55% at 50% 45%, #000 0%, transparent 72%);
+          mask-image: radial-gradient(ellipse 60% 55% at 50% 45%, #000 0%, transparent 72%);
+}
+.stage-wrap { position: relative; flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.stage-content {
+  position: absolute; inset: 0; display: grid; place-items: center; overflow-y: auto;
+  padding: 24px max(20px, env(safe-area-inset-right, 0px)) 24px max(20px, env(safe-area-inset-left, 0px));
+}
+.stage { width: min(40rem, 100%); display: flex; flex-direction: column; align-items: center; gap: 18px; text-align: center; }
+.stage h2 { margin: 0; font: 400 26px/1.25 var(--font-prose); text-wrap: balance; letter-spacing: -.01em; }
+.stage p { margin: 0; color: var(--muted); max-width: 32rem; text-wrap: pretty; }
+.stage .composer { width: 100%; text-align: left; }
+.recents { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.cmd {
+  display: inline-flex; align-items: center; gap: 10px; padding: 9px 10px 9px 14px; border-radius: var(--r-md);
+  background: var(--surface); border: 1px solid var(--line-strong); font: 13px/1 var(--font-mono); max-width: 100%;
+}
+.cmd code { overflow-x: auto; white-space: nowrap; }
+.state-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 28px 24px; box-shadow: var(--shadow); }
+.state-tag { font: 11px/1 var(--font-mono); padding: 5px 8px; border-radius: 999px; background: var(--sunken); color: var(--muted); }
+
+/* ---------- palette ---------- */
+.overlay { position: fixed; inset: 0; background: color-mix(in srgb, var(--ink) 30%, transparent); display: grid; place-items: start center; padding: 12vh 16px 16px; z-index: 30; }
+.overlay[hidden] { display: none !important; }
+.palette { width: min(36rem, 100%); background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--r-lg); box-shadow: var(--shadow); overflow: hidden; }
+.palette input { width: 100%; border: 0; outline: 0; background: transparent; padding: 16px 18px; font: 15px/1 var(--font-ui); color: var(--ink); border-bottom: 1px solid var(--line); }
+.palette ul { list-style: none; margin: 0; padding: 6px; max-height: 50vh; overflow-y: auto; }
+.palette li button { width: 100%; display: grid; grid-template-columns: 6.5rem minmax(0,1fr) auto; gap: 12px; align-items: center; text-align: left; padding: 9px 12px; border-radius: var(--r-md); }
+.palette li button:hover, .palette li button.sel { background: var(--sunken); }
+.palette .slash { font: 500 12.5px/1 var(--font-mono); color: var(--clay-ink); }
+.palette .desc { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.palette .grp { padding: 10px 12px 4px; font: 500 11px/1 var(--font-mono); color: var(--faint); }
+
+/* ---------- prototype controls (not part of the design) ---------- */
+.proto {
+  position: fixed; z-index: 40;
+  right: max(14px, env(safe-area-inset-right, 0px)); bottom: max(14px, env(safe-area-inset-bottom, 0px));
+  background: var(--ink); color: var(--bg); border-radius: 14px; padding: 10px; width: 236px;
+  font: 12px/1.3 var(--font-ui); box-shadow: 0 12px 32px -10px rgba(0,0,0,.5);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.proto.min > :not(.proto-head) { display: none; }
+.proto-head { display: flex; align-items: center; gap: 8px; font: 11px/1 var(--font-pixel); letter-spacing: .03em; }
+.proto-head button { margin-left: auto; color: inherit; opacity: .7; font: 12px/1 var(--font-mono); }
+.proto label { font: 10.5px/1 var(--font-mono); opacity: .65; text-transform: uppercase; letter-spacing: .05em; }
+.seg { display: flex; flex-wrap: wrap; gap: 4px; }
+.seg button { padding: 5px 7px; border-radius: 6px; background: color-mix(in srgb, var(--bg) 12%, transparent); color: inherit; font: 11.5px/1 var(--font-ui); }
+.seg button[aria-pressed="true"] { background: var(--clay); color: #fff; }
+
+/* ---------- motion ---------- */
+@keyframes pulse { 50% { opacity: .35; } }
+@keyframes blink { 50% { opacity: 0; } }
+@keyframes glow { 50% { fill: var(--golem-eye); } }
+@keyframes wink { 0%, 86% { opacity: 1; } 88%, 92% { opacity: 0; } 94% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+/* ---------- narrow ---------- */
+@media (max-width: 1100px) {
+  .app, .app.no-drawer { grid-template-columns: var(--sidebar) minmax(0, 1fr); }
+  .drawer { display: none; }
+  .app.drawer-open .drawer { display: flex; position: fixed; right: 0; top: 0; bottom: 0; width: min(var(--drawer), 92vw); z-index: 20; box-shadow: var(--shadow); }
+}
+@media (max-width: 760px) {
+  .app, .app.no-drawer { grid-template-columns: minmax(0, 1fr); }
+  .sidebar { display: none; }
+  .app.sidebar-open .sidebar { display: flex; position: fixed; left: 0; top: 0; bottom: 0; width: min(var(--sidebar), 86vw); z-index: 20; box-shadow: var(--shadow); }
+  .topbar .menu { display: inline-grid; }
+  .topbar .chips .folder { display: none; }
+  .column { padding-top: 20px; gap: 22px; }
+  .prose { font-size: 15.5px; }
+  .shem-head { flex-wrap: wrap; }
+  .shem-tabs { margin-left: 42px; }
+  .hint { display: none; }
+  .proto { width: calc(100vw - 28px); max-width: 300px; }
+}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-plus" viewBox="0 0 16 16"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none"/></symbol>
+    <symbol id="i-search" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M10.5 10.5 14 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+    <symbol id="i-up" viewBox="0 0 16 16"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+    <symbol id="i-stop" viewBox="0 0 16 16"><rect x="4" y="4" width="8" height="8" rx="1.5" fill="currentColor"/></symbol>
+    <symbol id="i-panel" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="2" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M10 3v10" stroke="currentColor" stroke-width="1.4"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 16 16"><path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 16 16"><circle cx="8" cy="8" r="3" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1 1M11.6 11.6l1 1M3.4 12.6l1-1M11.6 4.4l1-1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></symbol>
+    <symbol id="i-seal" viewBox="0 0 16 16"><path d="M8 1.8 13.2 4v4.1c0 3-2.2 5.2-5.2 6.1-3-.9-5.2-3.1-5.2-6.1V4z" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linejoin="round"/><path d="m5.6 8 1.7 1.7L10.6 6.4" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 16 16"><path d="M2 4.5c0-.6.4-1 1-1h3l1.5 1.5H13c.6 0 1 .4 1 1V12c0 .6-.4 1-1 1H3c-.6 0-1-.4-1-1z" stroke="currentColor" stroke-width="1.3" fill="none"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 16 16"><rect x="5" y="5" width="8.5" height="8.5" rx="1.5" stroke="currentColor" stroke-width="1.3" fill="none"/><path d="M3 10.5V3.8C3 3.4 3.4 3 3.8 3h6.7" stroke="currentColor" stroke-width="1.3" fill="none"/></symbol>
+  </defs>
+</svg>
+
+<div class="app" id="app" data-state="waiting">
+  <!-- ======= sidebar ======= -->
+  <aside class="sidebar" aria-label="Sessions">
+    <div class="brand">
+      <svg class="golem" data-golem width="27" height="18" aria-hidden="true"></svg>
+      <span class="word">golem</span>
+      <span class="state" id="brand-state">waiting for you</span>
+    </div>
+    <button class="new-btn" type="button"><svg width="16" height="16"><use href="#i-plus"/></svg>New session<kbd>⌘ N</kbd></button>
+    <button class="search" type="button" data-open-palette><svg width="14" height="14"><use href="#i-search"/></svg>Search or run a command<kbd>⌘ K</kbd></button>
+
+    <nav class="sessions">
+      <section class="group">
+        <h3><svg width="12" height="12"><use href="#i-folder"/></svg>~/repos/golem</h3>
+        <ul>
+          <li><button class="sess active" type="button" aria-current="page"><span class="dot waiting" title="Waiting for your approval"></span><span class="t">UTF-8 split in the socket client</span><span class="ago">now</span></button></li>
+          <li><button class="sess" type="button"><span class="dot running" title="Running"></span><span class="t">ADR-028: the web gateway</span><span class="ago">2m</span></button></li>
+          <li><button class="sess fork" type="button"><span class="dot"></span><span class="t">gateway, cookie per port</span><span class="ago">9m</span></button></li>
+          <li><button class="sess" type="button"><span class="dot"></span><span class="t">Invoke /ship from the composer</span><span class="ago">1h</span></button></li>
+          <li><button class="sess" type="button"><span class="dot failed" title="Last run failed"></span><span class="t">Ollama start timeout</span><span class="ago">3h</span></button></li>
+        </ul>
+      </section>
+      <section class="group">
+        <h3><svg width="12" height="12"><use href="#i-folder"/></svg>~/notes</h3>
+        <ul>
+          <li><button class="sess" type="button"><span class="dot"></span><span class="t">Weekday PR digest, draft</span><span class="ago">1d</span></button></li>
+          <li><button class="sess" type="button"><span class="dot"></span><span class="t">Receipts from Downloads</span><span class="ago">4d</span></button></li>
+        </ul>
+      </section>
+      <section class="group">
+        <h3><svg width="12" height="12"><use href="#i-folder"/></svg>~/repos/architect-doc</h3>
+        <ul>
+          <li><button class="sess" type="button"><span class="dot"></span><span class="t">Explain the release flow gif</span><span class="ago">6d</span></button></li>
+        </ul>
+      </section>
+    </nav>
+
+    <div class="sidebar-foot">
+      <span class="conn"><i></i>connected</span><span>· v0.4.0 · up 3h</span>
+      <button class="icon-btn" type="button" id="theme-btn" aria-label="Switch theme"><svg><use href="#i-sun"/></svg></button>
+    </div>
+  </aside>
+
+  <!-- ======= main ======= -->
+  <main class="main">
+    <header class="topbar">
+      <button class="icon-btn menu" type="button" id="menu-btn" aria-label="Sessions"><svg><use href="#i-menu"/></svg></button>
+      <h1 id="title">UTF-8 split in the socket client</h1>
+      <div class="spacer"></div>
+      <div class="chips">
+        <button class="chip" type="button"><span class="sw"></span>qwen3-coder:30b · local</button>
+        <span class="chip folder"><svg width="12" height="12"><use href="#i-folder"/></svg>~/repos/golem</span>
+      </div>
+      <button class="icon-btn" type="button" id="drawer-btn" aria-label="Show todos and details"><svg><use href="#i-panel"/></svg></button>
+    </header>
+
+    <!-- chat view -->
+    <div class="scroll" id="view-chat">
+      <div class="column">
+        <div class="msg-you">A character that is two or three bytes in UTF-8 sometimes shows up as � in the TUI, only on long answers. Can you find why?<span class="meta">14:02</span></div>
+
+        <article class="msg-golem">
+          <div class="who"><svg class="golem" data-golem width="18" height="12" role="img" aria-label="golem"></svg><time>14:02</time></div>
+          <div class="tools">
+            <button class="tool" type="button" aria-expanded="false" data-tablet="t1"><span class="chev">›</span><span class="name">grep</span><span class="arg">toString("utf8")  packages/</span><span class="res ok">2 matches</span></button>
+            <div class="tablet" id="t1" hidden>packages/client/src/connect.ts:619:      buffer += chunk.toString("utf8");
+packages/daemon/golem/mcp/stdio.py:88:        line = chunk.decode("utf-8")</div>
+            <button class="tool" type="button" aria-expanded="false" data-tablet="t2"><span class="chev">›</span><span class="name">read_file</span><span class="arg">packages/client/src/connect.ts  600–640</span><span class="res ok">41 lines</span></button>
+            <div class="tablet" id="t2" hidden>605  function openSocket(): net.Socket {
+606    const current = net.createConnection(options.socketPath);
+ …
+618    current.on("data", (chunk: Buffer) =&gt; {
+619      buffer += chunk.toString("utf8");
+620      let newline = buffer.indexOf("\n");</div>
+          </div>
+          <div class="prose">
+            <p>Found it. The client decodes each socket chunk on its own, in <code>connect.ts</code> line 619. The socket hands over bytes in pieces of whatever size the kernel had ready, so on a long answer a piece can end in the middle of a character. Each half is then decoded alone, and both halves become <code>�</code>.</p>
+            <p>The fix is a decoder that keeps an unfinished character until the next chunk arrives:</p>
+          </div>
+          <pre class="code"><span class="k">const</span> decoder = <span class="k">new</span> TextDecoder(<span class="s">"utf-8"</span>);
+<span class="c">// stream: true holds back a split character for the next call</span>
+buffer += decoder.decode(chunk, { stream: <span class="k">true</span> });</pre>
+          <div class="prose"><p>I will add a test that splits <code>é</code> across two chunks, then change the line.</p></div>
+          <div class="foot"><span>8.4s</span><span>·</span><span>2 tools</span></div>
+        </article>
+
+        <article class="msg-golem waiting" id="pending-msg">
+          <div class="who"><svg class="golem" data-golem width="18" height="12" role="img" aria-label="golem"></svg><time>14:03</time></div>
+          <div class="tools">
+            <button class="tool" type="button" aria-expanded="false"><span class="chev">›</span><span class="name">edit_file</span><span class="arg">packages/client/src/connect.ts</span><span class="res wait">waiting for you</span></button>
+          </div>
+
+          <section class="shem" id="shem" aria-label="Approval">
+            <div class="shem-head">
+              <span class="seal"><svg><use href="#i-seal"/></svg></span>
+              <div style="min-width:0">
+                <h2>Allow <code>edit_file</code> on connect.ts?</h2>
+                <div class="why">rule: <b>edit_file → ask</b> · built-in default</div>
+              </div>
+              <div class="shem-tabs" role="group" aria-label="Diff layout">
+                <button type="button" aria-pressed="true" data-diff="unified">Unified</button>
+                <button type="button" aria-pressed="false" data-diff="split">Split</button>
+              </div>
+            </div>
+            <div class="diff" id="diff-unified">
+              <div class="file"><span>packages/client/src/connect.ts</span><span class="add">+2</span><span class="del">−1</span></div>
+              <table>
+                <tr class="hunk"><td class="n"></td><td class="n"></td><td>@@ -615,7 +615,8 @@ function openSocket()</td></tr>
+                <tr><td class="n">616</td><td class="n">616</td><td>    });</td></tr>
+                <tr><td class="n">617</td><td class="n">617</td><td>    current.on("data", (chunk: Buffer) =&gt; {</td></tr>
+                <tr class="d"><td class="n">618</td><td class="n"></td><td><span class="sig">-</span>     buffer += chunk.toString("utf8");</td></tr>
+                <tr class="a"><td class="n"></td><td class="n">618</td><td><span class="sig">+</span>     // stream: true keeps a split character for the next chunk</td></tr>
+                <tr class="a"><td class="n"></td><td class="n">619</td><td><span class="sig">+</span>     buffer += decoder.decode(chunk, { stream: true });</td></tr>
+                <tr><td class="n">619</td><td class="n">620</td><td>      let newline = buffer.indexOf("\n");</td></tr>
+              </table>
+            </div>
+            <div class="diff split" id="diff-split" hidden>
+              <div class="file"><span>packages/client/src/connect.ts</span><span class="add">+2</span><span class="del">−1</span></div>
+              <table>
+                <tr class="hunk"><td class="n"></td><td colspan="3">@@ -615,7 +615,8 @@ function openSocket()</td></tr>
+                <tr><td class="n">617</td><td class="half">    current.on("data", (chunk) =&gt; {</td><td class="n">617</td><td class="half">    current.on("data", (chunk) =&gt; {</td></tr>
+                <tr><td class="n">618</td><td class="half d"><span class="sig">-</span>     buffer += chunk.toString("utf8");</td><td class="n">618</td><td class="half a"><span class="sig">+</span>     // stream: true keeps a split character</td></tr>
+                <tr><td class="n"></td><td class="half"></td><td class="n">619</td><td class="half a"><span class="sig">+</span>     buffer += decoder.decode(chunk, { stream: true });</td></tr>
+                <tr><td class="n">619</td><td class="half">      let newline = buffer.indexOf("\n");</td><td class="n">620</td><td class="half">      let newline = buffer.indexOf("\n");</td></tr>
+              </table>
+            </div>
+            <div class="shem-actions">
+              <button class="btn primary" type="button" data-verdict="Allowed once">Allow once <kbd>↵</kbd></button>
+              <button class="btn" type="button" data-verdict="Allowed for this session">For this session <kbd>S</kbd></button>
+              <button class="btn" type="button" data-verdict="Always allowed: a rule was written">Always <kbd>W</kbd></button>
+              <button class="btn" type="button">Edit <kbd>E</kbd></button>
+              <span class="sp"></span>
+              <button class="btn deny" type="button" data-verdict="Denied">Deny <kbd>D</kbd></button>
+            </div>
+            <div class="verdict" id="verdict">✓ Allowed once</div>
+          </section>
+        </article>
+      </div>
+    </div>
+
+    <!-- empty view -->
+    <div class="stage-wrap" id="view-empty" hidden>
+      <div class="center-stage" aria-hidden="true"></div>
+      <div class="stage-content">
+        <div class="stage">
+          <svg class="golem" data-golem width="90" height="60" aria-hidden="true"></svg>
+          <h2>What should golem work on?</h2>
+          <div class="composer">
+            <textarea id="empty-input" rows="2" placeholder='Try "explain this repo"' aria-label="Message"></textarea>
+            <div class="composer-row">
+              <button class="chip" type="button"><span class="sw"></span>qwen3-coder:30b · local</button>
+              <button class="chip" type="button"><svg width="12" height="12"><use href="#i-folder"/></svg>~/repos/golem</button>
+              <span class="sp"></span>
+              <button class="send" type="button" aria-label="Send"><svg><use href="#i-up"/></svg></button>
+            </div>
+          </div>
+          <div class="recents">
+            <button class="chip" type="button">Continue: ADR-028, the web gateway</button>
+            <button class="chip" type="button">/ship</button>
+            <button class="chip" type="button">/model</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- full-screen states -->
+    <div class="stage-wrap" id="view-state" hidden>
+      <div class="stage-content">
+        <div class="stage state-card" id="state-card"></div>
+      </div>
+    </div>
+
+    <!-- dock -->
+    <div class="dock" id="dock">
+      <div class="dock-inner">
+        <div class="meter" id="meter"><svg class="golem" data-golem width="15" height="10" aria-hidden="true"></svg><span id="meter-text">waiting for your approval · edit_file</span><span class="sp"></span><span>Esc cancels the run</span></div>
+        <div class="composer">
+          <textarea id="input" rows="1" placeholder="Reply, or type / for commands" aria-label="Message"></textarea>
+          <div class="composer-row">
+            <button class="chip" type="button">/ commands</button>
+            <span class="sp"></span>
+            <button class="send stop" type="button" id="send" aria-label="Stop"><svg><use href="#i-stop"/></svg></button>
+          </div>
+        </div>
+        <div class="hint"><span><kbd>↵</kbd> send</span><span><kbd>⇧ ↵</kbd> new line</span><span><kbd>⌘ K</kbd> commands</span><span><kbd>↑</kbd> last message</span></div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ======= drawer ======= -->
+  <aside class="drawer" aria-label="Details">
+    <div class="drawer-tabs" role="tablist">
+      <button type="button" role="tab" aria-selected="true" data-tab="todos">Todos</button>
+      <button type="button" role="tab" aria-selected="false" data-tab="session">Session</button>
+      <button type="button" role="tab" aria-selected="false" data-tab="wire">Wire</button>
+    </div>
+    <div class="drawer-body" data-panel="todos">
+      <div class="progress"><span>2 of 4</span><span class="bar"><span class="on"></span><span class="on"></span><span class="cur"></span><span></span></span></div>
+      <ul class="todos">
+        <li class="todo done"><span class="box"></span><span class="txt">Find where socket chunks are decoded</span></li>
+        <li class="todo done"><span class="box"></span><span class="txt">Write a test that splits é across two chunks</span></li>
+        <li class="todo doing"><span class="box"></span><span class="txt">Decode with a streaming TextDecoder</span></li>
+        <li class="todo"><span class="box"></span><span class="txt">Run the client tests</span></li>
+      </ul>
+    </div>
+    <div class="drawer-body" data-panel="session" hidden>
+      <h4>Session</h4>
+      <dl class="kv">
+        <dt>model</dt><dd>qwen3-coder:30b · local</dd>
+        <dt>folder</dt><dd>~/repos/golem</dd>
+        <dt>messages</dt><dd>4</dd>
+        <dt>allowed</dt><dd>read_file, grep</dd>
+        <dt>skills</dt><dd>ship (pinned)</dd>
+        <dt>mcp</dt><dd>github · running</dd>
+      </dl>
+    </div>
+    <div class="drawer-body" data-panel="wire" hidden>
+      <h4>Last protocol lines</h4>
+      <div class="wire"><span class="out">→ approval.respond</span>  pending
+<span class="in">← approval.needed</span>   seq 1843
+<span class="in">← tool.requested</span>    seq 1842  edit_file
+<span class="in">← message.completed</span> seq 1838
+<span class="in">← tool.completed</span>    seq 1836  read_file
+<span class="out">→ message.send</span>      "A character that…"
+<span class="out">→ session.attach</span>    after_seq 1779</div>
+    </div>
+  </aside>
+</div>
+
+<!-- palette -->
+<div class="overlay" id="palette" hidden>
+  <div class="palette" role="dialog" aria-label="Commands">
+    <input id="palette-input" placeholder="Type a command or a session title" aria-label="Search commands">
+    <ul id="palette-list"></ul>
+  </div>
+</div>
+
+<!-- prototype controls -->
+<div class="proto" id="proto" data-state="thinking">
+  <div class="proto-head"><svg class="golem" data-golem width="15" height="10" aria-hidden="true"></svg>prototype<button type="button" id="proto-min" aria-label="Hide prototype controls">hide</button></div>
+  <label>Screen</label>
+  <div class="seg" data-seg="screen">
+    <button type="button" aria-pressed="true" data-v="chat">Chat</button>
+    <button type="button" aria-pressed="false" data-v="empty">Empty</button>
+    <button type="button" aria-pressed="false" data-v="unauthorized">Unauthorized</button>
+    <button type="button" aria-pressed="false" data-v="mismatch">Old daemon</button>
+    <button type="button" aria-pressed="false" data-v="down">Daemon down</button>
+  </div>
+  <label>Golem's state</label>
+  <div class="seg" data-seg="state">
+    <button type="button" aria-pressed="false" data-v="idle">Idle</button>
+    <button type="button" aria-pressed="false" data-v="thinking">Thinking</button>
+    <button type="button" aria-pressed="true" data-v="waiting">Waiting</button>
+    <button type="button" aria-pressed="false" data-v="failed">Failed</button>
+    <button type="button" aria-pressed="false" data-v="disconnected">Offline</button>
+  </div>
+  <label>Wordmark</label>
+  <div class="seg" data-seg="wordmark">
+    <button type="button" aria-pressed="true" data-v="sans">Sans</button>
+    <button type="button" aria-pressed="false" data-v="serif">Serif</button>
+    <button type="button" aria-pressed="false" data-v="mono">Mono</button>
+    <button type="button" aria-pressed="false" data-v="pixel">Pixel</button>
+  </div>
+  <label>Theme</label>
+  <div class="seg" data-seg="theme">
+    <button type="button" aria-pressed="true" data-v="system">System</button>
+    <button type="button" aria-pressed="false" data-v="light">Slip</button>
+    <button type="button" aria-pressed="false" data-v="dark">Kiln</button>
+  </div>
+  <label>Try</label>
+  <div class="seg">
+    <button type="button" id="stream-btn">Stream an answer</button>
+    <button type="button" data-open-palette>⌘K palette</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const app = $("#app");
+
+  /* The pixel golem: the 9×6 grid from packages/tui/src/logo.ts. b = body, d = eye. */
+  const GRID = ["...bbb...", "..bdbdb..", "bbbbbbbbb", "b.bbbbb.b", "b.bbbbb.b", "..bb.bb.."];
+  const NS = "http://www.w3.org/2000/svg";
+  const drawGolem = svg => {
+    if (svg.childElementCount) return;
+    svg.setAttribute("viewBox", "0 0 9 6");
+    svg.setAttribute("shape-rendering", "crispEdges");
+    GRID.forEach((row, y) => [...row].forEach((c, x) => {
+      if (c === ".") return;
+      const r = document.createElementNS(NS, "rect");
+      r.setAttribute("x", x); r.setAttribute("y", y); r.setAttribute("width", 1.02); r.setAttribute("height", 1.02);
+      r.setAttribute("class", c === "d" ? "e" : "b");
+      svg.appendChild(r);
+    }));
+  };
+  $$("[data-golem]").forEach(drawGolem);
+
+  /* Golem's state drives the eyes, the label, and the meter. */
+  const STATE_TEXT = {
+    idle: ["idle", "ready"],
+    thinking: ["working", "thinking · 3s"],
+    waiting: ["waiting for you", "waiting for your approval · edit_file"],
+    failed: ["last run failed", "qwen3-coder:30b did not answer · run ollama serve"],
+    disconnected: ["offline", "reconnecting in 2s · attempt 3"],
+  };
+  function setState(s) {
+    app.dataset.state = s;
+    $("#proto").dataset.state = s;
+    $("#brand-state").textContent = STATE_TEXT[s][0];
+    $("#meter-text").textContent = STATE_TEXT[s][1];
+    const busy = s === "thinking" || s === "waiting";
+    const send = $("#send");
+    send.classList.toggle("stop", busy);
+    send.setAttribute("aria-label", busy ? "Stop" : "Send");
+    send.querySelector("use").setAttribute("href", busy ? "#i-stop" : "#i-up");
+    const conn = $(".conn");
+    conn.innerHTML = s === "disconnected" ? '<i style="background:var(--wait)"></i>reconnecting' : "<i></i>connected";
+    pressed("state", s);
+  }
+
+  /* Screens */
+  const STATES = {
+    unauthorized: {
+      tag: "unauthorized", title: "This page needs a fresh link",
+      body: "The gateway restarted, so it no longer knows this tab. Run this in a terminal and golem opens a new link.",
+      cmd: "golem web", eye: "disconnected",
+    },
+    mismatch: {
+      tag: "protocol 2.25 · daemon 1.9", title: "The daemon is older than this page",
+      body: "golem was upgraded, but the daemon that runs is from before. Restart it, and this page reconnects by itself.",
+      cmd: "golem daemon restart", eye: "failed",
+    },
+    down: {
+      tag: "reconnecting · attempt 4", title: "golem's daemon is not running",
+      body: "The page will keep trying. If the daemon is not installed as a background job, start it once.",
+      cmd: "golem daemon start", eye: "disconnected",
+    },
+  };
+  function setScreen(v) {
+    $("#view-chat").hidden = v !== "chat";
+    $("#view-empty").hidden = v !== "empty";
+    $("#view-state").hidden = !STATES[v];
+    $("#dock").hidden = v !== "chat";
+    $("#title").textContent = v === "empty" ? "New session" : (STATES[v] ? "golem" : "UTF-8 split in the socket client");
+    if (STATES[v]) {
+      const s = STATES[v];
+      $("#state-card").innerHTML =
+        `<svg class="golem" data-golem width="72" height="48" aria-hidden="true"></svg>
+         <span class="state-tag">${s.tag}</span><h2>${s.title}</h2><p>${s.body}</p>
+         <span class="cmd"><code>${s.cmd}</code><button class="icon-btn" type="button" aria-label="Copy command" data-copy="${s.cmd}"><svg><use href="#i-copy"/></svg></button></span>`;
+      const svg = $("#state-card [data-golem]");
+      svg.setAttribute("viewBox", "0 0 9 6"); svg.setAttribute("shape-rendering", "crispEdges");
+      GRID.forEach((row, y) => [...row].forEach((c, x) => {
+        if (c === ".") return;
+        const r = document.createElementNS(NS, "rect");
+        r.setAttribute("x", x); r.setAttribute("y", y); r.setAttribute("width", 1.02); r.setAttribute("height", 1.02);
+        r.setAttribute("class", c === "d" ? "e" : "b"); svg.appendChild(r);
+      }));
+      setState(s.eye);
+    } else if (v === "empty") setState("idle");
+    else setState(app.dataset.state === "disconnected" ? "waiting" : app.dataset.state);
+    pressed("screen", v);
+  }
+
+  function setTheme(v) {
+    if (v === "system") document.documentElement.removeAttribute("data-theme");
+    else document.documentElement.dataset.theme = v;
+    try { localStorage.setItem("golem-proto-theme", v); } catch (e) {}
+    pressed("theme", v);
+  }
+  function pressed(seg, v) {
+    $$(`[data-seg="${seg}"] button`).forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === v)));
+  }
+  $$("[data-seg] button").forEach(b => b.addEventListener("click", () => {
+    const seg = b.parentElement.dataset.seg;
+    if (seg === "screen") setScreen(b.dataset.v);
+    if (seg === "state") setState(b.dataset.v);
+    if (seg === "theme") setTheme(b.dataset.v);
+    if (seg === "wordmark") { document.documentElement.dataset.wordmark = b.dataset.v; pressed("wordmark", b.dataset.v); }
+  }));
+  $("#theme-btn").addEventListener("click", () => {
+    const dark = document.documentElement.dataset.theme === "dark" ||
+      (!document.documentElement.dataset.theme && matchMedia("(prefers-color-scheme: dark)").matches);
+    setTheme(dark ? "light" : "dark");
+  });
+  try { const t = localStorage.getItem("golem-proto-theme"); if (t) setTheme(t); } catch (e) {}
+  $("#proto-min").addEventListener("click", e => {
+    const p = $("#proto"); p.classList.toggle("min");
+    e.currentTarget.textContent = p.classList.contains("min") ? "show" : "hide";
+  });
+
+  /* Tool lines open into their tablet */
+  $$(".tool[data-tablet]").forEach(b => b.addEventListener("click", () => {
+    const t = document.getElementById(b.dataset.tablet);
+    t.hidden = !t.hidden; b.setAttribute("aria-expanded", String(!t.hidden));
+  }));
+
+  /* Diff layout */
+  $$("[data-diff]").forEach(b => b.addEventListener("click", () => {
+    $$("[data-diff]").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+    $("#diff-unified").hidden = b.dataset.diff !== "unified";
+    $("#diff-split").hidden = b.dataset.diff !== "split";
+  }));
+
+  /* Answering the shem */
+  function answer(text) {
+    const shem = $("#shem");
+    if (shem.classList.contains("resolved")) return;
+    shem.classList.add("resolved");
+    $("#pending-msg").classList.remove("waiting");
+    const v = $("#verdict");
+    v.textContent = (text === "Denied" ? "✗ " : "✓ ") + text;
+    v.style.color = text === "Denied" ? "var(--deny)" : "var(--allow)";
+    const res = $(".tool .res.wait");
+    if (res) { res.classList.remove("wait"); res.classList.add(text === "Denied" ? "x" : "ok"); res.textContent = text === "Denied" ? "✗ denied" : "+2 −1"; }
+    setState(text === "Denied" ? "idle" : "thinking");
+    if (text !== "Denied") setTimeout(() => streamAnswer(), 500);
+  }
+  $$("[data-verdict]").forEach(b => b.addEventListener("click", () => answer(b.dataset.verdict)));
+
+  /* A streamed answer, with the clay pixel cursor */
+  let streaming = false;
+  function streamAnswer() {
+    if (streaming) return;
+    streaming = true;
+    setScreen("chat"); setState("thinking");
+    const col = $("#view-chat .column");
+    const art = document.createElement("article");
+    art.className = "msg-golem live";
+    art.innerHTML = `<div class="who"><svg class="golem" data-golem width="18" height="12" role="img" aria-label="golem"></svg><time>14:04</time></div>
+      <div class="tools"><button class="tool" type="button"><span class="chev">›</span><span class="name">shell</span><span class="arg">pnpm --filter @golem/client test</span><span class="res ok">48 passed</span></button></div>
+      <div class="prose"><p></p></div>`;
+    col.appendChild(art);
+    art.querySelectorAll("[data-golem]").forEach(drawGolem);
+    const p = art.querySelector("p");
+    const text = "The change is in, and the client tests pass, including the new one that splits é across two chunks. The MCP stdio reader looked similar, but it decodes whole lines, and a line always ends on a character boundary, so I left it as it is.";
+    const words = text.split(" ");
+    let i = 0; const started = Date.now();
+    const scroller = $("#view-chat");
+    const tick = () => {
+      i = Math.min(words.length, i + 1 + Math.floor(Math.random() * 2));
+      p.innerHTML = words.slice(0, i).join(" ").replace("é", "é") + '<span class="cursor" aria-hidden="true"></span>';
+      $("#meter-text").textContent = `writing · ${p.textContent.length} chars · ${((Date.now() - started) / 1000).toFixed(0)}s`;
+      scroller.scrollTop = scroller.scrollHeight;
+      if (i < words.length) setTimeout(tick, 60 + Math.random() * 70);
+      else {
+        p.innerHTML = words.join(" ");
+        const f = document.createElement("div"); f.className = "foot"; f.innerHTML = "<span>6.1s</span><span>·</span><span>1 tool</span>";
+        art.appendChild(f);
+        $$(".todo").forEach(t => { t.classList.remove("doing"); t.classList.add("done"); });
+        $(".progress span").textContent = "4 of 4";
+        $$(".progress .bar span").forEach(s => { s.className = "on"; });
+        art.classList.remove("live");
+        setState("idle"); streaming = false;
+      }
+    };
+    setTimeout(tick, 400);
+  }
+  $("#stream-btn").addEventListener("click", () => {
+    if (!$("#shem").classList.contains("resolved")) answer("Allowed once");
+    else streamAnswer();
+  });
+
+  /* Drawer tabs */
+  $$("[data-tab]").forEach(b => b.addEventListener("click", () => {
+    $$("[data-tab]").forEach(x => x.setAttribute("aria-selected", String(x === b)));
+    $$("[data-panel]").forEach(p => { p.hidden = p.dataset.panel !== b.dataset.tab; });
+  }));
+  $("#drawer-btn").addEventListener("click", () => {
+    if (matchMedia("(max-width: 1100px)").matches) app.classList.toggle("drawer-open");
+    else app.classList.toggle("no-drawer");
+  });
+  $("#menu-btn").addEventListener("click", () => app.classList.toggle("sidebar-open"));
+  document.addEventListener("click", e => {
+    if (app.classList.contains("sidebar-open") && !e.target.closest(".sidebar, #menu-btn")) app.classList.remove("sidebar-open");
+    if (app.classList.contains("drawer-open") && !e.target.closest(".drawer, #drawer-btn")) app.classList.remove("drawer-open");
+  });
+
+  /* ⌘K palette, from the TUI's slash-command table */
+  const CMDS = [
+    ["Session", "/new", "Start a new session", "⌘ N"],
+    ["Session", "/fork", "Copy this session up to its last answer", ""],
+    ["Session", "/title", "Rename this session", ""],
+    ["Session", "/close", "Close this session", ""],
+    ["Session", "/export", "Save this session as markdown", ""],
+    ["Model", "/model", "Pick a model, or download one", "⌘ M"],
+    ["Tools", "/permissions", "Tool rules for this folder", ""],
+    ["Tools", "/mcp", "MCP servers and their tools", ""],
+    ["Tools", "/skills", "Skills golem can use", ""],
+    ["View", "/todos", "Show or hide the todo list", "⌘ ."],
+    ["View", "/copy", "Copy the last answer", ""],
+    ["View", "/debug wire", "Show the last protocol lines", ""],
+  ];
+  const list = $("#palette-list");
+  let sel = 0;
+  function renderPalette(q = "") {
+    const f = CMDS.filter(c => (c[1] + " " + c[2]).toLowerCase().includes(q.toLowerCase()));
+    sel = Math.min(sel, Math.max(0, f.length - 1));
+    let last = ""; list.innerHTML = "";
+    f.forEach((c, i) => {
+      if (c[0] !== last) { const g = document.createElement("li"); g.className = "grp"; g.textContent = c[0]; list.appendChild(g); last = c[0]; }
+      const li = document.createElement("li");
+      li.innerHTML = `<button type="button" class="${i === sel ? "sel" : ""}"><span class="slash">${c[1]}</span><span class="desc">${c[2]}</span>${c[3] ? `<kbd>${c[3]}</kbd>` : "<span></span>"}</button>`;
+      li.querySelector("button").addEventListener("click", closePalette);
+      list.appendChild(li);
+    });
+    if (!f.length) list.innerHTML = '<li class="grp">Nothing matches. Text that is not a command is sent as a message.</li>';
+  }
+  function openPalette() { $("#palette").hidden = false; renderPalette(); const i = $("#palette-input"); i.value = ""; i.focus(); }
+  function closePalette() { $("#palette").hidden = true; }
+  $$("[data-open-palette]").forEach(b => b.addEventListener("click", openPalette));
+  $("#palette").addEventListener("click", e => { if (e.target.id === "palette") closePalette(); });
+  $("#palette-input").addEventListener("input", e => { sel = 0; renderPalette(e.target.value); });
+  $("#palette-input").addEventListener("keydown", e => {
+    const n = $$("#palette-list button").length;
+    if (e.key === "ArrowDown") { sel = (sel + 1) % Math.max(n, 1); renderPalette(e.target.value); e.preventDefault(); }
+    if (e.key === "ArrowUp") { sel = (sel - 1 + n) % Math.max(n, 1); renderPalette(e.target.value); e.preventDefault(); }
+    if (e.key === "Enter") closePalette();
+  });
+  document.addEventListener("keydown", e => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); $("#palette").hidden ? openPalette() : closePalette(); }
+    if (e.key === "Escape") closePalette();
+    const typing = e.target.closest("textarea, input");
+    if (!typing && $("#palette").hidden && !$("#shem").classList.contains("resolved") && !$("#view-chat").hidden) {
+      const map = { Enter: "Allowed once", s: "Allowed for this session", w: "Always allowed: a rule was written", d: "Denied" };
+      if (map[e.key]) { e.preventDefault(); answer(map[e.key]); }
+    }
+  });
+
+  /* Copy buttons on the state screens */
+  document.addEventListener("click", e => {
+    const b = e.target.closest("[data-copy]");
+    if (!b) return;
+    navigator.clipboard?.writeText(b.dataset.copy).catch(() => {});
+  });
+
+  /* Composer grows with its text */
+  $$("textarea").forEach(t => t.addEventListener("input", () => { t.style.height = "auto"; t.style.height = Math.min(t.scrollHeight, innerHeight * .4) + "px"; }));
+
+  /* #kiln or #slip picks a theme, #shot hides these controls (for screenshots) */
+  const h = location.hash.slice(1).split(",");
+  if (h.includes("kiln")) setTheme("dark");
+  if (h.includes("slip")) setTheme("light");
+  if (h.includes("shot")) $("#proto").hidden = true;
+  if (h.includes("end")) requestAnimationFrame(() => { const v = $("#view-chat"); v.scrollTop = v.scrollHeight; });
+
+  setState("waiting");
+})();
+</script>
