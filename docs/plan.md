@@ -13,6 +13,7 @@ This file is about what comes next. How the existing pieces are built is in [arc
 | Phase | What you get | Milestone |
 |---|---|---|
 | 2. Skills | Claude Code compatible `SKILL.md` skills | M4 — Skilled |
+| 10. Web UI | The chat in your browser, served by `golem web` | M7 — In the browser |
 | 3. Flows | Durable workflows written in Python, resumable after a crash | M5 — Works alone |
 | 4. Triggers | Schedules, file watchers, and notifications | M5 — Works alone |
 | 5. Memory | Long-term memory that you can see and edit | M6 — Remembers |
@@ -21,11 +22,11 @@ This file is about what comes next. How the existing pieces are built is in [arc
 | 8. Platforms | One interface for everything OS-specific, then Linux and Windows | Later |
 | 9. Model routing and long sessions | Token and cost display, a cheap profile for small jobs, budgets, escalation, compaction | Later |
 
-What is built is in [architecture.md](architecture.md) and the ADRs, and how to install, run, and release it is in [sre.md](sre.md). Phase 1, the first run and the terminal UX, is built ([#62](https://github.com/MilanPavel/golem/issues/62)), so skills are next.
+What is built is in [architecture.md](architecture.md) and the ADRs, and how to install, run, and release it is in [sre.md](sre.md). Phase 1, the first run and the terminal UX, is built ([#62](https://github.com/MilanPavel/golem/issues/62)), so skills are next, then the web UI.
 
 ```mermaid
 flowchart LR
-  p2[2 Skills] --> p3[3 Flows] --> p4[4 Triggers] --> p5[5 Memory] --> p6[6 Evals and hardening] --> p7[7 TUI polish] --> p8[8 Platforms] --> p9[9 Model routing and long sessions]
+  p2[2 Skills] --> p10[10 Web UI] --> p3[3 Flows] --> p4[4 Triggers] --> p5[5 Memory] --> p6[6 Evals and hardening] --> p7[7 TUI polish] --> p8[8 Platforms] --> p9[9 Model routing and long sessions]
 ```
 
 ### How to read a phase
@@ -171,6 +172,137 @@ flowchart LR
 - **Done when:** a proposed skill is accepted and then triggers in a new session.
 
 Later phases pick up the rest: `model:` frontmatter (9.3), `context: fork` (3.6), and compaction (9.5), which keeps pinned skills for free because they live in the system prompt.
+
+---
+
+## Phase 10 — Web UI
+
+The chat in your browser, served by the `golem` command. `golem web` starts a gateway on `127.0.0.1` inside the `golem` binary. It serves a page built from a new `packages/web` and bridges each browser WebSocket to its own connection on the daemon's socket. The daemon does not change. The details are in [#150](https://github.com/MilanPavel/golem/issues/150), and the why is in [vision.md, chapter 1](vision.md#1-web-ui). It runs after Skills. Each ticket is one commit and one pull request.
+
+Choices that hold for the whole phase:
+
+- **The daemon keeps only its Unix socket.** Everything that faces a network is the gateway, in the `golem` binary ([ADR-028](adr/028-web-gateway.md)).
+- **The gateway is a strict bridge.** One WebSocket message is exactly one JSON object, the browser may call only methods on an allowlist that `just gen` writes, and payloads are never rewritten.
+- **Login trades a token for a cookie.** A token from a `0600` file opens `/#t=<token>`. The page trades it for a random session cookie named `golem_<port>` (`HttpOnly`, `SameSite=Strict`). `Origin` and `Host` are checked exactly on every request and upgrade. A refused upgrade closes with code 4401.
+- **One gateway per user, on a stable port** (`run/web.json`), so the origin, the cookie, and an installed PWA survive a restart.
+- **`@golem/client` gets a transport seam** (`Dial` and `Link`), with a Unix link and a WebSocket link. The heartbeat runs from the browser to the daemon.
+- **`packages/view` holds the pure code that turns events into a transcript.** The TUI and the browser share it.
+- **The stack is React 19, Vite, Tailwind v4 with semantic `@theme` tokens, Radix, `cva`, and TanStack Query.** The default palette is reset and arbitrary values are banned ([ADR-029](adr/029-web-stack.md)).
+- **Pushed events and pulled answers live apart.** The `@golem/view` reducer folds a session's events into one small store per attached session, with deltas batched per frame. Answers to requests (`model.list`, `config.get`, `mcp.list`, `skill.list`, …) live in TanStack Query, and the pushed events that change them refresh them. Commands have no optimistic updates: what you see comes from the daemon's events, as in the TUI.
+- **The design is minimal and golem's own.** A light theme, slip, and a dark theme, kiln, with one clay accent. Type is Geist, Literata, and Geist Mono. Messages are marked by the pixel golem, whose eyes show the state. An approval reads like the shem.
+- **Model output is untrusted.** Markdown goes through DOMPurify, a strict CSP applies, and Shiki uses its JavaScript engine, with no WASM.
+
+```mermaid
+flowchart LR
+  s1[10.1 ADRs] --> s3[10.3 Transport seam]
+  s1 --> s5[10.5 Gateway]
+  s2[10.2 Design] --> s6[10.6 Web scaffold]
+  s3 --> s7[10.7 Wire up and embed]
+  s5 --> s7
+  s6 --> s7
+  s4[10.4 packages/view] --> s8[10.8 Chat]
+  s7 --> s8 --> s9[10.9 Tools and approvals] --> s10[10.10 Models and sessions] --> s11[10.11 Artifacts and settings]
+  s11 --> s12[10.12 Responsive and accessible]
+  s11 --> s13[10.13 PWA]
+  s11 --> s14[10.14 golem web install]
+```
+
+10.1 and 10.2 come first, side by side. Then 10.3 to 10.6 can run side by side, each in its own worktree. 10.1 to 10.8 are the first usable web UI.
+
+### 10.1 ADRs: the web gateway and the web stack — [#151](https://github.com/MilanPavel/golem/issues/151)
+
+- **Goal:** every choice the code in 10.3 to 10.7 depends on is written down and agreed before that code is written.
+- **You can:** read why the gateway is shaped as it is, what it refuses, and which libraries the page uses.
+- **Build:** ADR-028 (framing, the allowlist, login, the run file and port, headers and CSP, backpressure, the threat model, and the full security test list), [ADR-029](adr/029-web-stack.md) (the stack, styling, and state), the `Dial` and `Link` interfaces, and this section.
+- **Done when:** both ADRs are merged, and the security test list in ADR-028 is reviewed by hand.
+
+### 10.2 A design for the web UI — [#155](https://github.com/MilanPavel/golem/issues/155)
+
+- **Goal:** agree how the web UI looks before any of it is built.
+- **You can:** open a clickable prototype in both themes and at phone width, and read the design in `docs/design/web.md`.
+- **Build:** an HTML prototype of the empty state, a chat with a streamed answer and a tool call, an approval with a diff, the session sidebar, the todo drawer, the ⌘K palette, and the failure states. Clay accent, the pixel golem with eyes for idle, thinking, waiting, failed, and disconnected (each with a text label), a clay pixel block as the streaming cursor, slip and kiln themes, Geist, Literata, and Geist Mono, and 150 to 200 ms motion that honours `prefers-reduced-motion`.
+- **Done when:** the prototype is approved, and the tokens in `docs/design/web.md` pass the contrast check.
+
+### 10.3 A transport seam in `@golem/client` — [#158](https://github.com/MilanPavel/golem/issues/158)
+
+- **Goal:** the client's core (hello, heartbeat, reconnect, re-attach from `seq`, dropping repeats) runs in a browser as well as in Node.
+- **You can:** nothing new on screen. A browser can use `@golem/client` over a WebSocket.
+- **Build:** `Dial = () => Link` injected into the core, `unix-link.ts` with a streaming UTF-8 decoder (this fixes a multi-byte character split across chunks), `ws-link.ts` with an `unauthorized` state on close code 4401, and two entry points, `@golem/client` (no `node:`) and `@golem/client/node`.
+- **Done when:** `connect.test.ts` passes unchanged, a contract suite passes for both links, and the core typechecks with no Node types.
+- **Watch out:** `connect.test.ts` runs on a real socket. It is the safety net, so it is not rewritten.
+
+### 10.4 `packages/view`: one reducer for the TUI and the browser — [#162](https://github.com/MilanPavel/golem/issues/162)
+
+- **Goal:** the code that turns events into a chat lives in one package that both screens use.
+- **You can:** nothing new on screen. The TUI is unchanged.
+- **Build:** a pure TypeScript `packages/view` with no React, Ink, or Node. It takes only the reducer core: `chat-state`, `todos`, `sanitize`, the diff parser, and the parts of `status-label` and `window-title` about meaning. The command table, suggestions, and pickers stay in the TUI until 10.10.
+- **Done when:** `just check` is green, the TUI is unchanged, and golden event logs give the same state live, replayed, and replayed with repeats.
+- **Watch out:** Skills 2.2 edits `chat-state.ts`. Rebase before you start, and keep the move mechanical.
+
+### 10.5 The gateway and `golem web` — [#166](https://github.com/MilanPavel/golem/issues/166)
+
+- **Goal:** a safe local door between a browser and the daemon.
+- **You can:** run `golem web` and get a link that opens a page, which can speak the golem protocol through the gateway.
+- **Build:** a new `packages/gateway` with pure functions over `Request` and strings (`checkUpgrade`, `exchangeToken`, `filterMessage`) and a thin `Bun.serve` adapter, everything in ADR-028, `golem web [--port N] [--no-open] [--json]`, and a spike that serves a file embedded by `bun build --compile`.
+- **Done when:** every test in ADR-028's list passes, a bridged `hello` works, and the compiled binary serves an embedded file.
+
+### 10.6 The web package: scaffold, tokens, and primitives — [#173](https://github.com/MilanPavel/golem/issues/173)
+
+- **Goal:** a foundation for the page, which needs neither the gateway nor the client yet.
+- **You can:** run the page in dev mode and see a gallery of buttons, inputs, cards, menus, and the pixel golem, in both themes.
+- **Build:** `packages/web` as decided in ADR-029 and run by `just check`, `tokens.css` from 10.2, the contrast validator, the ban on arbitrary values, and the primitives in `src/ui/` on Radix and `cva`, with a `/gallery` route in dev mode.
+- **Done when:** `just check` runs the package, the validator passes, and axe finds nothing in the gallery.
+
+### 10.7 `golem web` serves the real page, connected — [#177](https://github.com/MilanPavel/golem/issues/177)
+
+- **Goal:** the built page, inside the binary, talks to the daemon.
+- **You can:** run `golem web` from a release build and see "connected · golem vX", or a clear screen that says what is wrong.
+- **Build:** a connection provider over the WebSocket link, a screen for each state (connecting, unauthorized, version mismatch, daemon down, gateway down), the Vite dev proxy that rewrites `Origin`, a `just e2e` harness (daemon, gateway, a fake model, and Chromium), and `dist.sh` embedding the page, checked by `smoke_dist`.
+- **Done when:** the compiled `golem web` connects, and an expired cookie and a version mismatch show their screens.
+
+### 10.8 Chat in the browser — [#181](https://github.com/MilanPavel/golem/issues/181)
+
+- **Goal:** the web UI is good enough to use every day for plain chats.
+- **You can:** pick a session, send a message, watch the answer stream, stop it, start a new session, and reload in the middle of an answer without losing anything.
+- **Build:** one store per attached session fed by `@golem/view`, with deltas applied once per animation frame and the title, favicon, and approval state updated outside it. A live store for the connection and the session list, and a TanStack Query client with ADR-029's table of which pushed event refreshes which answer. The sidebar from `session.list` with `watch`, grouped by folder. The transcript with markdown through DOMPurify, Shiki, and the clay pixel cursor. The composer with several lines, `[Pasted text #N]` tokens, history, and stop. The pixel golem's eyes and the favicon show the state.
+- **Done when:** e2e passes: reload mid-stream, two tabs, a hidden tab that comes back, a daemon restart, an expired cookie, and the XSS corpus.
+
+### 10.9 Tools and approvals in the browser — [#182](https://github.com/MilanPavel/golem/issues/182)
+
+- **Goal:** the part where the browser beats the terminal.
+- **You can:** see each tool call as one line that opens into its output, approve a file change from a side-by-side diff, edit a call's arguments before allowing it, and follow the todo list in a drawer.
+- **Build:** tool lines with live `tool.output`, split and unified diffs, the approval card (Allow once, Allow for this session, Always allow, Edit arguments, Deny), the todo drawer, and cancel.
+- **Done when:** an `edit_file` is approved from its diff, and an approval answered in the TUI closes the card in the page.
+
+### 10.10 Models, session actions, and a command palette — [#183](https://github.com/MilanPavel/golem/issues/183)
+
+- **Goal:** every command used daily in the TUI has a place in the browser.
+- **Build:** the model picker with downloads and progress (`model.list` in TanStack Query, refreshed by `model.pull.done`), rename, fork, and close with forks shown as a tree, and a ⌘K palette and `/` suggestions from the slash-command table, which moves to `@golem/view` in this step.
+- **Done when:** every daily TUI command has a web equivalent.
+
+### 10.11 Artifacts and settings — [#184](https://github.com/MilanPavel/golem/issues/184)
+
+- **Goal:** the rest of what the TUI can show.
+- **Build:** an artifact viewer, the tool rules, MCP servers, and skills (each a query, refreshed by `mcp.server.status` and `skill.registry.changed`), where each API key is stored (read-only, from `auth.list`), and the wire view with secrets redacted as in the TUI.
+- **Done when:** each view matches its TUI command.
+
+### 10.12 Phone-sized screens and accessibility — [#185](https://github.com/MilanPavel/golem/issues/185)
+
+- **Goal:** the web UI works at any width, from the keyboard, and with a screen reader.
+- **Build:** the sidebar and the drawer become sheets at phone width, a keyboard and screen-reader pass, e2e in WebKit too, screenshots in both themes on macOS runners only, and a README section.
+- **Done when:** Lighthouse accessibility scores 95 or more, in both themes.
+
+### 10.13 Install the web UI as an app (PWA) — [#186](https://github.com/MilanPavel/golem/issues/186)
+
+- **Goal:** the web UI in its own window, with a Dock icon, and nothing to notarize.
+- **Build:** a manifest and icons from the pixel golem, and no service worker that caches the app shell, so an upgrade never shows an old page.
+- **Done when:** the page installs from Chrome and Safari, and shows the new version right after `brew upgrade`.
+
+### 10.14 `golem web install` keeps the gateway running — [#187](https://github.com/MilanPavel/golem/issues/187)
+
+- **Goal:** the web UI is always there, like the daemon.
+- **Build:** `golem web install|uninstall` writes a second launchd job, like `golem daemon install`, and `run/web.json` makes `golem web` reuse the job's gateway: one owner, as in ADR-020.
+- **Done when:** after a reboot, `golem web` opens the page at once, through the running job.
 
 ---
 
