@@ -2,7 +2,7 @@
   "$defs": {
     "MessageCompletedData": {
       "additionalProperties": false,
-      "description": "Full text of a user or assistant message.\n\n``interrupted`` is true when the run stopped before the model finished.\n``text`` is then what had streamed so far.",
+      "description": "Full text of a user or assistant message.\n\n``interrupted`` is true when the run stopped before the model finished.\n``text`` is then what had streamed so far. ``skill`` is set on a user\nmessage that invoked a skill: ``text`` is then the skill body the model\ngot, with the arguments filled in, and a client can show the skill's name\nand arguments instead.",
       "properties": {
         "interrupted": {
           "default": false,
@@ -22,6 +22,17 @@
           "title": "Role",
           "type": "string"
         },
+        "skill": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SkillCall"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "text": {
           "title": "Text",
           "type": "string"
@@ -33,6 +44,29 @@
         "text"
       ],
       "title": "MessageCompletedData",
+      "type": "object"
+    },
+    "SkillCall": {
+      "additionalProperties": false,
+      "description": "A skill run once by name, with what was typed after it.",
+      "properties": {
+        "args": {
+          "default": "",
+          "maxLength": 100000,
+          "title": "Args",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "SkillCall",
       "type": "object"
     }
   },

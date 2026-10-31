@@ -36,6 +36,8 @@ from golem.sessions.runner import (
     run_turn,
 )
 from golem.sessions.titles import TitleGenerator, choose_title, clean_title, fork_title
+from golem.skills.invoke import Invocation, SkillInvokeError, invoke
+from golem.skills.registry import SkillRegistry
 from golem.store.records import RunRecords, SessionActivity, SessionRecords
 from golem.tools.registry import ToolError, ToolScope
 from golem_protocol.events import (
@@ -49,6 +51,7 @@ from golem_protocol.events import (
     SessionAllowance,
     SessionCreatedData,
     SessionUpdatedData,
+    SkillCall,
     TodosUpdatedData,
 )
 
@@ -139,8 +142,10 @@ class SessionManager:
         runs: RunRecords,
         *,
         titles: TitleGenerator | None = None,
+        skills: SkillRegistry | None = None,
     ) -> None:
         self._runtime = runtime
+        self._skills = skills
         self._events = events
         self._records = records
         self._run_records = runs
@@ -342,14 +347,24 @@ class SessionManager:
         """The model ``daemon.status`` reports for this process."""
         return self._runtime.router.identity()
 
-    async def send(self, session_id: str, text: str, *, cwd: str | None = None) -> str:
+    async def send(
+        self,
+        session_id: str,
+        text: str,
+        *,
+        cwd: str | None = None,
+        skill: SkillCall | None = None,
+    ) -> str:
         """Start one graph run. Returns ``run_id`` before the model finishes.
 
         The run's events go to the targets attached to ``session_id``. A
         session without a folder takes ``cwd`` first, with ``session.updated``.
+        With ``skill``, the model gets that skill's filled-in body instead of
+        ``text``, and ``text`` is kept as what the user typed.
 
         Raises :class:`SessionNotFoundError`, :class:`SessionBusyError`,
-        :class:`SchemaMismatchError`, or :class:`~golem.models.router.ModelConfigError`.
+        :class:`SchemaMismatchError`, :class:`~golem.skills.invoke.SkillInvokeError`,
+        or :class:`~golem.models.router.ModelConfigError`.
         """
         async with self._lock:
             session = await self._resolve(session_id)
@@ -358,6 +373,8 @@ class SessionManager:
             if await self._run_records.waiting(session_id) is not None:
                 raise SessionBusyError(session_id)
             self._runtime.router.chat_model(session.model_profile)
+            folder = session.cwd if session.cwd is not None else cwd
+            invocation = None if skill is None else self._invoke(session_id, folder, skill)
             if session.cwd is None and cwd is not None:
                 await self._events.emit(
                     session_id, None, "session.updated", SessionUpdatedData(cwd=cwd)
@@ -366,7 +383,9 @@ class SessionManager:
             turn = Turn(
                 session_id=session.session_id,
                 run_id=new_id("r"),
-                text=text,
+                text=text if invocation is None else invocation.text,
+                skill=invocation,
+                typed=None if invocation is None else text,
                 model_profile=session.model_profile,
                 schema_version=session.schema_version,
                 user_message_id=new_id("m"),
@@ -591,9 +610,15 @@ class SessionManager:
         if tasks:
             await asyncio.wait(tasks)
 
+    def _invoke(self, session_id: str, folder: str | None, call: SkillCall) -> Invocation:
+        if self._skills is None:
+            raise SkillInvokeError("skills are not loaded in this daemon")
+        view = self._skills.view(None if folder is None else Path(folder))
+        return invoke(view, call, session_id=session_id)
+
     async def _turn(self, session: _LiveSession, turn: Turn, control: RunControl) -> None:
         reply = await run_turn(self._runtime, self._events, turn, control)
-        self._title_after(session, turn.text, reply)
+        self._title_after(session, turn.typed or turn.text, reply)
 
     async def _resumed(
         self, session: _LiveSession, resume: Resume, control: RunControl, prompt: str | None

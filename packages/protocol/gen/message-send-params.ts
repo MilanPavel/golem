@@ -2,6 +2,8 @@
 
 export type Cwd = string | null;
 export type SessionId = string;
+export type Args = string;
+export type Name = string;
 export type Text = string;
 
 /**
@@ -10,9 +12,26 @@ export type Text = string;
  * The run's events go to the connections attached to the session.
  * ``cwd`` is the sender's folder, an absolute path. A session without a
  * project folder takes it, and keeps it. A session with one ignores it.
+ *
+ * ``skill`` runs a skill once: the model gets the skill's body with
+ * ``skill.args`` filled in, instead of ``text``. ``text`` is then what the
+ * user typed, such as ``/ship fix the mcp restart``. A skill the session
+ * does not see, or one that is disabled, broken, or not user-invocable, is
+ * error ``-32013``.
  */
 export interface MessageSendParams {
   cwd?: Cwd;
   session_id: SessionId;
+  skill?: SkillCall | null;
   text: Text;
+}
+/**
+ * A skill run once by name, with what was typed after it.
+ *
+ * This interface was referenced by `MessageSendParams`'s JSON-Schema
+ * via the `definition` "SkillCall".
+ */
+export interface SkillCall {
+  args?: Args;
+  name: Name;
 }

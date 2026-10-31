@@ -5,9 +5,11 @@ from __future__ import annotations
 from pathlib import Path
 from typing import cast
 
+from fakes import ScriptedChatModel
 from test_server import HELLO, RpcClient, error_code, rpc_result, start_daemon, stop_daemon
 
-from golem.server.dispatcher import INVALID_PARAMS
+from golem.models.router import ModelRouter
+from golem.server.dispatcher import INVALID_PARAMS, SKILL_NOT_FOUND
 
 REPO = Path(__file__).resolve().parents[3]
 
@@ -64,6 +66,28 @@ async def test_skill_list_refuses_a_relative_folder(short_home: Path) -> None:
         await client.call("hello", HELLO)
 
         assert error_code(await client.call("skill.list", {"cwd": "relative"})) == INVALID_PARAMS
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+
+
+async def test_message_send_runs_a_skill_and_refuses_an_unknown_one(short_home: Path) -> None:
+    _skill(short_home / "skills", "notes", "description: Write notes.\n")
+    model = ScriptedChatModel(replies=["Noted."])
+    app, task = await start_daemon(short_home, router=ModelRouter(model=model))
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        created = rpc_result(await client.call("session.create", {}))
+        send = {"session_id": created["session_id"], "text": "/notes on skills"}
+
+        unknown = await client.call("message.send", {**send, "skill": {"name": "nope"}})
+        sent = await client.call(
+            "message.send", {**send, "skill": {"name": "notes", "args": "on skills"}}
+        )
+
+        assert error_code(unknown) == SKILL_NOT_FOUND
+        assert "run_id" in rpc_result(sent)
     finally:
         await client.close()
         await stop_daemon(app, task)

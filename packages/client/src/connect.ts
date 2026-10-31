@@ -87,6 +87,7 @@ export const MODEL_PULL_FAILED = -32009;
 export const APPROVAL_NOT_FOUND = -32010;
 export const INVALID_TOOL_ARGS = -32011;
 export const ARTIFACT_NOT_FOUND = -32012;
+export const SKILL_NOT_FOUND = -32013;
 
 export type { ChatEvent, SessionSummary };
 const DEFAULT_HEARTBEAT_MS = 5_000;

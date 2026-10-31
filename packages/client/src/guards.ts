@@ -48,6 +48,7 @@ const EVENT_TYPES = new Set([
   "tool.failed",
   "approval.needed",
   "approval.resolved",
+  "skill.activated",
 ]);
 
 export function isRecord(value: unknown): value is Record<string, unknown> {

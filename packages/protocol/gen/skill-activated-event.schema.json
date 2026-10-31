@@ -1,0 +1,89 @@
+{
+  "$defs": {
+    "SkillActivatedData": {
+      "additionalProperties": false,
+      "description": "A skill is active in the session.\n\n``how`` is ``invoked`` for a skill run once by name: its body is that\nturn's user message. ``source`` is where it was found, ``path`` its folder,\nand ``hash`` the sha256 of its ``SKILL.md``.",
+      "properties": {
+        "hash": {
+          "title": "Hash",
+          "type": "string"
+        },
+        "how": {
+          "const": "invoked",
+          "title": "How",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "source": {
+          "enum": [
+            "project",
+            "user",
+            "bundled"
+          ],
+          "title": "Source",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "source",
+        "how",
+        "path",
+        "hash"
+      ],
+      "title": "SkillActivatedData",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "A skill became active. It comes just before the user message that invoked it.",
+  "properties": {
+    "data": {
+      "$ref": "#/$defs/SkillActivatedData"
+    },
+    "run_id": {
+      "minLength": 1,
+      "title": "Run Id",
+      "type": "string"
+    },
+    "seq": {
+      "minimum": 1,
+      "title": "Seq",
+      "type": "integer"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    },
+    "ts": {
+      "minLength": 1,
+      "title": "Ts",
+      "type": "string"
+    },
+    "type": {
+      "const": "skill.activated",
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "seq",
+    "session_id",
+    "run_id",
+    "ts",
+    "type",
+    "data"
+  ],
+  "title": "SkillActivatedEvent",
+  "type": "object"
+}
