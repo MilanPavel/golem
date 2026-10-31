@@ -46,6 +46,7 @@ The scope is optional. Use it when a change sits in one part of golem.
 |---|---|
 | `daemon` | The daemon as a whole: startup, the socket, launchd |
 | `tui` | The chat screen |
+| `web` | The web UI and the gateway that serves it |
 | `cli` | The `golem` command and its subcommands |
 | `client` | The shared TypeScript socket client |
 | `protocol` | The wire models and the generated types |

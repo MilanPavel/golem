@@ -97,6 +97,7 @@ It runs lint, typecheck, tests, and `just gen`, and it fails if the generated fi
 | any other part of `packages/daemon/` | `daemon` |
 | `packages/protocol/` | `protocol` |
 | `packages/tui/`, `packages/cli/`, `packages/client/` | `tui`, `cli`, `client` |
+| `packages/web/`, `packages/gateway/` | `web` |
 | `scripts/setup.sh`, `scripts/dist.sh`, `scripts/package.sh`, `scripts/render_formula.sh`, `golem/launchd.py` | `install` |
 | `cliff.toml`, `CHANGELOG.md`, `release.yml`, signing | `release` |
 | `.github/` | `ci` |
