@@ -1,7 +1,20 @@
 {
   "additionalProperties": false,
-  "description": "``session.list``. Newest activity first.\n\nWith ``watch``, the connection also gets a ``session.summary``\nnotification whenever a session's summary changes, until it closes.\nWatching again is not an error.",
+  "description": "``session.list``. Newest activity first.\n\nWith ``watch``, the connection also gets a ``session.summary``\nnotification whenever a session's summary changes, until it closes.\nWatching again is not an error.\n\nWith ``cwd``, an absolute path, only the sessions in that project folder\nare listed. It does not go with ``watch``.",
   "properties": {
+    "cwd": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cwd"
+    },
     "limit": {
       "default": 50,
       "maximum": 500,

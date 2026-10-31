@@ -93,6 +93,8 @@ export const ARTIFACT_NOT_FOUND = -32012;
 export const SKILL_NOT_FOUND = -32013;
 
 export type { ChatEvent, SessionSummary };
+/** The web gateway closes a link with this code when its token is missing or wrong. Retrying cannot help. */
+export const UNAUTHORIZED_CLOSE_CODE = 4401;
 const DEFAULT_HEARTBEAT_MS = 5_000;
 const DEFAULT_HEARTBEAT_TIMEOUT_MS = 10_000;
 const DEFAULT_CONNECT_TIMEOUT_MS = 2_000;
@@ -112,7 +114,8 @@ export type ConnectionState =
   | { status: "connected" }
   | { status: "reconnecting"; attempt: number; delayMs: number }
   | { status: "closed"; reason: string }
-  | { status: "rejected"; reason: string };
+  | { status: "rejected"; reason: string }
+  | { status: "unauthorized" };
 
 interface ConnectBase {
   clientName: string;
@@ -146,7 +149,8 @@ export interface GolemClient {
    */
   attachSession(sessionId: string, afterSeq?: number): Promise<SessionAttachResult>;
   detachSession(sessionId: string): Promise<void>;
-  listSessions(limit?: number): Promise<SessionListResult>;
+  /** Open sessions, newest activity first. With `cwd`, only those in that project folder. */
+  listSessions(limit?: number, cwd?: string): Promise<SessionListResult>;
   /**
    * Follow the session list. Every listed session, then every later change,
    * reaches {@link GolemClient.onSessionSummary}. After a reconnect the client
@@ -544,7 +548,7 @@ export function connectGolem(options: ConnectOptions): GolemClient {
     }
   }
 
-  function onLinkClosed(error: Error | undefined): void {
+  function onLinkClosed(error: Error | undefined, code?: number): void {
     stopHeartbeat();
     if (connectTimer !== undefined) {
       clearTimeout(connectTimer);
@@ -553,6 +557,11 @@ export function connectGolem(options: ConnectOptions): GolemClient {
     rejectPending(error ?? new Error("connection closed"));
     if (userClosed) {
       setState({ status: "closed", reason: "closed" });
+      return;
+    }
+    if (code === UNAUTHORIZED_CLOSE_CODE) {
+      setState({ status: "unauthorized" });
+      failReady(new Error("unauthorized"));
       return;
     }
     if (rejected) {
@@ -625,12 +634,12 @@ export function connectGolem(options: ConnectOptions): GolemClient {
         handleLine(line);
       }
     });
-    current.onClose((error) => {
+    current.onClose((error, code) => {
       if (gen !== generation) {
         return;
       }
       open = false;
-      onLinkClosed(error);
+      onLinkClosed(error, code);
     });
     current.onOpen(() => {
       if (gen !== generation) {
@@ -752,9 +761,12 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       await call("session.detach", { session_id: sessionId });
       attachments.untrack(sessionId);
     },
-    async listSessions(limit?: number): Promise<SessionListResult> {
+    async listSessions(limit?: number, cwd?: string): Promise<SessionListResult> {
       await ready;
-      const result = await call("session.list", limit === undefined ? {} : { limit });
+      const result = await call("session.list", {
+        ...(limit === undefined ? {} : { limit }),
+        ...(cwd === undefined ? {} : { cwd }),
+      });
       if (!isSessionListResult(result)) {
         throw new Error("invalid session.list result");
       }

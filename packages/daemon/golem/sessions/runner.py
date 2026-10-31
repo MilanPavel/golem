@@ -206,6 +206,7 @@ async def run_turn(
             cwd=turn.cwd,
             allowed_tools=turn.allowed_tools,
             mcp_servers=turn.mcp_servers,
+            skill_folder=None if skill is None else str(skill.path),
         )
         return await _finish(stream, progress, emit)
     except asyncio.CancelledError:

@@ -10,6 +10,7 @@ export {
   SKILL_NOT_FOUND,
   MODEL_NOT_CONFIGURED,
   RpcError,
+  UNAUTHORIZED_CLOSE_CODE,
   RUN_NOT_FOUND,
   SESSION_BUSY,
   SESSION_NOT_FOUND,
@@ -23,6 +24,7 @@ export {
   type SessionSummary,
 } from "./connect.ts";
 export type { Dial, Link } from "./link.ts";
+export { wsDial } from "./ws-link.ts";
 export type { ModelProbeResult } from "../../protocol/gen/model-probe-result.ts";
 export type { McpListResult } from "../../protocol/gen/mcp-list-result.ts";
 export type { McpServer } from "../../protocol/gen/mcp-server.ts";
