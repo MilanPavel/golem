@@ -1,0 +1,81 @@
+@import "tailwindcss";
+
+/* The one source of golem's design tokens. Values are in docs/design/web.md.
+   Each colour is light-dark(slip, kiln): the page follows the system, or data-theme. */
+@theme {
+  --color-*: initial;
+  --font-*: initial;
+  --radius-*: initial;
+  --shadow-*: initial;
+
+  --color-bg: light-dark(#F3F2EF, #15120F);
+  --color-surface: light-dark(#FBFAF8, #1D1915);
+  --color-sunken: light-dark(#EAE8E3, #110E0C);
+  --color-ink: light-dark(#1D1A17, #EEE7DF);
+  --color-muted: light-dark(#57524C, #B5ACA2);
+  --color-faint: light-dark(#6C665F, #8F877E);
+  --color-line: light-dark(#DEDAD3, #2C2621);
+  --color-line-strong: light-dark(#C9C3BA, #3B332C);
+  --color-clay: light-dark(#C4783A, #D08549);
+  --color-clay-ink: light-dark(#94501E, #E6A06A);
+  --color-clay-soft: light-dark(#F1E2D4, #2E2118);
+  --color-slip: light-dark(#ECE3D8, #2A221B);
+  --color-golem-body: light-dark(#9C6B3C, #A8733F);
+  --color-golem-eye: light-dark(#2A1408, #0E0704);
+  --color-allow: light-dark(#3F7342, #86B57F);
+  --color-allow-soft: light-dark(#DFEBDD, #1F2B1E);
+  --color-deny: light-dark(#A8402F, #E58474);
+  --color-deny-soft: light-dark(#F4DED9, #33201C);
+  --color-wait: light-dark(#8A600E, #E2B655);
+  --color-wait-soft: light-dark(#F3E7C9, #30271A);
+  --color-code-bg: light-dark(#EFEDE9, #191512);
+
+  --font-ui: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-prose: "Literata Variable", Georgia, serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, monospace;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 18px;
+
+  --shadow-soft: 0 1px 0 rgba(29, 26, 23, 0.04), 0 8px 24px -12px rgba(29, 26, 23, 0.18);
+}
+
+:root {
+  color-scheme: light dark;
+}
+
+:root[data-theme="slip"] {
+  color-scheme: light;
+}
+
+:root[data-theme="kiln"] {
+  color-scheme: dark;
+}
+
+/* Shadows cannot use light-dark(), so the kiln value is set here. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="slip"]) {
+    --shadow-soft: 0 1px 0 rgba(0, 0, 0, 0.3), 0 10px 30px -12px rgba(0, 0, 0, 0.6);
+  }
+}
+
+:root[data-theme="kiln"] {
+  --shadow-soft: 0 1px 0 rgba(0, 0, 0, 0.3), 0 10px 30px -12px rgba(0, 0, 0, 0.6);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+@layer base {
+  body {
+    @apply bg-bg font-ui text-ink;
+  }
+}

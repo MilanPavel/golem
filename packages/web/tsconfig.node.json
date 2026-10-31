@@ -13,5 +13,5 @@
     "allowImportingTsExtensions": true,
     "types": ["node"]
   },
-  "include": ["vite.config.ts", "src/lint-rules.test.ts"]
+  "include": ["vite.config.ts", "src/lint-rules.test.ts", "src/styles/no-arbitrary.test.ts", "src/styles/tokens.test.ts"]
 }

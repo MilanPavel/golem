@@ -1,4 +1,4 @@
-import type { ChatEvent } from "@golem/client";
+import type { ChatEvent, SkillCall } from "@golem/client";
 
 import type { TodoItem } from "./todos.ts";
 
@@ -50,6 +50,8 @@ export type ChatMessage = {
   durationMs?: number;
   /** Tool calls this reply asked for, in order. */
   tools?: ToolBlock[];
+  /** Set on a user message that ran a skill. `text` is then the filled-in body. */
+  skill?: SkillCall;
 };
 
 export type ChatState = {
@@ -363,6 +365,7 @@ function upsertCompleted(
     interrupted: event.data.interrupted === true,
     at: event.ts,
     ...(durationMs === undefined ? {} : { durationMs }),
+    ...(event.data.skill == null ? {} : { skill: event.data.skill }),
   };
   const index = messages.findIndex((message) => message.id === next.id);
   if (index < 0) {

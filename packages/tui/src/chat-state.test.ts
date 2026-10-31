@@ -610,3 +610,30 @@ test("a finished download takes its progress out of the banner, and nothing else
   const other = { ...emptyChat, notice: "open a session first" };
   assert.equal(downloadEnded(other), other);
 });
+
+test("a replayed user message that ran a skill keeps its skill marker", () => {
+  const events = [
+    { seq: 1, session_id: "s", run_id: "r", ts: "t", type: "run.started", data: {} },
+    {
+      seq: 2,
+      session_id: "s",
+      run_id: "r",
+      ts: "t",
+      type: "skill.activated",
+      data: { name: "ship", source: "project", how: "invoked", path: "/p/.agents/skills/ship", hash: "h" },
+    },
+    {
+      seq: 3,
+      session_id: "s",
+      run_id: "r",
+      ts: "t",
+      type: "message.completed",
+      data: { message_id: "u1", role: "user", text: "Open a PR: x\n", skill: { name: "ship", args: "x" } },
+    },
+    { seq: 4, session_id: "s", run_id: "r", ts: "t", type: "message.completed", data: { message_id: "u2", role: "user", text: "plain" } },
+  ] satisfies ChatEvent[];
+  const live = events.reduce(reduceChat, emptyChat);
+  assert.deepEqual(live.messages[0]?.skill, { name: "ship", args: "x" });
+  assert.equal(live.messages[0]?.text, "Open a PR: x\n");
+  assert.equal("skill" in (live.messages[1] ?? {}), false);
+});

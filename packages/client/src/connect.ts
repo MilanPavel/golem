@@ -1,5 +1,4 @@
 import type { Dial, Link } from "./link.ts";
-import { unixDial } from "./unix-link.ts";
 
 import type { AuthListResult } from "../../protocol/gen/auth-list-result.ts";
 import type { AuthRemoveResult } from "../../protocol/gen/auth-remove-result.ts";
@@ -124,10 +123,8 @@ interface ConnectBase {
   backoff?: (attempt: number) => number;
 }
 
-/** How the client reaches the daemon: a Unix socket path, or a function that opens a link. */
-export type ConnectTransport = { socketPath: string; dial?: never } | { dial: Dial; socketPath?: never };
-
-export type ConnectOptions = ConnectBase & ConnectTransport;
+/** `dial` opens the link to the daemon. `@golem/client/node` has one for a Unix socket. */
+export type ConnectOptions = ConnectBase & { dial: Dial };
 
 export interface GolemClient {
   readonly state: ConnectionState;
@@ -270,7 +267,7 @@ export function connectGolem(options: ConnectOptions): GolemClient {
   const heartbeatTimeoutMs = options.heartbeatTimeoutMs ?? DEFAULT_HEARTBEAT_TIMEOUT_MS;
   const connectTimeoutMs = options.connectTimeoutMs ?? DEFAULT_CONNECT_TIMEOUT_MS;
   const backoff = options.backoff ?? backoffDelayMs;
-  const dial: Dial = options.dial ?? unixDial(options.socketPath);
+  const dial: Dial = options.dial;
 
   let state: ConnectionState = { status: "connecting" };
   const listeners = new Set<(next: ConnectionState) => void>();

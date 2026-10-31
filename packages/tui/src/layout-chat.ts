@@ -1,3 +1,4 @@
+import type { SkillCall } from "@golem/client";
 import { Lexer, type Token, type Tokens } from "marked";
 
 import type { ChatMessage, ToolBlock } from "./chat-state.ts";
@@ -40,7 +41,7 @@ export type Transcript = Viewport & {
 export type TranscriptOptions = {
   times: boolean;
   now: number;
-  /** Ctrl-O: draw each tool call's output under its line. */
+  /** Ctrl-O: draw each tool call's output under its line, and each skill's body under its line. */
   toolOutput?: boolean;
 };
 
@@ -75,11 +76,13 @@ export function layoutMessages(
     const label = role === "user" ? "you" : "golem";
     const tools = message.tools ?? [];
     const body =
-      tools.length > 0 && message.text.length === 0
-        ? []
-        : message.streaming
-          ? wrapSpans([{ text: message.text }], width)
-          : markdownLines(message.text, width);
+      message.skill !== undefined
+        ? skillLines(message.skill, message.text, width, options?.toolOutput === true)
+        : tools.length > 0 && message.text.length === 0
+          ? []
+          : message.streaming
+            ? wrapSpans([{ text: message.text }], width)
+            : markdownLines(message.text, width);
     if (!continues) {
       lines.push(paint({ role, spans: labelSpans(label, message, options) }, width));
     }
@@ -189,6 +192,22 @@ export function toolLines(tool: ToolBlock, width: number, expanded: boolean): Sp
   }
   if (tool.artifactId !== undefined) {
     lines.push(...wrapSpans([{ text: `  │ all of it: /artifact ${tool.artifactId}`, dim: true }], width));
+  }
+  return lines;
+}
+
+export const SKILL_MARK = "◆ skill";
+
+/** `/ship fix the mcp restart  ◆ skill`, then the filled-in body while Ctrl-O is on. */
+export function skillLines(skill: SkillCall, body: string, width: number, expanded: boolean): Span[][] {
+  const args = skill.args ?? "";
+  const typed = args.length > 0 ? `/${skill.name} ${args}` : `/${skill.name}`;
+  const lines = wrapSpans([{ text: visibleText(typed) }, { text: `  ${SKILL_MARK}`, dim: true }], width);
+  if (!expanded) {
+    return lines;
+  }
+  for (const row of body.replace(/\n+$/, "").split("\n")) {
+    lines.push(...wrapSpans([{ text: `  │ ${visibleText(row)}`, dim: true }], width));
   }
   return lines;
 }
