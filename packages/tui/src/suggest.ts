@@ -1,7 +1,11 @@
 export type SuggestCommand = {
   name: string;
+  /** A skill's argument hint, shown after its name. */
+  hint?: string;
   description: string;
   choices?: readonly string[];
+  /** Choices for the word after one of `choices`. */
+  subChoices?: Readonly<Record<string, readonly string[]>>;
 };
 
 export type Suggestion = {
@@ -15,8 +19,9 @@ export type Suggestion = {
 
 /**
  * Commands for a draft that starts with one `/`, then that command's choices
- * after a space. Prefix matches come before substring matches. `//` is a
- * message, so it never suggests.
+ * after a space, then the choices for the word after that, such as the skill
+ * names after `/skill run`. Prefix matches come before substring matches.
+ * `//` is a message, so it never suggests.
  */
 export function suggest(draft: string, registry: readonly SuggestCommand[]): Suggestion[] {
   if (!draft.startsWith("/") || draft.startsWith("//")) {
@@ -25,7 +30,7 @@ export function suggest(draft: string, registry: readonly SuggestCommand[]): Sug
   const space = draft.search(/\s/);
   if (space === -1) {
     return rank(registry, (command) => command.name, draft).map((command) => ({
-      label: command.name,
+      label: command.hint === undefined || command.hint.length === 0 ? command.name : `${command.name} ${command.hint}`,
       description: command.description,
       completion: `${command.name} `,
       partial: draft !== command.name,
@@ -33,10 +38,10 @@ export function suggest(draft: string, registry: readonly SuggestCommand[]): Sug
   }
   const name = draft.slice(0, space);
   const rest = draft.slice(space).trimStart();
-  if (/\s/.test(rest)) {
-    return [];
-  }
   const command = registry.find((candidate) => candidate.name === name);
+  if (/\s/.test(rest)) {
+    return subSuggestions(command, name, rest);
+  }
   const choices = command?.choices;
   if (command === undefined || choices === undefined || choices.length === 0) {
     return [];
@@ -46,6 +51,22 @@ export function suggest(draft: string, registry: readonly SuggestCommand[]): Sug
     description: command.description,
     completion: `${name} ${choice}`,
     partial: rest.length > 0 && rest !== choice,
+  }));
+}
+
+function subSuggestions(command: SuggestCommand | undefined, name: string, rest: string): Suggestion[] {
+  const space = rest.search(/\s/);
+  const choice = rest.slice(0, space);
+  const word = rest.slice(space).trimStart();
+  const choices = command?.subChoices?.[choice];
+  if (command === undefined || choices === undefined || choices.length === 0 || /\s/.test(word)) {
+    return [];
+  }
+  return rank(choices, (item) => item, word).map((item) => ({
+    label: item,
+    description: command.description,
+    completion: `${name} ${choice} ${item} `,
+    partial: word !== item,
   }));
 }
 

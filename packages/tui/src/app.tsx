@@ -10,6 +10,7 @@ import {
   type GolemClient,
   type ListedModel,
   type ModelListResult,
+  type SkillCall,
   type WireLine,
   GOLEM_VERSION,
 } from "@golem/client";
@@ -29,11 +30,13 @@ import {
 } from "./chat-state.ts";
 import {
   applyComposer,
+  invocableSkills,
   closedDebug,
   COMMANDS,
   helpLines,
   toggleDebugTab,
   withModelChoices,
+  withSkillChoices,
   type DebugState,
 } from "./commands.ts";
 import {
@@ -380,7 +383,10 @@ export function App({
     historyCursor !== null ||
     secret !== null
       ? []
-      : suggest(draft.text, withModelChoices(COMMANDS, modelNames(listing)));
+      : suggest(
+          draft.text,
+          withSkillChoices(withModelChoices(COMMANDS, modelNames(listing)), invocableSkills(skillList.skills ?? [])),
+        );
   const composerText = secret === null ? draft.text : maskSecret(secret.value);
   const suggestSelected =
     suggestPick.draft === draft.text ? Math.min(suggestPick.index, Math.max(0, suggestMatches.length - 1)) : 0;
@@ -899,12 +905,16 @@ export function App({
   }
 
   function submit(): void {
-    const outcome = applyComposer(debugRef.current, expandPastes(draftRef.current.text, pastesRef.current));
+    const outcome = applyComposer(
+      debugRef.current,
+      expandPastes(draftRef.current.text, pastesRef.current),
+      invocableSkills(skillListRef.current.skills ?? []),
+    );
     if (outcome.kind === "idle") {
       return;
     }
     if (
-      outcome.kind === "send" &&
+      (outcome.kind === "send" || outcome.kind === "skill") &&
       (busyRef.current || sessionRef.current === null || connectionRef.current.status !== "connected")
     ) {
       return;
@@ -1122,11 +1132,14 @@ export function App({
     setDraft(draftAt(""));
     // The draft is gone, so its pastes are too. The numbers keep counting.
     pastesRef.current = { next: pastesRef.current.next, texts: new Map() };
-    sendText(outcome.text);
+    sendText(outcome.text, outcome.kind === "skill" ? { name: outcome.name, args: outcome.args } : undefined);
   }
 
-  /** Send `text` to this session. On an error it goes back into the composer. */
-  function sendText(text: string): void {
+  /**
+   * Send `text` to this session. On an error it goes back into the composer.
+   * With `skill`, the daemon runs that skill once, and `text` is the line as typed.
+   */
+  function sendText(text: string, skill?: SkillCall): void {
     const currentSession = sessionRef.current;
     if (currentSession === null || busyRef.current || connectionRef.current.status !== "connected") {
       setDraft(draftAt(text));
@@ -1134,7 +1147,8 @@ export function App({
     }
     setOffset(0);
     setChat((current) => ({ ...current, notice: null }));
-    void client.sendMessage(currentSession, text, { cwd: process.cwd() }).then(
+    const options = skill === undefined ? { cwd: process.cwd() } : { cwd: process.cwd(), skill };
+    void client.sendMessage(currentSession, text, options).then(
       () => {
         sentHistory.current.remember(text);
       },

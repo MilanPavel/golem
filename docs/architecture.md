@@ -309,7 +309,7 @@ A skill can be used in three ways, and all three need the registry below:
 
 | Way | Who decides | Where the body goes | Status |
 |---|---|---|---|
-| `/ship fix the mcp restart` | You | Your message, with your words filled in | Daemon built (`message.send` with `skill`). The TUI comes in 2.2.3 |
+| `/ship fix the mcp restart` | You | Your message, with your words filled in | Built |
 | `/skill pin ship` | You | The system prompt, until you unpin it | Planned (2.3) |
 | `load_skill("ship")` | The model | A tool result | Planned (2.4) |
 
@@ -317,7 +317,7 @@ The daemon owns the skills, as it owns sessions and rules. Graph state will hold
 
 ### What happens today
 
-Step 2.1 finds, checks, and lists skills. `message.send` with `skill` runs one by name: `golem/skills/invoke.py` finds it in the session's view, reads its body from disk, and fills it in with `golem/skills/expand.py`. The run logs `skill.activated`, then the user message with the filled-in body as its `text` and the skill's name and arguments as `skill`. A skill the session cannot run is error `-32013`, and no turn starts.
+Step 2.1 finds, checks, and lists skills. `message.send` with `skill` runs one by name: `golem/skills/invoke.py` finds it in the session's view, reads its body from disk, and fills it in with `golem/skills/expand.py`. The run logs `skill.activated`, then the user message with the filled-in body as its `text` and the skill's name and arguments as `skill`. A skill the session cannot run is error `-32013`, and no turn starts. In the TUI, `/name` runs a skill when no command has that name, and `/skill run <name> [args]` always does. The arguments are the rest of the line, with their spacing and quotes kept. The `/` suggestions list the skills you can run, with their `argument-hint`, from the same `skill.list` that `/skills` shows. Skills with `user-invocable: false` are not listed and not run (`packages/tui/src/commands.ts`).
 
 ```mermaid
 flowchart LR
@@ -350,8 +350,10 @@ Each source is read one level deep. A folder with a `SKILL.md` is a skill, and a
 | `golem/skills/parse.py` | Reads and checks one `SKILL.md`. `read_body` reads the instructions |
 | `golem/skills/registry.py` | Sources, winners, the per-folder view, the cache, and the watch |
 | `golem/skills/check.py` | `golem skills check` |
+| `golem/skills/expand.py`, `golem/skills/invoke.py` | Filling in a body, and running a skill by name |
 | `golem/server/handlers.py` | `skill.list` |
 | `packages/tui/src/skills-manager.ts` | `/skills` |
+| `packages/tui/src/commands.ts` | `/name` and `/skill run`, and the skill rows in the `/` suggestions |
 | `packages/cli/src/format-skills.ts` | `golem skills` |
 
 ### What comes next

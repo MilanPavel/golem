@@ -1,3 +1,5 @@
+import type { ListedSkill } from "@golem/client";
+
 export type DebugTab = "wire" | "model";
 
 export type DebugState = {
@@ -21,6 +23,8 @@ export type ComposerOutcome =
   | { kind: "mcp" }
   | { kind: "mcp-toggle"; on: boolean; name: string }
   | { kind: "send"; text: string; debug: DebugState }
+  /** Run a skill once. `text` is the line as typed, and the daemon fills in the body from `args`. */
+  | { kind: "skill"; name: string; args: string; text: string; debug: DebugState }
   | { kind: "sessions" }
   | { kind: "skills" }
   | { kind: "permissions" }
@@ -53,10 +57,30 @@ export type Command = {
   description: string;
   /** Fixed argument choices. Free text, such as a title, has none. */
   choices?: readonly string[];
+  /** A skill's `argument-hint`, shown after its name in the suggestions. */
+  hint?: string;
+  /** Choices for the word after one of `choices`, such as the skill names after `/skill run`. */
+  subChoices?: Readonly<Record<string, readonly string[]>>;
   run: (debug: DebugState, args: readonly string[]) => ComposerOutcome;
 };
 
+/** A skill you can run by name: usable, and not `user-invocable: false`. */
+export type SkillChoice = {
+  name: string;
+  description: string;
+  argumentHint: string | null;
+};
+
+/** The skills `skill.list` returned that you can run with `/name`. */
+export function invocableSkills(listed: readonly ListedSkill[]): SkillChoice[] {
+  return listed
+    .filter((skill) => skill.usable && skill.user_invocable !== false)
+    .map((skill) => ({ name: skill.name, description: skill.description, argumentHint: skill.argument_hint ?? null }));
+}
+
 const UNKNOWN = "unknown command \u2014 /help lists them";
+const SKILL_USAGE = "/skill run <name> [args] runs a skill \u2014 /skills lists them";
+const HELD_SKILL = "a skill is not held \u2014 /debug hold turns hold off";
 
 /** Built-in providers that take an API key. A provider added in config.toml works too. */
 export const KEY_PROVIDERS: readonly string[] = ["anthropic", "groq", "openai", "openrouter", "together"];
@@ -180,6 +204,14 @@ export const COMMANDS: readonly Command[] = [
     run: withoutArgs({ kind: "sessions" }),
   },
   {
+    name: "/skill",
+    args: "run <name> [args]",
+    description: "Runs a skill once, even one whose name a command already uses.",
+    choices: ["run"],
+    // The composer reads /skill itself, because a skill's arguments keep their spacing and quotes.
+    run: () => ({ kind: "unknown", notice: SKILL_USAGE }),
+  },
+  {
     name: "/skills",
     args: "",
     description: "Lists the skills this folder sees, with broken and hidden ones and why.",
@@ -205,6 +237,29 @@ export const COMMANDS: readonly Command[] = [
   },
 ];
 
+/**
+ * `commands` with one row per skill, for suggestions, and the skill names
+ * after `/skill run`. A built-in command keeps its name, so a skill named
+ * like one is suggested only after `/skill run`.
+ */
+export function withSkillChoices(commands: readonly Command[], skills: readonly SkillChoice[]): Command[] {
+  const taken = new Set(commands.map((command) => command.name));
+  const names = skills.map((skill) => skill.name);
+  const rows: Command[] = skills
+    .filter((skill) => !taken.has(`/${skill.name}`))
+    .map((skill) => ({
+      name: `/${skill.name}`,
+      args: skill.argumentHint ?? "",
+      ...(skill.argumentHint === null ? {} : { hint: skill.argumentHint }),
+      description: skill.description,
+      run: () => unknown(),
+    }));
+  const withRun = commands.map((command) =>
+    command.name === "/skill" ? { ...command, subChoices: { run: names } } : command,
+  );
+  return [...withRun, ...rows];
+}
+
 /** `commands` with `/model`'s argument choices set to `names`, for suggestions. */
 export function withModelChoices(commands: readonly Command[], names: readonly string[]): Command[] {
   return commands.map((command) => (command.name === "/model" ? { ...command, choices: names } : command));
@@ -225,7 +280,15 @@ export function toggleDebugTab(debug: DebugState): DebugState {
   return { ...debug, tab: debug.tab === "wire" ? "model" : "wire" };
 }
 
-export function applyComposer(debug: DebugState, raw: string): ComposerOutcome {
+/**
+ * What Enter does with the draft. `skills` are the ones `/name` may run. A
+ * built-in command wins a name, and `/skill run <name>` always reaches the skill.
+ */
+export function applyComposer(
+  debug: DebugState,
+  raw: string,
+  skills: readonly SkillChoice[] = [],
+): ComposerOutcome {
   const text = raw.trim();
   if (text.length === 0) {
     return { kind: "idle" };
@@ -234,7 +297,7 @@ export function applyComposer(debug: DebugState, raw: string): ComposerOutcome {
     return sendOrPreview(debug, text.slice(2).trim());
   }
   if (text.startsWith("/")) {
-    return applyCommand(debug, text);
+    return applyCommand(debug, text, skills);
   }
   return sendOrPreview(debug, text);
 }
@@ -255,10 +318,45 @@ function sendOrPreview(debug: DebugState, text: string): ComposerOutcome {
   return { kind: "send", text, debug };
 }
 
-function applyCommand(debug: DebugState, text: string): ComposerOutcome {
-  const [name, ...args] = text.split(/\s+/);
+function applyCommand(debug: DebugState, text: string, skills: readonly SkillChoice[]): ComposerOutcome {
+  const [name = "", ...args] = text.split(/\s+/);
+  if (name === "/skill") {
+    return skillCommand(debug, text, skills);
+  }
   const command = COMMANDS.find((candidate) => candidate.name === name);
-  return command === undefined ? unknown() : command.run(debug, args);
+  if (command !== undefined) {
+    return command.run(debug, args);
+  }
+  const skill = skills.find((candidate) => `/${candidate.name}` === name);
+  return skill === undefined ? unknown() : runSkill(debug, skill.name, afterWords(text, 1), text);
+}
+
+/** `/skill run <name> [args]`. */
+function skillCommand(debug: DebugState, text: string, skills: readonly SkillChoice[]): ComposerOutcome {
+  const [, sub, name] = text.split(/\s+/);
+  if (sub !== "run" || name === undefined) {
+    return { kind: "unknown", notice: SKILL_USAGE };
+  }
+  if (!skills.some((skill) => skill.name === name)) {
+    return { kind: "unknown", notice: `no skill named ${name} to run \u2014 /skills lists them` };
+  }
+  return runSkill(debug, name, afterWords(text, 3), text);
+}
+
+function runSkill(debug: DebugState, name: string, args: string, text: string): ComposerOutcome {
+  if (debug.hold) {
+    return local(debug, null, false, HELD_SKILL);
+  }
+  return { kind: "skill", name, args, text, debug };
+}
+
+/** `text` after its first `count` words, with the spacing and quotes inside kept. */
+function afterWords(text: string, count: number): string {
+  let rest = text;
+  for (let word = 0; word < count; word += 1) {
+    rest = rest.replace(/^\s*\S+/, "");
+  }
+  return rest.trim();
 }
 
 function providerCommand(kind: "login" | "logout"): Command["run"] {

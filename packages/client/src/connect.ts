@@ -10,10 +10,14 @@ import type { ConfigGetResult } from "../../protocol/gen/config-get-result.ts";
 import type { PolicyEditResult } from "../../protocol/gen/policy-edit-result.ts";
 
 export type ApprovalChoice = "allow" | "allow_session" | "allow_always" | "deny";
+
+/** `cwd` is the sender's folder. `skill` runs a skill once by name. */
+export type SendOptions = { cwd?: string; skill?: SkillCall };
 import type { DaemonStatus } from "../../protocol/gen/daemon-status.ts";
 import type { McpListResult } from "../../protocol/gen/mcp-list-result.ts";
 import type { McpServer } from "../../protocol/gen/mcp-server.ts";
 import type { ModelServerStatus } from "../../protocol/gen/model-server-status.ts";
+import type { SkillCall } from "../../protocol/gen/skill-call.ts";
 import type { SkillListResult } from "../../protocol/gen/skill-list-result.ts";
 import type { McpToggleResult } from "../../protocol/gen/mcp-toggle-result.ts";
 import type { McpToolsResult } from "../../protocol/gen/mcp-tools-result.ts";
@@ -158,7 +162,8 @@ export interface GolemClient {
   /** Set the title by hand. Resolves with the title as stored: one line, at most 60 characters. */
   renameSession(sessionId: string, title: string): Promise<SessionRenameResult>;
   /** `cwd` gives a session without a project folder this one. A session with a folder keeps its own. */
-  sendMessage(sessionId: string, text: string, options?: { cwd?: string }): Promise<MessageSendResult>;
+  /** With `skill`, the daemon runs that skill once and `text` is the line as typed. */
+  sendMessage(sessionId: string, text: string, options?: SendOptions): Promise<MessageSendResult>;
   /** Stop a run. Resolves after `run.cancelled` is in the log; `cancelled` is false when it had ended. */
   cancelRun(runId: string): Promise<RunCancelResult>;
   inspectSession(sessionId: string): Promise<SessionInspectResult>;
@@ -788,9 +793,15 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       }
       return result;
     },
-    async sendMessage(sessionId: string, text: string, options?: { cwd?: string }): Promise<MessageSendResult> {
+    async sendMessage(sessionId: string, text: string, options?: SendOptions): Promise<MessageSendResult> {
       await ready;
-      const params = options?.cwd === undefined ? { session_id: sessionId, text } : { session_id: sessionId, text, cwd: options.cwd };
+      const params: Record<string, unknown> = { session_id: sessionId, text };
+      if (options?.cwd !== undefined) {
+        params["cwd"] = options.cwd;
+      }
+      if (options?.skill !== undefined) {
+        params["skill"] = options.skill;
+      }
       const result = await call("message.send", params);
       if (!isMessageSendResult(result)) {
         throw new Error("invalid message.send result");
