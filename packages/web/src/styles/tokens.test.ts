@@ -34,6 +34,7 @@ const text: Record<string, string[]> = {
   wait: ["bg", "surface", "sunken", "wait-soft"],
 };
 const nonText: Record<string, string[]> = { clay: ["bg", "surface"] };
+text["on-clay"] = ["clay"];
 
 const cases: [string, string, number][] = [
   ...Object.entries(text).flatMap(([fg, bgs]) => bgs.map((bg) => [fg, bg, 4.5] as [string, string, number])),
@@ -59,3 +60,9 @@ for (const theme of ["slip", "kiln"] as const) {
     expect(r, `${theme}: ${fg} on ${bg} is ${r.toFixed(2)}:1, needs ${min}:1`).toBeGreaterThanOrEqual(min);
   });
 }
+
+test("a theme can scope any element, not only the root", () => {
+  expect(css).toMatch(/(^|\n)\[data-theme="slip"\]\s*\{/);
+  expect(css).toMatch(/(^|\n)\[data-theme="kiln"\]\s*\{/);
+  expect(css).not.toMatch(/:root\[data-theme="(slip|kiln)"\]\s*\{/);
+});

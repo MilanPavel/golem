@@ -26,8 +26,8 @@ export default tseslint.config(
         {
           patterns: [
             {
-              group: ["**/features", "**/features/**", "**/store", "**/store/**"],
-              message: "ui must not depend on features or store.",
+              group: ["**/features", "**/features/**", "**/store", "**/store/**", "**/gallery", "**/gallery/**"],
+              message: "ui must not depend on features, store, or gallery.",
             },
           ],
         },
