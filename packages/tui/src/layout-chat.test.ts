@@ -2,7 +2,15 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import type { ChatMessage } from "./chat-state.ts";
-import { gutterColumn, INTERRUPTED_MARK, layoutMessages, layoutTranscript, toolLabel, type Span } from "./layout-chat.ts";
+import {
+  gutterColumn,
+  INTERRUPTED_MARK,
+  layoutMessages,
+  layoutTranscript,
+  SKILL_MARK,
+  toolLabel,
+  type Span,
+} from "./layout-chat.ts";
 
 function textOf(spans: readonly Span[]): string {
   return spans.map((span) => span.text).join("");
@@ -213,4 +221,30 @@ test("a running command shows its newest output line, or more with Ctrl-O", () =
     textOf(line.spans),
   );
   assert.deepEqual(expanded.slice(2), ["  │ one", "  │ two", "  │ three"]);
+});
+
+test("a skill message shows the typed line, and Ctrl-O shows the filled-in body", () => {
+  const sent: ChatMessage = {
+    ...message("u", "user", "# Ship\n\nOpen a PR for: fix the mcp restart\n"),
+    skill: { name: "ship", args: "fix the mcp restart" },
+  };
+  const collapsed = layoutMessages([sent], 60).map((line) => textOf(line.spans).trimEnd());
+  assert.deepEqual(collapsed, ["you", `/ship fix the mcp restart  ${SKILL_MARK}`]);
+
+  const expanded = layoutMessages([sent], 60, { times: false, now: 0, toolOutput: true }).map((line) =>
+    textOf(line.spans).trimEnd(),
+  );
+  assert.deepEqual(expanded, [
+    "you",
+    `/ship fix the mcp restart  ${SKILL_MARK}`,
+    "  │ # Ship",
+    "  │",
+    "  │ Open a PR for: fix the mcp restart",
+  ]);
+});
+
+test("a skill run without arguments shows only its name", () => {
+  const sent: ChatMessage = { ...message("u", "user", "Body\n"), skill: { name: "setup", args: "" } };
+  const lines = layoutMessages([sent], 60).map((line) => textOf(line.spans).trimEnd());
+  assert.deepEqual(lines, ["you", `/setup  ${SKILL_MARK}`]);
 });

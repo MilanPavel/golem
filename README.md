@@ -242,7 +242,7 @@ golem skills                                  # the same list, in a shell
 golem skills check ~/.golem/skills/release-notes   # find mistakes before you share one
 ```
 
-**Run one by name.** Type `/release-notes v0.5` and the model gets that skill's instructions, with `v0.5` filled in where the skill asks for its arguments. Skills show in the `/` suggestions with their argument hint. A command such as `/help` keeps its name, so `/skill run help` runs a skill of that name. A skill with `user-invocable: false` is left out.
+**Run one by name.** Type `/release-notes v0.5` and the model gets that skill's instructions, with `v0.5` filled in where the skill asks for its arguments. Skills show in the `/` suggestions with their argument hint. A command such as `/help` keeps its name, so `/skill run help` runs a skill of that name. A skill with `user-invocable: false` is left out. The transcript shows the line you typed, marked `◆ skill`. Ctrl-O shows the instructions the model got.
 
 **What works today, and what is next.** Golem finds, checks, lists, and runs skills. Showing a skill you ran as one short line, letting it read its own files, keeping one on for a whole chat, and letting the model pick one when the task fits are the next steps of [Phase 2](docs/plan.md#phase-2--skills). How it works inside, with an animation, is in [architecture.md](docs/architecture.md#skills).
 
@@ -329,7 +329,7 @@ Type `/` and suggestions appear. `/help` lists everything.
 | Enter / Shift-Enter | Send / new line |
 | Up on an empty line | Recall a message you sent |
 | Ctrl-C | Stop the answer. Twice quits |
-| Ctrl-O | Show what each tool returned |
+| Ctrl-O | Show what each tool returned, and the instructions of each skill you ran |
 | Ctrl-G | Edit the message in `$EDITOR` |
 | Page Up / Page Down, End | Scroll, and jump back to the newest line |
 | `?` on an empty line, or F1 | All keys |
