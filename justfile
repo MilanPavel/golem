@@ -84,9 +84,10 @@ test:
 golem *args:
     pnpm exec golem {{args}}
 
-# Open the status TUI.
+# Open the TUI in the folder just was run from, so its session works there.
+[no-cd]
 tui:
-    pnpm --filter @golem/tui start
+    TSX_TSCONFIG_PATH="{{justfile_directory()}}/packages/tui/tsconfig.json" "{{justfile_directory()}}/packages/tui/node_modules/.bin/tsx" "{{justfile_directory()}}/packages/tui/src/main.tsx"
 
 # Build dist/golem-<version>-<os>-<arch>: a frozen daemon and one golem binary.
 dist:

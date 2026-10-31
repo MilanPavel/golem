@@ -155,12 +155,22 @@ class SessionListParams(BaseModel):
     With ``watch``, the connection also gets a ``session.summary``
     notification whenever a session's summary changes, until it closes.
     Watching again is not an error.
+
+    With ``cwd``, an absolute path, only the sessions in that project folder
+    are listed. It does not go with ``watch``.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     limit: int = Field(default=50, ge=1, le=500)
     watch: bool = False
+    cwd: str | None = Field(default=None, min_length=1)
+
+    @model_validator(mode="after")
+    def _cwd_without_watch(self) -> Self:
+        if self.watch and self.cwd is not None:
+            raise ValueError("session.list takes cwd or watch, not both")
+        return self
 
 
 class SessionSummary(BaseModel):
@@ -169,7 +179,8 @@ class SessionSummary(BaseModel):
     ``status`` is ``running`` while a run is open, ``waiting`` while a run
     waits for a tool approval, and ``closed`` after ``session.close``. ``last_seq`` is the newest
     stored event, so a client can tell what it has not seen, and which of
-    two summaries of one session is newer.
+    two summaries of one session is newer. ``cwd`` is the session's project
+    folder, null for a session that has not been given one.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -181,6 +192,7 @@ class SessionSummary(BaseModel):
     created_at: str = Field(min_length=1)
     updated_at: str = Field(min_length=1)
     last_seq: int = Field(ge=0)
+    cwd: str | None = Field(default=None, min_length=1)
 
 
 class SessionListResult(BaseModel):

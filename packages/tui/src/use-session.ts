@@ -22,7 +22,7 @@ export type SessionHandle = {
 /**
  * The session this TUI follows.
  *
- * On the first connect it attaches to the session with the newest activity.
+ * On the first connect it attaches to the newest session in `cwd`.
  * After a reconnect the client attaches again by itself, so nothing reopens.
  */
 export function useSession(
@@ -38,7 +38,7 @@ export function useSession(
   latest.current = callbacks;
 
   const open = useCallback(
-    async (how: typeof openLatest): Promise<void> => {
+    async (how: (opener: SessionOpener, choose: (sessionId: string) => void) => Promise<string>): Promise<void> => {
       if (opening.current) {
         return;
       }
@@ -46,7 +46,7 @@ export function useSession(
       const previous = ref.current;
       try {
         const opener: SessionOpener = {
-          listSessions: (limit) => client.listSessions(limit),
+          listSessions: (limit, folder) => client.listSessions(limit, folder),
           attachSession: (sessionId, afterSeq) => client.attachSession(sessionId, afterSeq),
           createSession: () => client.createSession({ cwd }),
         };
@@ -71,9 +71,9 @@ export function useSession(
 
   useEffect(() => {
     if (connected && ref.current === null) {
-      void open(openLatest);
+      void open((opener, choose) => openLatest(opener, cwd, choose));
     }
-  }, [connected, open]);
+  }, [connected, open, cwd]);
 
   const startNew = useCallback(() => {
     void open(openNew);

@@ -76,12 +76,15 @@ class SessionRecords:
         row = await self._database.fetch_one(f"{_ACTIVITY} WHERE s.session_id = ?", (session_id,))
         return None if row is None else _activity(row)
 
-    async def recent(self, limit: int) -> list[SessionActivity]:
-        """Open sessions with the newest activity first. Closed ones stay in the log."""
+    async def recent(self, limit: int, cwd: str | None = None) -> list[SessionActivity]:
+        """Open sessions with the newest activity first. Closed ones stay in the log.
+
+        With ``cwd``, only the sessions in that folder.
+        """
         rows = await self._database.fetch_all(
-            f"{_ACTIVITY} WHERE s.closed_at IS NULL"
+            f"{_ACTIVITY} WHERE s.closed_at IS NULL AND (? IS NULL OR s.cwd = ?)"
             " ORDER BY s.updated_at DESC, s.session_id DESC LIMIT ?",
-            (limit,),
+            (cwd, cwd, limit),
         )
         return [_activity(row) for row in rows]
 
