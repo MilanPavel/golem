@@ -242,7 +242,9 @@ golem skills                                  # the same list, in a shell
 golem skills check ~/.golem/skills/release-notes   # find mistakes before you share one
 ```
 
-**What works today, and what is next.** Golem finds, checks, and lists skills. Running one with `/release-notes`, keeping one on for a whole chat, and letting the model pick one when the task fits are the next steps of [Phase 2](docs/plan.md#phase-2--skills). How it works inside, with an animation, is in [architecture.md](docs/architecture.md#skills).
+**Run one by name.** Type `/release-notes v0.5` and the model gets that skill's instructions, with `v0.5` filled in where the skill asks for its arguments. Skills show in the `/` suggestions with their argument hint. A command such as `/help` keeps its name, so `/skill run help` runs a skill of that name. A skill with `user-invocable: false` is left out.
+
+**What works today, and what is next.** Golem finds, checks, lists, and runs skills. Showing a skill you ran as one short line, letting it read its own files, keeping one on for a whole chat, and letting the model pick one when the task fits are the next steps of [Phase 2](docs/plan.md#phase-2--skills). How it works inside, with an animation, is in [architecture.md](docs/architecture.md#skills).
 
 <details>
 <summary><b>Skill settings</b></summary>
@@ -311,6 +313,7 @@ Type `/` and suggestions appear. `/help` lists everything.
 | `/artifact` | Open the full output of the last long tool call in your pager |
 | `/permissions` | Review and change tool rules |
 | `/skills` | See the skills this folder has, and open one to see why it is or is not used |
+| `/<skill> [args]`, `/skill run <name> [args]` | Run a skill once. The second form reaches a skill named like a command |
 | `/mcp` | Manage MCP servers: view tools, reconnect, turn on or off. `/mcp enable <name>` and `/mcp disable <name>` are shortcuts |
 | `/login`, `/logout <provider>` | Save or remove an API key |
 | `/todos`, `/time` | Show or hide the agent's todo list, or message times |

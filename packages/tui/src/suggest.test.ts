@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { COMMANDS, withModelChoices } from "./commands.ts";
+import { COMMANDS, withModelChoices, withSkillChoices, type SkillChoice } from "./commands.ts";
 import {
   applySuggestion,
   moveSuggestion,
@@ -93,4 +93,51 @@ test("the selection stops at the ends and stays on screen", () => {
   assert.deepEqual(suggestionWindow(10, 0, 6), { start: 0, index: 0 });
   assert.deepEqual(suggestionWindow(10, 6, 6), { start: 1, index: 6 });
   assert.deepEqual(suggestionWindow(3, 2, 6), { start: 0, index: 2 });
+});
+
+const SKILLS: readonly SkillChoice[] = [
+  { name: "ship", description: "Open a pull request.", argumentHint: "[hint]" },
+  { name: "setup", description: "Make a checkout ready.", argumentHint: null },
+  { name: "help", description: "Named like a command.", argumentHint: null },
+];
+
+test("skills are suggested after the commands, with their argument hint", () => {
+  const items = suggest("/sh", withSkillChoices(COMMANDS, SKILLS));
+  assert.deepEqual(
+    items.map((item) => [item.label, item.completion, item.description]),
+    [["/ship [hint]", "/ship ", "Open a pull request."]],
+  );
+  assert.deepEqual(applySuggestion("/ship", suggest("/ship", withSkillChoices(COMMANDS, SKILLS)), 0, "enter"), {
+    draft: "/ship",
+    submit: true,
+  });
+});
+
+test("a skill named like a command is suggested only after /skill run", () => {
+  const registry = withSkillChoices(COMMANDS, SKILLS);
+  assert.deepEqual(
+    registry.filter((command) => command.name === "/help").map((command) => command.description),
+    [COMMANDS.find((command) => command.name === "/help")?.description],
+  );
+
+  const names = suggest("/skill run ", registry);
+  assert.deepEqual(
+    names.map((item) => item.label),
+    ["ship", "setup", "help"],
+  );
+  const help = suggest("/skill run he", registry);
+  assert.deepEqual(
+    help.map((item) => item.completion),
+    ["/skill run help "],
+  );
+  assert.deepEqual(applySuggestion("/skill run he", help, 0, "tab"), { draft: "/skill run help ", submit: false });
+  assert.deepEqual(suggest("/skill run help now", registry), []);
+});
+
+test("/skill suggests run, and nothing after run without skills", () => {
+  assert.deepEqual(
+    suggest("/skill ", COMMANDS).map((item) => item.label),
+    ["run"],
+  );
+  assert.deepEqual(suggest("/skill run ", COMMANDS), []);
 });

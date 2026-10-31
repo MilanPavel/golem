@@ -14,6 +14,7 @@ export {
   SESSION_BUSY,
   SESSION_NOT_FOUND,
   type ApprovalChoice,
+  type SendOptions,
   type ChatEvent,
   type ConnectionState,
   type ConnectOptions,
@@ -21,12 +22,15 @@ export {
   type PullUpdate,
   type SessionSummary,
 } from "./connect.ts";
+export type { Dial, Link } from "./link.ts";
+export { unixDial } from "./unix-link.ts";
 export type { ModelProbeResult } from "../../protocol/gen/model-probe-result.ts";
 export type { McpListResult } from "../../protocol/gen/mcp-list-result.ts";
 export type { McpServer } from "../../protocol/gen/mcp-server.ts";
 export type { ModelServerStatus } from "../../protocol/gen/model-server-status.ts";
 export type { McpToggleResult } from "../../protocol/gen/mcp-toggle-result.ts";
 export type { McpToolInfo, McpToolsResult } from "../../protocol/gen/mcp-tools-result.ts";
+export type { SkillCall } from "../../protocol/gen/skill-call.ts";
 export type { ListedSkill, SkillListResult } from "../../protocol/gen/skill-list-result.ts";
 export type { ConfigGetResult, ConfigRule } from "../../protocol/gen/config-get-result.ts";
 export type { ListedModel, ModelListResult } from "../../protocol/gen/model-list-result.ts";

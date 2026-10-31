@@ -1,7 +1,18 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { applyComposer, closedDebug, COMMANDS, helpLines, toggleDebugTab, type DebugState } from "./commands.ts";
+import type { ListedSkill } from "@golem/client";
+
+import {
+  applyComposer,
+  closedDebug,
+  COMMANDS,
+  helpLines,
+  invocableSkills,
+  toggleDebugTab,
+  type DebugState,
+  type SkillChoice,
+} from "./commands.ts";
 
 test("a sentence is sent and a slash command is not", () => {
   const sentence = applyComposer(closedDebug, "hello");
@@ -203,4 +214,78 @@ test("/mcp shows the servers, and enable or disable takes one name", () => {
       notice: "/mcp, /mcp enable <name>, or /mcp disable <name>",
     });
   }
+});
+
+const SKILLS: readonly SkillChoice[] = [
+  { name: "ship", description: "Open a pull request.", argumentHint: "[hint]" },
+  { name: "help", description: "A skill named like a command.", argumentHint: null },
+];
+
+test("/name runs a skill with the rest of the line as its arguments, spacing and quotes kept", () => {
+  const outcome = applyComposer(closedDebug, '/ship fix the  "mcp restart"', SKILLS);
+  assert.deepEqual(outcome, {
+    kind: "skill",
+    name: "ship",
+    args: 'fix the  "mcp restart"',
+    text: '/ship fix the  "mcp restart"',
+    debug: closedDebug,
+  });
+
+  const bare = applyComposer(closedDebug, "/ship", SKILLS);
+  assert.equal(bare.kind, "skill");
+  if (bare.kind === "skill") {
+    assert.equal(bare.args, "");
+  }
+});
+
+test("a name that is neither a command nor a skill is still unknown", () => {
+  const outcome = applyComposer(closedDebug, "/nope now", SKILLS);
+  assert.equal(outcome.kind, "unknown");
+  assert.equal(applyComposer(closedDebug, "/ship").kind, "unknown");
+});
+
+test("a built-in command wins a name, and /skill run reaches the skill", () => {
+  assert.equal(applyComposer(closedDebug, "/help", SKILLS).kind, "help");
+
+  const run = applyComposer(closedDebug, "/skill run help with  this", SKILLS);
+  assert.deepEqual(run, {
+    kind: "skill",
+    name: "help",
+    args: "with  this",
+    text: "/skill run help with  this",
+    debug: closedDebug,
+  });
+});
+
+test("/skill without run and a name, or with a skill it cannot run, says how", () => {
+  for (const line of ["/skill", "/skill run", "/skill go ship"]) {
+    const outcome = applyComposer(closedDebug, line, SKILLS);
+    assert.equal(outcome.kind, "unknown", line);
+    if (outcome.kind === "unknown") {
+      assert.match(outcome.notice, /\/skill run <name>/);
+    }
+  }
+  const missing = applyComposer(closedDebug, "/skill run nope", SKILLS);
+  assert.deepEqual(missing, { kind: "unknown", notice: "no skill named nope to run — /skills lists them" });
+});
+
+test("a skill is not held: hold says so and keeps the draft out of the model", () => {
+  const held: DebugState = { ...closedDebug, open: true, tab: "model", hold: true };
+  const outcome = applyComposer(held, "/ship now", SKILLS);
+  assert.equal(outcome.kind, "local");
+  if (outcome.kind === "local") {
+    assert.match(outcome.notice ?? "", /not held/);
+    assert.equal(outcome.debug.held, null);
+  }
+});
+
+test("only usable skills without user-invocable: false can be run by name", () => {
+  const listed: ListedSkill[] = [
+    { name: "ship", description: "Ship.", path: "/a", source: "project", usable: true, argument_hint: "[hint]" },
+    { name: "facts", description: "Background.", path: "/b", source: "user", usable: true, user_invocable: false },
+    { name: "broken", description: "Bad.", path: "/c", source: "user", usable: false },
+  ];
+
+  assert.deepEqual(invocableSkills(listed), [{ name: "ship", description: "Ship.", argumentHint: "[hint]" }]);
+  assert.equal(applyComposer(closedDebug, "/facts", invocableSkills(listed)).kind, "unknown");
 });
