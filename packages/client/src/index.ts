@@ -22,6 +22,8 @@ export {
   type PullUpdate,
   type SessionSummary,
 } from "./connect.ts";
+export type { Dial, Link } from "./link.ts";
+export { unixDial } from "./unix-link.ts";
 export type { ModelProbeResult } from "../../protocol/gen/model-probe-result.ts";
 export type { McpListResult } from "../../protocol/gen/mcp-list-result.ts";
 export type { McpServer } from "../../protocol/gen/mcp-server.ts";

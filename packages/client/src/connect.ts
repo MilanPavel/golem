@@ -1,5 +1,5 @@
-import { randomUUID } from "node:crypto";
-import net from "node:net";
+import type { Dial, Link } from "./link.ts";
+import { unixDial } from "./unix-link.ts";
 
 import type { AuthListResult } from "../../protocol/gen/auth-list-result.ts";
 import type { AuthRemoveResult } from "../../protocol/gen/auth-remove-result.ts";
@@ -115,8 +115,7 @@ export type ConnectionState =
   | { status: "closed"; reason: string }
   | { status: "rejected"; reason: string };
 
-export interface ConnectOptions {
-  socketPath: string;
+interface ConnectBase {
   clientName: string;
   reconnect: boolean;
   heartbeatMs?: number;
@@ -124,6 +123,11 @@ export interface ConnectOptions {
   connectTimeoutMs?: number;
   backoff?: (attempt: number) => number;
 }
+
+/** How the client reaches the daemon: a Unix socket path, or a function that opens a link. */
+export type ConnectTransport = { socketPath: string; dial?: never } | { dial: Dial; socketPath?: never };
+
+export type ConnectOptions = ConnectBase & ConnectTransport;
 
 export interface GolemClient {
   readonly state: ConnectionState;
@@ -265,6 +269,7 @@ export function connectGolem(options: ConnectOptions): GolemClient {
   const heartbeatTimeoutMs = options.heartbeatTimeoutMs ?? DEFAULT_HEARTBEAT_TIMEOUT_MS;
   const connectTimeoutMs = options.connectTimeoutMs ?? DEFAULT_CONNECT_TIMEOUT_MS;
   const backoff = options.backoff ?? backoffDelayMs;
+  const dial: Dial = options.dial ?? unixDial(options.socketPath);
 
   let state: ConnectionState = { status: "connecting" };
   const listeners = new Set<(next: ConnectionState) => void>();
@@ -283,13 +288,14 @@ export function connectGolem(options: ConnectOptions): GolemClient {
   let nextId = 1;
   let generation = 0;
   let attempt = 0;
-  let socket: net.Socket | undefined;
+  let link: Link | undefined;
+  let open = false;
   let userClosed = false;
   let rejected = false;
   let readySettled = false;
-  let reconnectTimer: NodeJS.Timeout | undefined;
-  let connectTimer: NodeJS.Timeout | undefined;
-  let heartbeatTimer: NodeJS.Timeout | undefined;
+  let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+  let connectTimer: ReturnType<typeof setTimeout> | undefined;
+  let heartbeatTimer: ReturnType<typeof setInterval> | undefined;
 
   let resolveReady: () => void = () => undefined;
   let rejectReady: (error: Error) => void = () => undefined;
@@ -365,8 +371,8 @@ export function connectGolem(options: ConnectOptions): GolemClient {
   }
 
   function call(method: string, params: Record<string, unknown>): Promise<unknown> {
-    const current = socket;
-    if (current === undefined || current.destroyed) {
+    const current = link;
+    if (current === undefined || !open) {
       return Promise.reject(new Error("not connected"));
     }
     const id = nextId;
@@ -381,7 +387,7 @@ export function connectGolem(options: ConnectOptions): GolemClient {
         detail: outgoingDetail(method, params),
         json: method === "ping" ? "" : shown,
       });
-      current.write(`${payload}\n`);
+      current.send(payload);
     });
   }
 
@@ -391,7 +397,7 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       message = JSON.parse(line) as unknown;
     } catch {
       record({ direction: "in", kind: "invalid json" });
-      socket?.destroy(new Error("invalid json"));
+      link?.close(new Error("invalid json"));
       return;
     }
     if (isRecord(message) && message["method"] === "event") {
@@ -506,7 +512,7 @@ export function connectGolem(options: ConnectOptions): GolemClient {
         rejected = true;
         setState({ status: "rejected", reason: text });
         failReady(error);
-        socket?.destroy();
+        link?.close();
       }
       waiter.reject(error);
       return;
@@ -541,7 +547,7 @@ export function connectGolem(options: ConnectOptions): GolemClient {
     }
   }
 
-  function onSocketClosed(error: Error | undefined): void {
+  function onLinkClosed(error: Error | undefined): void {
     stopHeartbeat();
     if (connectTimer !== undefined) {
       clearTimeout(connectTimer);
@@ -565,7 +571,7 @@ export function connectGolem(options: ConnectOptions): GolemClient {
     const delayMs = backoff(attempt);
     setState({ status: "reconnecting", attempt, delayMs });
     reconnectTimer = setTimeout(() => {
-      openSocket();
+      openLink();
     }, delayMs);
   }
 
@@ -585,21 +591,21 @@ export function connectGolem(options: ConnectOptions): GolemClient {
     ]);
   }
 
-  function startHeartbeat(current: net.Socket, gen: number): void {
+  function startHeartbeat(current: Link, gen: number): void {
     stopHeartbeat();
     heartbeatTimer = setInterval(() => {
-      if (gen !== generation || current.destroyed) {
+      if (gen !== generation || !open) {
         return;
       }
-      const nonce = randomUUID();
+      const nonce = globalThis.crypto.randomUUID();
       const timeout = setTimeout(() => {
-        current.destroy(new Error("heartbeat timeout"));
+        current.close(new Error("heartbeat timeout"));
       }, heartbeatTimeoutMs);
       void call("ping", { nonce })
         .then((result) => {
           clearTimeout(timeout);
           if (!isPing(result) || result.nonce !== nonce) {
-            current.destroy(new Error("heartbeat nonce mismatch"));
+            current.close(new Error("heartbeat nonce mismatch"));
           }
         })
         .catch(() => {
@@ -608,38 +614,32 @@ export function connectGolem(options: ConnectOptions): GolemClient {
     }, heartbeatMs);
   }
 
-  function openSocket(): void {
+  function openLink(): void {
     const gen = ++generation;
-    const current = net.createConnection(options.socketPath);
-    socket = current;
-    let buffer = "";
-    let lastError: Error | undefined;
+    const current = dial();
+    link = current;
+    open = false;
     connectTimer = setTimeout(() => {
-      current.destroy(new Error("timed out"));
+      current.close(new Error("timed out"));
     }, connectTimeoutMs);
 
-    current.on("error", (error: Error) => {
-      lastError = error;
-    });
-    current.on("data", (chunk: Buffer) => {
-      buffer += chunk.toString("utf8");
-      let newline = buffer.indexOf("\n");
-      while (newline >= 0) {
-        const line = buffer.slice(0, newline).replace(/\r$/, "");
-        buffer = buffer.slice(newline + 1);
-        if (line.length > 0) {
-          handleLine(line);
-        }
-        newline = buffer.indexOf("\n");
+    current.onLine((line) => {
+      if (gen === generation) {
+        handleLine(line);
       }
     });
-    current.on("close", () => {
+    current.onClose((error) => {
       if (gen !== generation) {
         return;
       }
-      onSocketClosed(lastError);
+      open = false;
+      onLinkClosed(error);
     });
-    current.on("connect", () => {
+    current.onOpen(() => {
+      if (gen !== generation) {
+        return;
+      }
+      open = true;
       void call("hello", {
         protocol_major: PROTOCOL_MAJOR,
         protocol_minor: PROTOCOL_MINOR,
@@ -655,7 +655,7 @@ export function connectGolem(options: ConnectOptions): GolemClient {
             rejected = true;
             setState({ status: "rejected", reason });
             failReady(new Error(reason));
-            current.destroy();
+            current.close();
             return;
           }
           if (connectTimer !== undefined) {
@@ -675,13 +675,13 @@ export function connectGolem(options: ConnectOptions): GolemClient {
           // The close handler reconnects, or records a protocol rejection.
           // A reattach that failed for another reason drops the socket and retries.
           if (gen === generation && !rejected) {
-            current.destroy();
+            current.close();
           }
         });
     });
   }
 
-  openSocket();
+  openLink();
 
   return {
     get state() {
@@ -1036,7 +1036,7 @@ export function connectGolem(options: ConnectOptions): GolemClient {
         clearTimeout(connectTimer);
       }
       stopHeartbeat();
-      socket?.destroy();
+      link?.close();
       rejectPending(new Error("closed"));
       failReady(new Error("closed"));
       setState({ status: "closed", reason: "closed" });
