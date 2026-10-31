@@ -5,9 +5,10 @@ import { RpcError, SESSION_NOT_FOUND, type SessionSummary } from "@golem/client"
 
 import { openLatest, openNew, openOne, type SessionOpener } from "./session-open.ts";
 
-function summary(sessionId: string): SessionSummary {
+function summary(sessionId: string, cwd = "/work"): SessionSummary {
   return {
     session_id: sessionId,
+    cwd,
     model_profile: "remote",
     title: null,
     status: "idle",
@@ -20,9 +21,10 @@ function summary(sessionId: string): SessionSummary {
 function fake(sessions: SessionSummary[], missing: ReadonlySet<string> = new Set()) {
   const calls: string[] = [];
   const client: SessionOpener = {
-    listSessions: (limit) => {
-      calls.push(`list ${limit}`);
-      return Promise.resolve({ sessions: sessions.slice(0, limit) });
+    listSessions: (limit, cwd) => {
+      calls.push(`list ${limit} ${cwd}`);
+      const here = sessions.filter((session) => cwd === undefined || session.cwd === cwd);
+      return Promise.resolve({ sessions: here.slice(0, limit) });
     },
     createSession: () => {
       calls.push("create");
@@ -39,25 +41,31 @@ function fake(sessions: SessionSummary[], missing: ReadonlySet<string> = new Set
   return { client, calls };
 }
 
-test("openLatest attaches to the newest session", async () => {
-  const { client, calls } = fake([summary("s_newest"), summary("s_older")]);
+test("openLatest attaches to the newest session in the folder", async () => {
+  const { client, calls } = fake([summary("s_elsewhere", "/home"), summary("s_newest"), summary("s_older")]);
   const chosen: string[] = [];
-  assert.equal(await openLatest(client, (id) => chosen.push(id)), "s_newest");
-  assert.deepEqual(calls, ["list 1", "attach s_newest"]);
+  assert.equal(await openLatest(client, "/work", (id) => chosen.push(id)), "s_newest");
+  assert.deepEqual(calls, ["list 1 /work", "attach s_newest"]);
   assert.deepEqual(chosen, ["s_newest"]);
 });
 
 test("openLatest starts a session when there is none", async () => {
   const { client, calls } = fake([]);
-  assert.equal(await openLatest(client, () => undefined), "s_new");
-  assert.deepEqual(calls, ["list 1", "create", "attach s_new"]);
+  assert.equal(await openLatest(client, "/work", () => undefined), "s_new");
+  assert.deepEqual(calls, ["list 1 /work", "create", "attach s_new"]);
+});
+
+test("openLatest starts a session when only other folders have one", async () => {
+  const { client, calls } = fake([summary("s_home", "/home")]);
+  assert.equal(await openLatest(client, "/work", () => undefined), "s_new");
+  assert.deepEqual(calls, ["list 1 /work", "create", "attach s_new"]);
 });
 
 test("openLatest replaces a session that vanished", async () => {
   const { client, calls } = fake([summary("s_gone")], new Set(["s_gone"]));
   const chosen: string[] = [];
-  assert.equal(await openLatest(client, (id) => chosen.push(id)), "s_new");
-  assert.deepEqual(calls, ["list 1", "attach s_gone", "create", "attach s_new"]);
+  assert.equal(await openLatest(client, "/work", (id) => chosen.push(id)), "s_new");
+  assert.deepEqual(calls, ["list 1 /work", "attach s_gone", "create", "attach s_new"]);
   assert.deepEqual(chosen, ["s_gone", "s_new"]);
 });
 

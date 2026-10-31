@@ -146,7 +146,8 @@ export interface GolemClient {
    */
   attachSession(sessionId: string, afterSeq?: number): Promise<SessionAttachResult>;
   detachSession(sessionId: string): Promise<void>;
-  listSessions(limit?: number): Promise<SessionListResult>;
+  /** Open sessions, newest activity first. With `cwd`, only those in that project folder. */
+  listSessions(limit?: number, cwd?: string): Promise<SessionListResult>;
   /**
    * Follow the session list. Every listed session, then every later change,
    * reaches {@link GolemClient.onSessionSummary}. After a reconnect the client
@@ -752,9 +753,12 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       await call("session.detach", { session_id: sessionId });
       attachments.untrack(sessionId);
     },
-    async listSessions(limit?: number): Promise<SessionListResult> {
+    async listSessions(limit?: number, cwd?: string): Promise<SessionListResult> {
       await ready;
-      const result = await call("session.list", limit === undefined ? {} : { limit });
+      const result = await call("session.list", {
+        ...(limit === undefined ? {} : { limit }),
+        ...(cwd === undefined ? {} : { cwd }),
+      });
       if (!isSessionListResult(result)) {
         throw new Error("invalid session.list result");
       }

@@ -237,11 +237,13 @@ async def _session_detach(ctx: RequestContext, params: SessionDetachParams) -> S
 
 
 async def _session_list(ctx: RequestContext, params: SessionListParams) -> SessionListResult:
+    if params.cwd is not None and not Path(params.cwd).is_absolute():
+        raise RpcCallError(INVALID_PARAMS, "cwd must be an absolute path")
     sessions = _sessions(ctx)
     if params.watch:
         found = await sessions.watch(params.limit, ctx.connection)
     else:
-        found = await sessions.recent(params.limit)
+        found = await sessions.recent(params.limit, params.cwd)
     return SessionListResult(sessions=[summarize(item) for item in found])
 
 
