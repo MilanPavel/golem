@@ -24,6 +24,7 @@ def summarize(activity: SessionActivity) -> SessionSummary:
         created_at=session.created_at,
         updated_at=session.updated_at,
         last_seq=activity.last_seq,
+        cwd=session.cwd,
     )
 
 

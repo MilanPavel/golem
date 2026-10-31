@@ -242,9 +242,9 @@ golem skills                                  # the same list, in a shell
 golem skills check ~/.golem/skills/release-notes   # find mistakes before you share one
 ```
 
-**Run one by name.** Type `/release-notes v0.5` and the model gets that skill's instructions, with `v0.5` filled in where the skill asks for its arguments. Skills show in the `/` suggestions with their argument hint. A command such as `/help` keeps its name, so `/skill run help` runs a skill of that name. A skill with `user-invocable: false` is left out. The transcript shows the line you typed, marked `◆ skill`. Ctrl-O shows the instructions the model got.
+**Run one by name.** Type `/release-notes v0.5` and the model gets that skill's instructions, with `v0.5` filled in where the skill asks for its arguments. Skills show in the `/` suggestions with their argument hint. A command such as `/help` keeps its name, so `/skill run help` runs a skill of that name. A skill with `user-invocable: false` is left out. The transcript shows the line you typed, marked `◆ skill`. Ctrl-O shows the instructions the model got. Once a chat runs a skill, the model may read the files in that skill's folder, and its commands may run the skill's scripts. Nothing writes there.
 
-**What works today, and what is next.** Golem finds, checks, lists, and runs skills. Showing a skill you ran as one short line, letting it read its own files, keeping one on for a whole chat, and letting the model pick one when the task fits are the next steps of [Phase 2](docs/plan.md#phase-2--skills). How it works inside, with an animation, is in [architecture.md](docs/architecture.md#skills).
+**What works today, and what is next.** Golem finds, checks, lists, and runs skills, shows a skill you ran as one short line, and lets it read its own files. Keeping one on for a whole chat, and letting the model pick one when the task fits are the next steps of [Phase 2](docs/plan.md#phase-2--skills). How it works inside, with an animation, is in [architecture.md](docs/architecture.md#skills).
 
 <details>
 <summary><b>Skill settings</b></summary>

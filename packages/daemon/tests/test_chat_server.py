@@ -534,6 +534,29 @@ async def test_list_puts_recent_activity_first(short_home: Path) -> None:
         await stop_daemon(app, task)
 
 
+async def test_list_with_cwd_keeps_only_that_folder(short_home: Path, tmp_path: Path) -> None:
+    app, task = await start_daemon(short_home, router=ModelRouter(model=GatedChatModel()))
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        here, elsewhere = str(tmp_path / "here"), str(tmp_path / "elsewhere")
+        mine = rpc_result(await client.call("session.create", {"cwd": here}))["session_id"]
+        await client.call("session.create", {"cwd": elsewhere})
+        await client.call("session.create", {})
+
+        listed = rpc_result(await client.call("session.list", {"cwd": here}))
+        summaries = [_record(item) for item in cast(list[object], listed["sessions"])]
+        assert [(item["session_id"], item["cwd"]) for item in summaries if item] == [(mine, here)]
+
+        relative = await client.call("session.list", {"cwd": "here"})
+        assert error_code(relative) == INVALID_PARAMS
+        watched = await client.call("session.list", {"cwd": here, "watch": True})
+        assert error_code(watched) == INVALID_PARAMS
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+
+
 def _event_data(event: dict[str, object]) -> dict[str, object]:
     params = _record(event.get("params"))
     data = _record(params.get("data")) if params else None

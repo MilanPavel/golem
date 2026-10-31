@@ -259,7 +259,13 @@ export function App({
   );
   const selectionRef = useRef<Selection | null>(null);
   const dragging = useRef(false);
-  const selectFrame = useRef<{ view: ChatView; all: readonly LayoutLine[]; shown: boolean } | null>(null);
+  const selectFrame = useRef<{
+    view: ChatView;
+    all: readonly LayoutLine[];
+    shown: boolean;
+    /** The screen row of the pinned question, and the offset a click there scrolls to. */
+    pinned: { row: number; offset: number } | null;
+  } | null>(null);
   const [tail, setTail] = useState<TailAnchor | null>(null);
   const [showTimes, setShowTimes] = useState(false);
   const [showTodos, setShowTodos] = useState(DEFAULT_PREFS.todos);
@@ -572,6 +578,12 @@ export function App({
     return onPointer((event) => {
       const frame = selectFrame.current;
       if (frame === null) {
+        return;
+      }
+      if (event.kind === "down" && frame.shown && frame.pinned !== null && event.row === frame.pinned.row) {
+        dragging.current = false;
+        showSelection(null);
+        setOffset(frame.pinned.offset);
         return;
       }
       if (event.kind === "down") {
@@ -2034,9 +2046,17 @@ export function App({
       ? chatSelection.selection
       : null;
   selectionRef.current = selection;
+  const pinnedRows = transcript.pinned === null ? 0 : 1;
   selectFrame.current = {
-    view: { top: budget.header, rows: transcript.lines.length, first: firstShown, count: transcript.lineCount, width: contentWidth },
+    view: {
+      top: budget.header + pinnedRows,
+      rows: transcript.lines.length,
+      first: firstShown,
+      count: transcript.lineCount,
+      width: contentWidth,
+    },
     all: transcript.all,
+    pinned: transcript.pinned === null ? null : { row: budget.header, offset: transcript.pinned.offset },
     shown: !keysOpen && !picker.open && !mcpManager.open && !skillsManager.open && !perms.open && !switcher.open,
   };
   const composer =
@@ -2154,6 +2174,14 @@ export function App({
       <Box flexDirection="column" width={columns} height={budget.body} flexShrink={0} overflow="hidden">
         <Box flexDirection="column" width={columns} height={chatHeight} flexShrink={0} overflow="hidden">
           {chatHeight > 0 && chat.messages.length === 0 ? <Text dimColor>Type a message.</Text> : null}
+          {transcript.pinned !== null ? (
+            <Box width={columns} height={1} overflow="hidden">
+              <Box width={contentWidth} height={1} backgroundColor={QUESTION_BG}>
+                <LineView line={transcript.pinned.line} columns={null} />
+              </Box>
+              {transcript.gutter !== null ? <Text dimColor>{transcript.gutter[0] ?? " "}</Text> : null}
+            </Box>
+          ) : null}
           {transcript.lines.map((line, index) => (
             <Box key={index} width={columns} height={1} overflow="hidden">
               <Box
@@ -2167,7 +2195,7 @@ export function App({
                 />
               </Box>
               {transcript.gutter !== null ? (
-                <Text dimColor>{transcript.gutter[index] ?? " "}</Text>
+                <Text dimColor>{transcript.gutter[index + pinnedRows] ?? " "}</Text>
               ) : null}
             </Box>
           ))}

@@ -233,9 +233,9 @@ class SessionManager:
         """Forget ``target`` everywhere, as a watcher too. Called when its connection closes."""
         self._events.detach_all(target)
 
-    async def recent(self, limit: int) -> list[SessionActivity]:
-        """Sessions with the newest activity first."""
-        return await self._records.recent(limit)
+    async def recent(self, limit: int, cwd: str | None = None) -> list[SessionActivity]:
+        """Sessions with the newest activity first; with ``cwd``, only those in that folder."""
+        return await self._records.recent(limit, cwd)
 
     async def watch(self, limit: int, target: SummaryTarget) -> list[SessionActivity]:
         """Like :meth:`recent`, and ``target`` gets each later change as a summary."""

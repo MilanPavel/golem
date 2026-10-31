@@ -1,11 +1,24 @@
 {
   "additionalProperties": false,
-  "description": "One session as ``session.list`` reports it.\n\n``status`` is ``running`` while a run is open, ``waiting`` while a run\nwaits for a tool approval, and ``closed`` after ``session.close``. ``last_seq`` is the newest\nstored event, so a client can tell what it has not seen, and which of\ntwo summaries of one session is newer.",
+  "description": "One session as ``session.list`` reports it.\n\n``status`` is ``running`` while a run is open, ``waiting`` while a run\nwaits for a tool approval, and ``closed`` after ``session.close``. ``last_seq`` is the newest\nstored event, so a client can tell what it has not seen, and which of\ntwo summaries of one session is newer. ``cwd`` is the session's project\nfolder, null for a session that has not been given one.",
   "properties": {
     "created_at": {
       "minLength": 1,
       "title": "Created At",
       "type": "string"
+    },
+    "cwd": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cwd"
     },
     "last_seq": {
       "minimum": 0,

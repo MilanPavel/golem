@@ -33,7 +33,8 @@ An Architecture Decision Record (ADR) is a short note of one choice: what was de
 | [027](027-terminal-tab-status.md) | The tab shows golem's state with escape sequences, and iTerm2 gets its own | accepted | 2026-10-28 |
 | [028](028-web-gateway.md) | A browser reaches the daemon only through a strict gateway in the golem binary | accepted | 2026-10-31 |
 | [029](029-web-stack.md) | The web UI is React and Vite, styled only through golem's own Tailwind tokens | accepted | 2026-10-31 |
+| [030](030-skill-read-roots.md) | The folder of a skill the session ran is a read root, never a write root | accepted | 2026-10-31 |
 
 How the running code fits together is in [../architecture.md](../architecture.md).
 
-New records use [template.md](template.md). Number the next file `028-….md` and add a row here.
+New records use [template.md](template.md). Number the next file `031-….md` and add a row here.

@@ -246,11 +246,15 @@ export function isSessionSummary(value: unknown): value is SessionSummary {
     isRecord(value) &&
     typeof value["session_id"] === "string" &&
     typeof value["model_profile"] === "string" &&
-    (value["status"] === "idle" || value["status"] === "running" || value["status"] === "closed") &&
+    (value["status"] === "idle" ||
+      value["status"] === "running" ||
+      value["status"] === "waiting" ||
+      value["status"] === "closed") &&
     typeof value["created_at"] === "string" &&
     typeof value["updated_at"] === "string" &&
     typeof value["last_seq"] === "number" &&
-    (value["title"] === undefined || value["title"] === null || typeof value["title"] === "string")
+    (value["title"] === undefined || value["title"] === null || typeof value["title"] === "string") &&
+    (value["cwd"] === undefined || value["cwd"] === null || typeof value["cwd"] === "string")
   );
 }
 

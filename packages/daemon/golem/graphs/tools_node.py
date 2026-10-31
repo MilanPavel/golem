@@ -136,6 +136,7 @@ def tools_node(
             web=policy.web(),
             session_id=session_id,
             artifacts=artifacts,
+            read_roots=tuple(Path(folder) for folder in state.get("skill_folders") or []),
         )
         allowed = _allowed(config)
         asked = _asked(config)
