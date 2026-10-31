@@ -121,6 +121,8 @@ The gateway turns app API calls into protocol calls. Keeping the two apart is wh
 
 *First, because it is cheap, you would use it every day, and it builds the network door everything after it needs.*
 
+This is now planned as [Phase 10 in plan.md](plan.md#phase-10--web-ui), tracked by [#150](https://github.com/MilanPavel/golem/issues/150).
+
 The chat in your browser, like Claude on the web.
 
 ### What the browser does better than the terminal
