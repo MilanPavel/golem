@@ -144,14 +144,16 @@ class ChatRuntime:
         cwd: str | None = None,
         allowed_tools: Sequence[Allowance] = (),
         mcp_servers: Sequence[str] = (),
+        skill_folder: str | None = None,
     ) -> AsyncGenerator[object]:
         """Stream one user turn. The first turn writes the state fields.
 
         Tool calls a stopped run left without results get a cancelled result
         first, so the provider accepts the history. ``cwd`` is the folder the
         file tools work in, and ``mcp_servers`` the on-demand MCP servers the
-        session turned on. Raises :class:`TooManyStepsError` when the model
-        keeps calling tools.
+        session turned on. ``skill_folder`` is the folder of the skill this turn
+        runs, which the read tools may read from then on. Raises
+        :class:`TooManyStepsError` when the model keeps calling tools.
 
         Close the generator (``contextlib.aclosing``) when you stop early, so
         the graph run ends before the checkpoint is touched again.
@@ -175,6 +177,8 @@ class ChatRuntime:
             schema_version=schema_version,
             has_checkpoint=bool(existing),
         )
+        if skill_folder is not None:
+            graph_input["skill_folders"] = [skill_folder]
         async with aclosing(self._parts(graph_input, config)) as parts:
             async for part in parts:
                 yield part
