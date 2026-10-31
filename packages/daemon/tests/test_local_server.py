@@ -107,6 +107,26 @@ async def test_a_server_that_never_answers_is_stopped(ollama: FakeServe, tmp_pat
     assert ollama.processes[0].signals == ["term"]
 
 
+async def test_the_start_waits_out_ollamas_gpu_discovery_watchdog(
+    ollama: FakeServe, tmp_path: Path
+) -> None:
+    # Ollama answers only once GPU discovery ends, which its watchdog cuts off at 15 s.
+    clock = _Clock()
+    started: list[float] = []
+    ollama.on_spawn = lambda _process: started.append(clock.now)
+
+    def tick() -> float:
+        clock.now += 1
+        if started and clock.now - started[0] >= 16:
+            ollama.up = True
+        return clock.now
+
+    server, heard = _server(ollama, tmp_path, clock=tick)
+    assert await server.ensure_running() is True
+    assert server.owner == "golem"
+    assert heard == [("starting", None), ("ready", None)]
+
+
 async def test_losing_the_port_to_another_daemon_uses_its_server(
     ollama: FakeServe, tmp_path: Path
 ) -> None:
