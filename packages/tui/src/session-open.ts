@@ -3,14 +3,21 @@ import { RpcError, SESSION_NOT_FOUND, type GolemClient } from "@golem/client";
 export type SessionOpener = Pick<GolemClient, "listSessions" | "createSession" | "attachSession">;
 
 /**
- * Attach to the session with the newest activity, or start one when there is none.
+ * Attach to the newest session in `cwd`, or start one when that folder has none.
+ *
+ * A session's folder never changes, so a session from another folder would
+ * put the file tools somewhere the user did not start golem.
  *
  * `choose` runs before the attach, so the TUI already follows the session when
  * the replay arrives. It runs again when the newest session vanished and a new
  * one replaces it.
  */
-export async function openLatest(client: SessionOpener, choose: (sessionId: string) => void): Promise<string> {
-  const { sessions } = await client.listSessions(1);
+export async function openLatest(
+  client: SessionOpener,
+  cwd: string,
+  choose: (sessionId: string) => void,
+): Promise<string> {
+  const { sessions } = await client.listSessions(1, cwd);
   const latest = sessions[0];
   if (latest !== undefined) {
     choose(latest.session_id);
