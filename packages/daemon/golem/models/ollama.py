@@ -44,7 +44,9 @@ BINARIES = (
 _LOCAL_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 _DEFAULT_PORT = 11434
 _PROBE_TIMEOUT = 1.0
-_START_TIMEOUT = 15.0
+# Ollama answers only once its GPU discovery ends, and that can run into its own
+# 15 s watchdog, as on the first start after an install.
+_START_TIMEOUT = 60.0
 _POLL_SECONDS = 0.25
 _STOP_GRACE = 5.0
 
