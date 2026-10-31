@@ -18,7 +18,8 @@ golem/
    ├─ daemon/              # Python: golem
    ├─ client/              # TypeScript: @golem/client
    ├─ cli/                 # TypeScript: @golem/cli  (bin: golem)
-   └─ tui/                 # TypeScript: @golem/tui
+   ├─ tui/                 # TypeScript: @golem/tui
+   └─ web/                 # TypeScript: @golem/web
 ```
 
 Python 3.12 is pinned in `.python-version`. CI installs Node 24.
@@ -38,13 +39,14 @@ Each member is a Hatchling project and names its import package explicitly (`gol
 
 ## TypeScript
 
-`pnpm-workspace.yaml` includes `packages/client`, `packages/cli`, and `packages/tui`. The root `package.json` is private and sets `packageManager` to `pnpm@10.29.3`. It depends on `json-schema-to-typescript` for `just gen`, and on `@golem/cli` so `pnpm exec golem` resolves the bin.
+`pnpm-workspace.yaml` includes `packages/client`, `packages/cli`, `packages/tui`, and `packages/web`. The root `package.json` is private and sets `packageManager` to `pnpm@10.29.3`. It depends on `json-schema-to-typescript` for `just gen`, and on `@golem/cli` so `pnpm exec golem` resolves the bin.
 
 | Package | Role |
 |---|---|
 | `@golem/client` | Socket client shared by the TUI and the CLI. Imports generated types from `packages/protocol/gen`. |
 | `@golem/cli` | The `golem` bin. `status` uses the client. `daemon` subcommands run `python -m golem`. |
 | `@golem/tui` | Ink status line. Depends on `@golem/client`. |
+| `@golem/web` | The web UI, built with Vite. Phase 10. |
 
 Each package carries its own TypeScript, ESLint, and `typescript-eslint` devDependencies. `tsconfig.json` includes that package's `src` and `../protocol/gen/**/*.ts`. `packages/protocol/gen/package.json` sets `"type": "module"` so the value exports in `version.ts` typecheck. The client and the CLI import those files with a `.ts` extension, which Node runs with type stripping. There is no npm package for the protocol.
 

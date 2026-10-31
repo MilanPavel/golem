@@ -9,7 +9,7 @@
 set -eu
 
 types='feat|fix|perf|refactor|docs|test|build|ci|chore|revert|style'
-scopes='daemon|tui|cli|client|protocol|models|sessions|tools|mcp|skills|secrets|install|release|ci|docs|plan|deps'
+scopes='daemon|tui|web|cli|client|protocol|models|sessions|tools|mcp|skills|secrets|install|release|ci|docs|plan|deps'
 max=100
 
 # The first line that is not blank and not a comment.

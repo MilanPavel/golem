@@ -46,6 +46,7 @@ Everything is in one repository, with two sets of packages:
 | `packages/client` | TypeScript | The library that talks to the daemon |
 | `packages/cli` | TypeScript | The `golem` command |
 | `packages/tui` | TypeScript | The chat screen |
+| `packages/web` | TypeScript | The web UI, built with Vite. Phase 10. |
 
 The message formats are written once, in Python. A script (`just gen`) turns them into TypeScript, so the two sides cannot disagree. If someone changes one side and forgets the other, the checks fail.
 
