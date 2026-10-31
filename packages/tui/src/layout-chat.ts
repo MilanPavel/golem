@@ -23,6 +23,8 @@ export type LayoutLine = {
   spans: readonly Span[];
   /** Set when this row only continues the line above, so a copy joins them with this. */
   joins?: Joint;
+  /** On the `you` row of a question: the question's first line, shown pinned while it is scrolled off. */
+  asks?: string;
 };
 
 export type Viewport = {
@@ -31,7 +33,17 @@ export type Viewport = {
   offsetFromBottom: number;
 };
 
+/** The question whose answer fills the window, drawn above `lines` while its own rows are scrolled off. */
+export type PinnedQuestion = {
+  line: LayoutLine;
+  /** The offset that brings the question's `you` row to the top of the window. */
+  offset: number;
+};
+
 export type Transcript = Viewport & {
+  /** Row 0 of the window when set. `lines` and `gutter` then start one row lower. */
+  pinned: PinnedQuestion | null;
+  /** One mark per row of the window, the pinned row included. */
   gutter: readonly string[] | null;
   lineCount: number;
   /** Every row at the width shown, top to bottom. `lines` is the window onto it. */
@@ -84,7 +96,8 @@ export function layoutMessages(
             ? wrapSpans([{ text: message.text }], width)
             : markdownLines(message.text, width);
     if (!continues) {
-      lines.push(paint({ role, spans: labelSpans(label, message, options) }, width));
+      const head: LayoutLine = { role, spans: labelSpans(label, message, options) };
+      lines.push(paint(role === "user" ? { ...head, asks: firstLine(message.text) } : head, width));
     }
     for (const spans of body) {
       lines.push(paint(wrappedLine(role, spans), width));
@@ -149,12 +162,49 @@ export function layoutTranscript(
   const overflows = rows > 0 && full.length > rows;
   const contentWidth = overflows ? Math.max(1, width - 1) : width;
   const lines = overflows ? layoutMessages(messages, contentWidth, options) : full;
-  const fitted = fitViewport(lines, rows, offsetFromBottom);
+  const whole = fitViewport(lines, rows, offsetFromBottom);
+  const question = whole.overflow ? questionAbove(lines, lines.length - whole.offsetFromBottom - whole.lines.length) : -1;
+  const fitted = question < 0 || rows < 2 ? whole : fitViewport(lines, rows - 1, whole.offsetFromBottom);
+  const pinned =
+    fitted === whole
+      ? null
+      : {
+          line: pinnedLine(lines[question] as LayoutLine, contentWidth),
+          offset: Math.max(0, lines.length - question - rows),
+        };
+  const shown = fitted.lines.length + (pinned === null ? 0 : 1);
   const gutter =
-    fitted.overflow && fitted.lines.length > 0
-      ? gutterColumn(lines.length, fitted.lines.length, fitted.offsetFromBottom)
-      : null;
-  return { ...fitted, gutter, lineCount: lines.length, all: lines };
+    fitted.overflow && shown > 0 ? gutterColumn(lines.length, shown, fitted.offsetFromBottom) : null;
+  return { ...fitted, pinned, gutter, lineCount: lines.length, all: lines };
+}
+
+/**
+ * The `you` row of the question above row `first`, or -1 when row `first`
+ * starts a question itself or no question is above it.
+ */
+function questionAbove(lines: readonly LayoutLine[], first: number): number {
+  if (lines[first]?.asks !== undefined) {
+    return -1;
+  }
+  for (let index = first - 1; index >= 0; index -= 1) {
+    if (lines[index]?.asks !== undefined) {
+      return index;
+    }
+  }
+  return -1;
+}
+
+/** `you  <first line of the question>`, cut to one row with `…`. */
+function pinnedLine(head: LayoutLine, width: number): LayoutLine {
+  const room = Math.max(0, width - 5);
+  const asks = head.asks ?? "";
+  const text = asks.length > room ? `${asks.slice(0, Math.max(0, room - 1))}…` : asks;
+  return padLine({ role: "user", spans: [{ text: "you", bold: true }, { text: `  ${text}` }] }, width);
+}
+
+function firstLine(text: string): string {
+  const line = text.split("\n").find((part) => part.trim().length > 0) ?? "";
+  return visibleText(line.trim().replace(/\s+/g, " "));
 }
 
 /** `read_file src/a.ts ✓  12 lines`, then the output while Ctrl-O is on. */
