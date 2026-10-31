@@ -16,5 +16,5 @@
     "types": ["vite/client"]
   },
   "include": ["src"],
-  "exclude": ["src/lint-rules.test.ts"]
+  "exclude": ["src/lint-rules.test.ts", "src/styles/no-arbitrary.test.ts", "src/styles/tokens.test.ts"]
 }

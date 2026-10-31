@@ -51,26 +51,25 @@ Golem's look is a short list of named values. `src/styles/tokens.css` is the onl
 @theme {
   --color-*: initial;          /* no Tailwind colours */
   --font-*: initial;
-  --color-bg: #F3F2EF;         /* slip: limestone */
-  --color-surface: #FBFAF8;
-  --color-ink: #1D1A17;
-  --color-clay: #C4783A;
-  --color-allow: #3F7342;
+  --color-bg: light-dark(#F3F2EF, #15120F);   /* slip, then kiln */
+  --color-surface: light-dark(#FBFAF8, #1D1915);
+  --color-ink: light-dark(#1D1A17, #EEE7DF);
+  --color-clay: light-dark(#C4783A, #D08549);
+  --color-allow: light-dark(#3F7342, #86B57F);
   /* … */
-  --font-ui: "Geist", ui-sans-serif, system-ui, sans-serif;
-  --font-prose: "Literata", Georgia, serif;
-  --font-mono: "Geist Mono", ui-monospace, monospace;
+  --font-ui: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-prose: "Literata Variable", Georgia, serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, monospace;
 }
 
-[data-theme="kiln"] {
-  --color-bg: #15120F;
-  --color-surface: #1D1915;
-  /* … the same names, darker values */
-}
+:root { color-scheme: light dark; }
+:root[data-theme="slip"] { color-scheme: light; }
+:root[data-theme="kiln"] { color-scheme: dark; }
 ```
 
 - **Names say what a colour is for,** not what it looks like: `surface`, `ink`, `muted`, `line`, `clay`, `slip`, `allow`, `deny`, `wait`. A component writes `bg-surface text-ink`, and the kiln theme changes it without a `dark:` variant anywhere.
-- **The theme** is `data-theme` on `<html>`. It follows the system until you pick one, and the page remembers your pick in `localStorage`.
+- **Each token is defined once,** as a pair of values: `light-dark(slip, kiln)`. `color-scheme` picks the value, so there is no second block of overrides to keep in step.
+- **The theme** is `color-scheme`. With no `data-theme` on `<html>` the system decides, with no script and no flash. `data-theme="slip"` or `"kiln"` forces one, and the page remembers your pick in `localStorage`.
 - **Arbitrary values are refused.** A check in `just check` fails on a class such as `bg-[#123456]`, `p-[13px]`, or `text-[15px]`. A one-off value either becomes a token or does not ship. This is what keeps the look from drifting as the code grows.
 - **Plain CSS is used only where a class cannot reach:**
   - the markdown in an answer, which `marked` writes without classes, in `prose.css`
