@@ -27,6 +27,22 @@ test("ui may not import from store", async () => {
   expect(found.map((m) => m.ruleId)).toContain("no-restricted-imports");
 });
 
+test("ui may not import from gallery", async () => {
+  const found = await messages(
+    'import { x } from "../gallery/gallery";\nexport const y = x;\n',
+    "src/ui/button.ts",
+  );
+  expect(found.map((m) => m.ruleId)).toContain("no-restricted-imports");
+});
+
+test("gallery may import ui", async () => {
+  const found = await messages(
+    'import { x } from "../ui/button";\nexport const y = x;\n',
+    "src/gallery/g.ts",
+  );
+  expect(found).toEqual([]);
+});
+
 test("features may not import @golem/client", async () => {
   const found = await messages(
     'import { x } from "@golem/client";\nexport const y = x;\n',

@@ -5,7 +5,8 @@ import { fileURLToPath } from "node:url";
 import { expect, test } from "vitest";
 
 // A utility followed by -[...], or an arbitrary property such as [color:red].
-const ARBITRARY_VALUE = /\b[a-z][a-z0-9-]*-\[[^\]\s]+\]/;
+// A data-[...] or aria-[...] variant matches an attribute, not a value, so it is allowed.
+const ARBITRARY_VALUE = /(?<![\w-])(?!data-|aria-)[a-z][a-z0-9-]*-\[[^\]\s]+\]/;
 const ARBITRARY_PROPERTY = /(?<![\w\]])\[[a-z-]+:[^\]\s]+\]/;
 const RAW_HEX = /#[0-9a-fA-F]{3,8}\b/;
 
@@ -46,5 +47,7 @@ test("the check catches arbitrary values and passes tokens", () => {
   expect(findings('<div className="p-[13px]" />', false)).toEqual([1]);
   expect(findings('<div className="[color:red]" />', false)).toEqual([1]);
   expect(findings('<div className="bg-surface p-4" />', false)).toEqual([]);
+  expect(findings('<div className="data-[state=open]:animate-pop-in aria-[sort=asc]:bg-line" />', false)).toEqual([]);
+  expect(findings('<div className="data-[state=open]:p-[13px]" />', false)).toEqual([1]);
   expect(findings('const color = "#123456";', true)).toEqual([1]);
 });

@@ -28,29 +28,62 @@
   --color-deny-soft: light-dark(#F4DED9, #33201C);
   --color-wait: light-dark(#8A600E, #E2B655);
   --color-wait-soft: light-dark(#F3E7C9, #30271A);
+  --color-on-clay: light-dark(#2A1408, #0E0704);
   --color-code-bg: light-dark(#EFEDE9, #191512);
 
   --font-ui: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
   --font-prose: "Literata Variable", Georgia, serif;
   --font-mono: "Geist Mono Variable", ui-monospace, monospace;
 
+  --radius-xs: 2px;
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 16px;
   --radius-xl: 18px;
 
   --shadow-soft: 0 1px 0 rgba(29, 26, 23, 0.04), 0 8px 24px -12px rgba(29, 26, 23, 0.18);
+
+  /* Overlays and cards: 150 to 200 ms, switched off by prefers-reduced-motion below. */
+  --animate-fade-in: fade-in 150ms ease-out;
+  --animate-fade-out: fade-out 150ms ease-in;
+  --animate-pop-in: pop-in 180ms ease-out;
+  --animate-pop-out: pop-out 150ms ease-in;
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes fade-out {
+    to {
+      opacity: 0;
+    }
+  }
+  @keyframes pop-in {
+    from {
+      opacity: 0;
+      scale: 0.97;
+    }
+  }
+  @keyframes pop-out {
+    to {
+      opacity: 0;
+      scale: 0.97;
+    }
+  }
 }
 
 :root {
   color-scheme: light dark;
 }
 
-:root[data-theme="slip"] {
+/* data-theme on any element scopes a theme to its subtree; on <html> it is the page theme. */
+[data-theme="slip"] {
   color-scheme: light;
+  --shadow-soft: 0 1px 0 rgba(29, 26, 23, 0.04), 0 8px 24px -12px rgba(29, 26, 23, 0.18);
 }
 
-:root[data-theme="kiln"] {
+[data-theme="kiln"] {
   color-scheme: dark;
 }
 
@@ -61,7 +94,7 @@
   }
 }
 
-:root[data-theme="kiln"] {
+[data-theme="kiln"] {
   --shadow-soft: 0 1px 0 rgba(0, 0, 0, 0.3), 0 10px 30px -12px rgba(0, 0, 0, 0.6);
 }
 

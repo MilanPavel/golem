@@ -1,0 +1,59 @@
+/* The pixel golem's colours and eye animations. Colours come from tokens only. */
+.pixel-golem {
+  display: block;
+  height: auto;
+}
+
+.pixel-golem .body {
+  fill: var(--color-golem-body);
+}
+
+.pixel-golem .eye {
+  fill: var(--color-golem-eye);
+}
+
+.pixel-golem[data-state="thinking"] .eye {
+  fill: var(--color-clay);
+  animation: golem-glow 1.4s ease-in-out infinite;
+}
+
+.pixel-golem[data-state="waiting"] .eye {
+  fill: var(--color-wait);
+  animation: golem-wink 2.4s steps(1) infinite;
+}
+
+.pixel-golem[data-state="failed"] .eye {
+  fill: var(--color-deny);
+}
+
+.pixel-golem[data-state="failed"] .body {
+  fill: color-mix(in srgb, var(--color-golem-body) 70%, var(--color-faint));
+}
+
+.pixel-golem[data-state="offline"] .body {
+  fill: var(--color-line-strong);
+}
+
+.pixel-golem[data-state="offline"] .eye {
+  fill: var(--color-faint);
+}
+
+@keyframes golem-glow {
+  50% {
+    fill: var(--color-golem-eye);
+  }
+}
+
+@keyframes golem-wink {
+  0%,
+  86% {
+    opacity: 1;
+  }
+  88%,
+  92% {
+    opacity: 0;
+  }
+  94% {
+    opacity: 1;
+  }
+}
