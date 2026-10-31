@@ -176,6 +176,7 @@ class DaemonApp:
                         local,
                     ),
                     self._titles,
+                    self.state.skills,
                 )
                 if self._discovery is None:
                     models = ModelDiscovery(router, self.paths.cache_dir)
@@ -339,14 +340,17 @@ class DaemonApp:
 
 
 async def _open_sessions(
-    database: Database, runtime: ChatRuntime, titles: TitleGenerator | None
+    database: Database,
+    runtime: ChatRuntime,
+    titles: TitleGenerator | None,
+    skills: SkillRegistry | None,
 ) -> SessionManager:
     events = EventLog(database)
     records = SessionRecords(database)
     session_log = SessionLog(events, EventBus(), records)
     runs = RunRecords(database)
     await recover_runs(runs, events, session_log, runtime)
-    return SessionManager(runtime, session_log, records, runs, titles=titles)
+    return SessionManager(runtime, session_log, records, runs, titles=titles, skills=skills)
 
 
 def _install_signals(

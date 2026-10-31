@@ -44,6 +44,7 @@ from golem.models.errors import ModelUnreachable
 from golem.permissions.engine import Allowance
 from golem.sessions.interrupted import close_reply
 from golem.sessions.log import SessionLog
+from golem.skills.invoke import Invocation
 from golem_protocol.events import (
     ApprovalDecision,
     ApprovalNeededData,
@@ -55,6 +56,7 @@ from golem_protocol.events import (
     MessageStartedData,
     RunCancelledData,
     RunFailedData,
+    SkillActivatedData,
     TodosUpdatedData,
     ToolCompletedData,
     ToolFailedData,
@@ -72,7 +74,12 @@ CANCELLED_TOOL = "cancelled before it finished"
 
 @dataclass(frozen=True, slots=True)
 class Turn:
-    """What one ``message.send`` asked for, with the ids already chosen."""
+    """What one ``message.send`` asked for, with the ids already chosen.
+
+    ``text`` is what the model gets. For a skill invoked by name that is the
+    skill's filled-in body, ``skill`` says which skill, and ``typed`` is what
+    the user typed.
+    """
 
     session_id: str
     run_id: str
@@ -84,6 +91,8 @@ class Turn:
     cwd: str | None = None
     allowed_tools: tuple[Allowance, ...] = ()
     mcp_servers: tuple[str, ...] = ()
+    skill: Invocation | None = None
+    typed: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -158,9 +167,26 @@ async def run_turn(
 
     try:
         control.started.set()
+        skill = turn.skill
+        if skill is not None:
+            await emit(
+                "skill.activated",
+                SkillActivatedData(
+                    name=skill.call.name,
+                    source=skill.source,
+                    how="invoked",
+                    path=str(skill.path),
+                    hash=skill.hash,
+                ),
+            )
         await emit(
             "message.completed",
-            MessageCompletedData(message_id=turn.user_message_id, role="user", text=turn.text),
+            MessageCompletedData(
+                message_id=turn.user_message_id,
+                role="user",
+                text=turn.text,
+                skill=None if skill is None else skill.call,
+            ),
         )
         # Emits are shielded: once one is awaited, it lands even if this task is cancelled.
         progress.run_started = True

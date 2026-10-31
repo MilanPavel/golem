@@ -66,11 +66,23 @@ class MessageDeltaData(BaseModel):
     text: str
 
 
+class SkillCall(BaseModel):
+    """A skill run once by name, with what was typed after it."""
+
+    model_config = _CONFIG
+
+    name: str = Field(min_length=1, max_length=64)
+    args: str = Field(default="", max_length=100_000)
+
+
 class MessageCompletedData(BaseModel):
     """Full text of a user or assistant message.
 
     ``interrupted`` is true when the run stopped before the model finished.
-    ``text`` is then what had streamed so far.
+    ``text`` is then what had streamed so far. ``skill`` is set on a user
+    message that invoked a skill: ``text`` is then the skill body the model
+    got, with the arguments filled in, and a client can show the skill's name
+    and arguments instead.
     """
 
     model_config = _CONFIG
@@ -79,6 +91,28 @@ class MessageCompletedData(BaseModel):
     role: Literal["user", "assistant"]
     text: str
     interrupted: bool = False
+    skill: SkillCall | None = None
+
+
+SkillSource = Literal["project", "user", "bundled"]
+"""Where a skill was found: the session's project, the user's folders, or golem itself."""
+
+
+class SkillActivatedData(BaseModel):
+    """A skill is active in the session.
+
+    ``how`` is ``invoked`` for a skill run once by name: its body is that
+    turn's user message. ``source`` is where it was found, ``path`` its folder,
+    and ``hash`` the sha256 of its ``SKILL.md``.
+    """
+
+    model_config = _CONFIG
+
+    name: str = Field(min_length=1)
+    source: SkillSource
+    how: Literal["invoked"]
+    path: str = Field(min_length=1)
+    hash: str
 
 
 class EmptyEventData(BaseModel):
@@ -542,6 +576,19 @@ class TodosUpdatedEvent(BaseModel):
     data: TodosUpdatedData
 
 
+class SkillActivatedEvent(BaseModel):
+    """A skill became active. It comes just before the user message that invoked it."""
+
+    model_config = _CONFIG
+
+    seq: int = Field(ge=1)
+    session_id: str = Field(min_length=1)
+    run_id: str = Field(min_length=1)
+    ts: str = Field(min_length=1)
+    type: Literal["skill.activated"]
+    data: SkillActivatedData
+
+
 EventType = Literal[
     "session.created",
     "session.updated",
@@ -562,6 +609,7 @@ EventType = Literal[
     "approval.needed",
     "approval.resolved",
     "todos.updated",
+    "skill.activated",
 ]
 """The ``type`` of each :data:`ChatEvent` member."""
 
@@ -585,7 +633,8 @@ ChatEvent = Annotated[
     | ToolFailedEvent
     | ApprovalNeededEvent
     | ApprovalResolvedEvent
-    | TodosUpdatedEvent,
+    | TodosUpdatedEvent
+    | SkillActivatedEvent,
     Field(discriminator="type"),
 ]
 
@@ -625,6 +674,10 @@ __all__ = [
     "SessionCreatedEvent",
     "SessionUpdatedData",
     "SessionUpdatedEvent",
+    "SkillActivatedData",
+    "SkillActivatedEvent",
+    "SkillCall",
+    "SkillSource",
     "Todo",
     "TodoStatus",
     "TodosUpdatedData",

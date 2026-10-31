@@ -7,6 +7,8 @@ from typing import Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
 
+from golem_protocol.events import SkillCall, SkillSource
+
 
 class HelloParams(BaseModel):
     """First command on a connection. Negotiates the protocol version."""
@@ -195,6 +197,12 @@ class MessageSendParams(BaseModel):
     The run's events go to the connections attached to the session.
     ``cwd`` is the sender's folder, an absolute path. A session without a
     project folder takes it, and keeps it. A session with one ignores it.
+
+    ``skill`` runs a skill once: the model gets the skill's body with
+    ``skill.args`` filled in, instead of ``text``. ``text`` is then what the
+    user typed, such as ``/ship fix the mcp restart``. A skill the session
+    does not see, or one that is disabled, broken, or not user-invocable, is
+    error ``-32013``.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -202,6 +210,7 @@ class MessageSendParams(BaseModel):
     session_id: str = Field(min_length=1)
     text: str = Field(min_length=1, max_length=100_000)
     cwd: str | None = Field(default=None, min_length=1)
+    skill: SkillCall | None = None
 
 
 class MessageSendResult(BaseModel):
@@ -628,9 +637,6 @@ class SkillListParams(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     cwd: str | None = Field(default=None, min_length=1)
-
-
-SkillSource = Literal["project", "user", "bundled"]
 
 
 class ListedSkill(BaseModel):
