@@ -7,7 +7,8 @@ The profile allows what a build or a test run needs and little more:
 - **Network** is denied unless ``[shell] network = true``. Local Unix sockets
   stay open, so a tool can still reach a daemon of its own.
 - **Reads** are allowed, except in folders that hold credentials, golem's own
-  home among them.
+  home among them. Golem's skills folder is the one part of its home a
+  command may read, so a skill can run its own scripts.
 
 The command runs in its own process group. A timeout or a cancelled run
 kills the whole group, so a test runner's children die with it.
@@ -45,6 +46,9 @@ SECRET_DIRS = (
     "Library/Keychains",
 )
 """Under the home folder. A command may not read these."""
+
+SKILL_DIRS = (".golem/skills",)
+"""Under the home folder, inside a :data:`SECRET_DIRS` folder. A command may read these."""
 
 CACHE_DIRS = (".cache", "Library/Caches", ".npm", "Library/pnpm", ".cargo/registry")
 """Under the home folder. Builds write here, so a command may too."""
@@ -101,6 +105,9 @@ def profile(root: Path, settings: ShellSettings, *, home: Path) -> str:
         '  (regex #"^/dev/tty") (regex #"^/dev/fd/") (literal "/dev/dtracehelper"))',
         "(deny file-read*",
         *[f"  (subpath {_quote((home / name).resolve())})" for name in SECRET_DIRS],
+        ")",
+        "(allow file-read*",
+        *[f"  (subpath {_quote((home / name).resolve())})" for name in SKILL_DIRS],
         ")",
     ]
     if not settings.network:
@@ -264,4 +271,13 @@ def _quote(path: Path) -> str:
     return f'"{text}"'
 
 
-__all__ = ["CACHE_DIRS", "SECRET_DIRS", "Finished", "available", "environment", "profile", "run"]
+__all__ = [
+    "CACHE_DIRS",
+    "SECRET_DIRS",
+    "SKILL_DIRS",
+    "Finished",
+    "available",
+    "environment",
+    "profile",
+    "run",
+]
