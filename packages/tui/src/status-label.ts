@@ -22,6 +22,8 @@ export function statusLabel(state: ConnectionState): string {
       return "closed";
     case "rejected":
       return state.reason;
+    case "unauthorized":
+      return "unauthorized";
   }
 }
 
