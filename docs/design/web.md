@@ -165,7 +165,7 @@ These become `packages/web/src/styles/tokens.css` in step 10.6. The names say wh
 | `golem-eye` | `#2A1408` | `#0E0704` | The figure's eyes at rest |
 | `allow` / `allow-soft` | `#3F7342` / `#DFEBDD` | `#86B57F` / `#1F2B1E` | Allowed, added lines, done |
 | `deny` / `deny-soft` | `#A8402F` / `#F4DED9` | `#E58474` / `#33201C` | Denied, removed lines, failed |
-| `wait` / `wait-soft` | `#96690F` / `#F3E7C9` | `#E2B655` / `#30271A` | Waiting for you |
+| `wait` / `wait-soft` | `#8A600E` / `#F3E7C9` | `#E2B655` / `#30271A` | Waiting for you |
 | `code-bg` | `#EFEDE9` | `#191512` | Code blocks, tool output |
 
 ### Contrast
@@ -178,8 +178,11 @@ Checked with the WCAG 2.2 formula. 4.5:1 for text, 3:1 for fills and focus rings
 | `muted` on `bg` / `sunken` / `slip` | 6.9 / 6.3 / 6.1 | 8.3 / 7.8 / 7.0 |
 | `faint` on `bg` / `sunken` / `surface` | 5.1 / 4.6 / 5.4 | 5.3 / 4.9 / 5.4 |
 | `clay-ink` on `bg` / `surface` | 5.5 / 5.9 | 8.5 / 8.0 |
-| `allow`, `deny`, `wait` on `surface` | 5.4, 5.9, 4.7 | 7.4, 6.6, 9.2 |
+| `allow`, `deny`, `wait` on `surface` | 5.4, 5.9, 5.35 | 7.4, 6.6, 9.2 |
+| `wait` on `bg` / `sunken` | 4.99 / 4.56 | 9.8 / 10.1 |
 | `clay` on `bg` (a fill, and the focus ring) | 3.1 | 6.3 |
+
+`wait` was darkened from `#96690F` so the waiting label passes on `bg` as well.
 
 `faint` reaches only 4.47 on `slip`, so text on your messages uses `muted`. The check in 10.6.2 runs over every pair in this table.
 
