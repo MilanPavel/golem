@@ -431,7 +431,7 @@ export const KEYS: readonly KeyBinding[] = [
     id: "tool-output",
     label: "Ctrl-O",
     contexts: ["transcript"],
-    description: "Shows or hides the output of tool calls.",
+    description: "Shows or hides the output of tool calls and the body of each skill run.",
     when: { name: "ctrl-o", overlay: false, switcher: false },
     run: () => ({ kind: "toggle-tools" }),
   },

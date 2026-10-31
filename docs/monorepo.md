@@ -43,7 +43,7 @@ Each member is a Hatchling project and names its import package explicitly (`gol
 
 | Package | Role |
 |---|---|
-| `@golem/client` | Socket client shared by the TUI and the CLI. Imports generated types from `packages/protocol/gen`. |
+| `@golem/client` | Client shared by the TUI and the CLI. `@golem/client` runs in any runtime. `@golem/client/node` adds the Unix socket. Imports generated types from `packages/protocol/gen`. |
 | `@golem/cli` | The `golem` bin. `status` uses the client. `daemon` subcommands run `python -m golem`. |
 | `@golem/tui` | Ink status line. Depends on `@golem/client`. |
 | `@golem/web` | The web UI, built with Vite. Phase 10. |
