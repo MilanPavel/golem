@@ -91,7 +91,7 @@ Built today:
 - `run.cancel`, and Ctrl-C in the TUI. A cancelled answer keeps what it said. [ADR-008](adr/008-cancellation.md).
 - Titles, a live session list, and the TUI switcher (`/sessions`, `/new`, `/title`). [ADR-009](adr/009-session-list.md).
 - `session.fork` and `/fork`. A new session with the history up to one message. [ADR-010](adr/010-fork.md).
-- Read-only tools: `read_file`, `list_dir`, `glob`, and `grep`, inside the session's project folder. [ADR-011](adr/011-tools.md).
+- Read-only tools: `read_file`, `list_dir`, `glob`, and `grep`, inside the session's project folder, and inside the folder of each skill the session ran. [ADR-011](adr/011-tools.md), [ADR-030](adr/030-skill-read-roots.md).
 - `web_fetch`: one page as text, asked per host, never from a private address. [ADR-017](adr/017-web-fetch.md).
 - Artifacts: tool output over 20 000 characters in `golem.db`, read in pages with `read_artifact` and `artifact.read`. [ADR-016](adr/016-artifacts.md).
 - Write tools: `write_file` and `edit_file`, inside the session's project folder and outside its `.golem/` and `.git/`, with the diff in the approval. [ADR-015](adr/015-write-tools.md).
@@ -102,7 +102,7 @@ Built today:
 - An agent todo list: `todo_write`, `todos.updated`, and the todo band. [ADR-018](adr/018-tool-state-updates.md).
 - MCP servers over stdio or HTTP, from `[mcp.<name>]` in the user's file or a trusted project's. Their tools are `mcp__<server>__<tool>`, ask before every call, and reach the model marked as data. A server is on for every session, on demand per session (`/mcp enable`), or off. Servers restart with backoff when they exit or stop answering `ping`, and pick up config changes without a daemon restart. Tokens come from the Keychain as `keychain:mcp/<name>`. [ADR-023](adr/023-mcp-client.md).
 
-- Skills: `SKILL.md` folders from the project, the user, and golem, checked, listed with `/skills`, `golem skills`, and `skill.list`, and reloaded within two seconds of a change. Using them comes next. [ADR-025](adr/025-skill-sources.md), and [Skills](#skills) below.
+- Skills: `SKILL.md` folders from the project, the user, and golem, checked, listed with `/skills`, `golem skills`, and `skill.list`, and reloaded within two seconds of a change. `/name` runs one, and the model may then read its folder. Pinning one and letting the model pick one come next. [ADR-025](adr/025-skill-sources.md), and [Skills](#skills) below.
 
 Planned next:
 
@@ -133,7 +133,7 @@ The socket is only the door. Behind it, these jobs sit in one process:
 | Tools | Plain Python functions with a Pydantic argument model, in `golem/tools/`. The graph offers them to the model and runs them in its own `tools` node. | Built: file reads and writes, `shell`, git, `web_fetch` |
 | MCP servers | Child processes or HTTP endpoints from `[mcp.<name>]`, started in the background, watched with `ping`, and restarted with backoff. Each session's tools come from `ToolRegistry.scoped` (`golem/mcp/`). | Built |
 | Permissions | Rules from the project, the user, and the defaults, checked in order before every tool call (`golem/permissions/`). | Built |
-| Skills | The `SKILL.md` folders a session's folder sees, and which one each name means (`golem/skills/`). | Built: finding and listing. Using them planned |
+| Skills | The `SKILL.md` folders a session's folder sees, and which one each name means (`golem/skills/`). | Built: finding, listing, and running by name. Pinning planned |
 | Event log | The history. Every event, numbered by `seq`, written before it is sent. A client that reconnects will read it and rebuild the screen. | Written. Replay to clients planned |
 
 The graph does not own the rest of the product. It calls ordinary Python for three things that have to stay ours:
@@ -192,7 +192,7 @@ If you quit the TUI halfway through, the daemon still finishes the run and saves
 If you press Ctrl-C while the answer streams, the TUI sends `run.cancel`. The daemon cancels the run task. Each tool call still open gets `tool.failed`. The answer gets a `message.completed` with the text streamed so far and `interrupted: true`, then `run.cancelled` with the reason `user`. The same partial text is written into the checkpoint, so "go on" continues from it ([ADR-008](adr/008-cancellation.md)). Stopping the daemon does the same for every open run, with the reason `shutdown`.
 
 `shell` runs the user's login shell (`$SHELL -lc`) in the session folder, under `sandbox-exec` ([ADR-014](adr/014-shell-sandbox.md)):
-- **The sandbox** allows writes only to the folder, the temp folders, the usual tool caches, and `[shell] writable`. It denies the network unless `[shell] network = true`, except local Unix sockets. It denies reads of folders that hold credentials, `~/.ssh` and `~/.golem` among them. Variables that look like credentials (`*_API_KEY`, `*_TOKEN`, `*_SECRET`, `*PASSWORD*`) are removed from the environment.
+- **The sandbox** allows writes only to the folder, the temp folders, the usual tool caches, and `[shell] writable`. It denies the network unless `[shell] network = true`, except local Unix sockets. It denies reads of folders that hold credentials, `~/.ssh` and `~/.golem` among them, but allows reads of `~/.golem/skills`, so a skill can run its scripts ([ADR-030](adr/030-skill-read-roots.md)). Variables that look like credentials (`*_API_KEY`, `*_TOKEN`, `*_SECRET`, `*PASSWORD*`) are removed from the environment.
 - **Output** is stdout and stderr together. It streams as `tool.output` in batches of up to 2 KB or 0.2 s, up to 64 KB per call. Up to 5 MB is kept (the first 1 MB and the last 4 MB), then `[exit code N]`, and long output becomes an artifact. A failing command is a `tool.completed` with summary `exit N`, not a failure.
 - **Stopping.** The command runs in its own process group. `[shell] timeout_seconds`, or a smaller `timeout_seconds` in the call, kills the group, and so does cancelling the run.
 - **Policy.** `shell` is not read-only, so by default every command asks. A rule's `match` is checked against the command, so `match = "git status|pnpm test*"` allows those and nothing else. Allowing a command for the session allows that exact command, not every command.
@@ -317,7 +317,7 @@ The daemon owns the skills, as it owns sessions and rules. Graph state will hold
 
 ### What happens today
 
-Step 2.1 finds, checks, and lists skills. `message.send` with `skill` runs one by name: `golem/skills/invoke.py` finds it in the session's view, reads its body from disk, and fills it in with `golem/skills/expand.py`. The run logs `skill.activated`, then the user message with the filled-in body as its `text` and the skill's name and arguments as `skill`. A skill the session cannot run is error `-32013`, and no turn starts. In the TUI, `/name` runs a skill when no command has that name, and `/skill run <name> [args]` always does. The arguments are the rest of the line, with their spacing and quotes kept. The `/` suggestions list the skills you can run, with their `argument-hint`, from the same `skill.list` that `/skills` shows. Skills with `user-invocable: false` are not listed and not run (`packages/tui/src/commands.ts`). The transcript draws a user message that has `skill` as the typed line, `/ship fix the mcp restart  ◆ skill`, and Ctrl-O shows the filled-in body under it (`packages/tui/src/layout-chat.ts`). A reattach replays the same event, so it draws the same line. `/debug model` still shows the full text the model got.
+Step 2.1 finds, checks, and lists skills. `message.send` with `skill` runs one by name: `golem/skills/invoke.py` finds it in the session's view, reads its body from disk, and fills it in with `golem/skills/expand.py`. The run logs `skill.activated`, then the user message with the filled-in body as its `text` and the skill's name and arguments as `skill`. A skill the session cannot run is error `-32013`, and no turn starts. In the TUI, `/name` runs a skill when no command has that name, and `/skill run <name> [args]` always does. The arguments are the rest of the line, with their spacing and quotes kept. The `/` suggestions list the skills you can run, with their `argument-hint`, from the same `skill.list` that `/skills` shows. Skills with `user-invocable: false` are not listed and not run (`packages/tui/src/commands.ts`). The transcript draws a user message that has `skill` as the typed line, `/ship fix the mcp restart  ◆ skill`, and Ctrl-O shows the filled-in body under it (`packages/tui/src/layout-chat.ts`). A reattach replays the same event, so it draws the same line. `/debug model` still shows the full text the model got. Each run of a skill adds its folder to the graph state (`skill_folders`), so it survives a restart and a fork copies it. The read tools take an absolute path inside one of those folders, and refuse one that resolves into a folder the sandbox closes. The write tools never take one ([ADR-030](adr/030-skill-read-roots.md)).
 
 ```mermaid
 flowchart LR

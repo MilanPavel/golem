@@ -1,6 +1,7 @@
 """Read-only file tools: ``read_file``, ``list_dir``, ``glob``, and ``grep``.
 
-Every path is resolved inside the session folder first. File reads run in a
+Every path is resolved inside the session folder first, or inside the folder
+of a skill the session ran. File reads run in a
 thread so a large folder does not stall the event loop.
 """
 
@@ -15,7 +16,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from golem.tools.paths import inside, relative, session_root
+from golem.tools.paths import Readable, readable
 from golem.tools.registry import Tool, ToolContext, ToolError, ToolResult
 
 SKIPPED_DIRS = frozenset(
@@ -51,7 +52,10 @@ _ARGS = ConfigDict(extra="forbid")
 class ReadFileArgs(BaseModel):
     model_config = _ARGS
 
-    path: str = Field(min_length=1, description="File path, relative to the project folder.")
+    path: str = Field(
+        min_length=1,
+        description="File path, relative to the project folder, or absolute in a skill folder.",
+    )
     offset: int = Field(default=1, ge=1, description="First line to read, from 1.")
     limit: int = Field(
         default=DEFAULT_READ_LINES, ge=1, le=DEFAULT_READ_LINES, description="Lines to read."
@@ -85,23 +89,23 @@ class GrepArgs(BaseModel):
 
 
 async def _read_file(args: ReadFileArgs, ctx: ToolContext) -> ToolResult:
-    return await asyncio.to_thread(read_file, session_root(ctx), args)
+    return await asyncio.to_thread(read_file, readable(ctx), args)
 
 
 async def _list_dir(args: ListDirArgs, ctx: ToolContext) -> ToolResult:
-    return await asyncio.to_thread(list_dir, session_root(ctx), args)
+    return await asyncio.to_thread(list_dir, readable(ctx), args)
 
 
 async def _glob(args: GlobArgs, ctx: ToolContext) -> ToolResult:
-    return await asyncio.to_thread(glob_files, session_root(ctx), args)
+    return await asyncio.to_thread(glob_files, readable(ctx), args)
 
 
 async def _grep(args: GrepArgs, ctx: ToolContext) -> ToolResult:
-    return await asyncio.to_thread(grep, session_root(ctx), args)
+    return await asyncio.to_thread(grep, readable(ctx), args)
 
 
-def read_file(root: Path, args: ReadFileArgs) -> ToolResult:
-    path = inside(root, args.path)
+def read_file(where: Readable, args: ReadFileArgs) -> ToolResult:
+    path = where.resolve(args.path)
     if not path.is_file():
         raise ToolError(f"{args.path} is not a file")
     if path.stat().st_size > MAX_READ_BYTES:
@@ -124,8 +128,8 @@ def read_file(root: Path, args: ReadFileArgs) -> ToolResult:
     return ToolResult(output="\n".join(numbered), summary=summary)
 
 
-def list_dir(root: Path, args: ListDirArgs) -> ToolResult:
-    path = inside(root, args.path)
+def list_dir(where: Readable, args: ListDirArgs) -> ToolResult:
+    path = where.resolve(args.path)
     if not path.is_dir():
         raise ToolError(f"{args.path} is not a folder")
     try:
@@ -140,8 +144,8 @@ def list_dir(root: Path, args: ListDirArgs) -> ToolResult:
     return ToolResult(output=output, summary=_count(len(names), "entry", "entries"))
 
 
-def glob_files(root: Path, args: GlobArgs) -> ToolResult:
-    base = inside(root, args.path)
+def glob_files(where: Readable, args: GlobArgs) -> ToolResult:
+    base = where.resolve(args.path)
     if not base.is_dir():
         raise ToolError(f"{args.path} is not a folder")
     if Path(args.pattern).is_absolute() or ".." in Path(args.pattern).parts:
@@ -151,10 +155,10 @@ def glob_files(root: Path, args: GlobArgs) -> ToolResult:
         if not match.is_file() or _skipped(match.relative_to(base)):
             continue
         try:
-            resolved = inside(root, str(match))
+            resolved = where.resolve(str(match))
         except ToolError:
             continue
-        found.append(relative(root, resolved))
+        found.append(where.show(resolved))
         if len(found) > MAX_ENTRIES:
             break
     shown = found[:MAX_ENTRIES]
@@ -164,8 +168,8 @@ def glob_files(root: Path, args: GlobArgs) -> ToolResult:
     return ToolResult(output=output, summary=_count(len(shown), "file"))
 
 
-def grep(root: Path, args: GrepArgs) -> ToolResult:
-    base = inside(root, args.path)
+def grep(where: Readable, args: GrepArgs) -> ToolResult:
+    base = where.resolve(args.path)
     try:
         regex = re.compile(args.pattern, re.IGNORECASE if args.ignore_case else 0)
     except re.error as exc:
@@ -181,7 +185,7 @@ def grep(root: Path, args: GrepArgs) -> ToolResult:
     for path in files:
         if args.include is not None and not fnmatch(path.name, args.include):
             continue
-        hits = _grep_file(root, path, regex)
+        hits = _grep_file(where, path, regex)
         if hits:
             files_hit += 1
             matches.extend(hits)
@@ -197,9 +201,9 @@ def grep(root: Path, args: GrepArgs) -> ToolResult:
     return ToolResult(output=output, summary=summary)
 
 
-def _grep_file(root: Path, path: Path, regex: re.Pattern[str]) -> list[str]:
+def _grep_file(where: Readable, path: Path, regex: re.Pattern[str]) -> list[str]:
     try:
-        shown = relative(root, inside(root, str(path)))
+        shown = where.show(where.resolve(str(path)))
     except ToolError:
         return []
     try:
@@ -248,7 +252,8 @@ def _count(n: int, one: str, many: str | None = None) -> str:
 READ_FILE = Tool(
     name="read_file",
     description=(
-        "Read a text file in the project folder. Lines come numbered. "
+        "Read a text file in the project folder, or in the folder of a skill this "
+        "session ran. Lines come numbered. "
         f"Reads up to {DEFAULT_READ_LINES} lines from offset."
     ),
     args=ReadFileArgs,

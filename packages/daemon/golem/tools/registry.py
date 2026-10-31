@@ -71,7 +71,8 @@ class ToolContext:
     same reply have run, so a preview builds on them. ``approved_diff`` is the
     diff the user approved for this call: a file tool applies its change only
     when it still makes exactly that diff. ``artifacts`` holds the big output
-    of ``session_id``.
+    of ``session_id``. ``read_roots`` are the folders of the skills the
+    session ran: the read tools may read them, and nothing writes there.
     """
 
     root: Path | None
@@ -83,6 +84,7 @@ class ToolContext:
     session_id: str | None = None
     artifacts: Artifacts | None = None
     network: Network = field(default_factory=Network)
+    read_roots: tuple[Path, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
