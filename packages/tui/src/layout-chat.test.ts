@@ -34,7 +34,8 @@ test("overflow keeps the tail until the offset moves toward the start", () => {
     messages.push(message(String(index), "user", `line ${index}`));
   }
   const tail = layoutTranscript(messages, 40, 4, 0);
-  assert.equal(tail.lines.length, 4);
+  assert.equal(tail.lines.length + (tail.pinned === null ? 0 : 1), 4);
+  assert.equal(tail.gutter?.length, 4);
   assert.equal(tail.overflow, true);
   assert.ok(tail.gutter);
   const rendered = tail.lines.map((line) => textOf(line.spans)).join("\n");
@@ -46,6 +47,52 @@ test("overflow keeps the tail until the offset moves toward the start", () => {
   assert.equal(head.offsetFromBottom > 0, true);
   assert.match(head.lines.map((line) => textOf(line.spans)).join("\n"), /line 0/);
   assert.equal(head.gutter?.[0], "█");
+});
+
+function answer(lines: number): string {
+  return Array.from({ length: lines }, (_, index) => `answer ${index}`).join("\n\n");
+}
+
+test("a question scrolled off the top is pinned above its answer", () => {
+  const messages = [message("q", "user", "what is infinity?\nmore detail"), message("a", "assistant", answer(20))];
+  const view = layoutTranscript(messages, 40, 6, 0);
+  assert.ok(view.pinned);
+  assert.equal(textOf(view.pinned.line.spans).trimEnd(), "you  what is infinity?");
+  assert.equal(view.pinned.line.role, "user");
+  assert.equal(view.lines.length, 5);
+  assert.equal(view.gutter?.length, 6);
+  assert.match(textOf(view.lines.at(-1)?.spans ?? []), /answer 19/);
+
+  const top = layoutTranscript(messages, 40, 6, view.pinned.offset);
+  assert.equal(top.pinned, null);
+  assert.equal(textOf(top.lines[0]?.spans ?? []).trimEnd(), "you");
+});
+
+test("the newest question above the window is the one pinned", () => {
+  const messages = [
+    message("q1", "user", "first"),
+    message("a1", "assistant", answer(10)),
+    message("q2", "user", "second"),
+    message("a2", "assistant", answer(10)),
+  ];
+  const view = layoutTranscript(messages, 40, 4, 0);
+  assert.match(textOf(view.pinned?.line.spans ?? []), /^you {2}second/);
+});
+
+test("nothing is pinned while the question's own row is in view, or with no question", () => {
+  const short = [message("q", "user", "hi"), message("a", "assistant", answer(2))];
+  assert.equal(layoutTranscript(short, 40, 20, 0).pinned, null);
+  const lone = [message("a", "assistant", answer(20))];
+  assert.equal(layoutTranscript(lone, 40, 4, 0).pinned, null);
+});
+
+test("a long question is cut to one row", () => {
+  const messages = [message("q", "user", "x".repeat(100)), message("a", "assistant", answer(20))];
+  const pinned = layoutTranscript(messages, 30, 4, 0).pinned;
+  assert.ok(pinned);
+  const text = textOf(pinned.line.spans);
+  assert.equal(text.length, 29);
+  assert.match(text, /…$/);
 });
 
 test("a shorter window keeps the same line at the bottom", () => {
