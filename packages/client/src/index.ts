@@ -23,7 +23,6 @@ export {
   type SessionSummary,
 } from "./connect.ts";
 export type { Dial, Link } from "./link.ts";
-export { unixDial } from "./unix-link.ts";
 export type { ModelProbeResult } from "../../protocol/gen/model-probe-result.ts";
 export type { McpListResult } from "../../protocol/gen/mcp-list-result.ts";
 export type { McpServer } from "../../protocol/gen/mcp-server.ts";
@@ -35,7 +34,6 @@ export type { ListedSkill, SkillListResult } from "../../protocol/gen/skill-list
 export type { ConfigGetResult, ConfigRule } from "../../protocol/gen/config-get-result.ts";
 export type { ListedModel, ModelListResult } from "../../protocol/gen/model-list-result.ts";
 export { mergeSummary } from "./session-index.ts";
-export { resolveSocketPath } from "./socket-path.ts";
 export { VERSION as GOLEM_VERSION } from "./version.ts";
 export {
   formatWireLine,

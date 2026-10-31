@@ -6,7 +6,7 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { PROTOCOL_MAJOR } from "../../protocol/gen/version.ts";
-import { connectGolem, type ChatEvent, type ConnectionState, type SessionSummary } from "./connect.ts";
+import { connectGolem, type ChatEvent, type ConnectionState, type SessionSummary } from "./node.ts";
 import { mergeSummary } from "./session-index.ts";
 import { formatWireLine } from "./wire.ts";
 

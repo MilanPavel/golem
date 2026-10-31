@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 
 import { render } from "ink";
 
-import { connectGolem, resolveSocketPath } from "@golem/client";
+import { connectGolem, resolveSocketPath } from "@golem/client/node";
 
 import { App } from "./app.tsx";
 import { bindPointer } from "./screen.ts";

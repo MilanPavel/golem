@@ -3,7 +3,7 @@ import { existsSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import { resolve } from "node:path";
 
-import { connectGolem, GOLEM_VERSION, resolveSocketPath } from "@golem/client";
+import { connectGolem, GOLEM_VERSION, resolveSocketPath } from "@golem/client/node";
 
 import type { DaemonStatus } from "../../protocol/gen/daemon-status.ts";
 
