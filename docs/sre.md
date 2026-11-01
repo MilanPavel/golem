@@ -188,6 +188,24 @@ The `dist` job also runs `just check-signature`. CI builds are signed ad-hoc, wh
 
 A pull request also runs `pr-title` (`.github/workflows/pr.yml`). The title becomes the commit on `main`, so it goes through the same check as a local commit message, `.githooks/commit-msg` ([ADR-024](adr/024-commits-prs-releases.md)). A new push to a pull request cancels that PR's older run.
 
+`just check` also builds the docs site (`just docs-build`), so a dead link in `docs/` fails the check like a test does.
+
+### The docs site
+
+The docs in `docs/` are also a site, built with VitePress and published to GitHub Pages at <https://milanpavel.github.io/golem/> ([ADR-034](adr/034-docs-site.md)). `just docs` serves it locally and reloads on every edit.
+
+```mermaid
+flowchart LR
+  pr["pull request"] --> check["just check<br/>builds the site"]
+  check -->|squash merge| main["main"]
+  main --> build["docs.yml: build"] --> deploy["deploy to Pages"] --> site["milanpavel.github.io/golem"]
+```
+
+- **When it publishes.** `.github/workflows/docs.yml` runs on a push to `main` that changes `docs/`, `tokens.css` (the site's palette), `pnpm-lock.yaml`, or the workflow itself. **Run workflow** on its Actions page publishes by hand. A pull request never publishes.
+- **One deploy at a time.** A newer push waits for the running deploy, so the site never shows half a build.
+- **The Pages setting.** Settings → Pages → Source must be **GitHub Actions**. It is set once, outside the repo. If someone switches it to a branch, the deploy job fails and the site stays as it was. `gh api repos/MilanPavel/golem/pages -q .build_type` should print `workflow`.
+- **Who may deploy.** The `github-pages` environment only allows deploys from `main`.
+
 ### Pull requests
 
 Changes reach `main` only through a pull request:
