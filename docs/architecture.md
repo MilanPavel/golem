@@ -76,7 +76,7 @@ What talks to what, and how:
 - **Inside the daemon.** Ordinary Python calls in one asyncio process. A run is an asyncio task. The graph is a library the session manager calls. It is not a second process.
 - **Daemon to model.** HTTPS to Anthropic, OpenAI, or a hosted OpenAI-compatible API such as OpenRouter, or plain HTTP to Ollama's native API or a local OpenAI-compatible server. The model router resolves each session's model name to one of them.
 - **Daemon to disk.** SQLite files under `~/.golem`. `checkpoints.db` is written by LangGraph's SQLite checkpointer. `golem.db` is ours: the event log and the session and run tables, through one `aiosqlite` connection.
-- **Who starts what.** launchd starts the daemon at login and again after a crash. You start the clients.
+- **Who starts what.** launchd starts the daemon at login and again after a crash. You start the clients. When no daemon answers and there is no launch agent, `golem` asks once whether to install it, or to run a daemon only while the window is open ([ADR-033](adr/033-golem-offers-to-start-the-service.md)).
 
 ## Built today, planned next
 
