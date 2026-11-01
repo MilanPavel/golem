@@ -22,7 +22,8 @@ export type Params =
   | ApprovalNeededEvent
   | ApprovalResolvedEvent
   | TodosUpdatedEvent
-  | SkillActivatedEvent;
+  | SkillActivatedEvent
+  | SkillDeactivatedEvent;
 export type Cwd = string | null;
 export type MessageId = string;
 export type SessionId = string;
@@ -182,15 +183,22 @@ export type SessionId19 = string;
 export type Ts18 = string;
 export type Type18 = 'todos.updated';
 export type Hash = string;
-export type How = 'invoked';
+export type How = 'invoked' | 'pinned';
 export type Name4 = string;
 export type Path = string;
 export type Source1 = 'project' | 'user' | 'bundled';
-export type RunId19 = string;
+export type RunId19 = string | null;
 export type Seq19 = number;
 export type SessionId20 = string;
 export type Ts19 = string;
 export type Type19 = 'skill.activated';
+export type Name5 = string;
+export type Reason2 = 'unpinned';
+export type RunId20 = string | null;
+export type Seq20 = number;
+export type SessionId21 = string;
+export type Ts20 = string;
+export type Type20 = 'skill.deactivated';
 
 /**
  * Server → client event. No ``id``; this is not a response to a request.
@@ -758,14 +766,17 @@ export interface Todo {
   text: Text3;
 }
 /**
- * A skill became active. It comes just before the user message that invoked it.
+ * A skill became active.
+ *
+ * An invoked skill's event comes just before the user message that invoked
+ * it, in that run. A pin is not part of a run, so its ``run_id`` is null.
  *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "SkillActivatedEvent".
  */
 export interface SkillActivatedEvent {
   data: SkillActivatedData;
-  run_id: RunId19;
+  run_id?: RunId19;
   seq: Seq19;
   session_id: SessionId20;
   ts: Ts19;
@@ -775,8 +786,10 @@ export interface SkillActivatedEvent {
  * A skill is active in the session.
  *
  * ``how`` is ``invoked`` for a skill run once by name: its body is that
- * turn's user message. ``source`` is where it was found, ``path`` its folder,
- * and ``hash`` the sha256 of its ``SKILL.md``.
+ * turn's user message. It is ``pinned`` for a skill turned on for the whole
+ * session: its body is in the system prompt of every model call until it is
+ * unpinned. ``source`` is where it was found, ``path`` its folder, and
+ * ``hash`` the sha256 of its ``SKILL.md``.
  *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "SkillActivatedData".
@@ -787,4 +800,28 @@ export interface SkillActivatedData {
   name: Name4;
   path: Path;
   source: Source1;
+}
+/**
+ * A pinned skill was turned off. Not part of a run, so ``run_id`` is null.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "SkillDeactivatedEvent".
+ */
+export interface SkillDeactivatedEvent {
+  data: SkillDeactivatedData;
+  run_id?: RunId20;
+  seq: Seq20;
+  session_id: SessionId21;
+  ts: Ts20;
+  type: Type20;
+}
+/**
+ * A pinned skill is off again. ``unpinned``: the user turned it off.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "SkillDeactivatedData".
+ */
+export interface SkillDeactivatedData {
+  name: Name5;
+  reason: Reason2;
 }

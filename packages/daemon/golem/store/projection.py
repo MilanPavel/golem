@@ -7,9 +7,10 @@ event they follow, before the event row, so foreign keys hold.
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 
 from golem.store.database import Transaction
-from golem.store.records import decode_allowances, encode_allowances
+from golem.store.records import decode_allowances, decode_names, encode_allowances
 from golem_protocol.events import (
     ApprovalNeededEvent,
     ApprovalResolvedEvent,
@@ -23,6 +24,8 @@ from golem_protocol.events import (
     SessionClosedEvent,
     SessionCreatedEvent,
     SessionUpdatedEvent,
+    SkillActivatedEvent,
+    SkillDeactivatedEvent,
     ToolOutputEvent,
 )
 
@@ -67,6 +70,12 @@ async def project(tx: Transaction, event: ChatEvent) -> None:
                 "UPDATE sessions SET mcp_servers = ? WHERE session_id = ?",
                 (json.dumps(event.data.mcp_servers), event.session_id),
             )
+    elif isinstance(event, SkillActivatedEvent) and event.data.how == "pinned":
+        await _set_skills(tx, event.session_id, lambda names: [*names, event.data.name])
+    elif isinstance(event, SkillDeactivatedEvent):
+        await _set_skills(
+            tx, event.session_id, lambda names: [n for n in names if n != event.data.name]
+        )
     elif isinstance(event, ModelSelectedEvent):
         await tx.execute(
             "UPDATE sessions SET model_profile = ? WHERE session_id = ?",
@@ -134,3 +143,17 @@ async def _finish_run(
 
 
 __all__ = ["project"]
+
+
+async def _set_skills(
+    tx: Transaction, session_id: str, change: Callable[[list[str]], list[str]]
+) -> None:
+    """Rewrite ``sessions.skills``, the pinned skills in pin order, with ``change``."""
+    rows = await tx.fetch_all("SELECT skills FROM sessions WHERE session_id = ?", (session_id,))
+    if not rows:
+        return
+    names = [name for name in change(list(decode_names(rows[0]["skills"]))) if name]
+    unique = list(dict.fromkeys(names))
+    await tx.execute(
+        "UPDATE sessions SET skills = ? WHERE session_id = ?", (json.dumps(unique), session_id)
+    )

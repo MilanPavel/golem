@@ -1,0 +1,22 @@
+{
+  "additionalProperties": false,
+  "description": "A pinned skill is off again. ``unpinned``: the user turned it off.",
+  "properties": {
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "reason": {
+      "const": "unpinned",
+      "title": "Reason",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "reason"
+  ],
+  "title": "SkillDeactivatedData",
+  "type": "object"
+}

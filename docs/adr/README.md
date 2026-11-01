@@ -35,7 +35,8 @@ An Architecture Decision Record (ADR) is a short note of one choice: what was de
 | [029](029-web-stack.md) | The web UI is React and Vite, styled only through golem's own Tailwind tokens | accepted | 2026-10-31 |
 | [030](030-skill-read-roots.md) | The folder of a skill the session ran is a read root, never a write root | accepted | 2026-10-31 |
 | [031](031-system-prompt.md) | The system prompt is built for each model call, and never stored | accepted | 2026-11-01 |
+| [032](032-pinned-skills.md) | Pinned skills live in the session record, not in graph state | accepted | 2026-11-01 |
 
 How the running code fits together is in [../architecture.md](../architecture.md).
 
-New records use [template.md](template.md). Number the next file `032-….md` and add a row here.
+New records use [template.md](template.md). Number the next file `033-….md` and add a row here.

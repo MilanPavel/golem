@@ -1112,14 +1112,17 @@
     },
     "SkillActivatedData": {
       "additionalProperties": false,
-      "description": "A skill is active in the session.\n\n``how`` is ``invoked`` for a skill run once by name: its body is that\nturn's user message. ``source`` is where it was found, ``path`` its folder,\nand ``hash`` the sha256 of its ``SKILL.md``.",
+      "description": "A skill is active in the session.\n\n``how`` is ``invoked`` for a skill run once by name: its body is that\nturn's user message. It is ``pinned`` for a skill turned on for the whole\nsession: its body is in the system prompt of every model call until it is\nunpinned. ``source`` is where it was found, ``path`` its folder, and\n``hash`` the sha256 of its ``SKILL.md``.",
       "properties": {
         "hash": {
           "title": "Hash",
           "type": "string"
         },
         "how": {
-          "const": "invoked",
+          "enum": [
+            "invoked",
+            "pinned"
+          ],
           "title": "How",
           "type": "string"
         },
@@ -1155,15 +1158,23 @@
     },
     "SkillActivatedEvent": {
       "additionalProperties": false,
-      "description": "A skill became active. It comes just before the user message that invoked it.",
+      "description": "A skill became active.\n\nAn invoked skill's event comes just before the user message that invoked\nit, in that run. A pin is not part of a run, so its ``run_id`` is null.",
       "properties": {
         "data": {
           "$ref": "#/$defs/SkillActivatedData"
         },
         "run_id": {
-          "minLength": 1,
-          "title": "Run Id",
-          "type": "string"
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Run Id"
         },
         "seq": {
           "minimum": 1,
@@ -1189,7 +1200,6 @@
       "required": [
         "seq",
         "session_id",
-        "run_id",
         "ts",
         "type",
         "data"
@@ -1218,6 +1228,79 @@
         "name"
       ],
       "title": "SkillCall",
+      "type": "object"
+    },
+    "SkillDeactivatedData": {
+      "additionalProperties": false,
+      "description": "A pinned skill is off again. ``unpinned``: the user turned it off.",
+      "properties": {
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "reason": {
+          "const": "unpinned",
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "reason"
+      ],
+      "title": "SkillDeactivatedData",
+      "type": "object"
+    },
+    "SkillDeactivatedEvent": {
+      "additionalProperties": false,
+      "description": "A pinned skill was turned off. Not part of a run, so ``run_id`` is null.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/SkillDeactivatedData"
+        },
+        "run_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Run Id"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "skill.deactivated",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "SkillDeactivatedEvent",
       "type": "object"
     },
     "Todo": {
@@ -1727,6 +1810,7 @@
           "session.created": "#/$defs/SessionCreatedEvent",
           "session.updated": "#/$defs/SessionUpdatedEvent",
           "skill.activated": "#/$defs/SkillActivatedEvent",
+          "skill.deactivated": "#/$defs/SkillDeactivatedEvent",
           "todos.updated": "#/$defs/TodosUpdatedEvent",
           "tool.completed": "#/$defs/ToolCompletedEvent",
           "tool.failed": "#/$defs/ToolFailedEvent",
@@ -1796,6 +1880,9 @@
         },
         {
           "$ref": "#/$defs/SkillActivatedEvent"
+        },
+        {
+          "$ref": "#/$defs/SkillDeactivatedEvent"
         }
       ],
       "title": "Params"
