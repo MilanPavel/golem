@@ -1,0 +1,181 @@
+{
+  "live": [
+    {
+      "data": {
+        "cwd": "/tmp/golem-golden",
+        "forked_from": null,
+        "model_name": null,
+        "model_profile": "remote",
+        "model_provider": null
+      },
+      "run_id": null,
+      "seq": 1,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:00Z",
+      "type": "session.created"
+    },
+    {
+      "data": {
+        "interrupted": false,
+        "message_id": "id-3",
+        "role": "user",
+        "skill": null,
+        "text": "count"
+      },
+      "run_id": "id-2",
+      "seq": 2,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:01Z",
+      "type": "message.completed"
+    },
+    {
+      "data": {},
+      "run_id": "id-2",
+      "seq": 3,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:02Z",
+      "type": "run.started"
+    },
+    {
+      "data": {
+        "message_id": "id-4",
+        "role": "assistant"
+      },
+      "run_id": "id-2",
+      "seq": 4,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:03Z",
+      "type": "message.started"
+    },
+    {
+      "data": {
+        "message_id": "id-4",
+        "text": "H"
+      },
+      "run_id": "id-2",
+      "seq": 5,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:04Z",
+      "type": "message.delta"
+    },
+    {
+      "data": {
+        "message_id": "id-4",
+        "text": "e"
+      },
+      "run_id": "id-2",
+      "seq": 6,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:05Z",
+      "type": "message.delta"
+    },
+    {
+      "data": {
+        "message_id": "id-4",
+        "text": "l"
+      },
+      "run_id": "id-2",
+      "seq": 7,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:06Z",
+      "type": "message.delta"
+    },
+    {
+      "data": {
+        "interrupted": true,
+        "message_id": "id-4",
+        "role": "assistant",
+        "skill": null,
+        "text": "Hel"
+      },
+      "run_id": "id-2",
+      "seq": 8,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:07Z",
+      "type": "message.completed"
+    },
+    {
+      "data": {
+        "reason": "user"
+      },
+      "run_id": "id-2",
+      "seq": 9,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:08Z",
+      "type": "run.cancelled"
+    }
+  ],
+  "replay": [
+    {
+      "data": {
+        "cwd": "/tmp/golem-golden",
+        "forked_from": null,
+        "model_name": null,
+        "model_profile": "remote",
+        "model_provider": null
+      },
+      "run_id": null,
+      "seq": 1,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:00Z",
+      "type": "session.created"
+    },
+    {
+      "data": {
+        "interrupted": false,
+        "message_id": "id-3",
+        "role": "user",
+        "skill": null,
+        "text": "count"
+      },
+      "run_id": "id-2",
+      "seq": 2,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:01Z",
+      "type": "message.completed"
+    },
+    {
+      "data": {},
+      "run_id": "id-2",
+      "seq": 3,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:02Z",
+      "type": "run.started"
+    },
+    {
+      "data": {
+        "message_id": "id-4",
+        "role": "assistant"
+      },
+      "run_id": "id-2",
+      "seq": 4,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:03Z",
+      "type": "message.started"
+    },
+    {
+      "data": {
+        "interrupted": true,
+        "message_id": "id-4",
+        "role": "assistant",
+        "skill": null,
+        "text": "Hel"
+      },
+      "run_id": "id-2",
+      "seq": 8,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:07Z",
+      "type": "message.completed"
+    },
+    {
+      "data": {
+        "reason": "user"
+      },
+      "run_id": "id-2",
+      "seq": 9,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:08Z",
+      "type": "run.cancelled"
+    }
+  ]
+}

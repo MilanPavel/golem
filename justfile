@@ -51,6 +51,10 @@ gen:
     done
     uv run python -c 'from golem_protocol.codegen import default_gen_dir, export_browser_methods, export_version; export_version(default_gen_dir()); export_browser_methods(default_gen_dir())'
 
+# Record the event logs the view package tests fold: a real daemon, a fake model, five chats.
+golden:
+    uv run python packages/daemon/tests/golden.py
+
 # Refresh the bundled copy of LiteLLM's model prices.
 prices:
     uv run python -m golem.models.prices

@@ -1,3 +1,4 @@
+export { Attachments } from "./attachments.ts";
 export { backoffDelayMs } from "./backoff.ts";
 export {
   connectGolem,
