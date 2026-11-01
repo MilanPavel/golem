@@ -12,6 +12,9 @@ htmlcov/
 node_modules/
 dist/
 
+# The docs site's build and cache (just docs-build)
+docs/.vitepress/cache/
+
 # Stamped by `just dist`, then packaged. A checkout has no version file.
 packages/daemon/golem/_build.py
 

@@ -12,6 +12,7 @@ golem/
 ├─ pnpm-lock.yaml          # one lockfile for every Node package
 ├─ pnpm-workspace.yaml
 ├─ justfile
+├─ docs/                   # the docs, and the site over them: @golem/docs (VitePress)
 └─ packages/
    ├─ protocol/            # Python: golem-protocol
    │  └─ gen/              # generated JSON Schema and TypeScript
@@ -72,7 +73,9 @@ The generated files are committed. `just check` copies `packages/protocol/gen`, 
 | `just fmt` | `ruff format` and `ruff check --fix` |
 | `just typecheck` | `pyright` (strict) and `tsc --noEmit` in the TypeScript packages |
 | `just test` | `pytest`, then the TypeScript package tests |
-| `just check` | `gen`, then lint, typecheck, and test; fails if `gen/` drifted |
+| `just check` | `gen`, then lint, typecheck, test, and `docs-build`; fails if `gen/` drifted or a docs link is dead |
+| `just docs` | The docs site at `localhost:5173/golem/`, reloading as you edit |
+| `just docs-build` | Builds the docs site into `docs/.vitepress/dist` ([ADR-034](adr/034-docs-site.md)) |
 | `just golem …` | The `golem` CLI (`status`, `daemon install\|start\|stop\|logs`) |
 | `just tui` | The status TUI |
 
