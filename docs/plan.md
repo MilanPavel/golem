@@ -12,6 +12,7 @@ This file is about what comes next. How the existing pieces are built is in [arc
 
 | Phase | What you get | Milestone |
 |---|---|---|
+| 1. First run, continued | `brew install` to a first answer, in the terminal and the browser | M3 — Smooth first run |
 | 2. Skills | Claude Code compatible `SKILL.md` skills | M4 — Skilled |
 | 10. Web UI | The chat in your browser, served by `golem web` | M7 — In the browser |
 | 3. Flows | Durable workflows written in Python, resumable after a crash | M5 — Works alone |
@@ -22,11 +23,11 @@ This file is about what comes next. How the existing pieces are built is in [arc
 | 8. Platforms | One interface for everything OS-specific, then Linux and Windows | Later |
 | 9. Model routing and long sessions | Token and cost display, a cheap profile for small jobs, budgets, escalation, compaction | Later |
 
-What is built is in [architecture.md](architecture.md) and the ADRs, and how to install, run, and release it is in [sre.md](sre.md). Phase 1, the first run and the terminal UX, is built ([#62](https://github.com/MilanPavel/golem/issues/62)), so skills are next, then the web UI.
+What is built is in [architecture.md](architecture.md) and the ADRs, and how to install, run, and release it is in [sre.md](sre.md). Steps 1.1 to 1.6 of Phase 1, the first run and the terminal UX, are built ([#62](https://github.com/MilanPavel/golem/issues/62)). Steps 1.7 to 1.14 finish the first run from `brew install`, so they come first, then skills, then the web UI.
 
 ```mermaid
 flowchart LR
-  p2[2 Skills] --> p10[10 Web UI] --> p3[3 Flows] --> p4[4 Triggers] --> p5[5 Memory] --> p6[6 Evals and hardening] --> p7[7 TUI polish] --> p8[8 Platforms] --> p9[9 Model routing and long sessions]
+  p1[1 First run, continued] --> p2[2 Skills] --> p10[10 Web UI] --> p3[3 Flows] --> p4[4 Triggers] --> p5[5 Memory] --> p6[6 Evals and hardening] --> p7[7 TUI polish] --> p8[8 Platforms] --> p9[9 Model routing and long sessions]
 ```
 
 ### How to read a phase
@@ -99,6 +100,95 @@ Rules:
 
 ---
 
+## Phase 1 — First run, continued
+
+A new user types `brew install milanpavel/golem/golem` and `golem`, and nothing else, to reach a first answer, local or hosted, in the TUI or the browser. Steps 1.1 to 1.6 are built. The details are in [#62](https://github.com/MilanPavel/golem/issues/62) and in each step's issue, and every ticket is a sub-issue of its step. One ticket per commit and per PR. This section keeps the why.
+
+Today, after `brew install`, nothing starts the daemon, and `golem` says `reconnecting` forever. A daemon that crashes at start looks the same. On a fresh Mac the model picker shows models marked `down`. A hosted model takes Esc, `/login`, a paste, and `/model` again, and a wrong key shows up only on the first message. Sending with no model says to edit config.toml. MCP needs TOML by hand, and no skills ship with golem.
+
+Choices that hold for the whole phase:
+
+- **Every screen has a default on Enter, every failure names one next step, and nothing asks the user to open a file.**
+- **The TUI may install the launch agent, after a yes.** launchd stays the only long-lived owner of the daemon, so [ADR-022](adr/022-homebrew-tap.md) holds. 1.7 adds the ADR.
+- **The TUI and the web UI share one first run.** They share one daemon and one `~/.golem`, so whichever opens first sets golem up for both, and the other goes straight to the chat. The first-run state lives in `packages/view`, and the facts (Ollama installed or running, which providers have a key, whether the default resolves) come from the daemon's model list.
+- **The daemon installs Ollama**, by brew's absolute path, so the browser can do it too. This replaces decision 4 of #62, where the TUI ran `brew install`. 1.10 adds the ADR.
+- **Starting the daemon and entering an API key stay terminal steps for the web.** `golem web` asks about the daemon before it opens the page, and [ADR-028](adr/028-web-gateway.md) keeps refusing `auth.set` from the browser.
+
+```mermaid
+flowchart LR
+  s7[1.7 Own service] --> s8[1.8 First-run choices]
+  s8 --> s9[1.9 API key in the picker] --> s14[1.14 Check]
+  s8 --> s10[1.10 Local, no dead end] --> s14
+  s8 --> s11[1.11 Empty chat teaches]
+  s12[1.12 MCP without TOML] --> s14
+  s13[1.13 Starter skills] --> s14
+```
+
+1.12 and 1.13 do not depend on the others. Do 1.8.1 and 1.8.2 before 10.10 ([#183](https://github.com/MilanPavel/golem/issues/183)), so the web model page is built on them.
+
+### 1.7 golem starts its own service — [#220](https://github.com/MilanPavel/golem/issues/220)
+
+- **Goal:** after `brew install`, typing `golem` is enough.
+- **You can:** run `golem` right after `brew install`, say yes once, and reach the chat. When the service can't start, see why and what to do.
+- **Build:** the TUI offers to start the service when no daemon answers (now and at every login, or only for this session), a daemon that can't start writes why to `run/last-error` and the TUI and CLI show it, CLI commands that need the daemon name the command that starts it, a version mismatch restarts with one key, `golem web` runs the same check before it opens the browser, and the caveats and the README say two commands.
+- **Done when:** on a Mac with no launch agent, `brew install milanpavel/golem/golem && golem` reaches the chat after one Enter.
+- **Watch out:** never install the launch agent in a non-interactive run. 1.7.5 needs `golem web` from 10.5 ([#166](https://github.com/MilanPavel/golem/issues/166)).
+
+### 1.8 A first run that asks how golem should think — [#227](https://github.com/MilanPavel/golem/issues/227)
+
+- **Goal:** the first start offers three choices: on this Mac, with an API key, or later.
+- **You can:** pick one and be led to a working model. Open golem again, or open the web UI, and land in the chat.
+- **Build:** the model list says what setup needs, an unset default is a clean `null` (no `"remote"` profile, no config.toml in the error), the first-run state in `packages/view`, the welcome card in the TUI, a `welcome back` line for a returning user, and `starting Ollama…` and `loading <model>…` in the band.
+- **Done when:** a fresh `GOLEM_HOME` shows the three choices, and a default that resolves shows none.
+- **Watch out:** the model list grows fields, so bump the protocol minor and run `just gen`.
+
+### 1.9 An API key from the picker — [#233](https://github.com/MilanPavel/golem/issues/233)
+
+- **Goal:** a hosted model is one flow: provider, key, model.
+- **You can:** paste a key in the picker, know at once whether it works, and use a key already in your shell.
+- **Build:** the daemon checks a key against the provider before it stores it, the key prompt opens inside the picker, a key in `ANTHROPIC_API_KEY` (and the others) is one Enter, and the TUI explains the macOS Keychain prompt while it is open.
+- **Done when:** from a fresh `GOLEM_HOME`, 'With an API key' reaches a first answer with no command typed.
+- **Watch out:** the web UI cannot set a key. It shows `golem auth set <provider>` with a copy button and refreshes when the key appears.
+
+### 1.10 A local model with no dead end — [#238](https://github.com/MilanPavel/golem/issues/238)
+
+- **Goal:** 'On this Mac' always ends with a model that answers.
+- **You can:** see which model fits your Mac and how big it is, and get it, with or without Homebrew, from the TUI or the web UI.
+- **Build:** the daemon installs Ollama and streams progress like a model pull, one recommended model by RAM with its size and the time left, and without Homebrew, the download page opens and golem carries on when Ollama appears.
+- **Done when:** on a Mac with no Ollama, 'On this Mac' reaches a first answer from the recommended model.
+- **Watch out:** under launchd the daemon has no `PATH`, so brew is called by its absolute path with auto-update and analytics off.
+
+### 1.11 An empty chat that teaches — [#242](https://github.com/MilanPavel/golem/issues/242)
+
+- **Goal:** the first empty chat shows what to ask and what golem can do.
+- **You can:** pick a starter prompt that fits the folder, and learn one feature at a time from the placeholder.
+- **Build:** two or three starter prompts by folder (a pure function in `packages/view`), and one rotating tip per new session.
+- **Done when:** in a git repo, the empty chat offers 'Explain this project', and Enter sends it.
+
+### 1.12 MCP without TOML — [#245](https://github.com/MilanPavel/golem/issues/245)
+
+- **Goal:** adding an MCP server never means opening `config.toml`.
+- **You can:** run `golem mcp add`, or `/mcp add`, pick GitHub or the filesystem, and use its tools in the next message.
+- **Build:** `golem mcp add|remove` writing `[mcp.<name>]` through `config_edit.py`, and `/mcp add` with a short list (filesystem, GitHub, fetch, other) and the hidden token prompt from 1.9.
+- **Done when:** `/mcp add` → GitHub → token → its tools work, with no restart.
+
+### 1.13 Starter skills ship with golem — [#248](https://github.com/MilanPavel/golem/issues/248)
+
+- **Goal:** a new user has a few useful skills on day one.
+- **You can:** type `/skills` on a fresh install and see the skills that come with golem.
+- **Build:** the `bundled` skill source gets the folder from the release tarball, and two or three small starter skills.
+- **Done when:** a release build lists them, and a user skill with the same name wins.
+- **Watch out:** keep [ADR-025](adr/025-skill-sources.md)'s order of sources.
+
+### 1.14 Check: a clean first run — [#251](https://github.com/MilanPavel/golem/issues/251)
+
+- **Goal:** the first run from `brew install` is proved on a clean Mac account.
+- **You can:** trust that a new user reaches a first answer with two commands.
+- **Build:** `golem doctor` ends with the next step, a first-run journey test with an empty `GOLEM_HOME`, no Ollama, and no keys, and a clean-room run from the tap on a spare macOS user: the key path, the local path, and `golem web` first.
+- **Done when:** all three reach a first answer with no file edited, and `docs/install.md` matches what you see.
+
+---
+
 ## Phase 2 — Skills
 
 Agent Skills (`SKILL.md`) compatible with Claude Code, loaded by progressive disclosure. The details and the use cases are in the milestone, tracked by [#10](https://github.com/MilanPavel/golem/issues/10). Each step is one PR, and each of its tickets is one commit in it. This section keeps the why.
@@ -120,7 +210,7 @@ Choices that hold for the whole phase:
 - **`~/.claude/skills` and `<project>/.claude/skills` are read by default.** Legacy `.claude/commands/*.md` is not.
 - **Invoking comes before pinning.** It is the most-used Claude Code feature, and it needs no system prompt.
 
-The registry, `/skills`, and `golem skills` are built ([#4](https://github.com/MilanPavel/golem/issues/4)). So is running a skill once with `/name` ([#21](https://github.com/MilanPavel/golem/issues/21)): the arguments are filled in, the transcript shows the line you typed, and the model may read the skill's folder. Running `/ship` in golem showed that the shell cannot yet do its work in a git worktree or with `gh`, so 2.8 comes next.
+The registry, `/skills`, and `golem skills` are built ([#4](https://github.com/MilanPavel/golem/issues/4)). So is running a skill once with `/name` ([#21](https://github.com/MilanPavel/golem/issues/21)): the arguments are filled in, the transcript shows the line you typed, and the model may read the skill's folder. Running `/ship` in golem showed that the shell cannot yet do its work in a git worktree or with `gh`, so 2.8 comes next in this phase.
 
 ```mermaid
 flowchart LR
