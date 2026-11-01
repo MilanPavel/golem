@@ -532,7 +532,7 @@ stateDiagram-v2
 | `golem daemon restart` | Swaps the running daemon for the one the launchd file names, after an upgrade. Waits until the new one answers and prints its version. Warns when the launchd file names a different golem than the one you ran: then run `install` |
 | `golem daemon uninstall` | Stops it and deletes the launchd file. Your data in `~/.golem` stays |
 | `golem daemon logs` | Shows the log and follows new lines |
-| `golem status` | Shows pid, version, and uptime. Exits with code 1 if the daemon is not running |
+| `golem status` | Shows pid, version, and uptime. Exits with code 1 if the daemon is not running, and prints why it could not start or the one command that starts it. `models`, `config`, `skills list`, and `auth` do the same |
 | `golem doctor` | Checks the install and prints a fix under each problem (section 12). Exits with code 1 if anything failed |
 
 `kill` is not a way to stop it: launchd starts it again within seconds. Use `golem daemon stop`.
