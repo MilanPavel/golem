@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { existsSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 
 import { connectGolem, GOLEM_VERSION, resolveSocketPath } from "@golem/client/node";
 
@@ -17,11 +17,17 @@ import { formatModels } from "./format-models.ts";
 import { formatSkills } from "./format-skills.ts";
 import { formatStatus } from "./format-status.ts";
 import { formatCliVersion } from "./format-version.ts";
+import { readChoice } from "./read-choice.ts";
 import { readSecret } from "./read-secret.ts";
+import { type Gate, gateService, type SessionDaemon } from "./service-gate.ts";
 import { findWorkspaceRoot } from "./workspace.ts";
 
 // The first start of a fresh build takes a few seconds while macOS checks its libraries.
 const RESTART_TIMEOUT_MS = 15_000;
+// The very first start after `brew install` also checks every library once.
+const FIRST_START_TIMEOUT_MS = 30_000;
+// launchd's job, as golem/launchd.py names it.
+const LAUNCH_AGENT = join(homedir(), "Library", "LaunchAgents", "dev.golem.daemon.plist");
 
 const USAGE =
   "usage: golem\n" +
@@ -312,9 +318,86 @@ async function captureLocated(command: string, args: string[]): Promise<string> 
 }
 
 async function openTui(): Promise<number> {
-  const tui = await import("@golem/tui");
-  await tui.runTui();
-  return 0;
+  const gate = await gateService(serviceGate());
+  if (gate.kind === "exit") {
+    return gate.code;
+  }
+  try {
+    const tui = await import("@golem/tui");
+    await tui.runTui();
+    return 0;
+  } finally {
+    gate.session?.stop();
+  }
+}
+
+function serviceGate(): Gate {
+  return {
+    answers: async () => (await readDaemonStatus()) !== null,
+    installed: () => existsSync(LAUNCH_AGENT),
+    interactive: process.stdin.isTTY === true && process.stdout.isTTY === true,
+    ask: readChoice,
+    install: async () => {
+      const located = locateOrSay();
+      return located !== null && (await runLocated(located.command, [...located.args, "daemon", "install"])) === 0;
+    },
+    serve: () => {
+      const located = locateOrSay();
+      return located === null ? null : serveForThisWindow(located);
+    },
+    waitUntilAnswers: async (giveUp) =>
+      (await awaitRestart(null, {
+        readStatus: readDaemonStatus,
+        sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+        now: () => Date.now(),
+        timeoutMs: FIRST_START_TIMEOUT_MS,
+        pollMs: 200,
+        giveUp,
+      })) !== null,
+    write: (text) => process.stdout.write(text),
+  };
+}
+
+function locateOrSay(): DaemonCommand | null {
+  try {
+    return locate();
+  } catch (error) {
+    process.stderr.write(`${explain(error)}\n`);
+    return null;
+  }
+}
+
+/**
+ * The daemon as a child of this process. It logs to ~/.golem/logs itself; stderr
+ * is kept only for a crash before it answers, and read all along so it never blocks.
+ */
+function serveForThisWindow(located: DaemonCommand): SessionDaemon {
+  const child = spawn(located.command, [...located.args, "serve"], { stdio: ["ignore", "ignore", "pipe"] });
+  let stderr = "";
+  child.stderr.setEncoding("utf8");
+  child.stderr.on("data", (chunk: string) => {
+    stderr = (stderr + chunk).slice(-4_000);
+  });
+  let failed = false;
+  child.on("error", (error) => {
+    failed = true;
+    stderr += `${error.message}\n`;
+  });
+  // SIGTERM lets the daemon cancel running answers, keep what they said, and release its lock.
+  const stop = (): void => {
+    if (child.exitCode === null && child.signalCode === null) {
+      child.kill("SIGTERM");
+    }
+  };
+  process.on("exit", stop);
+  return {
+    stop: () => {
+      process.off("exit", stop);
+      stop();
+    },
+    output: () => stderr,
+    exited: () => child.exitCode !== null || child.signalCode !== null || failed,
+  };
 }
 
 function explain(error: unknown): string {
