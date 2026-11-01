@@ -13,6 +13,7 @@ import {
   writeRunFile,
   writeTokenFile,
 } from "@golem/gateway/node";
+import { loadAssets } from "@golem/gateway/assets";
 import { startGateway, type Gateway } from "@golem/gateway/server";
 
 import { formatWebOutput, isLiveHealth, isSafeLink, webLink, type WebArgs } from "./web.ts";
@@ -122,7 +123,7 @@ async function runGateway(args: WebArgs): Promise<number> {
   const token = randomSecret();
   let gateway: Gateway;
   try {
-    gateway = startGateway({ port: args.port, socketPath: resolveSocketPath(), token });
+    gateway = startGateway({ port: args.port, socketPath: resolveSocketPath(), token, assets: loadAssets() });
   } catch (error) {
     if (!isAddressInUse(error)) throw error;
     // A `golem web` that started at the same moment may have won the port. Reuse it only when
