@@ -16,7 +16,10 @@ import { Textarea } from "../ui/textarea.tsx";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip.tsx";
 import { ConnectionScreen } from "../features/connection/connection-screen.tsx";
 import { connectionScreen } from "../features/connection/connection-screen.ts";
+import { HomeView } from "../features/shell/index.ts";
+import { SidebarView } from "../features/sessions/index.ts";
 import type { ConnectionSnapshot } from "../store/connection.ts";
+import type { SessionSummary } from "../store/session-list.ts";
 import { ThemeSwitch } from "../theme-switch.tsx";
 
 const SNAPSHOTS: ConnectionSnapshot[] = [
@@ -27,6 +30,31 @@ const SNAPSHOTS: ConnectionSnapshot[] = [
   { state: { status: "reconnecting", attempt: 2, delayMs: 1000 }, daemonVersion: null },
   { state: { status: "closed", reason: "closed" }, daemonVersion: null },
 ];
+
+const NOW = Date.parse("2026-11-01T12:00:00Z");
+
+function fakeSession(
+  id: string,
+  title: string | null,
+  cwd: string | null,
+  status: SessionSummary["status"],
+  minutesAgo: number,
+): SessionSummary {
+  const at = new Date(NOW - minutesAgo * 60_000).toISOString();
+  return { session_id: id, created_at: at, updated_at: at, last_seq: 1, model_profile: "default", status, cwd, title };
+}
+
+const SESSIONS: SessionSummary[] = [
+  fakeSession("a", "UTF-8 split in the socket client", "/Users/you/repos/golem", "waiting", 0),
+  fakeSession("b", "ADR-028: the web gateway", "/Users/you/repos/golem", "running", 2),
+  fakeSession("c", "Invoke /ship from the composer", "/Users/you/repos/golem", "idle", 75),
+  fakeSession("d", "Weekday PR digest, draft", "/Users/you/notes", "idle", 60 * 26),
+  fakeSession("e", null, "/Users/you/notes", "idle", 60 * 24 * 12),
+  fakeSession("f", "A scratch session", null, "idle", 60 * 24 * 5),
+  fakeSession("g", "Closed, so hidden", "/Users/you/notes", "closed", 5),
+];
+
+const CONNECTED: ConnectionSnapshot = { state: { status: "connected" }, daemonVersion: "0.4.0" };
 
 const STATES: GolemState[] = ["idle", "thinking", "waiting", "failed", "offline"];
 
@@ -80,6 +108,32 @@ function Panel({ theme }: { theme: "slip" | "kiln" }) {
               </div>
             ) : null;
           })}
+        </div>
+      </section>
+
+      <section className="mt-6">
+        <h3 className="mb-2 font-mono text-xs text-faint">Sidebar</h3>
+        <div className="h-96 overflow-hidden rounded-lg border border-line">
+          <SidebarView
+            label={`Sessions, ${theme}`}
+            sessions={SESSIONS}
+            selectedId="b"
+            connection={CONNECTED}
+            now={NOW}
+            onNavigate={() => {}}
+          />
+        </div>
+      </section>
+
+      <section className="mt-6">
+        <h3 className="mb-2 font-mono text-xs text-faint">Empty screen</h3>
+        <div className="flex h-96 flex-col rounded-lg border border-line bg-bg">
+          <HomeView
+            headingLevel="h4"
+            folder="/Users/you/repos/golem"
+            folders={["/Users/you/repos/golem", "/Users/you/notes"]}
+            onChange={() => {}}
+          />
         </div>
       </section>
 

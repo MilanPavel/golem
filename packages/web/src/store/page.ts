@@ -1,6 +1,7 @@
 import type { GolemClient } from "@golem/client";
 import type { QueryClient } from "@tanstack/react-query";
 import { createConnectionStore, type ConnectionStore } from "./connection.ts";
+import { createNewSessionFolder, type NewSessionFolderStore } from "./new-session.ts";
 import { createQueryClient, keepQueriesHonest } from "./query.ts";
 import { createRouter, type Router } from "./router.ts";
 import { createSessionList, type SessionList } from "./session-list.ts";
@@ -40,6 +41,7 @@ export type Page = {
   connection: ConnectionStore;
   sessions: Sessions;
   sessionList: SessionList;
+  newSession: NewSessionFolderStore;
   queryClient: QueryClient;
   router: Router;
   actions: PageActions;
@@ -60,6 +62,7 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
   const connection = createConnectionStore(() => client);
   const sessions = createSessions(client, options.frame);
   const sessionList = createSessionList(client);
+  const newSession = createNewSessionFolder();
   const queryClient = createQueryClient();
   const router = createRouter();
   const doc = options.doc ?? document;
@@ -77,6 +80,7 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
     connection,
     sessions,
     sessionList,
+    newSession,
     queryClient,
     router,
     actions: {

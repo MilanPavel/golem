@@ -5,6 +5,7 @@ import { ConnectionProvider } from "./connection-context.tsx";
 import type { Page, PageActions } from "./page.ts";
 import type { Route } from "./router.ts";
 import type { SessionSummary } from "@golem/client";
+import { distinctFolders, resolveFolder } from "./new-session.ts";
 import { initialSessionView, type SessionView } from "./session-store.ts";
 
 const PageContext = createContext<Page | null>(null);
@@ -70,4 +71,23 @@ export function useSession<T>(id: string, selector: (view: SessionView) => T, is
 
 export function usePageActions(): PageActions {
   return usePage().actions;
+}
+
+/** The folder the next new session gets, and a setter for it (null for no folder). */
+export function useNewSessionFolder(): [string | null, (folder: string | null) => void] {
+  const { newSession, sessionList } = usePage();
+  const state = useSyncExternalStore(newSession.subscribe, newSession.getSnapshot);
+  const list = useSyncExternalStore(sessionList.subscribe, sessionList.getSnapshot);
+  return [resolveFolder(state, list), newSession.choose];
+}
+
+/** The folders to offer for a new session, newest first. */
+export function useKnownFolders(): string[] {
+  const list = useSessionList();
+  return distinctFolders(list);
+}
+
+/** Tells the page which folder the session in view runs in, so the next new session starts there. */
+export function useRememberOpenedFolder(): (cwd: string | null) => void {
+  return usePage().newSession.opened;
 }

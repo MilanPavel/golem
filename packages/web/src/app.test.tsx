@@ -5,13 +5,20 @@ import { afterEach, expect, test, vi } from "vitest";
 import { App } from "./app.tsx";
 import type { ConnectionSnapshot } from "./store/connection.ts";
 import { ConnectionProvider } from "./store/connection-context.tsx";
+import { createPage } from "./store/page.ts";
+import { PageProvider } from "./store/page-context.tsx";
+import { fakeClient, fakeFrame } from "./store/test-support.ts";
 
 function renderApp(snapshot: ConnectionSnapshot) {
   const source = { subscribe: () => () => {}, getSnapshot: () => snapshot };
+  const page = createPage(fakeClient().client, { frame: fakeFrame(), doc: new EventTarget() as unknown as Document });
+  // The inner provider decides what the test's link looks like; the page supplies the rest.
   return render(
-    <ConnectionProvider source={source}>
-      <App />
-    </ConnectionProvider>,
+    <PageProvider page={page}>
+      <ConnectionProvider source={source}>
+        <App />
+      </ConnectionProvider>
+    </PageProvider>,
   );
 }
 
@@ -68,7 +75,8 @@ test("the copy button writes the command and shows Copied", async () => {
 
 test("connected shows the page, the connection line, and the version", async () => {
   const { container } = renderApp({ state: { status: "connected" }, daemonVersion: "0.9.1" });
-  expect(screen.getByRole("heading", { name: "golem" })).toBeTruthy();
+  expect(screen.getByText("golem", { selector: "span" })).toBeTruthy();
+  expect(screen.getByRole("heading", { name: "Start a new session" })).toBeTruthy();
   expect(screen.getByText("connected")).toBeTruthy();
   expect(screen.getByText("golem v0.9.1")).toBeTruthy();
   expect(screen.queryByRole("status")).toBeNull();
