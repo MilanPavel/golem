@@ -19,6 +19,7 @@ import sys
 import tempfile
 import threading
 import time
+import urllib.request
 from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -32,6 +33,7 @@ START_LIMIT_S = 1.5
 TIMED_STARTS = 5
 FIRST_START_LIMIT_S = 30.0
 CHAT_TIMEOUT_S = 60.0
+WEB_START_LIMIT_S = 15.0
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -96,9 +98,114 @@ def main() -> int:
             fastest = min(times)
             print(f"no start was under {START_LIMIT_S:g}s (fastest {fastest:.3f}s)", file=sys.stderr)
             return 1
+        if not check_web(tree, env, home):
+            return 1
     finally:
         server.shutdown()
     return 0
+
+
+def http_get(url: str) -> tuple[int, dict[str, str], bytes]:
+    with urllib.request.urlopen(url, timeout=10) as res:
+        headers = {key.lower(): value for key, value in res.headers.items()}
+        return res.status, headers, res.read()
+
+
+def read_first_line(proc: subprocess.Popen[bytes], limit: float) -> bytes:
+    """The first stdout line of ``proc``, or b"" when none comes within ``limit`` seconds."""
+    assert proc.stdout is not None
+    lines: queue.Queue[bytes] = queue.Queue()
+    threading.Thread(target=lambda: lines.put(proc.stdout.readline()), daemon=True).start()  # type: ignore[union-attr]
+    try:
+        return lines.get(timeout=limit)
+    except queue.Empty:
+        return b""
+
+
+def check_web(tree: Path, env: dict[str, str], home: Path) -> bool:
+    """``golem web`` serves the embedded page, answers /healthz, and removes its run file."""
+    golem = tree / "bin" / "golem"
+    proc = subprocess.Popen(
+        [str(golem), "web", "--json", "--port", "0"],
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    ok = False
+    try:
+        line = read_first_line(proc, WEB_START_LIMIT_S)
+        if not line:
+            print(f"golem web printed nothing within {WEB_START_LIMIT_S:g}s", file=sys.stderr)
+        else:
+            ok = check_web_page(json.loads(line))
+    except (OSError, ValueError) as exc:
+        print(f"golem web check failed: {exc}", file=sys.stderr)
+    finally:
+        if proc.poll() is None:
+            proc.send_signal(signal.SIGTERM)
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait(timeout=5)
+    if proc.stderr is not None and not ok:
+        print(proc.stderr.read().decode("utf-8", "replace"), file=sys.stderr)
+    if ok and (home / "run" / "web.json").exists():
+        print("golem web left run/web.json behind", file=sys.stderr)
+        return False
+    return ok
+
+
+def check_web_page(info: object) -> bool:
+    if not isinstance(info, dict):
+        print(f"golem web --json printed {info!r}", file=sys.stderr)
+        return False
+    fields = cast(dict[str, object], info)
+    port = fields.get("port")
+    pid = fields.get("pid")
+    if not isinstance(port, int) or not isinstance(pid, int):
+        print(f"golem web --json has no port and pid: {fields!r}", file=sys.stderr)
+        return False
+    base = f"http://127.0.0.1:{port}"
+    status, headers, body = http_get(f"{base}/")
+    problems: list[str] = []
+    if status != 200:
+        problems.append(f"GET / was {status}")
+    if not headers.get("content-type", "").startswith("text/html"):
+        problems.append(f"content-type was {headers.get('content-type')!r}")
+    if headers.get("cache-control") != "no-cache":
+        problems.append(f"cache-control was {headers.get('cache-control')!r}")
+    if "content-security-policy" not in headers:
+        problems.append("no content-security-policy header")
+    if b'<div id="root">' not in body:
+        problems.append('the page has no <div id="root">')
+    match = re.search(rb'<script[^>]*\ssrc="(/assets/[^"]+\.js)"', body)
+    if match is None:
+        problems.append("the page has no module script under /assets/")
+    else:
+        script = match.group(1).decode()
+        try:
+            s_status, s_headers, _ = http_get(f"{base}{script}")
+        except OSError as exc:
+            problems.append(f"GET {script} failed: {exc}")
+        else:
+            kind = s_headers.get("content-type", "")
+            if s_status != 200:
+                problems.append(f"GET {script} was {s_status}")
+            if not kind.startswith(("text/javascript", "application/javascript")):
+                problems.append(f"{script} content-type was {kind!r}")
+            if "immutable" not in s_headers.get("cache-control", ""):
+                problems.append(f"{script} cache-control was {s_headers.get('cache-control')!r}")
+    _, _, health = http_get(f"{base}/healthz")
+    reported = json.loads(health).get("pid")
+    if reported != pid:
+        problems.append(f"/healthz pid was {reported!r}, not {pid}")
+    for problem in problems:
+        print(f"web: {problem}", file=sys.stderr)
+    if problems:
+        return False
+    print(f"web ok: {port}")
+    return True
 
 
 def run_daemon(

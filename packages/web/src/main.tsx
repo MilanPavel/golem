@@ -5,6 +5,8 @@ import "./styles/tokens.css";
 import { lazy, StrictMode, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./app.tsx";
+import { bootConnection, createPageConnection } from "./store/boot.ts";
+import { ConnectionProvider } from "./store/connection-context.tsx";
 import { applyTheme, readTheme } from "./styles/theme.ts";
 
 const root = document.getElementById("root");
@@ -19,6 +21,11 @@ const Gallery = import.meta.env.DEV
   : null;
 const showGallery = import.meta.env.DEV && location.pathname === "/gallery";
 
+const connection = createPageConnection();
+if (!showGallery) {
+  void bootConnection(connection);
+}
+
 createRoot(root).render(
   <StrictMode>
     {showGallery && Gallery ? (
@@ -26,7 +33,9 @@ createRoot(root).render(
         <Gallery />
       </Suspense>
     ) : (
-      <App />
+      <ConnectionProvider source={connection}>
+        <App />
+      </ConnectionProvider>
     )}
   </StrictMode>,
 );

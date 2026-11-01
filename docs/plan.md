@@ -82,16 +82,15 @@ Agents use the Graph API, where the model decides control flow. Flows use the Fu
 
 ### Protocol, what is left to add
 
-JSON-RPC 2.0, one JSON object per line, over `~/.golem/run/golem.sock`. Protocol 2.27 is on the wire today (see [architecture.md](architecture.md#what-is-on-the-wire-today)). The phases below add the rest.
+JSON-RPC 2.0, one JSON object per line, over `~/.golem/run/golem.sock`. Protocol 2.29 is on the wire today (see [architecture.md](architecture.md#what-is-on-the-wire-today)). The phases below add the rest.
 
 | Group | New events | Phase |
 |---|---|---|
 | Models | `usage.reported` (tokens, cost) | 9.1 |
 | System | `warning`, `error` | 9.4 |
-| Skills | `skill.activated`, `skill.deactivated` | 2.3 |
 | Runs and flows | `run.step.started`, `run.step.completed`, `run.interrupted` | 3.2, 3.4 |
 
-New commands: `session.set_skills` (2.3), `skill.trust | untrust` (2.6), `flow.list | start | status` (3.1), and `daemon.shutdown` (8.1).
+New commands: `skill.trust | untrust` (2.6), `flow.list | start | status` (3.1), and `daemon.shutdown` (8.1).
 
 Rules:
 
@@ -205,17 +204,17 @@ A skill becomes active in one of three ways:
 Choices that hold for the whole phase:
 
 - **The daemon owns the registry, and graph state holds only skill names.** Bodies are read from disk when the prompt is built.
-- **The system prompt is built per model call and never checkpointed.** golem has none today, so 2.3 adds it.
+- **The system prompt is built per model call and never checkpointed** ([ADR-031](adr/031-system-prompt.md)).
 - **`allowed-tools` pre-approves, as in Claude Code, but only for a trusted skill**, and a deny rule always wins. The earlier plan said it only narrows.
 - **A skill from an untrusted project works like a user skill.** Only its scripts and `` !`cmd` `` always ask, and its `allowed-tools` is ignored until the project is trusted ([ADR-012](adr/012-permission-rules.md)).
 - **`~/.claude/skills` and `<project>/.claude/skills` are read by default.** Legacy `.claude/commands/*.md` is not.
 - **Invoking comes before pinning.** It is the most-used Claude Code feature, and it needs no system prompt.
 
-The registry, `/skills`, and `golem skills` are built ([#4](https://github.com/MilanPavel/golem/issues/4)). So is running a skill once with `/name` ([#21](https://github.com/MilanPavel/golem/issues/21)): the arguments are filled in, the transcript shows the line you typed, and the model may read the skill's folder. Running `/ship` in golem showed that the shell cannot yet do its work in a git worktree or with `gh`, so 2.8 comes next in this phase.
+The registry, `/skills`, and `golem skills` are built ([#4](https://github.com/MilanPavel/golem/issues/4)). So is running a skill once with `/name` ([#21](https://github.com/MilanPavel/golem/issues/21)): the arguments are filled in, the transcript shows the line you typed, and the model may read the skill's folder. So is pinning a skill for the whole session ([#5](https://github.com/MilanPavel/golem/issues/5)): its body is in the system prompt of every model call, an edit or a deletion is logged once and never stops a turn, and a pin survives a restart and a fork ([ADR-032](adr/032-pinned-skills.md)). Running `/ship` in golem showed that the shell cannot yet do its work in a git worktree or with `gh`, so 2.8 comes next in this phase.
 
 ```mermaid
 flowchart LR
-  s8[2.8 Shell in a real repo] --> s3[2.3 Pin + system prompt] --> s4[2.4 Model-driven loading]
+  s8[2.8 Shell in a real repo] --> s4[2.4 Model-driven loading]
   s4 --> s5[2.5 Embeddings]
   s4 --> s6[2.6 Trust] --> s7[2.7 Self-authored]
 ```
@@ -226,14 +225,7 @@ flowchart LR
 - **You can:** run `git` and `gh` from golem's shell, in a worktree too, and see when golem's sandbox refused something and how to allow it.
 - **Build:** the sandbox may write a worktree's git folders, `gh` and `git push` reach GitHub with your credentials after an approval, a sandbox refusal says it was the sandbox, and a command that fails is not marked `✓`.
 - **Done when:** `/ship` in golem on this repo, from a git worktree, opens a pull request.
-- **Watch out:** it is numbered 2.8 so that 2.3 to 2.7 keep their issues, but it comes right after 2.2. How a command gets your credentials needs an ADR: one shell line can run several programs, so a rule keyed on the first word is easy to get around.
-
-### 2.3 Pinned skills and the system prompt — [#5](https://github.com/MilanPavel/golem/issues/5)
-
-- **Goal:** you can turn a skill on for the whole session.
-- **You can:** `/skill pin <name>`, `/skill unpin <name>`, and see active skills in the status line and the system prompt in `/debug model`.
-- **Build:** a system prompt builder, `active_skills` in graph state with `session.set_skills`, `skill.activated` and `skill.deactivated`, handling of a pinned skill that is edited or deleted, and a fork that copies pins.
-- **Done when:** a pinned skill changes the answer, and is still pinned after `kill -9` and a reattach.
+- **Watch out:** it is numbered 2.8 so that 2.3 to 2.7 keep their issues, but it comes before 2.4. How a command gets your credentials needs an ADR: one shell line can run several programs, so a rule keyed on the first word is easy to get around.
 
 ### 2.4 Model-driven loading — [#6](https://github.com/MilanPavel/golem/issues/6)
 

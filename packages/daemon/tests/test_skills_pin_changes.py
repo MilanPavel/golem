@@ -24,7 +24,12 @@ from golem.skills.registry import SkillRegistry
 from golem.store.database import Database
 from golem.store.events import EventLog
 from golem.store.records import RunRecords, SessionRecords
-from golem_protocol.events import ChatEvent, SkillActivatedEvent, SkillSkippedEvent
+from golem_protocol.events import (
+    ChatEvent,
+    MessageCompletedEvent,
+    SkillActivatedEvent,
+    SkillSkippedEvent,
+)
 
 
 def _write(folder: Path, body: str) -> None:
@@ -241,3 +246,44 @@ def test_pin_memory_says_only_what_changed() -> None:
     assert memory.read("a", "h1") is True
     memory.forget("a")
     assert memory.read("a", "h1") is True
+
+
+async def test_a_fork_starts_with_the_pins_and_mcp_servers_of_its_source(
+    database: Database, tmp_path: Path, terse: Path
+) -> None:
+    _write(tmp_path / "skills" / "polite", "Say please.\n")
+    chat = _Chat(database, tmp_path, ToolCallingChatModel(replies=["a", "b", "c"]))
+    session_id = await chat.manager.create(None)
+    await chat.manager.set_skills(session_id, pin=["terse", "polite"])
+    await chat.manager.set_mcp(session_id, "docs", True)
+    shutil.rmtree(tmp_path / "skills" / "polite")
+    await chat.send(session_id, "one")
+    message_id = next(
+        event.data.message_id
+        for event in reversed(await chat.events.after(session_id, 0))
+        if isinstance(event, MessageCompletedEvent)
+    )
+
+    fork_id = await chat.manager.fork(session_id, message_id)
+    record = await chat.records.get(fork_id)
+    assert record is not None
+    assert (record.skills, record.mcp_servers) == (("terse", "polite"), ("docs",))
+    copied = await chat.pin_events(fork_id)
+    assert [(e.type, e.run_id) for e in copied] == [
+        ("skill.activated", None),
+        ("skill.activated", None),
+        ("skill.skipped", None),
+    ]
+    # The fork knows polite was left out, so its first call logs nothing new.
+    await chat.send(fork_id, "two")
+    assert len(await chat.pin_events(fork_id)) == 3
+    assert "Answer in one line." in (_system(chat.model.seen[-1]) or "")
+    assert await chat.manager.tool_scope(fork_id) == await chat.manager.tool_scope(session_id)
+
+    # A daemon restart reads both back from the store.
+    await chat.manager.cancel_all()
+    chat.restart()
+    await chat.send(fork_id, "three")
+    await chat.manager.cancel_all()
+    assert len(await chat.pin_events(fork_id)) == 3
+    assert await chat.manager.tool_scope(fork_id) == await chat.manager.tool_scope(session_id)

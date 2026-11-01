@@ -7,6 +7,8 @@ export type RestartWait = {
   now: () => number;
   timeoutMs: number;
   pollMs: number;
+  /** True once waiting is pointless, such as when the daemon being waited for exited. */
+  giveUp?: () => boolean;
 };
 
 /**
@@ -23,7 +25,7 @@ export async function awaitRestart(
     if (status !== null && status.pid !== previousPid && status.state === "running") {
       return status;
     }
-    if (wait.now() >= deadline) {
+    if (wait.now() >= deadline || wait.giveUp?.() === true) {
       return null;
     }
     await wait.sleep(wait.pollMs);

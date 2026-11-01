@@ -120,7 +120,7 @@ flowchart TB
 ```
 
 - **The daemon** is packed by PyInstaller as a folder, not a single file. A single file would have to unpack itself every time it starts, which is slow. The recipe is in `packages/daemon/golem-daemon.spec`. It lists a few modules that PyInstaller cannot find on its own, because some libraries load them in a roundabout way.
-- **`golem`** is compiled by bun into one file ([ADR-019](adr/019-single-binary.md)).
+- **`golem`** is compiled by bun into one file ([ADR-019](adr/019-single-binary.md)). It also carries the web page, the Vite build of `packages/web`, and `smoke-dist` checks that `golem web` serves it.
 - **Signing.** Last, `scripts/sign_dist.py` signs every program file in the folder: ad-hoc by default, or with the certificate named by `GOLEM_SIGN_IDENTITY` (section 5). `just check-signature` checks the result, and `just package` packs the folder into the `.tar.gz` and `.sha256` a release ships.
 
 ### The smoke test
