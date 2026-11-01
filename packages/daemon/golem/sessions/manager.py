@@ -101,6 +101,12 @@ class SessionView:
     model_provider: str | None
     model_name: str | None
     messages: list[PlainMessage]
+    """The system prompt first, when there is one, then the stored messages."""
+
+    @property
+    def stored(self) -> int:
+        """How many of ``messages`` are in the checkpoint: all but the system prompt."""
+        return sum(1 for message in self.messages if message.role != "system")
 
 
 class SchemaMismatchError(Exception):
@@ -242,17 +248,19 @@ class SessionManager:
         return await self._events.watch(limit, target)
 
     async def inspect(self, session_id: str) -> SessionView:
-        """The messages the next model call would see. Does not start a run."""
+        """The messages the next model call would see, system prompt first. Does not start a run."""
         async with self._lock:
             session = await self._resolve(session_id)
             values = await self._runtime.values(session_id)
             identity = self._runtime.router.identity(session.model_profile)
+            system = await self._runtime.system_prompt(session_id, session.cwd)
+            messages = plain_messages(values)
             return SessionView(
                 session_id=session.session_id,
                 model_profile=session.model_profile,
                 model_provider=identity.provider,
                 model_name=identity.name,
-                messages=plain_messages(values),
+                messages=[PlainMessage("system", system), *messages] if system else messages,
             )
 
     async def close(self, session_id: str) -> str:
