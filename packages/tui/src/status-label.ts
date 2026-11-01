@@ -95,9 +95,13 @@ export function versionLabel(
   return { text: `tui ${tuiVersion} · daemon ${daemonVersion} · run golem daemon restart`, warn: true };
 }
 
-/** For the status line: `skills: ship, setup`, the pinned skills in pin order, or "". */
-export function skillsLabel(active: readonly string[]): string {
-  return active.length === 0 ? "" : `skills: ${active.join(", ")}`;
+/**
+ * For the status line: `skills: ship, setup`, the pinned skills in pin order, or "".
+ * A pin the newest model call left out reads `ship (skipped)`.
+ */
+export function skillsLabel(active: readonly string[], skipped: readonly string[] = []): string {
+  const names = active.map((name) => (skipped.includes(name) ? `${name} (skipped)` : name));
+  return names.length === 0 ? "" : `skills: ${names.join(", ")}`;
 }
 
 /** For the status line: the provider whose server did not answer, then any other alert, or "". */
@@ -181,13 +185,15 @@ export function statusSegments(input: {
   alert?: string;
   /** The skills pinned in the session, in pin order. */
   skills?: readonly string[];
+  /** The pinned skills the newest model call left out. */
+  skippedSkills?: readonly string[];
 }): StatusSegment[] {
   return [
     segment("connection", input.connection, STATUS_PRIORITY.connection, "connection", true),
     segment("alert", input.alert ?? "", STATUS_PRIORITY.alert, "alert"),
     segment("title", input.title, STATUS_PRIORITY.title, "title"),
     segment("model", input.model, STATUS_PRIORITY.model, "model"),
-    segment("skills", skillsLabel(input.skills ?? []), STATUS_PRIORITY.skills, "dim"),
+    segment("skills", skillsLabel(input.skills ?? [], input.skippedSkills ?? []), STATUS_PRIORITY.skills, "dim"),
     segment("folder", input.folder, STATUS_PRIORITY.folder, "dim"),
     segment(
       "messages",

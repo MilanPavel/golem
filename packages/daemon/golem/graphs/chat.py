@@ -33,6 +33,7 @@ from golem.graphs.tools_node import (
     ASKED_KEY,
     CWD_KEY,
     MCP_KEY,
+    PINNED_FOLDERS_KEY,
     Answer,
     cancelled_results,
     scope_of,
@@ -156,6 +157,7 @@ class ChatRuntime:
         mcp_servers: Sequence[str] = (),
         skill_folder: str | None = None,
         pinned: Sequence[str] = (),
+        pinned_folders: Sequence[str] = (),
     ) -> AsyncGenerator[object]:
         """Stream one user turn. The first turn writes the state fields.
 
@@ -164,7 +166,8 @@ class ChatRuntime:
         file tools work in, and ``mcp_servers`` the on-demand MCP servers the
         session turned on. ``skill_folder`` is the folder of the skill this turn
         runs, which the read tools may read from then on. ``pinned`` are the
-        skills pinned in the session, for the system prompt. Raises
+        skills pinned in the session, for the system prompt, and
+        ``pinned_folders`` their folders, which the read tools may read. Raises
         :class:`TooManyStepsError` when the model keeps calling tools.
 
         Close the generator (``contextlib.aclosing``) when you stop early, so
@@ -178,6 +181,7 @@ class ChatRuntime:
                 ALLOWED_KEY: [list(pair) for pair in allowed_tools],
                 MCP_KEY: list(mcp_servers),
                 PINNED_KEY: list(pinned),
+                PINNED_FOLDERS_KEY: list(pinned_folders),
             },
             "recursion_limit": _RECURSION_LIMIT,
         }
@@ -206,6 +210,7 @@ class ChatRuntime:
         asked: Sequence[str] = (),
         mcp_servers: Sequence[str] = (),
         pinned: Sequence[str] = (),
+        pinned_folders: Sequence[str] = (),
     ) -> AsyncGenerator[object]:
         """Go on with a run paused on a tool approval, with the user's ``answer``.
 
@@ -221,6 +226,7 @@ class ChatRuntime:
                 ASKED_KEY: list(asked),
                 MCP_KEY: list(mcp_servers),
                 PINNED_KEY: list(pinned),
+                PINNED_FOLDERS_KEY: list(pinned_folders),
             },
             "recursion_limit": _RECURSION_LIMIT,
         }
@@ -355,7 +361,8 @@ def open_chat(
         scope = scope_of(config)
         await registry.prepare(scope)
         tools = registry.scoped(scope)
-        system = system_prompt.message(PromptContext(state, _cwd(config), _pinned(config)))
+        context = PromptContext(state, _cwd(config), _pinned(config), get_stream_writer())
+        system = system_prompt.message(context)
         # The system message is sent, never returned, so it stays out of the checkpoint.
         sent = messages if system is None else [system, *messages]
         async with _held(router, local, profile):

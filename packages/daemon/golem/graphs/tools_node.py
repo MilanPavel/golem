@@ -50,6 +50,8 @@ from golem.tools.registry import (
 log = logging.getLogger("golem.graphs")
 
 CWD_KEY = "golem_cwd"
+PINNED_FOLDERS_KEY = "golem_pinned_folders"
+"""The ``configurable`` key with the folders of the session's pinned skills, for the read tools."""
 """``configurable`` key for the session folder. It is not checkpointed."""
 
 ALLOWED_KEY = "golem_allowed_tools"
@@ -136,7 +138,7 @@ def tools_node(
             web=policy.web(),
             session_id=session_id,
             artifacts=artifacts,
-            read_roots=tuple(Path(folder) for folder in state.get("skill_folders") or []),
+            read_roots=_read_roots(state, config),
         )
         allowed = _allowed(config)
         asked = _asked(config)
@@ -417,6 +419,17 @@ def _root(config: RunnableConfig) -> Path | None:
     return Path(raw) if isinstance(raw, str) and raw != "" else None
 
 
+def _read_roots(state: AgentState, config: RunnableConfig) -> tuple[Path, ...]:
+    """The folders of the skills this session ran, then those of its pins, once each."""
+    configurable = cast(Mapping[str, object], config.get("configurable", {}))
+    raw = configurable.get(PINNED_FOLDERS_KEY)
+    pinned = (
+        [f for f in cast(list[object], raw) if isinstance(f, str)] if isinstance(raw, list) else []
+    )
+    folders = [*(state.get("skill_folders") or []), *pinned]
+    return tuple(Path(folder) for folder in dict.fromkeys(folders))
+
+
 __all__ = [
     "ALLOWED_KEY",
     "ARTIFACT_CHARS",
@@ -426,6 +439,7 @@ __all__ = [
     "CWD_KEY",
     "DENIED_RESULT",
     "MCP_KEY",
+    "PINNED_FOLDERS_KEY",
     "PREVIEW_CHARS",
     "STATE_KEYS",
     "Answer",

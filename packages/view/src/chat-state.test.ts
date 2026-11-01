@@ -8,6 +8,7 @@ import {
   forkPoint,
   downloadEnded,
   SHUTDOWN_NOTICE,
+  skippedNotice,
   createDeltaBatcher,
   emptyChat,
   failureText,
@@ -657,4 +658,35 @@ test("pins and unpins become the active skills, in pin order; an invoked skill i
   ] satisfies ChatEvent[];
   const states = events.map((_, index) => events.slice(0, index + 1).reduce(reduceChat, emptyChat).activeSkills);
   assert.deepEqual(states, [["terse"], ["terse", "polite"], ["terse", "polite"], ["terse", "polite"], ["polite"]]);
+});
+
+test("a skipped pin is marked and named in a notice, until a call reads it again or it is unpinned", () => {
+  const base = { session_id: "s", run_id: "r", ts: "t" };
+  const skipped = (seq: number, name: string) =>
+    ({ ...base, seq, type: "skill.skipped", data: { name, reason: "missing", message: `no skill named ${name}` } }) satisfies ChatEvent;
+  const activated = (seq: number, name: string) =>
+    ({ ...base, seq, type: "skill.activated", data: { name, source: "user", how: "pinned", path: `/s/${name}`, hash: "h2" } }) satisfies ChatEvent;
+  const pinned = [activated(1, "terse"), activated(2, "polite")].reduce(reduceChat, emptyChat);
+
+  const gone = [skipped(3, "terse"), skipped(4, "terse")].reduce(reduceChat, pinned);
+  assert.deepEqual(gone.skippedSkills, ["terse"]);
+  assert.deepEqual(gone.activeSkills, ["terse", "polite"]);
+  assert.equal(gone.notice, skippedNotice("terse", "no skill named terse"));
+  assert.equal(gone.notice, "no skill named terse, so terse is left out. It stays pinned: fix it, or /skill unpin terse");
+
+  const back = reduceChat(gone, activated(5, "terse"));
+  assert.deepEqual(back.skippedSkills, []);
+  assert.equal(back.notice, null);
+
+  const unpinned = reduceChat(gone, {
+    ...base,
+    run_id: null,
+    seq: 5,
+    type: "skill.deactivated",
+    data: { name: "terse", reason: "unpinned" },
+  });
+  assert.deepEqual([unpinned.skippedSkills, unpinned.activeSkills, unpinned.notice], [[], ["polite"], null]);
+
+  const other = reduceChat({ ...gone, notice: "something else" }, activated(5, "terse"));
+  assert.equal(other.notice, "something else");
 });

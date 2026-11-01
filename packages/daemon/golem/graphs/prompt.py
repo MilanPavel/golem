@@ -27,12 +27,15 @@ class PromptContext:
 
     ``pinned`` are the names of the skills pinned in the session, in pin order.
     They are the daemon's, not the checkpoint's, so a pin made between turns
-    applies to the next call.
+    applies to the next call. ``report`` takes what a section wants the run's
+    log to know, such as a pinned skill it left out. It is set during a model
+    call only, so building the prompt for ``/debug model`` logs nothing.
     """
 
     state: Mapping[str, object]
     cwd: str | None = None
     pinned: tuple[str, ...] = ()
+    report: Callable[[Mapping[str, object]], None] | None = None
 
 
 Section = Callable[[PromptContext], str | None]

@@ -105,7 +105,9 @@ class SkillActivatedData(BaseModel):
     turn's user message. It is ``pinned`` for a skill turned on for the whole
     session: its body is in the system prompt of every model call until it is
     unpinned. ``source`` is where it was found, ``path`` its folder, and
-    ``hash`` the sha256 of its ``SKILL.md``.
+    ``hash`` the sha256 of its ``SKILL.md``. A pinned skill whose file changed,
+    or that can be used again after it was skipped, is activated again in the
+    run whose model call first reads the new body.
     """
 
     model_config = _CONFIG
@@ -124,6 +126,22 @@ class SkillDeactivatedData(BaseModel):
 
     name: str = Field(min_length=1)
     reason: Literal["unpinned"]
+
+
+class SkillSkippedData(BaseModel):
+    """A pinned skill was left out of a model call. It stays pinned.
+
+    ``reason`` is ``missing`` when the session finds no skill of that name,
+    ``disabled`` when ``[skills]`` turns it off, and ``broken`` when its
+    ``SKILL.md`` cannot be read or is not valid. ``message`` says it for a
+    person.
+    """
+
+    model_config = _CONFIG
+
+    name: str = Field(min_length=1)
+    reason: Literal["missing", "disabled", "broken"]
+    message: str = Field(min_length=1)
 
 
 class EmptyEventData(BaseModel):
@@ -617,6 +635,22 @@ class SkillDeactivatedEvent(BaseModel):
     data: SkillDeactivatedData
 
 
+class SkillSkippedEvent(BaseModel):
+    """A pinned skill was left out of the run's model calls.
+
+    Logged once when it becomes unusable, not for every call.
+    """
+
+    model_config = _CONFIG
+
+    seq: int = Field(ge=1)
+    session_id: str = Field(min_length=1)
+    run_id: str | None = Field(default=None, min_length=1)
+    ts: str = Field(min_length=1)
+    type: Literal["skill.skipped"]
+    data: SkillSkippedData
+
+
 EventType = Literal[
     "session.created",
     "session.updated",
@@ -639,6 +673,7 @@ EventType = Literal[
     "todos.updated",
     "skill.activated",
     "skill.deactivated",
+    "skill.skipped",
 ]
 """The ``type`` of each :data:`ChatEvent` member."""
 
@@ -664,7 +699,8 @@ ChatEvent = Annotated[
     | ApprovalResolvedEvent
     | TodosUpdatedEvent
     | SkillActivatedEvent
-    | SkillDeactivatedEvent,
+    | SkillDeactivatedEvent
+    | SkillSkippedEvent,
     Field(discriminator="type"),
 ]
 
@@ -709,6 +745,8 @@ __all__ = [
     "SkillCall",
     "SkillDeactivatedData",
     "SkillDeactivatedEvent",
+    "SkillSkippedData",
+    "SkillSkippedEvent",
     "SkillSource",
     "Todo",
     "TodoStatus",
