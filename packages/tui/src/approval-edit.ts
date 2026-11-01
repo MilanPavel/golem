@@ -1,5 +1,5 @@
 import type { ApprovalLine } from "./approval.ts";
-import type { PendingApproval } from "./chat-state.ts";
+import type { PendingApproval } from "@golem/view";
 import { type Draft, draftAt } from "./edit.ts";
 
 /** The waiting call's arguments, edited as JSON in the composer's place. */

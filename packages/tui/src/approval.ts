@@ -1,4 +1,4 @@
-import type { PendingApproval } from "./chat-state.ts";
+import type { PendingApproval } from "@golem/view";
 import { type DiffTone, diffWindow, parseDiff } from "./diff-view.ts";
 import { toolLabel } from "./layout-chat.ts";
 

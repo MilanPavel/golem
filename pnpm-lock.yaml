@@ -63,6 +63,9 @@ importers:
       '@golem/client':
         specifier: workspace:*
         version: link:../client
+      '@golem/view':
+        specifier: workspace:*
+        version: link:../view
       ink:
         specifier: ^8.0.0
         version: 8.0.0(@types/react@19.3.0)(react-devtools-core@file:scripts/react-devtools-core)(react@19.3.1)
@@ -88,6 +91,25 @@ importers:
       tsx:
         specifier: ^4.23.15
         version: 4.23.15
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.3
+      typescript-eslint:
+        specifier: ^8.44.0
+        version: 8.71.0(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3)
+
+  packages/view:
+    dependencies:
+      '@golem/client':
+        specifier: workspace:*
+        version: link:../client
+    devDependencies:
+      '@types/node':
+        specifier: ^24.10.1
+        version: 24.19.1
+      eslint:
+        specifier: ^9.36.0
+        version: 9.39.5(jiti@2.7.0)
       typescript:
         specifier: ^5.9.2
         version: 5.9.3

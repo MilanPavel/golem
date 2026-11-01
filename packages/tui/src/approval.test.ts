@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { APPROVAL_ROWS, approvalLines, approvalRows } from "./approval.ts";
-import type { PendingApproval } from "./chat-state.ts";
+import type { PendingApproval } from "@golem/view";
 
 const DIFF = "--- a/a.py\n+++ b/a.py\n@@ -1,2 +1,2 @@\n one\n-two\n+TWO\n";
 

@@ -1,4 +1,4 @@
-import type { ChatMessage } from "./chat-state.ts";
+import type { ChatMessage } from "@golem/view";
 
 export type MeterPhase = "thinking" | "writing" | "waiting";
 
