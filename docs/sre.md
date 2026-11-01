@@ -550,7 +550,7 @@ dist/golem-*/libexec/golem-daemon/golem-daemon serve # from a build
 
 ### Only one daemon at a time
 
-The daemon locks the file `~/.golem/run/golem.pid` for as long as it runs ([ADR-004](adr/004-pid-lock.md)). A second daemon sees the lock and exits with `daemon already running (pid N)`. If the daemon crashed, the lock is gone, so the next start knows the old socket file is stale and replaces it.
+The daemon locks the file `~/.golem/run/golem.pid` for as long as it runs ([ADR-004](adr/004-pid-lock.md)). A second daemon sees the lock and exits with `daemon already running (pid N)`. It also writes the holder's pid and command line to `~/.golem/run/last-error`, which `golem` and `golem status` show. If the daemon crashed, the lock is gone, so the next start knows the old socket file is stale and replaces it.
 
 ### Starting and stopping
 
@@ -581,7 +581,7 @@ Everything is in one folder: `~/.golem`, or whatever `GOLEM_HOME` points to.
 | `tui.json`, `exports/` | Screen preferences, and chats you exported | Optional |
 | `cache/` | Model lists and prices, refreshed daily | No, safe to delete |
 | `logs/` | Log files, and `ollama.log` from an Ollama golem started | No |
-| `run/` | The socket, the lock, the Keychain record, and `ollama-<port>.pid` for an Ollama golem started | No |
+| `run/` | The socket, the lock, `last-error` from a start that failed, the Keychain record, and `ollama-<port>.pid` for an Ollama golem started | No |
 
 **Backing up:** both `.db` files are SQLite databases. Copy them while the daemon is stopped. While it runs, use `sqlite3 ~/.golem/golem.db ".backup /path/to/copy.db"`.
 
