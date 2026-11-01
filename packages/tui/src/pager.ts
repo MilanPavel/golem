@@ -3,8 +3,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import type { ChatMessage } from "./chat-state.ts";
-import { visibleText } from "./sanitize.ts";
+import { visibleText, type ChatMessage } from "@golem/view";
 
 /** `$PAGER`, split on spaces, or `less` when it is unset. */
 export function pagerCommand(env: NodeJS.ProcessEnv = process.env): string[] {

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 
-import type { ChatMessage } from "./chat-state.ts";
+import type { ChatMessage } from "@golem/view";
 import { newestArtifact, pagerCommand, showInPager } from "./pager.ts";
 
 test("the pager is $PAGER split on spaces, or less", () => {

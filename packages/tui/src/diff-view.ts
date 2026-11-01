@@ -1,6 +1,6 @@
 /** A unified diff as rows for the approval band: one tone per row, cut to the width. */
 
-import { visibleText } from "./sanitize.ts";
+import { visibleText } from "@golem/view";
 
 export type DiffTone = "add" | "del" | "hunk" | "meta" | "context";
 
