@@ -240,6 +240,63 @@ test("heartbeat timeout reconnects", async () => {
   }
 });
 
+test("checkNow pings at once when the link is open, and not before", async () => {
+  let pings = 0;
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      onRequest: (_socket, method) => {
+        if (method === "ping") {
+          pings += 1;
+        }
+      },
+    });
+  });
+  const client = connectGolem({
+    socketPath: server.socketPath,
+    clientName: "web",
+    reconnect: false,
+    heartbeatMs: 60_000,
+    heartbeatTimeoutMs: 60,
+  });
+  try {
+    client.checkNow();
+    await client.ready;
+    assert.equal(pings, 0);
+    client.checkNow();
+    await waitFor(() => pings === 1);
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    assert.equal(client.state.status, "connected");
+  } finally {
+    client.close();
+    await server.close();
+  }
+});
+
+test("checkNow on a silent daemon drops the link after the timeout", async () => {
+  let connections = 0;
+  const server = await listen((socket) => {
+    connections += 1;
+    attach(socket, { answerPing: connections > 1 });
+  });
+  const client = connectGolem({
+    socketPath: server.socketPath,
+    clientName: "web",
+    reconnect: true,
+    backoff: () => 0,
+    heartbeatMs: 60_000,
+    heartbeatTimeoutMs: 60,
+  });
+  try {
+    await client.ready;
+    client.checkNow();
+    await waitFor(() => connections >= 2 && client.state.status === "connected");
+  } finally {
+    client.close();
+    await server.close();
+  }
+});
+
 test("an event line does not settle a pending ping", async () => {
   let connections = 0;
   const server = await listen((socket) => {
