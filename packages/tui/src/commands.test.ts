@@ -9,6 +9,7 @@ import {
   COMMANDS,
   helpLines,
   invocableSkills,
+  pinnableSkills,
   toggleDebugTab,
   type DebugState,
   type SkillChoice,
@@ -258,7 +259,7 @@ test("a built-in command wins a name, and /skill run reaches the skill", () => {
 });
 
 test("/skill without run and a name, or with a skill it cannot run, says how", () => {
-  for (const line of ["/skill", "/skill run", "/skill go ship"]) {
+  for (const line of ["/skill run", "/skill go ship"]) {
     const outcome = applyComposer(closedDebug, line, SKILLS);
     assert.equal(outcome.kind, "unknown", line);
     if (outcome.kind === "unknown") {
@@ -288,4 +289,49 @@ test("only usable skills without user-invocable: false can be run by name", () =
 
   assert.deepEqual(invocableSkills(listed), [{ name: "ship", description: "Ship.", argumentHint: "[hint]" }]);
   assert.equal(applyComposer(closedDebug, "/facts", invocableSkills(listed)).kind, "unknown");
+});
+
+const PINS = { pinnable: ["ship", "facts", "help"], active: ["facts"] };
+
+test("/skill pin and /skill unpin name one skill", () => {
+  assert.deepEqual(applyComposer(closedDebug, "/skill pin ship", SKILLS, PINS), {
+    kind: "skill-pin",
+    pin: true,
+    name: "ship",
+  });
+  assert.deepEqual(applyComposer(closedDebug, "/skill unpin facts", SKILLS, PINS), {
+    kind: "skill-pin",
+    pin: false,
+    name: "facts",
+  });
+});
+
+test("/skill pin and unpin say why when there is nothing to do", () => {
+  const notice = (line: string): string | null => {
+    const outcome = applyComposer(closedDebug, line, SKILLS, PINS);
+    return outcome.kind === "unknown" || outcome.kind === "local" ? outcome.notice : `kind ${outcome.kind}`;
+  };
+  assert.equal(notice("/skill pin facts"), "facts is already pinned");
+  assert.equal(notice("/skill pin nope"), "no skill named nope to pin — /skills lists them");
+  assert.equal(notice("/skill unpin ship"), "ship is not pinned — pinned: facts");
+  assert.equal(notice("/skill pin"), "/skill pin takes one skill name");
+  assert.equal(notice("/skill unpin a b"), "/skill unpin takes one skill name");
+});
+
+test("/skill alone lists the pinned skills", () => {
+  const listed = applyComposer(closedDebug, "/skill", SKILLS, { pinnable: ["ship", "facts"], active: ["facts", "ship"] });
+  assert.equal(listed.kind, "local");
+  assert.equal(listed.kind === "local" ? listed.notice : null, "pinned: facts, ship");
+  const none = applyComposer(closedDebug, "/skill", SKILLS);
+  assert.equal(none.kind === "local" ? none.notice : null, "no skills pinned — /skill pin <name> pins one for this session");
+});
+
+test("every usable skill can be pinned, background ones too", () => {
+  const listed: ListedSkill[] = [
+    { name: "ship", description: "Ship.", path: "/a", source: "project", usable: true },
+    { name: "facts", description: "Background.", path: "/b", source: "user", usable: true, user_invocable: false },
+    { name: "broken", description: "Bad.", path: "/c", source: "user", usable: false },
+    { name: "ship", description: "Hidden by the project's.", path: "/d", source: "user", usable: false },
+  ];
+  assert.deepEqual(pinnableSkills(listed), ["ship", "facts"]);
 });

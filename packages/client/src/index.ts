@@ -31,6 +31,7 @@ export type { McpListResult } from "../../protocol/gen/mcp-list-result.ts";
 export type { McpServer } from "../../protocol/gen/mcp-server.ts";
 export type { ModelServerStatus } from "../../protocol/gen/model-server-status.ts";
 export type { McpToggleResult } from "../../protocol/gen/mcp-toggle-result.ts";
+export type { SessionSetSkillsResult } from "../../protocol/gen/session-set-skills-result.ts";
 export type { McpToolInfo, McpToolsResult } from "../../protocol/gen/mcp-tools-result.ts";
 export type { SkillCall } from "../../protocol/gen/skill-call.ts";
 export type { ListedSkill, SkillListResult } from "../../protocol/gen/skill-list-result.ts";
