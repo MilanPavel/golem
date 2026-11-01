@@ -310,6 +310,9 @@ export function connectGolem(options: ConnectOptions): GolemClient {
     resolveReady = resolve;
     rejectReady = reject;
   });
+  // A caller that never awaits `ready` (the web page watches the state instead) must not see an
+  // unhandled rejection. Every await of `ready` still gets the error.
+  ready.catch(() => undefined);
 
   function setState(next: ConnectionState): void {
     state = next;

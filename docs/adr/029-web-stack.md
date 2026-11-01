@@ -165,6 +165,7 @@ Everything golem shows can come from a model, a tool, a web page, or a file some
 - **End to end** (Playwright, `just e2e`, kept out of `just check`):
   - a temporary `GOLEM_HOME`, the daemon with a fake model, and the gateway
   - Chromium from 10.7. WebKit from 10.12, the engine golem desktop would use
+  - for now it drives the installed Chrome (`channel: "chrome"`), because the browser download is blocked here. CI can switch to Playwright's Chromium later
   - any CSP violation or console error fails a test
 - **Screenshots** in both themes, from 10.12, on macOS runners only, because font rendering differs on Linux.
 
