@@ -58,6 +58,21 @@ importers:
         specifier: ^8.22.1
         version: 8.22.1
 
+  packages/gateway:
+    devDependencies:
+      '@types/node':
+        specifier: ^24.10.1
+        version: 24.19.1
+      eslint:
+        specifier: ^9.36.0
+        version: 9.39.5(jiti@2.7.0)
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.3
+      typescript-eslint:
+        specifier: ^8.44.0
+        version: 8.71.0(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3)
+
   packages/tui:
     dependencies:
       '@golem/client':
