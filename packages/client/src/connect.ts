@@ -247,6 +247,8 @@ export interface GolemClient {
    * whose project skills changed, or `null` when every folder's did.
    */
   onSkillsChanged(listener: (root: string | null) => void): () => void;
+  /** Ping the daemon now, with the heartbeat's timeout. A dead link then closes and reconnects. Does nothing unless the link is open. */
+  checkNow(): void;
   close(): void;
 }
 
@@ -610,26 +612,31 @@ export function connectGolem(options: ConnectOptions): GolemClient {
     ]);
   }
 
+  /** One ping on `current`. A late or wrong answer closes the link, and the close reconnects. */
+  function ping(current: Link, gen: number): void {
+    if (gen !== generation || !open) {
+      return;
+    }
+    const nonce = globalThis.crypto.randomUUID();
+    const timeout = setTimeout(() => {
+      current.close(new Error("heartbeat timeout"));
+    }, heartbeatTimeoutMs);
+    void call("ping", { nonce })
+      .then((result) => {
+        clearTimeout(timeout);
+        if (!isPing(result) || result.nonce !== nonce) {
+          current.close(new Error("heartbeat nonce mismatch"));
+        }
+      })
+      .catch(() => {
+        clearTimeout(timeout);
+      });
+  }
+
   function startHeartbeat(current: Link, gen: number): void {
     stopHeartbeat();
     heartbeatTimer = setInterval(() => {
-      if (gen !== generation || !open) {
-        return;
-      }
-      const nonce = globalThis.crypto.randomUUID();
-      const timeout = setTimeout(() => {
-        current.close(new Error("heartbeat timeout"));
-      }, heartbeatTimeoutMs);
-      void call("ping", { nonce })
-        .then((result) => {
-          clearTimeout(timeout);
-          if (!isPing(result) || result.nonce !== nonce) {
-            current.close(new Error("heartbeat nonce mismatch"));
-          }
-        })
-        .catch(() => {
-          clearTimeout(timeout);
-        });
+      ping(current, gen);
     }, heartbeatMs);
   }
 
@@ -707,6 +714,11 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       return state;
     },
     ready,
+    checkNow(): void {
+      if (link !== undefined && open) {
+        ping(link, generation);
+      }
+    },
     onState(listener: (next: ConnectionState) => void): () => void {
       listeners.add(listener);
       return () => {
