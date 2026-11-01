@@ -1,4 +1,4 @@
-import type { ConnectionState } from "@golem/client";
+import { connectionLabel } from "@golem/view";
 
 import { newLinesLabel } from "./transcript.ts";
 
@@ -10,22 +10,7 @@ export type ModelInfo = {
 
 const emptyModel: ModelInfo = { profile: null, provider: null, name: null };
 
-export function statusLabel(state: ConnectionState): string {
-  switch (state.status) {
-    case "connecting":
-      return "connecting";
-    case "connected":
-      return "connected";
-    case "reconnecting":
-      return "reconnecting";
-    case "closed":
-      return "closed";
-    case "rejected":
-      return state.reason;
-    case "unauthorized":
-      return "unauthorized";
-  }
-}
+export const statusLabel = connectionLabel;
 
 export function modelChip(name: string | null, profile: string | null): string {
   // A ref such as ollama/qwen3:8b already ends in the name, so the name alone says it.
