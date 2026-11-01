@@ -28,7 +28,7 @@
     }
   },
   "additionalProperties": false,
-  "description": "The conversation stored for this session.\n\n``message_count`` is the length of ``messages``. Provider and name are\nnull when the daemon cannot resolve ``model_profile``.",
+  "description": "The conversation stored for this session, as the next model call sees it.\n\nWhen golem has a system prompt for the session, it is the first of\n``messages``, with role ``system``. It is built for each call and never\nstored, so ``message_count`` counts only the stored messages. Provider and\nname are null when the daemon cannot resolve ``model_profile``.",
   "properties": {
     "message_count": {
       "minimum": 0,
