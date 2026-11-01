@@ -5,3 +5,4 @@ packages:
   - "packages/tui"
   - "packages/view"
   - "packages/web"
+  - "docs"

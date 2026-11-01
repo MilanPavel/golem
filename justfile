@@ -84,6 +84,14 @@ test:
     uv run pytest
     pnpm -r --if-present test
 
+# Serve the docs site at http://localhost:5173/golem/, reloading on every edit (ADR-034).
+docs:
+    pnpm --filter @golem/docs dev
+
+# Build the docs site into docs/.vitepress/dist. A dead link fails the build.
+docs-build:
+    pnpm --filter @golem/docs build
+
 # Run the golem CLI (--version, status, daemon install|start|stop|logs).
 golem *args:
     pnpm exec golem {{args}}
@@ -191,3 +199,4 @@ check:
     just lint
     just typecheck
     just test
+    just docs-build

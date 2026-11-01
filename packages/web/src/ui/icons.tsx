@@ -60,3 +60,8 @@ export const SearchIcon = (props: IconProps) => (
     <path d="M10 10l3.5 3.5" />
   </Icon>
 );
+export const FolderIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M2 4.5c0-.6.4-1 1-1h3l1.5 1.5H13c.6 0 1 .4 1 1V12c0 .6-.4 1-1 1H3c-.6 0-1-.4-1-1z" />
+  </Icon>
+);

@@ -437,6 +437,7 @@ From a checkout, the Keychain trusts uv's shared Python rather than golem itself
 | `just check` | Lint, typecheck, and tests. This is what CI runs |
 | `just test` | Just the tests |
 | `just gen` | Regenerates the TypeScript protocol types from Python |
+| `just docs` | Serves the docs site locally, reloading as you edit |
 | `just dist` | Builds a standalone golem into `dist/` |
 | `just smoke-dist` | Starts that build against a fake model and checks one chat |
 

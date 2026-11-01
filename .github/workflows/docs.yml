@@ -1,0 +1,68 @@
+name: docs
+
+# Publishes the docs site to GitHub Pages, at https://milanpavel.github.io/golem/ (ADR-034).
+# Only main is published. A pull request builds the same site in `just check` (ci.yml),
+# so a dead link or a broken page fails there, before it can merge.
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "docs/**"
+      - "packages/web/src/styles/tokens.css" # the site's palette is read from it
+      - "pnpm-lock.yaml"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One deploy at a time. A newer push waits for the running deploy, and is never cancelled
+# halfway, so the site never shows half a build.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The whole history, so each page's "last updated" date comes from its last commit.
+          fetch-depth: 0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Install Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: pnpm
+
+      # The site needs only its own packages, not the whole workspace.
+      - name: Install the docs packages
+        run: pnpm install --frozen-lockfile --filter @golem/docs
+
+      - name: Build the site
+        run: pnpm --filter @golem/docs build
+
+      - uses: actions/configure-pages@v6
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: docs/.vitepress/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

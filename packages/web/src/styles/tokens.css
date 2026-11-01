@@ -35,6 +35,10 @@
   --font-prose: "Literata Variable", Georgia, serif;
   --font-mono: "Geist Mono Variable", ui-monospace, monospace;
 
+  /* Layout widths from docs/design/web.md: w-sidebar is 268 px, max-w-column is 46 rem. */
+  --spacing-sidebar: 16.75rem;
+  --container-column: 46rem;
+
   --radius-xs: 2px;
   --radius-sm: 6px;
   --radius-md: 10px;
