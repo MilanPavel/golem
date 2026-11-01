@@ -24,8 +24,12 @@ esac
 dest="$root/dist/golem-${version}-${os}-${arch}"
 build_file="$root/packages/daemon/golem/_build.py"
 
+gen_assets="$root/packages/gateway/src/bun/gen-assets.ts"
+
 cleanup() {
   rm -f "$build_file"
+  # Put the committed stub back, so a checkout is never left with the generated module.
+  bun "$gen_assets" --stub 2>/dev/null || true
 }
 trap cleanup EXIT
 
@@ -57,6 +61,8 @@ if ! command -v bun >/dev/null 2>&1; then
 fi
 # A JSON string, so `bun build --define` inlines the git tag into GOLEM_VERSION.
 define_value=$(printf '%s' "$version" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
+# Embed the web page's files in bin/golem. The cleanup trap restores the stub.
+bun "$gen_assets" "$root/packages/gateway/placeholder"
 bun build "$root/packages/cli/src/main.ts" \
   --compile \
   --outfile "$dest/bin/golem" \

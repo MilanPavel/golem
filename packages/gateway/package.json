@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/core.ts",
     "./server": "./src/bun/server.ts",
+    "./assets": "./src/bun/load-assets.ts",
     "./node": "./src/node.ts"
   },
   "scripts": {

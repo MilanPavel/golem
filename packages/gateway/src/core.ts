@@ -17,3 +17,4 @@ export {
   createBridge,
 } from "./bridge.ts";
 export type { Bridge, BridgeIO } from "./bridge.ts";
+export { assetCacheControl, assetKey, fallbackKey } from "./assets.ts";
