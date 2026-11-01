@@ -152,6 +152,9 @@ importers:
       '@fontsource-variable/literata':
         specifier: ^5.3.0
         version: 5.3.0
+      '@golem/client':
+        specifier: workspace:*
+        version: link:../client
       '@golem/view':
         specifier: workspace:*
         version: link:../view
