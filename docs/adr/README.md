@@ -37,7 +37,8 @@ An Architecture Decision Record (ADR) is a short note of one choice: what was de
 | [031](031-system-prompt.md) | The system prompt is built for each model call, and never stored | accepted | 2026-11-01 |
 | [032](032-pinned-skills.md) | Pinned skills live in the session record, not in graph state | accepted | 2026-11-01 |
 | [033](033-golem-offers-to-start-the-service.md) | `golem` offers to start the service when nothing answers, and launchd still owns it | accepted | 2026-11-01 |
+| [034](034-docs-site.md) | The docs are a VitePress site over `docs/`, published to GitHub Pages | accepted | 2026-11-01 |
 
 How the running code fits together is in [../architecture.md](../architecture.md).
 
-New records use [template.md](template.md). Number the next file `034-….md` and add a row here.
+New records use [template.md](template.md). Number the next file `035-….md` and add a row here.
