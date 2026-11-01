@@ -39,6 +39,12 @@ test("a daemon that was not running counts as soon as one answers", async () => 
   assert.deepEqual(await awaitRestart(null, fake.wait), status(3));
 });
 
+test("waiting stops at once when giving up says so", async () => {
+  const fake = clock([null]);
+  assert.equal(await awaitRestart(null, { ...fake.wait, giveUp: () => fake.calls >= 2 }), null);
+  assert.equal(fake.calls, 2);
+});
+
 test("a daemon that never comes back times out", async () => {
   const fake = clock([null]);
   assert.equal(await awaitRestart(7, fake.wait), null);

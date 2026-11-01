@@ -182,6 +182,8 @@ test("reconnects after the daemon drops the socket", async () => {
     await waitFor(() => client.state.status === "connected");
     assert.ok(statuses(seen).includes("connected"));
     assert.ok(statuses(seen).includes("reconnecting"));
+    const reconnecting = seen.find((state) => state.status === "reconnecting");
+    assert.ok(reconnecting && !("closeCode" in reconnecting));
   } finally {
     client.close();
     await server.close();

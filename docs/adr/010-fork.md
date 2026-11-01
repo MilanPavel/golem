@@ -17,6 +17,8 @@ The model's side and the screen's side are cut at the same place. Checkpoint mes
 
 The manager checks the log first. The cut message must have a `message.completed` in the source's log. Then it writes the new thread, and logs the fork's `session.created` with `forked_from {session_id, message_id}`. The `sessions` row stores the same two columns. Then it copies the source's `message.completed` events up to and including the cut, with new `seq` numbers and their original `run_id`. A source with a title gives the fork the same title plus `(fork)`.
 
+The fork also starts with the source's session switches as they are when it forks, not as they were at the cut (step 2.3.5). Its on-demand MCP servers are one `session.updated` with `mcp_servers`. Each pinned skill is the source's newest pinned `skill.activated`, and the `skill.skipped` after it if one came later, copied with no run. So the fork's log says what the source's log says about each pin, and its first model call logs only what changed since. The tools the source allowed for the session are not copied: the fork asks again. Rules written with `allow_always` are in the policy files, so they apply to both.
+
 A message with no completed event, or no checkpoint ending at it, is `-32007`. A session from before the event log has an empty log, so it cannot be forked. An interrupted reply with no text was never written to the checkpoint, so it cannot be a cut either.
 
 Forking at an assistant message keeps that reply. Forking at a user message keeps the question and drops its answer, so the next send on the fork adds a second user message after it.
@@ -32,6 +34,10 @@ Copying the source's current state and trimming its message list would break onc
 Copying every event, deltas and `run.*` included, would replay runs the fork never had, and the `runs` table would hold them twice. The completed messages are all the screen needs.
 
 Giving the copied events new run ids would hide where each message came from.
+
+Copying the pins and MCP servers from the checkpoint at the cut would need them in graph state. They live in the session record, which has no history ([ADR-032](032-pinned-skills.md)), and a user who forks wants the setup they have now.
+
+Copying the session's allowed tools would turn a fork into a way to keep an approval past the session it was given in.
 
 ## What it costs
 
