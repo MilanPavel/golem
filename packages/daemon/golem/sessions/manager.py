@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Coroutine
+from collections.abc import Coroutine, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -37,6 +37,7 @@ from golem.sessions.runner import (
 )
 from golem.sessions.titles import TitleGenerator, choose_title, clean_title, fork_title
 from golem.skills.invoke import Invocation, SkillInvokeError, invoke
+from golem.skills.pinned import SkillPinError, pinnable
 from golem.skills.registry import SkillRegistry
 from golem.store.records import RunRecords, SessionActivity, SessionRecords
 from golem.tools.registry import ToolError, ToolScope
@@ -51,7 +52,9 @@ from golem_protocol.events import (
     SessionAllowance,
     SessionCreatedData,
     SessionUpdatedData,
+    SkillActivatedData,
     SkillCall,
+    SkillDeactivatedData,
     TodosUpdatedData,
 )
 
@@ -125,6 +128,8 @@ class _LiveSession:
     cwd: str | None = None
     allowed_tools: set[Allowance] = field(default_factory=set[Allowance])
     mcp_servers: set[str] = field(default_factory=set[str])
+    skills: list[str] = field(default_factory=list[str])
+    """The pinned skills, in the order they were pinned."""
     title: str | None = None
     titling: bool = False
     closed: bool = False
@@ -253,7 +258,7 @@ class SessionManager:
             session = await self._resolve(session_id)
             values = await self._runtime.values(session_id)
             identity = self._runtime.router.identity(session.model_profile)
-            system = await self._runtime.system_prompt(session_id, session.cwd)
+            system = await self._runtime.system_prompt(session_id, session.cwd, session.skills)
             messages = plain_messages(values)
             return SessionView(
                 session_id=session.session_id,
@@ -401,6 +406,7 @@ class SessionManager:
                 cwd=session.cwd,
                 allowed_tools=_ordered(session.allowed_tools),
                 mcp_servers=tuple(sorted(session.mcp_servers)),
+                pinned=tuple(session.skills),
             )
             control = RunControl()
             await self._start(session, turn.run_id, control, self._turn(session, turn, control))
@@ -465,6 +471,7 @@ class SessionManager:
                 diff=pending.diff,
                 args=args,
                 mcp_servers=tuple(sorted(session.mcp_servers)),
+                pinned=tuple(session.skills),
             )
             control = RunControl()
             work = self._resumed(session, resume, control, pending.prompt)
@@ -523,6 +530,58 @@ class SessionManager:
                     SessionUpdatedData(mcp_servers=sorted(session.mcp_servers)),
                 )
             return sorted(session.mcp_servers)
+
+    async def set_skills(
+        self, session_id: str, pin: Sequence[str] = (), unpin: Sequence[str] = ()
+    ) -> list[str]:
+        """Pin skills for the whole session, or unpin them. Returns the pins, in order.
+
+        Each new pin is ``skill.activated`` with ``how: "pinned"``, and each
+        unpin is ``skill.deactivated``. Both are stored, so the pins survive a
+        restart. From the next turn on, every model call has the pinned bodies
+        in its system prompt.
+        Pinning a pinned skill, or unpinning one that is not, changes nothing.
+
+        Raises :class:`SessionNotFoundError`, or :class:`SkillPinError` when a
+        name is in both lists or the session cannot pin it. Nothing changes then.
+        """
+        both = sorted(set(pin) & set(unpin))
+        if both:
+            raise SkillPinError(f"{both[0]} is in both pin and unpin")
+        async with self._lock:
+            session = await self._resolve(session_id)
+            new = [name for name in dict.fromkeys(pin) if name not in session.skills]
+            gone = [name for name in dict.fromkeys(unpin) if name in session.skills]
+            found = []
+            if new:
+                if self._skills is None:
+                    raise SkillPinError("skills are not loaded in this daemon")
+                view = self._skills.view(None if session.cwd is None else Path(session.cwd))
+                found = [pinnable(view, name) for name in new]
+            for entry in found:
+                skill = entry.skill
+                await self._events.emit(
+                    session_id,
+                    None,
+                    "skill.activated",
+                    SkillActivatedData(
+                        name=skill.name,
+                        source=entry.origin,
+                        how="pinned",
+                        path=str(skill.path),
+                        hash=skill.hash,
+                    ),
+                )
+                session.skills.append(skill.name)
+            for name in gone:
+                await self._events.emit(
+                    session_id,
+                    None,
+                    "skill.deactivated",
+                    SkillDeactivatedData(name=name, reason="unpinned"),
+                )
+                session.skills.remove(name)
+            return list(session.skills)
 
     def _check_edited(
         self, session: _LiveSession, name: str, decision: ApprovalDecision, args: dict[str, object]
@@ -700,6 +759,7 @@ class SessionManager:
             cwd=None if record is None else record.cwd,
             allowed_tools=set() if record is None else set(record.allowed_tools),
             mcp_servers=set() if record is None else set(record.mcp_servers),
+            skills=[] if record is None else list(record.skills),
         )
         if record is None:
             await self._announce(session)

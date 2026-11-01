@@ -44,6 +44,7 @@ METHOD_ACCESS: Final[Mapping[str, Access]] = {
     "mcp.restart": "browser",
     "mcp.set_enabled": "browser",
     "skill.list": "browser",
+    "session.set_skills": "browser",
     "model.probe": "browser",
     "model.pull": "browser",
     "model.pull_cancel": "browser",

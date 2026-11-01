@@ -34,6 +34,7 @@ export const BROWSER_METHODS: ReadonlySet<string> = new Set([
   "session.rename",
   "session.revoke",
   "session.set_model",
+  "session.set_skills",
   "skill.list",
 ]);
 

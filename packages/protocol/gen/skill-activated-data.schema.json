@@ -1,13 +1,16 @@
 {
   "additionalProperties": false,
-  "description": "A skill is active in the session.\n\n``how`` is ``invoked`` for a skill run once by name: its body is that\nturn's user message. ``source`` is where it was found, ``path`` its folder,\nand ``hash`` the sha256 of its ``SKILL.md``.",
+  "description": "A skill is active in the session.\n\n``how`` is ``invoked`` for a skill run once by name: its body is that\nturn's user message. It is ``pinned`` for a skill turned on for the whole\nsession: its body is in the system prompt of every model call until it is\nunpinned. ``source`` is where it was found, ``path`` its folder, and\n``hash`` the sha256 of its ``SKILL.md``.",
   "properties": {
     "hash": {
       "title": "Hash",
       "type": "string"
     },
     "how": {
-      "const": "invoked",
+      "enum": [
+        "invoked",
+        "pinned"
+      ],
       "title": "How",
       "type": "string"
     },

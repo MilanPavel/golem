@@ -16,6 +16,7 @@ from pydantic import BaseModel
 
 from golem.config import load_settings
 from golem.graphs.chat import ChatRuntime, open_chat
+from golem.graphs.prompt import SystemPrompt
 from golem.lock import DaemonAlreadyRunning, DaemonLock
 from golem.logging import configure_logging
 from golem.mcp import McpSupervisor
@@ -42,6 +43,7 @@ from golem.sessions.log import SessionLog
 from golem.sessions.manager import SessionManager
 from golem.sessions.recovery import recover_runs
 from golem.sessions.titles import ModelTitles, TitleGenerator
+from golem.skills.pinned import pinned_section
 from golem.skills.registry import SkillRegistry
 from golem.store.artifacts import ArtifactStore
 from golem.store.checkpoints import open_checkpoints
@@ -174,6 +176,7 @@ class DaemonApp:
                         self.state.policy,
                         self.state.artifacts,
                         local,
+                        SystemPrompt(sections=(pinned_section(self.state.skills),)),
                     ),
                     self._titles,
                     self.state.skills,

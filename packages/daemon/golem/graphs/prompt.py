@@ -17,13 +17,22 @@ from dataclasses import dataclass
 
 from langchain_core.messages import SystemMessage
 
+PINNED_KEY = "golem_pinned_skills"
+"""The ``configurable`` key that carries the session's pinned skills to each model call."""
+
 
 @dataclass(frozen=True, slots=True)
 class PromptContext:
-    """What a section may read: the checkpoint values and the session folder."""
+    """What a section may read: the checkpoint values, the session folder, and the pins.
+
+    ``pinned`` are the names of the skills pinned in the session, in pin order.
+    They are the daemon's, not the checkpoint's, so a pin made between turns
+    applies to the next call.
+    """
 
     state: Mapping[str, object]
     cwd: str | None = None
+    pinned: tuple[str, ...] = ()
 
 
 Section = Callable[[PromptContext], str | None]
@@ -51,4 +60,4 @@ class SystemPrompt:
         return SystemMessage(content=text) if text else None
 
 
-__all__ = ["PromptContext", "Section", "SystemPrompt"]
+__all__ = ["PINNED_KEY", "PromptContext", "Section", "SystemPrompt"]
