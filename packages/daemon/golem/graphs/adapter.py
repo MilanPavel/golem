@@ -16,6 +16,12 @@ from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage
 STREAM_KEY = "golem"
 """Key of every golem item on the custom stream. The graph writes, the adapter reads."""
 
+PIN_READ_KIND = "skill.pin_read"
+"""``STREAM_KEY`` value of a model call's report that it read a pinned skill."""
+
+PIN_SKIPPED_KIND = "skill.pin_skipped"
+"""``STREAM_KEY`` value of a model call's report that it left a pinned skill out."""
+
 APPROVAL_KIND = "approval"
 """``STREAM_KEY`` value of an interrupt that waits for a tool approval."""
 
@@ -97,6 +103,25 @@ class ApprovalAsked:
     diff: str | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class PinRead:
+    """A model call read a pinned skill's ``SKILL.md``, with this ``hash``."""
+
+    name: str
+    source: str
+    path: str
+    hash: str
+
+
+@dataclass(frozen=True, slots=True)
+class PinSkipped:
+    """A model call left a pinned skill out of the system prompt."""
+
+    name: str
+    reason: str
+    message: str
+
+
 Fact = (
     ModelStarted
     | TextDelta
@@ -107,6 +132,8 @@ Fact = (
     | ToolErrored
     | ApprovalAsked
     | TodosChanged
+    | PinRead
+    | PinSkipped
 )
 
 
@@ -273,6 +300,8 @@ def _custom(data: object) -> Fact | None:
     call_id = item.get("call_id")
     if kind == "model.started" and isinstance(message_id, str):
         return ModelStarted(message_id)
+    if kind in (PIN_READ_KIND, PIN_SKIPPED_KIND):
+        return _pin(kind, item)
     if not isinstance(call_id, str):
         return None
     if kind == "tool.started":
@@ -307,12 +336,29 @@ def _custom(data: object) -> Fact | None:
     return None
 
 
+def _pin(kind: object, item: Mapping[str, object]) -> PinRead | PinSkipped | None:
+    fields = (
+        ("name", "source", "path", "hash")
+        if kind == PIN_READ_KIND
+        else ("name", "reason", "message")
+    )
+    values = [item.get(key) for key in fields]
+    strings = [value for value in values if isinstance(value, str) and value]
+    if len(strings) != len(fields):
+        return None
+    return PinRead(*strings) if kind == PIN_READ_KIND else PinSkipped(*strings)
+
+
 __all__ = [
     "APPROVAL_KIND",
+    "PIN_READ_KIND",
+    "PIN_SKIPPED_KIND",
     "STREAM_KEY",
     "ApprovalAsked",
     "Fact",
     "ModelStarted",
+    "PinRead",
+    "PinSkipped",
     "PlainMessage",
     "RequestedCall",
     "TextCompleted",

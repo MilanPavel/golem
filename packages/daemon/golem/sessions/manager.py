@@ -37,7 +37,7 @@ from golem.sessions.runner import (
 )
 from golem.sessions.titles import TitleGenerator, choose_title, clean_title, fork_title
 from golem.skills.invoke import Invocation, SkillInvokeError, invoke
-from golem.skills.pinned import SkillPinError, pinnable
+from golem.skills.pinned import PinMemory, SkillPinError, pinnable, pinned_folders
 from golem.skills.registry import SkillRegistry
 from golem.store.records import RunRecords, SessionActivity, SessionRecords
 from golem.tools.registry import ToolError, ToolScope
@@ -130,6 +130,8 @@ class _LiveSession:
     mcp_servers: set[str] = field(default_factory=set[str])
     skills: list[str] = field(default_factory=list[str])
     """The pinned skills, in the order they were pinned."""
+    pins: PinMemory = field(default_factory=PinMemory)
+    """What the log last said about each pin, so a run logs only a change."""
     title: str | None = None
     titling: bool = False
     closed: bool = False
@@ -407,6 +409,8 @@ class SessionManager:
                 allowed_tools=_ordered(session.allowed_tools),
                 mcp_servers=tuple(sorted(session.mcp_servers)),
                 pinned=tuple(session.skills),
+                pinned_folders=self._pinned_folders(session),
+                pins=session.pins,
             )
             control = RunControl()
             await self._start(session, turn.run_id, control, self._turn(session, turn, control))
@@ -472,6 +476,8 @@ class SessionManager:
                 args=args,
                 mcp_servers=tuple(sorted(session.mcp_servers)),
                 pinned=tuple(session.skills),
+                pinned_folders=self._pinned_folders(session),
+                pins=session.pins,
             )
             control = RunControl()
             work = self._resumed(session, resume, control, pending.prompt)
@@ -573,6 +579,7 @@ class SessionManager:
                     ),
                 )
                 session.skills.append(skill.name)
+                session.pins.read(skill.name, skill.hash)
             for name in gone:
                 await self._events.emit(
                     session_id,
@@ -581,7 +588,14 @@ class SessionManager:
                     SkillDeactivatedData(name=name, reason="unpinned"),
                 )
                 session.skills.remove(name)
+                session.pins.forget(name)
             return list(session.skills)
+
+    def _pinned_folders(self, session: _LiveSession) -> tuple[str, ...]:
+        """The folders of the session's pins that it can use now."""
+        if self._skills is None or not session.skills:
+            return ()
+        return tuple(pinned_folders(self._skills, session.cwd, session.skills))
 
     def _check_edited(
         self, session: _LiveSession, name: str, decision: ApprovalDecision, args: dict[str, object]
@@ -761,6 +775,8 @@ class SessionManager:
             mcp_servers=set() if record is None else set(record.mcp_servers),
             skills=[] if record is None else list(record.skills),
         )
+        if session.skills:
+            session.pins = PinMemory.from_events(await self._events.stored(session_id))
         if record is None:
             await self._announce(session)
         self._sessions[session_id] = session

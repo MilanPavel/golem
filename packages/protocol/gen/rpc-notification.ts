@@ -23,7 +23,8 @@ export type Params =
   | ApprovalResolvedEvent
   | TodosUpdatedEvent
   | SkillActivatedEvent
-  | SkillDeactivatedEvent;
+  | SkillDeactivatedEvent
+  | SkillSkippedEvent;
 export type Cwd = string | null;
 export type MessageId = string;
 export type SessionId = string;
@@ -199,6 +200,14 @@ export type Seq20 = number;
 export type SessionId21 = string;
 export type Ts20 = string;
 export type Type20 = 'skill.deactivated';
+export type Message2 = string;
+export type Name6 = string;
+export type Reason3 = 'missing' | 'disabled' | 'broken';
+export type RunId21 = string | null;
+export type Seq21 = number;
+export type SessionId22 = string;
+export type Ts21 = string;
+export type Type21 = 'skill.skipped';
 
 /**
  * Server → client event. No ``id``; this is not a response to a request.
@@ -789,7 +798,9 @@ export interface SkillActivatedEvent {
  * turn's user message. It is ``pinned`` for a skill turned on for the whole
  * session: its body is in the system prompt of every model call until it is
  * unpinned. ``source`` is where it was found, ``path`` its folder, and
- * ``hash`` the sha256 of its ``SKILL.md``.
+ * ``hash`` the sha256 of its ``SKILL.md``. A pinned skill whose file changed,
+ * or that can be used again after it was skipped, is activated again in the
+ * run whose model call first reads the new body.
  *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "SkillActivatedData".
@@ -824,4 +835,36 @@ export interface SkillDeactivatedEvent {
 export interface SkillDeactivatedData {
   name: Name5;
   reason: Reason2;
+}
+/**
+ * A pinned skill was left out of the run's model calls.
+ *
+ * Logged once when it becomes unusable, not for every call.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "SkillSkippedEvent".
+ */
+export interface SkillSkippedEvent {
+  data: SkillSkippedData;
+  run_id?: RunId21;
+  seq: Seq21;
+  session_id: SessionId22;
+  ts: Ts21;
+  type: Type21;
+}
+/**
+ * A pinned skill was left out of a model call. It stays pinned.
+ *
+ * ``reason`` is ``missing`` when the session finds no skill of that name,
+ * ``disabled`` when ``[skills]`` turns it off, and ``broken`` when its
+ * ``SKILL.md`` cannot be read or is not valid. ``message`` says it for a
+ * person.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "SkillSkippedData".
+ */
+export interface SkillSkippedData {
+  message: Message2;
+  name: Name6;
+  reason: Reason3;
 }

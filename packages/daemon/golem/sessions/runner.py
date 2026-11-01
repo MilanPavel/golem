@@ -29,6 +29,8 @@ from pydantic import BaseModel
 from golem.graphs.adapter import (
     ApprovalAsked,
     ModelStarted,
+    PinRead,
+    PinSkipped,
     TextCompleted,
     TextDelta,
     TodosChanged,
@@ -45,6 +47,7 @@ from golem.permissions.engine import Allowance
 from golem.sessions.interrupted import close_reply
 from golem.sessions.log import SessionLog
 from golem.skills.invoke import Invocation
+from golem.skills.pinned import PinMemory
 from golem_protocol.events import (
     ApprovalDecision,
     ApprovalNeededData,
@@ -57,6 +60,7 @@ from golem_protocol.events import (
     RunCancelledData,
     RunFailedData,
     SkillActivatedData,
+    SkillSkippedData,
     TodosUpdatedData,
     ToolCompletedData,
     ToolFailedData,
@@ -92,6 +96,8 @@ class Turn:
     allowed_tools: tuple[Allowance, ...] = ()
     mcp_servers: tuple[str, ...] = ()
     pinned: tuple[str, ...] = ()
+    pinned_folders: tuple[str, ...] = ()
+    pins: PinMemory = field(default_factory=PinMemory, compare=False)
     skill: Invocation | None = None
     typed: str | None = None
 
@@ -123,6 +129,8 @@ class Resume:
     args: dict[str, object] | None = None
     mcp_servers: tuple[str, ...] = ()
     pinned: tuple[str, ...] = ()
+    pinned_folders: tuple[str, ...] = ()
+    pins: PinMemory = field(default_factory=PinMemory, compare=False)
 
 
 @dataclass
@@ -151,6 +159,7 @@ class _Progress:
     parts: list[str] = field(default_factory=list[str])
     calls: list[str] = field(default_factory=list[str])
     waiting: bool = False
+    pins: PinMemory = field(default_factory=PinMemory)
 
 
 async def run_turn(
@@ -162,7 +171,7 @@ async def run_turn(
     waits for an approval. Cancellation is re-raised after ``run.cancelled``
     is in the log.
     """
-    progress = _Progress()
+    progress = _Progress(pins=turn.pins)
 
     async def emit(kind: EventType, data: BaseModel) -> None:
         await events.emit(turn.session_id, turn.run_id, kind, data)
@@ -209,6 +218,7 @@ async def run_turn(
             allowed_tools=turn.allowed_tools,
             mcp_servers=turn.mcp_servers,
             pinned=turn.pinned,
+            pinned_folders=turn.pinned_folders,
             skill_folder=None if skill is None else str(skill.path),
         )
         return await _finish(stream, progress, emit)
@@ -234,7 +244,7 @@ async def resume_turn(
 
     Returns what :func:`run_turn` returns.
     """
-    progress = _Progress(run_started=True, calls=list(resume.open_calls))
+    progress = _Progress(run_started=True, calls=list(resume.open_calls), pins=resume.pins)
 
     async def emit(kind: EventType, data: BaseModel) -> None:
         await events.emit(resume.session_id, resume.run_id, kind, data)
@@ -260,6 +270,7 @@ async def resume_turn(
             asked=resume.asked,
             mcp_servers=resume.mcp_servers,
             pinned=resume.pinned,
+            pinned_folders=resume.pinned_folders,
         )
         return await _finish(stream, progress, emit)
     except asyncio.CancelledError:
@@ -364,6 +375,16 @@ async def _apply(
             "todos.updated",
             TodosUpdatedData.model_validate({"call_id": fact.call_id, "todos": list(fact.todos)}),
         )
+    elif isinstance(fact, PinRead):
+        if progress.pins.read(fact.name, fact.hash):
+            data = {"name": fact.name, "source": fact.source, "how": "pinned"}
+            data |= {"path": fact.path, "hash": fact.hash}
+            await emit("skill.activated", SkillActivatedData.model_validate(data))
+    elif isinstance(fact, PinSkipped):
+        data = {"name": fact.name, "reason": fact.reason, "message": fact.message}
+        skipped = SkillSkippedData.model_validate(data)
+        if progress.pins.skipped(skipped.name, skipped.reason):
+            await emit("skill.skipped", skipped)
     elif isinstance(fact, ApprovalAsked):
         progress.waiting = True
         await emit(

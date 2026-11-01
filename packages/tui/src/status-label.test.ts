@@ -11,6 +11,7 @@ import {
   sessionTitleLabel,
   shortCwd,
   shownSessionTitle,
+  skillsLabel,
   startedAtMs,
   statusLabel,
   statusSegments,
@@ -229,4 +230,10 @@ test("pinned skills show after the model, and leave the line before new lines an
       .find((segment) => segment.id === "skills")?.text,
     "",
   );
+});
+
+test("a pinned skill the model call left out is marked skipped, in its place", () => {
+  assert.equal(skillsLabel(["ship", "setup"], ["ship"]), "skills: ship (skipped), setup");
+  assert.equal(skillsLabel(["setup"], ["ship"]), "skills: setup");
+  assert.equal(skillsLabel([], []), "");
 });
