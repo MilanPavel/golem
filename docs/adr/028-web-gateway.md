@@ -138,6 +138,8 @@ The daemon reads JSON lines and splits on `\n` ([ADR-003](003-protocol.md)). A b
 | `Cache-Control` | `no-cache` on `index.html`, `public, max-age=31536000, immutable` on hashed assets | After `brew upgrade`, the next load is the new page |
 | `Cross-Origin-Opener-Policy` | `same-origin` | Another window cannot reach into the page |
 
+- The page's files are embedded in `bin/golem` at `just dist` (`import … with { type: "file" }`). A checkout serves a folder instead. A page path without a file extension serves `index.html`, so the page's routes reload.
+
 There is no service worker that caches the page. One would show an old page, speaking an old protocol, after an upgrade.
 
 ### Development
