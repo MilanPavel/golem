@@ -10,6 +10,9 @@ import {
   createSessionStore,
   exchangeToken,
   isSecretShape,
+  assetCacheControl,
+  assetKey,
+  fallbackKey,
   withSecurityHeaders,
 } from "../core.ts";
 import type { Bridge, SessionStore } from "../core.ts";
@@ -21,6 +24,8 @@ export interface GatewayOptions {
   sessions?: SessionStore;
   /** Most live WebSockets at once. Default 16. */
   maxSockets?: number;
+  /** URL keys of the page's files, to the file on disk (or in the binary). Default none. */
+  assets?: ReadonlyMap<string, string>;
 }
 
 export interface Gateway {
@@ -57,6 +62,26 @@ export function startGateway(opts: GatewayOptions): Gateway {
     const checked = checkRequest(req, port, { requireOrigin: false });
     if (!checked.ok) return text(checked.status, checked.reason);
     return Response.json({ golem: "web", pid: process.pid }, { headers: { "Cache-Control": "no-store" } });
+  }
+
+  const assets = opts.assets ?? new Map<string, string>();
+
+  function asset(req: Request, port: number, pathname: string): Response {
+    if (req.method !== "GET" && req.method !== "HEAD") return text(405, "method not allowed");
+    const checked = checkRequest(req, port, { requireOrigin: false });
+    if (!checked.ok) return text(checked.status, checked.reason);
+    let key = assetKey(pathname);
+    let file = assets.get(key);
+    if (file === undefined) {
+      const fallback = fallbackKey(pathname);
+      file = fallback === null ? undefined : assets.get(fallback);
+      if (fallback === null || file === undefined) return text(404, "not found");
+      key = fallback;
+    }
+    const blob = Bun.file(file);
+    return new Response(req.method === "HEAD" ? null : blob, {
+      headers: { "Content-Type": blob.type, "Cache-Control": assetCacheControl(key) },
+    });
   }
 
   function upgrade(req: Request, server: Bun.Server<SocketData>): Response | undefined {
@@ -121,7 +146,7 @@ export function startGateway(opts: GatewayOptions): Gateway {
       if (path === "/healthz") res = health(req, port);
       else if (path === "/auth/exchange") res = await exchangeToken(req, port, opts.token, sessions);
       else if (path === "/ws") res = upgrade(req, srv);
-      else res = text(404, "not found");
+      else res = asset(req, port, path);
       return res === undefined ? undefined : withSecurityHeaders(res);
     },
     websocket: {
