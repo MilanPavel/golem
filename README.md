@@ -291,6 +291,7 @@ flowchart LR
 | `golem daemon install` / `uninstall` | Sets up or removes the background service. `~/.golem` stays |
 | `golem daemon start` / `stop` / `restart` | Controls the daemon. `restart` after an upgrade |
 | `golem daemon logs` | Follows the daemon's log |
+| `golem web` | Serves the chat in your browser on 127.0.0.1 until Ctrl-C. `--no-open` prints the link instead |
 | `golem auth set` / `remove` / `list` | Manages API keys, and MCP tokens (`mcp/<name>`), in the Keychain |
 | `golem models` | Every model you can use or download, with size, price, and context |
 | `golem config show` | The settings and tool rules in effect for this folder |

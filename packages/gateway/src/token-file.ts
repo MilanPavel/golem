@@ -33,12 +33,13 @@ export async function checkRunDir(dir: string): Promise<void> {
   if ((st.mode & 0o022) !== 0) throw new Error(`${dir} can be written by others. ${fix}`);
 }
 
-/** Writes a new token. An old file is from a gateway that stopped. */
-export async function writeTokenFile(dir: string): Promise<string> {
+/** Writes a token, a new one unless given. An old file is from a gateway that stopped. */
+export async function writeTokenFile(dir: string, given?: string): Promise<string> {
   await checkRunDir(dir);
   const file = path.join(dir, TOKEN_NAME);
   await removeTokenFile(dir);
-  const token = randomSecret();
+  const token = given ?? randomSecret();
+  if (!isSecretShape(token)) throw new Error("a login token must come from randomSecret");
   const flags = constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW;
   const handle = await open(file, flags, 0o600);
   try {

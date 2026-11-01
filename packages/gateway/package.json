@@ -4,7 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "exports": {
-    ".": "./src/core.ts"
+    ".": "./src/core.ts",
+    "./server": "./src/bun/server.ts",
+    "./node": "./src/node.ts"
   },
   "scripts": {
     "lint": "eslint src",

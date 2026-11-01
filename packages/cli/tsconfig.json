@@ -12,7 +12,7 @@
     "isolatedModules": true,
     "allowImportingTsExtensions": true,
     "jsx": "react-jsx",
-    "types": ["node"],
+    "types": ["node", "bun"],
     "resolveJsonModule": true
   },
   "include": ["src/**/*.ts", "../protocol/gen/**/*.ts"]
