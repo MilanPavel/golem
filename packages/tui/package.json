@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@golem/client": "workspace:*",
+    "@golem/view": "workspace:*",
     "ink": "^8.0.0",
     "react-devtools-core": "file:../../scripts/react-devtools-core",
     "marked": "^18.1.0",

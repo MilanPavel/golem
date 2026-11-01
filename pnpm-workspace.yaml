@@ -2,4 +2,5 @@ packages:
   - "packages/client"
   - "packages/cli"
   - "packages/tui"
+  - "packages/view"
   - "packages/web"

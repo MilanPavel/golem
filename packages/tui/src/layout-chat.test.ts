@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import type { ChatMessage } from "./chat-state.ts";
+import type { ChatMessage } from "@golem/view";
 import {
   gutterColumn,
   INTERRUPTED_MARK,

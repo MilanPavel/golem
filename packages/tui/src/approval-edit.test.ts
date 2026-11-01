@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { argsEditLines, editedArgs, liveArgsEdit, parseArgs, startArgsEdit } from "./approval-edit.ts";
-import type { PendingApproval } from "./chat-state.ts";
+import type { PendingApproval } from "@golem/view";
 
 const approval: PendingApproval = {
   callId: "c1",
