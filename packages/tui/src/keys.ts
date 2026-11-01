@@ -34,7 +34,8 @@ export type PressName =
   | "ctrl-u"
   | "ctrl-k"
   | "ctrl-g"
-  | "ctrl-o";
+  | "ctrl-o"
+  | "ctrl-r";
 
 export type Press = {
   name: PressName | null;
@@ -108,6 +109,7 @@ export type KeyEffect =
   | { kind: "move-row"; direction: -1 | 1 }
   | { kind: "edit-external" }
   | { kind: "toggle-tools" }
+  | { kind: "restart-service" }
   | { kind: "approve"; decision: "allow" | "allow_session" | "allow_always" | "deny" }
   | { kind: "scroll-diff"; toward: ScrollToward; line: boolean }
   | { kind: "edit-args" }
@@ -436,6 +438,14 @@ export const KEYS: readonly KeyBinding[] = [
     run: () => ({ kind: "toggle-tools" }),
   },
   {
+    id: "restart-service",
+    label: "Ctrl-R",
+    contexts: ["composer"],
+    description: "Restarts golem's service when the banner offers it, such as after brew upgrade.",
+    when: { name: "ctrl-r", overlay: false, switcher: false },
+    run: () => ({ kind: "restart-service" }),
+  },
+  {
     id: "show-keys",
     label: "?",
     contexts: ["composer"],
@@ -728,6 +738,9 @@ function ctrlName(input: string): PressName | null {
   }
   if (input === "o") {
     return "ctrl-o";
+  }
+  if (input === "r") {
+    return "ctrl-r";
   }
   return null;
 }

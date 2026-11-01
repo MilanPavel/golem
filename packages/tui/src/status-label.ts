@@ -92,7 +92,19 @@ export function versionLabel(
   if (daemonVersion.length === 0 || tuiVersion === daemonVersion) {
     return { text: tuiVersion, warn: false };
   }
-  return { text: `tui ${tuiVersion} · daemon ${daemonVersion} · run golem daemon restart`, warn: true };
+  return { text: `tui ${tuiVersion} · daemon ${daemonVersion}`, warn: true };
+}
+
+/**
+ * For the banner, after `brew upgrade` left the old daemon running: what changed, and how to restart.
+ * Null when the versions match or the daemon's is not known yet.
+ */
+export function upgradeBanner(tuiVersion: string, daemonVersion: string, canRestart: boolean): string | null {
+  if (!versionLabel(tuiVersion, daemonVersion).warn) {
+    return null;
+  }
+  const how = canRestart ? "ctrl-r restart" : "run golem daemon restart";
+  return `golem is ${tuiVersion}, its service still runs ${daemonVersion} · ${how}`;
 }
 
 /**
