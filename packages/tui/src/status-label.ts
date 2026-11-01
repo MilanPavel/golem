@@ -68,7 +68,8 @@ export type StatusSegment = {
 
 /**
  * Connection never drops. After that, the right-hand segments leave first:
- * uptime, message count, folder, new lines, then model, then the title, then an alert.
+ * uptime, message count, folder, pinned skills, new lines, then model, then
+ * the title, then an alert.
  */
 export const STATUS_PRIORITY = {
   connection: 100,
@@ -76,6 +77,7 @@ export const STATUS_PRIORITY = {
   title: 80,
   model: 60,
   fresh: 55,
+  skills: 45,
   folder: 40,
   messages: 20,
   uptime: 10,
@@ -91,6 +93,11 @@ export function versionLabel(
     return { text: tuiVersion, warn: false };
   }
   return { text: `tui ${tuiVersion} · daemon ${daemonVersion} · run golem daemon restart`, warn: true };
+}
+
+/** For the status line: `skills: ship, setup`, the pinned skills in pin order, or "". */
+export function skillsLabel(active: readonly string[]): string {
+  return active.length === 0 ? "" : `skills: ${active.join(", ")}`;
 }
 
 /** For the status line: the provider whose server did not answer, then any other alert, or "". */
@@ -172,12 +179,15 @@ export function statusSegments(input: {
   freshLines?: number;
   /** Something the session uses is down, such as an MCP server. */
   alert?: string;
+  /** The skills pinned in the session, in pin order. */
+  skills?: readonly string[];
 }): StatusSegment[] {
   return [
     segment("connection", input.connection, STATUS_PRIORITY.connection, "connection", true),
     segment("alert", input.alert ?? "", STATUS_PRIORITY.alert, "alert"),
     segment("title", input.title, STATUS_PRIORITY.title, "title"),
     segment("model", input.model, STATUS_PRIORITY.model, "model"),
+    segment("skills", skillsLabel(input.skills ?? []), STATUS_PRIORITY.skills, "dim"),
     segment("folder", input.folder, STATUS_PRIORITY.folder, "dim"),
     segment(
       "messages",

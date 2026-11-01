@@ -637,3 +637,24 @@ test("a replayed user message that ran a skill keeps its skill marker", () => {
   assert.equal(live.messages[0]?.text, "Open a PR: x\n");
   assert.equal("skill" in (live.messages[1] ?? {}), false);
 });
+
+test("pins and unpins become the active skills, in pin order; an invoked skill is not one", () => {
+  const activated = (seq: number, name: string, how: "pinned" | "invoked") =>
+    ({
+      seq,
+      session_id: "s",
+      run_id: null,
+      ts: "t",
+      type: "skill.activated",
+      data: { name, source: "user", how, path: `/skills/${name}`, hash: "h" },
+    }) satisfies ChatEvent;
+  const events = [
+    activated(1, "terse", "pinned"),
+    activated(2, "polite", "pinned"),
+    activated(3, "ship", "invoked"),
+    activated(4, "terse", "pinned"),
+    { seq: 5, session_id: "s", run_id: null, ts: "t", type: "skill.deactivated", data: { name: "terse", reason: "unpinned" } },
+  ] satisfies ChatEvent[];
+  const states = events.map((_, index) => events.slice(0, index + 1).reduce(reduceChat, emptyChat).activeSkills);
+  assert.deepEqual(states, [["terse"], ["terse", "polite"], ["terse", "polite"], ["terse", "polite"], ["polite"]]);
+});

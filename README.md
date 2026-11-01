@@ -244,7 +244,9 @@ golem skills check ~/.golem/skills/release-notes   # find mistakes before you sh
 
 **Run one by name.** Type `/release-notes v0.5` and the model gets that skill's instructions, with `v0.5` filled in where the skill asks for its arguments. Skills show in the `/` suggestions with their argument hint. A command such as `/help` keeps its name, so `/skill run help` runs a skill of that name. A skill with `user-invocable: false` is left out. The transcript shows the line you typed, marked `◆ skill`. Ctrl-O shows the instructions the model got. Once a chat runs a skill, the model may read the files in that skill's folder, and its commands may run the skill's scripts. Nothing writes there.
 
-**What works today, and what is next.** Golem finds, checks, lists, and runs skills, shows a skill you ran as one short line, and lets it read its own files. Keeping one on for a whole chat, and letting the model pick one when the task fits are the next steps of [Phase 2](docs/plan.md#phase-2--skills). How it works inside, with an animation, is in [architecture.md](docs/architecture.md#skills).
+**Keep one on.** `/skill pin terse` puts that skill's instructions in front of every message to the model, for the rest of the chat. `/skill unpin terse` turns it off, and `/skill` alone lists what is pinned. The status line shows `skills: terse`. A pin survives a restart of golem. Skills with `user-invocable: false` can be pinned too.
+
+**What works today, and what is next.** Golem finds, checks, lists, runs, and pins skills, shows a skill you ran as one short line, and lets it read its own files. Letting the model pick one when the task fits is the next step of [Phase 2](docs/plan.md#phase-2--skills). How it works inside, with an animation, is in [architecture.md](docs/architecture.md#skills).
 
 <details>
 <summary><b>Skill settings</b></summary>
@@ -314,6 +316,7 @@ Type `/` and suggestions appear. `/help` lists everything.
 | `/permissions` | Review and change tool rules |
 | `/skills` | See the skills this folder has, and open one to see why it is or is not used |
 | `/<skill> [args]`, `/skill run <name> [args]` | Run a skill once. The second form reaches a skill named like a command |
+| `/skill pin <name>`, `/skill unpin <name>`, `/skill` | Keep a skill on for the whole chat, turn it off, or list the pinned ones |
 | `/mcp` | Manage MCP servers: view tools, reconnect, turn on or off. `/mcp enable <name>` and `/mcp disable <name>` are shortcuts |
 | `/login`, `/logout <provider>` | Save or remove an API key |
 | `/todos`, `/time` | Show or hide the agent's todo list, or message times |
