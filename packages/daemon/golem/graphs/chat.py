@@ -26,6 +26,7 @@ from langgraph.graph import END, START, StateGraph  # pyright: ignore[reportMiss
 from langgraph.types import Command
 
 from golem.graphs.adapter import STREAM_KEY, message_text
+from golem.graphs.prompt import PromptContext, SystemPrompt
 from golem.graphs.state import AgentState
 from golem.graphs.tools_node import (
     ALLOWED_KEY,
@@ -118,11 +119,13 @@ class ChatRuntime:
         router: ModelRouter,
         tools: ToolRegistry | None = None,
         policy: Policy | None = None,
+        prompt: SystemPrompt | None = None,
     ) -> None:
         self._graph = graph
         self.router = router
         self.tools = default_registry() if tools is None else tools
         self.policy = Policy(None) if policy is None else policy
+        self.prompt = SystemPrompt() if prompt is None else prompt
 
     async def values(self, session_id: str) -> Mapping[str, object]:
         """Checkpoint values for ``session_id``, or an empty mapping."""
@@ -131,6 +134,10 @@ class ChatRuntime:
         if not isinstance(raw, dict) or not raw:
             return {}
         return cast(Mapping[str, object], raw)
+
+    async def system_prompt(self, session_id: str, cwd: str | None) -> str:
+        """The system prompt the next model call of ``session_id`` would get, or ``""``."""
+        return self.prompt.text(PromptContext(await self.values(session_id), cwd))
 
     async def stream(
         self,
@@ -316,6 +323,7 @@ def open_chat(
     policy: Policy | None = None,
     artifacts: Artifacts | None = None,
     local: LocalServers | None = None,
+    prompt: SystemPrompt | None = None,
 ) -> ChatRuntime:
     """Compile the chat graph against ``checkpointer``.
 
@@ -323,10 +331,13 @@ def open_chat(
     built-in rules only, with no user or project file. Without ``artifacts``,
     big tool output is cut instead of stored. With ``local``, a model call to
     an Ollama on this machine starts it first, and holds it while it answers.
+    ``prompt`` builds the system prompt for each model call. It defaults to
+    none, so the model sees only the stored history.
     """
     registry = default_registry() if tools is None else tools
     rules = Policy(None) if policy is None else policy
     binder = _ToolBinder()
+    system_prompt = SystemPrompt() if prompt is None else prompt
 
     async def call_model(state: AgentState, config: RunnableConfig) -> dict[str, list[BaseMessage]]:
         messages = list(state["messages"])
@@ -336,9 +347,12 @@ def open_chat(
         scope = scope_of(config)
         await registry.prepare(scope)
         tools = registry.scoped(scope)
+        system = system_prompt.message(PromptContext(state, _cwd(config)))
+        # The system message is sent, never returned, so it stays out of the checkpoint.
+        sent = messages if system is None else [system, *messages]
         async with _held(router, local, profile):
             try:
-                response = await binder.invoke(profile, router.chat_model(profile), messages, tools)
+                response = await binder.invoke(profile, router.chat_model(profile), sent, tools)
             except Exception as exc:
                 down = router.unreachable(profile, exc)
                 if down is None:
@@ -361,7 +375,9 @@ def open_chat(
     builder.add_edge(START, "call_model")
     builder.add_conditional_edges("call_model", route, {"tools": "tools", "end": END})
     builder.add_edge("tools", "call_model")
-    return ChatRuntime(builder.compile(checkpointer=checkpointer), router, registry, rules)
+    return ChatRuntime(
+        builder.compile(checkpointer=checkpointer), router, registry, rules, system_prompt
+    )
 
 
 class _ToolBinder:
@@ -412,6 +428,12 @@ def _ai(message: BaseMessage) -> AIMessage:
     if isinstance(message, AIMessage):
         return message
     return AIMessage(content=message.content)
+
+
+def _cwd(config: RunnableConfig) -> str | None:
+    configurable = cast(Mapping[str, object], config.get("configurable", {}))
+    raw = configurable.get(CWD_KEY)
+    return raw if isinstance(raw, str) and raw != "" else None
 
 
 def _reply_id(messages: Sequence[BaseMessage], config: RunnableConfig) -> str:
