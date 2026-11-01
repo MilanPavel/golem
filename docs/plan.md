@@ -80,7 +80,7 @@ Agents use the Graph API, where the model decides control flow. Flows use the Fu
 
 ### Protocol, what is left to add
 
-JSON-RPC 2.0, one JSON object per line, over `~/.golem/run/golem.sock`. Protocol 2.25 is on the wire today (see [architecture.md](architecture.md#what-is-on-the-wire-today)). The phases below add the rest.
+JSON-RPC 2.0, one JSON object per line, over `~/.golem/run/golem.sock`. Protocol 2.27 is on the wire today (see [architecture.md](architecture.md#what-is-on-the-wire-today)). The phases below add the rest.
 
 | Group | New events | Phase |
 |---|---|---|
@@ -120,21 +120,22 @@ Choices that hold for the whole phase:
 - **`~/.claude/skills` and `<project>/.claude/skills` are read by default.** Legacy `.claude/commands/*.md` is not.
 - **Invoking comes before pinning.** It is the most-used Claude Code feature, and it needs no system prompt.
 
-The registry, `/skills`, and `golem skills` are built ([#4](https://github.com/MilanPavel/golem/issues/4)).
+The registry, `/skills`, and `golem skills` are built ([#4](https://github.com/MilanPavel/golem/issues/4)). So is running a skill once with `/name` ([#21](https://github.com/MilanPavel/golem/issues/21)): the arguments are filled in, the transcript shows the line you typed, and the model may read the skill's folder. Running `/ship` in golem showed that the shell cannot yet do its work in a git worktree or with `gh`, so 2.8 comes next.
 
 ```mermaid
 flowchart LR
-  s2[2.2 Invoke /name] --> s3[2.3 Pin + system prompt] --> s4[2.4 Model-driven loading]
+  s8[2.8 Shell in a real repo] --> s3[2.3 Pin + system prompt] --> s4[2.4 Model-driven loading]
   s4 --> s5[2.5 Embeddings]
   s4 --> s6[2.6 Trust] --> s7[2.7 Self-authored]
 ```
 
-### 2.2 Invoke a skill with `/name` — [#21](https://github.com/MilanPavel/golem/issues/21)
+### 2.8 The shell works in a real repo — [#204](https://github.com/MilanPavel/golem/issues/204)
 
-- **Goal:** you can run a skill once, with arguments, the way Claude Code does.
-- **You can:** `/ship fix the mcp restart`.
-- **Build:** body expansion (`$ARGUMENTS`, `${CLAUDE_SKILL_DIR}`, …), `message.send` with a skill, `/name` in the composer, a collapsed transcript line, and skill folders as read roots for the read tools and the sandbox.
-- **Done when:** `/ship` in golem on this repo behaves like `/ship` in Claude Code.
+- **Goal:** `/ship` in golem opens a pull request, from a clone or a git worktree.
+- **You can:** run `git` and `gh` from golem's shell, in a worktree too, and see when golem's sandbox refused something and how to allow it.
+- **Build:** the sandbox may write a worktree's git folders, `gh` and `git push` reach GitHub with your credentials after an approval, a sandbox refusal says it was the sandbox, and a command that fails is not marked `✓`.
+- **Done when:** `/ship` in golem on this repo, from a git worktree, opens a pull request.
+- **Watch out:** it is numbered 2.8 so that 2.3 to 2.7 keep their issues, but it comes right after 2.2. How a command gets your credentials needs an ADR: one shell line can run several programs, so a rule keyed on the first word is easy to get around.
 
 ### 2.3 Pinned skills and the system prompt — [#5](https://github.com/MilanPavel/golem/issues/5)
 
@@ -237,7 +238,7 @@ flowchart LR
 - **You can:** nothing new on screen. The TUI is unchanged.
 - **Build:** a pure TypeScript `packages/view` with no React, Ink, or Node. It takes only the reducer core: `chat-state`, `todos`, `sanitize`, the diff parser, and the parts of `status-label` and `window-title` about meaning. The command table, suggestions, and pickers stay in the TUI until 10.10.
 - **Done when:** `just check` is green, the TUI is unchanged, and golden event logs give the same state live, replayed, and replayed with repeats.
-- **Watch out:** Skills 2.2 edits `chat-state.ts`. Rebase before you start, and keep the move mechanical.
+- **Watch out:** Skills 2.2 added `skill` to `ChatMessage` in `chat-state.ts`. Move it with the rest, and keep the move mechanical.
 
 ### 10.5 The gateway and `golem web` — [#166](https://github.com/MilanPavel/golem/issues/166)
 
