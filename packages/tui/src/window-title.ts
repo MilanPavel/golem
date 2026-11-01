@@ -1,4 +1,5 @@
 import type { ConnectionState } from "@golem/client";
+import { golemState } from "@golem/view";
 
 import type { MeterPhase } from "./progress.ts";
 
@@ -31,16 +32,8 @@ export const RESTORE_WINDOW_TITLE = `${ESC}[23;0t`;
 export type TabState = "offline" | "waiting" | "working" | "error" | "idle";
 
 export function tabState(state: Pick<TitleState, "phase" | "error" | "connection">): TabState {
-  if (state.connection !== "connected") {
-    return "offline";
-  }
-  if (state.phase === "waiting") {
-    return "waiting";
-  }
-  if (state.phase !== null) {
-    return "working";
-  }
-  return state.error ? "error" : "idle";
+  const shown = golemState(state);
+  return shown === "thinking" ? "working" : shown === "failed" ? "error" : shown;
 }
 
 /** The state as one mark before the title. */

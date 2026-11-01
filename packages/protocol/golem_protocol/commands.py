@@ -329,10 +329,12 @@ class InspectMessage(BaseModel):
 
 
 class SessionInspectResult(BaseModel):
-    """The conversation stored for this session.
+    """The conversation stored for this session, as the next model call sees it.
 
-    ``message_count`` is the length of ``messages``. Provider and name are
-    null when the daemon cannot resolve ``model_profile``.
+    When golem has a system prompt for the session, it is the first of
+    ``messages``, with role ``system``. It is built for each call and never
+    stored, so ``message_count`` counts only the stored messages. Provider and
+    name are null when the daemon cannot resolve ``model_profile``.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)

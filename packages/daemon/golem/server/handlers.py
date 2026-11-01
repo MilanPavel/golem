@@ -356,7 +356,7 @@ async def _session_inspect(
         model_profile=view.model_profile,
         model_provider=view.model_provider,
         model_name=view.model_name,
-        message_count=len(view.messages),
+        message_count=view.stored,
         messages=[
             InspectMessage(role=message.role, text=message.text) for message in view.messages
         ],
