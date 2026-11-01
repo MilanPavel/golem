@@ -123,6 +123,15 @@ flowchart TB
 - **`golem`** is compiled by bun into one file ([ADR-019](adr/019-single-binary.md)). It also carries the web page, the Vite build of `packages/web`, and `smoke-dist` checks that `golem web` serves it.
 - **Signing.** Last, `scripts/sign_dist.py` signs every program file in the folder: ad-hoc by default, or with the certificate named by `GOLEM_SIGN_IDENTITY` (section 5). `just check-signature` checks the result, and `just package` packs the folder into the `.tar.gz` and `.sha256` a release ships.
 
+### Developing the web page
+
+- Run `golem web` (or `just golem web`) once. It starts the gateway.
+- Run `pnpm --filter @golem/web dev`, and open the `golem web dev:` link it prints.
+- The dev server sends `/ws` and `/auth` to the gateway. It reads the port from `run/web.json` (else `GOLEM_WEB_PORT`, else 7480) when it starts, so restart it after the gateway.
+- The proxy sets the `Host` and `Origin` headers the gateway expects. The gateway's checks stay as they are ([ADR-028](adr/028-web-gateway.md)).
+- If no gateway runs, the dev server says so and keeps serving.
+- `just e2e` runs the browser tests with the installed Chrome. Each test starts its own daemon and gateway in a temporary `GOLEM_HOME`. It is not in `just check` or CI yet.
+
 ### The smoke test
 
 A "smoke test" is a quick check that the build turns on and works. `just smoke-dist` checks the newest build:

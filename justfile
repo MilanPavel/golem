@@ -170,6 +170,10 @@ tag version="":
     printf '%s pushed. The release runs at %s/actions/workflows/release.yml\n' \
       "$tag" "$(gh repo view --json url --jq .url)"
 
+# Run the web page's end-to-end tests in Chrome: a real daemon, gateway, and page.
+e2e:
+    pnpm --filter @golem/web e2e
+
 # Lint, typecheck, test, and fail if generated protocol files drift.
 check:
     #!/usr/bin/env bash
