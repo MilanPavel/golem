@@ -22,8 +22,9 @@ This file is about what comes next. How the existing pieces are built is in [arc
 | 7. TUI polish | A render cache for long sessions, themes, and search in the transcript | Later |
 | 8. Platforms | One interface for everything OS-specific, then Linux and Windows | Later |
 | 9. Model routing and long sessions | Token and cost display, a cheap profile for small jobs, budgets, escalation, compaction | Later |
+| 11. Docs (parallel track) | A docs site in golem's look, a short README, and "How agents work" | Any time |
 
-What is built is in [architecture.md](architecture.md) and the ADRs, and how to install, run, and release it is in [sre.md](sre.md). Steps 1.1 to 1.6 of Phase 1, the first run and the terminal UX, are built ([#62](https://github.com/MilanPavel/golem/issues/62)). Steps 1.7 to 1.14 finish the first run from `brew install`, so they come first, then skills, then the web UI.
+What is built is in [architecture.md](architecture.md) and the ADRs, and how to install, run, and release it is in [sre.md](sre.md). Steps 1.1 to 1.6 of Phase 1, the first run and the terminal UX, are built ([#62](https://github.com/MilanPavel/golem/issues/62)). Steps 1.7 to 1.14 finish the first run from `brew install`, so they come first, then skills, then the web UI. Phase 11, the docs, runs beside them and blocks nothing.
 
 ```mermaid
 flowchart LR
@@ -81,16 +82,15 @@ Agents use the Graph API, where the model decides control flow. Flows use the Fu
 
 ### Protocol, what is left to add
 
-JSON-RPC 2.0, one JSON object per line, over `~/.golem/run/golem.sock`. Protocol 2.27 is on the wire today (see [architecture.md](architecture.md#what-is-on-the-wire-today)). The phases below add the rest.
+JSON-RPC 2.0, one JSON object per line, over `~/.golem/run/golem.sock`. Protocol 2.29 is on the wire today (see [architecture.md](architecture.md#what-is-on-the-wire-today)). The phases below add the rest.
 
 | Group | New events | Phase |
 |---|---|---|
 | Models | `usage.reported` (tokens, cost) | 9.1 |
 | System | `warning`, `error` | 9.4 |
-| Skills | `skill.activated`, `skill.deactivated` | 2.3 |
 | Runs and flows | `run.step.started`, `run.step.completed`, `run.interrupted` | 3.2, 3.4 |
 
-New commands: `session.set_skills` (2.3), `skill.trust | untrust` (2.6), `flow.list | start | status` (3.1), and `daemon.shutdown` (8.1).
+New commands: `skill.trust | untrust` (2.6), `flow.list | start | status` (3.1), and `daemon.shutdown` (8.1).
 
 Rules:
 
@@ -204,17 +204,17 @@ A skill becomes active in one of three ways:
 Choices that hold for the whole phase:
 
 - **The daemon owns the registry, and graph state holds only skill names.** Bodies are read from disk when the prompt is built.
-- **The system prompt is built per model call and never checkpointed.** golem has none today, so 2.3 adds it.
+- **The system prompt is built per model call and never checkpointed** ([ADR-031](adr/031-system-prompt.md)).
 - **`allowed-tools` pre-approves, as in Claude Code, but only for a trusted skill**, and a deny rule always wins. The earlier plan said it only narrows.
 - **A skill from an untrusted project works like a user skill.** Only its scripts and `` !`cmd` `` always ask, and its `allowed-tools` is ignored until the project is trusted ([ADR-012](adr/012-permission-rules.md)).
 - **`~/.claude/skills` and `<project>/.claude/skills` are read by default.** Legacy `.claude/commands/*.md` is not.
 - **Invoking comes before pinning.** It is the most-used Claude Code feature, and it needs no system prompt.
 
-The registry, `/skills`, and `golem skills` are built ([#4](https://github.com/MilanPavel/golem/issues/4)). So is running a skill once with `/name` ([#21](https://github.com/MilanPavel/golem/issues/21)): the arguments are filled in, the transcript shows the line you typed, and the model may read the skill's folder. Running `/ship` in golem showed that the shell cannot yet do its work in a git worktree or with `gh`, so 2.8 comes next in this phase.
+The registry, `/skills`, and `golem skills` are built ([#4](https://github.com/MilanPavel/golem/issues/4)). So is running a skill once with `/name` ([#21](https://github.com/MilanPavel/golem/issues/21)): the arguments are filled in, the transcript shows the line you typed, and the model may read the skill's folder. So is pinning a skill for the whole session ([#5](https://github.com/MilanPavel/golem/issues/5)): its body is in the system prompt of every model call, an edit or a deletion is logged once and never stops a turn, and a pin survives a restart and a fork ([ADR-032](adr/032-pinned-skills.md)). Running `/ship` in golem showed that the shell cannot yet do its work in a git worktree or with `gh`, so 2.8 comes next in this phase.
 
 ```mermaid
 flowchart LR
-  s8[2.8 Shell in a real repo] --> s3[2.3 Pin + system prompt] --> s4[2.4 Model-driven loading]
+  s8[2.8 Shell in a real repo] --> s4[2.4 Model-driven loading]
   s4 --> s5[2.5 Embeddings]
   s4 --> s6[2.6 Trust] --> s7[2.7 Self-authored]
 ```
@@ -225,14 +225,7 @@ flowchart LR
 - **You can:** run `git` and `gh` from golem's shell, in a worktree too, and see when golem's sandbox refused something and how to allow it.
 - **Build:** the sandbox may write a worktree's git folders, `gh` and `git push` reach GitHub with your credentials after an approval, a sandbox refusal says it was the sandbox, and a command that fails is not marked `✓`.
 - **Done when:** `/ship` in golem on this repo, from a git worktree, opens a pull request.
-- **Watch out:** it is numbered 2.8 so that 2.3 to 2.7 keep their issues, but it comes right after 2.2. How a command gets your credentials needs an ADR: one shell line can run several programs, so a rule keyed on the first word is easy to get around.
-
-### 2.3 Pinned skills and the system prompt — [#5](https://github.com/MilanPavel/golem/issues/5)
-
-- **Goal:** you can turn a skill on for the whole session.
-- **You can:** `/skill pin <name>`, `/skill unpin <name>`, and see active skills in the status line and the system prompt in `/debug model`.
-- **Build:** a system prompt builder, `active_skills` in graph state with `session.set_skills`, `skill.activated` and `skill.deactivated`, handling of a pinned skill that is edited or deleted, and a fork that copies pins.
-- **Done when:** a pinned skill changes the answer, and is still pinned after `kill -9` and a reattach.
+- **Watch out:** it is numbered 2.8 so that 2.3 to 2.7 keep their issues, but it comes before 2.4. How a command gets your credentials needs an ADR: one shell line can run several programs, so a rule keyed on the first word is easy to get around.
 
 ### 2.4 Model-driven loading — [#6](https://github.com/MilanPavel/golem/issues/6)
 
@@ -394,6 +387,102 @@ flowchart LR
 - **Goal:** the web UI is always there, like the daemon.
 - **Build:** `golem web install|uninstall` writes a second launchd job, like `golem daemon install`, and `run/web.json` makes `golem web` reuse the job's gateway: one owner, as in ADR-020.
 - **Done when:** after a reboot, `golem web` opens the page at once, through the running job.
+
+---
+
+## Phase 11 — Docs
+
+A docs site with a side menu, search, and both themes, in golem's own look. A short README that points to it. A series, "How agents work", that explains one common agent idea per page and then shows how golem builds it. The details are in [#264](https://github.com/MilanPavel/golem/issues/264) and in each step's issue, and every ticket is a sub-issue of its step. One ticket per commit and per PR.
+
+It is a parallel track. It touches only `docs/`, the README, and CI, so it never blocks Phase 1 or Skills, and each step runs in its own worktree.
+
+Today the README is 461 lines and is also the user guide and the contributor guide: models, MCP, skills, commands, and hacking. The docs in `docs/` are good but have no navigation, and nothing explains the ideas behind an agent to someone who has not built one.
+
+Choices that hold for the whole phase:
+
+- **VitePress, published to GitHub Pages** by a workflow on every merge to `main`, at `milanpavel.github.io/golem`. Pull requests build the site but do not publish it. The step's ADR says why.
+- **The sources stay in `docs/`.** URLs come from VitePress `rewrites`, so the links in AGENTS.md, the skills, and the code keep working. The ADRs, architecture.md, and this file are pages on the site, as they are.
+- **A broken link fails `just check`.** `docs-build` is part of it.
+- **The look is the web UI's.** The palette comes from `packages/web/src/styles/tokens.css`, imported and not copied, in slip and kiln. Type is Literata for prose, Geist for the interface, Geist Mono for code, and Silkscreen for small labels. The pixel golem from `packages/tui/src/logo.ts` is the logo, the favicon, and the 404 page. The `why-*` and legend SVGs are the home page. An approval example reads like the shem.
+- **The README is the front door, not the manual.** It keeps the logo, the tagline, the demo, why golem, three install commands, and a link to the docs.
+- **Every "How agents work" page has one shape:** the idea in plain words, how agents usually do it, how golem does it (a diagram, one real trace, and code pointers), why (the ADRs), and how to see it live. architecture.md stays the dense reference that the series links into.
+
+```mermaid
+flowchart LR
+  s1[11.1 ADR and the site's shape] --> s2[11.2 Scaffold and Pages] --> s3[11.3 Golem theme]
+  s2 --> s4[11.4 User guide] --> s5[11.5 Short README]
+  s3 --> s6[11.6 How agents work]
+  s2 --> s7[11.7 Contributor docs]
+```
+
+11.4 and 11.7 can run beside 11.3. 11.6 waits for the theme, because its pages use the `concept` and `golem` containers.
+
+### 11.1 ADR and the site's shape — [#265](https://github.com/MilanPavel/golem/issues/265)
+
+- **Goal:** the tool, the hosting, the sitemap, and the shape of a concept page are agreed before any page is built.
+- **You can:** read why the docs are a VitePress site on Pages, see the sidebar, and see the template every concept page follows.
+- **Build:** an ADR (VitePress, Pages, sources in `docs/` with `rewrites`, the dead-link check), the sitemap (Get started, Use golem, How agents work, Build golem, Project), and `docs/concepts/_template.md`.
+- **Done when:** the ADR is merged and the template has every section filled with guidance.
+
+### 11.2 A VitePress site on GitHub Pages — [#268](https://github.com/MilanPavel/golem/issues/268)
+
+- **Goal:** today's docs, with a side menu and search, published on every merge.
+- **You can:** open `milanpavel.github.io/golem`, find any doc or ADR from the sidebar, search, and switch light and dark. `just docs` serves it locally.
+- **Build:** `docs/package.json` (`@golem/docs`) in the pnpm workspace, `docs/.vitepress/config.mts` (sidebar, local search, edit link, `base: '/golem/'`, Mermaid), links that leave `docs/` turned into GitHub URLs or includes, `just docs` and `just docs-build` (in `check`), and `.github/workflows/docs.yml` with `deploy-pages`.
+- **Done when:** a merge to `main` publishes the site, every existing page is in the sidebar, Mermaid renders, and `just check` fails on a broken link.
+- **Watch out:** Pages must be switched to "GitHub Actions" once in the repo settings. Images need the `/golem/` base.
+
+### 11.3 golem's look — [#271](https://github.com/MilanPavel/golem/issues/271)
+
+- **Goal:** the site looks like golem, not like VitePress.
+- **You can:** open a home page with the pixel golem, the legend, and the four "why" cards, and read pages set like a book, in slip and kiln.
+- **Build:** the tokens mapped onto VitePress's variables (brand to clay, tips to allow, wait, and deny), the fonts, Mermaid themed from the tokens, `PixelGolem.vue` (logo, favicon, hero, 404, clay eyes on hover), the home page, and four containers: `shem`, `tablet`, `concept`, and `golem`.
+- **Done when:** screenshots in slip and kiln sit well beside `web-chat-slip.png` and `web-chat-kiln.png`, and `prefers-reduced-motion` stops every animation.
+- **Watch out:** the `why-*` SVGs have a light parchment card. Check them on kiln before you change any SVG.
+
+### 11.4 The user guide — [#276](https://github.com/MilanPavel/golem/issues/276)
+
+- **Goal:** everything a user needs moves from the README to the site.
+- **You can:** read Introduction, Install, First chat, Models, Commands, Tools and permissions, MCP servers, Skills, and Web UI, each on its own page.
+- **Build:** the README sections moved and lightly edited, `docs/install.md` folded into Install, and a shem example on the permissions page.
+- **Done when:** every README section has a page, and nothing in the README is only in the README.
+
+### 11.5 A short README — [#280](https://github.com/MilanPavel/golem/issues/280)
+
+- **Goal:** the README fits on two screens and sends readers to the docs.
+- **You can:** see what golem is, install it, and find the docs, in under a minute.
+- **Build:** the logo, the tagline, the legend, the badges, the demo, why golem, three install commands, a Documentation link, one Contributing line, and the license. Links to old README anchors (AGENTS.md, the skills, the brew caveats) point to the site.
+- **Done when:** the README is under about 90 lines and renders well on GitHub in both themes.
+- **Watch out:** 1.7.6 ([#226](https://github.com/MilanPavel/golem/issues/226)) also edits the README. Whichever lands second rebases.
+
+### 11.6 How agents work — [#282](https://github.com/MilanPavel/golem/issues/282)
+
+- **Goal:** someone who has never built an agent understands the common ideas, and how golem builds each one.
+- **You can:** read a series, in order, from "what an agent is" to "what comes next", each page ending in a way to see it live in golem.
+- **Build:** one page per ticket, from the template in 11.1:
+
+  | Ticket | The idea | In golem |
+  |---|---|---|
+  | 11.6.1 | What an agent is: the loop of model, tool calls, and results | one turn, the LangGraph boundary ([ADR-002](adr/002-langgraph-boundary.md), [ADR-031](adr/031-system-prompt.md)) |
+  | 11.6.2 | Talking to models: providers, streaming, tokens and cost, local or hosted | the model list, the local model server ([ADR-026](adr/026-local-model-server.md)) |
+  | 11.6.3 | Tools and tool calling: schemas, results, state updates | built-in and write tools ([ADR-011](adr/011-tools.md), [015](adr/015-write-tools.md), [017](adr/017-web-fetch.md), [018](adr/018-tool-state-updates.md)) |
+  | 11.6.4 | Safety: permissions, approvals, sandboxes | rules, the shem, the shell sandbox ([ADR-012](adr/012-permission-rules.md), [013](adr/013-approvals.md), [014](adr/014-shell-sandbox.md)) |
+  | 11.6.5 | Context: the system prompt, skills, progressive disclosure | [ADR-025](adr/025-skill-sources.md), [030](adr/030-skill-read-roots.md), [031](adr/031-system-prompt.md), [032](adr/032-pinned-skills.md) |
+  | 11.6.6 | MCP: tools from outside | the MCP client ([ADR-023](adr/023-mcp-client.md)) |
+  | 11.6.7 | Sessions that survive: checkpoints, crashes, fork, cancel | [ADR-006](adr/006-checkpoint-continuity.md), [008](adr/008-cancellation.md), [009](adr/009-session-list.md), [010](adr/010-fork.md) |
+  | 11.6.8 | The agent and its screens: a process split and an event protocol | [ADR-001](adr/001-process-split.md), [003](adr/003-protocol.md), [005](adr/005-client-package.md), [007](adr/007-attach-and-fan-out.md), [028](adr/028-web-gateway.md) |
+  | 11.6.9 | What comes next: memory, evals, routing, compaction | Phases 5, 6, and 9 of this plan |
+
+  Plus an "Architecture tour" under Build golem that follows one message end to end and links into the series.
+- **Done when:** every page follows the template, has a diagram, one real trace, code pointers that resolve, and a "try it" that works on today's golem.
+- **Watch out:** code pointers rot. Point at files and names, and use line numbers only where `just docs-build` can check them.
+
+### 11.7 Contributor docs — [#293](https://github.com/MilanPavel/golem/issues/293)
+
+- **Goal:** a contributor finds setup, the everyday commands, shipping, and the decisions from the sidebar.
+- **You can:** read Hacking, Contributing, and Releasing as pages, and browse the ADRs by topic.
+- **Build:** Hacking moved from the README, CONTRIBUTING.md included as a page, an ADR index with status and topic, and sre.md split into sections that read well in the sidebar.
+- **Done when:** the README has no contributor section left beyond one line, and every ADR is reachable from the index by topic.
 
 ---
 

@@ -53,8 +53,10 @@ from golem_protocol.events import (
     SessionCreatedData,
     SessionUpdatedData,
     SkillActivatedData,
+    SkillActivatedEvent,
     SkillCall,
     SkillDeactivatedData,
+    SkillSkippedEvent,
     TodosUpdatedData,
 )
 
@@ -190,14 +192,18 @@ class SessionManager:
 
         The new thread starts from the checkpoint that ends at that message.
         Its log gets the parent's ``message.completed`` events up to it, with
-        their original ``run_id`` and new ``seq``. Nobody is attached yet.
+        their original ``run_id`` and new ``seq``. It also starts with the
+        source's pinned skills and on-demand MCP servers as they are now. The
+        tools allowed for the session are not copied, so the fork asks again.
+        Nobody is attached yet.
 
         Raises :class:`MessageNotFoundError`, :class:`SessionNotFoundError`,
         or :class:`SchemaMismatchError`.
         """
         async with self._lock:
             source = await self._resolve(session_id)
-            history = _completed_through(await self._events.stored(session_id), at_message_id)
+            stored = await self._events.stored(session_id)
+            history = _completed_through(stored, at_message_id)
             if history is None:
                 raise MessageNotFoundError(at_message_id)
             fork = _LiveSession(
@@ -205,6 +211,8 @@ class SessionManager:
                 model_profile=source.model_profile,
                 schema_version=SCHEMA_VERSION,
                 cwd=source.cwd,
+                mcp_servers=set(source.mcp_servers),
+                skills=list(source.skills),
             )
             if not await self._runtime.fork(
                 session_id, fork.session_id, at_message_id=at_message_id
@@ -223,6 +231,17 @@ class SessionManager:
                     "todos.updated",
                     TodosUpdatedData.model_validate({"todos": todos}),
                 )
+            if fork.mcp_servers:
+                await self._events.emit(
+                    fork.session_id,
+                    None,
+                    "session.updated",
+                    SessionUpdatedData(mcp_servers=sorted(fork.mcp_servers)),
+                )
+            pins = _pin_events(stored, fork.skills)
+            for event in pins:
+                await self._events.emit(fork.session_id, None, event.type, event.data)
+            fork.pins = PinMemory.from_events(pins)
             if source.title is not None:
                 await self._set_title(fork, fork_title(source.title))
             self._sessions[fork.session_id] = fork
@@ -813,6 +832,28 @@ def _scope(session: _LiveSession) -> ToolScope:
 
 def _ordered(allowed: set[Allowance]) -> tuple[Allowance, ...]:
     return tuple(sorted(allowed, key=lambda pair: (pair[0], pair[1] or "")))
+
+
+def _pin_events(
+    stored: Sequence[ChatEvent], names: Sequence[str]
+) -> list[SkillActivatedEvent | SkillSkippedEvent]:
+    """For each pin in ``names``, what the log last said about it, to copy into a fork.
+
+    That is its newest pinned ``skill.activated``, and the ``skill.skipped``
+    after it, if one came later.
+    """
+    copied: list[SkillActivatedEvent | SkillSkippedEvent] = []
+    for name in names:
+        activated: SkillActivatedEvent | None = None
+        skipped: SkillSkippedEvent | None = None
+        for event in stored:
+            if isinstance(event, SkillActivatedEvent) and event.data.how == "pinned":
+                if event.data.name == name:
+                    activated, skipped = event, None
+            elif isinstance(event, SkillSkippedEvent) and event.data.name == name:
+                skipped = event
+        copied.extend(event for event in (activated, skipped) if event is not None)
+    return copied
 
 
 def _completed_through(

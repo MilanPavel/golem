@@ -2,6 +2,7 @@ export { Attachments } from "./attachments.ts";
 export { backoffDelayMs } from "./backoff.ts";
 export {
   connectGolem,
+  DAEMON_DOWN_CLOSE_CODE,
   KEYCHAIN_UNAVAILABLE,
   MESSAGE_NOT_FOUND,
   MODEL_PULL_FAILED,

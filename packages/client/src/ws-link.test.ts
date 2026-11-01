@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { connectGolem } from "./connect.ts";
+import { connectGolem, DAEMON_DOWN_CLOSE_CODE, type ConnectionState } from "./connect.ts";
 import type { Dial } from "./link.ts";
 import { startWsServer } from "./ws-test-server.ts";
 import { wsDial } from "./ws-link.ts";
@@ -28,6 +28,22 @@ test("close code 4401 sets unauthorized and is not redialed", async () => {
   await settle();
   assert.equal(dials, 1);
   assert.deepEqual(client.state, { status: "unauthorized" });
+  client.close();
+  await server.stop();
+});
+
+test("close code 1013 reaches the reconnecting state as closeCode", async () => {
+  const server = await startWsServer((socket) => socket.close(1013));
+  const client = connectGolem({ dial: server.dial, clientName: "test", reconnect: true, backoff: () => 60_000 });
+  client.ready.catch(() => undefined);
+  const state = await new Promise<ConnectionState>((resolve) => {
+    client.onState((next) => {
+      if (next.status === "reconnecting") {
+        resolve(next);
+      }
+    });
+  });
+  assert.deepEqual(state, { status: "reconnecting", attempt: 1, delayMs: 60_000, closeCode: DAEMON_DOWN_CLOSE_CODE });
   client.close();
   await server.stop();
 });

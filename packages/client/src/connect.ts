@@ -97,6 +97,8 @@ export const SKILL_NOT_FOUND = -32013;
 export type { ChatEvent, SessionSummary };
 /** The web gateway closes a link with this code when its token is missing or wrong. Retrying cannot help. */
 export const UNAUTHORIZED_CLOSE_CODE = 4401;
+/** The gateway closes with this when its daemon is not running (ADR-028). */
+export const DAEMON_DOWN_CLOSE_CODE = 1013;
 const DEFAULT_HEARTBEAT_MS = 5_000;
 const DEFAULT_HEARTBEAT_TIMEOUT_MS = 10_000;
 const DEFAULT_CONNECT_TIMEOUT_MS = 2_000;
@@ -114,7 +116,7 @@ export class RpcError extends Error {
 export type ConnectionState =
   | { status: "connecting" }
   | { status: "connected" }
-  | { status: "reconnecting"; attempt: number; delayMs: number }
+  | { status: "reconnecting"; attempt: number; delayMs: number; closeCode?: number }
   | { status: "closed"; reason: string }
   | { status: "rejected"; reason: string }
   | { status: "unauthorized" };
@@ -579,7 +581,11 @@ export function connectGolem(options: ConnectOptions): GolemClient {
     }
     attempt += 1;
     const delayMs = backoff(attempt);
-    setState({ status: "reconnecting", attempt, delayMs });
+    setState(
+      code === undefined
+        ? { status: "reconnecting", attempt, delayMs }
+        : { status: "reconnecting", attempt, delayMs, closeCode: code },
+    );
     reconnectTimer = setTimeout(() => {
       openLink();
     }, delayMs);

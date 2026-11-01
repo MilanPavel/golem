@@ -177,8 +177,25 @@ def check_web_page(info: object) -> bool:
         problems.append(f"cache-control was {headers.get('cache-control')!r}")
     if "content-security-policy" not in headers:
         problems.append("no content-security-policy header")
-    if b"golem web" not in body:
-        problems.append("the page does not contain 'golem web'")
+    if b'<div id="root">' not in body:
+        problems.append('the page has no <div id="root">')
+    match = re.search(rb'<script[^>]*\ssrc="(/assets/[^"]+\.js)"', body)
+    if match is None:
+        problems.append("the page has no module script under /assets/")
+    else:
+        script = match.group(1).decode()
+        try:
+            s_status, s_headers, _ = http_get(f"{base}{script}")
+        except OSError as exc:
+            problems.append(f"GET {script} failed: {exc}")
+        else:
+            kind = s_headers.get("content-type", "")
+            if s_status != 200:
+                problems.append(f"GET {script} was {s_status}")
+            if not kind.startswith(("text/javascript", "application/javascript")):
+                problems.append(f"{script} content-type was {kind!r}")
+            if "immutable" not in s_headers.get("cache-control", ""):
+                problems.append(f"{script} cache-control was {s_headers.get('cache-control')!r}")
     _, _, health = http_get(f"{base}/healthz")
     reported = json.loads(health).get("pid")
     if reported != pid:

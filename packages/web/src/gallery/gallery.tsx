@@ -14,7 +14,19 @@ import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from "../ui/pop
 import { StatusDot } from "../ui/status-dot.tsx";
 import { Textarea } from "../ui/textarea.tsx";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip.tsx";
+import { ConnectionScreen } from "../features/connection/connection-screen.tsx";
+import { connectionScreen } from "../features/connection/connection-screen.ts";
+import type { ConnectionSnapshot } from "../store/connection.ts";
 import { ThemeSwitch } from "../theme-switch.tsx";
+
+const SNAPSHOTS: ConnectionSnapshot[] = [
+  { state: { status: "connecting" }, daemonVersion: null },
+  { state: { status: "unauthorized" }, daemonVersion: null },
+  { state: { status: "rejected", reason: "protocol major mismatch: client 2, daemon 1" }, daemonVersion: null },
+  { state: { status: "reconnecting", attempt: 4, delayMs: 2000, closeCode: 1013 }, daemonVersion: null },
+  { state: { status: "reconnecting", attempt: 2, delayMs: 1000 }, daemonVersion: null },
+  { state: { status: "closed", reason: "closed" }, daemonVersion: null },
+];
 
 const STATES: GolemState[] = ["idle", "thinking", "waiting", "failed", "offline"];
 
@@ -56,6 +68,20 @@ function Panel({ theme }: { theme: "slip" | "kiln" }) {
         <IconButton label="Search"><SearchIcon /></IconButton>
         <IconButton label="Disabled" disabled><CopyIcon /></IconButton>
       </Group>
+
+      <section className="mt-6">
+        <h3 className="mb-2 font-mono text-xs text-faint">Connection screens</h3>
+        <div className="grid gap-4">
+          {SNAPSHOTS.map((snapshot) => {
+            const spec = connectionScreen(snapshot);
+            return spec ? (
+              <div key={`${spec.kind}-${spec.tag}`} className="rounded-lg border border-line bg-bg">
+                <ConnectionScreen spec={spec} headingLevel="h4" />
+              </div>
+            ) : null;
+          })}
+        </div>
+      </section>
 
       <Group title="Input, textarea">
         <Input aria-label={`Name, ${theme}`} placeholder="Name" />
