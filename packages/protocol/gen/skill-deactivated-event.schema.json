@@ -1,0 +1,75 @@
+{
+  "$defs": {
+    "SkillDeactivatedData": {
+      "additionalProperties": false,
+      "description": "A pinned skill is off again. ``unpinned``: the user turned it off.",
+      "properties": {
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "reason": {
+          "const": "unpinned",
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "reason"
+      ],
+      "title": "SkillDeactivatedData",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "A pinned skill was turned off. Not part of a run, so ``run_id`` is null.",
+  "properties": {
+    "data": {
+      "$ref": "#/$defs/SkillDeactivatedData"
+    },
+    "run_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Run Id"
+    },
+    "seq": {
+      "minimum": 1,
+      "title": "Seq",
+      "type": "integer"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    },
+    "ts": {
+      "minLength": 1,
+      "title": "Ts",
+      "type": "string"
+    },
+    "type": {
+      "const": "skill.deactivated",
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "seq",
+    "session_id",
+    "ts",
+    "type",
+    "data"
+  ],
+  "title": "SkillDeactivatedEvent",
+  "type": "object"
+}

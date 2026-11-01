@@ -1,0 +1,30 @@
+{
+  "additionalProperties": false,
+  "description": "``session.set_skills``. Pin skills for the whole session, or unpin them.\n\nA pinned skill's body is in the system prompt of every model call. Names\nin ``pin`` are added in order, after the ones already pinned. A name may\nnot be in both lists.",
+  "properties": {
+    "pin": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Pin",
+      "type": "array"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    },
+    "unpin": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Unpin",
+      "type": "array"
+    }
+  },
+  "required": [
+    "session_id"
+  ],
+  "title": "SessionSetSkillsParams",
+  "type": "object"
+}

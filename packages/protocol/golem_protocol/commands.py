@@ -290,6 +290,30 @@ class SessionRenameResult(BaseModel):
     title: str = Field(min_length=1)
 
 
+class SessionSetSkillsParams(BaseModel):
+    """``session.set_skills``. Pin skills for the whole session, or unpin them.
+
+    A pinned skill's body is in the system prompt of every model call. Names
+    in ``pin`` are added in order, after the ones already pinned. A name may
+    not be in both lists.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    pin: list[str] = Field(default_factory=list[str])
+    unpin: list[str] = Field(default_factory=list[str])
+
+
+class SessionSetSkillsResult(BaseModel):
+    """The skills pinned in the session now, in the order they were pinned."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    skills: list[str]
+
+
 class SessionForkParams(BaseModel):
     """``session.fork``. A new session with this one's history up to ``at_message_id``.
 
@@ -1043,6 +1067,8 @@ __all__ = [
     "SessionRevokeResult",
     "SessionSetModelParams",
     "SessionSetModelResult",
+    "SessionSetSkillsParams",
+    "SessionSetSkillsResult",
     "SessionSummary",
     "SkillListParams",
     "SkillListResult",

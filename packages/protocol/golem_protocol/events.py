@@ -102,17 +102,28 @@ class SkillActivatedData(BaseModel):
     """A skill is active in the session.
 
     ``how`` is ``invoked`` for a skill run once by name: its body is that
-    turn's user message. ``source`` is where it was found, ``path`` its folder,
-    and ``hash`` the sha256 of its ``SKILL.md``.
+    turn's user message. It is ``pinned`` for a skill turned on for the whole
+    session: its body is in the system prompt of every model call until it is
+    unpinned. ``source`` is where it was found, ``path`` its folder, and
+    ``hash`` the sha256 of its ``SKILL.md``.
     """
 
     model_config = _CONFIG
 
     name: str = Field(min_length=1)
     source: SkillSource
-    how: Literal["invoked"]
+    how: Literal["invoked", "pinned"]
     path: str = Field(min_length=1)
     hash: str
+
+
+class SkillDeactivatedData(BaseModel):
+    """A pinned skill is off again. ``unpinned``: the user turned it off."""
+
+    model_config = _CONFIG
+
+    name: str = Field(min_length=1)
+    reason: Literal["unpinned"]
 
 
 class EmptyEventData(BaseModel):
@@ -577,16 +588,33 @@ class TodosUpdatedEvent(BaseModel):
 
 
 class SkillActivatedEvent(BaseModel):
-    """A skill became active. It comes just before the user message that invoked it."""
+    """A skill became active.
+
+    An invoked skill's event comes just before the user message that invoked
+    it, in that run. A pin is not part of a run, so its ``run_id`` is null.
+    """
 
     model_config = _CONFIG
 
     seq: int = Field(ge=1)
     session_id: str = Field(min_length=1)
-    run_id: str = Field(min_length=1)
+    run_id: str | None = Field(default=None, min_length=1)
     ts: str = Field(min_length=1)
     type: Literal["skill.activated"]
     data: SkillActivatedData
+
+
+class SkillDeactivatedEvent(BaseModel):
+    """A pinned skill was turned off. Not part of a run, so ``run_id`` is null."""
+
+    model_config = _CONFIG
+
+    seq: int = Field(ge=1)
+    session_id: str = Field(min_length=1)
+    run_id: str | None = Field(default=None, min_length=1)
+    ts: str = Field(min_length=1)
+    type: Literal["skill.deactivated"]
+    data: SkillDeactivatedData
 
 
 EventType = Literal[
@@ -610,6 +638,7 @@ EventType = Literal[
     "approval.resolved",
     "todos.updated",
     "skill.activated",
+    "skill.deactivated",
 ]
 """The ``type`` of each :data:`ChatEvent` member."""
 
@@ -634,7 +663,8 @@ ChatEvent = Annotated[
     | ApprovalNeededEvent
     | ApprovalResolvedEvent
     | TodosUpdatedEvent
-    | SkillActivatedEvent,
+    | SkillActivatedEvent
+    | SkillDeactivatedEvent,
     Field(discriminator="type"),
 ]
 
@@ -677,6 +707,8 @@ __all__ = [
     "SkillActivatedData",
     "SkillActivatedEvent",
     "SkillCall",
+    "SkillDeactivatedData",
+    "SkillDeactivatedEvent",
     "SkillSource",
     "Todo",
     "TodoStatus",

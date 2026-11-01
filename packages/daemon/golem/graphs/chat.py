@@ -26,7 +26,7 @@ from langgraph.graph import END, START, StateGraph  # pyright: ignore[reportMiss
 from langgraph.types import Command
 
 from golem.graphs.adapter import STREAM_KEY, message_text
-from golem.graphs.prompt import PromptContext, SystemPrompt
+from golem.graphs.prompt import PINNED_KEY, PromptContext, SystemPrompt
 from golem.graphs.state import AgentState
 from golem.graphs.tools_node import (
     ALLOWED_KEY,
@@ -135,9 +135,12 @@ class ChatRuntime:
             return {}
         return cast(Mapping[str, object], raw)
 
-    async def system_prompt(self, session_id: str, cwd: str | None) -> str:
+    async def system_prompt(
+        self, session_id: str, cwd: str | None, pinned: Sequence[str] = ()
+    ) -> str:
         """The system prompt the next model call of ``session_id`` would get, or ``""``."""
-        return self.prompt.text(PromptContext(await self.values(session_id), cwd))
+        values = await self.values(session_id)
+        return self.prompt.text(PromptContext(values, cwd, tuple(pinned)))
 
     async def stream(
         self,
@@ -152,6 +155,7 @@ class ChatRuntime:
         allowed_tools: Sequence[Allowance] = (),
         mcp_servers: Sequence[str] = (),
         skill_folder: str | None = None,
+        pinned: Sequence[str] = (),
     ) -> AsyncGenerator[object]:
         """Stream one user turn. The first turn writes the state fields.
 
@@ -159,7 +163,8 @@ class ChatRuntime:
         first, so the provider accepts the history. ``cwd`` is the folder the
         file tools work in, and ``mcp_servers`` the on-demand MCP servers the
         session turned on. ``skill_folder`` is the folder of the skill this turn
-        runs, which the read tools may read from then on. Raises
+        runs, which the read tools may read from then on. ``pinned`` are the
+        skills pinned in the session, for the system prompt. Raises
         :class:`TooManyStepsError` when the model keeps calling tools.
 
         Close the generator (``contextlib.aclosing``) when you stop early, so
@@ -172,6 +177,7 @@ class ChatRuntime:
                 CWD_KEY: cwd or "",
                 ALLOWED_KEY: [list(pair) for pair in allowed_tools],
                 MCP_KEY: list(mcp_servers),
+                PINNED_KEY: list(pinned),
             },
             "recursion_limit": _RECURSION_LIMIT,
         }
@@ -199,6 +205,7 @@ class ChatRuntime:
         allowed_tools: Sequence[Allowance] = (),
         asked: Sequence[str] = (),
         mcp_servers: Sequence[str] = (),
+        pinned: Sequence[str] = (),
     ) -> AsyncGenerator[object]:
         """Go on with a run paused on a tool approval, with the user's ``answer``.
 
@@ -213,6 +220,7 @@ class ChatRuntime:
                 ALLOWED_KEY: [list(pair) for pair in allowed_tools],
                 ASKED_KEY: list(asked),
                 MCP_KEY: list(mcp_servers),
+                PINNED_KEY: list(pinned),
             },
             "recursion_limit": _RECURSION_LIMIT,
         }
@@ -347,7 +355,7 @@ def open_chat(
         scope = scope_of(config)
         await registry.prepare(scope)
         tools = registry.scoped(scope)
-        system = system_prompt.message(PromptContext(state, _cwd(config)))
+        system = system_prompt.message(PromptContext(state, _cwd(config), _pinned(config)))
         # The system message is sent, never returned, so it stays out of the checkpoint.
         sent = messages if system is None else [system, *messages]
         async with _held(router, local, profile):
@@ -434,6 +442,14 @@ def _cwd(config: RunnableConfig) -> str | None:
     configurable = cast(Mapping[str, object], config.get("configurable", {}))
     raw = configurable.get(CWD_KEY)
     return raw if isinstance(raw, str) and raw != "" else None
+
+
+def _pinned(config: RunnableConfig) -> tuple[str, ...]:
+    configurable = cast(Mapping[str, object], config.get("configurable", {}))
+    raw = configurable.get(PINNED_KEY)
+    if not isinstance(raw, list):
+        return ()
+    return tuple(name for name in cast(list[object], raw) if isinstance(name, str))
 
 
 def _reply_id(messages: Sequence[BaseMessage], config: RunnableConfig) -> str:

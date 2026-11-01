@@ -55,6 +55,7 @@ from golem.sessions.manager import (
 )
 from golem.sessions.summaries import summarize
 from golem.skills.invoke import SkillInvokeError
+from golem.skills.pinned import SkillPinError
 from golem.skills.registry import listed_skill
 from golem.tools.registry import ToolScope
 from golem_protocol.commands import (
@@ -130,6 +131,8 @@ from golem_protocol.commands import (
     SessionRevokeResult,
     SessionSetModelParams,
     SessionSetModelResult,
+    SessionSetSkillsParams,
+    SessionSetSkillsResult,
     SkillListParams,
     SkillListResult,
 )
@@ -630,6 +633,23 @@ async def _skill_list(ctx: RequestContext, params: SkillListParams) -> SkillList
     return SkillListResult(skills=[listed_skill(entry) for entry in view.listed])
 
 
+async def _session_set_skills(
+    ctx: RequestContext, params: SessionSetSkillsParams
+) -> SessionSetSkillsResult:
+    both = sorted(set(params.pin) & set(params.unpin))
+    if both:
+        raise RpcCallError(INVALID_PARAMS, f"{both[0]} is in both pin and unpin")
+    try:
+        skills = await _sessions(ctx).set_skills(params.session_id, params.pin, params.unpin)
+    except SessionNotFoundError as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
+    except SchemaMismatchError as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, str(exc)) from exc
+    except SkillPinError as exc:
+        raise RpcCallError(SKILL_NOT_FOUND, str(exc)) from exc
+    return SessionSetSkillsResult(session_id=params.session_id, skills=skills)
+
+
 async def _mcp_enable(ctx: RequestContext, params: McpToggleParams) -> McpToggleResult:
     return await _mcp_toggle(ctx, params, True)
 
@@ -805,6 +825,9 @@ def standard_methods() -> dict[str, Method]:
         "mcp.restart": Method("mcp.restart", McpServerParams, True, _mcp_restart),
         "mcp.set_enabled": Method("mcp.set_enabled", McpSetEnabledParams, True, _mcp_set_enabled),
         "skill.list": Method("skill.list", SkillListParams, True, _skill_list),
+        "session.set_skills": Method(
+            "session.set_skills", SessionSetSkillsParams, True, _session_set_skills
+        ),
         "model.probe": Method("model.probe", ModelProbeParams, True, _model_probe),
         "model.pull": Method("model.pull", ModelPullParams, True, _model_pull),
         "model.pull_cancel": Method(

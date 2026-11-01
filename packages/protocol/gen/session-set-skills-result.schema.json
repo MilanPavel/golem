@@ -1,0 +1,24 @@
+{
+  "additionalProperties": false,
+  "description": "The skills pinned in the session now, in the order they were pinned.",
+  "properties": {
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    },
+    "skills": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Skills",
+      "type": "array"
+    }
+  },
+  "required": [
+    "session_id",
+    "skills"
+  ],
+  "title": "SessionSetSkillsResult",
+  "type": "object"
+}

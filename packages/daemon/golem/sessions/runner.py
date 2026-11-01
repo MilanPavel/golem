@@ -91,6 +91,7 @@ class Turn:
     cwd: str | None = None
     allowed_tools: tuple[Allowance, ...] = ()
     mcp_servers: tuple[str, ...] = ()
+    pinned: tuple[str, ...] = ()
     skill: Invocation | None = None
     typed: str | None = None
 
@@ -121,6 +122,7 @@ class Resume:
     diff: str | None = None
     args: dict[str, object] | None = None
     mcp_servers: tuple[str, ...] = ()
+    pinned: tuple[str, ...] = ()
 
 
 @dataclass
@@ -206,6 +208,7 @@ async def run_turn(
             cwd=turn.cwd,
             allowed_tools=turn.allowed_tools,
             mcp_servers=turn.mcp_servers,
+            pinned=turn.pinned,
             skill_folder=None if skill is None else str(skill.path),
         )
         return await _finish(stream, progress, emit)
@@ -256,6 +259,7 @@ async def resume_turn(
             allowed_tools=resume.allowed_tools,
             asked=resume.asked,
             mcp_servers=resume.mcp_servers,
+            pinned=resume.pinned,
         )
         return await _finish(stream, progress, emit)
     except asyncio.CancelledError:
