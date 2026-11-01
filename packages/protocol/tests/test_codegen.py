@@ -1,7 +1,14 @@
 import json
 from pathlib import Path
 
-from golem_protocol.codegen import MODELS, export_schemas, export_version, schema_stem
+from golem_protocol.codegen import (
+    MODELS,
+    export_browser_methods,
+    export_schemas,
+    export_version,
+    schema_stem,
+)
+from golem_protocol.methods import BROWSER_METHODS, METHOD_ACCESS
 from golem_protocol.version import PROTOCOL_MAJOR, PROTOCOL_MINOR
 
 
@@ -34,3 +41,23 @@ def test_export_version_writes_constants(tmp_path: Path) -> None:
     text = path.read_text(encoding="utf-8")
     assert f"export const PROTOCOL_MAJOR = {PROTOCOL_MAJOR};" in text
     assert f"export const PROTOCOL_MINOR = {PROTOCOL_MINOR};" in text
+
+
+def test_export_browser_methods_lists_each_method_once(tmp_path: Path) -> None:
+    path = export_browser_methods(tmp_path)
+    text = path.read_text(encoding="utf-8")
+    browser, local = text.split("LOCAL_ONLY_METHODS")
+    for name in BROWSER_METHODS:
+        assert f'"{name}",' in browser
+    assert '"auth.set",' in local
+    assert '"auth.remove",' in local
+    assert '"auth.set"' not in browser
+    assert text.count('",') == len(METHOD_ACCESS)
+
+
+def test_export_browser_methods_is_sorted_and_deterministic(tmp_path: Path) -> None:
+    first = export_browser_methods(tmp_path).read_text(encoding="utf-8")
+    second = export_browser_methods(tmp_path).read_text(encoding="utf-8")
+    assert first == second
+    names = [line.strip(' ",') for line in first.split("LOCAL_ONLY_METHODS")[0].splitlines()[3:-3]]
+    assert names == sorted(BROWSER_METHODS)
