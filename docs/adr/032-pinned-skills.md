@@ -53,7 +53,7 @@ The ticket for 2.3.2 (#37) asked for two copies: an `active_skills` list in `Age
 
 ### Negative
 
-- A fork does not copy the pins yet. 2.3.5 copies `sessions.skills` and `mcp_servers` together.
+- A fork copies the pins as they are when it forks, not as they were at the cut ([ADR-010](010-fork.md)).
 - A turn that is already running keeps the pins it started with. A pin applies from the next turn.
 - The registry notices an edit by the file's size and time. Two edits of the same size within the file system's time step could look like one.
 
