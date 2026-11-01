@@ -504,6 +504,7 @@ export function App({
       freshLines: followed.fresh,
       alert: alertLabel(chat.down, mcpAlert(mcp.servers)),
       skills: sessionId === null ? [] : chat.activeSkills,
+      skippedSkills: chat.skippedSkills,
     }),
     columns,
   );

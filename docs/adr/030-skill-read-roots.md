@@ -14,7 +14,7 @@ Two things stopped that from working:
 
 ## Decision
 
-- **Read tools.** Each skill the session runs adds its folder to the graph state (`skill_folders`), so the list survives a restart and follows a fork. The read tools accept an absolute path inside one of those folders. A relative path still means the session folder.
+- **Read tools.** Each skill the session runs adds its folder to the graph state (`skill_folders`), so the list survives a restart and follows a fork. A pinned skill's folder is readable too, while it is pinned: each turn passes the folders of the pins the session can use now (step 2.3.4). The read tools accept an absolute path inside one of those folders. A relative path still means the session folder.
 - **Never written.** The write tools still take only paths inside the session folder. The sandbox still allows writes only to the session folder, the temp folders, and the caches.
 - **Sandbox.** It still denies reads of `~/.golem`, then allows reads of `~/.golem/skills`. In a sandbox profile the later rule wins. The other skill folders were never denied.
 - **Credentials stay closed.** A path inside a skill folder that resolves into a folder the sandbox keeps from commands (`~/.ssh`, the rest of `~/.golem`, and so on) is refused. A skill folder that is a link to `~/.ssh` reads nothing there.

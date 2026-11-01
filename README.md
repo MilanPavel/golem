@@ -244,7 +244,7 @@ golem skills check ~/.golem/skills/release-notes   # find mistakes before you sh
 
 **Run one by name.** Type `/release-notes v0.5` and the model gets that skill's instructions, with `v0.5` filled in where the skill asks for its arguments. Skills show in the `/` suggestions with their argument hint. A command such as `/help` keeps its name, so `/skill run help` runs a skill of that name. A skill with `user-invocable: false` is left out. The transcript shows the line you typed, marked `◆ skill`. Ctrl-O shows the instructions the model got. Once a chat runs a skill, the model may read the files in that skill's folder, and its commands may run the skill's scripts. Nothing writes there.
 
-**Keep one on.** `/skill pin terse` puts that skill's instructions in front of every message to the model, for the rest of the chat. `/skill unpin terse` turns it off, and `/skill` alone lists what is pinned. The status line shows `skills: terse`. A pin survives a restart of golem. Skills with `user-invocable: false` can be pinned too.
+**Keep one on.** `/skill pin terse` puts that skill's instructions in front of every message to the model, for the rest of the chat. `/skill unpin terse` turns it off, and `/skill` alone lists what is pinned. The status line shows `skills: terse`. A pin survives a restart of golem. Skills with `user-invocable: false` can be pinned too. Edit the skill and the next message uses the new version. If you delete or break it, golem says so once, shows `terse (skipped)`, and goes on without it. It stays pinned, so fixing the file brings it back. A pinned skill's own files, such as `references/`, are readable while it is pinned.
 
 **What works today, and what is next.** Golem finds, checks, lists, runs, and pins skills, shows a skill you ran as one short line, and lets it read its own files. Letting the model pick one when the task fits is the next step of [Phase 2](docs/plan.md#phase-2--skills). How it works inside, with an animation, is in [architecture.md](docs/architecture.md#skills).
 
@@ -291,6 +291,7 @@ flowchart LR
 | `golem daemon install` / `uninstall` | Sets up or removes the background service. `~/.golem` stays |
 | `golem daemon start` / `stop` / `restart` | Controls the daemon. `restart` after an upgrade |
 | `golem daemon logs` | Follows the daemon's log |
+| `golem web` | Serves the chat in your browser on 127.0.0.1 until Ctrl-C. `--no-open` prints the link instead |
 | `golem auth set` / `remove` / `list` | Manages API keys, and MCP tokens (`mcp/<name>`), in the Keychain |
 | `golem models` | Every model you can use or download, with size, price, and context |
 | `golem config show` | The settings and tool rules in effect for this folder |

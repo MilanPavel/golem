@@ -68,13 +68,20 @@ sequenceDiagram
   - **`Origin`** must be exactly `http://127.0.0.1:<port>`. `localhost` is a different origin and is refused, so the CLI always opens `127.0.0.1`. On an upgrade or a `POST`, a missing `Origin` is refused too. Browsers always send it there, so only a program that is not a browser leaves it out, and such a program can use the socket.
   - **`Sec-Fetch-Site`**, when present, must be `same-origin` or `none`.
   - **The cookie** must name a live secret. The static page and its assets are served without it, so the page can load and run the exchange, but nothing on them is private.
-- **A refused upgrade is accepted, then closed with code 4401.** A browser reports a refused upgrade only as a generic failure (close code 1006), the same as a network error, and the client would retry forever. Code 4401 lets the client stop and show "Run `golem web` for a fresh link". The 4401 close is sent before any protocol line passes.
+- **A refused upgrade is accepted, then closed with code 4401.** This is for a missing or wrong cookie only. A wrong `Host` or `Origin` gets a plain 403 and no WebSocket: the page never sends one, and a foreign site should not get an open socket. A browser reports a refused upgrade only as a generic failure (close code 1006), the same as a network error, and the client would retry forever. Code 4401 lets the client stop and show "Run `golem web` for a fresh link". The 4401 close is sent before any protocol line passes.
+- **The WebSocket path is `/ws`.**
+  - When the daemon is not running at the upgrade, the socket opens and closes with 1013, so the page can tell "daemon down" from "gateway down".
+  - A daemon that closes later closes the WebSocket with 1001.
+- **`/healthz` answers `{"golem":"web","pid":N}`.** It needs no secret, and it checks `Host`.
 
 ### One gateway per user
 
 - `run/web.json` holds `pid`, `port`, and `started_at`. `golem web` reads it first. If that pid is a live `golem` process and `/healthz` answers, it reuses that gateway: it reads `web.token` and opens the same kind of link. The token stays valid while its gateway runs, so no second door is needed to ask for a fresh one. The page removes `#t=` with `history.replaceState`, so the token does not stay in the browser's history. Otherwise it removes the stale file and starts a new gateway. This is the single-owner rule of [ADR-020](020-safe-upgrades.md), and the launchd job of step 10.14 relies on it.
 - **The port is stable: 7480 by default,** or `--port N`. A random port would change the origin on each start, and with it the cookie, the theme the page remembers, and an installed PWA. A port that is taken fails with a message that names `--port`. The gateway does not read `config.toml`. It is a TypeScript program, and one flag is simpler than a second TOML reader.
 - `golem web --json` prints `{url, port, pid}` and opens nothing, for golem desktop later.
+- `golem web` runs the gateway in the foreground until Ctrl-C. Running always in the background is the launchd job of step 10.14.
+- A gateway is live only when `/healthz` answers with the pid in `web.json`. Anything else is stale: the files are replaced. The gateway starts before `web.token` is written, so a port that is taken never replaces the token of the gateway that holds it.
+- The browser is opened through `osascript` reading the link on stdin, because process arguments are visible to other users (`ps`), and the link holds the token. Without `--no-open` the terminal shows the address without the token.
 
 ### Framing
 
@@ -87,7 +94,7 @@ The daemon reads JSON lines and splits on `\n` ([ADR-003](003-protocol.md)). A b
     - it contains `\n` or `\r`
     - `JSON.parse` fails
     - the value is not a plain object (an array, a number, or `null`)
-    - `method` is not a string
+    - `method` is missing or is not a string
   - The `\n` rule matters most. Without it, `{"method":"ping"}\n{"method":"auth.set",…}` would pass the method check as `ping` and reach the daemon as two commands.
   - The gateway appends the one `\n` itself, and forwards the original text unchanged. It never forwards a re-serialized copy, so what the daemon reads is exactly what the page sent.
 - **Daemon to browser: one line is one WebSocket message.**
@@ -96,6 +103,7 @@ The daemon reads JSON lines and splits on `\n` ([ADR-003](003-protocol.md)). A b
 - **Refusals:**
   - A message that breaks framing means the page has a bug, or is not the page. The gateway closes the WebSocket with 1008 (policy violation), and the daemon connection with it.
   - A well-formed request for a method that is not allowed gets a JSON-RPC error with the request's `id`, code `-32020`, and the message `not allowed from the browser`. The connection stays open.
+  - A denied request whose `id` is not a string, number, or null (an object or an array) gets no reply, because JSON-RPC has no way to address it.
 - **The gateway never speaks the protocol itself.** It sends no `hello` and no `ping` on a bridged connection. Request ids belong to the page alone, so they cannot collide.
 
 ### Which methods a browser may call
@@ -117,6 +125,7 @@ The daemon reads JSON lines and splits on `\n` ([ADR-003](003-protocol.md)). A b
   - When the browser falls behind, `ws.getBufferedAmount()` grows. Above 4 MiB the gateway stops reading the daemon socket, and resumes on `drain`.
   - The daemon's queue for that connection then fills. At `MAX_PENDING_FRAMES` (20 000, `golem/server/connection.py`) the daemon drops the connection, and the page re-attaches from `after_seq`.
   - This reuses the recovery that already exists, and the gateway never buffers without a limit.
+- **Input for the daemon is bounded.** When browser-to-daemon input piles up past 4 MiB unwritten, the gateway closes the WebSocket with 1008.
 - **At most 16 WebSockets at once.** The 17th upgrade gets 503. One person has a handful of tabs, so more than that means something is wrong.
 
 ### Headers

@@ -4,14 +4,17 @@
   "version": "0.0.0",
   "type": "module",
   "exports": {
-    ".": "./src/core.ts"
+    ".": "./src/core.ts",
+    "./server": "./src/bun/server.ts",
+    "./node": "./src/node.ts"
   },
   "scripts": {
     "lint": "eslint src",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.core.json",
-    "test": "node --experimental-strip-types --test src/*.test.ts"
+    "test": "node --experimental-strip-types --test src/*.test.ts && bun test src/bun"
   },
   "devDependencies": {
+    "@types/bun": "1.3.10",
     "@types/node": "^24.10.1",
     "eslint": "^9.36.0",
     "typescript": "^5.9.2",

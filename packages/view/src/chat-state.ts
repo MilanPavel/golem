@@ -68,6 +68,8 @@ export type ChatState = {
   todos: TodoItem[];
   /** The skills pinned in the session, in pin order, from `skill.activated` and `skill.deactivated`. */
   activeSkills: string[];
+  /** Pinned skills the newest model call left out, from `skill.skipped`, until one reads them again. */
+  skippedSkills: string[];
   /**
    * The provider whose server did not answer, from `run.failed` with
    * `model_unreachable` or `not_installed`. Cleared when a run completes or
@@ -91,6 +93,7 @@ export const emptyChat: ChatState = {
   approval: null,
   todos: [],
   activeSkills: [],
+  skippedSkills: [],
   down: null,
   retry: null,
 };
@@ -142,6 +145,24 @@ export const CANCELLED_NOTICE = "cancelled";
 export function downloadEnded(state: ChatState): ChatState {
   return state.notice?.startsWith("downloading ") === true ? { ...state, notice: null } : state;
 }
+/** What the banner says when a model call leaves a pinned skill out. */
+export function skippedNotice(name: string, why: string): string {
+  return `${why}, so ${name} is left out. It stays pinned: fix it, or /skill unpin ${name}`;
+}
+
+/** Forget that ``name`` was left out, and its notice, once it is read again or unpinned. */
+function withoutSkip(state: ChatState, name: string): ChatState {
+  if (!state.skippedSkills.includes(name)) {
+    return state;
+  }
+  const stale = state.notice?.endsWith(`/skill unpin ${name}`) === true;
+  return {
+    ...state,
+    skippedSkills: state.skippedSkills.filter((n) => n !== name),
+    notice: stale ? null : state.notice,
+  };
+}
+
 export const SHUTDOWN_NOTICE = "the daemon stopped, so the run was cancelled";
 
 /**
@@ -257,13 +278,23 @@ export function reduceChat(state: ChatState, event: ChatEvent): ChatState {
       });
       return { ...answered, approval: null };
     }
-    case "skill.activated":
-      if (event.data.how !== "pinned" || state.activeSkills.includes(event.data.name)) {
+    case "skill.activated": {
+      const name = event.data.name;
+      if (event.data.how !== "pinned") {
         return state;
       }
-      return { ...state, activeSkills: [...state.activeSkills, event.data.name] };
-    case "skill.deactivated":
-      return { ...state, activeSkills: state.activeSkills.filter((name) => name !== event.data.name) };
+      const activeSkills = state.activeSkills.includes(name) ? state.activeSkills : [...state.activeSkills, name];
+      return { ...withoutSkip(state, name), activeSkills };
+    }
+    case "skill.deactivated": {
+      const name = event.data.name;
+      return { ...withoutSkip(state, name), activeSkills: state.activeSkills.filter((n) => n !== name) };
+    }
+    case "skill.skipped": {
+      const name = event.data.name;
+      const skippedSkills = state.skippedSkills.includes(name) ? state.skippedSkills : [...state.skippedSkills, name];
+      return { ...state, skippedSkills, notice: skippedNotice(name, event.data.message) };
+    }
     case "todos.updated":
       return { ...state, todos: event.data.todos.map((todo) => ({ id: todo.id, text: todo.text, status: todo.status })) };
     case "tool.started":
