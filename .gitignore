@@ -11,6 +11,8 @@ htmlcov/
 # Node
 node_modules/
 dist/
+packages/web/test-results/
+packages/web/playwright-report/
 
 # Stamped by `just dist`, then packaged. A checkout has no version file.
 packages/daemon/golem/_build.py
