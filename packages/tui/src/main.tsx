@@ -3,14 +3,20 @@ import { fileURLToPath } from "node:url";
 
 import { render } from "ink";
 
-import { connectGolem, resolveSocketPath } from "@golem/client/node";
+import { connectGolem, readStartError, resolveSocketPath } from "@golem/client/node";
 
 import { App } from "./app.tsx";
 import { bindPointer } from "./screen.ts";
+import type { ServiceControl } from "./service.ts";
 import { clearProgress, clearTabStatus, popWindowTitle, pushWindowTitle } from "./window-title.ts";
 
+export type { ServiceControl };
+
+/** On its own the screen can say why the daemon did not start, but not restart it. */
+const READ_ONLY_SERVICE: ServiceControl = { startError: readStartError, installed: () => false, restart: null };
+
 /** Open the chat screen. Returns when the screen exits. */
-export async function runTui(): Promise<void> {
+export async function runTui(options: { service?: ServiceControl } = {}): Promise<void> {
   const client = connectGolem({
     socketPath: resolveSocketPath(),
     clientName: "tui",
@@ -43,7 +49,12 @@ export async function runTui(): Promise<void> {
   process.on("exit", restoreTitle);
 
   try {
-    const instance = render(<App client={client} onWheel={pointer.subscribe} onPointer={pointer.subscribePointer} />, {
+    const instance = render(<App
+        client={client}
+        onWheel={pointer.subscribe}
+        onPointer={pointer.subscribePointer}
+        service={options.service ?? READ_ONLY_SERVICE}
+      />, {
       stdin: pointer.stdin,
       alternateScreen: true,
       exitOnCtrlC: false,

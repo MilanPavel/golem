@@ -22,7 +22,7 @@ export {
   type ToolBlock,
   type ToolStatus,
 } from "./chat-state.ts";
-export { connectionLabel } from "./connection.ts";
+export { connectionLabel, serviceProblem, type ServiceProblem } from "./connection.ts";
 export { parseDiff, type DiffLine, type DiffTone } from "./diff.ts";
 export { golemState, type GolemState, type RunPhase } from "./golem-state.ts";
 export { visibleText } from "./sanitize.ts";
