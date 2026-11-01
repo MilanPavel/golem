@@ -18,6 +18,8 @@ import { formatSkills } from "./format-skills.ts";
 import { formatStatus } from "./format-status.ts";
 import { formatCliVersion } from "./format-version.ts";
 import { readSecret } from "./read-secret.ts";
+import { parseWebArgs } from "./web.ts";
+import { runWeb } from "./web-command.ts";
 import { findWorkspaceRoot } from "./workspace.ts";
 
 // The first start of a fresh build takes a few seconds while macOS checks its libraries.
@@ -28,7 +30,8 @@ const USAGE =
   "       golem --version | golem --help | golem status | golem doctor\n" +
   "       golem daemon install|start|stop|restart|uninstall|logs\n" +
   "       golem auth set|remove <provider> | golem auth list | golem models [--refresh]\n" +
-  "       golem config show [--resolved] | golem skills [list] | golem skills check <path>";
+  "       golem config show [--resolved] | golem skills [list] | golem skills check <path>\n" +
+  "       golem web [--port N] [--no-open] [--json]";
 
 // exitCode, not exit(): exit() drops output a pipe has not read yet.
 process.exitCode = await run(process.argv.slice(2));
@@ -65,6 +68,10 @@ async function run(args: string[]): Promise<number> {
   }
   if (command === "skills" && rest[0] === "check" && rest.length === 2 && rest[1] !== undefined) {
     return runSkillsCheck(rest[1]);
+  }
+  if (command === "web") {
+    const parsed = parseWebArgs(rest);
+    if (parsed !== null) return runWeb(parsed);
   }
   if (command === "config" && rest[0] === "show" && (rest.length === 1 || (rest.length === 2 && rest[1] === "--resolved"))) {
     return runConfigShow();

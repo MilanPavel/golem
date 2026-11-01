@@ -79,6 +79,9 @@ sequenceDiagram
 - `run/web.json` holds `pid`, `port`, and `started_at`. `golem web` reads it first. If that pid is a live `golem` process and `/healthz` answers, it reuses that gateway: it reads `web.token` and opens the same kind of link. The token stays valid while its gateway runs, so no second door is needed to ask for a fresh one. The page removes `#t=` with `history.replaceState`, so the token does not stay in the browser's history. Otherwise it removes the stale file and starts a new gateway. This is the single-owner rule of [ADR-020](020-safe-upgrades.md), and the launchd job of step 10.14 relies on it.
 - **The port is stable: 7480 by default,** or `--port N`. A random port would change the origin on each start, and with it the cookie, the theme the page remembers, and an installed PWA. A port that is taken fails with a message that names `--port`. The gateway does not read `config.toml`. It is a TypeScript program, and one flag is simpler than a second TOML reader.
 - `golem web --json` prints `{url, port, pid}` and opens nothing, for golem desktop later.
+- `golem web` runs the gateway in the foreground until Ctrl-C. Running always in the background is the launchd job of step 10.14.
+- A gateway is live only when `/healthz` answers with the pid in `web.json`. Anything else is stale: the files are replaced. The gateway starts before `web.token` is written, so a port that is taken never replaces the token of the gateway that holds it.
+- The browser is opened through `osascript` reading the link on stdin, because process arguments are visible to other users (`ps`), and the link holds the token. Without `--no-open` the terminal shows the address without the token.
 
 ### Framing
 
