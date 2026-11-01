@@ -32,7 +32,9 @@ export interface SkillActivatedEvent {
  * turn's user message. It is ``pinned`` for a skill turned on for the whole
  * session: its body is in the system prompt of every model call until it is
  * unpinned. ``source`` is where it was found, ``path`` its folder, and
- * ``hash`` the sha256 of its ``SKILL.md``.
+ * ``hash`` the sha256 of its ``SKILL.md``. A pinned skill whose file changed,
+ * or that can be used again after it was skipped, is activated again in the
+ * run whose model call first reads the new body.
  *
  * This interface was referenced by `SkillActivatedEvent`'s JSON-Schema
  * via the `definition` "SkillActivatedData".

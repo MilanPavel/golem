@@ -1,0 +1,32 @@
+{
+  "additionalProperties": false,
+  "description": "A pinned skill was left out of a model call. It stays pinned.\n\n``reason`` is ``missing`` when the session finds no skill of that name,\n``disabled`` when ``[skills]`` turns it off, and ``broken`` when its\n``SKILL.md`` cannot be read or is not valid. ``message`` says it for a\nperson.",
+  "properties": {
+    "message": {
+      "minLength": 1,
+      "title": "Message",
+      "type": "string"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "reason": {
+      "enum": [
+        "missing",
+        "disabled",
+        "broken"
+      ],
+      "title": "Reason",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "reason",
+    "message"
+  ],
+  "title": "SkillSkippedData",
+  "type": "object"
+}
