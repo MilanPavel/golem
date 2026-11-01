@@ -1,6 +1,6 @@
-import type { ChatMessage } from "@golem/view";
+import type { ChatMessage, RunPhase } from "@golem/view";
 
-export type MeterPhase = "thinking" | "writing" | "waiting";
+export type MeterPhase = RunPhase;
 
 const BLOCK = 3;
 
