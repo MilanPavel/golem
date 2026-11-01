@@ -28,6 +28,8 @@ import {
   todoRows,
   type ChatState,
   type DeltaBatcher,
+  serviceProblem,
+  type ServiceProblem,
 } from "@golem/view";
 import {
   applyComposer,
@@ -99,6 +101,7 @@ import { layoutTranscript, type LayoutLine } from "./layout-chat.ts";
 import { DEFAULT_PREFS, loadPrefs, prefsPath, savePref } from "./prefs.ts";
 import { TodoBand } from "./todo-band.tsx";
 import { InstallBand } from "./install-band.tsx";
+import { RESTARTING, type ServiceControl } from "./service.ts";
 import { findBrew, type InstallState, installRows, reduceInstall, runInstall, startedInstall } from "./ollama-install.ts";
 import {
   maskSecret,
@@ -218,12 +221,31 @@ export function App({
   client,
   onWheel,
   onPointer,
+  service,
 }: {
   client: GolemClient;
   onWheel?: WheelSubscribe;
   onPointer?: PointerSubscribe;
+  service?: ServiceControl;
 }) {
   const [connection, setConnection] = useState<ConnectionState>(client.state);
+  const [problem, setProblem] = useState<ServiceProblem | null>(null);
+  const [restarting, setRestarting] = useState(false);
+  const problemRef = useRef(problem);
+  problemRef.current = problem;
+  const restartingRef = useRef(restarting);
+  restartingRef.current = restarting;
+  useEffect(() => {
+    if (service === undefined) {
+      return;
+    }
+    // Each reconnect attempt is a new state, so the file is read again each time.
+    const next = serviceProblem(connection, service.startError(), service.installed());
+    setProblem(next !== null && service.restart === null ? { ...next, restart: false } : next);
+    if (connection.status === "connected") {
+      setRestarting(false);
+    }
+  }, [connection, service]);
   const [chat, setChat] = useState<ChatState>(emptyChat);
   const [hint, setHint] = useState<Hint | null>(null);
   useEffect(() => {
@@ -376,7 +398,8 @@ export function App({
   const columns = frameColumns(size.columns || 80);
   const rows = size.rows || 24;
   const asking = retryOffer() !== null;
-  const banner = asking ? RETRY_QUESTION : (chat.error ?? chat.notice);
+  const serviceText = restarting ? RESTARTING : (problem?.text ?? null);
+  const banner = asking ? RETRY_QUESTION : (chat.error ?? serviceText ?? chat.notice);
   const hintText = liveHint(hint, Date.now())?.text ?? null;
   const suggestMatches =
     chat.busy ||
@@ -1999,6 +2022,10 @@ export function App({
       }
       return;
     }
+    if (restartOffered() && press.name === null && !press.ctrl && !press.meta && press.input === "r") {
+      restartService();
+      return;
+    }
     const retry = retryOffer();
     if (retry !== null && !keysOpenRef.current && (press.name === "return" || press.name === "escape")) {
       const enter = press.name === "return";
@@ -2011,6 +2038,31 @@ export function App({
     }
     applyKeyEffect(pressKey(currentPlace(), press));
   });
+
+  /** `r` restarts a service that is installed but does not answer, with an empty composer. */
+  function restartOffered(): boolean {
+    return (
+      problemRef.current?.restart === true &&
+      !restartingRef.current &&
+      draftRef.current.text === "" &&
+      !keysOpenRef.current
+    );
+  }
+
+  function restartService(): void {
+    const restart = service?.restart;
+    if (restart === null || restart === undefined) {
+      return;
+    }
+    setRestarting(true);
+    restart().then(
+      () => setRestarting(false),
+      (error: unknown) => {
+        setRestarting(false);
+        setChat((current) => ({ ...current, error: `golem daemon restart failed: ${messageOf(error)}` }));
+      },
+    );
+  }
 
   /** The banner's install question: after a missing Ollama stopped a message, with an empty composer. */
   function retryOffer(): { ref: string; text: string } | null {
@@ -2278,7 +2330,7 @@ export function App({
       {budget.banner > 0 && (banner !== null || hintText !== null) ? (
         <BannerLine
           row={bannerRow(banner, hintText, columns)}
-          color={chat.error !== null && !asking ? "red" : "yellow"}
+          color={(chat.error !== null || (serviceText !== null && !restarting)) && !asking ? "red" : "yellow"}
         />
       ) : null}
       {budget.meter > 0 && phase !== null ? (

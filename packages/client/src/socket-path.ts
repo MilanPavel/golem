@@ -2,10 +2,14 @@ import os from "node:os";
 import path from "node:path";
 
 /** Same precedence as ``golem.paths.resolve_paths``: argument, then ``GOLEM_HOME``, then ``~/.golem``. */
-export function resolveSocketPath(home?: string): string {
+export function resolveGolemHome(home?: string): string {
   const fromEnv = process.env["GOLEM_HOME"]?.trim() ?? "";
   const selected = home ?? (fromEnv.length > 0 ? fromEnv : path.join(os.homedir(), ".golem"));
-  return path.join(resolveHome(selected), "run", "golem.sock");
+  return resolveHome(selected);
+}
+
+export function resolveSocketPath(home?: string): string {
+  return path.join(resolveGolemHome(home), "run", "golem.sock");
 }
 
 function resolveHome(input: string): string {

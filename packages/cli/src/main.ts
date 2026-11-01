@@ -3,7 +3,7 @@ import { existsSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { connectGolem, GOLEM_VERSION, resolveSocketPath } from "@golem/client/node";
+import { connectGolem, GOLEM_VERSION, readStartError, resolveSocketPath } from "@golem/client/node";
 
 import type { DaemonStatus } from "../../protocol/gen/daemon-status.ts";
 
@@ -219,7 +219,8 @@ async function runStatus(): Promise<number> {
     process.stdout.write(`${formatStatus(status)}\n`);
     return 0;
   } catch (error) {
-    process.stderr.write(`${explain(error)}\n`);
+    const startError = readStartError();
+    process.stderr.write(startError === null ? `${explain(error)}\n` : formatStartError(startError));
     return 1;
   } finally {
     client.close();
@@ -291,6 +292,28 @@ async function runDaemon(args: string[]): Promise<number> {
   return 0;
 }
 
+function formatStartError(error: { reason: string; next: string }): string {
+  const next = error.next.length > 0 ? `next: ${error.next}\n` : "";
+  return `golem can't start: ${error.reason}\n${next}`;
+}
+
+/** `golem daemon restart` for the chat screen: no output, and an error when it does not come back. */
+async function restartQuietly(): Promise<void> {
+  const located = locate();
+  const previous = await readDaemonStatus();
+  await captureLocated(located.command, [...located.args, "daemon", "restart"]);
+  const restarted = await awaitRestart(previous?.pid ?? null, {
+    readStatus: readDaemonStatus,
+    sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+    now: () => Date.now(),
+    timeoutMs: RESTART_TIMEOUT_MS,
+    pollMs: 200,
+  });
+  if (restarted === null) {
+    throw new Error(formatRestarted(null, RESTART_TIMEOUT_MS));
+  }
+}
+
 async function runLocated(command: string, args: string[]): Promise<number> {
   const child = spawn(command, args, { stdio: "inherit" });
   return await new Promise((resolve) => {
@@ -331,7 +354,9 @@ async function openTui(): Promise<number> {
   }
   try {
     const tui = await import("@golem/tui");
-    await tui.runTui();
+    await tui.runTui({
+      service: { startError: readStartError, installed: () => existsSync(LAUNCH_AGENT), restart: restartQuietly },
+    });
     return 0;
   } finally {
     gate.session?.stop();
