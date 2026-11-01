@@ -4,7 +4,8 @@ import { unixDial } from "./unix-link.ts";
 
 export * from "./index.ts";
 export { unixDial } from "./unix-link.ts";
-export { resolveSocketPath } from "./socket-path.ts";
+export { resolveGolemHome, resolveSocketPath } from "./socket-path.ts";
+export { readStartError, type StartError } from "./start-error.ts";
 
 type Transport = { socketPath: string; dial?: never } | { dial: Dial; socketPath?: never };
 

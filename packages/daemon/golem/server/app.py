@@ -37,6 +37,13 @@ from golem.server.dispatcher import (
 )
 from golem.server.framing import MAX_LINE_BYTES, FrameTooLong, read_frame
 from golem.server.handlers import standard_methods
+from golem.server.start_error import (
+    clear_start_error,
+    describe_database_too_new,
+    describe_lock_held,
+    describe_socket_path_too_long,
+    write_start_error,
+)
 from golem.server.state import DaemonState
 from golem.sessions.bus import EventBus
 from golem.sessions.log import SessionLog
@@ -201,6 +208,7 @@ class DaemonApp:
                     self._unlink_socket()
                     self._server = await self._listen()
                     os.chmod(self.paths.socket_path, 0o600)
+                    clear_start_error(self.paths)
                     log.info("listening on %s", self.paths.socket_path)
                     mcp.start()
                     self.state.skills.start()
@@ -402,14 +410,21 @@ async def serve_forever() -> int:
     try:
         await app.serve()
     except DaemonAlreadyRunning as exc:
-        log.error("%s", exc)
-        print(exc, file=sys.stderr)
-        return 1
-    except (SocketPathTooLong, DatabaseTooNewError) as exc:
-        log.error("%s", exc)
-        print(exc, file=sys.stderr)
-        return 1
+        return _refuse_start(paths, exc, describe_lock_held(exc))
+    except SocketPathTooLong as exc:
+        return _refuse_start(paths, exc, describe_socket_path_too_long(exc.path))
+    except DatabaseTooNewError as exc:
+        return _refuse_start(paths, exc, describe_database_too_new(exc))
     return 0
+
+
+def _refuse_start(paths: GolemPaths, exc: Exception, why: tuple[str, str]) -> int:
+    """Log, print, and leave ``run/last-error`` for a client that cannot connect."""
+    reason, next_step = why
+    log.error("%s", exc)
+    print(f"{exc}\n{reason}. Next: {next_step}", file=sys.stderr)
+    write_start_error(paths, reason, next_step)
+    return 1
 
 
 async def _stop_idle(local: LocalServers) -> None:

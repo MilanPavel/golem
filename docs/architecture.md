@@ -116,7 +116,7 @@ Planned next:
 
 One daemon per user. It starts when you log in, and launchd starts it again if it crashes. Closing the TUI does not stop it. That is the point: a chat can finish, or wait for your approval, while the TUI is closed.
 
-Clients reach it through a Unix socket at `~/.golem/run/golem.sock`. The file mode is `0600`, so only your user can open it. That permission is the login check. There is no account and no password. `run/golem.pid` is the lock that lets a restart delete a socket left behind by a crash. [ADR-004](adr/004-pid-lock.md) is that lock.
+Clients reach it through a Unix socket at `~/.golem/run/golem.sock`. The file mode is `0600`, so only your user can open it. That permission is the login check. There is no account and no password. `run/golem.pid` is the lock that lets a restart delete a socket left behind by a crash. [ADR-004](adr/004-pid-lock.md) is that lock. A start that gives up on purpose (the lock is held, the socket path is too long, or `golem.db` is from a newer golem) writes the reason and the next step to `run/last-error` (`golem/server/start_error.py`). The lock case names the holder's pid and command line, which shows a checkout's path for a `uv run` daemon. While nothing answers, the TUI shows that file in its banner, and `golem status` prints it. With no such file and a launch agent installed, the banner says the service isn't answering, and `r` with an empty composer runs `golem daemon restart`.
 
 <br clear="left">
 
@@ -250,6 +250,7 @@ The daemon keeps its files under one home directory. `resolve_paths` picks it: a
 |---|---|---|
 | `run/golem.sock` | The socket clients connect to | Built |
 | `run/golem.pid` | The lockfile. The daemon holds a flock on it and writes its pid | Built |
+| `run/last-error` | Why the last start failed, then the next step, on two lines. A start that listens removes it | Built |
 | `checkpoints.db` | Model memory for a chat. The thread id is the session id. Separate so it can be wiped without deleting the event log | Built |
 | `config.toml` | Settings for this user | Built |
 | `logs/golem.jsonl` | The daemon's own log, one JSON object per line | Built |

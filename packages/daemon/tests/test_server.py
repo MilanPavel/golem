@@ -36,6 +36,7 @@ from golem.server.dispatcher import (
     RequestContext,
 )
 from golem.server.framing import MAX_LINE_BYTES
+from golem.server.start_error import write_start_error
 from golem.sessions.titles import TitleGenerator
 from golem_protocol.version import PROTOCOL_MAJOR, PROTOCOL_MINOR
 
@@ -487,6 +488,17 @@ def test_typescript_status_fails_when_daemon_is_down(short_home: Path) -> None:
     completed = _golem_status(short_home)
     assert completed.returncode == 1
     assert "daemon is not running" in completed.stderr
+
+
+def test_typescript_status_says_why_the_daemon_could_not_start(short_home: Path) -> None:
+    paths = resolve_paths(short_home)
+    write_start_error(paths, "your data is from golem 0.9.0, this is 0.4.0", "brew upgrade golem")
+    completed = _golem_status(short_home)
+    assert completed.returncode == 1
+    assert completed.stderr == (
+        "golem can't start: your data is from golem 0.9.0, this is 0.4.0\n"
+        "next: brew upgrade golem\n"
+    )
 
 
 def _golem_status(home: Path) -> subprocess.CompletedProcess[str]:

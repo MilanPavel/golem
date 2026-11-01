@@ -5,7 +5,7 @@ export default tseslint.config(
   ...tseslint.configs.recommended,
   {
     files: ["src/**/*.ts"],
-    ignores: ["src/node.ts", "src/unix-link.ts", "src/socket-path.ts", "src/link-contract.ts", "src/ws-test-server.ts", "src/**/*.test.ts"],
+    ignores: ["src/node.ts", "src/unix-link.ts", "src/socket-path.ts", "src/start-error.ts", "src/link-contract.ts", "src/ws-test-server.ts", "src/**/*.test.ts"],
     rules: {
       "no-restricted-imports": [
         "error",
