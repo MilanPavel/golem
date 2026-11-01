@@ -25,9 +25,10 @@ import {
   reduceChat,
   RETRY_QUESTION,
   serverUp,
+  todoRows,
   type ChatState,
   type DeltaBatcher,
-} from "./chat-state.ts";
+} from "@golem/view";
 import {
   applyComposer,
   invocableSkills,
@@ -98,7 +99,6 @@ import { DEFAULT_PREFS, loadPrefs, prefsPath, savePref } from "./prefs.ts";
 import { TodoBand } from "./todo-band.tsx";
 import { InstallBand } from "./install-band.tsx";
 import { findBrew, type InstallState, installRows, reduceInstall, runInstall, startedInstall } from "./ollama-install.ts";
-import { todoRows } from "./todos.ts";
 import {
   maskSecret,
   openSecret,

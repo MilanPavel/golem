@@ -2,7 +2,7 @@ import { Box, Text } from "ink";
 
 import { type ApprovalLine, approvalLines } from "./approval.ts";
 import { type ArgsEdit, argsEditLines } from "./approval-edit.ts";
-import type { PendingApproval } from "./chat-state.ts";
+import type { PendingApproval } from "@golem/view";
 import { DIFF_ADD, DIFF_DEL, DIFF_HUNK } from "./theme.ts";
 
 /** The waiting tool call above the composer, with its diff when it changes a file. */

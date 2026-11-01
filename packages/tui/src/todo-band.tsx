@@ -1,7 +1,7 @@
 import { Box, Text } from "ink";
 
 import { CLAY } from "./theme.ts";
-import { type TodoItem, todoLines } from "./todos.ts";
+import { type TodoItem, todoLines } from "@golem/view";
 
 /** The agent's plan above the composer. The step in progress stands out, finished ones fade. */
 export function TodoBand({ todos, columns, height }: { todos: readonly TodoItem[]; columns: number; height: number }) {
