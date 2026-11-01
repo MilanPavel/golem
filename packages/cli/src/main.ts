@@ -9,6 +9,7 @@ import type { DaemonStatus } from "../../protocol/gen/daemon-status.ts";
 
 import { awaitRestart, formatRestarted } from "./await-restart.ts";
 import { type DaemonCommand, locateDaemon } from "./daemon-locator.ts";
+import { explainDaemonDown, isDaemonDown } from "./daemon-down.ts";
 import { doctorExitCode, formatDoctor, parseChecks, runDoctor } from "./doctor.ts";
 
 import { formatConfig } from "./format-config.ts";
@@ -92,7 +93,7 @@ async function runConfigShow(): Promise<number> {
     process.stdout.write(`${formatConfig(await client.getConfig(process.cwd()))}\n`);
     return 0;
   } catch (error) {
-    process.stderr.write(`${explain(error)}\n`);
+    process.stderr.write(`${explainClient(error)}\n`);
     return 1;
   } finally {
     client.close();
@@ -107,7 +108,7 @@ async function runSkillsList(): Promise<number> {
     process.stdout.write(`${formatSkills(listed.skills, homedir(), columns)}\n`);
     return 0;
   } catch (error) {
-    process.stderr.write(`${explain(error)}\n`);
+    process.stderr.write(`${explainClient(error)}\n`);
     return 1;
   } finally {
     client.close();
@@ -132,7 +133,7 @@ async function runModels(refresh: boolean): Promise<number> {
     process.stdout.write(`${formatModels(await client.listModels(refresh))}\n`);
     return 0;
   } catch (error) {
-    process.stderr.write(`${explain(error)}\n`);
+    process.stderr.write(`${explainClient(error)}\n`);
     return 1;
   } finally {
     client.close();
@@ -175,7 +176,7 @@ async function runAuth(args: string[]): Promise<number> {
     }
     return 0;
   } catch (error) {
-    process.stderr.write(`${explain(error)}\n`);
+    process.stderr.write(`${explainClient(error)}\n`);
     return 1;
   } finally {
     client.close();
@@ -219,8 +220,7 @@ async function runStatus(): Promise<number> {
     process.stdout.write(`${formatStatus(status)}\n`);
     return 0;
   } catch (error) {
-    const startError = readStartError();
-    process.stderr.write(startError === null ? `${explain(error)}\n` : formatStartError(startError));
+    process.stderr.write(`${explainClient(error)}\n`);
     return 1;
   } finally {
     client.close();
@@ -290,11 +290,6 @@ async function runDaemon(args: string[]): Promise<number> {
   }
   process.stdout.write(`${report}\n`);
   return 0;
-}
-
-function formatStartError(error: { reason: string; next: string }): string {
-  const next = error.next.length > 0 ? `next: ${error.next}\n` : "";
-  return `golem can't start: ${error.reason}\n${next}`;
 }
 
 /** `golem daemon restart` for the chat screen: no output, and an error when it does not come back. */
@@ -434,12 +429,13 @@ function serveForThisWindow(located: DaemonCommand): SessionDaemon {
 
 function explain(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
-  if (
-    message.includes("ECONNREFUSED") ||
-    message.includes("ENOENT") ||
-    message.includes("timed out")
-  ) {
-    return `daemon is not running (${message})`;
-  }
-  return message;
+  return isDaemonDown(message) ? `daemon is not running (${message})` : message;
+}
+
+/** For a command that talks to the daemon: when none answers, why, or the one command that starts it. */
+function explainClient(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  return isDaemonDown(message)
+    ? explainDaemonDown(message, readStartError(), existsSync(LAUNCH_AGENT))
+    : message;
 }
