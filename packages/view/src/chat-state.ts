@@ -66,6 +66,8 @@ export type ChatState = {
   approval: PendingApproval | null;
   /** The agent's todo list, from the newest `todos.updated`. */
   todos: TodoItem[];
+  /** The skills pinned in the session, in pin order, from `skill.activated` and `skill.deactivated`. */
+  activeSkills: string[];
   /**
    * The provider whose server did not answer, from `run.failed` with
    * `model_unreachable` or `not_installed`. Cleared when a run completes or
@@ -88,6 +90,7 @@ export const emptyChat: ChatState = {
   runId: null,
   approval: null,
   todos: [],
+  activeSkills: [],
   down: null,
   retry: null,
 };
@@ -254,6 +257,13 @@ export function reduceChat(state: ChatState, event: ChatEvent): ChatState {
       });
       return { ...answered, approval: null };
     }
+    case "skill.activated":
+      if (event.data.how !== "pinned" || state.activeSkills.includes(event.data.name)) {
+        return state;
+      }
+      return { ...state, activeSkills: [...state.activeSkills, event.data.name] };
+    case "skill.deactivated":
+      return { ...state, activeSkills: state.activeSkills.filter((name) => name !== event.data.name) };
     case "todos.updated":
       return { ...state, todos: event.data.todos.map((todo) => ({ id: todo.id, text: todo.text, status: todo.status })) };
     case "tool.started":

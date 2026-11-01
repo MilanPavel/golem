@@ -19,6 +19,7 @@ import type { ModelServerStatus } from "../../protocol/gen/model-server-status.t
 import type { SkillCall } from "../../protocol/gen/skill-call.ts";
 import type { SkillListResult } from "../../protocol/gen/skill-list-result.ts";
 import type { McpToggleResult } from "../../protocol/gen/mcp-toggle-result.ts";
+import type { SessionSetSkillsResult } from "../../protocol/gen/session-set-skills-result.ts";
 import type { McpToolsResult } from "../../protocol/gen/mcp-tools-result.ts";
 import type { MessageSendResult } from "../../protocol/gen/message-send-result.ts";
 import type { ModelListResult } from "../../protocol/gen/model-list-result.ts";
@@ -52,6 +53,7 @@ import {
   isMcpListResult,
   isMcpServer,
   isMcpToggleResult,
+  isSessionSetSkillsResult,
   isMcpToolsResult,
   isMessageSendResult,
   isModelListResult,
@@ -221,6 +223,8 @@ export interface GolemClient {
   /** Turn an on-demand MCP server on for a session. Resolves with the servers it has on. */
   enableMcp(sessionId: string, name: string): Promise<McpToggleResult>;
   disableMcp(sessionId: string, name: string): Promise<McpToggleResult>;
+  /** Pin skills for the whole session, or unpin them. Resolves with the pins, in pin order. */
+  setSkills(sessionId: string, change: { pin?: string[]; unpin?: string[] }): Promise<SessionSetSkillsResult>;
   /** A running server's tools, with what each says it does. `sessionId` picks its project's server. */
   mcpTools(name: string, sessionId?: string): Promise<McpToolsResult>;
   /** Start a server again now. Resolves with its state, usually `starting`. */
@@ -991,6 +995,17 @@ export function connectGolem(options: ConnectOptions): GolemClient {
     },
     async disableMcp(sessionId: string, name: string): Promise<McpToggleResult> {
       return toggleMcp("mcp.disable", sessionId, name);
+    },
+    async setSkills(
+      sessionId: string,
+      change: { pin?: string[]; unpin?: string[] },
+    ): Promise<SessionSetSkillsResult> {
+      await ready;
+      const result = await call("session.set_skills", { session_id: sessionId, ...change });
+      if (!isSessionSetSkillsResult(result)) {
+        throw new Error("invalid session.set_skills result");
+      }
+      return result;
     },
     async mcpTools(name: string, sessionId?: string): Promise<McpToolsResult> {
       await ready;

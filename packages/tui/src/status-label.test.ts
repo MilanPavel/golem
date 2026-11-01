@@ -208,3 +208,25 @@ test("an alert sits after the connection and is the last to leave", () => {
   assert.deepEqual(ids(22), ["connection", "alert"]);
   assert.equal(segments.find((segment) => segment.id === "alert")?.tone, "alert");
 });
+
+test("pinned skills show after the model, and leave the line before new lines and the model", () => {
+  const segments = statusSegments({
+    connection: "connected",
+    title: "Trip",
+    model: "qwen",
+    folder: "~/repos/golem",
+    messageCount: null,
+    uptimeSeconds: null,
+    skills: ["ship", "setup"],
+  });
+  const ids = (columns: number) => fitSegments(segments, columns).map((segment) => segment.id);
+  assert.equal(segments.find((segment) => segment.id === "skills")?.text, "skills: ship, setup");
+  assert.deepEqual(ids(80), ["connection", "title", "model", "skills", "folder"]);
+  assert.deepEqual(ids(50), ["connection", "title", "model", "skills"]);
+  assert.deepEqual(ids(30), ["connection", "title", "model"]);
+  assert.equal(
+    statusSegments({ connection: "c", title: "t", model: "m", folder: "", messageCount: null, uptimeSeconds: null })
+      .find((segment) => segment.id === "skills")?.text,
+    "",
+  );
+});

@@ -25,6 +25,8 @@ export type ComposerOutcome =
   | { kind: "send"; text: string; debug: DebugState }
   /** Run a skill once. `text` is the line as typed, and the daemon fills in the body from `args`. */
   | { kind: "skill"; name: string; args: string; text: string; debug: DebugState }
+  /** Pin a skill for the whole session, or unpin it. */
+  | { kind: "skill-pin"; pin: boolean; name: string }
   | { kind: "sessions" }
   | { kind: "skills" }
   | { kind: "permissions" }
@@ -78,8 +80,32 @@ export function invocableSkills(listed: readonly ListedSkill[]): SkillChoice[] {
     .map((skill) => ({ name: skill.name, description: skill.description, argumentHint: skill.argument_hint ?? null }));
 }
 
+/**
+ * What `/skill pin` and `/skill unpin` may name: every usable skill, and the
+ * ones pinned now, in pin order. A skill with `user-invocable: false` may be
+ * pinned, because such skills are background knowledge.
+ */
+export type PinChoices = {
+  pinnable: readonly string[];
+  active: readonly string[];
+};
+
+const noPins: PinChoices = { pinnable: [], active: [] };
+
+/** The names of the usable skills, for `/skill pin`. */
+export function pinnableSkills(listed: readonly ListedSkill[]): string[] {
+  return [...new Set(listed.filter((skill) => skill.usable).map((skill) => skill.name))];
+}
+
+/** `/skill` alone: the skills pinned in this session. */
+export function pinnedNotice(active: readonly string[]): string {
+  return active.length === 0
+    ? "no skills pinned \u2014 /skill pin <name> pins one for this session"
+    : `pinned: ${active.join(", ")}`;
+}
+
 const UNKNOWN = "unknown command \u2014 /help lists them";
-const SKILL_USAGE = "/skill run <name> [args] runs a skill \u2014 /skills lists them";
+const SKILL_USAGE = "/skill run <name> [args] \u00b7 /skill pin <name> \u00b7 /skill unpin <name>";
 const HELD_SKILL = "a skill is not held \u2014 /debug hold turns hold off";
 
 /** Built-in providers that take an API key. A provider added in config.toml works too. */
@@ -205,9 +231,9 @@ export const COMMANDS: readonly Command[] = [
   },
   {
     name: "/skill",
-    args: "run <name> [args]",
-    description: "Runs a skill once, even one whose name a command already uses.",
-    choices: ["run"],
+    args: "run|pin|unpin <name>",
+    description: "Runs a skill once, or pins one for the whole session. Alone, lists the pinned skills.",
+    choices: ["run", "pin", "unpin"],
     // The composer reads /skill itself, because a skill's arguments keep their spacing and quotes.
     run: () => ({ kind: "unknown", notice: SKILL_USAGE }),
   },
@@ -239,10 +265,14 @@ export const COMMANDS: readonly Command[] = [
 
 /**
  * `commands` with one row per skill, for suggestions, and the skill names
- * after `/skill run`. A built-in command keeps its name, so a skill named
- * like one is suggested only after `/skill run`.
+ * after `/skill run`, `/skill pin`, and `/skill unpin`. A built-in command
+ * keeps its name, so a skill named like one is suggested only after `/skill run`.
  */
-export function withSkillChoices(commands: readonly Command[], skills: readonly SkillChoice[]): Command[] {
+export function withSkillChoices(
+  commands: readonly Command[],
+  skills: readonly SkillChoice[],
+  pins: PinChoices = noPins,
+): Command[] {
   const taken = new Set(commands.map((command) => command.name));
   const names = skills.map((skill) => skill.name);
   const rows: Command[] = skills
@@ -255,7 +285,16 @@ export function withSkillChoices(commands: readonly Command[], skills: readonly 
       run: () => unknown(),
     }));
   const withRun = commands.map((command) =>
-    command.name === "/skill" ? { ...command, subChoices: { run: names } } : command,
+    command.name === "/skill"
+      ? {
+          ...command,
+          subChoices: {
+            run: names,
+            pin: pins.pinnable.filter((name) => !pins.active.includes(name)),
+            unpin: [...pins.active],
+          },
+        }
+      : command,
   );
   return [...withRun, ...rows];
 }
@@ -281,13 +320,15 @@ export function toggleDebugTab(debug: DebugState): DebugState {
 }
 
 /**
- * What Enter does with the draft. `skills` are the ones `/name` may run. A
- * built-in command wins a name, and `/skill run <name>` always reaches the skill.
+ * What Enter does with the draft. `skills` are the ones `/name` may run, and
+ * `pins` what `/skill pin` and `/skill unpin` may name. A built-in command
+ * wins a name, and `/skill run <name>` always reaches the skill.
  */
 export function applyComposer(
   debug: DebugState,
   raw: string,
   skills: readonly SkillChoice[] = [],
+  pins: PinChoices = noPins,
 ): ComposerOutcome {
   const text = raw.trim();
   if (text.length === 0) {
@@ -297,7 +338,7 @@ export function applyComposer(
     return sendOrPreview(debug, text.slice(2).trim());
   }
   if (text.startsWith("/")) {
-    return applyCommand(debug, text, skills);
+    return applyCommand(debug, text, skills, pins);
   }
   return sendOrPreview(debug, text);
 }
@@ -318,10 +359,15 @@ function sendOrPreview(debug: DebugState, text: string): ComposerOutcome {
   return { kind: "send", text, debug };
 }
 
-function applyCommand(debug: DebugState, text: string, skills: readonly SkillChoice[]): ComposerOutcome {
+function applyCommand(
+  debug: DebugState,
+  text: string,
+  skills: readonly SkillChoice[],
+  pins: PinChoices,
+): ComposerOutcome {
   const [name = "", ...args] = text.split(/\s+/);
   if (name === "/skill") {
-    return skillCommand(debug, text, skills);
+    return skillCommand(debug, text, skills, pins);
   }
   const command = COMMANDS.find((candidate) => candidate.name === name);
   if (command !== undefined) {
@@ -331,9 +377,20 @@ function applyCommand(debug: DebugState, text: string, skills: readonly SkillCho
   return skill === undefined ? unknown() : runSkill(debug, skill.name, afterWords(text, 1), text);
 }
 
-/** `/skill run <name> [args]`. */
-function skillCommand(debug: DebugState, text: string, skills: readonly SkillChoice[]): ComposerOutcome {
-  const [, sub, name] = text.split(/\s+/);
+/** `/skill` alone, `/skill run <name> [args]`, `/skill pin <name>`, and `/skill unpin <name>`. */
+function skillCommand(
+  debug: DebugState,
+  text: string,
+  skills: readonly SkillChoice[],
+  pins: PinChoices,
+): ComposerOutcome {
+  const [, sub, name, extra] = text.split(/\s+/);
+  if (sub === undefined) {
+    return local(debug, null, false, pinnedNotice(pins.active));
+  }
+  if (sub === "pin" || sub === "unpin") {
+    return pinCommand(debug, sub === "pin", name, extra, pins);
+  }
   if (sub !== "run" || name === undefined) {
     return { kind: "unknown", notice: SKILL_USAGE };
   }
@@ -341,6 +398,30 @@ function skillCommand(debug: DebugState, text: string, skills: readonly SkillCho
     return { kind: "unknown", notice: `no skill named ${name} to run \u2014 /skills lists them` };
   }
   return runSkill(debug, name, afterWords(text, 3), text);
+}
+
+function pinCommand(
+  debug: DebugState,
+  pin: boolean,
+  name: string | undefined,
+  extra: string | undefined,
+  pins: PinChoices,
+): ComposerOutcome {
+  const verb = pin ? "pin" : "unpin";
+  if (name === undefined || extra !== undefined) {
+    return { kind: "unknown", notice: `/skill ${verb} takes one skill name` };
+  }
+  const pinned = pins.active.includes(name);
+  if (pin && pinned) {
+    return local(debug, null, false, `${name} is already pinned`);
+  }
+  if (pin && !pins.pinnable.includes(name)) {
+    return { kind: "unknown", notice: `no skill named ${name} to pin \u2014 /skills lists them` };
+  }
+  if (!pin && !pinned) {
+    return local(debug, null, false, `${name} is not pinned \u2014 ${pinnedNotice(pins.active)}`);
+  }
+  return { kind: "skill-pin", pin, name };
 }
 
 function runSkill(debug: DebugState, name: string, args: string, text: string): ComposerOutcome {

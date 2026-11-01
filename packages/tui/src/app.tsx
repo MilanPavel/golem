@@ -32,6 +32,7 @@ import {
 import {
   applyComposer,
   invocableSkills,
+  pinnableSkills,
   closedDebug,
   COMMANDS,
   helpLines,
@@ -391,7 +392,11 @@ export function App({
       ? []
       : suggest(
           draft.text,
-          withSkillChoices(withModelChoices(COMMANDS, modelNames(listing)), invocableSkills(skillList.skills ?? [])),
+          withSkillChoices(
+            withModelChoices(COMMANDS, modelNames(listing)),
+            invocableSkills(skillList.skills ?? []),
+            { pinnable: pinnableSkills(skillList.skills ?? []), active: chat.activeSkills },
+          ),
         );
   const composerText = secret === null ? draft.text : maskSecret(secret.value);
   const suggestSelected =
@@ -498,6 +503,7 @@ export function App({
       uptimeSeconds,
       freshLines: followed.fresh,
       alert: alertLabel(chat.down, mcpAlert(mcp.servers)),
+      skills: sessionId === null ? [] : chat.activeSkills,
     }),
     columns,
   );
@@ -921,6 +927,7 @@ export function App({
       debugRef.current,
       expandPastes(draftRef.current.text, pastesRef.current),
       invocableSkills(skillListRef.current.skills ?? []),
+      { pinnable: pinnableSkills(skillListRef.current.skills ?? []), active: chatRef.current.activeSkills },
     );
     if (outcome.kind === "idle") {
       return;
@@ -974,6 +981,28 @@ export function App({
           const notice = `${outcome.name} is ${outcome.on ? "on" : "off"} for this session`;
           setChat((state) => ({ ...state, notice }));
           loadMcp();
+        },
+        (error: unknown) => {
+          const notice = error instanceof Error ? error.message : String(error);
+          setChat((state) => ({ ...state, notice }));
+        },
+      );
+      return;
+    }
+    if (outcome.kind === "skill-pin") {
+      setDraft(draftAt(""));
+      const current = sessionRef.current;
+      if (current === null) {
+        setChat((state) => ({ ...state, notice: "open a session first" }));
+        return;
+      }
+      const change = outcome.pin ? { pin: [outcome.name] } : { unpin: [outcome.name] };
+      client.setSkills(current, change).then(
+        () => {
+          const notice = outcome.pin
+            ? `${outcome.name} is pinned for this session`
+            : `${outcome.name} is unpinned`;
+          setChat((state) => ({ ...state, notice }));
         },
         (error: unknown) => {
           const notice = error instanceof Error ? error.message : String(error);

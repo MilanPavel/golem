@@ -134,10 +134,22 @@ test("a skill named like a command is suggested only after /skill run", () => {
   assert.deepEqual(suggest("/skill run help now", registry), []);
 });
 
-test("/skill suggests run, and nothing after run without skills", () => {
+test("/skill suggests run, pin, and unpin, and nothing after run without skills", () => {
   assert.deepEqual(
     suggest("/skill ", COMMANDS).map((item) => item.label),
-    ["run"],
+    ["run", "pin", "unpin"],
   );
   assert.deepEqual(suggest("/skill run ", COMMANDS), []);
+});
+
+test("/skill pin suggests skills not pinned yet, and /skill unpin the pinned ones", () => {
+  const registry = withSkillChoices(COMMANDS, SKILLS, { pinnable: ["ship", "facts", "help"], active: ["facts"] });
+  assert.deepEqual(
+    suggest("/skill pin ", registry).map((item) => item.completion),
+    ["/skill pin ship ", "/skill pin help "],
+  );
+  assert.deepEqual(
+    suggest("/skill unpin ", registry).map((item) => item.completion),
+    ["/skill unpin facts "],
+  );
 });
