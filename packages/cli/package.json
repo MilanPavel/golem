@@ -13,9 +13,11 @@
   },
   "dependencies": {
     "@golem/client": "workspace:*",
+    "@golem/gateway": "workspace:*",
     "@golem/tui": "workspace:*"
   },
   "devDependencies": {
+    "@types/bun": "1.3.10",
     "@types/node": "^24.10.1",
     "eslint": "^9.36.0",
     "typescript": "^5.9.2",

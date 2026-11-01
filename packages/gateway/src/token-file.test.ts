@@ -115,3 +115,10 @@ test("an empty or damaged token file is refused", async () => {
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test("write keeps a token it is given", async () => {
+  const dir = await runDir();
+  const given = "A".repeat(43);
+  assert.equal(await writeTokenFile(dir, given), given);
+  assert.equal(await readTokenFile(dir), given);
+});
