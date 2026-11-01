@@ -7,3 +7,13 @@ export type { Check } from "./auth.ts";
 export { isSecretShape, randomSecret, timingSafeEqual } from "./secret.ts";
 export { createSessionStore } from "./sessions.ts";
 export type { SessionOptions, SessionStore } from "./sessions.ts";
+export { CONTENT_SECURITY_POLICY, withSecurityHeaders } from "./headers.ts";
+export {
+  CLOSE_DAEMON_DOWN,
+  CLOSE_GOING_AWAY,
+  CLOSE_POLICY,
+  MAX_DAEMON_BACKLOG_BYTES,
+  PAUSE_ABOVE_BYTES,
+  createBridge,
+} from "./bridge.ts";
+export type { Bridge, BridgeIO } from "./bridge.ts";

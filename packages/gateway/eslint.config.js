@@ -5,7 +5,7 @@ export default tseslint.config(
   ...tseslint.configs.recommended,
   {
     files: ["src/**/*.ts"],
-    ignores: ["src/**/*.test.ts", "src/token-file.ts"],
+    ignores: ["src/**/*.test.ts", "src/token-file.ts", "src/bun/**"],
     rules: {
       "no-restricted-imports": [
         "error",
