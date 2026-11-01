@@ -1,6 +1,8 @@
 import { mergeSummary, type GolemClient, type SessionSummary } from "@golem/client";
 import { createStore, type StoreSource } from "./create-store.ts";
 
+export type { SessionSummary };
+
 export type SessionListClient = Pick<GolemClient, "onSessionSummary" | "watchSessions" | "ready">;
 
 export type SessionList = StoreSource<readonly SessionSummary[]> & {
