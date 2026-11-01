@@ -1,0 +1,276 @@
+{
+  "live": [
+    {
+      "data": {
+        "cwd": "/tmp/golem-golden",
+        "forked_from": null,
+        "model_name": null,
+        "model_profile": "remote",
+        "model_provider": null
+      },
+      "run_id": null,
+      "seq": 1,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:00Z",
+      "type": "session.created"
+    },
+    {
+      "data": {
+        "interrupted": false,
+        "message_id": "id-3",
+        "role": "user",
+        "skill": null,
+        "text": "say hi"
+      },
+      "run_id": "id-2",
+      "seq": 2,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:01Z",
+      "type": "message.completed"
+    },
+    {
+      "data": {},
+      "run_id": "id-2",
+      "seq": 3,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:02Z",
+      "type": "run.started"
+    },
+    {
+      "data": {
+        "message_id": "id-4",
+        "role": "assistant"
+      },
+      "run_id": "id-2",
+      "seq": 4,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:03Z",
+      "type": "message.started"
+    },
+    {
+      "data": {
+        "message_id": "id-4",
+        "text": "H"
+      },
+      "run_id": "id-2",
+      "seq": 5,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:04Z",
+      "type": "message.delta"
+    },
+    {
+      "data": {
+        "message_id": "id-4",
+        "text": "e"
+      },
+      "run_id": "id-2",
+      "seq": 6,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:05Z",
+      "type": "message.delta"
+    },
+    {
+      "data": {
+        "message_id": "id-4",
+        "text": "l"
+      },
+      "run_id": "id-2",
+      "seq": 7,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:06Z",
+      "type": "message.delta"
+    },
+    {
+      "data": {
+        "message_id": "id-4",
+        "text": "l"
+      },
+      "run_id": "id-2",
+      "seq": 8,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:07Z",
+      "type": "message.delta"
+    },
+    {
+      "data": {
+        "message_id": "id-4",
+        "text": "o"
+      },
+      "run_id": "id-2",
+      "seq": 9,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:08Z",
+      "type": "message.delta"
+    },
+    {
+      "data": {
+        "message_id": "id-4",
+        "text": " "
+      },
+      "run_id": "id-2",
+      "seq": 10,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:09Z",
+      "type": "message.delta"
+    },
+    {
+      "data": {
+        "message_id": "id-4",
+        "text": "t"
+      },
+      "run_id": "id-2",
+      "seq": 11,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:10Z",
+      "type": "message.delta"
+    },
+    {
+      "data": {
+        "message_id": "id-4",
+        "text": "h"
+      },
+      "run_id": "id-2",
+      "seq": 12,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:11Z",
+      "type": "message.delta"
+    },
+    {
+      "data": {
+        "message_id": "id-4",
+        "text": "e"
+      },
+      "run_id": "id-2",
+      "seq": 13,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:12Z",
+      "type": "message.delta"
+    },
+    {
+      "data": {
+        "message_id": "id-4",
+        "text": "r"
+      },
+      "run_id": "id-2",
+      "seq": 14,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:13Z",
+      "type": "message.delta"
+    },
+    {
+      "data": {
+        "message_id": "id-4",
+        "text": "e"
+      },
+      "run_id": "id-2",
+      "seq": 15,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:14Z",
+      "type": "message.delta"
+    },
+    {
+      "data": {
+        "message_id": "id-4",
+        "text": "."
+      },
+      "run_id": "id-2",
+      "seq": 16,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:15Z",
+      "type": "message.delta"
+    },
+    {
+      "data": {
+        "interrupted": false,
+        "message_id": "id-4",
+        "role": "assistant",
+        "skill": null,
+        "text": "Hello there."
+      },
+      "run_id": "id-2",
+      "seq": 17,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:16Z",
+      "type": "message.completed"
+    },
+    {
+      "data": {},
+      "run_id": "id-2",
+      "seq": 18,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:17Z",
+      "type": "run.completed"
+    }
+  ],
+  "replay": [
+    {
+      "data": {
+        "cwd": "/tmp/golem-golden",
+        "forked_from": null,
+        "model_name": null,
+        "model_profile": "remote",
+        "model_provider": null
+      },
+      "run_id": null,
+      "seq": 1,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:00Z",
+      "type": "session.created"
+    },
+    {
+      "data": {
+        "interrupted": false,
+        "message_id": "id-3",
+        "role": "user",
+        "skill": null,
+        "text": "say hi"
+      },
+      "run_id": "id-2",
+      "seq": 2,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:01Z",
+      "type": "message.completed"
+    },
+    {
+      "data": {},
+      "run_id": "id-2",
+      "seq": 3,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:02Z",
+      "type": "run.started"
+    },
+    {
+      "data": {
+        "message_id": "id-4",
+        "role": "assistant"
+      },
+      "run_id": "id-2",
+      "seq": 4,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:03Z",
+      "type": "message.started"
+    },
+    {
+      "data": {
+        "interrupted": false,
+        "message_id": "id-4",
+        "role": "assistant",
+        "skill": null,
+        "text": "Hello there."
+      },
+      "run_id": "id-2",
+      "seq": 17,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:16Z",
+      "type": "message.completed"
+    },
+    {
+      "data": {},
+      "run_id": "id-2",
+      "seq": 18,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:17Z",
+      "type": "run.completed"
+    }
+  ]
+}
