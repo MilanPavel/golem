@@ -160,6 +160,117 @@ html.dark {
   background-color: var(--golem-clay);
 }
 
+/* The pixel golem (PixelGolem.vue). Its eyes turn clay when you point at the nav logo. */
+.pixel-golem {
+  display: block;
+  flex-shrink: 0;
+}
+.pixel-golem .body {
+  fill: var(--golem-golem-body);
+}
+.pixel-golem .eye {
+  fill: var(--golem-golem-eye);
+  transition: fill 180ms ease-out;
+}
+.VPNavBarTitle .title:hover .pixel-golem .eye {
+  fill: var(--golem-clay);
+}
+.VPNavBarTitle .pixel-golem {
+  margin-right: 10px;
+}
+.pixel-golem[data-state="thinking"] .eye {
+  fill: var(--golem-clay);
+  animation: golem-glow 1.4s ease-in-out infinite;
+}
+.pixel-golem[data-state="waiting"] .eye {
+  fill: var(--golem-wait);
+  animation: golem-wink 2.4s steps(1) infinite;
+}
+.pixel-golem[data-state="failed"] .eye {
+  fill: var(--golem-deny);
+}
+.pixel-golem[data-state="offline"] .body {
+  fill: var(--golem-line-strong);
+}
+.pixel-golem[data-state="offline"] .eye {
+  fill: var(--golem-faint);
+}
+@keyframes golem-glow {
+  50% {
+    fill: var(--golem-golem-eye);
+  }
+}
+@keyframes golem-wink {
+  0%,
+  86% {
+    opacity: 1;
+  }
+  88%,
+  92% {
+    opacity: 0;
+  }
+  94% {
+    opacity: 1;
+  }
+}
+
+/* A small golem beside each sidebar group title: 2 px a pixel, 18 by 12. */
+.VPSidebarItem.level-0 > .item > .text::before {
+  content: "";
+  display: inline-block;
+  width: 18px;
+  height: 12px;
+  margin-right: 8px;
+  vertical-align: -1px;
+  background: var(--golem-mark) no-repeat center / contain;
+  image-rendering: pixelated;
+}
+
+/* The 404 page: one of the web UI's full-screen states. */
+.golem-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  max-width: 32rem;
+  margin: 0 auto;
+  padding: 96px 24px 128px;
+  text-align: center;
+}
+.golem-state-tag {
+  margin-top: 18px;
+  font-family: var(--golem-font-mono);
+  font-size: 12px;
+  color: var(--golem-muted);
+  overflow-wrap: anywhere;
+}
+.golem-state-heading {
+  font-family: var(--golem-font-prose);
+  font-size: 30px;
+  font-weight: 500;
+  line-height: 1.25;
+  color: var(--golem-ink);
+}
+.golem-state-text {
+  font-family: var(--golem-font-prose);
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--golem-muted);
+}
+.golem-state-link {
+  margin-top: 10px;
+  padding: 8px 18px;
+  border-radius: 8px;
+  background: var(--golem-clay);
+  color: var(--golem-on-clay);
+  font-weight: 500;
+  font-size: 14px;
+  transition: background-color 180ms ease-out;
+}
+.golem-state-link:hover {
+  background: var(--golem-clay-ink);
+}
+
 /* Mermaid diagrams, drawn by GolemMermaid.vue. Mermaid sets each SVG's width and its
    largest size; the figure only centres it and scrolls a diagram wider than the page. */
 .golem-mermaid {

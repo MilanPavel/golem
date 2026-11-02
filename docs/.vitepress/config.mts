@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import type { Plugin } from "vite";
 import { type DefaultTheme, defineConfig } from "vitepress";
 import { NOT_PAGES, REPO_URL, bundleHtmlAssets, siteHref } from "./links.ts";
+import { faviconHref, markCss } from "./golem.ts";
 import { checkTokens, parseTokens, tokensCss } from "./tokens.ts";
 
 const docsDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -33,7 +34,8 @@ function golemTokens(): Plugin {
     load(id) {
       if (id === `\0${css}`) {
         this.addWatchFile(tokensFile);
-        return tokensCss(read());
+        const palette = read();
+        return `${tokensCss(palette)}\n${markCss(palette)}`;
       }
       if (id === `\0${js}`) {
         this.addWatchFile(tokensFile);
@@ -93,7 +95,8 @@ export default defineConfig({
   lastUpdated: true,
   srcExclude: NOT_PAGES,
 
-  head: [["link", { rel: "icon", type: "image/svg+xml", href: "/golem/logo.svg" }]],
+  // The favicon is the pixel golem, drawn from logo.ts in the theme's colours.
+  head: [["link", { rel: "icon", type: "image/svg+xml", href: faviconHref(parseTokens(fs.readFileSync(tokensFile, "utf8"))) }]],
 
   markdown: {
     config(md) {
@@ -126,7 +129,6 @@ export default defineConfig({
   },
 
   themeConfig: {
-    logo: "/logo.svg",
     nav: [
       { text: "Install", link: "/install" },
       { text: "Architecture", link: "/architecture" },
@@ -142,7 +144,7 @@ export default defineConfig({
     outline: { level: [2, 3] },
   },
 
-  // docs/images is served as is, so the logo and the favicon have stable URLs with no copy.
+  // docs/images is served as is, so the README's images have stable URLs with no copy.
   // Mermaid is one large chunk, loaded only on pages that have a diagram.
   vite: {
     publicDir: path.join(docsDir, "images"),

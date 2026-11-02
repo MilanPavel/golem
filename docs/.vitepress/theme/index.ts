@@ -14,11 +14,21 @@ import "@fontsource/silkscreen";
 import "virtual:golem-tokens.css";
 import "./custom.css";
 
+import { h } from "vue";
 import GolemMermaid from "./GolemMermaid.vue";
+import NotFound from "./NotFound.vue";
+import PixelGolem from "./PixelGolem.vue";
 
 export default {
   extends: DefaultTheme,
+  // The pixel golem is the nav logo, and the 404 page is one of golem's full-screen states.
+  Layout: () =>
+    h(DefaultTheme.Layout, null, {
+      "nav-bar-title-before": () => h(PixelGolem, { cell: 3, decorative: true }),
+      "not-found": () => h(NotFound),
+    }),
   enhanceApp({ app }) {
     app.component("GolemMermaid", GolemMermaid);
+    app.component("PixelGolem", PixelGolem);
   },
 } satisfies Theme;
