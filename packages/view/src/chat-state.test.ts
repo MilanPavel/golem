@@ -535,6 +535,7 @@ test("approval events set and clear the waiting call", () => {
     data: { call_id: "c1", name: "edit_file", args: { path: "x" }, source: "rule", diff: "-a\n+b\n" },
   });
   assert.equal(withDiff.approval?.diff, "-a\n+b\n");
+  assert.equal(waiting.messages[0]?.tools?.[0]?.diff, undefined);
   assert.equal(waiting.busy, true);
   assert.equal(waiting.messages[0]?.tools?.[0]?.status, "waiting");
 
@@ -689,4 +690,19 @@ test("a skipped pin is marked and named in a notice, until a call reads it again
 
   const other = reduceChat({ ...gone, notice: "something else" }, activated(5, "terse"));
   assert.equal(other.notice, "something else");
+});
+
+test("the diff from approval.needed stays on the tool after the answer", () => {
+  const base = { session_id: "s", run_id: "r", ts: "t" } as const;
+  const events: ChatEvent[] = [
+    { ...base, seq: 1, type: "run.started", data: {} },
+    { ...base, seq: 2, type: "message.started", data: { message_id: "a", role: "assistant" } },
+    { ...base, seq: 3, type: "message.completed", data: { message_id: "a", role: "assistant", text: "" } },
+    { ...base, seq: 4, type: "tool.requested", data: { call_id: "c1", message_id: "a", name: "edit_file", args: { path: "x" } } },
+    { ...base, seq: 5, type: "approval.needed", data: { call_id: "c1", name: "edit_file", args: { path: "x" }, source: "rule", diff: "-a\n+b\n" } },
+    { ...base, seq: 6, type: "approval.resolved", data: { call_id: "c1", name: "edit_file", decision: "allow" } },
+  ];
+  const state = events.reduce(reduceChat, emptyChat);
+  assert.equal(state.approval, null);
+  assert.equal(state.messages[0]?.tools?.[0]?.diff, "-a\n+b\n");
 });
