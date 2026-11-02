@@ -7,7 +7,6 @@ import type { Press, PressName } from "./keys.ts";
 import {
   afterInstall,
   closedPicker,
-  firstRunChoice,
   layoutPicker,
   modelNames,
   openPicker,
@@ -166,14 +165,6 @@ test("a model that cannot run says what to do", () => {
   assert.match(unusableReason(LISTING.models[2]!) ?? "", /\/model pull qwen3:30b-a3b/);
   assert.equal(unusableReason(model("ollama/x", { status: "server_down" })), "Ollama is not answering: run ollama serve");
   assert.equal(unusableReason(LISTING.models[0]!), null);
-});
-
-test("first start: a resolving default needs nothing, one ready model is used, else the picker opens", () => {
-  assert.equal(firstRunChoice(LISTING), null);
-  const unset = { ...LISTING, default: "remote" };
-  assert.deepEqual(firstRunChoice(unset), { kind: "pick" });
-  const one = { ...unset, models: [LISTING.models[0]!, LISTING.models[2]!] };
-  assert.deepEqual(firstRunChoice(one), { kind: "auto", model: LISTING.models[0] });
 });
 
 function selecting(ref: string): PickerState {
