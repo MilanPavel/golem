@@ -500,15 +500,38 @@ class ListedProvider(BaseModel):
     stale: bool = False
 
 
-class ModelListResult(BaseModel):
-    """``default`` is the model a new session gets. ``ram_gb`` is this machine's memory."""
+class ModelSetup(BaseModel):
+    """Where the user is in setting up a model, for a first-run screen.
+
+    ``keys`` are the providers with a key, from the environment or the
+    Keychain. ``default_status`` is the default model's status, ``unknown``
+    when it names a model golem does not list, and null when no default is
+    chosen.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    default: str = Field(min_length=1)
+    ollama_installed: bool
+    ollama_running: bool
+    keys: list[str] = Field(default_factory=list)
+    default_status: (
+        Literal["ready", "needs_key", "not_installed", "server_down", "pulling", "unknown"] | None
+    ) = None
+
+
+class ModelListResult(BaseModel):
+    """``default`` is the model a new session gets, null before one is chosen.
+
+    ``ram_gb`` is this machine's memory.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    default: str | None = Field(min_length=1)
     ram_gb: float | None = Field(default=None, gt=0)
     models: list[ListedModel]
     providers: list[ListedProvider]
+    setup: ModelSetup
 
 
 class SessionSetModelParams(BaseModel):
@@ -876,7 +899,7 @@ class ConfigGetResult(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     config_file: str = Field(min_length=1)
-    default_model: str = Field(min_length=1)
+    default_model: str | None = Field(min_length=1)
     log_level: str = Field(min_length=1)
     session_titles: bool
     trusted_projects: list[str]

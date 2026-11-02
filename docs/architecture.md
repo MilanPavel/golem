@@ -265,10 +265,10 @@ In `golem.db`, `events` is the source. `sessions` and `runs` are written in the 
 Settings come from three places. Each one overrides the one before it: `~/.golem/config.toml`, then `<project>/.golem/config.toml`, then `GOLEM_…` environment variables. An explicit `log_level` passed to `load_settings` wins over all three. The keys read today:
 
 - `log_level`: `DEBUG`, `INFO`, `WARNING`, or `ERROR`. Environment: `GOLEM_LOG_LEVEL`.
-- `default_model`: a profile name or a `provider/model` ref. New sessions store it as their `model_profile`. Defaults to `model_profile`.
+- `default_model`: a profile name or a `provider/model` ref. New sessions store it as their `model_profile`. Defaults to the flat settings' profile when those are set, and to none otherwise. A session made with none stores `remote` and uses the default once one is chosen. Sending with no model fails with `model_not_configured` and `no model chosen yet`.
 - `[models.<name>]`: a profile with `model` (a ref) and optional `ctx`, which the `ollama` provider sends as `num_ctx`.
 - `[providers.<name>]`: `kind`, `base_url`, and `api_key_env`. Built-in presets are `anthropic`, `openai`, `ollama` (native API), `openrouter`, `groq`, `together`, and `lmstudio`. A new name is `openai_compat` and needs `base_url`.
-- `model_profile`, `model_provider`, `model_name`, `model_base_url`: the flat settings from before profiles. They load as one profile named `model_profile` (default `remote`), so stored sessions keep resolving. An empty or Ollama `model_base_url` maps to the `ollama` provider.
+- `model_profile`, `model_provider`, `model_name`, `model_base_url`: the flat settings from before profiles. They load as one profile named `model_profile` (`remote` when unset), so stored sessions keep resolving. An empty or Ollama `model_base_url` maps to the `ollama` provider.
 - `[ollama]`: `start` (default `true`) lets the daemon run `ollama serve` when a local model is needed and nothing answers. `idle_stop_minutes` (default 30, 0 never) stops a server it started after that long unused.
 - `session_titles`: default `true`. Name each session after its first completed run with one model call. Environment: `GOLEM_SESSION_TITLES`.
 - `[[rule]]`: a tool rule with `tool` (a glob on the tool name, default `*`), optional `match` (a glob on the tool's subject, such as a `grep` or `glob` pattern, with `|` between alternatives), optional `path` (a glob on the resolved path the call touches), and `action`: `allow`, `ask`, or `deny`.
@@ -452,7 +452,7 @@ MCP servers are listed with `mcp.list`: each one's name, state (`idle`, `startin
 
 `model.set_default` writes `default_model` into the user's `config.toml` with `tomlkit`, which keeps comments and layout (`golem/config_edit.py`). The router picks the change up on its next read.
 
-`model.list` returns `default`, this machine's `ram_gb`, a list of providers with their status (`ready`, `needs_key`, `server_down`, `not_installed` for a local Ollama with no binary, or `unlisted` when nothing uses one yet), and one entry per model ref.
+`model.list` returns `default` (null before one is chosen), this machine's `ram_gb`, a list of providers with their status (`ready`, `needs_key`, `server_down`, `not_installed` for a local Ollama with no binary, or `unlisted` when nothing uses one yet), and one entry per model ref. With no Ollama binary, a catalog model is `not_installed`, one install away, and the picker labels it `install`. `setup` says where the user is, for a first-run screen in the TUI or the browser: `ollama_installed`, `ollama_running`, `keys` (the providers with a key), and `default_status`, the default model's status, `unknown` when golem does not list it, or null with no default.
 - **Where entries come from** (`golem/models/discovery.py`):
   - installed Ollama models, from `/api/tags`, with `/api/show` filling in what an older Ollama leaves out;
   - local models to download, from the bundled `local-catalog.toml`;

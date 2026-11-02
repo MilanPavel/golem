@@ -210,15 +210,69 @@
       ],
       "title": "ModelPriceInfo",
       "type": "object"
+    },
+    "ModelSetup": {
+      "additionalProperties": false,
+      "description": "Where the user is in setting up a model, for a first-run screen.\n\n``keys`` are the providers with a key, from the environment or the\nKeychain. ``default_status`` is the default model's status, ``unknown``\nwhen it names a model golem does not list, and null when no default is\nchosen.",
+      "properties": {
+        "default_status": {
+          "anyOf": [
+            {
+              "enum": [
+                "ready",
+                "needs_key",
+                "not_installed",
+                "server_down",
+                "pulling",
+                "unknown"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Default Status"
+        },
+        "keys": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Keys",
+          "type": "array"
+        },
+        "ollama_installed": {
+          "title": "Ollama Installed",
+          "type": "boolean"
+        },
+        "ollama_running": {
+          "title": "Ollama Running",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "ollama_installed",
+        "ollama_running"
+      ],
+      "title": "ModelSetup",
+      "type": "object"
     }
   },
   "additionalProperties": false,
-  "description": "``default`` is the model a new session gets. ``ram_gb`` is this machine's memory.",
+  "description": "``default`` is the model a new session gets, null before one is chosen.\n\n``ram_gb`` is this machine's memory.",
   "properties": {
     "default": {
-      "minLength": 1,
-      "title": "Default",
-      "type": "string"
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Default"
     },
     "models": {
       "items": {
@@ -246,12 +300,16 @@
       ],
       "default": null,
       "title": "Ram Gb"
+    },
+    "setup": {
+      "$ref": "#/$defs/ModelSetup"
     }
   },
   "required": [
     "default",
     "models",
-    "providers"
+    "providers",
+    "setup"
   ],
   "title": "ModelListResult",
   "type": "object"

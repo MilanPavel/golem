@@ -91,8 +91,21 @@ def test_unknown_provider_is_rejected() -> None:
 
 def test_unconfigured_default_is_rejected() -> None:
     router = ModelRouter(GolemSettings())
-    with pytest.raises(ModelConfigError, match="no model is configured"):
+    assert router.default is None
+    with pytest.raises(ModelConfigError, match=r"^no model chosen yet$"):
         router.chat_model(router.profile_name)
+
+
+def test_a_session_made_before_a_default_uses_it_once_chosen() -> None:
+    settings = GolemSettings(default_model="ollama/qwen3:8b")
+    assert ModelRouter(settings).resolve("remote").ref == "ollama/qwen3:8b"
+
+
+def test_an_old_config_with_model_profile_remote_still_loads() -> None:
+    settings = GolemSettings(model_profile="remote", model_provider="anthropic", model_name="old")
+    router = ModelRouter(settings)
+    assert router.default == "remote"
+    assert router.resolve("remote").ref == "anthropic/old"
 
 
 def test_ollama_is_native_and_passes_ctx() -> None:

@@ -93,12 +93,31 @@ class ListedProvider:
     stale: bool = False
 
 
+DefaultStatus = Literal["ready", "needs_key", "not_installed", "server_down", "pulling", "unknown"]
+
+
+@dataclass(frozen=True, slots=True)
+class ModelSetup:
+    """Where the user is in setting up a model, for a first-run screen.
+
+    ``keys`` are the providers with a key. ``default_status`` is the default
+    model's status, ``unknown`` when it names nothing golem lists, and None
+    when no default is chosen.
+    """
+
+    ollama_installed: bool
+    ollama_running: bool
+    keys: tuple[str, ...]
+    default_status: DefaultStatus | None
+
+
 @dataclass(frozen=True, slots=True)
 class ModelListing:
-    default: str
+    default: str | None
     ram_gb: float | None
     models: list[ListedModel]
     providers: list[ListedProvider]
+    setup: ModelSetup
 
 
 @dataclass(frozen=True, slots=True)
@@ -191,7 +210,7 @@ class ModelDiscovery:
         router = self._router
         providers = router.providers()
         profiles = router.profiles()
-        default = router.profile_name
+        default = router.default
         keys: dict[str, str | None]
         try:
             keys = await asyncio.to_thread(_keys, router, providers)
@@ -229,18 +248,27 @@ class ModelDiscovery:
         models = _with_pulls(
             self._merge(providers, profiles, default, keys, results, states), self.pulling()
         )
+        ollama_state = states.get("ollama")
+        running = ollama_state is not None and ollama_state.status == "ready"
+        setup = ModelSetup(
+            ollama_installed=running or await asyncio.to_thread(self._ollama_installed),
+            ollama_running=running,
+            keys=tuple(sorted(name for name, key in keys.items() if key is not None)),
+            default_status=_default_status(models, default),
+        )
         return ModelListing(
             default=default,
             ram_gb=None if self._ram_gb is None else round(self._ram_gb, 1),
             models=models,
             providers=[states[name] for name in sorted(states)],
+            setup=setup,
         )
 
     def _merge(
         self,
         providers: dict[str, Provider],
         profiles: dict[str, ModelSettings],
-        default: str,
+        default: str | None,
         keys: dict[str, str | None],
         results: dict[str, _ProviderResult],
         states: dict[str, ListedProvider],
@@ -265,14 +293,16 @@ class ModelDiscovery:
             name, _, model_id = entry.ref.partition("/")
             if name not in providers:
                 continue
-            up = name in results and results[name].up
+            # With no Ollama on this machine, a catalog model is one install away, not down.
+            result = results.get(name)
+            ready = result is not None and (result.up or result.missing)
             by_ref[entry.ref] = self._listed(
                 entry.ref,
                 name,
                 _Found(model_id=model_id, size_gb=entry.size_gb, tools=True),
                 source="catalog",
                 label=entry.label,
-                status="not_installed" if up else "server_down",
+                status="not_installed" if ready else "server_down",
             )
         aliases: dict[str, list[str]] = {}
         ctx_overrides: dict[str, int] = {}
@@ -284,7 +314,7 @@ class ModelDiscovery:
             if profile.price is not None:
                 price_overrides.setdefault(profile.model, profile.price)
         named = set(aliases)
-        if default not in profiles and "/" in default:
+        if default is not None and default not in profiles and "/" in default:
             named.add(default)
         for ref in sorted(named):
             name, _, model_id = ref.partition("/")
@@ -614,15 +644,25 @@ def _keys(router: ModelRouter, providers: dict[str, Provider]) -> dict[str, str 
 
 
 def _referenced_providers(
-    router: ModelRouter, profiles: dict[str, ModelSettings], default: str
+    router: ModelRouter, profiles: dict[str, ModelSettings], default: str | None
 ) -> set[str]:
     refs: list[str] = [profile.model for profile in profiles.values()]
-    if "/" in default:
+    if default is not None and "/" in default:
         refs.append(default)
     names = {ref.partition("/")[0] for ref in refs}
-    with contextlib.suppress(ModelConfigError):
-        names.add(router.resolve(default).provider_name)
+    if default is not None:
+        with contextlib.suppress(ModelConfigError):
+            names.add(router.resolve(default).provider_name)
     return names
+
+
+def _default_status(models: list[ListedModel], default: str | None) -> DefaultStatus | None:
+    if default is None:
+        return None
+    for model in models:
+        if model.ref == default or default in model.profiles:
+            return model.status
+    return "unknown"
 
 
 def _with_pulls(models: list[ListedModel], pulling: dict[str, float | None]) -> list[ListedModel]:
@@ -655,7 +695,8 @@ def _with_pulls(models: list[ListedModel], pulling: dict[str, float | None]) -> 
 
 def _unlisted_status(provider: Provider, key: str | None, state: ListedProvider | None) -> Status:
     if provider.kind == "ollama":
-        return "not_installed" if state is not None and state.status == "ready" else "server_down"
+        found = state is not None and state.status in ("ready", "not_installed")
+        return "not_installed" if found else "server_down"
     if provider.api_key_env is not None and key is None:
         return "needs_key"
     if state is not None and state.status == "server_down":

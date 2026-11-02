@@ -10,14 +10,17 @@ const STATUS: Record<ListedModel["status"], string> = {
 
 /** One row per model, grouped by provider, then a line per provider that needs something. */
 export function formatModels(listing: ModelListResult): string {
+  const missing = new Set(listing.providers.filter((item) => item.status === "not_installed").map((item) => item.provider));
   const rows = listing.models.map((model) => [
-    model.ref === listing.default || (model.profiles ?? []).includes(listing.default) ? "*" : " ",
+    listing.default !== null && (model.ref === listing.default || (model.profiles ?? []).includes(listing.default))
+      ? "*"
+      : " ",
     model.ref,
     (model.profiles ?? []).join(","),
     contextLabel(model.ctx),
     priceLabel(model),
     sizeLabel(model),
-    STATUS[model.status] +
+    (model.status === "not_installed" && missing.has(model.provider) ? "install" : STATUS[model.status]) +
       (model.status === "pulling" && typeof model.progress === "number" ? ` ${Math.floor(model.progress * 100)}%` : "") +
       (model.stale ? " (cached)" : ""),
   ]);

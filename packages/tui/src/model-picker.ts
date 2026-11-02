@@ -408,7 +408,8 @@ export function layoutPicker(input: {
   for (const group of pickerGroups(listing, input.state.query)) {
     lines.push({ kind: "header", text: group.title });
     for (const model of group.models) {
-      lines.push(modelRow(model, model.ref === selectedRef, namesModel(model, input.current), input.columns));
+      const missing = providerMissing(listing, model.provider);
+      lines.push(modelRow(model, model.ref === selectedRef, namesModel(model, input.current), input.columns, missing));
     }
   }
   if (models.length === 0) {
@@ -428,8 +429,8 @@ export function layoutPicker(input: {
   return lines.slice(start, start + rows);
 }
 
-function modelRow(model: ListedModel, selected: boolean, current: boolean, columns: number): PickerRow {
-  const facts = [contextLabel(model.ctx), priceLabel(model), sizeLabel(model), statusLabel(model)]
+function modelRow(model: ListedModel, selected: boolean, current: boolean, columns: number, missing: boolean): PickerRow {
+  const facts = [contextLabel(model.ctx), priceLabel(model), sizeLabel(model), statusLabel(model, missing)]
     .filter((part) => part.length > 0)
     .join("  ");
   const profiles = model.profiles ?? [];
@@ -475,14 +476,15 @@ function sizeLabel(model: ListedModel): string {
   return `${model.size_gb} GB${fitText}`;
 }
 
-function statusLabel(model: ListedModel): string {
+/** `missing` is a provider whose program is not on this Mac: its models install it first. */
+function statusLabel(model: ListedModel, missing: boolean): string {
   switch (model.status) {
     case "ready":
       return model.stale ? "cached" : "";
     case "needs_key":
       return "needs key";
     case "not_installed":
-      return "download";
+      return missing ? "install" : "download";
     case "pulling":
       return model.progress === null || model.progress === undefined
         ? "downloading"
