@@ -69,6 +69,13 @@ const sidebar: DefaultTheme.Sidebar = [
     ],
   },
   {
+    text: "Use golem",
+    items: [
+      { text: "Models and API keys", link: "/guide/models" },
+      { text: "Commands", link: "/guide/commands" },
+    ],
+  },
+  {
     text: "Build golem",
     items: [
       { text: "Architecture", link: "/architecture" },
