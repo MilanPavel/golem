@@ -486,6 +486,48 @@ test("reattaches after a reconnect from the last seq and drops replayed events",
   }
 });
 
+test("a detach while the link is down forgets the seq, so the next attach replays from the start", async () => {
+  const attaches: Array<{ connection: number; afterSeq: number }> = [];
+  let connections = 0;
+  const server = await listen((socket) => {
+    connections += 1;
+    const mine = connections;
+    attach(socket, {
+      answerPing: true,
+      onAttach: (current, params, id) => {
+        attaches.push({ connection: mine, afterSeq: params.after_seq });
+        write(current, deltaEvent(1));
+        write(current, deltaEvent(2));
+        write(current, { jsonrpc: "2.0", id, result: { session_id: params.session_id, last_seq: 2 } });
+        if (mine === 1) {
+          current.end();
+        }
+      },
+    });
+  });
+  const client = connectGolem({
+    socketPath: server.socketPath,
+    clientName: "web",
+    reconnect: true,
+    backoff: () => 300,
+    heartbeatMs: 60_000,
+  });
+  try {
+    await client.attachSession("s_test");
+    await waitFor(() => client.state.status !== "connected");
+    await assert.rejects(client.detachSession("s_test"));
+    await waitFor(() => connections >= 2 && client.state.status === "connected");
+    await client.attachSession("s_test");
+    assert.deepEqual(attaches, [
+      { connection: 1, afterSeq: 0 },
+      { connection: 2, afterSeq: 0 },
+    ]);
+  } finally {
+    client.close();
+    await server.close();
+  }
+});
+
 test("a session gone after a reconnect is no longer followed", async () => {
   const attaches: number[] = [];
   let connections = 0;
