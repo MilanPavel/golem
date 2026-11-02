@@ -39,6 +39,9 @@ log = logging.getLogger(__name__)
 KeySource = Literal["env", "keychain"]
 
 
+NO_MODEL = "no model chosen yet"
+
+
 class ModelConfigError(Exception):
     """The model name, provider, or API key is missing or unknown."""
 
@@ -75,6 +78,10 @@ PRESETS: dict[str, Provider] = {
     ),
     "lmstudio": Provider(kind="openai_compat", base_url="http://127.0.0.1:1234/v1"),
 }
+
+# The name of the flat settings' profile when model_profile is unset. A session
+# made while no default is chosen stores it too, and resolves once one is.
+LEGACY_PROFILE = "remote"
 
 # The flat settings with any other base_url talk to it through this provider.
 _LEGACY_PROVIDER = "legacy"
@@ -129,7 +136,7 @@ class ModelIdentity:
 
 @dataclass(frozen=True, slots=True)
 class _Catalog:
-    default: str
+    default: str | None
     providers: dict[str, Provider]
     models: dict[str, ModelSettings]
 
@@ -167,11 +174,18 @@ class ModelRouter:
 
     @property
     def profile_name(self) -> str:
-        """The name a new session gets when it asks for none."""
+        """The name a new session gets when it asks for none.
+
+        With no default chosen, it is :data:`LEGACY_PROFILE`, which resolves
+        once a default is set.
+        """
+        return self.default or LEGACY_PROFILE
+
+    @property
+    def default(self) -> str | None:
+        """``default_model``, or the flat settings' profile, or None when neither is set."""
         catalog = self._current()
-        if catalog is None:
-            return "remote"
-        return catalog.default
+        return None if catalog is None else catalog.default
 
     def resolve(self, name: str) -> ResolvedModel:
         """Look ``name`` up as a profile, then parse it as a ref.
@@ -181,12 +195,14 @@ class ModelRouter:
         catalog = self._current()
         if catalog is None:
             raise ModelConfigError("model settings are not configured")
+        if catalog.default is not None and name == LEGACY_PROFILE and name not in catalog.models:
+            name = catalog.default
         profile = catalog.models.get(name)
         ref = name if profile is None else profile.model
         provider_name, _, model_id = ref.partition("/")
         if model_id == "":
-            if name == catalog.default:
-                raise ModelConfigError("no model is configured: set default_model in config.toml")
+            if name in (catalog.default, LEGACY_PROFILE):
+                raise ModelConfigError(NO_MODEL)
             raise ModelConfigError(f"unknown model: {name}")
         provider = catalog.providers.get(provider_name)
         if provider is None:
@@ -401,9 +417,10 @@ def _catalog(settings: GolemSettings) -> _Catalog:
         providers[name] = _merge(PRESETS.get(name), configured)
     models = dict(settings.models)
     legacy = _legacy_model(settings, providers)
-    if legacy is not None and settings.model_profile not in models:
-        models[settings.model_profile] = legacy
-    default = settings.default_model or settings.model_profile
+    legacy_name = settings.model_profile or LEGACY_PROFILE
+    if legacy is not None and legacy_name not in models:
+        models[legacy_name] = legacy
+    default = settings.default_model or (legacy_name if legacy is not None else None)
     return _Catalog(default=default, providers=providers, models=models)
 
 

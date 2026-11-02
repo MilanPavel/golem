@@ -54,6 +54,7 @@ const LISTING: ModelListResult = {
     { provider: "groq", status: "needs_key" },
     { provider: "ollama", status: "ready" },
   ],
+  setup: { ollama_installed: true, ollama_running: true, keys: ["openrouter"], default_status: "ready" },
 };
 
 function press(name: PressName | null, input = "", ctrl = false): Press {
@@ -250,13 +251,14 @@ const NO_OLLAMA: ModelListResult = {
   default: "anthropic/claude-x",
   ram_gb: 36,
   models: [
-    model("ollama/qwen3:8b", { source: "catalog", status: "server_down", size_gb: 5.2, fit: "fits" }),
+    model("ollama/qwen3:8b", { source: "catalog", status: "not_installed", size_gb: 5.2, fit: "fits" }),
     model("anthropic/claude-x"),
   ],
   providers: [
     { provider: "anthropic", status: "ready" },
     { provider: "ollama", status: "not_installed" },
   ],
+  setup: { ollama_installed: false, ollama_running: false, keys: ["anthropic"], default_status: "ready" },
 };
 
 test("a local model asks to install Ollama first when it is not installed", () => {
@@ -275,6 +277,12 @@ test("a local model asks to install Ollama first when it is not installed", () =
   assert.equal(yes.state.confirm, null);
   const no = pressPicker(asked.state, NO_OLLAMA, "close");
   assert.deepEqual([no.action.kind, no.state.confirm, no.state.open], ["none", null, true]);
+});
+
+test("with no Ollama, a catalog model reads install, not download", () => {
+  const rows = layoutPicker({ state: openPicker(null), listing: NO_OLLAMA, current: null, columns: 100, rows: 40 });
+  const qwen = rows.find((row) => row.kind === "model" && row.ref === "ollama/qwen3:8b");
+  assert.ok(qwen?.kind === "model" && qwen.facts.endsWith("install"));
 });
 
 test("a hosted model never asks about Ollama", () => {

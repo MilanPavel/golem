@@ -129,9 +129,16 @@
       "type": "string"
     },
     "default_model": {
-      "minLength": 1,
-      "title": "Default Model",
-      "type": "string"
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Default Model"
     },
     "log_level": {
       "minLength": 1,

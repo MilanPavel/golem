@@ -167,7 +167,39 @@ async def test_an_ollama_that_is_not_installed_says_so(tmp_path: Path) -> None:
     )
     listing = await discovery.list()
     assert {p.provider: p.status for p in listing.providers}["ollama"] == "not_installed"
+    # One install away, not down: the picker offers to install Ollama.
+    assert _by_ref(listing.models)["ollama/qwen3:8b"].status == "not_installed"
+    assert (listing.setup.ollama_installed, listing.setup.ollama_running) == (False, False)
+    await discovery.aclose()
+
+
+async def test_a_fresh_home_has_no_default_and_says_what_setup_needs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    router = ModelRouter(GolemSettings(), keys=MemoryKeyStore({"anthropic": "sk-test"}))
+    discovery = _discovery(router, Network({}), tmp_path)
+    listing = await discovery.list()
+    assert listing.default is None
+    assert listing.setup.ollama_installed and not listing.setup.ollama_running
+    assert listing.setup.keys == ("anthropic",)
+    assert listing.setup.default_status is None
     assert _by_ref(listing.models)["ollama/qwen3:8b"].status == "server_down"
+    await discovery.aclose()
+
+
+async def test_setup_gives_the_default_models_status(tmp_path: Path) -> None:
+    network = Network(_ollama_routes())
+    for default, status in (("ollama/qwen3:8b", "ready"), ("ollama/small:1b", "not_installed")):
+        router = ModelRouter(GolemSettings(default_model=default), keys=MemoryKeyStore())
+        discovery = _discovery(router, network, tmp_path)
+        listing = await discovery.list()
+        assert listing.setup.ollama_running
+        assert (listing.default, listing.setup.default_status) == (default, status)
+        await discovery.aclose()
+    router = ModelRouter(GolemSettings(default_model="gone"), keys=MemoryKeyStore())
+    discovery = _discovery(router, network, tmp_path)
+    assert (await discovery.list()).setup.default_status == "unknown"
     await discovery.aclose()
 
 
