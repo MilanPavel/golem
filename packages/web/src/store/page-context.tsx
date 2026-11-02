@@ -5,6 +5,7 @@ import { ConnectionProvider } from "./connection-context.tsx";
 import type { Page, PageActions } from "./page.ts";
 import type { Route } from "./router.ts";
 import type { SessionSummary } from "@golem/client";
+import type { Pastes } from "@golem/view";
 import { distinctFolders, resolveFolder } from "./new-session.ts";
 import { initialSessionView, type SessionView } from "./session-store.ts";
 
@@ -90,4 +91,20 @@ export function useKnownFolders(): string[] {
 /** Tells the page which folder the session in view runs in, so the next new session starts there. */
 export function useRememberOpenedFolder(): (cwd: string | null) => void {
   return usePage().newSession.opened;
+}
+
+/** The unsent text for a key (a session id, or "new"), kept while the page lives. */
+export function useDraft(key: string): [string, (text: string) => void] {
+  const { drafts } = usePage();
+  const text = useSyncExternalStore(drafts.subscribe, () => drafts.get(key).text);
+  const set = useCallback((next: string) => drafts.setText(key, next), [drafts, key]);
+  return [text, set];
+}
+
+/** The long pastes behind the tokens in a draft. */
+export function useDraftPastes(key: string): [Pastes, (pastes: Pastes) => void] {
+  const { drafts } = usePage();
+  const pastes = useSyncExternalStore(drafts.subscribe, () => drafts.get(key).pastes);
+  const set = useCallback((next: Pastes) => drafts.setPastes(key, next), [drafts, key]);
+  return [pastes, set];
 }

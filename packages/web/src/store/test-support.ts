@@ -1,8 +1,16 @@
-import type { ChatEvent, ConnectionState, PullUpdate, SessionSummary } from "@golem/client";
+import { RpcError, SESSION_BUSY, type ChatEvent, type ConnectionState, type PullUpdate, type SessionSummary } from "@golem/client";
 import { vi } from "vitest";
 import type { PageClient } from "./page.ts";
 
 let seq = 0;
+
+/** A failed call, as the client rejects it. */
+export function rpcError(code: number, message: string): RpcError {
+  return new RpcError(code, message);
+}
+
+export const SESSION_BUSY_CODE = SESSION_BUSY;
+export const INVALID_PARAMS_CODE = -32602;
 
 /** A chat event with the envelope filled in. */
 export function ev(sessionId: string, type: ChatEvent["type"], data: Record<string, unknown> = {}): ChatEvent {

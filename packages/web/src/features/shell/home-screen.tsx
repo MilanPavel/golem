@@ -1,21 +1,21 @@
+import type { ReactNode } from "react";
+import { NewSessionComposer, useStartSession } from "../composer/index.ts";
 import { PixelGolem } from "../../ui/pixel-golem.tsx";
 import { useKnownFolders, useNewSessionFolder } from "../../store/page-context.tsx";
 import { FolderChip, type FolderChipProps } from "./folder-chip.tsx";
 import "./shell.css";
 
-/**
- * The large composer of the empty screen goes here (step 10.8.4). It reads the folder with
- * `useNewSessionFolder` when it creates the session.
- */
-export function NewSessionComposerSlot() {
-  return null;
-}
-
 /** The empty screen: the golem, a line, the composer's slot, and the folder chip. */
 export function HomeView({
   headingLevel: Heading = "h1",
+  composer = null,
+  folderError = null,
   ...chip
 }: FolderChipProps & {
+  /** The large composer. */
+  composer?: ReactNode;
+  /** Why the daemon refused the folder, shown under the chip. */
+  folderError?: string | null;
   /** The heading level. A page has one h1; the gallery shows the screen under its own headings. */
   headingLevel?: "h1" | "h2" | "h3" | "h4";
 }) {
@@ -25,8 +25,13 @@ export function HomeView({
       <div className="relative flex w-full max-w-xl flex-col items-center gap-4 text-center">
         <PixelGolem state="idle" size="lg" />
         <Heading className="font-prose text-2xl font-normal tracking-tight text-balance">Start a new session</Heading>
-        <NewSessionComposerSlot />
+        {composer}
         <FolderChip {...chip} />
+        {folderError ? (
+          <p role="alert" className="-mt-2 text-xs text-deny">
+            {folderError}
+          </p>
+        ) : null}
       </div>
     </div>
   );
@@ -35,5 +40,14 @@ export function HomeView({
 export function HomeScreen() {
   const [folder, setFolder] = useNewSessionFolder();
   const folders = useKnownFolders();
-  return <HomeView folder={folder} folders={folders} onChange={setFolder} />;
+  const start = useStartSession(folder);
+  return (
+    <HomeView
+      folder={folder}
+      folders={folders}
+      onChange={setFolder}
+      composer={<NewSessionComposer start={start} />}
+      folderError={start.folderError}
+    />
+  );
 }
