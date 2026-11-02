@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import type { Plugin } from "vite";
 import { type DefaultTheme, defineConfig } from "vitepress";
 import { NOT_PAGES, REPO_URL, bundleHtmlAssets, siteHref } from "./links.ts";
+import { golemContainers } from "./containers.ts";
 import { faviconHref, markCss } from "./golem.ts";
 import { checkTokens, parseTokens, tokensCss } from "./tokens.ts";
 
@@ -125,6 +126,9 @@ export default defineConfig({
         }
         return fence(tokens, idx, options, env, self);
       };
+
+      // ::: shem, ```tablet, ::: concept, and ::: golem (containers.ts).
+      golemContainers(md);
     },
   },
 
