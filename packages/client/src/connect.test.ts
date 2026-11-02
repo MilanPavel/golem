@@ -672,13 +672,14 @@ test("setKey sends the key to the daemon and never to the wire log", async () =>
   }
 });
 
-test("listModels asks for a refresh only when told to", async () => {
+test("listModels asks for a refresh only when told to, and takes a listing with no default", async () => {
   const sent: Record<string, unknown>[] = [];
   const listed = {
-    default: "qwen",
+    default: null,
     ram_gb: 36,
     models: [{ ref: "ollama/qwen3:8b", label: "Qwen3 8B", provider: "ollama", source: "installed", status: "ready" }],
     providers: [{ provider: "ollama", status: "ready" }],
+    setup: { ollama_installed: true, ollama_running: true, keys: [], default_status: null },
   };
   const server = await listen((socket) => {
     attach(socket, {

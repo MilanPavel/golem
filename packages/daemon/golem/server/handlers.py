@@ -105,6 +105,7 @@ from golem_protocol.commands import (
     ModelPullResult,
     ModelSetDefaultParams,
     ModelSetDefaultResult,
+    ModelSetup,
     PingParams,
     PolicyEditResult,
     PolicyRemoveParams,
@@ -485,6 +486,12 @@ async def _model_list(ctx: RequestContext, params: ModelListParams) -> ModelList
             ListedProvider(provider=item.provider, status=item.status, stale=item.stale)
             for item in listing.providers
         ],
+        setup=ModelSetup(
+            ollama_installed=listing.setup.ollama_installed,
+            ollama_running=listing.setup.ollama_running,
+            keys=list(listing.setup.keys),
+            default_status=listing.setup.default_status,
+        ),
     )
 
 
@@ -548,7 +555,7 @@ async def _config_get(ctx: RequestContext, params: ConfigGetParams) -> ConfigGet
         allowed = [ConfigAllowance(tool=tool, subject=subject) for tool, subject in pairs]
     return ConfigGetResult(
         config_file=str(paths.config_file),
-        default_model=_sessions(ctx).router.profile_name,
+        default_model=_sessions(ctx).router.default,
         log_level=settings.log_level,
         session_titles=settings.session_titles,
         trusted_projects=settings.trusted_projects,

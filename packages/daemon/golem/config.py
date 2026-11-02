@@ -301,7 +301,7 @@ class GolemSettings(BaseSettings):
     providers: dict[str, ProviderSettings] = Field(default_factory=dict)
     models: dict[str, ModelSettings] = Field(default_factory=dict)
     # The flat settings from before named profiles. They load as one profile named model_profile.
-    model_profile: str = Field(default="remote", min_length=1)
+    model_profile: str | None = Field(default=None, min_length=1)
     model_provider: ModelProvider | None = None
     model_name: str | None = Field(default=None, min_length=1)
     model_base_url: Annotated[str | None, BeforeValidator(_blank_to_none)] = None

@@ -4,7 +4,7 @@ import type { ConfigGetResult, ConfigRule } from "../../protocol/gen/config-get-
 export function formatConfig(config: ConfigGetResult): string {
   const lines = [
     `config file      ${config.config_file}`,
-    `default model    ${config.default_model}`,
+    `default model    ${config.default_model ?? "none chosen yet"}`,
     `log level        ${config.log_level}`,
     `session titles   ${config.session_titles ? "on" : "off"}`,
     `trusted projects ${config.trusted_projects.length > 0 ? config.trusted_projects.join(", ") : "none"}`,

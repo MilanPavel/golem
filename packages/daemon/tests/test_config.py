@@ -83,7 +83,7 @@ def test_model_settings_load_from_toml_and_env(
     settings = load_settings(home=home, project_dir=tmp_path / "project")
     assert settings.model_provider == "openai"
     assert settings.model_name == "gpt-test"
-    assert settings.model_profile == "remote"
+    assert settings.model_profile is None
     monkeypatch.setenv("GOLEM_MODEL_NAME", "from-env")
     overridden = load_settings(home=home, project_dir=tmp_path / "project")
     assert overridden.model_name == "from-env"

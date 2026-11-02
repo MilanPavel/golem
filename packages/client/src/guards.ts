@@ -86,7 +86,8 @@ export function asChatEvent(value: unknown): ChatEvent | undefined {
 export function isModelListResult(value: unknown): value is ModelListResult {
   return (
     isRecord(value) &&
-    typeof value["default"] === "string" &&
+    (typeof value["default"] === "string" || value["default"] === null) &&
+    isModelSetup(value["setup"]) &&
     Array.isArray(value["providers"]) &&
     Array.isArray(value["models"]) &&
     value["models"].every(
@@ -97,6 +98,15 @@ export function isModelListResult(value: unknown): value is ModelListResult {
         typeof model["provider"] === "string" &&
         typeof model["status"] === "string",
     )
+  );
+}
+
+function isModelSetup(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    typeof value["ollama_installed"] === "boolean" &&
+    typeof value["ollama_running"] === "boolean" &&
+    Array.isArray(value["keys"])
   );
 }
 
@@ -206,7 +216,7 @@ export function isConfigGetResult(value: unknown): value is ConfigGetResult {
   return (
     isRecord(value) &&
     typeof value["config_file"] === "string" &&
-    typeof value["default_model"] === "string" &&
+    (typeof value["default_model"] === "string" || value["default_model"] === null) &&
     Array.isArray(value["rules"]) &&
     value["rules"].every(
       (rule) =>

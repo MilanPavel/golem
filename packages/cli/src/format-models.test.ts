@@ -45,6 +45,7 @@ test("formatModels marks the default and says what each provider needs", () => {
       { provider: "anthropic", status: "needs_key" },
       { provider: "ollama", status: "ready" },
     ],
+    setup: { ollama_installed: true, ollama_running: true, keys: [], default_status: "ready" },
   });
   assert.equal(
     text,
