@@ -1,0 +1,196 @@
+/* golem's look on VitePress. Every colour is a --golem-* token from the web UI's tokens.css
+   (served by config.mts: slip on :root, kiln on html.dark). No colour is written here. */
+
+:root {
+  --golem-font-ui: "Geist Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --golem-font-prose: "Literata Variable", "Iowan Old Style", Georgia, serif;
+  --golem-font-mono: "Geist Mono Variable", ui-monospace, "SF Mono", Menlo, monospace;
+  --golem-font-pixel: "Silkscreen", var(--golem-font-mono);
+
+  color-scheme: light;
+
+  /* Surfaces and text */
+  --vp-c-bg: var(--golem-bg);
+  --vp-c-bg-alt: var(--golem-sunken);
+  --vp-c-bg-elv: var(--golem-surface);
+  --vp-c-bg-soft: var(--golem-surface);
+  --vp-c-text-1: var(--golem-ink);
+  --vp-c-text-2: var(--golem-muted);
+  --vp-c-text-3: var(--golem-faint);
+  --vp-c-divider: var(--golem-line);
+  --vp-c-border: var(--golem-line-strong);
+  --vp-c-gutter: var(--golem-line);
+
+  /* Clay is the one accent: links, the brand button, what is golem's */
+  --vp-c-brand-1: var(--golem-clay-ink);
+  --vp-c-brand-2: var(--golem-clay);
+  --vp-c-brand-3: var(--golem-clay);
+  --vp-c-brand-soft: var(--golem-clay-soft);
+  --vp-button-brand-text: var(--golem-on-clay);
+  --vp-button-brand-hover-text: var(--golem-on-clay);
+  --vp-button-brand-active-text: var(--golem-on-clay);
+
+  /* Greys for buttons, badges, and notes */
+  --vp-c-default-1: var(--golem-line-strong);
+  --vp-c-default-2: var(--golem-line);
+  --vp-c-default-3: var(--golem-sunken);
+  --vp-c-default-soft: var(--golem-sunken);
+
+  /* Callouts take the approval colours: tip is allow, warning is wait, danger is deny */
+  --vp-c-tip-1: var(--golem-allow);
+  --vp-c-tip-2: var(--golem-allow);
+  --vp-c-tip-3: var(--golem-allow);
+  --vp-c-tip-soft: var(--golem-allow-soft);
+  --vp-c-warning-1: var(--golem-wait);
+  --vp-c-warning-2: var(--golem-wait);
+  --vp-c-warning-3: var(--golem-wait);
+  --vp-c-warning-soft: var(--golem-wait-soft);
+  --vp-c-danger-1: var(--golem-deny);
+  --vp-c-danger-2: var(--golem-deny);
+  --vp-c-danger-3: var(--golem-deny);
+  --vp-c-danger-soft: var(--golem-deny-soft);
+  --vp-c-important-1: var(--golem-clay-ink);
+  --vp-c-important-2: var(--golem-clay);
+  --vp-c-important-3: var(--golem-clay);
+  --vp-c-important-soft: var(--golem-clay-soft);
+  --vp-c-note-1: var(--golem-muted);
+  --vp-c-note-soft: var(--golem-sunken);
+
+  /* Code */
+  --vp-code-block-bg: var(--golem-code-bg);
+  --vp-code-bg: var(--golem-code-bg);
+  --vp-code-color: var(--golem-ink);
+  --vp-code-copy-code-bg: var(--golem-surface);
+  --vp-code-tab-bg: var(--golem-code-bg);
+
+  /* Type */
+  --vp-font-family-base: var(--golem-font-ui);
+  --vp-font-family-mono: var(--golem-font-mono);
+
+  /* The home page hero */
+  --vp-home-hero-name-color: var(--golem-clay-ink);
+
+  /* Search */
+  --vp-local-search-bg: var(--golem-bg);
+  --vp-local-search-result-bg: var(--golem-surface);
+  --vp-local-search-highlight-bg: var(--golem-clay-soft);
+  --vp-local-search-highlight-text: var(--golem-ink);
+}
+
+html.dark {
+  color-scheme: dark;
+}
+
+/* Pages read like golem's answers: a book serif, about 65 characters a line. */
+/* Not inside a diagram: Mermaid sizes its boxes for Geist, and labels are <p> elements. */
+.vp-doc p:not(.golem-mermaid *),
+.vp-doc li:not(.golem-mermaid *),
+.vp-doc blockquote,
+.vp-doc dd {
+  font-family: var(--golem-font-prose);
+  font-size: 16px;
+  line-height: 1.68;
+}
+
+/* The web UI's answer column: 40rem, about 70 characters of Literata. */
+/* :root matches the extra weight of VitePress's scoped [data-v-…] selector. */
+:root .VPDoc .content-container,
+:root .VPDoc.has-aside .content-container {
+  max-width: 40rem;
+}
+
+/* Headings, tables, and the interface stay in Geist. */
+.vp-doc h1,
+.vp-doc h2,
+.vp-doc h3,
+.vp-doc h4 {
+  font-family: var(--golem-font-ui);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.vp-doc h2 {
+  border-top-color: var(--golem-line);
+}
+
+.vp-doc table {
+  font-family: var(--golem-font-ui);
+  font-size: 14.5px;
+}
+
+.vp-doc th {
+  background-color: var(--golem-sunken);
+}
+
+.vp-doc tr:nth-child(2n) {
+  background-color: var(--golem-surface);
+}
+
+/* Inline code in prose keeps the mono face at a size that sits with the serif. */
+.vp-doc :not(pre) > code {
+  font-size: 0.86em;
+}
+
+/* List markers are clay, as in golem's answers. */
+.vp-doc li::marker {
+  color: var(--golem-clay);
+}
+
+/* Links: clay ink, underlined only on hover. */
+.vp-doc a {
+  text-decoration: none;
+  font-weight: 500;
+}
+.vp-doc a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Sidebar group titles in the pixel face, the golem's small labels. */
+.VPSidebarItem.level-0 > .item > .text {
+  font-family: var(--golem-font-pixel);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: var(--golem-muted);
+}
+
+/* The page in the sidebar you are on: a clay mark at the edge, like the web UI's sessions. */
+.VPSidebarItem.is-active > .item .indicator {
+  background-color: var(--golem-clay);
+}
+
+/* Mermaid diagrams, drawn by GolemMermaid.vue. Mermaid sets each SVG's width and its
+   largest size; the figure only centres it and scrolls a diagram wider than the page. */
+.golem-mermaid {
+  margin: 20px 0;
+  overflow-x: auto;
+}
+.golem-mermaid svg {
+  display: block;
+  margin: 0 auto;
+}
+.golem-mermaid p {
+  margin: 0;
+  line-height: 1.4;
+}
+.golem-mermaid-source,
+.golem-mermaid-failed {
+  font-family: var(--golem-font-mono);
+  font-size: 13px;
+  white-space: pre-wrap;
+  color: var(--golem-muted);
+}
+.golem-mermaid-failed {
+  color: var(--golem-deny);
+}
+
+/* 150 to 200 ms, and none at all when the reader asks for less motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
