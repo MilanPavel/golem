@@ -59,6 +59,20 @@ test("dangerouslySetInnerHTML is refused", async () => {
   expect(found.map((m) => m.ruleId)).toContain("no-restricted-syntax");
 });
 
+test("dangerouslySetInnerHTML is refused outside features/chat too", async () => {
+  const found = await messages(
+    "export const A = () => <div dangerouslySetInnerHTML={{ __html: 'x' }} />;\n",
+    "src/ui/a.tsx",
+  );
+  expect(found.map((m) => m.ruleId)).toContain("no-restricted-syntax");
+});
+
+test("only markdown-view.tsx may use dangerouslySetInnerHTML", async () => {
+  const code = "export const A = () => <div dangerouslySetInnerHTML={{ __html: 'x' }} />;\n";
+  expect(await messages(code, "src/features/chat/markdown-view.tsx")).toEqual([]);
+  expect((await messages(code, "src/features/chat/other-view.tsx")).map((m) => m.ruleId)).toContain("no-restricted-syntax");
+});
+
 test("a clean file under ui has no errors", async () => {
   const found = await messages("export const y = 1;\n", "src/ui/clean.ts");
   expect(found).toEqual([]);

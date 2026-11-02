@@ -19,6 +19,11 @@ export default tseslint.config(
     },
   },
   {
+    // The one place that may put sanitized HTML in the page.
+    files: ["src/features/chat/markdown-view.tsx"],
+    rules: { "no-restricted-syntax": "off" },
+  },
+  {
     files: ["src/ui/**"],
     rules: {
       "no-restricted-imports": [
