@@ -17,8 +17,8 @@ import { Textarea } from "../ui/textarea.tsx";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip.tsx";
 import { ConnectionScreen } from "../features/connection/connection-screen.tsx";
 import { connectionScreen } from "../features/connection/connection-screen.ts";
-import { TranscriptMessages } from "../features/chat/index.ts";
-import { SAMPLE_CHAT } from "../features/chat/sample.ts";
+import { ToolLine, TranscriptMessages } from "../features/chat/index.ts";
+import { SAMPLE_CHAT, SAMPLE_TOOLS } from "../features/chat/sample.ts";
 import { Composer, DockView, Meter } from "../features/composer/index.ts";
 import { createHistory } from "../features/composer/history.ts";
 import { HomeView } from "../features/shell/index.ts";
@@ -255,6 +255,11 @@ function Panel({ theme }: { theme: "slip" | "kiln" }) {
         <h3 className="mb-2 font-mono text-xs text-faint">Transcript</h3>
         <div className="flex flex-col gap-6 rounded-lg border border-line bg-bg p-4">
           <TranscriptMessages chat={SAMPLE_CHAT} />
+          <ul aria-label="Tool tablets" className="flex list-none flex-col gap-0.5 p-0 font-mono text-xs leading-snug">
+            {SAMPLE_TOOLS.map((tool) => (
+              <ToolLine key={tool.callId} tool={tool} defaultOpen={tool.status === "running"} />
+            ))}
+          </ul>
         </div>
       </section>
 

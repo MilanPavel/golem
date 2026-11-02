@@ -199,13 +199,54 @@
   }
 }
 
-/* A tool call as one line: a chevron, the name, the arguments, and the result. */
+/* A tool call as one line that opens into its tablet. */
 .tool-line {
+  border-radius: var(--radius-sm);
+  color: var(--color-muted);
+}
+
+.tool-line-head {
   display: grid;
   grid-template-columns: auto auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
+  width: 100%;
   padding: 4px 8px;
   border-radius: var(--radius-sm);
-  color: var(--color-muted);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tool-chevron {
+  display: inline-block;
+  transition: transform 150ms ease;
+}
+
+.tool-line-head[aria-expanded="true"] .tool-chevron {
+  transform: rotate(90deg);
+}
+
+.tool-tablet {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 4px 8px 4px 24px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  background: var(--color-code-bg);
+  color: var(--color-ink);
+}
+
+.tool-tablet pre {
+  margin: 0;
+  font: inherit;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tool-chevron {
+    transition: none;
+  }
 }
