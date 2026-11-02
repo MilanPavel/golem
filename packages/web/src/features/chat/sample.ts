@@ -1,4 +1,4 @@
-import type { ChatMessage, ChatState } from "@golem/view";
+import type { ChatMessage, ChatState, ToolBlock } from "@golem/view";
 
 const CODE = ["```ts", "export function clamp(n: number, lo: number, hi: number): number {", "  // keep n inside the range", '  return Math.min(Math.max(n, lo), hi);', "}", "```"].join("\n");
 
@@ -20,6 +20,25 @@ const ANSWER = [
   "The [design notes](https://example.com/notes) say why.",
 ].join("\n");
 
+/** One tool call in each status, for the gallery and the tests. */
+export const SAMPLE_TOOLS: ToolBlock[] = [
+  { callId: "t1", name: "read_file", args: { path: "src/socket.ts" }, status: "done", summary: "41 lines", preview: 'import { clamp } from "./clamp";\n\nexport function connect(url: string) {\n  // ...' },
+  { callId: "t2", name: "grep", args: { pattern: "Math.min", path: "src" }, status: "done", summary: "2 matches" },
+  { callId: "t3", name: "run", args: { command: "pnpm test --filter @golem/client" }, status: "waiting" },
+  { callId: "t4", name: "run", args: { command: "just check" }, status: "running", output: "$ just check\nlint ok\ntypes ok\nrunning tests..." },
+  { callId: "t5", name: "write_file", args: { path: "/etc/hosts" }, status: "failed", error: "denied" },
+  {
+    callId: "t6",
+    name: "run_shell",
+    args: { command: "pnpm test" },
+    status: "done",
+    summary: "exit 0",
+    preview: "> @golem/web test\n 40 tests passed",
+    truncated: true,
+    artifactId: "art_7f3a",
+  },
+];
+
 /** A transcript that shows every kind of message, for the gallery and the tests. */
 export const SAMPLE_CHAT: Pick<ChatState, "messages" | "error" | "notice"> = {
   messages: [
@@ -31,13 +50,7 @@ export const SAMPLE_CHAT: Pick<ChatState, "messages" | "error" | "notice"> = {
       streaming: false,
       at: "2026-11-01T14:02:09",
       durationMs: 8400,
-      tools: [
-        { callId: "t1", name: "read_file", args: { path: "src/socket.ts" }, status: "done", summary: "41 lines" },
-        { callId: "t2", name: "grep", args: { pattern: "Math.min", path: "src" }, status: "done", summary: "2 matches" },
-        { callId: "t3", name: "run", args: { command: "pnpm test --filter @golem/client" }, status: "waiting" },
-        { callId: "t4", name: "run", args: { command: "just check" }, status: "running" },
-        { callId: "t5", name: "write_file", args: { path: "/etc/hosts" }, status: "failed", error: "denied" },
-      ],
+      tools: SAMPLE_TOOLS,
     },
     { id: "u2", role: "user", text: "Now the same for the retry delay.", streaming: false, at: "2026-11-01T14:03:00", skill: { name: "ship" } },
     { id: "a2", role: "assistant", text: "Looking at the retry delay now, which lives in", streaming: true, at: "2026-11-01T14:03:02" },
