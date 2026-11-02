@@ -165,6 +165,7 @@ import {
   statusLabel,
   statusSegments,
   uptimeRefreshMs,
+  upgradeBanner,
   versionLabel,
   type ModelInfo,
   type StatusSegment,
@@ -234,6 +235,7 @@ export function App({
   const problemRef = useRef(problem);
   problemRef.current = problem;
   const restartingRef = useRef(restarting);
+  const upgradeRef = useRef<string | null>(null);
   restartingRef.current = restarting;
   useEffect(() => {
     if (service === undefined) {
@@ -398,7 +400,12 @@ export function App({
   const columns = frameColumns(size.columns || 80);
   const rows = size.rows || 24;
   const asking = retryOffer() !== null;
-  const serviceText = restarting ? RESTARTING : (problem?.text ?? null);
+  const upgrade =
+    connection.status === "connected"
+      ? upgradeBanner(GOLEM_VERSION, daemonVersion, service?.restart != null)
+      : null;
+  upgradeRef.current = upgrade;
+  const serviceText = restarting ? RESTARTING : (problem?.text ?? upgrade);
   const banner = asking ? RETRY_QUESTION : (chat.error ?? serviceText ?? chat.notice);
   const hintText = liveHint(hint, Date.now())?.text ?? null;
   const suggestMatches =
@@ -1849,6 +1856,11 @@ export function App({
         }
         return;
       }
+      case "restart-service":
+        if (serviceRestartable()) {
+          restartService();
+        }
+        return;
       case "toggle-tools":
         setToolOutput((shown) => {
           const next = !shown;
@@ -2046,6 +2058,15 @@ export function App({
       !restartingRef.current &&
       draftRef.current.text === "" &&
       !keysOpenRef.current
+    );
+  }
+
+  /** Ctrl-R restarts whenever the banner offers it: a service that does not answer, or one older than this golem. */
+  function serviceRestartable(): boolean {
+    return (
+      service?.restart != null &&
+      !restartingRef.current &&
+      (problemRef.current?.restart === true || upgradeRef.current !== null)
     );
   }
 
@@ -2330,7 +2351,7 @@ export function App({
       {budget.banner > 0 && (banner !== null || hintText !== null) ? (
         <BannerLine
           row={bannerRow(banner, hintText, columns)}
-          color={(chat.error !== null || (serviceText !== null && !restarting)) && !asking ? "red" : "yellow"}
+          color={(chat.error !== null || (problem !== null && !restarting)) && !asking ? "red" : "yellow"}
         />
       ) : null}
       {budget.meter > 0 && phase !== null ? (

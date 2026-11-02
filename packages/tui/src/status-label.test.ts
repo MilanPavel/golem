@@ -16,6 +16,7 @@ import {
   statusLabel,
   statusSegments,
   uptimeRefreshMs,
+  upgradeBanner,
   versionLabel,
 } from "./status-label.ts";
 
@@ -67,9 +68,19 @@ test("a matching daemon version is one number, and a mismatch is a yellow notice
   assert.deepEqual(versionLabel("0.0.0", "0.0.0"), { text: "0.0.0", warn: false });
   assert.deepEqual(versionLabel("0.0.0", ""), { text: "0.0.0", warn: false });
   assert.deepEqual(versionLabel("0.0.0", "0.1.0"), {
-    text: "tui 0.0.0 · daemon 0.1.0 · run golem daemon restart",
+    text: "tui 0.0.0 · daemon 0.1.0",
     warn: true,
   });
+});
+
+test("after an upgrade the banner says what changed and how to restart", () => {
+  assert.equal(upgradeBanner("0.5.0", "0.5.0", true), null);
+  assert.equal(upgradeBanner("0.5.0", "", true), null);
+  assert.equal(upgradeBanner("0.5.0", "0.4.0", true), "golem is 0.5.0, its service still runs 0.4.0 · ctrl-r restart");
+  assert.equal(
+    upgradeBanner("0.5.0", "0.4.0", false),
+    "golem is 0.5.0, its service still runs 0.4.0 · run golem daemon restart",
+  );
 });
 
 test("the session title falls back to untitled", () => {
