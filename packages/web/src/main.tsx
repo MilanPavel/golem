@@ -2,6 +2,7 @@ import "@fontsource-variable/geist";
 import "@fontsource-variable/geist-mono";
 import "@fontsource-variable/literata";
 import "./styles/tokens.css";
+import "./styles/prose.css";
 import { lazy, StrictMode, Suspense, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./app.tsx";

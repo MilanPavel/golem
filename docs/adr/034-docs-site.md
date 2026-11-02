@@ -29,7 +29,7 @@ flowchart LR
 - New pages go in new folders: `docs/guide/`, `docs/concepts/`, and `docs/contributing/`. When a page should have a nicer URL than its file name, `rewrites` in the config maps it. The file does not move, so the links in AGENTS.md, the skills, code comments, and issues keep working.
 - `srcExclude` leaves out what is not a page: `design/prototype.html` and `adr/template.md`.
 - A link that leaves `docs/` (to `../README.md`, `../CONTRIBUTING.md`, or `packages/…`) becomes a full GitHub URL. A file the site should show, such as `CONTRIBUTING.md`, is pulled in with `<!--@include: ../CONTRIBUTING.md-->`, so it still has one source.
-- Mermaid is rendered by `vitepress-plugin-mermaid`. The plan, the architecture, and nine ADRs already use it.
+- Mermaid diagrams are drawn by a small component of the theme, `GolemMermaid.vue`, in golem's palette for each theme. The plan, the architecture, and nine ADRs already use Mermaid. (`vitepress-plugin-mermaid` was used at first. It always draws dark mode in Mermaid's own dark theme, so step 11.3.1 replaced it.)
 - Search is VitePress's local search. It is built into the site, so there is no service and no key.
 
 ### Published to GitHub Pages by a workflow
@@ -49,7 +49,7 @@ flowchart LR
 The approved design is [docs/design/web.md](../design/web.md), and [ADR-029](029-web-stack.md) makes `packages/web/src/styles/tokens.css` the one place golem's colours are defined. The docs use the same palette, in slip and kiln:
 
 - `tokens.css` is a Tailwind `@theme` block, which VitePress cannot import. `config.mts` reads the file at build time, takes each `--color-*` line, and serves them as plain custom properties through a virtual CSS module. The theme maps them onto VitePress's variables: `--vp-c-brand-1` comes from `clay-ink`, `--vp-c-bg` from `bg`, a tip from `allow`, and so on. A token that the map names but the file does not have fails the build.
-- The values are `light-dark(slip, kiln)`. The theme sets `color-scheme: light` on `:root`, and `dark` on `html.dark`, the class VitePress's toggle sets, so the same values follow the switch.
+- Each value is `light-dark(slip, kiln)`. The docs write the slip value on `:root` and the kiln value on `html.dark`, the class VitePress's toggle sets, so the colours follow the switch. Mermaid gets the same values as plain colours, because it works out its shades from them.
 - Fonts are self-hosted from the same `@fontsource-variable` packages the web UI uses: Geist, Literata, and Geist Mono. The pixel labels use `@fontsource/silkscreen`. No font request leaves the site.
 - The pixel golem is drawn from the grid in `packages/tui/src/logo.ts`. The legend and `why-*` SVGs in `docs/images/` are used as they are.
 

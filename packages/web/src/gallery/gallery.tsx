@@ -1,4 +1,5 @@
-import type { ReactNode } from "react";
+import { noPastes } from "@golem/view";
+import { useState, type ReactNode } from "react";
 import { Badge } from "../ui/badge.tsx";
 import { Button } from "../ui/button.tsx";
 import { Card } from "../ui/card.tsx";
@@ -16,6 +17,10 @@ import { Textarea } from "../ui/textarea.tsx";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip.tsx";
 import { ConnectionScreen } from "../features/connection/connection-screen.tsx";
 import { connectionScreen } from "../features/connection/connection-screen.ts";
+import { TranscriptMessages } from "../features/chat/index.ts";
+import { SAMPLE_CHAT } from "../features/chat/sample.ts";
+import { Composer, DockView, Meter } from "../features/composer/index.ts";
+import { createHistory } from "../features/composer/history.ts";
 import { HomeView } from "../features/shell/index.ts";
 import { SidebarView } from "../features/sessions/index.ts";
 import type { ConnectionSnapshot } from "../store/connection.ts";
@@ -64,6 +69,36 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
       <h3 className="mb-2 font-mono text-xs text-faint">{title}</h3>
       <div className="flex flex-wrap items-center gap-2">{children}</div>
     </section>
+  );
+}
+
+const galleryHistory = createHistory(() => null);
+
+/** A composer with its draft in the component, so the gallery needs no page. */
+function DemoComposer({
+  size,
+  busy = false,
+  disabledReason = null,
+}: {
+  size?: "dock" | "large";
+  busy?: boolean;
+  disabledReason?: string | null;
+}) {
+  const [text, setText] = useState("");
+  const [pastes, setPastes] = useState(noPastes);
+  return (
+    <Composer
+      size={size}
+      text={text}
+      onTextChange={setText}
+      pastes={pastes}
+      onPastesChange={setPastes}
+      history={galleryHistory}
+      onSend={async () => undefined}
+      busy={busy}
+      onStop={() => {}}
+      disabledReason={disabledReason}
+    />
   );
 }
 
@@ -133,6 +168,30 @@ function Panel({ theme }: { theme: "slip" | "kiln" }) {
             folder="/Users/you/repos/golem"
             folders={["/Users/you/repos/golem", "/Users/you/notes"]}
             onChange={() => {}}
+            composer={<DemoComposer size="large" />}
+          />
+        </div>
+      </section>
+
+      <section className="mt-6">
+        <h3 className="mb-2 font-mono text-xs text-faint">Dock</h3>
+        <div className="grid gap-4 rounded-lg border border-line bg-bg p-4">
+          <DockView busy={false} meter={<Meter state="idle" runStartedAt={null} />} composer={<DemoComposer />} />
+          <DockView
+            busy
+            meter={<Meter state="thinking" runStartedAt={new Date(NOW - 12_000).toISOString()} />}
+            composer={<DemoComposer busy />}
+            error="golem is still answering. Stop it first, or wait."
+          />
+          <DockView
+            busy
+            meter={<Meter state="waiting" runStartedAt={null} />}
+            composer={<DemoComposer busy />}
+          />
+          <DockView
+            busy={false}
+            meter={<Meter state="offline" runStartedAt={null} />}
+            composer={<DemoComposer disabledReason="Not connected to golem" />}
           />
         </div>
       </section>
@@ -181,6 +240,13 @@ function Panel({ theme }: { theme: "slip" | "kiln" }) {
         <PixelGolem state="idle" size="sm" />
         <PixelGolem state="idle" size="lg" />
       </Group>
+
+      <section className="mt-6">
+        <h3 className="mb-2 font-mono text-xs text-faint">Transcript</h3>
+        <div className="flex flex-col gap-6 rounded-lg border border-line bg-bg p-4">
+          <TranscriptMessages chat={SAMPLE_CHAT} />
+        </div>
+      </section>
 
       <Group title="Dialog, popover, menu, tooltip">
         <Dialog>
