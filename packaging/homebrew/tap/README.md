@@ -4,9 +4,7 @@ The Homebrew tap for [golem](https://github.com/MilanPavel/golem), a personal AI
 
 ```bash
 brew install milanpavel/golem/golem
-golem daemon install        # start the daemon, now and at every login
-golem auth set anthropic    # optional: save an API key, or use Ollama
-golem                       # open the chat
+golem                       # open the chat; the first time, it asks to start its service
 ```
 
 The [install guide](https://github.com/MilanPavel/golem/blob/main/docs/install.md) explains each step.
@@ -15,7 +13,7 @@ Upgrade:
 
 ```bash
 brew upgrade golem
-golem daemon restart
+golem daemon restart        # or press Ctrl-R in golem
 ```
 
 Remove, in this order. Chats and settings stay in `~/.golem`:
