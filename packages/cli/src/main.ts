@@ -21,7 +21,7 @@ import { formatCliVersion } from "./format-version.ts";
 import { readChoice } from "./read-choice.ts";
 import { readSecret } from "./read-secret.ts";
 import { type Gate, gateService, type SessionDaemon } from "./service-gate.ts";
-import { parseWebArgs } from "./web.ts";
+import { parseWebArgs, type WebArgs } from "./web.ts";
 import { runWeb } from "./web-command.ts";
 import { findWorkspaceRoot } from "./workspace.ts";
 
@@ -78,7 +78,7 @@ async function run(args: string[]): Promise<number> {
   }
   if (command === "web") {
     const parsed = parseWebArgs(rest);
-    if (parsed !== null) return runWeb(parsed);
+    if (parsed !== null) return openWeb(parsed);
   }
   if (command === "config" && rest[0] === "show" && (rest.length === 1 || (rest.length === 2 && rest[1] === "--resolved"))) {
     return runConfigShow();
@@ -355,6 +355,44 @@ async function openTui(): Promise<number> {
     return 0;
   } finally {
     gate.session?.stop();
+  }
+}
+
+/**
+ * `golem web` checks the daemon first, so the page does not open on "daemon down".
+ * In a terminal it asks the question `golem` asks. With `--no-open` or `--json`
+ * it never asks: with no daemon it says why or what to run, and exits 1.
+ */
+async function openWeb(args: WebArgs): Promise<number> {
+  if (!args.open) {
+    const down = await daemonDown();
+    if (down !== null) {
+      process.stderr.write(`${down}\n`);
+      return 1;
+    }
+    return runWeb(args);
+  }
+  const gate = await gateService(serviceGate());
+  if (gate.kind === "exit") {
+    return gate.code;
+  }
+  try {
+    return await runWeb(args);
+  } finally {
+    gate.session?.stop();
+  }
+}
+
+/** Null when a daemon answers. Otherwise what a command that needs one prints. */
+async function daemonDown(): Promise<string | null> {
+  const client = connectOnce();
+  try {
+    await client.status();
+    return null;
+  } catch (error) {
+    return explainClient(error);
+  } finally {
+    client.close();
   }
 }
 
