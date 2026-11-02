@@ -510,7 +510,7 @@ sequenceDiagram
 - **A model that cannot run** is dimmed, and choosing it says what to do instead.
 - **Downloads:** Enter on a model to download asks once with its size and fit, or twice when it is too big, then calls `model.pull`. The row shows the live percentage from `model.pull.progress`, and the session switches to the model on `model.pull.done`. `x` asks, then stops a download or removes an installed model. `/model pull <name>` and `/model rm <name>` probe first and ask in the same way.
 - **`/model <name>`** switches directly, and the suggestions under the composer are the profile names and ready refs from the last listing.
-- **On a first start** whose default resolves to nothing, the TUI uses the only ready model, or opens the picker.
+- **On a first start** whose default resolves to nothing, the TUI uses the only ready model, or opens the picker. The rule lives in `packages/view/src/first-run.ts`, with the steps the browser will share: `service`, then `choose` (on this Mac, with an API key, or later), then `local` or `key`, then `ready`.
 - **Code:** `model-picker.ts`, which holds the pure state, grouping, and layout, and `model-picker.tsx`.
 
 `/permissions` shows, in place of the transcript, the tool rules for the session's folder in the order they are checked, then what this session allows, from `config.get`. Up and Down move. `a`, `k`, and `d` set the selected rule to allow, ask, or deny (`policy.update`), and `x` deletes it (`policy.remove`) or revokes the allowance (`session.revoke`). Built-in defaults are listed dimmed and cannot be changed. `r` lists again, and Esc closes. Code: `permissions.ts`.
