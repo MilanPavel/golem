@@ -16,19 +16,27 @@ import "./custom.css";
 
 import { h } from "vue";
 import GolemMermaid from "./GolemMermaid.vue";
+import HomeDemo from "./HomeDemo.vue";
+import HomeLegend from "./HomeLegend.vue";
+import HomeWhy from "./HomeWhy.vue";
 import NotFound from "./NotFound.vue";
 import PixelGolem from "./PixelGolem.vue";
 
 export default {
   extends: DefaultTheme,
-  // The pixel golem is the nav logo, and the 404 page is one of golem's full-screen states.
+  // The pixel golem is the nav logo and the home page's hero, and the 404 page is one of
+  // golem's full-screen states.
   Layout: () =>
     h(DefaultTheme.Layout, null, {
       "nav-bar-title-before": () => h(PixelGolem, { cell: 3, decorative: true }),
+      "home-hero-image": () => h("div", { class: "golem-hero" }, [h(PixelGolem, { cell: 28 })]),
       "not-found": () => h(NotFound),
     }),
   enhanceApp({ app }) {
     app.component("GolemMermaid", GolemMermaid);
     app.component("PixelGolem", PixelGolem);
+    app.component("HomeLegend", HomeLegend);
+    app.component("HomeWhy", HomeWhy);
+    app.component("HomeDemo", HomeDemo);
   },
 } satisfies Theme;

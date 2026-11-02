@@ -226,6 +226,140 @@ html.dark {
   image-rendering: pixelated;
 }
 
+/* The home page. The hero's golem sits on a soft clay glow; the sections below share one column. */
+.VPHero .name .clip {
+  font-family: var(--golem-font-ui);
+  letter-spacing: -0.03em;
+}
+.VPHero .text {
+  font-family: var(--golem-font-prose);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+.VPHero .tagline {
+  font-family: var(--golem-font-prose);
+}
+.golem-hero {
+  display: grid;
+  place-items: center;
+  width: 320px;
+  height: 320px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--golem-clay-soft) 0%, transparent 68%);
+}
+.golem-hero .pixel-golem {
+  width: 252px;
+  height: auto;
+}
+@media (max-width: 959px) {
+  .golem-hero {
+    width: 220px;
+    height: 220px;
+  }
+  .golem-hero .pixel-golem {
+    width: 162px;
+  }
+}
+
+.VPHome .vp-doc.container {
+  max-width: 60rem;
+  margin: 0 auto;
+}
+.VPHome .vp-doc h2 {
+  margin-top: 64px;
+}
+
+.golem-legend {
+  margin: 8px auto 0;
+  max-width: 560px;
+}
+.golem-legend img {
+  width: 100%;
+  height: auto;
+}
+.only-kiln,
+html.dark .only-slip {
+  display: none;
+}
+html.dark .only-kiln {
+  display: block;
+}
+
+/* The why cards: the SVGs carry their own parchment and edge, so the card adds only space. */
+.golem-why {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 32px 28px;
+  margin-top: 24px;
+}
+.golem-why-card img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+html.dark .golem-why-card img {
+  filter: brightness(0.92);
+}
+.vp-doc .golem-why-card h3 {
+  margin: 18px 0 6px;
+  font-size: 18px;
+}
+.vp-doc .golem-why-card p {
+  margin: 0;
+  font-size: 15px;
+  color: var(--golem-muted);
+}
+@media (max-width: 640px) {
+  .golem-why {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* The demo, in a terminal window on code-bg. */
+.golem-terminal {
+  margin: 24px 0 0;
+  border: 1px solid var(--golem-line-strong);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--golem-code-bg);
+  box-shadow: 0 18px 48px -24px rgb(0 0 0 / 0.35);
+}
+.golem-terminal-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--golem-line);
+  background: var(--golem-sunken);
+}
+.golem-terminal-bar .dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+}
+.golem-terminal-bar .deny {
+  background: var(--golem-deny);
+}
+.golem-terminal-bar .wait {
+  background: var(--golem-wait);
+}
+.golem-terminal-bar .allow {
+  background: var(--golem-allow);
+}
+.golem-terminal-title {
+  flex: 1;
+  margin-right: 49px;
+  text-align: center;
+  font-family: var(--golem-font-mono);
+  font-size: 12px;
+  color: var(--golem-muted);
+}
+.golem-terminal img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
 /* The 404 page: one of the web UI's full-screen states. */
 .golem-state {
   display: flex;
