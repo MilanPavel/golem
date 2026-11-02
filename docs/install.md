@@ -74,7 +74,7 @@ golem
 - golem can read and search files only inside the folder you started it in. It asks before it changes a file or runs a command.
 - Type `/help` for all commands, or `?` on an empty line for all keys. Ctrl-C twice quits.
 
-Closing the chat doesn't stop an answer. Run `golem` again to see it.
+Closing the chat doesn't stop an answer. Run `golem` again to see it. [First chat](guide/first-chat.md) walks through a first question and a first approval.
 
 ## Upgrade
 

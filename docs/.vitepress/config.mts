@@ -62,7 +62,11 @@ function adrItems(): DefaultTheme.SidebarItem[] {
 const sidebar: DefaultTheme.Sidebar = [
   {
     text: "Get started",
-    items: [{ text: "Install", link: "/install" }],
+    items: [
+      { text: "Introduction", link: "/guide/introduction" },
+      { text: "Install", link: "/install" },
+      { text: "First chat", link: "/guide/first-chat" },
+    ],
   },
   {
     text: "Build golem",

@@ -782,9 +782,15 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       return result;
     },
     async detachSession(sessionId: string): Promise<void> {
-      await ready;
-      await call("session.detach", { session_id: sessionId });
+      // Stop following at once. If the call fails because the link is down, the daemon has
+      // dropped the attachment anyway, and a later attach must replay from the start.
       attachments.untrack(sessionId);
+      await ready;
+      if (attachments.seen(sessionId) !== undefined) {
+        // Attached again while this waited: detaching now would cut the new attachment.
+        return;
+      }
+      await call("session.detach", { session_id: sessionId });
     },
     async listSessions(limit?: number, cwd?: string): Promise<SessionListResult> {
       await ready;
