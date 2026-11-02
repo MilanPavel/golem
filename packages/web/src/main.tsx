@@ -6,6 +6,7 @@ import "./styles/prose.css";
 import { lazy, StrictMode, Suspense, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./app.tsx";
+import { watchTabStatus } from "./features/tab-status/index.ts";
 import { bootPage } from "./store/boot.ts";
 import { PageProvider } from "./store/page-context.tsx";
 import { applyTheme, readTheme } from "./styles/theme.ts";
@@ -36,6 +37,7 @@ if (showGallery && Gallery) {
 } else {
   void bootPage().then((page) => {
     page.start();
+    watchTabStatus(page);
     render(
       <PageProvider page={page}>
         <App />
