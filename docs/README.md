@@ -10,9 +10,9 @@ For someone who wants to use golem today.
 
 | Page | File | Ticket |
 |---|---|---|
-| Introduction: why golem, how it works | `guide/introduction.md` | [#277](https://github.com/MilanPavel/golem/issues/277) |
-| Install, upgrade, remove | [install.md](install.md) | [#277](https://github.com/MilanPavel/golem/issues/277) |
-| First chat | `guide/first-chat.md` | [#277](https://github.com/MilanPavel/golem/issues/277) |
+| Introduction: why golem, how it works | [guide/introduction.md](guide/introduction.md) | |
+| Install, upgrade, remove | [install.md](install.md) | |
+| First chat | [guide/first-chat.md](guide/first-chat.md) | |
 
 ## Use golem
 
