@@ -5,17 +5,61 @@ import http from "node:http";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
-import { after, test } from "node:test";
+import { after, before, test } from "node:test";
 import { fileURLToPath } from "node:url";
+
+import { PROTOCOL_MAJOR, PROTOCOL_MINOR } from "../../protocol/gen/version.ts";
 
 const MAIN = path.join(path.dirname(fileURLToPath(import.meta.url)), "main.ts");
 const home = fs.mkdtempSync(path.join(os.tmpdir(), "gw-"));
 const runDir = path.join(home, "run");
 const children = new Set<ChildProcess>();
 
+const empty = fs.mkdtempSync(path.join(os.tmpdir(), "gw-none-"));
+
+/** Answers `hello` and `daemon.status` on the home's socket, so `golem web` finds a daemon. */
+function fakeDaemon(): net.Server {
+  const answers: Record<string, unknown> = {
+    hello: { daemon_version: "0.0.0-dev", protocol_major: PROTOCOL_MAJOR, protocol_minor: PROTOCOL_MINOR },
+    "daemon.status": {
+      pid: process.pid,
+      version: "0.0.0-dev",
+      protocol_major: PROTOCOL_MAJOR,
+      protocol_minor: PROTOCOL_MINOR,
+      uptime_seconds: 1,
+      state: "running",
+    },
+  };
+  return net.createServer((socket) => {
+    socket.on("error", () => {});
+    let buffered = "";
+    socket.on("data", (chunk: Buffer) => {
+      buffered += chunk.toString();
+      let end = buffered.indexOf("\n");
+      while (end >= 0) {
+        const request = JSON.parse(buffered.slice(0, end)) as { id: number; method: string };
+        buffered = buffered.slice(end + 1);
+        const result = answers[request.method] ?? {};
+        socket.write(`${JSON.stringify({ jsonrpc: "2.0", id: request.id, result })}\n`);
+        end = buffered.indexOf("\n");
+      }
+    });
+  });
+}
+
+let daemon: net.Server;
+
+before(async () => {
+  fs.mkdirSync(runDir, { recursive: true });
+  daemon = fakeDaemon();
+  await new Promise<void>((done) => daemon.listen(path.join(runDir, "golem.sock"), done));
+});
+
 after(() => {
   for (const c of children) c.kill("SIGKILL");
+  daemon.close();
   fs.rmSync(home, { recursive: true, force: true });
+  fs.rmSync(empty, { recursive: true, force: true });
 });
 
 interface Run {
@@ -26,8 +70,12 @@ interface Run {
 }
 
 function golemWeb(...args: string[]): Run {
+  return golemWebIn(home, ...args);
+}
+
+function golemWebIn(golemHome: string, ...args: string[]): Run {
   const child = spawn("bun", [MAIN, "web", ...args], {
-    env: { ...process.env, GOLEM_HOME: home },
+    env: { ...process.env, GOLEM_HOME: golemHome },
     stdio: ["ignore", "pipe", "pipe"],
   });
   children.add(child);
@@ -145,6 +193,16 @@ test("a server that only claims to be a gateway never gets the token", async () 
     assert.match(run.stderr(), new RegExp(`port ${port} is in use`));
   } finally {
     impostor.close();
+  }
+});
+
+test("with --json or --no-open and no daemon, it says what to run and starts nothing", async () => {
+  for (const flag of ["--json", "--no-open"]) {
+    const run = golemWebIn(empty, flag, "--port", "0");
+    assert.equal(await run.exit, 1);
+    assert.equal(await run.stdout, "");
+    assert.match(run.stderr(), /^daemon is not running \(.*\)\nrun: golem daemon (install|start)\n$/);
+    assert.equal(fs.existsSync(path.join(empty, "run", "web.json")), false);
   }
 });
 
