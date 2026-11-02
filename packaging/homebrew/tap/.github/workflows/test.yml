@@ -32,6 +32,9 @@ jobs:
           taps="$(brew --repository)/Library/Taps/$owner"
           mkdir -p "$taps"
           ln -s "$GITHUB_WORKSPACE" "$taps/homebrew-golem"
+          # Homebrew refuses to load a formula from a tap it does not trust.
+          # This checkout is the code under test, so trust it.
+          brew trust "$owner/golem"
           echo "FORMULA=$owner/golem/golem" >> "$GITHUB_ENV"
 
       - name: Audit
