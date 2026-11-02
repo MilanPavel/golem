@@ -29,12 +29,19 @@ test("an expired cookie asks for a fresh link", async ({ page, rig, tolerate }) 
   await expect(page.getByRole("heading", { name: "This page needs a fresh link" })).toBeVisible();
 });
 
-test("an older daemon is named", async ({ page, rig }) => {
+test("an older daemon is named", async ({ page, rig, tolerate }) => {
+  tolerate.push(...STOPPED);
   const home = rig.home();
-  rig.own(await startFakeDaemon(home, PROTOCOL_MAJOR - 1));
+  // `golem web` refuses to start on an older daemon, so start it on a current one and swap.
+  const daemon = await startDaemon(home);
   const gateway = rig.own(await startGateway(home));
   await page.goto(gateway.url);
-  await expect(page.getByRole("heading", { name: "The daemon is older than this page" })).toBeVisible();
+  await expect(page.getByText("connected", { exact: true })).toBeVisible();
+  await daemon.stop();
+  rig.own(await startFakeDaemon(home, PROTOCOL_MAJOR - 1));
+  await expect(page.getByRole("heading", { name: "The daemon is older than this page" })).toBeVisible({
+    timeout: BACKOFF_MS,
+  });
 });
 
 test("the daemon goes down and comes back", async ({ page, rig, tolerate }) => {
