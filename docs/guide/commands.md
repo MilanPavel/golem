@@ -77,6 +77,8 @@ Type `/` and suggestions appear, with each command's arguments. `/help` lists ev
 | `/mcp` | Manage MCP servers: view tools, reconnect, turn on or off |
 | `/mcp enable <name>`, `/mcp disable <name>` | Turn a server on or off for this chat |
 
+[Tools and permissions](./permissions.md), [Skills](./skills.md), and [MCP servers](./mcp.md) have the details.
+
 ### The screen
 
 | Command | What it does |
