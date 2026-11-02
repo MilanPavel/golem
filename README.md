@@ -65,23 +65,12 @@ You need an Apple Silicon Mac and [Homebrew](https://brew.sh).
 
 ```bash
 brew install milanpavel/golem/golem   # install
-golem daemon install                  # start golem's background service, now and at every login
+golem                                 # open the chat, in any project folder
 ```
 
-Give it a brain, local or hosted. A local model needs nothing here: golem installs Ollama when you pick one. A hosted one needs your API key:
+The first time, golem asks to start its background service, now and at every login. Press Enter. Then it lets you pick a model, local or hosted. A local one downloads right there, with a progress bar, and golem installs Ollama if you don't have it. A hosted one needs your API key: type `/login anthropic` in the chat, or run `golem auth set anthropic`. That's it.
 
-```bash
-golem auth set anthropic                            # paste your API key
-```
-
-Then open the chat in any project folder:
-
-```bash
-cd ~/my-project
-golem
-```
-
-On the first start, golem lets you pick a model. A local one downloads right there, with a progress bar. That's it.
+Without the chat, for example for `golem web` in a script, `golem daemon install` starts the service with no question.
 
 New to the terminal? [docs/install.md](docs/install.md) walks through every step, plus upgrading and removing.
 
@@ -89,7 +78,7 @@ New to the terminal? [docs/install.md](docs/install.md) walks through every step
 <summary><b>Upgrade or remove</b></summary>
 
 ```bash
-brew upgrade golem && golem daemon restart        # upgrade; chats and settings carry over
+brew upgrade golem                                # upgrade, then press Ctrl-R in golem; chats and settings carry over
 
 golem daemon uninstall && brew uninstall golem    # remove, in this order; ~/.golem stays
 ```

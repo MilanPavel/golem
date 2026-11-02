@@ -13,7 +13,7 @@ The golem repository is the source of every file in the tap. Each stable release
 
 `packaging/homebrew/golem.rb.in` is the formula, with the version, checksum, and repository left blank. `scripts/render_formula.sh` fills them in and refuses anything but a stable `X.Y.Z`, a sha256, and `owner/repo`.
 
-By default Homebrew edits a keg after install. It gives every library an absolute install name and signs it again ad-hoc, and it deletes `RECORD` from Python `.dist-info` folders. Every library in the daemon has an `@rpath` install name and links nothing outside the tree, so `preserve_rpath` leaves all of them alone. `skip_clean "libexec"` keeps the Python metadata. The formula has no `service` block. Its caveats print `golem daemon install`, `restart`, and `uninstall`.
+By default Homebrew edits a keg after install. It gives every library an absolute install name and signs it again ad-hoc, and it deletes `RECORD` from Python `.dist-info` folders. Every library in the daemon has an `@rpath` install name and links nothing outside the tree, so `preserve_rpath` leaves all of them alone. `skip_clean "libexec"` keeps the Python metadata. The formula has no `service` block. Its caveats say to run `golem`, which asks to install the launch agent ([ADR-033](033-golem-offers-to-start-the-service.md)), and to run `golem daemon uninstall` before `brew uninstall`.
 
 `golem` resolves its own path before it looks for `../libexec/`, because `$(brew --prefix)/bin/golem` is a link into the keg. The daemon finds its files the same way. `launchd.stable_path` turns `<prefix>/Cellar/golem/<version>/…` into `<prefix>/opt/golem/…` when that link points at the same file, and `golem daemon install` writes that path into the plist.
 
