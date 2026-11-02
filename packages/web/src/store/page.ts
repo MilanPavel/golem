@@ -1,5 +1,6 @@
 import type { GolemClient } from "@golem/client";
 import type { QueryClient } from "@tanstack/react-query";
+import { createDrafts, type Drafts } from "./drafts.ts";
 import { createConnectionStore, type ConnectionStore } from "./connection.ts";
 import { createNewSessionFolder, type NewSessionFolderStore } from "./new-session.ts";
 import { createQueryClient, keepQueriesHonest } from "./query.ts";
@@ -42,6 +43,7 @@ export type Page = {
   sessions: Sessions;
   sessionList: SessionList;
   newSession: NewSessionFolderStore;
+  drafts: Drafts;
   queryClient: QueryClient;
   router: Router;
   actions: PageActions;
@@ -63,6 +65,7 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
   const sessions = createSessions(client, options.frame);
   const sessionList = createSessionList(client);
   const newSession = createNewSessionFolder();
+  const drafts = createDrafts();
   const queryClient = createQueryClient();
   const router = createRouter();
   const doc = options.doc ?? document;
@@ -81,6 +84,7 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
     sessions,
     sessionList,
     newSession,
+    drafts,
     queryClient,
     router,
     actions: {

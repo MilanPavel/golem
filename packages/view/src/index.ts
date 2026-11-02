@@ -27,3 +27,15 @@ export { parseDiff, type DiffLine, type DiffTone } from "./diff.ts";
 export { golemState, type GolemState, type RunPhase } from "./golem-state.ts";
 export { visibleText } from "./sanitize.ts";
 export { todoLines, todoRows, TODO_ROWS, type TodoItem, type TodoLine, type TodoStatus } from "./todos.ts";
+export {
+  collapsePaste,
+  collapses,
+  expandPastes,
+  noPastes,
+  PASTE_CHARS,
+  PASTE_LINES,
+  pasteText,
+  pasteToken,
+  prunePastes,
+  type Pastes,
+} from "./paste.ts";

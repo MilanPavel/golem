@@ -6,6 +6,7 @@ import { PixelGolem } from "../../ui/pixel-golem.tsx";
 import { useNavigate, useRememberOpenedFolder, useSession, useSessionList } from "../../store/page-context.tsx";
 import type { SessionModel, SessionView } from "../../store/session-store.ts";
 import { Transcript } from "../chat/index.ts";
+import { SessionDock } from "../composer/index.ts";
 import { folderName } from "../sessions/folder.ts";
 
 type Header = Pick<SessionView, "title" | "cwd" | "model" | "status">;
@@ -26,9 +27,9 @@ export function TranscriptSlot({ id }: { id: string }) {
   return <Transcript id={id} />;
 }
 
-/** The meter and the composer go here (step 10.8.4). */
-export function DockSlot() {
-  return null;
+/** The meter, the composer, and the key hints. */
+export function DockSlot({ id }: { id: string }) {
+  return <SessionDock key={id} sessionId={id} />;
 }
 
 function ModelChip({ model }: { model: SessionModel }) {
@@ -99,7 +100,7 @@ export function SessionScreen({ id }: { id: string }) {
       </TopBar>
       <TranscriptSlot id={id} />
       <div className="mx-auto w-full max-w-column px-5 pb-4">
-        <DockSlot />
+        <DockSlot id={id} />
       </div>
     </>
   );

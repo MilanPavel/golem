@@ -1,0 +1,4 @@
+/* The textarea grows with its text up to 40% of the window, then scrolls. */
+.composer-input {
+  max-height: 40vh;
+}
