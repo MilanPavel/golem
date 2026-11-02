@@ -102,3 +102,39 @@ export function serviceStarted(state: FirstRun, listing: ModelListResult | null)
 export function modelChosen(state: FirstRun): FirstRun {
   return state.step === "service" ? state : { step: "ready" };
 }
+
+/**
+ * The local model the card offers: a downloaded one that is ready, else the
+ * largest catalog model that fits in a quarter of this Mac's memory, so the
+ * first download stays small. Null when none does.
+ */
+export function recommendedLocal(listing: ModelListResult): ListedModel | null {
+  const local = listing.models.filter((model) => model.provider === "ollama");
+  const ready = local.find((model) => model.status === "ready");
+  if (ready !== undefined) {
+    return ready;
+  }
+  const cap = (listing.ram_gb ?? 32) / 4;
+  const fitting = local.filter(
+    (model) =>
+      model.source === "catalog" && model.status !== "pulling" && model.fit === "fits" && (model.size_gb ?? Infinity) <= cap,
+  );
+  return fitting.reduce<ListedModel | null>((best, model) => (best === null || (model.size_gb ?? 0) > (best.size_gb ?? 0) ? model : best), null);
+}
+
+/** Hosted providers to name on the card: those with a key first, then the rest that take one. */
+export function hostedProviders(listing: ModelListResult): string[] {
+  const keyed = new Set(listing.setup.keys ?? []);
+  const hosted = listing.providers
+    .filter((item) => item.provider !== "ollama" && (item.status === "needs_key" || keyed.has(item.provider)))
+    .map((item) => item.provider);
+  return [...hosted.filter((name) => keyed.has(name)), ...hosted.filter((name) => !keyed.has(name))];
+}
+
+/** What a send with no model chosen shows. The message stays in the composer for after the pick. */
+export const NO_MODEL_NOTICE = "No model yet · pick one, then Enter sends your message";
+
+/** True for the daemon's `model_not_configured` when no model was ever chosen. */
+export function noModelChosen(code: number, message: string, notConfigured: number): boolean {
+  return code === notConfigured && message === "no model chosen yet";
+}

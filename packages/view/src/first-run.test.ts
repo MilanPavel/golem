@@ -5,10 +5,13 @@ import type { ListedModel, ModelListResult } from "@golem/client";
 
 import {
   firstRunChoice,
+  hostedProviders,
   localNeeds,
   modelChosen,
   namesModel,
+  noModelChosen,
   pressFirstRun,
+  recommendedLocal,
   serviceStarted,
   startFirstRun,
   suggestedOption,
@@ -103,4 +106,36 @@ test("the service starting and a model being chosen move the start on", () => {
   assert.deepEqual(serviceStarted({ step: "key" }, FRESH), { step: "key" });
   assert.deepEqual(modelChosen({ step: "local" }), { step: "ready" });
   assert.deepEqual(modelChosen({ step: "service" }), { step: "service" });
+});
+
+test("the card offers a ready local model, else the largest in a quarter of memory", () => {
+  assert.equal(recommendedLocal(SET_UP), QWEN);
+  const small = model("ollama/small:1b", { source: "catalog", status: "not_installed", size_gb: 1, fit: "fits" });
+  const mid = model("ollama/mid:8b", { source: "catalog", status: "not_installed", size_gb: 5.2, fit: "fits" });
+  const large = model("ollama/large:24b", { source: "catalog", status: "not_installed", size_gb: 14.3, fit: "fits" });
+  const big = model("ollama/big:70b", { source: "catalog", status: "not_installed", size_gb: 40, fit: "too_big" });
+  assert.equal(recommendedLocal({ ...FRESH, models: [small, mid, large, big, CLAUDE] }), mid);
+  assert.equal(recommendedLocal({ ...FRESH, ram_gb: 16, models: [small, mid, large, CLAUDE] }), small);
+  assert.equal(recommendedLocal({ ...FRESH, models: [big, CLAUDE] }), null);
+});
+
+test("hosted providers put the ones with a key first and leave Ollama out", () => {
+  const listing: ModelListResult = {
+    ...FRESH,
+    providers: [
+      { provider: "anthropic", status: "needs_key" },
+      { provider: "groq", status: "ready" },
+      { provider: "lmstudio", status: "unlisted" },
+      { provider: "ollama", status: "server_down" },
+      { provider: "openai", status: "needs_key" },
+    ],
+    setup: { ...FRESH.setup, keys: ["groq"] },
+  };
+  assert.deepEqual(hostedProviders(listing), ["groq", "anthropic", "openai"]);
+});
+
+test("only the never-chosen error reads as no model yet", () => {
+  assert.ok(noModelChosen(-32005, "no model chosen yet", -32005));
+  assert.ok(!noModelChosen(-32005, "unknown model: qwen", -32005));
+  assert.ok(!noModelChosen(-32003, "no model chosen yet", -32005));
 });
