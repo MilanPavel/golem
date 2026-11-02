@@ -1,5 +1,4 @@
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
 
 import { resolveSocketPath } from "@golem/client/node";
 import { randomSecret } from "@golem/gateway";
@@ -144,8 +143,5 @@ async function runGateway(args: WebArgs): Promise<number> {
   }
   const stopped = stayUntilStopped(gateway, runDir);
   await show(args, gateway.port, process.pid, token, true);
-  if (!existsSync(resolveSocketPath())) {
-    process.stderr.write("the daemon is not running. Start it with golem daemon start\n");
-  }
   return stopped;
 }
