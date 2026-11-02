@@ -24,10 +24,8 @@ class Golem < Formula
   # for every install. Two owners would start two daemons.
   def caveats
     <<~EOS
-      Start the golem daemon, now and at every login:
-        golem daemon install
-      After `brew upgrade golem`, switch the running daemon to the new version:
-        golem daemon restart
+      Run golem to get started.
+      After `brew upgrade golem`, press Ctrl-R in golem to restart its service.
       Before `brew uninstall golem`, remove the service:
         golem daemon uninstall
       Chats and settings stay in ~/.golem.
