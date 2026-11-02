@@ -97,8 +97,8 @@ All settings live in `~/.golem/config.toml`. `golem config show` prints the ones
 
 - **From the environment.** Every setting can also come from an environment variable: `GOLEM_` plus the name in capitals, for example `GOLEM_LOG_LEVEL`.
 - **When it applies.** Model settings apply at once. For the others, restart the daemon with `golem daemon restart`.
-- **Tool rules** (allow, ask, or deny a tool by name or path) live in the same file, or in a project's `.golem/policy.toml`. `/permissions` in the chat shows them.
-- **MCP servers and skills** have their own sections, in the README for now.
+- **Tool rules** (allow, ask, or deny a tool by name or path) live in the same file, or in a project's `.golem/policy.toml`. [Tools and permissions](./permissions.md) explains them, and the `[shell]` and `[web]` settings.
+- **MCP servers and skills** have their own pages: [MCP servers](./mcp.md) and [Skills](./skills.md).
 
 ## Next
 
