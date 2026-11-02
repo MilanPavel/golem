@@ -1,8 +1,8 @@
-import type { ChatMessage } from "@golem/view";
+import { LIVE_OUTPUT_CHARS, type ChatMessage, type ToolBlock } from "@golem/view";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import axe from "axe-core";
 import { expect, test } from "vitest";
-import { TranscriptColumn, TranscriptMessages } from "./transcript.tsx";
+import { ToolLine, TranscriptColumn, TranscriptMessages } from "./transcript.tsx";
 import { SAMPLE_CHAT } from "./sample.ts";
 
 const noContrast = { rules: { "color-contrast": { enabled: false } } };
@@ -100,7 +100,7 @@ test("each tool status reads its own way, and long arguments keep their full tex
   expect(items[1]?.textContent).toContain("waiting for you");
   expect(items[2]?.textContent).toContain("running…");
   expect(items[4]?.textContent).toContain("✗ denied");
-  expect(screen.queryAllByRole("button")).toHaveLength(0);
+  expect(screen.getAllByRole("button")).toHaveLength(5);
 });
 
 test("the chat's error and notice close the transcript", () => {
@@ -150,3 +150,85 @@ for (const theme of ["slip", "kiln"] as const) {
     expect((await axe.run(container, noContrast)).violations).toEqual([]);
   });
 }
+
+const tool = (over: Partial<ToolBlock> = {}): ToolBlock => ({ callId: "t", name: "run_shell", args: { command: "ls -la" }, status: "running", ...over });
+const renderTool = (block: ToolBlock) => render(<ul><ToolLine tool={block} /></ul>);
+const line = () => screen.getByRole("button");
+
+test("each status shows its result, the done one in allow", () => {
+  const view = renderTool(tool({ status: "done", summary: "41 lines" }));
+  expect(line().textContent).toContain("✓ 41 lines");
+  expect(line().querySelector(".text-allow")?.textContent).toContain("41 lines");
+  view.unmount();
+  renderTool(tool({ status: "waiting" }));
+  expect(line().textContent).toContain("waiting for you");
+  expect(line().querySelector(".text-wait")).toBeTruthy();
+});
+
+test("a failed line shows the error cut to fit, in deny", () => {
+  renderTool(tool({ status: "failed", error: "denied" }));
+  expect(line().textContent).toContain("✗ denied");
+  expect(line().querySelector(".truncate.text-deny")).toBeTruthy();
+});
+
+test("the line opens and closes its tablet by click and by Enter", () => {
+  renderTool(tool({ status: "waiting", args: { command: "ls", all: true } }));
+  expect(line().getAttribute("aria-expanded")).toBe("false");
+  expect(screen.queryByText(/"all": true/)).toBeNull();
+  fireEvent.click(line());
+  expect(line().getAttribute("aria-expanded")).toBe("true");
+  const tablet = document.getElementById(line().getAttribute("aria-controls") ?? "");
+  expect(tablet?.textContent).toContain('"all": true');
+  expect(tablet?.textContent).not.toContain("output");
+  fireEvent.click(line());
+  expect(line().getAttribute("aria-expanded")).toBe("false");
+  expect(document.getElementById(tablet?.id ?? "")).toBeNull();
+});
+
+test("Enter on the focused line toggles it", async () => {
+  const { default: userEvent } = await import("@testing-library/user-event");
+  const user = userEvent.setup();
+  renderTool(tool());
+  line().focus();
+  await user.keyboard("{Enter}");
+  expect(line().getAttribute("aria-expanded")).toBe("true");
+  await user.keyboard(" ");
+  expect(line().getAttribute("aria-expanded")).toBe("false");
+});
+
+test("running output updates live, says when there is none, and notes cut output", () => {
+  const view = renderTool(tool());
+  fireEvent.click(line());
+  expect(screen.getByText("no output yet")).toBeTruthy();
+  view.rerender(<ul><ToolLine tool={tool({ output: "one" })} /></ul>);
+  expect(screen.getByText("one")).toBeTruthy();
+  expect(screen.queryByText(/Earlier output/)).toBeNull();
+  view.rerender(<ul><ToolLine tool={tool({ output: "one\ntwo" })} /></ul>);
+  expect(screen.getByText(/one\s+two/)).toBeTruthy();
+  view.rerender(<ul><ToolLine tool={tool({ output: "x".repeat(LIVE_OUTPUT_CHARS) })} /></ul>);
+  expect(screen.getByText(/Earlier output is not shown/)).toBeTruthy();
+});
+
+test("a done tool shows its preview, and the cut and artifact notes", () => {
+  renderTool(tool({ status: "done", summary: "ok", preview: "hello", truncated: true, artifactId: "art_1" }));
+  fireEvent.click(line());
+  expect(screen.getByText("hello")).toBeTruthy();
+  expect(screen.getByText("The output was cut.")).toBeTruthy();
+  expect(screen.getByText("The whole output is saved as artifact art_1.")).toBeTruthy();
+});
+
+test("a failed tool shows the whole error in the tablet", () => {
+  const error = `${"boom ".repeat(60)}end`;
+  renderTool(tool({ status: "failed", error }));
+  fireEvent.click(line());
+  const pre = document.querySelector("pre.text-deny");
+  expect(pre?.textContent).toBe(error);
+});
+
+test("hostile output is text, never an element", () => {
+  const evil = "<img src=x onerror=alert(1)>";
+  renderTool(tool({ status: "done", summary: "ok", preview: evil }));
+  fireEvent.click(line());
+  expect(screen.getByText(evil)).toBeTruthy();
+  expect(document.querySelector("img")).toBeNull();
+});
