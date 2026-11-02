@@ -20,14 +20,25 @@ brew install milanpavel/golem/golem
 golem --version             # golem 0.1.0, or newer
 ```
 
-## 2. Start the daemon
+## 2. Open golem
 
-The daemon is the part of golem that talks to the model and keeps your chats. This command starts it now and at every login, and restarts it if it ever crashes:
+```bash
+golem
+```
+
+The first time, golem asks to start its background service. The service is the part of golem that talks to the model and keeps your chats, so a chat keeps going when you close the terminal. Press Enter to start it now and at every login. It also restarts by itself if it ever crashes. Press `n` to run it only while this window is open, or `q` to quit.
+
+Check it any time:
+
+```bash
+golem status                # prints pid, version, and uptime
+golem doctor                # checks the whole install
+```
+
+Without the chat, for example to use only `golem web` or a script, start the service with no question:
 
 ```bash
 golem daemon install
-golem status                # prints pid, version, and uptime
-golem doctor                # checks the whole install
 ```
 
 ## 3. Choose a model
@@ -38,7 +49,7 @@ Pick at least one. You can use both.
 
 golem starts Ollama when a local model needs it, and stops it after 30 minutes unused. If you want Ollama running all the time, run `brew install ollama` and `brew services start ollama`. golem uses that one and never stops it.
 
-You choose the model in the next step, from inside golem.
+You choose the model in step 4, from inside golem.
 
 **A hosted model** (Anthropic, OpenAI, OpenRouter, Groq, or Together). You need an API key from that provider. golem saves it in the macOS Keychain, never in a file:
 
@@ -46,6 +57,8 @@ You choose the model in the next step, from inside golem.
 golem auth set anthropic    # paste the key; nothing is echoed
 golem auth list             # shows which providers have a key
 ```
+
+Or type `/login anthropic` in the chat.
 
 ## 4. Chat
 
@@ -68,8 +81,9 @@ Closing the chat doesn't stop an answer. Run `golem` again to see it.
 ```bash
 brew update
 brew upgrade golem
-golem daemon restart        # switches the running daemon to the new version
 ```
+
+The running service is still the old version. golem says so in the chat: press Ctrl-R there to restart it. Or run `golem daemon restart`.
 
 Your chats and settings carry over. If a new version changes the database, golem copies the old file first, for example to `~/.golem/golem.db.bak-5`.
 
