@@ -98,7 +98,11 @@ def main() -> int:
             fastest = min(times)
             print(f"no start was under {START_LIMIT_S:g}s (fastest {fastest:.3f}s)", file=sys.stderr)
             return 1
-        if not check_web(tree, env, home):
+        # `golem web --json` exits 1 with no daemon, so the page is checked with one running.
+        def web() -> bool:
+            return check_web(tree, env, home)
+
+        if run_daemon(daemon, env, home, "web", FIRST_START_LIMIT_S, web) is None:
             return 1
     finally:
         server.shutdown()

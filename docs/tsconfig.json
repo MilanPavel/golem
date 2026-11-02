@@ -11,5 +11,5 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": [".vitepress/*.ts", ".vitepress/*.mts"]
+  "include": [".vitepress/*.ts", ".vitepress/*.mts", ".vitepress/theme/*.ts"]
 }

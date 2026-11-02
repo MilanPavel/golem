@@ -17,6 +17,8 @@ import { Textarea } from "../ui/textarea.tsx";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip.tsx";
 import { ConnectionScreen } from "../features/connection/connection-screen.tsx";
 import { connectionScreen } from "../features/connection/connection-screen.ts";
+import { TranscriptMessages } from "../features/chat/index.ts";
+import { SAMPLE_CHAT } from "../features/chat/sample.ts";
 import { Composer, DockView, Meter } from "../features/composer/index.ts";
 import { createHistory } from "../features/composer/history.ts";
 import { HomeView } from "../features/shell/index.ts";
@@ -238,6 +240,13 @@ function Panel({ theme }: { theme: "slip" | "kiln" }) {
         <PixelGolem state="idle" size="sm" />
         <PixelGolem state="idle" size="lg" />
       </Group>
+
+      <section className="mt-6">
+        <h3 className="mb-2 font-mono text-xs text-faint">Transcript</h3>
+        <div className="flex flex-col gap-6 rounded-lg border border-line bg-bg p-4">
+          <TranscriptMessages chat={SAMPLE_CHAT} />
+        </div>
+      </section>
 
       <Group title="Dialog, popover, menu, tooltip">
         <Dialog>

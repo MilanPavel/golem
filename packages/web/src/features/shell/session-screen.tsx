@@ -5,6 +5,7 @@ import { FolderIcon } from "../../ui/icons.tsx";
 import { PixelGolem } from "../../ui/pixel-golem.tsx";
 import { useNavigate, useRememberOpenedFolder, useSession, useSessionList } from "../../store/page-context.tsx";
 import type { SessionModel, SessionView } from "../../store/session-store.ts";
+import { Transcript } from "../chat/index.ts";
 import { SessionDock } from "../composer/index.ts";
 import { folderName } from "../sessions/folder.ts";
 
@@ -21,9 +22,9 @@ const selectHeader = (view: SessionView): Header => ({
   status: view.status,
 });
 
-/** The transcript goes here (step 10.8.3). */
-export function TranscriptSlot() {
-  return <p className="text-sm text-faint">The conversation will appear here.</p>;
+/** The transcript: it is the scrolling column. */
+export function TranscriptSlot({ id }: { id: string }) {
+  return <Transcript id={id} />;
 }
 
 /** The meter, the composer, and the key hints. */
@@ -97,11 +98,7 @@ export function SessionScreen({ id }: { id: string }) {
           </Badge>
         )}
       </TopBar>
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto flex max-w-column flex-col gap-6 px-5 py-7">
-          <TranscriptSlot />
-        </div>
-      </div>
+      <TranscriptSlot id={id} />
       <div className="mx-auto w-full max-w-column px-5 pb-4">
         <DockSlot id={id} />
       </div>

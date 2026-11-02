@@ -1,14 +1,47 @@
 // The docs site: VitePress over docs/, published to GitHub Pages (ADR-034).
-// The side menu follows the map in docs/README.md. golem's own look comes in step 11.3.
+// The side menu follows the map in docs/README.md. golem's look is in theme/ (step 11.3).
 
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { DefaultTheme } from "vitepress";
-import { withMermaid } from "vitepress-plugin-mermaid";
+import type { Plugin } from "vite";
+import { type DefaultTheme, defineConfig } from "vitepress";
 import { NOT_PAGES, REPO_URL, bundleHtmlAssets, siteHref } from "./links.ts";
+import { checkTokens, parseTokens, tokensCss } from "./tokens.ts";
 
 const docsDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const tokensFile = path.resolve(docsDir, "../packages/web/src/styles/tokens.css");
+
+/**
+ * Serves the web UI's palette to the theme, read from tokens.css on every build and never
+ * copied: `virtual:golem-tokens.css` (the --golem-* properties) and `virtual:golem-tokens`
+ * (the values, for Mermaid). A token the theme uses but the file lacks fails the build.
+ */
+function golemTokens(): Plugin {
+  const css = "virtual:golem-tokens.css";
+  const js = "virtual:golem-tokens";
+  const read = () => {
+    const palette = parseTokens(fs.readFileSync(tokensFile, "utf8"));
+    checkTokens(palette);
+    return palette;
+  };
+  return {
+    name: "golem-tokens",
+    resolveId(id) {
+      if (id === css || id === js) return `\0${id}`;
+    },
+    load(id) {
+      if (id === `\0${css}`) {
+        this.addWatchFile(tokensFile);
+        return tokensCss(read());
+      }
+      if (id === `\0${js}`) {
+        this.addWatchFile(tokensFile);
+        return `export default ${JSON.stringify(read())};`;
+      }
+    },
+  };
+}
 
 /** Every ADR, numbered, with the title from its first heading ("# ADR-012: …"). */
 function adrItems(): DefaultTheme.SidebarItem[] {
@@ -52,7 +85,7 @@ const sidebar: DefaultTheme.Sidebar = [
   },
 ];
 
-export default withMermaid({
+export default defineConfig({
   title: "golem",
   description: "Your own AI agent, living on your Mac.",
   base: "/golem/",
@@ -79,6 +112,16 @@ export default withMermaid({
           }
         }
       });
+
+      // A ```mermaid block becomes <GolemMermaid>, drawn in golem's palette (theme/).
+      const fence = md.renderer.rules.fence!;
+      md.renderer.rules.fence = (tokens, idx, options, env, self) => {
+        const token = tokens[idx]!;
+        if (token.info.trim() === "mermaid") {
+          return `<GolemMermaid code="${encodeURIComponent(token.content)}" />\n`;
+        }
+        return fence(tokens, idx, options, env, self);
+      };
     },
   },
 
@@ -101,7 +144,9 @@ export default withMermaid({
 
   // docs/images is served as is, so the logo and the favicon have stable URLs with no copy.
   // Mermaid is one large chunk, loaded only on pages that have a diagram.
-  vite: { publicDir: path.join(docsDir, "images"), build: { chunkSizeWarningLimit: 3000 } },
-
-  mermaid: {},
+  vite: {
+    publicDir: path.join(docsDir, "images"),
+    build: { chunkSizeWarningLimit: 3000 },
+    plugins: [golemTokens()],
+  },
 });
