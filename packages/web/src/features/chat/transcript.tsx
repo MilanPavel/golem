@@ -6,6 +6,10 @@ import { cn } from "../../ui/cn.ts";
 import type { GolemState } from "../../ui/golem-state.ts";
 import { PixelGolem } from "../../ui/pixel-golem.tsx";
 import { formatClock, formatDuration, shouldStick, squeezeArgs } from "./format.ts";
+import type { DiffMode } from "../diff/diff-mode.ts";
+import { DiffModeSwitch } from "../diff/diff-mode-switch.tsx";
+import { useDiffMode } from "../diff/diff-mode.ts";
+import { DiffView } from "../diff/diff-view.tsx";
 import { Markdown } from "./markdown-view.tsx";
 
 function ToolResult({ tool }: { tool: ToolBlock }) {
@@ -37,7 +41,7 @@ function Label({ children }: { children: string }) {
   return <p className="mb-1 text-faint">{children}</p>;
 }
 
-function ToolOutput({ tool }: { tool: ToolBlock }) {
+function ToolOutput({ tool, mode }: { tool: ToolBlock; mode: DiffMode }) {
   switch (tool.status) {
     case "running": {
       const output = tool.output ?? "";
@@ -53,7 +57,11 @@ function ToolOutput({ tool }: { tool: ToolBlock }) {
       return (
         <section>
           <Label>output</Label>
-          {tool.preview ? <pre className={TABLET_TEXT}>{tool.preview}</pre> : <p className="text-faint">no output</p>}
+          {tool.preview ? (
+            tool.name === "git_diff" ? <DiffView diff={tool.preview} mode={mode} /> : <pre className={TABLET_TEXT}>{tool.preview}</pre>
+          ) : (
+            <p className="text-faint">no output</p>
+          )}
           {tool.truncated ? <p className="mt-1 text-faint">The output was cut.</p> : null}
           {tool.artifactId ? <p className="mt-1 text-faint">The whole output is saved as artifact {tool.artifactId}.</p> : null}
         </section>
@@ -75,6 +83,7 @@ export function ToolLine({ tool, defaultOpen = false }: { tool: ToolBlock; defau
   const args = squeezeArgs(tool.args);
   const [open, setOpen] = useState(defaultOpen);
   const tabletId = useId();
+  const [diffMode, setDiffMode] = useDiffMode();
   return (
     <li data-tool-status={tool.status} className="tool-line">
       <button
@@ -93,11 +102,20 @@ export function ToolLine({ tool, defaultOpen = false }: { tool: ToolBlock; defau
       </button>
       {open ? (
         <div id={tabletId} className="tool-tablet">
+          {tool.diff ? (
+            <section>
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <p className="text-faint">change</p>
+                <DiffModeSwitch mode={diffMode} onChange={setDiffMode} />
+              </div>
+              <DiffView diff={tool.diff} mode={diffMode} />
+            </section>
+          ) : null}
           <section>
             <Label>arguments</Label>
             <pre className={TABLET_TEXT}>{JSON.stringify(tool.args, null, 2)}</pre>
           </section>
-          <ToolOutput tool={tool} />
+          <ToolOutput tool={tool} mode={diffMode} />
         </div>
       ) : null}
     </li>
