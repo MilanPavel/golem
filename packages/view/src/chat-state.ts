@@ -32,6 +32,8 @@ export type ToolBlock = {
   error?: string;
   /** The newest output of a running call, from `tool.output`. */
   output?: string;
+  /** The change a file tool would make, as a unified diff, from `approval.needed`. */
+  diff?: string;
 };
 
 /** Characters of live output kept per tool call. */
@@ -256,7 +258,11 @@ export function reduceChat(state: ChatState, event: ChatEvent): ChatState {
       };
     }
     case "approval.needed": {
-      const waiting = updateTool(state, event.data.call_id, (tool) => ({ ...tool, status: "waiting" }));
+      const waiting = updateTool(state, event.data.call_id, (tool) => ({
+        ...tool,
+        status: "waiting",
+        ...(event.data.diff ? { diff: event.data.diff } : {}),
+      }));
       return {
         ...waiting,
         busy: true,

@@ -1,3 +1,4 @@
+import { SAMPLE_EDIT_DIFF } from "../diff/sample.ts";
 import type { ChatMessage, ChatState, ToolBlock } from "@golem/view";
 
 const CODE = ["```ts", "export function clamp(n: number, lo: number, hi: number): number {", "  // keep n inside the range", '  return Math.min(Math.max(n, lo), hi);', "}", "```"].join("\n");
@@ -36,6 +37,14 @@ export const SAMPLE_TOOLS: ToolBlock[] = [
     preview: "> @golem/web test\n 40 tests passed",
     truncated: true,
     artifactId: "art_7f3a",
+  },
+  {
+    callId: "t7",
+    name: "edit_file",
+    args: { path: "src/socket.ts" },
+    status: "done",
+    summary: "edited",
+    diff: SAMPLE_EDIT_DIFF,
   },
 ];
 

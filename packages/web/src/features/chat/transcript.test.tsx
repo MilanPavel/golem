@@ -232,3 +232,39 @@ test("hostile output is text, never an element", () => {
   expect(screen.getByText(evil)).toBeTruthy();
   expect(document.querySelector("img")).toBeNull();
 });
+
+test("a tool with a diff shows the change first, with the switch", () => {
+  renderTool({
+    callId: "d",
+    name: "edit_file",
+    args: { path: "a.ts" },
+    status: "waiting",
+    diff: "--- a/a.ts\n+++ b/a.ts\n@@ -1 +1 @@\n-one\n+two\n",
+  });
+  fireEvent.click(screen.getByRole("button", { name: /edit_file/ }));
+  expect(screen.getByText("change")).toBeTruthy();
+  expect(screen.getByRole("table", { name: "Change to a.ts" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Split" })).toBeTruthy();
+  const labels = Array.from(document.querySelectorAll(".tool-tablet section > p, .tool-tablet section > div > p")).map((p) => p.textContent);
+  expect(labels.indexOf("change")).toBeLessThan(labels.indexOf("arguments"));
+});
+
+test("a finished git_diff shows its preview as a diff", () => {
+  renderTool({
+    callId: "g",
+    name: "git_diff",
+    args: {},
+    status: "done",
+    summary: "1 file",
+    preview: "--- a/a.ts\n+++ b/a.ts\n@@ -1 +1 @@\n-one\n+two\n",
+  });
+  fireEvent.click(screen.getByRole("button", { name: /git_diff/ }));
+  expect(screen.getByRole("table", { name: "Change to a.ts" })).toBeTruthy();
+});
+
+test("a tool without a diff shows no change section", () => {
+  renderTool({ callId: "r", name: "read_file", args: {}, status: "done", summary: "1 line", preview: "x" });
+  fireEvent.click(screen.getByRole("button", { name: /read_file/ }));
+  expect(screen.queryByText("change")).toBeNull();
+  expect(screen.queryByRole("table")).toBeNull();
+});

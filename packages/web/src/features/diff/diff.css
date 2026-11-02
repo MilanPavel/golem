@@ -1,0 +1,8 @@
+/* The diff block's type: 12.5 px from docs/design/web.md, which no Tailwind text size matches.
+   Colours are tokens, set on the elements in diff-view.tsx. */
+
+.diff-table {
+  font-family: var(--font-mono);
+  font-size: 0.78125rem;
+  line-height: 1.5;
+}

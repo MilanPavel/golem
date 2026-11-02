@@ -19,6 +19,8 @@ import { ConnectionScreen } from "../features/connection/connection-screen.tsx";
 import { connectionScreen } from "../features/connection/connection-screen.ts";
 import { ToolLine, TranscriptMessages } from "../features/chat/index.ts";
 import { SAMPLE_CHAT, SAMPLE_TOOLS } from "../features/chat/sample.ts";
+import { DiffModeSwitch, DiffView } from "../features/diff/index.ts";
+import { SAMPLE_EDIT_DIFF, SAMPLE_LONG_LINE_DIFF, SAMPLE_NEW_FILE_DIFF } from "../features/diff/sample.ts";
 import { Composer, DockView, Meter } from "../features/composer/index.ts";
 import { createHistory } from "../features/composer/history.ts";
 import { HomeView } from "../features/shell/index.ts";
@@ -100,6 +102,38 @@ function DemoComposer({
       onStop={() => {}}
       disabledReason={disabledReason}
     />
+  );
+}
+
+/** Every diff in both layouts, and the switch on its own. */
+function DiffDemo() {
+  const [mode, setMode] = useState<"unified" | "split">("unified");
+  const samples = [
+    ["An edit with two hunks", SAMPLE_EDIT_DIFF],
+    ["A new file", SAMPLE_NEW_FILE_DIFF],
+    ["A long line", SAMPLE_LONG_LINE_DIFF],
+  ] as const;
+  return (
+    <section className="mt-6">
+      <h3 className="mb-2 font-mono text-xs text-faint">Diff</h3>
+      <div className="flex flex-col gap-4">
+        <div>
+          <div className="mb-1 flex items-center gap-3">
+            <p className="text-xs text-muted">With the switch</p>
+            <DiffModeSwitch mode={mode} onChange={setMode} />
+          </div>
+          <DiffView diff={SAMPLE_EDIT_DIFF} mode={mode} />
+        </div>
+        {samples.flatMap(([title, diff]) =>
+          (["unified", "split"] as const).map((layout) => (
+            <div key={`${title}-${layout}`}>
+              <p className="mb-1 text-xs text-muted">{`${title}, ${layout}`}</p>
+              <DiffView diff={diff} mode={layout} />
+            </div>
+          )),
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -262,6 +296,8 @@ function Panel({ theme }: { theme: "slip" | "kiln" }) {
           </ul>
         </div>
       </section>
+
+      <DiffDemo />
 
       <Group title="Dialog, popover, menu, tooltip">
         <Dialog>
