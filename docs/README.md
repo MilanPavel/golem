@@ -18,8 +18,8 @@ For someone who wants to use golem today.
 
 | Page | File | Ticket |
 |---|---|---|
-| Models and API keys | `guide/models.md` | [#278](https://github.com/MilanPavel/golem/issues/278) |
-| Commands, in the shell and in the chat | `guide/commands.md` | [#278](https://github.com/MilanPavel/golem/issues/278) |
+| Models and API keys | [guide/models.md](guide/models.md) | |
+| Commands, in the shell and in the chat | [guide/commands.md](guide/commands.md) | |
 | Tools and permissions | `guide/permissions.md` | [#279](https://github.com/MilanPavel/golem/issues/279) |
 | MCP servers | `guide/mcp.md` | [#279](https://github.com/MilanPavel/golem/issues/279) |
 | Skills | `guide/skills.md` | [#279](https://github.com/MilanPavel/golem/issues/279) |
