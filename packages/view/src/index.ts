@@ -24,6 +24,20 @@ export {
 } from "./chat-state.ts";
 export { connectionLabel, serviceProblem, type ServiceProblem } from "./connection.ts";
 export { parseDiff, type DiffLine, type DiffTone } from "./diff.ts";
+export {
+  FIRST_RUN_OPTIONS,
+  firstRunChoice,
+  localNeeds,
+  modelChosen,
+  namesModel,
+  pressFirstRun,
+  serviceStarted,
+  startFirstRun,
+  suggestedOption,
+  type FirstRun,
+  type FirstRunKey,
+  type FirstRunOption,
+} from "./first-run.ts";
 export { golemState, type GolemState, type RunPhase } from "./golem-state.ts";
 export { visibleText } from "./sanitize.ts";
 export { todoLines, todoRows, TODO_ROWS, type TodoItem, type TodoLine, type TodoStatus } from "./todos.ts";

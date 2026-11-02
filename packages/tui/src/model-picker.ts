@@ -1,4 +1,5 @@
 import type { ListedModel, ModelListResult } from "@golem/client";
+import { namesModel } from "@golem/view";
 
 import type { Press } from "./keys.ts";
 
@@ -119,27 +120,6 @@ export function modelNames(listing: ModelListResult | null): string[] {
   const profiles = listing.models.flatMap((model) => model.profiles ?? []);
   const refs = listing.models.filter((model) => model.status === "ready").map((model) => model.ref);
   return [...new Set([...profiles.sort(), ...refs])];
-}
-
-/** True when `name` is the ref or a profile of `model`. */
-export function namesModel(model: ListedModel, name: string | null): boolean {
-  return name !== null && (model.ref === name || (model.profiles ?? []).includes(name));
-}
-
-/**
- * What a first start does. `null` when the default resolves. With no default,
- * one ready model is used without asking; otherwise the picker opens.
- */
-export function firstRunChoice(listing: ModelListResult): { kind: "auto"; model: ListedModel } | { kind: "pick" } | null {
-  if (listing.models.some((model) => namesModel(model, listing.default))) {
-    return null;
-  }
-  const ready = listing.models.filter((model) => model.status === "ready");
-  const only = ready[0];
-  if (ready.length === 1 && only !== undefined) {
-    return { kind: "auto", model: only };
-  }
-  return { kind: "pick" };
 }
 
 /** True when the listing says `provider` is a local server that is not installed. */
