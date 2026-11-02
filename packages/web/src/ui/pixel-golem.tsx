@@ -4,7 +4,7 @@ import { GOLEM_STATE_LABEL, type GolemState } from "./golem-state.ts";
 import "./pixel-golem.css";
 
 // The 9×6 figure from packages/tui/src/logo.ts. b is body, d is an eye.
-const ART = [
+export const ART = [
   "...bbb...",
   "..bdbdb..",
   "bbbbbbbbb",
@@ -13,9 +13,10 @@ const ART = [
   "..bb.bb..",
 ] as const;
 
-const WIDTH = ART[0].length;
+export const WIDTH = ART[0].length;
 
-const CELLS = ART.flatMap((row, y) =>
+/** Each lit cell of the figure: where it is and whether it is an eye. */
+export const CELLS = ART.flatMap((row, y) =>
   [...row].flatMap((char, x) => (char === "b" || char === "d" ? [{ x, y, eye: char === "d" }] : [])),
 );
 

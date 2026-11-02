@@ -23,6 +23,7 @@ import { Composer, DockView, Meter } from "../features/composer/index.ts";
 import { createHistory } from "../features/composer/history.ts";
 import { HomeView } from "../features/shell/index.ts";
 import { SidebarView } from "../features/sessions/index.ts";
+import { faviconHref, tabTitle } from "../features/tab-status/index.ts";
 import type { ConnectionSnapshot } from "../store/connection.ts";
 import type { SessionSummary } from "../store/session-list.ts";
 import { ThemeSwitch } from "../theme-switch.tsx";
@@ -239,6 +240,15 @@ function Panel({ theme }: { theme: "slip" | "kiln" }) {
         ))}
         <PixelGolem state="idle" size="sm" />
         <PixelGolem state="idle" size="lg" />
+      </Group>
+
+      <Group title="Tab icon and title">
+        {STATES.map((state) => (
+          <span key={state} className="inline-flex items-center gap-2 text-sm">
+            <img src={faviconHref(state)} alt={`golem tab icon · ${GOLEM_STATE_LABEL[state]}`} className="size-4" />
+            <span className="font-mono text-xs text-muted">{tabTitle(state, "Fix the login bug")}</span>
+          </span>
+        ))}
       </Group>
 
       <section className="mt-6">

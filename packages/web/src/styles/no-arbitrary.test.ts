@@ -33,8 +33,9 @@ function* files(dir: string): Generator<string> {
 test("no component uses an arbitrary Tailwind value or a raw hex colour", () => {
   const found: string[] = [];
   for (const path of files(src)) {
-    const isTokens = path.endsWith(join("styles", "tokens.css"));
-    if (isTokens) continue;
+    // The favicon is an image outside the page, so it cannot read tokens. A test pins its hexes to tokens.css.
+    const exempt = [join("styles", "tokens.css"), join("features", "tab-status", "favicon-colors.ts")];
+    if (exempt.some((end) => path.endsWith(end))) continue;
     for (const line of findings(readFileSync(path, "utf8"), true)) {
       found.push(`${path.slice(src.length)}:${line}`);
     }
