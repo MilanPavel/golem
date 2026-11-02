@@ -360,6 +360,209 @@ html.dark .golem-why-card img {
   height: auto;
 }
 
+/* VitePress's callouts title in the interface face, not the prose serif. */
+.vp-doc .custom-block .custom-block-title {
+  font-family: var(--golem-font-ui);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* ::: shem, an approval as the web UI draws it: a card with a clay seal (containers.ts). */
+.vp-doc .shem {
+  margin: 24px 0;
+  border: 1px solid var(--golem-line-strong);
+  border-radius: 16px;
+  background: var(--golem-surface);
+  box-shadow: 0 10px 32px -18px rgb(0 0 0 / 0.35);
+  overflow: hidden;
+}
+.vp-doc .shem-head {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px 16px 12px;
+}
+.vp-doc .seal {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  background: var(--golem-clay);
+  color: var(--golem-on-clay);
+  box-shadow: inset 0 -2px 0 rgb(0 0 0 / 0.18);
+}
+.vp-doc .seal svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.vp-doc .shem-ask {
+  min-width: 0;
+}
+.vp-doc .shem .shem-question {
+  margin: 0;
+  font: 600 15px/1.35 var(--golem-font-ui);
+  color: var(--golem-ink);
+}
+.vp-doc .shem-question code {
+  font-size: 13.5px;
+  background: var(--golem-clay-soft);
+  color: var(--golem-clay-ink);
+}
+.vp-doc .shem .shem-rule {
+  margin: 4px 0 0;
+  font: 12px/1.4 var(--golem-font-mono);
+  color: var(--golem-muted);
+  overflow-wrap: anywhere;
+}
+.vp-doc .shem-body {
+  border-top: 1px solid var(--golem-line);
+  border-bottom: 1px solid var(--golem-line);
+  background: var(--golem-bg);
+}
+.vp-doc .shem-body > :not(div[class*="language-"]) {
+  margin: 12px 16px;
+}
+.vp-doc .shem-body > div[class*="language-"] {
+  margin: 0;
+  border-radius: 0;
+  background: var(--golem-bg);
+}
+.vp-doc .shem-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 12px 16px 14px;
+}
+.vp-doc .shem-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 11px;
+  border: 1px solid var(--golem-line-strong);
+  border-radius: 10px;
+  background: var(--golem-surface);
+  font: 500 13px/1.4 var(--golem-font-ui);
+  color: var(--golem-ink);
+  white-space: nowrap;
+}
+.vp-doc .shem-btn.primary {
+  background: var(--golem-ink);
+  border-color: var(--golem-ink);
+  color: var(--golem-bg);
+}
+.vp-doc .shem-btn.deny {
+  color: var(--golem-deny);
+}
+.vp-doc .shem-btn kbd {
+  font: 11px/1 var(--golem-font-mono);
+  padding: 2px 4px;
+  border: 1px solid var(--golem-line-strong);
+  border-radius: 4px;
+  color: var(--golem-muted);
+}
+.vp-doc .shem-btn.primary kbd {
+  border-color: color-mix(in srgb, var(--golem-bg) 40%, transparent);
+  color: var(--golem-bg);
+}
+.vp-doc .shem-sp {
+  flex: 1;
+}
+
+/* ```tablet, a tool line and its output, as a tool line opens in the web UI. */
+.vp-doc .tablet {
+  margin: 16px 0;
+  border: 1px solid var(--golem-line);
+  border-radius: 10px;
+  background: var(--golem-code-bg);
+  overflow: hidden;
+}
+.vp-doc .tablet-line {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--golem-line);
+  background: var(--golem-sunken);
+  font: 12.5px/1.4 var(--golem-font-mono);
+  color: var(--golem-muted);
+}
+.vp-doc .tablet-tool {
+  color: var(--golem-ink);
+  font-weight: 500;
+}
+.vp-doc .tablet-arg {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vp-doc .tablet-result {
+  color: var(--golem-faint);
+  white-space: nowrap;
+}
+.vp-doc .tablet-result::before {
+  content: "✓ ";
+  color: var(--golem-allow);
+}
+.vp-doc .tablet pre {
+  margin: 0;
+  padding: 10px 12px;
+  overflow-x: auto;
+  font: 12.5px/1.6 var(--golem-font-mono);
+  color: var(--golem-muted);
+  white-space: pre;
+}
+
+/* ::: concept and ::: golem, the two halves of a "How agents work" page. The general idea
+   sits on a quiet rule; golem's half carries clay and the golem's mark. */
+.vp-doc .golem-half {
+  margin: 20px 0;
+  padding: 4px 0 4px 20px;
+  border-left: 3px solid var(--golem-line-strong);
+}
+.vp-doc .golem-half.golem {
+  padding: 16px 20px 6px;
+  border: 1px solid var(--golem-line);
+  border-left: 3px solid var(--golem-clay);
+  border-radius: 4px 12px 12px 4px;
+  background: color-mix(in srgb, var(--golem-clay-soft) 45%, var(--golem-bg));
+}
+.vp-doc .golem-half .golem-half-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 4px;
+  font-family: var(--golem-font-pixel);
+  font-size: 12px;
+  line-height: 1.4;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--golem-muted);
+}
+.vp-doc .golem-half.golem .golem-half-title {
+  color: var(--golem-clay-ink);
+}
+.vp-doc .golem-half.golem .golem-half-title::before {
+  content: "";
+  width: 18px;
+  height: 12px;
+  background: var(--golem-mark) no-repeat center / contain;
+  image-rendering: pixelated;
+}
+.vp-doc .golem-half > :last-child {
+  margin-bottom: 12px;
+}
+
 /* The 404 page: one of the web UI's full-screen states. */
 .golem-state {
   display: flex;
