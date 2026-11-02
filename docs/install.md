@@ -127,4 +127,4 @@ Run `golem doctor` first. It checks the install from top to bottom and prints a 
 | macOS asks whether golem may use a Keychain item | Choose Always Allow. It asks once, for keys saved by an older copy of golem |
 | Anything else | Run `golem daemon logs` |
 
-Settings are in `~/.golem/config.toml`. The [README](../README.md#choose-a-model) lists them all.
+Settings are in `~/.golem/config.toml`. [Models and API keys](guide/models.md#settings) lists them all.
