@@ -2,6 +2,7 @@ import { homedir } from "node:os";
 import { useEffect, useRef, useState } from "react";
 import { Box, Text, useApp, useInput, usePaste, useStdin, useWindowSize } from "ink";
 import {
+  MODEL_NOT_CONFIGURED,
   RpcError,
   SESSION_NOT_FOUND,
   type ApprovalChoice,
@@ -22,6 +23,13 @@ import {
   emptyChat,
   firstRunChoice,
   forkPoint,
+  NO_MODEL_NOTICE,
+  noModelChosen,
+  pressFirstRun,
+  recommendedLocal,
+  startFirstRun,
+  suggestedOption,
+  type FirstRun,
   providersUp,
   reduceChat,
   RETRY_QUESTION,
@@ -54,6 +62,7 @@ import {
   pickerHint,
   pickerKeyOf,
   pickerName,
+  providerMissing,
   pressPicker,
   unusableReason,
   withPulls,
@@ -61,6 +70,8 @@ import {
   type PullState,
 } from "./model-picker.ts";
 import { ModelPickerView } from "./model-picker.tsx";
+import { layoutWelcome, welcomeKeyOf } from "./welcome.ts";
+import { WelcomeView } from "./welcome.tsx";
 import { draftAt, edit, editDraft, insertText, type Draft } from "./edit.ts";
 import { collapsePaste, deleteToken, expandPastes, noPastes, type Pastes } from "./paste.ts";
 import {
@@ -332,6 +343,10 @@ export function App({
   const listingRef = useRef(listing);
   listingRef.current = listing;
   const firstRunChecked = useRef(false);
+  // The first-start card. It shows while the step is `choose`; `local` and `key` are in the picker.
+  const [welcome, setWelcome] = useState<FirstRun | null>(null);
+  const welcomeRef = useRef(welcome);
+  welcomeRef.current = welcome;
   const [pulls, setPulls] = useState<Record<string, PullState>>({});
   const pullsRef = useRef(pulls);
   pullsRef.current = pulls;
@@ -464,7 +479,8 @@ export function App({
       ? measured
       : layoutTranscript(chat.messages, columns, chatHeight, followed.offset, transcriptOptions);
   const model = preferModel(sessionModel, daemonModel);
-  const chip = modelChip(model.name, model.profile);
+  // Before any model is chosen the session's name is only a placeholder.
+  const chip = listing?.default === null && model.provider === null ? "no model" : modelChip(model.name, model.profile);
   const cwd = shortCwd(sessionCwd ?? process.cwd(), homedir());
   const versions = versionLabel(GOLEM_VERSION, daemonVersion);
   const phase = meterPhase(chat.busy, assistantChars(chat.messages), chat.approval !== null);
@@ -874,7 +890,7 @@ export function App({
       return;
     }
     if (choice.kind === "pick") {
-      setPicker(openPicker(null, true));
+      showWelcome(startFirstRun(listing, true));
       return;
     }
     chooseModel(choice.model, pickerName(choice.model), true, `Using ${choice.model.ref}, the only model ready. /model to change.`);
@@ -1231,9 +1247,64 @@ export function App({
           session.startNew();
           return;
         }
+        if (error instanceof RpcError && noModelChosen(error.code, error.message, MODEL_NOT_CONFIGURED)) {
+          setChat((current) => ({ ...current, busy: false, error: NO_MODEL_NOTICE }));
+          openWelcome();
+          return;
+        }
         setChat((current) => ({ ...current, busy: false, error: messageOf(error) }));
       },
     );
+  }
+
+  function showWelcome(next: FirstRun | null): void {
+    welcomeRef.current = next;
+    setWelcome(next);
+  }
+
+  /** The first-run choices again, after a send with no model chosen. */
+  function openWelcome(): void {
+    const current = listingRef.current;
+    if (current === null) {
+      loadModels(false);
+      return;
+    }
+    showWelcome({ step: "choose", option: suggestedOption(current) });
+  }
+
+  function onWelcomePress(press: Press): void {
+    const state = welcomeRef.current;
+    const current = listingRef.current;
+    const key = welcomeKeyOf(press);
+    if (state === null || current === null || key === null) {
+      return;
+    }
+    const next = key === "later" ? ({ step: "ready" } as const) : pressFirstRun(state, key);
+    if (next.step === "ready") {
+      showWelcome(null);
+      setChat((chat) => ({ ...chat, error: null, notice: "no model chosen yet: /model any time" }));
+      return;
+    }
+    showWelcome(next);
+    if (next.step === "local") {
+      const model = recommendedLocal(current);
+      if (model !== null && model.status === "ready") {
+        showWelcome(null);
+        chooseModel(model, pickerName(model), true);
+        return;
+      }
+      const confirm =
+        model === null ? null : confirmFor(providerMissing(current, model.provider) ? "install" : "pull", model, true);
+      const opened = openPicker(model?.ref ?? null, true, confirm);
+      pickerRef.current = opened;
+      setPicker(opened);
+    } else if (next.step === "key") {
+      const hosted = current.models.find((model) => model.provider !== "ollama" && model.status === "ready") ??
+        current.models.find((model) => model.status === "needs_key");
+      const opened = openPicker(hosted?.ref ?? null, true);
+      pickerRef.current = opened;
+      setPicker(opened);
+    }
   }
 
   function loadModels(refresh: boolean): void {
@@ -1541,6 +1612,16 @@ export function App({
     pickerRef.current = pressed.state;
     setPicker(pressed.state);
     const action = pressed.action;
+    const starting = welcomeRef.current;
+    if (starting !== null && (starting.step === "local" || starting.step === "key")) {
+      if (action.kind === "close") {
+        showWelcome(pressFirstRun(starting, "back"));
+        return;
+      }
+      if (action.kind === "choose" || action.kind === "pull" || action.kind === "install") {
+        showWelcome(null);
+      }
+    }
     if (action.kind === "refresh") {
       setChat((current) => ({ ...current, notice: "refreshing models…" }));
       loadModels(true);
@@ -2012,6 +2093,10 @@ export function App({
       onPickerPress(press);
       return;
     }
+    if (welcomeRef.current?.step === "choose" && !keysOpenRef.current && press.name !== "f1") {
+      onWelcomePress(press);
+      return;
+    }
     if (permsRef.current.open && !keysOpenRef.current && press.name !== "f1" && press.name !== "ctrl-c") {
       onPermissionsPress(press);
       return;
@@ -2114,6 +2199,7 @@ export function App({
       busyRef.current ||
       switcherRef.current.open ||
       pickerRef.current.open ||
+      welcomeRef.current?.step === "choose" ||
       permsRef.current.open ||
       mcpManagerRef.current.open ||
       skillsManagerRef.current.open ||
@@ -2223,6 +2309,8 @@ export function App({
           height={budget.body}
           hint={pickerHint(picker, shownListing?.ram_gb ?? null)}
         />
+      ) : welcome?.step === "choose" && shownListing !== null ? (
+        <WelcomeView rows={layoutWelcome(welcome.option, shownListing)} columns={columns} height={budget.body} />
       ) : mcpManager.open ? (
         <Box flexDirection="column" width={columns} height={budget.body} flexShrink={0} overflow="hidden">
           {layoutMcpManager({
