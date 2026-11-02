@@ -75,7 +75,7 @@ export function connectionScreen({ state }: ConnectionSnapshot): ScreenSpec | nu
           kind: "daemon-down",
           tag: `reconnecting · attempt ${state.attempt}`,
           heading: "golem's daemon is not running",
-          sentence: "Start it. This page reconnects by itself.",
+          sentence: "Start it, and this page reconnects by itself. If it does not start, golem status says why.",
           command: "golem daemon start",
           golem: "offline",
         };
