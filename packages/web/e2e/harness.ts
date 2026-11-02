@@ -1,8 +1,10 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer, type Server, type Socket } from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
+import type { FakeModel } from "./fake-model.ts";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const REPO = path.resolve(HERE, "../../..");
@@ -72,6 +74,18 @@ async function waitFor(what: string, ms: number, ready: () => boolean, child?: C
     if (Date.now() > end) throw new Error(`${what}: not ready after ${ms} ms`);
     await new Promise((r) => setTimeout(r, 50));
   }
+}
+
+/** Points the daemon in `home` at the fake model, with session titles off (no extra model call). */
+export function writeModelConfig(home: string, model: Pick<FakeModel, "baseUrl">): void {
+  const lines = [
+    'model_provider = "openai_compat"',
+    'model_name = "fake"',
+    `model_base_url = "${model.baseUrl}"`,
+    "session_titles = false",
+    "",
+  ];
+  writeFileSync(path.join(home, "config.toml"), lines.join("\n"));
 }
 
 export interface Daemon {
