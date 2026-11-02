@@ -73,6 +73,10 @@ const sidebar: DefaultTheme.Sidebar = [
     items: [
       { text: "Models and API keys", link: "/guide/models" },
       { text: "Commands", link: "/guide/commands" },
+      { text: "Tools and permissions", link: "/guide/permissions" },
+      { text: "MCP servers", link: "/guide/mcp" },
+      { text: "Skills", link: "/guide/skills" },
+      { text: "The web UI", link: "/guide/web" },
     ],
   },
   {

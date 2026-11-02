@@ -65,7 +65,7 @@ a once · s this session · w always (saves a rule) · e edit · d deny
 | **e** | Edit the call's arguments first, then allow it once |
 | **d** or **Esc** | Deny it. The model is told the call was denied, and carries on without it |
 
-In the browser, the same question is a card:
+The [web UI](./web.md) will show the same question as a card. It is the next step of the web UI, so for now answer approvals in the terminal:
 
 ::: shem Allow `edit_file` on README.md? | rule: edit_file → ask · built-in default
 
@@ -79,7 +79,7 @@ In the browser, the same question is a card:
 
 :::
 
-The line under the question says which rule asked. A command goes through the same question before it runs, and it runs in a sandbox: only inside the folder, and with no network unless you allow it. How the rules decide is in [ADR-012](../adr/012-permission-rules.md) and [ADR-013](../adr/013-approvals.md).
+The line under the question says which rule asked. A command goes through the same question before it runs, and it runs in a sandbox: only inside the folder, and with no network unless you allow it. [Tools and permissions](./permissions.md) explains the rules, and how to stop golem asking for the calls you trust.
 
 ## Stop, leave, and come back
 
@@ -91,5 +91,6 @@ The line under the question says which rule asked. A command goes through the sa
 ## Next
 
 - [How it works](./introduction.md#how-it-works), if you skipped it.
-- Open the same chat in your browser with `golem web`.
+- Open the same chat in your browser with [`golem web`](./web.md).
+- [Models and API keys](./models.md) and [Commands](./commands.md), for everything else.
 - Something wrong? [When something is wrong](../install.md#when-something-is-wrong) lists the usual fixes.

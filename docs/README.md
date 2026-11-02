@@ -20,10 +20,10 @@ For someone who wants to use golem today.
 |---|---|---|
 | Models and API keys | [guide/models.md](guide/models.md) | |
 | Commands, in the shell and in the chat | [guide/commands.md](guide/commands.md) | |
-| Tools and permissions | `guide/permissions.md` | [#279](https://github.com/MilanPavel/golem/issues/279) |
-| MCP servers | `guide/mcp.md` | [#279](https://github.com/MilanPavel/golem/issues/279) |
-| Skills | `guide/skills.md` | [#279](https://github.com/MilanPavel/golem/issues/279) |
-| The web UI | `guide/web.md` | [#279](https://github.com/MilanPavel/golem/issues/279) |
+| Tools and permissions | [guide/permissions.md](guide/permissions.md) | |
+| MCP servers | [guide/mcp.md](guide/mcp.md) | |
+| Skills | [guide/skills.md](guide/skills.md) | |
+| The web UI | [guide/web.md](guide/web.md) | |
 
 ## How agents work
 
