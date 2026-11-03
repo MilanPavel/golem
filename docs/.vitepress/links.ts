@@ -19,9 +19,12 @@ const SCHEME = /^[a-z][a-z0-9+.-]*:/i;
  *
  * @param href the link as written in the markdown
  * @param page the page's path relative to docs/, such as `adr/024-commits-prs-releases.md`
- * @returns the href to use: unchanged for pages, anchors, assets, and absolute URLs, or a GitHub URL
+ * @param from the file the link was written in, relative to docs/: the page itself, or a file the
+ *   page includes, such as `../CONTRIBUTING.md`
+ * @returns the href to use: unchanged for pages, anchors, assets, and absolute URLs, or a GitHub URL.
+ *   A link to a page from an included file is made relative to the page instead.
  */
-export function siteHref(href: string, page: string): string {
+export function siteHref(href: string, page: string, from: string = page): string {
   if (href === "" || href.startsWith("#") || href.startsWith("/") || SCHEME.test(href)) return href;
 
   const hashAt = href.indexOf("#");
@@ -30,14 +33,38 @@ export function siteHref(href: string, page: string): string {
   if (target === "" || ASSET.test(target)) return href;
 
   // A path relative to the repo root, in posix form.
-  const fromRoot = path.posix.normalize(path.posix.join("docs", path.posix.dirname(page), target));
+  const fromRoot = path.posix.normalize(path.posix.join("docs", path.posix.dirname(from), target));
   const inDocs = fromRoot.startsWith("docs/");
   const inDocsPath = inDocs ? fromRoot.slice("docs/".length) : "";
   const isPage = inDocs && inDocsPath.endsWith(".md") && !NOT_PAGES.includes(inDocsPath);
-  if (isPage) return href;
+  if (isPage) {
+    if (from === page) return href;
+    return path.posix.relative(path.posix.join("docs", path.posix.dirname(page)), fromRoot) + hash;
+  }
 
   const isFolder = target.endsWith("/") || !path.posix.extname(fromRoot);
   return (isFolder ? TREE : BLOB) + fromRoot.replace(/\/$/, "") + hash;
+}
+
+const LINKS_FROM = /^<!--\s*links-from:\s*(\S+)\s*-->$/;
+
+/**
+ * `<!--@include:-->` pastes a file as is, so a page that includes a file from elsewhere, such as
+ * CONTRIBUTING.md, says where that file's links were written. The path is relative to the page:
+ *
+ *     <!-- links-from: ../../CONTRIBUTING.md -->
+ *     <!--@include: ../../CONTRIBUTING.md-->
+ *     <!-- links-from: page -->
+ *
+ * @param html an html_block's content
+ * @param page the page's path relative to docs/
+ * @returns the file the next links were written in, relative to docs/, or undefined for other HTML
+ */
+export function linksFrom(html: string, page: string): string | undefined {
+  const match = html.trim().match(LINKS_FROM);
+  if (!match) return undefined;
+  if (match[1] === "page") return page;
+  return path.posix.normalize(path.posix.join(path.posix.dirname(page), match[1]!));
 }
 
 /**
