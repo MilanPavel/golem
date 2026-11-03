@@ -101,7 +101,7 @@ Your chats and settings stay in `~/.golem`. To delete them too, run `rm -rf ~/.g
 
 ## When something is wrong
 
-Run `golem doctor` first. It checks the install from top to bottom and prints a fix under each problem:
+Run `golem doctor` first. It checks the install from top to bottom, prints a fix under each problem, and ends with the one thing to do next:
 
 ```text
 ✓ daemon   /opt/homebrew/opt/golem/libexec/golem-daemon/golem-daemon
@@ -111,10 +111,11 @@ Run `golem doctor` first. It checks the install from top to bottom and prints a 
 ✓ config   /Users/you/.golem/config.toml is valid
 ✓ model    new chats start on ollama/qwen3:8b
 ✗ ollama   Ollama is not installed
-           fix: pick a local model in /model, and golem installs it, or brew install ollama
+           fix: golem, then /setup installs it, or brew install ollama
 ✓ disk     154.6 GB free
 
 1 problem.
+Next: golem, then /setup installs it, or brew install ollama
 ```
 
 | What you see | What to do |

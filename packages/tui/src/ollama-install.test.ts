@@ -1,45 +1,21 @@
 import assert from "node:assert/strict";
-import { EventEmitter } from "node:events";
-import { PassThrough } from "node:stream";
 import { test } from "node:test";
 
 import {
-  findBrew,
   INSTALL_BAND_ROWS,
   INSTALL_KEPT_LINES,
-  type InstallEvent,
-  type InstallProcess,
   type InstallState,
+  installEventOf,
   installLines,
   installRows,
   OLLAMA_DOWNLOAD,
   reduceInstall,
-  runInstall,
   startedInstall,
 } from "./ollama-install.ts";
 
 function output(state: InstallState, ...texts: string[]): InstallState {
   return texts.reduce((next, text) => reduceInstall(next, { kind: "output", text }), state);
 }
-
-class FakeBrew extends EventEmitter {
-  stdout = new PassThrough();
-  stderr = new PassThrough();
-  killed: string[] = [];
-
-  kill(signal?: NodeJS.Signals): boolean {
-    this.killed.push(signal ?? "SIGTERM");
-    return true;
-  }
-}
-
-test("brew is found on PATH first, then where Homebrew installs it", () => {
-  const has = (files: string[]) => (file: string) => files.includes(file);
-  assert.equal(findBrew("/usr/bin:/Users/me/brew/bin", has(["/Users/me/brew/bin/brew"])), "/Users/me/brew/bin/brew");
-  assert.equal(findBrew("/usr/bin", has(["/opt/homebrew/bin/brew", "/usr/local/bin/brew"])), "/opt/homebrew/bin/brew");
-  assert.equal(findBrew(undefined, has(["/usr/local/bin/brew"])), "/usr/local/bin/brew");
-  assert.equal(findBrew("/usr/bin", has([])), null);
-});
 
 test("output becomes lines, without colours, and a redrawn line keeps its newest text", () => {
   const state = output(startedInstall, "==> Fetching \u001b[32mollama\u001b[0m\n##   10%\r####  50", "%\r###### 100%\n", "==> Pour");
@@ -109,56 +85,24 @@ test("without Homebrew the band links the download and runs nothing", () => {
   ]);
 });
 
-test("runInstall streams both outputs, then one exit", () => {
-  const brew = new FakeBrew();
-  const events: InstallEvent[] = [];
-  const calls: { command: string; args: string[]; hints: string | undefined }[] = [];
-  runInstall("/opt/homebrew/bin/brew", (event) => events.push(event), {
-    env: { PATH: "/usr/bin" },
-    spawn: (command, args, env) => {
-      calls.push({ command, args, hints: env.HOMEBREW_NO_ENV_HINTS });
-      return brew as unknown as InstallProcess;
-    },
+test("the daemon's output and its end become the band's events", () => {
+  assert.deepEqual(installEventOf({ kind: "output", text: "==> Pouring\n" }), { kind: "output", text: "==> Pouring\n" });
+  assert.deepEqual(installEventOf({ kind: "done", done: { outcome: "installed" } }), {
+    kind: "exit",
+    code: 0,
+    stopped: false,
   });
-  brew.stdout.emit("data", Buffer.from("==> Pouring\n"));
-  brew.stderr.emit("data", "Warning: x\n");
-  brew.emit("close", 0);
-  brew.emit("close", 0);
-  assert.deepEqual(calls, [{ command: "/opt/homebrew/bin/brew", args: ["install", "ollama"], hints: "1" }]);
-  assert.deepEqual(events, [
-    { kind: "output", text: "==> Pouring\n" },
-    { kind: "output", text: "Warning: x\n" },
-    { kind: "exit", code: 0, stopped: false },
-  ]);
-});
-
-test("stop sends SIGTERM once, and the exit says it was stopped", () => {
-  const brew = new FakeBrew();
-  const events: InstallEvent[] = [];
-  const run = runInstall("brew", (event) => events.push(event), { spawn: () => brew as unknown as InstallProcess });
-  run.stop();
-  run.stop();
-  brew.emit("close", 143);
-  run.stop();
-  assert.deepEqual(brew.killed, ["SIGTERM"]);
-  assert.deepEqual(events, [{ kind: "exit", code: 143, stopped: true }]);
-});
-
-test("a brew that cannot start fails with the reason", () => {
-  const events: InstallEvent[] = [];
-  runInstall("brew", (event) => events.push(event), {
-    spawn: () => {
-      throw new Error("spawn brew ENOENT");
-    },
+  assert.deepEqual(installEventOf({ kind: "done", done: { outcome: "stopped" } }), {
+    kind: "exit",
+    code: null,
+    stopped: true,
   });
-  const brew = new FakeBrew();
-  runInstall("brew", (event) => events.push(event), { spawn: () => brew as unknown as InstallProcess });
-  brew.emit("error", new Error("spawn brew EACCES"));
-  brew.emit("close", null);
-  assert.deepEqual(events, [
-    { kind: "error", message: "spawn brew ENOENT" },
-    { kind: "error", message: "spawn brew EACCES" },
-  ]);
+  assert.deepEqual(installEventOf({ kind: "done", done: { outcome: "failed", reason: "code 1: Error: no space" } }), {
+    kind: "error",
+    message: "code 1: Error: no space",
+  });
+  const done = reduceInstall(startedInstall, installEventOf({ kind: "done", done: { outcome: "installed" } }));
+  assert.equal(done.phase, "done");
 });
 
 test("the band is tall while brew runs or after it failed, and short otherwise", () => {

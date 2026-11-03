@@ -1,0 +1,15 @@
+{
+  "additionalProperties": false,
+  "description": "``running`` is false when golem may not start it: no Ollama, or ``[ollama] start`` off.",
+  "properties": {
+    "running": {
+      "title": "Running",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "running"
+  ],
+  "title": "OllamaStartResult",
+  "type": "object"
+}

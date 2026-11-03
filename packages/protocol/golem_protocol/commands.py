@@ -374,21 +374,25 @@ class SessionInspectResult(BaseModel):
 class AuthSetParams(BaseModel):
     """``auth.set``. Store an API key for ``provider`` in the OS credential store.
 
-    A client never logs or displays ``key``.
+    A client never logs or displays ``key``. With ``check``, a model
+    provider's key is tried against the provider first, and a key it rejects
+    is not stored.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     provider: str = Field(min_length=1)
     key: SecretStr = Field(min_length=1, max_length=4096)
+    check: bool = True
 
 
 class AuthSetResult(BaseModel):
-    """The provider whose key was stored."""
+    """The provider whose key was stored. ``models``: how many models a checked key opens."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     provider: str = Field(min_length=1)
+    models: int | None = Field(default=None, ge=0)
 
 
 class AuthRemoveParams(BaseModel):
@@ -1014,6 +1018,102 @@ class ApprovalRespondResult(BaseModel):
     run_id: str = Field(min_length=1)
 
 
+SetupPart = Literal["service", "socket", "config", "engine", "model", "tools", "disk"]
+SetupState = Literal["ok", "warn", "fail"]
+SetupAction = Literal["install_ollama", "start_ollama", "pick_model", "set_key", "edit_config"]
+
+
+class SetupStatusParams(BaseModel):
+    """``setup.status``. What is set up and what is broken, as ``golem doctor`` sees it."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+class SetupRow(BaseModel):
+    """One check. ``fix`` is a command to type; ``action`` is what a setup screen offers instead.
+
+    ``target`` is what the action is about: a provider for ``set_key``, a
+    model ref for ``pick_model``.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    part: SetupPart
+    name: str = Field(min_length=1)
+    state: SetupState
+    detail: str
+    fix: str | None = None
+    action: SetupAction | None = None
+    target: str | None = Field(default=None, min_length=1)
+
+
+class SetupStatusResult(BaseModel):
+    """The rows in the order ``golem doctor`` prints them."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    rows: list[SetupRow]
+
+
+class OllamaInstallParams(BaseModel):
+    """``ollama.install``. Install Ollama with Homebrew. Output: ``ollama.install.output``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+class OllamaInstallResult(BaseModel):
+    """``started`` is false when an install was already running."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    started: bool
+
+
+class OllamaInstallCancelParams(BaseModel):
+    """``ollama.install_cancel``. Stop a running install."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+class OllamaInstallCancelResult(BaseModel):
+    """``cancelled`` is false when no install was running."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    cancelled: bool
+
+
+class OllamaInstallOutput(BaseModel):
+    """Output from ``brew install ollama`` as it came, carriage returns included."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    text: str
+
+
+class OllamaInstallDone(BaseModel):
+    """The install ended. ``reason`` says why when it ``failed``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    outcome: Literal["installed", "failed", "stopped"]
+    reason: str | None = None
+
+
+class OllamaStartParams(BaseModel):
+    """``ollama.start``. Start the local Ollama now, as a model call would."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+class OllamaStartResult(BaseModel):
+    """``running`` is false when golem may not start it: no Ollama, or ``[ollama] start`` off."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    running: bool
+
+
 __all__ = [
     "ApprovalRespondParams",
     "ApprovalRespondResult",
@@ -1064,6 +1164,14 @@ __all__ = [
     "ModelPullResult",
     "ModelSetDefaultParams",
     "ModelSetDefaultResult",
+    "OllamaInstallCancelParams",
+    "OllamaInstallCancelResult",
+    "OllamaInstallDone",
+    "OllamaInstallOutput",
+    "OllamaInstallParams",
+    "OllamaInstallResult",
+    "OllamaStartParams",
+    "OllamaStartResult",
     "PingParams",
     "PolicyEditResult",
     "PolicyRemoveParams",
@@ -1093,6 +1201,12 @@ __all__ = [
     "SessionSetSkillsParams",
     "SessionSetSkillsResult",
     "SessionSummary",
+    "SetupAction",
+    "SetupPart",
+    "SetupRow",
+    "SetupState",
+    "SetupStatusParams",
+    "SetupStatusResult",
     "SkillListParams",
     "SkillListResult",
     "SkillRegistryChanged",

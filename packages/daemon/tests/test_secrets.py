@@ -141,7 +141,8 @@ async def test_no_file_under_the_golem_home_holds_a_stored_key(short_home: Path)
     try:
         await client.call("hello", HELLO)
         key = "sk-ant-golem-secret-test-1234567890"
-        rpc_result(await client.call("auth.set", {"provider": "anthropic", "key": key}))
+        params = {"provider": "anthropic", "key": key, "check": False}
+        rpc_result(await client.call("auth.set", params))
         await client.call("auth.list")
     finally:
         await client.close()

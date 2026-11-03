@@ -7,6 +7,7 @@ from typing import Literal
 
 from golem.mcp import McpSupervisor
 from golem.models.discovery import ModelDiscovery
+from golem.models.install import OllamaInstaller
 from golem.models.ollama import LocalServers
 from golem.models.pulls import PullManager
 from golem.paths import GolemPaths
@@ -35,3 +36,4 @@ class DaemonState:
     secrets: SecretStore | None = None
     skills: SkillRegistry | None = None
     local_servers: LocalServers | None = None
+    installer: OllamaInstaller | None = None

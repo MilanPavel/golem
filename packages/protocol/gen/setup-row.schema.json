@@ -1,0 +1,89 @@
+{
+  "additionalProperties": false,
+  "description": "One check. ``fix`` is a command to type; ``action`` is what a setup screen offers instead.\n\n``target`` is what the action is about: a provider for ``set_key``, a\nmodel ref for ``pick_model``.",
+  "properties": {
+    "action": {
+      "anyOf": [
+        {
+          "enum": [
+            "install_ollama",
+            "start_ollama",
+            "pick_model",
+            "set_key",
+            "edit_config"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Action"
+    },
+    "detail": {
+      "title": "Detail",
+      "type": "string"
+    },
+    "fix": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Fix"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "part": {
+      "enum": [
+        "service",
+        "socket",
+        "config",
+        "engine",
+        "model",
+        "tools",
+        "disk"
+      ],
+      "title": "Part",
+      "type": "string"
+    },
+    "state": {
+      "enum": [
+        "ok",
+        "warn",
+        "fail"
+      ],
+      "title": "State",
+      "type": "string"
+    },
+    "target": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Target"
+    }
+  },
+  "required": [
+    "part",
+    "name",
+    "state",
+    "detail"
+  ],
+  "title": "SetupRow",
+  "type": "object"
+}

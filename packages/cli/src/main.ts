@@ -3,7 +3,14 @@ import { existsSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { connectGolem, GOLEM_VERSION, readStartError, resolveSocketPath } from "@golem/client/node";
+import {
+  connectGolem,
+  GOLEM_VERSION,
+  KEY_UNCHECKED,
+  readStartError,
+  resolveSocketPath,
+  RpcError,
+} from "@golem/client/node";
 
 import type { DaemonStatus } from "../../protocol/gen/daemon-status.ts";
 
@@ -36,7 +43,7 @@ const USAGE =
   "usage: golem\n" +
   "       golem --version | golem --help | golem status | golem doctor\n" +
   "       golem daemon install|start|stop|restart|uninstall|logs\n" +
-  "       golem auth set|remove <provider> | golem auth list | golem models [--refresh]\n" +
+  "       golem auth set <provider> [--no-check] | golem auth remove <provider> | golem auth list | golem models [--refresh]\n" +
   "       golem config show [--resolved] | golem skills [list] | golem skills check <path>\n" +
   "       golem web [--port N] [--no-open] [--json]";
 
@@ -140,7 +147,9 @@ async function runModels(refresh: boolean): Promise<number> {
   }
 }
 
-async function runAuth(args: string[]): Promise<number> {
+async function runAuth(given: string[]): Promise<number> {
+  const check = !given.includes("--no-check");
+  const args = given.filter((arg) => arg !== "--no-check");
   const [action, provider, ...extra] = args;
   const named = provider !== undefined && provider.length > 0 && extra.length === 0;
   if (!(action === "list" && provider === undefined) && !((action === "set" || action === "remove") && named)) {
@@ -166,8 +175,12 @@ async function runAuth(args: string[]): Promise<number> {
       const listed = await client.listKeys();
       process.stdout.write(`${formatKeys(listed.providers)}\n`);
     } else if (action === "set") {
-      await client.setKey(provider ?? "", key);
-      process.stdout.write(`${provider} key saved in the Keychain\n`);
+      const stored = await client.setKey(provider ?? "", key, { check });
+      const opens =
+        stored.models === undefined || stored.models === null
+          ? ""
+          : ` · it works, ${stored.models} ${stored.models === 1 ? "model" : "models"}`;
+      process.stdout.write(`${provider} key saved in the Keychain${opens}\n`);
     } else {
       const removed = await client.removeKey(provider ?? "");
       process.stdout.write(
@@ -177,6 +190,9 @@ async function runAuth(args: string[]): Promise<number> {
     return 0;
   } catch (error) {
     process.stderr.write(`${explainClient(error)}\n`);
+    if (error instanceof RpcError && error.code === KEY_UNCHECKED) {
+      process.stderr.write(`to store it anyway: golem auth set ${provider} --no-check\n`);
+    }
     return 1;
   } finally {
     client.close();

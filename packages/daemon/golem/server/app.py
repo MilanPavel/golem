@@ -21,6 +21,7 @@ from golem.lock import DaemonAlreadyRunning, DaemonLock
 from golem.logging import configure_logging
 from golem.mcp import McpSupervisor
 from golem.models.discovery import ModelDiscovery
+from golem.models.install import OllamaInstaller
 from golem.models.keys import ProviderKeys
 from golem.models.ollama import LocalServer, LocalServers, ServerState
 from golem.models.pulls import PullManager
@@ -202,6 +203,7 @@ class DaemonApp:
                 models.local = local
                 self.state.models = models
                 self.state.pulls = pulls
+                self.state.installer = OllamaInstaller(broadcast=self._broadcast)
                 try:
                     if install_signals:
                         installed = _install_signals(loop, self.request_shutdown)
@@ -228,6 +230,9 @@ class DaemonApp:
             if self.state.skills is not None:
                 await self.state.skills.aclose()
             self.state.skills = None
+            if self.state.installer is not None:
+                await self.state.installer.aclose()
+            self.state.installer = None
             if self.state.pulls is not None:
                 await self.state.pulls.aclose()
             self.state.pulls = None

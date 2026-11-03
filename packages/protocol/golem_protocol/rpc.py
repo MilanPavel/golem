@@ -9,6 +9,8 @@ from golem_protocol.commands import (
     ModelPullDone,
     ModelPullProgress,
     ModelServerStatus,
+    OllamaInstallDone,
+    OllamaInstallOutput,
     SessionSummary,
     SkillRegistryChanged,
 )
@@ -153,3 +155,23 @@ __all__ = [
     "SessionSummaryNotification",
     "SkillRegistryChangedNotification",
 ]
+
+
+class OllamaInstallOutputNotification(BaseModel):
+    """Server → every connection: output from a running Ollama install. Not stored."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    jsonrpc: Literal["2.0"] = "2.0"
+    method: Literal["ollama.install.output"] = "ollama.install.output"
+    params: OllamaInstallOutput
+
+
+class OllamaInstallDoneNotification(BaseModel):
+    """Server → every connection: an Ollama install ended. Not stored."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    jsonrpc: Literal["2.0"] = "2.0"
+    method: Literal["ollama.install.done"] = "ollama.install.done"
+    params: OllamaInstallDone
