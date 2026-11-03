@@ -765,7 +765,7 @@ The same formula will work on Linux (plan step 8.2), with a systemd service inst
 
 ## 11. Settings that matter for running golem
 
-All settings are listed in the [README](../README.md#all-settings). For running golem, you mostly need to know where settings come from and when they take effect.
+All settings are listed in [Models and API keys](guide/models.md#settings). For running golem, you mostly need to know where settings come from and when they take effect.
 
 **Where they come from.** If the same setting is in more than one place, the last one wins:
 

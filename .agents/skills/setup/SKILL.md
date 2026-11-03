@@ -57,4 +57,4 @@ End with a short summary:
 
 - what is ready;
 - what is still a warning;
-- the next command, `just golem` to open the chat, as in the README.
+- the next command, `just golem` to open the chat, as in docs/contributing/hacking.md.
