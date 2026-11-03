@@ -10,9 +10,15 @@
 //   ```
 //
 //   ::: concept [title]  /  ::: golem [title]    the two halves of a "How agents work" page
+//
+//   ```screen A4 · Engine | Enter on **On this Mac** → A5
+//   …the screen as plain text…       a TUI screen in a terminal window, coloured by
+//   ```                              screen.ts from its marks (✓ ✗ ! › ⠙ ███ and the hints)
 
 import container from "markdown-it-container";
 import type { MarkdownRenderer as MarkdownIt } from "vitepress";
+
+import { renderScreen } from "./screen.ts";
 
 // The web UI's seal: a shield with a tick.
 const SEAL =
@@ -68,6 +74,13 @@ export function golemContainers(md: MarkdownIt): void {
   md.renderer.rules.fence = (tokens, idx, options, env, self) => {
     const token = tokens[idx]!;
     const [lang, ...rest] = token.info.trim().split(/\s+/);
+    if (lang === "screen") {
+      const [title = "", caption = ""] = rest.join(" ").split(/\s+\|\s+/, 2);
+      return renderScreen(token.content, {
+        title: md.utils.escapeHtml(title),
+        caption: caption ? md.renderInline(caption) : "",
+      });
+    }
     if (lang !== "tablet") return fence(tokens, idx, options, env, self);
     const [tool = "", ...args] = rest;
     const [arg = "", result = ""] = args.join(" ").split(/\s+·\s+/, 2);
