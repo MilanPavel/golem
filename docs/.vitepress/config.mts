@@ -86,6 +86,7 @@ const sidebar: DefaultTheme.Sidebar = [
       { text: "The monorepo", link: "/monorepo" },
       { text: "Building, releasing, and running", link: "/sre" },
       { text: "The web UI's design", link: "/design/web" },
+      { text: "The setup window's design", link: "/design/setup-window" },
     ],
   },
   {
