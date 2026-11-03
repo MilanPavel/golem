@@ -1,4 +1,5 @@
 export type { ApprovalChoice } from "@golem/client";
+export { editedArgs, parseArgs, type ParsedArgs } from "./approval-args.ts";
 export {
   appendDelta,
   CANCELLED_NOTICE,

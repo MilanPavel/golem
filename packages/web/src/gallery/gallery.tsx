@@ -139,6 +139,12 @@ function DiffDemo() {
   );
 }
 
+/** A pending card whose editor is open, and closes on Cancel. */
+function EditingDemo({ draft }: { draft?: string }) {
+  const [editing, setEditing] = useState(true);
+  return <ApprovalCard tool={PENDING_SHELL} pending editing={editing} draft={draft} onEdit={setEditing} onAnswer={() => {}} />;
+}
+
 /** The approval card, pending and answered. */
 function ApprovalDemo() {
   return (
@@ -147,6 +153,14 @@ function ApprovalDemo() {
       <div className="flex flex-col gap-4">
         <ApprovalCard tool={PENDING_EDIT} pending onAnswer={() => {}} />
         <ApprovalCard tool={PENDING_SHELL} pending onAnswer={() => {}} />
+        <div>
+          <p className="mb-1 text-xs text-muted">Editing the arguments</p>
+          <EditingDemo />
+        </div>
+        <div>
+          <p className="mb-1 text-xs text-muted">Editing the arguments, not valid JSON</p>
+          <EditingDemo draft={'{\n  "command": "pnpm test",\n'} />
+        </div>
         {ANSWERED.map(({ label, tool }) => (
           <div key={label}>
             <p className="mb-1 text-xs text-muted">{label}</p>

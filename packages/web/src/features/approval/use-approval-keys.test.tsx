@@ -65,3 +65,23 @@ test("with no pending call there is no listener", () => {
   fireEvent.keyDown(document.body, { key: "d" });
   expect(onAnswer).not.toHaveBeenCalled();
 });
+
+test("e and E on the page open the editor, and follow the same ignore rules", () => {
+  const onAnswer = vi.fn();
+  const onEdit = vi.fn();
+  function EditProbe({ canAnswer = () => true }: { canAnswer?: () => boolean }) {
+    useApprovalKeys({ callId: "c1", canAnswer, onAnswer, onEdit });
+    return <textarea aria-label="Message" />;
+  }
+  const view = render(<EditProbe />);
+  fireEvent.keyDown(document.body, { key: "e" });
+  fireEvent.keyDown(document.body, { key: "E" });
+  expect(onEdit.mock.calls).toEqual([["c1"], ["c1"]]);
+  fireEvent.keyDown(view.getByLabelText("Message"), { key: "e" });
+  fireEvent.keyDown(document.body, { key: "e", metaKey: true });
+  expect(onEdit).toHaveBeenCalledTimes(2);
+  view.rerender(<EditProbe canAnswer={() => false} />);
+  fireEvent.keyDown(document.body, { key: "e" });
+  expect(onEdit).toHaveBeenCalledTimes(2);
+  expect(onAnswer).not.toHaveBeenCalled();
+});

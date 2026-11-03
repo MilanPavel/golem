@@ -1,5 +1,5 @@
 import type { ApprovalLine } from "./approval.ts";
-import type { PendingApproval } from "@golem/view";
+import { editedArgs as editedArgsOf, parseArgs, type PendingApproval } from "@golem/view";
 import { type Draft, draftAt } from "./edit.ts";
 
 /** The waiting call's arguments, edited as JSON in the composer's place. */
@@ -12,7 +12,7 @@ export type ArgsEdit = {
   submitting: boolean;
 };
 
-export type ParsedArgs = { ok: true; args: Record<string, unknown> } | { ok: false; error: string };
+export { parseArgs };
 
 /** Rows the editor may take, in place of the composer's five. */
 export const ARGS_EDIT_ROWS = 12;
@@ -32,20 +32,7 @@ export function editedArgs(
   approval: PendingApproval,
   args: Readonly<Record<string, unknown>>,
 ): Readonly<Record<string, unknown>> | null {
-  return JSON.stringify(args) === JSON.stringify(approval.args) ? null : args;
-}
-
-export function parseArgs(text: string): ParsedArgs {
-  let value: unknown;
-  try {
-    value = JSON.parse(text);
-  } catch (error) {
-    return { ok: false, error: `not JSON: ${error instanceof Error ? error.message : String(error)}` };
-  }
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    return { ok: false, error: "the arguments must be one JSON object" };
-  }
-  return { ok: true, args: value as Record<string, unknown> };
+  return editedArgsOf(approval.args, args);
 }
 
 /** The band above the editor: what is edited, the last error or the keys. */
