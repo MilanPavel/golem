@@ -1,6 +1,9 @@
-import { LIVE_OUTPUT_CHARS, type ChatMessage, type ChatState, type ToolBlock } from "@golem/view";
+import { LIVE_OUTPUT_CHARS, type ChatMessage, type ChatState, type ToolBlock, type ApprovalChoice } from "@golem/view";
 import { memo, useCallback, useId, useLayoutEffect, useRef, useState } from "react";
-import { useSession } from "../../store/page-context.tsx";
+import { usePageActions, useDraftReader, useSession } from "../../store/page-context.tsx";
+import { ApprovalCard } from "../approval/approval-card.tsx";
+import { useApprovalAnswer } from "../approval/use-approval-answer.ts";
+import { useApprovalKeys } from "../approval/use-approval-keys.ts";
 import { Button } from "../../ui/button.tsx";
 import { cn } from "../../ui/cn.ts";
 import type { GolemState } from "../../ui/golem-state.ts";
@@ -22,6 +25,13 @@ function ToolResult({ tool }: { tool: ToolBlock }) {
         </span>
       );
     case "failed":
+      if (tool.approval?.answer?.decision === "deny") {
+        return (
+          <span className="whitespace-nowrap text-deny">
+            <span aria-hidden="true">✗ </span>denied
+          </span>
+        );
+      }
       return (
         <span className="max-w-xs truncate whitespace-nowrap text-deny" title={tool.error}>
           <span aria-hidden="true">✗ </span>
@@ -146,7 +156,21 @@ export const UserMessage = memo(function UserMessage({ message }: { message: Cha
   );
 });
 
-export const GolemMessage = memo(function GolemMessage({ message }: { message: ChatMessage }) {
+type Answering = {
+  /** The call this message's card waits on, or null when none of its tools is the pending one. */
+  approvalCallId?: string | null;
+  sending?: boolean;
+  error?: string | null;
+  onAnswer?: (callId: string, decision: ApprovalChoice) => void;
+};
+
+export const GolemMessage = memo(function GolemMessage({
+  message,
+  approvalCallId = null,
+  sending = false,
+  error = null,
+  onAnswer,
+}: { message: ChatMessage } & Answering) {
   const tools = message.tools ?? [];
   const duration = message.durationMs === undefined ? "" : formatDuration(message.durationMs);
   const foot = [duration, tools.length > 0 ? `${tools.length} ${tools.length === 1 ? "tool" : "tools"}` : ""].filter(Boolean);
@@ -165,6 +189,20 @@ export const GolemMessage = memo(function GolemMessage({ message }: { message: C
           <Markdown text={message.text} streaming={message.streaming} />
         </div>
       ) : null}
+      {tools.map((tool) =>
+        tool.approval ? (
+          <ApprovalCard
+            key={tool.callId}
+            tool={tool}
+            pending={tool.callId === approvalCallId}
+            sending={sending && tool.callId === approvalCallId}
+            error={tool.callId === approvalCallId ? error : null}
+            onAnswer={(decision) => {
+              onAnswer?.(tool.callId, decision);
+            }}
+          />
+        ) : null,
+      )}
       {message.streaming ? <span aria-hidden="true" data-cursor className="transcript-cursor" /> : null}
       {message.interrupted ? <p className="font-mono text-xs text-muted">stopped</p> : null}
       {!message.streaming && foot.length > 0 ? (
@@ -174,8 +212,19 @@ export const GolemMessage = memo(function GolemMessage({ message }: { message: C
   );
 });
 
+/** What the transcript draws of the chat. `approval` names the call whose card is open. */
+export type TranscriptChat = Pick<ChatState, "messages" | "error" | "notice"> & Partial<Pick<ChatState, "approval">>;
+
+type Answers = {
+  onAnswer?: (callId: string, decision: ApprovalChoice) => void;
+  /** The call whose answer is on its way. */
+  sendingId?: string | null;
+  answerError?: string | null;
+};
+
 /** The messages and the closing error or notice. Pure: the page's stores are not read here. */
-export function TranscriptMessages({ chat }: { chat: Pick<ChatState, "messages" | "error" | "notice"> }) {
+export function TranscriptMessages({ chat, onAnswer, sendingId = null, answerError = null }: { chat: TranscriptChat } & Answers) {
+  const pendingId = chat.approval?.callId ?? null;
   if (chat.messages.length === 0 && !chat.error && !chat.notice) {
     return <p className="text-sm text-faint">No messages yet.</p>;
   }
@@ -184,8 +233,17 @@ export function TranscriptMessages({ chat }: { chat: Pick<ChatState, "messages" 
       {chat.messages.map((message) =>
         message.role === "user" ? (
           <UserMessage key={message.id} message={message} />
+        ) : pendingId !== null && message.tools?.some((tool) => tool.callId === pendingId) === true ? (
+          <GolemMessage
+            key={message.id}
+            message={message}
+            approvalCallId={pendingId}
+            sending={sendingId === pendingId}
+            error={answerError}
+            onAnswer={onAnswer}
+          />
         ) : (
-          <GolemMessage key={message.id} message={message} />
+          <GolemMessage key={message.id} message={message} onAnswer={onAnswer} />
         ),
       )}
       {chat.error ? <p role="alert" className="text-sm text-deny">{chat.error}</p> : null}
@@ -198,7 +256,13 @@ export function TranscriptMessages({ chat }: { chat: Pick<ChatState, "messages" 
  * The scrolling column. While you are at the bottom it follows the text; once you scroll up it
  * stays where you are and offers a way back down.
  */
-export function TranscriptColumn({ chat, className }: { chat: Pick<ChatState, "messages" | "error" | "notice">; className?: string }) {
+export function TranscriptColumn({
+  chat,
+  className,
+  onAnswer,
+  sendingId,
+  answerError,
+}: { chat: TranscriptChat; className?: string } & Answers) {
   const scroller = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
   const stuck = useRef(true);
@@ -238,7 +302,7 @@ export function TranscriptColumn({ chat, className }: { chat: Pick<ChatState, "m
     <div className={cn("relative flex min-h-0 flex-1 flex-col", className)}>
       <div ref={scroller} onScroll={onScroll} className="min-h-0 flex-1 overflow-y-auto" data-transcript-scroller>
         <div ref={content} className="mx-auto flex max-w-column flex-col gap-6 px-5 py-7">
-          <TranscriptMessages chat={chat} />
+          <TranscriptMessages chat={chat} onAnswer={onAnswer} sendingId={sendingId} answerError={answerError} />
         </div>
       </div>
       {atBottom ? null : (
@@ -263,5 +327,12 @@ export function TranscriptColumn({ chat, className }: { chat: Pick<ChatState, "m
 /** A session's transcript, read from the page's session store. */
 export function Transcript({ id }: { id: string }) {
   const chat = useSession(id, (view) => view.chat);
-  return <TranscriptColumn chat={chat} />;
+  const { respond } = usePageActions();
+  const callId = chat.approval?.callId ?? null;
+  const send = useCallback((call: string, decision: ApprovalChoice) => respond(id, call, decision), [respond, id]);
+  const { answer, sendingId, error } = useApprovalAnswer(send, callId);
+  const readDraft = useDraftReader(id);
+  // A key answers only while the composer is empty; typing is never taken for an answer.
+  useApprovalKeys({ callId, canAnswer: () => readDraft() === "", onAnswer: answer });
+  return <TranscriptColumn chat={chat} onAnswer={answer} sendingId={sendingId} answerError={error} />;
 }

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { bundleHtmlAssets, siteHref } from "./links.ts";
+import { bundleHtmlAssets, linksFrom, siteHref } from "./links.ts";
 
 const blob = "https://github.com/MilanPavel/golem/blob/main/";
 
@@ -30,6 +30,23 @@ test("a file in docs/ that is not a page goes to GitHub", () => {
 
 test("a folder goes to the folder on GitHub", () => {
   assert.equal(siteHref("../packages/web/", "plan.md"), "https://github.com/MilanPavel/golem/tree/main/packages/web");
+});
+
+test("a link in an included file resolves from that file", () => {
+  const page = "contributing/index.md";
+  const from = "../CONTRIBUTING.md";
+  assert.equal(siteHref("docs/sre.md", page, from), "../sre.md");
+  assert.equal(siteHref("docs/adr/README.md#top", page, from), "../adr/README.md#top");
+  assert.equal(siteHref("CHANGELOG.md", page, from), `${blob}CHANGELOG.md`);
+  assert.equal(siteHref("#types", page, from), "#types");
+});
+
+test("a links-from marker names the file the next links were written in", () => {
+  const page = "contributing/index.md";
+  assert.equal(linksFrom("<!-- links-from: ../../CONTRIBUTING.md -->\n", page), "../CONTRIBUTING.md");
+  assert.equal(linksFrom("<!-- links-from: page -->", page), page);
+  assert.equal(linksFrom("<!-- a comment -->", page), undefined);
+  assert.equal(linksFrom('<img src="a.png">', page), undefined);
 });
 
 test("bare asset paths in raw HTML get ./ so Vite bundles them", () => {

@@ -10,6 +10,7 @@ export const buttonVariants = cva(
         primary: "border-clay bg-clay text-on-clay hover:brightness-105",
         secondary: "border-line-strong bg-surface text-ink hover:border-ink",
         ghost: "border-transparent bg-transparent text-muted hover:bg-line hover:text-ink",
+        ink: "border-ink bg-ink text-bg hover:brightness-110",
         danger: "border-line-strong bg-surface text-deny hover:border-deny",
       },
       size: {

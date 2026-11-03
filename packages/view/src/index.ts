@@ -1,3 +1,4 @@
+export type { ApprovalChoice } from "@golem/client";
 export {
   appendDelta,
   CANCELLED_NOTICE,
@@ -15,10 +16,12 @@ export {
   SHUTDOWN_NOTICE,
   skippedNotice,
   SWITCH_HINT,
+  type ApprovalAnswer,
   type ChatMessage,
   type ChatState,
   type DeltaBatcher,
   type PendingApproval,
+  type ToolApproval,
   type ToolBlock,
   type ToolStatus,
 } from "./chat-state.ts";

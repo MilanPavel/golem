@@ -46,6 +46,24 @@ tool.completed     seq 7  list_dir  12 entries
 run.completed      seq 12
 ```
 
+## The screen: a TUI screen
+
+```screen A4 · Engine | Enter on **On this Mac** → A5
+✓ Service ── ● Engine ── ○ Model ── ○ Ready
+
+Where should golem think?
+
+› On this Mac      private, free · uses Ollama
+  With an API key  Anthropic, OpenAI, Groq, OpenRouter…
+  Later            golem can't answer until you pick
+
+⠸ brew install ollama                              41s
+  downloading  ███████████░░░░░░░  118 / 190 MB
+❯ ••••••••▏
+
+Enter picks · ↑↓ move · Esc back · q quit
+```
+
 ## The two halves of a concept page
 
 ::: concept

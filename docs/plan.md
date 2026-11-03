@@ -110,16 +110,16 @@ Choices that hold for the whole phase:
 
 - **Every screen has a default on Enter, every failure names one next step, and nothing asks the user to open a file.**
 - **The TUI may install the launch agent, after a yes.** launchd stays the only long-lived owner of the daemon, so [ADR-022](adr/022-homebrew-tap.md) holds. 1.7 adds the ADR.
-- **The TUI and the web UI share one first run.** They share one daemon and one `~/.golem`, so whichever opens first sets golem up for both, and the other goes straight to the chat. The first-run state lives in `packages/view`, and the facts (Ollama installed or running, which providers have a key, whether the default resolves) come from the daemon's model list.
-- **The daemon installs Ollama**, by brew's absolute path, so the browser can do it too. This replaces decision 4 of #62, where the TUI ran `brew install`. 1.10 adds the ADR.
+- **The TUI and the web UI share one first run.** They share one daemon and one `~/.golem`, so whichever opens first sets golem up for both, and the other goes straight to the chat. The setup window's navigation lives in `packages/view`, and the facts (Ollama installed or running, which providers have a key that works, whether the default resolves) come from the daemon's `setup.status`.
+- **Setup is one window, in order: service, engine, model.** It is centred on an empty screen, every wait shows a spinner and the time, and `/setup` opens the same window later as an overview of what works. Every screen is in [design/setup-window.md](design/setup-window.md).
+- **The daemon installs Ollama**, by brew's absolute path, so the browser can do it too. This replaces decision 4 of #62, where the TUI ran `brew install`. 1.9.1 adds the ADR.
 - **Starting the daemon and entering an API key stay terminal steps for the web.** `golem web` asks about the daemon before it opens the page, and [ADR-028](adr/028-web-gateway.md) keeps refusing `auth.set` from the browser.
 
 ```mermaid
 flowchart LR
   s7[1.7 Own service] --> s8[1.8 First-run choices]
-  s8 --> s9[1.9 API key in the picker] --> s14[1.14 Check]
-  s8 --> s10[1.10 Local, no dead end] --> s14
-  s8 --> s11[1.11 Empty chat teaches]
+  s8 --> s9[1.9 The setup window] --> s14[1.14 Check]
+  s9 --> s11[1.11 Empty chat teaches]
   s12[1.12 MCP without TOML] --> s14
   s13[1.13 Starter skills] --> s14
 ```
@@ -138,25 +138,17 @@ flowchart LR
 
 - **Goal:** the first start offers three choices: on this Mac, with an API key, or later.
 - **You can:** pick one and be led to a working model. Open golem again, or open the web UI, and land in the chat.
-- **Build:** the model list says what setup needs, an unset default is a clean `null` (no `"remote"` profile, no config.toml in the error), the first-run state in `packages/view`, the welcome card in the TUI, a `welcome back` line for a returning user, and `starting Ollama…` and `loading <model>…` in the band.
+- **Build:** the model list says what setup needs, an unset default is a clean `null` (no `"remote"` profile, no config.toml in the error), the first-run state in `packages/view`, and the welcome card in the TUI. The `welcome back` line and `starting Ollama…` in the band moved to 1.9.
 - **Done when:** a fresh `GOLEM_HOME` shows the three choices, and a default that resolves shows none.
-- **Watch out:** the model list grows fields, so bump the protocol minor and run `just gen`.
+- **Watch out:** testing v0.5.0 on a bare Mac showed the card on top of the chat, and a model asked for before Ollama was there. 1.9 replaces the card with the setup window.
 
-### 1.9 An API key from the picker — [#233](https://github.com/MilanPavel/golem/issues/233)
+### 1.9 The setup window — [#343](https://github.com/MilanPavel/golem/issues/343)
 
-- **Goal:** a hosted model is one flow: provider, key, model.
-- **You can:** paste a key in the picker, know at once whether it works, and use a key already in your shell.
-- **Build:** the daemon checks a key against the provider before it stores it, the key prompt opens inside the picker, a key in `ANTHROPIC_API_KEY` (and the others) is one Enter, and the TUI explains the macOS Keychain prompt while it is open.
-- **Done when:** from a fresh `GOLEM_HOME`, 'With an API key' reaches a first answer with no command typed.
-- **Watch out:** the web UI cannot set a key. It shows `golem auth set <provider>` with a copy button and refreshes when the key appears.
-
-### 1.10 A local model with no dead end — [#238](https://github.com/MilanPavel/golem/issues/238)
-
-- **Goal:** 'On this Mac' always ends with a model that answers.
-- **You can:** see which model fits your Mac and how big it is, and get it, with or without Homebrew, from the TUI or the web UI.
-- **Build:** the daemon installs Ollama and streams progress like a model pull, one recommended model by RAM with its size and the time left, and without Homebrew, the download page opens and golem carries on when Ollama appears.
-- **Done when:** on a Mac with no Ollama, 'On this Mac' reaches a first answer from the recommended model.
-- **Watch out:** under launchd the daemon has no `PATH`, so brew is called by its absolute path with auto-update and analytics off.
+- **Goal:** golem sets itself up in one centred window, in order: service, engine, model. The same window later shows what is set up and fixes what is broken.
+- **You can:** run `golem` on a bare Mac and be led one panel at a time to a model that answers, on this Mac or with an API key, with every wait shown. Later, type `/setup` to see every part of golem, fix a broken one with Enter, change the model, or run the setup again.
+- **Build:** four tickets, each a whole slice. 1.9.1 ([#344](https://github.com/MilanPavel/golem/issues/344)): the daemon's `setup.status` (the `golem doctor` checks behind one call), a key checked before it is stored, and an Ollama install the daemon runs and streams. 1.9.2 ([#345](https://github.com/MilanPavel/golem/issues/345)): the window and its navigation in `packages/view`, the Service panel with live progress, Engine, Ready, the overview, `/setup`, the `welcome back` line, and band lines for a broken part. 1.9.3 ([#346](https://github.com/MilanPavel/golem/issues/346)): the Ollama panel (install, start, or the website) and the Model panel (sized for the Mac, download with time left, a missing default named), and `starting Ollama…` in the band. 1.9.4 ([#347](https://github.com/MilanPavel/golem/issues/347)): the Provider and Key panels, with the shell's key, the check, and the Keychain prompt explained.
+- **Done when:** on a bare Mac, `golem` reaches a first answer through the window both ways with no command typed, and `/setup` shows every part and fixes a broken one with Enter.
+- **Watch out:** the screens and the navigation table are in [design/setup-window.md](design/setup-window.md); build to them. This step replaces the old 1.9 (API key in the picker, [#233](https://github.com/MilanPavel/golem/issues/233)) and 1.10 (local model, [#238](https://github.com/MilanPavel/golem/issues/238)), so there is no 1.10. The web UI uses the same navigation and `setup.status` in 10.10, and shows a command to copy for the service and the key ([ADR-028](adr/028-web-gateway.md)). Under launchd the daemon has no `PATH`, so brew is called by its absolute path.
 
 ### 1.11 An empty chat that teaches — [#242](https://github.com/MilanPavel/golem/issues/242)
 
@@ -169,7 +161,7 @@ flowchart LR
 
 - **Goal:** adding an MCP server never means opening `config.toml`.
 - **You can:** run `golem mcp add`, or `/mcp add`, pick GitHub or the filesystem, and use its tools in the next message.
-- **Build:** `golem mcp add|remove` writing `[mcp.<name>]` through `config_edit.py`, and `/mcp add` with a short list (filesystem, GitHub, fetch, other) and the hidden token prompt from 1.9.
+- **Build:** `golem mcp add|remove` writing `[mcp.<name>]` through `config_edit.py`, and `/mcp add` with a short list (filesystem, GitHub, fetch, other) and the hidden key field from 1.9.4.
 - **Done when:** `/mcp add` → GitHub → token → its tools work, with no restart.
 
 ### 1.13 Starter skills ship with golem — [#248](https://github.com/MilanPavel/golem/issues/248)
@@ -184,7 +176,7 @@ flowchart LR
 
 - **Goal:** the first run from `brew install` is proved on a clean Mac account.
 - **You can:** trust that a new user reaches a first answer with two commands.
-- **Build:** `golem doctor` ends with the next step, a first-run journey test with an empty `GOLEM_HOME`, no Ollama, and no keys, and a clean-room run from the tap on a spare macOS user: the key path, the local path, and `golem web` first.
+- **Build:** a first-run journey test with an empty `GOLEM_HOME`, no Ollama, and no keys, and a clean-room run from the tap on a spare macOS user: the key path, the local path, and `golem web` first.
 - **Done when:** all three reach a first answer with no file edited, and `docs/install.md` matches what you see.
 
 ---
