@@ -718,7 +718,7 @@ brew uninstall golem        # then: remove the program
 
 Your chats and settings in `~/.golem` stay, on purpose. Delete that folder yourself if you want them gone.
 
-**The order matters.** After `brew uninstall`, the `golem` command is gone, so `golem daemon uninstall` can no longer run. launchd keeps trying to start a program that does not exist. To clean up by hand:
+**The order matters.** After `brew uninstall`, the `golem` command is gone, so `golem daemon uninstall` can no longer run. The daemon that was running keeps running from deleted files, or launchd keeps trying to start a program that does not exist. A newer `golem` repairs this when it opens: a launch agent that launchd doesn't run, or whose program is gone, is installed again. A daemon whose socket file was deleted, for example with `rm -rf ~/.golem`, stops within 5 seconds, so launchd starts a fresh one. To clean up by hand:
 
 ```bash
 launchctl bootout gui/$(id -u)/dev.golem.daemon

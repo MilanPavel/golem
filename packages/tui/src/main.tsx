@@ -16,6 +16,7 @@ export type { ServiceControl, WindowDaemon };
 const READ_ONLY_SERVICE: ServiceControl = {
   startError: readStartError,
   installed: () => false,
+  agentLoaded: () => false,
   restart: null,
   install: null,
   uninstall: null,

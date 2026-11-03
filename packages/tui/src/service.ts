@@ -13,6 +13,13 @@ export type ServiceControl = {
   startError: () => { reason: string; next: string } | null;
   /** True when the launch agent exists, so launchd should be running the daemon. */
   installed: () => boolean;
+  /**
+   * True when launchd has the job loaded and the program it names still
+   * exists, so waiting for it makes sense. False after `brew uninstall`, a
+   * `launchctl bootout`, or a plist left by another golem: then it needs
+   * `golem daemon install` again.
+   */
+  agentLoaded: () => boolean;
   /** `golem daemon restart`. Rejects with why it failed. Null when this screen cannot restart it. */
   restart: (() => Promise<void>) | null;
   /** `golem daemon install`, quietly. Rejects with why. Null when this screen cannot. */
