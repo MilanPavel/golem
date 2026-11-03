@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Box, Text, useApp, useInput, usePaste, useStdin, useWindowSize } from "ink";
 import {
   MODEL_NOT_CONFIGURED,
+  KEY_UNCHECKED,
   OLLAMA_FAILED,
   RpcError,
   SESSION_NOT_FOUND,
@@ -54,6 +55,16 @@ import {
   single,
   welcomeBack,
   withLog,
+  hostedProvider,
+  keyChecked,
+  keyLines,
+  openKey,
+  pressKey as pressKeyPanel,
+  pressProvider,
+  providerLines,
+  providerSelected,
+  type KeyInput,
+  type KeyState,
   defaultGone,
   modelChoices,
   modelLines,
@@ -79,7 +90,6 @@ import {
   type ServiceState,
   type SetupLine,
   type SetupNext,
-  type SetupPanel,
   type SetupStart,
   type SetupWindow,
   providersUp,
@@ -165,15 +175,6 @@ import { TodoBand } from "./todo-band.tsx";
 import { InstallBand } from "./install-band.tsx";
 import { RESTARTING, type ServiceControl, type WindowDaemon } from "./service.ts";
 import { installEventOf, type InstallState, installRows, reduceInstall, startedInstall } from "./ollama-install.ts";
-import {
-  maskSecret,
-  openSecret,
-  pasteSecret,
-  pressSecret,
-  secretNotice,
-  type SecretPrompt,
-  type SecretStep,
-} from "./secret.ts";
 import { APPROVAL_ROWS, approvalRows, diffLineCount } from "./approval.ts";
 import { ApprovalBand } from "./approval-band.tsx";
 import {
@@ -281,9 +282,7 @@ import { useSession } from "./use-session.ts";
 type Install = { state: InstallState; ref: string; setDefault: boolean; resend: string | null };
 
 /**
- * The setup window as this screen holds it. The Provider and Key panels are
- * the model picker until they get panels of their own, so on them the picker
- * shows and the window waits behind it.
+ * The setup window as this screen holds it: where it is, and each panel's own state.
  */
 type SetupUi = {
   window: SetupWindow;
@@ -296,17 +295,15 @@ type SetupUi = {
   quit: number | null;
   ollama: OllamaState;
   model: ModelPanelState;
+  /** The Provider panel's selection, and the provider the Key panel is for. */
+  provider: number;
+  hosted: string | null;
+  key: KeyState;
   /** Which models the Model panel offers: this Mac's, every engine's, or with the gone default first. */
   scope: ModelScope;
   ready: { engine: string; model: string } | null;
 };
 
-// Until 1.9.4, the API key path is the model picker.
-const PICKER_PANELS: ReadonlySet<SetupPanel> = new Set(["provider", "key"]);
-
-function onPicker(ui: SetupUi | null): boolean {
-  return ui !== null && ui.window.view === "panel" && PICKER_PANELS.has(ui.window.panel);
-}
 
 export function App({
   client,
@@ -412,9 +409,6 @@ export function App({
   const [suggestDismissed, setSuggestDismissed] = useState(false);
   const [suggestPick, setSuggestPick] = useState({ draft: "", index: 0 });
   const [historyCursor, setHistoryCursor] = useState<HistoryCursor | null>(null);
-  const [secret, setSecret] = useState<SecretPrompt | null>(null);
-  const secretRef = useRef(secret);
-  secretRef.current = secret;
   const [picker, setPicker] = useState<PickerState>(closedPicker);
   const pickerRef = useRef(picker);
   pickerRef.current = picker;
@@ -549,8 +543,7 @@ export function App({
     picker.open ||
     keysOpen ||
     suggestDismissed ||
-    historyCursor !== null ||
-    secret !== null
+    historyCursor !== null
       ? []
       : suggest(
           draft.text,
@@ -560,14 +553,14 @@ export function App({
             { pinnable: pinnableSkills(skillList.skills ?? []), active: chat.activeSkills },
           ),
         );
-  const composerText = secret === null ? draft.text : maskSecret(secret.value);
+  const composerText = draft.text;
   const suggestSelected =
     suggestPick.draft === draft.text ? Math.min(suggestPick.index, Math.max(0, suggestMatches.length - 1)) : 0;
   const budget = frameBudget({
     rows,
     columns,
     draft: argsEdit !== null ? argsEdit.draft.text : composerText,
-    busy: chat.busy && secret === null && argsEdit === null,
+    busy: chat.busy && argsEdit === null,
     banner: (banner !== null && banner.length > 0) || hintText !== null,
     debug: debug.open,
     suggestions: suggestMatches.length,
@@ -975,7 +968,7 @@ export function App({
       const { ref, ok, error } = update.done;
       pullTracks.current.delete(ref);
       const ui = setupRef.current;
-      if (ui !== null && ui.model.phase === "downloading" && ui.model.ref === ref && !onPicker(ui)) {
+      if (ui !== null && ui.model.phase === "downloading" && ui.model.ref === ref) {
         // The Model panel waited for this one: use it, and go on to Ready.
         setPulls((current) => {
           const next = { ...current };
@@ -1067,6 +1060,7 @@ export function App({
       setup.service.phase === "running" ||
       (setup.window.view === "panel" && setup.window.panel === "ollama" && ["installing", "starting", "waiting"].includes(setup.ollama.phase)) ||
       (setup.window.view === "panel" && setup.window.panel === "model" && setup.model.phase === "downloading") ||
+      (setup.window.view === "panel" && setup.window.panel === "key" && (setup.key.phase === "checking" || setup.key.phase === "works")) ||
       (setup.window.view === "overview" && setup.overview.rows === null));
   useEffect(() => {
     if (!setupTicking) {
@@ -1333,8 +1327,7 @@ export function App({
     }
     if (outcome.kind === "login") {
       setDraft(draftAt(""));
-      applySecretStep({ prompt: openSecret(outcome.provider), submit: null });
-      setChat((current) => ({ ...current, error: null, notice: secretNotice(outcome.provider) }));
+      openKeyPanel(outcome.provider, "chat");
       return;
     }
     if (outcome.kind === "logout") {
@@ -1511,6 +1504,9 @@ export function App({
       ollama: { phase: "missing", selected: 0, note: null },
       model: START_MODEL_PANEL,
       scope: { kind: "local" },
+      provider: 0,
+      hosted: null,
+      key: openKey("anthropic", null),
     };
   }
 
@@ -1599,15 +1595,133 @@ export function App({
       return;
     }
     if (window.panel === "model") {
-      moved.scope = modelScope(window);
+      moved.scope = moved.path === "key" && moved.hosted !== null && window.mode === "guided"
+        ? { kind: "provider", provider: moved.hosted }
+        : modelScope(window);
       const listing = listingRef.current;
       const selected = listing === null ? 0 : modelSelected(modelChoices(listing, moved.scope, false));
       moved.model = { phase: "pick", selected, all: false };
     }
-    showSetup(moved);
-    if (PICKER_PANELS.has(window.panel)) {
-      openSetupPicker(moved);
+    if (window.panel === "provider") {
+      moved.provider = providerSelected(listingRef.current);
     }
+    if (window.panel === "key") {
+      const hosted = moved.hosted ?? "anthropic";
+      moved.hosted = hosted;
+      moved.key = openKey(hosted, shellKey(hosted));
+    }
+    showSetup(moved);
+  }
+
+  /** The provider's key from the terminal golem was started in. The daemon never reads the shell. */
+  function shellKey(provider: string): string | null {
+    const name = hostedProvider(provider)?.env;
+    const value = name === undefined ? undefined : process.env[name];
+    return value === undefined || value.trim().length === 0 ? null : value.trim();
+  }
+
+  /** `/login` and Add an API key: the Key panel for `provider`, or the Provider panel first. */
+  function openKeyPanel(provider: string | null, origin: "chat" | "overview", from?: SetupUi): void {
+    const window = single(provider === null ? "provider" : "key", origin);
+    const ui = from ?? newSetup(window, askService(serviceRunner()));
+    setSwitcher(closedSwitcher);
+    goSetup({ kind: "window", window }, { ...ui, hosted: provider, path: "key" });
+  }
+
+  function onProviderKey(ui: SetupUi, window: SetupWindow & { view: "panel" }, key: SetupKey): void {
+    if (key === "back") {
+      goSetup(advance(window, { kind: "cancelled" }, ollamaFacts()), ui);
+      return;
+    }
+    if (key !== "up" && key !== "down" && key !== "enter") {
+      return;
+    }
+    const pressed = pressProvider(listingRef.current, ui.provider, key);
+    if (pressed.provider === null) {
+      showSetup({ ...ui, provider: pressed.selected });
+      return;
+    }
+    goSetup(advance(window, { kind: "provider", provider: pressed.provider }, ollamaFacts()), {
+      ...ui,
+      provider: pressed.selected,
+      hosted: pressed.provider,
+    });
+  }
+
+  /** The Key panel takes raw keys: q and r are letters of a key there. */
+  function keyInputOf(press: Press, typing: boolean): KeyInput | "interrupt" | null {
+    switch (press.name) {
+      case "escape":
+        return { kind: "back" };
+      case "return":
+        return { kind: "enter" };
+      case "ctrl-c":
+        return "interrupt";
+      case "up":
+        return typing ? null : { kind: "up" };
+      case "down":
+        return typing ? null : { kind: "down" };
+      case "backspace":
+        return { kind: "delete" };
+      case "ctrl-u":
+      case "ctrl-w":
+        return { kind: "clear" };
+      default:
+        break;
+    }
+    if ((press.name === null || press.name === "question") && !press.ctrl && !press.meta && press.input.length > 0) {
+      return typing ? { kind: "text", text: press.input } : null;
+    }
+    return null;
+  }
+
+  function onKeyInput(ui: SetupUi, window: SetupWindow & { view: "panel" }, input: KeyInput): void {
+    const pressed = pressKeyPanel(ui.key, input, Date.now());
+    showSetup({ ...ui, key: pressed.state });
+    const effect = pressed.effect;
+    if (effect.kind === "back") {
+      goSetup(advance(window, { kind: "cancelled" }, ollamaFacts()), ui);
+      return;
+    }
+    if (effect.kind !== "check") {
+      return;
+    }
+    const key = effect.key === "shell" ? (shellKey(effect.provider) ?? "") : effect.key.typed;
+    void client.setKey(effect.provider, key).then(
+      (result) => {
+        updateSetup((now) => ({ ...now, key: keyChecked(now.key, { ok: true, models: result.models ?? null }, Date.now()) }));
+        // The first read of the new key by this daemon may wait on the Keychain dialog.
+        void client.listModels(true).then(
+          (listed) => {
+            listingRef.current = listed;
+            setListing(listed);
+            setChat((current) => providersUp(current, listed.providers));
+            const now = setupRef.current;
+            if (now === null || now.window.view !== "panel" || now.window.panel !== "key") {
+              return;
+            }
+            const name = hostedProvider(effect.provider)?.name ?? effect.provider;
+            goSetup(advance(now.window, { kind: "done" }, ollamaFacts()), {
+              ...now,
+              overview: { ...now.overview, notice: `${name} key saved` },
+            });
+            if (now.window.mode === "single" && now.window.origin === "chat") {
+              setChat((current) => ({ ...current, error: null, notice: `${name} key saved in the Keychain · /model to use it` }));
+            }
+          },
+          (error: unknown) => {
+            updateSetup((now) => ({ ...now, key: { phase: "typing", provider: effect.provider, value: "", error: `models: ${messageOf(error)}` } }));
+          },
+        );
+      },
+      (error: unknown) => {
+        const reason =
+          error instanceof RpcError && error.code === KEY_UNCHECKED
+            ? `couldn't check it: ${error.message}`
+            : messageOf(error);
+        updateSetup((now) => ({ ...now, key: keyChecked(now.key, { ok: false, reason }, Date.now()) }));
+      },
+    );
   }
 
   /** Guided mode offers this Mac's models. Alone it offers every engine's, or names a default that is gone. */
@@ -1746,20 +1860,6 @@ export function App({
       case "none":
         break;
     }
-  }
-
-  /** The picker in place of the Provider and Key panels, until 1.9.4. */
-  function openSetupPicker(ui: SetupUi): void {
-    const current = listingRef.current;
-    let opened = openPicker(currentModelRef(), false);
-    if (ui.path === "key" && current !== null) {
-      const hosted =
-        current.models.find((model) => model.provider !== "ollama" && model.status === "ready") ??
-        current.models.find((model) => model.status === "needs_key");
-      opened = openPicker(hosted?.ref ?? null, true);
-    }
-    pickerRef.current = opened;
-    setPicker(opened);
   }
 
   /** The start's decision, once the service answers and the model list is in. */
@@ -1923,6 +2023,15 @@ export function App({
 
   function onSetupPress(press: Press): void {
     const ui = setupRef.current;
+    if (ui !== null && ui.quit === null && ui.window.view === "panel" && ui.window.panel === "key") {
+      const input = keyInputOf(press, ui.key.phase === "typing");
+      if (input === "interrupt") {
+        showSetup({ ...ui, quit: 0 });
+      } else if (input !== null) {
+        onKeyInput(ui, ui.window, input);
+      }
+      return;
+    }
     const key = setupKeyOf(press);
     if (ui === null || key === null) {
       return;
@@ -1957,6 +2066,8 @@ export function App({
       onOllamaKey(ui, ui.window, key);
     } else if (ui.window.panel === "model") {
       onModelKey(ui, ui.window, key);
+    } else if (ui.window.panel === "provider") {
+      onProviderKey(ui, ui.window, key);
     } else if (ui.window.panel === "ready" && key === "enter") {
       closeSetup();
     }
@@ -2088,13 +2199,7 @@ export function App({
         goSetup({ kind: "window", window: single("model", "overview") }, { ...ui, path: "pick" });
         return;
       case "set_key":
-        if (choice.target !== null) {
-          // The key prompt is the composer's; the overview comes back once it is saved.
-          applySecretStep({ prompt: openSecret(choice.target), submit: null });
-          setChat((current) => ({ ...current, error: null, notice: secretNotice(choice.target ?? "") }));
-          return;
-        }
-        goSetup({ kind: "window", window: single("provider", "overview") }, { ...ui, path: "key" });
+        openKeyPanel(choice.target, "overview", ui);
         return;
       case "edit_config":
         return;
@@ -2142,6 +2247,13 @@ export function App({
                 : ui.scope.kind === "local"
                   ? "model-local"
                   : "model",
+        };
+      case "provider":
+        return { lines: providerLines(listingRef.current, ui.provider), screen: "provider" };
+      case "key":
+        return {
+          lines: keyLines(ui.key, now),
+          screen: ui.key.phase === "typing" ? "key-typing" : ui.key.phase === "found" ? "provider" : "service-wait",
         };
       case "ready": {
         const runner = serviceRunner();
@@ -2471,27 +2583,6 @@ export function App({
     pickerRef.current = pressed.state;
     setPicker(pressed.state);
     const action = pressed.action;
-    const ui = setupRef.current;
-    if (ui !== null && onPicker(ui) && ui.window.view === "panel") {
-      // The picker stands in for a setup panel: where it ends is the window's business.
-      if (action.kind === "close") {
-        goSetup(advance(ui.window, { kind: "cancelled" }, ollamaFacts()), ui);
-        return;
-      }
-      if (action.kind === "choose") {
-        chooseModel(action.model, action.name, action.setDefault);
-        modelPicked(action.model?.provider ?? null, action.model?.label ?? action.name);
-        return;
-      }
-      if (action.kind === "pull") {
-        startPull(action.ref, action.use, action.setDefault);
-        goSetup(advance({ ...ui.window, panel: "model" }, { kind: "background" }, ollamaFacts()), ui);
-        return;
-      }
-      if (action.kind === "install") {
-        showSetup(null);
-      }
-    }
     if (action.kind === "refresh") {
       setChat((current) => ({ ...current, notice: "refreshing models…" }));
       loadModels(true);
@@ -2524,30 +2615,6 @@ export function App({
     } else if (action.kind === "close") {
       setChat((current) => ({ ...current, notice: state.firstRun ? NO_MODEL_BAND : null }));
     }
-  }
-
-  function applySecretStep(step: SecretStep): void {
-    secretRef.current = step.prompt;
-    setSecret(step.prompt);
-    if (step.prompt !== null) {
-      return;
-    }
-    const submitted = step.submit;
-    if (submitted === null) {
-      setChat((current) => ({ ...current, notice: null }));
-      return;
-    }
-    setChat((current) => ({ ...current, notice: `saving the ${submitted.provider} key…` }));
-    void client.setKey(submitted.provider, submitted.key).then(
-      () => {
-        setChat((current) => ({ ...current, error: null, notice: `${submitted.provider} key saved in the Keychain` }));
-        loadModels(true);
-        recheck();
-      },
-      (error: unknown) => {
-        setChat((current) => ({ ...current, notice: null, error: messageOf(error) }));
-      },
-    );
   }
 
   function removeKey(provider: string): void {
@@ -2956,12 +3023,7 @@ export function App({
       showSelection(null);
       return;
     }
-    const prompt = secretRef.current;
-    if (prompt !== null) {
-      applySecretStep(pressSecret(prompt, press));
-      return;
-    }
-    if (setupRef.current !== null && !onPicker(setupRef.current)) {
+    if (setupRef.current !== null) {
       onSetupPress(press);
       return;
     }
@@ -3062,16 +3124,18 @@ export function App({
   }
 
   usePaste((text) => {
-    const prompt = secretRef.current;
-    if (prompt !== null) {
-      applySecretStep({ prompt: pasteSecret(prompt, text), submit: null });
+    const ui = setupRef.current;
+    if (ui !== null) {
+      // Only the Key panel takes a paste: the key.
+      if (ui.window.view === "panel" && ui.window.panel === "key") {
+        onKeyInput(ui, ui.window, { kind: "text", text });
+      }
       return;
     }
     if (
       busyRef.current ||
       switcherRef.current.open ||
       pickerRef.current.open ||
-      (setupRef.current !== null && !onPicker(setupRef.current)) ||
       permsRef.current.open ||
       mcpManagerRef.current.open ||
       skillsManagerRef.current.open ||
@@ -3123,9 +3187,7 @@ export function App({
   const composer =
     argsEdit !== null
       ? layoutComposer(argsEdit.draft.text, argsEdit.draft.cursor, columns, budget.composer, false)
-      : secret === null
-        ? layoutComposer(draft.text, draft.cursor, columns, budget.composer, chat.busy, placeholder)
-        : layoutComposer(composerText, composerText.length, columns, budget.composer, false);
+      : layoutComposer(draft.text, draft.cursor, columns, budget.composer, chat.busy, placeholder);
   const debugLayout = layoutDebug({
     debug,
     rows: budget.debug,
@@ -3151,7 +3213,7 @@ export function App({
     }
   }, [debugLayout.lineCount, debugLayout.offsetFromBottom, debugOffset]);
 
-  if (setup !== null && !onPicker(setup) && secret === null) {
+  if (setup !== null) {
     const shown = setupView(setup, setupNow);
     return (
       <SetupFrame

@@ -27,8 +27,8 @@ const STEP_OF: Record<SetupPanel, SetupStep> = {
   ready: "Ready",
 };
 
-/** Where the window opened: the first start, `/setup`, or a send with no model. */
-export type SetupOrigin = "start" | "overview" | "send";
+/** Where the window opened: the first start, `/setup`, a send with no model, or a command such as `/login`. */
+export type SetupOrigin = "start" | "overview" | "send" | "chat";
 
 export type SetupWindow =
   | { view: "overview" }
@@ -82,6 +82,14 @@ export function advance(window: SetupWindow, result: SetupResult, facts: SetupFa
     return CHAT;
   }
   if (window.mode === "single") {
+    // Provider and Key go together: an API key is added with both, alone.
+    if (window.panel === "provider" && result.kind === "provider") {
+      return { kind: "window", window: { ...window, panel: "key", trail: [...window.trail, "provider"] } };
+    }
+    if (result.kind === "cancelled" && window.trail.length > 0) {
+      const before = window.trail.at(-1) ?? window.panel;
+      return { kind: "window", window: { ...window, panel: before, trail: window.trail.slice(0, -1) } };
+    }
     return window.origin === "overview" ? { kind: "window", window: OVERVIEW } : CHAT;
   }
   if (result.kind === "cancelled") {
@@ -215,7 +223,9 @@ export type SetupLine =
   | { kind: "text"; text: string; dim?: boolean }
   | { kind: "status"; mark: Mark; text: string; right?: string }
   | { kind: "option"; label: string; detail: string; selected: boolean }
-  | { kind: "row"; mark: Mark; label: string; text: string };
+  | { kind: "row"; mark: Mark; label: string; text: string }
+  /** A field being typed into, such as a hidden key. */
+  | { kind: "field"; text: string };
 
 export type Choice<T> = { id: T; label: string; detail: string };
 
