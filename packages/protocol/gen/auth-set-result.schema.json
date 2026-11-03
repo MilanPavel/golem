@@ -1,7 +1,20 @@
 {
   "additionalProperties": false,
-  "description": "The provider whose key was stored.",
+  "description": "The provider whose key was stored. ``models``: how many models a checked key opens.",
   "properties": {
+    "models": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Models"
+    },
     "provider": {
       "minLength": 1,
       "title": "Provider",

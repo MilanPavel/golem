@@ -1,0 +1,32 @@
+{
+  "additionalProperties": false,
+  "description": "The install ended. ``reason`` says why when it ``failed``.",
+  "properties": {
+    "outcome": {
+      "enum": [
+        "installed",
+        "failed",
+        "stopped"
+      ],
+      "title": "Outcome",
+      "type": "string"
+    },
+    "reason": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reason"
+    }
+  },
+  "required": [
+    "outcome"
+  ],
+  "title": "OllamaInstallDone",
+  "type": "object"
+}

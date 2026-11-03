@@ -173,7 +173,7 @@ async def test_storing_a_servers_secret_restarts_it_with_the_secret(short_home: 
         assert before["error"] == "no secret mcp/fake in the Keychain: run golem auth set mcp/fake"
 
         stored = await client.call("auth.set", {"provider": "mcp/fake", "key": "s3cret"})
-        assert rpc_result(stored) == {"provider": "mcp/fake"}
+        assert rpc_result(stored) == {"provider": "mcp/fake", "models": None}
         assert secrets.secrets == {"mcp/fake": "s3cret"}
         await _settled(client)
         assert (await _servers(client))[0]["state"] == "running"

@@ -1,0 +1,7 @@
+{
+  "additionalProperties": false,
+  "description": "``ollama.start``. Start the local Ollama now, as a model call would.",
+  "properties": {},
+  "title": "OllamaStartParams",
+  "type": "object"
+}

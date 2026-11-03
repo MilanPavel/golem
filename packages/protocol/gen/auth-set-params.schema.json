@@ -1,7 +1,12 @@
 {
   "additionalProperties": false,
-  "description": "``auth.set``. Store an API key for ``provider`` in the OS credential store.\n\nA client never logs or displays ``key``.",
+  "description": "``auth.set``. Store an API key for ``provider`` in the OS credential store.\n\nA client never logs or displays ``key``. With ``check``, a model\nprovider's key is tried against the provider first, and a key it rejects\nis not stored.",
   "properties": {
+    "check": {
+      "default": true,
+      "title": "Check",
+      "type": "boolean"
+    },
     "key": {
       "format": "password",
       "maxLength": 4096,

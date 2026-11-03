@@ -46,6 +46,8 @@ golem auth list              # which providers have a key
 golem auth remove anthropic  # delete it from the Keychain
 ```
 
+golem tries the key with the provider before it saves it. A key the provider refuses is not saved, and golem says why, for example `anthropic rejected the key (401 · invalid x-api-key)`. Offline, add `--no-check` to save it anyway.
+
 In the chat, `/login anthropic` and `/logout anthropic` do the same. A model whose provider has no key shows `needs key` in red.
 
 | Provider | What you need |

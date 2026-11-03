@@ -1,0 +1,7 @@
+{
+  "additionalProperties": false,
+  "description": "``setup.status``. What is set up and what is broken, as ``golem doctor`` sees it.",
+  "properties": {},
+  "title": "SetupStatusParams",
+  "type": "object"
+}

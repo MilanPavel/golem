@@ -1,0 +1,60 @@
+{
+  "$defs": {
+    "OllamaInstallDone": {
+      "additionalProperties": false,
+      "description": "The install ended. ``reason`` says why when it ``failed``.",
+      "properties": {
+        "outcome": {
+          "enum": [
+            "installed",
+            "failed",
+            "stopped"
+          ],
+          "title": "Outcome",
+          "type": "string"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        }
+      },
+      "required": [
+        "outcome"
+      ],
+      "title": "OllamaInstallDone",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Server → every connection: an Ollama install ended. Not stored.",
+  "properties": {
+    "jsonrpc": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Jsonrpc",
+      "type": "string"
+    },
+    "method": {
+      "const": "ollama.install.done",
+      "default": "ollama.install.done",
+      "title": "Method",
+      "type": "string"
+    },
+    "params": {
+      "$ref": "#/$defs/OllamaInstallDone"
+    }
+  },
+  "required": [
+    "params"
+  ],
+  "title": "OllamaInstallDoneNotification",
+  "type": "object"
+}

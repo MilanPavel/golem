@@ -3,7 +3,15 @@ import { test } from "node:test";
 
 import type { DaemonStatus } from "../../protocol/gen/daemon-status.ts";
 
-import { type Check, doctorExitCode, formatDoctor, parseChecks, runDoctor, runningCheck } from "./doctor.ts";
+import {
+  type Check,
+  doctorExitCode,
+  formatDoctor,
+  nextStep,
+  parseChecks,
+  runDoctor,
+  runningCheck,
+} from "./doctor.ts";
 
 const DAEMON = { command: "/opt/homebrew/opt/golem/libexec/golem-daemon/golem-daemon", args: [] };
 
@@ -119,6 +127,7 @@ test("the checklist aligns details and shows a fix under each problem", () => {
       "           fix: open golem and pick one with /model",
       "",
       "1 problem, 1 warning.",
+      "Next: pick a local model in /model, and golem installs it, or brew install ollama",
     ].join("\n"),
   );
   assert.equal(doctorExitCode(checks), 1);
@@ -128,17 +137,32 @@ test("a detail over several lines stays in its column", () => {
   const checks: Check[] = [{ name: "daemon", status: "fail", detail: "not found. Tried:\n  /a\n  /b", fix: "reinstall" }];
   assert.equal(
     formatDoctor(checks),
-    ["✗ daemon  not found. Tried:", "            /a", "            /b", "          fix: reinstall", "", "1 problem."].join(
-      "\n",
-    ),
+    [
+      "✗ daemon  not found. Tried:",
+      "            /a",
+      "            /b",
+      "          fix: reinstall",
+      "",
+      "1 problem.",
+      "Next: reinstall",
+    ].join("\n"),
   );
 });
 
 test("warnings alone do not fail, and all ok says so", () => {
   const warned: Check[] = [{ name: "model", status: "warn", detail: "no model chosen yet" }];
   assert.equal(doctorExitCode(warned), 0);
-  assert.match(formatDoctor(warned), /\n\n1 warning\.$/);
+  assert.match(formatDoctor(warned), /\n\n1 warning\.\nNext: golem$/);
   const fine: Check[] = [{ name: "disk", status: "ok", detail: "50.0 GB free" }];
-  assert.equal(formatDoctor(fine), "✓ disk  50.0 GB free\n\nEverything looks good.");
+  assert.equal(formatDoctor(fine), "✓ disk  50.0 GB free\n\nEverything looks good.\nNext: golem");
   assert.equal(doctorExitCode(fine), 0);
+});
+
+test("the next step is the first failure's fix, then the first warning's", () => {
+  const checks: Check[] = [
+    { name: "model", status: "warn", detail: "no model chosen yet", fix: "golem, then pick one" },
+    { name: "service", status: "fail", detail: "launchd has no golem job", fix: "golem daemon install" },
+  ];
+  assert.equal(nextStep(checks), "Next: golem daemon install");
+  assert.equal(nextStep(checks.slice(0, 1)), "Next: golem, then pick one");
 });

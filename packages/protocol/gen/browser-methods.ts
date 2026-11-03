@@ -20,6 +20,9 @@ export const BROWSER_METHODS: ReadonlySet<string> = new Set([
   "model.pull",
   "model.pull_cancel",
   "model.set_default",
+  "ollama.install",
+  "ollama.install_cancel",
+  "ollama.start",
   "ping",
   "policy.remove",
   "policy.update",
@@ -35,6 +38,7 @@ export const BROWSER_METHODS: ReadonlySet<string> = new Set([
   "session.revoke",
   "session.set_model",
   "session.set_skills",
+  "setup.status",
   "skill.list",
 ]);
 

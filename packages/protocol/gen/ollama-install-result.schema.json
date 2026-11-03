@@ -1,0 +1,15 @@
+{
+  "additionalProperties": false,
+  "description": "``started`` is false when an install was already running.",
+  "properties": {
+    "started": {
+      "title": "Started",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "started"
+  ],
+  "title": "OllamaInstallResult",
+  "type": "object"
+}

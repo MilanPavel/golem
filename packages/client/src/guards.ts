@@ -1,3 +1,5 @@
+import type { OllamaInstallDone } from "../../protocol/gen/ollama-install-done.ts";
+import type { SetupRow, SetupStatusResult } from "../../protocol/gen/setup-status-result.ts";
 import type { McpListResult } from "../../protocol/gen/mcp-list-result.ts";
 import type { McpServer } from "../../protocol/gen/mcp-server.ts";
 import type { ModelServerStatus } from "../../protocol/gen/model-server-status.ts";
@@ -205,7 +207,39 @@ export function isModelSetDefaultResult(value: unknown): value is ModelSetDefaul
 }
 
 export function isAuthSetResult(value: unknown): value is AuthSetResult {
-  return isRecord(value) && typeof value["provider"] === "string";
+  const models = isRecord(value) ? value["models"] : undefined;
+  return (
+    isRecord(value) &&
+    typeof value["provider"] === "string" &&
+    (models === undefined || models === null || typeof models === "number")
+  );
+}
+
+const SETUP_PARTS = new Set(["service", "socket", "config", "engine", "model", "tools", "disk"]);
+const SETUP_STATES = new Set(["ok", "warn", "fail"]);
+
+function isSetupRow(value: unknown): value is SetupRow {
+  return (
+    isRecord(value) &&
+    typeof value["name"] === "string" &&
+    typeof value["detail"] === "string" &&
+    typeof value["part"] === "string" &&
+    SETUP_PARTS.has(value["part"]) &&
+    typeof value["state"] === "string" &&
+    SETUP_STATES.has(value["state"]) &&
+    (value["action"] === undefined || value["action"] === null || typeof value["action"] === "string")
+  );
+}
+
+export function isSetupStatusResult(value: unknown): value is SetupStatusResult {
+  return isRecord(value) && Array.isArray(value["rows"]) && value["rows"].every(isSetupRow);
+}
+
+export function isOllamaInstallDone(value: unknown): value is OllamaInstallDone {
+  return (
+    isRecord(value) &&
+    (value["outcome"] === "installed" || value["outcome"] === "failed" || value["outcome"] === "stopped")
+  );
 }
 
 export function isAuthRemoveResult(value: unknown): value is AuthRemoveResult {

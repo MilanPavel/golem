@@ -16,6 +16,8 @@ export interface Check {
   status: CheckStatus;
   detail: string;
   fix?: string | null;
+  /** Where a setup screen shows the line. The daemon's checks have it; the CLI's own do not. */
+  part?: string;
 }
 
 export interface DoctorInput {
@@ -96,7 +98,18 @@ export function formatDoctor(checks: Check[]): string {
     const fix = check.status !== "ok" && check.fix ? [`fix: ${check.fix}`] : [];
     return [line, ...[...more, ...fix].map((rest) => `${indent}${rest}`)];
   });
-  return [...lines, "", summary(checks)].join("\n");
+  return [...lines, "", summary(checks), nextStep(checks)].join("\n");
+}
+
+/**
+ * The one thing to do next: the first failure's fix, else the first
+ * warning's, else open golem.
+ */
+export function nextStep(checks: Check[]): string {
+  const first =
+    checks.find((check) => check.status === "fail" && check.fix) ??
+    checks.find((check) => check.status === "warn" && check.fix);
+  return `Next: ${first?.fix ?? "golem"}`;
 }
 
 export function doctorExitCode(checks: Check[]): number {

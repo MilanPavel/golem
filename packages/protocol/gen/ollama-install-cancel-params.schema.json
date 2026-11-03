@@ -1,0 +1,7 @@
+{
+  "additionalProperties": false,
+  "description": "``ollama.install_cancel``. Stop a running install.",
+  "properties": {},
+  "title": "OllamaInstallCancelParams",
+  "type": "object"
+}

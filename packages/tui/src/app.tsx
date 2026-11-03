@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Box, Text, useApp, useInput, usePaste, useStdin, useWindowSize } from "ink";
 import {
   MODEL_NOT_CONFIGURED,
+  OLLAMA_FAILED,
   RpcError,
   SESSION_NOT_FOUND,
   type ApprovalChoice,
@@ -113,7 +114,7 @@ import { DEFAULT_PREFS, loadPrefs, prefsPath, savePref } from "./prefs.ts";
 import { TodoBand } from "./todo-band.tsx";
 import { InstallBand } from "./install-band.tsx";
 import { RESTARTING, type ServiceControl } from "./service.ts";
-import { findBrew, type InstallState, installRows, reduceInstall, runInstall, startedInstall } from "./ollama-install.ts";
+import { installEventOf, type InstallState, installRows, reduceInstall, startedInstall } from "./ollama-install.ts";
 import {
   maskSecret,
   openSecret,
@@ -359,6 +360,7 @@ export function App({
   const installRef = useRef(install);
   installRef.current = install;
   const stopInstall = useRef<(() => void) | null>(null);
+  const cancelInstall = useRef<(() => void) | null>(null);
   const shownListing = withPulls(listing, pulls);
   const draftRef = useRef(draft);
   const busyRef = useRef(chat.busy);
@@ -556,6 +558,7 @@ export function App({
   );
 
   useEffect(() => () => batcher.current?.stop(), []);
+  // The daemon's install goes on after this window closes; only stop listening.
   useEffect(() => () => stopInstall.current?.(), []);
 
   useEffect(() => {
@@ -1376,35 +1379,47 @@ export function App({
   }
 
   /**
-   * Install Ollama with Homebrew, then offer to download `ref` and use it.
-   * With `resend`, download it without asking and send that message again.
+   * Have the daemon install Ollama with Homebrew, then offer to download `ref`
+   * and use it. With `resend`, download it without asking and send that
+   * message again.
    */
   function startInstall(ref: string, setDefault: boolean, resend: string | null = null): void {
     pickerRef.current = closedPicker;
     setPicker(closedPicker);
-    const brew = findBrew(process.env.PATH);
-    if (brew === null) {
-      showInstall({ state: { phase: "no_brew" }, ref, setDefault, resend });
-      return;
-    }
     showInstall({ state: startedInstall, ref, setDefault, resend });
-    const run = runInstall(brew, (event) => {
+    const stopListening = client.onOllamaInstall((update) => {
       const current = installRef.current;
       if (current === null) {
         return;
       }
-      const state = reduceInstall(current.state, event);
+      const state = reduceInstall(current.state, installEventOf(update));
       showInstall({ ...current, state });
       if (state.phase !== "running") {
+        stopListening();
         stopInstall.current = null;
       }
       if (state.phase === "done") {
         onInstalled(ref, setDefault, resend);
       }
     });
-    if (installRef.current?.state.phase === "running") {
-      stopInstall.current = run.stop;
-    }
+    stopInstall.current = stopListening;
+    cancelInstall.current = () => {
+      void client.cancelOllamaInstall().catch(() => undefined);
+    };
+    // `started` is false when another window already runs it: its output reaches this one too.
+    client.installOllama().catch((error: unknown) => {
+      stopListening();
+      stopInstall.current = null;
+      const current = installRef.current;
+      if (current === null) {
+        return;
+      }
+      if (error instanceof RpcError && error.code === OLLAMA_FAILED && error.data?.["no_brew"] === true) {
+        showInstall({ ...current, state: { phase: "no_brew" } });
+        return;
+      }
+      showInstall({ ...current, state: reduceInstall(current.state, { kind: "error", message: messageOf(error) }) });
+    });
   }
 
   /** The daemon finds the new binary on its next look, and starts Ollama for the listing. */
@@ -2113,7 +2128,7 @@ export function App({
     if (installing !== null && press.name === "escape" && !keysOpenRef.current) {
       // Esc stops brew while it runs, and puts the band away after.
       if (installing.state.phase === "running") {
-        stopInstall.current?.();
+        cancelInstall.current?.();
       } else {
         showInstall(null);
       }

@@ -777,6 +777,35 @@ test("download progress and its end reach onPull", async () => {
   }
 });
 
+test("setup.status reads the rows, and the Ollama install's output reaches onOllamaInstall", async () => {
+  const row = { part: "engine", name: "ollama", state: "warn", detail: "Ollama is not installed", action: "install_ollama" };
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: { "setup.status": { rows: [row] }, "ollama.install": { started: true } },
+      onHello: (current) => {
+        write(current, { jsonrpc: "2.0", method: "ollama.install.output", params: { text: "==> Pouring\n" } });
+        write(current, { jsonrpc: "2.0", method: "ollama.install.done", params: { outcome: "installed" } });
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
+  const updates: string[] = [];
+  const stop = client.onOllamaInstall((update) => {
+    updates.push(update.kind === "output" ? update.text : update.done.outcome);
+  });
+  try {
+    assert.deepEqual(await client.setupStatus(), { rows: [row] });
+    assert.deepEqual(await client.installOllama(), { started: true });
+    await waitFor(() => updates.length >= 2);
+    assert.deepEqual(updates, ["==> Pouring\n", "installed"]);
+  } finally {
+    stop();
+    client.close();
+    await server.close();
+  }
+});
+
 test("mcp.list reads the servers, and mcp.server.status reaches onMcpStatus", async () => {
   const git = { name: "git", state: "running", command: "uvx mcp-server-git", tools: ["mcp__git__git_status"], error: null };
   const sent: Record<string, unknown>[] = [];

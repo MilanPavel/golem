@@ -4,6 +4,9 @@ export {
   connectGolem,
   DAEMON_DOWN_CLOSE_CODE,
   KEYCHAIN_UNAVAILABLE,
+  KEY_REJECTED,
+  KEY_UNCHECKED,
+  OLLAMA_FAILED,
   MESSAGE_NOT_FOUND,
   MODEL_PULL_FAILED,
   APPROVAL_NOT_FOUND,
@@ -22,6 +25,7 @@ export {
   type ConnectionState,
   type ConnectOptions,
   type GolemClient,
+  type OllamaInstallUpdate,
   type PullUpdate,
   type SessionSummary,
 } from "./connect.ts";
@@ -38,6 +42,7 @@ export type { SkillCall } from "../../protocol/gen/skill-call.ts";
 export type { ListedSkill, SkillListResult } from "../../protocol/gen/skill-list-result.ts";
 export type { ConfigGetResult, ConfigRule } from "../../protocol/gen/config-get-result.ts";
 export type { ListedModel, ModelListResult } from "../../protocol/gen/model-list-result.ts";
+export type { SetupRow, SetupStatusResult } from "../../protocol/gen/setup-status-result.ts";
 export { mergeSummary } from "./session-index.ts";
 export { VERSION as GOLEM_VERSION } from "./version.ts";
 export {
