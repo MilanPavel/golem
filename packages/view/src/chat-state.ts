@@ -1,4 +1,4 @@
-import type { ChatEvent, SkillCall } from "@golem/client";
+import type { ApprovalChoice, ChatEvent, SkillCall } from "@golem/client";
 
 import type { TodoItem } from "./todos.ts";
 
@@ -14,6 +14,12 @@ export type PendingApproval = {
   /** The change a file tool would make, as a unified diff. */
   diff: string | null;
 };
+
+/** How a question about a tool call was answered. */
+export type ApprovalAnswer = { decision: ApprovalChoice; rule: string | null; edited: boolean };
+
+/** The question asked about a tool call, and the answer once there is one. */
+export type ToolApproval = { source: string; subject: string | null; answer?: ApprovalAnswer };
 
 /** One tool call, drawn under the assistant message that asked for it. */
 export type ToolBlock = {
@@ -34,6 +40,8 @@ export type ToolBlock = {
   output?: string;
   /** The change a file tool would make, as a unified diff, from `approval.needed`. */
   diff?: string;
+  /** The question the run asked about this call, from `approval.needed` and `approval.resolved`. */
+  approval?: ToolApproval;
 };
 
 /** Characters of live output kept per tool call. */
@@ -261,6 +269,7 @@ export function reduceChat(state: ChatState, event: ChatEvent): ChatState {
       const waiting = updateTool(state, event.data.call_id, (tool) => ({
         ...tool,
         status: "waiting",
+        approval: { source: event.data.source, subject: event.data.subject ?? null },
         ...(event.data.diff ? { diff: event.data.diff } : {}),
       }));
       return {
@@ -280,7 +289,18 @@ export function reduceChat(state: ChatState, event: ChatEvent): ChatState {
       const edited = event.data.args ?? null;
       const answered = updateTool(state, event.data.call_id, (tool) => {
         const args = edited === null ? tool.args : edited;
-        return tool.status === "waiting" ? { ...tool, status: "requested", args } : { ...tool, args };
+        const answer: ApprovalAnswer = {
+          decision: event.data.decision,
+          rule: event.data.rule ?? null,
+          edited: edited !== null,
+        };
+        const approval: ToolApproval = {
+          ...(tool.approval ?? { source: "", subject: event.data.subject ?? null }),
+          answer,
+        };
+        return tool.status === "waiting"
+          ? { ...tool, status: "requested", args, approval }
+          : { ...tool, args, approval };
       });
       return { ...answered, approval: null };
     }

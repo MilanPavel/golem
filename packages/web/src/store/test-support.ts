@@ -74,6 +74,7 @@ export function fakeClient() {
     createSession: vi.fn<PageClient["createSession"]>(async () => ({ session_id: "s_new" })),
     sendMessage: vi.fn<PageClient["sendMessage"]>(async () => ({}) as never),
     cancelRun: vi.fn<PageClient["cancelRun"]>(async () => ({}) as never),
+    respondApproval: vi.fn<PageClient["respondApproval"]>(async () => ({}) as never),
     checkNow: vi.fn(),
     close: vi.fn(),
   };

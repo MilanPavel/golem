@@ -19,6 +19,8 @@ import { ConnectionScreen } from "../features/connection/connection-screen.tsx";
 import { connectionScreen } from "../features/connection/connection-screen.ts";
 import { ToolLine, TranscriptMessages } from "../features/chat/index.ts";
 import { SAMPLE_CHAT, SAMPLE_TOOLS } from "../features/chat/sample.ts";
+import { ApprovalCard } from "../features/approval/index.ts";
+import { ANSWERED, PENDING_EDIT, PENDING_SHELL } from "../features/approval/sample.ts";
 import { DiffModeSwitch, DiffView } from "../features/diff/index.ts";
 import { SAMPLE_EDIT_DIFF, SAMPLE_LONG_LINE_DIFF, SAMPLE_NEW_FILE_DIFF } from "../features/diff/sample.ts";
 import { Composer, DockView, Meter } from "../features/composer/index.ts";
@@ -137,6 +139,25 @@ function DiffDemo() {
   );
 }
 
+/** The approval card, pending and answered. */
+function ApprovalDemo() {
+  return (
+    <section className="mt-6">
+      <h3 className="mb-2 font-mono text-xs text-faint">Approval</h3>
+      <div className="flex flex-col gap-4">
+        <ApprovalCard tool={PENDING_EDIT} pending onAnswer={() => {}} />
+        <ApprovalCard tool={PENDING_SHELL} pending onAnswer={() => {}} />
+        {ANSWERED.map(({ label, tool }) => (
+          <div key={label}>
+            <p className="mb-1 text-xs text-muted">{label}</p>
+            <ApprovalCard tool={tool} pending={false} onAnswer={() => {}} />
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function Panel({ theme }: { theme: "slip" | "kiln" }) {
   return (
     <section data-theme={theme} aria-label={`${theme} theme`} className="rounded-lg border border-line bg-bg p-4 text-ink">
@@ -146,6 +167,7 @@ function Panel({ theme }: { theme: "slip" | "kiln" }) {
         <Button kind="primary">Primary</Button>
         <Button kind="secondary">Secondary</Button>
         <Button kind="ghost">Ghost</Button>
+        <Button kind="ink">Ink</Button>
         <Button kind="danger">Danger</Button>
         <Button kind="primary" size="sm">Small</Button>
         <Button kind="secondary" size="sm">Small</Button>
@@ -230,6 +252,8 @@ function Panel({ theme }: { theme: "slip" | "kiln" }) {
           />
         </div>
       </section>
+
+      <ApprovalDemo />
 
       <Group title="Input, textarea">
         <Input aria-label={`Name, ${theme}`} placeholder="Name" />
