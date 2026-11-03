@@ -9,7 +9,7 @@
 //   …output…                         a tool line and its output, in mono on code-bg, not parsed
 //   ```
 //
-//   ::: concept [title]  /  ::: golem [title]    the two halves of a "How agents work" page
+//   ::: concept [title]  /  ::: golem [title]    the two halves of a "How golem works" chapter
 //
 //   ```screen A4 · Engine | Enter on **On this Mac** → A5
 //   …the screen as plain text…       a TUI screen in a terminal window, coloured by

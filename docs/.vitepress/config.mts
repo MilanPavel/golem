@@ -79,12 +79,17 @@ const sidebar: DefaultTheme.Sidebar = [
       { text: "The web UI", link: "/guide/web" },
     ],
   },
+  // golem's architecture, one idea per chapter: the idea in agents generally, then golem's
+  // version, then its details (docs/architecture/_template.md). Step 11.6 adds the chapters.
+  {
+    text: "How golem works",
+    items: [{ text: "Overview", link: "/architecture" }],
+  },
   {
     text: "Build golem",
     items: [
       { text: "Hacking on golem", link: "/contributing/hacking" },
       { text: "Contributing", link: "/contributing/" },
-      { text: "Architecture", link: "/architecture" },
       { text: "The monorepo", link: "/monorepo" },
       { text: "Building, releasing, and running", link: "/sre" },
       { text: "The web UI's design", link: "/design/web" },
