@@ -92,3 +92,51 @@ test("a key answers the call, and a failed send shows its error", async () => {
   expect(fake.raw.respondApproval).toHaveBeenCalledWith("s1", "c1", "deny");
   expect(screen.getByRole("alert").textContent).toBe("no such call");
 });
+
+const edit = (text: string) => fireEvent.change(screen.getByRole("textbox"), { target: { value: text } });
+
+test("E opens the editor; an edited allow goes out with the new arguments", async () => {
+  const { fake, send } = setup();
+  await wait();
+  ask(send);
+  fireEvent.keyDown(document.body, { key: "e" });
+  expect(document.activeElement).toBe(screen.getByRole("textbox"));
+  edit('{"path": "src/b.ts"}');
+  fireEvent.click(screen.getByRole("button", { name: /^Allow once/ }));
+  await wait();
+  expect(fake.raw.respondApproval).toHaveBeenCalledWith("s1", "c1", "allow", { path: "src/b.ts" });
+});
+
+test("unchanged arguments send no args", async () => {
+  const { fake, send } = setup();
+  await wait();
+  ask(send);
+  fireEvent.click(screen.getByRole("button", { name: /^Edit/ }));
+  fireEvent.keyDown(screen.getByRole("textbox"), { key: "Enter", metaKey: true });
+  await wait();
+  expect(fake.raw.respondApproval).toHaveBeenCalledTimes(1);
+  expect(fake.raw.respondApproval.mock.calls[0]).toEqual(["s1", "c1", "allow"]);
+});
+
+test("while editing, Enter, S, W, and D on the page answer nothing", async () => {
+  const { fake, send } = setup();
+  await wait();
+  ask(send);
+  fireEvent.keyDown(document.body, { key: "e" });
+  for (const key of ["Enter", "s", "w", "d"]) fireEvent.keyDown(document.body, { key });
+  await wait();
+  expect(fake.raw.respondApproval).not.toHaveBeenCalled();
+  fireEvent.keyDown(screen.getByRole("textbox"), { key: "Escape" });
+  fireEvent.keyDown(document.body, { key: "d" });
+  await wait();
+  expect(fake.raw.respondApproval).toHaveBeenCalledWith("s1", "c1", "deny");
+});
+
+test("an answer from elsewhere closes the editor", async () => {
+  const { send } = setup();
+  await wait();
+  ask(send);
+  fireEvent.keyDown(document.body, { key: "e" });
+  send("approval.resolved", { call_id: "c1", name: "edit_file", decision: "allow", subject: "src/a.ts" });
+  expect(screen.queryByRole("textbox")).toBeNull();
+});

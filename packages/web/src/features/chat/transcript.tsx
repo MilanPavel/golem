@@ -156,12 +156,17 @@ export const UserMessage = memo(function UserMessage({ message }: { message: Cha
   );
 });
 
+type Args = Readonly<Record<string, unknown>>;
+
 type Answering = {
   /** The call this message's card waits on, or null when none of its tools is the pending one. */
   approvalCallId?: string | null;
   sending?: boolean;
   error?: string | null;
-  onAnswer?: (callId: string, decision: ApprovalChoice) => void;
+  /** The pending call's arguments are open for editing. */
+  editing?: boolean;
+  onEdit?: (open: boolean) => void;
+  onAnswer?: (callId: string, decision: ApprovalChoice, args?: Args) => void;
 };
 
 export const GolemMessage = memo(function GolemMessage({
@@ -169,6 +174,8 @@ export const GolemMessage = memo(function GolemMessage({
   approvalCallId = null,
   sending = false,
   error = null,
+  editing = false,
+  onEdit,
   onAnswer,
 }: { message: ChatMessage } & Answering) {
   const tools = message.tools ?? [];
@@ -197,8 +204,11 @@ export const GolemMessage = memo(function GolemMessage({
             pending={tool.callId === approvalCallId}
             sending={sending && tool.callId === approvalCallId}
             error={tool.callId === approvalCallId ? error : null}
-            onAnswer={(decision) => {
-              onAnswer?.(tool.callId, decision);
+            editing={editing && tool.callId === approvalCallId}
+            onEdit={onEdit}
+            onAnswer={(decision, args) => {
+              if (args === undefined) onAnswer?.(tool.callId, decision);
+              else onAnswer?.(tool.callId, decision, args);
             }}
           />
         ) : null,
@@ -216,14 +226,17 @@ export const GolemMessage = memo(function GolemMessage({
 export type TranscriptChat = Pick<ChatState, "messages" | "error" | "notice"> & Partial<Pick<ChatState, "approval">>;
 
 type Answers = {
-  onAnswer?: (callId: string, decision: ApprovalChoice) => void;
+  onAnswer?: (callId: string, decision: ApprovalChoice, args?: Args) => void;
+  /** The pending call's arguments are open for editing. */
+  editing?: boolean;
+  onEdit?: (open: boolean) => void;
   /** The call whose answer is on its way. */
   sendingId?: string | null;
   answerError?: string | null;
 };
 
 /** The messages and the closing error or notice. Pure: the page's stores are not read here. */
-export function TranscriptMessages({ chat, onAnswer, sendingId = null, answerError = null }: { chat: TranscriptChat } & Answers) {
+export function TranscriptMessages({ chat, onAnswer, sendingId = null, answerError = null, editing = false, onEdit }: { chat: TranscriptChat } & Answers) {
   const pendingId = chat.approval?.callId ?? null;
   if (chat.messages.length === 0 && !chat.error && !chat.notice) {
     return <p className="text-sm text-faint">No messages yet.</p>;
@@ -240,6 +253,8 @@ export function TranscriptMessages({ chat, onAnswer, sendingId = null, answerErr
             approvalCallId={pendingId}
             sending={sendingId === pendingId}
             error={answerError}
+            editing={editing}
+            onEdit={onEdit}
             onAnswer={onAnswer}
           />
         ) : (
@@ -262,6 +277,8 @@ export function TranscriptColumn({
   onAnswer,
   sendingId,
   answerError,
+  editing,
+  onEdit,
 }: { chat: TranscriptChat; className?: string } & Answers) {
   const scroller = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
@@ -302,7 +319,7 @@ export function TranscriptColumn({
     <div className={cn("relative flex min-h-0 flex-1 flex-col", className)}>
       <div ref={scroller} onScroll={onScroll} className="min-h-0 flex-1 overflow-y-auto" data-transcript-scroller>
         <div ref={content} className="mx-auto flex max-w-column flex-col gap-6 px-5 py-7">
-          <TranscriptMessages chat={chat} onAnswer={onAnswer} sendingId={sendingId} answerError={answerError} />
+          <TranscriptMessages chat={chat} onAnswer={onAnswer} sendingId={sendingId} answerError={answerError} editing={editing} onEdit={onEdit} />
         </div>
       </div>
       {atBottom ? null : (
@@ -329,10 +346,32 @@ export function Transcript({ id }: { id: string }) {
   const chat = useSession(id, (view) => view.chat);
   const { respond } = usePageActions();
   const callId = chat.approval?.callId ?? null;
-  const send = useCallback((call: string, decision: ApprovalChoice) => respond(id, call, decision), [respond, id]);
+  const send = useCallback(
+    (call: string, decision: ApprovalChoice, args?: Args) =>
+      args === undefined ? respond(id, call, decision) : respond(id, call, decision, args),
+    [respond, id],
+  );
   const { answer, sendingId, error } = useApprovalAnswer(send, callId);
+  // The editor belongs to the call it was opened on; a new pending call starts closed.
+  const [editingFor, setEditingFor] = useState<string | null>(null);
+  const editing = callId !== null && editingFor === callId;
+  const onEdit = useCallback(
+    (open: boolean) => {
+      setEditingFor(open ? callId : null);
+    },
+    [callId],
+  );
   const readDraft = useDraftReader(id);
-  // A key answers only while the composer is empty; typing is never taken for an answer.
-  useApprovalKeys({ callId, canAnswer: () => readDraft() === "", onAnswer: answer });
-  return <TranscriptColumn chat={chat} onAnswer={answer} sendingId={sendingId} answerError={error} />;
+  // A key answers only while the composer is empty and the arguments are not being edited.
+  useApprovalKeys({
+    callId,
+    canAnswer: () => readDraft() === "" && !editing,
+    onAnswer: answer,
+    onEdit: () => {
+      onEdit(true);
+    },
+  });
+  return (
+    <TranscriptColumn chat={chat} onAnswer={answer} sendingId={sendingId} answerError={error} editing={editing} onEdit={onEdit} />
+  );
 }

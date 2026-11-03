@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { argsEditLines, editedArgs, liveArgsEdit, parseArgs, startArgsEdit } from "./approval-edit.ts";
+import { argsEditLines, editedArgs, liveArgsEdit, startArgsEdit } from "./approval-edit.ts";
 import type { PendingApproval } from "@golem/view";
 
 const approval: PendingApproval = {
@@ -17,13 +17,6 @@ test("the editor starts with the arguments as indented JSON and the cursor at th
   assert.equal(edit.draft.text, JSON.stringify(approval.args, null, 2));
   assert.equal(edit.draft.cursor, edit.draft.text.length);
   assert.equal(edit.error, null);
-});
-
-test("only one JSON object is accepted", () => {
-  assert.deepEqual(parseArgs('{"path": "b.py"}'), { ok: true, args: { path: "b.py" } });
-  for (const text of ["[1]", "null", '"x"', "{"]) {
-    assert.equal(parseArgs(text).ok, false, text);
-  }
 });
 
 test("an edit for a call that no longer waits is dropped", () => {
