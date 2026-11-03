@@ -1,5 +1,5 @@
-import { noPastes } from "@golem/view";
-import { useState, type ReactNode } from "react";
+import { noPastes, type TodoItem } from "@golem/view";
+import { useId, useState, type ReactNode } from "react";
 import { Badge } from "../ui/badge.tsx";
 import { Button } from "../ui/button.tsx";
 import { Card } from "../ui/card.tsx";
@@ -23,6 +23,7 @@ import { ApprovalCard } from "../features/approval/index.ts";
 import { ANSWERED, PENDING_EDIT, PENDING_SHELL } from "../features/approval/sample.ts";
 import { DiffModeSwitch, DiffView } from "../features/diff/index.ts";
 import { SAMPLE_EDIT_DIFF, SAMPLE_LONG_LINE_DIFF, SAMPLE_NEW_FILE_DIFF } from "../features/diff/sample.ts";
+import { Drawer, TodoList } from "../features/drawer/index.ts";
 import { Composer, DockView, Meter } from "../features/composer/index.ts";
 import { createHistory } from "../features/composer/history.ts";
 import { HomeView } from "../features/shell/index.ts";
@@ -134,6 +135,48 @@ function DiffDemo() {
             </div>
           )),
         )}
+      </div>
+    </section>
+  );
+}
+
+const SAMPLE_TODOS: TodoItem[] = [
+  { id: "1", text: "Find where socket chunks are decoded", status: "done" },
+  { id: "2", text: "Write a test that splits \u00e9 across two chunks", status: "done" },
+  { id: "3", text: "Decode with a streaming TextDecoder", status: "in_progress" },
+  { id: "4", text: "Run the client tests", status: "pending" },
+];
+
+const LONG_TODO: TodoItem[] = [
+  {
+    id: "1",
+    text: "Rewrite packages/client/src/connection/reconnect-with-backoff-and-jitter.ts so that the delay never exceeds thirty seconds, whatever the attempt count",
+    status: "in_progress",
+  },
+];
+
+/** The todo list in its states, and the drawer frame at a fixed height. */
+function DrawerDemo({ theme }: { theme: string }) {
+  const id = useId();
+  return (
+    <section className="mt-6">
+      <h3 className="mb-2 font-mono text-xs text-faint">Drawer</h3>
+      <div className="flex flex-wrap items-start gap-4">
+        {(
+          [
+            ["Four steps", SAMPLE_TODOS],
+            ["Empty", []],
+            ["A long item", LONG_TODO],
+          ] as const
+        ).map(([title, todos]) => (
+          <div key={title} className="flex w-80 flex-col gap-4 rounded-lg border border-line bg-surface p-4">
+            <p className="text-xs text-muted">{title}</p>
+            <TodoList todos={todos} />
+          </div>
+        ))}
+        <div className="flex h-96 overflow-hidden rounded-lg border border-line">
+          <Drawer id={id} label={`Details, ${theme}`} todos={SAMPLE_TODOS} floating={false} onClose={() => {}} />
+        </div>
       </div>
     </section>
   );
@@ -336,6 +379,8 @@ function Panel({ theme }: { theme: "slip" | "kiln" }) {
       </section>
 
       <DiffDemo />
+
+      <DrawerDemo theme={theme} />
 
       <Group title="Dialog, popover, menu, tooltip">
         <Dialog>

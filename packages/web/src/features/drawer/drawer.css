@@ -1,0 +1,4 @@
+/* The hatched fill of the box beside the task in progress. Colours are tokens. */
+.todo-hatch {
+  background: repeating-linear-gradient(135deg, var(--color-clay) 0 2px, transparent 2px 4px);
+}
