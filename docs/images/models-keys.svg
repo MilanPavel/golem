@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 352" role="img" aria-label="How golem finds a provider's key at each model call: first the environment variable that api_key_env names, then the macOS Keychain, where every secret golem keeps lives under one service. With no key, the call fails and names /login.">
+<style>
+  :root { --bg:#F3F2EF; --surface:#FBFAF8; --ink:#1D1A17; --muted:#57524C; --faint:#6C665F;
+          --line:#B9B3AA; --clay:#C4783A; --clay-ink:#94501E; --soft:#F1E2D4; --sunken:#EAE8E3; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#15120F; --surface:#1D1915; --ink:#EEE7DF; --muted:#B5ACA2; --faint:#8F877E;
+            --line:#5A5148; --clay:#D08549; --clay-ink:#E6A06A; --soft:#2E2118; --sunken:#110E0C; }
+  }
+  @media (prefers-reduced-motion: reduce) { .anim { display:none } }
+  text { font-family: Geist, Inter, -apple-system, "Helvetica Neue", Arial, sans-serif; fill: var(--ink); }
+  .mono { font-family: "Geist Mono", "SF Mono", Menlo, Consolas, monospace; letter-spacing: .04em; }
+  .label { font-size: 13px; fill: var(--muted); letter-spacing: .06em; }
+  .small { font-size: 12px; }
+  .faint { fill: var(--faint); }
+  .muted { fill: var(--muted); }
+  .clay { fill: var(--clay-ink); }
+  .wire { stroke: var(--line); stroke-width: 1.2; fill: none; }
+  .head { fill: var(--line); }
+  .back { stroke-dasharray: 3 3; }
+  .edge { fill: none; stroke: var(--line); stroke-width: 1.2; stroke-dasharray: 4 4; }
+  .lit { fill: none; stroke: var(--clay); stroke-width: 1.8; }
+  .box { fill: var(--surface); }
+  .dot { fill: var(--clay); }
+</style>
+<rect width="880" height="352" rx="12" fill="var(--bg)"/>
+<text class="mono label" x="32" y="44">AT EACH MODEL CALL</text><text class="mono" x="848" y="62" text-anchor="end" font-size="40" style="fill:var(--clay-ink)">2 places</text><text x="848" y="90" text-anchor="end" font-size="16" class="muted">the router looks for a provider's key here, in order</text>
+<rect x="40" y="132" width="260" height="76" rx="2" fill="var(--surface)"/><text class="mono small clay" x="56" y="156">1</text><text x="56" y="178" font-size="15">An environment variable</text><text class="mono small faint" x="56" y="197">the one api_key_env names</text>
+<path class="wire" d="M300 170 H338"/><path class="head" d="M332 166 L339 170 L332 174 Z"/>
+<rect x="340" y="132" width="260" height="76" rx="2" fill="var(--surface)"/><text class="mono small clay" x="356" y="156">2</text><text x="356" y="178" font-size="15">The macOS Keychain</text><text class="mono small faint" x="356" y="197">provider/&lt;name&gt;</text>
+<path class="wire" d="M600 170 H638"/><path class="head" d="M632 166 L639 170 L632 174 Z"/>
+<rect x="640" y="132" width="208" height="76" rx="2" fill="var(--soft)"/><text class="mono small clay" x="656" y="156">→</text><text x="656" y="178" font-size="15">The key</text><text class="mono small faint" x="656" y="197">read for this call only</text>
+<text class="mono label" x="340" y="238">ONE STORE FOR EVERY SECRET · SERVICE GOLEM</text>
+<rect x="340" y="248" width="260" height="24" rx="2" fill="var(--sunken)"/><text class="mono small" x="352" y="264">provider/anthropic</text><text class="mono small faint" x="588" y="264" text-anchor="end">a model key</text><rect x="340" y="278" width="260" height="24" rx="2" fill="var(--sunken)"/><text class="mono small" x="352" y="294">mcp/github</text><text class="mono small faint" x="588" y="294" text-anchor="end">a token</text><rect x="340" y="308" width="260" height="24" rx="2" fill="var(--sunken)"/><text class="mono small" x="352" y="324">hook/deploy</text><text class="mono small faint" x="588" y="324" text-anchor="end">a token</text>
+<text class="mono label" x="40" y="264">NO KEY AT ALL</text>
+<text x="40" y="286" font-size="14" class="muted">The call fails, and the error</text>
+<text x="40" y="306" font-size="14" class="muted">names <tspan class="mono">/login &lt;provider&gt;</tspan>.</text>
+<text x="640" y="264" font-size="14" class="muted">Never in a file: a setting</text>
+<text x="640" y="284" font-size="14" class="muted">with a key in it does</text>
+<text x="640" y="304" font-size="14" class="muted">not load.</text>
+<g class="anim"><rect class="dot" x="-5.0" y="-5.0" width="10" height="10" opacity="0"><animateMotion dur="10s" repeatCount="indefinite" calcMode="linear" path="M20 170 H40 V132 H300 V170 H340 V132 H600 V170 H640" keyTimes="0;0.0400;0.4000;1" keyPoints="0;0;1;1"/><animate attributeName="opacity" dur="10s" repeatCount="indefinite" keyTimes="0.0000;0.0280;0.0400;0.4000;0.4120;1.0000" values="0;0;1;1;0;0"/></rect><text opacity="0" class="mono small faint" x="170" y="228" text-anchor="middle">not set: look further<animate attributeName="opacity" dur="10s" repeatCount="indefinite" keyTimes="0.0000;0.1080;0.1200;0.4200;0.4320;1.0000" values="0;0;1;1;0;0"/></text><rect class="lit" x="336" y="128" width="268" height="84" rx="5" opacity="0"><animate attributeName="opacity" dur="10s" repeatCount="indefinite" keyTimes="0.0000;0.2680;0.2800;0.4600;0.4720;1.0000" values="0;0;1;1;0;0"/></rect><rect class="lit" x="636" y="128" width="216" height="84" rx="5" opacity="0"><animate attributeName="opacity" dur="10s" repeatCount="indefinite" keyTimes="0.0000;0.3880;0.4000;0.4800;0.4920;1.0000" values="0;0;1;1;0;0"/></rect><rect class="dot" x="-5.0" y="-5.0" width="10" height="10" opacity="0"><animateMotion dur="10s" repeatCount="indefinite" calcMode="linear" path="M20 170 H40 V132 H170" keyTimes="0;0.5600;0.6400;1" keyPoints="0;0;1;1"/><animate attributeName="opacity" dur="10s" repeatCount="indefinite" keyTimes="0.0000;0.5480;0.5600;0.6400;0.6520;1.0000" values="0;0;1;1;0;0"/></rect><rect class="lit" x="36" y="128" width="268" height="84" rx="5" opacity="0"><animate attributeName="opacity" dur="10s" repeatCount="indefinite" keyTimes="0.0000;0.6280;0.6400;0.8400;0.8520;1.0000" values="0;0;1;1;0;0"/></rect><text opacity="0" class="mono small clay" x="170" y="228" text-anchor="middle">set: it wins<animate attributeName="opacity" dur="10s" repeatCount="indefinite" keyTimes="0.0000;0.6280;0.6400;0.9200;0.9320;1.0000" values="0;0;1;1;0;0"/></text></g>
+</svg>
