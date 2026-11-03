@@ -291,7 +291,7 @@ Each log record is written twice: a short line on stderr, and a JSON line in `lo
 
 ## Skills
 
-A skill is a folder with a `SKILL.md`: a short YAML header (`name`, `description`) and then the instructions, in markdown. Scripts and reference notes can sit next to it. Golem reads the [Agent Skills](https://agentskills.io) format that Claude Code uses, so a skill written for another agent works here unchanged. How to write one and where to put it is in the [README](../README.md#use-skills).
+A skill is a folder with a `SKILL.md`: a short YAML header (`name`, `description`) and then the instructions, in markdown. Scripts and reference notes can sit next to it. Golem reads the [Agent Skills](https://agentskills.io) format that Claude Code uses, so a skill written for another agent works here unchanged. [Skills](guide/skills.md) says how to write one and where to put it.
 
 <p align="center">
   <img src="images/skills.gif" alt="An animation in seven steps: a skill is a folder with a SKILL.md, a header and instructions; the model sees one line per skill, the body when it is used, and its files when needed; golem looks in the project's .golem, .agents, and .claude skill folders, then the user's, then its own; the first working skill of a name wins and the rest are listed with why; saving a skill sends skill.registry.changed and /skills updates without a restart; golem skills and golem skills check in a shell; and next, three ways to use a skill: /name, pin, and the model loading it" width="900">
