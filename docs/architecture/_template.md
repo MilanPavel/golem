@@ -1,7 +1,10 @@
 ---
-# A "How agents work" page. Copy this file to docs/concepts/<slug>.md, fill it in, and delete
-# every guidance line (the ones in > quotes and in HTML comments). ADR-034 and Phase 11 of
-# docs/plan.md say why the series exists. The 11.6 tickets in #282 list the pages.
+# A "How golem works" chapter. Copy this file to docs/architecture/<slug>.md, fill it in, and
+# delete every guidance line (the ones in > quotes and in HTML comments). Each chapter is one
+# idea that most agents share, taught in general first, then how golem builds it, then golem's
+# details for contributors. Together the chapters are golem's architecture; architecture.md is
+# the overview that links them. ADR-034 and Phase 11 of docs/plan.md say why. The 11.6 tickets
+# in #282 list the chapters.
 title: The idea, as a short noun phrase        # "The agent loop", "Tool calling"
 description: One sentence a search result can show. What the reader will understand.
 order: 0                                       # its place in the series, from 1
@@ -16,9 +19,10 @@ adrs: []                                       # the ADRs this page explains, su
 Rules for the whole page:
 - Plain words and short sentences. Explain a term the first time it is used.
 - General first, golem second. The first two sections never mention golem.
-- One idea per page. Link to the other concept pages, don't repeat them.
+- One idea per page. Link to the other chapters, don't repeat them.
 - Show, don't claim: a diagram, a real trace, a real file.
-- Aim for 800 to 1 500 words. A reader should finish in about ten minutes.
+- Aim for 800 to 1 500 words before "The details". A reader should get the idea in about ten
+  minutes and can stop there. "The details" is as long as the reference needs.
 -->
 
 ## The idea
@@ -99,8 +103,24 @@ run.completed      seq 12
 2. Ask: `…`
 3. Watch for `…` in the wire panel. It is the step from the diagram above.
 
+## The details
+
+> **For contributors: the reference for this part of golem.** A reader who only wants the idea stops above. This section is the part of the old `architecture.md` that belongs to this idea, moved here, not copied, and kept as exact as before: every event, field, limit, error, and edge case. Leave `architecture.md` a one-line pointer to this chapter in its place.
+
+> One `###` heading per part, in the order they run, so the outline on the right is a map. Plain prose and lists, as in the rest of the page. Keep the facts precise. Tighten the wording only where it is unclear.
+
+### The first part
+
+> …
+
+> End with the files, one row each, so a contributor knows where to start:
+
+| File | What it does |
+|---|---|
+| `packages/daemon/golem/…` | One line |
+
 ## Read more
 
-> Two to five links: the next concept page, the section of [architecture.md](../architecture.md), and one outside source worth the time. A specification, a paper, or a good post.
+> Two to five links: the next chapter, the overview in [architecture.md](../architecture.md), and one outside source worth the time. A specification, a paper, or a good post.
 
 - Next: [The next idea](./next-slug.md)

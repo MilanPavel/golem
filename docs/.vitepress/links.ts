@@ -9,7 +9,7 @@ const BLOB = `${REPO_URL}/blob/main/`;
 const TREE = `${REPO_URL}/tree/main/`;
 
 /** Files in docs/ that are not pages. Matches `srcExclude` in config.mts. */
-export const NOT_PAGES = ["README.md", "adr/template.md", "concepts/_template.md", "design/prototype.html"];
+export const NOT_PAGES = ["README.md", "adr/template.md", "architecture/_template.md", "design/prototype.html"];
 
 const ASSET = /\.(svg|png|jpe?g|gif|webp|avif|ico|mp4|webm|woff2?)$/i;
 const SCHEME = /^[a-z][a-z0-9+.-]*:/i;
