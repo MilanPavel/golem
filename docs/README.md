@@ -33,7 +33,7 @@ golem's architecture, one idea per chapter. Each chapter explains an idea that m
 |---|---|---|---|
 | | Overview, and one message end to end | [architecture.md](architecture.md) | [#292](https://github.com/MilanPavel/golem/issues/292) |
 | 1 | The agent loop | [architecture/agent-loop.md](architecture/agent-loop.md) | |
-| 2 | Talking to models | `architecture/models.md` | [#284](https://github.com/MilanPavel/golem/issues/284) |
+| 2 | Talking to models | [architecture/models.md](architecture/models.md) | |
 | 3 | Tools | `architecture/tools.md` | [#285](https://github.com/MilanPavel/golem/issues/285) |
 | 4 | Safety: permissions, approvals, sandboxes | `architecture/safety.md` | [#286](https://github.com/MilanPavel/golem/issues/286) |
 | 5 | Context: the system prompt and skills | `architecture/context.md` | [#287](https://github.com/MilanPavel/golem/issues/287) |
