@@ -18,7 +18,7 @@ golem
 
 ## Pick a model
 
-On the first start, golem uses your only ready model. If you have several, or none, it opens the model picker. Type `/model` to open it again at any time.
+On the first start, golem's setup window asks where golem should think: on this Mac, with an API key, or later. If you have exactly one ready model, golem uses it without asking. Type `/model` to open the model picker at any time, and `/setup` to see the whole setup.
 
 - **Up** and **Down** choose a model, and **Enter** picks it for this chat.
 - **`d`** also makes it the default for new chats.

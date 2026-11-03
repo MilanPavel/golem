@@ -7,13 +7,22 @@ import { connectGolem, readStartError, resolveSocketPath } from "@golem/client/n
 
 import { App } from "./app.tsx";
 import { bindPointer } from "./screen.ts";
-import type { ServiceControl } from "./service.ts";
+import type { ServiceControl, WindowDaemon } from "./service.ts";
 import { clearProgress, clearTabStatus, popWindowTitle, pushWindowTitle } from "./window-title.ts";
 
-export type { ServiceControl };
+export type { ServiceControl, WindowDaemon };
 
-/** On its own the screen can say why the daemon did not start, but not restart it. */
-const READ_ONLY_SERVICE: ServiceControl = { startError: readStartError, installed: () => false, restart: null };
+/** On its own the screen can say why the daemon did not start, but not start or restart it. */
+const READ_ONLY_SERVICE: ServiceControl = {
+  startError: readStartError,
+  installed: () => false,
+  restart: null,
+  install: null,
+  uninstall: null,
+  serve: null,
+  windowDaemon: () => null,
+  logTail: () => [],
+};
 
 /** Open the chat screen. Returns when the screen exits. */
 export async function runTui(options: { service?: ServiceControl } = {}): Promise<void> {

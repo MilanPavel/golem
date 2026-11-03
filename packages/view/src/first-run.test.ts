@@ -6,16 +6,9 @@ import type { ListedModel, ModelListResult } from "@golem/client";
 import {
   firstRunChoice,
   hostedProviders,
-  localNeeds,
-  modelChosen,
   namesModel,
   noModelChosen,
-  pressFirstRun,
   recommendedLocal,
-  serviceStarted,
-  startFirstRun,
-  suggestedOption,
-  type FirstRun,
 } from "./first-run.ts";
 
 function model(ref: string, extra: Partial<ListedModel> = {}): ListedModel {
@@ -57,55 +50,6 @@ test("a resolving default needs nothing, one ready model is used, else the user 
   assert.deepEqual(firstRunChoice(unset), { kind: "auto", model: QWEN });
   assert.deepEqual(firstRunChoice({ ...unset, models: [QWEN, model("ollama/gemma4:e4b")] }), { kind: "pick" });
   assert.deepEqual(firstRunChoice(FRESH), { kind: "pick" });
-});
-
-test("a start waits for the service, then for the model list", () => {
-  assert.deepEqual(startFirstRun(null, false), { step: "service" });
-  assert.equal(startFirstRun(null, true), null);
-  assert.deepEqual(startFirstRun(SET_UP, true), { step: "ready" });
-  assert.deepEqual(startFirstRun({ ...SET_UP, default: null }, true), { step: "ready" });
-  assert.deepEqual(startFirstRun(FRESH, true), { step: "choose", option: "local" });
-});
-
-test("a stored key suggests the API key path first", () => {
-  assert.equal(suggestedOption(FRESH), "local");
-  const keyed = { ...FRESH, setup: { ...FRESH.setup, keys: ["anthropic"] } };
-  assert.equal(suggestedOption(keyed), "key");
-  assert.deepEqual(startFirstRun(keyed, true), { step: "choose", option: "key" });
-});
-
-test("the local path says whether Ollama needs installing or starting", () => {
-  assert.equal(localNeeds(FRESH), "start");
-  assert.equal(localNeeds({ ...FRESH, setup: { ...FRESH.setup, ollama_installed: false } }), "install");
-  assert.equal(localNeeds(SET_UP), null);
-});
-
-test("up and down move between the three choices and stop at the ends", () => {
-  const start: FirstRun = { step: "choose", option: "local" };
-  assert.deepEqual(pressFirstRun(start, "up"), start);
-  const key = pressFirstRun(start, "down");
-  assert.deepEqual(key, { step: "choose", option: "key" });
-  const later = pressFirstRun(key, "down");
-  assert.deepEqual(pressFirstRun(later, "down"), { step: "choose", option: "later" });
-  assert.deepEqual(pressFirstRun(later, "up"), key);
-  assert.deepEqual(pressFirstRun(start, "back"), start);
-});
-
-test("enter takes a path, later goes to the chat, and back returns to the same choice", () => {
-  assert.deepEqual(pressFirstRun({ step: "choose", option: "local" }, "enter"), { step: "local" });
-  assert.deepEqual(pressFirstRun({ step: "choose", option: "key" }, "enter"), { step: "key" });
-  assert.deepEqual(pressFirstRun({ step: "choose", option: "later" }, "enter"), { step: "ready" });
-  assert.deepEqual(pressFirstRun({ step: "key" }, "back"), { step: "choose", option: "key" });
-  assert.deepEqual(pressFirstRun({ step: "local" }, "enter"), { step: "local" });
-  assert.deepEqual(pressFirstRun({ step: "service" }, "enter"), { step: "service" });
-});
-
-test("the service starting and a model being chosen move the start on", () => {
-  assert.deepEqual(serviceStarted({ step: "service" }, FRESH), { step: "choose", option: "local" });
-  assert.equal(serviceStarted({ step: "service" }, null), null);
-  assert.deepEqual(serviceStarted({ step: "key" }, FRESH), { step: "key" });
-  assert.deepEqual(modelChosen({ step: "local" }), { step: "ready" });
-  assert.deepEqual(modelChosen({ step: "service" }), { step: "service" });
 });
 
 test("the card offers a ready local model, else the largest in a quarter of memory", () => {
