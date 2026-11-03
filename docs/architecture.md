@@ -138,57 +138,15 @@ The socket is only the door. Behind it, these jobs sit in one process:
 | Skills | The `SKILL.md` folders a session's folder sees, and which one each name means (`golem/skills/`). | Built: finding, listing, and running by name. Pinning planned |
 | Event log | The history. Every event, numbered by `seq`, written before it is sent. A client that reconnects will read it and rebuild the screen. | Written. Replay to clients planned |
 
-The graph does not own the rest of the product. It calls ordinary Python for three things that have to stay ours:
-
-- **Which model** answers this step, and whether the budget allows it.
-- **Whether a tool may run.** Every tool call asks the same permission check before it runs. Flows and skills will ask it too. File tools also refuse any path outside the session's project folder, whatever the rules say.
-- **Which skills** exist and which are active. A skill is a `SKILL.md` the model can be given. The registry lives in the daemon, and the graph will only ever hold skill names ([Skills](#skills)).
-
-LangChain message objects stay inside the graph. The protocol server never sends them out. An adapter turns the graph's stream into protocol events first. [ADR-002](adr/002-langgraph-boundary.md) is that boundary.
+What the graph owns, and what it calls instead, is in [The agent loop](architecture/agent-loop.md#what-the-graph-owns-and-what-it-calls).
 
 ### One turn
 
-You type in the TUI. The daemon is the only place the model runs.
+One turn, the graph, its messages, failures and the cap, the folder, and models without tools are in [The agent loop](architecture/agent-loop.md#the-details). What a turn does with the system prompt and with tools is still here:
 
-```mermaid
-sequenceDiagram
-  participant You
-  participant TUI
-  participant Daemon
-  participant Graph
-  participant Model
-  You->>TUI: a sentence
-  TUI->>Daemon: message.send
-  Daemon-->>TUI: your message.completed, run.started, message.started
-  Daemon->>Graph: continue thread = session id
-  Graph->>Model: messages so far
-  Model-->>Graph: tokens
-  Graph-->>Daemon: stream chunks
-  Daemon-->>TUI: message.delta, many times
-  Graph->>Graph: write checkpoint
-  Daemon-->>TUI: message.completed, run.completed
-  TUI-->>You: the screen updates
-```
-
-Every event in that diagram is written to `golem.db` first, then sent. The checkpoint messages carry the same message ids as the events, so the two stores name the same sentence the same way.
-
-A turn can hold more than one model call. When the reply asks for tools, the graph runs them and calls the model again with their results:
-
-```mermaid
-flowchart LR
-  startNode[START] --> callModel[call_model]
-  callModel -->|"tool calls"| toolsNode[tools]
-  callModel -->|"no tool calls"| endNode[END]
-  toolsNode --> callModel
-```
-
-- **Messages.** Each model call is its own assistant message, with its own `message.started` and `message.completed`. The TUI draws the replies of one turn under a single `golem` label. The first one has the id the turn chose before the run. `call_model` gives each later one a new id and writes it to the graph's custom stream, and the runner opens that message. A reply that only calls tools completes with empty text.
 - **The system prompt.** `call_model` builds it for each call from the sections in `golem/graphs/prompt.py` and sends it in front of the history. The node returns only the reply, so the prompt is never checkpointed. With no section to say anything, no system message is sent. Its one section today holds the pinned skills (`golem/skills/pinned.py`) ([ADR-031](adr/031-system-prompt.md)).
 - **Tool events.** After a reply completes, each tool call it asked for is `tool.requested`, with the asking `message_id`, the tool name, and the arguments. The `tools` node then writes `tool.started`, and `tool.completed` (a one-line summary, the first 4 KB of the output, and `artifact_id` when it was long) or `tool.failed` (the reason). Output up to 20 000 characters goes to the model as a `ToolMessage` in the checkpoint. Longer output is stored whole in the `artifacts` table, and the message keeps the first 12 000 and the last 4 000 characters and a note with the artifact's id, which `read_artifact` pages through ([ADR-016](adr/016-artifacts.md)).
 - **Todos.** `todo_write` replaces the agent's todo list, which lives in graph state (`todos`) and needs no approval. A tool changes state only through `ToolResult.update`, and the `tools` node applies only the keys in `STATE_KEYS`. Each change is a `todos.updated` event with the whole list, and a fork starts with one for the list it copied ([ADR-018](adr/018-tool-state-updates.md)).
-- **Failures.** A refused path, bad arguments, or an exception in a tool becomes `tool.failed`, and the model reads the same message as the result. The run goes on. A run that reaches 25 model calls fails with `the run stopped after 25 model calls`.
-- **The folder.** `session.create` takes `cwd`, the TUI's working directory, and the session keeps it (`sessions.cwd`, and in `session.created`). A fork keeps its source's folder. The runner passes it to the graph in `configurable`, so it is not checkpointed. Paths resolve inside it with symlinks followed. A session made before tools has no folder. The TUI sends its working directory with each `message.send`, and such a session takes it once, stored as `session.updated` with `cwd`. After that it keeps it. A session that still has none gets the tools, and each call says it has no project folder.
-- **Models without tools.** A chat model class without `bind_tools` gets no tools. A model whose server refuses tools, such as an Ollama model without the `tools` capability, is asked again without them, and that profile is not offered tools again until the daemon restarts.
 
 If you quit the TUI halfway through, the daemon still finishes the run and saves the checkpoint. The next message in that session continues from it.
 
@@ -239,8 +197,6 @@ sequenceDiagram
 A run stopped between a reply and its tool results leaves tool calls without a result in the checkpoint, and providers refuse that history. Before the next turn streams, each such call gets a result that says it was cancelled.
 
 If the daemon dies halfway through, the run has no task left to finish it. At the next start the daemon closes it: each open tool call gets `tool.failed`, the open answer gets a `message.completed` with the text streamed so far and `interrupted: true`, then `run.failed`. The same partial text is written into the checkpoint, so the model's next turn sees what the screen showed.
-
-There will be two kinds of graph, on purpose. In an **agent** session, the model picks the next step. In a **flow**, our Python picks the next step, and each expensive step is saved so a resume does not run it again.
 
 A step that stops to ask you a question runs again from its first line when you answer. The side effect goes after that stop, or in its own step, so a resume does not do it twice.
 

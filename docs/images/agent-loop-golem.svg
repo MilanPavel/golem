@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 372" role="img" aria-label="golem's graph: message.send starts a run, call_model asks for tools, the tools node returns their results, twice, and run.completed ends it.">
+<style>
+  :root { --bg:#F3F2EF; --surface:#FBFAF8; --ink:#1D1A17; --muted:#57524C; --faint:#6C665F;
+          --line:#B9B3AA; --clay:#C4783A; --clay-ink:#94501E; --soft:#F1E2D4; --tool:#B8754F; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#15120F; --surface:#1D1915; --ink:#EEE7DF; --muted:#B5ACA2; --faint:#8F877E;
+            --line:#5A5148; --clay:#D08549; --clay-ink:#E6A06A; --soft:#2E2118; --tool:#B8754F; }
+  }
+  @media (prefers-reduced-motion: reduce) { .pulse, .anim { display:none } }
+  text { font-family: Geist, Inter, -apple-system, "Helvetica Neue", Arial, sans-serif; fill: var(--ink); }
+  .mono { font-family: "Geist Mono", "SF Mono", Menlo, Consolas, monospace; letter-spacing: .06em; }
+  .label { font-size: 13px; fill: var(--muted); }
+  .small { font-size: 12px; }
+  .clay { fill: var(--clay-ink); }
+  .wire { stroke: var(--line); stroke-width: 1.2; fill: none; }
+  .head { fill: var(--line); }
+  .tool { fill: var(--tool); }
+  .lit { fill: none; stroke: var(--clay); stroke-width: 2; }
+  .think { fill: none; stroke: var(--clay); stroke-width: 1.5; }
+  .box { fill: var(--surface); }
+</style>
+<rect width="880" height="372" rx="12" fill="var(--bg)"/>
+
+<text class="mono label" x="32" y="44">ONE MESSAGE</text>
+<text class="mono" x="848" y="62" text-anchor="end" font-size="40" style="fill:var(--clay-ink)">2 nodes</text>
+<text x="848" y="90" text-anchor="end" font-size="16" style="fill:var(--muted)">call_model and tools, inside the daemon</text>
+
+<text class="mono label" x="250" y="120" text-anchor="middle">MESSAGE.SEND</text>
+<path class="wire" d="M250 126 V196"/><path class="head" d="M246 190 L250 197 L254 190 Z"/>
+
+<rect x="120" y="150" width="640" height="150" rx="3" fill="var(--soft)"/>
+<text x="140" y="180" font-size="17">One run, in the daemon</text>
+
+<rect class="box" x="150" y="200" width="200" height="64" rx="2"/>
+<text x="250" y="236" text-anchor="middle" font-size="18" class="mono">call_model</text>
+<g class="anim"><text class="mono small clay" x="250" y="254" text-anchor="middle" opacity="0">call 1 of 3<animate attributeName="opacity" dur="10s" repeatCount="indefinite" keyTimes="0.0000;0.0550;0.0700;0.2500;0.2650;1.0000" values="0;0;1;1;0;0"/></text><text class="mono small clay" x="250" y="254" text-anchor="middle" opacity="0">call 2 of 3<animate attributeName="opacity" dur="10s" repeatCount="indefinite" keyTimes="0.0000;0.4050;0.4200;0.6000;0.6150;1.0000" values="0;0;1;1;0;0"/></text><text class="mono small clay" x="250" y="254" text-anchor="middle" opacity="0">call 3 of 3<animate attributeName="opacity" dur="10s" repeatCount="indefinite" keyTimes="0.0000;0.7550;0.7700;0.9200;0.9350;1.0000" values="0;0;1;1;0;0"/></text></g>
+
+<path class="wire" d="M350 218 H522"/><path class="head" d="M516 214 L523 218 L516 222 Z"/>
+<text class="mono label" x="436" y="208" text-anchor="middle">TOOL.REQUESTED</text>
+<path class="wire" d="M528 246 H356"/><path class="head" d="M362 242 L355 246 L362 250 Z"/>
+<text class="mono label" x="436" y="268" text-anchor="middle">TOOL.COMPLETED</text>
+
+<text x="618" y="196" text-anchor="middle" font-size="15">tools</text>
+<rect class="tool" x="530" y="208" width="34" height="34" rx="2"/><rect class="tool" x="574" y="208" width="34" height="34" rx="2"/><rect class="tool" x="618" y="208" width="34" height="34" rx="2"/><rect class="tool" x="662" y="208" width="34" height="34" rx="2"/>
+<rect x="706" y="208" width="34" height="34" rx="2" fill="none" stroke="var(--clay)" stroke-dasharray="4 3" stroke-width="1.2"/>
+<text class="mono small" x="618" y="284" text-anchor="middle" style="fill:var(--faint)">read_file · shell · edit_file · grep</text>
+
+<path class="wire" d="M250 264 V328"/><path class="head" d="M246 322 L250 329 L254 322 Z"/>
+<text class="mono label" x="250" y="352" text-anchor="middle">RUN.COMPLETED</text>
+
+<g class="anim"><rect class="think" x="146" y="196" width="208" height="72" rx="5" opacity="0"><animate attributeName="opacity" dur="10s" repeatCount="indefinite" keyTimes="0.0000;0.0550;0.0700;0.1300;0.1450;1.0000" values="0;0;1;1;0;0"/></rect><rect class="think" x="146" y="196" width="208" height="72" rx="5" opacity="0"><animate attributeName="opacity" dur="10s" repeatCount="indefinite" keyTimes="0.0000;0.4050;0.4200;0.4800;0.4950;1.0000" values="0;0;1;1;0;0"/></rect><rect class="think" x="146" y="196" width="208" height="72" rx="5" opacity="0"><animate attributeName="opacity" dur="10s" repeatCount="indefinite" keyTimes="0.0000;0.7550;0.7700;0.8300;0.8450;1.0000" values="0;0;1;1;0;0"/></rect><rect class="lit" x="526" y="204" width="42" height="42" rx="4" opacity="0"><animate attributeName="opacity" dur="10s" repeatCount="indefinite" keyTimes="0.0000;0.2350;0.2500;0.3100;0.3250;1.0000" values="0;0;1;1;0;0"/></rect><rect class="lit" x="614" y="204" width="42" height="42" rx="4" opacity="0"><animate attributeName="opacity" dur="10s" repeatCount="indefinite" keyTimes="0.0000;0.5850;0.6000;0.6600;0.6750;1.0000" values="0;0;1;1;0;0"/></rect></g>
+
+<g class="pulse">
+  <rect x="-5" y="-5" width="10" height="10" fill="var(--clay)">
+    <animateMotion dur="10s" repeatCount="indefinite" calcMode="linear" path="M250 128 V200 H350 V218 H528 V246 H350 V218 H528 V246 H350 V264 H250 V336"
+      keyTimes="0;0.07;0.13;0.25;0.31;0.42;0.48;0.60;0.66;0.77;0.83;0.92;1" keyPoints="0;0.1616;0.1616;0.3129;0.3367;0.4881;0.5119;0.6633;0.6871;0.8384;0.8384;1;1"/>
+    <animate attributeName="opacity" dur="10s" repeatCount="indefinite"
+      keyTimes="0;0.02;0.92;0.96;1" values="0;1;1;0;0"/>
+  </rect>
+</g>
+</svg>

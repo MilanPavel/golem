@@ -83,7 +83,10 @@ const sidebar: DefaultTheme.Sidebar = [
   // version, then its details (docs/architecture/_template.md). Step 11.6 adds the chapters.
   {
     text: "How golem works",
-    items: [{ text: "Overview", link: "/architecture" }],
+    items: [
+      { text: "Overview", link: "/architecture" },
+      { text: "1. The agent loop", link: "/architecture/agent-loop" },
+    ],
   },
   {
     text: "Build golem",
