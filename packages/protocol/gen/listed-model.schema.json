@@ -37,7 +37,7 @@
     }
   },
   "additionalProperties": false,
-  "description": "One model, by ``provider/model`` ref.\n\n``source`` is where golem found it: ``installed`` on a local server,\n``catalog`` for a local model to download, ``remote`` from a provider's\nlist, or ``profile`` when only config names it. ``progress`` is set while\nit is ``pulling``. ``profiles`` are the profile names that point at it.\n``fit`` says whether a local model fits in this machine's memory.\n``stale`` means a cached list was shown because the provider did not\nanswer in time.",
+  "description": "One model, by ``provider/model`` ref.\n\n``source`` is where golem found it: ``installed`` on a local server,\n``catalog`` for a local model to download, ``remote`` from a provider's\nlist, or ``profile`` when only config names it. ``progress`` is set while\nit is ``pulling``. ``profiles`` are the profile names that point at it.\n``fit`` says whether a local model fits in this machine's memory.\n``tags`` are a catalog model's tags, such as ``coding``, and\n``recommended`` marks the one catalog model golem suggests for this Mac.\n``stale`` means a cached list was shown because the provider did not\nanswer in time.",
   "properties": {
     "ctx": {
       "anyOf": [
@@ -111,6 +111,11 @@
       "title": "Provider",
       "type": "string"
     },
+    "recommended": {
+      "default": false,
+      "title": "Recommended",
+      "type": "boolean"
+    },
     "ref": {
       "minLength": 3,
       "title": "Ref",
@@ -154,6 +159,13 @@
       ],
       "title": "Status",
       "type": "string"
+    },
+    "tags": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Tags",
+      "type": "array"
     },
     "tools": {
       "anyOf": [

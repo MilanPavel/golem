@@ -469,6 +469,8 @@ class ListedModel(BaseModel):
     list, or ``profile`` when only config names it. ``progress`` is set while
     it is ``pulling``. ``profiles`` are the profile names that point at it.
     ``fit`` says whether a local model fits in this machine's memory.
+    ``tags`` are a catalog model's tags, such as ``coding``, and
+    ``recommended`` marks the one catalog model golem suggests for this Mac.
     ``stale`` means a cached list was shown because the provider did not
     answer in time.
     """
@@ -488,6 +490,8 @@ class ListedModel(BaseModel):
     size_gb: float | None = Field(default=None, ge=0)
     fit: Literal["fits", "tight", "too_big"] | None = None
     stale: bool = False
+    tags: list[str] = Field(default_factory=list)
+    recommended: bool = False
 
 
 class ListedProvider(BaseModel):
@@ -526,13 +530,15 @@ class ModelSetup(BaseModel):
 class ModelListResult(BaseModel):
     """``default`` is the model a new session gets, null before one is chosen.
 
-    ``ram_gb`` is this machine's memory.
+    ``ram_gb`` is this machine's memory, and ``disk_free_gb`` the free space
+    in the home folder, where Ollama keeps its models.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     default: str | None = Field(min_length=1)
     ram_gb: float | None = Field(default=None, gt=0)
+    disk_free_gb: float | None = Field(default=None, ge=0)
     models: list[ListedModel]
     providers: list[ListedProvider]
     setup: ModelSetup

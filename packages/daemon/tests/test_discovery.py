@@ -136,6 +136,42 @@ async def test_installed_and_catalog_models_are_merged(tmp_path: Path) -> None:
     await discovery.aclose()
 
 
+async def test_the_largest_starter_that_fits_is_recommended_and_tags_are_listed(
+    tmp_path: Path,
+) -> None:
+    catalog = [
+        CatalogEntry(
+            ref="ollama/small:1b", label="S", size_gb=1.0, tags=("starter",), min_ram_gb=8
+        ),
+        CatalogEntry(
+            ref="ollama/qwen3:8b", label="Q", size_gb=5.2, tags=("starter", "coding"), min_ram_gb=16
+        ),
+        CatalogEntry(
+            ref="ollama/huge:70b", label="H", size_gb=40.0, tags=("starter",), min_ram_gb=64
+        ),
+    ]
+    network = Network(_ollama_routes())
+    router = ModelRouter(GolemSettings(), keys=MemoryKeyStore())
+    for ram, expected in ((36.0, "ollama/qwen3:8b"), (8.0, "ollama/small:1b"), (4.0, None)):
+        discovery = ModelDiscovery(
+            router,
+            tmp_path / f"cache-{ram}",
+            transport=httpx.MockTransport(network),
+            ram_gb=ram,
+            catalog=catalog,
+            price_book=PRICES,
+            fetch_prices=False,
+            ollama_installed=lambda: True,
+        )
+        listing = await discovery.list()
+        recommended = [model.ref for model in listing.models if model.recommended]
+        assert recommended == ([] if expected is None else [expected])
+        # An installed catalog model keeps the catalog's tags.
+        assert _by_ref(listing.models)["ollama/qwen3:8b"].tags == ("starter", "coding")
+        assert listing.disk_free_gb is not None and listing.disk_free_gb > 0
+        await discovery.aclose()
+
+
 async def test_a_new_pull_shows_up_on_the_next_list(tmp_path: Path) -> None:
     tags = {"models": [dict(TAGS["models"][0])]}
     network = Network({"127.0.0.1/api/tags": lambda _r: httpx.Response(200, json=tags)})

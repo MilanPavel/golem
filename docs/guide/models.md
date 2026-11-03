@@ -30,7 +30,7 @@ In a shell, `golem models` lists every model you can use or download, with its s
 
 A local model runs in [Ollama](https://ollama.com), on your Mac. It's free, it needs no account, and nothing leaves the machine. It needs a few GB of disk and memory.
 
-- **Nothing to install first.** When you pick a local model and Ollama is missing, golem asks once, then installs it with Homebrew and downloads the model.
+- **Nothing to install first.** On the first start, or in `/setup`, **On this Mac** installs Ollama with Homebrew, or opens its download page and goes on when Ollama appears. Then it lists the models sized for your Mac, with one marked `recommended`, and downloads the one you pick with its speed and time left. Esc keeps the download going in the chat.
 - **golem starts Ollama** when a local model needs it, and stops it after 30 minutes unused. Its log is `~/.golem/logs/ollama.log`.
 - **Your own Ollama wins.** If you run Ollama yourself, for example with `brew services start ollama`, golem uses that one and never stops it.
 

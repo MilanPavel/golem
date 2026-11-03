@@ -46,7 +46,21 @@ export function setupKeyOf(press: Press): SetupKey | null {
 }
 
 /** What the frame shows now, for its key hints. */
-export type SetupScreen = "service-ask" | "service-wait" | "service-failed" | "engine" | "ready" | "overview" | "quit";
+export type SetupScreen =
+  | "service-ask"
+  | "service-wait"
+  | "service-failed"
+  | "engine"
+  | "ollama-ask"
+  | "ollama-installing"
+  | "ollama-waiting"
+  | "model"
+  | "model-local"
+  | "model-gone"
+  | "model-downloading"
+  | "ready"
+  | "overview"
+  | "quit";
 
 export function setupHint(screen: SetupScreen, window: SetupWindow): string {
   const fromStart = window.view === "panel" && window.origin === "start";
@@ -64,6 +78,19 @@ export function setupHint(screen: SetupScreen, window: SetupWindow): string {
       return window.view === "panel" && window.origin === "send"
         ? "Enter picks · ↑↓ move · Esc back"
         : "Enter picks · ↑↓ move · Esc back · q quit";
+    case "ollama-ask":
+    case "model":
+      return "Enter picks · ↑↓ move · Esc back";
+    case "ollama-installing":
+      return "Esc stops";
+    case "ollama-waiting":
+      return "Esc back";
+    case "model-local":
+      return "Enter downloads · ↑↓ move · Esc back";
+    case "model-gone":
+      return "Enter picks · ↑↓ move · Esc chat without a model";
+    case "model-downloading":
+      return "Esc keeps it downloading and opens the chat";
     case "ready":
       return "Enter starts chatting";
     case "overview":

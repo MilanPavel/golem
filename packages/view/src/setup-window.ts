@@ -173,17 +173,30 @@ export function setupAtStart(serviceUp: boolean, listing: ModelListResult | null
   if (listing === null) {
     return null;
   }
+  if (defaultGone(listing)) {
+    return { kind: "window", window: single("model", "start"), reason: `${listing.default ?? ""} is no longer available` };
+  }
   const choice = firstRunChoice(listing);
   if (choice === null) {
     return { kind: "none" };
-  }
-  if (listing.default !== null && !listing.models.some((model) => namesModel(model, listing.default))) {
-    return { kind: "window", window: single("model", "start"), reason: `${listing.default} is no longer available` };
   }
   if (choice.kind === "auto") {
     return { kind: "auto", model: choice.model };
   }
   return { kind: "window", window: guided("engine", "start"), reason: null };
+}
+
+/**
+ * True when the default names a model that is gone: golem lists nothing by
+ * that name, or it is a local model no longer downloaded. A stopped Ollama
+ * is not gone: golem starts it.
+ */
+export function defaultGone(listing: ModelListResult): boolean {
+  if (listing.default === null) {
+    return false;
+  }
+  const named = listing.models.find((model) => namesModel(model, listing.default));
+  return named === undefined || (named.provider === "ollama" && named.status === "not_installed");
 }
 
 /** The line a working start shows in place of the window. */

@@ -45,6 +45,10 @@ test("hints follow the screen: q quits only on the first question", () => {
   assert.equal(setupHint("overview", OVERVIEW), "Enter picks · ↑↓ move · r recheck · Esc back to chat");
   assert.equal(setupHint("service-wait", guided("service", "start")), "");
   assert.equal(shortHint("Enter picks · ↑↓ move · Esc back"), "Enter · ↑↓ · Esc");
+  assert.equal(setupHint("ollama-installing", guided("ollama", "start")), "Esc stops");
+  assert.equal(setupHint("model-local", guided("model", "start")), "Enter downloads · ↑↓ move · Esc back");
+  assert.equal(setupHint("model-downloading", guided("model", "start")), "Esc keeps it downloading and opens the chat");
+  assert.equal(setupHint("model-gone", single("model", "start")), "Enter picks · ↑↓ move · Esc chat without a model");
 });
 
 test("the stepper shows each step's state, and only in guided mode", () => {

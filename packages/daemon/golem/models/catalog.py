@@ -13,6 +13,7 @@ class CatalogEntry:
     label: str
     size_gb: float
     tags: tuple[str, ...]
+    min_ram_gb: float | None = None
 
 
 def load_local_catalog() -> list[CatalogEntry]:
@@ -27,6 +28,7 @@ def load_local_catalog() -> list[CatalogEntry]:
                 label=str(item["label"]),
                 size_gb=float(item["size_gb"]),
                 tags=tuple(str(tag) for tag in item.get("tags", [])),
+                min_ram_gb=float(item["min_ram_gb"]) if "min_ram_gb" in item else None,
             )
         )
     return entries
