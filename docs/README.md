@@ -25,21 +25,23 @@ For someone who wants to use golem today.
 | Skills | [guide/skills.md](guide/skills.md) | |
 | The web UI | [guide/web.md](guide/web.md) | |
 
-## How agents work
+## How golem works
 
-Each page explains one idea that most agents share, and then how golem builds it. Every page follows [concepts/_template.md](concepts/_template.md). Read them in order.
+golem's architecture, one idea per chapter. Each chapter explains an idea that most agents share, then how golem builds it, and ends with golem's details for contributors. Every chapter follows [architecture/_template.md](architecture/_template.md). Read them in order. [architecture.md](architecture.md) is the overview: the whole system on one page, and one message followed end to end.
 
-| # | Page | File | Ticket |
+| # | Chapter | File | Ticket |
 |---|---|---|---|
-| 1 | What an agent is: the loop | `concepts/agent-loop.md` | [#283](https://github.com/MilanPavel/golem/issues/283) |
-| 2 | Talking to models | `concepts/models.md` | [#284](https://github.com/MilanPavel/golem/issues/284) |
-| 3 | Tools and tool calling | `concepts/tools.md` | [#285](https://github.com/MilanPavel/golem/issues/285) |
-| 4 | Safety: permissions, approvals, sandboxes | `concepts/safety.md` | [#286](https://github.com/MilanPavel/golem/issues/286) |
-| 5 | Context: the system prompt and skills | `concepts/context.md` | [#287](https://github.com/MilanPavel/golem/issues/287) |
-| 6 | MCP: tools from outside | `concepts/mcp.md` | [#288](https://github.com/MilanPavel/golem/issues/288) |
-| 7 | Sessions that survive | `concepts/durable-sessions.md` | [#289](https://github.com/MilanPavel/golem/issues/289) |
-| 8 | The agent and its screens | `concepts/agent-and-screens.md` | [#290](https://github.com/MilanPavel/golem/issues/290) |
-| 9 | What comes next | `concepts/whats-next.md` | [#291](https://github.com/MilanPavel/golem/issues/291) |
+| | Overview, and one message end to end | [architecture.md](architecture.md) | [#292](https://github.com/MilanPavel/golem/issues/292) |
+| 1 | The agent loop | `architecture/agent-loop.md` | [#283](https://github.com/MilanPavel/golem/issues/283) |
+| 2 | Talking to models | `architecture/models.md` | [#284](https://github.com/MilanPavel/golem/issues/284) |
+| 3 | Tools | `architecture/tools.md` | [#285](https://github.com/MilanPavel/golem/issues/285) |
+| 4 | Safety: permissions, approvals, sandboxes | `architecture/safety.md` | [#286](https://github.com/MilanPavel/golem/issues/286) |
+| 5 | Context: the system prompt and skills | `architecture/context.md` | [#287](https://github.com/MilanPavel/golem/issues/287) |
+| 6 | MCP: tools from outside | `architecture/mcp.md` | [#288](https://github.com/MilanPavel/golem/issues/288) |
+| 7 | Sessions that survive | `architecture/sessions.md` | [#289](https://github.com/MilanPavel/golem/issues/289) |
+| 8 | The daemon and its protocol | `architecture/daemon-and-protocol.md` | [#290](https://github.com/MilanPavel/golem/issues/290) |
+| 9 | The screens: the TUI and the web UI | `architecture/screens.md` | [#354](https://github.com/MilanPavel/golem/issues/354) |
+| 10 | What comes next | `architecture/whats-next.md` | [#291](https://github.com/MilanPavel/golem/issues/291) |
 
 ## Build golem
 
@@ -47,8 +49,7 @@ For someone who wants to change golem.
 
 | Page | File | Ticket |
 |---|---|---|
-| Architecture tour: one message, end to end | `contributing/architecture-tour.md` | [#292](https://github.com/MilanPavel/golem/issues/292) |
-| Architecture, the reference | [architecture.md](architecture.md) | |
+| Settings, the reference | `settings.md` | [#292](https://github.com/MilanPavel/golem/issues/292) |
 | The monorepo | [monorepo.md](monorepo.md) | |
 | Hacking: set up, run, ship | [contributing/hacking.md](contributing/hacking.md) | |
 | Contributing | [contributing/index.md](contributing/index.md), which includes [CONTRIBUTING.md](../CONTRIBUTING.md) | |
@@ -65,7 +66,7 @@ For someone who wants to change golem.
 
 ## Not pages
 
-- `concepts/_template.md`: the shape of a concept page.
+- `architecture/_template.md`: the shape of a "How golem works" chapter.
 - `adr/template.md`: the shape of an ADR.
 - `design/prototype.html`: the web UI's prototype. Open it in a browser.
 - `images/`: the pictures the pages use.

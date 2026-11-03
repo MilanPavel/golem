@@ -8,6 +8,8 @@ Golem is one long-running program, and several clients that attach to it. This f
 
 The choice behind each piece is in [adr/](adr/README.md). How the Python and TypeScript trees share one repository is in [monorepo.md](monorepo.md).
 
+This file is becoming the overview of "How golem works". Each part below moves to its own chapter in `docs/architecture/`: the idea in agents generally, how golem builds it, and these details. A part that has moved leaves a link here.
+
 <br clear="left">
 
 ## The short version
