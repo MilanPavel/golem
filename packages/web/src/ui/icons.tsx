@@ -65,3 +65,9 @@ export const FolderIcon = (props: IconProps) => (
     <path d="M2 4.5c0-.6.4-1 1-1h3l1.5 1.5H13c.6 0 1 .4 1 1V12c0 .6-.4 1-1 1H3c-.6 0-1-.4-1-1z" />
   </Icon>
 );
+export const PanelIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <rect x="2" y="3" width="12" height="10" rx="2" />
+    <path d="M10 3v10" />
+  </Icon>
+);
