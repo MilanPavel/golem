@@ -12,6 +12,7 @@ import {
   type GolemClient,
   type ListedModel,
   type ModelListResult,
+  type SetupRow,
   type SkillCall,
   type WireLine,
   GOLEM_VERSION,
@@ -22,15 +23,45 @@ import {
   CANCELLED_NOTICE,
   downloadEnded,
   emptyChat,
-  firstRunChoice,
   forkPoint,
   NO_MODEL_NOTICE,
   noModelChosen,
-  pressFirstRun,
   recommendedLocal,
-  startFirstRun,
-  suggestedOption,
-  type FirstRun,
+  advance,
+  agentInstalled,
+  askService,
+  engineLines,
+  engineSelected,
+  guided,
+  move,
+  OVERVIEW,
+  overviewChoices,
+  overviewLines,
+  pressEngine,
+  pressService,
+  providerName,
+  QUIT_CHOICES,
+  quitLines,
+  readyLines,
+  RUNNING_PAUSE_MS,
+  serviceAnswered,
+  serviceFailed,
+  serviceLines,
+  serviceRow,
+  serviceTimedOut,
+  setupAtStart,
+  setupBand,
+  single,
+  welcomeBack,
+  withLog,
+  NO_MODEL_BAND,
+  type ServiceRunner,
+  type ServiceState,
+  type SetupLine,
+  type SetupNext,
+  type SetupPanel,
+  type SetupStart,
+  type SetupWindow,
   providersUp,
   reduceChat,
   RETRY_QUESTION,
@@ -71,8 +102,8 @@ import {
   type PullState,
 } from "./model-picker.ts";
 import { ModelPickerView } from "./model-picker.tsx";
-import { layoutWelcome, welcomeKeyOf } from "./welcome.ts";
-import { WelcomeView } from "./welcome.tsx";
+import { setupHint, setupKeyOf, type SetupKey, type SetupScreen } from "./setup-frame.ts";
+import { SetupFrame } from "./setup-frame.tsx";
 import { draftAt, edit, editDraft, insertText, type Draft } from "./edit.ts";
 import { collapsePaste, deleteToken, expandPastes, noPastes, type Pastes } from "./paste.ts";
 import {
@@ -113,7 +144,7 @@ import { layoutTranscript, type LayoutLine } from "./layout-chat.ts";
 import { DEFAULT_PREFS, loadPrefs, prefsPath, savePref } from "./prefs.ts";
 import { TodoBand } from "./todo-band.tsx";
 import { InstallBand } from "./install-band.tsx";
-import { RESTARTING, type ServiceControl } from "./service.ts";
+import { RESTARTING, type ServiceControl, type WindowDaemon } from "./service.ts";
 import { installEventOf, type InstallState, installRows, reduceInstall, startedInstall } from "./ollama-install.ts";
 import {
   maskSecret,
@@ -230,6 +261,29 @@ import { useSession } from "./use-session.ts";
 /** `resend` is the failed message to send again once Ollama and the model are there. */
 type Install = { state: InstallState; ref: string; setDefault: boolean; resend: string | null };
 
+/**
+ * The setup window as this screen holds it. The Ollama, Provider, Key, and
+ * Model panels are the model picker until they get panels of their own, so
+ * on them the picker shows and the window waits behind it.
+ */
+type SetupUi = {
+  window: SetupWindow;
+  service: ServiceState;
+  engine: number;
+  /** Which picker the Engine, the overview, or the start asked for. */
+  path: "local" | "key" | "pick";
+  overview: { selected: number; rows: SetupRow[] | null; notice: string | null };
+  /** The Quit setup? question, with its selection, or null. */
+  quit: number | null;
+  ready: { engine: string; model: string } | null;
+};
+
+const PICKER_PANELS: ReadonlySet<SetupPanel> = new Set(["ollama", "provider", "key", "model"]);
+
+function onPicker(ui: SetupUi | null): boolean {
+  return ui !== null && ui.window.view === "panel" && PICKER_PANELS.has(ui.window.panel);
+}
+
 export function App({
   client,
   onWheel,
@@ -343,11 +397,21 @@ export function App({
   const [listing, setListing] = useState<ModelListResult | null>(null);
   const listingRef = useRef(listing);
   listingRef.current = listing;
-  const firstRunChecked = useRef(false);
-  // The first-start card. It shows while the step is `choose`; `local` and `key` are in the picker.
-  const [welcome, setWelcome] = useState<FirstRun | null>(null);
-  const welcomeRef = useRef(welcome);
-  welcomeRef.current = welcome;
+  // The setup window. It covers the whole screen, except on the panels the picker stands in for.
+  const [setup, setSetupState] = useState<SetupUi | null>(null);
+  const setupRef = useRef(setup);
+  setupRef.current = setup;
+  const startDecided = useRef(false);
+  /** This screen's session, for the banner, which is worked out before the session hook runs. */
+  const shownSession = useRef<string | null>(null);
+  /** The service answered before the model list came: Engine opens once it does. */
+  const awaitingListing = useRef(false);
+  const windowDaemon = useRef<WindowDaemon | null>(null);
+  const [setupNow, setSetupNow] = useState(() => Date.now());
+  /** `setup.status` for the band's one line, when something is wrong. */
+  const [bandRows, setBandRows] = useState<SetupRow[] | null>(null);
+  /** The model a working start names in `welcome back`, until the first send. */
+  const [welcomeModel, setWelcomeModel] = useState<string | null>(null);
   const [pulls, setPulls] = useState<Record<string, PullState>>({});
   const pullsRef = useRef(pulls);
   pullsRef.current = pulls;
@@ -423,7 +487,13 @@ export function App({
       : null;
   upgradeRef.current = upgrade;
   const serviceText = restarting ? RESTARTING : (problem?.text ?? upgrade);
-  const banner = asking ? RETRY_QUESTION : (chat.error ?? serviceText ?? chat.notice);
+  const sessions = useSessionIndex(client, connection.status === "connected");
+  const setupLine = bandRows === null ? null : setupBand(bandRows);
+  // The chat this start opened is not one to come back to.
+  const otherChats = sessions.filter((summary) => summary.session_id !== shownSession.current).length;
+  const welcomeLine = welcomeModel === null ? null : welcomeBack(welcomeModel, otherChats);
+  // Something wrong wins over the greeting.
+  const banner = asking ? RETRY_QUESTION : (chat.error ?? serviceText ?? chat.notice ?? setupLine ?? welcomeLine);
   const hintText = liveHint(hint, Date.now())?.text ?? null;
   const suggestMatches =
     chat.busy ||
@@ -520,7 +590,7 @@ export function App({
   });
   const sessionRef = session.ref;
   const sessionId = session.id;
-  const sessions = useSessionIndex(client, connection.status === "connected");
+  shownSession.current = sessionId;
   const sessionsRef = useRef(sessions);
   sessionsRef.current = sessions;
   const indexedTitle = sessions.find((summary) => summary.session_id === sessionId)?.title;
@@ -883,21 +953,83 @@ export function App({
     });
   }, [client]);
 
+  // What opens at the start: the window on Service when nothing answers, else what the model list says.
   useEffect(() => {
-    if (listing === null || sessionId === null || firstRunChecked.current) {
+    if (startDecided.current) {
       return;
     }
-    firstRunChecked.current = true;
-    const choice = firstRunChoice(listing);
-    if (choice === null) {
+    if (connection.status === "reconnecting" || connection.status === "closed") {
+      startDecided.current = true;
+      showSetup(newSetup(guided("service", "start"), serviceAtStart()));
       return;
     }
-    if (choice.kind === "pick") {
-      showWelcome(startFirstRun(listing, true));
+    if (connection.status !== "connected" || listing === null || sessionId === null) {
       return;
     }
-    chooseModel(choice.model, pickerName(choice.model), true, `Using ${choice.model.ref}, the only model ready. /model to change.`);
-  }, [listing, sessionId]);
+    startDecided.current = true;
+    applyStart(setupAtStart(true, listing));
+  }, [connection, listing, sessionId]);
+
+  useEffect(() => {
+    if (awaitingListing.current && listing !== null) {
+      awaitingListing.current = false;
+      serviceDone();
+    }
+  }, [listing]);
+
+  // The service answering moves Service on, after a moment of `✓ service running`.
+  useEffect(() => {
+    const ui = setupRef.current;
+    if (connection.status !== "connected" || ui === null || ui.service.phase !== "starting") {
+      return;
+    }
+    if (ui.service.how === "install" && !ui.service.agent) {
+      return;
+    }
+    showSetup({ ...ui, service: serviceAnswered(ui.service, Date.now()) });
+  }, [connection, setup?.service]);
+
+  // The window's clock: the seconds, the spinner, and the waits that end on their own.
+  const setupTicking =
+    setup !== null &&
+    (setup.service.phase === "starting" ||
+      setup.service.phase === "running" ||
+      (setup.window.view === "overview" && setup.overview.rows === null));
+  useEffect(() => {
+    if (!setupTicking) {
+      return;
+    }
+    const timer = setInterval(() => {
+      setSetupNow(Date.now());
+    }, 100);
+    return () => clearInterval(timer);
+  }, [setupTicking]);
+
+  useEffect(() => {
+    const ui = setupRef.current;
+    if (ui === null) {
+      return;
+    }
+    const state = ui.service;
+    if (state.phase === "running" && setupNow - state.since >= RUNNING_PAUSE_MS) {
+      serviceDone();
+      return;
+    }
+    if (state.phase !== "starting") {
+      return;
+    }
+    const own = windowDaemon.current;
+    if (state.how === "session" && own !== null && own.exited()) {
+      windowDaemon.current = null;
+      const said = own.output().trim().split("\n").at(-1) ?? "";
+      failService(said.length > 0 ? said : "it stopped before it answered", "golem daemon logs");
+      return;
+    }
+    if (serviceTimedOut(state, setupNow)) {
+      const error = service?.startError() ?? null;
+      failService(error?.reason ?? "it didn't answer in 45 seconds", error?.next ?? "golem daemon logs");
+    }
+  }, [setupNow]);
 
   useEffect(() => {
     if (uptimeRefresh === null) {
@@ -1078,6 +1210,12 @@ export function App({
       setSwitcher(openSwitcher(sessionRef.current));
       return;
     }
+    if (outcome.kind === "setup") {
+      setDraft(draftAt(""));
+      openSetup(OVERVIEW);
+      loadModels(false);
+      return;
+    }
     if (outcome.kind === "model") {
       setDraft(draftAt(""));
       if (outcome.name === null) {
@@ -1237,6 +1375,7 @@ export function App({
       return;
     }
     setOffset(0);
+    setWelcomeModel(null);
     setChat((current) => ({ ...current, notice: null }));
     const options = skill === undefined ? { cwd: process.cwd() } : { cwd: process.cwd(), skill };
     void client.sendMessage(currentSession, text, options).then(
@@ -1252,7 +1391,7 @@ export function App({
         }
         if (error instanceof RpcError && noModelChosen(error.code, error.message, MODEL_NOT_CONFIGURED)) {
           setChat((current) => ({ ...current, busy: false, error: NO_MODEL_NOTICE }));
-          openWelcome();
+          openSetup(guided("engine", "send"));
           return;
         }
         setChat((current) => ({ ...current, busy: false, error: messageOf(error) }));
@@ -1260,53 +1399,484 @@ export function App({
     );
   }
 
-  function showWelcome(next: FirstRun | null): void {
-    welcomeRef.current = next;
-    setWelcome(next);
+  function showSetup(next: SetupUi | null): void {
+    setupRef.current = next;
+    setSetupState(next);
   }
 
-  /** The first-run choices again, after a send with no model chosen. */
-  function openWelcome(): void {
-    const current = listingRef.current;
-    if (current === null) {
-      loadModels(false);
-      return;
-    }
-    showWelcome({ step: "choose", option: suggestedOption(current) });
+  function newSetup(window: SetupWindow, state: ServiceState): SetupUi {
+    return {
+      window,
+      service: state,
+      engine: engineSelected(listingRef.current),
+      path: "pick",
+      overview: { selected: 0, rows: null, notice: null },
+      quit: null,
+      ready: null,
+    };
   }
 
-  function onWelcomePress(press: Press): void {
-    const state = welcomeRef.current;
+  /** Who runs the service that answers: launchd, this terminal, or someone else. Null when none answers. */
+  function serviceRunner(): ServiceRunner | null {
+    if (connectionRef.current.status !== "connected") {
+      return null;
+    }
+    if (windowDaemon.current !== null && !windowDaemon.current.exited()) {
+      return "window";
+    }
+    return service?.installed() === true ? "launchd" : "other";
+  }
+
+  /**
+   * The Service panel when nothing answers at the start. With no launch agent
+   * it asks. With one, launchd is starting it, or it failed and said why.
+   */
+  function serviceAtStart(): ServiceState {
+    if (service?.installed() !== true) {
+      return askService(null);
+    }
+    const error = service.startError();
+    const starting: ServiceState = { phase: "starting", how: "install", agent: true, since: Date.now() };
+    return error === null ? starting : serviceFailed(starting, error.reason, error.next);
+  }
+
+  function ollamaFacts(): { ollamaRunning: boolean } {
+    return { ollamaRunning: listingRef.current?.setup.ollama_running === true };
+  }
+
+  /** Open the window. The overview reads `setup.status` as it opens. */
+  function openSetup(window: SetupWindow): void {
+    setSwitcher(closedSwitcher);
+    pickerRef.current = closedPicker;
+    setPicker(closedPicker);
+    const ui = newSetup(window, askService(serviceRunner()));
+    if (window.view === "overview") {
+      showSetup(ui);
+      recheck();
+      return;
+    }
+    goSetup({ kind: "window", window }, ui);
+  }
+
+  /** Close the window and go to the chat. The band says what is still wrong. */
+  function closeSetup(): void {
+    showSetup(null);
+    refreshBand();
+  }
+
+  /** Go where the navigation table says. */
+  function goSetup(next: SetupNext, ui: SetupUi): void {
+    if (next.kind === "quit") {
+      exit();
+      return;
+    }
+    if (next.kind === "chat") {
+      closeSetup();
+      return;
+    }
+    const window = next.window;
+    const moved: SetupUi = { ...ui, window, quit: null };
+    if (window.view === "overview") {
+      showSetup({ ...moved, overview: { ...ui.overview, selected: 0 } });
+      recheck();
+      return;
+    }
+    if (window.panel === "service" && ui.service.phase !== "starting") {
+      moved.service = askService(serviceRunner());
+    }
+    if (window.panel === "engine") {
+      moved.engine = engineSelected(listingRef.current);
+    }
+    showSetup(moved);
+    if (PICKER_PANELS.has(window.panel)) {
+      openSetupPicker(moved);
+    }
+  }
+
+  /** The picker in place of the Ollama, Provider, Key, and Model panels. */
+  function openSetupPicker(ui: SetupUi): void {
     const current = listingRef.current;
-    const key = welcomeKeyOf(press);
-    if (state === null || current === null || key === null) {
-      return;
-    }
-    const next = key === "later" ? ({ step: "ready" } as const) : pressFirstRun(state, key);
-    if (next.step === "ready") {
-      showWelcome(null);
-      setChat((chat) => ({ ...chat, error: null, notice: "no model chosen yet: /model any time" }));
-      return;
-    }
-    showWelcome(next);
-    if (next.step === "local") {
+    let opened = openPicker(currentModelRef(), false);
+    if (ui.path === "local" && current !== null) {
       const model = recommendedLocal(current);
       if (model !== null && model.status === "ready") {
-        showWelcome(null);
         chooseModel(model, pickerName(model), true);
+        modelPicked(model.provider, model.label);
         return;
       }
       const confirm =
         model === null ? null : confirmFor(providerMissing(current, model.provider) ? "install" : "pull", model, true);
-      const opened = openPicker(model?.ref ?? null, true, confirm);
-      pickerRef.current = opened;
-      setPicker(opened);
-    } else if (next.step === "key") {
-      const hosted = current.models.find((model) => model.provider !== "ollama" && model.status === "ready") ??
+      opened = openPicker(model?.ref ?? null, true, confirm);
+    } else if (ui.path === "key" && current !== null) {
+      const hosted =
+        current.models.find((model) => model.provider !== "ollama" && model.status === "ready") ??
         current.models.find((model) => model.status === "needs_key");
-      const opened = openPicker(hosted?.ref ?? null, true);
-      pickerRef.current = opened;
-      setPicker(opened);
+      opened = openPicker(hosted?.ref ?? null, true);
+    }
+    pickerRef.current = opened;
+    setPicker(opened);
+  }
+
+  /** The start's decision, once the service answers and the model list is in. */
+  function applyStart(start: SetupStart | null): void {
+    if (start === null) {
+      return;
+    }
+    if (start.kind === "none") {
+      showSetup(null);
+      const listed = listingRef.current?.models.find(
+        (model) => model.ref === listingRef.current?.default || (model.profiles ?? []).includes(listingRef.current?.default ?? ""),
+      );
+      setWelcomeModel(listed?.label ?? listingRef.current?.default ?? "");
+      refreshBand();
+      return;
+    }
+    if (start.kind === "auto") {
+      showSetup(null);
+      chooseModel(start.model, pickerName(start.model), true, `Using ${start.model.ref}, the only model ready. /setup to change.`);
+      return;
+    }
+    if (start.reason !== null) {
+      setChat((current) => ({ ...current, notice: `${start.reason} · pick another` }));
+    }
+    goSetup({ kind: "window", window: start.window }, newSetup(start.window, askService(serviceRunner())));
+  }
+
+  /** Service is done: on to Engine, or, at the start, wherever the model list says. */
+  function serviceDone(): void {
+    const ui = setupRef.current;
+    if (ui === null || ui.window.view !== "panel") {
+      return;
+    }
+    const settled: SetupUi = { ...ui, service: askService(serviceRunner()) };
+    if (ui.window.origin === "start") {
+      const start = setupAtStart(true, listingRef.current);
+      if (start === null) {
+        showSetup(settled);
+        awaitingListing.current = true;
+        return;
+      }
+      if (start.kind !== "window" || start.window.view !== "panel" || start.window.panel !== "engine") {
+        applyStart(start);
+        return;
+      }
+    }
+    goSetup(advance(ui.window, { kind: "done" }, ollamaFacts()), settled);
+  }
+
+  function updateService(change: (state: ServiceState) => ServiceState): void {
+    const ui = setupRef.current;
+    if (ui !== null) {
+      showSetup({ ...ui, service: change(ui.service) });
+    }
+  }
+
+  function failService(reason: string, next: string): void {
+    updateService((state) => serviceFailed(state, reason, next));
+  }
+
+  /** `golem daemon install`, then launchd starts the service and the client finds it. */
+  function installService(): void {
+    const install = service?.install ?? null;
+    if (install === null) {
+      failService("this golem can't install its service", "golem daemon install");
+      return;
+    }
+    windowDaemon.current?.stop();
+    windowDaemon.current = null;
+    install().then(
+      () => updateService((state) => agentInstalled(state, Date.now())),
+      (error: unknown) => failService(messageOf(error), "golem daemon logs"),
+    );
+  }
+
+  /** The service as a child of this terminal. From launchd's, the launch agent goes first. */
+  function serveHere(): void {
+    const serve = service?.serve ?? null;
+    if (serve === null) {
+      failService("this golem can't start its service", "golem daemon install");
+      return;
+    }
+    const start = (): void => {
+      try {
+        windowDaemon.current = serve();
+      } catch (error) {
+        failService(messageOf(error), "golem daemon logs");
+      }
+    };
+    const uninstall = service?.uninstall ?? null;
+    if (service?.installed() === true && uninstall !== null) {
+      uninstall().then(start, (error: unknown) => failService(messageOf(error), "golem daemon logs"));
+      return;
+    }
+    start();
+  }
+
+  /** Stop and remove the service. golem can't answer without it, so it quits. */
+  function removeService(): void {
+    const uninstall = service?.uninstall ?? null;
+    windowDaemon.current?.stop();
+    windowDaemon.current = null;
+    if (uninstall === null) {
+      exit();
+      return;
+    }
+    uninstall().then(
+      () => exit(),
+      (error: unknown) => failService(messageOf(error), "golem daemon uninstall"),
+    );
+  }
+
+  /** A model was chosen in the picker: Ready in guided mode, else back where the panel came from. */
+  function modelPicked(provider: string | null, label: string): void {
+    const ui = setupRef.current;
+    if (ui === null || ui.window.view !== "panel") {
+      return;
+    }
+    const engine = provider === "ollama" ? "Ollama on this Mac" : provider === null ? "" : `${providerName(provider)} with an API key`;
+    const ready = { engine, model: `${label} · saved as default` };
+    const asModel: SetupWindow = { ...ui.window, panel: "model" };
+    goSetup(advance(asModel, { kind: "done" }, ollamaFacts()), { ...ui, ready });
+  }
+
+  /** Read `setup.status` again for the overview and the band. */
+  function recheck(): void {
+    const ui = setupRef.current;
+    if (ui !== null && ui.window.view === "overview") {
+      showSetup({ ...ui, overview: { ...ui.overview, rows: null } });
+    }
+    void client.setupStatus().then(
+      (result) => {
+        setBandRows(result.rows);
+        const now = setupRef.current;
+        if (now !== null && now.window.view === "overview") {
+          const count = overviewChoices(result.rows).length;
+          showSetup({
+            ...now,
+            overview: { ...now.overview, rows: result.rows, selected: Math.min(now.overview.selected, count - 1) },
+          });
+        }
+      },
+      (error: unknown) => {
+        const now = setupRef.current;
+        if (now !== null && now.window.view === "overview") {
+          showSetup({ ...now, overview: { ...now.overview, rows: [], notice: `couldn't check: ${messageOf(error)}` } });
+        }
+      },
+    );
+  }
+
+  function refreshBand(): void {
+    if (connectionRef.current.status !== "connected") {
+      return;
+    }
+    void client.setupStatus().then(
+      (result) => setBandRows(result.rows),
+      () => undefined,
+    );
+  }
+
+  function onSetupPress(press: Press): void {
+    const ui = setupRef.current;
+    const key = setupKeyOf(press);
+    if (ui === null || key === null) {
+      return;
+    }
+    if (ui.quit !== null) {
+      if (key === "interrupt") {
+        exit();
+        return;
+      }
+      onQuitKey(ui, ui.quit, key);
+      return;
+    }
+    if (key === "quit" || key === "interrupt") {
+      if (ui.window.view === "overview" || ui.window.panel === "ready") {
+        closeSetup();
+      } else if (ui.window.panel === "service" && serviceRunner() === null) {
+        exit();
+      } else {
+        showSetup({ ...ui, quit: 0 });
+      }
+      return;
+    }
+    if (ui.window.view === "overview") {
+      onOverviewKey(ui, key);
+      return;
+    }
+    if (ui.window.panel === "service") {
+      onServiceKey(ui, key);
+    } else if (ui.window.panel === "engine") {
+      onEngineKey(ui, ui.window, key);
+    } else if (ui.window.panel === "ready" && key === "enter") {
+      closeSetup();
+    }
+  }
+
+  function onQuitKey(ui: SetupUi, selected: number, key: SetupKey): void {
+    if (key === "up" || key === "down") {
+      showSetup({ ...ui, quit: move(selected, QUIT_CHOICES.length, key) });
+    } else if (key === "back") {
+      showSetup({ ...ui, quit: null });
+    } else if (key === "enter") {
+      if (QUIT_CHOICES[selected]?.id === "quit") {
+        closeSetup();
+      } else {
+        showSetup({ ...ui, quit: null });
+      }
+    }
+  }
+
+  function onServiceKey(ui: SetupUi, key: SetupKey): void {
+    if (key === "recheck" || key === "quit" || key === "interrupt") {
+      return;
+    }
+    const now = Date.now();
+    if (key === "back" && ui.service.phase !== "confirm") {
+      if (ui.service.phase !== "starting" && ui.service.phase !== "running") {
+        goSetup(advance(ui.window, { kind: "cancelled" }, ollamaFacts()), ui);
+      }
+      return;
+    }
+    const pressed = pressService(ui.service, key, now);
+    showSetup({ ...ui, service: pressed.state });
+    switch (pressed.effect.kind) {
+      case "install":
+        installService();
+        break;
+      case "session":
+        serveHere();
+        break;
+      case "done":
+        serviceDone();
+        break;
+      case "remove":
+        removeService();
+        break;
+      case "log": {
+        const own = windowDaemon.current;
+        const log = own !== null ? own.output().trim().split("\n").slice(-8) : (service?.logTail() ?? []);
+        updateService((state) => withLog(state, log.length > 0 ? log : ["the log is empty"]));
+        break;
+      }
+      case "quit":
+        exit();
+        break;
+      case "none":
+        break;
+    }
+  }
+
+  function onEngineKey(ui: SetupUi, window: SetupWindow & { view: "panel" }, key: SetupKey): void {
+    if (key === "back") {
+      goSetup(advance(window, { kind: "cancelled" }, ollamaFacts()), ui);
+      return;
+    }
+    if (key !== "up" && key !== "down" && key !== "enter") {
+      return;
+    }
+    const pressed = pressEngine(window.origin, listingRef.current, ui.engine, key);
+    const result = pressed.result;
+    if (result === null) {
+      showSetup({ ...ui, engine: pressed.selected });
+      return;
+    }
+    const path = result.kind === "key" ? "key" : "local";
+    goSetup(advance(window, result, ollamaFacts()), { ...ui, engine: pressed.selected, path });
+  }
+
+  function onOverviewKey(ui: SetupUi, key: SetupKey): void {
+    const rows = ui.overview.rows;
+    if (key === "back") {
+      closeSetup();
+      return;
+    }
+    if (key === "recheck") {
+      showSetup({ ...ui, overview: { ...ui.overview, notice: null } });
+      recheck();
+      return;
+    }
+    if (rows === null || key === "quit" || key === "interrupt") {
+      return;
+    }
+    const choices = overviewChoices(rows);
+    if (key === "up" || key === "down") {
+      showSetup({ ...ui, overview: { ...ui.overview, selected: move(ui.overview.selected, choices.length, key) } });
+      return;
+    }
+    const choice = choices[ui.overview.selected];
+    if (choice === undefined) {
+      return;
+    }
+    if (choice.kind === "guided") {
+      goSetup({ kind: "window", window: guided("service", "overview") }, { ...ui, service: askService(serviceRunner()) });
+      return;
+    }
+    switch (choice.action) {
+      case "start_ollama":
+        showSetup({ ...ui, overview: { ...ui.overview, notice: "starting Ollama…" } });
+        void client.startOllama().then(
+          (result) => {
+            const now = setupRef.current;
+            if (now !== null && now.window.view === "overview") {
+              showSetup({ ...now, overview: { ...now.overview, notice: result.running ? "Ollama is running" : "Ollama didn't start" } });
+            }
+            loadModels(true);
+            recheck();
+          },
+          (error: unknown) => {
+            const now = setupRef.current;
+            if (now !== null) {
+              showSetup({ ...now, overview: { ...now.overview, notice: `Ollama didn't start: ${messageOf(error)}` } });
+            }
+          },
+        );
+        return;
+      case "install_ollama":
+        goSetup({ kind: "window", window: single("ollama", "overview") }, { ...ui, path: "local" });
+        return;
+      case "pick_model":
+        goSetup({ kind: "window", window: single("model", "overview") }, { ...ui, path: "pick" });
+        return;
+      case "set_key":
+        if (choice.target !== null) {
+          // The key prompt is the composer's; the overview comes back once it is saved.
+          applySecretStep({ prompt: openSecret(choice.target), submit: null });
+          setChat((current) => ({ ...current, error: null, notice: secretNotice(choice.target ?? "") }));
+          return;
+        }
+        goSetup({ kind: "window", window: single("provider", "overview") }, { ...ui, path: "key" });
+        return;
+      case "edit_config":
+        return;
+    }
+  }
+
+  /** What the window shows now, and which hints go with it. */
+  function setupView(ui: SetupUi, now: number): { lines: SetupLine[]; screen: SetupScreen } {
+    if (ui.quit !== null) {
+      return { lines: quitLines(ui.quit), screen: "quit" };
+    }
+    if (ui.window.view === "overview") {
+      const row = serviceRow(serviceRunner(), daemonVersion);
+      return { lines: overviewLines(ui.overview.rows, row, ui.overview.selected, ui.overview.notice), screen: "overview" };
+    }
+    switch (ui.window.panel) {
+      case "service": {
+        const phase = ui.service.phase;
+        const screen: SetupScreen =
+          phase === "starting" || phase === "running" ? "service-wait" : phase === "failed" ? "service-failed" : "service-ask";
+        return { lines: serviceLines(ui.service, now), screen };
+      }
+      case "engine":
+        return { lines: engineLines(ui.window.origin, listingRef.current, ui.engine), screen: "engine" };
+      case "ready": {
+        const runner = serviceRunner();
+        const service = runner === "launchd" ? "running, starts at login" : runner === "window" ? "running while this terminal is open" : "running";
+        return { lines: readyLines({ service, ...(ui.ready ?? { engine: "", model: "" }) }), screen: "ready" };
+      }
+      default:
+        return { lines: [], screen: "ready" };
     }
   }
 
@@ -1345,6 +1915,7 @@ export function App({
         }
         pickerRef.current = closedPicker;
         setPicker(closedPicker);
+        refreshBand();
         const label = result?.model_name ?? name;
         setChat((state) => ({
           ...state,
@@ -1627,14 +2198,25 @@ export function App({
     pickerRef.current = pressed.state;
     setPicker(pressed.state);
     const action = pressed.action;
-    const starting = welcomeRef.current;
-    if (starting !== null && (starting.step === "local" || starting.step === "key")) {
+    const ui = setupRef.current;
+    if (ui !== null && onPicker(ui) && ui.window.view === "panel") {
+      // The picker stands in for a setup panel: where it ends is the window's business.
       if (action.kind === "close") {
-        showWelcome(pressFirstRun(starting, "back"));
+        goSetup(advance(ui.window, { kind: "cancelled" }, ollamaFacts()), ui);
         return;
       }
-      if (action.kind === "choose" || action.kind === "pull" || action.kind === "install") {
-        showWelcome(null);
+      if (action.kind === "choose") {
+        chooseModel(action.model, action.name, action.setDefault);
+        modelPicked(action.model?.provider ?? null, action.model?.label ?? action.name);
+        return;
+      }
+      if (action.kind === "pull") {
+        startPull(action.ref, action.use, action.setDefault);
+        goSetup(advance({ ...ui.window, panel: "model" }, { kind: "background" }, ollamaFacts()), ui);
+        return;
+      }
+      if (action.kind === "install") {
+        showSetup(null);
       }
     }
     if (action.kind === "refresh") {
@@ -1667,7 +2249,7 @@ export function App({
         },
       );
     } else if (action.kind === "close") {
-      setChat((current) => ({ ...current, notice: state.firstRun ? "no model chosen yet: /model to pick one" : null }));
+      setChat((current) => ({ ...current, notice: state.firstRun ? NO_MODEL_BAND : null }));
     }
   }
 
@@ -1686,6 +2268,8 @@ export function App({
     void client.setKey(submitted.provider, submitted.key).then(
       () => {
         setChat((current) => ({ ...current, error: null, notice: `${submitted.provider} key saved in the Keychain` }));
+        loadModels(true);
+        recheck();
       },
       (error: unknown) => {
         setChat((current) => ({ ...current, notice: null, error: messageOf(error) }));
@@ -2104,12 +2688,12 @@ export function App({
       applySecretStep(pressSecret(prompt, press));
       return;
     }
-    if (pickerRef.current.open && !keysOpenRef.current && press.name !== "f1") {
-      onPickerPress(press);
+    if (setupRef.current !== null && !onPicker(setupRef.current)) {
+      onSetupPress(press);
       return;
     }
-    if (welcomeRef.current?.step === "choose" && !keysOpenRef.current && press.name !== "f1") {
-      onWelcomePress(press);
+    if (pickerRef.current.open && !keysOpenRef.current && press.name !== "f1") {
+      onPickerPress(press);
       return;
     }
     if (permsRef.current.open && !keysOpenRef.current && press.name !== "f1" && press.name !== "ctrl-c") {
@@ -2214,7 +2798,7 @@ export function App({
       busyRef.current ||
       switcherRef.current.open ||
       pickerRef.current.open ||
-      welcomeRef.current?.step === "choose" ||
+      (setupRef.current !== null && !onPicker(setupRef.current)) ||
       permsRef.current.open ||
       mcpManagerRef.current.open ||
       skillsManagerRef.current.open ||
@@ -2294,6 +2878,21 @@ export function App({
     }
   }, [debugLayout.lineCount, debugLayout.offsetFromBottom, debugOffset]);
 
+  if (setup !== null && !onPicker(setup) && secret === null) {
+    const shown = setupView(setup, setupNow);
+    return (
+      <SetupFrame
+        window={setup.window}
+        lines={shown.lines}
+        hint={setupHint(shown.screen, setup.window)}
+        version={`golem ${GOLEM_VERSION}`}
+        columns={size.columns || 80}
+        rows={rows}
+        frame={Math.floor(setupNow / 100)}
+      />
+    );
+  }
+
   return (
     <Box flexDirection="column" width={columns} height={rows} overflow="hidden">
       <Header
@@ -2324,8 +2923,6 @@ export function App({
           height={budget.body}
           hint={pickerHint(picker, shownListing?.ram_gb ?? null)}
         />
-      ) : welcome?.step === "choose" && shownListing !== null ? (
-        <WelcomeView rows={layoutWelcome(welcome.option, shownListing)} columns={columns} height={budget.body} />
       ) : mcpManager.open ? (
         <Box flexDirection="column" width={columns} height={budget.body} flexShrink={0} overflow="hidden">
           {layoutMcpManager({

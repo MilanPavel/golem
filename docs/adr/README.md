@@ -39,7 +39,8 @@ An Architecture Decision Record (ADR) is a short note of one choice: what was de
 | [033](033-golem-offers-to-start-the-service.md) | `golem` offers to start the service when nothing answers, and launchd still owns it | accepted | 2026-11-01 |
 | [034](034-docs-site.md) | The docs are a VitePress site over `docs/`, published to GitHub Pages | accepted | 2026-11-01 |
 | [035](035-daemon-installs-ollama.md) | The daemon installs Ollama, and checks a key before it stores it | accepted | 2026-11-03 |
+| [036](036-setup-window-asks-for-the-service.md) | The setup window asks for the service, inside the chat screen | accepted | 2026-11-03 |
 
 How the running code fits together is in [../architecture.md](../architecture.md).
 
-New records use [template.md](template.md). Number the next file `036-….md` and add a row here.
+New records use [template.md](template.md). Number the next file `037-….md` and add a row here.

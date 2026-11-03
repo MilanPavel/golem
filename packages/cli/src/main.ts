@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { existsSync, realpathSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -8,6 +8,7 @@ import {
   GOLEM_VERSION,
   KEY_UNCHECKED,
   readStartError,
+  resolveGolemHome,
   resolveSocketPath,
   RpcError,
 } from "@golem/client/node";
@@ -358,19 +359,46 @@ async function captureLocated(command: string, args: string[]): Promise<string> 
   return Buffer.concat(out).toString("utf8");
 }
 
+/**
+ * The chat screen. With no service it opens on the setup window, which asks
+ * whether golem may start one. A daemon it starts for this terminal stops when golem quits.
+ */
 async function openTui(): Promise<number> {
-  const gate = await gateService(serviceGate());
-  if (gate.kind === "exit") {
-    return gate.code;
-  }
+  const owned: { session: SessionDaemon | null } = { session: null };
+  const daemon = async (...args: string[]): Promise<void> => {
+    const located = locate();
+    await captureLocated(located.command, [...located.args, "daemon", ...args]);
+  };
   try {
     const tui = await import("@golem/tui");
     await tui.runTui({
-      service: { startError: readStartError, installed: () => existsSync(LAUNCH_AGENT), restart: restartQuietly },
+      service: {
+        startError: readStartError,
+        installed: () => existsSync(LAUNCH_AGENT),
+        restart: restartQuietly,
+        install: () => daemon("install"),
+        uninstall: () => daemon("uninstall"),
+        serve: () => {
+          owned.session?.stop();
+          owned.session = serveForThisWindow(locate());
+          return owned.session;
+        },
+        windowDaemon: () => (owned.session === null || owned.session.exited() ? null : owned.session),
+        logTail: () => logTail(join(resolveGolemHome(), "logs", "launchd.stderr.log"), 8),
+      },
     });
     return 0;
   } finally {
-    gate.session?.stop();
+    owned.session?.stop();
+  }
+}
+
+/** The last `count` lines of a log file, or none when it can't be read. */
+function logTail(file: string, count: number): string[] {
+  try {
+    return readFileSync(file, "utf8").trimEnd().split("\n").slice(-count);
+  } catch {
+    return [];
   }
 }
 
@@ -470,10 +498,19 @@ function serveForThisWindow(located: DaemonCommand): SessionDaemon {
       child.kill("SIGTERM");
     }
   };
+  // Closing the terminal sends SIGHUP, and nothing runs on "exit" after a signal: stop it here too.
+  const onSignal = (signal: NodeJS.Signals): void => {
+    stop();
+    process.exit(signal === "SIGHUP" ? 129 : 143);
+  };
   process.on("exit", stop);
+  process.once("SIGHUP", onSignal);
+  process.once("SIGTERM", onSignal);
   return {
     stop: () => {
       process.off("exit", stop);
+      process.off("SIGHUP", onSignal);
+      process.off("SIGTERM", onSignal);
       stop();
     },
     output: () => stderr,
