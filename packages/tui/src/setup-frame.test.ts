@@ -49,6 +49,8 @@ test("hints follow the screen: q quits only on the first question", () => {
   assert.equal(setupHint("model-local", guided("model", "start")), "Enter downloads · ↑↓ move · Esc back");
   assert.equal(setupHint("model-downloading", guided("model", "start")), "Esc keeps it downloading and opens the chat");
   assert.equal(setupHint("model-gone", single("model", "start")), "Enter picks · ↑↓ move · Esc chat without a model");
+  assert.equal(setupHint("key-typing", single("key", "chat")), "Enter checks · Esc back");
+  assert.equal(setupHint("provider", guided("provider", "start")), "Enter picks · ↑↓ move · Esc back");
 });
 
 test("the stepper shows each step's state, and only in guided mode", () => {
@@ -75,4 +77,11 @@ test("a status line puts its time on the right, and options line up their detail
     ["  ", "Later        ", "any time"],
   );
   assert.equal(lineSpans(options[0], 40, 0, width)[1]?.tone, "selected");
+});
+
+test("a field shows the prompt mark, the hidden key, and a cursor", () => {
+  assert.deepEqual(
+    lineSpans({ kind: "field", text: "••••" }, 40, 0, 0).map((span) => span.text),
+    ["❯ ", "••••", "▏"],
+  );
 });

@@ -1,6 +1,7 @@
 import type { ListedModel, ModelListResult } from "@golem/client";
 
 import { namesModel } from "./first-run.ts";
+import { hostedProvider, recommendedHosted } from "./setup-key.ts";
 import { elapsed, move, providerName, type Choice, type PanelKey, type SetupLine } from "./setup-window.ts";
 
 /**
@@ -137,7 +138,11 @@ export function ollamaInstallEnded(
 // Model
 
 /** Which models the panel offers: local ones in guided mode, every ready engine's alone. */
-export type ModelScope = { kind: "local" } | { kind: "all"; current: string | null } | { kind: "gone"; name: string };
+export type ModelScope =
+  | { kind: "local" }
+  | { kind: "provider"; provider: string }
+  | { kind: "all"; current: string | null }
+  | { kind: "gone"; name: string };
 
 export type ModelPanelState =
   | { phase: "pick"; selected: number; all: boolean }
@@ -152,6 +157,8 @@ export type ModelChoice =
 
 /** How many rows show before "Show all". */
 export const SHORT_LIST = 5;
+/** How many rows the window shows at once of a long list. */
+export const MAX_ROWS = 12;
 
 const BLURBS: Record<string, string> = {
   coding: "good for code",
@@ -218,6 +225,15 @@ export function modelChoices(listing: ModelListResult, scope: ModelScope, all: b
   if (scope.kind === "local") {
     return shorten(localOrder(local).map((model) => row(model, ram, false)), all);
   }
+  if (scope.kind === "provider") {
+    const best = recommendedHosted(listing.models, scope.provider);
+    const others = listing.models.filter((model) => model.provider === scope.provider && model.status === "ready" && model !== best);
+    const rows: ModelChoice[] = [
+      ...(best === null ? [] : [{ kind: "model", model: best, label: best.label, detail: "recommended" } as const]),
+      ...others.map((model): ModelChoice => ({ kind: "model", model, label: model.label, detail: "" })),
+    ];
+    return shorten(rows, all);
+  }
   if (scope.kind === "gone") {
     const named = listing.models.find((model) => namesModel(model, scope.name));
     const again: ModelChoice[] =
@@ -259,6 +275,9 @@ function title(listing: ModelListResult, scope: ModelScope): SetupLine[] {
     const where = named?.provider === "ollama" ? " in Ollama" : "";
     return [{ kind: "status", mark: "attn", text: `${scope.name} is no longer installed${where}.` }];
   }
+  if (scope.kind === "provider") {
+    return [{ kind: "title", text: `Pick a model · ${hostedProvider(scope.provider)?.name ?? scope.provider}` }];
+  }
   if (scope.kind === "local") {
     const ram = listing.ram_gb === null || listing.ram_gb === undefined ? "" : ` · this Mac has ${Math.round(listing.ram_gb)} GB`;
     return [{ kind: "title", text: `Pick a model · Ollama${ram}` }];
@@ -287,16 +306,26 @@ export function modelLines(listing: ModelListResult | null, scope: ModelScope, s
   if (choices.length === 0) {
     lines.push({ kind: "text", text: "No model is ready yet. Add an API key, or pick On this Mac.", dim: true });
   }
+  // A long list scrolls with the selection, so the window keeps its size.
+  const first = Math.max(0, Math.min(state.selected - Math.floor(MAX_ROWS / 2), choices.length - MAX_ROWS));
+  const shown = choices.slice(first, first + MAX_ROWS);
+  if (first > 0) {
+    lines.push({ kind: "text", text: `  ↑ ${first} more`, dim: true });
+  }
   lines.push(
-    ...choices.map(
+    ...shown.map(
       (choice, index): SetupLine => ({
         kind: "option",
         label: choice.label,
         detail: choice.kind === "model" ? choice.detail : "",
-        selected: index === state.selected,
+        selected: first + index === state.selected,
       }),
     ),
   );
+  const after = choices.length - first - shown.length;
+  if (after > 0) {
+    lines.push({ kind: "text", text: `  ↓ ${after} more`, dim: true });
+  }
   if (scope.kind === "local" && listing.disk_free_gb !== null && listing.disk_free_gb !== undefined) {
     lines.push({ kind: "blank" }, { kind: "text", text: `${Math.round(listing.disk_free_gb)} GB free on disk`, dim: true });
   }

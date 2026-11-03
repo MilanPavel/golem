@@ -144,10 +144,11 @@ test("/model opens the picker or names one model", () => {
   assert.equal(applyComposer(closedDebug, "/model pull").kind, "model");
 });
 
-test("/login and /logout take exactly one provider, and the key never goes in the command", () => {
+test("/login takes one provider or none, /logout exactly one, and the key never goes in the command", () => {
   assert.deepEqual(applyComposer(closedDebug, "/login anthropic"), { kind: "login", provider: "anthropic" });
+  assert.deepEqual(applyComposer(closedDebug, "/login"), { kind: "login", provider: null });
   assert.deepEqual(applyComposer(closedDebug, "/logout openai"), { kind: "logout", provider: "openai" });
-  assert.equal(applyComposer(closedDebug, "/login").kind, "unknown");
+  assert.equal(applyComposer(closedDebug, "/logout").kind, "unknown");
   assert.equal(applyComposer(closedDebug, "/login anthropic sk-abc").kind, "unknown");
 });
 

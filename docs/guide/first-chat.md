@@ -23,7 +23,7 @@ On the first start, golem's setup window asks where golem should think: on this 
 - **Up** and **Down** choose a model, and **Enter** picks it for this chat.
 - **`d`** also makes it the default for new chats.
 - A local model that is not downloaded yet asks once, then downloads with a progress bar. If Ollama is missing, golem offers to install it with Homebrew first.
-- A hosted model needs its API key. Type `/login anthropic` (or the provider you use), and paste the key. Nothing is echoed, and the key goes to the Keychain.
+- A hosted model needs its API key. Type `/login`, pick the provider, and paste the key, or Enter on Use it when your shell already has it. golem checks it with the provider before it saves it in the Keychain, and nothing is echoed.
 
 ## Ask a first question
 
