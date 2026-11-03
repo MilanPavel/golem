@@ -1,12 +1,14 @@
-import { useEffect } from "react";
+import type { TodoItem } from "@golem/view";
+import { useEffect, useRef, type Ref } from "react";
 import { Badge } from "../../ui/badge.tsx";
 import { Button } from "../../ui/button.tsx";
-import { FolderIcon } from "../../ui/icons.tsx";
+import { FolderIcon, PanelIcon } from "../../ui/icons.tsx";
 import { PixelGolem } from "../../ui/pixel-golem.tsx";
 import { useNavigate, useRememberOpenedFolder, useSession, useSessionList } from "../../store/page-context.tsx";
 import type { SessionModel, SessionView } from "../../store/session-store.ts";
 import { Transcript } from "../chat/index.ts";
 import { SessionDock } from "../composer/index.ts";
+import { Drawer, DRAWER_ID, useDrawerOpen } from "../drawer/index.ts";
 import { folderName } from "../sessions/folder.ts";
 
 type Header = Pick<SessionView, "title" | "cwd" | "model" | "status">;
@@ -14,6 +16,8 @@ type Header = Pick<SessionView, "title" | "cwd" | "model" | "status">;
 function sameHeader(a: Header, b: Header): boolean {
   return a.title === b.title && a.cwd === b.cwd && a.model === b.model && a.status === b.status;
 }
+
+const selectTodos = (view: SessionView) => view.chat.todos;
 
 const selectHeader = (view: SessionView): Header => ({
   title: view.title,
@@ -67,11 +71,50 @@ export function GoneScreen() {
   );
 }
 
+/** The top bar's switch for the drawer; closed, it shows how far the todos are. */
+function DrawerToggle({
+  open,
+  todos,
+  onToggle,
+  ref,
+}: {
+  open: boolean;
+  todos: readonly TodoItem[];
+  onToggle: () => void;
+  ref?: Ref<HTMLButtonElement>;
+}) {
+  const done = todos.filter((todo) => todo.status === "done").length;
+  const count = !open && todos.length > 0 ? `${done}/${todos.length}` : null;
+  return (
+    <Button
+      kind="ghost"
+      size="sm"
+      aria-label={open ? "Hide details" : "Show details"}
+      aria-expanded={open}
+      aria-controls={DRAWER_ID}
+      title={count === null ? undefined : `${done} of ${todos.length} todos done`}
+      onClick={onToggle}
+      ref={ref}
+      className="h-8 min-w-8 rounded-sm px-2"
+    >
+      <PanelIcon />
+      {count === null ? null : (
+        <span aria-hidden="true" className="font-mono text-xs text-muted">
+          {count}
+        </span>
+      )}
+    </Button>
+  );
+}
+
 /** A session: the top bar, then the column with the transcript's and the dock's slots. */
 export function SessionScreen({ id }: { id: string }) {
   const header = useSession(id, selectHeader, sameHeader);
   const summary = useSessionList().find((session) => session.session_id === id);
   const remember = useRememberOpenedFolder();
+  const todos = useSession(id, selectTodos);
+  const [drawerOpen, setDrawerOpen] = useDrawerOpen();
+  const toggle = useRef<HTMLButtonElement>(null);
 
   const title = header.title ?? summary?.title ?? null;
   const cwd = summary ? (summary.cwd ?? null) : header.status === "ready" ? header.cwd : undefined;
@@ -88,20 +131,33 @@ export function SessionScreen({ id }: { id: string }) {
     return <GoneScreen />;
   }
   return (
-    <>
-      <TopBar title={title || "New session"}>
-        {model ? <ModelChip model={model} /> : null}
-        {cwd === undefined ? null : (
-          <Badge title={cwd ?? undefined}>
-            <FolderIcon className="size-3" />
-            {folderName(cwd)}
-          </Badge>
-        )}
-      </TopBar>
-      <TranscriptSlot id={id} />
-      <div className="mx-auto w-full max-w-column px-5 pb-4">
-        <DockSlot id={id} />
+    <div className="flex min-h-0 min-w-0 flex-1">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <TopBar title={title || "New session"}>
+          {model ? <ModelChip model={model} /> : null}
+          {cwd === undefined ? null : (
+            <Badge title={cwd ?? undefined}>
+              <FolderIcon className="size-3" />
+              {folderName(cwd)}
+            </Badge>
+          )}
+          <DrawerToggle ref={toggle} open={drawerOpen} todos={todos} onToggle={() => setDrawerOpen(!drawerOpen)} />
+        </TopBar>
+        <TranscriptSlot id={id} />
+        <div className="mx-auto w-full max-w-column px-5 pb-4">
+          <DockSlot id={id} />
+        </div>
       </div>
-    </>
+      {drawerOpen ? (
+        <Drawer
+          todos={todos}
+          onClose={() => {
+            // The drawer's own button goes away with it, so focus goes back to the toggle.
+            setDrawerOpen(false);
+            toggle.current?.focus();
+          }}
+        />
+      ) : null}
+    </div>
   );
 }
