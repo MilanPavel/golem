@@ -2,6 +2,12 @@
 
 What changed in each release of golem, newest first. `just release` writes each section from the commit messages on `main` ([CONTRIBUTING.md](CONTRIBUTING.md)), and the release pull request is the place to edit it. The GitHub release shows the same section. How a release is made is in [docs/sre.md](docs/sre.md), section 5.
 
+## [0.6.1] - 2026-11-03
+
+### Fixes
+
+- **tui:** setup reinstalls a launch agent launchd doesn't run, and a daemon stops if its socket goes ([#364](https://github.com/MilanPavel/golem/pull/364))
+
 ## [0.6.0] - 2026-11-03
 
 ### Features
