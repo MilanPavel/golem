@@ -35,6 +35,7 @@ const text: Record<string, string[]> = {
 };
 const nonText: Record<string, string[]> = { clay: ["bg", "surface"] };
 text["on-clay"] = ["clay"];
+text.bg = ["ink"];
 
 const cases: [string, string, number][] = [
   ...Object.entries(text).flatMap(([fg, bgs]) => bgs.map((bg) => [fg, bg, 4.5] as [string, string, number])),
