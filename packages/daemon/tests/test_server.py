@@ -225,6 +225,7 @@ async def start_daemon(
     secrets: SecretStore | None = None,
     user_home: Path | None = None,
     local_servers: LocalServers | None = None,
+    socket_check_seconds: float = 5.0,
 ) -> tuple[DaemonApp, asyncio.Task[None]]:
     """Serve in this process. Unless a test passes ``local_servers``, golem never starts Ollama."""
     paths = resolve_paths(home)
@@ -245,6 +246,7 @@ async def start_daemon(
         secrets=secrets,
         user_home=user_home if user_home is not None else home,
         local_servers=local_servers,
+        socket_check_seconds=socket_check_seconds,
     )
     task = asyncio.create_task(app.serve(install_signals=False))
     await _wait_listening(paths.socket_path, task)
@@ -376,6 +378,20 @@ async def test_stale_socket_file_is_replaced(short_home: Path) -> None:
     finally:
         await client.close()
         await stop_daemon(app, task)
+
+
+async def test_a_deleted_socket_stops_the_daemon(short_home: Path) -> None:
+    app, task = await start_daemon(short_home, socket_check_seconds=0.05)
+    app.paths.socket_path.unlink()
+    await asyncio.wait_for(task, timeout=2)
+
+
+async def test_a_replaced_socket_stops_the_daemon_and_is_left_alone(short_home: Path) -> None:
+    app, task = await start_daemon(short_home, socket_check_seconds=0.05)
+    app.paths.socket_path.unlink()
+    app.paths.socket_path.write_text("another daemon", encoding="utf-8")
+    await asyncio.wait_for(task, timeout=2)
+    assert app.paths.socket_path.read_text(encoding="utf-8") == "another daemon"
 
 
 async def test_shutdown_drains_in_flight_handler(short_home: Path) -> None:

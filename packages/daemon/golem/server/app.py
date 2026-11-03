@@ -69,6 +69,8 @@ FLUSH_TIMEOUT_SECONDS = 1.0
 # sockaddr_un.sun_path is 104 bytes on macOS, including the trailing NUL.
 _MAX_SOCKET_BYTES = 103
 _IDLE_CHECK_SECONDS = 60.0
+# How often the daemon checks that its socket file is still the one it bound.
+SOCKET_CHECK_SECONDS = 5.0
 
 
 class SocketPathTooLong(Exception):
@@ -101,8 +103,11 @@ class DaemonApp:
         secrets: SecretStore | None = None,
         user_home: Path | None = None,
         local_servers: LocalServers | None = None,
+        socket_check_seconds: float = SOCKET_CHECK_SECONDS,
     ) -> None:
         self.paths = paths
+        self._socket_check_seconds = socket_check_seconds
+        self._socket_inode: int | None = None
         self._user_home = user_home
         self._router = router
         self._titles = titles
@@ -210,14 +215,17 @@ class DaemonApp:
                     self._unlink_socket()
                     self._server = await self._listen()
                     os.chmod(self.paths.socket_path, 0o600)
+                    self._socket_inode = self.paths.socket_path.stat().st_ino
                     clear_start_error(self.paths)
                     log.info("listening on %s", self.paths.socket_path)
                     mcp.start()
                     self.state.skills.start()
                     idle = asyncio.create_task(_stop_idle(local), name="golem-ollama-idle")
+                    watch = asyncio.create_task(self._watch_socket(), name="golem-socket-watch")
                     await self._stop.wait()
                     log.info("shutting down")
                     idle.cancel()
+                    watch.cancel()
                     await self._shutdown()
                 finally:
                     for sig in installed:
@@ -340,7 +348,30 @@ class DaemonApp:
         finally:
             os.umask(previous)
 
+    def _socket_is_ours(self) -> bool:
+        try:
+            inode = self.paths.socket_path.stat().st_ino
+        except FileNotFoundError:
+            return False
+        return self._socket_inode is None or inode == self._socket_inode
+
+    async def _watch_socket(self) -> None:
+        """Stop once the socket file is gone or replaced, so launchd starts a reachable daemon.
+
+        Deleting ``GOLEM_HOME`` takes the socket with it, and a daemon that
+        kept running would answer no one.
+        """
+        while True:
+            await asyncio.sleep(self._socket_check_seconds)
+            if not self._socket_is_ours():
+                log.warning("socket %s is gone; stopping", self.paths.socket_path)
+                self.request_shutdown()
+                return
+
     def _unlink_socket(self) -> None:
+        # Another daemon's socket at the same path is left alone.
+        if not self._socket_is_ours():
+            return
         try:
             self.paths.socket_path.unlink()
         except FileNotFoundError:
