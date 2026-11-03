@@ -2,6 +2,28 @@
 
 What changed in each release of golem, newest first. `just release` writes each section from the commit messages on `main` ([CONTRIBUTING.md](CONTRIBUTING.md)), and the release pull request is the place to edit it. The GitHub release shows the same section. How a release is made is in [docs/sre.md](docs/sre.md), section 5.
 
+## [0.6.0] - 2026-11-03
+
+### Features
+
+- **web:** approvals can be answered in the browser from a card with the diff ([#349](https://github.com/MilanPavel/golem/pull/349))
+- **daemon:** golem checks an API key before saving it, and installs Ollama itself ([#352](https://github.com/MilanPavel/golem/pull/352))
+- **web:** a call's arguments can be edited before allowing it once ([#356](https://github.com/MilanPavel/golem/pull/356))
+- **tui:** golem sets itself up in one window, and /setup shows what is broken and fixes it ([#357](https://github.com/MilanPavel/golem/pull/357))
+- **web:** a drawer beside the chat shows the agent's todo list ([#358](https://github.com/MilanPavel/golem/pull/358))
+- **tui:** On this Mac installs Ollama, then lists models sized for this Mac and downloads one ([#360](https://github.com/MilanPavel/golem/pull/360))
+- **tui:** With an API key picks a provider, checks the key, and lists its models in setup ([#361](https://github.com/MilanPavel/golem/pull/361))
+
+### Fixes
+
+- **ci:** trust the tap checkout so brew audit can load the formula ([#342](https://github.com/MilanPavel/golem/pull/342))
+
+### Docs
+
+- hacking and contributing pages on the docs site ([#348](https://github.com/MilanPavel/golem/pull/348))
+- a short README that links to the docs site ([#350](https://github.com/MilanPavel/golem/pull/350))
+- How golem works, chapter 1: the agent loop ([#359](https://github.com/MilanPavel/golem/pull/359))
+
 ## [0.5.0] - 2026-11-02
 
 ### Features
