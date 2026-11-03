@@ -7,7 +7,7 @@ brew install milanpavel/golem/golem
 golem                       # open the chat; the first time, it asks to start its service
 ```
 
-The [install guide](https://github.com/MilanPavel/golem/blob/main/docs/install.md) explains each step.
+The [install guide](https://milanpavel.github.io/golem/install) explains each step.
 
 Upgrade:
 

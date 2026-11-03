@@ -706,3 +706,57 @@ test("the diff from approval.needed stays on the tool after the answer", () => {
   assert.equal(state.approval, null);
   assert.equal(state.messages[0]?.tools?.[0]?.diff, "-a\n+b\n");
 });
+
+function approvalEvents(resolved: Record<string, unknown> | null): ChatEvent[] {
+  const base = { session_id: "s", run_id: "r", ts: "t" } as const;
+  const events: ChatEvent[] = [
+    { ...base, seq: 1, type: "run.started", data: {} },
+    { ...base, seq: 2, type: "message.started", data: { message_id: "a", role: "assistant" } },
+    { ...base, seq: 3, type: "message.completed", data: { message_id: "a", role: "assistant", text: "" } },
+    { ...base, seq: 4, type: "tool.requested", data: { call_id: "c1", message_id: "a", name: "edit_file", args: { path: "x" } } },
+    { ...base, seq: 5, type: "approval.needed", data: { call_id: "c1", name: "edit_file", args: { path: "x" }, source: "built-in default", subject: "x" } },
+  ];
+  if (resolved !== null) {
+    events.push({ ...base, seq: 6, type: "approval.resolved", data: { call_id: "c1", name: "edit_file", ...resolved } } as ChatEvent);
+  }
+  return events;
+}
+
+test("approval.needed records the question on the tool", () => {
+  const state = approvalEvents(null).reduce(reduceChat, emptyChat);
+  assert.deepEqual(state.messages[0]?.tools?.[0]?.approval, { source: "built-in default", subject: "x" });
+});
+
+test("approval.resolved records each decision as the answer", () => {
+  for (const decision of ["allow", "allow_session", "allow_always", "deny"] as const) {
+    const state = approvalEvents({ decision }).reduce(reduceChat, emptyChat);
+    assert.deepEqual(state.messages[0]?.tools?.[0]?.approval?.answer, { decision, rule: null, edited: false });
+  }
+  const always = approvalEvents({ decision: "allow_always", rule: "edit_file(x) → allow" }).reduce(reduceChat, emptyChat);
+  assert.equal(always.messages[0]?.tools?.[0]?.approval?.answer?.rule, "edit_file(x) → allow");
+});
+
+test("approval.resolved with edited arguments marks the answer edited", () => {
+  const state = approvalEvents({ decision: "allow", args: { path: "y" } }).reduce(reduceChat, emptyChat);
+  const tool = state.messages[0]?.tools?.[0];
+  assert.equal(tool?.approval?.answer?.edited, true);
+  assert.deepEqual(tool?.args, { path: "y" });
+});
+
+test("approval.resolved without a question first still records the answer", () => {
+  const events = approvalEvents({ decision: "deny", subject: "x" });
+  events.splice(4, 1);
+  const state = events.reduce(reduceChat, emptyChat);
+  assert.deepEqual(state.messages[0]?.tools?.[0]?.approval, {
+    source: "",
+    subject: "x",
+    answer: { decision: "deny", rule: null, edited: false },
+  });
+});
+
+test("replaying the approval events twice gives the same tool", () => {
+  const events = approvalEvents({ decision: "allow_session" });
+  const once = events.reduce(reduceChat, emptyChat);
+  const twice = [...events, ...events.slice(3)].reduce(reduceChat, emptyChat);
+  assert.deepEqual(twice.messages[0]?.tools?.[0]?.approval, once.messages[0]?.tools?.[0]?.approval);
+});

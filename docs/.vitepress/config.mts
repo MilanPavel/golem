@@ -6,7 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Plugin } from "vite";
 import { type DefaultTheme, defineConfig } from "vitepress";
-import { NOT_PAGES, REPO_URL, bundleHtmlAssets, siteHref } from "./links.ts";
+import { NOT_PAGES, REPO_URL, bundleHtmlAssets, linksFrom, siteHref } from "./links.ts";
 import { golemContainers } from "./containers.ts";
 import { faviconHref, markCss } from "./golem.ts";
 import { checkTokens, parseTokens, tokensCss } from "./tokens.ts";
@@ -82,6 +82,8 @@ const sidebar: DefaultTheme.Sidebar = [
   {
     text: "Build golem",
     items: [
+      { text: "Hacking on golem", link: "/contributing/hacking" },
+      { text: "Contributing", link: "/contributing/" },
       { text: "Architecture", link: "/architecture" },
       { text: "The monorepo", link: "/monorepo" },
       { text: "Building, releasing, and running", link: "/sre" },
@@ -119,13 +121,18 @@ export default defineConfig({
     config(md) {
       // Links that leave docs/ go to GitHub, and bare asset paths in raw HTML are bundled.
       md.core.ruler.after("inline", "golem-links", (state) => {
+        // An included file's links resolve from that file, after a links-from marker (links.ts).
         const page: string = state.env.relativePath ?? "";
+        let from = page;
         for (const block of state.tokens) {
-          if (block.type === "html_block") block.content = bundleHtmlAssets(block.content);
+          if (block.type === "html_block") {
+            from = linksFrom(block.content, page) ?? from;
+            block.content = bundleHtmlAssets(block.content);
+          }
           for (const token of block.children ?? []) {
             if (token.type === "link_open") {
               const href = token.attrGet("href");
-              if (href !== null) token.attrSet("href", siteHref(href, page));
+              if (href !== null) token.attrSet("href", siteHref(href, page, from));
             } else if (token.type === "html_inline") {
               token.content = bundleHtmlAssets(token.content);
             }
@@ -158,7 +165,12 @@ export default defineConfig({
     socialLinks: [{ icon: "github", link: REPO_URL }],
     search: { provider: "local" },
     editLink: {
-      pattern: `${REPO_URL}/edit/main/docs/:path`,
+      // The Contributing page is CONTRIBUTING.md, included, so its edits go there. The function
+      // runs in the browser, so it cannot use REPO_URL.
+      pattern: ({ filePath }) => {
+        const edit = "https://github.com/MilanPavel/golem/edit/main/";
+        return filePath === "contributing/index.md" ? `${edit}CONTRIBUTING.md` : `${edit}docs/${filePath}`;
+      },
       text: "Edit this page on GitHub",
     },
     outline: { level: [2, 3] },
