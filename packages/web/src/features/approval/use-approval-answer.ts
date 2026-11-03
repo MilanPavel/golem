@@ -2,6 +2,7 @@ import type { ApprovalChoice } from "@golem/view";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { sendErrorText } from "../../store/errors.ts";
 
+type Args = Readonly<Record<string, unknown>>;
 type Sent = { id: string; error: string | null };
 
 /**
@@ -11,9 +12,9 @@ type Sent = { id: string; error: string | null };
  * belong to the call they came from, so a new call starts clean.
  */
 export function useApprovalAnswer(
-  respond: (callId: string, decision: ApprovalChoice) => Promise<void>,
+  respond: (callId: string, decision: ApprovalChoice, args?: Args) => Promise<void>,
   callId: string | null = null,
-): { answer: (callId: string, decision: ApprovalChoice) => void; sendingId: string | null; error: string | null } {
+): { answer: (callId: string, decision: ApprovalChoice, args?: Args) => void; sendingId: string | null; error: string | null } {
   const [sent, setSent] = useState<Sent | null>(null);
   const [failed, setFailed] = useState<Sent | null>(null);
   const flying = useRef<string | null>(null);
@@ -22,12 +23,12 @@ export function useApprovalAnswer(
     latest.current = respond;
   });
 
-  const answer = useCallback((id: string, decision: ApprovalChoice) => {
+  const answer = useCallback((id: string, decision: ApprovalChoice, args?: Args) => {
     if (flying.current === id) return;
     flying.current = id;
     setSent({ id, error: null });
     setFailed(null);
-    latest.current(id, decision).catch((err: unknown) => {
+    (args === undefined ? latest.current(id, decision) : latest.current(id, decision, args)).catch((err: unknown) => {
       flying.current = null;
       setSent(null);
       setFailed({ id, error: sendErrorText(err) });

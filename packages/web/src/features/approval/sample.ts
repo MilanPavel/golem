@@ -32,6 +32,7 @@ const answered = (callId: string, answer: NonNullable<ToolBlock["approval"]>["an
 /** Each way a question ends, for the gallery and the tests. */
 export const ANSWERED: { label: string; tool: ToolBlock }[] = [
   { label: "Allowed once", tool: answered("an1", { decision: "allow", rule: null, edited: false }) },
+  { label: "Allowed once, with edited arguments", tool: answered("an6", { decision: "allow", rule: null, edited: true }) },
   { label: "Allowed for this session", tool: answered("an2", { decision: "allow_session", rule: null, edited: false }) },
   { label: "Always allowed, with a rule", tool: answered("an3", { decision: "allow_always", rule: "edit_file(src/**) → allow", edited: false }) },
   { label: "Denied", tool: { ...answered("an4", { decision: "deny", rule: null, edited: false }), status: "failed", error: "the user denied this tool call" } },

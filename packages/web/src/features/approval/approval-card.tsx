@@ -1,8 +1,9 @@
-import type { ToolBlock, ApprovalChoice } from "@golem/view";
-import { Fragment } from "react";
+import { editedArgs, parseArgs, type ToolBlock, type ApprovalChoice } from "@golem/view";
+import { Fragment, useEffect, useId, useRef, useState } from "react";
 import { Button } from "../../ui/button.tsx";
 import { cn } from "../../ui/cn.ts";
 import { Kbd } from "../../ui/kbd.tsx";
+import { Textarea } from "../../ui/textarea.tsx";
 import { DiffModeSwitch } from "../diff/diff-mode-switch.tsx";
 import { useDiffMode } from "../diff/diff-mode.ts";
 import { DiffView } from "../diff/diff-view.tsx";
@@ -29,6 +30,106 @@ const ACTIONS: { decision: ApprovalChoice; label: string; key: string; shortcut:
   { decision: "deny", label: "Deny", key: "D", shortcut: "D", kind: "danger" },
 ];
 
+const INK_KBD = "border-bg/40 bg-transparent text-bg";
+const MIN_ROWS = 8;
+const MAX_ROWS = 20;
+
+type Args = Readonly<Record<string, unknown>>;
+
+/**
+ * The call's arguments as JSON, to change before allowing it once. The draft lives here, so
+ * closing the editor drops it. Allow waits for a JSON object; Cmd or Ctrl and Enter allows,
+ * Escape closes.
+ */
+function ArgsEditor({
+  tool,
+  sending,
+  draft,
+  onAnswer,
+  onCancel,
+}: {
+  tool: ToolBlock;
+  sending: boolean;
+  draft?: string;
+  onAnswer: (decision: ApprovalChoice, args?: Args) => void;
+  onCancel: () => void;
+}) {
+  const [text, setText] = useState(() => draft ?? JSON.stringify(tool.args, null, 2));
+  const field = useRef<HTMLTextAreaElement>(null);
+  const labelId = useId();
+  const reasonId = useId();
+  useEffect(() => {
+    const el = field.current;
+    if (el === null) return;
+    el.focus();
+    el.setSelectionRange(el.value.length, el.value.length);
+  }, []);
+  const parsed = parseArgs(text);
+  const rows = Math.min(MAX_ROWS, Math.max(MIN_ROWS, text.split("\n").length));
+
+  function allow(): void {
+    if (!parsed.ok || sending) return;
+    const edited = editedArgs(tool.args, parsed.args);
+    if (edited === null) onAnswer("allow");
+    else onAnswer("allow", edited);
+  }
+
+  return (
+    <>
+      <div className="border-y border-line bg-code-bg px-4 py-2">
+        <label id={labelId} htmlFor={`${labelId}-field`} className="mb-1 block text-xs text-muted">
+          Arguments, as JSON. Allow runs the edited call once.
+        </label>
+        <Textarea
+          id={`${labelId}-field`}
+          ref={field}
+          value={text}
+          rows={rows}
+          readOnly={sending}
+          spellCheck={false}
+          autoCapitalize="off"
+          autoCorrect="off"
+          aria-invalid={parsed.ok ? undefined : true}
+          aria-describedby={parsed.ok ? undefined : reasonId}
+          className="bg-code-bg font-mono text-xs"
+          onChange={(event) => {
+            setText(event.target.value);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              event.preventDefault();
+              event.stopPropagation();
+              if (!sending) onCancel();
+            } else if (event.key === "Enter" && (event.metaKey || event.ctrlKey) && !event.nativeEvent.isComposing) {
+              event.preventDefault();
+              allow();
+            }
+          }}
+        />
+        {parsed.ok ? null : (
+          <p id={reasonId} role="status" className="mt-1 font-mono text-xs text-deny wrap-anywhere">
+            {parsed.error}
+          </p>
+        )}
+      </div>
+      <div className="flex flex-wrap items-center gap-2 px-4 pt-3 pb-3.5">
+        <Button kind="ink" disabled={sending || !parsed.ok} aria-keyshortcuts="Meta+Enter Control+Enter" data-decision="allow" onClick={allow}>
+          Allow once
+          <Kbd className={INK_KBD}>⌘↵</Kbd>
+        </Button>
+        <Button disabled={sending} aria-keyshortcuts="Escape" data-action="cancel" onClick={onCancel}>
+          Cancel
+          <Kbd>Esc</Kbd>
+        </Button>
+        <Button kind="danger" className="ml-auto" disabled={sending} aria-keyshortcuts="D" data-decision="deny" onClick={() => { onAnswer("deny"); }}>
+          Deny
+          <Kbd>D</Kbd>
+        </Button>
+      </div>
+    </>
+  );
+}
+
 /**
  * The question about one tool call, drawn like the shem: the seal, what is asked, the rule that
  * asked, the change or the arguments, and the answers. Once answered it shrinks to one line.
@@ -38,15 +139,31 @@ export function ApprovalCard({
   pending,
   sending = false,
   error = null,
+  editing = false,
+  draft,
+  onEdit = () => {},
   onAnswer,
 }: {
   tool: ToolBlock;
   pending: boolean;
   sending?: boolean;
   error?: string | null;
-  onAnswer: (decision: ApprovalChoice) => void;
+  /** The arguments are open for editing. */
+  editing?: boolean;
+  /** The text the editor opens with, in place of the call's arguments: for the gallery. */
+  draft?: string;
+  onEdit?: (open: boolean) => void;
+  onAnswer: (decision: ApprovalChoice, args?: Args) => void;
 }) {
   const [mode, setMode] = useDiffMode();
+  const editButton = useRef<HTMLButtonElement>(null);
+  const wasEditing = useRef(false);
+  const showEditor = editing && pending && tool.approval?.answer === undefined;
+  useEffect(() => {
+    // Closing the editor puts focus back on the button that opened it.
+    if (wasEditing.current && !showEditor) editButton.current?.focus();
+    wasEditing.current = showEditor;
+  }, [showEditor]);
   const approval = tool.approval;
   if (approval === undefined) return null;
   const answer = approval.answer;
@@ -72,13 +189,30 @@ export function ApprovalCard({
             {approval.source ? ` · ${approval.source}` : ""}
           </p>
         </div>
-        {open && tool.diff ? (
+        {open && !showEditor && tool.diff ? (
           <div className="ml-auto flex-none">
             <DiffModeSwitch mode={mode} onChange={setMode} />
           </div>
         ) : null}
       </div>
-      {open ? (
+      {open && showEditor ? (
+        <>
+          <ArgsEditor
+            tool={tool}
+            sending={sending}
+            draft={draft}
+            onAnswer={onAnswer}
+            onCancel={() => {
+              onEdit(false);
+            }}
+          />
+          {error ? (
+            <p role="alert" className="px-4 pb-3.5 text-sm text-deny">
+              {error}
+            </p>
+          ) : null}
+        </>
+      ) : open ? (
         <>
           {tool.diff ? (
             <div className="overflow-x-auto border-y border-line bg-bg px-4 py-2 font-mono text-xs">
@@ -92,9 +226,25 @@ export function ApprovalCard({
           <div className="flex flex-wrap items-center gap-2 px-4 pt-3 pb-3.5">
             {ACTIONS.map((action) => (
               <Fragment key={action.decision}>
-                {action.decision === "deny" ? <span className="flex-1" /> : null}
+                {action.decision === "deny" ? (
+                  <>
+                    <Button
+                      disabled={sending}
+                      ref={editButton}
+                      aria-keyshortcuts="E"
+                      data-action="edit"
+                      onClick={() => {
+                        onEdit(true);
+                      }}
+                    >
+                      Edit
+                      <Kbd>E</Kbd>
+                    </Button>
+                  </>
+                ) : null}
                 <Button
                   kind={action.kind}
+                  className={action.decision === "deny" ? "ml-auto" : undefined}
                   disabled={sending}
                   aria-keyshortcuts={action.shortcut}
                   data-decision={action.decision}
@@ -103,7 +253,7 @@ export function ApprovalCard({
                   }}
                 >
                   {action.label}
-                  <Kbd className={action.kind === "ink" ? "border-bg/40 bg-transparent text-bg" : undefined}>{action.key}</Kbd>
+                  <Kbd className={action.kind === "ink" ? INK_KBD : undefined}>{action.key}</Kbd>
                 </Button>
               </Fragment>
             ))}

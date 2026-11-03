@@ -37,7 +37,7 @@ export type PageActions = {
   createSession(cwd: string | null): Promise<string>;
   send(sessionId: string, text: string): Promise<void>;
   cancel(runId: string): Promise<void>;
-  respond(sessionId: string, callId: string, decision: ApprovalChoice): Promise<void>;
+  respond(sessionId: string, callId: string, decision: ApprovalChoice, args?: Readonly<Record<string, unknown>>): Promise<void>;
 };
 
 export type Page = {
@@ -100,8 +100,9 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       async cancel(runId) {
         await client.cancelRun(runId);
       },
-      async respond(sessionId, callId, decision) {
-        await client.respondApproval(sessionId, callId, decision);
+      async respond(sessionId, callId, decision, args) {
+        if (args === undefined) await client.respondApproval(sessionId, callId, decision);
+        else await client.respondApproval(sessionId, callId, decision, args);
       },
     },
     acquire(id) {
