@@ -89,7 +89,7 @@ Your chats and settings carry over. If a new version changes the database, golem
 
 ## Remove
 
-Run these in this order. If you run `brew uninstall` first, macOS keeps trying to start a daemon that no longer exists.
+Run these in this order. If you run `brew uninstall` first, the old service can keep running. The next `golem` you install sees the leftover launch agent and installs it again.
 
 ```bash
 golem daemon uninstall
