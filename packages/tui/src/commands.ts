@@ -43,7 +43,7 @@ export type ComposerOutcome =
   | { kind: "model"; name: string | null }
   | { kind: "model-pull"; name: string }
   | { kind: "model-rm"; name: string }
-  | { kind: "login"; provider: string }
+  | { kind: "login"; provider: string | null }
   | { kind: "logout"; provider: string }
   | {
       kind: "local";
@@ -169,8 +169,8 @@ export const COMMANDS: readonly Command[] = [
   },
   {
     name: "/login",
-    args: "<provider>",
-    description: "Asks for the provider's API key and saves it in the Keychain.",
+    args: "[provider]",
+    description: "Adds an API key, checked with the provider and saved in the Keychain.",
     choices: KEY_PROVIDERS,
     run: providerCommand("login"),
   },
@@ -450,6 +450,9 @@ function afterWords(text: string, count: number): string {
 function providerCommand(kind: "login" | "logout"): Command["run"] {
   return (_debug, args) => {
     const provider = args[0];
+    if (kind === "login" && args.length === 0) {
+      return { kind, provider: null };
+    }
     if (args.length !== 1 || provider === undefined || provider.length === 0) {
       return { kind: "unknown", notice: `/${kind} needs a provider, for example /${kind} anthropic` };
     }

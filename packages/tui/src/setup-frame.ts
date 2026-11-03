@@ -58,6 +58,8 @@ export type SetupScreen =
   | "model-local"
   | "model-gone"
   | "model-downloading"
+  | "provider"
+  | "key-typing"
   | "ready"
   | "overview"
   | "quit";
@@ -78,6 +80,9 @@ export function setupHint(screen: SetupScreen, window: SetupWindow): string {
       return window.view === "panel" && window.origin === "send"
         ? "Enter picks · ↑↓ move · Esc back"
         : "Enter picks · ↑↓ move · Esc back · q quit";
+    case "key-typing":
+      return "Enter checks · Esc back";
+    case "provider":
     case "ollama-ask":
     case "model":
       return "Enter picks · ↑↓ move · Esc back";
@@ -155,6 +160,12 @@ export function lineSpans(line: SetupLine, width: number, frame: number, labels:
       ];
     case "row":
       return [glyph(line.mark, frame), { text: ` ${line.label.padEnd(10)}`, tone: "bold" }, { text: line.text, tone: "plain" }];
+    case "field":
+      return [
+        { text: "❯ ", tone: "clay" },
+        { text: line.text, tone: "dim" },
+        { text: "▏", tone: frame % 10 < 5 ? "clay" : "plain" },
+      ];
   }
 }
 

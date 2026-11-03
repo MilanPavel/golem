@@ -59,7 +59,7 @@ Type `/` and suggestions appear, with each command's arguments. `/help` lists ev
 | `/model` | Open the model picker |
 | `/model <name>` | Switch this chat to a model or a profile |
 | `/model pull <name>`, `/model rm <name>` | Download or remove a local model |
-| `/login <provider>`, `/logout <provider>` | Save or remove an API key |
+| `/login [provider]`, `/logout <provider>` | Add an API key, checked with the provider, or remove one |
 | `/setup` | See what is set up and what is broken, fix it, or walk the setup steps again |
 
 [Models and API keys](./models.md) has the details.

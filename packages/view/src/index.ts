@@ -114,6 +114,7 @@ export {
   pullBand,
   pullLine,
   pullSpeed,
+  MAX_ROWS,
   SHORT_LIST,
   START_MODEL_PANEL,
   startPull,
@@ -127,6 +128,24 @@ export {
   type OllamaState,
   type PullTrack,
 } from "./setup-local.ts";
+export {
+  HOSTED_PROVIDERS,
+  hostedProvider,
+  KEYCHAIN_HINT_MS,
+  keyChecked,
+  keyLines,
+  maskKey,
+  openKey,
+  pressKey,
+  pressProvider,
+  providerLines,
+  providerSelected,
+  recommendedHosted,
+  type HostedProvider,
+  type KeyEffect,
+  type KeyInput,
+  type KeyState,
+} from "./setup-key.ts";
 export { golemState, type GolemState, type RunPhase } from "./golem-state.ts";
 export { visibleText } from "./sanitize.ts";
 export { todoLines, todoRows, TODO_ROWS, type TodoItem, type TodoLine, type TodoStatus } from "./todos.ts";

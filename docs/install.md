@@ -58,7 +58,7 @@ golem auth set anthropic    # paste the key; nothing is echoed
 golem auth list             # shows which providers have a key
 ```
 
-Or type `/login anthropic` in the chat.
+Or type `/login` in the chat, pick the provider, and paste the key.
 
 ## 4. Chat
 
