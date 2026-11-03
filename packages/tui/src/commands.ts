@@ -28,6 +28,7 @@ export type ComposerOutcome =
   /** Pin a skill for the whole session, or unpin it. */
   | { kind: "skill-pin"; pin: boolean; name: string }
   | { kind: "sessions" }
+  | { kind: "setup" }
   | { kind: "skills" }
   | { kind: "permissions" }
   | { kind: "new" }
@@ -228,6 +229,12 @@ export const COMMANDS: readonly Command[] = [
     args: "",
     description: "Opens the session switcher.",
     run: withoutArgs({ kind: "sessions" }),
+  },
+  {
+    name: "/setup",
+    args: "",
+    description: "Shows what is set up and what is broken, and fixes it: the service, the engine, the model.",
+    run: withoutArgs({ kind: "setup" }),
   },
   {
     name: "/skill",

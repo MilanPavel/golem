@@ -26,7 +26,7 @@ golem --version             # golem 0.1.0, or newer
 golem
 ```
 
-The first time, golem asks to start its background service. The service is the part of golem that talks to the model and keeps your chats, so a chat keeps going when you close the terminal. Press Enter to start it now and at every login. It also restarts by itself if it ever crashes. Press `n` to run it only while this window is open, or `q` to quit.
+The first time, golem opens its setup window. It starts with the background service: the part of golem that talks to the model and keeps your chats, so a chat keeps going when you close the terminal. Enter starts it now and at every login, and it restarts by itself if it ever crashes. **Only while this terminal is open** runs it until you quit golem. The window shows each step while the service starts, then asks how golem should think. Type `/setup` later to see what is set up, fix what is broken, or walk the steps again.
 
 Check it any time:
 
