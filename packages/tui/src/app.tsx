@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process";
 import { homedir } from "node:os";
 import { useEffect, useRef, useState } from "react";
 import { Box, Text, useApp, useInput, usePaste, useStdin, useWindowSize } from "ink";
@@ -26,7 +27,6 @@ import {
   forkPoint,
   NO_MODEL_NOTICE,
   noModelChosen,
-  recommendedLocal,
   advance,
   agentInstalled,
   askService,
@@ -54,6 +54,26 @@ import {
   single,
   welcomeBack,
   withLog,
+  defaultGone,
+  modelChoices,
+  modelLines,
+  modelPullFailed,
+  modelSelected,
+  OLLAMA_DOWNLOAD_URL,
+  ollamaAtOpen,
+  ollamaInstallEnded,
+  ollamaLines,
+  pressModel,
+  pressOllama,
+  pullBand,
+  START_MODEL_PANEL,
+  startPull as startPullTrack,
+  trackPull,
+  warmingLine,
+  type ModelPanelState,
+  type ModelScope,
+  type OllamaState,
+  type PullTrack,
   NO_MODEL_BAND,
   type ServiceRunner,
   type ServiceState,
@@ -94,7 +114,6 @@ import {
   pickerHint,
   pickerKeyOf,
   pickerName,
-  providerMissing,
   pressPicker,
   unusableReason,
   withPulls,
@@ -262,9 +281,9 @@ import { useSession } from "./use-session.ts";
 type Install = { state: InstallState; ref: string; setDefault: boolean; resend: string | null };
 
 /**
- * The setup window as this screen holds it. The Ollama, Provider, Key, and
- * Model panels are the model picker until they get panels of their own, so
- * on them the picker shows and the window waits behind it.
+ * The setup window as this screen holds it. The Provider and Key panels are
+ * the model picker until they get panels of their own, so on them the picker
+ * shows and the window waits behind it.
  */
 type SetupUi = {
   window: SetupWindow;
@@ -275,10 +294,15 @@ type SetupUi = {
   overview: { selected: number; rows: SetupRow[] | null; notice: string | null };
   /** The Quit setup? question, with its selection, or null. */
   quit: number | null;
+  ollama: OllamaState;
+  model: ModelPanelState;
+  /** Which models the Model panel offers: this Mac's, every engine's, or with the gone default first. */
+  scope: ModelScope;
   ready: { engine: string; model: string } | null;
 };
 
-const PICKER_PANELS: ReadonlySet<SetupPanel> = new Set(["ollama", "provider", "key", "model"]);
+// Until 1.9.4, the API key path is the model picker.
+const PICKER_PANELS: ReadonlySet<SetupPanel> = new Set(["provider", "key"]);
 
 function onPicker(ui: SetupUi | null): boolean {
   return ui !== null && ui.window.view === "panel" && PICKER_PANELS.has(ui.window.panel);
@@ -412,6 +436,10 @@ export function App({
   const [bandRows, setBandRows] = useState<SetupRow[] | null>(null);
   /** The model a working start names in `welcome back`, until the first send. */
   const [welcomeModel, setWelcomeModel] = useState<string | null>(null);
+  /** Each download's bytes over time, for its speed and time left. */
+  const pullTracks = useRef(new Map<string, PullTrack>());
+  /** Local models that answered once in this window, so they are in memory: no `loading …` for them. */
+  const warmModels = useRef(new Set<string>());
   const [pulls, setPulls] = useState<Record<string, PullState>>({});
   const pullsRef = useRef(pulls);
   pullsRef.current = pulls;
@@ -493,7 +521,24 @@ export function App({
   const otherChats = sessions.filter((summary) => summary.session_id !== shownSession.current).length;
   const welcomeLine = welcomeModel === null ? null : welcomeBack(welcomeModel, otherChats);
   // Something wrong wins over the greeting.
-  const banner = asking ? RETRY_QUESTION : (chat.error ?? serviceText ?? chat.notice ?? setupLine ?? welcomeLine);
+  const model = preferModel(sessionModel, daemonModel);
+  // Before any model is chosen the session's name is only a placeholder.
+  const chip = listing?.default === null && model.provider === null ? "no model" : modelChip(model.name, model.profile);
+  const answering = assistantChars(chat.messages) > 0;
+  const warming = warmingLine({
+    busy: chat.busy,
+    answered: answering,
+    provider: model.provider,
+    label: chip,
+    serverStarting: servers["ollama"] === "starting",
+    cold: model.provider === "ollama" && !warmModels.current.has(chip),
+  });
+  if (chat.busy && answering && model.provider === "ollama") {
+    warmModels.current.add(chip);
+  }
+  const banner = asking
+    ? RETRY_QUESTION
+    : (chat.error ?? serviceText ?? warming ?? chat.notice ?? setupLine ?? welcomeLine);
   const hintText = liveHint(hint, Date.now())?.text ?? null;
   const suggestMatches =
     chat.busy ||
@@ -550,9 +595,6 @@ export function App({
     followed.offset === offset
       ? measured
       : layoutTranscript(chat.messages, columns, chatHeight, followed.offset, transcriptOptions);
-  const model = preferModel(sessionModel, daemonModel);
-  // Before any model is chosen the session's name is only a placeholder.
-  const chip = listing?.default === null && model.provider === null ? "no model" : modelChip(model.name, model.profile);
   const cwd = shortCwd(sessionCwd ?? process.cwd(), homedir());
   const versions = versionLabel(GOLEM_VERSION, daemonVersion);
   const phase = meterPhase(chat.busy, assistantChars(chat.messages), chat.approval !== null);
@@ -912,19 +954,48 @@ export function App({
   useEffect(() => {
     return client.onPull((update) => {
       if (update.kind === "progress") {
-        const { ref, progress, status } = update.progress;
+        const { ref, progress, status, completed, total } = update.progress;
         setPulls((current) => ({ ...current, [ref]: { progress: progress ?? null, status } }));
+        const now = Date.now();
+        const listed = listingRef.current?.models.find((model) => model.ref === ref);
+        const before = pullTracks.current.get(ref) ?? (listed === undefined ? { completed: 0, total: null, samples: [] } : startPullTrack(listed, now));
+        const track = trackPull(before, completed ?? null, total ?? null, now);
+        pullTracks.current.set(ref, track);
+        updateSetup((ui) => (ui.model.phase === "downloading" && ui.model.ref === ref ? { ...ui, model: { ...ui.model, pull: track } } : ui));
         if (!pickerRef.current.open) {
-          const percent = progress === null || progress === undefined ? "" : ` ${Math.floor(progress * 100)}%`;
+          const notice = pullBand(listed?.label ?? ref, track);
           setChat((current) =>
             current.notice === null || current.notice.startsWith("downloading ")
-              ? { ...current, notice: `downloading ${ref}${percent}` }
+              ? { ...current, notice }
               : current,
           );
         }
         return;
       }
       const { ref, ok, error } = update.done;
+      pullTracks.current.delete(ref);
+      const ui = setupRef.current;
+      if (ui !== null && ui.model.phase === "downloading" && ui.model.ref === ref && !onPicker(ui)) {
+        // The Model panel waited for this one: use it, and go on to Ready.
+        setPulls((current) => {
+          const next = { ...current };
+          delete next[ref];
+          return next;
+        });
+        if (ok) {
+          setChat(downloadEnded);
+          void client.listModels(false).then((listed) => {
+            listingRef.current = listed;
+            setListing(listed);
+            const model = listed.models.find((each) => each.ref === ref) ?? null;
+            chooseModel(model, ref, true);
+            modelPicked("ollama", model?.label ?? ref);
+          });
+        } else {
+          updateSetup((now) => ({ ...now, model: modelPullFailed(now.model, error ?? "unknown error") }));
+        }
+        return;
+      }
       setPulls((current) => {
         const next = { ...current };
         delete next[ref];
@@ -994,6 +1065,8 @@ export function App({
     setup !== null &&
     (setup.service.phase === "starting" ||
       setup.service.phase === "running" ||
+      (setup.window.view === "panel" && setup.window.panel === "ollama" && ["installing", "starting", "waiting"].includes(setup.ollama.phase)) ||
+      (setup.window.view === "panel" && setup.window.panel === "model" && setup.model.phase === "downloading") ||
       (setup.window.view === "overview" && setup.overview.rows === null));
   useEffect(() => {
     if (!setupTicking) {
@@ -1030,6 +1103,28 @@ export function App({
       failService(error?.reason ?? "it didn't answer in 45 seconds", error?.next ?? "golem daemon logs");
     }
   }, [setupNow]);
+
+  // From the download page, golem goes on by itself once Ollama is on this Mac.
+  const waitingForOllama = setup?.window.view === "panel" && setup.window.panel === "ollama" && setup.ollama.phase === "waiting";
+  useEffect(() => {
+    if (!waitingForOllama) {
+      return;
+    }
+    const timer = setInterval(() => {
+      void client.listModels(true).then(
+        (listed) => {
+          listingRef.current = listed;
+          setListing(listed);
+          const ui = setupRef.current;
+          if (listed.setup.ollama_installed && ui !== null && ui.ollama.phase === "waiting") {
+            startOllamaNow();
+          }
+        },
+        () => undefined,
+      );
+    }, 3_000);
+    return () => clearInterval(timer);
+  }, [waitingForOllama]);
 
   useEffect(() => {
     if (uptimeRefresh === null) {
@@ -1413,6 +1508,9 @@ export function App({
       overview: { selected: 0, rows: null, notice: null },
       quit: null,
       ready: null,
+      ollama: { phase: "missing", selected: 0, note: null },
+      model: START_MODEL_PANEL,
+      scope: { kind: "local" },
     };
   }
 
@@ -1487,27 +1585,174 @@ export function App({
     if (window.panel === "engine") {
       moved.engine = engineSelected(listingRef.current);
     }
+    if (window.panel === "ollama") {
+      const opened = ollamaAtOpen(listingRef.current, Date.now());
+      if (opened === "running") {
+        goSetup(advance(window, { kind: "done" }, ollamaFacts()), moved);
+        return;
+      }
+      moved.ollama = opened;
+      showSetup(moved);
+      if (opened.phase === "starting") {
+        startOllamaNow();
+      }
+      return;
+    }
+    if (window.panel === "model") {
+      moved.scope = modelScope(window);
+      const listing = listingRef.current;
+      const selected = listing === null ? 0 : modelSelected(modelChoices(listing, moved.scope, false));
+      moved.model = { phase: "pick", selected, all: false };
+    }
     showSetup(moved);
     if (PICKER_PANELS.has(window.panel)) {
       openSetupPicker(moved);
     }
   }
 
-  /** The picker in place of the Ollama, Provider, Key, and Model panels. */
+  /** Guided mode offers this Mac's models. Alone it offers every engine's, or names a default that is gone. */
+  function modelScope(window: SetupWindow & { view: "panel" }): ModelScope {
+    if (window.mode === "guided") {
+      return { kind: "local" };
+    }
+    const listing = listingRef.current;
+    if (window.origin === "start" && listing !== null && listing.default !== null && defaultGone(listing)) {
+      return { kind: "gone", name: listing.default };
+    }
+    return { kind: "all", current: currentModelRef() ?? listing?.default ?? null };
+  }
+
+  function updateSetup(change: (ui: SetupUi) => SetupUi): void {
+    const ui = setupRef.current;
+    if (ui !== null) {
+      showSetup(change(ui));
+    }
+  }
+
+  /** Start Ollama, list the models again, and go on to the Model panel. */
+  function startOllamaNow(): void {
+    updateSetup((ui) => ({ ...ui, ollama: { phase: "starting", since: Date.now(), installed: ui.ollama.phase === "starting" && ui.ollama.installed } }));
+    void client
+      .startOllama()
+      .then(async (result) => {
+        if (!result.running) {
+          throw new Error("Ollama didn't start");
+        }
+        const listed = await client.listModels(true);
+        listingRef.current = listed;
+        setListing(listed);
+        setChat((current) => providersUp(current, listed.providers));
+        const ui = setupRef.current;
+        if (ui !== null && ui.window.view === "panel" && ui.window.panel === "ollama") {
+          goSetup(advance(ui.window, { kind: "done" }, { ollamaRunning: true }), ui);
+        }
+      })
+      .catch((error: unknown) => {
+        updateSetup((ui) => ({ ...ui, ollama: { phase: "failed", reason: messageOf(error), selected: 0 } }));
+      });
+  }
+
+  /** The daemon installs Ollama with Homebrew; its output reaches every window. */
+  function installOllamaHere(): void {
+    let last = "";
+    let partial = "";
+    const stop = client.onOllamaInstall((update) => {
+      const event = installEventOf(update);
+      if (event.kind === "output") {
+        const lines = (partial + event.text).split("\n");
+        partial = lines.pop() ?? "";
+        const shown = lines.map((line) => line.split("\r").at(-1)?.trim() ?? "").filter((line) => line.length > 0);
+        last = shown.at(-1) ?? last;
+        updateSetup((ui) => (ui.ollama.phase === "installing" ? { ...ui, ollama: { ...ui.ollama, last } } : ui));
+        return;
+      }
+      stop();
+      const outcome = event.kind === "error" ? "failed" : event.stopped ? "stopped" : event.code === 0 ? "installed" : "failed";
+      const reason = event.kind === "error" ? event.message : last.length > 0 ? last : "brew install ollama failed";
+      updateSetup((ui) => ({ ...ui, ollama: ollamaInstallEnded(ui.ollama, outcome, reason, Date.now()) }));
+      if (outcome === "installed") {
+        startOllamaNow();
+      }
+    });
+    client.installOllama().catch((error: unknown) => {
+      stop();
+      if (error instanceof RpcError && error.code === OLLAMA_FAILED && error.data?.["no_brew"] === true) {
+        updateSetup((ui) => ({ ...ui, ollama: ollamaInstallEnded(ui.ollama, "no_brew", "", Date.now()) }));
+        openDownloadPage();
+        return;
+      }
+      updateSetup((ui) => ({ ...ui, ollama: ollamaInstallEnded(ui.ollama, "failed", messageOf(error), Date.now()) }));
+    });
+  }
+
+  function openDownloadPage(): void {
+    try {
+      spawn("open", [OLLAMA_DOWNLOAD_URL], { stdio: "ignore", detached: true }).unref();
+    } catch {
+      // The panel still names the page.
+    }
+  }
+
+  function onOllamaKey(ui: SetupUi, window: SetupWindow & { view: "panel" }, key: SetupKey): void {
+    if (key !== "up" && key !== "down" && key !== "enter" && key !== "back") {
+      return;
+    }
+    const pressed = pressOllama(ui.ollama, key, Date.now());
+    showSetup({ ...ui, ollama: pressed.state });
+    switch (pressed.effect.kind) {
+      case "install":
+        installOllamaHere();
+        break;
+      case "website":
+        openDownloadPage();
+        break;
+      case "cancel":
+        void client.cancelOllamaInstall().catch(() => undefined);
+        break;
+      case "back":
+        goSetup(advance(window, { kind: "cancelled" }, ollamaFacts()), ui);
+        break;
+      case "none":
+        break;
+    }
+  }
+
+  function onModelKey(ui: SetupUi, window: SetupWindow & { view: "panel" }, key: SetupKey): void {
+    if (key !== "up" && key !== "down" && key !== "enter" && key !== "back") {
+      return;
+    }
+    const pressed = pressModel(withPulls(listingRef.current, pullsRef.current), ui.scope, ui.model, key, Date.now());
+    showSetup({ ...ui, model: pressed.state });
+    const effect = pressed.effect;
+    switch (effect.kind) {
+      case "choose":
+        chooseModel(effect.model, pickerName(effect.model), true);
+        modelPicked(effect.model.provider, effect.model.label);
+        break;
+      case "pull":
+        pullTracks.current.set(effect.model.ref, startPullTrack(effect.model, Date.now()));
+        startPull(effect.model.ref, false, true);
+        break;
+      case "background":
+        if (ui.model.phase === "downloading") {
+          // The download goes on in the band, and the model is used once it is in.
+          useAfterPull.current.set(ui.model.ref, { setDefault: true });
+        }
+        goSetup(advance({ ...window, panel: "model" }, { kind: "background" }, ollamaFacts()), ui);
+        break;
+      case "back":
+        goSetup(advance(window, { kind: "cancelled" }, ollamaFacts()), ui);
+        break;
+      case "none":
+        break;
+    }
+  }
+
+  /** The picker in place of the Provider and Key panels, until 1.9.4. */
   function openSetupPicker(ui: SetupUi): void {
     const current = listingRef.current;
     let opened = openPicker(currentModelRef(), false);
-    if (ui.path === "local" && current !== null) {
-      const model = recommendedLocal(current);
-      if (model !== null && model.status === "ready") {
-        chooseModel(model, pickerName(model), true);
-        modelPicked(model.provider, model.label);
-        return;
-      }
-      const confirm =
-        model === null ? null : confirmFor(providerMissing(current, model.provider) ? "install" : "pull", model, true);
-      opened = openPicker(model?.ref ?? null, true, confirm);
-    } else if (ui.path === "key" && current !== null) {
+    if (ui.path === "key" && current !== null) {
       const hosted =
         current.models.find((model) => model.provider !== "ollama" && model.status === "ready") ??
         current.models.find((model) => model.status === "needs_key");
@@ -1536,9 +1781,7 @@ export function App({
       chooseModel(start.model, pickerName(start.model), true, `Using ${start.model.ref}, the only model ready. /setup to change.`);
       return;
     }
-    if (start.reason !== null) {
-      setChat((current) => ({ ...current, notice: `${start.reason} · pick another` }));
-    }
+    // A default that is gone is named by the Model panel itself (E3).
     goSetup({ kind: "window", window: start.window }, newSetup(start.window, askService(serviceRunner())));
   }
 
@@ -1636,7 +1879,9 @@ export function App({
     const engine = provider === "ollama" ? "Ollama on this Mac" : provider === null ? "" : `${providerName(provider)} with an API key`;
     const ready = { engine, model: `${label} · saved as default` };
     const asModel: SetupWindow = { ...ui.window, panel: "model" };
-    goSetup(advance(asModel, { kind: "done" }, ollamaFacts()), { ...ui, ready });
+    // Back on the overview, it says what changed.
+    const overview = { ...ui.overview, notice: `default is now ${label}` };
+    goSetup(advance(asModel, { kind: "done" }, ollamaFacts()), { ...ui, ready, overview });
   }
 
   /** Read `setup.status` again for the overview and the band. */
@@ -1708,6 +1953,10 @@ export function App({
       onServiceKey(ui, key);
     } else if (ui.window.panel === "engine") {
       onEngineKey(ui, ui.window, key);
+    } else if (ui.window.panel === "ollama") {
+      onOllamaKey(ui, ui.window, key);
+    } else if (ui.window.panel === "model") {
+      onModelKey(ui, ui.window, key);
     } else if (ui.window.panel === "ready" && key === "enter") {
       closeSetup();
     }
@@ -1870,6 +2119,30 @@ export function App({
       }
       case "engine":
         return { lines: engineLines(ui.window.origin, listingRef.current, ui.engine), screen: "engine" };
+      case "ollama":
+        return {
+          lines: ollamaLines(ui.ollama, now),
+          screen:
+            ui.ollama.phase === "installing"
+              ? "ollama-installing"
+              : ui.ollama.phase === "waiting"
+                ? "ollama-waiting"
+                : ui.ollama.phase === "starting"
+                  ? "service-wait"
+                  : "ollama-ask",
+        };
+      case "model":
+        return {
+          lines: modelLines(withPulls(listingRef.current, pullsRef.current), ui.scope, ui.model, now),
+          screen:
+            ui.model.phase === "downloading"
+              ? "model-downloading"
+              : ui.scope.kind === "gone"
+                ? "model-gone"
+                : ui.scope.kind === "local"
+                  ? "model-local"
+                  : "model",
+        };
       case "ready": {
         const runner = serviceRunner();
         const service = runner === "launchd" ? "running, starts at login" : runner === "window" ? "running while this terminal is open" : "running";

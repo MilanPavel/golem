@@ -118,6 +118,10 @@ test("the start opens Service, Engine, the Model alone, the one ready model, or 
   assert.deepEqual(setupAtStart(true, FRESH), { kind: "window", window: guided("engine", "start"), reason: null });
   const gone = setupAtStart(true, { ...WORKING, default: "ollama/old:1b" });
   assert.deepEqual(gone, { kind: "window", window: single("model", "start"), reason: "ollama/old:1b is no longer available" });
+  const deleted = { ...WORKING, models: [model("ollama/qwen3:8b", { source: "profile", status: "not_installed" })] };
+  assert.equal(setupAtStart(true, deleted)?.kind, "window");
+  const stopped = { ...WORKING, models: [model("ollama/qwen3:8b", { status: "server_down" })] };
+  assert.deepEqual(setupAtStart(true, stopped), { kind: "none" });
   const one = setupAtStart(true, { ...WORKING, default: null });
   assert.equal(one?.kind, "auto");
 });

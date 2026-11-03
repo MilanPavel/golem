@@ -39,6 +39,7 @@ export {
 export {
   advance,
   agentInstalled,
+  defaultGone,
   askService,
   elapsed,
   engineChoices,
@@ -97,6 +98,35 @@ export {
   type SetupWindow,
   type StepState,
 } from "./setup-window.ts";
+export {
+  modelBlurb,
+  modelChoices,
+  modelLines,
+  modelPullFailed,
+  modelSelected,
+  OLLAMA_DOWNLOAD_URL,
+  ollamaAtOpen,
+  ollamaInstallEnded,
+  ollamaLines,
+  pressModel,
+  pressOllama,
+  progressBar,
+  pullBand,
+  pullLine,
+  pullSpeed,
+  SHORT_LIST,
+  START_MODEL_PANEL,
+  startPull,
+  trackPull,
+  warmingLine,
+  type ModelChoice,
+  type ModelEffect,
+  type ModelPanelState,
+  type ModelScope,
+  type OllamaEffect,
+  type OllamaState,
+  type PullTrack,
+} from "./setup-local.ts";
 export { golemState, type GolemState, type RunPhase } from "./golem-state.ts";
 export { visibleText } from "./sanitize.ts";
 export { todoLines, todoRows, TODO_ROWS, type TodoItem, type TodoLine, type TodoStatus } from "./todos.ts";

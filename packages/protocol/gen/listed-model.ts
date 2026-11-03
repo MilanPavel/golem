@@ -9,11 +9,13 @@ export type Output = number;
 export type Profiles = string[];
 export type Progress = number | null;
 export type Provider = string;
+export type Recommended = boolean;
 export type Ref = string;
 export type SizeGb = number | null;
 export type Source = 'installed' | 'catalog' | 'remote' | 'profile';
 export type Stale = boolean;
 export type Status = 'ready' | 'needs_key' | 'not_installed' | 'server_down' | 'pulling';
+export type Tags = string[];
 export type Tools = boolean | null;
 
 /**
@@ -24,6 +26,8 @@ export type Tools = boolean | null;
  * list, or ``profile`` when only config names it. ``progress`` is set while
  * it is ``pulling``. ``profiles`` are the profile names that point at it.
  * ``fit`` says whether a local model fits in this machine's memory.
+ * ``tags`` are a catalog model's tags, such as ``coding``, and
+ * ``recommended`` marks the one catalog model golem suggests for this Mac.
  * ``stale`` means a cached list was shown because the provider did not
  * answer in time.
  */
@@ -35,11 +39,13 @@ export interface ListedModel {
   profiles?: Profiles;
   progress?: Progress;
   provider: Provider;
+  recommended?: Recommended;
   ref: Ref;
   size_gb?: SizeGb;
   source: Source;
   stale?: Stale;
   status: Status;
+  tags?: Tags;
   tools?: Tools;
 }
 /**

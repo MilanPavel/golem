@@ -27,15 +27,19 @@ export function firstRunChoice(listing: ModelListResult): { kind: "auto"; model:
 }
 
 /**
- * The local model the card offers: a downloaded one that is ready, else the
- * largest catalog model that fits in a quarter of this Mac's memory, so the
- * first download stays small. Null when none does.
+ * The local model to offer first: a downloaded one that is ready, else the
+ * one the daemon recommends for this Mac's memory. An older daemon marks
+ * none, so then it is the largest catalog model in a quarter of memory.
  */
 export function recommendedLocal(listing: ModelListResult): ListedModel | null {
   const local = listing.models.filter((model) => model.provider === "ollama");
   const ready = local.find((model) => model.status === "ready");
   if (ready !== undefined) {
     return ready;
+  }
+  const marked = local.find((model) => model.recommended === true && model.status !== "pulling");
+  if (marked !== undefined) {
+    return marked;
   }
   const cap = (listing.ram_gb ?? 32) / 4;
   const fitting = local.filter(

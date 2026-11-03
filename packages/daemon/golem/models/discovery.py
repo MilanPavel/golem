@@ -23,6 +23,7 @@ import contextlib
 import json
 import logging
 import re
+import shutil
 import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field, replace
@@ -92,6 +93,8 @@ class ListedModel:
     size_gb: float | None = None
     fit: hardware.Fit | None = None
     stale: bool = False
+    tags: tuple[str, ...] = ()
+    recommended: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -126,6 +129,7 @@ class ModelListing:
     models: list[ListedModel]
     providers: list[ListedProvider]
     setup: ModelSetup
+    disk_free_gb: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -270,6 +274,7 @@ class ModelDiscovery:
             models=models,
             providers=[states[name] for name in sorted(states)],
             setup=setup,
+            disk_free_gb=await asyncio.to_thread(_free_disk_gb),
         )
 
     def _merge(
@@ -295,8 +300,12 @@ class ModelDiscovery:
                     label=labels.get(ref) or found.label or found.model_id,
                     stale=result.stale,
                 )
+        recommended = self._recommended()
         for entry in self._catalog:
             if entry.ref in by_ref:
+                by_ref[entry.ref] = replace(
+                    by_ref[entry.ref], tags=entry.tags, recommended=entry.ref == recommended
+                )
                 continue
             name, _, model_id = entry.ref.partition("/")
             if name not in providers:
@@ -311,6 +320,9 @@ class ModelDiscovery:
                 source="catalog",
                 label=entry.label,
                 status="not_installed" if ready else "server_down",
+            )
+            by_ref[entry.ref] = replace(
+                by_ref[entry.ref], tags=entry.tags, recommended=entry.ref == recommended
             )
         aliases: dict[str, list[str]] = {}
         ctx_overrides: dict[str, int] = {}
@@ -372,6 +384,17 @@ class ModelDiscovery:
             fit=self._fit(found.size_gb, None),
             stale=stale,
         )
+
+    def _recommended(self) -> str | None:
+        """The largest starter this Mac has the memory for; the smallest when memory is unknown."""
+        starters = [entry for entry in self._catalog if "starter" in entry.tags]
+        if self._ram_gb is None:
+            return starters[0].ref if starters else None
+        ram = self._ram_gb
+        fitting = [
+            entry for entry in starters if entry.min_ram_gb is not None and entry.min_ram_gb <= ram
+        ]
+        return max(fitting, key=lambda entry: entry.min_ram_gb or 0).ref if fitting else None
 
     def _fit(self, size_gb: float | None, ctx: int | None) -> hardware.Fit | None:
         if size_gb is None or self._ram_gb is None:
@@ -830,3 +853,11 @@ def _number(value: object) -> float | None:
         except ValueError:
             return None
     return None
+
+
+def _free_disk_gb() -> float | None:
+    """Free space where Ollama keeps its models, under the home folder."""
+    try:
+        return round(shutil.disk_usage(Path.home()).free / 1e9, 1)
+    except OSError:
+        return None

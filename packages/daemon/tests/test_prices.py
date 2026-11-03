@@ -133,3 +133,10 @@ def test_the_local_catalog_is_sorted_by_size_and_names_ollama_refs() -> None:
     assert [entry.size_gb for entry in entries] == sorted(entry.size_gb for entry in entries)
     assert all(entry.ref.startswith("ollama/") for entry in entries)
     assert len({entry.ref for entry in entries}) == len(entries)
+
+
+def test_every_catalog_model_says_how_much_memory_it_needs_and_starters_exist() -> None:
+    entries = load_local_catalog()
+    assert all(entry.min_ram_gb is not None and entry.min_ram_gb >= 8 for entry in entries)
+    starters = [entry for entry in entries if "starter" in entry.tags]
+    assert [entry.min_ram_gb for entry in starters] == [8.0, 16.0]

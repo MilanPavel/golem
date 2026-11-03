@@ -504,6 +504,8 @@ async def _model_list(ctx: RequestContext, params: ModelListParams) -> ModelList
                 size_gb=model.size_gb,
                 fit=model.fit,
                 stale=model.stale,
+                tags=list(model.tags),
+                recommended=model.recommended,
             )
             for model in listing.models
         ],
@@ -511,6 +513,7 @@ async def _model_list(ctx: RequestContext, params: ModelListParams) -> ModelList
             ListedProvider(provider=item.provider, status=item.status, stale=item.stale)
             for item in listing.providers
         ],
+        disk_free_gb=listing.disk_free_gb,
         setup=ModelSetup(
             ollama_installed=listing.setup.ollama_installed,
             ollama_running=listing.setup.ollama_running,
