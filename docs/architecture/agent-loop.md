@@ -185,7 +185,7 @@ There will be two kinds of graph, on purpose. In an **agent** session, the model
 
 ## Read more
 
-- Next: *Talking to models*, what happens inside `call_model` (chapter 2, coming next).
+- Next: [Talking to models](./models.md), what happens inside `call_model`.
 - [The overview](../architecture.md): the whole system on one page.
 - [ReAct: Synergizing Reasoning and Acting in Language Models](https://arxiv.org/abs/2210.03629), the paper behind the plain loop.
 - [LangGraph's docs](https://langchain-ai.github.io/langgraph/), for the graph, checkpoints, and interrupts.

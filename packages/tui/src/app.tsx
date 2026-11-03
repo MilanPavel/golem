@@ -1024,7 +1024,11 @@ export function App({
     }
     if (connection.status === "reconnecting" || connection.status === "closed") {
       startDecided.current = true;
-      showSetup(newSetup(guided("service", "start"), serviceAtStart()));
+      const start = serviceAtStart();
+      showSetup(newSetup(guided("service", "start"), start.state));
+      if (start.reinstall) {
+        installService();
+      }
       return;
     }
     if (connection.status !== "connected" || listing === null || sessionId === null) {
@@ -1523,15 +1527,21 @@ export function App({
 
   /**
    * The Service panel when nothing answers at the start. With no launch agent
-   * it asks. With one, launchd is starting it, or it failed and said why.
+   * it asks. With one that launchd runs, launchd is starting it, or it failed
+   * and said why. With one launchd doesn't run, such as after `brew uninstall`
+   * or `launchctl bootout`, it is installed again: the plist says yes was given.
    */
-  function serviceAtStart(): ServiceState {
+  function serviceAtStart(): { state: ServiceState; reinstall: boolean } {
     if (service?.installed() !== true) {
-      return askService(null);
+      return { state: askService(null), reinstall: false };
     }
     const error = service.startError();
-    const starting: ServiceState = { phase: "starting", how: "install", agent: true, since: Date.now() };
-    return error === null ? starting : serviceFailed(starting, error.reason, error.next);
+    if (error !== null) {
+      const failed: ServiceState = { phase: "starting", how: "install", agent: true, since: Date.now() };
+      return { state: serviceFailed(failed, error.reason, error.next), reinstall: false };
+    }
+    const loaded = service.agentLoaded();
+    return { state: { phase: "starting", how: "install", agent: loaded, since: Date.now() }, reinstall: !loaded };
   }
 
   function ollamaFacts(): { ollamaRunning: boolean } {

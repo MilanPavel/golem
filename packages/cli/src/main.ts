@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
@@ -375,6 +375,7 @@ async function openTui(): Promise<number> {
       service: {
         startError: readStartError,
         installed: () => existsSync(LAUNCH_AGENT),
+        agentLoaded: launchAgentLoaded,
         restart: restartQuietly,
         install: () => daemon("install"),
         uninstall: () => daemon("uninstall"),
@@ -391,6 +392,21 @@ async function openTui(): Promise<number> {
   } finally {
     owned.session?.stop();
   }
+}
+
+/** launchd has the job loaded, and the program its plist names is still there. */
+function launchAgentLoaded(): boolean {
+  if (!existsSync(LAUNCH_AGENT)) {
+    return false;
+  }
+  const program = spawnSync("plutil", ["-extract", "ProgramArguments.0", "raw", "-o", "-", LAUNCH_AGENT], {
+    encoding: "utf8",
+  });
+  if (program.status !== 0 || !existsSync(program.stdout.trim())) {
+    return false;
+  }
+  const job = spawnSync("launchctl", ["print", `gui/${process.getuid?.() ?? 0}/dev.golem.daemon`], { stdio: "ignore" });
+  return job.status === 0;
 }
 
 /** The last `count` lines of a log file, or none when it can't be read. */
