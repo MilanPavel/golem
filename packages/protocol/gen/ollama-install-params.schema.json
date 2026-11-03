@@ -1,0 +1,7 @@
+{
+  "additionalProperties": false,
+  "description": "``ollama.install``. Install Ollama with Homebrew. Output: ``ollama.install.output``.",
+  "properties": {},
+  "title": "OllamaInstallParams",
+  "type": "object"
+}

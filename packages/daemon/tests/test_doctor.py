@@ -170,8 +170,28 @@ def test_an_invalid_config_skips_the_model_checks(tmp_path: Path) -> None:
 def test_no_model_chosen_yet_is_a_warning(tmp_path: Path) -> None:
     checks = _models(tmp_path, "", FakePlatform())
     assert checks == [
-        Check("model", "warn", "no model chosen yet", "open golem and pick one with /model")
+        Check("model", "warn", "no model chosen yet", "golem, then pick one"),
+        Check("ollama", "ok", "running, 1 model downloaded"),
     ]
+    assert [(check.part, check.action) for check in checks] == [
+        ("model", "pick_model"),
+        ("engine", None),
+    ]
+
+
+def test_with_no_model_the_engines_say_what_could_think(tmp_path: Path) -> None:
+    keys = MemoryKeyStore()
+    keys.set("anthropic", "sk-test")
+    platform = FakePlatform(ollama=None, commands=set())
+    checks = _models(tmp_path, "", platform, keys)
+    assert checks[1:] == [
+        Check("ollama", "warn", "Ollama is not installed", "golem, then pick On this Mac"),
+        Check("anthropic", "ok", "API key in the Keychain"),
+    ]
+    assert checks[1].action == "install_ollama"
+    stopped = _models(tmp_path, "", FakePlatform(ollama=None))
+    assert stopped[1] == Check("ollama", "ok", "installed, not running, golem starts it")
+    assert stopped[1].action == "start_ollama"
 
 
 def test_a_default_that_does_not_resolve_fails(tmp_path: Path) -> None:
@@ -181,9 +201,11 @@ def test_a_default_that_does_not_resolve_fails(tmp_path: Path) -> None:
             "model",
             "fail",
             "unknown model provider: nowhere",
-            "pick another with /model, or fix config.toml",
-        )
+            "golem, then pick another with /setup",
+        ),
+        Check("ollama", "ok", "running, 1 model downloaded"),
     ]
+    assert (checks[0].action, checks[0].target) == ("pick_model", "nowhere/x")
 
 
 def test_a_running_ollama_with_the_model_is_ok(tmp_path: Path) -> None:
@@ -223,7 +245,7 @@ def test_a_stopped_ollama_golem_may_not_start_fails_with_a_fix(tmp_path: Path) -
 @pytest.mark.parametrize(
     ("config", "fix"),
     [
-        ("", "pick a local model in /model, and golem installs it, or brew install ollama"),
+        ("", "golem, then /setup installs it, or brew install ollama"),
         ("[ollama]\nstart = false\n", "brew install ollama && brew services start ollama"),
     ],
 )
@@ -260,7 +282,7 @@ def test_a_model_ollama_has_not_downloaded_fails(tmp_path: Path) -> None:
     assert [check.status for check in checks] == ["ok", "ok"]
     checks = _models(tmp_path, config, FakePlatform(ollama=["qwen3:8b"]))
     assert checks[-1] == Check(
-        "model gemma3", "fail", "not downloaded", "ollama pull gemma3, or pick it in /model"
+        "model gemma3", "fail", "not downloaded", "ollama pull gemma3, or pick another in /setup"
     )
 
 
@@ -322,12 +344,16 @@ def test_golem_doctor_prints_the_checks_as_json(
     monkeypatch.setattr("golem.secrets.KeychainSecrets", MemorySecrets)
     assert main(["doctor"]) == 0
     printed = json.loads(capsys.readouterr().out)
-    assert [check["name"] for check in printed] == ["service", "config", "model", "disk"]
+    names = [check["name"] for check in printed]
+    assert names == ["service", "config", "model", "ollama", "disk"]
     assert printed[0] == {
         "name": "service",
         "status": "ok",
         "detail": f"launchd runs {THIS[0]}",
         "fix": None,
+        "part": "service",
+        "action": None,
+        "target": None,
     }
 
 

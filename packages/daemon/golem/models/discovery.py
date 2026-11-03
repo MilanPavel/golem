@@ -69,6 +69,14 @@ _NOT_CHAT = (
 _SOURCE_ORDER: dict[Source, int] = {"installed": 0, "catalog": 1, "remote": 2, "profile": 3}
 
 
+class KeyRejected(Exception):
+    """The provider said no to the key. The message names the provider and its reason."""
+
+
+class KeyUnchecked(Exception):
+    """The key could not be tried: the provider did not answer, or answered with something else."""
+
+
 @dataclass(frozen=True, slots=True)
 class ListedModel:
     ref: str
@@ -471,6 +479,32 @@ class ModelDiscovery:
             return _ProviderResult(found=cached.models, stale=True)
         return _ProviderResult(found=fresh.models)
 
+    async def check_key(self, name: str, key: str) -> int:
+        """How many models ``key`` opens at provider ``name``, by listing them with it.
+
+        Raises :class:`KeyRejected` when the provider refuses the key, and
+        :class:`KeyUnchecked` when it can't be asked. A good key's list is
+        kept, so the next ``model.list`` shows its models at once.
+        """
+        provider = self._router.provider(name)
+        if provider is None or provider.kind == "ollama":
+            raise KeyUnchecked(f"{name} takes no key")
+        client = self._http()
+        try:
+            if _is_openrouter(provider):
+                # OpenRouter lists its models to anyone, so ask about the key itself.
+                await _openrouter_key(client, provider, key)
+            remote = await self._fetch_remote(name, provider, key)
+        except httpx.HTTPStatusError as exc:
+            reason = _http_reason(exc.response)
+            if exc.response.status_code in (401, 403):
+                raise KeyRejected(f"{name} rejected the key ({reason})") from exc
+            raise KeyUnchecked(f"{name} answered {reason}") from exc
+        except (httpx.HTTPError, ValueError) as exc:
+            raise KeyUnchecked(f"could not reach {name}: {exc or type(exc).__name__}") from exc
+        self._remote[name] = remote
+        return len(remote.models)
+
     def _fetched(self, name: str, task: asyncio.Task[_Remote]) -> None:
         if self._fetching.get(name) is task:
             del self._fetching[name]
@@ -622,6 +656,40 @@ async def _compatible_models(
             )
         )
     return found
+
+
+def _is_openrouter(provider: Provider) -> bool:
+    return provider.base_url is not None and "openrouter.ai" in provider.base_url
+
+
+async def _openrouter_key(client: httpx.AsyncClient, provider: Provider, key: str) -> None:
+    assert provider.base_url is not None
+    response = await client.get(
+        f"{provider.base_url.rstrip('/')}/key",
+        headers={"authorization": f"Bearer {key}"},
+        timeout=_REMOTE_TIMEOUT,
+    )
+    response.raise_for_status()
+
+
+def _http_reason(response: httpx.Response) -> str:
+    """``401 · invalid x-api-key``: the status and the provider's own message, when it sent one."""
+    message: object = None
+    try:
+        body: object = response.json()
+    except ValueError:
+        body = None
+    error = _dict(body).get("error")
+    if isinstance(error, dict):
+        message = cast(dict[str, object], error).get("message")
+    elif isinstance(error, str):
+        message = error
+    if not isinstance(message, str) or not message.strip():
+        message = _dict(body).get("message")
+    if isinstance(message, str) and message.strip():
+        first = message.strip().splitlines()[0]
+        return f"{response.status_code} · {first[:120]}"
+    return f"{response.status_code} · {response.reason_phrase or 'no reason given'}"
 
 
 def _per_token_price(raw: object) -> ModelPrice | None:

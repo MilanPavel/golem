@@ -1,0 +1,15 @@
+{
+  "additionalProperties": false,
+  "description": "Output from ``brew install ollama`` as it came, carriage returns included.",
+  "properties": {
+    "text": {
+      "title": "Text",
+      "type": "string"
+    }
+  },
+  "required": [
+    "text"
+  ],
+  "title": "OllamaInstallOutput",
+  "type": "object"
+}

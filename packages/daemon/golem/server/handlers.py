@@ -15,11 +15,15 @@ from pydantic import BaseModel, ConfigDict
 from golem import __version__
 from golem.config import load_settings
 from golem.config_edit import McpTableError, RuleIndexError, set_default_model, set_mcp_enabled
+from golem.doctor import MacPlatform, run_checks
 from golem.mcp import McpServerError, McpSupervisor
 from golem.models import ollama
-from golem.models.keys import KeyStore, KeyStoreError
+from golem.models.discovery import KeyRejected, KeyUnchecked
+from golem.models.errors import ModelUnreachable
+from golem.models.install import InstallError, OllamaInstaller
+from golem.models.keys import KeyStore, KeyStoreError, MemoryKeyStore
 from golem.models.pulls import PullError, PullManager
-from golem.models.router import ModelConfigError, ModelRouter
+from golem.models.router import OLLAMA_BASE_URL, ModelConfigError, ModelRouter
 from golem.permissions.policy import PROJECT_POLICY
 from golem.secrets import SecretStore, SecretStoreError, check_name
 from golem.server.dispatcher import (
@@ -28,10 +32,13 @@ from golem.server.dispatcher import (
     INTERNAL_ERROR,
     INVALID_PARAMS,
     INVALID_TOOL_ARGS,
+    KEY_REJECTED,
+    KEY_UNCHECKED,
     KEYCHAIN_UNAVAILABLE,
     MESSAGE_NOT_FOUND,
     MODEL_NOT_CONFIGURED,
     MODEL_PULL_FAILED,
+    OLLAMA_FAILED,
     PROTOCOL_MISMATCH,
     RUN_NOT_FOUND,
     SESSION_BUSY,
@@ -106,6 +113,12 @@ from golem_protocol.commands import (
     ModelSetDefaultParams,
     ModelSetDefaultResult,
     ModelSetup,
+    OllamaInstallCancelParams,
+    OllamaInstallCancelResult,
+    OllamaInstallParams,
+    OllamaInstallResult,
+    OllamaStartParams,
+    OllamaStartResult,
     PingParams,
     PolicyEditResult,
     PolicyRemoveParams,
@@ -134,6 +147,9 @@ from golem_protocol.commands import (
     SessionSetModelResult,
     SessionSetSkillsParams,
     SessionSetSkillsResult,
+    SetupRow,
+    SetupStatusParams,
+    SetupStatusResult,
     SkillListParams,
     SkillListResult,
 )
@@ -383,12 +399,21 @@ async def _auth_set(ctx: RequestContext, params: AuthSetParams) -> AuthSetResult
         return AuthSetResult(provider=params.provider)
     router = _sessions(ctx).router
     store = _key_store(router, params.provider)
+    models: int | None = None
+    if params.check and ctx.state.models is not None:
+        # Tried first, so a key the provider refuses never replaces a working one.
+        try:
+            models = await ctx.state.models.check_key(params.provider, key)
+        except KeyRejected as exc:
+            raise RpcCallError(KEY_REJECTED, str(exc)) from exc
+        except KeyUnchecked as exc:
+            raise RpcCallError(KEY_UNCHECKED, str(exc)) from exc
     try:
         await asyncio.to_thread(store.set, params.provider, key)
     except KeyStoreError as exc:
         raise RpcCallError(KEYCHAIN_UNAVAILABLE, str(exc)) from exc
-    log.info("stored key provider=%s", params.provider)
-    return AuthSetResult(provider=params.provider)
+    log.info("stored key provider=%s checked=%s", params.provider, models is not None)
+    return AuthSetResult(provider=params.provider, models=models)
 
 
 async def _auth_remove(ctx: RequestContext, params: AuthRemoveParams) -> AuthRemoveResult:
@@ -779,6 +804,68 @@ async def _model_delete(ctx: RequestContext, params: ModelDeleteParams) -> Model
     return ModelDeleteResult(ref=ref, deleted=deleted)
 
 
+async def _setup_status(ctx: RequestContext, _params: SetupStatusParams) -> SetupStatusResult:
+    keys = _sessions(ctx).router.keys or MemoryKeyStore()
+    secrets = ctx.state.secrets
+    checks = await asyncio.to_thread(
+        run_checks,
+        ctx.state.paths,
+        MacPlatform(),
+        keys,
+        (lambda _name: None) if secrets is None else secrets.get,
+    )
+    return SetupStatusResult(
+        rows=[
+            SetupRow(
+                part=check.part,
+                name=check.name,
+                state=check.status,
+                detail=check.detail,
+                fix=check.fix,
+                action=check.action,
+                target=check.target,
+            )
+            for check in checks
+        ]
+    )
+
+
+def _installer(ctx: RequestContext) -> OllamaInstaller:
+    installer = ctx.state.installer
+    if installer is None:
+        raise RpcCallError(INTERNAL_ERROR, "the installer is not ready")
+    return installer
+
+
+async def _ollama_install(ctx: RequestContext, _params: OllamaInstallParams) -> OllamaInstallResult:
+    try:
+        started = await _installer(ctx).start()
+    except InstallError as exc:
+        raise RpcCallError(OLLAMA_FAILED, str(exc), {"no_brew": exc.no_brew}) from exc
+    return OllamaInstallResult(started=started)
+
+
+async def _ollama_install_cancel(
+    ctx: RequestContext, _params: OllamaInstallCancelParams
+) -> OllamaInstallCancelResult:
+    return OllamaInstallCancelResult(cancelled=await _installer(ctx).cancel())
+
+
+async def _ollama_start(ctx: RequestContext, _params: OllamaStartParams) -> OllamaStartResult:
+    local = ctx.state.local_servers
+    provider = _sessions(ctx).router.provider("ollama")
+    if local is None or provider is None or provider.kind != "ollama":
+        raise RpcCallError(INVALID_PARAMS, "no local Ollama is set up")
+    server = local.get("ollama", provider.base_url or OLLAMA_BASE_URL)
+    if server is None:
+        raise RpcCallError(INVALID_PARAMS, "Ollama is not on this machine")
+    try:
+        running = await server.ensure_running()
+    except ModelUnreachable as exc:
+        raise RpcCallError(OLLAMA_FAILED, str(exc)) from exc
+    return OllamaStartResult(running=running)
+
+
 def _key_store(router: ModelRouter, provider_name: str) -> KeyStore:
     provider = router.provider(provider_name)
     if provider is None:
@@ -844,6 +931,12 @@ def standard_methods() -> dict[str, Method]:
         "model.set_default": Method(
             "model.set_default", ModelSetDefaultParams, True, _model_set_default
         ),
+        "setup.status": Method("setup.status", SetupStatusParams, True, _setup_status),
+        "ollama.install": Method("ollama.install", OllamaInstallParams, True, _ollama_install),
+        "ollama.install_cancel": Method(
+            "ollama.install_cancel", OllamaInstallCancelParams, True, _ollama_install_cancel
+        ),
+        "ollama.start": Method("ollama.start", OllamaStartParams, True, _ollama_start),
         "session.set_model": Method(
             "session.set_model", SessionSetModelParams, True, _session_set_model
         ),

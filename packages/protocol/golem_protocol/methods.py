@@ -51,6 +51,10 @@ METHOD_ACCESS: Final[Mapping[str, Access]] = {
     "model.delete": "browser",
     "model.set_default": "browser",
     "session.set_model": "browser",
+    "setup.status": "browser",
+    "ollama.install": "browser",
+    "ollama.install_cancel": "browser",
+    "ollama.start": "browser",
 }
 
 BROWSER_METHODS: Final[frozenset[str]] = frozenset(

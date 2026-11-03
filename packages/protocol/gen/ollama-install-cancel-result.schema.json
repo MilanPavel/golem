@@ -1,0 +1,15 @@
+{
+  "additionalProperties": false,
+  "description": "``cancelled`` is false when no install was running.",
+  "properties": {
+    "cancelled": {
+      "title": "Cancelled",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "cancelled"
+  ],
+  "title": "OllamaInstallCancelResult",
+  "type": "object"
+}

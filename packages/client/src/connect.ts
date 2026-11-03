@@ -3,6 +3,11 @@ import type { Dial, Link } from "./link.ts";
 import type { AuthListResult } from "../../protocol/gen/auth-list-result.ts";
 import type { AuthRemoveResult } from "../../protocol/gen/auth-remove-result.ts";
 import type { AuthSetResult } from "../../protocol/gen/auth-set-result.ts";
+import type { OllamaInstallCancelResult } from "../../protocol/gen/ollama-install-cancel-result.ts";
+import type { OllamaInstallDone } from "../../protocol/gen/ollama-install-done.ts";
+import type { OllamaInstallResult } from "../../protocol/gen/ollama-install-result.ts";
+import type { OllamaStartResult } from "../../protocol/gen/ollama-start-result.ts";
+import type { SetupStatusResult } from "../../protocol/gen/setup-status-result.ts";
 import type { ApprovalRespondResult } from "../../protocol/gen/approval-respond-result.ts";
 import type { ArtifactReadResult } from "../../protocol/gen/artifact-read-result.ts";
 import type { ConfigGetResult } from "../../protocol/gen/config-get-result.ts";
@@ -48,6 +53,8 @@ import {
   isAuthListResult,
   isAuthRemoveResult,
   isAuthSetResult,
+  isOllamaInstallDone,
+  isSetupStatusResult,
   isDaemonStatus,
   isHelloResult,
   isMcpListResult,
@@ -93,6 +100,12 @@ export const APPROVAL_NOT_FOUND = -32010;
 export const INVALID_TOOL_ARGS = -32011;
 export const ARTIFACT_NOT_FOUND = -32012;
 export const SKILL_NOT_FOUND = -32013;
+/** The provider refused the key, and it was not stored. */
+export const KEY_REJECTED = -32014;
+/** The key could not be tried (no network, or an odd answer), and it was not stored. */
+export const KEY_UNCHECKED = -32015;
+/** Installing or starting Ollama failed. `data.no_brew` means Homebrew is missing. */
+export const OLLAMA_FAILED = -32016;
 
 export type { ChatEvent, SessionSummary };
 /** The web gateway closes a link with this code when its token is missing or wrong. Retrying cannot help. */
@@ -106,10 +119,14 @@ const DEFAULT_CONNECT_TIMEOUT_MS = 2_000;
 export class RpcError extends Error {
   readonly code: number;
 
-  constructor(code: number, message: string) {
+  /** The error's `data`, when the daemon sent an object. */
+  readonly data: Record<string, unknown> | null;
+
+  constructor(code: number, message: string, data: Record<string, unknown> | null = null) {
     super(message);
     this.name = "RpcError";
     this.code = code;
+    this.data = data;
   }
 }
 
@@ -177,7 +194,12 @@ export interface GolemClient {
   cancelRun(runId: string): Promise<RunCancelResult>;
   inspectSession(sessionId: string): Promise<SessionInspectResult>;
   /** Store a provider's API key in the daemon's credential store. The wire view shows it redacted. */
-  setKey(provider: string, key: string): Promise<AuthSetResult>;
+  /**
+   * Store an API key. With `check` (the default), the daemon tries it against
+   * the provider first and rejects it with {@link KEY_REJECTED} or
+   * {@link KEY_UNCHECKED}; `models` is then how many models it opens.
+   */
+  setKey(provider: string, key: string, options?: { check?: boolean }): Promise<AuthSetResult>;
   removeKey(provider: string): Promise<AuthRemoveResult>;
   listKeys(): Promise<AuthListResult>;
   /** Resolved settings, and the tool rules for `cwd` in the order they are checked. */
@@ -237,6 +259,15 @@ export interface GolemClient {
   onMcpStatus(listener: (server: McpServer) => void): () => void;
   /** `model.server.status`: a local model server such as Ollama started, failed, or stopped. */
   onModelServer(listener: (status: ModelServerStatus) => void): () => void;
+  /** Every part of golem's setup, as `golem doctor` checks it. */
+  setupStatus(): Promise<SetupStatusResult>;
+  /** Install Ollama with Homebrew, run by the daemon. Output reaches {@link GolemClient.onOllamaInstall}. */
+  installOllama(): Promise<OllamaInstallResult>;
+  cancelOllamaInstall(): Promise<OllamaInstallCancelResult>;
+  /** Start the local Ollama now. `running` is false when golem may not start it. */
+  startOllama(): Promise<OllamaStartResult>;
+  /** `ollama.install.output` and `ollama.install.done`, from any client's install. */
+  onOllamaInstall(listener: (update: OllamaInstallUpdate) => void): () => void;
   /**
    * The skills a session in `cwd` sees, highest source first, with the ones
    * that lost their name or are broken. Without `cwd`, only the user's.
@@ -251,6 +282,10 @@ export interface GolemClient {
   checkNow(): void;
   close(): void;
 }
+
+export type OllamaInstallUpdate =
+  | { kind: "output"; text: string }
+  | { kind: "done"; done: OllamaInstallDone };
 
 export type PullUpdate =
   | { kind: "progress"; progress: ModelPullProgress }
@@ -289,6 +324,7 @@ export function connectGolem(options: ConnectOptions): GolemClient {
   const mcpListeners = new Set<(server: McpServer) => void>();
   const skillListeners = new Set<(root: string | null) => void>();
   const serverListeners = new Set<(status: ModelServerStatus) => void>();
+  const installListeners = new Set<(update: OllamaInstallUpdate) => void>();
   const pending = new Map<number, Pending>();
   const attachments = new Attachments();
   let watching = false;
@@ -462,6 +498,29 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       }
       return;
     }
+    if (
+      isRecord(message) &&
+      (message["method"] === "ollama.install.output" || message["method"] === "ollama.install.done")
+    ) {
+      const params = message["params"];
+      record({ direction: "in", kind: message["method"], detail: "", json: line });
+      let update: OllamaInstallUpdate | undefined;
+      if (message["method"] === "ollama.install.output" && isRecord(params) && typeof params["text"] === "string") {
+        update = { kind: "output", text: params["text"] };
+      } else if (message["method"] === "ollama.install.done" && isOllamaInstallDone(params)) {
+        update = { kind: "done", done: params };
+      }
+      if (update !== undefined) {
+        for (const listener of installListeners) {
+          try {
+            listener(update);
+          } catch {
+            // A listener must not tear the socket down.
+          }
+        }
+      }
+      return;
+    }
     if (isRecord(message) && message["method"] === "model.server.status") {
       const params = message["params"];
       const detail = isModelServerStatus(params) ? `${params.provider} ${params.state}` : "";
@@ -519,7 +578,8 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       });
       const code = typeof errorBody["code"] === "number" ? errorBody["code"] : -1;
       const text = typeof errorBody["message"] === "string" ? errorBody["message"] : "rpc error";
-      const error = new RpcError(code, text);
+      const data = isRecord(errorBody["data"]) ? errorBody["data"] : null;
+      const error = new RpcError(code, text, data);
       if (code === PROTOCOL_MISMATCH) {
         rejected = true;
         setState({ status: "rejected", reason: text });
@@ -864,9 +924,10 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       }
       return result;
     },
-    async setKey(provider: string, key: string): Promise<AuthSetResult> {
+    async setKey(provider: string, key: string, options: { check?: boolean } = {}): Promise<AuthSetResult> {
       await ready;
-      const result = await call("auth.set", { provider, key });
+      const params = options.check === false ? { provider, key, check: false } : { provider, key };
+      const result = await call("auth.set", params);
       if (!isAuthSetResult(result)) {
         throw new Error("invalid auth.set result");
       }
@@ -1058,6 +1119,44 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       serverListeners.add(listener);
       return () => {
         serverListeners.delete(listener);
+      };
+    },
+    async setupStatus(): Promise<SetupStatusResult> {
+      await ready;
+      const result = await call("setup.status", {});
+      if (!isSetupStatusResult(result)) {
+        throw new Error("invalid setup.status result");
+      }
+      return result;
+    },
+    async installOllama(): Promise<OllamaInstallResult> {
+      await ready;
+      const result = await call("ollama.install", {});
+      if (!isRecord(result) || typeof result["started"] !== "boolean") {
+        throw new Error("invalid ollama.install result");
+      }
+      return { started: result["started"] };
+    },
+    async cancelOllamaInstall(): Promise<OllamaInstallCancelResult> {
+      await ready;
+      const result = await call("ollama.install_cancel", {});
+      if (!isRecord(result) || typeof result["cancelled"] !== "boolean") {
+        throw new Error("invalid ollama.install_cancel result");
+      }
+      return { cancelled: result["cancelled"] };
+    },
+    async startOllama(): Promise<OllamaStartResult> {
+      await ready;
+      const result = await call("ollama.start", {});
+      if (!isRecord(result) || typeof result["running"] !== "boolean") {
+        throw new Error("invalid ollama.start result");
+      }
+      return { running: result["running"] };
+    },
+    onOllamaInstall(listener: (update: OllamaInstallUpdate) => void): () => void {
+      installListeners.add(listener);
+      return () => {
+        installListeners.delete(listener);
       };
     },
     async listSkills(cwd?: string): Promise<SkillListResult> {

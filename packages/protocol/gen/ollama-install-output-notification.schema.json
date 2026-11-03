@@ -1,0 +1,43 @@
+{
+  "$defs": {
+    "OllamaInstallOutput": {
+      "additionalProperties": false,
+      "description": "Output from ``brew install ollama`` as it came, carriage returns included.",
+      "properties": {
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "title": "OllamaInstallOutput",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Server → every connection: output from a running Ollama install. Not stored.",
+  "properties": {
+    "jsonrpc": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Jsonrpc",
+      "type": "string"
+    },
+    "method": {
+      "const": "ollama.install.output",
+      "default": "ollama.install.output",
+      "title": "Method",
+      "type": "string"
+    },
+    "params": {
+      "$ref": "#/$defs/OllamaInstallOutput"
+    }
+  },
+  "required": [
+    "params"
+  ],
+  "title": "OllamaInstallOutputNotification",
+  "type": "object"
+}

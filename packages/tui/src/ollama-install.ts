@@ -1,16 +1,12 @@
-import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
-import { delimiter, join } from "node:path";
-
+import type { OllamaInstallUpdate } from "@golem/client";
 import { visibleText } from "@golem/view";
 
 /**
- * Installing Ollama with Homebrew. The TUI runs `brew`, not the daemon: the
- * daemon runs under launchd with no `PATH` of the user's and no terminal.
+ * The band while Ollama installs. The daemon runs `brew install ollama`
+ * (ADR-035), so every client sees the same install; this file turns its
+ * output into the band's lines.
  */
 
-/** Where Homebrew puts `brew` on Apple silicon and on Intel Macs. */
-export const BREW_PATHS = ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"] as const;
 export const OLLAMA_DOWNLOAD = "https://ollama.com/download";
 /** Output lines kept for the band. Older ones are dropped. */
 export const INSTALL_KEPT_LINES = 200;
@@ -30,16 +26,6 @@ export type InstallEvent =
   | { kind: "error"; message: string };
 
 export type BandLine = { text: string; tone: "title" | "output" | "ok" | "error" | "hint" };
-
-/** `brew` on `PATH`, then at the Homebrew install paths, or null. */
-export function findBrew(path: string | undefined, exists: (file: string) => boolean = existsSync): string | null {
-  for (const dir of (path ?? "").split(delimiter)) {
-    if (dir.length > 0 && exists(join(dir, "brew"))) {
-      return join(dir, "brew");
-    }
-  }
-  return BREW_PATHS.find((file) => exists(file)) ?? null;
-}
 
 export const startedInstall: InstallState = { phase: "running", lines: [], partial: "" };
 
@@ -122,59 +108,19 @@ export function installLines(state: InstallState, columns: number, rows: number)
   return lines.slice(0, rows).map((line) => ({ ...line, text: fit(line.text, width) }));
 }
 
-/** The parts of a child process the install uses, so tests can pass a fake. */
-export type InstallProcess = {
-  stdout: NodeJS.ReadableStream | null;
-  stderr: NodeJS.ReadableStream | null;
-  on(event: "close", listener: (code: number | null) => void): unknown;
-  on(event: "error", listener: (error: Error) => void): unknown;
-  kill(signal?: NodeJS.Signals): boolean;
-};
-
-export type Spawn = (command: string, args: string[], env: NodeJS.ProcessEnv) => InstallProcess;
-
-const spawnBrew: Spawn = (command, args, env) => spawn(command, args, { env, stdio: ["ignore", "pipe", "pipe"] });
-
-/** Runs `brew install ollama` and reports each event. `stop` ends it. */
-export function runInstall(
-  brew: string,
-  onEvent: (event: InstallEvent) => void,
-  options: { env?: NodeJS.ProcessEnv; spawn?: Spawn } = {},
-): { stop: () => void } {
-  // No hints about Homebrew's own settings, which would only crowd the band.
-  const env = { ...(options.env ?? process.env), HOMEBREW_NO_ENV_HINTS: "1" };
-  let ended = false;
-  let stopped = false;
-  const end = (event: InstallEvent): void => {
-    if (!ended) {
-      ended = true;
-      onEvent(event);
-    }
-  };
-  let child: InstallProcess;
-  try {
-    child = (options.spawn ?? spawnBrew)(brew, ["install", "ollama"], env);
-  } catch (error) {
-    end({ kind: "error", message: error instanceof Error ? error.message : String(error) });
-    return { stop: () => undefined };
+/** One update from the daemon's install, as the band's reducer reads it. */
+export function installEventOf(update: OllamaInstallUpdate): InstallEvent {
+  if (update.kind === "output") {
+    return { kind: "output", text: update.text };
   }
-  const output = (chunk: Buffer | string): void => {
-    if (!ended) {
-      onEvent({ kind: "output", text: typeof chunk === "string" ? chunk : chunk.toString("utf8") });
-    }
-  };
-  child.stdout?.on("data", output);
-  child.stderr?.on("data", output);
-  child.on("error", (error) => end({ kind: "error", message: error.message }));
-  child.on("close", (code) => end({ kind: "exit", code, stopped }));
-  return {
-    stop: () => {
-      if (!ended && !stopped) {
-        stopped = true;
-        child.kill("SIGTERM");
-      }
-    },
-  };
+  switch (update.done.outcome) {
+    case "installed":
+      return { kind: "exit", code: 0, stopped: false };
+    case "stopped":
+      return { kind: "exit", code: null, stopped: true };
+    case "failed":
+      return { kind: "error", message: update.done.reason ?? "brew install ollama failed" };
+  }
 }
 
 function withPartial(state: { lines: string[]; partial: string }): string[] {
