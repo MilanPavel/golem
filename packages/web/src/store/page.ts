@@ -1,4 +1,4 @@
-import type { GolemClient } from "@golem/client";
+import type { ApprovalChoice, GolemClient } from "@golem/client";
 import type { QueryClient } from "@tanstack/react-query";
 import { createDrafts, type Drafts } from "./drafts.ts";
 import { createConnectionStore, type ConnectionStore } from "./connection.ts";
@@ -27,6 +27,7 @@ export type PageClient = Pick<
   | "createSession"
   | "sendMessage"
   | "cancelRun"
+  | "respondApproval"
   | "checkNow"
   | "close"
 >;
@@ -36,6 +37,7 @@ export type PageActions = {
   createSession(cwd: string | null): Promise<string>;
   send(sessionId: string, text: string): Promise<void>;
   cancel(runId: string): Promise<void>;
+  respond(sessionId: string, callId: string, decision: ApprovalChoice): Promise<void>;
 };
 
 export type Page = {
@@ -97,6 +99,9 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       },
       async cancel(runId) {
         await client.cancelRun(runId);
+      },
+      async respond(sessionId, callId, decision) {
+        await client.respondApproval(sessionId, callId, decision);
       },
     },
     acquire(id) {

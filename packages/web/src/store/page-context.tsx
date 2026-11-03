@@ -108,3 +108,9 @@ export function useDraftPastes(key: string): [Pastes, (pastes: Pastes) => void] 
   const set = useCallback((next: Pastes) => drafts.setPastes(key, next), [drafts, key]);
   return [pastes, set];
 }
+
+/** Reads a session's draft text when called, without re-rendering when it changes. */
+export function useDraftReader(key: string): () => string {
+  const { drafts } = usePage();
+  return useCallback(() => drafts.get(key).text, [drafts, key]);
+}

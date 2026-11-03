@@ -50,3 +50,8 @@ test("an icon button requires a label", () => {
   const bad = <IconButton><PlusIcon /></IconButton>;
   expect(bad).toBeTruthy();
 });
+
+test("the ink kind is the dark button", () => {
+  render(<Button kind="ink">Allow once</Button>);
+  expect(screen.getByRole("button").className).toContain("bg-ink");
+});
