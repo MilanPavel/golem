@@ -25,6 +25,7 @@ import {
   setupBand,
   shortStepper,
   single,
+  INSTALL_TIMEOUT_MS,
   SLOW_START_MS,
   START_TIMEOUT_MS,
   stepper,
@@ -160,6 +161,18 @@ test("the Service question installs or runs for this terminal, and each sub-step
   assert.deepEqual(serviceAnswered(starting, 9_000), { phase: "running", since: 9_000 });
   const session = pressService(pressService(ask, "down", 0).state, "enter", 0);
   assert.deepEqual(session.effect, { kind: "session" });
+});
+
+test("the install waits longer than the start, explains the wait, and still starts the service after a give-up", () => {
+  const installing: ServiceState = { phase: "starting", how: "install", agent: false, since: 0 };
+  assert.ok(serviceLines(installing, SLOW_START_MS).some((line) => line.kind === "text" && line.text.includes("macOS checks")));
+  assert.ok(!serviceTimedOut(installing, START_TIMEOUT_MS));
+  assert.ok(!serviceTimedOut(installing, INSTALL_TIMEOUT_MS - 1));
+  assert.ok(serviceTimedOut(installing, INSTALL_TIMEOUT_MS));
+  const gaveUp = serviceFailed(installing, "it didn't answer", "golem daemon logs");
+  assert.deepEqual(agentInstalled(gaveUp, 5), { phase: "starting", how: "install", agent: true, since: 5 });
+  const session = serviceFailed({ phase: "starting", how: "session", agent: false, since: 0 }, "x", "y");
+  assert.deepEqual(agentInstalled(session, 5), session);
 });
 
 test("a failed start offers retry, the log, and quit with the next command", () => {
