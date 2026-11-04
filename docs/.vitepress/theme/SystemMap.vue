@@ -52,12 +52,12 @@ const parts: Part[] = [
   {
     id: "socket", x: 232, y: 76, w: 80, h: 230, title: "socket", sub: "golem.sock",
     about: "A Unix socket at `~/.golem/run/golem.sock`, mode `0600`: only your user can open it, and that is the login. Each line is one JSON-RPC 2.0 object. No network port is opened.",
-    code: "golem/server/", link: "/architecture#the-daemon", chapter: "The daemon",
+    code: "golem/server/", link: "/architecture/daemon", chapter: "The daemon",
   },
   {
     id: "server", x: 346, y: 76, w: 298, h: 44, title: "Protocol server", sub: "one JSON line, one command",
     about: "Reads one line at a time, checks it against the protocol models, runs the command, and queues the reply and the events of attached sessions for that connection.",
-    code: "golem/server/handlers.py", link: "/architecture#the-protocol", chapter: "The protocol",
+    code: "golem/server/handlers.py", link: "/architecture/protocol", chapter: "The protocol",
   },
   {
     id: "sessions", x: 346, y: 136, w: 298, h: 44, title: "Sessions", sub: "runs, the event log, fan-out",
@@ -161,12 +161,12 @@ const steps: Step[] = [
   {
     title: "You press Enter",
     text: "The TUI sends one JSON line over the socket: `message.send`, with the session id and your text.",
-    lit: ["tui", "socket"], path: ["tui", "socket"], link: "/architecture#the-protocol", chapter: "The protocol",
+    lit: ["tui", "socket"], path: ["tui", "socket"], link: "/architecture/protocol", chapter: "The protocol",
   },
   {
     title: "The daemon takes it",
     text: "The protocol server reads the line, checks it against the protocol models, and replies with a `run_id`. The work goes on without the client.",
-    lit: ["socket", "server"], path: ["socket", "server"], link: "/architecture#the-daemon", chapter: "The daemon",
+    lit: ["socket", "server"], path: ["socket", "server"], link: "/architecture/daemon", chapter: "The daemon",
   },
   {
     title: "A run starts, and is written down",

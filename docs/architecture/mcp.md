@@ -1,7 +1,7 @@
 ---
 title: MCP
 description: What the Model Context Protocol is, why agents share one way to reach outside tools, and how golem runs MCP servers, scopes their tools, and asks before every call.
-order: 8
+order: 11
 adrs: [23]
 ---
 
@@ -264,7 +264,7 @@ golem's client follows one protocol version. A server that answers with another 
 
 ## Read more
 
-- Next: [Sessions that survive](./sessions.md): the event log, checkpoints, cancel, crash recovery, and fork.
+- Next: *The screens*: the TUI and the web UI, drawn from the events (chapter 12, coming next).
 - Before: [Skills](./skills.md).
 - [MCP servers](../guide/mcp.md), the user's guide: adding servers, tokens, and every setting.
 - [The MCP specification](https://modelcontextprotocol.io/specification).

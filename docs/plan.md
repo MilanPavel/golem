@@ -15,6 +15,7 @@ This file is about what comes next. How the existing pieces are built is in [arc
 | 1. First run, continued | `brew install` to a first answer, in the terminal and the browser | M3 — Smooth first run |
 | 2. Skills | Claude Code compatible `SKILL.md` skills | M4 — Skilled |
 | 10. Web UI | The chat in your browser, served by `golem web` | M7 — In the browser |
+| 12. Models | Curated local and hosted lists by category, six providers, local models you can tune and learn from | M8 — Models |
 | 3. Flows | Durable workflows written in Python, resumable after a crash | M5 — Works alone |
 | 4. Triggers | Schedules, file watchers, and notifications | M5 — Works alone |
 | 5. Memory | Long-term memory that you can see and edit | M6 — Remembers |
@@ -24,11 +25,11 @@ This file is about what comes next. How the existing pieces are built is in [arc
 | 9. Model routing and long sessions | Token and cost display, a cheap profile for small jobs, budgets, escalation, compaction | Later |
 | 11. Docs (parallel track) | A docs site in golem's look, a short README, and "How golem works" | Any time |
 
-What is built is in [architecture.md](architecture.md) and the ADRs, and how to install, run, and release it is in [sre.md](sre.md). Steps 1.1 to 1.6 of Phase 1, the first run and the terminal UX, are built ([#62](https://github.com/MilanPavel/golem/issues/62)). Steps 1.7 to 1.14 finish the first run from `brew install`, so they come first, then skills, then the web UI. Phase 11, the docs, runs beside them and blocks nothing.
+What is built is in [architecture.md](architecture.md) and the ADRs, and how to install, run, and release it is in [sre.md](sre.md). Steps 1.1 to 1.6 of Phase 1, the first run and the terminal UX, are built ([#62](https://github.com/MilanPavel/golem/issues/62)). Steps 1.7 to 1.14 finish the first run from `brew install`, so they come first, then skills, then the web UI, then the model work in Phase 12. Phase 11, the docs, runs beside them and blocks nothing.
 
 ```mermaid
 flowchart LR
-  p1[1 First run, continued] --> p2[2 Skills] --> p10[10 Web UI] --> p3[3 Flows] --> p4[4 Triggers] --> p5[5 Memory] --> p6[6 Evals and hardening] --> p7[7 TUI polish] --> p8[8 Platforms] --> p9[9 Model routing and long sessions]
+  p1[1 First run, continued] --> p2[2 Skills] --> p10[10 Web UI] --> p12[12 Models] --> p3[3 Flows] --> p4[4 Triggers] --> p5[5 Memory] --> p6[6 Evals and hardening] --> p7[7 TUI polish] --> p8[8 Platforms] --> p9[9 Model routing and long sessions]
 ```
 
 ### How to read a phase
@@ -82,15 +83,16 @@ Agents use the Graph API, where the model decides control flow. Flows use the Fu
 
 ### Protocol, what is left to add
 
-JSON-RPC 2.0, one JSON object per line, over `~/.golem/run/golem.sock`. Protocol 2.29 is on the wire today (see [architecture.md](architecture.md#what-is-on-the-wire-today)). The phases below add the rest.
+JSON-RPC 2.0, one JSON object per line, over `~/.golem/run/golem.sock`. Protocol 2.29 is on the wire today (see [The protocol](architecture/protocol.md#what-is-on-the-wire-today)). The phases below add the rest.
 
 | Group | New events | Phase |
 |---|---|---|
+| Models | `model.options.changed` (12.6), `model.speed` (12.11) | 12 |
 | Models | `usage.reported` (tokens, cost) | 9.1 |
 | System | `warning`, `error` | 9.4 |
 | Runs and flows | `run.step.started`, `run.step.completed`, `run.interrupted` | 3.2, 3.4 |
 
-New commands: `skill.trust | untrust` (2.6), `flow.list | start | status` (3.1), and `daemon.shutdown` (8.1).
+New commands: `model.options.get | set` and `session.set_options` (12.6), `model.card` (12.10), `model.compare` (12.14), `skill.trust | untrust` (2.6), `flow.list | start | status` (3.1), and `daemon.shutdown` (8.1).
 
 Rules:
 
@@ -382,6 +384,195 @@ flowchart LR
 
 ---
 
+## Phase 12 — Models
+
+Choosing and running a model gets easier, and it teaches as you go. Today a local model runs with Ollama's defaults, because golem sends only the model, the URL, and sometimes `num_ctx` ([router.py](../packages/daemon/golem/models/router.py)). The picker lists models with no sense of what each one is for. A hosted list is whatever the provider returns: an OpenAI key lists every model it can see, retired ones included. golem also offers providers it does not need to. Phase 12 runs after the web UI, because its screens build on the web model dialog (10.10). Each ticket is one commit and one pull request.
+
+Choices that hold for the whole phase:
+
+- **Six hosted providers, plus Ollama:** OpenAI, Anthropic, Google, DeepSeek, xAI, and Moonshot. OpenRouter, Groq, Together, and LM Studio are removed, along with their presets, key checks, and price data. Any other provider name in config fails with an error that lists the six.
+- **One hand-kept catalog** (`models/data/catalog.toml`, which replaces `local-catalog.toml`) holds `[[local]]` and `[[hosted]]` entries. Each entry has `ref`, `label`, `categories`, a one-line `blurb`, and, for a local model, its size and the memory it needs. It is still the only model list kept by hand.
+- **golem offers a hosted model when it is in both lists.** The provider's live list answers "can this key call it?", and the catalog answers "is it current and worth offering?". **Show all** adds every live chat model that LiteLLM marks as tool-capable and not past its `deprecation_date`. A ref you type always works.
+- **Categories are a fixed set:** General, Coding, Reasoning, Vision, Fast, and Long context. They come from the catalog for a curated model, from Ollama's `/api/show` `capabilities` for an installed one, and from LiteLLM's `supports_*` fields for the rest.
+- **The daemon owns the model options.** Each option's range, default, source, and plain-words explanation come from `model.options.get`, so the TUI and the web show the same text. Options are saved per model, a session can override them for itself, and nothing asks you to open a file.
+- **The defaults are always the starting point.** A model starts with its own Modelfile `parameters`, then Ollama's defaults. A changed value always shows as a chip.
+
+```mermaid
+flowchart LR
+  s1[12.1 ADR and design] --> s2[12.2 Six providers] --> s3[12.3 Curated hosted list]
+  s1 --> s4[12.4 Categories] --> s5[12.5 A better local list]
+  s1 --> s6[12.6 Options in the daemon] --> s7[12.7 /tune in the TUI]
+  s6 --> s8[12.8 Tune in the web]
+  s6 --> s9[12.9 Thinking control]
+  s3 --> s12[12.12 Retirement warnings]
+  s3 --> s13[12.13 Catalog updates]
+  s11[12.11 Speed on this Mac] --> s10[12.10 Model card]
+  s3 --> s10
+  s4 --> s10
+  s1 --> s14[12.14 Compare in the web]
+  s5 & s7 & s8 & s9 & s10 & s12 & s13 & s14 --> s15[12.15 Check]
+```
+
+After 12.1, three tracks can run side by side, each in its own worktree: providers (12.2, 12.3), categories (12.4, 12.5), and options (12.6 to 12.9).
+
+### 12.1 ADR and a design for tuning
+
+- **Goal:** the provider set, the catalog and its filter rule, where options are stored, and how tuning looks are agreed before any code.
+- **You can:** read why golem offers the models it does, and open the `/tune` mockups for the TUI and the web.
+- **Build:**
+  - ADR-037. It covers the six providers and which LangChain package each one uses (a native package where it carries thinking content, `openai_compat` where that is enough), the catalog format, the hosted filter, and option storage (`[ollama.models."<name>"]` in `config.toml`, written by the daemon through [config_edit.py](../packages/daemon/golem/config_edit.py), and session overrides as events in the log).
+  - `docs/design/tune.md`: the TUI panel and the web tab, presets, the memory gauge, and the wording of every option's explanation.
+- **Done when:** the ADR and the design are merged.
+
+### 12.2 Six providers
+
+- **Goal:** Google, DeepSeek, xAI, and Moonshot work like OpenAI and Anthropic, and the providers golem no longer offers are gone.
+- **You can:** run `golem auth set google` (or `deepseek`, `xai`, `moonshot`), see the key checked, and chat with that provider's models.
+- **Build:**
+  - Remove the `openrouter`, `groq`, `together`, and `lmstudio` presets from `PRESETS`, the OpenRouter key check, and their providers in the trimmed LiteLLM file ([prices.py](../packages/daemon/golem/models/prices.py)).
+  - One ticket per new provider: the preset, the model list, `check_key`, chat, prices, and a contract test on a recorded response.
+  - The setup window, `/login`, `golem auth set`, and `golem doctor` list the six.
+- **Done when:** a key for each of the six is checked, lists its models, and answers a message that uses a tool.
+- **Watch out:** every new LangChain package must load in the frozen daemon. Run `just smoke-dist`.
+
+### 12.3 A curated hosted list
+
+- **Goal:** only current models you can call are offered.
+- **You can:** paste an OpenAI key and see a short list of current models, with **show all** one key away.
+- **Build:**
+  - `[[hosted]]` catalog entries for the six providers.
+  - Keep LiteLLM's `deprecation_date`, `supports_reasoning`, and `supports_vision`. The listing in [discovery.py](../packages/daemon/golem/models/discovery.py) intersects the live list with the catalog.
+  - **Show all** in the TUI picker and the web dialog.
+- **Done when:** an OpenAI key lists only catalog models by default, and no model past its deprecation date appears even under **show all**.
+
+### 12.4 Categories
+
+- **Goal:** you can pick a model by what it is for.
+- **You can:** filter the picker to Coding or Vision, and see each model's categories next to it.
+- **Build:**
+  - `ListedModel.categories` in the protocol, filled from the catalog, `/api/show`, and LiteLLM. Run `just gen`.
+  - Grouping and filter keys in the TUI picker ([model-picker.ts](../packages/tui/src/model-picker.ts)), through [model-list.ts](../packages/view/src/model-list.ts).
+  - Filter chips in the web model dialog.
+- **Done when:** an installed model with no catalog entry still shows the right categories, from Ollama's capabilities.
+
+### 12.5 A better local list
+
+- **Goal:** a good local model for every category, at every memory size.
+- **You can:** see "recommended for coding on this Mac" next to "recommended".
+- **Build:**
+  - New entries, each one checked against the Ollama registry by `catalog_check.py`. The starting proposal:
+
+    | Memory | General | Coding | Reasoning | Vision | Fast |
+    |---|---|---|---|---|---|
+    | 8 GB | Qwen3.5 4B | — | — | Gemma 4 E2B | Phi-4-mini, Llama 3.2 3B |
+    | 16 GB | Qwen3.5 9B | the smallest current Qwen coder | DeepSeek-R1 8B | Gemma 4 E4B | — |
+    | 32 GB | Mistral Small 24B | Devstral 24B | gpt-oss 20B | Mistral Small 24B | — |
+    | 48 GB | Qwen3.8 27B, Gemma 4 26B | Qwen3 Coder 30B | Qwen3.8 27B | Gemma 4 26B | Qwen3 30B-A3B |
+    | 64 GB+ | — | — | gpt-oss 120B | — | — |
+
+  - A starter for each category and memory size, so the recommendation follows the category you filtered on.
+- **Done when:** on an 8, 16, and 32 GB Mac, each category recommends a model that fits.
+
+### 12.6 Model options in the daemon
+
+- **Goal:** Ollama options can be changed, saved per model, and overridden for one session.
+- **You can:** nothing new on screen yet. A client can read and set options.
+- **Build:**
+  - The option table: temperature, top_p, top_k, min_p, repeat_penalty, num_ctx, num_predict, seed, and keep_alive. Each has a range, a step, and a short and a long explanation.
+  - The model's own defaults, from `/api/show` `parameters`.
+  - Storage in `[ollama.models."<name>"]`, written by the daemon.
+  - `model.options.get | set`, `session.set_options`, and a `model.options.changed` event, so a replayed session gets its options back.
+  - [router.py](../packages/daemon/golem/models/router.py) `chat_model` passes the result to `ChatOllama`.
+- **Done when:** a saved temperature reaches Ollama, and a session override applies to that session only.
+
+### 12.7 `/tune` in the TUI
+
+- **Goal:** you learn what each option does, and change it without leaving the chat.
+- **You can:** type `/tune` and see:
+
+  ```
+   tune · qwen3.5:9b                         saved for this model · s this session only
+   ▸ temperature  ▕██████▌        ▏ 0.7    model default 0.7
+     top_p        ▕█████████████▌ ▏ 0.95
+     num_ctx      ▕████▌          ▏ 16k    +1.1 GB · fits
+   ─ temperature ─────────────────────────────────────────────
+   How adventurous each next word is. Low gives the same answer
+   every time, good for code and facts. High gives more variety,
+   good for ideas. Try 0.2 for code.   ←/→ change · r reset · t try again
+   presets  1 precise   2 balanced   3 creative   4 long memory
+  ```
+
+- **Build:**
+  - The panel: one row per option with a block slider, and an explanation of the focused option.
+  - Presets that teach by example. Each changes a few values, and the rows that moved light up.
+  - A memory gauge for `num_ctx`, from [hardware.py](../packages/daemon/golem/models/hardware.py).
+  - `t` asks the last question again with the new settings in a throwaway fork, so you see the difference and keep your chat.
+  - A status chip (`temp 0.2 · ctx 16k`) while a value differs from the default, and `/tune temperature 0.3` with completion.
+- **Done when:** a new user can set a precise preset, see the answer change with `t`, and reset with `r`.
+
+### 12.8 Tune in the web
+
+- **Goal:** the same thing in the browser.
+- **You can:** open the model dialog's Tune tab, move sliders, and read the same explanations.
+- **Build:** the Tune tab, with presets, the memory gauge, try again, and the chip, all built on 12.6.
+- **Done when:** a change made in the browser shows at once in an attached TUI, and the other way round.
+
+### 12.9 Thinking control
+
+- **Goal:** one **think** setting, whichever model you use.
+- **You can:** turn thinking on or off, or pick low, medium, or high, and show or hide the thinking.
+- **Build:**
+  - Ollama's `think` (on or off, and levels for gpt-oss).
+  - Reasoning effort for OpenAI, DeepSeek, and xAI, and a thinking budget for Anthropic and Gemini, all behind the same three levels.
+  - Showing or hiding thinking in both UIs.
+- **Done when:** the setting changes the request for every provider that has one, and is hidden for models without thinking.
+
+### 12.10 Model card
+
+- **Goal:** you know a model before you pick it.
+- **You can:** press `i` in the picker, or open a model's card in the web, and read what it is good at.
+- **Build:** `model.card` (blurb, categories, capabilities, context size, license, fit, price, speed, and deprecation date), a TUI card, and a web card.
+- **Done when:** every catalog model has a card with no empty fields that the catalog could fill.
+
+### 12.11 Speed on this Mac
+
+- **Goal:** you see how fast a local model really is here.
+- **You can:** read `~38 tok/s here` next to a model you have used.
+- **Build:** tokens per second measured from finished local answers, a rolling median per model, a `model.speed` event, and the figure in the pickers and on the card.
+- **Done when:** the figure matches `ollama run --verbose` within 10 percent.
+
+### 12.12 Retirement warnings
+
+- **Goal:** a model going away is never a surprise.
+- **You can:** see a warning when your default or a saved model is deprecated or no longer listed, and switch to its successor with one key.
+- **Build:** a `successor` field in the catalog, a check on each listing, and the warning in the setup overview and the status line.
+- **Done when:** a recorded listing without the default model shows the warning, and Enter switches to the successor.
+
+### 12.13 Catalog updates without a release
+
+- **Goal:** better curation reaches users between releases.
+- **You can:** get new catalog entries without upgrading golem.
+- **Build:** a daily fetch of `catalog.toml` from the repo, like the LiteLLM prices. It is checked against the schema, cached, and replaced by the bundled copy if anything fails. `catalog_version` shows in `/setup` and `golem doctor`.
+- **Done when:** a changed catalog on `main` appears within a day, and a broken one is ignored with a warning in the log.
+- **Watch out:** the catalog is data, never code. An entry cannot add a provider or a `base_url`.
+
+### 12.14 Side-by-side compare in the web
+
+- **Goal:** you can compare two models on one question.
+- **You can:** send one prompt to two models and read both answers side by side, with time, tokens, and cost.
+- **Build:** `model.compare`, which runs one prompt on two models in throwaway forks with no tools, and a two-column view.
+- **Done when:** a compare of a local and a hosted model shows both answers and leaves the session unchanged.
+
+### 12.15 Check: models end to end
+
+- **Goal:** the whole phase works together on a clean machine.
+- **Build:** a written run. Add a key for each of the six providers and check the lists are curated. Filter by category, tune a local model, override it for one session, and compare two models.
+- **Done when:** the run passes on a clean Mac, in the TUI and the browser.
+
+Later, outside this phase: disk hygiene (installed models with size and last use, and removing unused ones in one step), and an embedding category in the catalog that 2.5's pre-selection uses.
+
+---
+
 ## Phase 11 — Docs
 
 A docs site with a side menu, search, and both themes, in golem's own look. A short README that points to it. A series, "How golem works", that explains one common agent idea per chapter, then shows how golem builds it, and holds golem's architecture. The details are in [#264](https://github.com/MilanPavel/golem/issues/264) and in each step's issue, and every ticket is a sub-issue of its step. One ticket per commit and per PR.
@@ -463,7 +654,7 @@ flowchart LR
   | 11.6.5 | Two chapters: Context (the system prompt and pins), and Skills | the system prompt and the pinning part of Skills; the rest of the Skills section | [ADR-025](adr/025-skill-sources.md), [030](adr/030-skill-read-roots.md), [031](adr/031-system-prompt.md), [032](adr/032-pinned-skills.md) |
   | 11.6.6 | MCP: tools from outside | the MCP parts, plus what `golem/mcp/` does | [ADR-023](adr/023-mcp-client.md) |
   | 11.6.7 | Sessions that survive | the event log and checkpoints, files on disk, migrations, cancel, crash recovery, fork | [ADR-006](adr/006-checkpoint-continuity.md), [008](adr/008-cancellation.md), [009](adr/009-session-list.md), [010](adr/010-fork.md), [020](adr/020-safe-upgrades.md) |
-  | 11.6.8 | The daemon and its protocol | the daemon, the socket, the pid lock, the protocol, attach and fan-out | [ADR-001](adr/001-process-split.md), [003](adr/003-protocol.md), [004](adr/004-pid-lock.md), [007](adr/007-attach-and-fan-out.md) |
+  | 11.6.8 | Two chapters: The daemon, and The protocol | the daemon, the socket, the pid lock, and what it owns; the protocol, attach and fan-out, what is on the wire, and the protocol package | [ADR-001](adr/001-process-split.md), [003](adr/003-protocol.md), [004](adr/004-pid-lock.md), [007](adr/007-attach-and-fan-out.md) |
   | 11.6.9 | The screens: the TUI and the web UI | the TUI and the shared client, plus the web gateway | [ADR-005](adr/005-client-package.md), [028](adr/028-web-gateway.md), [029](adr/029-web-stack.md) |
   | 11.6.10 | What comes next: memory, evals, routing, compaction | "planned next" | Phases 5, 6, and 9 of this plan |
   | 11.6.11 | The overview | what is left: the short version, and the system on one machine as a map you can click, with a tour of one message that links each hop to its chapter. The settings list moves to its own reference page, `docs/settings.md` | |
@@ -899,6 +1090,7 @@ Built-in defaults, then `~/.golem/config.toml`, then `<project>/.golem/config.to
 | Scope explosion | Never finishing | Small steps with exit checks, daily use of what already ships |
 | Prompt injection through tools or MCP | Unsafe actions | No auto-approve from content, the sandbox, minimal default permissions |
 | A frozen daemon misses a dynamic import | A release that does not start | `just smoke-dist` on every platform in CI, before upload |
+| Six provider SDKs drift | A provider stops working after an upgrade | Contract tests per provider on recorded responses, pinned SDK versions (12.2) |
 | macOS-only code spreads before Phase 8 | A costly Windows port | New OS-specific code goes behind a small function from the start, so 8.1 only moves it |
 
 ## Open questions

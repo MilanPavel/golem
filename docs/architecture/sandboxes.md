@@ -1,7 +1,7 @@
 ---
 title: Sandboxes
 description: Why a command you allowed still runs in a box, what golem's shell sandbox lets through and what it stops, and how the file tools keep to the project folder.
-order: 5
+order: 8
 adrs: [14, 30]
 ---
 

@@ -34,16 +34,17 @@ golem's architecture, one idea per chapter. Each chapter explains an idea that m
 | | Overview, and one message end to end | [architecture.md](architecture.md) | [#292](https://github.com/MilanPavel/golem/issues/292) |
 | 1 | The agent loop | [architecture/agent-loop.md](architecture/agent-loop.md) | |
 | 2 | Talking to models | [architecture/models.md](architecture/models.md) | |
-| 3 | Tools | [architecture/tools.md](architecture/tools.md) | |
-| 4 | Permissions: rules and approvals | [architecture/permissions.md](architecture/permissions.md) | |
-| 5 | Sandboxes | [architecture/sandboxes.md](architecture/sandboxes.md) | |
-| 6 | Context: the system prompt | [architecture/context.md](architecture/context.md) | |
-| 7 | Skills | [architecture/skills.md](architecture/skills.md) | |
-| 8 | MCP: tools from outside | [architecture/mcp.md](architecture/mcp.md) | |
-| 9 | Sessions that survive | [architecture/sessions.md](architecture/sessions.md) | |
-| 10 | The daemon and its protocol | `architecture/daemon-and-protocol.md` | [#290](https://github.com/MilanPavel/golem/issues/290) |
-| 11 | The screens: the TUI and the web UI | `architecture/screens.md` | [#354](https://github.com/MilanPavel/golem/issues/354) |
-| 12 | What comes next | `architecture/whats-next.md` | [#291](https://github.com/MilanPavel/golem/issues/291) |
+| 3 | The daemon | [architecture/daemon.md](architecture/daemon.md) | |
+| 4 | The protocol | [architecture/protocol.md](architecture/protocol.md) | |
+| 5 | Sessions that survive | [architecture/sessions.md](architecture/sessions.md) | |
+| 6 | Tools | [architecture/tools.md](architecture/tools.md) | |
+| 7 | Permissions: rules and approvals | [architecture/permissions.md](architecture/permissions.md) | |
+| 8 | Sandboxes | [architecture/sandboxes.md](architecture/sandboxes.md) | |
+| 9 | Context: the system prompt | [architecture/context.md](architecture/context.md) | |
+| 10 | Skills | [architecture/skills.md](architecture/skills.md) | |
+| 11 | MCP: tools from outside | [architecture/mcp.md](architecture/mcp.md) | |
+| 12 | The screens: the TUI and the web UI | `architecture/screens.md` | [#354](https://github.com/MilanPavel/golem/issues/354) |
+| 13 | What comes next | `architecture/whats-next.md` | [#291](https://github.com/MilanPavel/golem/issues/291) |
 
 ## Build golem
 

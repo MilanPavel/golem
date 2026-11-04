@@ -1,7 +1,7 @@
 ---
 title: Context
 description: What the model sees on each call, why it is sent again every time, and how golem builds its system prompt for each call and never stores it.
-order: 6
+order: 9
 adrs: [31, 32]
 ---
 
