@@ -727,6 +727,34 @@ async def test_fork_returns_a_session_whose_replay_is_the_copied_history(short_h
         await stop_daemon(app, task)
 
 
+async def test_list_names_the_session_a_fork_came_from(short_home: Path) -> None:
+    app, task = await start_daemon(
+        short_home, router=ModelRouter(model=ScriptedChatModel(replies=["Hi"]))
+    )
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        source = await _open(client)
+        await client.call("message.send", {"session_id": source, "text": "hello"})
+        await client.wait_for_event("run.completed")
+        reply = _event_data(client.events[-2])
+        forked = rpc_result(
+            await client.call(
+                "session.fork", {"session_id": source, "at_message_id": reply["message_id"]}
+            )
+        )
+        listed = rpc_result(await client.call("session.list", {}))
+        parents: dict[str, object] = {}
+        for item in cast(list[object], listed["sessions"]):
+            record = _record(item)
+            if record is not None:
+                parents[cast(str, record["session_id"])] = record["forked_from"]
+        assert parents == {source: None, cast(str, forked["session_id"]): source}
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+
+
 async def test_config_get_lists_the_rules_for_a_folder(short_home: Path) -> None:
     (short_home / "config.toml").write_text(
         '[[rule]]\ntool = "grep"\nmatch = "*secret*"\naction = "deny"\n', encoding="utf-8"

@@ -59,17 +59,16 @@ The socket is only the door. Behind it, these jobs sit in one process:
 | Tools | Plain Python functions with a Pydantic argument model, in `golem/tools/`. The graph offers them to the model and runs them in its own `tools` node ([Tools](architecture/tools.md)). | Built: file reads and writes, `shell`, git, `web_fetch` |
 | MCP servers | Child processes or HTTP endpoints from `[mcp.<name>]`, started in the background, watched with `ping`, and restarted with backoff. Each session's tools come from `ToolRegistry.scoped` (`golem/mcp/`). | Built |
 | Permissions | Rules from the project, the user, and the defaults, checked in order before every tool call (`golem/permissions/`, [Permissions](architecture/permissions.md)). | Built |
-| Skills | The `SKILL.md` folders a session's folder sees, and which one each name means (`golem/skills/`). | Built: finding, listing, and running by name. Pinning planned |
+| Skills | The `SKILL.md` folders a session's folder sees, and which one each name means (`golem/skills/`, [Skills](architecture/skills.md)). | Built: finding, listing, running by name, and pinning. The model picking one planned |
 | Event log | The history. Every event, numbered by `seq`, written before it is sent. A client that reconnects will read it and rebuild the screen. | Written. Replay to clients planned |
 
 What the graph owns, and what it calls instead, is in [The agent loop](architecture/agent-loop.md#what-the-graph-owns-and-what-it-calls).
 
 ### One turn
 
-One turn, the graph, its messages, failures and the cap, the folder, and models without tools are in [The agent loop](architecture/agent-loop.md#the-details). What a turn does with the system prompt is still here:
+One turn, the graph, its messages, failures and the cap, the folder, and models without tools are in [The agent loop](architecture/agent-loop.md#the-details).
 
-- **The system prompt.** `call_model` builds it for each call from the sections in `golem/graphs/prompt.py` and sends it in front of the history. The node returns only the reply, so the prompt is never checkpointed. With no section to say anything, no system message is sent. Its one section today holds the pinned skills (`golem/skills/pinned.py`) ([ADR-031](adr/031-system-prompt.md)).
-- **Tools.** Tool events, long output and artifacts, and todos are in [Tools](architecture/tools.md#the-details).
+The system prompt, built for each call and never stored, is in [Context](architecture/context.md#the-system-prompt). Tool events, long output and artifacts, and todos are in [Tools](architecture/tools.md#the-details).
 
 If you quit the TUI halfway through, the daemon still finishes the run and saves the checkpoint. The next message in that session continues from it.
 
@@ -131,83 +130,7 @@ Each log record is written twice: a short line on stderr, and a JSON line in `lo
 
 ## Skills
 
-A skill is a folder with a `SKILL.md`: a short YAML header (`name`, `description`) and then the instructions, in markdown. Scripts and reference notes can sit next to it. Golem reads the [Agent Skills](https://agentskills.io) format that Claude Code uses, so a skill written for another agent works here unchanged. [Skills](guide/skills.md) says how to write one and where to put it.
-
-<p align="center">
-  <img src="images/skills.gif" alt="An animation in seven steps: a skill is a folder with a SKILL.md, a header and instructions; the model sees one line per skill, the body when it is used, and its files when needed; golem looks in the project's .golem, .agents, and .claude skill folders, then the user's, then its own; the first working skill of a name wins and the rest are listed with why; saving a skill sends skill.registry.changed and /skills updates without a restart; golem skills and golem skills check in a shell; and next, three ways to use a skill: /name, pin, and the model loading it" width="900">
-</p>
-
-### The idea: cheap until it is used
-
-A model's context is small, and most skills are not needed in most turns. So a skill reaches the model in three levels, each only when it is needed. This is what the Agent Skills format calls progressive disclosure:
-
-| Level | What the model sees | When | Status |
-|---|---|---|---|
-| 1. Index | One line per skill: its `name` and `description` | Every model call | Planned (2.4) |
-| 2. Body | The instructions in `SKILL.md` | When the skill is used | Planned (2.2 to 2.4) |
-| 3. Files | `references/`, script output | When the body says to read or run them | Planned (2.2) |
-
-A skill can be used in three ways, and all three need the registry below:
-
-| Way | Who decides | Where the body goes | Status |
-|---|---|---|---|
-| `/ship fix the mcp restart` | You | Your message, with your words filled in | Built |
-| `/skill pin ship` | You | The system prompt, until you unpin it | Built |
-| `load_skill("ship")` | The model | A tool result | Planned (2.4) |
-
-The daemon owns the skills, as it owns sessions and rules. Graph state will hold only skill names, never bodies, so checkpoints stay small. A skill can never do more than the rules allow: whatever it asks for goes through the same permission check and approvals as any tool call (2.6).
-
-### What happens today
-
-Step 2.1 finds, checks, and lists skills. `message.send` with `skill` runs one by name: `golem/skills/invoke.py` finds it in the session's view, reads its body from disk, and fills it in with `golem/skills/expand.py`. The run logs `skill.activated`, then the user message with the filled-in body as its `text` and the skill's name and arguments as `skill`. A skill the session cannot run is error `-32013`, and no turn starts. In the TUI, `/name` runs a skill when no command has that name, and `/skill run <name> [args]` always does. The arguments are the rest of the line, with their spacing and quotes kept. The `/` suggestions list the skills you can run, with their `argument-hint`, from the same `skill.list` that `/skills` shows. Skills with `user-invocable: false` are not listed and not run (`packages/tui/src/commands.ts`). The transcript draws a user message that has `skill` as the typed line, `/ship fix the mcp restart  ◆ skill`, and Ctrl-O shows the filled-in body under it (`packages/tui/src/layout-chat.ts`). A reattach replays the same event, so it draws the same line. `/debug model` still shows the full text the model got. Each run of a skill adds its folder to the graph state (`skill_folders`), so it survives a restart and a fork copies it. The read tools take an absolute path inside one of those folders, and refuse one that resolves into a folder the sandbox closes. The write tools never take one ([ADR-030](adr/030-skill-read-roots.md)). `session.set_skills` pins a skill for the whole session: the daemon checks it in the session's view, stores `skill.activated` with `how: "pinned"` and no run, and keeps the names in pin order in `sessions.skills`. An unpin stores `skill.deactivated`. Each turn passes the pins to the graph, and the system prompt's pinned section reads each body from disk for every model call, fills it in with no arguments, and wraps it in `<skill name="…">`. A pinned skill that is gone or broken is left out of the prompt and stays pinned ([ADR-032](adr/032-pinned-skills.md)). While it builds the prompt, the section reports each pin to the run through the graph's stream: the hash it read, or why it left the skill out. The session's `PinMemory` keeps what the log last said, so the run logs only a change: `skill.activated` with the new hash after an edit, or one `skill.skipped` (`missing`, `disabled`, `broken`). After a restart it is rebuilt from the stored events. Each turn also passes the folders of the usable pins to the read tools, which read them until the skill is unpinned. A fork starts with the source's pins and on-demand MCP servers as they are now: it copies each pin's newest `skill.activated`, and a later `skill.skipped`, and one `session.updated` with `mcp_servers`. It does not copy the tools allowed for the session ([ADR-010](adr/010-fork.md)). In the TUI, `/skill pin <name>` and `/skill unpin <name>` call it, and `/skill` alone lists the pins. Any usable skill may be pinned, `user-invocable: false` ones too. The suggestions after `/skill pin` leave out the pinned ones, and after `/skill unpin` list only those. The chat reducer keeps `activeSkills` from `skill.activated` with `how: "pinned"` and `skill.deactivated`, so a reattach shows the same pins, and the status line shows them as `skills: ship, setup`, after the model. A `skill.skipped` marks that pin `ship (skipped)` and sets a notice, until a call reads it again or it is unpinned. That segment leaves a narrow line after the folder and before new lines.
-
-```mermaid
-flowchart LR
-  folders["skill folders<br/>project, user, bundled"] -->|"parse the header"| registry["SkillRegistry<br/>view(folder)"]
-  registry -->|skill.list| clients["/skills in the TUI<br/>golem skills"]
-  watch["every 2 s: did a SKILL.md<br/>or config.toml change?"] --> registry
-  watch -->|skill.registry.changed| clients
-  check["golem skills check"] -->|"parse, no daemon"| folders
-```
-
-**1. Reading one skill** (`golem/skills/parse.py`). Only the header is read, at most 64 KB, and the body is read later, when the skill is used. A problem never stops golem: the skill is kept with its `errors`, and is never used, or with `warnings`, and is used anyway. The Agent Skills rules apply: `name` is lowercase letters, digits, and single hyphens, it matches the folder, and `description` is at most 1024 characters. Where Claude Code is looser, golem follows it: `name` may be left out, a missing `description` falls back to the first paragraph of the body, and a file may have no header at all. A `SKILL.md` over 1 MB is an error. Claude Code fields that golem does not use yet (`context`, `agent`, `hooks`) give a warning.
-
-**2. Where it looks** (`golem/skills/registry.py`). A session's own folder first, then the user's folders, then golem's own skills:
-
-1. `<folder>/.golem/skills`, `<folder>/.agents/skills`, `<folder>/.claude/skills`
-2. `~/.golem/skills`, `~/.agents/skills`, `~/.claude/skills`, then `[skills] extra_dirs`
-3. Bundled with golem (2.7)
-
-Each source is read one level deep. A folder with a `SKILL.md` is a skill, and a name that starts with `.` or `_` is skipped. Symlinks are followed, and a folder reached twice counts once, so this repository's `.claude/skills`, which links to `.agents/skills`, lists each skill once.
-
-**3. Who wins a name.** The daemon serves every session, and each session has its own folder, so there is no single list. `SkillRegistry.view(folder)` builds the list one folder sees. The first valid skill of a name wins. A broken skill never wins, so a broken copy in a project does not hide your working one. Every skill that lost stays in the list with `shadowed_by`, the folder of the winner, and `[skills] disabled` marks a skill that is listed but never used. Trust plays no part here: a skill is text, like any file in the project. What a skill may do without asking is decided in 2.6.
-
-**4. Kept current.** A parsed skill is cached until the stamp of its `SKILL.md`, its modification time and size, changes. Every two seconds, `SkillRegistry.check` compares the stamps of the user's folders, and of each session folder the registry was asked about, with what it saw last. It also reads `[skills]` again when `config.toml` changes, and a file that does not validate keeps the last good settings. A change sends `skill.registry.changed` to every connection, with `root` set to the session folder, or `null` when every folder is affected. Golem polls instead of using a file watcher, the same way it reloads rules, models, and MCP servers ([ADR-025](adr/025-skill-sources.md)).
-
-**5. Seeing them.** `skill.list {cwd}` returns every skill found, winners first, each with its `source`, `path`, `usable`, `shadowed_by`, `errors`, `warnings`, and header flags. `/skills` in the TUI shows them by source, and opens one with its details. `golem skills` prints the same list. `golem skills check <path>` runs the parser in the daemon executable without a running daemon, prints every error and warning, and exits with 1 on an error.
-
-| File | What it does |
-|---|---|
-| `golem/skills/model.py` | `Skill`, what golem knows about one folder |
-| `golem/skills/parse.py` | Reads and checks one `SKILL.md`. `read_body` reads the instructions |
-| `golem/skills/registry.py` | Sources, winners, the per-folder view, the cache, and the watch |
-| `golem/skills/check.py` | `golem skills check` |
-| `golem/skills/expand.py`, `golem/skills/invoke.py` | Filling in a body, and running a skill by name |
-| `golem/server/handlers.py` | `skill.list` |
-| `packages/tui/src/skills-manager.ts` | `/skills` |
-| `packages/tui/src/commands.ts` | `/name` and `/skill run`, and the skill rows in the `/` suggestions |
-| `packages/cli/src/format-skills.ts` | `golem skills` |
-
-### What comes next
-
-| Step | What you get |
-|---|---|
-| [2.2](https://github.com/MilanPavel/golem/issues/21) | Run a skill with `/name args`, and let it read its own files and run its scripts |
-| [2.3](https://github.com/MilanPavel/golem/issues/5) | Pin a skill for a chat. Golem gets a system prompt, built for each model call and never stored |
-| [2.4](https://github.com/MilanPavel/golem/issues/6) | The index in the system prompt, and a `load_skill` tool, so the model picks a skill itself |
-| [2.5](https://github.com/MilanPavel/golem/issues/7) | A short list chosen by embeddings, for local models |
-| [2.6](https://github.com/MilanPavel/golem/issues/8) | Trust: a skill's scripts ask first, and `allowed-tools` lets a trusted skill skip the ask, never past a deny rule |
-| [2.7](https://github.com/MilanPavel/golem/issues/9) | Golem writes a skill for you to review |
+Skills, from finding and listing them to running one by name, are in [Skills](architecture/skills.md). Pinned skills, and the system prompt they go into, are in [Context](architecture/context.md).
 
 ## The protocol
 
@@ -357,7 +280,7 @@ A window at least 20 rows tall and 42 columns wide gives the header the logo: 18
 The other bands ask for rows only when they are needed.
 
 - The debug panel wants 7.
-- The composer wants one row per line of the draft, up to 5, or 1 while a reply is in progress. That one row is `…`, and typing is ignored. The first line starts with `❯ `. A dim `─` rule above and below frames it, in place of a background, so it reads the same on light and dark terminals. A chat with no messages lists starter prompts under `Type a message.`, chosen from the folder by `starterPrompts` in `packages/view` (a git repo, an empty folder, or any other). Down moves into the list, and Enter puts the prompt in the composer. An empty draft shows a dim placeholder such as `Try "explain this repo"`, the same one for the whole session, with the cursor on its first letter. The colours are named in `theme.ts`. Extra lines come out of the chat. Scroll is how many lines sit below the window, so the line you were reading stays put.
+- The composer wants one row per line of the draft, up to 5, or 1 while a reply is in progress. That one row is `…`, and typing is ignored. The first line starts with `❯ `. A dim `─` rule above and below frames it, in place of a background, so it reads the same on light and dark terminals. A chat with no messages lists starter prompts under `Type a message.`, chosen from the folder by `starterPrompts` in `packages/view` (a git repo, an empty folder, or any other). Down moves into the list, and Enter puts the prompt in the composer. An empty draft shows a dim tip such as `Tip: /skills lists what golem knows how to do`, with the cursor on its first letter. The tips are `TIPS` in `packages/view`. A session keeps its tip, and each new session shows the next one: the count is in `~/.golem/tip`. The colours are named in `theme.ts`. Extra lines come out of the chat. Scroll is how many lines sit below the window, so the line you were reading stays put.
 - The meter wants 1 while a reply is in progress: `thinking` (or `starting ollama` while golem starts the session model's local server, from `model.server.status`), then `writing · N chars · Ns`, with a small block that moves.
 - Command suggestions want up to 6, above the composer, and only while the draft is a `/` command.
 - The todo band wants one row per item of the agent's todo list: `[ ]` pending, `[~]` in progress (bold, clay), `[x]` done (dim). A finished list, a list longer than 6, or a short window shows one row instead: `todos 2/5 · <the current step>`. An empty list takes no rows, and `/todos` hides or shows the band, remembered in `tui.json`.

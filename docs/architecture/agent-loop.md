@@ -122,7 +122,7 @@ The graph does not own the rest of the product. It calls ordinary Python for thr
 
 - **Which model** answers this step, and whether the budget allows it.
 - **Whether a tool may run.** Every tool call asks the same permission check before it runs. Flows and skills will ask it too. File tools also refuse any path outside the session's project folder, whatever the rules say.
-- **Which skills** exist and which are active. A skill is a `SKILL.md` the model can be given. The registry lives in the daemon, and the graph will only ever hold skill names ([Skills](../architecture.md#skills)).
+- **Which skills** exist and which are active. A skill is a `SKILL.md` the model can be given. The registry lives in the daemon, and the graph will only ever hold skill names ([Skills](./skills.md)).
 
 LangChain message objects stay inside the graph. The protocol server never sends them out. An adapter turns the graph's stream into protocol events first. [ADR-002](../adr/002-langgraph-boundary.md) is that boundary.
 

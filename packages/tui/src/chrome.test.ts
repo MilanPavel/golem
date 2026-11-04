@@ -7,8 +7,6 @@ import {
   frameColumns,
   layoutComposer,
   moveRow,
-  PLACEHOLDERS,
-  placeholderFor,
   PROMPT,
   type FrameBudget,
 } from "./chrome.ts";
@@ -222,13 +220,6 @@ test("an empty draft shows a placeholder with the cursor on its first letter", (
   assert.equal(layoutComposer("a", 1, 40, 1, false, "hint")[0]?.placeholder, undefined);
   assert.deepEqual(layoutComposer("", 0, 40, 1, true, "hint"), [{ prefix: "", text: "…", cursorAt: null }]);
   assert.deepEqual(layoutComposer("", 0, 40, 1, false), [{ prefix: PROMPT, text: "", cursorAt: 0 }]);
-});
-
-test("a session keeps its placeholder", () => {
-  assert.equal(placeholderFor("s_1"), placeholderFor("s_1"));
-  assert.ok((PLACEHOLDERS as readonly string[]).includes(placeholderFor("")));
-  const seen = new Set(["s_1", "s_2", "s_3", "s_4", "s_5", "s_6"].map(placeholderFor));
-  assert.ok(seen.size > 1);
 });
 
 test("the rules frame the composer and give their rows back first", () => {

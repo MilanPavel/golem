@@ -26,8 +26,8 @@ import { SAMPLE_EDIT_DIFF, SAMPLE_LONG_LINE_DIFF, SAMPLE_NEW_FILE_DIFF } from ".
 import { Drawer, TodoList } from "../features/drawer/index.ts";
 import { Composer, DockView, Meter } from "../features/composer/index.ts";
 import { createHistory } from "../features/composer/history.ts";
-import { HomeView } from "../features/shell/index.ts";
-import { SidebarView } from "../features/sessions/index.ts";
+import { HomeView, SessionTitle } from "../features/shell/index.ts";
+import { CloseSessionDialog, RenameField, SidebarView } from "../features/sessions/index.ts";
 import { faviconHref, tabTitle } from "../features/tab-status/index.ts";
 import type { ConnectionSnapshot } from "../store/connection.ts";
 import type { SessionSummary } from "../store/session-list.ts";
@@ -50,15 +50,20 @@ function fakeSession(
   cwd: string | null,
   status: SessionSummary["status"],
   minutesAgo: number,
+  forkedFrom?: string,
 ): SessionSummary {
   const at = new Date(NOW - minutesAgo * 60_000).toISOString();
-  return { session_id: id, created_at: at, updated_at: at, last_seq: 1, model_profile: "default", status, cwd, title };
+  const base = { session_id: id, created_at: at, updated_at: at, last_seq: 1, model_profile: "default", status, cwd, title };
+  return forkedFrom === undefined ? base : { ...base, forked_from: forkedFrom };
 }
 
 const SESSIONS: SessionSummary[] = [
   fakeSession("a", "UTF-8 split in the socket client", "/Users/you/repos/golem", "waiting", 0),
   fakeSession("b", "ADR-028: the web gateway", "/Users/you/repos/golem", "running", 2),
   fakeSession("c", "Invoke /ship from the composer", "/Users/you/repos/golem", "idle", 75),
+  fakeSession("h", "Same fix, as a table", "/Users/you/repos/golem", "idle", 30, "a"),
+  fakeSession("i", "Table with a decoder test", "/Users/you/repos/golem", "idle", 20, "h"),
+  fakeSession("j", "Gateway ADR, shorter", "/Users/you/repos/golem", "idle", 90, "gone"),
   fakeSession("d", "Weekday PR digest, draft", "/Users/you/notes", "idle", 60 * 26),
   fakeSession("e", null, "/Users/you/notes", "idle", 60 * 24 * 12),
   fakeSession("f", "A scratch session", null, "idle", 60 * 24 * 5),
@@ -215,6 +220,42 @@ function ApprovalDemo() {
   );
 }
 
+function SessionActionsDemo({ theme }: { theme: string }) {
+  const [closing, setClosing] = useState(false);
+  return (
+    <div className="grid gap-4 rounded-lg border border-line bg-bg p-4">
+      <div className="flex items-center rounded-md border border-line px-4 py-2.5">
+        <SessionTitle
+          title="UTF-8 split in the socket client"
+          canFork
+          headingLevel="h4"
+          actions={{ rename: () => Promise.resolve(), fork: () => Promise.resolve(), close: () => Promise.resolve() }}
+        />
+      </div>
+      <div className="flex items-center rounded-md border border-line px-4 py-2.5">
+        <SessionTitle
+          title={null}
+          canFork={false}
+          headingLevel="h4"
+          actions={{ rename: () => Promise.resolve(), fork: () => Promise.resolve(), close: () => Promise.resolve() }}
+        />
+      </div>
+      <div className="flex items-center gap-2 rounded-md border border-line px-4 py-2.5">
+        <RenameField
+          initial="UTF-8 split in the socket client"
+          label={`Session title, ${theme}`}
+          onSave={() => Promise.reject(new Error("session not found"))}
+          onEnd={() => {}}
+        />
+      </div>
+      <div>
+        <Button onClick={() => setClosing(true)}>Close dialog</Button>
+        <CloseSessionDialog open={closing} onOpenChange={setClosing} onConfirm={() => Promise.resolve()} />
+      </div>
+    </div>
+  );
+}
+
 function Panel({ theme }: { theme: "slip" | "kiln" }) {
   return (
     <section data-theme={theme} aria-label={`${theme} theme`} className="rounded-lg border border-line bg-bg p-4 text-ink">
@@ -270,8 +311,14 @@ function Panel({ theme }: { theme: "slip" | "kiln" }) {
             connection={CONNECTED}
             now={NOW}
             onNavigate={() => {}}
+            actions={{ rename: () => Promise.resolve(), close: () => Promise.resolve() }}
           />
         </div>
+      </section>
+
+      <section className="mt-6">
+        <h3 className="mb-2 font-mono text-xs text-faint">Session title, rename, and close</h3>
+        <SessionActionsDemo theme={theme} />
       </section>
 
       <section className="mt-6">

@@ -168,7 +168,7 @@ Who may read and write where ([ADR-030](../adr/030-skill-read-roots.md)):
 
 ## Read more
 
-- Next: *Context*, what the model is told before your message: the system prompt and skills (chapter 6, coming next).
+- Next: [Context](./context.md), what the model sees on each call, and the system prompt.
 - Before: [Permissions](./permissions.md).
 - [Tools and permissions](../guide/permissions.md#the-shell-sandbox), the user's guide to the sandbox.
 - [The overview](../architecture.md): the whole system on one page.

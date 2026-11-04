@@ -25,6 +25,7 @@ def summarize(activity: SessionActivity) -> SessionSummary:
         updated_at=session.updated_at,
         last_seq=activity.last_seq,
         cwd=session.cwd,
+        forked_from=session.forked_from,
     )
 
 
