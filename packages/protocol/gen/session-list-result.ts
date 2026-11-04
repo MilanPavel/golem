@@ -2,6 +2,7 @@
 
 export type CreatedAt = string;
 export type Cwd = string | null;
+export type ForkedFrom = string | null;
 export type LastSeq = number;
 export type ModelProfile = string;
 export type SessionId = string;
@@ -23,7 +24,9 @@ export interface SessionListResult {
  * waits for a tool approval, and ``closed`` after ``session.close``. ``last_seq`` is the newest
  * stored event, so a client can tell what it has not seen, and which of
  * two summaries of one session is newer. ``cwd`` is the session's project
- * folder, null for a session that has not been given one.
+ * folder, null for a session that has not been given one. ``forked_from`` is
+ * the id of the session this one was forked from, null for a session that is
+ * not a fork. An older daemon leaves it out.
  *
  * This interface was referenced by `SessionListResult`'s JSON-Schema
  * via the `definition` "SessionSummary".
@@ -31,6 +34,7 @@ export interface SessionListResult {
 export interface SessionSummary {
   created_at: CreatedAt;
   cwd?: Cwd;
+  forked_from?: ForkedFrom;
   last_seq: LastSeq;
   model_profile: ModelProfile;
   session_id: SessionId;

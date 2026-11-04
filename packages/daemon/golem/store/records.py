@@ -14,7 +14,7 @@ RunStatus = Literal["running", "waiting", "completed", "failed", "cancelled"]
 
 _ACTIVITY = (
     "SELECT s.session_id, s.model_profile, s.title, s.created_at, s.updated_at, s.closed_at,"
-    " s.cwd, s.allowed_tools, s.mcp_servers, s.skills,"
+    " s.cwd, s.allowed_tools, s.mcp_servers, s.skills, s.forked_from_session_id,"
     " EXISTS (SELECT 1 FROM runs r"
     "  WHERE r.session_id = s.session_id AND r.status = 'running') AS running,"
     " EXISTS (SELECT 1 FROM runs r"
@@ -38,6 +38,8 @@ class SessionRecord:
     mcp_servers: tuple[str, ...] = ()
     skills: tuple[str, ...] = ()
     """The pinned skills, in the order they were pinned."""
+    forked_from: str | None = None
+    """The session this one was forked from."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,7 +69,7 @@ class SessionRecords:
     async def get(self, session_id: str) -> SessionRecord | None:
         row = await self._database.fetch_one(
             "SELECT session_id, model_profile, title, created_at, updated_at, closed_at, cwd,"
-            " allowed_tools, mcp_servers, skills"
+            " allowed_tools, mcp_servers, skills, forked_from_session_id"
             " FROM sessions WHERE session_id = ?",
             (session_id,),
         )
@@ -169,6 +171,7 @@ def _session(row: sqlite3.Row) -> SessionRecord:
         allowed_tools=tuple(decode_allowances(row["allowed_tools"])),
         mcp_servers=decode_names(row["mcp_servers"]),
         skills=decode_names(row["skills"]),
+        forked_from=row["forked_from_session_id"],
     )
 
 

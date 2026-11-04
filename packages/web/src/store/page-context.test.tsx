@@ -111,6 +111,18 @@ test("a selector keeps a component from rendering for other slices", async () =>
   page.stop();
 });
 
+test("rename, fork, and close call the client with the session and return what it gives", async () => {
+  const { fake, page } = setup();
+  const { actions } = page;
+  await actions.rename("s", "New title");
+  expect(fake.raw.renameSession).toHaveBeenCalledWith("s", "New title");
+  await expect(actions.fork("s", "m_9")).resolves.toBe("s_fork");
+  expect(fake.raw.forkSession).toHaveBeenCalledWith("s", "m_9");
+  await actions.close("s");
+  expect(fake.raw.closeSession).toHaveBeenCalledWith("s");
+  page.stop();
+});
+
 test("routes, actions, and the visibility check", async () => {
   const { fake, page, doc } = setup();
   const probe = renderHook(() => ({ route: useRoute(), actions: usePageActions() }), {

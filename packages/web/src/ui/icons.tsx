@@ -71,3 +71,10 @@ export const PanelIcon = (props: IconProps) => (
     <path d="M10 3v10" />
   </Icon>
 );
+export const MoreIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <circle cx="3.5" cy="8" r="1" fill="currentColor" stroke="none" />
+    <circle cx="8" cy="8" r="1" fill="currentColor" stroke="none" />
+    <circle cx="12.5" cy="8" r="1" fill="currentColor" stroke="none" />
+  </Icon>
+);

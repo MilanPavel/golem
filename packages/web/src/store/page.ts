@@ -26,6 +26,9 @@ export type PageClient = Pick<
   | "watchSessions"
   | "createSession"
   | "sendMessage"
+  | "renameSession"
+  | "forkSession"
+  | "closeSession"
   | "cancelRun"
   | "respondApproval"
   | "checkNow"
@@ -37,6 +40,11 @@ export type PageActions = {
   createSession(cwd: string | null): Promise<string>;
   send(sessionId: string, text: string): Promise<void>;
   cancel(runId: string): Promise<void>;
+  /** Sets the title. What the page shows afterwards comes from the daemon's summary. */
+  rename(sessionId: string, title: string): Promise<void>;
+  /** Forks at a message and resolves with the new session's id. */
+  fork(sessionId: string, atMessageId: string): Promise<string>;
+  close(sessionId: string): Promise<void>;
   respond(sessionId: string, callId: string, decision: ApprovalChoice, args?: Readonly<Record<string, unknown>>): Promise<void>;
 };
 
@@ -99,6 +107,16 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       },
       async cancel(runId) {
         await client.cancelRun(runId);
+      },
+      async rename(sessionId, title) {
+        await client.renameSession(sessionId, title);
+      },
+      async fork(sessionId, atMessageId) {
+        const forked = await client.forkSession(sessionId, atMessageId);
+        return forked.session_id;
+      },
+      async close(sessionId) {
+        await client.closeSession(sessionId);
       },
       async respond(sessionId, callId, decision, args) {
         if (args === undefined) await client.respondApproval(sessionId, callId, decision);
