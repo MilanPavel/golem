@@ -39,7 +39,7 @@ golem's architecture, one idea per chapter. Each chapter explains an idea that m
 | 5 | Sandboxes | [architecture/sandboxes.md](architecture/sandboxes.md) | |
 | 6 | Context: the system prompt | [architecture/context.md](architecture/context.md) | |
 | 7 | Skills | [architecture/skills.md](architecture/skills.md) | |
-| 8 | MCP: tools from outside | `architecture/mcp.md` | [#288](https://github.com/MilanPavel/golem/issues/288) |
+| 8 | MCP: tools from outside | [architecture/mcp.md](architecture/mcp.md) | |
 | 9 | Sessions that survive | `architecture/sessions.md` | [#289](https://github.com/MilanPavel/golem/issues/289) |
 | 10 | The daemon and its protocol | `architecture/daemon-and-protocol.md` | [#290](https://github.com/MilanPavel/golem/issues/290) |
 | 11 | The screens: the TUI and the web UI | `architecture/screens.md` | [#354](https://github.com/MilanPavel/golem/issues/354) |

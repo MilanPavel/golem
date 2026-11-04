@@ -195,7 +195,7 @@ Steps [2.2](https://github.com/MilanPavel/golem/issues/21), running a skill by n
 
 ## Read more
 
-- Next: *MCP*, tools from outside: servers that give golem more tools (chapter 8, coming next).
+- Next: [MCP](./mcp.md), tools from outside: servers that give golem more tools.
 - Before: [Context](./context.md).
 - [Skills](../guide/skills.md), the user's guide: writing one, where to put it, and the settings.
 - [The overview](../architecture.md): the whole system on one page.
