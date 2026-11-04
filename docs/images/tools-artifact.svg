@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 440" role="img" aria-label="Long tool output: output over 20 000 characters is stored whole as an artifact in golem.db. The model reads its first 12 000 and last 4 000 characters, with a note in between that names the artifact, and pages through the rest with read_artifact, up to 20 000 characters at a time.">
+<style>
+  :root { --bg:#F3F2EF; --surface:#FBFAF8; --ink:#1D1A17; --muted:#57524C; --faint:#6C665F;
+          --line:#B9B3AA; --clay:#C4783A; --clay-ink:#94501E; --soft:#F1E2D4; --sunken:#EAE8E3; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#15120F; --surface:#1D1915; --ink:#EEE7DF; --muted:#B5ACA2; --faint:#8F877E;
+            --line:#5A5148; --clay:#D08549; --clay-ink:#E6A06A; --soft:#2E2118; --sunken:#110E0C; }
+  }
+  @media (prefers-reduced-motion: reduce) { .anim { display:none } }
+  text { font-family: Geist, Inter, -apple-system, "Helvetica Neue", Arial, sans-serif; fill: var(--ink); }
+  .mono { font-family: "Geist Mono", "SF Mono", Menlo, Consolas, monospace; letter-spacing: .04em; }
+  .label { font-size: 13px; fill: var(--muted); letter-spacing: .06em; }
+  .small { font-size: 12px; }
+  .faint { fill: var(--faint); }
+  .muted { fill: var(--muted); }
+  .clay { fill: var(--clay-ink); }
+  .wire { stroke: var(--line); stroke-width: 1.2; fill: none; }
+  .head { fill: var(--line); }
+  .back { stroke-dasharray: 3 3; }
+  .edge { fill: none; stroke: var(--line); stroke-width: 1.2; stroke-dasharray: 4 4; }
+  .lit { fill: none; stroke: var(--clay); stroke-width: 1.8; }
+  .box { fill: var(--surface); }
+  .dot { fill: var(--clay); }
+</style>
+<rect width="880" height="440" rx="12" fill="var(--bg)"/>
+<text class="mono label" x="32" y="44">LONG TOOL OUTPUT</text><text class="mono" x="848" y="62" text-anchor="end" font-size="40" style="fill:var(--clay-ink)">20 000</text><text x="848" y="90" text-anchor="end" font-size="16" class="muted">characters, then it is an artifact</text>
+
+<text class="mono label" x="40" y="166">OUTPUT</text>
+<text class="small faint" x="40" y="184">100 000 chars</text>
+<rect x="200" y="150" width="640" height="28" rx="2" style="fill:var(--line)" opacity=".55"/>
+<path d="M328.0 140 V188" stroke="var(--clay)" stroke-width="1.4" stroke-dasharray="3 3"/>
+<text class="mono small clay" x="334.0" y="142">20 000</text>
+
+<text class="mono label" x="40" y="238">THE MODEL READS</text>
+<text class="small faint" x="40" y="256">in the checkpoint</text>
+<rect x="200" y="222" width="76.80000000000001" height="28" rx="2" style="fill:var(--clay)"/>
+<text class="mono small faint" x="200" y="270">head 12 000</text>
+<rect class="box" x="284.8" y="222" width="521.5999999999999" height="28" rx="2" style="stroke:var(--line);stroke-dasharray:3 3"/>
+<text class="mono small faint" x="545.6" y="241" text-anchor="middle">[84 000 characters cut … in artifact a_… · read_artifact]</text>
+<rect x="814.4" y="222" width="25.600000000000023" height="28" rx="2" style="fill:var(--clay)"/>
+<text class="mono small faint" x="840" y="270" text-anchor="end">tail 4 000</text>
+
+<text class="mono label" x="40" y="310">ARTIFACTS</text>
+<text class="small faint" x="40" y="328">golem.db, all of it</text>
+<rect x="200" y="294" width="640" height="28" rx="2" style="fill:var(--clay)" opacity=".45"/>
+
+<text class="mono label" x="40" y="382">READ_ARTIFACT</text>
+<text class="small faint" x="40" y="400">up to 20 000 a page</text>
+<rect class="box" x="200" y="366" width="640" height="28" rx="2"/>
+
+<g class="anim"><rect class="lit" x="196" y="146" width="648" height="36" rx="5" opacity="0"><animate attributeName="opacity" dur="10s" repeatCount="indefinite" keyTimes="0.0000;0.0080;0.0200;0.1400;0.1520;1.0000" values="0;0;1;1;0;0"/></rect><rect class="dot" x="-5.0" y="-5.0" width="10" height="10" opacity="0"><animateMotion dur="10s" repeatCount="indefinite" calcMode="linear" path="M240 178 V222" keyTimes="0;0.1400;0.2200;1" keyPoints="0;0;1;1"/><animate attributeName="opacity" dur="10s" repeatCount="indefinite" keyTimes="0.0000;0.1280;0.1400;0.2200;0.2320;1.0000" values="0;0;1;1;0;0"/></rect><rect class="dot" x="-5.0" y="-5.0" width="10" height="10" opacity="0"><animateMotion dur="10s" repeatCount="indefinite" calcMode="linear" path="M824 178 V222" keyTimes="0;0.1400;0.2200;1" keyPoints="0;0;1;1"/><animate attributeName="opacity" dur="10s" repeatCount="indefinite" keyTimes="0.0000;0.1280;0.1400;0.2200;0.2320;1.0000" values="0;0;1;1;0;0"/></rect><rect class="lit" x="196" y="218" width="648" height="36" rx="5" opacity="0"><animate attributeName="opacity" dur="10s" repeatCount="indefinite" keyTimes="0.0000;0.2080;0.2200;0.3400;0.3520;1.0000" values="0;0;1;1;0;0"/></rect><rect class="dot" x="-5.0" y="-5.0" width="10" height="10" opacity="0"><animateMotion dur="10s" repeatCount="indefinite" calcMode="linear" path="M520.0 178 V294" keyTimes="0;0.3000;0.4000;1" keyPoints="0;0;1;1"/><animate attributeName="opacity" dur="10s" repeatCount="indefinite" keyTimes="0.0000;0.2880;0.3000;0.4000;0.4120;1.0000" values="0;0;1;1;0;0"/></rect><rect class="lit" x="196" y="290" width="648" height="36" rx="5" opacity="0"><animate attributeName="opacity" dur="10s" repeatCount="indefinite" keyTimes="0.0000;0.3880;0.4000;0.5000;0.5120;1.0000" values="0;0;1;1;0;0"/></rect><rect class="lit" x="276.8" y="290" width="128.0" height="36" rx="5" opacity="0"><animate attributeName="opacity" dur="10s" repeatCount="indefinite" keyTimes="0.0000;0.4880;0.5000;0.6000;0.6120;1.0000" values="0;0;1;1;0;0"/></rect><rect class="dot" x="-3.5" y="-3.5" width="7" height="7" opacity="0"><animateMotion dur="10s" repeatCount="indefinite" calcMode="linear" path="M340.8 326 V380" keyTimes="0;0.5200;0.5700;1" keyPoints="0;0;1;1"/><animate attributeName="opacity" dur="10s" repeatCount="indefinite" keyTimes="0.0000;0.5080;0.5200;0.5700;0.5820;1.0000" values="0;0;1;1;0;0"/></rect><rect x="276.8" y="366" width="128.0" height="28" rx="2" style="fill:var(--clay)" opacity="0"><animate attributeName="opacity" dur="10s" repeatCount="indefinite" keyTimes="0.0000;0.5580;0.5700;0.6000;0.6120;1.0000" values="0;0;1;1;0;0"/></rect><text opacity="0" class="mono small clay" x="276.8" y="418">offset 12 000<animate attributeName="opacity" dur="10s" repeatCount="indefinite" keyTimes="0.0000;0.5380;0.5500;0.6000;0.6120;1.0000" values="0;0;1;1;0;0"/></text><rect class="lit" x="404.8" y="290" width="128.0" height="36" rx="5" opacity="0"><animate attributeName="opacity" dur="10s" repeatCount="indefinite" keyTimes="0.0000;0.5980;0.6100;0.7100;0.7220;1.0000" values="0;0;1;1;0;0"/></rect><rect class="dot" x="-3.5" y="-3.5" width="7" height="7" opacity="0"><animateMotion dur="10s" repeatCount="indefinite" calcMode="linear" path="M468.8 326 V380" keyTimes="0;0.6300;0.6800;1" keyPoints="0;0;1;1"/><animate attributeName="opacity" dur="10s" repeatCount="indefinite" keyTimes="0.0000;0.6180;0.6300;0.6800;0.6920;1.0000" values="0;0;1;1;0;0"/></rect><rect x="404.8" y="366" width="128.0" height="28" rx="2" style="fill:var(--clay)" opacity="0"><animate attributeName="opacity" dur="10s" repeatCount="indefinite" keyTimes="0.0000;0.6680;0.6800;0.7100;0.7220;1.0000" values="0;0;1;1;0;0"/></rect><text opacity="0" class="mono small clay" x="404.8" y="418">offset 32 000<animate attributeName="opacity" dur="10s" repeatCount="indefinite" keyTimes="0.0000;0.6480;0.6600;0.7100;0.7220;1.0000" values="0;0;1;1;0;0"/></text><rect class="lit" x="532.8" y="290" width="128.0" height="36" rx="5" opacity="0"><animate attributeName="opacity" dur="10s" repeatCount="indefinite" keyTimes="0.0000;0.7080;0.7200;0.8200;0.8320;1.0000" values="0;0;1;1;0;0"/></rect><rect class="dot" x="-3.5" y="-3.5" width="7" height="7" opacity="0"><animateMotion dur="10s" repeatCount="indefinite" calcMode="linear" path="M596.8 326 V380" keyTimes="0;0.7400;0.7900;1" keyPoints="0;0;1;1"/><animate attributeName="opacity" dur="10s" repeatCount="indefinite" keyTimes="0.0000;0.7280;0.7400;0.7900;0.8020;1.0000" values="0;0;1;1;0;0"/></rect><rect x="532.8" y="366" width="128.0" height="28" rx="2" style="fill:var(--clay)" opacity="0"><animate attributeName="opacity" dur="10s" repeatCount="indefinite" keyTimes="0.0000;0.7780;0.7900;0.8200;0.8320;1.0000" values="0;0;1;1;0;0"/></rect><text opacity="0" class="mono small clay" x="532.8" y="418">offset 52 000<animate attributeName="opacity" dur="10s" repeatCount="indefinite" keyTimes="0.0000;0.7580;0.7700;0.8200;0.8320;1.0000" values="0;0;1;1;0;0"/></text><rect class="lit" x="660.8" y="290" width="128.0" height="36" rx="5" opacity="0"><animate attributeName="opacity" dur="10s" repeatCount="indefinite" keyTimes="0.0000;0.8180;0.8300;0.9300;0.9420;1.0000" values="0;0;1;1;0;0"/></rect><rect class="dot" x="-3.5" y="-3.5" width="7" height="7" opacity="0"><animateMotion dur="10s" repeatCount="indefinite" calcMode="linear" path="M724.8 326 V380" keyTimes="0;0.8500;0.9000;1" keyPoints="0;0;1;1"/><animate attributeName="opacity" dur="10s" repeatCount="indefinite" keyTimes="0.0000;0.8380;0.8500;0.9000;0.9120;1.0000" values="0;0;1;1;0;0"/></rect><rect x="660.8" y="366" width="128.0" height="28" rx="2" style="fill:var(--clay)" opacity="0"><animate attributeName="opacity" dur="10s" repeatCount="indefinite" keyTimes="0.0000;0.8880;0.9000;0.9300;0.9420;1.0000" values="0;0;1;1;0;0"/></rect><text opacity="0" class="mono small clay" x="660.8" y="418">offset 72 000<animate attributeName="opacity" dur="10s" repeatCount="indefinite" keyTimes="0.0000;0.8680;0.8800;0.9300;0.9420;1.0000" values="0;0;1;1;0;0"/></text></g>
+</svg>

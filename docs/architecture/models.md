@@ -206,7 +206,7 @@ Downloads go through Ollama (`golem/models/pulls.py`):
 
 ## Read more
 
-- Next: *Tools and tool calling*, what happens when the reply asks for a tool (chapter 3, coming next).
+- Next: [Tools](./tools.md), what happens when the reply asks for a tool.
 - Before: [The agent loop](./agent-loop.md).
 - [Models and API keys](../guide/models.md), the user's guide to the same thing.
 - [The overview](../architecture.md): the whole system on one page.
