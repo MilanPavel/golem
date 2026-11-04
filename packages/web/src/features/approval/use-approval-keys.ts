@@ -1,6 +1,6 @@
 import type { ApprovalChoice } from "@golem/view";
 import { useEffect, useRef } from "react";
-import { keyDecision } from "./text.ts";
+import { approvalKey } from "./text.ts";
 
 const EDITABLE = "input, textarea, select, [contenteditable]:not([contenteditable='false'])";
 const OVERLAY = "[role=dialog], [role=menu], [role=listbox]";
@@ -35,9 +35,10 @@ export function useApprovalKeys({
     function onKeyDown(event: KeyboardEvent): void {
       if (event.defaultPrevented || event.isComposing || event.repeat) return;
       if (event.metaKey || event.ctrlKey || event.altKey) return;
-      const edit = event.key === "e" || event.key === "E";
-      const decision = edit ? null : keyDecision(event.key);
-      if (decision === null && !edit) return;
+      const found = approvalKey(event.key);
+      if (found === null) return;
+      const edit = found === "edit";
+      const decision = edit ? null : found;
       if (inside(event.target, EDITABLE) || inside(event.target, OVERLAY)) return;
       if (event.key === "Enter" && inside(event.target, INTERACTIVE)) return;
       if (!latest.current.canAnswer()) return;

@@ -13,6 +13,7 @@ import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type Clip
 import { cn } from "../../ui/cn.ts";
 import { SendIcon, StopIcon } from "../../ui/icons.tsx";
 import { recall, type History, type Recall } from "./history.ts";
+import { registerComposer } from "./active-composer.ts";
 import { SuggestionList } from "./suggestion-list.tsx";
 import "./composer.css";
 
@@ -49,6 +50,8 @@ export type ComposerProps = {
   label?: string;
   autoFocus?: boolean;
   describedBy?: string;
+  /** The command palette runs its commands in this composer, and fills its draft. */
+  forPalette?: boolean;
 };
 
 /** A slash command is not held back by a run in progress, but `//` is a message. */
@@ -88,6 +91,7 @@ export function Composer({
   label = "Message",
   autoFocus = false,
   describedBy,
+  forPalette = false,
 }: ComposerProps) {
   const field = useRef<HTMLTextAreaElement>(null);
   const [hint, setHint] = useState<string | null>(null);
@@ -104,6 +108,31 @@ export function Composer({
   useEffect(() => {
     live.current = { text, pastes };
   });
+
+  const latest = useRef({ onSend, onTextChange, onEdit, onPastesChange, history });
+  useEffect(() => {
+    latest.current = { onSend, onTextChange, onEdit, onPastesChange, history };
+  });
+
+  useEffect(() => {
+    if (!forPalette) return;
+    return registerComposer({
+      run: (line) => latest.current.onSend(line),
+      insert: (value) => {
+        // The new line replaces the draft, so the old one goes to history: ↑ brings it back.
+        const old = expandPastes(live.current.text, live.current.pastes);
+        if (old.trim() !== "" && old !== value) latest.current.history.add(old);
+        caret.current = "end";
+        recalled.current = null;
+        setBrowsing(false);
+        latest.current.onEdit?.();
+        latest.current.onPastesChange(noPastes);
+        latest.current.onTextChange(value);
+        field.current?.focus();
+      },
+      focus: () => field.current?.focus(),
+    });
+  }, [forPalette]);
 
   useEffect(() => {
     if (autoFocus) {

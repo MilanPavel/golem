@@ -1,5 +1,6 @@
 import { Link } from "../../ui/link.tsx";
 import { useNavigate, useRoute } from "../../store/page-context.tsx";
+import { openPalette, PaletteHost } from "../palette/index.ts";
 import { Sidebar } from "../sessions/index.ts";
 import { HomeScreen } from "./home-screen.tsx";
 import { SessionScreen } from "./session-screen.tsx";
@@ -36,10 +37,11 @@ function Content() {
 export function Shell() {
   return (
     <div className="flex h-dvh bg-bg text-ink">
-      <Sidebar />
+      <Sidebar onSearch={openPalette} />
       <main className="flex min-w-0 flex-1 flex-col">
         <Content />
       </main>
+      <PaletteHost />
     </div>
   );
 }

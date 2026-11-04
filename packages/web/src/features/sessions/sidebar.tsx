@@ -3,11 +3,12 @@ import { cn } from "../../ui/cn.ts";
 import { Button } from "../../ui/button.tsx";
 import { GOLEM_STATE_LABEL } from "../../ui/golem-state.ts";
 import { IconButton } from "../../ui/icon-button.tsx";
-import { FolderIcon, MoreIcon, PlusIcon } from "../../ui/icons.tsx";
+import { FolderIcon, MoreIcon, PlusIcon, SearchIcon } from "../../ui/icons.tsx";
 import { Kbd } from "../../ui/kbd.tsx";
 import { Link } from "../../ui/link.tsx";
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "../../ui/menu.tsx";
 import { PixelGolem } from "../../ui/pixel-golem.tsx";
+import { isMac, modShortcut } from "../../ui/platform.ts";
 import { ThemeSwitch } from "../../theme-switch.tsx";
 import type { ConnectionSnapshot } from "../../store/connection.ts";
 import { useConnection } from "../../store/connection-context.tsx";
@@ -221,10 +222,12 @@ export type SidebarViewProps = {
   label?: string;
   /** Rename and close from each row's menu. Without it the rows have no menu. */
   actions?: SidebarActions;
+  /** Opens the command palette; `trigger` is the button, for focus afterwards. Without it there is no Search button. */
+  onSearch?: (trigger: HTMLElement) => void;
 };
 
 /** The sidebar of docs/design/web.md: golem's state, New session, sessions by folder, the connection and the theme. */
-export function SidebarView({ sessions, selectedId, connection, now, onNavigate, label = "Sessions", actions }: SidebarViewProps) {
+export function SidebarView({ sessions, selectedId, connection, now, onNavigate, label = "Sessions", actions, onSearch }: SidebarViewProps) {
   const [closing, setClosing] = useState<SessionSummary | null>(null);
   // Where focus goes when the dialog shuts: the row's menu button, or New session once the row is gone.
   const closeTrigger = useRef<HTMLButtonElement | null>(null);
@@ -248,10 +251,21 @@ export function SidebarView({ sessions, selectedId, connection, now, onNavigate,
       <Button ref={newSession} className="w-full justify-start" onClick={() => onNavigate("/")}>
         <PlusIcon />
         New session
-        <Kbd className="ml-auto" aria-hidden="true">
-          ⌘N
-        </Kbd>
       </Button>
+      {onSearch ? (
+        <Button
+          kind="ghost"
+          className="w-full justify-start"
+          aria-keyshortcuts={isMac() ? "Meta+K" : "Control+K"}
+          onClick={(event) => onSearch(event.currentTarget)}
+        >
+          <SearchIcon />
+          <span className="truncate">Search or run a command</span>
+          <Kbd className="ml-auto" aria-hidden="true">
+            {modShortcut("K")}
+          </Kbd>
+        </Button>
+      ) : null}
       <div className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto pr-0.5">
         {groupByFolder(shown).map((group) => (
           <FolderGroup
@@ -290,7 +304,7 @@ export function SidebarView({ sessions, selectedId, connection, now, onNavigate,
 }
 
 /** The sidebar on the live page. It refreshes its "2m" labels once a minute. */
-export function Sidebar() {
+export function Sidebar({ onSearch }: { onSearch?: (trigger: HTMLElement) => void }) {
   const sessions = useSessionList();
   const route = useRoute();
   const navigate = useNavigate();
@@ -306,6 +320,7 @@ export function Sidebar() {
       now={now}
       onNavigate={navigate}
       actions={actions}
+      onSearch={onSearch}
     />
   );
 }

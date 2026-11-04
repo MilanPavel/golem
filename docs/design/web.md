@@ -26,7 +26,7 @@ It borrows the calm, centred reading column and generous input from Claude's cha
 ```
 ┌──────────────┬───────────────────────────────────────┬──────────────┐
 │ ▞ golem      │ Session title       model · folder  ▯ │ Todos Session│
-│ + New  ⌘N    ├───────────────────────────────────────┤ Wire         │
+│ + New        ├───────────────────────────────────────┤ Wire         │
 │ Search  ⌘K   │                                       │              │
 │              │           you: a question  ▐          │ 2 of 4 ▬▬▬▭  │
 │ ~/repos/golem│  ▞ (hover: 14:02)                     │ ☑ Find …     │
@@ -45,7 +45,7 @@ It borrows the calm, centred reading column and generous input from Claude's cha
    268 px            column at most 46 rem                 320 px
 ```
 
-- **Sidebar** (`sunken`): the wordmark with golem's state, New session, Search or run a command (⌘K), then sessions grouped by folder. Each session has a small square for its state, its title, and how long ago it was active. A fork is indented under its parent with `⑂`. At the bottom are the connection, the version, and the theme switch.
+- **Sidebar** (`sunken`): the wordmark with golem's state, New session, a Search button (`Search or run a command`, with its key, ⌘K or Ctrl K) that opens the palette, then sessions grouped by folder. Each session has a small square for its state, its title, and how long ago it was active. A fork is indented under its parent with `⑂`. At the bottom are the connection, the version, and the theme switch.
 - **Top bar:** the session title, the model chip, the folder chip, and the drawer toggle.
 - **Column:**
   - Your messages are right-aligned slips in `slip`.
@@ -124,10 +124,25 @@ The page keeps retrying behind "daemon down", and the screen goes away by itself
 
 ## The ⌘K palette
 
-- A centred dialog with a search field on top.
-- The commands come from the TUI's slash-command table, grouped as Session, Model, Tools, and View. Each row has the `/name` in clay mono, a description, and its shortcut.
-- Typing filters the list. Up and Down move, Enter runs, and Esc closes.
-- Text that matches no command is sent as a message, the same as in the composer.
+- **Opening:** ⌘K on macOS, Ctrl+K elsewhere, from anywhere on the page, also while typing in the message box. It toggles, so the same key closes it. It does not open over another dialog. The sidebar's Search button opens it too. Browsers keep ⌘N for a new window, so the page binds no key for New session.
+- A centred dialog with a search field on top, named `Commands`, and a footer line `↵ run · ↑↓ move · esc close`. It is the same combobox and grouped list as the model dialog.
+- The commands come from the TUI's slash-command table, grouped as Session, Model, Tools, and View. Each row has the `/name` in clay mono, its arguments in faint mono, a description, and its key on the right when it has one (`/help` has `?`). A command the page lacks says `In the terminal for now` and still runs, which prints where it lives. View also has a `Keys` row, which is not a slash command; it opens the key list.
+- Typing filters on the name, the arguments, and the description, ignoring case. Names that start with the text come first. Up and Down move, Enter runs, and Esc closes and gives focus back to what had it.
+- **Who runs a command:** the composer on screen, through the same path as typing the line: the session's dock, or the start page's composer. With none (the not-found screen), the commands are listed, the palette says `Open a session or the start page to run commands.`, and Enter does nothing.
+- **What Enter does on a command:**
+  - No arguments, or only optional ones (`[...]`): it runs at once as `/name`, and the palette closes. `/title` shows the title, `/model` opens the model dialog, `/copy` copies the answer.
+  - A required argument (`<provider>`, `run|pin|unpin <name>`): it does not run. The palette closes and puts `/name ` in the message box with focus there, so the slash suggestions take over.
+- **Text that matches no command** leaves one row, `Send "<text>"`, in its own group `Message`. Enter sends it through the composer, so on the start page it starts a session. Text that starts with `/` and matches nothing runs too, which shows the unknown-command notice. If a run in progress holds the message back, it goes to the message box instead.
+
+## The key list
+
+- A dialog `Keys`, opened with `?` when focus is not in a field, and from the palette's `Keys` row. It does not open over another dialog. Esc closes it and focus goes back.
+- Sections, each key in a `Kbd`:
+  - **Page:** ⌘K the palette, ? this list, Esc close a dialog.
+  - **Composer:** ↵ send, ⇧↵ new line, ↑↓ earlier messages, / commands, Tab complete a command, Esc stop the answer.
+  - **Approval** (while one waits and the message box is empty and not focused): ↵ allow once, S for this session, W always, E edit, D deny. The list reads the same table the keys do.
+  - **Model dialog:** ↑↓ move, ↵ use or download, Esc clear the search, then close.
+- ⌘ is Ctrl off macOS, everywhere a key is shown.
 
 ## The model dialog
 
