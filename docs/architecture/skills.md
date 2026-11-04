@@ -1,7 +1,7 @@
 ---
 title: Skills
 description: How an agent learns a job it is not trained for without filling every call, and how golem finds skills, picks the one a name means, and runs it.
-order: 7
+order: 10
 adrs: [25, 30]
 ---
 

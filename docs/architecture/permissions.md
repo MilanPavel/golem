@@ -1,7 +1,7 @@
 ---
 title: Permissions
 description: Why an agent asks before it acts, how rules decide allow, ask, or deny, and how golem's approvals pause a run without holding it in memory.
-order: 4
+order: 7
 adrs: [12, 13]
 ---
 

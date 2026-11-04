@@ -40,29 +40,9 @@ What talks to what, and how:
 
 *Like the golem of Prague, the daemon keeps working through the night while its master is away.*
 
-One daemon per user. It starts when you log in, and launchd starts it again if it crashes. Closing the TUI does not stop it. That is the point: a chat can finish, or wait for your approval, while the TUI is closed.
-
-Clients reach it through a Unix socket at `~/.golem/run/golem.sock`. The file mode is `0600`, so only your user can open it. That permission is the login check. There is no account and no password. `run/golem.pid` is the lock that lets a restart delete a socket left behind by a crash. Every 5 s the daemon checks that the socket file is still the one it bound. If it is gone or replaced, as when `~/.golem` is deleted, the daemon stops, so launchd starts one that clients can reach. [ADR-004](adr/004-pid-lock.md) is that lock. A start that gives up on purpose (the lock is held, the socket path is too long, or `golem.db` is from a newer golem) writes the reason and the next step to `run/last-error` (`golem/server/start_error.py`). The lock case names the holder's pid and command line, which shows a checkout's path for a `uv run` daemon. While nothing answers, the TUI shows that file in its banner, and `golem status` prints it. With no such file and a launch agent installed, the banner says the service isn't answering, and `r` with an empty composer runs `golem daemon restart`.
+The daemon's process, its socket and lock, and what it owns are in [The daemon](architecture/daemon.md).
 
 <br clear="left">
-
-### What the daemon owns
-
-The socket is only the door. Behind it, these jobs sit in one process:
-
-| Job | What it does | Status |
-|---|---|---|
-| Protocol server | Reads one JSON line at a time. Runs the command. Queues the reply, and the events of attached sessions, for that connection. | Built |
-| Sessions | One chat or one flow run. Each has an id and a row in `golem.db`. | Built |
-| Graph runtime | The agent loop. Its memory is the checkpoint. | Built |
-| Model router | Resolves a profile name or `provider/model` ref to a chat model. | Built |
-| Tools | Plain Python functions with a Pydantic argument model, in `golem/tools/`. The graph offers them to the model and runs them in its own `tools` node ([Tools](architecture/tools.md)). | Built: file reads and writes, `shell`, git, `web_fetch` |
-| MCP servers | Child processes or HTTP endpoints from `[mcp.<name>]`, started in the background, watched with `ping`, and restarted with backoff. Each session's tools come from `ToolRegistry.scoped` (`golem/mcp/`, [MCP](architecture/mcp.md)). | Built |
-| Permissions | Rules from the project, the user, and the defaults, checked in order before every tool call (`golem/permissions/`, [Permissions](architecture/permissions.md)). | Built |
-| Skills | The `SKILL.md` folders a session's folder sees, and which one each name means (`golem/skills/`, [Skills](architecture/skills.md)). | Built: finding, listing, running by name, and pinning. The model picking one planned |
-| Event log | The history. Every event, numbered by `seq`, written before it is sent. A client that reconnects reads it and rebuilds the screen ([Sessions that survive](architecture/sessions.md)). | Built |
-
-What the graph owns, and what it calls instead, is in [The agent loop](architecture/agent-loop.md#what-the-graph-owns-and-what-it-calls).
 
 ### One turn
 
@@ -116,72 +96,9 @@ Skills, from finding and listing them to running one by name, are in [Skills](ar
 
 *In the legend, the golem obeyed only what was written on the shem, the scroll in its chest. The daemon is the same: it acts only on messages in the agreed shape.*
 
-The protocol exists so a client never has to understand the daemon's insides.
-
-The graph library has its own message classes, and those classes change. If the TUI spoke those classes, every client would be tied to that library, and a reconnect would have no stable history to read. So the daemon translates. What crosses the socket is our messages only.
+The protocol, from `hello` to what is on the wire, is in [The protocol](architecture/protocol.md).
 
 <br clear="left">
-
-### Two directions
-
-**Commands** go from client to daemon. They ask for something: open a session, send a sentence, approve a tool, cancel a run, list flows.
-
-**Events** go from daemon to client. They report something that already happened: a token arrived, a tool finished, a model was chosen, a run stopped.
-
-An event is a fact. The client builds the whole screen from the facts, in order. The daemon writes every fact to the event log first. Replay is not a special mode: it is the same stream, read from the start or from the last number the client has.
-
-```mermaid
-sequenceDiagram
-  participant Client
-  participant Daemon
-  Client->>Daemon: hello
-  Daemon-->>Client: version ok, or refuse
-  Client->>Daemon: attach session, after seq 1841
-  Daemon-->>Client: event seq 1842
-  Daemon-->>Client: event seq 1843
-  Client->>Daemon: message.send
-  Daemon-->>Client: message.delta, then message.completed
-```
-
-`hello` is the first command. The client and the daemon compare protocol versions. A break in the shapes bumps the major number, and the daemon refuses the client. Any minor on the same major is accepted. The current numbers and what each minor added are in [ADR-003](adr/003-protocol.md).
-
-A connection gets a session's events only after `session.attach`. Several connections can attach to one session, and each gets every event. The daemon holds one lock per session while it reads the replay and subscribes the connection, so no event lands in between. Each connection has its own outbound queue, so a slow terminal does not slow a run. A client that falls 20 000 lines behind is dropped, and it attaches again from its last `seq`.
-
-Each event line is one JSON-RPC 2.0 notification. The fields that matter:
-
-| Field | Meaning |
-|---|---|
-| `seq` | A rising number for this session. It survives a restart and can skip numbers. The client uses it to ask for "everything after here". |
-| `session_id` | Which chat or flow |
-| `run_id` | Which execution, when a session can have more than one |
-| `type` | What happened, such as `message.delta` |
-| `data` | The payload for that type |
-
-`tool.output` works the same way for a running tool call: its rows are deleted when the call's `tool.completed` or `tool.failed` is written, which keeps a short preview.
-
-`message.delta` is the live token stream. `golem.db` keeps the deltas only while the message is open. Writing its `message.completed` deletes them in the same transaction, so the database does not keep every fragment, and a reader that comes in mid-answer can still see the text so far. That is why `seq` skips numbers.
-
-`message.completed` has `interrupted: true` when the run stopped before the model finished. Its text is then what had streamed.
-
-### What is on the wire today
-
-| Commands | Events |
-|---|---|
-| `hello`, `ping`, `daemon.status`, `session.create`, `session.attach`, `session.detach`, `session.list`, `session.rename`, `session.fork`, `session.close`, `session.set_skills`, `message.send`, `run.cancel`, `approval.respond`, `session.inspect`, `config.get`, `policy.update`, `policy.remove`, `session.revoke`, `auth.set`, `auth.remove`, `auth.list`, `model.list`, `session.set_model`, `model.set_default`, `model.probe`, `model.pull`, `model.pull_cancel`, `model.delete`, `artifact.read`, `mcp.list`, `mcp.enable`, `mcp.disable`, `mcp.tools`, `mcp.restart`, `mcp.set_enabled`, `skill.list`, `setup.status`, `ollama.install`, `ollama.install_cancel`, `ollama.start` | `session.created`, `model.selected`, `message.started`, `message.delta`, `message.completed`, `tool.requested`, `tool.started`, `tool.output`, `tool.completed`, `tool.failed`, `approval.needed`, `approval.resolved`, `todos.updated`, `skill.activated`, `skill.deactivated`, `skill.skipped`, `run.started`, `run.completed`, `run.failed`, `run.cancelled`, `session.updated`, `session.closed`; `session.summary` to watchers; `model.pull.progress`, `model.pull.done`, `ollama.install.output`, `ollama.install.done`, `mcp.server.status`, `model.server.status`, and `skill.registry.changed` to every connection |
-
-After `hello`, a client sends `ping` every few seconds so a half-open socket is noticed. `daemon.status` returns the pid, uptime, and configured model, and the local model servers golem has used: who runs each one, and for one golem started its pid and memory. A new chat sends `session.create` with its `cwd`, then `session.attach` with `after_seq` 0, then `message.send`. `session.list` returns sessions newest activity first, each with `idle`, `running`, or `waiting` for an approval, its title, its folder (`cwd`), and its last `seq`. With `cwd`, it lists only the sessions in that folder; `cwd` does not go with `watch`. With `watch: true`, the connection also gets a `session.summary` after every change to any session, until it closes. `session.rename` sets a title by hand. `session.fork` copies a session's history up to one message into a new session, and the client attaches to it. `session.detach` stops one session's events. `session.inspect` reads the saved checkpoint messages and does not call the model. When golem has a system prompt for the session, it comes first, with role `system`, and `message_count` leaves it out ([ADR-031](adr/031-system-prompt.md)). A reply that called tools lists each call as `→ name(args)` after its text. `auth.set` tries a model provider's API key against the provider, then stores it in the Keychain, and a key the provider refuses is not stored ([ADR-035](adr/035-daemon-installs-ollama.md)). `auth.remove` deletes it, and `auth.list` says where each provider's key is without returning it. The client shows `auth.set` in the wire view with the key replaced by `[redacted]`.
-
-Switching a session's model, model errors, the local model server, and downloads are in [Talking to models](architecture/models.md#the-details).
-
-The MCP methods, `mcp.list` to `mcp.server.status`, are in [MCP](architecture/mcp.md#on-the-wire).
-
-The default model and `model.list` are in [Talking to models](architecture/models.md#the-model-list).
-
-### Why a protocol package
-
-Those shapes are written once, as Python classes in `golem_protocol`. `just gen` writes JSON Schema, then TypeScript, into `packages/protocol/gen/`. `@golem/client` imports the generated types, and the TUI and `golem status` both use that client. A hand-written TypeScript copy would drift, and the bug would show up as a wrong screen. Here `just check` fails if the generated files do not match the classes.
-
-Adding a message is the same every time. Add a class, run `just gen`, and the client sees a typed payload.
 
 ## The TUI
 
