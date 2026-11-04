@@ -1,8 +1,8 @@
-import axe from "axe-core";
 import type { Locator, Page } from "@playwright/test";
 
 import { XSS_CORPUS } from "../src/features/chat/xss-corpus.ts";
 import { startFakeModel, type FakeModel } from "./fake-model.ts";
+import { axeViolations } from "./axe.ts";
 import { expect, test } from "./fixtures.ts";
 import { startDaemon, startGateway, writeModelConfig, type Daemon, type Gateway, type Rig } from "./harness.ts";
 
@@ -215,17 +215,6 @@ export function add(a: number, b: number): number {
 
 A [link](https://example.com) to read.
 `;
-
-async function axeViolations(page: Page): Promise<string[]> {
-  await page.evaluate(axe.source);
-  const results = await page.evaluate(async () => {
-    const run = (window as unknown as { axe: { run: (c: Document) => Promise<{ violations: { id: string; impact: string | null; nodes: { target: unknown[] }[] }[] }> } }).axe.run;
-    return run(document);
-  });
-  return results.violations
-    .filter((v) => v.impact === "serious" || v.impact === "critical")
-    .map((v) => `${v.impact} ${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(" | ")}`);
-}
 
 for (const [theme, label] of [
   ["slip", "parchment"],

@@ -87,6 +87,7 @@ const sidebar: DefaultTheme.Sidebar = [
       { text: "Overview", link: "/architecture" },
       { text: "1. The agent loop", link: "/architecture/agent-loop" },
       { text: "2. Talking to models", link: "/architecture/models" },
+      { text: "3. Tools", link: "/architecture/tools" },
     ],
   },
   {
