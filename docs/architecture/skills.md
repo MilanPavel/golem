@@ -166,7 +166,7 @@ Each source is read one level deep. A folder with a `SKILL.md` is a skill, and a
 
 **5. Seeing them.** `skill.list {cwd}` returns every skill found, winners first, each with its `source`, `path`, `usable`, `shadowed_by`, `errors`, `warnings`, and header flags. `/skills` in the TUI shows them by source, and opens one with its details. `golem skills` prints the same list. `golem skills check <path>` runs the parser in the daemon executable without a running daemon, prints every error and warning, and exits with 1 on an error.
 
-The settings, `[skills] disabled`, `claude_dirs`, and `extra_dirs`, are in the [overview's settings list](../architecture.md#files-on-disk).
+The settings, `[skills] disabled`, `claude_dirs`, and `extra_dirs`, are in the [overview's settings list](../architecture.md#settings).
 
 ### Files
 

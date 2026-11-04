@@ -60,7 +60,7 @@ The socket is only the door. Behind it, these jobs sit in one process:
 | MCP servers | Child processes or HTTP endpoints from `[mcp.<name>]`, started in the background, watched with `ping`, and restarted with backoff. Each session's tools come from `ToolRegistry.scoped` (`golem/mcp/`, [MCP](architecture/mcp.md)). | Built |
 | Permissions | Rules from the project, the user, and the defaults, checked in order before every tool call (`golem/permissions/`, [Permissions](architecture/permissions.md)). | Built |
 | Skills | The `SKILL.md` folders a session's folder sees, and which one each name means (`golem/skills/`, [Skills](architecture/skills.md)). | Built: finding, listing, running by name, and pinning. The model picking one planned |
-| Event log | The history. Every event, numbered by `seq`, written before it is sent. A client that reconnects will read it and rebuild the screen. | Written. Replay to clients planned |
+| Event log | The history. Every event, numbered by `seq`, written before it is sent. A client that reconnects reads it and rebuilds the screen ([Sessions that survive](architecture/sessions.md)). | Built |
 
 What the graph owns, and what it calls instead, is in [The agent loop](architecture/agent-loop.md#what-the-graph-owns-and-what-it-calls).
 
@@ -70,9 +70,7 @@ One turn, the graph, its messages, failures and the cap, the folder, and models 
 
 The system prompt, built for each call and never stored, is in [Context](architecture/context.md#the-system-prompt). Tool events, long output and artifacts, and todos are in [Tools](architecture/tools.md#the-details).
 
-If you quit the TUI halfway through, the daemon still finishes the run and saves the checkpoint. The next message in that session continues from it.
-
-If you press Ctrl-C while the answer streams, the TUI sends `run.cancel`. The daemon cancels the run task. Each tool call still open gets `tool.failed`. The answer gets a `message.completed` with the text streamed so far and `interrupted: true`, then `run.cancelled` with the reason `user`. The same partial text is written into the checkpoint, so "go on" continues from it ([ADR-008](adr/008-cancellation.md)). Stopping the daemon does the same for every open run, with the reason `shutdown`.
+A run with no window, a cancel, and a crash are in [Sessions that survive](architecture/sessions.md#the-details).
 
 The shell sandbox, the git tools, and the file tools' folders are in [Sandboxes](architecture/sandboxes.md#the-details).
 
@@ -80,31 +78,11 @@ The shell sandbox, the git tools, and the file tools' folders are in [Sandboxes]
 
 Approvals, from the pause to the resume, are in [Permissions](architecture/permissions.md#approvals).
 
-A run stopped between a reply and its tool results leaves tool calls without a result in the checkpoint, and providers refuse that history. Before the next turn streams, each such call gets a result that says it was cancelled.
-
-If the daemon dies halfway through, the run has no task left to finish it. At the next start the daemon closes it: each open tool call gets `tool.failed`, the open answer gets a `message.completed` with the text streamed so far and `interrupted: true`, then `run.failed`. The same partial text is written into the checkpoint, so the model's next turn sees what the screen showed.
-
-A step that stops to ask you a question runs again from its first line when you answer. The side effect goes after that stop, or in its own step, so a resume does not do it twice.
-
 ### Files on disk
 
-The daemon keeps its files under one home directory. `resolve_paths` picks it: a function argument, otherwise `GOLEM_HOME`, otherwise `~/.golem`.
+The files under `~/.golem`, the event log, and migrations and backups are in [Sessions that survive](architecture/sessions.md#files-on-disk).
 
-| Path | Role | Status |
-|---|---|---|
-| `run/golem.sock` | The socket clients connect to | Built |
-| `run/golem.pid` | The lockfile. The daemon holds a flock on it and writes its pid | Built |
-| `run/last-error` | Why the last start failed, then the next step, on two lines. A start that listens removes it | Built |
-| `checkpoints.db` | Model memory for a chat. The thread id is the session id. Separate so it can be wiped without deleting the event log | Built |
-| `config.toml` | Settings for this user | Built |
-| `logs/golem.jsonl` | The daemon's own log, one JSON object per line | Built |
-| `cache/` | Hosted model lists (`models-<provider>.json`) and LiteLLM's prices (`litellm-prices.json`), each refreshed after a day. Safe to delete | Built |
-| `golem.db` | The event log, the `sessions` and `runs` tables derived from it, and `artifacts`, the long tool output. Costs later | Built |
-| `memory.db` | Long-term memory | Planned |
-| `skills/` | Skills you added on this machine, one folder each | Built |
-| `flows/` | Flows you added on this machine | Planned |
-
-In `golem.db`, `events` is the source. `sessions` and `runs` are written in the same transaction as the event they follow: `session.created` adds a session with its project folder (`cwd`), `run.started` opens a run, `approval.needed` marks it `waiting` and `approval.resolved` marks it running again, and `run.completed`, `run.failed`, or `run.cancelled` closes it. An `approval.resolved` with `allow_session` adds the tool to `sessions.allowed_tools`. `session.updated` sets the title, or the folder of a session that had none. `session.closed` records `closed_at`, which hides the session from `session.list`; the events stay. `artifacts` is not derived from events: the `tools` node writes a row for each long tool output, by session. The schema version is SQLite's `user_version`. Each numbered migration in `golem/store/migrations.py` runs once, in its own transaction, with a row in `schema_version` (the schema, the golem version that applied it, and when). Before the first pending migration, `golem/store/backup.py` copies the file to `golem.db.bak-<schema>` with SQLite's backup API, under a temporary name until the copy is complete, with the original's permissions. A file from a newer daemon is refused and left as it is; the error names the golem version that `schema_version` says wrote it, and `golem.db.bak-<schema>` when this daemon's schema has a copy. `library_versions` holds the LangGraph package versions that last opened `checkpoints.db`. `golem/store/checkpoints.py` compares them at start and, when they differ, copies that file to `checkpoints.db.bak-<langgraph version>` and records the new versions before LangGraph's saver opens it.
+### Settings
 
 Settings come from three places. Each one overrides the one before it: `~/.golem/config.toml`, then `<project>/.golem/config.toml`, then `GOLEM_…` environment variables. An explicit `log_level` passed to `load_settings` wins over all three. The keys read today:
 

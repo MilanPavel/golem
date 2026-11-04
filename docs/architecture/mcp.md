@@ -264,7 +264,7 @@ golem's client follows one protocol version. A server that answers with another 
 
 ## Read more
 
-- Next: *Sessions that survive*: the event log, checkpoints, cancel, crash recovery, and fork (chapter 9, coming next).
+- Next: [Sessions that survive](./sessions.md): the event log, checkpoints, cancel, crash recovery, and fork.
 - Before: [Skills](./skills.md).
 - [MCP servers](../guide/mcp.md), the user's guide: adding servers, tokens, and every setting.
 - [The MCP specification](https://modelcontextprotocol.io/specification).
