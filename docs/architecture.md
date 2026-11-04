@@ -20,57 +20,11 @@ A **client** attaches to that work. The TUI and the `golem` command are clients 
 
 The **protocol** is the only language between them. The daemon is Python. The clients are TypeScript. They do not share objects. They share message shapes, written once and generated for both sides.
 
-## Words used here
-
-| Word | Meaning |
-|---|---|
-| Daemon | The one background Python process per user. It owns the files and runs the model. |
-| Client | Any program that connects to the daemon's socket. It sends commands and reads events. |
-| Session | One chat, or later one flow. It has an id. |
-| Run | One answer inside a session: from the sentence you send until the model stops. |
-| Command | A request from a client to the daemon, such as `message.send`. |
-| Event | A fact the daemon reports back, such as `message.delta`. |
-| Checkpoint | The model's saved memory for a session, stored after each step. |
-| Graph | The agent loop. A LangGraph library call inside the daemon, not a separate service. |
-| Flow | A graph whose steps our Python picks, and whose expensive steps are saved. Planned. |
-| Skill | A folder with a `SKILL.md`: what one job is for, and how to do it. Found and listed today; used by the model next. |
-
 ## The system on one machine
 
 Everything runs on your machine, except the model when you pick a remote provider. There are two kinds of process: one daemon, and any number of clients.
 
-```mermaid
-flowchart LR
-  launchd["launchd"]
-  subgraph clientProcs ["Clients (Node)"]
-    tui["TUI"]
-    cli["golem command"]
-  end
-  sock["Unix socket<br>~/.golem/run/golem.sock"]
-  subgraph daemonProc ["Daemon (Python)"]
-    server["Protocol server"]
-    sessions["Session manager"]
-    runtime["Graph runtime<br>(LangGraph)"]
-    router["Model router"]
-  end
-  subgraph disk ["~/.golem"]
-    ckpt[("checkpoints.db<br>SQLite")]
-    golemdb[("golem.db<br>SQLite")]
-    memdb[("memory.db<br>planned")]
-  end
-  model["Model API<br>Anthropic, OpenAI, or local Ollama"]
-  launchd -->|"starts, restarts"| daemonProc
-  tui -->|"JSON lines"| sock
-  cli -->|"JSON lines"| sock
-  sock --> server
-  server --> sessions
-  sessions --> runtime
-  runtime --> router
-  runtime -->|"read, write"| ckpt
-  router -->|"HTTPS or local HTTP"| model
-  sessions -->|"append events"| golemdb
-  runtime -.-> memdb
-```
+<SystemMap />
 
 What talks to what, and how:
 
@@ -79,36 +33,6 @@ What talks to what, and how:
 - **Daemon to model.** HTTPS to Anthropic, OpenAI, or a hosted OpenAI-compatible API such as OpenRouter, or plain HTTP to Ollama's native API or a local OpenAI-compatible server. The model router resolves each session's model name to one of them.
 - **Daemon to disk.** SQLite files under `~/.golem`. `checkpoints.db` is written by LangGraph's SQLite checkpointer. `golem.db` is ours: the event log and the session and run tables, through one `aiosqlite` connection.
 - **Who starts what.** launchd starts the daemon at login and again after a crash. You start the clients. When no daemon answers and there is no launch agent, the TUI's setup window asks once whether to install it, or to run a daemon only while the terminal is open ([ADR-036](adr/036-setup-window-asks-for-the-service.md)). `golem web` asks the same in plain lines before it opens the browser ([ADR-033](adr/033-golem-offers-to-start-the-service.md)).
-
-## Built today, planned next
-
-Built today:
-
-- The daemon, its socket, the pid lock, and the launchd job.
-- `@golem/client`, the TUI, and `golem status`.
-- Chat sessions. Each one runs a single agent graph against the model it stored when it was created.
-- Checkpoints in `checkpoints.db`. They survive a daemon restart. [ADR-006](adr/006-checkpoint-continuity.md) is that choice.
-- The event log in `golem.db`. Every event is written there before it goes to the socket, so sessions, runs, and `seq` survive a restart. A run left open by a stopped daemon is closed at the next start.
-- `session.attach`. A client gets the stored events after the last `seq` it saw, then the live ones. Any number of clients can follow one session. The TUI opens the newest session in its working folder at startup, or a new one there. [ADR-007](adr/007-attach-and-fan-out.md) is that choice.
-- `run.cancel`, and Ctrl-C in the TUI. A cancelled answer keeps what it said. [ADR-008](adr/008-cancellation.md).
-- Titles, a live session list, and the TUI switcher (`/sessions`, `/new`, `/title`). [ADR-009](adr/009-session-list.md).
-- `session.fork` and `/fork`. A new session with the history up to one message. [ADR-010](adr/010-fork.md).
-- Read-only tools: `read_file`, `list_dir`, `glob`, and `grep`, inside the session's project folder, and inside the folder of each skill the session ran. [ADR-011](adr/011-tools.md), [ADR-030](adr/030-skill-read-roots.md).
-- `web_fetch`: one page as text, asked per host, never from a private address. [ADR-017](adr/017-web-fetch.md).
-- Artifacts: tool output over 20 000 characters in `golem.db`, read in pages with `read_artifact` and `artifact.read`. [ADR-016](adr/016-artifacts.md).
-- Write tools: `write_file` and `edit_file`, inside the session's project folder and outside its `.golem/` and `.git/`, with the diff in the approval. [ADR-015](adr/015-write-tools.md).
-- A sandboxed `shell`, with streamed output, and the read-only `git_status`, `git_diff`, and `git_log`. [ADR-014](adr/014-shell-sandbox.md).
-- Tool rules: allow, ask, or deny per tool, subject, and path, from `config.toml` and a project's `.golem/policy.toml`, and `golem config show`. [ADR-012](adr/012-permission-rules.md).
-- "Always allow" from the approval band, and `/permissions` to change, delete, or revoke rules and session allowances.
-- Approvals: a call a rule asks about pauses the run until you answer in the TUI, across a TUI close or a daemon restart. [ADR-013](adr/013-approvals.md).
-- An agent todo list: `todo_write`, `todos.updated`, and the todo band. [ADR-018](adr/018-tool-state-updates.md).
-- MCP servers over stdio or HTTP, from `[mcp.<name>]` in the user's file or a trusted project's. Their tools are `mcp__<server>__<tool>`, ask before every call, and reach the model marked as data. A server is on for every session, on demand per session (`/mcp enable`), or off. Servers restart with backoff when they exit or stop answering `ping`, and pick up config changes without a daemon restart. Tokens come from the Keychain as `keychain:mcp/<name>`. [ADR-023](adr/023-mcp-client.md).
-
-- Skills: `SKILL.md` folders from the project, the user, and golem, checked, listed with `/skills`, `golem skills`, and `skill.list`, and reloaded within two seconds of a change. `/name` runs one, and the model may then read its folder. Pinning one and letting the model pick one come next. [ADR-025](adr/025-skill-sources.md), and [Skills](#skills) below.
-
-Planned next:
-
-- Running, pinning, and loading skills, then flows and long-term memory in `memory.db`.
 
 ## The daemon
 
