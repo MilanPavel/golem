@@ -27,21 +27,23 @@ export function verdictText(answer: ApprovalAnswer): string {
   }
 }
 
+/** The keys that answer a pending approval, in the order the key list shows them. `key` is lower case. */
+export const APPROVAL_KEYS: readonly { key: string; shown: string; label: string; does: ApprovalChoice | "edit" }[] = [
+  { key: "enter", shown: "\u21b5", label: "allow once", does: "allow" },
+  { key: "s", shown: "S", label: "for this session", does: "allow_session" },
+  { key: "w", shown: "W", label: "always", does: "allow_always" },
+  { key: "e", shown: "E", label: "edit", does: "edit" },
+  { key: "d", shown: "D", label: "deny", does: "deny" },
+];
+
+/** What a key does to a pending approval: an answer, or "edit", or null for any other key. */
+export function approvalKey(key: string): ApprovalChoice | "edit" | null {
+  const lower = key.toLowerCase();
+  return APPROVAL_KEYS.find((entry) => entry.key === lower)?.does ?? null;
+}
+
 /** The answer a key stands for, or null. */
 export function keyDecision(key: string): ApprovalChoice | null {
-  switch (key) {
-    case "Enter":
-      return "allow";
-    case "s":
-    case "S":
-      return "allow_session";
-    case "w":
-    case "W":
-      return "allow_always";
-    case "d":
-    case "D":
-      return "deny";
-    default:
-      return null;
-  }
+  const does = approvalKey(key);
+  return does === "edit" ? null : does;
 }

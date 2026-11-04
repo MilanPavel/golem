@@ -78,6 +78,7 @@ export function SessionDock({ sessionId }: { sessionId: string }) {
         meter={<Meter state={state} runStartedAt={run.runStartedAt} />}
         composer={
           <Composer
+            forPalette
             text={text}
             onTextChange={setText}
             pastes={pastes}
