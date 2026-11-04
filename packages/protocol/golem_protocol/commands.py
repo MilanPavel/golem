@@ -180,7 +180,9 @@ class SessionSummary(BaseModel):
     waits for a tool approval, and ``closed`` after ``session.close``. ``last_seq`` is the newest
     stored event, so a client can tell what it has not seen, and which of
     two summaries of one session is newer. ``cwd`` is the session's project
-    folder, null for a session that has not been given one.
+    folder, null for a session that has not been given one. ``forked_from`` is
+    the id of the session this one was forked from, null for a session that is
+    not a fork. An older daemon leaves it out.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -193,6 +195,7 @@ class SessionSummary(BaseModel):
     updated_at: str = Field(min_length=1)
     last_seq: int = Field(ge=0)
     cwd: str | None = Field(default=None, min_length=1)
+    forked_from: str | None = Field(default=None, min_length=1)
 
 
 class SessionListResult(BaseModel):
