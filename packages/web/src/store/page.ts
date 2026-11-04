@@ -3,6 +3,8 @@ import type { QueryClient } from "@tanstack/react-query";
 import { createDrafts, type Drafts } from "./drafts.ts";
 import { createConnectionStore, type ConnectionStore } from "./connection.ts";
 import { createNewSessionFolder, type NewSessionFolderStore } from "./new-session.ts";
+import { MODEL_LIST_KEY, type ModelListResult } from "./models.ts";
+import { createPulls, type Pulls } from "./pulls.ts";
 import { createQueryClient, keepQueriesHonest } from "./query.ts";
 import { createRouter, type Router } from "./router.ts";
 import { createSessionList, type SessionList } from "./session-list.ts";
@@ -20,6 +22,7 @@ export type PageClient = Pick<
   | "onSkillsChanged"
   | "onMcpStatus"
   | "onPull"
+  | "onModelServer"
   | "status"
   | "attachSession"
   | "detachSession"
@@ -30,6 +33,12 @@ export type PageClient = Pick<
   | "forkSession"
   | "closeSession"
   | "cancelRun"
+  | "listModels"
+  | "setSessionModel"
+  | "setDefaultModel"
+  | "pullModel"
+  | "cancelPull"
+  | "deleteModel"
   | "respondApproval"
   | "checkNow"
   | "close"
@@ -46,6 +55,24 @@ export type PageActions = {
   fork(sessionId: string, atMessageId: string): Promise<string>;
   close(sessionId: string): Promise<void>;
   respond(sessionId: string, callId: string, decision: ApprovalChoice, args?: Readonly<Record<string, unknown>>): Promise<void>;
+  /** Switches the session's model. The chip changes from the daemon's `model.selected` event. */
+  useModel(sessionId: string, name: string): Promise<void>;
+  setDefault(name: string): Promise<void>;
+  /**
+   * Starts a download. With `after`, the page switches that session to the model when the
+   * download ends well, even if the dialog that asked is closed by then.
+   */
+  pull(ref: string, after?: { sessionId: string }): Promise<void>;
+  /** Stops a download. Ollama keeps the bytes for the next try. */
+  cancelPull(ref: string): Promise<void>;
+  remove(ref: string): Promise<void>;
+  /** Asks the providers again, past the daemon's cache, and puts the answer in the listing. */
+  refreshModels(): Promise<void>;
+};
+
+/** What each query key fetches. */
+export type PageQueries = {
+  modelList(): Promise<ModelListResult>;
 };
 
 export type Page = {
@@ -54,7 +81,9 @@ export type Page = {
   sessionList: SessionList;
   newSession: NewSessionFolderStore;
   drafts: Drafts;
+  pulls: Pulls;
   queryClient: QueryClient;
+  queries: PageQueries;
   router: Router;
   actions: PageActions;
   /**
@@ -77,6 +106,7 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
   const newSession = createNewSessionFolder();
   const drafts = createDrafts();
   const queryClient = createQueryClient();
+  const pulls = createPulls(client);
   const router = createRouter();
   const doc = options.doc ?? document;
   const uses = new Map<string, { count: number; timer: ReturnType<typeof setTimeout> | undefined }>();
@@ -95,7 +125,11 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
     sessionList,
     newSession,
     drafts,
+    pulls,
     queryClient,
+    queries: {
+      modelList: () => client.listModels(),
+    },
     router,
     actions: {
       async createSession(cwd) {
@@ -121,6 +155,34 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       async respond(sessionId, callId, decision, args) {
         if (args === undefined) await client.respondApproval(sessionId, callId, decision);
         else await client.respondApproval(sessionId, callId, decision, args);
+      },
+      async useModel(sessionId, name) {
+        await client.setSessionModel(sessionId, name);
+      },
+      async setDefault(name) {
+        await client.setDefaultModel(name);
+        await queryClient.invalidateQueries({ queryKey: MODEL_LIST_KEY });
+      },
+      async pull(ref, after) {
+        pulls.begin(ref);
+        if (after !== undefined) pulls.switchWhenDone(ref, after.sessionId);
+        try {
+          await client.pullModel(ref);
+        } catch (error) {
+          pulls.abort(ref);
+          throw error;
+        }
+      },
+      async cancelPull(ref) {
+        pulls.forget(ref);
+        await client.cancelPull(ref);
+      },
+      async remove(ref) {
+        await client.deleteModel(ref);
+        await queryClient.invalidateQueries({ queryKey: MODEL_LIST_KEY });
+      },
+      async refreshModels() {
+        queryClient.setQueryData(MODEL_LIST_KEY, await client.listModels(true));
       },
     },
     acquire(id) {
@@ -159,6 +221,7 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       started = true;
       connection.start();
       sessionList.start();
+      pulls.start();
       stopQueries = keepQueriesHonest(client, queryClient);
       doc.addEventListener("visibilitychange", onVisibility);
     },
@@ -168,6 +231,7 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       stopQueries?.();
       stopQueries = undefined;
       sessionList.stop();
+      pulls.stop();
       sessions.stop();
       router.stop();
       queryClient.clear();

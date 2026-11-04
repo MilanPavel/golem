@@ -78,3 +78,14 @@ export const MoreIcon = (props: IconProps) => (
     <circle cx="12.5" cy="8" r="1" fill="currentColor" stroke="none" />
   </Icon>
 );
+export const CheckIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M3.5 8.5l3 3 6-7" />
+  </Icon>
+);
+export const RefreshIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M13 8a5 5 0 1 1-1.5-3.6" />
+    <path d="M13 2.5v3h-3" />
+  </Icon>
+);

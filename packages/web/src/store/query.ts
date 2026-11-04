@@ -3,7 +3,7 @@ import { QueryClient } from "@tanstack/react-query";
 
 export type QueryWiringClient = Pick<
   GolemClient,
-  "state" | "onState" | "onEvent" | "onSessionSummary" | "onSkillsChanged" | "onMcpStatus" | "onPull"
+  "state" | "onState" | "onEvent" | "onSessionSummary" | "onSkillsChanged" | "onMcpStatus" | "onPull" | "onModelServer"
 >;
 
 /** Answers stay fresh until a pushed event says otherwise. Keys are `[method, ...params]`. */
@@ -36,6 +36,9 @@ export function keepQueriesHonest(client: QueryWiringClient, queryClient: QueryC
       if (update.kind === "done") {
         stale("model.list");
       }
+    }),
+    client.onModelServer(() => {
+      stale("model.list");
     }),
     client.onEvent((event) => {
       if (event.type === "session.updated") {

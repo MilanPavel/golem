@@ -1,5 +1,6 @@
-import { RpcError, SESSION_BUSY, type ChatEvent, type ConnectionState, type PullUpdate, type SessionSummary } from "@golem/client";
+import { RpcError, SESSION_BUSY, type ChatEvent, type ConnectionState, type ModelServerStatus, type PullUpdate, type SessionSummary } from "@golem/client";
 import { vi } from "vitest";
+import type { ModelListResult } from "./models.ts";
 import type { PageClient } from "./page.ts";
 
 let seq = 0;
@@ -31,6 +32,13 @@ export function summary(id: string, updatedAt: string, cwd: string | null = null
   };
 }
 
+const EMPTY_LISTING: ModelListResult = {
+  default: null,
+  models: [],
+  providers: [],
+  setup: { ollama_installed: true, ollama_running: true },
+};
+
 function listeners<A>() {
   const set = new Set<(arg: A) => void>();
   return {
@@ -55,6 +63,7 @@ export function fakeClient() {
   const skills = listeners<string | null>();
   const mcp = listeners<unknown>();
   const pull = listeners<PullUpdate>();
+  const server = listeners<ModelServerStatus>();
   let current: ConnectionState = { status: "connecting" };
   const raw = {
     get state() {
@@ -67,6 +76,7 @@ export function fakeClient() {
     onSkillsChanged: skills.on,
     onMcpStatus: mcp.on,
     onPull: pull.on,
+    onModelServer: server.on,
     status: vi.fn(async () => ({ version: "1.0.0" })),
     attachSession: vi.fn<PageClient["attachSession"]>(async () => ({}) as never),
     detachSession: vi.fn<PageClient["detachSession"]>(async () => undefined),
@@ -78,6 +88,12 @@ export function fakeClient() {
     sendMessage: vi.fn<PageClient["sendMessage"]>(async () => ({}) as never),
     cancelRun: vi.fn<PageClient["cancelRun"]>(async () => ({}) as never),
     respondApproval: vi.fn<PageClient["respondApproval"]>(async () => ({}) as never),
+    listModels: vi.fn<PageClient["listModels"]>(async () => EMPTY_LISTING),
+    setSessionModel: vi.fn<PageClient["setSessionModel"]>(async () => ({}) as never),
+    setDefaultModel: vi.fn<PageClient["setDefaultModel"]>(async () => ({}) as never),
+    pullModel: vi.fn<PageClient["pullModel"]>(async (ref) => ({ ref, started: true }) as never),
+    cancelPull: vi.fn<PageClient["cancelPull"]>(async (ref) => ({ ref, cancelled: true }) as never),
+    deleteModel: vi.fn<PageClient["deleteModel"]>(async (ref) => ({ ref, deleted: true }) as never),
     checkNow: vi.fn(),
     close: vi.fn(),
   };
@@ -97,6 +113,7 @@ export function fakeClient() {
       mcp.emit({});
     },
     emitPull: pull.emit,
+    emitModelServer: server.emit,
     eventListeners: event.size,
   };
 }

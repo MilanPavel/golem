@@ -49,6 +49,12 @@ test("a finished pull marks model.list, progress does not", () => {
   expect(stale()).toEqual(["model.list"]);
 });
 
+test("a local model server changing state marks model.list", () => {
+  const { fake, stale } = setup();
+  fake.emitModelServer({ base_url: "http://localhost:11434", provider: "ollama", state: "stopped" });
+  expect(stale()).toEqual(["model.list"]);
+});
+
 test("session.updated and a summary mark only that session's inspect", () => {
   const { fake, stale } = setup();
   fake.emitEvent(ev("a", "session.updated", { title: "T" }));
