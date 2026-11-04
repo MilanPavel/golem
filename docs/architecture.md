@@ -132,7 +132,7 @@ The socket is only the door. Behind it, these jobs sit in one process:
 | Sessions | One chat or one flow run. Each has an id and a row in `golem.db`. | Built |
 | Graph runtime | The agent loop. Its memory is the checkpoint. | Built |
 | Model router | Resolves a profile name or `provider/model` ref to a chat model. | Built |
-| Tools | Plain Python functions with a Pydantic argument model, in `golem/tools/`. The graph offers them to the model and runs them in its own `tools` node. | Built: file reads and writes, `shell`, git, `web_fetch` |
+| Tools | Plain Python functions with a Pydantic argument model, in `golem/tools/`. The graph offers them to the model and runs them in its own `tools` node ([Tools](architecture/tools.md)). | Built: file reads and writes, `shell`, git, `web_fetch` |
 | MCP servers | Child processes or HTTP endpoints from `[mcp.<name>]`, started in the background, watched with `ping`, and restarted with backoff. Each session's tools come from `ToolRegistry.scoped` (`golem/mcp/`). | Built |
 | Permissions | Rules from the project, the user, and the defaults, checked in order before every tool call (`golem/permissions/`). | Built |
 | Skills | The `SKILL.md` folders a session's folder sees, and which one each name means (`golem/skills/`). | Built: finding, listing, and running by name. Pinning planned |
@@ -142,11 +142,10 @@ What the graph owns, and what it calls instead, is in [The agent loop](architect
 
 ### One turn
 
-One turn, the graph, its messages, failures and the cap, the folder, and models without tools are in [The agent loop](architecture/agent-loop.md#the-details). What a turn does with the system prompt and with tools is still here:
+One turn, the graph, its messages, failures and the cap, the folder, and models without tools are in [The agent loop](architecture/agent-loop.md#the-details). What a turn does with the system prompt is still here:
 
 - **The system prompt.** `call_model` builds it for each call from the sections in `golem/graphs/prompt.py` and sends it in front of the history. The node returns only the reply, so the prompt is never checkpointed. With no section to say anything, no system message is sent. Its one section today holds the pinned skills (`golem/skills/pinned.py`) ([ADR-031](adr/031-system-prompt.md)).
-- **Tool events.** After a reply completes, each tool call it asked for is `tool.requested`, with the asking `message_id`, the tool name, and the arguments. The `tools` node then writes `tool.started`, and `tool.completed` (a one-line summary, the first 4 KB of the output, and `artifact_id` when it was long) or `tool.failed` (the reason). Output up to 20 000 characters goes to the model as a `ToolMessage` in the checkpoint. Longer output is stored whole in the `artifacts` table, and the message keeps the first 12 000 and the last 4 000 characters and a note with the artifact's id, which `read_artifact` pages through ([ADR-016](adr/016-artifacts.md)).
-- **Todos.** `todo_write` replaces the agent's todo list, which lives in graph state (`todos`) and needs no approval. A tool changes state only through `ToolResult.update`, and the `tools` node applies only the keys in `STATE_KEYS`. Each change is a `todos.updated` event with the whole list, and a fork starts with one for the list it copied ([ADR-018](adr/018-tool-state-updates.md)).
+- **Tools.** Tool events, long output and artifacts, and todos are in [Tools](architecture/tools.md#the-details).
 
 If you quit the TUI halfway through, the daemon still finishes the run and saves the checkpoint. The next message in that session continues from it.
 
@@ -154,19 +153,12 @@ If you press Ctrl-C while the answer streams, the TUI sends `run.cancel`. The da
 
 `shell` runs the user's login shell (`$SHELL -lc`) in the session folder, under `sandbox-exec` ([ADR-014](adr/014-shell-sandbox.md)):
 - **The sandbox** allows writes only to the folder, the temp folders, the usual tool caches, and `[shell] writable`. It denies the network unless `[shell] network = true`, except local Unix sockets. It denies reads of folders that hold credentials, `~/.ssh` and `~/.golem` among them, but allows reads of `~/.golem/skills`, so a skill can run its scripts ([ADR-030](adr/030-skill-read-roots.md)). Variables that look like credentials (`*_API_KEY`, `*_TOKEN`, `*_SECRET`, `*PASSWORD*`) are removed from the environment.
-- **Output** is stdout and stderr together. It streams as `tool.output` in batches of up to 2 KB or 0.2 s, up to 64 KB per call. Up to 5 MB is kept (the first 1 MB and the last 4 MB), then `[exit code N]`, and long output becomes an artifact. A failing command is a `tool.completed` with summary `exit N`, not a failure.
-- **Stopping.** The command runs in its own process group. `[shell] timeout_seconds`, or a smaller `timeout_seconds` in the call, kills the group, and so does cancelling the run.
 - **Policy.** `shell` is not read-only, so by default every command asks. A rule's `match` is checked against the command, so `match = "git status|pnpm test*"` allows those and nothing else. Allowing a command for the session allows that exact command, not every command.
 - **Where there is no sandbox**, for example inside another sandbox or off macOS, `shell` and the git helpers refuse to run and say why.
 
 `git_status`, `git_diff`, and `git_log` run git directly in the same sandbox, without the network. They switch off the repository settings that run code: `core.fsmonitor`, hooks, external diff drivers, and text conversion. They are read-only, so the default policy allows them.
 
-`write_file` replaces a whole file or creates it, with its folders. `edit_file` replaces exact text, and fails when the text is not in the file, or is there more than once without `replace_all`. Both run in the daemon, not in the sandbox (`golem/tools/write.py`):
-- **Where.** The path resolves inside the session folder with symlinks followed, and nothing under a `.golem/` or `.git/` folder may change, so a tool cannot edit the project's rules or its history.
-- **Plan, then apply.** Each call first works out the new text without writing anything, then writes it through a temp file in the same folder and a rename, keeping the file mode and the line endings. A file over 5 MB, a binary file, or one that is not UTF-8 is refused.
-- **The diff in the approval.** The `tools` node plans each call before it decides, and a call that asks carries the plan's unified diff in `approval.needed` (cut at 64 000 characters). A plan that cannot apply fails the call without asking. A later edit of the same file in the same reply is planned on top of the earlier one. When an approved call runs, it plans again and writes only if the diff is the one you were shown; otherwise it fails with `<path> changed after the user approved this change` ([ADR-015](adr/015-write-tools.md)).
-- **Result.** The summary is `+N -M <path>`, and the output, which the model reads and Ctrl-O shows, is the unified diff.
-- **Policy.** Neither is read-only, so by default every change asks. Their subject is the path relative to the folder, so allowing a change for the session allows changes to that file only, and "always allow" writes a rule with that file's exact `path`.
+`write_file` and `edit_file`, `web_fetch`, and the shell's output and timeout are in [Tools](architecture/tools.md#the-details).
 
 A call a rule asks about pauses the run ([ADR-013](adr/013-approvals.md)):
 
