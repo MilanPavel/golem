@@ -134,9 +134,20 @@ The page keeps retrying behind "daemon down", and the screen goes away by itself
 - The model chip in the top bar is a button, `Model: <name>`. It opens a centred dialog, `Choose a model`, and focus returns to the chip when it closes.
 - A search field over the list, as one combobox: focus stays in the field, Up, Down, Home, End, PageUp, and PageDown move the active row, Enter does its main action, and Esc clears the search, then closes.
 - The groups are the TUI picker's: Profiles, Installed, Download, then each provider. A row has the label, the ref in faint mono, and the facts in mono. The session's model has a check, the default a `default` badge.
-- A row that is not ready is muted and says why. The page never takes a key, so it names the command: `golem auth set <provider>`, `golem setup`, `ollama serve`.
+- A row that is not ready is muted and says why. The page never takes a key, so it names the command: `golem auth set <provider>`, `golem` then `/setup`, `ollama serve`.
 - A download shows a bar, `2.1 / 6.6 GB · 12 MB/s · 6 min`, and it is the same one the terminal shows, because progress reaches every connection.
 - The footer acts on the active row: Use for this session, Make default, Download, Stop download, Remove. Download and Remove ask first, in the footer; a model too big for the machine asks twice.
+
+## Slash commands in the composer
+
+- Typing `/` at the start of the message opens a list above the composer: the `/name` in clay mono, the description in muted text, at most about eight rows, then it scrolls. Up and Down move, Tab completes, Enter runs (a partial match fills in first), and Esc closes it for that text. Typing again opens it again. `//` is a message and never suggests. The list stays closed while a run is in progress or while you browse the history with Up and Down.
+- It is a listbox named `Commands`. The textarea stays a textbox and points at it with `aria-autocomplete="list"`, `aria-controls`, and `aria-activedescendant`, because a role of combobox is not allowed on a textarea. A polite live region says how many suggestions there are when the count changes.
+- After `/model ` the list offers model names, and after `/skill run ` skill names. The model and skill lists are fetched only once the text starts with `/`.
+- A command answers in one muted line above the key hints, such as `Renamed.` or `Copied the last answer.`. It clears when you type or run the next command. An error stays in the red line. A notice may carry a command for a terminal, such as `golem auth set anthropic`, in mono with a `Copy` button that says `Copied` for two seconds.
+- `/help` opens a `Commands` dialog with the table grouped as Session, Model, Tools, and View.
+- `/model`, `/close`, `/fork`, `/title`, `/skill`, `/copy`, `/export` (a markdown download), `/time`, and `/todos` act on the page. On the empty screen the ones that need a session say `Start a session first: send a message.`
+- The page has no key entry, so `/login` and `/logout` show the `golem auth` command to copy ([ADR-028](../adr/028-web-gateway.md)).
+- Not on the page yet, so each says where it lives: `/mcp`, `/skills`, `/permissions`, `/artifact`, `/setup`, and `/debug` are in the terminal (run `golem`, then the command); `/sessions` points at the sidebar. The Commands dialog marks the terminal ones `In the terminal for now`.
 
 ## Type
 

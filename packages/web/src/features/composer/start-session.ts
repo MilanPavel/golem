@@ -17,7 +17,7 @@ export function useStartSession(folder: string | null) {
   const [folderError, setFolderError] = useState<{ folder: string | null; message: string } | null>(null);
 
   const mutation = useMutation({
-    mutationFn: async (text: string) => {
+    mutationFn: async ({ text, skill }: { text: string; skill?: { name: string; args: string } }) => {
       setFolderError(null);
       let id = created.current?.folder === folder ? created.current.id : null;
       if (id === null) {
@@ -31,7 +31,7 @@ export function useStartSession(folder: string | null) {
         }
         created.current = { folder, id };
       }
-      await actions.send(id, text);
+      await actions.send(id, text, skill);
       created.current = null;
       navigate(`/s/${id}`);
     },
@@ -40,7 +40,8 @@ export function useStartSession(folder: string | null) {
   const folderMessage = folderError !== null && folderError.folder === folder ? folderError.message : null;
   const failure = mutation.error;
   return {
-    send: (text: string) => mutation.mutateAsync(text),
+    send: (text: string, skill?: { name: string; args: string }) =>
+      mutation.mutateAsync(skill === undefined ? { text } : { text, skill }),
     pending: mutation.isPending,
     folderError: folderMessage,
     error: failure && folderMessage === null ? sendErrorText(failure) : null,

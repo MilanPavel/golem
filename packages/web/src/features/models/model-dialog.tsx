@@ -429,12 +429,15 @@ export function ModelDialog({
   open,
   onOpenChange,
   onCloseAutoFocus,
+  initial,
 }: {
   sessionId: string;
-  session: { profile: string; name: string | null };
+  session: { profile: string; name: string | null } | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCloseAutoFocus?: (event: Event) => void;
+  /** Where the dialog starts: a model made active, and the question asked of it. */
+  initial?: ModelDialogViewProps["initial"];
 }) {
   const query = useModelList(open);
   const pulls = usePulls();
@@ -461,6 +464,7 @@ export function ModelDialog({
       onRetry={() => void query.refetch()}
       pulls={pulls}
       actions={actions}
+      initial={initial}
     />
   );
 }
