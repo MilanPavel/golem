@@ -5,6 +5,7 @@ from typing import Annotated, Any, Literal
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
 from golem_protocol.commands import (
+    KeychainWait,
     McpServer,
     ModelPullDone,
     ModelPullProgress,
@@ -142,6 +143,7 @@ class SkillRegistryChangedNotification(BaseModel):
 
 
 __all__ = [
+    "KeychainWaitNotification",
     "McpServerStatusNotification",
     "ModelPullDoneNotification",
     "ModelPullProgressNotification",
@@ -155,6 +157,16 @@ __all__ = [
     "SessionSummaryNotification",
     "SkillRegistryChangedNotification",
 ]
+
+
+class KeychainWaitNotification(BaseModel):
+    """Server → every connection: a Keychain read started to wait on macOS, or ended. Not stored."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    jsonrpc: Literal["2.0"] = "2.0"
+    method: Literal["keychain.wait"] = "keychain.wait"
+    params: KeychainWait
 
 
 class OllamaInstallOutputNotification(BaseModel):

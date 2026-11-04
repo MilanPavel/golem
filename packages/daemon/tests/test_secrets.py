@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import sys
+import time
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -158,3 +160,74 @@ def test_a_provider_name_the_keychain_cannot_hold_is_a_store_error() -> None:
 
     with pytest.raises(KeyStoreError, match="cannot hold a key"):
         ProviderKeys(MemorySecrets()).get("my provider")
+
+
+class _SlowBackend(_Backend):
+    """Waits on each read, as the Keychain does while macOS shows its dialog."""
+
+    def __init__(self, delay: float) -> None:
+        super().__init__()
+        self.delay = delay
+
+    def get_password(self, service: str, username: str) -> str | None:
+        time.sleep(self.delay)
+        return super().get_password(service, username)
+
+
+def _slow(delay: float) -> Iterator[_SlowBackend]:
+    previous = keyring.get_keyring()
+    fake = _SlowBackend(delay)
+    keyring.set_keyring(fake)
+    yield fake
+    keyring.set_keyring(previous)
+
+
+@pytest.fixture
+def slow_backend() -> Iterator[_SlowBackend]:
+    yield from _slow(0.2)
+
+
+def test_a_slow_read_says_it_waits_and_when_it_ends(slow_backend: _SlowBackend) -> None:
+    slow_backend.items[("golem", "openai")] = "sk-o"
+    secrets = KeychainSecrets(wait_notice_seconds=0.02)
+    seen: list[tuple[str, bool]] = []
+    secrets.on_wait = lambda name, waiting: seen.append((name, waiting))
+    assert secrets.get("provider/openai") == "sk-o"
+    assert seen == [("provider/openai", True), ("provider/openai", False)]
+    # A cached read doesn't touch the Keychain.
+    assert secrets.get("provider/openai") == "sk-o"
+    assert len(seen) == 2
+
+
+def test_a_quick_read_says_nothing(backend: _Backend) -> None:
+    backend.items[("golem", "openai")] = "sk-o"
+    secrets = KeychainSecrets(wait_notice_seconds=1.0)
+    seen: list[tuple[str, bool]] = []
+    secrets.on_wait = lambda name, waiting: seen.append((name, waiting))
+    assert secrets.get("provider/openai") == "sk-o"
+    assert seen == []
+
+
+async def test_every_client_hears_that_the_keychain_waits(
+    short_home: Path, slow_backend: _SlowBackend
+) -> None:
+    slow_backend.items[("golem", "openai")] = "sk-o"
+    secrets = KeychainSecrets(wait_notice_seconds=0.02)
+    app, task = await start_daemon(short_home, secrets=secrets)
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        assert await asyncio.to_thread(secrets.get, "provider/openai") == "sk-o"
+        for _ in range(100):
+            await client.take_events()
+            if len(client.notices) >= 2:
+                break
+            await asyncio.sleep(0.01)
+        assert [(n["method"], n["params"]) for n in client.notices] == [
+            ("keychain.wait", {"name": "provider/openai", "provider": "openai", "waiting": True}),
+            ("keychain.wait", {"name": "provider/openai", "provider": "openai", "waiting": False}),
+        ]
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+    assert secrets.on_wait is None

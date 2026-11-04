@@ -18,6 +18,8 @@ from __future__ import annotations
 import contextlib
 import re
 import sys
+import threading
+from collections.abc import Callable, Generator
 from pathlib import Path
 from typing import Annotated, Protocol
 
@@ -26,6 +28,11 @@ from pydantic import AfterValidator
 from golem.paths import resolve_paths
 
 SERVICE = "golem"
+# A Keychain read that takes longer than this is waiting on macOS: most likely
+# its dialog asking whether golem may use the item. A build signed without an
+# Apple Team ID gets a new partition each release, so macOS asks after every
+# upgrade (ADR-021).
+WAIT_NOTICE_SECONDS = 0.5
 KEYCHAIN_PREFIX = "keychain:"
 
 _NAME = re.compile(r"^(provider|mcp|hook)/[A-Za-z0-9][A-Za-z0-9._-]*$")
@@ -90,9 +97,17 @@ def resolve(ref: str, store: SecretStore) -> str:
 class KeychainSecrets:
     """``keyring`` with a read cache. Golem changes secrets only through this object."""
 
-    def __init__(self, service: str = SERVICE) -> None:
+    def __init__(
+        self, service: str = SERVICE, *, wait_notice_seconds: float = WAIT_NOTICE_SECONDS
+    ) -> None:
         self._service = service
         self._cache: dict[str, str | None] = {}
+        self._wait_notice_seconds = wait_notice_seconds
+        self.on_wait: Callable[[str, bool], None] | None = None
+        """Called with ``(name, True)`` when a read is slow, then ``(name, False)`` when it ends.
+
+        It runs on whatever thread reads the Keychain.
+        """
 
     def get(self, name: str) -> str | None:
         if name in self._cache:
@@ -100,14 +115,41 @@ class KeychainSecrets:
         import keyring
         from keyring.errors import KeyringError
 
-        try:
-            value = keyring.get_password(self._service, account(name))
-        except KeyringError as exc:
-            raise SecretStoreError(f"keychain is unavailable: {exc}") from exc
-        self._cache[name] = value
-        if value:
-            self._claim(name, value)
+        with self._watch(name):
+            try:
+                value = keyring.get_password(self._service, account(name))
+            except KeyringError as exc:
+                raise SecretStoreError(f"keychain is unavailable: {exc}") from exc
+            self._cache[name] = value
+            if value:
+                self._claim(name, value)
         return value
+
+    @contextlib.contextmanager
+    def _watch(self, name: str) -> Generator[None]:
+        """Tell :attr:`on_wait` when the read inside takes a moment, and when it ends."""
+        listener = self.on_wait
+        if listener is None:
+            yield
+            return
+        fired = threading.Event()
+
+        def slow() -> None:
+            fired.set()
+            listener(name, True)
+
+        timer = threading.Timer(self._wait_notice_seconds, slow)
+        timer.daemon = True
+        timer.start()
+        try:
+            yield
+        finally:
+            timer.cancel()
+            # Timer.cancel can't stop a callback that already began, so wait for it.
+            if timer.is_alive():
+                timer.join()
+            if fired.is_set():
+                listener(name, False)
 
     def set(self, name: str, value: str) -> None:
         import keyring

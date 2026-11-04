@@ -57,6 +57,8 @@ import {
   withLog,
   hostedProvider,
   keyChecked,
+  keychainLines,
+  keychainNotice,
   keyLines,
   openKey,
   pressKey as pressKeyPanel,
@@ -350,6 +352,8 @@ export function App({
   const [draft, setDraft] = useState<Draft>({ text: "", cursor: 0 });
   const [sessionModel, setSessionModel] = useState<ModelInfo | null>(null);
   const [servers, setServers] = useState<ServerStates>({});
+  /** Secrets whose Keychain read waits on macOS, most likely its dialog (`keychain.wait`). */
+  const [keychainWaiting, setKeychainWaiting] = useState<readonly string[]>([]);
   const [sessionCwd, setSessionCwd] = useState<string | null>(null);
   const sessionCwdRef = useRef(sessionCwd);
   sessionCwdRef.current = sessionCwd;
@@ -425,6 +429,8 @@ export function App({
   /** The service answered before the model list came: Engine opens once it does. */
   const awaitingListing = useRef(false);
   const windowDaemon = useRef<WindowDaemon | null>(null);
+  /** True while `golem daemon install` runs, so Retry doesn't start a second one. */
+  const installing = useRef(false);
   const [setupNow, setSetupNow] = useState(() => Date.now());
   /** `setup.status` for the band's one line, when something is wrong. */
   const [bandRows, setBandRows] = useState<SetupRow[] | null>(null);
@@ -532,7 +538,7 @@ export function App({
   }
   const banner = asking
     ? RETRY_QUESTION
-    : (chat.error ?? serviceText ?? warming ?? chat.notice ?? setupLine ?? welcomeLine);
+    : (keychainNotice(keychainWaiting) ?? chat.error ?? serviceText ?? warming ?? chat.notice ?? setupLine ?? welcomeLine);
   const hintText = liveHint(hint, Date.now())?.text ?? null;
   const suggestMatches =
     chat.busy ||
@@ -931,6 +937,22 @@ export function App({
   }, [client]);
 
   useEffect(() => {
+    return client.onKeychainWait((wait) => {
+      setKeychainWaiting((current) => {
+        const others = current.filter((name) => name !== wait.name);
+        return wait.waiting ? [...others, wait.name] : others;
+      });
+    });
+  }, [client]);
+
+  // A dialog that was open when the daemon went away is gone with it.
+  useEffect(() => {
+    if (connection.status !== "connected") {
+      setKeychainWaiting([]);
+    }
+  }, [connection.status]);
+
+  useEffect(() => {
     return client.onModelServer((status) => {
       setServers((current) => applyServerStatus(current, status));
       if (status.state === "ready") {
@@ -1098,7 +1120,8 @@ export function App({
     }
     if (serviceTimedOut(state, setupNow)) {
       const error = service?.startError() ?? null;
-      failService(error?.reason ?? "it didn't answer in 45 seconds", error?.next ?? "golem daemon logs");
+      const waited = state.how === "install" && !state.agent ? "the install didn't finish in 3 minutes" : "it didn't answer in 45 seconds";
+      failService(error?.reason ?? waited, error?.next ?? "golem daemon logs");
     }
   }, [setupNow]);
 
@@ -1935,12 +1958,21 @@ export function App({
       failService("this golem can't install its service", "golem daemon install");
       return;
     }
+    // Retry while the first install still runs waits for that one.
+    if (installing.current) {
+      return;
+    }
     windowDaemon.current?.stop();
     windowDaemon.current = null;
-    install().then(
-      () => updateService((state) => agentInstalled(state, Date.now())),
-      (error: unknown) => failService(messageOf(error), "golem daemon logs"),
-    );
+    installing.current = true;
+    install()
+      .then(
+        () => updateService((state) => agentInstalled(state, Date.now())),
+        (error: unknown) => failService(messageOf(error), "golem daemon logs"),
+      )
+      .finally(() => {
+        installing.current = false;
+      });
   }
 
   /** The service as a child of this terminal. From launchd's, the launch agent goes first. */
@@ -3224,7 +3256,11 @@ export function App({
   }, [debugLayout.lineCount, debugLayout.offsetFromBottom, debugOffset]);
 
   if (setup !== null) {
-    const shown = setupView(setup, setupNow);
+    const view = setupView(setup, setupNow);
+    // The Key panel says this itself while it checks a key.
+    const keyPanelSays =
+      setup.window.view === "panel" && setup.window.panel === "key" && (setup.key.phase === "checking" || setup.key.phase === "works");
+    const shown = keyPanelSays ? view : { ...view, lines: [...view.lines, ...keychainLines(keychainWaiting)] };
     return (
       <SetupFrame
         window={setup.window}

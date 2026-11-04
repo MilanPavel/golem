@@ -806,6 +806,34 @@ test("setup.status reads the rows, and the Ollama install's output reaches onOll
   }
 });
 
+test("keychain.wait reaches onKeychainWait, and a malformed one is dropped", async () => {
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: { "setup.status": { rows: [] } },
+      onHello: (current) => {
+        write(current, { jsonrpc: "2.0", method: "keychain.wait", params: { name: "provider/openai" } });
+        write(current, { jsonrpc: "2.0", method: "keychain.wait", params: { name: "provider/openai", provider: "openai", waiting: true } });
+        write(current, { jsonrpc: "2.0", method: "keychain.wait", params: { name: "mcp/github", provider: null, waiting: false } });
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
+  const waits: string[] = [];
+  const stop = client.onKeychainWait((wait) => {
+    waits.push(`${wait.name}:${String(wait.waiting)}`);
+  });
+  try {
+    await client.setupStatus();
+    await waitFor(() => waits.length >= 2);
+    assert.deepEqual(waits, ["provider/openai:true", "mcp/github:false"]);
+  } finally {
+    stop();
+    client.close();
+    await server.close();
+  }
+});
+
 test("mcp.list reads the servers, and mcp.server.status reaches onMcpStatus", async () => {
   const git = { name: "git", state: "running", command: "uvx mcp-server-git", tools: ["mcp__git__git_status"], error: null };
   const sent: Record<string, unknown>[] = [];

@@ -59,8 +59,8 @@ from golem.store.database import Database, DatabaseTooNewError
 from golem.store.events import EventLog
 from golem.store.records import RunRecords, SessionRecords
 from golem.tools import default_registry
-from golem_protocol.commands import ModelServerStatus
-from golem_protocol.rpc import ModelServerStatusNotification
+from golem_protocol.commands import KeychainWait, ModelServerStatus
+from golem_protocol.rpc import KeychainWaitNotification, ModelServerStatusNotification
 
 log = logging.getLogger("golem.server")
 
@@ -147,6 +147,11 @@ class DaemonApp:
         self._lock.acquire()
         loop = asyncio.get_running_loop()
         installed: list[signal.Signals] = []
+        keychain = self.state.secrets if isinstance(self.state.secrets, KeychainSecrets) else None
+        if keychain is not None:
+            keychain.on_wait = lambda name, waiting: self._from_thread(
+                loop, self._keychain_waited, name, waiting
+            )
         try:
             settings = load_settings(home=self.paths.home, project_dir=self.paths.home)
             router = self._router or ModelRouter(settings, home=self.paths.home)
@@ -232,6 +237,8 @@ class DaemonApp:
                         loop.remove_signal_handler(sig)
                     self._unlink_socket()
         finally:
+            if keychain is not None:
+                keychain.on_wait = None
             if self.state.mcp is not None:
                 await self.state.mcp.aclose()
             self.state.mcp = None
@@ -258,6 +265,25 @@ class DaemonApp:
         """An MCP server's secret, ``mcp/<name>``, from the daemon's store."""
         secrets = self.state.secrets
         return None if secrets is None else secrets.get(name)
+
+    @staticmethod
+    def _from_thread(
+        loop: asyncio.AbstractEventLoop,
+        callback: Callable[[str, bool], None],
+        name: str,
+        waiting: bool,
+    ) -> None:
+        loop.call_soon_threadsafe(callback, name, waiting)
+
+    def _keychain_waited(self, name: str, waiting: bool) -> None:
+        if waiting:
+            log.info("keychain read of %s is waiting on macOS", name)
+        provider = name.removeprefix("provider/") if name.startswith("provider/") else None
+        self._broadcast(
+            KeychainWaitNotification(
+                params=KeychainWait(name=name, provider=provider, waiting=waiting)
+            )
+        )
 
     def _server_changed(self, server: LocalServer, state: ServerState, message: str | None) -> None:
         status = ModelServerStatus(

@@ -271,8 +271,19 @@ export type ServiceState =
 /** After this the wait is explained, and after the next the start counts as failed. */
 export const SLOW_START_MS = 10_000;
 export const START_TIMEOUT_MS = 45_000;
+/**
+ * `golem daemon install` runs the daemon's binary, and its first run after
+ * `brew install` waits while macOS checks every library. That can take a
+ * minute, so the install gets longer than the start.
+ */
+export const INSTALL_TIMEOUT_MS = 180_000;
 /** How long `✓ service running` shows before Engine. */
 export const RUNNING_PAUSE_MS = 500;
+
+const FIRST_RUN_NOTE: SetupLine[] = [
+  { kind: "text", text: "the first start takes longer while macOS checks", dim: true },
+  { kind: "text", text: "the app. This happens once.", dim: true },
+];
 
 export function askService(runner: ServiceRunner | null): ServiceState {
   return { phase: "ask", runner, selected: 0 };
@@ -356,15 +367,15 @@ export function serviceLines(state: ServiceState, now: number): SetupLine[] {
             : { kind: "status", mark: "spin", text: "installing the launch agent…", right: took },
         );
         if (!state.agent) {
+          if (now - state.since >= SLOW_START_MS) {
+            lines.push(...FIRST_RUN_NOTE);
+          }
           return lines;
         }
       }
       lines.push({ kind: "status", mark: "spin", text: "starting the service…", right: took });
       if (now - state.since >= SLOW_START_MS) {
-        lines.push(
-          { kind: "text", text: "the first start takes longer while macOS checks", dim: true },
-          { kind: "text", text: "the app. This happens once.", dim: true },
-        );
+        lines.push(...FIRST_RUN_NOTE);
       } else {
         lines.push({ kind: "text", text: "waiting for it to answer", dim: true });
       }
@@ -443,7 +454,11 @@ export function pressService(state: ServiceState, key: PanelKey, now: number): {
 
 /** The launch agent is in place: the service is starting now. */
 export function agentInstalled(state: ServiceState, now: number): ServiceState {
-  return state.phase === "starting" ? { ...state, agent: true, since: now } : state;
+  if (state.phase === "starting" || (state.phase === "failed" && state.how === "install")) {
+    // An install that ends after the window gave up still starts the service.
+    return { phase: "starting", how: "install", agent: true, since: now };
+  }
+  return state;
 }
 
 /** The service answered. */
@@ -459,7 +474,11 @@ export function serviceFailed(state: ServiceState, reason: string, next: string)
 
 /** A start that has waited too long. */
 export function serviceTimedOut(state: ServiceState, now: number): boolean {
-  return state.phase === "starting" && now - state.since >= START_TIMEOUT_MS;
+  if (state.phase !== "starting") {
+    return false;
+  }
+  const limit = state.how === "install" && !state.agent ? INSTALL_TIMEOUT_MS : START_TIMEOUT_MS;
+  return now - state.since >= limit;
 }
 
 export function withLog(state: ServiceState, log: readonly string[]): ServiceState {
