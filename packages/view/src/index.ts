@@ -26,6 +26,26 @@ export {
   type ToolBlock,
   type ToolStatus,
 } from "./chat-state.ts";
+export {
+  applyComposer,
+  closedDebug,
+  COMMANDS,
+  invocableSkills,
+  KEY_PROVIDERS,
+  pinnableSkills,
+  pinnedNotice,
+  toggleDebugTab,
+  withModelChoices,
+  withSkillChoices,
+  type Command,
+  type CommandGroup,
+  type ComposerOutcome,
+  type DebugState,
+  type DebugTab,
+  type PinChoices,
+  type SkillChoice,
+} from "./commands.ts";
+export { applySuggestion, moveSuggestion, suggest, type Suggestion, type SuggestCommand } from "./suggest.ts";
 export { connectionLabel, serviceProblem, type ServiceProblem } from "./connection.ts";
 export { parseDiff, type DiffLine, type DiffTone } from "./diff.ts";
 export {
