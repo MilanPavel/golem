@@ -64,7 +64,7 @@ Type `/release-notes v0.5`. The model gets that skill's instructions, with `v0.5
 
 ## What works today, and what is next
 
-golem finds, checks, lists, runs, and pins skills, and lets a skill read its own files. Letting the model pick a skill by itself when the task fits is the next step of [Phase 2](../plan.md#phase-2--skills). How it works inside is in [architecture.md](../architecture.md#skills).
+golem finds, checks, lists, runs, and pins skills, and lets a skill read its own files. Letting the model pick a skill by itself when the task fits is the next step of [Phase 2](../plan.md#phase-2--skills). How it works inside is in [Skills](../architecture/skills.md) and [Context](../architecture/context.md).
 
 ## Settings
 
