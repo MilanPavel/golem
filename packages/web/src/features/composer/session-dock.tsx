@@ -5,6 +5,7 @@ import { sendErrorText } from "../../store/errors.ts";
 import { useDraft, useDraftPastes, usePageActions, useSession } from "../../store/page-context.tsx";
 import type { SessionView } from "../../store/session-store.ts";
 import { Composer } from "./composer.tsx";
+import { useCommands } from "./use-commands.tsx";
 import { DockView } from "./dock.tsx";
 import { browserHistory } from "./history.ts";
 import { Meter } from "./meter.tsx";
@@ -25,6 +26,9 @@ const selectRun = ({ chat }: SessionView): Run => ({
   failed: chat.error !== null,
 });
 
+const selectCwd = (view: SessionView) => view.cwd;
+const selectActiveSkills = (view: SessionView) => view.chat.activeSkills;
+
 const sameRun = (a: Run, b: Run): boolean =>
   a.busy === b.busy &&
   a.runId === b.runId &&
@@ -40,7 +44,19 @@ export function SessionDock({ sessionId }: { sessionId: string }) {
   const [text, setText] = useDraft(sessionId);
   const [pastes, setPastes] = useDraftPastes(sessionId);
 
-  const send = useMutation({ mutationFn: (message: string) => actions.send(sessionId, message) });
+  const cwd = useSession(sessionId, selectCwd);
+  const active = useSession(sessionId, selectActiveSkills);
+
+  const send = useMutation({
+    mutationFn: ({ text: message, skill }: { text: string; skill?: { name: string; args: string } }) =>
+      actions.send(sessionId, message, skill),
+  });
+  const commands = useCommands({
+    session: { id: sessionId, active },
+    cwd,
+    typing: text.startsWith("/"),
+    send: (message, skill) => send.mutateAsync(skill === undefined ? { text: message } : { text: message, skill }),
+  });
   const stop = useMutation({
     mutationFn: async () => {
       if (run.runId !== null) {
@@ -52,24 +68,31 @@ export function SessionDock({ sessionId }: { sessionId: string }) {
   const phase = run.waiting ? "waiting" : run.busy ? "thinking" : null;
   const state = golemState({ connection, phase, error: run.failed });
   const failure = send.error ?? stop.error;
+  const line = commands.error ?? (failure ? sendErrorText(failure) : null);
   return (
-    <DockView
-      busy={run.busy}
-      error={failure ? sendErrorText(failure) : null}
-      meter={<Meter state={state} runStartedAt={run.runStartedAt} />}
-      composer={
-        <Composer
-          text={text}
-          onTextChange={setText}
-          pastes={pastes}
-          onPastesChange={setPastes}
-          history={browserHistory}
-          onSend={(message) => send.mutateAsync(message)}
-          busy={run.busy}
-          onStop={run.runId === null ? undefined : () => stop.mutate()}
-          disabledReason={connection === "connected" ? null : "Not connected to golem"}
-        />
-      }
-    />
+    <>
+      <DockView
+        busy={run.busy}
+        error={line}
+        notice={commands.notice}
+        meter={<Meter state={state} runStartedAt={run.runStartedAt} />}
+        composer={
+          <Composer
+            text={text}
+            onTextChange={setText}
+            pastes={pastes}
+            onPastesChange={setPastes}
+            history={browserHistory}
+            onSend={commands.run}
+            commands={commands.registry}
+            onEdit={commands.clear}
+            busy={run.busy}
+            onStop={run.runId === null ? undefined : () => stop.mutate()}
+            disabledReason={connection === "connected" ? null : "Not connected to golem"}
+          />
+        }
+      />
+      {commands.dialogs}
+    </>
   );
 }

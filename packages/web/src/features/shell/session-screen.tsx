@@ -1,5 +1,5 @@
 import { forkPoint, type TodoItem } from "@golem/view";
-import { useEffect, useMemo, useRef, useState, type ReactNode, type Ref } from "react";
+import { useEffect, useMemo, useRef, type ReactNode, type Ref, type RefObject } from "react";
 import { Badge, badgeVariants } from "../../ui/badge.tsx";
 import { Button } from "../../ui/button.tsx";
 import { FolderIcon, PanelIcon } from "../../ui/icons.tsx";
@@ -9,7 +9,7 @@ import type { SessionModel, SessionView } from "../../store/session-store.ts";
 import { Transcript } from "../chat/index.ts";
 import { SessionDock } from "../composer/index.ts";
 import { Drawer, DRAWER_ID, useDrawerOpen } from "../drawer/index.ts";
-import { ModelDialog } from "../models/index.ts";
+import { closeModelDialog, ModelDialog, openModelDialog, useModelDialogOpen } from "../models/index.ts";
 import { folderName, useSessionActions } from "../sessions/index.ts";
 import { SessionTitle } from "./session-title.tsx";
 
@@ -41,37 +41,67 @@ export function DockSlot({ id }: { id: string }) {
 }
 
 /** The session's model. It opens the dialog that switches it. */
-function ModelChip({ sessionId, model }: { sessionId: string; model: SessionModel }) {
-  const [open, setOpen] = useState(false);
-  const button = useRef<HTMLButtonElement>(null);
+function ModelChip({
+  sessionId,
+  model,
+  buttonRef,
+}: {
+  sessionId: string;
+  model: SessionModel;
+  buttonRef: RefObject<HTMLButtonElement | null>;
+}) {
   const detail = [model.profile, model.provider].filter((part) => part !== null).join(" · ");
   const name = model.name ?? model.profile;
   return (
-    <>
-      <button
-        ref={button}
-        type="button"
-        title={detail}
-        aria-label={`Model: ${name}`}
-        aria-haspopup="dialog"
-        onClick={() => setOpen(true)}
-        className={`${badgeVariants()} cursor-pointer outline-offset-2 outline-clay hover:border-ink hover:text-ink focus-visible:outline-2`}
-      >
-        <span aria-hidden="true" className="size-1.5 rounded-full bg-allow" />
-        {name}
-      </button>
-      <ModelDialog
-        sessionId={sessionId}
-        session={{ profile: model.profile, name: model.name }}
-        open={open}
-        onOpenChange={setOpen}
-        onCloseAutoFocus={(event) => {
-          // The dialog has no trigger of its own, so focus goes back to the chip by hand.
-          event.preventDefault();
-          button.current?.focus();
-        }}
-      />
-    </>
+    <button
+      ref={buttonRef}
+      type="button"
+      title={detail}
+      aria-label={`Model: ${name}`}
+      aria-haspopup="dialog"
+      onClick={() => openModelDialog({ sessionId, returnTo: "chip" })}
+      className={`${badgeVariants()} cursor-pointer outline-offset-2 outline-clay hover:border-ink hover:text-ink focus-visible:outline-2`}
+    >
+      <span aria-hidden="true" className="size-1.5 rounded-full bg-allow" />
+      {name}
+    </button>
+  );
+}
+
+/** The one model dialog of the session. The chip and `/model` open it; it closes with the session. */
+function SessionModelDialog({
+  sessionId,
+  model,
+  chip,
+}: {
+  sessionId: string;
+  model: SessionModel | null;
+  chip: RefObject<HTMLButtonElement | null>;
+}) {
+  const open = useModelDialogOpen(sessionId);
+  // The store is cleared before the dialog reports its close, so remember where focus goes back to.
+  const returnTo = useRef<"chip" | HTMLElement | null>("chip");
+  useEffect(() => {
+    if (open !== null) returnTo.current = open.returnTo;
+  }, [open]);
+  useEffect(() => closeModelDialog, [sessionId]);
+  return (
+    <ModelDialog
+      sessionId={sessionId}
+      session={model === null ? null : { profile: model.profile, name: model.name }}
+      open={open !== null}
+      initial={open?.initial}
+      onOpenChange={(next) => {
+        if (!next) closeModelDialog();
+      }}
+      onCloseAutoFocus={(event) => {
+        // The dialog has no trigger of its own, so focus goes back by hand: to the chip, or to
+        // the composer that ran the command.
+        event.preventDefault();
+        const target = returnTo.current === "chip" ? chip.current : returnTo.current;
+        target?.focus();
+      }}
+    />
   );
 }
 
@@ -144,6 +174,7 @@ export function SessionScreen({ id }: { id: string }) {
   const todos = useSession(id, selectTodos);
   const [drawerOpen, setDrawerOpen] = useDrawerOpen();
   const toggle = useRef<HTMLButtonElement>(null);
+  const chip = useRef<HTMLButtonElement>(null);
   const atMessage = useSession(id, selectForkPoint);
   const session = useSessionActions();
   const titleActions = useMemo(
@@ -173,7 +204,7 @@ export function SessionScreen({ id }: { id: string }) {
     <div className="flex min-h-0 min-w-0 flex-1">
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <TopBar title={<SessionTitle title={title || null} canFork={atMessage !== null} actions={titleActions} />}>
-          {model ? <ModelChip sessionId={id} model={model} /> : null}
+          {model ? <ModelChip sessionId={id} model={model} buttonRef={chip} /> : null}
           {cwd === undefined ? null : (
             <Badge title={cwd ?? undefined}>
               <FolderIcon className="size-3" />
@@ -187,6 +218,7 @@ export function SessionScreen({ id }: { id: string }) {
           <DockSlot id={id} />
         </div>
       </div>
+      <SessionModelDialog sessionId={id} model={model} chip={chip} />
       {drawerOpen ? (
         <Drawer
           todos={todos}

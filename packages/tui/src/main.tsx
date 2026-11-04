@@ -1,6 +1,3 @@
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-
 import { render } from "ink";
 
 import { connectGolem, readStartError, resolveSocketPath } from "@golem/client/node";
@@ -25,7 +22,15 @@ const READ_ONLY_SERVICE: ServiceControl = {
   logTail: () => [],
 };
 
-/** Open the chat screen. Returns when the screen exits. */
+/**
+ * Open the chat screen. Returns when the screen exits.
+ *
+ * Importing this module must not open a screen. `golem` imports it and calls
+ * `runTui` with the service control, and `bun build --compile` gives every
+ * bundled module the binary's own path, so a "was I run directly?" check is
+ * true there too and would open a second screen that can't install the
+ * service. `dev.tsx` opens it on its own for `just tui`.
+ */
 export async function runTui(options: { service?: ServiceControl } = {}): Promise<void> {
   const client = connectGolem({
     socketPath: resolveSocketPath(),
@@ -79,20 +84,4 @@ export async function runTui(options: { service?: ServiceControl } = {}): Promis
     restoreTitle();
     client.close();
   }
-}
-
-function invokedDirectly(): boolean {
-  const entry = process.argv[1];
-  if (entry === undefined || entry.length === 0) {
-    return false;
-  }
-  try {
-    return path.resolve(entry) === fileURLToPath(import.meta.url);
-  } catch {
-    return false;
-  }
-}
-
-if (invokedDirectly()) {
-  await runTui();
 }

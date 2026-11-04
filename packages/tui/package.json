@@ -10,7 +10,7 @@
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test src/*.test.ts",
-    "start": "tsx src/main.tsx"
+    "start": "tsx src/dev.tsx"
   },
   "dependencies": {
     "@golem/client": "workspace:*",

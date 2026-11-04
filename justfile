@@ -99,7 +99,7 @@ golem *args:
 # Open the TUI in the folder just was run from, so its session works there.
 [no-cd]
 tui:
-    TSX_TSCONFIG_PATH="{{justfile_directory()}}/packages/tui/tsconfig.json" "{{justfile_directory()}}/packages/tui/node_modules/.bin/tsx" "{{justfile_directory()}}/packages/tui/src/main.tsx"
+    TSX_TSCONFIG_PATH="{{justfile_directory()}}/packages/tui/tsconfig.json" "{{justfile_directory()}}/packages/tui/node_modules/.bin/tsx" "{{justfile_directory()}}/packages/tui/src/dev.tsx"
 
 # Build dist/golem-<version>-<os>-<arch>: a frozen daemon and one golem binary.
 dist:

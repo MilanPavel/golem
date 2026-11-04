@@ -26,3 +26,13 @@ test("the gallery's model dialog shows a download with its speed and time left, 
   const results = await axe.run(document.body, { rules: { "color-contrast": { enabled: false }, region: { enabled: false } } });
   expect(results.violations).toEqual([]);
 });
+
+test("the gallery's Commands dialog lists the groups and passes axe", async () => {
+  const user = userEvent.setup();
+  render(<Gallery />);
+  await user.click(screen.getByRole("button", { name: "Commands, kiln" }));
+  const dialog = await screen.findByRole("dialog", { name: "Commands" });
+  expect(dialog.textContent).toContain("In the terminal for now");
+  const results = await axe.run(document.body, { rules: { "color-contrast": { enabled: false }, region: { enabled: false } } });
+  expect(results.violations).toEqual([]);
+});
