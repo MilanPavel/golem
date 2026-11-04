@@ -93,6 +93,7 @@ const sidebar: DefaultTheme.Sidebar = [
       { text: "6. Context", link: "/architecture/context" },
       { text: "7. Skills", link: "/architecture/skills" },
       { text: "8. MCP", link: "/architecture/mcp" },
+      { text: "9. Sessions", link: "/architecture/sessions" },
     ],
   },
   {
