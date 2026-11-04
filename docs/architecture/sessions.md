@@ -1,7 +1,7 @@
 ---
 title: Sessions that survive
 description: Why an agent's work should outlive a closed window, a stopped run, and a crash, and how golem keeps it in an event log and a checkpoint, closes what a crash left open, and forks a chat at one message.
-order: 9
+order: 5
 adrs: [6, 8, 9, 10, 20]
 ---
 
@@ -228,6 +228,6 @@ A step that stops to ask you a question runs again from its first line when you 
 
 ## Read more
 
-- Next: *The daemon and the protocol*: one process, the socket, attach, and fan-out (chapter 10, coming next).
-- Before: [MCP](./mcp.md).
+- Next: [Tools](./tools.md), what happens when the reply asks for a tool.
+- Before: [The protocol](./protocol.md).
 - [The overview](../architecture.md): the whole system on one page.
