@@ -7,12 +7,14 @@ Session stores, the live store, the query client, and the router.
 - `new-session.ts`: the folder the next new session gets: a pick, else the last opened session's, else the newest session's.
 - `drafts.ts`: the unsent text and its long pastes per session id (or `"new"`), in memory only.
 - `errors.ts`: reads a failed call: `isInvalidParams`, and `sendErrorText` for the line under the composer.
+- `models.ts`: the model listing's types and its query key.
+- `pulls.ts`: the downloads in flight, from every connection, with their speed, the last failures, and the wish to switch a session when one ends well.
 - `query.ts`: the TanStack query client, and the pushed events that mark answers stale.
 - `router.ts`: the current route from `location` and the history.
 - `connection.ts`: the link state and the daemon's version.
 - `login.ts`: takes the login token from the address and trades it for the cookie.
 - `page.ts`: everything the page holds, built on one client, with the session reference counts and the visibility check.
 - `boot.ts`: exchanges the token, makes the client, builds the page.
-- `page-context.tsx`: `PageProvider` and the hooks features use: `useRoute`, `useNavigate`, `useSessionList`, `useSession`, `usePageActions`, `useNewSessionFolder`, `useKnownFolders`, `useRememberOpenedFolder`, `useDraft`, `useDraftPastes`.
+- `page-context.tsx`: `PageProvider` and the hooks features use: `useRoute`, `useNavigate`, `useSessionList`, `useSession`, `usePageActions`, `useNewSessionFolder`, `useKnownFolders`, `useRememberOpenedFolder`, `useDraft`, `useDraftPastes`, `useModelList`, `usePulls`.
 - `connection-context.tsx`: `ConnectionProvider` and `useConnection`.
 - `test-support.ts`: a fake client and an event builder for tests.

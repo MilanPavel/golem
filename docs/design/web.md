@@ -129,6 +129,15 @@ The page keeps retrying behind "daemon down", and the screen goes away by itself
 - Typing filters the list. Up and Down move, Enter runs, and Esc closes.
 - Text that matches no command is sent as a message, the same as in the composer.
 
+## The model dialog
+
+- The model chip in the top bar is a button, `Model: <name>`. It opens a centred dialog, `Choose a model`, and focus returns to the chip when it closes.
+- A search field over the list, as one combobox: focus stays in the field, Up, Down, Home, End, PageUp, and PageDown move the active row, Enter does its main action, and Esc clears the search, then closes.
+- The groups are the TUI picker's: Profiles, Installed, Download, then each provider. A row has the label, the ref in faint mono, and the facts in mono. The session's model has a check, the default a `default` badge.
+- A row that is not ready is muted and says why. The page never takes a key, so it names the command: `golem auth set <provider>`, `golem setup`, `ollama serve`.
+- A download shows a bar, `2.1 / 6.6 GB · 12 MB/s · 6 min`, and it is the same one the terminal shows, because progress reaches every connection.
+- The footer acts on the active row: Use for this session, Make default, Download, Stop download, Remove. Download and Remove ask first, in the footer; a model too big for the machine asks twice.
+
 ## Type
 
 | Role | Face | Size and weight |

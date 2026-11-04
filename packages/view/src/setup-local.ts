@@ -436,7 +436,7 @@ function gb(bytes: number): string {
   return (bytes / 1e9).toFixed(1);
 }
 
-function timeLeft(seconds: number): string {
+export function timeLeft(seconds: number): string {
   if (seconds < 60) {
     return "under a minute";
   }

@@ -27,6 +27,8 @@ import { Drawer, TodoList } from "../features/drawer/index.ts";
 import { Composer, DockView, Meter } from "../features/composer/index.ts";
 import { createHistory } from "../features/composer/history.ts";
 import { HomeView, SessionTitle } from "../features/shell/index.ts";
+import { ModelDialogView, type ModelDialogViewProps } from "../features/models/index.ts";
+import { NO_OLLAMA_LISTING, OLLAMA_DOWN_LISTING, SAMPLE_LISTING, SAMPLE_PULLS } from "../features/models/sample.ts";
 import { CloseSessionDialog, RenameField, SidebarView } from "../features/sessions/index.ts";
 import { faviconHref, tabTitle } from "../features/tab-status/index.ts";
 import type { ConnectionSnapshot } from "../store/connection.ts";
@@ -256,6 +258,49 @@ function SessionActionsDemo({ theme }: { theme: string }) {
   );
 }
 
+const MODEL_CASES: { label: string; props: Partial<ModelDialogViewProps> }[] = [
+  { label: "The list", props: {} },
+  { label: "Download question", props: { initial: { activeId: "ollama/qwen3:14b", confirm: { kind: "pull", ref: "ollama/qwen3:14b", step: 1 } } } },
+  { label: "Too big, first question", props: { initial: { activeId: "ollama/qwen3:32b", confirm: { kind: "pull", ref: "ollama/qwen3:32b", step: 1 } } } },
+  { label: "Too big, second question", props: { initial: { activeId: "ollama/qwen3:32b", confirm: { kind: "pull", ref: "ollama/qwen3:32b", step: 2 } } } },
+  { label: "Remove question", props: { initial: { activeId: "ollama/gemma4:e4b", confirm: { kind: "remove", ref: "ollama/gemma4:e4b" } } } },
+  { label: "Download in progress", props: { initial: { activeId: "ollama/gemma3:12b" } } },
+  { label: "A refused action", props: { initial: { activeId: "ollama/gemma4:e4b", failure: "model not found" } } },
+  { label: "Ollama down", props: { listing: OLLAMA_DOWN_LISTING } },
+  { label: "No Ollama", props: { listing: NO_OLLAMA_LISTING } },
+  { label: "Loading", props: { listing: null } },
+  { label: "Could not list", props: { listing: null, loadError: "daemon went away" } },
+];
+
+/** The model dialog in each state it can start in. */
+function ModelDialogDemo({ theme }: { theme: string }) {
+  const [shown, setShown] = useState<string | null>(null);
+  const none = () => Promise.resolve();
+  return (
+    <div className="flex flex-wrap gap-2 rounded-lg border border-line bg-bg p-4">
+      {MODEL_CASES.map(({ label, props }) => (
+        <div key={label}>
+          <Button onClick={() => setShown(label)}>
+            {label}
+            <span className="sr-only">, {theme}</span>
+          </Button>
+          <ModelDialogView
+            open={shown === label}
+            onOpenChange={(open) => setShown(open ? label : null)}
+            session={{ profile: "local", name: "qwen3:8b" }}
+            listing={SAMPLE_LISTING}
+            loadError={null}
+            onRetry={() => {}}
+            pulls={SAMPLE_PULLS}
+            actions={{ use: none, setDefault: none, pull: none, stop: none, remove: none, refresh: none }}
+            {...props}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function Panel({ theme }: { theme: "slip" | "kiln" }) {
   return (
     <section data-theme={theme} aria-label={`${theme} theme`} className="rounded-lg border border-line bg-bg p-4 text-ink">
@@ -428,6 +473,11 @@ function Panel({ theme }: { theme: "slip" | "kiln" }) {
       <DiffDemo />
 
       <DrawerDemo theme={theme} />
+
+      <section className="mt-6">
+        <h3 className="mb-2 font-mono text-xs text-faint">Model dialog</h3>
+        <ModelDialogDemo theme={theme} />
+      </section>
 
       <Group title="Dialog, popover, menu, tooltip">
         <Dialog>

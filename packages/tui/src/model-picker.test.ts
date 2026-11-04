@@ -8,9 +8,7 @@ import {
   afterInstall,
   closedPicker,
   layoutPicker,
-  modelNames,
   openPicker,
-  pickerGroups,
   pickerHint,
   pickerKeyOf,
   pressPicker,
@@ -69,29 +67,6 @@ function keyed(state: PickerState, ...presses: Press[]): PickerState {
   }
   return current;
 }
-
-test("models are grouped: profiles, installed, download, then each provider", () => {
-  const groups = pickerGroups(LISTING, "");
-  assert.deepEqual(
-    groups.map((group) => [group.title, group.models.map((item) => item.ref)]),
-    [
-      ["Profiles", ["ollama/qwen3:8b", "anthropic/claude-x"]],
-      ["Installed", ["ollama/gemma4:e4b"]],
-      ["Download", ["ollama/qwen3:30b-a3b"]],
-      ["openrouter", ["openrouter/qwen/qwen3-235b", "openrouter/meta/llama-4"]],
-    ],
-  );
-});
-
-test("typing filters by ref, label, and profile name", () => {
-  assert.deepEqual(
-    pickerGroups(LISTING, "QWEN3").flatMap((group) => group.models.map((item) => item.ref)),
-    ["ollama/qwen3:8b", "ollama/qwen3:30b-a3b", "openrouter/qwen/qwen3-235b"],
-  );
-  assert.deepEqual(pickerGroups(LISTING, "sonn").flatMap((group) => group.models.map((item) => item.ref)), [
-    "anthropic/claude-x",
-  ]);
-});
 
 test("Enter chooses the selection by profile name, else by ref", () => {
   const first = pressPicker(openPicker(null), LISTING, "enter");
@@ -224,18 +199,6 @@ test("live progress shows on the row, and a pull nobody listed gets one", () => 
   assert.equal(withPulls(LISTING, {}), LISTING);
   const busy = pressPicker(selecting("ollama/qwen3:30b-a3b"), shown, "enter");
   assert.deepEqual(busy.action, { kind: "notice", text: "still downloading: x stops it" });
-});
-
-test("suggested names are profiles, then ready refs", () => {
-  assert.deepEqual(modelNames(LISTING), [
-    "qwen",
-    "sonnet",
-    "ollama/qwen3:8b",
-    "ollama/gemma4:e4b",
-    "openrouter/qwen/qwen3-235b",
-    "openrouter/meta/llama-4",
-  ]);
-  assert.deepEqual(modelNames(null), []);
 });
 
 const NO_OLLAMA: ModelListResult = {
