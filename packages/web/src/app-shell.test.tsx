@@ -95,7 +95,7 @@ test("the selected session is current, and a click navigates without a page load
 test("New session goes to the empty screen", async () => {
   const user = userEvent.setup();
   setup("/s/b");
-  await user.click(screen.getByRole("button", { name: /New session/ }));
+  await user.click(screen.getByRole("button", { name: "New session" }));
   expect(location.pathname).toBe("/");
   expect(screen.getByRole("heading", { name: "Start a new session" })).toBeTruthy();
 });
@@ -119,7 +119,7 @@ test("an unnamed session is New session", async () => {
   const { fake } = setup("/s/c");
   seed(fake);
   await wait();
-  expect(screen.getByRole("heading", { level: 1, name: "New session" })).toBeTruthy();
+  expect(screen.getByRole("heading", { level: 1, name: /New session/ })).toBeTruthy();
 });
 
 test("a session the daemon does not have says so, and the button goes back", async () => {
@@ -158,7 +158,7 @@ test("the folder chip defaults to the last opened session's folder", async () =>
   const { fake } = setup("/s/b");
   seed(fake);
   await wait();
-  await user.click(screen.getByRole("button", { name: /New session/ }));
+  await user.click(screen.getByRole("button", { name: "New session" }));
   expect(screen.getByRole("button", { name: "Folder: notes" })).toBeTruthy();
 });
 

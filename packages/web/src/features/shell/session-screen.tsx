@@ -1,5 +1,5 @@
-import type { TodoItem } from "@golem/view";
-import { useEffect, useRef, type Ref } from "react";
+import { forkPoint, type TodoItem } from "@golem/view";
+import { useEffect, useMemo, useRef, type ReactNode, type Ref } from "react";
 import { Badge } from "../../ui/badge.tsx";
 import { Button } from "../../ui/button.tsx";
 import { FolderIcon, PanelIcon } from "../../ui/icons.tsx";
@@ -9,7 +9,8 @@ import type { SessionModel, SessionView } from "../../store/session-store.ts";
 import { Transcript } from "../chat/index.ts";
 import { SessionDock } from "../composer/index.ts";
 import { Drawer, DRAWER_ID, useDrawerOpen } from "../drawer/index.ts";
-import { folderName } from "../sessions/folder.ts";
+import { folderName, useSessionActions } from "../sessions/index.ts";
+import { SessionTitle } from "./session-title.tsx";
 
 type Header = Pick<SessionView, "title" | "cwd" | "model" | "status">;
 
@@ -18,6 +19,8 @@ function sameHeader(a: Header, b: Header): boolean {
 }
 
 const selectTodos = (view: SessionView) => view.chat.todos;
+
+const selectForkPoint = (view: SessionView) => forkPoint(view.chat.messages);
 
 const selectHeader = (view: SessionView): Header => ({
   title: view.title,
@@ -46,10 +49,10 @@ function ModelChip({ model }: { model: SessionModel }) {
   );
 }
 
-export function TopBar({ title, children }: { title: string; children?: React.ReactNode }) {
+export function TopBar({ title, children }: { title: ReactNode; children?: ReactNode }) {
   return (
     <header className="flex min-h-13 items-center gap-2.5 border-b border-line px-4 py-2.5">
-      <h1 className="min-w-0 truncate text-sm leading-snug font-semibold">{title}</h1>
+      {title}
       <div className="flex-1" />
       <div className="flex min-w-0 gap-1.5">{children}</div>
     </header>
@@ -115,6 +118,16 @@ export function SessionScreen({ id }: { id: string }) {
   const todos = useSession(id, selectTodos);
   const [drawerOpen, setDrawerOpen] = useDrawerOpen();
   const toggle = useRef<HTMLButtonElement>(null);
+  const atMessage = useSession(id, selectForkPoint);
+  const session = useSessionActions();
+  const titleActions = useMemo(
+    () => ({
+      rename: (next: string) => session.rename(id, next),
+      fork: () => (atMessage === null ? Promise.reject(new Error("Nothing to fork yet.")) : session.fork(id, atMessage)),
+      close: () => session.close(id),
+    }),
+    [session, id, atMessage],
+  );
 
   const title = header.title ?? summary?.title ?? null;
   const cwd = summary ? (summary.cwd ?? null) : header.status === "ready" ? header.cwd : undefined;
@@ -133,7 +146,7 @@ export function SessionScreen({ id }: { id: string }) {
   return (
     <div className="flex min-h-0 min-w-0 flex-1">
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <TopBar title={title || "New session"}>
+        <TopBar title={<SessionTitle title={title || null} canFork={atMessage !== null} actions={titleActions} />}>
           {model ? <ModelChip model={model} /> : null}
           {cwd === undefined ? null : (
             <Badge title={cwd ?? undefined}>

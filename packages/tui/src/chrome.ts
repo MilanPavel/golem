@@ -36,23 +36,6 @@ export const PROMPT = "❯ ";
 const INDENT = "  ";
 const COMPOSER_RULES = 2;
 
-/** What an empty draft shows, one per session. */
-export const PLACEHOLDERS = [
-  'Try "explain this repo"',
-  'Try "fix the failing test"',
-  'Try "/model" to switch models',
-  'Try "what changed since yesterday?"',
-] as const;
-
-/** The placeholder for `key`, such as a session id: the same key always gets the same one. */
-export function placeholderFor(key: string): string {
-  let hash = 0;
-  for (const char of key) {
-    hash = (hash * 31 + (char.codePointAt(0) ?? 0)) >>> 0;
-  }
-  return PLACEHOLDERS[hash % PLACEHOLDERS.length] ?? PLACEHOLDERS[0];
-}
-
 // A glyph in the last column wraps before the newline, so the frame grows and the header scrolls away.
 export function frameColumns(terminalColumns: number): number {
   const width = Math.max(0, Math.floor(terminalColumns));
