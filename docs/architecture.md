@@ -134,7 +134,7 @@ The socket is only the door. Behind it, these jobs sit in one process:
 | Model router | Resolves a profile name or `provider/model` ref to a chat model. | Built |
 | Tools | Plain Python functions with a Pydantic argument model, in `golem/tools/`. The graph offers them to the model and runs them in its own `tools` node ([Tools](architecture/tools.md)). | Built: file reads and writes, `shell`, git, `web_fetch` |
 | MCP servers | Child processes or HTTP endpoints from `[mcp.<name>]`, started in the background, watched with `ping`, and restarted with backoff. Each session's tools come from `ToolRegistry.scoped` (`golem/mcp/`). | Built |
-| Permissions | Rules from the project, the user, and the defaults, checked in order before every tool call (`golem/permissions/`). | Built |
+| Permissions | Rules from the project, the user, and the defaults, checked in order before every tool call (`golem/permissions/`, [Permissions](architecture/permissions.md)). | Built |
 | Skills | The `SKILL.md` folders a session's folder sees, and which one each name means (`golem/skills/`). | Built: finding, listing, and running by name. Pinning planned |
 | Event log | The history. Every event, numbered by `seq`, written before it is sent. A client that reconnects will read it and rebuild the screen. | Written. Replay to clients planned |
 
@@ -151,40 +151,11 @@ If you quit the TUI halfway through, the daemon still finishes the run and saves
 
 If you press Ctrl-C while the answer streams, the TUI sends `run.cancel`. The daemon cancels the run task. Each tool call still open gets `tool.failed`. The answer gets a `message.completed` with the text streamed so far and `interrupted: true`, then `run.cancelled` with the reason `user`. The same partial text is written into the checkpoint, so "go on" continues from it ([ADR-008](adr/008-cancellation.md)). Stopping the daemon does the same for every open run, with the reason `shutdown`.
 
-`shell` runs the user's login shell (`$SHELL -lc`) in the session folder, under `sandbox-exec` ([ADR-014](adr/014-shell-sandbox.md)):
-- **The sandbox** allows writes only to the folder, the temp folders, the usual tool caches, and `[shell] writable`. It denies the network unless `[shell] network = true`, except local Unix sockets. It denies reads of folders that hold credentials, `~/.ssh` and `~/.golem` among them, but allows reads of `~/.golem/skills`, so a skill can run its scripts ([ADR-030](adr/030-skill-read-roots.md)). Variables that look like credentials (`*_API_KEY`, `*_TOKEN`, `*_SECRET`, `*PASSWORD*`) are removed from the environment.
-- **Policy.** `shell` is not read-only, so by default every command asks. A rule's `match` is checked against the command, so `match = "git status|pnpm test*"` allows those and nothing else. Allowing a command for the session allows that exact command, not every command.
-- **Where there is no sandbox**, for example inside another sandbox or off macOS, `shell` and the git helpers refuse to run and say why.
-
-`git_status`, `git_diff`, and `git_log` run git directly in the same sandbox, without the network. They switch off the repository settings that run code: `core.fsmonitor`, hooks, external diff drivers, and text conversion. They are read-only, so the default policy allows them.
+The shell sandbox, the git tools, and the file tools' folders are in [Sandboxes](architecture/sandboxes.md#the-details).
 
 `write_file` and `edit_file`, `web_fetch`, and the shell's output and timeout are in [Tools](architecture/tools.md#the-details).
 
-A call a rule asks about pauses the run ([ADR-013](adr/013-approvals.md)):
-
-```mermaid
-sequenceDiagram
-  participant You
-  participant TUI
-  participant Daemon
-  participant Graph
-  Graph->>Graph: tools node, interrupt()
-  Daemon-->>TUI: tool.requested, approval.needed
-  Note over Daemon: run waits, no task, survives a restart
-  You->>TUI: a, s, or d
-  TUI->>Daemon: approval.respond
-  Daemon-->>TUI: approval.resolved
-  Daemon->>Graph: resume with the answer
-  Graph->>Graph: tools node again from the top
-  Daemon-->>TUI: tool.started, tool.completed, the rest of the run
-```
-
-- **The pause.** The `tools` node decides about every call of the reply first, and calls `interrupt()` for the first one that asks. The run's task ends after `approval.needed`, and the run row is `waiting`. Nothing is in memory, so closing the TUI or restarting the daemon loses nothing. `session.list` reports the session as `waiting`.
-- **The answer.** `approval.respond` names the session, the call, and `allow`, `allow_session`, `allow_always`, or `deny`. With `allow` it may carry edited `args`: the daemon checks them against the tool and the rules first (`-32011` when refused, and the run keeps waiting), records them in `approval.resolved`, and the call runs once with them, its result starting with a note to the model. The daemon reads the pending call from the run's events, stores `approval.resolved`, and starts a new task that resumes the graph with `Command(resume=...)`, which carries the decision and the diff `approval.needed` showed. The node runs again from its first line. Earlier answers come back from LangGraph, the next call that asks pauses again, and only after the last answer does any call run. So no call runs twice, and no event is repeated.
-- **For the session.** `allow_session` also allows the same call for the rest of the session, without asking again. The key is the tool and its subject (`shell` with `git status`), or the tool alone when it has no subject, and it is stored in `sessions.allowed_tools`. A `deny` rule still wins over it. A denied call ends in `tool.failed`, and the model reads `the user denied this tool call`.
-- **Always.** `allow_always` writes an `allow` rule for exactly this call, first in `~/.golem/config.toml` with `tomlkit` so comments stay: the tool with its subject as `match` (escaped, so `*`, `?`, `[`, and `|` mean themselves), else its resolved `path`, else the tool alone. `approval.resolved` names the rule. Only the daemon writes it, and only for an answer you gave.
-- **Order on resume.** LangGraph matches answers to interrupts by their order in the node. A rule written while the run waited could make an asked call skip its interrupt and hand its answer to the next one. So the resume passes the call ids this run already asked about, those calls always interrupt again and get their own answer, and a call before the last asked one that would ask only because the rules changed fails with `the rules changed while the run waited`.
-- **While it waits.** `message.send` answers `SESSION_BUSY`. `run.cancel`, Ctrl-C, or `session.close` ends the run: each open call fails with `cancelled before it was approved`, then `run.cancelled`. A daemon stopping leaves a waiting run as it is.
+Approvals, from the pause to the resume, are in [Permissions](architecture/permissions.md#approvals).
 
 A run stopped between a reply and its tool results leaves tool calls without a result in the checkpoint, and providers refuse that history. Before the next turn streams, each such call gets a result that says it was cancelled.
 
@@ -228,12 +199,7 @@ Settings come from three places. Each one overrides the one before it: `~/.golem
 - `[skills]`: `disabled` (names listed but never used), `claude_dirs` (default `true`, read both `.claude/skills` folders), and `extra_dirs` (more folders of skills, after the user's own). Only the user's file sets these, and the daemon reads them again when the file changes ([ADR-025](adr/025-skill-sources.md)).
 - `[mcp.<name>]`: an MCP server. A stdio one has `command`, optional `args`, `env`, and `cwd`. An HTTP one has `url` and optional `headers`. A value in `env` or `headers` may name `keychain:mcp/<name>`, and a name that looks like a secret must. `enabled` is `true` (default), `"on_demand"`, or `false`, and `timeout_seconds` (default 120) bounds one tool call. The name may use letters, digits, and `-`. The daemon reads the user's file and, for sessions in a folder in `trusted_projects`, the project's `.golem/config.toml`, again whenever they change ([ADR-023](adr/023-mcp-client.md)).
 
-Tool rules are checked in this order, and the first one that matches decides ([ADR-012](adr/012-permission-rules.md)):
-1. `<session folder>/.golem/policy.toml`, which holds only `[[rule]]` entries. Its `allow` rules count only when the folder is in `trusted_projects`. Its `ask` and `deny` rules always apply. A file that does not validate makes every call in that folder ask.
-2. `[[rule]]` in `~/.golem/config.toml`. A file that stops validating keeps its last good rules.
-3. The defaults: read-only tools and internal ones (`todo_write`) are allowed, and everything else asks.
-
-Both files are read again when they change. A `deny` ends the call in `tool.failed`, without `tool.started`, and the model reads why. An `ask` waits for you (below). `golem config show` prints the settings and the rules for the folder it runs in, in that order, through `config.get`.
+The order tool rules are checked in, and what a rule matches, are in [Permissions](architecture/permissions.md#the-details).
 
 API keys, the Keychain, and how the router finds a key are in [Talking to models](architecture/models.md#the-router-and-keys).
 

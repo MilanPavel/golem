@@ -210,7 +210,7 @@ Longer output is stored whole in the `artifacts` table, and the message keeps th
 
 ### The shell's output
 
-`shell` runs the user's login shell (`$SHELL -lc`) in the session folder, under the sandbox, which [Tools and permissions](../guide/permissions.md) and [the overview](../architecture.md#one-turn) describe.
+`shell` runs the user's login shell (`$SHELL -lc`) in the session folder, under the sandbox, which [Sandboxes](./sandboxes.md) describes.
 
 - **Output** is stdout and stderr together. It streams as `tool.output` in batches of up to 2 KB or 0.2 s, up to 64 KB per call. Up to 5 MB is kept (the first 1 MB and the last 4 MB), then `[exit code N]`, and long output becomes an artifact. A failing command is a `tool.completed` with summary `exit N`, not a failure.
 - **Stopping.** The command runs in its own process group. `[shell] timeout_seconds`, or a smaller `timeout_seconds` in the call, kills the group, and so does cancelling the run.
@@ -234,7 +234,7 @@ Longer output is stored whole in the `artifacts` table, and the message keeps th
 
 ## Read more
 
-- Next: *Safety*, the rules, the approvals, and the sandbox that decide whether a call may run (chapter 4, coming next).
+- Next: [Permissions](./permissions.md), the rules and approvals that decide whether a call may run.
 - Before: [Talking to models](./models.md).
 - [Tools and permissions](../guide/permissions.md), the user's guide to the same thing.
 - [The overview](../architecture.md): the whole system on one page.
