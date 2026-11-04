@@ -21,6 +21,7 @@ import HomeLegend from "./HomeLegend.vue";
 import HomeWhy from "./HomeWhy.vue";
 import NotFound from "./NotFound.vue";
 import PixelGolem from "./PixelGolem.vue";
+import SystemMap from "./SystemMap.vue";
 
 export default {
   extends: DefaultTheme,
@@ -38,5 +39,6 @@ export default {
     app.component("HomeLegend", HomeLegend);
     app.component("HomeWhy", HomeWhy);
     app.component("HomeDemo", HomeDemo);
+    app.component("SystemMap", SystemMap);
   },
 } satisfies Theme;
