@@ -183,3 +183,14 @@ export {
   prunePastes,
   type Pastes,
 } from "./paste.ts";
+export {
+  pressStarter,
+  starterLines,
+  starterPrompts,
+  startersShown,
+  type FolderFacts,
+  type StarterKey,
+  type StarterLine,
+  type StarterPick,
+  type StarterPress,
+} from "./starter-prompts.ts";

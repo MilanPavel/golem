@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { homedir } from "node:os";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Box, Text, useApp, useInput, usePaste, useStdin, useWindowSize } from "ink";
 import {
   MODEL_NOT_CONFIGURED,
@@ -103,7 +103,14 @@ import {
   type DeltaBatcher,
   serviceProblem,
   type ServiceProblem,
+  pressStarter,
+  starterLines,
+  starterPrompts,
+  startersShown,
+  type StarterKey,
+  type StarterPick,
 } from "@golem/view";
+import { folderFacts } from "./folder-facts.ts";
 import {
   applyComposer,
   invocableSkills,
@@ -350,6 +357,10 @@ export function App({
     return () => clearTimeout(timer);
   }, [hint]);
   const [draft, setDraft] = useState<Draft>({ text: "", cursor: 0 });
+  /** The starter prompt Down moved to, under an empty chat. */
+  const [starterPick, setStarterPick] = useState<StarterPick>(null);
+  const starterPickRef = useRef(starterPick);
+  starterPickRef.current = starterPick;
   const [sessionModel, setSessionModel] = useState<ModelInfo | null>(null);
   const [servers, setServers] = useState<ServerStates>({});
   /** Secrets whose Keychain read waits on macOS, most likely its dialog (`keychain.wait`). */
@@ -455,6 +466,7 @@ export function App({
   const cancelInstall = useRef<(() => void) | null>(null);
   const shownListing = withPulls(listing, pulls);
   const draftRef = useRef(draft);
+  const startersRef = useRef<readonly string[]>([]);
   const busyRef = useRef(chat.busy);
   const chatRef = useRef(chat);
   const runIdRef = useRef(chat.runId);
@@ -586,6 +598,17 @@ export function App({
   const helpText = !keysOpen && !switcher.open ? panelLines : [];
   const helpHeight = Math.min(helpText.length, budget.body);
   const chatHeight = budget.body - helpHeight;
+  // Starter prompts fit the session's folder, and show until the first message.
+  const starterFolder = sessionCwd ?? process.cwd();
+  const folderPrompts = useMemo(() => starterPrompts(folderFacts(starterFolder)), [starterFolder]);
+  const starters =
+    connection.status === "connected" &&
+    chat.approval === null &&
+    startersShown({ messages: chat.messages.length, draft: draft.text, busy: chat.busy })
+      ? folderPrompts
+      : [];
+  startersRef.current = starters;
+  const starterRows = starterLines(starters, starters.length > 0 ? starterPick : null);
   const transcriptOptions = { times: showTimes, now, toolOutput };
   const measured = layoutTranscript(chat.messages, columns, chatHeight, offset, transcriptOptions);
   const widthKey = measured.overflow ? Math.max(1, columns - 1) : columns;
@@ -3109,8 +3132,42 @@ export function App({
       }
       return;
     }
+    if (onStarterPress(press.name)) {
+      return;
+    }
     applyKeyEffect(pressKey(currentPlace(), press));
   });
+
+  /** Down moves into the starter prompts, and Enter puts one in the composer. True when the key was theirs. */
+  function onStarterPress(name: string | null): boolean {
+    const key: StarterKey | null =
+      name === "up" || name === "down" || name === "escape" ? name : name === "return" ? "enter" : null;
+    const place = currentPlace();
+    if (
+      key === null ||
+      startersRef.current.length === 0 ||
+      place.overlay ||
+      place.help ||
+      place.switcher ||
+      place.debug ||
+      place.history
+    ) {
+      return false;
+    }
+    const pressed = pressStarter(starterPickRef.current, key, startersRef.current);
+    if (pressed.kind === "pass") {
+      return false;
+    }
+    if (pressed.kind === "pick") {
+      starterPickRef.current = pressed.pick;
+      setStarterPick(pressed.pick);
+      return true;
+    }
+    starterPickRef.current = null;
+    setStarterPick(null);
+    setDraft(draftAt(pressed.text));
+    return true;
+  }
 
   /** `r` restarts a service that is installed but does not answer, with an empty composer. */
   function restartOffered(): boolean {
@@ -3358,6 +3415,15 @@ export function App({
       <Box flexDirection="column" width={columns} height={budget.body} flexShrink={0} overflow="hidden">
         <Box flexDirection="column" width={columns} height={chatHeight} flexShrink={0} overflow="hidden">
           {chatHeight > 0 && chat.messages.length === 0 ? <Text dimColor>Type a message.</Text> : null}
+          {chat.messages.length === 0 && starterRows.length > 0 && chatHeight > starterRows.length + 1 ? (
+            <Box flexDirection="column" marginTop={1}>
+              {starterRows.map((row, index) => (
+                <Text key={index} bold={row.selected} dimColor={row.dim} wrap="truncate">
+                  {row.text}
+                </Text>
+              ))}
+            </Box>
+          ) : null}
           {transcript.pinned !== null ? (
             <Box width={columns} height={1} overflow="hidden">
               <Box width={contentWidth} height={1} backgroundColor={QUESTION_BG}>
