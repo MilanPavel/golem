@@ -1,8 +1,19 @@
-import { collapsePaste, expandPastes, noPastes, prunePastes, type Pastes } from "@golem/view";
-import { useEffect, useLayoutEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent } from "react";
+import {
+  applySuggestion,
+  collapsePaste,
+  expandPastes,
+  moveSuggestion,
+  noPastes,
+  prunePastes,
+  suggest,
+  type Pastes,
+  type SuggestCommand,
+} from "@golem/view";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent } from "react";
 import { cn } from "../../ui/cn.ts";
 import { SendIcon, StopIcon } from "../../ui/icons.tsx";
 import { recall, type History, type Recall } from "./history.ts";
+import { SuggestionList } from "./suggestion-list.tsx";
 import "./composer.css";
 
 export const BUSY_HINT = "golem is answering. Press Esc to stop it.";
@@ -15,8 +26,16 @@ export type ComposerProps = {
   pastes: Pastes;
   onPastesChange: (pastes: Pastes) => void;
   history: History;
-  /** Sends the text, long pastes already expanded. A rejection puts the text back. */
+  /**
+   * Sends the text, long pastes already expanded. A rejection puts the text back. Resolving with
+   * "handled" means the text was a command, which history does not keep; "busy" means a run holds
+   * it back, so the draft stays and the hint says why.
+   */
   onSend: (text: string) => Promise<unknown>;
+  /** The slash commands. With them, `/` at the start of the draft suggests them. */
+  commands?: readonly SuggestCommand[];
+  /** The person changed the draft: typed, pasted, or recalled an older text. */
+  onEdit?: () => void;
   /** "at-once" clears the draft when it is sent; "on-success" keeps it on screen until the send worked. */
   clear?: "at-once" | "on-success";
   /** A send is in flight and the composer waits for it. */
@@ -31,6 +50,12 @@ export type ComposerProps = {
   autoFocus?: boolean;
   describedBy?: string;
 };
+
+/** A slash command is not held back by a run in progress, but `//` is a message. */
+function isCommandLine(text: string): boolean {
+  const line = text.trimStart();
+  return line.startsWith("/") && !line.startsWith("//");
+}
 
 function atEdge(el: HTMLTextAreaElement, edge: "start" | "end", recalling: boolean): boolean {
   if (el.selectionStart !== el.selectionEnd) {
@@ -52,6 +77,8 @@ export function Composer({
   onPastesChange,
   history,
   onSend,
+  commands,
+  onEdit,
   clear = "at-once",
   pending = false,
   busy = false,
@@ -65,6 +92,11 @@ export function Composer({
   const field = useRef<HTMLTextAreaElement>(null);
   const [hint, setHint] = useState<string | null>(null);
   const recalled = useRef<Recall | null>(null);
+  const [browsing, setBrowsing] = useState(false);
+  const [dismissed, setDismissed] = useState<string | null>(null);
+  const [pick, setPick] = useState<{ draft: string; index: number }>({ draft: "", index: 0 });
+  const listId = useId();
+  const optionId = (index: number) => `${listId}-option-${index}`;
   const caret = useRef<number | "start" | "end" | null>(null);
   const live = useRef({ text, pastes });
   const disabled = disabledReason !== null;
@@ -93,6 +125,44 @@ export function Composer({
     }
   }, [text]);
 
+  const items = useMemo(
+    () =>
+      commands === undefined || busy || browsing || pending || disabled || dismissed === text
+        ? []
+        : suggest(text, commands),
+    [commands, busy, browsing, pending, disabled, dismissed, text],
+  );
+  const open = items.length > 0;
+  const selected = pick.draft === text ? Math.min(pick.index, items.length - 1) : 0;
+  const activeOption = open ? optionId(selected) : undefined;
+
+  // The same text for the same count, so typing that keeps the count announces nothing.
+  const count = open ? `${items.length} ${items.length === 1 ? "suggestion" : "suggestions"}` : "";
+
+  useEffect(() => {
+    if (activeOption !== undefined) {
+      document.getElementById(activeOption)?.scrollIntoView?.({ block: "nearest" });
+    }
+  }, [activeOption]);
+
+  function recalling(next: Recall | null): void {
+    recalled.current = next;
+    setBrowsing(next !== null);
+  }
+
+  /** Puts a suggestion's completion in the draft, with the caret at its end. */
+  function complete(index: number, key: "tab" | "enter"): void {
+    const result = applySuggestion(text, items, index, key);
+    if (result.submit) {
+      void submit();
+    } else if (result.draft !== text) {
+      caret.current = "end";
+      recalling(null);
+      onEdit?.();
+      onTextChange(result.draft);
+    }
+  }
+
   async function submit(): Promise<void> {
     const raw = text;
     const sent = expandPastes(raw, pastes);
@@ -100,20 +170,13 @@ export function Composer({
       return;
     }
     const savedPastes = pastes;
-    history.add(sent);
-    recalled.current = null;
+    recalling(null);
     setHint(null);
     if (clear === "at-once") {
       onTextChange("");
       onPastesChange(noPastes);
     }
-    try {
-      await onSend(sent);
-      if (clear === "on-success") {
-        onTextChange("");
-        onPastesChange(noPastes);
-      }
-    } catch {
+    const restore = (): void => {
       if (clear === "at-once") {
         const now = live.current.text;
         if (now === "") {
@@ -123,6 +186,24 @@ export function Composer({
           onTextChange(`${sent}\n${now}`);
         }
       }
+    };
+    try {
+      const result = await onSend(sent);
+      if (result === "busy") {
+        restore();
+        setHint(BUSY_HINT);
+        return;
+      }
+      if (result !== "handled") {
+        history.add(sent);
+      }
+      if (clear === "on-success") {
+        onTextChange("");
+        onPastesChange(noPastes);
+      }
+    } catch {
+      history.add(sent);
+      restore();
     }
   }
 
@@ -133,11 +214,18 @@ export function Composer({
     const el = event.currentTarget;
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
-      if (busy) {
+      if (open) {
+        complete(selected, "enter");
+      } else if (busy && !isCommandLine(text)) {
         setHint(BUSY_HINT);
       } else {
         void submit();
       }
+      return;
+    }
+    if (open && event.key === "Escape") {
+      event.preventDefault();
+      setDismissed(text);
       return;
     }
     if (event.key === "Escape" && busy && onStop) {
@@ -146,6 +234,16 @@ export function Composer({
       return;
     }
     if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
+      return;
+    }
+    if (open && (event.key === "ArrowUp" || event.key === "ArrowDown")) {
+      event.preventDefault();
+      setPick({ draft: text, index: moveSuggestion(selected, event.key === "ArrowUp" ? "up" : "down", items.length) });
+      return;
+    }
+    if (open && event.key === "Tab") {
+      event.preventDefault();
+      complete(selected, "tab");
       return;
     }
     if (event.key === "ArrowUp" || event.key === "ArrowDown") {
@@ -158,8 +256,9 @@ export function Composer({
         return;
       }
       event.preventDefault();
-      recalled.current = step.at;
+      recalling(step.at);
       caret.current = older ? "start" : "end";
+      onEdit?.();
       onTextChange(step.text);
       onPastesChange(noPastes);
     }
@@ -179,7 +278,8 @@ export function Composer({
     const start = el.selectionStart;
     const next = text.slice(0, start) + result.insert + text.slice(el.selectionEnd);
     caret.current = start + result.insert.length;
-    recalled.current = null;
+    recalling(null);
+    onEdit?.();
     onPastesChange(result.pastes);
     onTextChange(next);
   }
@@ -187,7 +287,21 @@ export function Composer({
   const large = size === "large";
   const stopping = busy && onStop !== undefined;
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="relative flex flex-col gap-1.5">
+      {open ? (
+        <SuggestionList
+          id={listId}
+          optionId={optionId}
+          items={items}
+          selected={selected}
+          onPick={(index) => complete(index, "tab")}
+        />
+      ) : null}
+      {commands === undefined ? null : (
+        <div aria-live="polite" className="sr-only">
+          {count}
+        </div>
+      )}
       <div
         data-composer={size}
         className={cn(
@@ -205,6 +319,13 @@ export function Composer({
           aria-busy={pending ? "true" : undefined}
           aria-label={label}
           aria-describedby={describedBy}
+          {...(commands === undefined
+            ? {}
+            : {
+                "aria-autocomplete": "list" as const,
+                "aria-controls": open ? listId : undefined,
+                "aria-activedescendant": activeOption,
+              })}
           placeholder={disabledReason ?? placeholder}
           spellCheck
           className={cn(
@@ -212,8 +333,9 @@ export function Composer({
             large && "min-h-12",
           )}
           onChange={(event) => {
-            recalled.current = null;
+            recalling(null);
             setHint(null);
+            onEdit?.();
             const value = event.target.value;
             onTextChange(value);
             const kept = prunePastes(value, pastes);

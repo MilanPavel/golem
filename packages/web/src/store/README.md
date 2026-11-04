@@ -15,6 +15,6 @@ Session stores, the live store, the query client, and the router.
 - `login.ts`: takes the login token from the address and trades it for the cookie.
 - `page.ts`: everything the page holds, built on one client, with the session reference counts and the visibility check.
 - `boot.ts`: exchanges the token, makes the client, builds the page.
-- `page-context.tsx`: `PageProvider` and the hooks features use: `useRoute`, `useNavigate`, `useSessionList`, `useSession`, `usePageActions`, `useNewSessionFolder`, `useKnownFolders`, `useRememberOpenedFolder`, `useDraft`, `useDraftPastes`, `useModelList`, `usePulls`.
+- `page-context.tsx`: `PageProvider` and the hooks features use: `useRoute`, `useNavigate`, `useSessionList`, `useSession`, `usePageActions`, `useNewSessionFolder`, `useKnownFolders`, `useRememberOpenedFolder`, `useDraft`, `useDraftPastes`, `useModelList`, `useSkillList`, `useSessionReader`, `usePulls`.
 - `connection-context.tsx`: `ConnectionProvider` and `useConnection`.
 - `test-support.ts`: a fake client and an event builder for tests.

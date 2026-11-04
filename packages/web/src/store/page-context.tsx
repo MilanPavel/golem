@@ -6,7 +6,7 @@ import { MODEL_LIST_KEY, type ModelListResult } from "./models.ts";
 import type { Page, PageActions } from "./page.ts";
 import type { PullsSnapshot } from "./pulls.ts";
 import type { Route } from "./router.ts";
-import type { SessionSummary } from "@golem/client";
+import type { SessionSummary, SkillListResult } from "@golem/client";
 import type { Pastes } from "@golem/view";
 import { distinctFolders, resolveFolder } from "./new-session.ts";
 import { initialSessionView, type SessionView } from "./session-store.ts";
@@ -121,6 +121,27 @@ export function useDraftReader(key: string): () => string {
 export function useModelList(enabled = true): UseQueryResult<ModelListResult> {
   const { queries } = usePage();
   return useQuery({ queryKey: [...MODEL_LIST_KEY], queryFn: queries.modelList, enabled });
+}
+
+/**
+ * Reads a session's view and its list summary when called, without re-rendering when they
+ * change. Null for no session (the empty screen); the view is the initial one until the session opens.
+ */
+export function useSessionReader(id: string | null): () => { view: SessionView; summary: SessionSummary | undefined } {
+  const { sessions, sessionList } = usePage();
+  return useCallback(
+    () => ({
+      view: (id === null ? undefined : sessions.get(id)?.getSnapshot()) ?? initialSessionView,
+      summary: id === null ? undefined : sessionList.getSnapshot().find((item) => item.session_id === id),
+    }),
+    [sessions, sessionList, id],
+  );
+}
+
+/** The skills a folder sees (all of them for null). Fetched only once `enabled`, and again after a skills change. */
+export function useSkillList(cwd: string | null, enabled = true): UseQueryResult<SkillListResult> {
+  const { queries } = usePage();
+  return useQuery({ queryKey: ["skill.list", cwd], queryFn: () => queries.skillList(cwd), enabled });
 }
 
 /** The downloads in flight and the last failures, from every connection. */

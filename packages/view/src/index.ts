@@ -183,6 +183,14 @@ export {
   type PickerGroup,
   type PullState,
 } from "./model-list.ts";
+export {
+  copyAnswer,
+  copyCode,
+  exportFileName,
+  lastFencedCode,
+  sessionMarkdown,
+  type CopyMessage,
+} from "./transcript-text.ts";
 export { golemState, type GolemState, type RunPhase } from "./golem-state.ts";
 export { visibleText } from "./sanitize.ts";
 export { todoLines, todoRows, TODO_ROWS, type TodoItem, type TodoLine, type TodoStatus } from "./todos.ts";

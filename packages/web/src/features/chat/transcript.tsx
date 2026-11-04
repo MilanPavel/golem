@@ -8,6 +8,7 @@ import { Button } from "../../ui/button.tsx";
 import { cn } from "../../ui/cn.ts";
 import type { GolemState } from "../../ui/golem-state.ts";
 import { PixelGolem } from "../../ui/pixel-golem.tsx";
+import { useTimesShown } from "./times-shown.ts";
 import { formatClock, formatDuration, shouldStick, squeezeArgs } from "./format.ts";
 import type { DiffMode } from "../diff/diff-mode.ts";
 import { DiffModeSwitch } from "../diff/diff-mode-switch.tsx";
@@ -138,7 +139,8 @@ function golemState(message: ChatMessage): GolemState {
 }
 
 export const UserMessage = memo(function UserMessage({ message }: { message: ChatMessage }) {
-  const time = formatClock(message.at);
+  const shown = useTimesShown();
+  const time = shown ? formatClock(message.at) : "";
   return (
     <article aria-label="You" className="flex max-w-xl flex-col items-end self-end">
       <div className="min-w-0 rounded-lg rounded-br-xs bg-slip px-3.5 py-2.5 text-sm leading-normal wrap-anywhere whitespace-pre-wrap">

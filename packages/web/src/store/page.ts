@@ -1,4 +1,4 @@
-import type { ApprovalChoice, GolemClient } from "@golem/client";
+import type { ApprovalChoice, GolemClient, SkillListResult } from "@golem/client";
 import type { QueryClient } from "@tanstack/react-query";
 import { createDrafts, type Drafts } from "./drafts.ts";
 import { createConnectionStore, type ConnectionStore } from "./connection.ts";
@@ -34,6 +34,8 @@ export type PageClient = Pick<
   | "closeSession"
   | "cancelRun"
   | "listModels"
+  | "listSkills"
+  | "setSkills"
   | "setSessionModel"
   | "setDefaultModel"
   | "pullModel"
@@ -47,7 +49,10 @@ export type PageClient = Pick<
 /** Thin calls on the client. Their results arrive as events, so there is nothing to merge. */
 export type PageActions = {
   createSession(cwd: string | null): Promise<string>;
-  send(sessionId: string, text: string): Promise<void>;
+  /** Sends a message. With `skill`, the daemon fills the skill's body in from `args`. */
+  send(sessionId: string, text: string, skill?: { name: string; args: string }): Promise<void>;
+  /** Pins a skill for the session, or unpins it. The pinned list arrives as `chat.activeSkills`. */
+  pinSkill(sessionId: string, name: string, pin: boolean): Promise<void>;
   cancel(runId: string): Promise<void>;
   /** Sets the title. What the page shows afterwards comes from the daemon's summary. */
   rename(sessionId: string, title: string): Promise<void>;
@@ -73,6 +78,8 @@ export type PageActions = {
 /** What each query key fetches. */
 export type PageQueries = {
   modelList(): Promise<ModelListResult>;
+  /** The skills a folder sees. `null` is no folder. */
+  skillList(cwd: string | null): Promise<SkillListResult>;
 };
 
 export type Page = {
@@ -129,6 +136,7 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
     queryClient,
     queries: {
       modelList: () => client.listModels(),
+      skillList: (cwd) => (cwd === null ? client.listSkills() : client.listSkills(cwd)),
     },
     router,
     actions: {
@@ -136,8 +144,12 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
         const created = await client.createSession(cwd === null ? undefined : { cwd });
         return created.session_id;
       },
-      async send(sessionId, text) {
-        await client.sendMessage(sessionId, text);
+      async send(sessionId, text, skill) {
+        if (skill === undefined) await client.sendMessage(sessionId, text);
+        else await client.sendMessage(sessionId, text, { skill });
+      },
+      async pinSkill(sessionId, name, pin) {
+        await client.setSkills(sessionId, pin ? { pin: [name] } : { unpin: [name] });
       },
       async cancel(runId) {
         await client.cancelRun(runId);
