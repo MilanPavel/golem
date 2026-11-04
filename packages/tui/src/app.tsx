@@ -29,6 +29,7 @@ import {
   NO_MODEL_NOTICE,
   noModelChosen,
   advance,
+  appendInstallOutput,
   agentInstalled,
   askService,
   engineLines,
@@ -90,6 +91,7 @@ import {
   NO_MODEL_BAND,
   type ServiceRunner,
   type ServiceState,
+  type InstallTail,
   type SetupLine,
   type SetupNext,
   type SetupStart,
@@ -1842,21 +1844,18 @@ export function App({
 
   /** The daemon installs Ollama with Homebrew; its output reaches every window. */
   function installOllamaHere(): void {
-    let last = "";
-    let partial = "";
+    let tail: InstallTail = { last: "", partial: "" };
     const stop = client.onOllamaInstall((update) => {
       const event = installEventOf(update);
       if (event.kind === "output") {
-        const lines = (partial + event.text).split("\n");
-        partial = lines.pop() ?? "";
-        const shown = lines.map((line) => line.split("\r").at(-1)?.trim() ?? "").filter((line) => line.length > 0);
-        last = shown.at(-1) ?? last;
+        tail = appendInstallOutput(tail, event.text);
+        const last = tail.last;
         updateSetup((ui) => (ui.ollama.phase === "installing" ? { ...ui, ollama: { ...ui.ollama, last } } : ui));
         return;
       }
       stop();
       const outcome = event.kind === "error" ? "failed" : event.stopped ? "stopped" : event.code === 0 ? "installed" : "failed";
-      const reason = event.kind === "error" ? event.message : last.length > 0 ? last : "brew install ollama failed";
+      const reason = event.kind === "error" ? event.message : tail.last.length > 0 ? tail.last : "brew install ollama failed";
       updateSetup((ui) => ({ ...ui, ollama: ollamaInstallEnded(ui.ollama, outcome, reason, Date.now()) }));
       if (outcome === "installed") {
         startOllamaNow();
@@ -2249,6 +2248,9 @@ export function App({
     }
     const choice = choices[ui.overview.selected];
     if (choice === undefined) {
+      return;
+    }
+    if (choice.kind === "service") {
       return;
     }
     if (choice.kind === "guided") {

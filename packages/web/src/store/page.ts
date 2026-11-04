@@ -1,15 +1,17 @@
-import type { ApprovalChoice, GolemClient, SkillListResult } from "@golem/client";
+import { OLLAMA_FAILED, RpcError, type ApprovalChoice, type GolemClient, type SetupStatusResult, type SkillListResult } from "@golem/client";
+import { installEventOf, type InstallEvent } from "@golem/view";
 import type { QueryClient } from "@tanstack/react-query";
 import { createDrafts, type Drafts } from "./drafts.ts";
 import { createConnectionStore, type ConnectionStore } from "./connection.ts";
 import { createNewSessionFolder, type NewSessionFolderStore } from "./new-session.ts";
-import { MODEL_LIST_KEY, type ModelListResult } from "./models.ts";
+import { MODEL_LIST_KEY, SETUP_STATUS_KEY, type ModelListResult } from "./models.ts";
 import { createPulls, type Pulls } from "./pulls.ts";
 import { createQueryClient, keepQueriesHonest } from "./query.ts";
 import { createRouter, type Router } from "./router.ts";
 import { createSessionList, type SessionList } from "./session-list.ts";
 import type { Frame, SessionStore } from "./session-store.ts";
 import { createSessions, type Sessions } from "./sessions.ts";
+import { createSetupStart, type SetupStart } from "./setup-start.ts";
 
 /** What the page needs of the client. */
 export type PageClient = Pick<
@@ -41,6 +43,11 @@ export type PageClient = Pick<
   | "pullModel"
   | "cancelPull"
   | "deleteModel"
+  | "setupStatus"
+  | "startOllama"
+  | "installOllama"
+  | "cancelOllamaInstall"
+  | "onOllamaInstall"
   | "respondApproval"
   | "checkNow"
   | "close"
@@ -68,16 +75,30 @@ export type PageActions = {
    * download ends well, even if the dialog that asked is closed by then.
    */
   pull(ref: string, after?: { sessionId: string }): Promise<void>;
+  /** Makes `name` the default model when the download of `ref` ends well, even with every dialog closed. */
+  defaultWhenPulled(ref: string, name: string): void;
   /** Stops a download. Ollama keeps the bytes for the next try. */
   cancelPull(ref: string): Promise<void>;
   remove(ref: string): Promise<void>;
-  /** Asks the providers again, past the daemon's cache, and puts the answer in the listing. */
-  refreshModels(): Promise<void>;
+  /** Asks the providers again, past the daemon's cache, puts the answer in the listing, and returns it. */
+  refreshModels(): Promise<ModelListResult>;
+  /** Starts Ollama. True when it answers afterwards. */
+  startOllama(): Promise<boolean>;
+  /**
+   * Installs Ollama with Homebrew, run by the daemon. `onEvent` gets its output and its end, and
+   * the subscription ends with it. Resolves "no_brew" when the Mac has no Homebrew, and rejects
+   * for any other refusal.
+   */
+  installOllama(onEvent: (event: InstallEvent) => void): Promise<"started" | "no_brew">;
+  /** Stops the install the daemon is running. */
+  cancelOllamaInstall(): Promise<void>;
 };
 
 /** What each query key fetches. */
 export type PageQueries = {
   modelList(): Promise<ModelListResult>;
+  /** The overview rows, from the same checks as `golem doctor`. */
+  setupStatus(): Promise<SetupStatusResult>;
   /** The skills a folder sees. `null` is no folder. */
   skillList(cwd: string | null): Promise<SkillListResult>;
 };
@@ -89,6 +110,7 @@ export type Page = {
   newSession: NewSessionFolderStore;
   drafts: Drafts;
   pulls: Pulls;
+  setupStart: SetupStart;
   queryClient: QueryClient;
   queries: PageQueries;
   router: Router;
@@ -113,7 +135,11 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
   const newSession = createNewSessionFolder();
   const drafts = createDrafts();
   const queryClient = createQueryClient();
-  const pulls = createPulls(client);
+  const pulls = createPulls(client, Date.now, () => {
+    void queryClient.invalidateQueries({ queryKey: MODEL_LIST_KEY });
+    void queryClient.invalidateQueries({ queryKey: SETUP_STATUS_KEY });
+  });
+  const setupStart = createSetupStart();
   const router = createRouter();
   const doc = options.doc ?? document;
   const uses = new Map<string, { count: number; timer: ReturnType<typeof setTimeout> | undefined }>();
@@ -133,9 +159,11 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
     newSession,
     drafts,
     pulls,
+    setupStart,
     queryClient,
     queries: {
       modelList: () => client.listModels(),
+      setupStatus: () => client.setupStatus(),
       skillList: (cwd) => (cwd === null ? client.listSkills() : client.listSkills(cwd)),
     },
     router,
@@ -174,6 +202,7 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       async setDefault(name) {
         await client.setDefaultModel(name);
         await queryClient.invalidateQueries({ queryKey: MODEL_LIST_KEY });
+        await queryClient.invalidateQueries({ queryKey: SETUP_STATUS_KEY });
       },
       async pull(ref, after) {
         pulls.begin(ref);
@@ -185,6 +214,9 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
           throw error;
         }
       },
+      defaultWhenPulled(ref, name) {
+        pulls.defaultWhenDone(ref, name);
+      },
       async cancelPull(ref) {
         pulls.forget(ref);
         await client.cancelPull(ref);
@@ -194,7 +226,34 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
         await queryClient.invalidateQueries({ queryKey: MODEL_LIST_KEY });
       },
       async refreshModels() {
-        queryClient.setQueryData(MODEL_LIST_KEY, await client.listModels(true));
+        const listing = await client.listModels(true);
+        queryClient.setQueryData(MODEL_LIST_KEY, listing);
+        void queryClient.invalidateQueries({ queryKey: SETUP_STATUS_KEY });
+        return listing;
+      },
+      async startOllama() {
+        const { running } = await client.startOllama();
+        void queryClient.invalidateQueries({ queryKey: MODEL_LIST_KEY });
+        void queryClient.invalidateQueries({ queryKey: SETUP_STATUS_KEY });
+        return running;
+      },
+      async installOllama(onEvent) {
+        const off = client.onOllamaInstall((update) => {
+          const event = installEventOf(update);
+          if (event.kind !== "output") off();
+          onEvent(event);
+        });
+        try {
+          await client.installOllama();
+          return "started";
+        } catch (error) {
+          off();
+          if (error instanceof RpcError && error.code === OLLAMA_FAILED && error.data?.["no_brew"] === true) return "no_brew";
+          throw error;
+        }
+      },
+      async cancelOllamaInstall() {
+        await client.cancelOllamaInstall();
       },
     },
     acquire(id) {

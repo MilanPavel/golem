@@ -1,4 +1,4 @@
-import { RpcError, SESSION_BUSY, type ChatEvent, type ConnectionState, type ModelServerStatus, type PullUpdate, type SessionSummary } from "@golem/client";
+import { RpcError, SESSION_BUSY, type ChatEvent, type ConnectionState, type OllamaInstallUpdate, type ModelServerStatus, type PullUpdate, type SessionSummary } from "@golem/client";
 import { vi } from "vitest";
 import type { ModelListResult } from "./models.ts";
 import type { PageClient } from "./page.ts";
@@ -32,10 +32,23 @@ export function summary(id: string, updatedAt: string, cwd: string | null = null
   };
 }
 
+/**
+ * A listing for a setup that works: the default names a model that is ready, so the page opens
+ * no setup window at its start. A test about setup passes its own listing.
+ */
 const EMPTY_LISTING: ModelListResult = {
-  default: null,
-  models: [],
-  providers: [],
+  default: "ollama/qwen3:8b",
+  models: [
+    {
+      ref: "ollama/qwen3:8b",
+      label: "Qwen3 8B",
+      provider: "ollama",
+      source: "installed",
+      status: "ready",
+      price: { input: 0, output: 0 },
+    },
+  ],
+  providers: [{ provider: "ollama", status: "ready" }],
   setup: { ollama_installed: true, ollama_running: true },
 };
 
@@ -64,6 +77,7 @@ export function fakeClient() {
   const mcp = listeners<unknown>();
   const pull = listeners<PullUpdate>();
   const server = listeners<ModelServerStatus>();
+  const install = listeners<OllamaInstallUpdate>();
   let current: ConnectionState = { status: "connecting" };
   const raw = {
     get state() {
@@ -77,6 +91,11 @@ export function fakeClient() {
     onMcpStatus: mcp.on,
     onPull: pull.on,
     onModelServer: server.on,
+    onOllamaInstall: install.on,
+    setupStatus: vi.fn<PageClient["setupStatus"]>(async () => ({ rows: [] })),
+    startOllama: vi.fn<PageClient["startOllama"]>(async () => ({ running: true })),
+    installOllama: vi.fn<PageClient["installOllama"]>(async () => ({ started: true })),
+    cancelOllamaInstall: vi.fn<PageClient["cancelOllamaInstall"]>(async () => ({ cancelled: true })),
     status: vi.fn(async () => ({ version: "1.0.0" })),
     attachSession: vi.fn<PageClient["attachSession"]>(async () => ({}) as never),
     detachSession: vi.fn<PageClient["detachSession"]>(async () => undefined),
@@ -116,6 +135,7 @@ export function fakeClient() {
     },
     emitPull: pull.emit,
     emitModelServer: server.emit,
+    emitInstall: install.emit,
     eventListeners: event.size,
   };
 }

@@ -1,6 +1,6 @@
-import { pullSpeed, timeLeft } from "@golem/view";
+import { pullSpeed, timeLeft, withPulls, type PullState } from "@golem/view";
 import type { ListedModel, ModelListResult } from "../../store/models.ts";
-import type { PullEntry } from "../../store/pulls.ts";
+import type { PullEntry, PullsSnapshot } from "../../store/pulls.ts";
 
 /** The model's name without its provider: `qwen3:8b` for `ollama/qwen3:8b`. */
 export function shortName(ref: string): string {
@@ -80,4 +80,13 @@ export function removeText(model: ListedModel): string {
 /** An installed Ollama model: the one kind golem can remove. */
 export function removable(model: ListedModel): boolean {
   return model.source === "installed" && model.provider === "ollama";
+}
+
+/** The listing with the downloads in flight laid over it, as `withPulls` wants them. */
+export function withActivePulls(listing: ModelListResult | null, pulls: PullsSnapshot): ModelListResult | null {
+  const record: Record<string, PullState> = {};
+  for (const [ref, entry] of pulls.active) {
+    record[ref] = { progress: pullShare(entry, null), status: entry.status };
+  }
+  return withPulls(listing, record);
 }

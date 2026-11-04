@@ -5,6 +5,7 @@ import type { PullEntry } from "../../store/pulls.ts";
 import { Badge } from "../../ui/badge.tsx";
 import { cn } from "../../ui/cn.ts";
 import { CheckIcon } from "../../ui/icons.tsx";
+import { PullBar } from "./pull-bar.tsx";
 import { pullShare, pullText, shortName } from "./model-text.ts";
 
 function Command({ children }: { children: ReactNode }) {
@@ -43,23 +44,7 @@ function reason(model: ListedModel, providerMissing: boolean): ReactNode {
 }
 
 function Progress({ model, entry }: { model: ListedModel; entry: PullEntry | undefined }) {
-  const share = pullShare(entry, model.progress);
-  const percent = share === null ? undefined : Math.floor(share * 100);
-  return (
-    <div className="mt-1.5 flex items-center gap-3">
-      <div
-        role="progressbar"
-        aria-label={`Downloading ${shortName(model.ref)}`}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={percent}
-        className="h-1.5 w-32 shrink-0 overflow-hidden rounded-full bg-line-strong"
-      >
-        <div className="h-full rounded-full bg-clay" style={{ width: `${percent ?? 0}%` }} />
-      </div>
-      <span className="font-mono text-xs text-muted">{pullText(entry)}</span>
-    </div>
-  );
+  return <PullBar label={`Downloading ${shortName(model.ref)}`} share={pullShare(entry, model.progress)} text={pullText(entry)} />;
 }
 
 export type ModelRowProps = {
