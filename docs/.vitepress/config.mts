@@ -90,6 +90,8 @@ const sidebar: DefaultTheme.Sidebar = [
       { text: "3. Tools", link: "/architecture/tools" },
       { text: "4. Permissions", link: "/architecture/permissions" },
       { text: "5. Sandboxes", link: "/architecture/sandboxes" },
+      { text: "6. Context", link: "/architecture/context" },
+      { text: "7. Skills", link: "/architecture/skills" },
     ],
   },
   {

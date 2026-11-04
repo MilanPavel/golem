@@ -106,6 +106,7 @@ import {
   pressStarter,
   starterLines,
   starterPrompts,
+  tipAt,
   startersShown,
   type StarterKey,
   type StarterPick,
@@ -160,7 +161,8 @@ import {
   suggestionWindow,
   type Suggestion,
 } from "./suggest.ts";
-import { frameBudget, frameColumns, layoutComposer, moveRow, placeholderFor } from "./chrome.ts";
+import { frameBudget, frameColumns, layoutComposer, moveRow } from "./chrome.ts";
+import { peekTip, takeTip, tipCounterPath } from "./tip-counter.ts";
 import { bannerRow, EXPORT_HINT_MS, hintFor, liveHint, type BannerRow, type Hint } from "./hint.ts";
 import { holdDebugOffset, layoutDebug, type CheckpointMessage, type DebugTone } from "./debug-view.ts";
 import { Header } from "./header.tsx";
@@ -654,6 +656,22 @@ export function App({
   });
   const sessionRef = session.ref;
   const sessionId = session.id;
+  // One tip per session: a session seen for the first time takes the next one.
+  const tipFile = useRef(tipCounterPath());
+  const sessionTips = useRef(new Map<string, number>());
+  const nextTip = useRef<number | null>(null);
+  function sessionTip(id: string | null): number {
+    if (id === null) {
+      nextTip.current ??= peekTip(tipFile.current);
+      return nextTip.current;
+    }
+    let count = sessionTips.current.get(id);
+    if (count === undefined) {
+      count = takeTip(tipFile.current);
+      sessionTips.current.set(id, count);
+    }
+    return count;
+  }
   shownSession.current = sessionId;
   const sessionsRef = useRef(sessions);
   sessionsRef.current = sessions;
@@ -3263,7 +3281,7 @@ export function App({
   }
 
   const contentWidth = transcript.gutter === null ? columns : Math.max(1, columns - 1);
-  const placeholder = placeholderFor(sessionId ?? "");
+  const placeholder = tipAt(sessionTip(sessionId));
   const firstShown = transcript.lineCount - transcript.offsetFromBottom - transcript.lines.length;
   const selection =
     chatSelection !== null && chatSelection.width === contentWidth && chatSelection.messages === chat.messages.length

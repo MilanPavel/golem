@@ -31,6 +31,8 @@ Type a message and press **Enter**. **Shift-Enter** starts a new line.
 
 A new chat lists two or three prompts to start with, picked for the folder. In a git repository they are *Explain this project*, *Find TODOs and group them*, and *What changed in the last few commits?*. In an empty folder they are *What can you do?* and *Help me start a new project here*. Press **Down** to pick one, then **Enter** to put it in the composer, where you can change it before you send it. **Up** still recalls earlier messages. The list goes away once you type or send.
 
+The empty composer shows one tip, such as `/sessions` or `?` for the keys. Each new chat shows the next one.
+
 ```text
 What does this project do? Look at the README and the main folders.
 ```
