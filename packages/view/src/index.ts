@@ -194,3 +194,4 @@ export {
   type StarterPick,
   type StarterPress,
 } from "./starter-prompts.ts";
+export { parseTipCount, tipAt, TIPS } from "./tips.ts";
