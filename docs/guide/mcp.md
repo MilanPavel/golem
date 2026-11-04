@@ -87,4 +87,4 @@ A project's `.golem/config.toml` can add servers for chats in that folder, once 
 - **Names.** A server name may use letters, digits, and `-`.
 - **Checks.** `golem doctor` checks that each server's command is found and its secrets are stored.
 
-How golem talks to servers is in [ADR-023](../adr/023-mcp-client.md).
+How golem talks to servers is in [MCP](../architecture/mcp.md), and why in [ADR-023](../adr/023-mcp-client.md).

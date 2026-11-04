@@ -57,7 +57,7 @@ The socket is only the door. Behind it, these jobs sit in one process:
 | Graph runtime | The agent loop. Its memory is the checkpoint. | Built |
 | Model router | Resolves a profile name or `provider/model` ref to a chat model. | Built |
 | Tools | Plain Python functions with a Pydantic argument model, in `golem/tools/`. The graph offers them to the model and runs them in its own `tools` node ([Tools](architecture/tools.md)). | Built: file reads and writes, `shell`, git, `web_fetch` |
-| MCP servers | Child processes or HTTP endpoints from `[mcp.<name>]`, started in the background, watched with `ping`, and restarted with backoff. Each session's tools come from `ToolRegistry.scoped` (`golem/mcp/`). | Built |
+| MCP servers | Child processes or HTTP endpoints from `[mcp.<name>]`, started in the background, watched with `ping`, and restarted with backoff. Each session's tools come from `ToolRegistry.scoped` (`golem/mcp/`, [MCP](architecture/mcp.md)). | Built |
 | Permissions | Rules from the project, the user, and the defaults, checked in order before every tool call (`golem/permissions/`, [Permissions](architecture/permissions.md)). | Built |
 | Skills | The `SKILL.md` folders a session's folder sees, and which one each name means (`golem/skills/`, [Skills](architecture/skills.md)). | Built: finding, listing, running by name, and pinning. The model picking one planned |
 | Event log | The history. Every event, numbered by `seq`, written before it is sent. A client that reconnects will read it and rebuild the screen. | Written. Replay to clients planned |
@@ -195,7 +195,7 @@ After `hello`, a client sends `ping` every few seconds so a half-open socket is 
 
 Switching a session's model, model errors, the local model server, and downloads are in [Talking to models](architecture/models.md#the-details).
 
-MCP servers are listed with `mcp.list`: each one's name, state (`idle`, `starting`, `running`, `failed`, or `disabled`), command line or URL, the tool names the model sees and roughly what their schemas cost in tokens, why it failed, and when it tries again. With a `session_id`, the list adds that session's trusted project servers and says which are on for it. `mcp.enable` and `mcp.disable` turn an on-demand server on or off for a session, stored as `session.updated` with `mcp_servers`. `mcp.tools`, `mcp.restart`, and `mcp.set_enabled` serve the TUI's `/mcp` manager: a server's tools with their descriptions, a reconnect, and `enabled` written into the file that names it. `mcp.server.status` carries one server to every welcomed connection whenever it changes, and like download progress it is not stored. The client, the transports, scoping, and why golem does not trust a server's own hints are in [ADR-023](adr/023-mcp-client.md).
+The MCP methods, `mcp.list` to `mcp.server.status`, are in [MCP](architecture/mcp.md#on-the-wire).
 
 The default model and `model.list` are in [Talking to models](architecture/models.md#the-model-list).
 
