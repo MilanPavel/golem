@@ -7,6 +7,8 @@ import {
   HOSTED_PROVIDERS,
   KEYCHAIN_HINT_MS,
   keyChecked,
+  keychainLines,
+  keychainNotice,
   keyLines,
   maskKey,
   openKey,
@@ -129,4 +131,18 @@ test("alone, Provider leads to Key, and Key ends where it was opened from", () =
   const back = advance(key.window, { kind: "cancelled" }, { ollamaRunning: false });
   assert.equal(back.kind === "window" && back.window.view === "panel" && back.window.panel, "provider");
   assert.deepEqual(advance(single("key", "chat"), { kind: "done" }, { ollamaRunning: false }), { kind: "chat", background: false });
+});
+
+test("a Keychain read waiting on macOS is named in the band and under the panel", () => {
+  assert.equal(keychainNotice([]), null);
+  assert.deepEqual(keychainLines([]), []);
+  assert.equal(keychainNotice(["provider/openai"]), "macOS is asking whether golem may use your OpenAI key · choose Always Allow");
+  assert.equal(
+    keychainNotice(["provider/openai", "provider/anthropic"]),
+    "macOS is asking whether golem may use your OpenAI and Anthropic keys · choose Always Allow",
+  );
+  assert.equal(keychainNotice(["mcp/github"]), "macOS is asking whether golem may use your github token · choose Always Allow");
+  const lines = keychainLines(["provider/groq"]);
+  assert.deepEqual(lines[1], { kind: "status", mark: "attn", text: "macOS is asking whether golem may use your Groq key." });
+  assert.equal(lines[2]?.kind === "text" && lines[2].text, '  Choose "Always Allow" in the dialog.');
 });

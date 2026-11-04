@@ -1097,6 +1097,20 @@ class OllamaInstallOutput(BaseModel):
     text: str
 
 
+class KeychainWait(BaseModel):
+    """A Keychain read is slow, as when macOS asks whether golem may use the item.
+
+    ``waiting`` is true when the read has taken a moment, and false once it
+    ended. ``provider`` is set for a provider's API key.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str
+    provider: str | None = None
+    waiting: bool
+
+
 class OllamaInstallDone(BaseModel):
     """The install ended. ``reason`` says why when it ``failed``."""
 
@@ -1140,6 +1154,7 @@ __all__ = [
     "HelloParams",
     "HelloResult",
     "InspectMessage",
+    "KeychainWait",
     "ListedModel",
     "ListedProvider",
     "ListedSkill",
