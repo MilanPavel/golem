@@ -16,3 +16,8 @@ export function sendErrorText(error: unknown): string {
   }
   return error instanceof Error && error.message !== "" ? error.message : "Could not send the message.";
 }
+
+/** One short line for a session action (rename, fork, close) the daemon refused or could not reach. */
+export function actionErrorText(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message !== "" ? error.message : fallback;
+}
