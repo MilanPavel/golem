@@ -88,6 +88,8 @@ const sidebar: DefaultTheme.Sidebar = [
       { text: "1. The agent loop", link: "/architecture/agent-loop" },
       { text: "2. Talking to models", link: "/architecture/models" },
       { text: "3. Tools", link: "/architecture/tools" },
+      { text: "4. Permissions", link: "/architecture/permissions" },
+      { text: "5. Sandboxes", link: "/architecture/sandboxes" },
     ],
   },
   {

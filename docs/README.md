@@ -35,13 +35,14 @@ golem's architecture, one idea per chapter. Each chapter explains an idea that m
 | 1 | The agent loop | [architecture/agent-loop.md](architecture/agent-loop.md) | |
 | 2 | Talking to models | [architecture/models.md](architecture/models.md) | |
 | 3 | Tools | [architecture/tools.md](architecture/tools.md) | |
-| 4 | Safety: permissions, approvals, sandboxes | `architecture/safety.md` | [#286](https://github.com/MilanPavel/golem/issues/286) |
-| 5 | Context: the system prompt and skills | `architecture/context.md` | [#287](https://github.com/MilanPavel/golem/issues/287) |
-| 6 | MCP: tools from outside | `architecture/mcp.md` | [#288](https://github.com/MilanPavel/golem/issues/288) |
-| 7 | Sessions that survive | `architecture/sessions.md` | [#289](https://github.com/MilanPavel/golem/issues/289) |
-| 8 | The daemon and its protocol | `architecture/daemon-and-protocol.md` | [#290](https://github.com/MilanPavel/golem/issues/290) |
-| 9 | The screens: the TUI and the web UI | `architecture/screens.md` | [#354](https://github.com/MilanPavel/golem/issues/354) |
-| 10 | What comes next | `architecture/whats-next.md` | [#291](https://github.com/MilanPavel/golem/issues/291) |
+| 4 | Permissions: rules and approvals | [architecture/permissions.md](architecture/permissions.md) | |
+| 5 | Sandboxes | [architecture/sandboxes.md](architecture/sandboxes.md) | |
+| 6 | Context: the system prompt and skills | `architecture/context.md` | [#287](https://github.com/MilanPavel/golem/issues/287) |
+| 7 | MCP: tools from outside | `architecture/mcp.md` | [#288](https://github.com/MilanPavel/golem/issues/288) |
+| 8 | Sessions that survive | `architecture/sessions.md` | [#289](https://github.com/MilanPavel/golem/issues/289) |
+| 9 | The daemon and its protocol | `architecture/daemon-and-protocol.md` | [#290](https://github.com/MilanPavel/golem/issues/290) |
+| 10 | The screens: the TUI and the web UI | `architecture/screens.md` | [#354](https://github.com/MilanPavel/golem/issues/354) |
+| 11 | What comes next | `architecture/whats-next.md` | [#291](https://github.com/MilanPavel/golem/issues/291) |
 
 ## Build golem
 

@@ -15,21 +15,7 @@ Run from the repo root: python3 scripts/figures/tools.py docs/images
 
 import sys
 
-from svg import arrow_down, arrow_right, blink, card, header, mover, outline, shown
-
-
-def facts(items: list[str], x: float, y: float, gap: float = 22) -> str:
-    parts = []
-    for i, fact in enumerate(items):
-        fy = y + i * gap
-        parts.append(f'<rect class="dot" x="{x}" y="{fy - 8}" width="6" height="6"/>')
-        parts.append(f'<text x="{x + 16}" y="{fy}" font-size="14" class="muted">{fact}</text>')
-    return "".join(parts)
-
-
-def arrow_left(x1: float, x2: float, y: float, back: bool = False) -> str:
-    cls = "wire back" if back else "wire"
-    return f'<path class="{cls}" d="M{x1} {y} H{x2 + 1}"/><path class="head" d="M{x2 + 7} {y - 4} L{x2} {y} L{x2 + 7} {y + 4} Z"/>'
+from svg import arrow_down, arrow_left, arrow_right, blink, card, facts, header, mover, outline, shown
 
 
 # --- A tool call, in agents generally -----------------------------------------------------
