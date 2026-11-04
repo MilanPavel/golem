@@ -142,6 +142,41 @@ const KEYCHAIN_DIALOG: SetupLine[] = [
   { kind: "text", text: '  choose "Always Allow" in the dialog.', dim: true },
 ];
 
+/** What a waiting Keychain read is for: `your OpenAI key`, `your github token`. */
+function secretLabel(names: readonly string[]): string {
+  const labels = names.map((name) => {
+    if (name.startsWith("provider/")) {
+      const id = name.slice("provider/".length);
+      return hostedProvider(id)?.name ?? id;
+    }
+    return name.slice(name.indexOf("/") + 1);
+  });
+  const joined = labels.length <= 1 ? (labels[0] ?? "") : `${labels.slice(0, -1).join(", ")} and ${labels.at(-1) ?? ""}`;
+  const tokens = names.every((name) => name.startsWith("provider/")) ? (names.length > 1 ? "keys" : "key") : names.length > 1 ? "secrets" : "token";
+  return `your ${joined} ${tokens}`;
+}
+
+/**
+ * The band while a Keychain read waits on macOS, from `keychain.wait`. A build
+ * without an Apple Team ID asks again after each upgrade (ADR-021), and the
+ * dialog would otherwise come with no word from golem. Null when nothing waits.
+ */
+export function keychainNotice(waiting: readonly string[]): string | null {
+  return waiting.length === 0 ? null : `macOS is asking whether golem may use ${secretLabel(waiting)} · choose Always Allow`;
+}
+
+/** The same, under any panel of the setup window. */
+export function keychainLines(waiting: readonly string[]): SetupLine[] {
+  if (waiting.length === 0) {
+    return [];
+  }
+  return [
+    { kind: "blank" },
+    { kind: "status", mark: "attn", text: `macOS is asking whether golem may use ${secretLabel(waiting)}.` },
+    { kind: "text", text: '  Choose "Always Allow" in the dialog.', dim: true },
+  ];
+}
+
 export function keyLines(state: KeyState, now: number): SetupLine[] {
   const provider = hostedProvider(state.provider);
   const name = provider?.name ?? state.provider;

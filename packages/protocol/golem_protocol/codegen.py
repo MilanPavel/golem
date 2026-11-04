@@ -27,6 +27,7 @@ from golem_protocol.commands import (
     HelloParams,
     HelloResult,
     InspectMessage,
+    KeychainWait,
     ListedModel,
     ListedProvider,
     ListedSkill,
@@ -154,6 +155,7 @@ from golem_protocol.events import (
 )
 from golem_protocol.methods import METHOD_ACCESS
 from golem_protocol.rpc import (
+    KeychainWaitNotification,
     McpServerStatusNotification,
     ModelPullDoneNotification,
     ModelPullProgressNotification,
@@ -325,6 +327,8 @@ MODELS: tuple[type[BaseModel], ...] = (
     OllamaInstallDoneNotification,
     OllamaStartParams,
     OllamaStartResult,
+    KeychainWait,
+    KeychainWaitNotification,
 )
 
 

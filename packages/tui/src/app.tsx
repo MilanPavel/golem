@@ -57,6 +57,8 @@ import {
   withLog,
   hostedProvider,
   keyChecked,
+  keychainLines,
+  keychainNotice,
   keyLines,
   openKey,
   pressKey as pressKeyPanel,
@@ -350,6 +352,8 @@ export function App({
   const [draft, setDraft] = useState<Draft>({ text: "", cursor: 0 });
   const [sessionModel, setSessionModel] = useState<ModelInfo | null>(null);
   const [servers, setServers] = useState<ServerStates>({});
+  /** Secrets whose Keychain read waits on macOS, most likely its dialog (`keychain.wait`). */
+  const [keychainWaiting, setKeychainWaiting] = useState<readonly string[]>([]);
   const [sessionCwd, setSessionCwd] = useState<string | null>(null);
   const sessionCwdRef = useRef(sessionCwd);
   sessionCwdRef.current = sessionCwd;
@@ -534,7 +538,7 @@ export function App({
   }
   const banner = asking
     ? RETRY_QUESTION
-    : (chat.error ?? serviceText ?? warming ?? chat.notice ?? setupLine ?? welcomeLine);
+    : (keychainNotice(keychainWaiting) ?? chat.error ?? serviceText ?? warming ?? chat.notice ?? setupLine ?? welcomeLine);
   const hintText = liveHint(hint, Date.now())?.text ?? null;
   const suggestMatches =
     chat.busy ||
@@ -931,6 +935,22 @@ export function App({
       );
     });
   }, [client]);
+
+  useEffect(() => {
+    return client.onKeychainWait((wait) => {
+      setKeychainWaiting((current) => {
+        const others = current.filter((name) => name !== wait.name);
+        return wait.waiting ? [...others, wait.name] : others;
+      });
+    });
+  }, [client]);
+
+  // A dialog that was open when the daemon went away is gone with it.
+  useEffect(() => {
+    if (connection.status !== "connected") {
+      setKeychainWaiting([]);
+    }
+  }, [connection.status]);
 
   useEffect(() => {
     return client.onModelServer((status) => {
@@ -3236,7 +3256,11 @@ export function App({
   }, [debugLayout.lineCount, debugLayout.offsetFromBottom, debugOffset]);
 
   if (setup !== null) {
-    const shown = setupView(setup, setupNow);
+    const view = setupView(setup, setupNow);
+    // The Key panel says this itself while it checks a key.
+    const keyPanelSays =
+      setup.window.view === "panel" && setup.window.panel === "key" && (setup.key.phase === "checking" || setup.key.phase === "works");
+    const shown = keyPanelSays ? view : { ...view, lines: [...view.lines, ...keychainLines(keychainWaiting)] };
     return (
       <SetupFrame
         window={setup.window}

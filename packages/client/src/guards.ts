@@ -1,3 +1,4 @@
+import type { KeychainWait } from "../../protocol/gen/keychain-wait.ts";
 import type { OllamaInstallDone } from "../../protocol/gen/ollama-install-done.ts";
 import type { SetupRow, SetupStatusResult } from "../../protocol/gen/setup-status-result.ts";
 import type { McpListResult } from "../../protocol/gen/mcp-list-result.ts";
@@ -233,6 +234,15 @@ function isSetupRow(value: unknown): value is SetupRow {
 
 export function isSetupStatusResult(value: unknown): value is SetupStatusResult {
   return isRecord(value) && Array.isArray(value["rows"]) && value["rows"].every(isSetupRow);
+}
+
+export function isKeychainWait(value: unknown): value is KeychainWait {
+  return (
+    isRecord(value) &&
+    typeof value["name"] === "string" &&
+    (value["provider"] === undefined || value["provider"] === null || typeof value["provider"] === "string") &&
+    typeof value["waiting"] === "boolean"
+  );
 }
 
 export function isOllamaInstallDone(value: unknown): value is OllamaInstallDone {

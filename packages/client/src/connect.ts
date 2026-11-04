@@ -4,6 +4,7 @@ import type { AuthListResult } from "../../protocol/gen/auth-list-result.ts";
 import type { AuthRemoveResult } from "../../protocol/gen/auth-remove-result.ts";
 import type { AuthSetResult } from "../../protocol/gen/auth-set-result.ts";
 import type { OllamaInstallCancelResult } from "../../protocol/gen/ollama-install-cancel-result.ts";
+import type { KeychainWait } from "../../protocol/gen/keychain-wait.ts";
 import type { OllamaInstallDone } from "../../protocol/gen/ollama-install-done.ts";
 import type { OllamaInstallResult } from "../../protocol/gen/ollama-install-result.ts";
 import type { OllamaStartResult } from "../../protocol/gen/ollama-start-result.ts";
@@ -53,6 +54,7 @@ import {
   isAuthListResult,
   isAuthRemoveResult,
   isAuthSetResult,
+  isKeychainWait,
   isOllamaInstallDone,
   isSetupStatusResult,
   isDaemonStatus,
@@ -268,6 +270,8 @@ export interface GolemClient {
   startOllama(): Promise<OllamaStartResult>;
   /** `ollama.install.output` and `ollama.install.done`, from any client's install. */
   onOllamaInstall(listener: (update: OllamaInstallUpdate) => void): () => void;
+  /** `keychain.wait`: a Keychain read is waiting on macOS, most likely its dialog, or it ended. */
+  onKeychainWait(listener: (wait: KeychainWait) => void): () => void;
   /**
    * The skills a session in `cwd` sees, highest source first, with the ones
    * that lost their name or are broken. Without `cwd`, only the user's.
@@ -325,6 +329,7 @@ export function connectGolem(options: ConnectOptions): GolemClient {
   const skillListeners = new Set<(root: string | null) => void>();
   const serverListeners = new Set<(status: ModelServerStatus) => void>();
   const installListeners = new Set<(update: OllamaInstallUpdate) => void>();
+  const keychainListeners = new Set<(wait: KeychainWait) => void>();
   const pending = new Map<number, Pending>();
   const attachments = new Attachments();
   let watching = false;
@@ -489,6 +494,20 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       record({ direction: "in", kind: "mcp.server.status", detail: name, json: line });
       if (isMcpServer(params)) {
         for (const listener of mcpListeners) {
+          try {
+            listener(params);
+          } catch {
+            // A listener must not tear the socket down.
+          }
+        }
+      }
+      return;
+    }
+    if (isRecord(message) && message["method"] === "keychain.wait") {
+      const params = message["params"];
+      record({ direction: "in", kind: "keychain.wait", detail: "", json: line });
+      if (isKeychainWait(params)) {
+        for (const listener of keychainListeners) {
           try {
             listener(params);
           } catch {
@@ -1157,6 +1176,12 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       installListeners.add(listener);
       return () => {
         installListeners.delete(listener);
+      };
+    },
+    onKeychainWait(listener: (wait: KeychainWait) => void): () => void {
+      keychainListeners.add(listener);
+      return () => {
+        keychainListeners.delete(listener);
       };
     },
     async listSkills(cwd?: string): Promise<SkillListResult> {

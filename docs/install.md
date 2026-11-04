@@ -125,7 +125,7 @@ Next: golem, then /setup installs it, or brew install ollama
 | The chat says `reconnecting` | The daemon isn't running. Run `golem status`, then `golem daemon start` |
 | `needs key` in red | Run `golem auth set <provider>`, or `/login <provider>` in the chat |
 | A local model doesn't answer | Run `golem doctor`. golem starts Ollama itself. If it doesn't start, look in `~/.golem/logs/ollama.log` |
-| macOS asks whether golem may use a Keychain item | Choose Always Allow. It asks once, for keys saved by an older copy of golem |
+| macOS asks whether golem may use a Keychain item | Choose Always Allow. It asks once per key after each upgrade, and golem names the key while the dialog is open |
 | Anything else | Run `golem daemon logs` |
 
 Settings are in `~/.golem/config.toml`. [Models and API keys](guide/models.md#settings) lists them all.

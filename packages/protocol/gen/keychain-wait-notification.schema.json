@@ -1,0 +1,60 @@
+{
+  "$defs": {
+    "KeychainWait": {
+      "additionalProperties": false,
+      "description": "A Keychain read is slow, as when macOS asks whether golem may use the item.\n\n``waiting`` is true when the read has taken a moment, and false once it\nended. ``provider`` is set for a provider's API key.",
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "provider": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Provider"
+        },
+        "waiting": {
+          "title": "Waiting",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "waiting"
+      ],
+      "title": "KeychainWait",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Server → every connection: a Keychain read started to wait on macOS, or ended. Not stored.",
+  "properties": {
+    "jsonrpc": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Jsonrpc",
+      "type": "string"
+    },
+    "method": {
+      "const": "keychain.wait",
+      "default": "keychain.wait",
+      "title": "Method",
+      "type": "string"
+    },
+    "params": {
+      "$ref": "#/$defs/KeychainWait"
+    }
+  },
+  "required": [
+    "params"
+  ],
+  "title": "KeychainWaitNotification",
+  "type": "object"
+}

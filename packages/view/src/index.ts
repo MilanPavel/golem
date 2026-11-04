@@ -133,6 +133,8 @@ export {
   hostedProvider,
   KEYCHAIN_HINT_MS,
   keyChecked,
+  keychainLines,
+  keychainNotice,
   keyLines,
   maskKey,
   openKey,

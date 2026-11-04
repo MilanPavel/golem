@@ -349,7 +349,7 @@ Users never see or install the certificate. There are no extra steps for signing
 | Situation | What the user sees | What to do |
 |---|---|---|
 | New user installs a release and saves a key with `golem auth set` | Nothing. The daemon saved the key, so it owns it. | Nothing |
-| Upgrade to a newer release | Nothing. Same name, same certificate. | Nothing |
+| Upgrade to a newer release | One Keychain dialog per key, on the first read after the upgrade. golem says so in the setup window or the chat band while the dialog is open. | **Always Allow**. The rule matches every release, but without an Apple Team ID macOS also ties each item to the build's hash (its partition, `cdhash:…`), and that changes every release |
 | First start of a release, with keys saved earlier by a source-code run or a local ad-hoc build | One Keychain dialog per key: "golem-daemon wants to use your confidential information" | Enter the Mac password and click **Always Allow**, once. The daemon then saves the key again as its own (section 9), so it never asks again. |
 | Archive downloaded in a browser instead of `curl` | macOS refuses to open `golem`, because a self-signed program is not notarized | Download with `curl` (section 6), or run `xattr -dr com.apple.quarantine <the unpacked folder>` |
 | We ever have to replace the certificate | One Keychain dialog per key after that upgrade | **Always Allow** once, as above |
@@ -636,7 +636,7 @@ flowchart TB
 
 When a built daemon first reads a key saved by the source-code version, macOS asks once. Choose **Always Allow**. The daemon then deletes the key and saves it again, so from then on only the daemon is trusted. It writes the key's name to `~/.golem/run/keychain-migrated`, so this happens only once per key.
 
-**Releases keep the trust.** Releases are signed with one certificate, so after you choose Always Allow once, later releases read the keys without asking. A local build is signed ad-hoc unless you give it the certificate, so macOS treats each rebuild as a new program and asks again.
+**Releases keep the rule, not the partition.** Releases are signed with one certificate, so every release matches the item's rule. macOS also gives each item a partition list, and a program with no Apple Team ID gets `cdhash:<its hash>` there. Each release has a new hash, so the first read after an upgrade asks again. While a read waits longer than half a second, the daemon sends `keychain.wait`, and the TUI names the key and says to choose Always Allow. Only a Developer ID signature, with a Team ID, ends the prompt. A local build is signed ad-hoc unless you give it the certificate, so macOS treats each rebuild as a new program and asks again.
 
 ---
 
