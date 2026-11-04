@@ -2,6 +2,29 @@
 
 What changed in each release of golem, newest first. `just release` writes each section from the commit messages on `main` ([CONTRIBUTING.md](CONTRIBUTING.md)), and the release pull request is the place to edit it. The GitHub release shows the same section. How a release is made is in [docs/sre.md](docs/sre.md), section 5.
 
+## [0.7.0] - 2026-11-04
+
+### Features
+
+- **tui:** golem names the key while macOS asks whether it may use it from the Keychain ([#375](https://github.com/MilanPavel/golem/pull/375))
+- **tui:** an empty chat lists starter prompts that fit the folder ([#379](https://github.com/MilanPavel/golem/pull/379))
+- **web:** rename, fork, and close a session from the page, with forks shown as a tree ([#380](https://github.com/MilanPavel/golem/pull/380))
+- **tui:** the empty composer shows one tip per session, the next one in each new session ([#381](https://github.com/MilanPavel/golem/pull/381))
+- **web:** pick, download, and remove models from the session's model chip ([#384](https://github.com/MilanPavel/golem/pull/384))
+
+### Fixes
+
+- **tui:** setup waits for the first golem daemon install while macOS checks the app ([#374](https://github.com/MilanPavel/golem/pull/374))
+
+### Docs
+
+- How golem works, chapter 2: talking to models ([#362](https://github.com/MilanPavel/golem/pull/362))
+- How golem works, chapter 3: tools ([#377](https://github.com/MilanPavel/golem/pull/377))
+- How golem works, chapters 4 and 5: permissions and sandboxes ([#378](https://github.com/MilanPavel/golem/pull/378))
+- How golem works, chapters 6 and 7: context and skills ([#382](https://github.com/MilanPavel/golem/pull/382))
+- the overview's system map can be clicked, and follows one message ([#383](https://github.com/MilanPavel/golem/pull/383))
+- How golem works, chapter 8: MCP ([#385](https://github.com/MilanPavel/golem/pull/385))
+
 ## [0.6.1] - 2026-11-03
 
 ### Fixes
