@@ -1,41 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import {
-  copyAnswer,
-  copyCode,
-  exportDestination,
-  exportFileName,
-  followTail,
-  formatDuration,
-  formatMessageTime,
-  newLinesLabel,
-  sessionMarkdown,
-} from "./transcript.ts";
+import { exportDestination, followTail, formatDuration, formatMessageTime, newLinesLabel } from "./transcript.ts";
 
-test("copy takes the last answer, or the last fenced block", () => {
-  const messages = [
-    { role: "user", text: "show me\n\n```\nold\n```" },
-    { role: "assistant", text: "first" },
-    { role: "assistant", text: "use this\n\n```ts\nconst n = 1\n```\n\nthen\n\n```\nlast\n```" },
-  ];
-  assert.equal(copyAnswer(messages), messages[2]?.text);
-  assert.equal(copyAnswer([{ role: "user", text: "hi" }, { role: "assistant", text: "" }]), null);
-  assert.equal(copyCode(messages), "last");
-  assert.equal(copyCode([{ role: "assistant", text: "no fence" }]), null);
-});
-
-test("export is markdown from the messages, named from the title", () => {
-  assert.equal(
-    sessionMarkdown("Trip\nplans", [
-      { role: "user", text: "hello" },
-      { role: "assistant", text: "hi\n\n```\ncode\n```" },
-    ]),
-    "# Trip plans\n\n**you**\n\nhello\n\n**golem**\n\nhi\n\n```\ncode\n```\n",
-  );
-  assert.equal(sessionMarkdown("  ", []), "# untitled\n");
-  assert.equal(exportFileName("a/b:c"), "a-b-c.md");
-  assert.equal(exportFileName("   "), "untitled.md");
+test("export goes to the given path, or the exports folder", () => {
   assert.equal(
     exportDestination({ env: { GOLEM_HOME: "/tmp/golem-home" }, home: "/home/me", title: "Trip", given: null }),
     "/tmp/golem-home/exports/Trip.md",

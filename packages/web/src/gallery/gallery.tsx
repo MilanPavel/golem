@@ -1,4 +1,4 @@
-import { noPastes, type TodoItem } from "@golem/view";
+import { COMMANDS, noPastes, withModelChoices, withSkillChoices, type TodoItem } from "@golem/view";
 import { useId, useState, type ReactNode } from "react";
 import { Badge } from "../ui/badge.tsx";
 import { Button } from "../ui/button.tsx";
@@ -26,6 +26,7 @@ import { SAMPLE_EDIT_DIFF, SAMPLE_LONG_LINE_DIFF, SAMPLE_NEW_FILE_DIFF } from ".
 import { Drawer, TodoList } from "../features/drawer/index.ts";
 import { Composer, DockView, Meter } from "../features/composer/index.ts";
 import { createHistory } from "../features/composer/history.ts";
+import { CommandsDialog } from "../features/composer/help-dialog.tsx";
 import { HomeView, SessionTitle } from "../features/shell/index.ts";
 import { ModelDialogView, type ModelDialogViewProps } from "../features/models/index.ts";
 import { NO_OLLAMA_LISTING, OLLAMA_DOWN_LISTING, SAMPLE_LISTING, SAMPLE_PULLS } from "../features/models/sample.ts";
@@ -88,16 +89,30 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
 const galleryHistory = createHistory(() => null);
 
 /** A composer with its draft in the component, so the gallery needs no page. */
+const GALLERY_COMMANDS = withSkillChoices(
+  withModelChoices(COMMANDS, ["local", "ollama/qwen3:8b", "ollama/gemma4:e4b"]),
+  [
+    { name: "review", description: "Reviews the diff.", argumentHint: "[path]" },
+    { name: "commit-message", description: "Writes a commit message.", argumentHint: null },
+  ],
+  { pinnable: ["review", "commit-message"], active: ["review"] },
+);
+
 function DemoComposer({
   size,
   busy = false,
   disabledReason = null,
+  initial = "",
+  commands,
 }: {
   size?: "dock" | "large";
   busy?: boolean;
   disabledReason?: string | null;
+  /** The draft to start with. A slash draft opens the suggestions when `commands` is set. */
+  initial?: string;
+  commands?: typeof GALLERY_COMMANDS;
 }) {
-  const [text, setText] = useState("");
+  const [text, setText] = useState(initial);
   const [pastes, setPastes] = useState(noPastes);
   return (
     <Composer
@@ -108,6 +123,7 @@ function DemoComposer({
       onPastesChange={setPastes}
       history={galleryHistory}
       onSend={async () => undefined}
+      commands={commands}
       busy={busy}
       onStop={() => {}}
       disabledReason={disabledReason}
@@ -272,6 +288,20 @@ const MODEL_CASES: { label: string; props: Partial<ModelDialogViewProps> }[] = [
   { label: "Could not list", props: { listing: null, loadError: "daemon went away" } },
 ];
 
+/** The Commands dialog, opened from a button. */
+function CommandsDemo({ theme }: { theme: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div>
+      <Button onClick={() => setOpen(true)}>
+        Commands
+        <span className="sr-only">, {theme}</span>
+      </Button>
+      <CommandsDialog open={open} onOpenChange={setOpen} commands={COMMANDS} />
+    </div>
+  );
+}
+
 /** The model dialog in each state it can start in. */
 function ModelDialogDemo({ theme }: { theme: string }) {
   const [shown, setShown] = useState<string | null>(null);
@@ -399,6 +429,38 @@ function Panel({ theme }: { theme: "slip" | "kiln" }) {
             meter={<Meter state="offline" runStartedAt={null} />}
             composer={<DemoComposer disabledReason="Not connected to golem" />}
           />
+        </div>
+      </section>
+
+      <section className="mt-6">
+        <h3 className="mb-2 font-mono text-xs text-faint">Dock, slash commands</h3>
+        <div className="grid gap-4 rounded-lg border border-line bg-bg p-4">
+          {[
+            { label: "all", initial: "/" },
+            { label: "partial", initial: "/mo" },
+            { label: "skills", initial: "/skill run " },
+          ].map(({ label, initial }) => (
+            <div key={label} className="pt-72" data-demo={`suggestions-${label}`}>
+              <DockView
+                busy={false}
+                meter={<Meter state="idle" runStartedAt={null} />}
+                composer={<DemoComposer initial={initial} commands={GALLERY_COMMANDS} />}
+              />
+            </div>
+          ))}
+          <DockView
+            busy={false}
+            meter={<Meter state="idle" runStartedAt={null} />}
+            composer={<DemoComposer commands={GALLERY_COMMANDS} />}
+            notice={{ text: "Copied the last answer." }}
+          />
+          <DockView
+            busy={false}
+            meter={<Meter state="idle" runStartedAt={null} />}
+            composer={<DemoComposer commands={GALLERY_COMMANDS} />}
+            notice={{ text: "Keys are set in a terminal:", command: "golem auth set anthropic" }}
+          />
+          <CommandsDemo theme={theme} />
         </div>
       </section>
 
