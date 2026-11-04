@@ -4,6 +4,8 @@ import { createServer, type Server, type Socket } from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { connectGolem, type GolemClient } from "@golem/client/node";
+
 import type { FakeModel } from "./fake-model.ts";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -261,4 +263,25 @@ async function freePort(): Promise<number> {
       server.close(() => resolve(port));
     });
   });
+}
+
+export interface SecondClient {
+  client: GolemClient;
+  stop(): Promise<void>;
+}
+
+/** A client on the daemon's Unix socket, like the terminal app, next to the page. */
+export async function startSecondClient(home: string): Promise<SecondClient> {
+  const client = connectGolem({ socketPath: socketPath(home), clientName: "e2e-second-client", reconnect: false });
+  const stop = (): Promise<void> => {
+    client.close();
+    return Promise.resolve();
+  };
+  try {
+    await client.ready;
+  } catch (error) {
+    await stop();
+    throw error;
+  }
+  return { client, stop };
 }

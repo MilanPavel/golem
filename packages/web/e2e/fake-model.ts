@@ -3,6 +3,8 @@ import type { Socket } from "node:net";
 
 export interface Reply {
   text: string;
+  /** When set, the reply is this tool call and `text` is ignored. */
+  tool?: { name: string; args: Record<string, unknown> };
   /** Pause after each word-sized chunk. */
   delayMs?: number;
 }
@@ -13,6 +15,8 @@ export interface FakeModel {
   port: number;
   /** Queue the text of the next reply. Replies are used in order; after that the default is used. */
   reply(text: string, options?: { delayMs?: number }): void;
+  /** Queue a reply that is one tool call. The arguments stream in two chunks. */
+  toolCall(name: string, args: Record<string, unknown>, options?: { delayMs?: number }): void;
   /** The delay between chunks for replies that do not set their own. */
   delayMs: number;
   /** Request bodies, parsed, in the order they arrived. */
@@ -24,7 +28,7 @@ export interface FakeModel {
 
 export const DEFAULT_REPLY = "Here is the fake answer.";
 
-function chunk(delta: Record<string, string>, finish: "stop" | null): string {
+function chunk(delta: Record<string, unknown>, finish: "stop" | "tool_calls" | null): string {
   const body = {
     id: "fake-1",
     object: "chat.completion.chunk",
@@ -53,6 +57,7 @@ export async function startFakeModel(): Promise<FakeModel> {
   const requests: unknown[] = [];
   const sockets = new Set<Socket>();
   const state = { delayMs: 0, aborted: 0 };
+  let callCount = 0;
 
   async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const raw = await readBody(req);
@@ -71,6 +76,22 @@ export async function startFakeModel(): Promise<FakeModel> {
       }
     });
     res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
+    if (next.tool !== undefined) {
+      callCount += 1;
+      const json = JSON.stringify(next.tool.args);
+      const cut = Math.max(1, Math.floor(json.length / 2));
+      const call = (fn: Record<string, string>): Record<string, unknown> => ({
+        role: "assistant",
+        tool_calls: [{ index: 0, ...(fn["name"] === undefined ? {} : { id: `call_${callCount}`, type: "function" }), function: fn }],
+      });
+      res.write(chunk(call({ name: next.tool.name, arguments: json.slice(0, cut) }), null));
+      if (delay > 0) await new Promise((r) => setTimeout(r, delay));
+      if (closed) return;
+      res.write(chunk(call({ arguments: json.slice(cut) }), null));
+      res.write(chunk({}, "tool_calls"));
+      res.end("data: [DONE]\n\n");
+      return;
+    }
     for (const piece of words(next.text)) {
       if (closed) return;
       res.write(chunk({ content: piece }, null));
@@ -99,6 +120,9 @@ export async function startFakeModel(): Promise<FakeModel> {
     port,
     reply(text, options) {
       queue.push({ text, ...(options?.delayMs === undefined ? {} : { delayMs: options.delayMs }) });
+    },
+    toolCall(name, args, options) {
+      queue.push({ text: "", tool: { name, args }, ...(options?.delayMs === undefined ? {} : { delayMs: options.delayMs }) });
     },
     get delayMs() {
       return state.delayMs;
