@@ -425,6 +425,8 @@ export function App({
   /** The service answered before the model list came: Engine opens once it does. */
   const awaitingListing = useRef(false);
   const windowDaemon = useRef<WindowDaemon | null>(null);
+  /** True while `golem daemon install` runs, so Retry doesn't start a second one. */
+  const installing = useRef(false);
   const [setupNow, setSetupNow] = useState(() => Date.now());
   /** `setup.status` for the band's one line, when something is wrong. */
   const [bandRows, setBandRows] = useState<SetupRow[] | null>(null);
@@ -1098,7 +1100,8 @@ export function App({
     }
     if (serviceTimedOut(state, setupNow)) {
       const error = service?.startError() ?? null;
-      failService(error?.reason ?? "it didn't answer in 45 seconds", error?.next ?? "golem daemon logs");
+      const waited = state.how === "install" && !state.agent ? "the install didn't finish in 3 minutes" : "it didn't answer in 45 seconds";
+      failService(error?.reason ?? waited, error?.next ?? "golem daemon logs");
     }
   }, [setupNow]);
 
@@ -1935,12 +1938,21 @@ export function App({
       failService("this golem can't install its service", "golem daemon install");
       return;
     }
+    // Retry while the first install still runs waits for that one.
+    if (installing.current) {
+      return;
+    }
     windowDaemon.current?.stop();
     windowDaemon.current = null;
-    install().then(
-      () => updateService((state) => agentInstalled(state, Date.now())),
-      (error: unknown) => failService(messageOf(error), "golem daemon logs"),
-    );
+    installing.current = true;
+    install()
+      .then(
+        () => updateService((state) => agentInstalled(state, Date.now())),
+        (error: unknown) => failService(messageOf(error), "golem daemon logs"),
+      )
+      .finally(() => {
+        installing.current = false;
+      });
   }
 
   /** The service as a child of this terminal. From launchd's, the launch agent goes first. */
