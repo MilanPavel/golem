@@ -28,6 +28,7 @@ import { Composer, DockView, Meter } from "../features/composer/index.ts";
 import { createHistory } from "../features/composer/history.ts";
 import { CommandsDialog } from "../features/composer/help-dialog.tsx";
 import { HomeView, SessionTitle } from "../features/shell/index.ts";
+import { CommandPaletteView, KeysDialog } from "../features/palette/index.ts";
 import { ModelDialogView, type ModelDialogViewProps } from "../features/models/index.ts";
 import { NO_OLLAMA_LISTING, OLLAMA_DOWN_LISTING, SAMPLE_LISTING, SAMPLE_PULLS } from "../features/models/sample.ts";
 import { CloseSessionDialog, RenameField, SidebarView } from "../features/sessions/index.ts";
@@ -302,6 +303,44 @@ function CommandsDemo({ theme }: { theme: string }) {
   );
 }
 
+const PALETTE_CASES: { label: string; hasComposer: boolean; initialQuery: string }[] = [
+  { label: "Palette, all commands", hasComposer: true, initialQuery: "" },
+  { label: "Palette, filtered", hasComposer: true, initialQuery: "mo" },
+  { label: "Palette, Send row", hasComposer: true, initialQuery: "explain this repo" },
+  { label: "Palette, no composer", hasComposer: false, initialQuery: "" },
+];
+
+/** The command palette in each state it can start in, and the key list. */
+function PaletteDemo({ theme }: { theme: string }) {
+  const [shown, setShown] = useState<string | null>(null);
+  return (
+    <div className="flex flex-wrap gap-2 rounded-lg border border-line bg-bg p-4">
+      {PALETTE_CASES.map(({ label, hasComposer, initialQuery }) => (
+        <div key={label}>
+          <Button onClick={() => setShown(label)}>
+            {label}
+            <span className="sr-only">, {theme}</span>
+          </Button>
+          <CommandPaletteView
+            open={shown === label}
+            onOpenChange={(open) => setShown(open ? label : null)}
+            hasComposer={hasComposer}
+            onPick={() => setShown(null)}
+            initialQuery={initialQuery}
+          />
+        </div>
+      ))}
+      <div>
+        <Button onClick={() => setShown("Keys")}>
+          Key list
+          <span className="sr-only">, {theme}</span>
+        </Button>
+        <KeysDialog open={shown === "Keys"} onOpenChange={(open) => setShown(open ? "Keys" : null)} />
+      </div>
+    </div>
+  );
+}
+
 /** The model dialog in each state it can start in. */
 function ModelDialogDemo({ theme }: { theme: string }) {
   const [shown, setShown] = useState<string | null>(null);
@@ -387,6 +426,7 @@ function Panel({ theme }: { theme: "slip" | "kiln" }) {
             now={NOW}
             onNavigate={() => {}}
             actions={{ rename: () => Promise.resolve(), close: () => Promise.resolve() }}
+            onSearch={() => {}}
           />
         </div>
       </section>
@@ -535,6 +575,11 @@ function Panel({ theme }: { theme: "slip" | "kiln" }) {
       <DiffDemo />
 
       <DrawerDemo theme={theme} />
+
+      <section className="mt-6">
+        <h3 className="mb-2 font-mono text-xs text-faint">Command palette and keys</h3>
+        <PaletteDemo theme={theme} />
+      </section>
 
       <section className="mt-6">
         <h3 className="mb-2 font-mono text-xs text-faint">Model dialog</h3>

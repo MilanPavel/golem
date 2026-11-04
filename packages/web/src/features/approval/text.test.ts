@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { approvalTarget, keyDecision, verdictText } from "./text.ts";
+import { APPROVAL_KEYS, approvalKey, approvalTarget, keyDecision, verdictText } from "./text.ts";
 
 test("the target is the file name, the subject, or the arguments", () => {
   expect(approvalTarget({ path: "a/b/c.ts" }, "x")).toEqual({ short: "c.ts", full: "a/b/c.ts" });
@@ -13,4 +13,13 @@ test("verdicts and keys", () => {
   expect(verdictText({ decision: "deny", rule: null, edited: false })).toBe("Denied");
   expect(keyDecision("Enter")).toBe("allow");
   expect(keyDecision("x")).toBeNull();
+});
+
+test("the key table is what answers: every row's key does what the list says", () => {
+  for (const entry of APPROVAL_KEYS) {
+    expect(approvalKey(entry.key)).toBe(entry.does);
+    expect(approvalKey(entry.key.toUpperCase())).toBe(entry.does);
+  }
+  expect(approvalKey("e")).toBe("edit");
+  expect(keyDecision("e")).toBeNull();
 });

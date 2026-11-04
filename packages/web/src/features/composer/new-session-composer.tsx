@@ -17,6 +17,7 @@ export function NewSessionComposer({ start }: { start: ReturnType<typeof useStar
   return (
     <div className="flex w-full flex-col gap-1.5">
       <Composer
+        forPalette
         size="large"
         label="Message"
         placeholder='Try "explain this repo"'
