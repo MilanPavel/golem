@@ -32,7 +32,7 @@ const parts: Part[] = [
   {
     id: "tui", x: 32, y: 76, w: 164, h: 48, title: "TUI", sub: "golem, in a terminal",
     about: "The chat in your terminal. It sends commands and draws the events it gets back. It holds no model memory, so you can close it while a run goes on.",
-    code: "packages/tui/", link: "/architecture#the-tui", chapter: "The TUI",
+    code: "packages/tui/", link: "/architecture/tui", chapter: "The terminal app",
   },
   {
     id: "cli", x: 32, y: 140, w: 164, h: 48, title: "golem command", sub: "status, skills, config",

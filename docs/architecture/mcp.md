@@ -264,7 +264,7 @@ golem's client follows one protocol version. A server that answers with another 
 
 ## Read more
 
-- Next: *The screens*: the TUI and the web UI, drawn from the events (chapter 12, coming next).
+- Next: [The terminal app](./tui.md), which draws a session from its events.
 - Before: [Skills](./skills.md).
 - [MCP servers](../guide/mcp.md), the user's guide: adding servers, tokens, and every setting.
 - [The MCP specification](https://modelcontextprotocol.io/specification).

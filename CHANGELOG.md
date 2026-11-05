@@ -2,6 +2,23 @@
 
 What changed in each release of golem, newest first. `just release` writes each section from the commit messages on `main` ([CONTRIBUTING.md](CONTRIBUTING.md)), and the release pull request is the place to edit it. The GitHub release shows the same section. How a release is made is in [docs/sre.md](docs/sre.md), section 5.
 
+## [0.8.0] - 2026-11-04
+
+### Features
+
+- **web:** slash commands and their suggestions in the web composer ([#389](https://github.com/MilanPavel/golem/pull/389))
+- **web:** a ⌘K command palette and a list of the page's keys ([#451](https://github.com/MilanPavel/golem/pull/451))
+
+### Fixes
+
+- **tui:** the compiled golem opens one setup window, and that window can install the service ([#388](https://github.com/MilanPavel/golem/pull/388))
+
+### Docs
+
+- How golem works, chapter 9: sessions that survive ([#390](https://github.com/MilanPavel/golem/pull/390))
+- update plan with models phase 12 ([#391](https://github.com/MilanPavel/golem/pull/391))
+- How golem works, chapters on the daemon and the protocol ([#392](https://github.com/MilanPavel/golem/pull/392))
+
 ## [0.7.0] - 2026-11-04
 
 ### Features
