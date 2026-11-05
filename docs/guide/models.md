@@ -84,7 +84,7 @@ api_key_env = "VLLM_API_KEY"       # optional
 
 ## Settings
 
-All settings live in `~/.golem/config.toml`. `golem config show` prints the ones in effect for the folder you are in, with the tool rules.
+All settings live in `~/.golem/config.toml`. `golem config show` prints the ones in effect for the folder you are in, with the tool rules. Every key is in [Settings](./settings.md); these are the ones for models.
 
 | Setting | Default | Meaning |
 |---|---|---|

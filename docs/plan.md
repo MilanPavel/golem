@@ -658,7 +658,7 @@ flowchart LR
   | 11.6.9 | The terminal app: drawing a session from its events | the TUI and the shared client | [ADR-005](adr/005-client-package.md) |
   | 11.6.10 | The web UI: a browser on a local socket | the web gateway and the browser app | [ADR-028](adr/028-web-gateway.md), [029](adr/029-web-stack.md) |
   | 11.6.11 | What comes next: memory, evals, routing, compaction | "planned next" | Phases 5, 6, and 9 of this plan |
-  | 11.6.12 | The overview | what is left: the short version, and the system on one machine as a map you can click, with a tour of one message that links each hop to its chapter. The settings list moves to its own reference page, `docs/settings.md` | |
+  | 11.6.12 | The overview | only the system on one machine, the map you can click with its tour of one message, and where to go next. The pointer sections go. The settings list becomes the Settings guide, `docs/guide/settings.md`, under Use golem | |
 
 - **Done when:** every chapter follows the template, has a diagram, one real trace, code pointers that resolve, and a "try it" that works on today's golem; architecture.md is only the overview; and nothing that was in it is lost.
 - **Watch out:** code pointers rot. Point at files and names, and use line numbers only where `just docs-build` can check them. Move the details, don't rewrite them: each moved section keeps its facts, and the review checks the diff for anything dropped.
