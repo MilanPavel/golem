@@ -655,9 +655,10 @@ flowchart LR
   | 11.6.6 | MCP: tools from outside | the MCP parts, plus what `golem/mcp/` does | [ADR-023](adr/023-mcp-client.md) |
   | 11.6.7 | Sessions that survive | the event log and checkpoints, files on disk, migrations, cancel, crash recovery, fork | [ADR-006](adr/006-checkpoint-continuity.md), [008](adr/008-cancellation.md), [009](adr/009-session-list.md), [010](adr/010-fork.md), [020](adr/020-safe-upgrades.md) |
   | 11.6.8 | Two chapters: The daemon, and The protocol | the daemon, the socket, the pid lock, and what it owns; the protocol, attach and fan-out, what is on the wire, and the protocol package | [ADR-001](adr/001-process-split.md), [003](adr/003-protocol.md), [004](adr/004-pid-lock.md), [007](adr/007-attach-and-fan-out.md) |
-  | 11.6.9 | The screens: the TUI and the web UI | the TUI and the shared client, plus the web gateway | [ADR-005](adr/005-client-package.md), [028](adr/028-web-gateway.md), [029](adr/029-web-stack.md) |
-  | 11.6.10 | What comes next: memory, evals, routing, compaction | "planned next" | Phases 5, 6, and 9 of this plan |
-  | 11.6.11 | The overview | what is left: the short version, and the system on one machine as a map you can click, with a tour of one message that links each hop to its chapter. The settings list moves to its own reference page, `docs/settings.md` | |
+  | 11.6.9 | The terminal app: drawing a session from its events | the TUI and the shared client | [ADR-005](adr/005-client-package.md) |
+  | 11.6.10 | The web UI: a browser on a local socket | the web gateway and the browser app | [ADR-028](adr/028-web-gateway.md), [029](adr/029-web-stack.md) |
+  | 11.6.11 | What comes next: memory, evals, routing, compaction | "planned next" | Phases 5, 6, and 9 of this plan |
+  | 11.6.12 | The overview | what is left: the short version, and the system on one machine as a map you can click, with a tour of one message that links each hop to its chapter. The settings list moves to its own reference page, `docs/settings.md` | |
 
 - **Done when:** every chapter follows the template, has a diagram, one real trace, code pointers that resolve, and a "try it" that works on today's golem; architecture.md is only the overview; and nothing that was in it is lost.
 - **Watch out:** code pointers rot. Point at files and names, and use line numbers only where `just docs-build` can check them. Move the details, don't rewrite them: each moved section keeps its facts, and the review checks the diff for anything dropped.
