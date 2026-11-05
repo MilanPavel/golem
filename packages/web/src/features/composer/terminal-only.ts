@@ -4,7 +4,6 @@ export const TERMINAL_ONLY: ReadonlySet<string> = new Set([
   "/debug",
   "/mcp",
   "/permissions",
-  "/setup",
   "/skills",
 ]);
 
@@ -20,7 +19,6 @@ export const NOT_YET = {
   skills: inTerminal("The skills list is", "/skills"),
   permissions: inTerminal("Rules are shown", "/permissions"),
   artifact: inTerminal("Tool output opens", "/artifact"),
-  setup: inTerminal("Setup is", "/setup"),
   debug: inTerminal("The debug panel is", "/debug"),
   sessions: "The sidebar lists your sessions.",
 } as const;

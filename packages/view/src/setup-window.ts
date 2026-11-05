@@ -577,6 +577,8 @@ export type SetupAction = NonNullable<SetupRow["action"]>;
 
 export type OverviewChoice =
   | { kind: "fix"; action: SetupAction; target: string | null; label: string }
+  /** The service runs but is not kept at login: the Service panel alone says how. */
+  | { kind: "service"; label: string }
   | { kind: "guided"; label: string };
 
 /** The Service row, which the UI fills itself: the daemon can't answer while it is down. */
@@ -587,6 +589,44 @@ export function serviceRow(runner: ServiceRunner | null, version: string): Setup
   const how = runner === "launchd" ? "starts at login" : runner === "window" ? "this terminal only" : "started by hand";
   const shown = version.length > 0 ? ` · ${version}` : "";
   return { part: "service", name: "service", state: "ok", detail: `running · ${how}${shown}` };
+}
+
+/** The command that keeps the service running at login. The page shows it to copy, since it never installs anything. */
+export const KEEP_SERVICE_COMMAND = "golem daemon install";
+
+/**
+ * The Service row for a page that is connected, so the service runs. The page cannot tell who
+ * started it, so the row keeps the daemon's launchd check: kept at login when that is ok, else
+ * "not kept", which needs attention but is not a failure.
+ */
+export function pageServiceRow(daemonRow: SetupRow | null, version: string): SetupRow {
+  const shown = version.length === 0 ? "" : ` · ${version.startsWith("v") ? version : `v${version}`}`;
+  if (daemonRow?.state === "ok") {
+    return { part: "service", name: "service", state: "ok", detail: `running${shown} · starts at login` };
+  }
+  return { part: "service", name: "service", state: "warn", detail: `running${shown} · not kept at login` };
+}
+
+/** The daemon's own service row in a `setup.status` result, if it sent one. */
+export function daemonServiceRow(rows: readonly SetupRow[]): SetupRow | null {
+  return rows.find((row) => row.part === "service" && row.name === "service") ?? null;
+}
+
+/** The page's Service panel: it runs now, and the command that keeps it so when it is not kept. */
+export function pageServiceLines(service: SetupRow): SetupLine[] {
+  const kept = service.state === "ok";
+  return [
+    { kind: "status", mark: "ok", text: "service running" },
+    { kind: "text", text: service.detail, dim: true },
+    { kind: "blank" },
+    ...(kept
+      ? [
+          { kind: "text", text: "golem's service starts at login, so your chats keep going after you close this page." } as const,
+          { kind: "blank" } as const,
+        ]
+      : [{ kind: "text", text: "To keep it running at login, run this in a terminal:" } as const]),
+    { kind: "option", label: "Continue", detail: "", selected: true },
+  ];
 }
 
 const PART_LABELS: Record<SetupRow["part"], string> = {
@@ -652,9 +692,12 @@ function actionLabel(action: SetupAction, target: string | null): string | null 
   }
 }
 
-/** The fixes for what is wrong first, then what can always be done. */
-export function overviewChoices(rows: readonly SetupRow[]): OverviewChoice[] {
-  const choices: OverviewChoice[] = [];
+/**
+ * The fixes for what is wrong first, then what can always be done. A `service` row that
+ * needs attention (only the page makes one) leads with the Service panel.
+ */
+export function overviewChoices(rows: readonly SetupRow[], service?: SetupRow): OverviewChoice[] {
+  const choices: OverviewChoice[] = service?.state === "warn" ? [{ kind: "service", label: "Keep it running at login" }] : [];
   const seen = new Set<string>();
   const add = (action: SetupAction, target: string | null, label: string): void => {
     const key = `${action}:${target ?? ""}`;
@@ -693,7 +736,7 @@ export function overviewLines(
   }
   return [
     ...lines,
-    ...overviewChoices(rows).map(
+    ...overviewChoices(rows, service).map(
       (choice, index): SetupLine => ({ kind: "option", label: choice.label, detail: "", selected: index === selected }),
     ),
   ];

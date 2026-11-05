@@ -1,5 +1,7 @@
 import {
   applyComposer,
+  guided,
+  OVERVIEW,
   closedDebug,
   COMMANDS,
   copyAnswer,
@@ -16,11 +18,12 @@ import {
   type ComposerOutcome,
 } from "@golem/view";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { actionErrorText } from "../../store/errors.ts";
+import { actionErrorText, isNoModelChosen } from "../../store/errors.ts";
 import { useModelList, useNavigate, usePageActions, useSessionReader, useSkillList } from "../../store/page-context.tsx";
 import { setTimesShown, timesShownStore } from "../chat/index.ts";
 import { drawerOpenStore, useDrawerOpen } from "../drawer/index.ts";
 import { openModelDialog } from "../models/index.ts";
+import { openSetup, startNoticeStore, useStartNotice } from "../setup/index.ts";
 import { CloseSessionDialog, useSessionActions } from "../sessions/index.ts";
 import { downloadText, writeClipboard } from "./copy-text.ts";
 import { CommandsDialog } from "./help-dialog.tsx";
@@ -74,7 +77,9 @@ export function useCommands({ session, cwd, typing, send }: UseCommandsOptions):
   const models = useModelList(typing);
   const skills = useSkillList(cwd, typing);
   const [, setDrawerOpen] = useDrawerOpen();
-  const [notice, setNotice] = useState<CommandNotice | null>(null);
+  const [ownNotice, setNotice] = useState<CommandNotice | null>(null);
+  const startNotice = useStartNotice();
+  const notice = ownNotice ?? (startNotice === null ? null : { text: startNotice });
   const [error, setError] = useState<string | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const returnTo = useRef<HTMLElement | null>(null);
@@ -101,6 +106,7 @@ export function useCommands({ session, cwd, typing, send }: UseCommandsOptions):
   });
 
   const clear = useCallback(() => {
+    startNoticeStore.set(null);
     setNotice(null);
     setError(null);
   }, []);
@@ -147,7 +153,8 @@ export function useCommands({ session, cwd, typing, send }: UseCommandsOptions):
           case "artifact":
             return say(NOT_YET.artifact);
           case "setup":
-            return say(NOT_YET.setup);
+            openSetup({ window: OVERVIEW, returnTo: focused() });
+            return "handled";
           case "sessions":
             return say(NOT_YET.sessions);
           case "login":
@@ -273,7 +280,13 @@ export function useCommands({ session, cwd, typing, send }: UseCommandsOptions):
         if (view.chat.busy) {
           return "busy";
         }
-        await sendMessage(outcome.text, outcome.kind === "skill" ? { name: outcome.name, args: outcome.args } : undefined);
+        try {
+          await sendMessage(outcome.text, outcome.kind === "skill" ? { name: outcome.name, args: outcome.args } : undefined);
+        } catch (err) {
+          // No model chosen yet: setup picks one. The draft stays, and goes when Enter is pressed again.
+          if (isNoModelChosen(err)) openSetup({ window: guided("engine", "send"), returnTo: focused() });
+          throw err;
+        }
         return "sent";
       }
       return runOutcome(outcome);

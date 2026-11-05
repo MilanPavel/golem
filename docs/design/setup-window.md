@@ -489,4 +489,4 @@ The TUI fills the Service row itself, from the launch agent and `run/last-error`
 
 ### The web UI
 
-The web uses the same navigation table and `setup.status`, and draws its own panels in 10.10 ([#183](https://github.com/MilanPavel/golem/issues/183)). Its Service and Key panels show the terminal command with a copy button, since [ADR-028](../adr/028-web-gateway.md) keeps both out of the browser.
+The web uses the same navigation table, panels, lines, and `setup.status`, and draws them as a centred dialog ([web.md](web.md#the-setup-window)). It differs in two panels, since [ADR-028](../adr/028-web-gateway.md) keeps both out of the browser. Service is already running, so it only shows `golem daemon install` with a copy button when launchd doesn't keep it, and its row comes from the daemon's launchd check with the version added. Key never takes a key: it shows `golem auth set <provider>` with a copy button and a `Check again` button. There is no Quit-setup question, and the dialog's close button is the same as Later.

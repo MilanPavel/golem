@@ -11,7 +11,13 @@ import {
   keychainNotice,
   keyLines,
   maskKey,
+  ASK_PAGE_KEY,
   openKey,
+  openPageKey,
+  pageKeyChecked,
+  pageKeyCommand,
+  pageKeyLines,
+  pressPageKey,
   pressKey,
   pressProvider,
   providerLines,
@@ -145,4 +151,45 @@ test("a Keychain read waiting on macOS is named in the band and under the panel"
   const lines = keychainLines(["provider/groq"]);
   assert.deepEqual(lines[1], { kind: "status", mark: "attn", text: "macOS is asking whether golem may use your Groq key." });
   assert.equal(lines[2]?.kind === "text" && lines[2].text, '  Choose "Always Allow" in the dialog.');
+});
+
+test("the page's Key panel names the command and has one choice, Check again", () => {
+  assert.equal(pageKeyCommand("anthropic"), "golem auth set anthropic");
+  const lines = pageKeyLines("anthropic", ASK_PAGE_KEY);
+  assert.equal(lines[0]?.kind === "title" ? lines[0].text : "", "Anthropic · API key");
+  assert.deepEqual(
+    lines.filter((line) => line.kind === "option"),
+    [{ kind: "option", label: "Check again", detail: "", selected: true }],
+  );
+});
+
+test("Check again checks, Esc goes back, and the arrows do nothing", () => {
+  assert.deepEqual(pressPageKey(ASK_PAGE_KEY, "enter"), { state: { phase: "checking" }, effect: { kind: "check" } });
+  assert.deepEqual(pressPageKey(ASK_PAGE_KEY, "down"), { state: ASK_PAGE_KEY, effect: { kind: "none" } });
+  assert.deepEqual(pressPageKey(ASK_PAGE_KEY, "back").effect, { kind: "back" });
+  // A check already running is not started twice.
+  assert.equal(pressPageKey({ phase: "checking" }, "enter").effect.kind, "none");
+});
+
+test("after a check the panel is done with a key, and says so without one", () => {
+  assert.equal(pageKeyChecked(false), "done");
+  assert.deepEqual(pageKeyChecked(true), { phase: "absent" });
+  const absent = pageKeyLines("groq", { phase: "absent" });
+  assert.ok(absent.some((line) => line.kind === "status" && line.mark === "attn" && line.text === "the key isn't there yet"));
+  assert.ok(pageKeyLines("groq", { phase: "checking" }).some((line) => line.kind === "status" && line.mark === "spin"));
+});
+
+test("a key already saved shows Continue and no command, and Enter is done", () => {
+  const saved = openPageKey(false);
+  assert.deepEqual(saved, { phase: "saved" });
+  assert.deepEqual(openPageKey(true), ASK_PAGE_KEY);
+  const lines = pageKeyLines("openai", saved);
+  assert.ok(lines.some((line) => line.kind === "status" && line.mark === "ok" && line.text === "Key saved for OpenAI."));
+  assert.ok(!lines.some((line) => line.kind === "text"));
+  assert.deepEqual(
+    lines.filter((line) => line.kind === "option"),
+    [{ kind: "option", label: "Continue", detail: "", selected: true }],
+  );
+  assert.deepEqual(pressPageKey(saved, "enter"), { state: saved, effect: { kind: "done" } });
+  assert.equal(pressPageKey(saved, "back").effect.kind, "back");
 });

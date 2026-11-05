@@ -9,6 +9,7 @@ import {
   pickerGroups,
   pickerModels,
   pickerName,
+  keyMissing,
   priceLabel,
   providerMissing,
   sizeLabel,
@@ -131,4 +132,22 @@ test("the fact labels", () => {
   assert.equal(statusLabel(model("a/b", { status: "pulling", progress: 0.425 }), false), "downloading 42%");
   assert.equal(statusLabel(model("a/b", { status: "pulling" }), false), "downloading");
   assert.equal(statusLabel(model("a/b", { status: "server_down" }), false), "down");
+});
+
+test("a key is missing while the provider needs one, is not listed, or there is no listing", () => {
+  const listing: ModelListResult = {
+    ...LISTING,
+    providers: [
+      { provider: "anthropic", status: "needs_key" },
+      { provider: "openai", status: "ready" },
+      { provider: "groq", status: "server_down" },
+    ],
+  };
+  assert.ok(keyMissing(listing, "anthropic"));
+  assert.ok(!keyMissing(listing, "openai"));
+  assert.ok(!keyMissing(listing, "groq"));
+  assert.ok(keyMissing(listing, "together"));
+  assert.ok(keyMissing(null, "anthropic"));
+  // A provider that is not installed is the other predicate's business.
+  assert.ok(!providerMissing(listing, "anthropic"));
 });

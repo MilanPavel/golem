@@ -8,6 +8,7 @@ const KEYS = [
   ["mcp.list"],
   ["mcp.tools", "fs"],
   ["model.list"],
+  ["setup.status"],
   ["session.inspect", "a"],
   ["session.inspect", "b"],
   ["daemon.status"],
@@ -46,13 +47,13 @@ test("a finished pull marks model.list, progress does not", () => {
   fake.emitPull({ kind: "progress", progress: {} } as never);
   expect(stale()).toEqual([]);
   fake.emitPull({ kind: "done", done: {} } as never);
-  expect(stale()).toEqual(["model.list"]);
+  expect(stale()).toEqual(["model.list", "setup.status"]);
 });
 
-test("a local model server changing state marks model.list", () => {
+test("a local model server changing state marks model.list and setup.status", () => {
   const { fake, stale } = setup();
   fake.emitModelServer({ base_url: "http://localhost:11434", provider: "ollama", state: "stopped" });
-  expect(stale()).toEqual(["model.list"]);
+  expect(stale()).toEqual(["model.list", "setup.status"]);
 });
 
 test("session.updated and a summary mark only that session's inspect", () => {

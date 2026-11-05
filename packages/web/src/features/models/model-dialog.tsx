@@ -1,4 +1,4 @@
-import { namesModel, pickerGroups, pickerName, providerMissing, withPulls, type PullState } from "@golem/view";
+import { namesModel, pickerGroups, pickerName, providerMissing } from "@golem/view";
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { actionErrorText } from "../../store/errors.ts";
 import type { ListedModel, ModelListResult } from "../../store/models.ts";
@@ -10,7 +10,7 @@ import { IconButton } from "../../ui/icon-button.tsx";
 import { RefreshIcon } from "../../ui/icons.tsx";
 import { resolveActive, SearchList, type SearchListItem } from "../../ui/search-list.tsx";
 import { ModelRow } from "./model-row.tsx";
-import { diskText, downloadText, pullShare, removable, removeText, shortName, tooBigText } from "./model-text.ts";
+import { diskText, downloadText, removable, removeText, shortName, tooBigText, withActivePulls } from "./model-text.ts";
 
 /** What the dialog does, with the session already bound. Each call rejects with the daemon's message. */
 export type ModelDialogActions = {
@@ -47,15 +47,6 @@ export type ModelDialogViewProps = {
 };
 
 type Guard = { busy: boolean; escape: (event: Event) => void };
-
-/** The listing with the downloads laid over it, as `withPulls` wants them. */
-function overlay(listing: ModelListResult | null, pulls: PullsSnapshot): ModelListResult | null {
-  const record: Record<string, PullState> = {};
-  for (const [ref, entry] of pulls.active) {
-    record[ref] = { progress: pullShare(entry, null), status: entry.status };
-  }
-  return withPulls(listing, record);
-}
 
 function confirmFits(confirm: ModelConfirm | null, model: ListedModel | null, missing: boolean): confirm is ModelConfirm {
   if (confirm === null || model === null || confirm.ref !== model.ref) {
@@ -106,7 +97,7 @@ function Content({
   const input = useRef<HTMLInputElement>(null);
   const confirmButton = useRef<HTMLButtonElement>(null);
 
-  const shown = useMemo(() => overlay(listing, pulls), [listing, pulls]);
+  const shown = useMemo(() => withActivePulls(listing, pulls), [listing, pulls]);
   const rows = useMemo<Row[]>(
     () =>
       shown === null
@@ -449,7 +440,9 @@ export function ModelDialog({
       pull: (ref) => page.pull(ref, { sessionId }),
       stop: (ref) => page.cancelPull(ref),
       remove: (ref) => page.remove(ref),
-      refresh: () => page.refreshModels(),
+      refresh: async () => {
+        await page.refreshModels();
+      },
     }),
     [page, sessionId],
   );

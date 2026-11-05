@@ -155,7 +155,7 @@ The daemon keeps its files under one home directory. `resolve_paths` picks it: a
 | `skills/` | Skills you added on this machine, one folder each | Built |
 | `flows/` | Flows you added on this machine | Planned |
 
-The settings in `config.toml` are in the [overview's settings list](../architecture.md#settings).
+The settings in `config.toml` are in the [Settings](../guide/settings.md).
 
 ### The event log
 

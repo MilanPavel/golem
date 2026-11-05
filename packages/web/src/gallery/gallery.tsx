@@ -30,6 +30,9 @@ import { CommandsDialog } from "../features/composer/help-dialog.tsx";
 import { HomeView, SessionTitle } from "../features/shell/index.ts";
 import { CommandPaletteView, KeysDialog } from "../features/palette/index.ts";
 import { ModelDialogView, type ModelDialogViewProps } from "../features/models/index.ts";
+import { SetupDialogView } from "../features/setup/index.ts";
+import { SETUP_CASES } from "../features/setup/sample.ts";
+import { panelView } from "../features/setup/setup-ui.ts";
 import { NO_OLLAMA_LISTING, OLLAMA_DOWN_LISTING, SAMPLE_LISTING, SAMPLE_PULLS } from "../features/models/sample.ts";
 import { CloseSessionDialog, RenameField, SidebarView } from "../features/sessions/index.ts";
 import { faviconHref, tabTitle } from "../features/tab-status/index.ts";
@@ -370,6 +373,32 @@ function ModelDialogDemo({ theme }: { theme: string }) {
   );
 }
 
+/** The setup window in each state the page draws it. */
+function SetupDemo({ theme }: { theme: string }) {
+  const [shown, setShown] = useState<string | null>(null);
+  return (
+    <div className="flex flex-wrap gap-2 rounded-lg border border-line bg-bg p-4">
+      {SETUP_CASES.map(({ label, ui, ctx }) => (
+        <div key={label}>
+          <Button onClick={() => setShown(label)}>
+            {`Setup, ${label}`}
+            <span className="sr-only">, {theme}</span>
+          </Button>
+          <SetupDialogView
+            open={shown === label}
+            onClose={() => setShown(null)}
+            window={ui.window}
+            view={panelView(ui, ctx)}
+            pull={ui.model.phase === "downloading" ? ctx.pulls.active.get(ui.model.ref) : undefined}
+            onKey={() => {}}
+            onChoose={() => {}}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function Panel({ theme }: { theme: "slip" | "kiln" }) {
   return (
     <section data-theme={theme} aria-label={`${theme} theme`} className="rounded-lg border border-line bg-bg p-4 text-ink">
@@ -584,6 +613,11 @@ function Panel({ theme }: { theme: "slip" | "kiln" }) {
       <section className="mt-6">
         <h3 className="mb-2 font-mono text-xs text-faint">Model dialog</h3>
         <ModelDialogDemo theme={theme} />
+      </section>
+
+      <section className="mt-6">
+        <h3 className="mb-2 font-mono text-xs text-faint">Setup window</h3>
+        <SetupDemo theme={theme} />
       </section>
 
       <Group title="Dialog, popover, menu, tooltip">
