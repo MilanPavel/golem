@@ -175,3 +175,36 @@ def test_an_mcp_server_is_turned_off_and_on_with_comments_kept(tmp_path: Path) -
     assert path.read_text(encoding="utf-8") == '# mine\n[mcp.git]\ncommand = "uvx"  # keep\n'
     with pytest.raises(McpTableError, match=r"no \[mcp\.web\]"):
         set_mcp_enabled(path, "web", False)
+
+
+def test_an_mcp_server_is_added_with_comments_kept_and_removed(tmp_path: Path) -> None:
+    from golem.config import load_mcp
+    from golem.config_edit import McpExistsError, McpTableError, add_mcp_server, remove_mcp_server
+
+    path = tmp_path / "config.toml"
+    path.write_text('# mine\ndefault_model = "local"  # keep\n', encoding="utf-8")
+    table = {"command": "uvx", "args": ["mcp-server-git"], "env": {"API_TOKEN": "keychain:mcp/git"}}
+    add_mcp_server(path, "git", table)
+    text = path.read_text(encoding="utf-8")
+    assert text.startswith('# mine\ndefault_model = "local"  # keep\n')
+    assert "[mcp.git]" in text
+    assert 'env = {API_TOKEN = "keychain:mcp/git"}' in text
+    assert load_mcp(path)["git"].args == ["mcp-server-git"]
+    with pytest.raises(McpExistsError, match=r"already has \[mcp\.git\]"):
+        add_mcp_server(path, "git", {"command": "other"})
+    add_mcp_server(path, "web", {"url": "https://example.com/mcp"})
+    remove_mcp_server(path, "git")
+    assert list(load_mcp(path)) == ["web"]
+    remove_mcp_server(path, "web")
+    assert path.read_text(encoding="utf-8") == '# mine\ndefault_model = "local"  # keep\n'
+    with pytest.raises(McpTableError, match=r"no \[mcp\.web\]"):
+        remove_mcp_server(path, "web")
+
+
+def test_an_mcp_server_is_added_to_a_missing_file(tmp_path: Path) -> None:
+    from golem.config import load_mcp
+    from golem.config_edit import add_mcp_server
+
+    path = tmp_path / "home" / "config.toml"
+    add_mcp_server(path, "git", {"command": "uvx"})
+    assert load_mcp(path)["git"].command == "uvx"

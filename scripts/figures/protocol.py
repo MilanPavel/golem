@@ -148,7 +148,7 @@ def one_shape() -> str:
         box(30, 150, 200, 56, "golem_protocol", "Python classes: the source", mono=True),
         arrow_right(230, 297, 178),
         '<text class="mono small" x="264" y="170" text-anchor="middle">just gen</text>',
-        box(300, 150, 230, 56, "packages/protocol/gen", "315 files: schema + TypeScript", mono=True),
+        box(300, 150, 230, 56, "packages/protocol/gen", "per message: schema + .ts", mono=True),
         arrow_right(530, 567, 178),
         box(570, 150, 280, 56, "@golem/client", "one client, two links", mono=True),
         arrow_down(130, 206, 292),
@@ -197,7 +197,7 @@ def one_shape() -> str:
 <g class="anim">{"".join(anim)}</g>"""
     return card(
         500,
-        "One shape for the daemon and every client. The messages are Python classes in golem_protocol. just gen writes 315 files of JSON Schema and TypeScript into packages/protocol/gen, and @golem/client uses them. The TUI and golem status reach the daemon over the Unix socket, one JSON object per line. A web page reaches it over a WebSocket through golem web, the gateway, which checks the token, the Origin, and the method, and passes the same line on. The daemon reads each line into the same Python classes.",
+        "One shape for the daemon and every client. The messages are Python classes in golem_protocol. just gen writes a JSON Schema and a TypeScript file for each message into packages/protocol/gen, and @golem/client uses them. The TUI and golem status reach the daemon over the Unix socket, one JSON object per line. A web page reaches it over a WebSocket through golem web, the gateway, which checks the token, the Origin, and the method, and passes the same line on. The daemon reads each line into the same Python classes.",
         body,
     )
 

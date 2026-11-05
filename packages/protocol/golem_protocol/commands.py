@@ -834,6 +834,46 @@ class McpSetEnabledParams(BaseModel):
     session_id: str | None = Field(default=None, min_length=1)
 
 
+class McpAddParams(BaseModel):
+    """``mcp.add``. Write ``[mcp.<name>]`` into the user's config, and start the server.
+
+    Give a ``command`` with its ``args`` for a stdio server, or a ``url`` for an
+    HTTP one. A ``token`` goes into the OS credential store as ``mcp/<name>``,
+    never into the file: an HTTP server sends it as a Bearer header, and a
+    command gets it in the variable ``token_env``. A client never logs or
+    displays ``token``.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9-]{0,31}$")
+    command: str | None = Field(default=None, min_length=1)
+    args: list[str] = Field(default_factory=list[str])
+    url: str | None = Field(default=None, min_length=1)
+    token: SecretStr | None = Field(default=None, min_length=1, max_length=4096)
+    token_env: str | None = Field(default=None, pattern=r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+class McpRemoveParams(BaseModel):
+    """``mcp.remove``. Delete ``[mcp.<name>]`` from the user's config, and stop the server.
+
+    The server's ``mcp/<name>`` token goes from the credential store too.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+
+
+class McpRemoveResult(BaseModel):
+    """The server that was removed. ``secret``: whether a stored token went with it."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    secret: bool
+
+
 class McpToggleParams(BaseModel):
     """``mcp.enable`` and ``mcp.disable``: an on-demand server, for one session."""
 
@@ -1161,8 +1201,11 @@ __all__ = [
     "ListedModel",
     "ListedProvider",
     "ListedSkill",
+    "McpAddParams",
     "McpListParams",
     "McpListResult",
+    "McpRemoveParams",
+    "McpRemoveResult",
     "McpServer",
     "McpServerParams",
     "McpServerState",

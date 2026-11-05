@@ -8,13 +8,22 @@ import os
 import time
 from dataclasses import replace
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict
 
 from golem import __version__
-from golem.config import load_settings
-from golem.config_edit import McpTableError, RuleIndexError, set_default_model, set_mcp_enabled
+from golem.config import McpServerSettings, load_settings
+from golem.config_edit import (
+    McpExistsError,
+    McpTableError,
+    RuleIndexError,
+    add_mcp_server,
+    has_mcp_server,
+    remove_mcp_server,
+    set_default_model,
+    set_mcp_enabled,
+)
 from golem.doctor import MacPlatform, run_checks
 from golem.mcp import McpServerError, McpSupervisor
 from golem.models import ollama
@@ -88,8 +97,11 @@ from golem_protocol.commands import (
     ListedModel,
     ListedProvider,
     LocalServer,
+    McpAddParams,
     McpListParams,
     McpListResult,
+    McpRemoveParams,
+    McpRemoveResult,
     McpServer,
     McpServerParams,
     McpSetEnabledParams,
@@ -742,6 +754,108 @@ async def _mcp_set_enabled(ctx: RequestContext, params: McpSetEnabledParams) -> 
         raise RpcCallError(INTERNAL_ERROR, f"could not write the config file: {exc}") from exc
 
 
+def _mcp_table(params: McpAddParams) -> dict[str, Any]:
+    """The ``[mcp.<name>]`` keys for ``params``, checked before anything is stored."""
+    if (params.command is None) == (params.url is None):
+        raise RpcCallError(INVALID_PARAMS, "pass either a command or a url")
+    secret = f"keychain:{MCP_PREFIX}{params.name}"
+    table: dict[str, Any] = {}
+    if params.url is not None:
+        if params.token_env is not None:
+            raise RpcCallError(
+                INVALID_PARAMS, "a url server sends its token as a header: drop --token-env"
+            )
+        table["url"] = params.url
+        if params.token is not None:
+            table["headers"] = {"Authorization": f"Bearer {secret}"}
+    else:
+        table["command"] = params.command
+        if params.args:
+            table["args"] = params.args
+        if params.token is not None:
+            if params.token_env is None:
+                raise RpcCallError(
+                    INVALID_PARAMS, "a token for a command needs token_env, the variable to set"
+                )
+            table["env"] = {params.token_env: secret}
+    if params.token is None and params.token_env is not None:
+        raise RpcCallError(INVALID_PARAMS, "token_env needs a token to put in it")
+    try:
+        McpServerSettings.model_validate(table)
+    except ValueError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+    return table
+
+
+async def _mcp_add(ctx: RequestContext, params: McpAddParams) -> McpServer:
+    mcp = _mcp(ctx)
+    table = _mcp_table(params)
+    if mcp.config_files(params.name):
+        raise RpcCallError(
+            INVALID_PARAMS,
+            f"mcp server {params.name} already exists: golem mcp remove {params.name} first",
+        )
+    path = ctx.state.paths.config_file
+    try:
+        # A table the servers skipped, such as an invalid one, still blocks the name.
+        listed = await asyncio.to_thread(has_mcp_server, path, params.name)
+    except (OSError, ValueError) as exc:
+        raise RpcCallError(INTERNAL_ERROR, f"could not read the config file: {exc}") from exc
+    if listed:
+        raise RpcCallError(
+            INVALID_PARAMS, f"{path} already has [mcp.{params.name}]: fix or remove it"
+        )
+    secret = f"{MCP_PREFIX}{params.name}"
+    if params.token is not None:
+        # Stored first, so the server never starts without it.
+        secrets = _mcp_secrets(ctx, secret)
+        try:
+            await asyncio.to_thread(secrets.set, secret, params.token.get_secret_value())
+        except SecretStoreError as exc:
+            raise RpcCallError(KEYCHAIN_UNAVAILABLE, str(exc)) from exc
+        log.info("stored secret %s", secret)
+    try:
+        await asyncio.to_thread(add_mcp_server, path, params.name, table)
+    except McpExistsError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+    except OSError as exc:
+        raise RpcCallError(INTERNAL_ERROR, f"could not write the config file: {exc}") from exc
+    mcp.reload(path)
+    try:
+        return mcp.status(await _optional_scope(ctx, None), params.name)
+    except McpServerError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+
+
+async def _mcp_remove(ctx: RequestContext, params: McpRemoveParams) -> McpRemoveResult:
+    mcp = _mcp(ctx)
+    path = ctx.state.paths.config_file
+    files = mcp.config_files(params.name)
+    if not files:
+        raise RpcCallError(INVALID_PARAMS, f"no mcp server named {params.name}")
+    if path not in files:
+        raise RpcCallError(
+            INVALID_PARAMS,
+            f"mcp server {params.name} is in {files[0]}: remove it from that file",
+        )
+    try:
+        await asyncio.to_thread(remove_mcp_server, path, params.name)
+    except McpTableError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+    except OSError as exc:
+        raise RpcCallError(INTERNAL_ERROR, f"could not write the config file: {exc}") from exc
+    mcp.reload(path)
+    secret = f"{MCP_PREFIX}{params.name}"
+    removed = False
+    if ctx.state.secrets is not None:
+        try:
+            removed = await asyncio.to_thread(ctx.state.secrets.delete, secret)
+        except SecretStoreError as exc:
+            raise RpcCallError(KEYCHAIN_UNAVAILABLE, str(exc)) from exc
+        log.info("removed secret %s removed=%s", secret, removed)
+    return McpRemoveResult(name=params.name, secret=removed)
+
+
 def _mcp(ctx: RequestContext) -> McpSupervisor:
     if ctx.state.mcp is None:
         raise RpcCallError(INTERNAL_ERROR, "MCP servers are not ready")
@@ -921,6 +1035,8 @@ def standard_methods() -> dict[str, Method]:
         "mcp.tools": Method("mcp.tools", McpServerParams, True, _mcp_tools),
         "mcp.restart": Method("mcp.restart", McpServerParams, True, _mcp_restart),
         "mcp.set_enabled": Method("mcp.set_enabled", McpSetEnabledParams, True, _mcp_set_enabled),
+        "mcp.add": Method("mcp.add", McpAddParams, True, _mcp_add),
+        "mcp.remove": Method("mcp.remove", McpRemoveParams, True, _mcp_remove),
         "skill.list": Method("skill.list", SkillListParams, True, _skill_list),
         "session.set_skills": Method(
             "session.set_skills", SessionSetSkillsParams, True, _session_set_skills

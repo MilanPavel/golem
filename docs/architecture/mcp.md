@@ -235,9 +235,12 @@ MCP servers are listed with `mcp.list`: each one's name, state (`idle`, `startin
 
 `mcp.set_enabled` writes through `golem/config_edit.py`, which keeps the file's comments, and applies the change at once.
 
+`mcp.add` and `mcp.remove` do the same for a whole `[mcp.<name>]` table, in the user's config only. `mcp.add` checks the table against the settings model first, stores a token as `mcp/<name>` before it writes, and refuses a name that exists. `mcp.remove` also deletes the token. Both are `local`: a token never goes through the browser gateway.
+
 ### In the TUI and the CLI
 
 - **`/mcp`** opens a manager (`packages/tui/src/mcp-manager.ts`): the servers grouped by the file that names them, then one server's status, command, file, tools, and token cost, with View tools, Turn on or off for this chat, Reconnect, and Disable everywhere (or Enable, for a disabled one). `/mcp enable|disable <name>` stays as a shortcut.
+- **`golem mcp add <name> -- <command…>`** or **`--url <url>`** sends `mcp.add` (`packages/cli/src/mcp-command.ts` reads the arguments). `--token` and `--token-env VAR` ask for the token with hidden input. **`golem mcp remove <name>`** sends `mcp.remove`.
 - **The status line** shows `mcp ✗ <name>` in red while a server the session uses is down.
 - **`golem doctor`** checks each server that may start: its command is found, and its secrets are stored.
 
@@ -259,8 +262,9 @@ golem's client follows one protocol version. A server that answers with another 
 | `packages/daemon/golem/mcp/tools.py` | A server's tools as golem tools: names, schemas, and the marked output |
 | `packages/daemon/golem/mcp/launch.py` | Finding the command, the environment, and the Keychain secrets |
 | `packages/daemon/golem/tools/registry.py` | `ToolScope` and `ToolRegistry.scoped` |
-| `packages/daemon/golem/config_edit.py` | `mcp.set_enabled`, written with the comments kept |
+| `packages/daemon/golem/config_edit.py` | `mcp.set_enabled`, `mcp.add`, and `mcp.remove`, written with the comments kept |
 | `packages/tui/src/mcp-manager.ts` | `/mcp` |
+| `packages/cli/src/mcp-command.ts` | The arguments of `golem mcp add` and `golem mcp remove` |
 
 ## Read more
 

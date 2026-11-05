@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 import tomlkit
 from tomlkit.items import AoT, Table
@@ -23,6 +23,53 @@ class RuleIndexError(ValueError):
 
 class McpTableError(ValueError):
     """The file has no ``[mcp.<name>]`` table."""
+
+
+class McpExistsError(ValueError):
+    """The file already has an ``[mcp.<name>]`` table."""
+
+
+def add_mcp_server(config_file: Path, name: str, table: dict[str, Any]) -> None:
+    """Add ``[mcp.<name>]`` with the keys of ``table``. Creates the file when it is missing."""
+    document = _read(config_file)
+    servers = cast(object, document.get("mcp"))  # pyright: ignore[reportUnknownMemberType]
+    if not isinstance(servers, Table):
+        servers = tomlkit.table(is_super_table=True)
+        document["mcp"] = servers
+    if name in servers:
+        raise McpExistsError(f"{config_file} already has [mcp.{name}]")
+    added = tomlkit.table()
+    for key, value in table.items():
+        if isinstance(value, dict):
+            inline = tomlkit.inline_table()
+            for inner_key, inner in cast(dict[str, Any], value).items():
+                inline[inner_key] = inner
+            added[key] = inline
+        else:
+            added[key] = value
+    servers[name] = added
+    _write(config_file, document)
+
+
+def has_mcp_server(config_file: Path, name: str) -> bool:
+    """True when the file has an ``[mcp.<name>]`` table, valid or not."""
+    servers = cast(object, _read(config_file).get("mcp"))  # pyright: ignore[reportUnknownMemberType]
+    return isinstance(servers, Table) and name in servers
+
+
+def remove_mcp_server(config_file: Path, name: str) -> None:
+    """Delete ``[mcp.<name>]``, and ``[mcp]`` itself once it holds no other server."""
+    document = _read(config_file)
+    servers = cast(object, document.get("mcp"))  # pyright: ignore[reportUnknownMemberType]
+    if not isinstance(servers, Table) or not isinstance(servers.get(name), Table):  # pyright: ignore[reportUnknownMemberType]
+        raise McpTableError(f"{config_file} has no [mcp.{name}]")
+    del servers[name]
+    if len(servers) == 0:
+        del document["mcp"]
+        # The blank line that set the table apart goes with it.
+        text = tomlkit.dumps(document).rstrip("\n")
+        document = tomlkit.parse(text + "\n" if text else "")
+    _write(config_file, document)
 
 
 def set_mcp_enabled(config_file: Path, name: str, enabled: McpEnabled) -> None:

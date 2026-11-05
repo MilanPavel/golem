@@ -31,6 +31,9 @@ export function shownParams(method: string, params: Record<string, unknown>): Re
   if (method === "auth.set" && "key" in params) {
     return { ...params, key: REDACTED };
   }
+  if (method === "mcp.add" && "token" in params) {
+    return { ...params, token: REDACTED };
+  }
   return params;
 }
 

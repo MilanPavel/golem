@@ -326,7 +326,7 @@ flowchart LR
 
 #### Why golem is signed
 
-golem keeps its secrets in the macOS Keychain (section 9): API keys today, and later MCP server and hook tokens. This section says "key" for all of them. The Keychain protects each key from other programs on your Mac:
+golem keeps its secrets in the macOS Keychain (section 9): API keys and MCP server tokens today, and later hook tokens. This section says "key" for all of them. The Keychain protects each key from other programs on your Mac:
 - The program that saved a key can read it without asking.
 - Any other program can read it only after macOS shows a password dialog and you click Allow.
 

@@ -1,0 +1,78 @@
+{
+  "additionalProperties": false,
+  "description": "``mcp.add``. Write ``[mcp.<name>]`` into the user's config, and start the server.\n\nGive a ``command`` with its ``args`` for a stdio server, or a ``url`` for an\nHTTP one. A ``token`` goes into the OS credential store as ``mcp/<name>``,\nnever into the file: an HTTP server sends it as a Bearer header, and a\ncommand gets it in the variable ``token_env``. A client never logs or\ndisplays ``token``.",
+  "properties": {
+    "args": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Args",
+      "type": "array"
+    },
+    "command": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Command"
+    },
+    "name": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9-]{0,31}$",
+      "title": "Name",
+      "type": "string"
+    },
+    "token": {
+      "anyOf": [
+        {
+          "format": "password",
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string",
+          "writeOnly": true
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Token"
+    },
+    "token_env": {
+      "anyOf": [
+        {
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Token Env"
+    },
+    "url": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Url"
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "title": "McpAddParams",
+  "type": "object"
+}

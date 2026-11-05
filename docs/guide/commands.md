@@ -21,6 +21,8 @@ golem has commands in two places: `golem …` in your shell, and `/…` inside t
 | `golem daemon start` / `stop` / `restart` | Controls the daemon. `restart` after an upgrade |
 | `golem daemon logs` | Follows the daemon's log |
 | `golem auth set <provider>` / `remove <provider>` | Saves or deletes an API key, or an MCP token (`mcp/<name>`), in the Keychain. A model key is tried first; `--no-check` skips that |
+| `golem mcp add <name> -- <command…>` / `--url <url>` | Adds an MCP server to `config.toml` and starts it. `--token` (web) or `--token-env VAR` (command) asks for a token and keeps it in the Keychain |
+| `golem mcp remove <name>` | Removes the server from `config.toml`, stops it, and deletes its token |
 | `golem auth list` | Which providers have a key |
 | `golem models` | Every model you can use or download, with size, price, and context. `--refresh` asks the providers again |
 | `golem config show` | The settings and tool rules in effect for this folder. `--resolved` is accepted and prints the same |

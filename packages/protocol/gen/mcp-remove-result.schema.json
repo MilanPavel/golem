@@ -1,0 +1,21 @@
+{
+  "additionalProperties": false,
+  "description": "The server that was removed. ``secret``: whether a stored token went with it.",
+  "properties": {
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "secret": {
+      "title": "Secret",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "name",
+    "secret"
+  ],
+  "title": "McpRemoveResult",
+  "type": "object"
+}

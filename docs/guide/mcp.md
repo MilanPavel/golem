@@ -9,7 +9,23 @@ Any [MCP](https://modelcontextprotocol.io) server gives golem new tools: a git s
 
 ## Add a server
 
-Add it to `~/.golem/config.toml`:
+Run `golem mcp add`. Put the server's command after `--`:
+
+```bash
+golem mcp add git -- uvx mcp-server-git --repository /path/to/your/repo
+```
+
+For a server on the web, give its URL. With `--token`, golem asks for the token and keeps it in the Keychain:
+
+```bash
+golem mcp add github --url https://api.githubcopilot.com/mcp/ --token
+```
+
+golem writes `[mcp.<name>]` to `~/.golem/config.toml` and starts the server, with no restart. `golem mcp remove git` deletes it again, and its token with it.
+
+A command that needs a token gets it in an environment variable: add `--token-env API_TOKEN`.
+
+You can write the table yourself instead. Add it to `~/.golem/config.toml`:
 
 ```toml
 [mcp.git]
@@ -54,7 +70,7 @@ Type `/mcp enable browser` in a chat. Only that chat gets the server, and it sta
 
 ## Servers on the web, with a token
 
-golem never keeps a token in the file. Name a Keychain secret instead, then store it:
+golem never keeps a token in the file. `golem mcp add <name> --url <url> --token` stores the token and writes the header for you. To do it by hand, name a Keychain secret, then store it:
 
 ```toml
 [mcp.github]

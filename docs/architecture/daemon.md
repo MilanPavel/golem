@@ -90,7 +90,7 @@ $ golem status
 connected
 pid: 10406
 version: 0.0.0-dev
-protocol: 2.34
+protocol: 2.35
 uptime: 1s
 state: running
 ```
