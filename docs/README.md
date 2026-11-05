@@ -45,7 +45,7 @@ golem's architecture, one idea per chapter. Each chapter explains an idea that m
 | 10 | Skills | [architecture/skills.md](architecture/skills.md) | |
 | 11 | MCP: tools from outside | [architecture/mcp.md](architecture/mcp.md) | |
 | 12 | The terminal app | [architecture/tui.md](architecture/tui.md) | |
-| 13 | The web UI | `architecture/web.md` | [#453](https://github.com/MilanPavel/golem/issues/453) |
+| 13 | The web UI | [architecture/web.md](architecture/web.md) | |
 | 14 | What comes next | `architecture/whats-next.md` | [#291](https://github.com/MilanPavel/golem/issues/291) |
 
 ## Build golem

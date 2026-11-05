@@ -42,12 +42,12 @@ const parts: Part[] = [
   {
     id: "web", x: 32, y: 204, w: 164, h: 44, title: "web UI", sub: "a browser tab",
     about: "The chat in a browser, opened by `golem web`. It speaks the same protocol, through the gateway, over a WebSocket.",
-    code: "packages/web/", link: "/guide/web", chapter: "Web UI",
+    code: "packages/web/", link: "/architecture/web", chapter: "The web UI",
   },
   {
     id: "gateway", x: 32, y: 262, w: 164, h: 44, title: "gateway", sub: "golem web, 127.0.0.1",
     about: "golem's one program that listens on a port. It lets in only the page `golem web` opened, passes protocol lines through unchanged, and refuses anything a browser should never send (ADR-028).",
-    code: "packages/gateway/", link: "/adr/028-web-gateway", chapter: "ADR-028",
+    code: "packages/gateway/", link: "/architecture/web#how-golem-does-it", chapter: "The web UI",
   },
   {
     id: "socket", x: 232, y: 76, w: 80, h: 230, title: "socket", sub: "golem.sock",
@@ -127,7 +127,7 @@ const parts: Part[] = [
   {
     id: "config", x: 32, y: 460, w: 264, h: 36, title: "config.toml", sub: "your settings and rules",
     about: "Your settings, models, rules, and MCP servers. A project's `.golem/` can add rules and servers, and the `GOLEM_` environment variables override both. Rules, models, skills, and servers are read again when the file changes.",
-    link: "/architecture#settings", chapter: "Settings",
+    link: "/guide/settings", chapter: "Settings",
   },
 ];
 
