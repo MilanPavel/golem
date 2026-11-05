@@ -1,5 +1,6 @@
 import {
   applyComposer,
+  catalogEntry,
   guided,
   OVERVIEW,
   closedDebug,
@@ -100,9 +101,9 @@ export function useCommands({ session, cwd, typing, send }: UseCommandsOptions):
     });
   }, [skills.data, models.data, active]);
 
-  const latest = useRef({ send, skills, models });
+  const latest = useRef({ send, skills, models, cwd });
   useEffect(() => {
-    latest.current = { send, skills, models };
+    latest.current = { send, skills, models, cwd };
   });
 
   const clear = useCallback(() => {
@@ -113,7 +114,7 @@ export function useCommands({ session, cwd, typing, send }: UseCommandsOptions):
 
   const run = useCallback(
     async (raw: string): Promise<RunResult> => {
-      const { send: sendMessage, skills: skillQuery, models: modelQuery } = latest.current;
+      const { send: sendMessage, skills: skillQuery, models: modelQuery, cwd: folder } = latest.current;
       clear();
       const line = raw.trim();
       let listed = skillQuery.data?.skills;
@@ -146,6 +147,17 @@ export function useCommands({ session, cwd, typing, send }: UseCommandsOptions):
           case "mcp":
           case "mcp-toggle":
             return say(NOT_YET.mcp);
+          case "mcp-add": {
+            const entry = found.id === null ? null : catalogEntry(found.id);
+            if (entry === null) {
+              return say(
+                "MCP servers are added in a terminal. Pick one: /mcp add filesystem, github, or fetch, or run:",
+                "golem mcp add <name> -- <command…>",
+              );
+            }
+            const token = entry.needsToken ? " It asks for the token there." : "";
+            return say(`Add it in a terminal.${token}`, entry.cliCommand(folder));
+          }
           case "skills":
             return say(NOT_YET.skills);
           case "permissions":

@@ -1,5 +1,7 @@
 import type { ListedSkill } from "@golem/client";
 
+import { catalogEntry, MCP_CATALOG_IDS } from "./mcp-catalog.ts";
+
 export type DebugTab = "wire" | "model";
 
 export type DebugState = {
@@ -21,6 +23,7 @@ export type ComposerOutcome =
   | { kind: "unknown"; notice: string }
   | { kind: "help" }
   | { kind: "mcp" }
+  | { kind: "mcp-add"; id: string | null }
   | { kind: "mcp-toggle"; on: boolean; name: string }
   | { kind: "send"; text: string; debug: DebugState }
   /** Run a skill once. `text` is the line as typed, and the daemon fills in the body from `args`. */
@@ -197,18 +200,25 @@ export const COMMANDS: readonly Command[] = [
   {
     name: "/mcp",
     group: "tools",
-    args: "[enable|disable <name>]",
-    description: "Manages the MCP servers: tools, reconnect, on or off. enable|disable <name> is a shortcut.",
-    choices: ["enable", "disable"],
+    args: "[add|enable|disable]",
+    description: "Manages the MCP servers: tools, reconnect, on or off. add picks one from a short list.",
+    choices: ["add", "enable", "disable"],
+    subChoices: { add: MCP_CATALOG_IDS },
     run: (_debug, args) => {
       const [action, name, ...extra] = args;
       if (action === undefined) {
         return { kind: "mcp" };
       }
+      if (action === "add" && name === undefined) {
+        return { kind: "mcp-add", id: null };
+      }
+      if (action === "add" && name !== undefined && extra.length === 0 && catalogEntry(name) !== null) {
+        return { kind: "mcp-add", id: name };
+      }
       if ((action === "enable" || action === "disable") && name !== undefined && extra.length === 0) {
         return { kind: "mcp-toggle", on: action === "enable", name };
       }
-      return { kind: "unknown", notice: "/mcp, /mcp enable <name>, or /mcp disable <name>" };
+      return { kind: "unknown", notice: `/mcp, /mcp add [${MCP_CATALOG_IDS.join("|")}], /mcp enable <name>, or /mcp disable <name>` };
     },
   },
   {

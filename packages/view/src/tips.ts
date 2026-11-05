@@ -5,7 +5,7 @@
  */
 
 export const TIPS = [
-  "Tip: /mcp connects tools such as GitHub",
+  "Tip: /mcp add connects tools such as GitHub",
   "Tip: /skills lists what golem knows how to do",
   "Tip: ? shows the keys",
   "Tip: /sessions switches between chats",
