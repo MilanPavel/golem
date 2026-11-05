@@ -2,6 +2,20 @@
 
 What changed in each release of golem, newest first. `just release` writes each section from the commit messages on `main` ([CONTRIBUTING.md](CONTRIBUTING.md)), and the release pull request is the place to edit it. The GitHub release shows the same section. How a release is made is in [docs/sre.md](docs/sre.md), section 5.
 
+## [0.9.0] - 2026-11-05
+
+### Features
+
+- **web:** the setup window in the browser ([#456](https://github.com/MilanPavel/golem/pull/456))
+- **mcp:** golem mcp add and golem mcp remove write the server to config.toml for you ([#458](https://github.com/MilanPavel/golem/pull/458))
+- **mcp:** /mcp add picks filesystem, GitHub, fetch, or your own server from a short list ([#479](https://github.com/MilanPavel/golem/pull/479))
+
+### Docs
+
+- How golem works, a chapter on the terminal app ([#455](https://github.com/MilanPavel/golem/pull/455))
+- a short Architecture overview, and a Settings guide ([#457](https://github.com/MilanPavel/golem/pull/457))
+- How golem works, a chapter on the web UI ([#478](https://github.com/MilanPavel/golem/pull/478))
+
 ## [0.8.0] - 2026-11-04
 
 ### Features
