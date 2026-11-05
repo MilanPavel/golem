@@ -386,7 +386,7 @@ flowchart LR
 
 ## Phase 12 — Models
 
-Choosing and running a model gets easier, and it teaches as you go. Today a local model runs with Ollama's defaults, because golem sends only the model, the URL, and sometimes `num_ctx` ([router.py](../packages/daemon/golem/models/router.py)). The picker lists models with no sense of what each one is for. A hosted list is whatever the provider returns: an OpenAI key lists every model it can see, retired ones included. golem also offers providers it does not need to. Phase 12 runs after the web UI, because its screens build on the web model dialog (10.10). Each ticket is one commit and one pull request.
+Choosing and running a model gets easier, and it teaches as you go. Today a local model runs with Ollama's defaults, because golem sends only the model, the URL, and sometimes `num_ctx` ([router.py](../packages/daemon/golem/models/router.py)). The picker lists models with no sense of what each one is for. A hosted list is whatever the provider returns: an OpenAI key lists every model it can see, retired ones included. golem also offers providers it does not need to. Phase 12 runs after the web UI, because its screens build on the web model dialog (10.10). The details are in [#393](https://github.com/MilanPavel/golem/issues/393), and every ticket is a sub-issue of its step. Each ticket is one commit and one pull request.
 
 Choices that hold for the whole phase:
 
@@ -415,7 +415,7 @@ flowchart LR
 
 After 12.1, three tracks can run side by side, each in its own worktree: providers (12.2, 12.3), categories (12.4, 12.5), and options (12.6 to 12.9).
 
-### 12.1 ADR and a design for tuning
+### 12.1 ADR and a design for tuning — [#394](https://github.com/MilanPavel/golem/issues/394)
 
 - **Goal:** the provider set, the catalog and its filter rule, where options are stored, and how tuning looks are agreed before any code.
 - **You can:** read why golem offers the models it does, and open the `/tune` mockups for the TUI and the web.
@@ -424,7 +424,7 @@ After 12.1, three tracks can run side by side, each in its own worktree: provide
   - `docs/design/tune.md`: the TUI panel and the web tab, presets, the memory gauge, and the wording of every option's explanation.
 - **Done when:** the ADR and the design are merged.
 
-### 12.2 Six providers
+### 12.2 Six providers — [#395](https://github.com/MilanPavel/golem/issues/395)
 
 - **Goal:** Google, DeepSeek, xAI, and Moonshot work like OpenAI and Anthropic, and the providers golem no longer offers are gone.
 - **You can:** run `golem auth set google` (or `deepseek`, `xai`, `moonshot`), see the key checked, and chat with that provider's models.
@@ -435,7 +435,7 @@ After 12.1, three tracks can run side by side, each in its own worktree: provide
 - **Done when:** a key for each of the six is checked, lists its models, and answers a message that uses a tool.
 - **Watch out:** every new LangChain package must load in the frozen daemon. Run `just smoke-dist`.
 
-### 12.3 A curated hosted list
+### 12.3 A curated hosted list — [#396](https://github.com/MilanPavel/golem/issues/396)
 
 - **Goal:** only current models you can call are offered.
 - **You can:** paste an OpenAI key and see a short list of current models, with **show all** one key away.
@@ -445,7 +445,7 @@ After 12.1, three tracks can run side by side, each in its own worktree: provide
   - **Show all** in the TUI picker and the web dialog.
 - **Done when:** an OpenAI key lists only catalog models by default, and no model past its deprecation date appears even under **show all**.
 
-### 12.4 Categories
+### 12.4 Categories — [#397](https://github.com/MilanPavel/golem/issues/397)
 
 - **Goal:** you can pick a model by what it is for.
 - **You can:** filter the picker to Coding or Vision, and see each model's categories next to it.
@@ -455,7 +455,7 @@ After 12.1, three tracks can run side by side, each in its own worktree: provide
   - Filter chips in the web model dialog.
 - **Done when:** an installed model with no catalog entry still shows the right categories, from Ollama's capabilities.
 
-### 12.5 A better local list
+### 12.5 A better local list — [#398](https://github.com/MilanPavel/golem/issues/398)
 
 - **Goal:** a good local model for every category, at every memory size.
 - **You can:** see "recommended for coding on this Mac" next to "recommended".
@@ -473,7 +473,7 @@ After 12.1, three tracks can run side by side, each in its own worktree: provide
   - A starter for each category and memory size, so the recommendation follows the category you filtered on.
 - **Done when:** on an 8, 16, and 32 GB Mac, each category recommends a model that fits.
 
-### 12.6 Model options in the daemon
+### 12.6 Model options in the daemon — [#399](https://github.com/MilanPavel/golem/issues/399)
 
 - **Goal:** Ollama options can be changed, saved per model, and overridden for one session.
 - **You can:** nothing new on screen yet. A client can read and set options.
@@ -485,7 +485,7 @@ After 12.1, three tracks can run side by side, each in its own worktree: provide
   - [router.py](../packages/daemon/golem/models/router.py) `chat_model` passes the result to `ChatOllama`.
 - **Done when:** a saved temperature reaches Ollama, and a session override applies to that session only.
 
-### 12.7 `/tune` in the TUI
+### 12.7 `/tune` in the TUI — [#400](https://github.com/MilanPavel/golem/issues/400)
 
 - **Goal:** you learn what each option does, and change it without leaving the chat.
 - **You can:** type `/tune` and see:
@@ -510,14 +510,14 @@ After 12.1, three tracks can run side by side, each in its own worktree: provide
   - A status chip (`temp 0.2 · ctx 16k`) while a value differs from the default, and `/tune temperature 0.3` with completion.
 - **Done when:** a new user can set a precise preset, see the answer change with `t`, and reset with `r`.
 
-### 12.8 Tune in the web
+### 12.8 Tune in the web — [#401](https://github.com/MilanPavel/golem/issues/401)
 
 - **Goal:** the same thing in the browser.
 - **You can:** open the model dialog's Tune tab, move sliders, and read the same explanations.
 - **Build:** the Tune tab, with presets, the memory gauge, try again, and the chip, all built on 12.6.
 - **Done when:** a change made in the browser shows at once in an attached TUI, and the other way round.
 
-### 12.9 Thinking control
+### 12.9 Thinking control — [#402](https://github.com/MilanPavel/golem/issues/402)
 
 - **Goal:** one **think** setting, whichever model you use.
 - **You can:** turn thinking on or off, or pick low, medium, or high, and show or hide the thinking.
@@ -527,28 +527,28 @@ After 12.1, three tracks can run side by side, each in its own worktree: provide
   - Showing or hiding thinking in both UIs.
 - **Done when:** the setting changes the request for every provider that has one, and is hidden for models without thinking.
 
-### 12.10 Model card
+### 12.10 Model card — [#403](https://github.com/MilanPavel/golem/issues/403)
 
 - **Goal:** you know a model before you pick it.
 - **You can:** press `i` in the picker, or open a model's card in the web, and read what it is good at.
 - **Build:** `model.card` (blurb, categories, capabilities, context size, license, fit, price, speed, and deprecation date), a TUI card, and a web card.
 - **Done when:** every catalog model has a card with no empty fields that the catalog could fill.
 
-### 12.11 Speed on this Mac
+### 12.11 Speed on this Mac — [#404](https://github.com/MilanPavel/golem/issues/404)
 
 - **Goal:** you see how fast a local model really is here.
 - **You can:** read `~38 tok/s here` next to a model you have used.
 - **Build:** tokens per second measured from finished local answers, a rolling median per model, a `model.speed` event, and the figure in the pickers and on the card.
 - **Done when:** the figure matches `ollama run --verbose` within 10 percent.
 
-### 12.12 Retirement warnings
+### 12.12 Retirement warnings — [#405](https://github.com/MilanPavel/golem/issues/405)
 
 - **Goal:** a model going away is never a surprise.
 - **You can:** see a warning when your default or a saved model is deprecated or no longer listed, and switch to its successor with one key.
 - **Build:** a `successor` field in the catalog, a check on each listing, and the warning in the setup overview and the status line.
 - **Done when:** a recorded listing without the default model shows the warning, and Enter switches to the successor.
 
-### 12.13 Catalog updates without a release
+### 12.13 Catalog updates without a release — [#406](https://github.com/MilanPavel/golem/issues/406)
 
 - **Goal:** better curation reaches users between releases.
 - **You can:** get new catalog entries without upgrading golem.
@@ -556,14 +556,14 @@ After 12.1, three tracks can run side by side, each in its own worktree: provide
 - **Done when:** a changed catalog on `main` appears within a day, and a broken one is ignored with a warning in the log.
 - **Watch out:** the catalog is data, never code. An entry cannot add a provider or a `base_url`.
 
-### 12.14 Side-by-side compare in the web
+### 12.14 Side-by-side compare in the web — [#407](https://github.com/MilanPavel/golem/issues/407)
 
 - **Goal:** you can compare two models on one question.
 - **You can:** send one prompt to two models and read both answers side by side, with time, tokens, and cost.
 - **Build:** `model.compare`, which runs one prompt on two models in throwaway forks with no tools, and a two-column view.
 - **Done when:** a compare of a local and a hosted model shows both answers and leaves the session unchanged.
 
-### 12.15 Check: models end to end
+### 12.15 Check: models end to end — [#408](https://github.com/MilanPavel/golem/issues/408)
 
 - **Goal:** the whole phase works together on a clean machine.
 - **Build:** a written run. Add a key for each of the six providers and check the lists are curated. Filter by category, tune a local model, override it for one session, and compare two models.
