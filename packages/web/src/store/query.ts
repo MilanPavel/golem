@@ -35,10 +35,12 @@ export function keepQueriesHonest(client: QueryWiringClient, queryClient: QueryC
     client.onPull((update) => {
       if (update.kind === "done") {
         stale("model.list");
+        stale("setup.status");
       }
     }),
     client.onModelServer(() => {
       stale("model.list");
+      stale("setup.status");
     }),
     client.onEvent((event) => {
       if (event.type === "session.updated") {

@@ -1,6 +1,6 @@
 import type { ListedModel, ModelListResult } from "@golem/client";
 
-import { elapsed, move, type Choice, type MoveKey, type SetupLine } from "./setup-window.ts";
+import { elapsed, move, providerName, type Choice, type MoveKey, type PanelKey, type SetupLine } from "./setup-window.ts";
 
 /**
  * With an API key: the Provider panel (B1) and the Key panel (B2–B3′) of
@@ -288,6 +288,74 @@ export function keyChecked(state: KeyState, result: { ok: true; models: number |
   return result.ok
     ? { phase: "works", provider: state.provider, models: result.models, since: now }
     : { phase: "typing", provider: state.provider, value: "", error: result.reason };
+}
+
+// The Key panel of a page. The browser never takes a key (ADR-028): it shows the command to run
+// in a terminal, and checks the listing again when asked.
+
+export type PageKeyState =
+  | { phase: "ask" }
+  | { phase: "checking" }
+  /** The provider already has a key: nothing to run, only Continue. */
+  | { phase: "saved" }
+  /** The check ran and the provider still has no key. */
+  | { phase: "absent" };
+
+export const ASK_PAGE_KEY: PageKeyState = { phase: "ask" };
+
+/** The panel as it opens: Continue when the provider already has a key, else the command to run. */
+export function openPageKey(missing: boolean): PageKeyState {
+  return missing ? ASK_PAGE_KEY : { phase: "saved" };
+}
+
+/** What to type in a terminal to store the provider's key. */
+export function pageKeyCommand(provider: string): string {
+  return `golem auth set ${provider}`;
+}
+
+export function pageKeyLines(provider: string, state: PageKeyState): SetupLine[] {
+  if (state.phase === "saved") {
+    return [
+      { kind: "title", text: `${providerName(provider)} · API key` },
+      { kind: "blank" },
+      { kind: "status", mark: "ok", text: `Key saved for ${providerName(provider)}.` },
+      { kind: "blank" },
+      { kind: "option", label: "Continue", detail: "", selected: true },
+    ];
+  }
+  const lines: SetupLine[] = [
+    { kind: "title", text: `${providerName(provider)} · API key` },
+    { kind: "blank" },
+    { kind: "text", text: "A web page never takes a key. In a terminal, run this and paste the key there:" },
+  ];
+  if (state.phase === "checking") {
+    return [...lines, { kind: "blank" }, { kind: "status", mark: "spin", text: "checking…" }];
+  }
+  if (state.phase === "absent") {
+    lines.push({ kind: "blank" }, { kind: "status", mark: "attn", text: "the key isn't there yet" });
+  }
+  return [...lines, { kind: "blank" }, { kind: "option", label: "Check again", detail: "", selected: true }];
+}
+
+export type PageKeyEffect = { kind: "none" } | { kind: "check" } | { kind: "done" } | { kind: "back" };
+
+/** The one choice is Check again, so only Enter and Esc do anything. */
+export function pressPageKey(state: PageKeyState, key: PanelKey): { state: PageKeyState; effect: PageKeyEffect } {
+  if (key === "back") {
+    return { state, effect: { kind: "back" } };
+  }
+  if (key !== "enter" || state.phase === "checking") {
+    return { state, effect: { kind: "none" } };
+  }
+  if (state.phase === "saved") {
+    return { state, effect: { kind: "done" } };
+  }
+  return { state: { phase: "checking" }, effect: { kind: "check" } };
+}
+
+/** The check came back: the provider still lacks a key, or it has one and the panel is done. */
+export function pageKeyChecked(missing: boolean): PageKeyState | "done" {
+  return missing ? { phase: "absent" } : "done";
 }
 
 // The provider's models (B4)

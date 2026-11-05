@@ -2,7 +2,7 @@ import type { GolemClient, PullUpdate } from "@golem/client";
 import { trackPull, type PullTrack } from "@golem/view";
 import { createStore, type StoreSource } from "./create-store.ts";
 
-export type PullsClient = Pick<GolemClient, "onPull" | "onState" | "setSessionModel">;
+export type PullsClient = Pick<GolemClient, "onPull" | "onState" | "setSessionModel" | "setDefaultModel">;
 
 /** A download in progress: its byte track for speed and time left, and the daemon's last words. */
 export type PullEntry = { track: PullTrack; status: string; progress: number | null };
@@ -21,6 +21,8 @@ export type Pulls = StoreSource<PullsSnapshot> & {
   abort(ref: string): void;
   /** Switch the session to the model once its download ends well. */
   switchWhenDone(ref: string, sessionId: string): void;
+  /** Make `name` the default model once the download ends well. A failed or stopped one sets nothing. */
+  defaultWhenDone(ref: string, name: string): void;
   /** Drop the wish for a download the person stopped. */
   forget(ref: string): void;
   start(): void;
@@ -47,9 +49,10 @@ function withEntry<V>(map: ReadonlyMap<string, V>, ref: string, value: V): Reado
  * The downloads in flight. Progress arrives for every connection, so a download started in the
  * terminal shows here as well. `now` is injected so tests can move time.
  */
-export function createPulls(client: PullsClient, now: () => number = Date.now): Pulls {
+export function createPulls(client: PullsClient, now: () => number = Date.now, onDefaultSet: () => void = () => undefined): Pulls {
   const store = createStore<PullsSnapshot>(EMPTY);
   const wishes = new Map<string, string>();
+  const defaults = new Map<string, string>();
   let offs: (() => void)[] | undefined;
   let dropped = false;
 
@@ -74,6 +77,8 @@ export function createPulls(client: PullsClient, now: () => number = Date.now): 
     const snapshot = store.getSnapshot();
     const sessionId = wishes.get(ref);
     wishes.delete(ref);
+    const defaultName = defaults.get(ref);
+    defaults.delete(ref);
     const failed =
       ok || error === CANCELLED
         ? without(snapshot.failed, ref)
@@ -81,6 +86,9 @@ export function createPulls(client: PullsClient, now: () => number = Date.now): 
     commit(without(snapshot.active, ref), failed);
     if (ok && sessionId !== undefined) {
       client.setSessionModel(sessionId, ref).catch(() => undefined);
+    }
+    if (ok && defaultName !== undefined) {
+      client.setDefaultModel(defaultName).then(onDefaultSet, () => undefined);
     }
   }
 
@@ -97,14 +105,19 @@ export function createPulls(client: PullsClient, now: () => number = Date.now): 
     },
     abort(ref) {
       wishes.delete(ref);
+      defaults.delete(ref);
       const snapshot = store.getSnapshot();
       commit(without(snapshot.active, ref), snapshot.failed);
     },
     switchWhenDone(ref, sessionId) {
       wishes.set(ref, sessionId);
     },
+    defaultWhenDone(ref, name) {
+      defaults.set(ref, name);
+    },
     forget(ref) {
       wishes.delete(ref);
+      defaults.delete(ref);
     },
     start() {
       if (offs !== undefined) {
@@ -138,6 +151,7 @@ export function createPulls(client: PullsClient, now: () => number = Date.now): 
       offs = undefined;
       dropped = false;
       wishes.clear();
+      defaults.clear();
       store.set(EMPTY);
     },
   };

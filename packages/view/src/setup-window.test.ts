@@ -17,6 +17,9 @@ import {
   pressEngine,
   pressService,
   serviceAnswered,
+  daemonServiceRow,
+  pageServiceLines,
+  pageServiceRow,
   serviceFailed,
   serviceLines,
   serviceRow,
@@ -270,4 +273,50 @@ test("the band names the first thing wrong, and says nothing when all is well", 
     setupBand([{ part: "model", name: "model qwen3:8b", state: "fail", detail: "not downloaded", action: "pick_model" }]),
     "! model qwen3:8b: not downloaded · /setup",
   );
+});
+
+const LAUNCHD_OK: SetupRow = { part: "service", name: "service", state: "ok", detail: "launchd runs /opt/golem" };
+const LAUNCHD_NO: SetupRow = { part: "service", name: "service", state: "fail", detail: "launchd has no golem job", fix: "golem daemon install" };
+
+test("the page's Service row keeps the daemon's launchd check, and a service not kept is attention, not failure", () => {
+  assert.deepEqual(pageServiceRow(LAUNCHD_OK, "0.5.0"), {
+    part: "service",
+    name: "service",
+    state: "ok",
+    detail: "running · v0.5.0 · starts at login",
+  });
+  assert.deepEqual(pageServiceRow(LAUNCHD_NO, "0.5.0"), {
+    part: "service",
+    name: "service",
+    state: "warn",
+    detail: "running · v0.5.0 · not kept at login",
+  });
+  assert.equal(pageServiceRow(null, "v1.2.0").detail, "running · v1.2.0 · not kept at login");
+  assert.equal(pageServiceRow(LAUNCHD_OK, "").detail, "running · starts at login");
+});
+
+test("the daemon's service row is found by its part and name", () => {
+  assert.equal(daemonServiceRow([...ROWS.filter((row) => row.part !== "service"), LAUNCHD_OK]), LAUNCHD_OK);
+  assert.equal(daemonServiceRow(ROWS.filter((row) => row.part !== "service")), null);
+});
+
+test("the overview leads with the Service panel when the service is not kept at login", () => {
+  const notKept = pageServiceRow(null, "0.5.0");
+  assert.deepEqual(
+    overviewChoices(ROWS, notKept).map((choice) => choice.label),
+    ["Keep it running at login", "Install Ollama", "Change model", "Add an API key", "Run setup again"],
+  );
+  assert.equal(overviewChoices(ROWS, pageServiceRow(LAUNCHD_OK, "0.5.0"))[0]?.label, "Install Ollama");
+  // The terminal's own rows are never "warn", so its list is unchanged.
+  assert.equal(overviewChoices(ROWS, serviceRow("other", "0.5.0"))[0]?.label, "Install Ollama");
+  const rows = overviewRows(ROWS, notKept);
+  assert.equal(rows[0]?.kind === "row" ? `${rows[0].mark} ${rows[0].text}` : "", "attn running · v0.5.0 · not kept at login");
+});
+
+test("the page's Service panel says it runs, and names the command only when it is not kept", () => {
+  const text = (lines: ReturnType<typeof pageServiceLines>): string =>
+    lines.map((line) => ("text" in line ? line.text : line.kind === "option" ? `> ${line.label}` : "")).join("|");
+  assert.match(text(pageServiceLines(pageServiceRow(null, "0.5.0"))), /run this in a terminal/);
+  assert.doesNotMatch(text(pageServiceLines(pageServiceRow(LAUNCHD_OK, "0.5.0"))), /run this in a terminal/);
+  assert.match(text(pageServiceLines(pageServiceRow(LAUNCHD_OK, "0.5.0"))), /starts at login/);
 });

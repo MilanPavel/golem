@@ -149,9 +149,17 @@ The page keeps retrying behind "daemon down", and the screen goes away by itself
 - The model chip in the top bar is a button, `Model: <name>`. It opens a centred dialog, `Choose a model`, and focus returns to the chip when it closes.
 - A search field over the list, as one combobox: focus stays in the field, Up, Down, Home, End, PageUp, and PageDown move the active row, Enter does its main action, and Esc clears the search, then closes.
 - The groups are the TUI picker's: Profiles, Installed, Download, then each provider. A row has the label, the ref in faint mono, and the facts in mono. The session's model has a check, the default a `default` badge.
-- A row that is not ready is muted and says why. The page never takes a key, so it names the command: `golem auth set <provider>`, `golem` then `/setup`, `ollama serve`.
+- A row that is not ready is muted and says why. The page never takes a key, so it names the command: `golem auth set <provider>`, `/setup`, `ollama serve`.
 - A download shows a bar, `2.1 / 6.6 GB · 12 MB/s · 6 min`, and it is the same one the terminal shows, because progress reaches every connection.
 - The footer acts on the active row: Use for this session, Make default, Download, Stop download, Remove. Download and Remove ask first, in the footer; a model too big for the machine asks twice.
+
+## The setup window
+
+- One centred dialog, `Setup`, drawn from the same panels, lines, and navigation table as the terminal's ([setup-window.md](setup-window.md)). Guided mode shows the stepper, with a word for each step (`done`, `current step`, `to do`, `skipped`) as well as its mark. Marked lines say `done`, `failed`, `needs attention`, or `working` to a screen reader, and `working` is a small clay square that pulses, still under reduced motion.
+- It opens from `/setup` and the palette's `/setup` row (the overview), from a send that fails for no model (guided from Engine, with the draft kept in the composer), and by itself at the start, once per page load: a fresh home opens guided from Engine, a default that is gone opens the Model panel alone, and a working setup opens nothing. It never opens over another dialog; a start-time opening waits until none is open.
+- Choices are a list of buttons. Up and Down move, Enter chooses, Esc goes back as the table says, and a click is the same as moving there and pressing Enter. Esc on the guided Service panel at the start, and Ready's Enter, close the window. The close button closes it at any point, like Later: the page goes on, and a download keeps running.
+- This Mac works from the page: the daemon installs Ollama with Homebrew and streams its output, starts it, and pulls the model, and a download shows the same bar as the model dialog. With no Homebrew, a link opens ollama.com/download in a new tab and the panel waits for Ollama to appear.
+- Service and Key are commands, not controls, because the page never installs a service or takes a key ([ADR-028](../adr/028-web-gateway.md)). The page is connected, so the service runs. The Service row says so with the version, and when launchd does not keep it the row needs attention and the panel shows `golem daemon install` with a Copy button. The Key panel shows `golem auth set <provider>` with Copy and a `Check again` button: it is done once the provider no longer needs a key, and says `the key isn't there yet` until then.
 
 ## Slash commands in the composer
 
@@ -162,7 +170,7 @@ The page keeps retrying behind "daemon down", and the screen goes away by itself
 - `/help` opens a `Commands` dialog with the table grouped as Session, Model, Tools, and View.
 - `/model`, `/close`, `/fork`, `/title`, `/skill`, `/copy`, `/export` (a markdown download), `/time`, and `/todos` act on the page. On the empty screen the ones that need a session say `Start a session first: send a message.`
 - The page has no key entry, so `/login` and `/logout` show the `golem auth` command to copy ([ADR-028](../adr/028-web-gateway.md)).
-- Not on the page yet, so each says where it lives: `/mcp`, `/skills`, `/permissions`, `/artifact`, `/setup`, and `/debug` are in the terminal (run `golem`, then the command); `/sessions` points at the sidebar. The Commands dialog marks the terminal ones `In the terminal for now`.
+- Not on the page yet, so each says where it lives: `/mcp`, `/skills`, `/permissions`, `/artifact`, and `/debug` are in the terminal (run `golem`, then the command); `/sessions` points at the sidebar. The Commands dialog marks the terminal ones `In the terminal for now`.
 
 ## Type
 

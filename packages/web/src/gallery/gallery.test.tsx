@@ -1,7 +1,8 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
 import { expect, test } from "vitest";
+import { SETUP_CASES } from "../features/setup/sample.ts";
 import { Gallery } from "./gallery.tsx";
 
 test("the gallery shows both themes and has no accessibility violations", async () => {
@@ -36,6 +37,30 @@ test("the gallery's Commands dialog lists the groups and passes axe", async () =
   const results = await axe.run(document.body, { rules: { "color-contrast": { enabled: false }, region: { enabled: false } } });
   expect(results.violations).toEqual([]);
 });
+
+// One test per state: each axe run takes seconds on CI, so a loop over them all outlasts the timeout.
+for (const theme of ["slip", "kiln"]) {
+  for (const { label } of SETUP_CASES) {
+    test(`the gallery's setup window, ${label}, in ${theme} passes axe`, async () => {
+      const user = userEvent.setup();
+      render(<Gallery />);
+      await user.click(screen.getByRole("button", { name: `Setup, ${label}, ${theme}` }));
+      const dialog = await screen.findByRole("dialog", { name: "Setup" });
+      if (label === "Overview") expect(dialog.textContent).toContain("not kept at login");
+      if (label === "Engine, guided") expect(within(dialog).getByRole("list", { name: "Setup steps" })).toBeTruthy();
+      if (label === "Ollama installing") expect(dialog.textContent).toContain("==> Pouring");
+      if (label === "Ollama, no Homebrew") expect(within(dialog).getByRole("link", { name: "Open ollama.com/download" })).toBeTruthy();
+      if (label === "Key") expect(dialog.textContent).toContain("golem auth set anthropic");
+      if (label === "Model, downloading") expect(dialog.textContent).toContain("2.1 / 6.6 GB · 12 MB/s");
+      if (label === "Model, download failed") expect(dialog.textContent).toContain("no space left on device");
+      if (label === "Ready") expect(dialog.textContent).toContain("Gemma 4 E4B · saved as default");
+      const results = await axe.run(document.body, { rules: { "color-contrast": { enabled: false }, region: { enabled: false } } });
+      expect(results.violations).toEqual([]);
+      await user.click(within(dialog).getByRole("button", { name: "Close setup" }));
+      await waitFor(() => expect(screen.queryByRole("dialog", { name: "Setup" })).toBeNull());
+    });
+  }
+}
 
 const palettes = [
   ["Palette, all commands", "Commands"],

@@ -288,6 +288,11 @@ function title(listing: ModelListResult, scope: ModelScope): SetupLine[] {
   return [{ kind: "title", text: `Pick a model${engines.length > 0 ? ` · ${engines.join(" + ")}` : ""}` }];
 }
 
+/** The index of the first row a long list shows, so the selected one stays in view. */
+export function firstShown(selected: number, count: number): number {
+  return Math.max(0, Math.min(selected - Math.floor(MAX_ROWS / 2), count - MAX_ROWS));
+}
+
 export function modelLines(listing: ModelListResult | null, scope: ModelScope, state: ModelPanelState, now: number): SetupLine[] {
   if (state.phase === "downloading") {
     return [
@@ -307,7 +312,7 @@ export function modelLines(listing: ModelListResult | null, scope: ModelScope, s
     lines.push({ kind: "text", text: "No model is ready yet. Add an API key, or pick On this Mac.", dim: true });
   }
   // A long list scrolls with the selection, so the window keeps its size.
-  const first = Math.max(0, Math.min(state.selected - Math.floor(MAX_ROWS / 2), choices.length - MAX_ROWS));
+  const first = firstShown(state.selected, choices.length);
   const shown = choices.slice(first, first + MAX_ROWS);
   if (first > 0) {
     lines.push({ kind: "text", text: `  ↑ ${first} more`, dim: true });

@@ -1,0 +1,10 @@
+/* The clay square that pulses while setup works. Reduced motion switches the animation off for the whole page. */
+.setup-pulse {
+  animation: setup-pulse 1s steps(2, jump-none) infinite;
+}
+
+@keyframes setup-pulse {
+  50% {
+    opacity: 0.3;
+  }
+}

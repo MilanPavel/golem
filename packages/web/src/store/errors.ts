@@ -1,4 +1,5 @@
-import { RpcError, SESSION_BUSY } from "@golem/client";
+import { MODEL_NOT_CONFIGURED, RpcError, SESSION_BUSY } from "@golem/client";
+import { NO_MODEL_NOTICE, noModelChosen } from "@golem/view";
 
 const INVALID_PARAMS = -32602;
 
@@ -9,8 +10,16 @@ export function isInvalidParams(error: unknown): error is RpcError {
   return error instanceof RpcError && error.code === INVALID_PARAMS;
 }
 
+/** The daemon refused a message because no model was ever chosen: the setup window picks one. */
+export function isNoModelChosen(error: unknown): boolean {
+  return error instanceof RpcError && noModelChosen(error.code, error.message, MODEL_NOT_CONFIGURED);
+}
+
 /** One short line for a message that could not be sent. */
 export function sendErrorText(error: unknown): string {
+  if (isNoModelChosen(error)) {
+    return NO_MODEL_NOTICE;
+  }
   if (error instanceof RpcError) {
     return error.code === SESSION_BUSY ? SESSION_BUSY_TEXT : error.message;
   }
