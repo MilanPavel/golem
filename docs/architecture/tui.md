@@ -52,7 +52,7 @@ Several open problems are the same in every terminal agent:
 
 ::: golem In golem
 
-golem's terminal app is a fold over the daemon's event stream, in three TypeScript packages ([ADR-005](../adr/005-client-package.md)). The web UI, the next chapter, shares the lower two.
+golem's terminal app is a fold over the daemon's event stream, in three TypeScript packages ([ADR-005](../adr/005-client-package.md)). [The web UI](./web.md), the next chapter, shares the lower two.
 
 - **`@golem/client` keeps the link.** It sends `hello`, then a `ping` every 5 s, and drops a link whose reply doesn't come within 10 s. It reconnects after a wait that starts at up to 200 ms and doubles up to 5 s. For each session it follows, it remembers the newest `seq` it delivered. After a reconnect it attaches again from that `seq`, and `Attachments.accept` drops any event at or below it ([ADR-007](../adr/007-attach-and-fan-out.md)).
 - **`@golem/view` folds.** `reduceChat` takes the chat and one event and returns the next chat. `createDeltaBatcher` collects `message.delta` text for 16 ms and hands it over as one update. The composer's commands and the setup window are here too, with no React, DOM, or Node code.
@@ -273,7 +273,7 @@ The client does not build the transcript. It hands each `event` line to `App`. I
 
 ## Read more
 
-- Next: *The web UI*: a browser on a local socket (chapter 13, coming next).
+- Next: [The web UI](./web.md): a browser on a local socket.
 - Before: [MCP](./mcp.md).
 - [The protocol](./protocol.md): `seq`, attach, and replay, which this screen folds.
 - [Sessions that survive](./sessions.md): the event log the replay reads.
