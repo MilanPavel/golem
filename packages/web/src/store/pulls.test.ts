@@ -198,3 +198,25 @@ test("after the link drops, the rows go back to the listing until progress comes
   progress(2_000, 5_000);
   expect(pulls.getSnapshot().active.get(REF)?.track.completed).toBe(2_000);
 });
+
+test("defaultWhenDone sets the default when the download ends well, and not when it fails, stops, or is aborted", async () => {
+  const { fake, pulls, done } = setup();
+  pulls.defaultWhenDone(REF, "local");
+  done(true);
+  await Promise.resolve();
+  expect(fake.raw.setDefaultModel).toHaveBeenCalledWith("local");
+
+  fake.raw.setDefaultModel.mockClear();
+  pulls.defaultWhenDone(REF, "local");
+  done(false, "no space");
+  pulls.defaultWhenDone(REF, "local");
+  done(false, "cancelled");
+  pulls.defaultWhenDone(REF, "local");
+  pulls.abort(REF);
+  done(true);
+  pulls.defaultWhenDone(REF, "local");
+  pulls.forget(REF);
+  done(true);
+  await Promise.resolve();
+  expect(fake.raw.setDefaultModel).not.toHaveBeenCalled();
+});

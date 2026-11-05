@@ -1,5 +1,6 @@
-import type { OllamaInstallUpdate } from "@golem/client";
-import { visibleText } from "@golem/view";
+import { type InstallEvent, installEventOf, visibleText } from "@golem/view";
+
+export { type InstallEvent, installEventOf };
 
 /**
  * The band while Ollama installs. The daemon runs `brew install ollama`
@@ -19,11 +20,6 @@ export type InstallState =
   | { phase: "failed"; lines: string[]; reason: string }
   | { phase: "stopped"; lines: string[] }
   | { phase: "no_brew" };
-
-export type InstallEvent =
-  | { kind: "output"; text: string }
-  | { kind: "exit"; code: number | null; stopped: boolean }
-  | { kind: "error"; message: string };
 
 export type BandLine = { text: string; tone: "title" | "output" | "ok" | "error" | "hint" };
 
@@ -106,21 +102,6 @@ export function installLines(state: InstallState, columns: number, rows: number)
   const shown = room === 0 ? [] : output.filter((line) => line.length > 0).slice(-room);
   const lines = [...head, ...shown.map((text): BandLine => ({ text, tone: "output" })), ...tail];
   return lines.slice(0, rows).map((line) => ({ ...line, text: fit(line.text, width) }));
-}
-
-/** One update from the daemon's install, as the band's reducer reads it. */
-export function installEventOf(update: OllamaInstallUpdate): InstallEvent {
-  if (update.kind === "output") {
-    return { kind: "output", text: update.text };
-  }
-  switch (update.done.outcome) {
-    case "installed":
-      return { kind: "exit", code: 0, stopped: false };
-    case "stopped":
-      return { kind: "exit", code: null, stopped: true };
-    case "failed":
-      return { kind: "error", message: update.done.reason ?? "brew install ollama failed" };
-  }
 }
 
 function withPartial(state: { lines: string[]; partial: string }): string[] {

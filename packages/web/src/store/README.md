@@ -6,8 +6,9 @@ Session stores, the live store, the query client, and the router.
 - `session-list.ts`: the live session list, and `groupByFolder` for the sidebar.
 - `new-session.ts`: the folder the next new session gets: a pick, else the last opened session's, else the newest session's.
 - `drafts.ts`: the unsent text and its long pastes per session id (or `"new"`), in memory only.
-- `errors.ts`: reads a failed call: `isInvalidParams`, and `sendErrorText` for the line under the composer.
-- `models.ts`: the model listing's types and its query key.
+- `errors.ts`: reads a failed call: `isInvalidParams`, `isNoModelChosen` (a send that setup answers), and `sendErrorText` for the line under the composer.
+- `setup-start.ts`: whether the page has decided what setup does at its start, kept across the shell's remounts.
+- `models.ts`: the model listing's types and the query keys of the listing and of `setup.status`.
 - `pulls.ts`: the downloads in flight, from every connection, with their speed, the last failures, and the wish to switch a session when one ends well.
 - `query.ts`: the TanStack query client, and the pushed events that mark answers stale.
 - `router.ts`: the current route from `location` and the history.
@@ -15,6 +16,6 @@ Session stores, the live store, the query client, and the router.
 - `login.ts`: takes the login token from the address and trades it for the cookie.
 - `page.ts`: everything the page holds, built on one client, with the session reference counts and the visibility check.
 - `boot.ts`: exchanges the token, makes the client, builds the page.
-- `page-context.tsx`: `PageProvider` and the hooks features use: `useRoute`, `useNavigate`, `useSessionList`, `useSession`, `usePageActions`, `useNewSessionFolder`, `useKnownFolders`, `useRememberOpenedFolder`, `useDraft`, `useDraftPastes`, `useModelList`, `useSkillList`, `useSessionReader`, `usePulls`.
+- `page-context.tsx`: `PageProvider` and the hooks features use: `useRoute`, `useNavigate`, `useSessionList`, `useSession`, `usePageActions`, `useNewSessionFolder`, `useKnownFolders`, `useRememberOpenedFolder`, `useDraft`, `useDraftPastes`, `useModelList`, `useSetupStatus`, `useSetupStart`, `useSkillList`, `useSessionReader`, `usePulls`.
 - `connection-context.tsx`: `ConnectionProvider` and `useConnection`.
 - `test-support.ts`: a fake client and an event builder for tests.

@@ -26,6 +26,8 @@ async function setup(listing: ModelListResult | Error = SAMPLE_LISTING) {
   const doc = new EventTarget() as unknown as Document;
   (doc as { visibilityState: string }).visibilityState = "visible";
   const page = createPage(fake.client, { frame: fakeFrame(), doc });
+  // These listings are about the model dialog, not about what opens at the start.
+  page.setupStart.decide();
   page.start();
   fake.setState({ status: "connected" });
   const view = render(
@@ -536,9 +538,9 @@ test("closing with Esc puts focus back on the chip", async () => {
   expect(document.activeElement).toBe(chip());
 });
 
-test("the list is not fetched until the dialog opens", async () => {
+test("the dialog reads the listing the page already holds, and asks again only when it is refreshed", async () => {
   const { fake } = await setup();
-  expect(fake.raw.listModels).not.toHaveBeenCalled();
+  expect(fake.raw.listModels).toHaveBeenCalledTimes(1);
 });
 
 for (const theme of ["slip", "kiln"]) {

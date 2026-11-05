@@ -69,6 +69,10 @@ export {
   move,
   NO_MODEL_BAND,
   OVERVIEW,
+  daemonServiceRow,
+  KEEP_SERVICE_COMMAND,
+  pageServiceLines,
+  pageServiceRow,
   overviewChoices,
   overviewLines,
   overviewRows,
@@ -119,6 +123,7 @@ export {
   type StepState,
 } from "./setup-window.ts";
 export {
+  firstShown,
   modelBlurb,
   modelChoices,
   modelLines,
@@ -150,8 +155,14 @@ export {
   type PullTrack,
 } from "./setup-local.ts";
 export {
+  ASK_PAGE_KEY,
   HOSTED_PROVIDERS,
   hostedProvider,
+  openPageKey,
+  pageKeyChecked,
+  pageKeyCommand,
+  pageKeyLines,
+  pressPageKey,
   KEYCHAIN_HINT_MS,
   keyChecked,
   keychainLines,
@@ -166,6 +177,8 @@ export {
   recommendedHosted,
   type HostedProvider,
   type KeyEffect,
+  type PageKeyEffect,
+  type PageKeyState,
   type KeyInput,
   type KeyState,
 } from "./setup-key.ts";
@@ -176,6 +189,7 @@ export {
   pickerModels,
   pickerName,
   priceLabel,
+  keyMissing,
   providerMissing,
   sizeLabel,
   statusLabel,
@@ -192,6 +206,7 @@ export {
   type CopyMessage,
 } from "./transcript-text.ts";
 export { golemState, type GolemState, type RunPhase } from "./golem-state.ts";
+export { appendInstallOutput, installEventOf, type InstallEvent, type InstallTail } from "./ollama-install.ts";
 export { visibleText } from "./sanitize.ts";
 export { todoLines, todoRows, TODO_ROWS, type TodoItem, type TodoLine, type TodoStatus } from "./todos.ts";
 export {

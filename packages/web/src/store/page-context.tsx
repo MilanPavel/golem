@@ -2,13 +2,14 @@ import { QueryClientProvider, useQuery, type UseQueryResult } from "@tanstack/re
 import { createContext, useCallback, useContext, useSyncExternalStore, type ReactNode } from "react";
 import { useSyncExternalStoreWithSelector } from "use-sync-external-store/with-selector";
 import { ConnectionProvider } from "./connection-context.tsx";
-import { MODEL_LIST_KEY, type ModelListResult } from "./models.ts";
+import { MODEL_LIST_KEY, SETUP_STATUS_KEY, type ModelListResult } from "./models.ts";
 import type { Page, PageActions } from "./page.ts";
 import type { PullsSnapshot } from "./pulls.ts";
 import type { Route } from "./router.ts";
-import type { SessionSummary, SkillListResult } from "@golem/client";
+import type { SessionSummary, SetupStatusResult, SkillListResult } from "@golem/client";
 import type { Pastes } from "@golem/view";
 import { distinctFolders, resolveFolder } from "./new-session.ts";
+import type { SetupStart } from "./setup-start.ts";
 import { initialSessionView, type SessionView } from "./session-store.ts";
 
 const PageContext = createContext<Page | null>(null);
@@ -123,6 +124,12 @@ export function useModelList(enabled = true): UseQueryResult<ModelListResult> {
   return useQuery({ queryKey: [...MODEL_LIST_KEY], queryFn: queries.modelList, enabled });
 }
 
+/** The overview rows: fresh until the model list or the model server changes, shared by every user of the hook. */
+export function useSetupStatus(enabled = true): UseQueryResult<SetupStatusResult> {
+  const { queries } = usePage();
+  return useQuery({ queryKey: [...SETUP_STATUS_KEY], queryFn: queries.setupStatus, enabled });
+}
+
 /**
  * Reads a session's view and its list summary when called, without re-rendering when they
  * change. Null for no session (the empty screen); the view is the initial one until the session opens.
@@ -148,4 +155,9 @@ export function useSkillList(cwd: string | null, enabled = true): UseQueryResult
 export function usePulls(): PullsSnapshot {
   const { pulls } = usePage();
   return useSyncExternalStore(pulls.subscribe, pulls.getSnapshot);
+}
+
+/** Whether the page has decided what setup does at its start, kept across the shell's remounts. */
+export function useSetupStart(): SetupStart {
+  return usePage().setupStart;
 }

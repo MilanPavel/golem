@@ -55,6 +55,15 @@ export function providerMissing(listing: ModelListResult | null, provider: strin
   return listing?.providers.some((item) => item.provider === provider && item.status === "not_installed") ?? false;
 }
 
+/**
+ * True while a hosted provider has no key: the listing says `needs_key`, or says nothing about
+ * it, or there is no listing yet. The page's Key panel waits on this.
+ */
+export function keyMissing(listing: ModelListResult | null, provider: string): boolean {
+  const found = listing?.providers.find((item) => item.provider === provider);
+  return found === undefined || found.status === "needs_key";
+}
+
 /** Groups in display order, filtered by `query` on ref, label, and profile names. */
 export function pickerGroups(listing: ModelListResult, query: string): PickerGroup[] {
   const needle = query.toLowerCase();

@@ -376,7 +376,6 @@ const NOT_YET: [string, string][] = [
   ["/skills", "The skills list is in the terminal for now: run golem, then /skills."],
   ["/permissions", "Rules are shown in the terminal for now: run golem, then /permissions."],
   ["/artifact", "Tool output opens in the terminal for now: run golem, then /artifact."],
-  ["/setup", "Setup is in the terminal for now: run golem, then /setup."],
   ["/sessions", "The sidebar lists your sessions."],
   ["/debug", "The debug panel is in the terminal for now: run golem, then /debug."],
 ];

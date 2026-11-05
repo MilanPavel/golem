@@ -85,22 +85,7 @@ test("without Homebrew the band links the download and runs nothing", () => {
   ]);
 });
 
-test("the daemon's output and its end become the band's events", () => {
-  assert.deepEqual(installEventOf({ kind: "output", text: "==> Pouring\n" }), { kind: "output", text: "==> Pouring\n" });
-  assert.deepEqual(installEventOf({ kind: "done", done: { outcome: "installed" } }), {
-    kind: "exit",
-    code: 0,
-    stopped: false,
-  });
-  assert.deepEqual(installEventOf({ kind: "done", done: { outcome: "stopped" } }), {
-    kind: "exit",
-    code: null,
-    stopped: true,
-  });
-  assert.deepEqual(installEventOf({ kind: "done", done: { outcome: "failed", reason: "code 1: Error: no space" } }), {
-    kind: "error",
-    message: "code 1: Error: no space",
-  });
+test("the daemon's end reaches the band's reducer", () => {
   const done = reduceInstall(startedInstall, installEventOf({ kind: "done", done: { outcome: "installed" } }));
   assert.equal(done.phase, "done");
 });
