@@ -170,7 +170,8 @@ The page keeps retrying behind "daemon down", and the screen goes away by itself
 - `/help` opens a `Commands` dialog with the table grouped as Session, Model, Tools, and View.
 - `/model`, `/close`, `/fork`, `/title`, `/skill`, `/copy`, `/export` (a markdown download), `/time`, and `/todos` act on the page. On the empty screen the ones that need a session say `Start a session first: send a message.`
 - The page has no key entry, so `/login` and `/logout` show the `golem auth` command to copy ([ADR-028](../adr/028-web-gateway.md)).
-- Not on the page yet, so each says where it lives: `/mcp`, `/skills`, `/permissions`, `/artifact`, and `/debug` are in the terminal (run `golem`, then the command); `/sessions` points at the sidebar. The Commands dialog marks the terminal ones `In the terminal for now`.
+- `/mcp add [filesystem|github|fetch]` shows the `golem mcp add` command to copy, with the session's folder for the filesystem one, for the same reason. `/mcp add` alone says servers are added in a terminal.
+- Not on the page yet, so each says where it lives: `/mcp` (but `/mcp add` shows its command), `/skills`, `/permissions`, `/artifact`, and `/debug` are in the terminal (run `golem`, then the command); `/sessions` points at the sidebar. The Commands dialog marks the terminal ones `In the terminal for now`.
 
 ## Type
 

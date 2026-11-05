@@ -45,6 +45,19 @@ export {
   type PinChoices,
   type SkillChoice,
 } from "./commands.ts";
+export {
+  catalogEntry,
+  GITHUB_TOKEN_HINT,
+  MCP_CATALOG,
+  MCP_CATALOG_IDS,
+  mcpNameError,
+  otherSpec,
+  shellQuote,
+  splitCommandLine,
+  type McpAddSpec,
+  type McpCatalogEntry,
+  type McpCatalogId,
+} from "./mcp-catalog.ts";
 export { applySuggestion, moveSuggestion, suggest, type Suggestion, type SuggestCommand } from "./suggest.ts";
 export { connectionLabel, serviceProblem, type ServiceProblem } from "./connection.ts";
 export { parseDiff, type DiffLine, type DiffTone } from "./diff.ts";

@@ -9,9 +9,12 @@ import {
   closedMcpManager,
   detailChoices,
   layoutMcpManager,
-  MCP_HINT,
+  mcpAdded,
+  mcpAddFailed,
+  mcpManagerTyping,
   mcpManagerKeyOf,
   type McpManagerState,
+  openMcpAdd,
   openMcpManager,
   orderedServers,
   pressMcpManager,
@@ -96,12 +99,25 @@ test("the list groups the user's servers, then the project's", () => {
     "  This project (~/app/.golem/config.toml)",
     "  ✔ db      1 tool",
     "",
-    "↑/↓ to navigate · Enter to open · Esc to close",
+    "  + Add a server",
+    "",
+    "↑/↓ to navigate · Enter to open · a to add a server · Esc to close",
   ]);
 });
 
-test("no servers says how to add one, and the wait says so", () => {
-  assert.deepEqual(shown(openMcpManager(), []).slice(0, 4), ["Manage MCP servers", "0 servers", "", MCP_HINT]);
+test("no servers shows the catalog, and the wait says so", () => {
+  const lines = shown(openMcpManager("/Users/me/app"), []);
+  assert.deepEqual(lines.slice(0, 8), [
+    "Manage MCP servers",
+    "0 servers",
+    "",
+    "Add one:",
+    "❯ 1. Filesystem: /Users/me/app",
+    "     Read and write files in the session folder.",
+    "  2. GitHub",
+    "     Repos, issues, and pull requests. Asks for a token.",
+  ]);
+  assert.ok(!lines.join("\n").includes("config.toml"));
   assert.equal(shown(openMcpManager(), null)[2], "asking the daemon…");
 });
 
@@ -196,4 +212,159 @@ test("a long list scrolls to keep the selection on screen", () => {
   const lines = layoutMcpManager({ state, servers: many, error: null, home: HOME, columns: 80, rows: 10 });
   assert.equal(lines.length, 10);
   assert.ok(lines.some((line) => line.selected === true && line.text.startsWith("s15")));
+});
+
+const typed = (text: string) => ({ text });
+const NONE = { kind: "none" } as const;
+
+function pressNone(state: McpManagerState, servers: readonly McpServer[], ...keys: Parameters<typeof pressMcpManager>[2][]) {
+  let current = state;
+  let action: ReturnType<typeof pressMcpManager>["action"] = NONE;
+  for (const key of keys) {
+    ({ state: current, action } = pressMcpManager(current, servers, key));
+  }
+  return { state: current, action };
+}
+
+test("a is Add a server, the last row of the list, and it opens the catalog", () => {
+  const byKey = press(openMcpManager("/f"), "add");
+  assert.deepEqual(byKey.state.view, { kind: "add", selected: 0, error: null });
+  const byRow = press(openMcpManager("/f"), "down", "down", "down", "down", "down", "enter");
+  assert.deepEqual(byRow.state.view, { kind: "add", selected: 0, error: null });
+  assert.deepEqual(press(byKey.state, "back").state.view, { kind: "list", selected: 0 });
+  assert.equal(press(openMcpManager(), "down", "down", "down", "down", "down", "down").state.view.kind, "list");
+});
+
+test("keys: a is add on a list, and text on a prompt", () => {
+  const key = (name: Press["name"], input = "", typing = false) =>
+    mcpManagerKeyOf({ name, input, ctrl: false, meta: false }, typing);
+  assert.equal(key(null, "a"), "add");
+  assert.deepEqual(key(null, "a", true), { text: "a" });
+  assert.deepEqual(key(null, "7", true), { text: "7" });
+  assert.deepEqual(key(null, "ab\n", true), { text: "ab" });
+  assert.equal(key("backspace", "", true), "delete");
+  assert.equal(key("ctrl-u", "", true), "clear");
+  assert.equal(key("up", "", true), null);
+  assert.equal(key("escape", "", true), "back");
+  assert.equal(mcpManagerKeyOf({ name: null, input: "x", ctrl: true, meta: false }, true), null);
+  assert.equal(mcpManagerTyping(openMcpManager()), false);
+  assert.equal(mcpManagerTyping(openMcpAdd("/f", "github").state), true);
+});
+
+test("the empty list takes a number or Enter to pick, and Esc closes", () => {
+  const first = pressNone(openMcpManager("/Users/me/app"), [], 1);
+  assert.deepEqual(first.action, {
+    kind: "add",
+    params: { name: "filesystem", command: "npx", args: ["-y", "@modelcontextprotocol/server-filesystem", "/Users/me/app"] },
+  });
+  assert.deepEqual(first.state.view, {
+    kind: "adding",
+    name: "filesystem",
+    back: { kind: "add", selected: 0, error: null },
+  });
+  assert.deepEqual(pressNone(openMcpManager("/f"), [], "down", "down", "enter").action, {
+    kind: "add",
+    params: { name: "fetch", command: "uvx", args: ["mcp-server-fetch"] },
+  });
+  assert.deepEqual(pressNone(openMcpManager(), [], "back").action, { kind: "close" });
+});
+
+test("the add view picks by Enter or number, and Esc goes back", () => {
+  const view = openMcpAdd("/f", null);
+  assert.deepEqual(view.state.view, { kind: "add", selected: 0, error: null });
+  assert.equal(view.action.kind, "none");
+  assert.deepEqual(press(view.state, 3).action, { kind: "add", params: { name: "fetch", command: "uvx", args: ["mcp-server-fetch"] } });
+  assert.deepEqual(press(view.state, "down", "enter").state.view, { kind: "token", id: "github", value: "", error: null });
+  assert.equal(press(view.state, 4).state.view.kind, "other");
+  assert.equal(press(view.state, 9).state, view.state);
+  assert.deepEqual(shown(view.state, SERVERS).slice(0, 4), [
+    "Add an MCP server",
+    "",
+    "❯ 1. Filesystem: /f",
+    "     Read and write files in the session folder.",
+  ]);
+});
+
+test("/mcp add github goes to the token, which is masked and sent on Enter", () => {
+  const { state } = openMcpAdd("/f", "github");
+  assert.deepEqual(state.view, { kind: "token", id: "github", value: "", error: null });
+  assert.equal(press(state, "enter").action.kind, "none");
+  assert.equal(press(state, typed("  "), "enter").action.kind, "none");
+  const typedIn = press(state, typed("ghp_secret"), typed("12"));
+  const lines = shown(typedIn.state);
+  assert.ok(lines.includes("Token: ••••••••••••"));
+  assert.ok(!lines.join("\n").includes("secret"));
+  assert.ok(lines.join("\n").includes("github.com/settings/personal-access-tokens/new"));
+  assert.ok(lines.join("\n").includes("Pull requests."));
+  const sent = press(typedIn.state, "enter");
+  assert.deepEqual(sent.action, {
+    kind: "add",
+    params: { name: "github", url: "https://api.githubcopilot.com/mcp/", token: "ghp_secret12" },
+  });
+  assert.equal(sent.state.view.kind, "adding");
+  assert.ok(!JSON.stringify(sent.state).includes("secret"));
+  assert.deepEqual(shown(sent.state), ["Add an MCP server", "", "adding github…", "", "Esc is off until the server answers"]);
+});
+
+test("the token prompt edits: delete, clear, and Esc back to the catalog", () => {
+  const { state } = openMcpAdd("/f", "github");
+  const view = (s: McpManagerState) => (s.view.kind === "token" ? s.view.value : null);
+  assert.equal(view(press(state, typed("abc"), "delete").state), "ab");
+  assert.equal(view(press(state, typed("abc"), "clear").state), "");
+  assert.deepEqual(press(state, typed("abc"), "back").state.view, { kind: "add", selected: 1, error: null });
+});
+
+test("a failed add returns to the screen it came from with the daemon's message, and asks again", () => {
+  const sent = press(openMcpAdd("/f", "github").state, typed("tok"), "enter").state;
+  const failed = mcpAddFailed(sent, "an MCP server named github already exists");
+  assert.deepEqual(failed.view, { kind: "token", id: "github", value: "", error: "an MCP server named github already exists" });
+  assert.ok(shown(failed).includes("✘ an MCP server named github already exists"));
+  assert.deepEqual(press(failed, typed("x")).state.view, { kind: "token", id: "github", value: "x", error: null });
+  const fetching = mcpAddFailed(openMcpAdd("/f", "fetch").state, "boom");
+  assert.deepEqual(fetching.view, { kind: "add", selected: 2, error: "boom" });
+  assert.equal(mcpAddFailed(openMcpManager(), "x").view.kind, "list");
+});
+
+test("while adding, keys do nothing", () => {
+  const adding = openMcpAdd("/f", "fetch").state;
+  for (const key of ["up", "down", "enter", "back", "add", 1] as const) {
+    assert.equal(press(adding, key).state, adding);
+    assert.equal(press(adding, key).action.kind, "none");
+  }
+});
+
+test("other asks for a name, then a command or a URL, and says what is wrong", () => {
+  const start = openMcpAdd("/f", "other").state;
+  assert.deepEqual(start.view, { kind: "other", field: "name", name: "", command: "", error: null });
+  const bad = press(start, typed("my server"), "enter").state;
+  assert.equal(bad.view.kind === "other" && bad.view.field, "name");
+  assert.ok(shown(bad).some((line) => line.startsWith("✘ Use letters")));
+  assert.ok(shown(press(start, "enter").state).some((line) => line.startsWith("✘ Give the server a name")));
+  const second = press(start, typed("my-tool"), "enter").state;
+  assert.equal(second.view.kind === "other" && second.view.field, "command");
+  assert.ok(shown(second).includes("❯ Command: "));
+  const empty = press(second, "enter");
+  assert.equal(empty.action.kind, "none");
+  assert.ok(shown(empty.state).some((line) => line.startsWith("✘ Type a command")));
+  const run = press(second, typed("uvx tool 'a b'"), "enter");
+  assert.deepEqual(run.action, { kind: "add", params: { name: "my-tool", command: "uvx", args: ["tool", "a b"] } });
+  const url = press(second, typed("https://x.example/mcp"), "enter");
+  assert.deepEqual(url.action, { kind: "add", params: { name: "my-tool", url: "https://x.example/mcp" } });
+  assert.deepEqual(press(second, "back").state.view, {
+    kind: "other",
+    field: "name",
+    name: "my-tool",
+    command: "",
+    error: null,
+  });
+  assert.deepEqual(press(start, "back").state.view, { kind: "add", selected: 3, error: null });
+});
+
+test("an added server shows in the list, selected", () => {
+  const added: McpServer = { ...git, name: "fetch" };
+  const servers = [...SERVERS, added];
+  const sent = pressNone(openMcpAdd("/f", "fetch").state, servers).state;
+  const state = mcpAdded(sent, servers, "fetch");
+  assert.deepEqual(state.view, { kind: "list", selected: 3 });
+  assert.ok(shown(state, servers).some((line) => line.startsWith("❯ ✔ fetch")));
 });

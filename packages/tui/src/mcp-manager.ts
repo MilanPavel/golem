@@ -1,4 +1,12 @@
-import type { McpServer, McpToolsResult } from "@golem/client";
+import type { McpAddParams, McpServer, McpToolsResult } from "@golem/client";
+import {
+  GITHUB_TOKEN_HINT,
+  MCP_CATALOG,
+  maskKey,
+  mcpNameError,
+  otherSpec,
+  type McpCatalogEntry,
+} from "@golem/view";
 
 import type { Press } from "./keys.ts";
 
@@ -11,14 +19,35 @@ import type { Press } from "./keys.ts";
 export type McpManagerView =
   | { kind: "list"; selected: number }
   | { kind: "detail"; name: string; project: string | null; selected: number }
-  | { kind: "tools"; name: string; project: string | null; offset: number };
+  | { kind: "tools"; name: string; project: string | null; offset: number }
+  /** The built-in servers, to pick one to add. */
+  | { kind: "add"; selected: number; error: string | null }
+  /** A hidden prompt for the token of the catalog entry `id`. The value is never drawn, only masked. */
+  | { kind: "token"; id: string; value: string; error: string | null }
+  /** `other`: a name, then a command line or a URL. */
+  | { kind: "other"; field: "name" | "command"; name: string; command: string; error: string | null }
+  /** The call is running; `back` is the screen to return to if it fails. */
+  | { kind: "adding"; name: string; back: McpManagerView };
 
-export type McpManagerState = { open: boolean; view: McpManagerView; tools: McpToolsResult | null };
+/** `folder` is the session's folder, which the filesystem server is scoped to. */
+export type McpManagerState = { open: boolean; view: McpManagerView; tools: McpToolsResult | null; folder: string };
 
-export const closedMcpManager: McpManagerState = { open: false, view: { kind: "list", selected: 0 }, tools: null };
+export const closedMcpManager: McpManagerState = { open: false, view: { kind: "list", selected: 0 }, tools: null, folder: "" };
 
-/** A digit picks that numbered action on a server's screen. */
-export type McpManagerKey = "up" | "down" | "enter" | "back" | number;
+/**
+ * A digit picks that numbered action on a screen. `add` is the `a` of the list. `text`, `delete`,
+ * and `clear` edit the field of a prompt, where digits and letters are text.
+ */
+export type McpManagerKey =
+  | "up"
+  | "down"
+  | "enter"
+  | "back"
+  | "add"
+  | "delete"
+  | "clear"
+  | { text: string }
+  | number;
 
 export type McpManagerAction =
   | { kind: "none" }
@@ -26,7 +55,9 @@ export type McpManagerAction =
   | { kind: "load-tools"; name: string }
   | { kind: "session"; name: string; on: boolean }
   | { kind: "restart"; name: string }
-  | { kind: "set-enabled"; name: string; enabled: boolean | "on_demand" };
+  | { kind: "set-enabled"; name: string; enabled: boolean | "on_demand" }
+  /** Add a server. `params.token`, when set, is a secret: never show or log it. */
+  | { kind: "add"; params: McpAddParams };
 
 export type McpTone = "ok" | "bad" | "wait" | "off";
 
@@ -41,20 +72,38 @@ export type McpManagerLine = {
   bold?: boolean;
 };
 
-export const MCP_HINT = "Add one to ~/.golem/config.toml as [mcp.<name>] with a command or a url.";
-const LIST_HINT = "↑/↓ to navigate · Enter to open · Esc to close";
+const LIST_HINT = "↑/↓ to navigate · Enter to open · a to add a server · Esc to close";
+const EMPTY_HINT = "↑/↓ to navigate · Enter or 1-4 to add · Esc to close";
+const ADD_HINT = "↑/↓ to navigate · Enter or 1-4 to add · Esc to go back";
+const PROMPT_HINT = "Enter to add · Esc to go back";
+const ADDING_HINT = "Esc is off until the server answers";
 const DETAIL_HINT = "↑/↓ to navigate · Enter to select · Esc to go back";
 const TOOLS_HINT = "↑/↓ to scroll · Esc to go back";
 
 type DetailChoice = { label: string; action: McpManagerAction | "view-tools" };
 
-export function openMcpManager(): McpManagerState {
-  return { open: true, view: { kind: "list", selected: 0 }, tools: null };
+export function openMcpManager(folder = ""): McpManagerState {
+  return { open: true, view: { kind: "list", selected: 0 }, tools: null, folder };
 }
 
-export function mcpManagerKeyOf(press: Press): McpManagerKey | null {
+/** `/mcp add [id]`: the catalog, or straight to the step of one entry, which may add it at once. */
+export function openMcpAdd(folder: string, id: string | null): { state: McpManagerState; action: McpManagerAction } {
+  const entry = MCP_CATALOG.find((item) => item.id === id);
+  const start = openMcpManager(folder);
+  if (entry === undefined) {
+    return { state: { ...start, view: { kind: "add", selected: 0, error: null } }, action: { kind: "none" } };
+  }
+  return startEntry(start, entry);
+}
+
+/** Whether the screen is a prompt, where a key is text and not a command. */
+export function mcpManagerTyping(state: McpManagerState): boolean {
+  return state.open && (state.view.kind === "token" || state.view.kind === "other");
+}
+
+export function mcpManagerKeyOf(press: Press, typing = false): McpManagerKey | null {
   if (press.name === "up" || press.name === "down") {
-    return press.name;
+    return typing ? null : press.name;
   }
   if (press.name === "return") {
     return "enter";
@@ -62,10 +111,133 @@ export function mcpManagerKeyOf(press: Press): McpManagerKey | null {
   if (press.name === "escape") {
     return "back";
   }
+  if (typing) {
+    if (press.name === "backspace") {
+      return "delete";
+    }
+    if (press.name === "ctrl-u" || press.name === "ctrl-w") {
+      return "clear";
+    }
+    const text = press.input.replace(/[\r\n]/g, "");
+    if ((press.name === null || press.name === "question") && !press.ctrl && !press.meta && text.length > 0) {
+      return { text };
+    }
+    return null;
+  }
   if (!press.ctrl && !press.meta && /^[1-9]$/.test(press.input)) {
     return Number(press.input);
   }
+  if (!press.ctrl && !press.meta && press.input === "a") {
+    return "add";
+  }
   return null;
+}
+
+/** The server was added: the list, with the new server selected. */
+export function mcpAdded(state: McpManagerState, servers: readonly McpServer[], name: string): McpManagerState {
+  const index = orderedServers(servers).findIndex((server) => server.name === name && !server.project);
+  return { ...state, view: { kind: "list", selected: Math.max(0, index) }, tools: null };
+}
+
+/** The call failed: back to the screen it came from, with the daemon's message. Anything else is left alone. */
+export function mcpAddFailed(state: McpManagerState, message: string): McpManagerState {
+  const view = state.view;
+  if (view.kind !== "adding") {
+    return state;
+  }
+  const back = view.back;
+  const shown = back.kind === "add" || back.kind === "token" || back.kind === "other" ? { ...back, error: message } : back;
+  return { ...state, view: shown };
+}
+
+function startEntry(state: McpManagerState, entry: McpCatalogEntry): { state: McpManagerState; action: McpManagerAction } {
+  const none = { kind: "none" } as const;
+  if (entry.params === null) {
+    return { state: { ...state, view: { kind: "other", field: "name", name: "", command: "", error: null } }, action: none };
+  }
+  if (entry.needsToken) {
+    return { state: { ...state, view: { kind: "token", id: entry.id, value: "", error: null } }, action: none };
+  }
+  const params = entry.params(state.folder);
+  const back: McpManagerView = { kind: "add", selected: MCP_CATALOG.indexOf(entry), error: null };
+  return { state: { ...state, view: { kind: "adding", name: params.name, back } }, action: { kind: "add", params } };
+}
+
+function pressAdd(
+  state: McpManagerState,
+  view: Extract<McpManagerView, { kind: "add" }>,
+  key: McpManagerKey,
+  onEmptyList: boolean,
+): { state: McpManagerState; action: McpManagerAction } {
+  const none = { kind: "none" } as const;
+  const selected = clamp(view.selected, MCP_CATALOG.length);
+  if (key === "back") {
+    return onEmptyList
+      ? { state: closedMcpManager, action: { kind: "close" } }
+      : { state: { ...state, view: { kind: "list", selected: 0 } }, action: none };
+  }
+  if (key === "up" || key === "down") {
+    const next = clamp(selected + (key === "up" ? -1 : 1), MCP_CATALOG.length);
+    return { state: { ...state, view: { kind: "add", selected: next, error: null } }, action: none };
+  }
+  const picked = key === "enter" ? MCP_CATALOG[selected] : typeof key === "number" ? MCP_CATALOG[key - 1] : undefined;
+  return picked === undefined ? { state, action: none } : startEntry(state, picked);
+}
+
+function pressPrompt(
+  state: McpManagerState,
+  view: Extract<McpManagerView, { kind: "token" | "other" }>,
+  key: McpManagerKey,
+): { state: McpManagerState; action: McpManagerAction } {
+  const none = { kind: "none" } as const;
+  const at = (next: McpManagerView) => ({ state: { ...state, view: next }, action: none });
+  const field = view.kind === "token" ? view.value : view.field === "name" ? view.name : view.command;
+  const withField = (value: string): McpManagerView =>
+    view.kind === "token"
+      ? { ...view, value, error: null }
+      : view.field === "name"
+        ? { ...view, name: value, error: null }
+        : { ...view, command: value, error: null };
+  if (typeof key === "object") {
+    return at(withField(field + key.text));
+  }
+  if (key === "delete") {
+    return at(withField([...field].slice(0, -1).join("")));
+  }
+  if (key === "clear") {
+    return at(withField(""));
+  }
+  if (key === "back") {
+    if (view.kind === "other" && view.field === "command") {
+      return at({ ...view, field: "name", error: null });
+    }
+    return at(view.kind === "token" ? { kind: "add", selected: 1, error: null } : { kind: "add", selected: 3, error: null });
+  }
+  if (key !== "enter") {
+    return { state, action: none };
+  }
+  if (view.kind === "token") {
+    const token = view.value.trim();
+    const entry = MCP_CATALOG.find((item) => item.id === view.id);
+    if (token.length === 0 || entry?.params == null) {
+      return { state, action: none };
+    }
+    // The typed value is dropped from the state as the call starts, so a failure asks again.
+    const params = { ...entry.params(state.folder), token };
+    const back: McpManagerView = { kind: "token", id: view.id, value: "", error: null };
+    return { state: { ...state, view: { kind: "adding", name: params.name, back } }, action: { kind: "add", params } };
+  }
+  if (view.field === "name") {
+    const name = view.name.trim();
+    const error = mcpNameError(name);
+    return error === null ? at({ ...view, name, field: "command", error: null }) : at({ ...view, error });
+  }
+  const spec = otherSpec(view.name, view.command);
+  if ("error" in spec) {
+    return at({ ...view, error: spec.error });
+  }
+  const back: McpManagerView = { ...view, error: null };
+  return { state: { ...state, view: { kind: "adding", name: view.name, back } }, action: { kind: "add", params: spec.spec } };
 }
 
 /** The user's servers first, then the project's, each sorted by name, as the list shows them. */
@@ -83,19 +255,40 @@ export function pressMcpManager(
   const none = { kind: "none" } as const;
   const view = state.view;
   const ordered = orderedServers(servers);
+  if (view.kind === "adding") {
+    return { state, action: none };
+  }
+  if (view.kind === "add") {
+    return pressAdd(state, view, key, false);
+  }
+  if (view.kind === "token" || view.kind === "other") {
+    return pressPrompt(state, view, key);
+  }
   if (view.kind === "list") {
-    const selected = clamp(view.selected, ordered.length);
+    if (ordered.length === 0) {
+      // Nothing to manage: the list is the catalog.
+      return pressAdd(state, { kind: "add", selected: view.selected, error: null }, key, true);
+    }
+    // The last row is "Add a server".
+    const rows = ordered.length + 1;
+    const selected = clamp(view.selected, rows);
     if (key === "back") {
       return { state: closedMcpManager, action: { kind: "close" } };
     }
+    if (key === "add") {
+      return { state: { ...state, view: { kind: "add", selected: 0, error: null } }, action: none };
+    }
     if (key === "up" || key === "down") {
-      const next = clamp(selected + (key === "up" ? -1 : 1), ordered.length);
+      const next = clamp(selected + (key === "up" ? -1 : 1), rows);
       return { state: { ...state, view: { kind: "list", selected: next } }, action: none };
     }
     const server = ordered[selected];
     if (key === "enter" && server !== undefined) {
       const detail: McpManagerView = { kind: "detail", name: server.name, project: server.project ?? null, selected: 0 };
       return { state: { ...state, view: detail }, action: none };
+    }
+    if (key === "enter") {
+      return { state: { ...state, view: { kind: "add", selected: 0, error: null } }, action: none };
     }
     return { state, action: none };
   }
@@ -124,7 +317,8 @@ export function pressMcpManager(
     const selected = clamp(view.selected + (key === "up" ? -1 : 1), choices.length);
     return { state: { ...state, view: { ...view, selected } }, action: none };
   }
-  const picked = key === "enter" ? choices[clamp(view.selected, choices.length)] : choices[key - 1];
+  const picked =
+    key === "enter" ? choices[clamp(view.selected, choices.length)] : typeof key === "number" ? choices[key - 1] : undefined;
   if (picked === undefined) {
     return { state, action: none };
   }
@@ -174,17 +368,25 @@ export function layoutMcpManager(input: {
   const servers = input.servers === null ? null : orderedServers(input.servers);
   let body: McpManagerLine[];
   let hint = LIST_HINT;
-  if (input.error !== null) {
+  const flow = flowLines(state, width);
+  if (flow !== null) {
+    body = flow.lines;
+    hint = flow.hint;
+  } else if (input.error !== null) {
     body = [{ text: "Manage MCP servers", bold: true }, { text: "" }, { text: input.error }];
   } else if (servers === null) {
     body = [{ text: "Manage MCP servers", bold: true }, { text: "" }, { text: "asking the daemon…", dim: true }];
   } else if (state.view.kind === "list") {
-    body = listLines(servers, state.view.selected, home);
+    body = listLines(servers, state.view.selected, home, state.folder);
+    hint = servers.length === 0 ? EMPTY_HINT : LIST_HINT;
   } else {
     const view = state.view;
+    if (view.kind !== "detail" && view.kind !== "tools") {
+      return [];
+    }
     const server = servers.find((item) => item.name === view.name && (item.project ?? null) === view.project);
     if (server === undefined) {
-      body = listLines(servers, 0, home);
+      body = listLines(servers, 0, home, state.folder);
     } else if (view.kind === "detail") {
       body = detailLines(server, view.selected, home);
       hint = DETAIL_HINT;
@@ -201,16 +403,83 @@ export function layoutMcpManager(input: {
   });
 }
 
-function listLines(servers: readonly McpServer[], selected: number, home: string): McpManagerLine[] {
+/** The catalog, numbered, each with its description under it. */
+function catalogLines(selected: number, folder: string): McpManagerLine[] {
+  const chosen = clamp(selected, MCP_CATALOG.length);
+  return MCP_CATALOG.flatMap((entry, index): McpManagerLine[] => [
+    {
+      text: `${index + 1}. ${entry.label(folder)}`,
+      prefix: index === chosen ? "❯ " : "  ",
+      selected: index === chosen,
+    },
+    { text: entry.description, prefix: "     ", dim: true },
+  ]);
+}
+
+/** The screens of adding a server, or null when the view is not one of them. */
+function flowLines(state: McpManagerState, width: number): { lines: McpManagerLine[]; hint: string } | null {
+  const view = state.view;
+  const title: McpManagerLine = { text: "Add an MCP server", bold: true };
+  const failure = (error: string | null): McpManagerLine[] =>
+    error === null ? [] : [{ text: "" }, { text: error, mark: { text: "✘", tone: "bad" } }];
+  if (view.kind === "add") {
+    return { lines: [title, { text: "" }, ...catalogLines(view.selected, state.folder), ...failure(view.error)], hint: ADD_HINT };
+  }
+  if (view.kind === "adding") {
+    return { lines: [title, { text: "" }, { text: `adding ${view.name}…`, dim: true }], hint: ADDING_HINT };
+  }
+  if (view.kind === "token") {
+    const entry = MCP_CATALOG.find((item) => item.id === view.id);
+    const lines: McpManagerLine[] = [
+      { text: `Add ${entry?.label(state.folder) ?? view.id}`, bold: true },
+      { text: "" },
+      ...wrap(GITHUB_TOKEN_HINT, width).map((text) => ({ text, dim: true })),
+      { text: "" },
+      { text: `Token: ${maskKey(view.value)}` },
+      { text: "Stored in your Keychain, never in a file.", dim: true },
+      ...failure(view.error),
+    ];
+    return { lines, hint: PROMPT_HINT };
+  }
+  if (view.kind === "other") {
+    const lines: McpManagerLine[] = [
+      title,
+      { text: "" },
+      { prefix: view.field === "name" ? "❯ " : "  ", text: `Name:    ${view.name}` },
+    ];
+    if (view.field === "command") {
+      lines.push({ prefix: "❯ ", text: `Command: ${view.command}` });
+      lines.push({ text: "A command line, or an https:// URL. For a token, use golem mcp add --token.", dim: true });
+    }
+    return { lines: [...lines, ...failure(view.error)], hint: PROMPT_HINT };
+  }
+  return null;
+}
+
+function wrap(text: string, width: number): string[] {
+  const lines: string[] = [];
+  let line = "";
+  for (const word of text.split(" ")) {
+    if (line.length > 0 && line.length + 1 + word.length > width) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = line.length === 0 ? word : `${line} ${word}`;
+    }
+  }
+  return line.length > 0 ? [...lines, line] : lines;
+}
+
+function listLines(servers: readonly McpServer[], selected: number, home: string, folder: string): McpManagerLine[] {
   const lines: McpManagerLine[] = [
     { text: "Manage MCP servers", bold: true },
     { text: `${servers.length} ${servers.length === 1 ? "server" : "servers"}`, dim: true },
   ];
   if (servers.length === 0) {
-    return [...lines, { text: "" }, { text: MCP_HINT }];
+    return [...lines, { text: "" }, { text: "Add one:", bold: true }, ...catalogLines(selected, folder)];
   }
   const nameWidth = Math.max(...servers.map((server) => server.name.length));
-  const chosen = clamp(selected, servers.length);
+  const chosen = clamp(selected, servers.length + 1);
   let group: string | null | undefined;
   servers.forEach((server, index) => {
     const source = server.project ?? null;
@@ -227,6 +496,10 @@ function listLines(servers: readonly McpServer[], selected: number, home: string
       dim: server.state === "disabled",
     });
   });
+  lines.push(
+    { text: "" },
+    { text: "+ Add a server", prefix: chosen === servers.length ? "❯ " : "  ", selected: chosen === servers.length },
+  );
   return lines;
 }
 

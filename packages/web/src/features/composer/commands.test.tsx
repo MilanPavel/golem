@@ -370,9 +370,28 @@ test("a clipboard that fails selects the command and does not throw", async () =
   expect(window.getSelection()?.toString()).toBe("golem auth set openai");
 });
 
+test("/mcp add shows the golem command to run in a terminal", async () => {
+  const { user } = await session();
+  await say(user, "/mcp add github");
+  const line = within(screen.getByText(/Add it in a terminal\./).closest("p") as HTMLElement);
+  expect(screen.getByText(/asks for the token/)).toBeTruthy();
+  expect(line.getByText("golem mcp add github --url https://api.githubcopilot.com/mcp/ --token").tagName).toBe("CODE");
+  await say(user, "/mcp add fetch");
+  expect(screen.getByText("golem mcp add fetch -- uvx mcp-server-fetch")).toBeTruthy();
+  await say(user, "/mcp add filesystem");
+  expect(
+    screen.getByText(`golem mcp add filesystem -- npx -y @modelcontextprotocol/server-filesystem ${CWD}`),
+  ).toBeTruthy();
+  await say(user, "/mcp add");
+  expect(screen.getByText(/MCP servers are added in a terminal\. Pick one: \/mcp add filesystem, github, or fetch/)).toBeTruthy();
+  expect(screen.getByText("golem mcp add <name> -- <command…>")).toBeTruthy();
+  await say(user, "/mcp add other");
+  expect(screen.getByText("golem mcp add <name> -- <command…>")).toBeTruthy();
+});
+
 const NOT_YET: [string, string][] = [
-  ["/mcp", "MCP servers are managed in the terminal for now: run golem, then /mcp."],
-  ["/mcp enable x", "MCP servers are managed in the terminal for now: run golem, then /mcp."],
+  ["/mcp", "MCP servers are managed in the terminal for now: run golem, then /mcp. To add one, use /mcp add."],
+  ["/mcp enable x", "MCP servers are managed in the terminal for now: run golem, then /mcp. To add one, use /mcp add."],
   ["/skills", "The skills list is in the terminal for now: run golem, then /skills."],
   ["/permissions", "Rules are shown in the terminal for now: run golem, then /permissions."],
   ["/artifact", "Tool output opens in the terminal for now: run golem, then /artifact."],

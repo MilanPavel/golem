@@ -15,7 +15,7 @@ function inTerminal(what: string, name: string): string {
 }
 
 export const NOT_YET = {
-  mcp: inTerminal("MCP servers are managed", "/mcp"),
+  mcp: `${inTerminal("MCP servers are managed", "/mcp")} To add one, use /mcp add.`,
   skills: inTerminal("The skills list is", "/skills"),
   permissions: inTerminal("Rules are shown", "/permissions"),
   artifact: inTerminal("Tool output opens", "/artifact"),

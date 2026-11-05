@@ -78,6 +78,7 @@ Type `/` and suggestions appear, with each command's arguments. `/help` lists ev
 | `/skill pin <name>`, `/skill unpin <name>` | Keep a skill on for the whole chat, or turn it off |
 | `/skill` | List the pinned skills |
 | `/mcp` | Manage MCP servers: view tools, reconnect, turn on or off |
+| `/mcp add [filesystem\|github\|fetch\|other]` | Add a server from a short list. The web UI shows the `golem mcp add` command instead |
 | `/mcp enable <name>`, `/mcp disable <name>` | Turn a server on or off for this chat |
 
 [Tools and permissions](./permissions.md), [Skills](./skills.md), and [MCP servers](./mcp.md) have the details.
