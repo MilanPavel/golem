@@ -24,6 +24,7 @@ For someone who wants to use golem today.
 | MCP servers | [guide/mcp.md](guide/mcp.md) | |
 | Skills | [guide/skills.md](guide/skills.md) | |
 | The web UI | [guide/web.md](guide/web.md) | |
+| Settings: every key in `config.toml` | [guide/settings.md](guide/settings.md) | |
 
 ## How golem works
 

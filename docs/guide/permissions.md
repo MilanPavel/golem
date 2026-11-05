@@ -109,7 +109,7 @@ writable = ["~/scratch"]
 timeout_seconds = 300
 ```
 
-The `[shell]` settings are read only from your own `config.toml`. A project cannot widen them. Restart the daemon after changing them.
+The `[shell]` settings are read only from your own `config.toml`. A project cannot widen them. A change applies from the next command.
 
 ## The web
 
