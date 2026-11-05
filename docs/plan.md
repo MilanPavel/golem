@@ -106,7 +106,7 @@ Rules:
 
 A new user types `brew install milanpavel/golem/golem` and `golem`, and nothing else, to reach a first answer, local or hosted, in the TUI or the browser. Steps 1.1 to 1.6 are built. The details are in [#62](https://github.com/MilanPavel/golem/issues/62) and in each step's issue, and every ticket is a sub-issue of its step. One ticket per commit and per PR. This section keeps the why.
 
-Today, after `brew install`, nothing starts the daemon, and `golem` says `reconnecting` forever. A daemon that crashes at start looks the same. On a fresh Mac the model picker shows models marked `down`. A hosted model takes Esc, `/login`, a paste, and `/model` again, and a wrong key shows up only on the first message. Sending with no model says to edit config.toml. MCP needs TOML by hand, and no skills ship with golem.
+Today, after `brew install`, nothing starts the daemon, and `golem` says `reconnecting` forever. A daemon that crashes at start looks the same. On a fresh Mac the model picker shows models marked `down`. A hosted model takes Esc, `/login`, a paste, and `/model` again, and a wrong key shows up only on the first message. Sending with no model says to edit config.toml. MCP has three hard-coded servers to pick from, no edit, test, logs, import, or OAuth, and nothing in the web UI, and no skills ship with golem.
 
 Choices that hold for the whole phase:
 
@@ -122,11 +122,11 @@ flowchart LR
   s7[1.7 Own service] --> s8[1.8 First-run choices]
   s8 --> s9[1.9 The setup window] --> s14[1.14 Check]
   s9 --> s11[1.11 Empty chat teaches]
-  s12[1.12 MCP without TOML] --> s14
+  s9 --> s12[1.12 MCP from anywhere] --> s14
   s13[1.13 Starter skills] --> s14
 ```
 
-1.12 and 1.13 do not depend on the others. Do 1.8.1 and 1.8.2 before 10.10 ([#183](https://github.com/MilanPavel/golem/issues/183)), so the web model page is built on them.
+1.13 does not depend on the others. 1.12.3 to 1.12.5 can start at any time, and 1.12.6 waits for 1.9. Do 1.8.1 and 1.8.2 before 10.10 ([#183](https://github.com/MilanPavel/golem/issues/183)), so the web model page is built on them.
 
 ### 1.7 golem starts its own service — [#220](https://github.com/MilanPavel/golem/issues/220)
 
@@ -161,10 +161,40 @@ flowchart LR
 
 ### 1.12 MCP without TOML — [#245](https://github.com/MilanPavel/golem/issues/245)
 
-- **Goal:** adding an MCP server never means opening `config.toml`.
-- **You can:** run `golem mcp add`, or `/mcp add`, pick GitHub or the filesystem, and use its tools in the next message.
-- **Build:** `golem mcp add|remove` writing `[mcp.<name>]` through `config_edit.py`, and `/mcp add` with a short list (filesystem, GitHub, fetch, other) and the hidden key field from 1.9.4.
-- **Done when:** `/mcp add` → GitHub → token → its tools work, with no restart.
+- **Goal:** MCP is one pick away, tested before it is saved, and editable from the terminal or the browser. Nobody has to open `config.toml`, but anyone can, in an editor that checks it.
+- **You can:**
+  - Pick a server from a curated catalog. golem installs Node or uv when the server needs them.
+  - Get a few on-demand servers on day one from the setup window.
+  - Test a server, read its logs, and try a tool.
+  - Edit every setting and hide tools you don't want.
+  - Edit the whole `config.toml`, with errors shown by line.
+  - Import servers from Claude Desktop, Claude Code, Cursor, VS Code, or Windsurf.
+  - Sign in to hosted servers with OAuth.
+  - Let the model ask to turn on an on-demand server.
+
+  All of it works in the TUI, the CLI, and the browser.
+- **Build:** one ticket each. Every issue lists the files, functions, RPC shapes, and tests.
+  - Built: 1.12.1 ([#246](https://github.com/MilanPavel/golem/issues/246)) `golem mcp add|remove`, and 1.12.2 ([#247](https://github.com/MilanPavel/golem/issues/247)) `/mcp add` with filesystem, GitHub, and fetch.
+  - 1.12.3 ([#482](https://github.com/MilanPavel/golem/issues/482)): ADR-037 and `design/mcp.md`, which has every screen.
+  - 1.12.4 ([#483](https://github.com/MilanPavel/golem/issues/483)): `mcp.get`, `mcp.update`, `mcp.add` with every field and project scope, a per-tool include and exclude, a per-server approval default, `env_passthrough`, and `config.raw.get|set`, which validates with line numbers and refuses on a conflict.
+  - 1.12.5 ([#484](https://github.com/MilanPavel/golem/issues/484)): `mcp.test` on an unsaved config, step by step with one hint; `mcp.logs` and a live log; `mcp.call` to try a tool; `golem doctor --mcp`.
+  - 1.12.6 ([#485](https://github.com/MilanPavel/golem/issues/485)): the catalog as daemon data, with about 13 entries, input forms, and `mcp.catalog`; `runtime.install` for Node and uv; and a Tools panel in the setup window.
+  - 1.12.7 ([#486](https://github.com/MilanPavel/golem/issues/486)): import from other apps' `mcpServers` JSON, with secrets moved to the Keychain, and export.
+  - 1.12.8 ([#487](https://github.com/MilanPavel/golem/issues/487)): `/mcp` v2 and `/config` in the TUI, and the full `golem mcp` CLI.
+  - 1.12.9 ([#488](https://github.com/MilanPavel/golem/issues/488)): a web Settings view, with MCP servers and a config editor.
+  - 1.12.10 ([#489](https://github.com/MilanPavel/golem/issues/489)): OAuth for remote servers.
+  - 1.12.11 ([#490](https://github.com/MilanPavel/golem/issues/490)): the model turns on an on-demand server with `mcp_enable`, after an approval.
+  - 1.12.12 ([#491](https://github.com/MilanPavel/golem/issues/491)): prompts, resources, and elicitation.
+- **Done when:**
+  - Playwright can be added from the catalog on a Mac without Node, then tested, a tool hidden, its logs read, the server edited, and removed. This works in the TUI and the browser, with no file opened by hand.
+  - A Claude Desktop config imports in one pick.
+  - Linear signs in with OAuth.
+  - A broken `config.toml` edit shows the line and leaves the file as it was.
+- **Watch out:**
+  - ADR-037 lets the browser add, edit, and remove MCP servers, with their tokens, and edit `config.toml`. Model provider keys stay terminal-only ([ADR-028](adr/028-web-gateway.md)).
+  - Node and uv are installed the way 1.9.1 installs Ollama, and the Tools panel goes into 1.9's setup window, so 1.12.6 starts after 1.9.
+  - The web MCP view moved here from 10.11.
+  - 1.12.12 may slip to a later phase.
 
 ### 1.13 Starter skills ship with golem — [#248](https://github.com/MilanPavel/golem/issues/248)
 
@@ -361,7 +391,7 @@ flowchart LR
 ### 10.11 Artifacts and settings — [#184](https://github.com/MilanPavel/golem/issues/184)
 
 - **Goal:** the rest of what the TUI can show.
-- **Build:** an artifact viewer, the tool rules, MCP servers, and skills (each a query, refreshed by `mcp.server.status` and `skill.registry.changed`), where each API key is stored (read-only, from `auth.list`), and the wire view with secrets redacted as in the TUI.
+- **Build:** an artifact viewer, the tool rules, and skills (each a query, refreshed by `skill.registry.changed`; MCP servers are in 1.12.9, [#488](https://github.com/MilanPavel/golem/issues/488)), where each API key is stored (read-only, from `auth.list`), and the wire view with secrets redacted as in the TUI.
 - **Done when:** each view matches its TUI command.
 
 ### 10.12 Phone-sized screens and accessibility — [#185](https://github.com/MilanPavel/golem/issues/185)
