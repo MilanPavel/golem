@@ -2,6 +2,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
 import { expect, test } from "vitest";
+import { SETUP_CASES } from "../features/setup/sample.ts";
 import { Gallery } from "./gallery.tsx";
 
 test("the gallery shows both themes and has no accessibility violations", async () => {
@@ -37,12 +38,12 @@ test("the gallery's Commands dialog lists the groups and passes axe", async () =
   expect(results.violations).toEqual([]);
 });
 
+// One test per state: each axe run takes seconds on CI, so a loop over them all outlasts the timeout.
 for (const theme of ["slip", "kiln"]) {
-  test(`the gallery's setup window shows every state in ${theme} and passes axe`, async () => {
-    const { SETUP_CASES } = await import("../features/setup/sample.ts");
-    const user = userEvent.setup();
-    render(<Gallery />);
-    for (const { label } of SETUP_CASES) {
+  for (const { label } of SETUP_CASES) {
+    test(`the gallery's setup window, ${label}, in ${theme} passes axe`, async () => {
+      const user = userEvent.setup();
+      render(<Gallery />);
       await user.click(screen.getByRole("button", { name: `Setup, ${label}, ${theme}` }));
       const dialog = await screen.findByRole("dialog", { name: "Setup" });
       if (label === "Overview") expect(dialog.textContent).toContain("not kept at login");
@@ -57,8 +58,8 @@ for (const theme of ["slip", "kiln"]) {
       expect(results.violations).toEqual([]);
       await user.click(within(dialog).getByRole("button", { name: "Close setup" }));
       await waitFor(() => expect(screen.queryByRole("dialog", { name: "Setup" })).toBeNull());
-    }
-  });
+    });
+  }
 }
 
 const palettes = [
