@@ -1,5 +1,7 @@
 # Vision
 
+![Two ways to see ahead: on parchment the golem gazes into a glowing crystal ball, and across the torn page it wears a VR headset in a neon future](images/vision.svg)
+
 Golem today is one daemon on your Mac and a chat in your terminal. This file is where it could go next: a chat in the browser and in a desktop app, an agent that serves your applications, copies of golem that work on rented machines, an iPhone app, and the core work that all of them stand on.
 
 **This is a vision, not a plan.** Nothing here is built, and only the choices marked *decided* are made. [plan.md](plan.md) lists the planned work, step by step. When a part of this file becomes work, it moves there, and its choices get an ADR in [adr/](adr/README.md).
@@ -17,52 +19,7 @@ Golem today is one daemon on your Mac and a chat in your terminal. This file is 
 | [7. The core keeps growing](#7-the-core-keeps-growing) | Skills, workflows, MLX, Linux and Windows, memory, evals, routing | Spread across every stage |
 | [8. Roadmap](#8-roadmap) | The order, and why | |
 
-Before the chapters, two short sections explain the ideas they all share: [golem in one picture](#golem-in-one-picture) and [one daemon, one protocol, one door](#one-daemon-one-protocol-one-door).
-
----
-
-## Golem in one picture
-
-Golem has four roles. Three of them already have names in [architecture.md](architecture.md). The fourth, the **runner**, is new.
-
-| Role | What it is | Today |
-|---|---|---|
-| **Daemon** | The state: the event log, checkpoints, settings, and the permission rules. It decides what may happen | One per user, on the Mac |
-| **Model server** | Where tokens are made: Ollama, MLX, vLLM, or a hosted API | On the Mac, or a hosted API |
-| **Runner** | Where tool calls run: file tools, the sandboxed shell, git, MCP servers | Inside the daemon |
-| **Clients** | Where you look and decide: the TUI, the `golem` command, later a browser and a phone | On the Mac |
-
-```mermaid
-flowchart LR
-  subgraph clients ["Clients"]
-    tui["TUI"]
-    web["Browser"]
-    phone["iPhone"]
-  end
-  daemon["Daemon<br>event log, checkpoints,<br>permission rules"]
-  model["Model server<br>Ollama, MLX, vLLM, hosted API"]
-  runner["Runner<br>files, shell, git, MCP"]
-  clients <-->|"commands, events"| daemon
-  daemon <-->|"prompts, tokens"| model
-  daemon <-->|"tool calls, results"| runner
-```
-
-Every chapter moves or adds one role. The web UI and the iPhone add clients. Serve mode and spawn start more daemons, on other machines. A remote runner moves tool calls.
-
-One rule holds everywhere: **one writer per session.** A session's event log and the rules that guard it live in exactly one daemon. There can be many clients, and there is never a second copy of the state to keep in sync.
-
-### What is already in place
-
-The hard parts of a golem you can reach from anywhere were built for the terminal, but none of them depend on it:
-
-| Built today | Why it matters later |
-|---|---|
-| The daemon owns the state, and clients only attach ([ADR-001](adr/001-process-split.md)) | A browser, a phone, or a parent golem is just one more client |
-| Every event has a `seq`, and `session.attach` replays from `after_seq` ([ADR-007](adr/007-attach-and-fan-out.md)) | A flaky network or a closed tab costs nothing: reconnect, replay, carry on |
-| The screen is a function of the events ([ADR-003](adr/003-protocol.md)) | Every client reads the same facts |
-| An approval waits for an answer across disconnects and restarts ([ADR-013](adr/013-approvals.md)) | Approving from a phone, or from another machine, needs no change to the run |
-| Message shapes are written once in Python, and generated ([ADR-003](adr/003-protocol.md)) | The same `just gen` can write Swift types and an OpenAPI spec |
-| `session.fork` copies a chat up to one message ([ADR-010](adr/010-fork.md)) | A chat can be cloned and sent to another machine |
+Before the chapters, one short section explains the idea they all share: [one daemon, one protocol, one door](#one-daemon-one-protocol-one-door).
 
 ---
 
