@@ -892,6 +892,43 @@ test("mcp.list reads the servers, and mcp.server.status reaches onMcpStatus", as
   }
 });
 
+test("addMcpServer keeps the token off the wire log, and removeMcpServer reports the secret", async () => {
+  const sent: Record<string, unknown>[] = [];
+  const github = { name: "github", state: "starting", command: "https://example.com/mcp", tools: [] };
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: {
+        "mcp.add": github,
+        "mcp.remove": { name: "github", secret: true },
+      },
+      onRequest: (_socket, method, params) => {
+        if (method.startsWith("mcp.")) {
+          sent.push({ method, ...params });
+        }
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
+  let shown = "";
+  const stop = client.onWire((lines) => {
+    shown = lines.map(formatWireLine).join("\n");
+  });
+  try {
+    const params = { name: "github", url: "https://example.com/mcp", token: "ghp-very-secret" };
+    assert.equal((await client.addMcpServer(params)).state, "starting");
+    assert.deepEqual(await client.removeMcpServer("github"), { name: "github", secret: true });
+    assert.deepEqual(sent, [{ method: "mcp.add", ...params }, { method: "mcp.remove", name: "github" }]);
+    assert.ok(shown.includes("mcp.add"));
+    assert.ok(shown.includes("[redacted]"));
+    assert.ok(!shown.includes("ghp-very-secret"));
+  } finally {
+    stop();
+    client.close();
+    await server.close();
+  }
+});
+
 test("model.server.status reaches onModelServer, and a malformed one does not", async () => {
   const base = { provider: "ollama", base_url: "http://127.0.0.1:11434" };
   const server = await listen((socket) => {

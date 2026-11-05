@@ -5,6 +5,7 @@ import type { McpListResult } from "../../protocol/gen/mcp-list-result.ts";
 import type { McpServer } from "../../protocol/gen/mcp-server.ts";
 import type { ModelServerStatus } from "../../protocol/gen/model-server-status.ts";
 import type { ListedSkill, SkillListResult } from "../../protocol/gen/skill-list-result.ts";
+import type { McpRemoveResult } from "../../protocol/gen/mcp-remove-result.ts";
 import type { McpToggleResult } from "../../protocol/gen/mcp-toggle-result.ts";
 import type { SessionSetSkillsResult } from "../../protocol/gen/session-set-skills-result.ts";
 import type { McpToolsResult } from "../../protocol/gen/mcp-tools-result.ts";
@@ -250,6 +251,10 @@ export function isOllamaInstallDone(value: unknown): value is OllamaInstallDone 
     isRecord(value) &&
     (value["outcome"] === "installed" || value["outcome"] === "failed" || value["outcome"] === "stopped")
   );
+}
+
+export function isMcpRemoveResult(value: unknown): value is McpRemoveResult {
+  return isRecord(value) && typeof value["name"] === "string" && typeof value["secret"] === "boolean";
 }
 
 export function isAuthRemoveResult(value: unknown): value is AuthRemoveResult {

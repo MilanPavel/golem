@@ -236,3 +236,103 @@ async def test_the_manager_lists_tools_restarts_and_turns_a_server_off(short_hom
     finally:
         await client.close()
         await stop_daemon(app, task)
+
+
+async def test_add_starts_a_stdio_server_and_remove_stops_it(short_home: Path) -> None:
+    app, task = await start_daemon(
+        short_home, router=ModelRouter(model=ToolCallingChatModel(replies=[]))
+    )
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        assert await _servers(client) == []
+        added = rpc_result(
+            await client.call(
+                "mcp.add", {"name": "fake", "command": sys.executable, "args": [SERVER]}
+            )
+        )
+        assert added["name"] == "fake"
+        text = (short_home / "config.toml").read_text(encoding="utf-8")
+        assert "[mcp.fake]" in text
+        await _settled(client)
+        [fake] = await _servers(client)
+        assert fake["state"] == "running"
+
+        again = await client.call("mcp.add", {"name": "fake", "command": "other"})
+        assert error_code(again) == INVALID_PARAMS
+
+        removed = rpc_result(await client.call("mcp.remove", {"name": "fake"}))
+        assert removed == {"name": "fake", "secret": False}
+        assert await _servers(client) == []
+        assert "mcp" not in (short_home / "config.toml").read_text(encoding="utf-8")
+        gone = await client.call("mcp.remove", {"name": "fake"})
+        assert error_code(gone) == INVALID_PARAMS
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+
+
+async def test_add_with_a_token_stores_it_and_remove_drops_it(short_home: Path) -> None:
+    secrets = MemorySecrets()
+    app, task = await start_daemon(
+        short_home, router=ModelRouter(model=ToolCallingChatModel(replies=[])), secrets=secrets
+    )
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        web = {"name": "github", "url": "http://127.0.0.1:9/mcp", "token": "ghp-secret"}
+        rpc_result(await client.call("mcp.add", web))
+        assert secrets.secrets == {"mcp/github": "ghp-secret"}
+        text = (short_home / "config.toml").read_text(encoding="utf-8")
+        assert 'Authorization = "Bearer keychain:mcp/github"' in text
+        assert "ghp-secret" not in text
+
+        env = {"name": "tool", "command": sys.executable, "args": [SERVER], "token": "t0k"}
+        rpc_result(await client.call("mcp.add", {**env, "token_env": "API_TOKEN"}))
+        assert secrets.secrets["mcp/tool"] == "t0k"
+        assert 'API_TOKEN = "keychain:mcp/tool"' in (short_home / "config.toml").read_text(
+            encoding="utf-8"
+        )
+
+        removed = rpc_result(await client.call("mcp.remove", {"name": "github"}))
+        assert removed == {"name": "github", "secret": True}
+        assert "mcp/github" not in secrets.secrets
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+
+
+async def test_add_with_a_bad_combination_writes_nothing(short_home: Path) -> None:
+    secrets = MemorySecrets()
+    app, task = await start_daemon(
+        short_home, router=ModelRouter(model=ToolCallingChatModel(replies=[])), secrets=secrets
+    )
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        url = "http://127.0.0.1:9/mcp"
+        bad: list[dict[str, object]] = [
+            {"name": "x"},
+            {"name": "x", "command": "uvx", "url": url},
+            {"name": "x", "command": "uvx", "token": "t"},
+            {"name": "x", "command": "uvx", "token_env": "TOKEN"},
+            {"name": "x", "url": url, "token_env": "TOKEN"},
+            {"name": "x", "url": "ftp://nope"},
+            {"name": "no_good", "command": "uvx"},
+        ]
+        for params in bad:
+            assert error_code(await client.call("mcp.add", params)) == INVALID_PARAMS, params
+        assert not (short_home / "config.toml").exists()
+        assert secrets.secrets == {}
+
+        # A table the servers skipped still holds the name, and its token stays.
+        secrets.secrets["mcp/old"] = "kept"
+        broken = '[mcp.old]\ncommand = "uvx"\nurl = "http://127.0.0.1:9/mcp"\n'
+        (short_home / "config.toml").write_text(broken, encoding="utf-8")
+        again = {"name": "old", "url": url, "token": "new"}
+        assert error_code(await client.call("mcp.add", again)) == INVALID_PARAMS
+        assert secrets.secrets == {"mcp/old": "kept"}
+        assert (short_home / "config.toml").read_text(encoding="utf-8") == broken
+    finally:
+        await client.close()
+        await stop_daemon(app, task)

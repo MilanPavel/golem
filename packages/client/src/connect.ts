@@ -3,6 +3,8 @@ import type { Dial, Link } from "./link.ts";
 import type { AuthListResult } from "../../protocol/gen/auth-list-result.ts";
 import type { AuthRemoveResult } from "../../protocol/gen/auth-remove-result.ts";
 import type { AuthSetResult } from "../../protocol/gen/auth-set-result.ts";
+import type { McpAddParams } from "../../protocol/gen/mcp-add-params.ts";
+import type { McpRemoveResult } from "../../protocol/gen/mcp-remove-result.ts";
 import type { OllamaInstallCancelResult } from "../../protocol/gen/ollama-install-cancel-result.ts";
 import type { KeychainWait } from "../../protocol/gen/keychain-wait.ts";
 import type { OllamaInstallDone } from "../../protocol/gen/ollama-install-done.ts";
@@ -60,6 +62,7 @@ import {
   isDaemonStatus,
   isHelloResult,
   isMcpListResult,
+  isMcpRemoveResult,
   isMcpServer,
   isMcpToggleResult,
   isSessionSetSkillsResult,
@@ -257,6 +260,10 @@ export interface GolemClient {
   restartMcp(name: string, sessionId?: string): Promise<McpServer>;
   /** Write `enabled` into the file that names the server. It applies at once. */
   setMcpEnabled(name: string, enabled: boolean | "on_demand", sessionId?: string): Promise<McpServer>;
+  /** Add `[mcp.<name>]` to the user's config and start the server. The wire view shows `token` redacted. */
+  addMcpServer(params: McpAddParams): Promise<McpServer>;
+  /** Remove `[mcp.<name>]` from the user's config, stop the server, and drop its stored token. */
+  removeMcpServer(name: string): Promise<McpRemoveResult>;
   /** `mcp.server.status`: a server started, failed, or changed its tools. */
   onMcpStatus(listener: (server: McpServer) => void): () => void;
   /** `model.server.status`: a local model server such as Ollama started, failed, or stopped. */
@@ -1127,6 +1134,17 @@ export function connectGolem(options: ConnectOptions): GolemClient {
     },
     async setMcpEnabled(name: string, enabled: boolean | "on_demand", sessionId?: string): Promise<McpServer> {
       return mcpServerCall("mcp.set_enabled", withSession({ name, enabled }, sessionId));
+    },
+    async addMcpServer(params: McpAddParams): Promise<McpServer> {
+      return mcpServerCall("mcp.add", { ...params });
+    },
+    async removeMcpServer(name: string): Promise<McpRemoveResult> {
+      await ready;
+      const result = await call("mcp.remove", { name });
+      if (!isMcpRemoveResult(result)) {
+        throw new Error("invalid mcp.remove result");
+      }
+      return result;
     },
     onMcpStatus(listener: (server: McpServer) => void): () => void {
       mcpListeners.add(listener);

@@ -43,6 +43,8 @@ METHOD_ACCESS: Final[Mapping[str, Access]] = {
     "mcp.tools": "browser",
     "mcp.restart": "browser",
     "mcp.set_enabled": "browser",
+    "mcp.add": "local",
+    "mcp.remove": "local",
     "skill.list": "browser",
     "session.set_skills": "browser",
     "model.probe": "browser",

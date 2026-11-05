@@ -193,6 +193,15 @@ class McpSupervisor:
             raise McpServerError(f"{name} has no config file to edit")
         return self._user_config
 
+    def config_files(self, name: str) -> list[Path]:
+        """Every file that names a server called ``name``, the user's first."""
+        found = [
+            (project is not None, _project_config(project) if project else self._user_config)
+            for (server, project) in self._servers
+            if server == name
+        ]
+        return [path for _, path in sorted(found, key=lambda item: item[0]) if path is not None]
+
     def status(self, scope: ToolScope, name: str) -> McpServer:
         found = [status for status in self.statuses(scope) if status.name == name]
         if not found:

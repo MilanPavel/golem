@@ -45,4 +45,6 @@ export const BROWSER_METHODS: ReadonlySet<string> = new Set([
 export const LOCAL_ONLY_METHODS: ReadonlySet<string> = new Set([
   "auth.remove",
   "auth.set",
+  "mcp.add",
+  "mcp.remove",
 ]);

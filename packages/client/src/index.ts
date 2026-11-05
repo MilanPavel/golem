@@ -33,6 +33,8 @@ export type { Dial, Link } from "./link.ts";
 export { wsDial } from "./ws-link.ts";
 export type { ModelProbeResult } from "../../protocol/gen/model-probe-result.ts";
 export type { McpListResult } from "../../protocol/gen/mcp-list-result.ts";
+export type { McpAddParams } from "../../protocol/gen/mcp-add-params.ts";
+export type { McpRemoveResult } from "../../protocol/gen/mcp-remove-result.ts";
 export type { McpServer } from "../../protocol/gen/mcp-server.ts";
 export type { KeychainWait } from "../../protocol/gen/keychain-wait.ts";
 export type { ModelServerStatus } from "../../protocol/gen/model-server-status.ts";

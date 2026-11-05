@@ -26,6 +26,7 @@ import { formatModels } from "./format-models.ts";
 import { formatSkills } from "./format-skills.ts";
 import { formatStatus } from "./format-status.ts";
 import { formatCliVersion } from "./format-version.ts";
+import { parseMcpArgs } from "./mcp-command.ts";
 import { readChoice } from "./read-choice.ts";
 import { readSecret } from "./read-secret.ts";
 import { type Gate, gateService, type SessionDaemon } from "./service-gate.ts";
@@ -45,6 +46,7 @@ const USAGE =
   "       golem --version | golem --help | golem status | golem doctor\n" +
   "       golem daemon install|start|stop|restart|uninstall|logs\n" +
   "       golem auth set <provider> [--no-check] | golem auth remove <provider> | golem auth list | golem models [--refresh]\n" +
+  "       golem mcp add <name> -- <command…> [--token-env VAR] | golem mcp add <name> --url <url> [--token] | golem mcp remove <name>\n" +
   "       golem config show [--resolved] | golem skills [list] | golem skills check <path>\n" +
   "       golem web [--port N] [--no-open] [--json]";
 
@@ -74,6 +76,9 @@ async function run(args: string[]): Promise<number> {
   }
   if (command === "auth") {
     return runAuth(rest);
+  }
+  if (command === "mcp") {
+    return runMcp(rest);
   }
   if (command === "models" && (rest.length === 0 || (rest.length === 1 && rest[0] === "--refresh"))) {
     return runModels(rest[0] === "--refresh");
@@ -194,6 +199,55 @@ async function runAuth(given: string[]): Promise<number> {
     if (error instanceof RpcError && error.code === KEY_UNCHECKED) {
       process.stderr.write(`to store it anyway: golem auth set ${provider} --no-check\n`);
     }
+    return 1;
+  } finally {
+    client.close();
+  }
+}
+
+async function runMcp(given: string[]): Promise<number> {
+  const parsed = parseMcpArgs(given);
+  if (parsed.kind === "error") {
+    process.stderr.write(`${parsed.message}\n`);
+    return 1;
+  }
+  let token = "";
+  const wantsToken = parsed.kind === "add" && ("url" in parsed ? parsed.token : parsed.tokenEnv !== null);
+  if (wantsToken) {
+    try {
+      token = await readSecret(`token for ${parsed.name}: `);
+    } catch (error) {
+      process.stderr.write(`${explain(error)}\n`);
+      return 1;
+    }
+    if (token.length === 0) {
+      process.stderr.write("no token given\n");
+      return 1;
+    }
+  }
+  const client = connectOnce();
+  try {
+    if (parsed.kind === "remove") {
+      await client.removeMcpServer(parsed.name);
+      process.stdout.write(`removed ${parsed.name}\n`);
+    } else {
+      const tokenParam = token.length > 0 ? { token } : {};
+      const added = await client.addMcpServer(
+        "url" in parsed
+          ? { name: parsed.name, url: parsed.url, ...tokenParam }
+          : {
+              name: parsed.name,
+              command: parsed.command,
+              args: parsed.args,
+              ...(parsed.tokenEnv === null ? {} : { token_env: parsed.tokenEnv }),
+              ...tokenParam,
+            },
+      );
+      process.stdout.write(`added ${parsed.name} · ${added.state}\n`);
+    }
+    return 0;
+  } catch (error) {
+    process.stderr.write(`${explainClient(error)}\n`);
     return 1;
   } finally {
     client.close();
