@@ -12,7 +12,8 @@ test("each session number gets the next tip, and the list starts over", () => {
   assert.equal(tipAt(Number.NaN), TIPS[0]);
 });
 
-test("the tips name /mcp, /skills, ? and /sessions", () => {
+test("the first tip names /mcp add, and the tips name /mcp, /skills, ? and /sessions", () => {
+  assert.equal(TIPS[0], "Tip: /mcp add connects tools such as GitHub");
   for (const word of ["/mcp", "/skills", "?", "/sessions"]) {
     assert.ok(
       TIPS.some((tip) => tip.includes(word)),

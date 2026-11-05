@@ -48,6 +48,7 @@ Some answers in the TUI and the web UI edit `config.toml` for you. golem keeps y
 - `w` on an approval adds a `[[rule]]` that allows exactly that call.
 - `/permissions` changes or removes a rule.
 - `/mcp` turns a server on or off with `enabled`.
+- `/mcp add` and `golem mcp add` add a `[mcp.<name>]` table, and `golem mcp remove` deletes one.
 
 ## Secrets stay out of the file
 

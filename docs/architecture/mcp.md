@@ -240,6 +240,7 @@ MCP servers are listed with `mcp.list`: each one's name, state (`idle`, `startin
 ### In the TUI and the CLI
 
 - **`/mcp`** opens a manager (`packages/tui/src/mcp-manager.ts`): the servers grouped by the file that names them, then one server's status, command, file, tools, and token cost, with View tools, Turn on or off for this chat, Reconnect, and Disable everywhere (or Enable, for a disabled one). `/mcp enable|disable <name>` stays as a shortcut.
+- **`/mcp add [id]`**, or **Add a server** (`a`) in the manager, opens the add view: `filesystem` (the session's folder), `github`, `fetch`, and `other`. GitHub goes on to a hidden token prompt, drawn with `maskKey` from the key panel, and `other` asks for a name, then a command line or a URL. The pick sends `mcp.add`, and the daemon's message shows in the view if it fails. With no servers, `/mcp` shows the same list. The list itself is `packages/view/src/mcp-catalog.ts`, shared with the web UI, which cannot send `mcp.add` and shows the `golem mcp add` line instead.
 - **`golem mcp add <name> -- <command…>`** or **`--url <url>`** sends `mcp.add` (`packages/cli/src/mcp-command.ts` reads the arguments). `--token` and `--token-env VAR` ask for the token with hidden input. **`golem mcp remove <name>`** sends `mcp.remove`.
 - **The status line** shows `mcp ✗ <name>` in red while a server the session uses is down.
 - **`golem doctor`** checks each server that may start: its command is found, and its secrets are stored.
@@ -263,7 +264,8 @@ golem's client follows one protocol version. A server that answers with another 
 | `packages/daemon/golem/mcp/launch.py` | Finding the command, the environment, and the Keychain secrets |
 | `packages/daemon/golem/tools/registry.py` | `ToolScope` and `ToolRegistry.scoped` |
 | `packages/daemon/golem/config_edit.py` | `mcp.set_enabled`, `mcp.add`, and `mcp.remove`, written with the comments kept |
-| `packages/tui/src/mcp-manager.ts` | `/mcp` |
+| `packages/tui/src/mcp-manager.ts` | `/mcp`, with the add view |
+| `packages/view/src/mcp-catalog.ts` | The servers `/mcp add` offers, and the `golem mcp add` line for each |
 | `packages/cli/src/mcp-command.ts` | The arguments of `golem mcp add` and `golem mcp remove` |
 
 ## Read more

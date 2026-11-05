@@ -214,9 +214,14 @@ import {
   closedMcpManager,
   layoutMcpManager,
   type McpManagerLine,
+  mcpAdded,
+  mcpAddFailed,
   mcpManagerKeyOf,
+  mcpManagerTyping,
+  type McpManagerAction,
   type McpManagerState,
   type McpTone,
+  openMcpAdd,
   openMcpManager,
   pressMcpManager,
 } from "./mcp-manager.ts";
@@ -1293,10 +1298,21 @@ export function App({
       setDraft(draftAt(""));
       setKeysOpen(false);
       setSwitcher(closedSwitcher);
-      const opened = openMcpManager();
+      const opened = openMcpManager(sessionCwdRef.current ?? process.cwd());
       mcpManagerRef.current = opened;
       setMcpManager(opened);
       loadMcp();
+      return;
+    }
+    if (outcome.kind === "mcp-add") {
+      setDraft(draftAt(""));
+      setKeysOpen(false);
+      setSwitcher(closedSwitcher);
+      const opened = openMcpAdd(sessionCwdRef.current ?? process.cwd(), outcome.id);
+      mcpManagerRef.current = opened.state;
+      setMcpManager(opened.state);
+      loadMcp();
+      runMcpAction(opened.action);
       return;
     }
     if (outcome.kind === "skills") {
@@ -2612,14 +2628,17 @@ export function App({
   }
 
   function onMcpManagerPress(press: Press): void {
-    const key = mcpManagerKeyOf(press);
+    const key = mcpManagerKeyOf(press, mcpManagerTyping(mcpManagerRef.current));
     if (key === null) {
       return;
     }
     const pressed = pressMcpManager(mcpManagerRef.current, mcpRef.current.servers ?? [], key);
     mcpManagerRef.current = pressed.state;
     setMcpManager(pressed.state);
-    const action = pressed.action;
+    runMcpAction(pressed.action);
+  }
+
+  function runMcpAction(action: McpManagerAction): void {
     const session = sessionRef.current ?? undefined;
     const done = (notice: string) => () => {
       setChat((state) => ({ ...state, error: null, notice }));
@@ -2628,7 +2647,24 @@ export function App({
     const failed = (error: unknown) => {
       setChat((state) => ({ ...state, notice: messageOf(error) }));
     };
-    if (action.kind === "load-tools") {
+    if (action.kind === "add") {
+      // The token, if any, goes only to the daemon: not into the chat, a notice, or a log.
+      client.addMcpServer(action.params).then(
+        (server) => {
+          const merged = mergeMcp(mcpRef.current.servers ?? [], server);
+          setMcp({ servers: merged, error: null });
+          const next = mcpAdded(mcpManagerRef.current, merged, server.name);
+          mcpManagerRef.current = next;
+          setMcpManager(next);
+          done(`added ${server.name} · ${server.state}`)();
+        },
+        (error: unknown) => {
+          const next = mcpAddFailed(mcpManagerRef.current, messageOf(error));
+          mcpManagerRef.current = next;
+          setMcpManager(next);
+        },
+      );
+    } else if (action.kind === "load-tools") {
       client.mcpTools(action.name, session).then((tools) => {
         setMcpManager((state) => (state.view.kind === "tools" && state.view.name === action.name ? { ...state, tools } : state));
       }, failed);

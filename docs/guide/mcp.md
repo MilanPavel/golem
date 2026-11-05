@@ -9,6 +9,19 @@ Any [MCP](https://modelcontextprotocol.io) server gives golem new tools: a git s
 
 ## Add a server
 
+### From a chat
+
+Type `/mcp add`. golem shows four choices:
+
+- **Filesystem** lets golem read and write files in the chat's folder.
+- **GitHub** asks for a token. The prompt hides what you type, and the token goes to the Keychain. It says how to make one: at github.com/settings/personal-access-tokens/new, pick the repos under Repository access, then add Contents, Issues, and Pull requests.
+- **Fetch** reads web pages as text.
+- **Other** asks for a name, then a command or a URL. For a token, use `golem mcp add --token` below.
+
+`/mcp add github` goes straight to the token. With no servers yet, `/mcp` shows the same choices. The web UI cannot add a server. `/mcp add` there shows the `golem mcp add` command to copy.
+
+### From a terminal
+
 Run `golem mcp add`. Put the server's command after `--`:
 
 ```bash
