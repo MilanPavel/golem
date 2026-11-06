@@ -13,6 +13,7 @@ from golem.doctor import (
     disk_check,
     mcp_checks,
     model_checks,
+    probe_checks,
     run_checks,
     service_check,
     socket_check,
@@ -20,6 +21,7 @@ from golem.doctor import (
 from golem.models.keys import KeyStoreError, MemoryKeyStore
 from golem.paths import GolemPaths, resolve_paths
 from golem.secrets import MemorySecrets, SecretStoreError
+from golem_protocol.commands import McpServer
 
 THIS = ["/opt/homebrew/opt/golem/libexec/golem-daemon/golem-daemon", "serve"]
 
@@ -399,3 +401,57 @@ def test_a_locked_keychain_fails_the_servers_that_need_a_secret(tmp_path: Path) 
 
     [check] = mcp_checks(settings, FakePlatform(commands={"uvx"}), locked)
     assert (check.status, check.detail) == ("fail", "keychain is unavailable: locked")
+
+
+def test_a_server_the_daemon_runs_shows_how_it_is_doing(tmp_path: Path) -> None:
+    config = (
+        '[mcp.up]\ncommand = "uvx"\n[mcp.down]\ncommand = "uvx"\n'
+        '[mcp.slow]\ncommand = "uvx"\n[mcp.lazy]\ncommand = "uvx"\nenabled = "on_demand"\n'
+    )
+    settings, _ = config_check(_home(tmp_path, config))
+    assert settings is not None
+    live = [
+        McpServer(name="up", state="running", command="uvx", tools=["a", "b"]),
+        McpServer(name="down", state="failed", command="uvx", error="exited with code 2"),
+        McpServer(name="slow", state="starting", command="uvx"),
+        McpServer(name="lazy", state="idle", command="uvx", on_demand=True),
+    ]
+    checks = {
+        c.name: c
+        for c in mcp_checks(settings, FakePlatform(commands={"uvx"}), lambda _n: None, live)
+    }
+    assert (checks["mcp up"].status, checks["mcp up"].detail) == ("ok", "running, 2 tools")
+    assert (checks["mcp down"].status, checks["mcp down"].detail) == (
+        "fail",
+        "exited with code 2",
+    )
+    assert checks["mcp slow"].status == "warn"
+    # An idle on-demand server gets the static check.
+    assert checks["mcp lazy"].detail == "runs /opt/homebrew/bin/uvx"
+    # Without the daemon, the static checks answer.
+    assert mcp_checks(settings, FakePlatform(commands={"uvx"}), lambda _n: None)[0].detail == (
+        "runs /opt/homebrew/bin/uvx"
+    )
+
+
+def test_doctor_mcp_tries_each_enabled_server_and_prints_the_hint(tmp_path: Path) -> None:
+    import json
+    import sys
+
+    server = str(Path(__file__).with_name("fake_mcp_server.py"))
+    config = (
+        f"[mcp.good]\ncommand = {json.dumps(sys.executable)}\nargs = [{json.dumps(server)}]\n"
+        '[mcp.bad]\ncommand = "no-such-mcp-command"\n'
+        '[mcp.off]\ncommand = "nope"\nenabled = false\n'
+    )
+    settings, _ = config_check(_home(tmp_path, config))
+    assert settings is not None
+    bad, good = probe_checks(settings, lambda _name: None)
+    assert (good.name, good.status, good.detail) == ("mcp good", "ok", "fake answers with 9 tools")
+    assert (bad.name, bad.status) == ("mcp bad", "fail")
+    assert bad.detail.startswith("resolve: command not found: no-such-mcp-command")
+    assert bad.fix == "Install no-such-mcp-command, or set command to its full path"
+    probed = run_checks(
+        _home(tmp_path, config), FakePlatform(commands=set()), MemoryKeyStore(), probe_mcp=True
+    )
+    assert [c.name for c in probed if c.name.startswith("mcp ")] == ["mcp bad", "mcp good"]

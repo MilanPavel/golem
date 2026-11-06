@@ -43,7 +43,7 @@ const LAUNCH_AGENT = join(homedir(), "Library", "LaunchAgents", "dev.golem.daemo
 
 const USAGE =
   "usage: golem\n" +
-  "       golem --version | golem --help | golem status | golem doctor\n" +
+  "       golem --version | golem --help | golem status | golem doctor [--mcp]\n" +
   "       golem daemon install|start|stop|restart|uninstall|logs\n" +
   "       golem auth set <provider> [--no-check] | golem auth remove <provider> | golem auth list | golem models [--refresh]\n" +
   "       golem mcp add <name> -- <command…> [--token-env VAR] | golem mcp add <name> --url <url> [--token] | golem mcp remove <name>\n" +
@@ -68,8 +68,8 @@ async function run(args: string[]): Promise<number> {
   if (command === "status") {
     return runStatus();
   }
-  if (command === "doctor" && rest.length === 0) {
-    return runDoctorCommand();
+  if (command === "doctor" && (rest.length === 0 || (rest.length === 1 && rest[0] === "--mcp"))) {
+    return runDoctorCommand(rest.length === 1);
   }
   if (command === "daemon") {
     return runDaemon(rest);
@@ -298,7 +298,7 @@ async function runStatus(): Promise<number> {
   }
 }
 
-async function runDoctorCommand(): Promise<number> {
+async function runDoctorCommand(mcp: boolean): Promise<number> {
   let located: DaemonCommand | { error: string };
   try {
     located = locate();
@@ -309,7 +309,9 @@ async function runDoctorCommand(): Promise<number> {
     cliVersion: GOLEM_VERSION,
     located,
     daemonChecks: async (daemon) =>
-      parseChecks(await captureLocated(daemon.command, [...daemon.args, "doctor"])),
+      parseChecks(
+        await captureLocated(daemon.command, [...daemon.args, "doctor", ...(mcp ? ["--mcp"] : [])]),
+      ),
     readStatus: readDaemonStatus,
   });
   process.stdout.write(`${formatDoctor(checks)}\n`);

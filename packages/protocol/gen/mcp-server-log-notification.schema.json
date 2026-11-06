@@ -1,0 +1,93 @@
+{
+  "$defs": {
+    "McpLogLine": {
+      "additionalProperties": false,
+      "description": "One line of a server's log: its stderr, or something golem did to it.",
+      "properties": {
+        "kind": {
+          "enum": [
+            "stderr",
+            "event"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "number"
+        }
+      },
+      "required": [
+        "ts",
+        "kind",
+        "text"
+      ],
+      "title": "McpLogLine",
+      "type": "object"
+    },
+    "McpServerLog": {
+      "additionalProperties": false,
+      "description": "``mcp.server.log``: new log lines of one server, at most one batch every 250 ms.",
+      "properties": {
+        "lines": {
+          "items": {
+            "$ref": "#/$defs/McpLogLine"
+          },
+          "title": "Lines",
+          "type": "array"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "project": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Project"
+        }
+      },
+      "required": [
+        "name",
+        "lines"
+      ],
+      "title": "McpServerLog",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Server → every connection: new log lines of an MCP server, batched. Not stored.",
+  "properties": {
+    "jsonrpc": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Jsonrpc",
+      "type": "string"
+    },
+    "method": {
+      "const": "mcp.server.log",
+      "default": "mcp.server.log",
+      "title": "Method",
+      "type": "string"
+    },
+    "params": {
+      "$ref": "#/$defs/McpServerLog"
+    }
+  },
+  "required": [
+    "params"
+  ],
+  "title": "McpServerLogNotification",
+  "type": "object"
+}

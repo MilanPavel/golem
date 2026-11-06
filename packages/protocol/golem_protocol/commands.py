@@ -893,6 +893,159 @@ class McpServerDetail(BaseModel):
     secrets: list[McpSecretInfo]
 
 
+McpTestStepName = Literal["resolve", "spawn", "connect", "initialize", "tools", "ping"]
+McpTestStepState = Literal["running", "ok", "failed", "skipped"]
+
+
+class McpTestStep(BaseModel):
+    """One step of ``mcp.test``: what it was, how it ended, and how long it took.
+
+    A stdio server goes ``resolve`` (the command is found), ``spawn``,
+    ``initialize``, ``tools``, ``ping``. An HTTP server goes ``resolve`` (the
+    host is found), ``connect``, then the same three. A step after a failed one
+    is ``skipped``.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    step: McpTestStepName
+    state: McpTestStepState
+    elapsed_ms: int = Field(default=0, ge=0)
+    detail: str | None = None
+
+
+class McpTestParams(BaseModel):
+    """``mcp.test``. Start a server, list its tools, and ping it, without saving anything.
+
+    Give ``name`` for a saved server, or ``config`` for one not saved yet, not
+    both. ``secrets`` (by reference, ``mcp/github``) are used for this test
+    first and then the Keychain, and are never stored. ``test_id`` ties the
+    ``mcp.test.progress`` notifications to this call.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    test_id: str = Field(min_length=1)
+    name: str | None = Field(default=None, min_length=1)
+    config: McpServerConfig | None = None
+    secrets: dict[str, SecretStr] = Field(default_factory=dict[str, SecretStr])
+    session_id: str | None = Field(default=None, min_length=1)
+
+    @model_validator(mode="after")
+    def _one_source(self) -> Self:
+        if (self.name is None) == (self.config is None):
+            raise ValueError("send either name or config")
+        return self
+
+
+class McpTestProgress(BaseModel):
+    """``mcp.test.progress``: a step of a running test started or ended. Not stored."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    test_id: str = Field(min_length=1)
+    step: McpTestStepName
+    state: McpTestStepState
+    elapsed_ms: int = Field(default=0, ge=0)
+    detail: str | None = None
+
+
+class McpImplementation(BaseModel):
+    """The server's own name and version, from its ``initialize`` answer."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str
+    version: str | None = None
+
+
+class McpTestResult(BaseModel):
+    """What ``mcp.test`` found.
+
+    ``steps`` has every step, with the ones after a failure ``skipped``.
+    ``stderr_tail`` is the server's last 50 lines of stderr, with secrets
+    replaced by ``•••``. ``hint`` is one next step for the person, and
+    ``runtime`` says which runtime (``node`` or ``uv``) a UI can offer to
+    install when that is the hint.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    test_id: str = Field(min_length=1)
+    ok: bool
+    steps: list[McpTestStep]
+    server_info: McpImplementation | None = None
+    protocol_version: str | None = None
+    tools: list[McpToolInfo] = Field(default_factory=list[McpToolInfo])
+    stderr_tail: list[str] = Field(default_factory=list[str])
+    hint: str | None = None
+    runtime: Literal["node", "uv"] | None = None
+
+
+class McpLogLine(BaseModel):
+    """One line of a server's log: its stderr, or something golem did to it."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    ts: float
+    kind: Literal["stderr", "event"]
+    text: str
+
+
+class McpLogsParams(BaseModel):
+    """``mcp.logs``. The last ``limit`` lines of a server's log, oldest first."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    session_id: str | None = Field(default=None, min_length=1)
+    limit: int = Field(default=200, ge=1, le=500)
+
+
+class McpLogsResult(BaseModel):
+    """The log lines of one server. The daemon keeps 500, across restarts."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    lines: list[McpLogLine]
+
+
+class McpServerLog(BaseModel):
+    """``mcp.server.log``: new log lines of one server, at most one batch every 250 ms."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    project: str | None = None
+    lines: list[McpLogLine]
+
+
+class McpCallParams(BaseModel):
+    """``mcp.call``. Run one tool of a running server, by the server's own tool name.
+
+    It is for a form where a person presses Run, so it asks no approval. It is
+    recorded in no session and the model never sees it.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    tool: str = Field(min_length=1)
+    arguments: dict[str, Any] = Field(default_factory=dict[str, Any])
+    session_id: str | None = Field(default=None, min_length=1)
+
+
+class McpCallResult(BaseModel):
+    """The tool's text, whether it failed, and its structured result when it has one."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    text: str
+    is_error: bool
+    structured: Any | None = None
+
+
 class McpSetEnabledParams(BaseModel):
     """``mcp.set_enabled``. Write ``enabled`` into the file that names the server.
 
@@ -1400,17 +1553,30 @@ __all__ = [
     "ListedProvider",
     "ListedSkill",
     "McpAddParams",
+    "McpCallParams",
+    "McpCallResult",
+    "McpImplementation",
     "McpListParams",
     "McpListResult",
+    "McpLogLine",
+    "McpLogsParams",
+    "McpLogsResult",
     "McpRemoveParams",
     "McpRemoveResult",
     "McpSecretInfo",
     "McpServer",
     "McpServerConfig",
     "McpServerDetail",
+    "McpServerLog",
     "McpServerParams",
     "McpServerState",
     "McpSetEnabledParams",
+    "McpTestParams",
+    "McpTestProgress",
+    "McpTestResult",
+    "McpTestStep",
+    "McpTestStepName",
+    "McpTestStepState",
     "McpToggleParams",
     "McpToggleResult",
     "McpToolFilterConfig",

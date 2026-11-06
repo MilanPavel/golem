@@ -1,0 +1,30 @@
+{
+  "additionalProperties": false,
+  "description": "The tool's text, whether it failed, and its structured result when it has one.",
+  "properties": {
+    "is_error": {
+      "title": "Is Error",
+      "type": "boolean"
+    },
+    "structured": {
+      "anyOf": [
+        {},
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Structured"
+    },
+    "text": {
+      "title": "Text",
+      "type": "string"
+    }
+  },
+  "required": [
+    "text",
+    "is_error"
+  ],
+  "title": "McpCallResult",
+  "type": "object"
+}

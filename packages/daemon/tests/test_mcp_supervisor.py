@@ -10,6 +10,7 @@ from collections.abc import AsyncIterator, Callable
 from pathlib import Path
 
 import pytest
+from pydantic import BaseModel
 
 from golem.config import McpServerSettings
 from golem.mcp import McpServerError, McpSupervisor, Timing
@@ -35,6 +36,12 @@ def _settings(*flags: str, **extra: object) -> McpServerSettings:
 def _toml(name: str, *flags: str, extra: str = "") -> str:
     args = json.dumps([SERVER, *flags])
     return f"[mcp.{name}]\ncommand = {json.dumps(sys.executable)}\nargs = {args}\n{extra}"
+
+
+def _keep(sent: list[McpServerStatusNotification], note: BaseModel) -> None:
+    """Keep the status notifications. Log batches come on the same channel."""
+    if isinstance(note, McpServerStatusNotification):
+        sent.append(note)
 
 
 async def _until(check: Callable[[], bool], timeout: float = 10) -> None:
@@ -71,7 +78,7 @@ async def test_servers_start_fail_and_report_each_change(running: list[McpSuperv
             "missing": McpServerSettings(command="no-such-mcp-server"),
             "off": _settings(enabled=False),
         },
-        broadcast=lambda note: sent.append(note),  # pyright: ignore[reportArgumentType]
+        broadcast=lambda note: _keep(sent, note),
         timing=Timing(backoff_first=60),
     )
     running.append(supervisor)
@@ -165,7 +172,7 @@ async def test_a_server_that_exits_comes_back_on_its_own(running: list[McpSuperv
     sent: list[McpServerStatusNotification] = []
     supervisor = McpSupervisor(
         {"fake": _settings()},
-        broadcast=lambda note: sent.append(note),  # pyright: ignore[reportArgumentType]
+        broadcast=lambda note: _keep(sent, note),
         timing=FAST,
     )
     running.append(supervisor)
@@ -190,7 +197,7 @@ async def test_a_server_that_stops_answering_is_started_again(running: list[McpS
     timing = Timing(backoff_first=0.05, health_seconds=0.1, ping_seconds=0.2)
     supervisor = McpSupervisor(
         {"fake": _settings("--deaf")},
-        broadcast=lambda note: sent.append(note),  # pyright: ignore[reportArgumentType]
+        broadcast=lambda note: _keep(sent, note),
         timing=timing,
     )
     running.append(supervisor)
