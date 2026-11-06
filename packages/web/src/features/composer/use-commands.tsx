@@ -29,6 +29,7 @@ import { CloseSessionDialog, useSessionActions } from "../sessions/index.ts";
 import { downloadText, writeClipboard } from "./copy-text.ts";
 import { CommandsDialog } from "./help-dialog.tsx";
 import type { CommandNotice } from "./notice-line.tsx";
+import { settingsPath } from "../../store/router.ts";
 import { NEEDS_SESSION, NOT_YET } from "./terminal-only.ts";
 
 /**
@@ -161,7 +162,8 @@ export function useCommands({ session, cwd, typing, send }: UseCommandsOptions):
           case "skills":
             return say(NOT_YET.skills);
           case "permissions":
-            return say(NOT_YET.permissions);
+            navigate(settingsPath("rules"));
+            return "handled";
           case "artifact":
             return say(NOT_YET.artifact);
           case "setup":

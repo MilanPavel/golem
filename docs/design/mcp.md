@@ -652,7 +652,7 @@ Enter sends · Esc declines
 
 ## J · The browser
 
-Everything in A to I is also in the browser, in one place: **Settings** ([web.md](web.md#the-settings-page)). It is two sections in the Settings list, **MCP servers** (`/settings/mcp`) and **Config file** (`/settings/config`), beside Setup and Appearance. It is the same view with the same words, drawn the way [the web UI](web.md) draws everything: a quiet reading column, one clay accent, and the status words next to every colour.
+Everything in A to I is also in the browser, in one place: **Settings** ([web.md](web.md#the-settings-page)). It is two sections in the Settings list, **MCP servers** (`/settings/mcp`) and **Config file** (`/settings/config`), beside Setup, Tool rules, and Appearance. It is the same view with the same words, drawn the way [the web UI](web.md) draws everything: a quiet reading column, one clay accent, and the status words next to every colour.
 
 ### Where it opens
 

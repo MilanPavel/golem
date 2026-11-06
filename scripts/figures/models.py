@@ -72,7 +72,7 @@ def where() -> str:
         column(228, "HOSTED", "pay per token", "the model runs on the provider's servers", "A hosted API", "anthropic · openai · …",
                ["big and fast", "needs an API key", "the conversation leaves your Mac"], 0.0, local=False)
         + '<path class="wire" d="M440 32 V438"/>'
-        + column(652, "LOCAL", "free", "the model runs on your own Mac", "A local server", "ollama · lm studio",
+        + column(652, "LOCAL", "free", "the model runs on your own Mac", "A local server", "ollama",
                  ["private, and works offline", "no account, no key", "needs memory and disk"], 0.5, local=True)
     )
     return card(448, "Where a model runs: a hosted API on the provider's servers, paid per token, or a local server on your own Mac, free and private. In both, the request goes down and the tokens stream back.", body)
@@ -80,7 +80,7 @@ def where() -> str:
 
 # --- The router ---------------------------------------------------------------------------
 
-ROWS = [("ollama", "this Mac"), ("anthropic", "API key"), ("openai", "API key"), ("openrouter", "API key")]
+ROWS = [("ollama", "this Mac"), ("anthropic", "API key"), ("openai", "API key"), ("google", "API key")]
 ROW_Y = [158, 208, 258, 308]
 
 

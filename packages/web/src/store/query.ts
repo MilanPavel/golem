@@ -43,6 +43,9 @@ export function keepQueriesHonest(client: QueryWiringClient, queryClient: QueryC
       stale("setup.status");
     }),
     client.onEvent((event) => {
+      if (event.type === "approval.resolved") {
+        stale("config.get");
+      }
       if (event.type === "session.updated") {
         stale("session.inspect", event.session_id);
       }

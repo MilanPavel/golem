@@ -1,9 +1,10 @@
-import { OLLAMA_FAILED, RpcError, type ApprovalChoice, type GolemClient, type SetupStatusResult, type SkillListResult } from "@golem/client";
+import { OLLAMA_FAILED, RpcError, type ApprovalChoice, type ConfigGetResult, type GolemClient, type SetupStatusResult, type SkillListResult } from "@golem/client";
 import { installEventOf, type InstallEvent } from "@golem/view";
 import type { QueryClient } from "@tanstack/react-query";
 import { createDrafts, type Drafts } from "./drafts.ts";
 import { createConnectionStore, type ConnectionStore } from "./connection.ts";
 import { createNewSessionFolder, type NewSessionFolderStore } from "./new-session.ts";
+import { CONFIG_KEY } from "./config.ts";
 import { MODEL_LIST_KEY, SETUP_STATUS_KEY, type ModelListResult } from "./models.ts";
 import { createPulls, type Pulls } from "./pulls.ts";
 import { createQueryClient, keepQueriesHonest } from "./query.ts";
@@ -38,6 +39,10 @@ export type PageClient = Pick<
   | "listModels"
   | "listSkills"
   | "setSkills"
+  | "getConfig"
+  | "updateRule"
+  | "removeRule"
+  | "revokeAllowance"
   | "setSessionModel"
   | "setDefaultModel"
   | "pullModel"
@@ -80,6 +85,12 @@ export type PageActions = {
   /** Stops a download. Ollama keeps the bytes for the next try. */
   cancelPull(ref: string): Promise<void>;
   remove(ref: string): Promise<void>;
+  /** Sets an existing rule's action. `cwd` goes with a rule of the folder's `.golem/policy.toml` only. */
+  updateRule(target: "user" | "project", index: number, action: "allow" | "ask" | "deny", cwd: string | undefined): Promise<void>;
+  /** Deletes a rule. `cwd` goes with a rule of the folder's `.golem/policy.toml` only. */
+  removeRule(target: "user" | "project", index: number, cwd: string | undefined): Promise<void>;
+  /** Drops something the session allows for the rest of the session. */
+  revokeAllowance(sessionId: string, tool: string, subject: string | null): Promise<void>;
   /** Asks the providers again, past the daemon's cache, puts the answer in the listing, and returns it. */
   refreshModels(): Promise<ModelListResult>;
   /** Starts Ollama. True when it answers afterwards. */
@@ -101,6 +112,8 @@ export type PageQueries = {
   setupStatus(): Promise<SetupStatusResult>;
   /** The skills a folder sees. `null` is no folder. */
   skillList(cwd: string | null): Promise<SkillListResult>;
+  /** The tool rules in check order, and what the session allows. `null` is no folder or no session. */
+  config(cwd: string | null, sessionId: string | null): Promise<ConfigGetResult>;
 };
 
 export type Page = {
@@ -165,6 +178,7 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       modelList: () => client.listModels(),
       setupStatus: () => client.setupStatus(),
       skillList: (cwd) => (cwd === null ? client.listSkills() : client.listSkills(cwd)),
+      config: (cwd, sessionId) => client.getConfig(cwd ?? undefined, sessionId ?? undefined),
     },
     router,
     actions: {
@@ -195,6 +209,29 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       async respond(sessionId, callId, decision, args) {
         if (args === undefined) await client.respondApproval(sessionId, callId, decision);
         else await client.respondApproval(sessionId, callId, decision, args);
+      },
+      async updateRule(target, index, action, cwd) {
+        try {
+          if (cwd === undefined) await client.updateRule(target, index, action);
+          else await client.updateRule(target, index, action, cwd);
+        } finally {
+          await queryClient.invalidateQueries({ queryKey: CONFIG_KEY });
+        }
+      },
+      async removeRule(target, index, cwd) {
+        try {
+          if (cwd === undefined) await client.removeRule(target, index);
+          else await client.removeRule(target, index, cwd);
+        } finally {
+          await queryClient.invalidateQueries({ queryKey: CONFIG_KEY });
+        }
+      },
+      async revokeAllowance(sessionId, tool, subject) {
+        try {
+          await client.revokeAllowance(sessionId, tool, subject);
+        } finally {
+          await queryClient.invalidateQueries({ queryKey: CONFIG_KEY });
+        }
       },
       async useModel(sessionId, name) {
         await client.setSessionModel(sessionId, name);
