@@ -45,7 +45,7 @@ It borrows the calm, centred reading column and generous input from Claude's cha
    268 px            column at most 46 rem                 320 px
 ```
 
-- **Sidebar** (`sunken`): the wordmark with golem's state, New session, a Search button (`Search or run a command`, with its key, ⌘K or Ctrl K) that opens the palette, then sessions grouped by folder. Each session has a small square for its state, its title, and how long ago it was active. A fork is indented under its parent with `⑂`. At the bottom are the Settings button, the connection, the version, and the theme switch. The Settings button has a gear and opens `/settings`. When `setup.status` has a problem, it shows a warning dot (`wait`) and the problem under the name as a line of text, with the same text in its name for a screen reader (`Settings, <problem>`), so colour is not the only signal. While the query loads or if it fails, the button is plain.
+- **Sidebar** (`sunken`): the wordmark with golem's state, New session, a Search button (`Search or run a command`, with its key, ⌘K or Ctrl K) that opens the palette, then sessions grouped by folder. Each session has a small square for its state, its title, and how long ago it was active. A fork is indented under its parent with `⑂`. At the bottom are the Settings button, the connection, and the version. The theme is chosen in Settings. The Settings button has a gear and opens `/settings`. When `setup.status` has a problem, it shows a warning dot (`wait`) and the problem under the name as a line of text, with the same text in its name for a screen reader (`Settings, <problem>`), so colour is not the only signal. While the query loads or if it fails, the button is plain.
 - **Top bar:** the session title, the model chip, the folder chip, and the drawer toggle.
 - **Column:**
   - Your messages are right-aligned slips in `slip`.
@@ -167,7 +167,7 @@ The page keeps retrying behind "daemon down", and the screen goes away by itself
 - **Layout:** a `Settings` heading, a list of sections on the left (`Settings sections`, a link each, the current one marked), and the section's heading and body beside it. Below 768 px the list is a row above the body. The session's top bar is not reused.
 - **Sections:** `Setup` and `Appearance`. A later ticket adds its section with one entry in `sections.ts` and one case in the screen.
   - **Setup:** one status line in mono (`all set`, or the first problem, as the sidebar button shows it) and an `Open setup` button that opens the overview window. The page reads `setup.status` again when the section opens, and again whenever the tab is seen again, because a key set in a terminal pushes no event.
-  - **Appearance:** the theme switch, the same one the sidebar has. A choice in either shows in both.
+  - **Appearance:** the theme: `Match system` (the default, follows the OS), `Light` (`slip`), or `Dark` (`kiln`). The stored value stays `slip` or `kiln`, so an earlier choice holds.
 - **Where it was opened from:** the route carries no session or folder. A session screen remembers its session and folder in memory, so the sections that depend on a folder (tool rules, MCP, skills) use that one, else the folder of the next new session, else none.
 - **Ways in:** the sidebar's Settings button and the palette's `Settings` row. There is no `/settings` slash command, because the terminal has no such page.
 

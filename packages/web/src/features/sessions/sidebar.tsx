@@ -10,7 +10,6 @@ import { Link } from "../../ui/link.tsx";
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "../../ui/menu.tsx";
 import { PixelGolem } from "../../ui/pixel-golem.tsx";
 import { isMac, modShortcut } from "../../ui/platform.ts";
-import { ThemeSwitch } from "../../theme-switch.tsx";
 import type { ConnectionSnapshot } from "../../store/connection.ts";
 import { useConnection } from "../../store/connection-context.tsx";
 import { useNavigate, useRoute, useSessionList, useSetupStatus } from "../../store/page-context.tsx";
@@ -252,7 +251,7 @@ function SettingsButton({ problem, open, onNavigate }: { problem: string | null;
   );
 }
 
-/** The sidebar of docs/design/web.md: golem's state, New session, sessions by folder, the connection and the theme. */
+/** The sidebar of docs/design/web.md: golem's state, New session, sessions by folder, the connection and Settings. */
 export function SidebarView({
   sessions,
   selectedId,
@@ -320,7 +319,6 @@ export function SidebarView({
       <div className="flex flex-col gap-2 border-t border-line px-2 pt-2.5">
         <SettingsButton problem={problem} open={settingsOpen} onNavigate={onNavigate} />
         <ConnectionLine snapshot={connection} />
-        <ThemeSwitch compact />
       </div>
       {actions ? (
         <CloseSessionDialog
