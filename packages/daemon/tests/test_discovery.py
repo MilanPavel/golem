@@ -91,6 +91,17 @@ def _ollama_routes() -> dict[str, Handler]:
     }
 
 
+DEEPSEEK = GolemSettings(
+    providers={
+        "deepseek": ProviderSettings(
+            kind="openai_compat",
+            base_url="https://api.deepseek.com/v1",
+            api_key_env="DEEPSEEK_API_KEY",
+        )
+    }
+)
+
+
 def _discovery(
     router: ModelRouter,
     network: Network,
@@ -241,13 +252,13 @@ async def test_setup_gives_the_default_models_status(tmp_path: Path) -> None:
 
 async def test_a_remote_ollama_is_down_not_missing(tmp_path: Path) -> None:
     settings = GolemSettings(
-        default_model="far/llama3",
-        providers={"far": ProviderSettings(kind="ollama", base_url="http://gpu-box:11434")},
+        default_model="ollama/llama3",
+        providers={"ollama": ProviderSettings(base_url="http://gpu-box:11434")},
     )
     discovery = _discovery(ModelRouter(settings), Network({}), tmp_path, ollama_installed=False)
     listing = await discovery.list()
     states = {p.provider: p.status for p in listing.providers}
-    assert (states["far"], states["ollama"]) == ("server_down", "not_installed")
+    assert states["ollama"] == "server_down"
     await discovery.aclose()
 
 
@@ -265,7 +276,6 @@ async def test_a_provider_without_a_key_is_not_listed(
     assert sonnet.price is not None and sonnet.price.input == pytest.approx(3.0)
     providers = {p.provider: p.status for p in listing.providers}
     assert providers["anthropic"] == "needs_key"
-    assert providers["lmstudio"] == "unlisted"
     assert not any("anthropic" in call for call in network.calls)
     await discovery.aclose()
 
@@ -305,11 +315,11 @@ async def test_anthropic_models_are_listed_with_litellm_prices(
     await discovery.aclose()
 
 
-async def test_openrouter_brings_its_own_prices(tmp_path: Path) -> None:
+async def test_a_provider_list_brings_its_own_prices(tmp_path: Path) -> None:
     body = {
         "data": [
             {
-                "id": "qwen/qwen3-235b-a22b",
+                "id": "deepseek-chat",
                 "name": "Qwen3 235B",
                 "context_length": 131072,
                 "pricing": {"prompt": "0.0000002", "completion": "0.0000006"},
@@ -317,10 +327,10 @@ async def test_openrouter_brings_its_own_prices(tmp_path: Path) -> None:
             }
         ]
     }
-    network = Network({**_ollama_routes(), "openrouter.ai/api/v1/models": _json(body)})
-    store = MemoryKeyStore({"openrouter": "sk-or"})
-    discovery = _discovery(ModelRouter(GolemSettings(), keys=store), network, tmp_path)
-    model = _by_ref((await discovery.list()).models)["openrouter/qwen/qwen3-235b-a22b"]
+    network = Network({**_ollama_routes(), "api.deepseek.com/v1/models": _json(body)})
+    store = MemoryKeyStore({"deepseek": "sk-ds"})
+    discovery = _discovery(ModelRouter(DEEPSEEK, keys=store), network, tmp_path)
+    model = _by_ref((await discovery.list()).models)["deepseek/deepseek-chat"]
     assert model.price is not None
     assert (model.price.input, model.price.output) == (pytest.approx(0.2), pytest.approx(0.6))
     assert (model.ctx, model.tools, model.label) == (131072, True, "Qwen3 235B")
@@ -339,24 +349,24 @@ def test_openai_chat_filter_uses_litellm_then_the_name() -> None:
 async def test_a_hosted_list_is_cached_for_a_day(tmp_path: Path) -> None:
     now = [1000.0]
     network = Network(
-        {**_ollama_routes(), "openrouter.ai/api/v1/models": _json({"data": [{"id": "a/b"}]})}
+        {**_ollama_routes(), "api.deepseek.com/v1/models": _json({"data": [{"id": "a/b"}]})}
     )
-    store = MemoryKeyStore({"openrouter": "sk-or"})
+    store = MemoryKeyStore({"deepseek": "sk-ds"})
     discovery = _discovery(
-        ModelRouter(GolemSettings(), keys=store), network, tmp_path, clock=lambda: now[0]
+        ModelRouter(DEEPSEEK, keys=store), network, tmp_path, clock=lambda: now[0]
     )
     await discovery.list()
     await discovery.list()
-    assert network.calls["openrouter.ai/api/v1/models"] == 1
+    assert network.calls["api.deepseek.com/v1/models"] == 1
     await discovery.aclose()
     reopened = _discovery(
-        ModelRouter(GolemSettings(), keys=store), network, tmp_path, clock=lambda: now[0]
+        ModelRouter(DEEPSEEK, keys=store), network, tmp_path, clock=lambda: now[0]
     )
-    assert "openrouter/a/b" in _by_ref((await reopened.list()).models)
-    assert network.calls["openrouter.ai/api/v1/models"] == 1
+    assert "deepseek/a/b" in _by_ref((await reopened.list()).models)
+    assert network.calls["api.deepseek.com/v1/models"] == 1
     await reopened.list(refresh=True)
-    assert network.calls["openrouter.ai/api/v1/models"] == 2
-    cached = json.loads((tmp_path / "cache" / "models-openrouter.json").read_text())
+    assert network.calls["api.deepseek.com/v1/models"] == 2
+    cached = json.loads((tmp_path / "cache" / "models-deepseek.json").read_text())
     assert cached["models"][0]["model_id"] == "a/b"
     await reopened.aclose()
 
@@ -370,18 +380,18 @@ async def test_a_failed_refresh_keeps_the_cache_and_says_stale(tmp_path: Path) -
             raise httpx.ConnectError("down", request=request)
         return httpx.Response(200, json={"data": [{"id": "a/b"}]})
 
-    network = Network({**_ollama_routes(), "openrouter.ai/api/v1/models": models})
-    store = MemoryKeyStore({"openrouter": "sk-or"})
+    network = Network({**_ollama_routes(), "api.deepseek.com/v1/models": models})
+    store = MemoryKeyStore({"deepseek": "sk-ds"})
     discovery = _discovery(
-        ModelRouter(GolemSettings(), keys=store), network, tmp_path, clock=lambda: now[0]
+        ModelRouter(DEEPSEEK, keys=store), network, tmp_path, clock=lambda: now[0]
     )
     await discovery.list()
     answer["ok"] = False
     now[0] += 2 * 24 * 3600
     listing = await discovery.list()
-    model = _by_ref(listing.models)["openrouter/a/b"]
+    model = _by_ref(listing.models)["deepseek/a/b"]
     assert model.stale
-    assert {p.provider: p.stale for p in listing.providers}["openrouter"]
+    assert {p.provider: p.stale for p in listing.providers}["deepseek"]
     await discovery.aclose()
 
 
@@ -394,13 +404,13 @@ async def test_a_slow_provider_does_not_hold_the_list(tmp_path: Path) -> None:
 
     class SlowTransport(httpx.AsyncBaseTransport):
         async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
-            if request.url.host == "openrouter.ai":
+            if request.url.host == "api.deepseek.com":
                 return await slow(request)
             return Network(_ollama_routes())(request)
 
-    store = MemoryKeyStore({"openrouter": "sk-or"})
+    store = MemoryKeyStore({"deepseek": "sk-ds"})
     discovery = ModelDiscovery(
-        ModelRouter(GolemSettings(), keys=store),
+        ModelRouter(DEEPSEEK, keys=store),
         tmp_path / "cache",
         transport=SlowTransport(),
         ram_gb=36.0,
@@ -410,12 +420,12 @@ async def test_a_slow_provider_does_not_hold_the_list(tmp_path: Path) -> None:
         fetch_prices=False,
     )
     first = await discovery.list()
-    assert "openrouter/a/b" not in _by_ref(first.models)
-    assert {p.provider: p.stale for p in first.providers}["openrouter"]
+    assert "deepseek/a/b" not in _by_ref(first.models)
+    assert {p.provider: p.stale for p in first.providers}["deepseek"]
     release.set()
     await asyncio.sleep(0.05)
     second = await discovery.list()
-    assert "openrouter/a/b" in _by_ref(second.models)
+    assert "deepseek/a/b" in _by_ref(second.models)
     await discovery.aclose()
 
 
@@ -426,9 +436,10 @@ async def test_profiles_alias_and_override_a_listed_model(tmp_path: Path) -> Non
             "qwen": ModelSettings(model="ollama/qwen3:8b", ctx=16384),
             "fast": ModelSettings(model="ollama/qwen3:8b"),
             "paid": ModelSettings(
-                model="lmstudio/local-x", price=ModelPrice(input=1.0, output=2.0)
+                model="deepseek/model-x", price=ModelPrice(input=1.0, output=2.0)
             ),
         },
+        providers=DEEPSEEK.providers,
     )
     network = Network(_ollama_routes())
     discovery = _discovery(ModelRouter(settings), network, tmp_path)
@@ -437,8 +448,8 @@ async def test_profiles_alias_and_override_a_listed_model(tmp_path: Path) -> Non
     assert listing.default == "qwen"
     assert models["ollama/qwen3:8b"].profiles == ("fast", "qwen")
     assert models["ollama/qwen3:8b"].ctx == 16384
-    paid = models["lmstudio/local-x"]
-    assert (paid.source, paid.status) == ("profile", "server_down")
+    paid = models["deepseek/model-x"]
+    assert (paid.source, paid.status) == ("profile", "needs_key")
     assert paid.price == ModelPrice(input=1.0, output=2.0)
     await discovery.aclose()
 

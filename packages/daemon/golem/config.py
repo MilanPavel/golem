@@ -20,7 +20,15 @@ from fnmatch import fnmatchcase
 from pathlib import Path
 from typing import Annotated, Literal, cast
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, TypeAdapter, model_validator
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    TypeAdapter,
+    field_validator,
+    model_validator,
+)
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
@@ -32,6 +40,17 @@ from golem.paths import resolve_paths
 
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
 ModelProvider = Literal["anthropic", "openai", "openai_compat"]
+
+# The hosted providers golem offers, and Ollama for models on this machine.
+HOSTED_PROVIDERS = ("openai", "anthropic", "google", "deepseek", "xai", "moonshot")
+PROVIDER_NAMES = frozenset({*HOSTED_PROVIDERS, "ollama"})
+
+
+def unknown_provider_message(name: str) -> str:
+    """The error for a provider name golem does not offer. It lists the six."""
+    return f"unknown model provider: {name}. Choose one of {', '.join(HOSTED_PROVIDERS)}, or ollama"
+
+
 ProviderKind = Literal["anthropic", "openai", "ollama", "openai_compat"]
 RuleAction = Literal["allow", "ask", "deny"]
 
@@ -367,6 +386,15 @@ class GolemSettings(BaseSettings):
     log_level: Annotated[LogLevel, BeforeValidator(_normalize_log_level)] = "INFO"
     default_model: str | None = Field(default=None, min_length=1)
     providers: dict[str, ProviderSettings] = Field(default_factory=dict)
+
+    @field_validator("providers")
+    @classmethod
+    def _known_providers(cls, value: dict[str, ProviderSettings]) -> dict[str, ProviderSettings]:
+        for name in value:
+            if name not in PROVIDER_NAMES:
+                raise ValueError(unknown_provider_message(name))
+        return value
+
     models: dict[str, ModelSettings] = Field(default_factory=dict)
     # The flat settings from before named profiles. They load as one profile named model_profile.
     model_profile: str | None = Field(default=None, min_length=1)

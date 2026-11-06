@@ -139,7 +139,11 @@ export function SearchList<T extends SearchListItem>({
         onChange={(event) => onQueryChange(event.target.value)}
         onKeyDown={onKeyDown}
       />
-      <div className={cn("min-h-0 overflow-y-auto", listClassName)}>
+      {/* A tab stop, so a list that scrolls can be scrolled without a mouse. The field still takes the keys. */}
+      <div
+        tabIndex={0}
+        className={cn("min-h-0 overflow-y-auto outline-offset-2 outline-clay focus-visible:outline-2", listClassName)}
+      >
         {listed ? (
           <div id={listId} role="listbox" aria-label={label} className="flex flex-col gap-2">
             {sections(items).map((section, at) => {
@@ -162,7 +166,7 @@ export function SearchList<T extends SearchListItem>({
                           onMouseDown={(event) => event.preventDefault()}
                           onClick={() => onActiveChange(item.id)}
                           onDoubleClick={() => onActivate(item)}
-                          className="cursor-default rounded-md px-3 py-2 aria-selected:bg-line"
+                          className="cursor-default rounded-md px-3 py-2 aria-selected:bg-sunken aria-selected:ring-1 aria-selected:ring-line-strong"
                         >
                           {renderItem(item, { active: isActive })}
                         </div>

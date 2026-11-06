@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from golem.cli import main
+from golem.config import unknown_provider_message
 from golem.doctor import (
     MIN_FREE_BYTES,
     Check,
@@ -202,7 +203,7 @@ def test_a_default_that_does_not_resolve_fails(tmp_path: Path) -> None:
         Check(
             "model",
             "fail",
-            "unknown model provider: nowhere",
+            unknown_provider_message("nowhere"),
             "golem, then pick another with /setup",
         ),
         Check("ollama", "ok", "running, 1 model downloaded"),
@@ -318,11 +319,6 @@ def test_a_locked_keychain_fails(tmp_path: Path) -> None:
         "fail",
         "keychain is unavailable: locked",
     )
-
-
-def test_a_local_server_without_a_key_is_ok(tmp_path: Path) -> None:
-    checks = _models(tmp_path, "default_model = 'lmstudio/qwen3'\n", FakePlatform())
-    assert checks[-1] == Check("lmstudio", "ok", "no key needed")
 
 
 @pytest.mark.parametrize(
