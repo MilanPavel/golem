@@ -1,0 +1,199 @@
+{
+  "$defs": {
+    "McpCatalogInput": {
+      "additionalProperties": false,
+      "description": "One thing a catalog entry asks for. A ``secret`` is never stored in the config file.",
+      "properties": {
+        "choices": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Choices",
+          "type": "array"
+        },
+        "default": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Default"
+        },
+        "hint": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Hint"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "path",
+            "text",
+            "secret",
+            "choice"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "label": {
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "required": {
+          "default": true,
+          "title": "Required",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "label"
+      ],
+      "title": "McpCatalogInput",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "A server ``mcp.catalog`` offers, and whether it can be added here and now.\n\n``name`` is the server name it adds. ``runtime`` is what runs it (``npx``,\n``uvx``, ``docker``) or ``url``, and ``auth`` is ``none``, ``token``, or\n``oauth``. ``missing`` names the program (``node``, ``uv``, ``docker``)\nthat is not installed, so a UI can offer ``runtime.install``. ``available``\nis false, with a ``reason``, for an entry that cannot be added yet.\n``added`` is true when a server of that name exists. ``on_demand`` entries\ncost no tokens until a chat turns them on, and ``starter`` ones are\noffered in the setup window.",
+  "properties": {
+    "added": {
+      "default": false,
+      "title": "Added",
+      "type": "boolean"
+    },
+    "auth": {
+      "enum": [
+        "none",
+        "token",
+        "oauth"
+      ],
+      "title": "Auth",
+      "type": "string"
+    },
+    "available": {
+      "default": true,
+      "title": "Available",
+      "type": "boolean"
+    },
+    "category": {
+      "enum": [
+        "files",
+        "code",
+        "web",
+        "data",
+        "productivity",
+        "other"
+      ],
+      "title": "Category",
+      "type": "string"
+    },
+    "description": {
+      "title": "Description",
+      "type": "string"
+    },
+    "homepage": {
+      "title": "Homepage",
+      "type": "string"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "inputs": {
+      "items": {
+        "$ref": "#/$defs/McpCatalogInput"
+      },
+      "title": "Inputs",
+      "type": "array"
+    },
+    "missing": {
+      "anyOf": [
+        {
+          "enum": [
+            "node",
+            "uv",
+            "docker"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Missing"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "on_demand": {
+      "default": true,
+      "title": "On Demand",
+      "type": "boolean"
+    },
+    "reason": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reason"
+    },
+    "runtime": {
+      "enum": [
+        "npx",
+        "uvx",
+        "docker",
+        "url"
+      ],
+      "title": "Runtime",
+      "type": "string"
+    },
+    "starter": {
+      "default": false,
+      "title": "Starter",
+      "type": "boolean"
+    },
+    "title": {
+      "minLength": 1,
+      "title": "Title",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "title",
+    "description",
+    "category",
+    "homepage",
+    "runtime",
+    "auth"
+  ],
+  "title": "McpCatalogEntry",
+  "type": "object"
+}
