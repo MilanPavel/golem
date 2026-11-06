@@ -77,7 +77,7 @@ One write in the project, and four things the sandbox kept out: a write to the h
 
 **Where it lives in the code:**
 
-- `packages/daemon/golem/tools/sandbox.py`: `profile`, `environment`, `available`, `run`, and the folder lists `SECRET_DIRS`, `SKILL_DIRS`, and `CACHE_DIRS`.
+- `packages/daemon/golem/tools/sandbox.py`: `profile`, `environment`, `available`, `run`, `git_dirs`, and the folder lists `SECRET_DIRS`, `SKILL_DIRS`, and `CACHE_DIRS`.
 - `packages/daemon/golem/tools/shell.py`: `shell` and the git tools, which run through it.
 - `packages/daemon/golem/tools/paths.py`: `inside`, `writable`, and `Readable`, the file tools' folder check.
 
@@ -114,7 +114,7 @@ For contributors: the reference for the shell sandbox, the git tools, and the fi
 ### The shell sandbox
 
 `shell` runs the user's login shell (`$SHELL -lc`) in the session folder, under `sandbox-exec` ([ADR-014](../adr/014-shell-sandbox.md)):
-- **The sandbox** allows writes only to the folder, the temp folders, the usual tool caches, and `[shell] writable`. It denies the network unless `[shell] network = true`, except local Unix sockets. It denies reads of folders that hold credentials, `~/.ssh` and `~/.golem` among them, but allows reads of `~/.golem/skills`, so a skill can run its scripts ([ADR-030](../adr/030-skill-read-roots.md)). Variables that look like credentials (`*_API_KEY`, `*_TOKEN`, `*_SECRET`, `*PASSWORD*`) are removed from the environment.
+- **The sandbox** allows writes only to the folder, the temp folders, the usual tool caches, and `[shell] writable`. When the folder is in a git checkout whose git folders are outside it, it may write those too, so `git fetch` and `git commit` work. In a git worktree they are its own folder, from the `gitdir:` line of its `.git` file, and the folder it shares with the main checkout, from `commondir`. The rest of the main checkout stays closed. golem reads the two files itself and does not run git (`sandbox.git_dirs`). The shared folder holds the main checkout's hooks and config, so a command could change them. A command in a plain clone could always do that, since its `.git` is inside the session folder. It denies the network unless `[shell] network = true`, except local Unix sockets. It denies reads of folders that hold credentials, `~/.ssh` and `~/.golem` among them, but allows reads of `~/.golem/skills`, so a skill can run its scripts ([ADR-030](../adr/030-skill-read-roots.md)). Variables that look like credentials (`*_API_KEY`, `*_TOKEN`, `*_SECRET`, `*PASSWORD*`) are removed from the environment.
 - **Policy.** `shell` is not read-only, so by default every command asks. A rule's `match` is checked against the command, so `match = "git status|pnpm test*"` allows those and nothing else. Allowing a command for the session allows that exact command, not every command.
 - **Where there is no sandbox**, for example inside another sandbox or off macOS, `shell` and the git helpers refuse to run and say why.
 
@@ -122,7 +122,7 @@ For contributors: the reference for the shell sandbox, the git tools, and the fi
 
 | | Allowed | Denied |
 |---|---|---|
-| Writes | The session folder, `/private/tmp`, `/private/var/folders`, `~/.cache`, `~/Library/Caches`, `~/.npm`, `~/Library/pnpm`, `~/.cargo/registry`, `[shell] writable`, and a few devices such as `/dev/null` | Everything else |
+| Writes | The session folder, `/private/tmp`, `/private/var/folders`, `~/.cache`, `~/Library/Caches`, `~/.npm`, `~/Library/pnpm`, `~/.cargo/registry`, `[shell] writable`, the checkout's git folders when they are outside the session folder, and a few devices such as `/dev/null` | Everything else |
 | Reads | Everything else, and `~/.golem/skills` | `~/.ssh`, `~/.gnupg`, `~/.aws`, `~/.azure`, `~/.kube`, `~/.docker`, `~/.netrc`, `~/.config/gh`, `~/.config/gcloud`, `~/.golem`, `~/Library/Keychains` |
 | Network | Local Unix sockets, or all of it with `[shell] network = true` | Everything else |
 

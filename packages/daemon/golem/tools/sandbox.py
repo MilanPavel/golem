@@ -3,7 +3,9 @@
 The profile allows what a build or a test run needs and little more:
 
 - **Writes** go only to the session folder, the temp folders, the usual tool
-  caches, and any ``[shell] writable`` folder.
+  caches, and any ``[shell] writable`` folder. When the session folder is in a
+  git checkout whose git folders are outside it, such as a git worktree, those
+  git folders are writable too, so ``git fetch`` and ``git commit`` work.
 - **Network** is denied unless ``[shell] network = true``. Local Unix sockets
   stay open, so a tool can still reach a daemon of its own.
 - **Reads** are allowed, except in folders that hold credentials, golem's own
@@ -95,6 +97,7 @@ def profile(root: Path, settings: ShellSettings, *, home: Path) -> str:
     writable = [root.resolve(), Path("/private/tmp"), Path("/private/var/folders")]
     writable += [(home / name).resolve() for name in CACHE_DIRS]
     writable += [_expand(raw, home) for raw in settings.writable]
+    writable += [folder for folder in git_dirs(root) if not folder.is_relative_to(root.resolve())]
     lines = [
         "(version 1)",
         "(allow default)",
@@ -113,6 +116,41 @@ def profile(root: Path, settings: ShellSettings, *, home: Path) -> str:
     if not settings.network:
         lines += ["(deny network*)", "(allow network* (remote unix-socket))"]
     return "\n".join(lines) + "\n"
+
+
+def git_dirs(root: Path) -> list[Path]:
+    """The git folders of the checkout ``root`` is in, or none outside a checkout.
+
+    A clone has one, ``.git``. A git worktree has a ``.git`` file that points
+    to its own folder, and that folder's ``commondir`` points to the folder it
+    shares with the main checkout. The files are read here, not by running git,
+    so a missing or broken git changes nothing.
+    """
+    start = root.resolve()
+    for folder in (start, *start.parents):
+        dot_git = folder / ".git"
+        if dot_git.is_dir():
+            return [dot_git]
+        if dot_git.is_file():
+            own = _pointed(dot_git, "gitdir:", folder)
+            if own is None:
+                return []
+            common = _pointed(own / "commondir", "", own)
+            return [own] if common is None or common == own else [own, common]
+    return []
+
+
+def _pointed(file: Path, prefix: str, base: Path) -> Path | None:
+    """The folder that ``file`` names after ``prefix``, relative to ``base``, if it exists."""
+    try:
+        text = file.read_text("utf-8").strip()
+    except (OSError, UnicodeDecodeError):
+        return None
+    name = text.removeprefix(prefix).strip()
+    if not text.startswith(prefix) or not name:
+        return None
+    target = (base / name).resolve()
+    return target if target.is_dir() else None
 
 
 def environment(base: dict[str, str], *, home: Path) -> dict[str, str]:
@@ -278,6 +316,7 @@ __all__ = [
     "Finished",
     "available",
     "environment",
+    "git_dirs",
     "profile",
     "run",
 ]

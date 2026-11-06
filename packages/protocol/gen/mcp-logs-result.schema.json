@@ -1,0 +1,55 @@
+{
+  "$defs": {
+    "McpLogLine": {
+      "additionalProperties": false,
+      "description": "One line of a server's log: its stderr, or something golem did to it.",
+      "properties": {
+        "kind": {
+          "enum": [
+            "stderr",
+            "event"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "number"
+        }
+      },
+      "required": [
+        "ts",
+        "kind",
+        "text"
+      ],
+      "title": "McpLogLine",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The log lines of one server. The daemon keeps 500, across restarts.",
+  "properties": {
+    "lines": {
+      "items": {
+        "$ref": "#/$defs/McpLogLine"
+      },
+      "title": "Lines",
+      "type": "array"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "lines"
+  ],
+  "title": "McpLogsResult",
+  "type": "object"
+}

@@ -11,9 +11,12 @@ tests run each check against a fake one.
 
 from __future__ import annotations
 
+import asyncio
+import json
 import os
 import shutil
 import stat
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal, Protocol, cast
@@ -24,6 +27,7 @@ from pydantic import ValidationError
 from golem import launchd
 from golem.config import GolemSettings, load_settings
 from golem.mcp.launch import Secrets, find_command
+from golem.mcp.probe import probe
 from golem.models import ollama
 from golem.models.keys import KeyStore, KeyStoreError
 from golem.models.router import (
@@ -35,6 +39,8 @@ from golem.models.router import (
 )
 from golem.paths import GolemPaths
 from golem.secrets import SecretStoreError
+from golem_protocol.commands import McpListResult, McpServer
+from golem_protocol.version import PROTOCOL_MAJOR
 
 Status = Literal["ok", "warn", "fail"]
 Part = Literal["service", "socket", "config", "engine", "model", "tools", "disk"]
@@ -137,10 +143,16 @@ def run_checks(
     platform: Platform,
     keys: KeyStore,
     secrets: Secrets = lambda _name: None,
+    *,
+    live_mcp: Sequence[McpServer] | None = None,
+    probe_mcp: bool = False,
 ) -> list[Check]:
     """Every check, in the order the checklist shows them.
 
-    ``secrets`` reads the ``mcp/…`` secrets MCP servers name.
+    ``secrets`` reads the ``mcp/…`` secrets MCP servers name. ``live_mcp`` is
+    what the running daemon says about its servers, so a server shows how it
+    is doing and not only that its command exists. ``probe_mcp`` tries each
+    enabled server instead, as ``mcp.test`` does.
     """
     checks = [service_check(platform)]
     socket = socket_check(paths)
@@ -150,7 +162,10 @@ def run_checks(
     checks.append(config)
     if settings is not None:
         checks.extend(model_checks(settings, platform, keys))
-        checks.extend(mcp_checks(settings, platform, secrets))
+        if probe_mcp:
+            checks.extend(probe_checks(settings, secrets))
+        else:
+            checks.extend(mcp_checks(settings, platform, secrets, live_mcp))
     checks.append(disk_check(paths, platform))
     return checks
 
@@ -247,13 +262,30 @@ def model_checks(settings: GolemSettings, platform: Platform, keys: KeyStore) ->
     return checks
 
 
-def mcp_checks(settings: GolemSettings, platform: Platform, secrets: Secrets) -> list[Check]:
-    """One line per MCP server that may start: its command is found, and its secrets stored."""
+def mcp_checks(
+    settings: GolemSettings,
+    platform: Platform,
+    secrets: Secrets,
+    live: Sequence[McpServer] | None = None,
+) -> list[Check]:
+    """One line per MCP server that may start: its command is found, and its secrets stored.
+
+    With ``live``, a server the daemon is running or failed to run says so, with its
+    error. One that is idle (on demand) or unknown to the daemon gets the static checks.
+    """
     checks: list[Check] = []
+    seen = {server.name: server for server in live or [] if server.project is None}
     for name, server in sorted(settings.mcp.items()):
         if server.enabled is False:
             continue
         label = f"mcp {name}"
+        if (running := seen.get(name)) is not None and running.state in (
+            "running",
+            "failed",
+            "starting",
+        ):
+            checks.append(_live_check(label, running))
+            continue
         try:
             missing = [secret for secret in server.secrets if not secrets(secret)]
         except SecretStoreError as exc:
@@ -284,6 +316,78 @@ def mcp_checks(settings: GolemSettings, platform: Platform, secrets: Secrets) ->
             continue
         checks.append(Check(label, "ok", f"runs {found}", part="tools"))
     return checks
+
+
+def _live_check(label: str, server: McpServer) -> Check:
+    if server.state == "running":
+        count = len(server.tools)
+        return Check(
+            label, "ok", f"running, {count} tool" + ("" if count == 1 else "s"), part="tools"
+        )
+    if server.state == "starting":
+        return Check(label, "warn", "still starting", "golem doctor --mcp", "tools")
+    return Check(label, "fail", server.error or "failed", "golem doctor --mcp", "tools")
+
+
+def probe_checks(settings: GolemSettings, secrets: Secrets) -> list[Check]:
+    """Try every enabled MCP server as ``mcp.test`` does, and say what stopped it."""
+
+    async def run() -> list[Check]:
+        checks: list[Check] = []
+        for name, server in sorted(settings.mcp.items()):
+            if server.enabled is False:
+                continue
+            label = f"mcp {name}"
+            try:
+                found = await probe(server, os.environ, secrets)
+            except SecretStoreError as exc:
+                checks.append(
+                    Check(label, "fail", str(exc), "unlock the login Keychain, try again", "tools")
+                )
+                continue
+            if found.ok:
+                said = found.server_name or "the server"
+                count = len(found.tools)
+                detail = f"{said} answers with {count} tool" + ("" if count == 1 else "s")
+                checks.append(Check(label, "ok", detail, part="tools"))
+                continue
+            step = next(step for step in found.steps if step.state == "failed")
+            detail = f"{step.step}: {step.detail}"
+            fix = None if found.hint is None else found.hint.text
+            checks.append(Check(label, "fail", detail, fix, "tools"))
+        return checks
+
+    return asyncio.run(run())
+
+
+def live_mcp(paths: GolemPaths) -> list[McpServer] | None:
+    """The servers the running daemon has, or None when it does not answer."""
+
+    async def ask() -> list[McpServer]:
+        reader, writer = await asyncio.open_unix_connection(str(paths.socket_path))
+
+        async def call(number: int, method: str, params: Mapping[str, object]) -> object:
+            request = {"jsonrpc": "2.0", "id": number, "method": method, "params": params}
+            writer.write(json.dumps(request).encode() + b"\n")
+            await writer.drain()
+            while True:
+                reply: object = json.loads(await reader.readline())
+                if isinstance(reply, dict):
+                    found = cast(dict[str, object], reply)
+                    if found.get("id") == number:
+                        return found.get("result")
+
+        try:
+            hello = {"protocol_major": PROTOCOL_MAJOR, "protocol_minor": 0, "client": "doctor"}
+            await call(1, "hello", hello)
+            return McpListResult.model_validate(await call(2, "mcp.list", {})).servers
+        finally:
+            writer.close()
+
+    try:
+        return asyncio.run(asyncio.wait_for(ask(), 3))
+    except (OSError, ValueError, TimeoutError, ValidationError):
+        return None
 
 
 def disk_check(paths: GolemPaths, platform: Platform) -> Check:
