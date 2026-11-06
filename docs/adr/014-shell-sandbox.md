@@ -33,6 +33,7 @@ flowchart LR
 - **Availability** is probed once per process by applying an empty profile. It fails off macOS, and inside another sandbox, where `sandbox_apply` is not permitted. That is also why the sandbox tests skip when golem's own test suite runs under the shell.
 - **Git.** `git_status`, `git_diff`, and `git_log` run git without a shell, in the same sandbox, with the network off and `core.fsmonitor`, hooks, external diff drivers, and text conversion switched off. A cloned repository's `.git/config` cannot run code through them, so they are read-only and the default policy allows them.
 - **Settings.** `[shell]` is read only from the user's `config.toml`, through the same reader as the tool rules ([ADR-012](012-permission-rules.md)). A project file cannot widen it.
+- **Outside the sandbox.** A command that needs the user's credentials or the network, such as `gh` or `git push`, runs through `shell_unsandboxed`, a tool of its own that asks each time ([ADR-038](038-shell-unsandboxed.md)). `shell` itself still runs only under the sandbox.
 
 ## Other shapes that lost
 

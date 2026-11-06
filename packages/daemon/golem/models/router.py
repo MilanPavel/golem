@@ -60,6 +60,7 @@ OLLAMA_BASE_URL = "http://127.0.0.1:11434"
 GOOGLE_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
 DEEPSEEK_BASE_URL = "https://api.deepseek.com"
 XAI_BASE_URL = "https://api.x.ai/v1"
+MOONSHOT_BASE_URL = "https://api.moonshot.ai/v1"
 
 PRESETS: dict[str, Provider] = {
     "anthropic": Provider(kind="anthropic", api_key_env="ANTHROPIC_API_KEY"),
@@ -69,6 +70,9 @@ PRESETS: dict[str, Provider] = {
         kind="openai_compat", base_url=DEEPSEEK_BASE_URL, api_key_env="DEEPSEEK_API_KEY"
     ),
     "xai": Provider(kind="xai", base_url=XAI_BASE_URL, api_key_env="XAI_API_KEY"),
+    "moonshot": Provider(
+        kind="openai_compat", base_url=MOONSHOT_BASE_URL, api_key_env="MOONSHOT_API_KEY"
+    ),
     "ollama": Provider(kind="ollama", base_url=OLLAMA_BASE_URL),
 }
 

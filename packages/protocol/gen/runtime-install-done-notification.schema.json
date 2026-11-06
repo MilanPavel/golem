@@ -1,0 +1,64 @@
+{
+  "$defs": {
+    "RuntimeInstallDone": {
+      "additionalProperties": false,
+      "description": "The install ended. ``error`` says why when ``ok`` is false, and is null when stopped.",
+      "properties": {
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error"
+        },
+        "name": {
+          "enum": [
+            "node",
+            "uv"
+          ],
+          "title": "Name",
+          "type": "string"
+        },
+        "ok": {
+          "title": "Ok",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "ok"
+      ],
+      "title": "RuntimeInstallDone",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Server → every connection: a Node or uv install ended. Not stored.",
+  "properties": {
+    "jsonrpc": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Jsonrpc",
+      "type": "string"
+    },
+    "method": {
+      "const": "runtime.install.done",
+      "default": "runtime.install.done",
+      "title": "Method",
+      "type": "string"
+    },
+    "params": {
+      "$ref": "#/$defs/RuntimeInstallDone"
+    }
+  },
+  "required": [
+    "params"
+  ],
+  "title": "RuntimeInstallDoneNotification",
+  "type": "object"
+}

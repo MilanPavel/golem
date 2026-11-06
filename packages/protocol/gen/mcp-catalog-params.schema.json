@@ -1,0 +1,21 @@
+{
+  "additionalProperties": false,
+  "description": "``mcp.catalog``. With ``session_id``, ``{folder}`` and ``added`` are about its project.",
+  "properties": {
+    "session_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Session Id"
+    }
+  },
+  "title": "McpCatalogParams",
+  "type": "object"
+}

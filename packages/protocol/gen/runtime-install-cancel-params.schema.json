@@ -1,0 +1,19 @@
+{
+  "additionalProperties": false,
+  "description": "``runtime.install_cancel``. Stop a running install.",
+  "properties": {
+    "name": {
+      "enum": [
+        "node",
+        "uv"
+      ],
+      "title": "Name",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "title": "RuntimeInstallCancelParams",
+  "type": "object"
+}

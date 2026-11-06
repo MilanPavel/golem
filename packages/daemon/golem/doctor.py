@@ -25,9 +25,9 @@ import httpx
 from pydantic import ValidationError
 
 from golem import launchd
-from golem.config import GolemSettings, load_settings
+from golem.config import GolemSettings, McpServerSettings, load_settings
 from golem.mcp.launch import Secrets, find_command
-from golem.mcp.probe import probe
+from golem.mcp.probe import Step, probe, test_hint
 from golem.models import ollama
 from golem.models.keys import KeyStore, KeyStoreError
 from golem.models.router import (
@@ -284,7 +284,7 @@ def mcp_checks(
             "failed",
             "starting",
         ):
-            checks.append(_live_check(label, running))
+            checks.append(_live_check(label, running, server))
             continue
         try:
             missing = [secret for secret in server.secrets if not secrets(secret)]
@@ -309,7 +309,14 @@ def mcp_checks(
             continue
         found = platform.mcp_command(server.command)
         if found is None:
+            hint = test_hint(
+                [Step("resolve", "failed", detail=f"command not found: {server.command}")],
+                [],
+                settings=server,
+            )
             fix = "install it, or set command to its full path in config.toml"
+            if hint is not None and hint.runtime is not None:
+                fix = hint.text
             checks.append(
                 Check(label, "fail", f"command not found: {server.command}", fix, "tools")
             )
@@ -318,7 +325,7 @@ def mcp_checks(
     return checks
 
 
-def _live_check(label: str, server: McpServer) -> Check:
+def _live_check(label: str, server: McpServer, settings: McpServerSettings) -> Check:
     if server.state == "running":
         count = len(server.tools)
         return Check(
@@ -326,7 +333,11 @@ def _live_check(label: str, server: McpServer) -> Check:
         )
     if server.state == "starting":
         return Check(label, "warn", "still starting", "golem doctor --mcp", "tools")
-    return Check(label, "fail", server.error or "failed", "golem doctor --mcp", "tools")
+    error = server.error or "failed"
+    step = "resolve" if error.startswith("command not found") else "initialize"
+    hint = test_hint([Step(step, "failed", detail=error)], [], settings=settings)
+    fix = hint.text if hint is not None else "golem doctor --mcp"
+    return Check(label, "fail", error, fix, "tools")
 
 
 def probe_checks(settings: GolemSettings, secrets: Secrets) -> list[Check]:

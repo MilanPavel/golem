@@ -12,9 +12,22 @@ from pydantic import BaseModel
 from test_doctor import FakePlatform
 from test_server import HELLO, RpcClient, error_code, rpc_result, start_daemon, stop_daemon
 
-from golem.models.install import InstallError, OllamaInstaller, Process, brew_env
+from golem.models.install import (
+    BrewInstaller,
+    InstallError,
+    OllamaInstaller,
+    Process,
+    brew_env,
+    runtime_installer,
+)
 from golem.server.dispatcher import OLLAMA_FAILED
-from golem_protocol.rpc import OllamaInstallDoneNotification, OllamaInstallOutputNotification
+from golem_protocol.commands import RuntimeName
+from golem_protocol.rpc import (
+    OllamaInstallDoneNotification,
+    OllamaInstallOutputNotification,
+    RuntimeInstallDoneNotification,
+    RuntimeInstallOutputNotification,
+)
 
 
 class FakeBrew:
@@ -68,7 +81,7 @@ def _installer(
     return installer, sent, calls
 
 
-async def _ended(installer: OllamaInstaller) -> None:
+async def _ended(installer: BrewInstaller) -> None:
     for _ in range(100):
         if not installer.running:
             return
@@ -173,6 +186,86 @@ async def test_setup_status_sends_the_doctor_checks(
         assert by_name["disk"]["part"] == "disk"
         assert "ollama" in by_name
         assert by_name["ollama"]["part"] == "engine"
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+
+
+def _runtime(
+    name: str, brew: FakeBrew, tmp_path: Path, *, program: bool = True
+) -> tuple[BrewInstaller, list[BaseModel]]:
+    sent: list[BaseModel] = []
+    folder = tmp_path / "bin"
+    folder.mkdir(exist_ok=True)
+    if program:
+        for tool in ("npx", "uvx"):
+            (folder / tool).write_text("#!/bin/sh\n")
+            (folder / tool).chmod(0o755)
+
+    async def spawn(command: str, args: list[str], env: Mapping[str, str]) -> Process:
+        sent.append(CallRecord(command=command, args=args))
+        return brew
+
+    installer = runtime_installer(
+        cast(RuntimeName, name),
+        broadcast=sent.append,
+        find=lambda: "/opt/homebrew/bin/brew",
+        spawn=spawn,
+        env={"HOME": "/Users/me", "PATH": str(folder)},
+    )
+    return installer, sent
+
+
+class CallRecord(BaseModel):
+    command: str
+    args: list[str]
+
+
+async def test_a_runtime_install_runs_the_formula_and_reports_by_name(tmp_path: Path) -> None:
+    installer, sent = _runtime("node", FakeBrew([b"==> Pouring node\n"]), tmp_path)
+    assert installer.formula == "node"
+    assert await installer.start() is True
+    await _ended(installer)
+    assert sent[0] == CallRecord(command="/opt/homebrew/bin/brew", args=["install", "node"])
+    output = cast(RuntimeInstallOutputNotification, sent[1])
+    assert (output.method, output.params.name) == ("runtime.install.output", "node")
+    done = cast(RuntimeInstallDoneNotification, sent[-1])
+    assert done.method == "runtime.install.done"
+    assert (done.params.name, done.params.ok, done.params.error) == ("node", True, None)
+
+
+async def test_a_runtime_install_fails_when_the_program_is_still_missing(tmp_path: Path) -> None:
+    installer, sent = _runtime("uv", FakeBrew([b"Error: no\n"], code=1), tmp_path, program=False)
+    await installer.start()
+    await _ended(installer)
+    done = cast(RuntimeInstallDoneNotification, sent[-1])
+    assert done.params.ok is False
+    assert done.params.error == "brew install uv exited with code 1: Error: no"
+
+
+async def test_a_stopped_runtime_install_has_no_error(tmp_path: Path) -> None:
+    installer, sent = _runtime("node", FakeBrew([], hang=True), tmp_path)
+    await installer.start()
+    assert await installer.start() is False
+    assert await installer.cancel() is True
+    await _ended(installer)
+    done = cast(RuntimeInstallDoneNotification, sent[-1])
+    assert (done.params.ok, done.params.error) == (False, None)
+
+
+async def test_runtime_install_over_the_socket_takes_only_node_and_uv(short_home: Path) -> None:
+    app, task = await start_daemon(short_home)
+    app.state.runtimes["node"] = runtime_installer("node", find=lambda: None)
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        reply = await client.call("runtime.install", {"name": "node"})
+        assert error_code(reply) == OLLAMA_FAILED
+        assert cast(dict[str, object], reply["error"])["data"] == {"no_brew": True}
+        cancelled = rpc_result(await client.call("runtime.install_cancel", {"name": "node"}))
+        assert cancelled == {"name": "node", "cancelled": False}
+        for bad in ("docker", "ollama", "git; rm -rf /"):
+            assert error_code(await client.call("runtime.install", {"name": bad})) == -32602
     finally:
         await client.close()
         await stop_daemon(app, task)

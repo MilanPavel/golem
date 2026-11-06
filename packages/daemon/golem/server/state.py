@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal
 
 from golem.mcp import McpSupervisor
 from golem.models.discovery import ModelDiscovery
-from golem.models.install import OllamaInstaller
+from golem.models.install import BrewInstaller, OllamaInstaller
 from golem.models.ollama import LocalServers
 from golem.models.pulls import PullManager
 from golem.paths import GolemPaths
@@ -37,3 +37,4 @@ class DaemonState:
     skills: SkillRegistry | None = None
     local_servers: LocalServers | None = None
     installer: OllamaInstaller | None = None
+    runtimes: dict[str, BrewInstaller] = field(default_factory=dict[str, BrewInstaller])

@@ -29,6 +29,7 @@ from golem.config_edit import (
 )
 from golem.config_raw import ADDRESS_FIELDS, check_text, owns
 from golem.mcp import McpServerError, McpSupervisor
+from golem.mcp.catalog import CatalogError, build, find_entry, unavailable
 from golem.secrets import SecretStore, SecretStoreError, check_name
 from golem.server.dispatcher import (
     INTERNAL_ERROR,
@@ -84,7 +85,11 @@ async def mcp_get(ctx: RequestContext, params: McpServerParams) -> McpServerDeta
 async def mcp_add(ctx: RequestContext, params: McpAddParams) -> McpServer:
     mcp = get_mcp(ctx)
     scope = ToolScope()
-    if params.config is None:
+    if params.catalog_id is not None:
+        scope = await get_scope(ctx, params.session_id)
+        path = await _target(ctx, params.scope, scope)
+        table, values = _catalog_table(params, scope)
+    elif params.config is None:
         table = _short_table(params)
         path = ctx.state.paths.config_file
         sent = {f"{MCP_PREFIX}{params.name}": params.token} if params.token is not None else {}
@@ -284,6 +289,22 @@ async def _raw_set(
 
 def _failed(message: str) -> ConfigRawResult:
     return ConfigRawResult(ok=False, errors=[ConfigError(message=message)])
+
+
+def _catalog_table(params: McpAddParams, scope: ToolScope) -> tuple[dict[str, Any], dict[str, str]]:
+    """The table for a catalog entry, and the secrets to store by reference."""
+    assert params.catalog_id is not None
+    entry = find_entry(params.catalog_id)
+    if entry is None:
+        raise RpcCallError(INVALID_PARAMS, f"there is no catalog entry {params.catalog_id}")
+    if (why := unavailable(entry)) is not None:
+        raise RpcCallError(INVALID_PARAMS, f"{entry.title} is not available yet: {why}")
+    folder = None if scope.root is None else str(scope.root)
+    secrets = {key: value.get_secret_value() for key, value in params.secrets.items()}
+    try:
+        return build(entry, params.inputs, secrets, name=params.name, folder=folder)
+    except CatalogError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
 
 
 def _short_table(params: McpAddParams) -> dict[str, Any]:

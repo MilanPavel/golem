@@ -14,6 +14,8 @@ from golem_protocol.commands import (
     ModelServerStatus,
     OllamaInstallDone,
     OllamaInstallOutput,
+    RuntimeInstallDone,
+    RuntimeInstallOutput,
     SessionSummary,
     SkillRegistryChanged,
 )
@@ -154,6 +156,26 @@ class ModelServerStatusNotification(BaseModel):
     params: ModelServerStatus
 
 
+class RuntimeInstallOutputNotification(BaseModel):
+    """Server → every connection: output from a running Node or uv install. Not stored."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    jsonrpc: Literal["2.0"] = "2.0"
+    method: Literal["runtime.install.output"] = "runtime.install.output"
+    params: RuntimeInstallOutput
+
+
+class RuntimeInstallDoneNotification(BaseModel):
+    """Server → every connection: a Node or uv install ended. Not stored."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    jsonrpc: Literal["2.0"] = "2.0"
+    method: Literal["runtime.install.done"] = "runtime.install.done"
+    params: RuntimeInstallDone
+
+
 class SkillRegistryChangedNotification(BaseModel):
     """Server → every connection: a skill or ``[skills]`` changed on disk. Not stored."""
 
@@ -178,6 +200,8 @@ __all__ = [
     "RpcNotification",
     "RpcRequest",
     "RpcSuccess",
+    "RuntimeInstallDoneNotification",
+    "RuntimeInstallOutputNotification",
     "SessionSummaryNotification",
     "SkillRegistryChangedNotification",
 ]

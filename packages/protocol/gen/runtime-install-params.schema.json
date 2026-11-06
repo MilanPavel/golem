@@ -1,0 +1,19 @@
+{
+  "additionalProperties": false,
+  "description": "``runtime.install``. Install Node or uv with Homebrew. Output: ``runtime.install.output``.",
+  "properties": {
+    "name": {
+      "enum": [
+        "node",
+        "uv"
+      ],
+      "title": "Name",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "title": "RuntimeInstallParams",
+  "type": "object"
+}

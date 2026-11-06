@@ -51,7 +51,7 @@ In the chat, `/login` opens the key panel: pick the provider, then paste the key
 | Provider | What you need |
 |---|---|
 | `ollama` | The app running on your Mac. No key |
-| `anthropic`, `openai`, `google`, `deepseek`, `xai` | An API key |
+| `anthropic`, `openai`, `google`, `deepseek`, `xai`, `moonshot` | An API key |
 
 An environment variable such as `ANTHROPIC_API_KEY` wins over the Keychain, which helps in scripts.
 

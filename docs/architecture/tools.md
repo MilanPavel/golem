@@ -138,6 +138,7 @@ Every session gets these (`default_registry`), plus the tools of its MCP servers
 | `todo_write` | Replace the agent's todo list | Allowed: internal |
 | `write_file`, `edit_file` | Create, replace, or edit a file in the project folder | Asks, per file |
 | `shell` | Run a command in the sandbox | Asks, per command |
+| `shell_unsandboxed` | Run a command outside the sandbox, with the user's credentials and the network | Asks, per command. Only a rule that names it allows it |
 | `web_fetch` | Read one web page as text | Asks, per host |
 
 A `Tool` says how the rules treat it:
@@ -223,7 +224,7 @@ Longer output is stored whole in the `artifacts` table, and the message keeps th
 | `packages/daemon/golem/tools/fs.py` | `read_file`, `list_dir`, `glob`, and `grep` |
 | `packages/daemon/golem/tools/paths.py` | Keeps paths inside the session folder and the skill folders |
 | `packages/daemon/golem/tools/write.py` | `write_file` and `edit_file`: plans, previews, and writes |
-| `packages/daemon/golem/tools/shell.py` | `shell`, `git_status`, `git_diff`, and `git_log` |
+| `packages/daemon/golem/tools/shell.py` | `shell`, `shell_unsandboxed`, `git_status`, `git_diff`, and `git_log` |
 | `packages/daemon/golem/tools/web.py` | `web_fetch` |
 | `packages/daemon/golem/tools/html_text.py` | HTML to text, for `web_fetch` |
 | `packages/daemon/golem/tools/untrusted.py` | The wrapper for outside content |

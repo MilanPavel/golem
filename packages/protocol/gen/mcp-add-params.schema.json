@@ -131,7 +131,7 @@
     }
   },
   "additionalProperties": false,
-  "description": "``mcp.add``. Write ``[mcp.<name>]`` into a config file, and start the server.\n\nThere are two forms, and sending both is an error.\n\nThe short form gives a ``command`` with its ``args`` for a stdio server, or a\n``url`` for an HTTP one, and writes the user's file. A ``token`` goes into\nthe OS credential store as ``mcp/<name>``, never into the file: an HTTP\nserver sends it as a Bearer header, and a command gets it in the variable\n``token_env``.\n\nThe full form gives the whole ``config``, and ``secrets`` by reference\n(``mcp/github``). Each secret must appear in ``config`` as\n``keychain:<ref>``, and may only be ``mcp/<name>`` or ``mcp/<name>-…`` for\nthis server. ``scope = \"project\"`` writes the trusted project of\n``session_id``. A client never logs or displays a token.",
+  "description": "``mcp.add``. Write ``[mcp.<name>]`` into a config file, and start the server.\n\nThere are two forms, and sending both is an error.\n\nThe short form gives a ``command`` with its ``args`` for a stdio server, or a\n``url`` for an HTTP one, and writes the user's file. A ``token`` goes into\nthe OS credential store as ``mcp/<name>``, never into the file: an HTTP\nserver sends it as a Bearer header, and a command gets it in the variable\n``token_env``.\n\nThe catalog form gives a ``catalog_id`` from ``mcp.catalog``, with the typed\n``inputs`` and the secret ones in ``secrets``, both by input id, and the\nentry's own ``name`` (or another one). The daemon fills the entry's template,\nchecks it, and stores each secret as ``mcp/<name>`` (``mcp/<name>-<id>`` for\nan input other than ``token``).\n\nThe full form gives the whole ``config``, and ``secrets`` by reference\n(``mcp/github``). Each secret must appear in ``config`` as\n``keychain:<ref>``, and may only be ``mcp/<name>`` or ``mcp/<name>-…`` for\nthis server. ``scope = \"project\"`` writes the trusted project of\n``session_id``. A client never logs or displays a token.",
   "properties": {
     "args": {
       "items": {
@@ -139,6 +139,19 @@
       },
       "title": "Args",
       "type": "array"
+    },
+    "catalog_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Catalog Id"
     },
     "command": {
       "anyOf": [
@@ -163,6 +176,13 @@
         }
       ],
       "default": null
+    },
+    "inputs": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Inputs",
+      "type": "object"
     },
     "name": {
       "pattern": "^[A-Za-z0-9][A-Za-z0-9-]{0,31}$",

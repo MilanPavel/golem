@@ -133,6 +133,11 @@ test("xAI recommends the plain Grok model over its variants", () => {
   assert.equal(recommendedHosted(models, "xai")?.ref, "xai/grok-4.3");
 });
 
+test("Moonshot recommends the plain Kimi model over its variants", () => {
+  const models = [model("moonshot/kimi-k3.1-pro"), model("moonshot/moonshot-v1-8k"), model("moonshot/kimi-k3")];
+  assert.equal(recommendedHosted(models, "moonshot")?.ref, "moonshot/kimi-k3");
+});
+
 test("a long list scrolls with the selection", () => {
   const many = { ...LISTING, models: Array.from({ length: 40 }, (_, index) => model(`openai/m${index}`)) };
   const lines = modelLines(many, { kind: "provider", provider: "openai" }, { phase: "pick", selected: 20, all: true }, 0);

@@ -1,0 +1,24 @@
+{
+  "additionalProperties": false,
+  "description": "``cancelled`` is false when that install was not running.",
+  "properties": {
+    "cancelled": {
+      "title": "Cancelled",
+      "type": "boolean"
+    },
+    "name": {
+      "enum": [
+        "node",
+        "uv"
+      ],
+      "title": "Name",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "cancelled"
+  ],
+  "title": "RuntimeInstallCancelResult",
+  "type": "object"
+}
