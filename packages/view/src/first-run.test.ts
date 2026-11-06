@@ -68,14 +68,12 @@ test("hosted providers put the ones with a key first and leave Ollama out", () =
     ...FRESH,
     providers: [
       { provider: "anthropic", status: "needs_key" },
-      { provider: "groq", status: "ready" },
-      { provider: "lmstudio", status: "unlisted" },
+      { provider: "openai", status: "ready" },
       { provider: "ollama", status: "server_down" },
-      { provider: "openai", status: "needs_key" },
     ],
-    setup: { ...FRESH.setup, keys: ["groq"] },
+    setup: { ...FRESH.setup, keys: ["openai"] },
   };
-  assert.deepEqual(hostedProviders(listing), ["groq", "anthropic", "openai"]);
+  assert.deepEqual(hostedProviders(listing), ["openai", "anthropic"]);
 });
 
 test("only the never-chosen error reads as no model yet", () => {

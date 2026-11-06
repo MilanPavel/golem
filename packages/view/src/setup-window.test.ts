@@ -48,7 +48,7 @@ const FRESH: ModelListResult = {
   models: [model("ollama/qwen3:8b", { source: "catalog", status: "not_installed" }), model("anthropic/claude-x", { status: "needs_key" })],
   providers: [
     { provider: "anthropic", status: "needs_key" },
-    { provider: "groq", status: "needs_key" },
+    { provider: "openai", status: "needs_key" },
     { provider: "ollama", status: "not_installed" },
   ],
   setup: { ollama_installed: false, ollama_running: false, keys: [], default_status: null },
@@ -82,7 +82,7 @@ test("guided mode walks the table: service, engine, then a path, model, ready, c
   assert.equal(step({ kind: "done" }), "chat");
   assert.equal(panelOf(advance(guided("engine", "start"), { kind: "local" }, UP)), "model");
   assert.equal(panelOf(advance(guided("engine", "start"), { kind: "key" }, UP)), "provider");
-  assert.equal(panelOf(advance({ ...guided("engine", "start"), panel: "provider" }, { kind: "provider", provider: "groq" }, UP)), "key");
+  assert.equal(panelOf(advance({ ...guided("engine", "start"), panel: "provider" }, { kind: "provider", provider: "openai" }, UP)), "key");
   assert.equal(panelOf(advance(guided("engine", "start"), { kind: "later" }, UP)), "chat");
   assert.equal(panelOf(advance({ ...guided("engine", "start"), panel: "model" }, { kind: "background" }, UP)), "chat+download");
 });
@@ -210,13 +210,13 @@ test("the Engine panel offers three ways, a send leaves out Later, a key is sugg
     engineChoices("start", FRESH).map((choice) => choice.id),
     ["local", "key", "later"],
   );
-  assert.equal(engineChoices("start", FRESH)[1]?.detail, "Anthropic, Groq");
+  assert.equal(engineChoices("start", FRESH)[1]?.detail, "Anthropic, OpenAI");
   assert.deepEqual(
     engineChoices("send", FRESH).map((choice) => choice.id),
     ["local", "key"],
   );
   assert.equal(engineSelected(FRESH), 0);
-  assert.equal(engineSelected({ ...FRESH, setup: { ...FRESH.setup, keys: ["groq"] } }), 1);
+  assert.equal(engineSelected({ ...FRESH, setup: { ...FRESH.setup, keys: ["openai"] } }), 1);
   assert.deepEqual(pressEngine("start", FRESH, 2, "enter"), { selected: 2, result: { kind: "later" } });
   assert.deepEqual(pressEngine("send", FRESH, 1, "down"), { selected: 1, result: null });
 });
@@ -253,11 +253,11 @@ test("the overview offers the fix first, then Change model, Add an API key, and 
   );
   const missing: SetupRow[] = [
     { part: "model", name: "model", state: "fail", detail: "gone", action: "pick_model", target: "ollama/a" },
-    { part: "engine", name: "groq", state: "fail", detail: "no API key", action: "set_key", target: "groq" },
+    { part: "engine", name: "openai", state: "fail", detail: "no API key", action: "set_key", target: "openai" },
   ];
   assert.deepEqual(
     overviewChoices(missing).map((choice) => choice.label),
-    ["Pick a model", "Add the Groq key", "Add an API key", "Run setup again"],
+    ["Pick a model", "Add the OpenAI key", "Add an API key", "Run setup again"],
   );
 });
 

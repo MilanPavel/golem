@@ -25,8 +25,8 @@ flowchart LR
   launchd["launchd<br/>(macOS service manager)"] -->|"starts at login,<br/>restarts after a crash"| daemon
   daemon --> data[("~/.golem<br/>settings, chats, logs")]
   daemon --> keychain[("macOS Keychain<br/>API keys")]
-  daemon -->|internet| cloud["Anthropic, OpenAI,<br/>OpenRouter, ..."]
-  daemon -->|this computer| local["Ollama, LM Studio"]
+  daemon -->|internet| cloud["Anthropic, OpenAI, ..."]
+  daemon -->|this computer| local["Ollama"]
 ```
 
 Why split it this way? Closing the chat screen does not stop the work. An answer keeps streaming, or a question keeps waiting for your approval, while the screen is closed. Open it again and everything is still there.

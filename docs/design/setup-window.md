@@ -96,7 +96,7 @@ Enter picks · ↑↓ move
 Where should golem think?
 
 › On this Mac      private, free · uses Ollama
-  With an API key  Anthropic, OpenAI, Groq, OpenRouter…
+  With an API key  Anthropic, OpenAI…
   Later            golem can't answer until you pick
 
 Enter picks · ↑↓ move · Esc back · q quit
@@ -218,9 +218,6 @@ With an API key · which provider?
 
 › Anthropic     Claude
   OpenAI        GPT
-  Groq          fast open models
-  OpenRouter    many providers, one key
-  Together      open models
 
 Enter picks · ↑↓ move · Esc back
 ```
@@ -318,7 +315,7 @@ connected   untitled   no model
 Pick how golem thinks, then Enter sends your message.
 
 › On this Mac      private, free · uses Ollama
-  With an API key  Anthropic, OpenAI, Groq, OpenRouter…
+  With an API key  Anthropic, OpenAI…
 
 Enter picks · ↑↓ move · Esc back
 ```

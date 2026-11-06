@@ -114,7 +114,7 @@ A profile: a short name for a model.
 
 ### `[providers.<name>]`
 
-The built-in providers are `anthropic`, `openai`, `ollama` (Ollama's own API), `openrouter`, `groq`, `together`, and `lmstudio`. A table with one of those names changes only the keys it sets. A new name is an OpenAI-compatible server and needs `base_url`.
+The providers are `openai`, `anthropic`, `google`, `deepseek`, `xai`, `moonshot`, and `ollama` (Ollama's own API). A table with one of those names changes only the keys it sets. Any other name is an error that lists them.
 
 | Key | Default | Meaning |
 |---|---|---|

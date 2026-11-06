@@ -7,11 +7,11 @@ Sources, merged by ref:
 - Local models to download, from the bundled ``local-catalog.toml``.
 - Hosted models, from each provider's model list once it has a key:
   Anthropic and OpenAI ``/v1/models``, and ``<base_url>/models`` for an
-  OpenAI-compatible provider such as OpenRouter, Groq, or Together.
+  OpenAI-compatible provider such as DeepSeek or xAI.
 - Profiles and ``default_model``, so a configured model always shows up.
 
 Prices and context sizes come from the profile, then from the provider's own
-list (Ollama, OpenRouter), then from LiteLLM. Hosted lists are cached for a
+list (Ollama), then from LiteLLM. Hosted lists are cached for a
 day under ``~/.golem/cache/``. A listing waits at most ``budget`` seconds for
 the network. A slower fetch keeps running, and its result is used next time.
 """
@@ -512,11 +512,7 @@ class ModelDiscovery:
         provider = self._router.provider(name)
         if provider is None or provider.kind == "ollama":
             raise KeyUnchecked(f"{name} takes no key")
-        client = self._http()
         try:
-            if _is_openrouter(provider):
-                # OpenRouter lists its models to anyone, so ask about the key itself.
-                await _openrouter_key(client, provider, key)
             remote = await self._fetch_remote(name, provider, key)
         except httpx.HTTPStatusError as exc:
             reason = _http_reason(exc.response)
@@ -681,20 +677,6 @@ async def _compatible_models(
     return found
 
 
-def _is_openrouter(provider: Provider) -> bool:
-    return provider.base_url is not None and "openrouter.ai" in provider.base_url
-
-
-async def _openrouter_key(client: httpx.AsyncClient, provider: Provider, key: str) -> None:
-    assert provider.base_url is not None
-    response = await client.get(
-        f"{provider.base_url.rstrip('/')}/key",
-        headers={"authorization": f"Bearer {key}"},
-        timeout=_REMOTE_TIMEOUT,
-    )
-    response.raise_for_status()
-
-
 def _http_reason(response: httpx.Response) -> str:
     """``401 · invalid x-api-key``: the status and the provider's own message, when it sent one."""
     message: object = None
@@ -716,7 +698,7 @@ def _http_reason(response: httpx.Response) -> str:
 
 
 def _per_token_price(raw: object) -> ModelPrice | None:
-    """OpenRouter's ``pricing``: USD per token, as strings."""
+    """A model list's ``pricing``: USD per token, as strings."""
     pricing = _dict(raw)
     given = _number(pricing.get("prompt"))
     taken = _number(pricing.get("completion"))

@@ -10,7 +10,7 @@ import pytest
 from test_server import HELLO, RpcClient, error_code, rpc_result, start_daemon, stop_daemon
 
 from golem.config import GolemSettings
-from golem.models.discovery import KeyRejected, ModelDiscovery
+from golem.models.discovery import ModelDiscovery
 from golem.models.keys import MemoryKeyStore
 from golem.models.router import ModelRouter
 from golem.server.dispatcher import (
@@ -177,30 +177,3 @@ async def test_a_key_that_cannot_be_checked_is_not_stored(short_home: Path) -> N
     finally:
         await client.close()
         await stop_daemon(app, task)
-
-
-async def test_openrouter_is_asked_about_the_key_since_its_model_list_is_public() -> None:
-    asked: list[str] = []
-
-    def openrouter(request: httpx.Request) -> httpx.Response:
-        asked.append(request.url.path)
-        if request.url.path == "/api/v1/key":
-            if request.headers.get("authorization") != "Bearer sk-or-good":
-                return httpx.Response(401, json={"error": {"message": "No auth credentials found"}})
-            return httpx.Response(200, json={"data": {"label": "golem"}})
-        return httpx.Response(200, json={"data": [{"id": "a/b"}, {"id": "c/d"}, {"id": "e/f"}]})
-
-    discovery = ModelDiscovery(
-        ModelRouter(GolemSettings(), keys=MemoryKeyStore()),
-        None,
-        transport=httpx.MockTransport(openrouter),
-        detect_ram=False,
-        fetch_prices=False,
-    )
-    try:
-        with pytest.raises(KeyRejected, match=r"openrouter rejected the key \(401 · No auth"):
-            await discovery.check_key("openrouter", "sk-or-bad")
-        assert asked == ["/api/v1/key"]
-        assert await discovery.check_key("openrouter", "sk-or-good") == 3
-    finally:
-        await discovery.aclose()
