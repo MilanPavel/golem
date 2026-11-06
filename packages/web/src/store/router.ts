@@ -1,6 +1,13 @@
 import { createStore, type StoreSource } from "./create-store.ts";
 
-export type Route = { name: "home" } | { name: "session"; id: string } | { name: "not-found" };
+export type Route =
+  | { name: "home" }
+  | { name: "session"; id: string }
+  | { name: "settings"; section: string }
+  | { name: "not-found" };
+
+/** The section `/settings` opens. */
+export const DEFAULT_SETTINGS_SECTION = "setup";
 
 export type Router = StoreSource<Route> & {
   navigate(path: string, options?: { replace?: boolean }): void;
@@ -8,10 +15,21 @@ export type Router = StoreSource<Route> & {
   stop(): void;
 };
 
-/** `/` is home, `/s/:id` a session (id decoded, not empty, no further `/`), anything else is not found. */
+/**
+ * `/` is home, `/s/:id` a session (id decoded, not empty, no further `/`), `/settings` and
+ * `/settings/:section` (lowercase letters and dashes) the settings page, anything else is not found.
+ * The router does not know which sections exist; the page says so for a name it does not list.
+ */
 export function parseRoute(pathname: string): Route {
   if (pathname === "/") {
     return { name: "home" };
+  }
+  if (pathname === "/settings") {
+    return { name: "settings", section: DEFAULT_SETTINGS_SECTION };
+  }
+  const section = /^\/settings\/([a-z-]+)$/.exec(pathname)?.[1];
+  if (section !== undefined) {
+    return { name: "settings", section };
   }
   const match = /^\/s\/([^/]+)$/.exec(pathname);
   if (match?.[1] !== undefined) {
@@ -32,8 +50,15 @@ export function sessionPath(id: string): string {
   return `/s/${encodeURIComponent(id)}`;
 }
 
+/** The path of a settings section. The default section is `/settings`. */
+export function settingsPath(section: string = DEFAULT_SETTINGS_SECTION): string {
+  return section === DEFAULT_SETTINGS_SECTION ? "/settings" : `/settings/${section}`;
+}
+
 function sameRoute(a: Route, b: Route): boolean {
-  return a.name === b.name && (a.name !== "session" || (b.name === "session" && a.id === b.id));
+  if (a.name === "session") return b.name === "session" && a.id === b.id;
+  if (a.name === "settings") return b.name === "settings" && a.section === b.section;
+  return a.name === b.name;
 }
 
 /** The current route, from `location` and the history. */

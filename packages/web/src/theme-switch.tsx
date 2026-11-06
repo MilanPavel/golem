@@ -1,33 +1,29 @@
 import { useState } from "react";
-import { cn } from "./ui/cn.ts";
 import { applyTheme, readTheme, type ThemeChoice } from "./styles/theme.ts";
 
 const CHOICES: { value: ThemeChoice; label: string }[] = [
-  { value: "system", label: "System" },
-  { value: "slip", label: "Slip" },
-  { value: "kiln", label: "Kiln" },
+  { value: "system", label: "Match system" },
+  { value: "slip", label: "Light" },
+  { value: "kiln", label: "Dark" },
 ];
 
-/** `compact` is for the sidebar: no top margin, no visible label, smaller buttons. */
-export function ThemeSwitch({ compact = false }: { compact?: boolean }) {
+/** The theme choice: follow the system, or always light (slip), or always dark (kiln). */
+export function ThemeSwitch() {
   const [theme, setTheme] = useState<ThemeChoice>(readTheme);
   const choose = (value: ThemeChoice) => {
     applyTheme(value);
     setTheme(value);
   };
   return (
-    <div role="group" aria-label="Theme" className={cn("flex items-center gap-2", !compact && "mt-6")}>
-      <span className={cn("text-sm text-muted", compact && "sr-only")}>Theme</span>
+    <div role="group" aria-label="Theme" className={"mt-6 flex items-center gap-2"}>
+      <span className="text-sm text-muted">Theme</span>
       {CHOICES.map(({ value, label }) => (
         <button
           key={value}
           type="button"
           aria-pressed={theme === value}
           onClick={() => choose(value)}
-          className={cn(
-            "rounded-md border border-line-strong bg-surface px-3 py-1 text-sm outline-offset-2 outline-clay focus-visible:outline-2 aria-pressed:bg-clay-soft aria-pressed:text-clay-ink",
-            compact && "px-2 py-0.5 text-xs",
-          )}
+          className="rounded-md border border-line-strong bg-surface px-3 py-1 text-sm outline-offset-2 outline-clay focus-visible:outline-2 aria-pressed:bg-clay-soft aria-pressed:text-clay-ink"
         >
           {label}
         </button>

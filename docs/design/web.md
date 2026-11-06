@@ -45,7 +45,7 @@ It borrows the calm, centred reading column and generous input from Claude's cha
    268 px            column at most 46 rem                 320 px
 ```
 
-- **Sidebar** (`sunken`): the wordmark with golem's state, New session, a Search button (`Search or run a command`, with its key, ⌘K or Ctrl K) that opens the palette, then sessions grouped by folder. Each session has a small square for its state, its title, and how long ago it was active. A fork is indented under its parent with `⑂`. At the bottom are the connection, the version, and the theme switch.
+- **Sidebar** (`sunken`): the wordmark with golem's state, New session, a Search button (`Search or run a command`, with its key, ⌘K or Ctrl K) that opens the palette, then sessions grouped by folder. Each session has a small square for its state, its title, and how long ago it was active. A fork is indented under its parent with `⑂`. At the bottom are the Settings button, the connection, and the version. The theme is chosen in Settings. The Settings button has a gear and opens `/settings`. When `setup.status` has a problem, it shows a warning dot (`wait`) and the problem under the name as a line of text, with the same text in its name for a screen reader (`Settings, <problem>`), so colour is not the only signal. While the query loads or if it fails, the button is plain.
 - **Top bar:** the session title, the model chip, the folder chip, and the drawer toggle.
 - **Column:**
   - Your messages are right-aligned slips in `slip`.
@@ -126,7 +126,7 @@ The page keeps retrying behind "daemon down", and the screen goes away by itself
 
 - **Opening:** ⌘K on macOS, Ctrl+K elsewhere, from anywhere on the page, also while typing in the message box. It toggles, so the same key closes it. It does not open over another dialog. The sidebar's Search button opens it too. Browsers keep ⌘N for a new window, so the page binds no key for New session.
 - A centred dialog with a search field on top, named `Commands`, and a footer line `↵ run · ↑↓ move · esc close`. It is the same combobox and grouped list as the model dialog.
-- The commands come from the TUI's slash-command table, grouped as Session, Model, Tools, and View. Each row has the `/name` in clay mono, its arguments in faint mono, a description, and its key on the right when it has one (`/help` has `?`). A command the page lacks says `In the terminal for now` and still runs, which prints where it lives. View also has a `Keys` row, which is not a slash command; it opens the key list.
+- The commands come from the TUI's slash-command table, grouped as Session, Model, Tools, and View. Each row has the `/name` in clay mono, its arguments in faint mono, a description, and its key on the right when it has one (`/help` has `?`). A command the page lacks says `In the terminal for now` and still runs, which prints where it lives. View also has two rows that are not slash commands: `Settings`, which opens the settings page, and `Keys`, which opens the key list. These two run with no composer on screen.
 - Typing filters on the name, the arguments, and the description, ignoring case. Names that start with the text come first. Up and Down move, Enter runs, and Esc closes and gives focus back to what had it.
 - **Who runs a command:** the composer on screen, through the same path as typing the line: the session's dock, or the start page's composer. With none (the not-found screen), the commands are listed, the palette says `Open a session or the start page to run commands.`, and Enter does nothing.
 - **What Enter does on a command:**
@@ -160,6 +160,16 @@ The page keeps retrying behind "daemon down", and the screen goes away by itself
 - Choices are a list of buttons. Up and Down move, Enter chooses, Esc goes back as the table says, and a click is the same as moving there and pressing Enter. Esc on the guided Service panel at the start, and Ready's Enter, close the window. The close button closes it at any point, like Later: the page goes on, and a download keeps running.
 - This Mac works from the page: the daemon installs Ollama with Homebrew and streams its output, starts it, and pulls the model, and a download shows the same bar as the model dialog. With no Homebrew, a link opens ollama.com/download in a new tab and the panel waits for Ollama to appear.
 - Service and Key are commands, not controls, because the page never installs a service or takes a key ([ADR-028](../adr/028-web-gateway.md)). The page is connected, so the service runs. The Service row says so with the version, and when launchd does not keep it the row needs attention and the panel shows `golem daemon install` with a Copy button. The Key panel shows `golem auth set <provider>` with Copy and a `Check again` button: it is done once the provider no longer needs a key, and says `the key isn't there yet` until then.
+
+## The Settings page
+
+- **Route:** `/settings` and `/settings/<section>`, a section being lowercase letters and dashes. `/settings` is the `setup` section. The router does not know the sections: a name the page does not list shows `There is no such section.` with a link back to `/settings`.
+- **Layout:** a `Settings` heading, a list of sections on the left (`Settings sections`, a link each, the current one marked), and the section's heading and body beside it. Below 768 px the list is a row above the body. The session's top bar is not reused.
+- **Sections:** `Setup` and `Appearance`. A later ticket adds its section with one entry in `sections.ts` and one case in the screen.
+  - **Setup:** one status line in mono (`all set`, or the first problem, as the sidebar button shows it) and an `Open setup` button that opens the overview window. The page reads `setup.status` again when the section opens, and again whenever the tab is seen again, because a key set in a terminal pushes no event.
+  - **Appearance:** the theme: `Match system` (the default, follows the OS), `Light` (`slip`), or `Dark` (`kiln`). The stored value stays `slip` or `kiln`, so an earlier choice holds.
+- **Where it was opened from:** the route carries no session or folder. A session screen remembers its session and folder in memory, so the sections that depend on a folder (tool rules, MCP, skills) use that one, else the folder of the next new session, else none.
+- **Ways in:** the sidebar's Settings button and the palette's `Settings` row. There is no `/settings` slash command, because the terminal has no such page.
 
 ## Slash commands in the composer
 

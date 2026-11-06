@@ -122,6 +122,17 @@ test("Google recommends the newest Pro model, then Flash", () => {
   assert.equal(recommendedHosted(models.slice(0, 1), "google")?.ref, "google/gemini-2.5-flash");
 });
 
+test("DeepSeek recommends deepseek-chat, then any V model", () => {
+  const models = [model("deepseek/deepseek-reasoner"), model("deepseek/deepseek-chat")];
+  assert.equal(recommendedHosted(models, "deepseek")?.ref, "deepseek/deepseek-chat");
+  assert.equal(recommendedHosted(models.slice(0, 1), "deepseek")?.ref, "deepseek/deepseek-reasoner");
+});
+
+test("xAI recommends the plain Grok model over its variants", () => {
+  const models = [model("xai/grok-4.3-latest"), model("xai/grok-3-mini"), model("xai/grok-4.3")];
+  assert.equal(recommendedHosted(models, "xai")?.ref, "xai/grok-4.3");
+});
+
 test("a long list scrolls with the selection", () => {
   const many = { ...LISTING, models: Array.from({ length: 40 }, (_, index) => model(`openai/m${index}`)) };
   const lines = modelLines(many, { kind: "provider", provider: "openai" }, { phase: "pick", selected: 20, all: true }, 0);

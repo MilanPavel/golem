@@ -1,5 +1,7 @@
 import { COMMANDS } from "@golem/view";
 import { useEffect, useRef } from "react";
+import { useNavigate } from "../../store/page-context.tsx";
+import { settingsPath } from "../../store/router.ts";
 import { hasMod } from "../../ui/platform.ts";
 import { activeComposer, useHasComposer } from "../composer/index.ts";
 import { CommandPaletteView } from "./command-palette.tsx";
@@ -51,6 +53,7 @@ export function PaletteHost() {
   usePageKeys();
   const open = usePaletteOpen();
   const hasComposer = useHasComposer();
+  const navigate = useNavigate();
   const then = useRef<(() => void) | null>(null);
   // Kept while a dialog closes, when `open` is already null.
   const returnTo = useRef<HTMLElement | null>(null);
@@ -62,7 +65,7 @@ export function PaletteHost() {
     const target = returnTo.current;
     switch (row.kind) {
       case "page":
-        then.current = () => openKeys(target);
+        then.current = row.page === "settings" ? () => navigate(settingsPath()) : () => openKeys(target);
         break;
       case "message":
         then.current = () => {
