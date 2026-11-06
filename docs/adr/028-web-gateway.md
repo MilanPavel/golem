@@ -112,6 +112,7 @@ The daemon reads JSON lines and splits on `\n` ([ADR-003](003-protocol.md)). A b
 - **Denied today:**
   - `auth.set`: the API key would pass through the page's memory, its devtools, and its wire view.
   - `auth.remove`: key management stays in the terminal, where the Keychain prompt is.
+- **Later additions:** [ADR-037](037-browser-manages-mcp-and-config.md) lets the browser manage MCP servers, send an MCP token, and edit `config.toml`, with two daemon checks that keep model provider keys and trust out of its reach. Model provider keys stay denied.
 - **Allowed, with reasons, because these are easy to get wrong:**
   - `auth.list` never returns a key, only where each one is stored.
   - `policy.update`, `approval.respond`, and `message.send` are allowed. They are the point of the web UI. Together they can make golem run code on the Mac, which is why the threat below is cross-site scripting (XSS), not secrets.

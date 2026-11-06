@@ -235,7 +235,7 @@ MCP servers are listed with `mcp.list`: each one's name, state (`idle`, `startin
 
 `mcp.set_enabled` writes through `golem/config_edit.py`, which keeps the file's comments, and applies the change at once.
 
-`mcp.add` and `mcp.remove` do the same for a whole `[mcp.<name>]` table, in the user's config only. `mcp.add` checks the table against the settings model first, stores a token as `mcp/<name>` before it writes, and refuses a name that exists. `mcp.remove` also deletes the token. Both are `local`: a token never goes through the browser gateway.
+`mcp.add` and `mcp.remove` do the same for a whole `[mcp.<name>]` table, in the user's config only. `mcp.add` checks the table against the settings model first, stores a token as `mcp/<name>` before it writes, and refuses a name that exists. `mcp.remove` also deletes the token. A token sent to `mcp.add` is stored before the file is written and never returned. These two are `local` today. [ADR-037](../adr/037-browser-manages-mcp-and-config.md) lets the browser call them, with the daemon refusing an edit that points a stored secret at another address, and step 1.12.4 makes that change.
 
 ### In the TUI and the CLI
 

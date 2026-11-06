@@ -174,9 +174,8 @@ flowchart LR
 
   All of it works in the TUI, the CLI, and the browser.
 - **Build:** one ticket each. Every issue lists the files, functions, RPC shapes, and tests.
-  - Built: 1.12.1 ([#246](https://github.com/MilanPavel/golem/issues/246)) `golem mcp add|remove`, and 1.12.2 ([#247](https://github.com/MilanPavel/golem/issues/247)) `/mcp add` with filesystem, GitHub, and fetch.
-  - 1.12.3 ([#482](https://github.com/MilanPavel/golem/issues/482)): ADR-037 and `design/mcp.md`, which has every screen.
-  - 1.12.4 ([#483](https://github.com/MilanPavel/golem/issues/483)): `mcp.get`, `mcp.update`, `mcp.add` with every field and project scope, a per-tool include and exclude, a per-server approval default, `env_passthrough`, and `config.raw.get|set`, which validates with line numbers and refuses on a conflict.
+  - Built: 1.12.1 ([#246](https://github.com/MilanPavel/golem/issues/246)) `golem mcp add|remove`, 1.12.2 ([#247](https://github.com/MilanPavel/golem/issues/247)) `/mcp add` with filesystem, GitHub, and fetch, and 1.12.3 ([#482](https://github.com/MilanPavel/golem/issues/482)) ADR-037 and [design/mcp.md](design/mcp.md), which has every screen.
+  - 1.12.4 ([#483](https://github.com/MilanPavel/golem/issues/483)): `mcp.get`, `mcp.update`, `mcp.add` with every field and project scope, a per-tool include and exclude, a per-server approval default, `env_passthrough`, and `config.raw.get|set`, which validates with line numbers and refuses on a conflict, and the two checks of ADR-037 (a browser edit cannot touch `providers`, `trusted_projects`, `shell`, or `web`; a stored secret is never sent to a changed address).
   - 1.12.5 ([#484](https://github.com/MilanPavel/golem/issues/484)): `mcp.test` on an unsaved config, step by step with one hint; `mcp.logs` and a live log; `mcp.call` to try a tool; `golem doctor --mcp`.
   - 1.12.6 ([#485](https://github.com/MilanPavel/golem/issues/485)): the catalog as daemon data, with about 13 entries, input forms, and `mcp.catalog`; `runtime.install` for Node and uv; and a Tools panel in the setup window.
   - 1.12.7 ([#486](https://github.com/MilanPavel/golem/issues/486)): import from other apps' `mcpServers` JSON, with secrets moved to the Keychain, and export.
