@@ -57,10 +57,12 @@ class Provider:
 
 
 OLLAMA_BASE_URL = "http://127.0.0.1:11434"
+GOOGLE_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
 
 PRESETS: dict[str, Provider] = {
     "anthropic": Provider(kind="anthropic", api_key_env="ANTHROPIC_API_KEY"),
     "openai": Provider(kind="openai", api_key_env="OPENAI_API_KEY"),
+    "google": Provider(kind="google", base_url=GOOGLE_BASE_URL, api_key_env="GOOGLE_API_KEY"),
     "ollama": Provider(kind="ollama", base_url=OLLAMA_BASE_URL),
 }
 
@@ -237,6 +239,14 @@ class ModelRouter:
             if provider.base_url is not None:
                 options["base_url"] = provider.base_url
             return ChatOpenAI.model_validate(options)
+        if provider.kind == "google":
+            from langchain_openai import ChatOpenAI
+
+            # Gemini's OpenAI-compatible endpoint, next to the native one that lists the models.
+            base = (provider.base_url or GOOGLE_BASE_URL).rstrip("/")
+            return ChatOpenAI.model_validate(
+                {"model": resolved.model_id, "base_url": f"{base}/openai/", "api_key": key}
+            )
         if provider.kind == "ollama":
             from langchain_ollama import ChatOllama
 

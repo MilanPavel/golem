@@ -38,7 +38,13 @@ from golem.models.catalog import CatalogEntry, load_local_catalog
 from golem.models.errors import ModelUnreachable
 from golem.models.keys import KeyStoreError
 from golem.models.ollama import LocalServers
-from golem.models.router import OLLAMA_BASE_URL, ModelConfigError, ModelRouter, Provider
+from golem.models.router import (
+    GOOGLE_BASE_URL,
+    OLLAMA_BASE_URL,
+    ModelConfigError,
+    ModelRouter,
+    Provider,
+)
 
 log = logging.getLogger(__name__)
 
@@ -516,7 +522,7 @@ class ModelDiscovery:
             remote = await self._fetch_remote(name, provider, key)
         except httpx.HTTPStatusError as exc:
             reason = _http_reason(exc.response)
-            if exc.response.status_code in (401, 403):
+            if exc.response.status_code in (401, 403) or _google_bad_key(provider, exc.response):
                 raise KeyRejected(f"{name} rejected the key ({reason})") from exc
             raise KeyUnchecked(f"{name} answered {reason}") from exc
         except (httpx.HTTPError, ValueError) as exc:
@@ -537,6 +543,8 @@ class ModelDiscovery:
             found = await _anthropic_models(client, provider, key)
         elif provider.kind == "openai":
             found = await _openai_models(client, provider, key, self._prices)
+        elif provider.kind == "google":
+            found = await _google_models(client, provider, key)
         else:
             found = await _compatible_models(client, provider, key)
         remote = _Remote(fetched_at=self._clock(), models=found)
@@ -630,6 +638,55 @@ async def _openai_models(
         if isinstance(model_id, str) and openai_chat_model(model_id, book):
             found.append(_Found(model_id=model_id))
     return found
+
+
+async def _google_models(
+    client: httpx.AsyncClient, provider: Provider, key: str | None
+) -> list[_Found]:
+    base = (provider.base_url or GOOGLE_BASE_URL).rstrip("/")
+    found: list[_Found] = []
+    token: str | None = None
+    for _ in range(10):
+        params: dict[str, str | int] = {"pageSize": 1000}
+        if token is not None:
+            params["pageToken"] = token
+        response = await client.get(
+            f"{base}/models",
+            params=params,
+            headers={"x-goog-api-key": key or ""},
+            timeout=_REMOTE_TIMEOUT,
+        )
+        response.raise_for_status()
+        body = _dict(response.json())
+        for item in _list(body.get("models")):
+            name = item.get("name")
+            methods = item.get("supportedGenerationMethods")
+            if not isinstance(name, str) or not isinstance(methods, list):
+                continue
+            if "generateContent" not in methods:
+                continue
+            label = item.get("displayName")
+            found.append(
+                _Found(
+                    model_id=name.removeprefix("models/"),
+                    label=label if isinstance(label, str) else None,
+                    ctx=_positive_int(item.get("inputTokenLimit")),
+                )
+            )
+        next_token = body.get("nextPageToken")
+        if not isinstance(next_token, str) or next_token == "":
+            break
+        token = next_token
+    return found
+
+
+def _google_bad_key(provider: Provider, response: httpx.Response) -> bool:
+    """Google answers 400, not 401, when the key does not exist."""
+    return (
+        provider.kind == "google"
+        and response.status_code == 400
+        and "api key" in (_http_reason(response).lower())
+    )
 
 
 def openai_chat_model(model_id: str, book: prices.PriceBook) -> bool:
