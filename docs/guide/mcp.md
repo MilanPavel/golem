@@ -68,6 +68,8 @@ tool = "mcp__git__git_status"
 action = "allow"
 ```
 
+To allow every tool of one server, set `approval = "allow"` in its table. Your own `[[rule]]`s still come first, so a `deny` rule beats it, and a server in a project's file counts only when the project is in `trusted_projects`.
+
 ## Only when you need it
 
 Every server's tools go into every prompt. That costs tokens, and many tools confuse small local models. With `enabled = "on_demand"`, a server stays out until a chat asks for it:
@@ -95,6 +97,18 @@ headers = { Authorization = "Bearer keychain:mcp/github" }
 golem auth set mcp/github     # prompts for the token
 ```
 
+## Choose which tools the model gets
+
+A server can offer dozens of tools, and each one's schema costs tokens in every call. `tools` keeps some of them from the model:
+
+```toml
+[mcp.github]
+url = "https://api.githubcopilot.com/mcp/"
+tools = { include = ["list_*", "get_*"], exclude = ["get_secret_scanning_*"] }
+```
+
+Both lists are patterns on the server's own tool names, such as `list_issues`, not the `mcp__github__list_issues` name the model sees. An empty `include` means every tool, and `exclude` wins. The model never sees a hidden tool, and it costs nothing in a prompt. A tool list for a server still shows hidden tools, marked as hidden.
+
 ## Per project
 
 A project's `.golem/config.toml` can add servers for chats in that folder, once you list the folder in `trusted_projects` in your own config.
@@ -106,11 +120,14 @@ A project's `.golem/config.toml` can add servers for chats in that folder, once 
 | `command` | | A program to run, on your `PATH` or as a full path. Homebrew's folders and `~/.local/bin` are searched too |
 | `args` | `[]` | Its arguments |
 | `env` | `{}` | Extra environment variables. A server sees only these, plus `HOME`, `PATH`, and a few basics |
+| `env_passthrough` | `[]` | Names of variables from golem's own environment to hand to the server. Not for secrets: a name such as `GITHUB_TOKEN` is refused, so use `env` with a Keychain secret. Under launchd golem has no shell environment, so a variable from your shell may not be there |
 | `cwd` | your home, or the project | Where the server runs |
 | `url` | | An HTTP server's address, instead of `command` |
 | `headers` | `{}` | Headers sent with every request to `url` |
 | `enabled` | `true` | `"on_demand"` for chats that run `/mcp enable`, or `false` to keep the settings without starting it |
 | `timeout_seconds` | `120` | The longest one tool call may take |
+| `tools` | all | `include` and `exclude` patterns for the tools the model gets, see above |
+| `approval` | `"ask"` | `"allow"` runs this server's calls without asking, after your own rules |
 
 - **Secrets.** A value in `env` or `headers` can name a Keychain secret, `keychain:mcp/<name>`, alone or inside the text. A name that looks like a secret, such as `GITHUB_TOKEN`, must.
 - **Names.** A server name may use letters, digits, and `-`.

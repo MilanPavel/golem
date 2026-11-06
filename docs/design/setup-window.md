@@ -1,6 +1,6 @@
 # The setup window: design
 
-This is how golem sets itself up in the terminal, and how it shows later what is set up and what is broken. Step 1.9 of [the plan](../plan.md#phase-1--first-run-continued) builds it.
+This is how golem sets itself up in the terminal, and how it shows later what is set up and what is broken. Step 1.9 of [the plan](../plan.md#phase-1--first-run-continued) builds it, and step 1.12 adds the Tools panel (H).
 
 ## The idea
 
@@ -14,7 +14,7 @@ flowchart LR
   engine -->|With an API key| provider["Provider"] --> key["Key"]
   ollama --> model["Model"]
   key --> model
-  model --> ready["Ready"] --> chat(["chat"])
+  model --> tools["Tools"] --> ready["Ready"] --> chat(["chat"])
   engine -->|Later| chat
   setup(["/setup"]) --> overview["Overview"]
   overview -->|Enter on a row| one["that one panel"] --> overview
@@ -23,7 +23,7 @@ flowchart LR
 
 Rules:
 
-- **Order: Service, then Engine, then Model, then Ready.** A step starts only when the one before it is done, so golem never asks for a model before something can run it.
+- **Order: Service, then Engine, then Model, then Tools, then Ready.** A step starts only when the one before it is done, so golem never asks for a model before something can run it. Tools is offered once, when no MCP server is set up yet, and `/setup` can open it any time.
 - **Nothing slow is silent.** Every wait shows a spinner, what is happening, and how long it has taken.
 - **Every panel has a default on Enter.** Esc goes back one step, and `q` quits.
 - **No chat chrome while setting up.** The window is centred on an empty screen, with no logo, composer, or status bar, until the chat can actually answer.
@@ -47,7 +47,7 @@ Each screen below is one state of the window, about 60 columns wide. The bar on 
 The user has nothing: no service, no Ollama, no model, no key.
 
 ```screen A1 · Service: the question | Enter → A2. q quits golem.
-● Service ── ○ Engine ── ○ Model ── ○ Ready
+● Service ── ○ Engine ── ○ Model ── ○ Tools ── ○ Ready
 
 Welcome to golem.
 
@@ -61,7 +61,7 @@ Enter picks · ↑↓ move · q quit
 ```
 
 ```screen A2 · Service: starting | Each sub-step shows as it happens. The service answers → A4.
-● Service ── ○ Engine ── ○ Model ── ○ Ready
+● Service ── ○ Engine ── ○ Model ── ○ Tools ── ○ Ready
 
 ✓ launch agent installed
 ⠙ starting the service…                             3s
@@ -69,7 +69,7 @@ Enter picks · ↑↓ move · q quit
 ```
 
 ```screen A3 · Service: a slow first start | After about 10 s the wait is explained, so it never looks stuck.
-● Service ── ○ Engine ── ○ Model ── ○ Ready
+● Service ── ○ Engine ── ○ Model ── ○ Tools ── ○ Ready
 
 ✓ launch agent installed
 ⠼ starting the service…                            12s
@@ -78,7 +78,7 @@ Enter picks · ↑↓ move · q quit
 ```
 
 ```screen A3′ · Service: it didn't start | After about 45 s, or when the service stops. The reason comes from run/last-error.
-● Service ── ○ Engine ── ○ Model ── ○ Ready
+● Service ── ○ Engine ── ○ Model ── ○ Tools ── ○ Ready
 
 ✗ the service didn't start
   data in ~/.golem is from golem 0.6, this is 0.5
@@ -91,7 +91,7 @@ Enter picks · ↑↓ move
 ```
 
 ```screen A4 · Engine | After half a second of "✓ service running". On this Mac → A5, With an API key → B1, Later → C1.
-✓ Service ── ● Engine ── ○ Model ── ○ Ready
+✓ Service ── ● Engine ── ○ Model ── ○ Tools ── ○ Ready
 
 Where should golem think?
 
@@ -103,7 +103,7 @@ Enter picks · ↑↓ move · Esc back · q quit
 ```
 
 ```screen A5 · Ollama: missing | The panel checks at once. Installed but stopped: it only starts it. Running: guided mode skips this panel.
-✓ Service ── ● Engine ── ○ Model ── ○ Ready
+✓ Service ── ● Engine ── ○ Model ── ○ Tools ── ○ Ready
 
 On this Mac · Ollama
 
@@ -117,7 +117,7 @@ Enter picks · ↑↓ move · Esc back
 ```
 
 ```screen A6 · Ollama: installing | The daemon runs brew and streams its output to every window.
-✓ Service ── ● Engine ── ○ Model ── ○ Ready
+✓ Service ── ● Engine ── ○ Model ── ○ Tools ── ○ Ready
 
 On this Mac · Ollama
 
@@ -128,7 +128,7 @@ Esc stops
 ```
 
 ```screen A6 · Ollama: starting | Installed → Ollama starts → A7.
-✓ Service ── ● Engine ── ○ Model ── ○ Ready
+✓ Service ── ● Engine ── ○ Model ── ○ Tools ── ○ Ready
 
 On this Mac · Ollama
 
@@ -137,7 +137,7 @@ On this Mac · Ollama
 ```
 
 ```screen A6′ · Ollama: no Homebrew | Or the user picked the website. Ollama appears → A7, on its own.
-✓ Service ── ● Engine ── ○ Model ── ○ Ready
+✓ Service ── ● Engine ── ○ Model ── ○ Tools ── ○ Ready
 
 On this Mac · Ollama
 
@@ -150,7 +150,7 @@ Esc back
 ```
 
 ```screen A7 · Model | The real catalog, sized for this Mac. Enter → A8.
-✓ Service ── ✓ Engine ── ● Model ── ○ Ready
+✓ Service ── ✓ Engine ── ● Model ── ○ Tools ── ○ Ready
 
 Pick a model · Ollama · this Mac has 36 GB
 
@@ -165,8 +165,8 @@ Pick a model · Ollama · this Mac has 36 GB
 Enter downloads · ↑↓ move · Esc back
 ```
 
-```screen A8 · Model: downloading | Done → A9. Esc → the chat, with the download in the band (A10′).
-✓ Service ── ✓ Engine ── ● Model ── ○ Ready
+```screen A8 · Model: downloading | Done → H1, the Tools panel (A9 when MCP servers already exist). Esc → the chat, with the download in the band (A10′).
+✓ Service ── ✓ Engine ── ● Model ── ○ Tools ── ○ Ready
 
 ⠦ downloading Gemma 4 E4B
   ██████░░░░░░░░░░░░  2.1 / 6.6 GB · 12 MB/s · 6 min
@@ -174,14 +174,15 @@ Enter downloads · ↑↓ move · Esc back
 Esc keeps it downloading and opens the chat
 ```
 
-```screen A9 · Ready | Enter → the chat.
-✓ Service ── ✓ Engine ── ✓ Model ── ● Ready
+```screen A9 · Ready | Enter → the chat. The Tools row is there only when Tools ran or servers exist.
+✓ Service ── ✓ Engine ── ✓ Model ── ✓ Tools ── ● Ready
 
 ✓ golem is ready
 
   Service   running, starts at login
   Engine    Ollama on this Mac
   Model     Gemma 4 E4B · saved as default
+  Tools     Fetch, Context7, Playwright · on demand
 
 /setup brings this back any time.
 
@@ -212,7 +213,7 @@ connected   untitled   Gemma 4 E4B
 From A4, With an API key.
 
 ```screen B1 · Provider | Enter → B2.
-✓ Service ── ● Engine ── ○ Model ── ○ Ready
+✓ Service ── ● Engine ── ○ Model ── ○ Tools ── ○ Ready
 
 With an API key · which provider?
 
@@ -223,7 +224,7 @@ Enter picks · ↑↓ move · Esc back
 ```
 
 ```screen B2 · Key: found in the shell | When the shell has ANTHROPIC_API_KEY. Use it → B3.
-✓ Service ── ● Engine ── ○ Model ── ○ Ready
+✓ Service ── ● Engine ── ○ Model ── ○ Tools ── ○ Ready
 
 Anthropic · API key
 
@@ -238,7 +239,7 @@ Enter picks · ↑↓ move · Esc back
 ```
 
 ```screen B2′ · Key: pasted | Enter → B3.
-✓ Service ── ● Engine ── ○ Model ── ○ Ready
+✓ Service ── ● Engine ── ○ Model ── ○ Tools ── ○ Ready
 
 Anthropic · API key
 
@@ -252,7 +253,7 @@ Enter checks · Esc back
 ```
 
 ```screen B3 · Key: checking | The daemon asks the provider before it stores the key.
-✓ Service ── ● Engine ── ○ Model ── ○ Ready
+✓ Service ── ● Engine ── ○ Model ── ○ Tools ── ○ Ready
 
 Anthropic · API key
 
@@ -260,7 +261,7 @@ Anthropic · API key
 ```
 
 ```screen B3 · Key: rejected | The provider's own reason. Nothing is stored, and the field stays open.
-✓ Service ── ● Engine ── ○ Model ── ○ Ready
+✓ Service ── ● Engine ── ○ Model ── ○ Tools ── ○ Ready
 
 Anthropic · API key
 
@@ -271,7 +272,7 @@ Enter checks · Esc back
 ```
 
 ```screen B3 · Key: it works | → B4.
-✓ Service ── ● Engine ── ○ Model ── ○ Ready
+✓ Service ── ● Engine ── ○ Model ── ○ Tools ── ○ Ready
 
 Anthropic · API key
 
@@ -279,7 +280,7 @@ Anthropic · API key
 ```
 
 ```screen B3′ · Key: macOS asks | The first read of a stored key by a new golem shows a system dialog.
-✓ Service ── ● Engine ── ○ Model ── ○ Ready
+✓ Service ── ● Engine ── ○ Model ── ○ Tools ── ○ Ready
 
 Anthropic · API key
 
@@ -287,8 +288,8 @@ Anthropic · API key
   Choose "Always Allow" in the dialog.
 ```
 
-```screen B4 · Model | The same panel as A7, with the provider's models. Enter → Ready, as in A9.
-✓ Service ── ✓ Engine ── ● Model ── ○ Ready
+```screen B4 · Model | The same panel as A7, with the provider's models. Enter → Tools (H1), then Ready as in A9.
+✓ Service ── ✓ Engine ── ● Model ── ○ Tools ── ○ Ready
 
 Pick a model · Anthropic
 
@@ -310,7 +311,7 @@ connected   untitled   no model
 ```
 
 ```screen C2 · Engine, after a send | Sending with no model opens the window on Engine. The message stays in the composer and goes once a model is ready.
-– Service ── ● Engine ── ○ Model ── ○ Ready
+– Service ── ● Engine ── ○ Model ── ○ Tools ── ○ Ready
 
 Pick how golem thinks, then Enter sends your message.
 
@@ -321,7 +322,7 @@ Enter picks · ↑↓ move · Esc back
 ```
 
 ```screen C3 · Quit setup? | q after the service is set up.
-✓ Service ── ● Engine ── ○ Model ── ○ Ready
+✓ Service ── ● Engine ── ○ Model ── ○ Tools ── ○ Ready
 
 Quit setup?
 The service stays on. /setup picks up where you left.
@@ -339,11 +340,12 @@ Enter picks · ↑↓ move
 ✓ Engine    Ollama 0.12 · running
             Anthropic · key works
 ✓ Model     Gemma 4 E4B · default
-✓ Tools     2 MCP servers connected
+✓ Tools     3 MCP servers · 2 on demand
 ✓ Skills    4 skills
 
 › Change model
   Add an API key
+  Manage tools
   Run setup again
 
 Enter picks · ↑↓ move · r recheck · Esc back to chat
@@ -360,7 +362,7 @@ Enter picks · ↑↓ move · Esc back
 ```
 
 ```screen D3 · Run setup again | Guided mode with today's choices filled in, so Enter on every panel changes nothing. "Stop and remove it" asks again.
-● Service ── ○ Engine ── ○ Model ── ○ Ready
+● Service ── ○ Engine ── ○ Model ── ○ Tools ── ○ Ready
 
 ✓ Service is running and starts at login.
 
@@ -369,6 +371,92 @@ Enter picks · ↑↓ move · Esc back
   Stop and remove it
 
 Enter picks · ↑↓ move · Esc back
+```
+
+## H · Tools
+
+One panel for the MCP servers golem can start. It sits between Model and Ready, so a new user has useful tools on day one, and none of them costs a token until a chat turns it on. The full manager is `/mcp` ([mcp.md](mcp.md)).
+
+```screen H1 · Tools: the offer | Opened from Model, only when no [mcp] table exists. The starter servers come from the catalog data (starter = true). Space ticks, Enter adds the ticked ones.
+✓ Service ── ✓ Engine ── ✓ Model ── ● Tools ── ○ Ready
+
+Give golem some tools?
+They cost nothing until a chat turns one on.
+
+› [x] Fetch        read any web page
+  [x] Context7     up-to-date library docs
+  [x] Playwright   browse and test web pages
+  [ ] GitHub       repos, issues, pull requests
+
+Space ticks · Enter adds 3 · s skip · Esc back
+```
+
+```screen H2 · Tools: GitHub needs a token | Ticking a server with a secret opens its field below the list. Empty means skip that server.
+✓ Service ── ✓ Engine ── ✓ Model ── ● Tools ── ○ Ready
+
+GitHub · token
+
+Paste a token:
+❯ ••••••••••••••••••••▏
+
+Make one at github.com/settings/personal-access-tokens/new
+Stored in your macOS Keychain, never in a file.
+
+Enter keeps it · Esc back
+```
+
+```screen H3 · Tools: adding | Node or uv is installed first when a server needs it, the way Ollama is (A6). Each row says what it is doing.
+✓ Service ── ✓ Engine ── ✓ Model ── ● Tools ── ○ Ready
+
+Adding 3 tools
+
+✓ Fetch        added · 1 tool
+⠸ Node         brew install node                   38s
+               downloading  ████████░░░░░░  41 / 98 MB
+○ Context7     waiting
+○ Playwright   needs Node
+
+Esc stops
+```
+
+```screen H4 · Tools: added | Enter → Ready.
+✓ Service ── ✓ Engine ── ✓ Model ── ● Tools ── ○ Ready
+
+✓ Fetch        1 tool · on demand
+✓ Context7     2 tools · on demand
+✓ Playwright   21 tools · on demand
+
+On demand: a chat turns one on with /mcp, or golem asks
+you first. /mcp manages them any time.
+
+Enter continues
+```
+
+```screen H5 · Tools: one failed | The reason is the one hint mcp.test gives. The others stay added.
+✓ Service ── ✓ Engine ── ✓ Model ── ● Tools ── ○ Ready
+
+✓ Fetch        1 tool · on demand
+✗ GitHub       the token was refused
+✓ Context7     2 tools · on demand
+
+› Paste a new token
+  Skip GitHub
+  Show the log
+
+Enter picks · ↑↓ move · Esc back
+```
+
+```screen H6 · Tools, from /setup | Single mode: the same panel with the servers already added shown as done. More is in /mcp.
+Tools · 3 servers
+
+  [x] Fetch        added
+  [x] Context7     added
+  [x] Playwright   added
+› [ ] GitHub       repos, issues, pull requests
+
+More servers: close this and type /mcp
+
+Space ticks · Enter adds 1 · Esc back
 ```
 
 ## E · Something breaks later
@@ -416,8 +504,8 @@ When golem has to start Ollama or load the model for the first message, the band
 
 ## F · A small terminal
 
-```screen F · Under 60×20 | The window loses its border and goes full width. The stepper becomes "2/4 Engine".
-golem setup · 2/4 Engine
+```screen F · Under 60×20 | The window loses its border and goes full width. The stepper becomes "2/5 Engine".
+golem setup · 2/5 Engine
 Where should golem think?
 › On this Mac      Ollama
   With an API key
@@ -446,6 +534,7 @@ Enter · ↑↓ · Esc
 | Provider | B1 | `provider:<id>`, `cancelled` |
 | Key | B2–B3′ | `done`, `cancelled` |
 | Model | A7, A8, B4, D2, E3 | `done`, `background`, `cancelled` |
+| Tools | H1–H6 | `done`, `skip`, `cancelled` |
 | Ready | A9 | `done` |
 | Overview | D1, E2 | `open:<panel>`, `guided`, `close` |
 
@@ -458,7 +547,8 @@ Enter · ↑↓ · Esc
 | guided | Engine `key` | Provider, then Key |
 | guided | Ollama or Key `done` | Model |
 | guided | Engine `later` | the chat (C1) |
-| guided | Model `done` | Ready |
+| guided | Model `done` | Tools when the user config has no `[mcp]` table, else Ready |
+| guided | Tools `done` or `skip` | Ready |
 | guided | Model `background` | the chat, with the download in the band (A10′) |
 | guided | Ready `done` | the chat |
 | guided | any `cancelled` | the panel before. On Service, golem quits |
@@ -475,15 +565,18 @@ Enter · ↑↓ · Esc
 | Everything works | nothing, the `welcome back` line (E4) |
 | `/setup` | the overview (D1) |
 
+Tools is offered once. "Offered" is kept with the setup window's other state, and a `[mcp]` table in the user config means there is nothing to offer.
+
 ### What the daemon gives
 
 - `setup.status`: every overview row in one call, from the same checks as `golem doctor`.
 - An Ollama install that streams progress, like a model pull.
 - A key check before the key is stored.
 - Pull progress, which exists today.
+- `mcp.catalog` for the Tools rows, `mcp.add` with a catalog id for Enter, `runtime.install` for Node and uv, and `mcp.test` for the one-line reason when a server fails. `setup.status` has a `tools` part for the overview row.
 
 The TUI fills the Service row itself, from the launch agent and `run/last-error`, because the daemon can't answer while it is down.
 
 ### The web UI
 
-The web uses the same navigation table, panels, lines, and `setup.status`, and draws them as a centred dialog ([web.md](web.md#the-setup-window)). It differs in two panels, since [ADR-028](../adr/028-web-gateway.md) keeps both out of the browser. Service is already running, so it only shows `golem daemon install` with a copy button when launchd doesn't keep it, and its row comes from the daemon's launchd check with the version added. Key never takes a key: it shows `golem auth set <provider>` with a copy button and a `Check again` button. There is no Quit-setup question, and the dialog's close button is the same as Later.
+The web uses the same navigation table, panels, lines, and `setup.status`, and draws them as a centred dialog ([web.md](web.md#the-setup-window)). It differs in two panels, since [ADR-028](../adr/028-web-gateway.md) keeps both out of the browser. Service is already running, so it only shows `golem daemon install` with a copy button when launchd doesn't keep it, and its row comes from the daemon's launchd check with the version added. Key never takes a key: it shows `golem auth set <provider>` with a copy button and a `Check again` button. Tools needs no such change: it is the same panel, and a token for GitHub may be typed into the page, because [ADR-037](../adr/037-browser-manages-mcp-and-config.md) allows MCP tokens, not model keys. There is no Quit-setup question, and the dialog's close button is the same as Later.

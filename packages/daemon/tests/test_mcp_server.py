@@ -217,7 +217,9 @@ async def test_the_manager_lists_tools_restarts_and_turns_a_server_off(short_hom
 
         tools = rpc_result(await client.call("mcp.tools", {"name": "fake"}))
         listed = cast(list[dict[str, object]], tools["tools"])
-        assert listed[0] == {"name": "mcp__fake__echo", "description": "Says the text back."}
+        assert listed[0]["name"] == "mcp__fake__echo"
+        assert listed[0]["description"] == "Says the text back."
+        assert listed[0]["hidden"] is False
 
         restarted = rpc_result(await client.call("mcp.restart", {"name": "fake"}))
         assert restarted["state"] == "starting"

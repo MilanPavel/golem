@@ -1,11 +1,13 @@
 """Which daemon methods a browser may call through the web gateway.
 
 Every daemon method is listed here, in the order the daemon registers them.
-``auth.set`` and ``auth.remove`` are ``"local"``: an API key typed into a page
-would sit in browser memory, so key management stays in the terminal. The
-gateway's allowlist is generated from this table (``just gen`` writes
-``gen/browser-methods.ts``), and a daemon test fails for any method that is
-missing here. ADR-028 is the reference.
+``auth.set`` and ``auth.remove`` are ``"local"``: a model provider's API key
+typed into a page would sit in browser memory, so key management stays in the
+terminal. MCP servers, their tokens, and ``config.toml`` may be managed from a
+page, with the daemon refusing edits that move a secret or widen trust
+(ADR-037). The gateway's allowlist is generated from this table (``just gen``
+writes ``gen/browser-methods.ts``), and a daemon test fails for any method that
+is missing here. ADR-028 and ADR-037 are the reference.
 """
 
 from collections.abc import Mapping
@@ -43,8 +45,13 @@ METHOD_ACCESS: Final[Mapping[str, Access]] = {
     "mcp.tools": "browser",
     "mcp.restart": "browser",
     "mcp.set_enabled": "browser",
-    "mcp.add": "local",
-    "mcp.remove": "local",
+    "mcp.add": "browser",
+    "mcp.remove": "browser",
+    "mcp.get": "browser",
+    "mcp.update": "browser",
+    "config.raw.get": "browser",
+    "config.raw.set": "browser",
+    "config.raw.set_protected": "local",
     "skill.list": "browser",
     "session.set_skills": "browser",
     "model.probe": "browser",

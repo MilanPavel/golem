@@ -1,0 +1,22 @@
+{
+  "additionalProperties": false,
+  "description": "``tools`` of ``[mcp.<name>]``: ``fnmatch`` patterns on the server's own tool names.\n\nAn empty ``include`` means every tool, and ``exclude`` wins.",
+  "properties": {
+    "exclude": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Exclude",
+      "type": "array"
+    },
+    "include": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Include",
+      "type": "array"
+    }
+  },
+  "title": "McpToolFilterConfig",
+  "type": "object"
+}

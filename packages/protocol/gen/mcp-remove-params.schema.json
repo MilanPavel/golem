@@ -1,11 +1,24 @@
 {
   "additionalProperties": false,
-  "description": "``mcp.remove``. Delete ``[mcp.<name>]`` from the user's config, and stop the server.\n\nThe server's ``mcp/<name>`` token goes from the credential store too.",
+  "description": "``mcp.remove``. Delete ``[mcp.<name>]`` from the user's config, and stop the server.\n\nThe server's ``mcp/<name>`` secrets go from the credential store too, unless\nanother server names them. With ``session_id``, a trusted project's server\ncan be removed.",
   "properties": {
     "name": {
       "minLength": 1,
       "title": "Name",
       "type": "string"
+    },
+    "session_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Session Id"
     }
   },
   "required": [
