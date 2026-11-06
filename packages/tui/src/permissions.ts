@@ -1,23 +1,13 @@
 import type { ConfigGetResult } from "@golem/client";
+import {
+  itemText,
+  permissionItems,
+  ruleChange,
+  type Action,
+  type PermissionsAction,
+} from "@golem/view";
 
 import type { Press } from "./keys.ts";
-
-type Action = "allow" | "ask" | "deny";
-
-/** One row of `/permissions`: a rule in check order, or something this session allows. */
-export type PermissionItem =
-  | {
-      kind: "rule";
-      action: Action;
-      tool: string;
-      match: string | null;
-      path: string | null;
-      source: string;
-      ignored: string | null;
-      file: "user" | "project" | "default";
-      index: number | null;
-    }
-  | { kind: "allowance"; tool: string; subject: string | null };
 
 export type PermissionsState = {
   open: boolean;
@@ -29,46 +19,13 @@ export const closedPermissions: PermissionsState = { open: false, selected: 0, c
 
 export type PermissionsKey = "up" | "down" | "close" | "refresh" | "delete" | Action;
 
-export type PermissionsAction =
-  | { kind: "none" }
-  | { kind: "close" }
-  | { kind: "refresh" }
-  | { kind: "notice"; text: string }
-  | { kind: "update"; target: "user" | "project"; index: number; action: Action }
-  | { kind: "remove"; target: "user" | "project"; index: number }
-  | { kind: "revoke"; tool: string; subject: string | null };
-
 export type PermissionsLine = { text: string; selected: boolean; dim: boolean };
 
 export const PERMISSIONS_HINT = "↑↓ move · a allow · k ask · d deny · x delete · r refresh · Esc close";
-export const DEFAULT_LOCKED = "built-in defaults cannot be changed; a rule in config.toml goes before them";
+export { DEFAULT_LOCKED, itemText, permissionItems, type PermissionItem } from "@golem/view";
 
 export function openPermissions(): PermissionsState {
   return { open: true, selected: 0, config: null };
-}
-
-/** Rules in check order, then what this session allows. */
-export function permissionItems(config: ConfigGetResult | null): PermissionItem[] {
-  if (config === null) {
-    return [];
-  }
-  const rules: PermissionItem[] = config.rules.map((rule) => ({
-    kind: "rule",
-    action: rule.action,
-    tool: rule.tool,
-    match: rule.match ?? null,
-    path: rule.path ?? null,
-    source: rule.source,
-    ignored: rule.ignored ?? null,
-    file: rule.file ?? "default",
-    index: rule.index ?? null,
-  }));
-  const allowed: PermissionItem[] = (config.session_allowed ?? []).map((item) => ({
-    kind: "allowance",
-    tool: item.tool,
-    subject: item.subject ?? null,
-  }));
-  return [...rules, ...allowed];
 }
 
 export function permissionsKeyOf(press: Press): PermissionsKey | null {
@@ -112,22 +69,7 @@ export function pressPermissions(
   if (item === undefined) {
     return { state, action: { kind: "none" } };
   }
-  if (item.kind === "allowance") {
-    if (key === "delete" || key === "deny") {
-      return { state, action: { kind: "revoke", tool: item.tool, subject: item.subject } };
-    }
-    return { state, action: { kind: "notice", text: "x revokes what this session allows" } };
-  }
-  if (item.file === "default" || item.index === null) {
-    return { state, action: { kind: "notice", text: DEFAULT_LOCKED } };
-  }
-  if (key === "delete") {
-    return { state, action: { kind: "remove", target: item.file, index: item.index } };
-  }
-  if (key === item.action) {
-    return { state, action: { kind: "none" } };
-  }
-  return { state, action: { kind: "update", target: item.file, index: item.index, action: key } };
+  return { state, action: ruleChange(item, key) };
 }
 
 /** The header, then at most `rows - 1` items scrolled to keep the selection on screen. */
@@ -150,22 +92,6 @@ export function layoutPermissions(state: PermissionsState, columns: number, rows
     dim: item.kind === "rule" && (item.file === "default" || item.ignored !== null),
   }));
   return [header, ...lines];
-}
-
-export function itemText(item: PermissionItem): string {
-  if (item.kind === "allowance") {
-    const what = item.subject === null ? item.tool : `${item.tool} ${item.subject}`;
-    return `  session  allow  ${what}  (for this session)`;
-  }
-  const scope = [item.tool];
-  if (item.match !== null) {
-    scope.push(`match "${item.match}"`);
-  }
-  if (item.path !== null) {
-    scope.push(`path "${item.path}"`);
-  }
-  const note = item.ignored === null ? item.source : `${item.source}, ignored: ${item.ignored}`;
-  return `  ${item.action.padEnd(5)}  ${scope.join(" ")}  ${note}`;
 }
 
 function fit(text: string, width: number): string {

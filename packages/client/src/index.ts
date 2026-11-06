@@ -43,7 +43,7 @@ export type { SessionSetSkillsResult } from "../../protocol/gen/session-set-skil
 export type { McpToolInfo, McpToolsResult } from "../../protocol/gen/mcp-tools-result.ts";
 export type { SkillCall } from "../../protocol/gen/skill-call.ts";
 export type { ListedSkill, SkillListResult } from "../../protocol/gen/skill-list-result.ts";
-export type { ConfigGetResult, ConfigRule } from "../../protocol/gen/config-get-result.ts";
+export type { ConfigAllowance, ConfigGetResult, ConfigRule } from "../../protocol/gen/config-get-result.ts";
 export type { ListedModel, ModelListResult } from "../../protocol/gen/model-list-result.ts";
 export type { SetupRow, SetupStatusResult } from "../../protocol/gen/setup-status-result.ts";
 export { mergeSummary } from "./session-index.ts";
