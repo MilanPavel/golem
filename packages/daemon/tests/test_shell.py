@@ -250,3 +250,46 @@ def test_shell_settings_come_from_the_user_config(tmp_path: Path) -> None:
     config.write_text("[shell]\nnetwork = true\ntimeout_seconds = 30\n", encoding="utf-8")
     assert Policy(config, home=tmp_path).shell() == ShellSettings(network=True, timeout_seconds=30)
     assert Policy(None, home=tmp_path).shell() == ShellSettings()
+
+
+async def test_an_unsandboxed_command_writes_anywhere_and_keeps_credentials(
+    root: Path, short_home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("GH_TOKEN", "t0ken")
+    # It needs no sandbox at all, so it runs where shell cannot.
+    monkeypatch.setattr(sandbox, "available", lambda: False)
+    outside = short_home / "pushed.txt"
+    done = await _call(root, "shell_unsandboxed", command=f'echo "$GH_TOKEN" > {outside} && pwd')
+    assert done.summary == "exit 0"
+    assert done.output.splitlines()[0] == str(root.resolve())
+    assert outside.read_text("utf-8") == "t0ken\n"
+    with pytest.raises(ToolError, match="sandbox"):
+        await _call(root, "shell", command="true")
+
+
+@needs_sandbox
+async def test_a_sandboxed_command_still_gets_no_credentials(
+    root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("GH_TOKEN", "t0ken")
+    done = await _call(root, "shell", command='echo "[$GH_TOKEN]"; cat ~/.config/gh/hosts.yml')
+    assert done.output.splitlines()[0] == "[]"
+    assert done.summary != "exit 0"
+
+
+def test_only_a_rule_that_names_shell_unsandboxed_allows_it(tmp_path: Path, root: Path) -> None:
+    registry = default_registry()
+    config = tmp_path / "config.toml"
+    push = {"command": "git push origin HEAD"}
+
+    def decide(rules: str) -> str:
+        config.write_text(rules, encoding="utf-8")
+        return Policy(config, home=tmp_path).check(registry, "shell_unsandboxed", push, root).action
+
+    assert decide("") == "ask"
+    broad = '[[rule]]\ntool = "{}"\nmatch = "git push*"\naction = "allow"\n'
+    assert decide(broad.format("shell")) == "ask"
+    assert decide(broad.format("*")) == "ask"
+    assert decide(broad.format("shell*")) == "ask"
+    assert decide(broad.format("shell_unsandboxed")) == "allow"
+    assert decide('[[rule]]\ntool = "*"\naction = "deny"\n') == "deny"

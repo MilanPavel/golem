@@ -2,7 +2,7 @@
 title: Sandboxes
 description: Why a command you allowed still runs in a box, what golem's shell sandbox lets through and what it stops, and how the file tools keep to the project folder.
 order: 8
-adrs: [14, 30]
+adrs: [14, 30, 38]
 ---
 
 # {{ $frontmatter.title }}
@@ -117,6 +117,7 @@ For contributors: the reference for the shell sandbox, the git tools, and the fi
 - **The sandbox** allows writes only to the folder, the temp folders, the usual tool caches, and `[shell] writable`. When the folder is in a git checkout whose git folders are outside it, it may write those too, so `git fetch` and `git commit` work. In a git worktree they are its own folder, from the `gitdir:` line of its `.git` file, and the folder it shares with the main checkout, from `commondir`. The rest of the main checkout stays closed. golem reads the two files itself and does not run git (`sandbox.git_dirs`). The shared folder holds the main checkout's hooks and config, so a command could change them. A command in a plain clone could always do that, since its `.git` is inside the session folder. It denies the network unless `[shell] network = true`, except local Unix sockets. It denies reads of folders that hold credentials, `~/.ssh` and `~/.golem` among them, but allows reads of `~/.golem/skills`, so a skill can run its scripts ([ADR-030](../adr/030-skill-read-roots.md)). Variables that look like credentials (`*_API_KEY`, `*_TOKEN`, `*_SECRET`, `*PASSWORD*`) are removed from the environment.
 - **Policy.** `shell` is not read-only, so by default every command asks. A rule's `match` is checked against the command, so `match = "git status|pnpm test*"` allows those and nothing else. Allowing a command for the session allows that exact command, not every command.
 - **Where there is no sandbox**, for example inside another sandbox or off macOS, `shell` and the git helpers refuse to run and say why.
+- **Outside the sandbox.** `shell_unsandboxed` runs the same way without `sandbox-exec`, and keeps the variables that hold credentials, so `gh` and `git push` work ([ADR-038](../adr/038-shell-unsandboxed.md)). It needs no sandbox, so it runs where `shell` cannot. It is a tool of its own, so a rule or a session allowance for `shell` never lets a command out. An `allow` rule covers it only when it names it (`NAMED_ONLY` in `golem/permissions/engine.py`), so `tool = "*"` does not.
 
 **The profile, in full** (`profile` in `golem/tools/sandbox.py`). It allows everything, then:
 

@@ -149,6 +149,7 @@ def test_schemas_use_the_function_format() -> None:
         "write_file",
         "edit_file",
         "shell",
+        "shell_unsandboxed",
         "git_status",
         "git_diff",
         "git_log",

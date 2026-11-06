@@ -21,6 +21,7 @@ golem does its work through **tools**: small actions it asks the daemon to run, 
 | `write_file` | Creates a file, or replaces all of it | Asks, with the diff |
 | `edit_file` | Replaces exact text in a file | Asks, with the diff |
 | `shell` | Runs a command, in a sandbox | Asks |
+| `shell_unsandboxed` | Runs a command outside the sandbox, with your credentials and the network, for `gh` and `git push` | Asks |
 | `web_fetch` | Reads one web page | Asks, per host |
 | `mcp__<server>__<tool>` | A tool from an [MCP server](./mcp.md) | Asks |
 
@@ -111,6 +112,18 @@ timeout_seconds = 300
 
 The `[shell]` settings are read only from your own `config.toml`. A project cannot widen them. A change applies from the next command.
 
+### Outside the sandbox
+
+`gh` and `git push` need your login and the network, which the sandbox keeps out. For such a command the model uses `shell_unsandboxed`. It runs in the project folder like `shell`, but without the sandbox, so it can do anything you can. It asks every time, and the question names the tool:
+
+```tablet
+Allow shell_unsandboxed gh pr create --fill?
+asked by built-in default
+a once · s this session · w always (saves a rule) · e edit · d deny
+```
+
+**s** and **w** cover that exact command. Only a rule that names `shell_unsandboxed` allows it: `tool = "*"` or `tool = "shell*"` with `action = "allow"` does not. Keep its `match` exact, because `match = "gh *"` would also allow `gh x; rm -rf ~`.
+
 ## The web
 
 `web_fetch` asks once per host, so a rule can allow the sites you trust:
@@ -133,5 +146,6 @@ A tool result over 20 000 characters is stored once, and the model sees its star
 - [ADR-012](../adr/012-permission-rules.md): rules, first match wins, and a project cannot allow itself.
 - [ADR-013](../adr/013-approvals.md): an approval pauses the run.
 - [ADR-014](../adr/014-shell-sandbox.md): the shell runs under `sandbox-exec`, or not at all.
+- [ADR-038](../adr/038-shell-unsandboxed.md): a command you approve may run outside the sandbox, as a tool of its own.
 - [ADR-015](../adr/015-write-tools.md): a file change is applied only as shown.
 - [ADR-016](../adr/016-artifacts.md) and [ADR-017](../adr/017-web-fetch.md): long output, and the web.
