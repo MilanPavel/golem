@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { applyTheme, onThemeApplied, readTheme } from "./theme.ts";
+import { applyTheme, readTheme } from "./theme.ts";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -42,14 +42,4 @@ test("blocked storage falls back to system and does not throw", () => {
   expect(readTheme()).toBe("system");
   expect(() => applyTheme("kiln")).not.toThrow();
   expect(document.documentElement.getAttribute("data-theme")).toBe("kiln");
-});
-
-test("listeners hear each applied theme until they unsubscribe", () => {
-  const heard: string[] = [];
-  const off = onThemeApplied((choice) => heard.push(choice));
-  applyTheme("kiln");
-  applyTheme("system");
-  off();
-  applyTheme("slip");
-  expect(heard).toEqual(["kiln", "system"]);
 });

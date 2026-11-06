@@ -124,15 +124,18 @@ test("the Setup section reads all set when nothing is wrong", async () => {
   expect(await screen.findByText("all set", { selector: "p" })).toBeTruthy();
 });
 
-test("Appearance changes the theme as the sidebar's switch does", async () => {
+test("Appearance offers Match system, Light and Dark, and the sidebar has no theme switch", async () => {
   const { user } = mount("/settings/appearance", OK_ROWS);
   const main = screen.getByRole("main");
-  await user.click(within(main).getByRole("button", { name: "Kiln" }));
+  expect(within(sidebar()).queryByRole("group", { name: "Theme" })).toBeNull();
+  expect(within(main).getByRole("button", { name: "Match system" }).getAttribute("aria-pressed")).toBe("true");
+  await user.click(within(main).getByRole("button", { name: "Dark" }));
   expect(document.documentElement.dataset.theme).toBe("kiln");
-  expect(within(sidebar()).getByRole("button", { name: "Kiln" }).getAttribute("aria-pressed")).toBe("true");
-  await user.click(within(sidebar()).getByRole("button", { name: "Slip" }));
+  expect(within(main).getByRole("button", { name: "Dark" }).getAttribute("aria-pressed")).toBe("true");
+  await user.click(within(main).getByRole("button", { name: "Light" }));
   expect(document.documentElement.dataset.theme).toBe("slip");
-  expect(within(main).getByRole("button", { name: "Slip" }).getAttribute("aria-pressed")).toBe("true");
+  await user.click(within(main).getByRole("button", { name: "Match system" }));
+  expect(document.documentElement.dataset.theme).toBeUndefined();
 });
 
 // Looking again
