@@ -62,6 +62,14 @@ export const HOSTED_PROVIDERS: readonly HostedProvider[] = [
     env: "XAI_API_KEY",
     prefer: [/^grok-\d+(\.\d+)?$/i, /^grok-\d/i, /^grok-/i],
   },
+  {
+    id: "moonshot",
+    name: "Moonshot",
+    blurb: "Kimi",
+    console: "platform.moonshot.ai/console/api-keys",
+    env: "MOONSHOT_API_KEY",
+    prefer: [/^kimi-k\d+(\.\d+)?$/i, /^kimi-k\d/i, /^kimi-/i, /^moonshot-v1-128k$/i],
+  },
 ];
 
 export function hostedProvider(id: string): HostedProvider | null {
