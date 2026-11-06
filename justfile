@@ -59,9 +59,10 @@ golden:
 prices:
     uv run python -m golem.models.prices
 
-# Check the local model catalog against the Ollama registry and list newer releases.
+# Check the local model catalog against the Ollama registry, and the MCP catalog against npm and PyPI.
 catalog:
     uv run python -m golem.models.catalog_check
+    uv run python -m golem.mcp.catalog_check
 
 # Lint Python and the TypeScript packages.
 lint:

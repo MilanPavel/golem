@@ -1046,6 +1046,127 @@ class McpCallResult(BaseModel):
     structured: Any | None = None
 
 
+McpCatalogCategory = Literal["files", "code", "web", "data", "productivity", "other"]
+
+
+class McpCatalogInput(BaseModel):
+    """One thing a catalog entry asks for. A ``secret`` is never stored in the config file."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str = Field(min_length=1)
+    kind: Literal["path", "text", "secret", "choice"]
+    label: str = Field(min_length=1)
+    hint: str | None = None
+    default: str | None = None
+    choices: list[str] = Field(default_factory=list[str])
+    required: bool = True
+
+
+class McpCatalogEntry(BaseModel):
+    """A server ``mcp.catalog`` offers, and whether it can be added here and now.
+
+    ``name`` is the server name it adds. ``runtime`` is what runs it (``npx``,
+    ``uvx``, ``docker``) or ``url``, and ``auth`` is ``none``, ``token``, or
+    ``oauth``. ``missing`` names the program (``node``, ``uv``, ``docker``)
+    that is not installed, so a UI can offer ``runtime.install``. ``available``
+    is false, with a ``reason``, for an entry that cannot be added yet.
+    ``added`` is true when a server of that name exists. ``on_demand`` entries
+    cost no tokens until a chat turns them on, and ``starter`` ones are
+    offered in the setup window.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    title: str = Field(min_length=1)
+    description: str
+    category: McpCatalogCategory
+    homepage: str
+    runtime: Literal["npx", "uvx", "docker", "url"]
+    auth: Literal["none", "token", "oauth"]
+    inputs: list[McpCatalogInput] = Field(default_factory=list[McpCatalogInput])
+    starter: bool = False
+    on_demand: bool = True
+    available: bool = True
+    reason: str | None = None
+    missing: Literal["node", "uv", "docker"] | None = None
+    added: bool = False
+
+
+class McpCatalogParams(BaseModel):
+    """``mcp.catalog``. With ``session_id``, ``{folder}`` and ``added`` are about its project."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str | None = Field(default=None, min_length=1)
+
+
+class McpCatalogResult(BaseModel):
+    """The entries, in the catalog's order."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    entries: list[McpCatalogEntry]
+
+
+RuntimeName = Literal["node", "uv"]
+
+
+class RuntimeInstallParams(BaseModel):
+    """``runtime.install``. Install Node or uv with Homebrew. Output: ``runtime.install.output``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: RuntimeName
+
+
+class RuntimeInstallResult(BaseModel):
+    """``started`` is false when that install was already running."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: RuntimeName
+    started: bool
+
+
+class RuntimeInstallCancelParams(BaseModel):
+    """``runtime.install_cancel``. Stop a running install."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: RuntimeName
+
+
+class RuntimeInstallCancelResult(BaseModel):
+    """``cancelled`` is false when that install was not running."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: RuntimeName
+    cancelled: bool
+
+
+class RuntimeInstallOutput(BaseModel):
+    """Output from ``brew install`` as it came, carriage returns included."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: RuntimeName
+    text: str
+
+
+class RuntimeInstallDone(BaseModel):
+    """The install ended. ``error`` says why when ``ok`` is false, and is null when stopped."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: RuntimeName
+    ok: bool
+    error: str | None = None
+
+
 class McpSetEnabledParams(BaseModel):
     """``mcp.set_enabled``. Write ``enabled`` into the file that names the server.
 
@@ -1071,6 +1192,12 @@ class McpAddParams(BaseModel):
     server sends it as a Bearer header, and a command gets it in the variable
     ``token_env``.
 
+    The catalog form gives a ``catalog_id`` from ``mcp.catalog``, with the typed
+    ``inputs`` and the secret ones in ``secrets``, both by input id, and the
+    entry's own ``name`` (or another one). The daemon fills the entry's template,
+    checks it, and stores each secret as ``mcp/<name>`` (``mcp/<name>-<id>`` for
+    an input other than ``token``).
+
     The full form gives the whole ``config``, and ``secrets`` by reference
     (``mcp/github``). Each secret must appear in ``config`` as
     ``keychain:<ref>``, and may only be ``mcp/<name>`` or ``mcp/<name>-…`` for
@@ -1087,6 +1214,8 @@ class McpAddParams(BaseModel):
     token: SecretStr | None = Field(default=None, min_length=1, max_length=4096)
     token_env: str | None = Field(default=None, pattern=r"^[A-Za-z_][A-Za-z0-9_]*$")
     config: McpServerConfig | None = None
+    catalog_id: str | None = Field(default=None, min_length=1)
+    inputs: dict[str, str] = Field(default_factory=dict[str, str])
     secrets: dict[str, SecretStr] = Field(default_factory=dict[str, SecretStr])
     scope: Literal["user", "project"] = "user"
     session_id: str | None = Field(default=None, min_length=1)
@@ -1100,10 +1229,19 @@ class McpAddParams(BaseModel):
             or self.token_env is not None
             or bool(self.args)
         )
-        if self.config is not None and short:
-            raise ValueError("send either config, or command, args, url, token, and token_env")
-        if self.config is None and (self.secrets or self.scope != "user"):
-            raise ValueError("secrets and scope go with config")
+        forms = sum([short, self.config is not None, self.catalog_id is not None])
+        if forms > 1:
+            raise ValueError(
+                "send one form: command, args, url, token, and token_env; or config; or catalog_id"
+            )
+        if (
+            self.config is None
+            and self.catalog_id is None
+            and (self.secrets or self.scope != "user")
+        ):
+            raise ValueError("secrets and scope go with config or catalog_id")
+        if self.catalog_id is None and self.inputs:
+            raise ValueError("inputs go with catalog_id")
         return self
 
 
@@ -1555,6 +1693,11 @@ __all__ = [
     "McpAddParams",
     "McpCallParams",
     "McpCallResult",
+    "McpCatalogCategory",
+    "McpCatalogEntry",
+    "McpCatalogInput",
+    "McpCatalogParams",
+    "McpCatalogResult",
     "McpImplementation",
     "McpListParams",
     "McpListResult",
@@ -1614,6 +1757,13 @@ __all__ = [
     "PolicyUpdateParams",
     "RunCancelParams",
     "RunCancelResult",
+    "RuntimeInstallCancelParams",
+    "RuntimeInstallCancelResult",
+    "RuntimeInstallDone",
+    "RuntimeInstallOutput",
+    "RuntimeInstallParams",
+    "RuntimeInstallResult",
+    "RuntimeName",
     "SessionAttachParams",
     "SessionAttachResult",
     "SessionCloseParams",

@@ -153,12 +153,16 @@ def _pointed(file: Path, prefix: str, base: Path) -> Path | None:
     return target if target.is_dir() else None
 
 
-def environment(base: dict[str, str], *, home: Path) -> dict[str, str]:
-    """``base`` without anything that looks like a credential, and with a usable PATH."""
+def environment(base: dict[str, str], *, home: Path, credentials: bool = False) -> dict[str, str]:
+    """``base`` without anything that looks like a credential, and with a usable PATH.
+
+    With ``credentials``, such variables stay, as for a command the user
+    approved to run outside the sandbox.
+    """
     env = {
         key: value
         for key, value in base.items()
-        if not any(marker in key.upper() for marker in _SECRET_ENV)
+        if credentials or not any(marker in key.upper() for marker in _SECRET_ENV)
     }
     extra = [
         "/opt/homebrew/bin",
@@ -189,14 +193,21 @@ async def run(
     timeout: float,
     on_output: Callable[[str], None] | None = None,
     home: Path | None = None,
+    sandboxed: bool = True,
 ) -> Finished:
-    """Run ``argv`` in ``root`` under the sandbox. Cancelling kills the process group."""
+    """Run ``argv`` in ``root`` under the sandbox. Cancelling kills the process group.
+
+    With ``sandboxed=False`` it runs without one, and keeps the variables that
+    hold credentials. Only a call the user approved for that may ask for it.
+    """
     home = (home if home is not None else Path.home()).resolve()
-    command = [str(SANDBOX_EXEC), "-p", profile(root, settings, home=home), *argv]
+    command = list(argv)
+    if sandboxed:
+        command = [str(SANDBOX_EXEC), "-p", profile(root, settings, home=home), *command]
     process = await asyncio.create_subprocess_exec(
         *command,
         cwd=root,
-        env=environment(dict(os.environ), home=home),
+        env=environment(dict(os.environ), home=home, credentials=not sandboxed),
         stdin=asyncio.subprocess.DEVNULL,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.STDOUT,

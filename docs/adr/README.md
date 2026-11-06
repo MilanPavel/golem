@@ -38,9 +38,10 @@ An Architecture Decision Record (ADR) is a short note of one choice: what was de
 | [032](032-pinned-skills.md) | Pinned skills live in the session record, not in graph state | accepted | 2026-11-01 |
 | [033](033-golem-offers-to-start-the-service.md) | `golem` offers to start the service when nothing answers, and launchd still owns it | accepted | 2026-11-01 |
 | [034](034-docs-site.md) | The docs are a VitePress site over `docs/`, published to GitHub Pages | accepted | 2026-11-01 |
-| [035](035-daemon-installs-ollama.md) | The daemon installs Ollama, and checks a key before it stores it | accepted | 2026-11-03 |
+| [035](035-daemon-installs-ollama.md) | The daemon installs Ollama, Node, and uv, and checks a key before it stores it | accepted | 2026-11-03 |
 | [036](036-setup-window-asks-for-the-service.md) | The setup window asks for the service, inside the chat screen | accepted | 2026-11-03 |
 | [037](037-browser-manages-mcp-and-config.md) | The browser manages MCP servers and `config.toml`, but cannot move a secret or widen trust | accepted | 2026-11-05 |
+| [038](038-shell-unsandboxed.md) | A command you approve may run outside the sandbox, as a tool of its own | accepted | 2026-11-06 |
 
 How the running code fits together is in [../architecture.md](../architecture.md).
 

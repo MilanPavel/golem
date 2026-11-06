@@ -18,6 +18,9 @@ from golem.config import PolicyRule, RuleAction
 
 DEFAULT_SOURCE = "built-in default"
 
+NAMED_ONLY = frozenset({"shell_unsandboxed"})
+"""Tools an ``allow`` rule covers only when it names them, so ``tool = "*"`` never does."""
+
 
 RuleFile = Literal["user", "project", "default"]
 
@@ -89,6 +92,8 @@ def check(call: Call, rules: Sequence[Rule], *, home: Path) -> Decision:
 
 def matches(rule: PolicyRule, call: Call, *, home: Path) -> bool:
     if not fnmatchcase(call.tool, rule.tool):
+        return False
+    if rule.action == "allow" and call.tool in NAMED_ONLY and rule.tool != call.tool:
         return False
     if rule.match is not None:
         if call.subject is None:
@@ -165,6 +170,7 @@ def _glob(text: str) -> str:
 
 __all__ = [
     "DEFAULT_SOURCE",
+    "NAMED_ONLY",
     "Allowance",
     "Call",
     "Decision",

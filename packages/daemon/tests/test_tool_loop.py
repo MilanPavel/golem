@@ -129,6 +129,7 @@ async def test_the_model_reads_a_file_then_answers(database: Database, project: 
         "write_file",
         "edit_file",
         "shell",
+        "shell_unsandboxed",
         "git_status",
         "git_diff",
         "git_log",

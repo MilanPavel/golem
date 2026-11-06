@@ -53,6 +53,7 @@ from golem.server.dispatcher import (
     RequestContext,
     RpcCallError,
 )
+from golem.server.mcp_catalog import mcp_catalog, runtime_install, runtime_install_cancel
 from golem.server.mcp_edit import (
     config_raw_get,
     config_raw_set,
@@ -107,6 +108,7 @@ from golem_protocol.commands import (
     LocalServer,
     McpAddParams,
     McpCallParams,
+    McpCatalogParams,
     McpListParams,
     McpListResult,
     McpLogsParams,
@@ -148,6 +150,8 @@ from golem_protocol.commands import (
     PolicyUpdateParams,
     RunCancelParams,
     RunCancelResult,
+    RuntimeInstallCancelParams,
+    RuntimeInstallParams,
     SessionAttachParams,
     SessionAttachResult,
     SessionCloseParams,
@@ -958,6 +962,11 @@ def standard_methods() -> dict[str, Method]:
         "mcp.get": Method("mcp.get", McpServerParams, True, mcp_get),
         "mcp.update": Method("mcp.update", McpUpdateParams, True, mcp_update),
         "mcp.test": Method("mcp.test", McpTestParams, True, mcp_test),
+        "mcp.catalog": Method("mcp.catalog", McpCatalogParams, True, mcp_catalog),
+        "runtime.install": Method("runtime.install", RuntimeInstallParams, True, runtime_install),
+        "runtime.install_cancel": Method(
+            "runtime.install_cancel", RuntimeInstallCancelParams, True, runtime_install_cancel
+        ),
         "mcp.logs": Method("mcp.logs", McpLogsParams, True, mcp_logs),
         "mcp.call": Method("mcp.call", McpCallParams, True, mcp_call),
         "config.raw.get": Method("config.raw.get", ConfigRawGetParams, True, config_raw_get),
