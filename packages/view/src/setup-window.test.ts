@@ -26,6 +26,7 @@ import {
   serviceTimedOut,
   setupAtStart,
   setupBand,
+  setupProblem,
   shortStepper,
   single,
   INSTALL_TIMEOUT_MS,
@@ -272,6 +273,21 @@ test("the band names the first thing wrong, and says nothing when all is well", 
   assert.equal(
     setupBand([{ part: "model", name: "model qwen3:8b", state: "fail", detail: "not downloaded", action: "pick_model" }]),
     "! model qwen3:8b: not downloaded · /setup",
+  );
+});
+
+test("the problem is the band's line without its marks, and null when all is well", () => {
+  assert.equal(setupProblem(ROWS), "Ollama: Ollama is not installed");
+  assert.equal(setupProblem(ROWS.filter((row) => row.state === "ok")), null);
+  assert.equal(
+    setupProblem([{ part: "model", name: "model", state: "warn", detail: "no model chosen yet", action: "pick_model" }]),
+    "no model yet",
+  );
+  assert.equal(setupProblem([{ part: "service", name: "service", state: "fail", detail: "no job" }]), null);
+  assert.equal(setupProblem([{ part: "socket", name: "socket", state: "fail", detail: "no socket" }]), null);
+  assert.equal(
+    setupProblem([{ part: "model", name: "model qwen3:8b", state: "fail", detail: "not downloaded", action: "pick_model" }]),
+    "model qwen3:8b: not downloaded",
   );
 });
 

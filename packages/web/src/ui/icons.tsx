@@ -23,6 +23,13 @@ function Icon({ children, ...props }: ComponentProps<"svg">) {
   );
 }
 
+/** A ring and eight short teeth. */
+export const GearIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <circle cx="8" cy="8" r="2.6" />
+    <path d="M13.4 8H15M1 8h1.6M8 13.4V15M8 1v1.6M11.82 4.18l1.13-1.13M3.05 12.95l1.13-1.13M11.82 11.82l1.13 1.13M3.05 3.05l1.13 1.13" />
+  </Icon>
+);
 export const PlusIcon = (props: IconProps) => (
   <Icon {...props}>
     <path d="M8 3v10M3 8h10" />
