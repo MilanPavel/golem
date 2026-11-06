@@ -38,6 +38,14 @@ export const HOSTED_PROVIDERS: readonly HostedProvider[] = [
     env: "OPENAI_API_KEY",
     prefer: [/^gpt-5(\.\d+)?$/i, /^gpt-5/i, /^gpt-4\.1$/i, /^gpt-4o$/i],
   },
+  {
+    id: "google",
+    name: "Google",
+    blurb: "Gemini",
+    console: "aistudio.google.com/apikey",
+    env: "GOOGLE_API_KEY",
+    prefer: [/^gemini-\d+(\.\d+)?-pro$/i, /^gemini-\d+(\.\d+)?-flash$/i, /^gemini-/i],
+  },
 ];
 
 export function hostedProvider(id: string): HostedProvider | null {

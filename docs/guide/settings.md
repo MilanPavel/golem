@@ -118,7 +118,7 @@ The providers are `openai`, `anthropic`, `google`, `deepseek`, `xai`, `moonshot`
 
 | Key | Default | Meaning |
 |---|---|---|
-| `kind` | `openai_compat` for a new name | `anthropic`, `openai`, `ollama`, or `openai_compat` |
+| `kind` | `openai_compat` for a new name | `anthropic`, `openai`, `google`, `ollama`, or `openai_compat` |
 | `base_url` | the preset's | Where the API answers, such as `http://127.0.0.1:1234/v1` |
 | `api_key_env` | the preset's, such as `ANTHROPIC_API_KEY` | The environment variable read before the Keychain |
 
