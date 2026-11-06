@@ -16,6 +16,7 @@ import shlex
 import tomllib
 from contextvars import ContextVar
 from dataclasses import dataclass
+from fnmatch import fnmatchcase
 from pathlib import Path
 from typing import Annotated, Literal, cast
 
@@ -220,6 +221,27 @@ MCP_SECRET = re.compile(r"keychain:(mcp/[A-Za-z0-9][A-Za-z0-9._-]*)")
 
 McpEnabled = bool | Literal["on_demand"]
 
+ENV_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+class McpToolFilter(BaseModel):
+    """``tools`` of a server: which of its tools the model gets.
+
+    Both lists are ``fnmatch`` patterns on the server's own tool name, not the
+    ``mcp__<server>__<tool>`` name. An empty ``include`` means every tool, and
+    ``exclude`` wins over ``include``.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    include: list[str] = Field(default_factory=list[str])
+    exclude: list[str] = Field(default_factory=list[str])
+
+    def allows(self, name: str) -> bool:
+        if any(fnmatchcase(name, pattern) for pattern in self.exclude):
+            return False
+        return not self.include or any(fnmatchcase(name, pattern) for pattern in self.include)
+
 
 class McpServerSettings(BaseModel):
     """``[mcp.<name>]``. An MCP server golem starts over stdio, or reaches over HTTP.
@@ -234,6 +256,12 @@ class McpServerSettings(BaseModel):
     ``enabled`` is ``true`` for every session, ``"on_demand"`` for the sessions
     that turn it on with ``/mcp enable``, or ``false``. ``timeout_seconds`` is
     the longest one tool call may take.
+
+    ``tools`` hides some of the server's tools from the model. ``approval`` is
+    ``"ask"`` (every call asks, the default) or ``"allow"`` (the server's calls
+    run without asking, after the user's own ``[[rule]]``s). ``env_passthrough``
+    names variables of the daemon's own environment to hand to a stdio server;
+    a secret goes through the Keychain instead.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -248,6 +276,9 @@ class McpServerSettings(BaseModel):
     headers: dict[str, str] = Field(default_factory=dict[str, str])
     enabled: McpEnabled = True
     timeout_seconds: int = Field(default=120, gt=0, le=3600)
+    tools: McpToolFilter = Field(default_factory=McpToolFilter)
+    approval: Literal["ask", "allow"] = "ask"
+    env_passthrough: list[str] = Field(default_factory=list[str])
 
     @model_validator(mode="after")
     def _one_transport(self) -> McpServerSettings:
@@ -257,6 +288,16 @@ class McpServerSettings(BaseModel):
             raise ValueError("args, env, and cwd are for a command; an HTTP server takes headers")
         if self.command is not None and self.headers:
             raise ValueError("headers are for an HTTP server; a command takes env")
+        if self.url is not None and self.env_passthrough:
+            raise ValueError("env_passthrough is for a command; an HTTP server takes headers")
+        for name in self.env_passthrough:
+            if ENV_NAME.match(name) is None:
+                raise ValueError(f"{name!r} is not a variable name in env_passthrough")
+            if _SECRET_KEY.search(name):
+                raise ValueError(
+                    f"{name} looks like a secret: set it in env as keychain:mcp/<name> "
+                    "instead of passing it through"
+                )
         for table in (self.env, self.headers):
             for key, value in table.items():
                 if _SECRET_KEY.search(key) and MCP_SECRET.search(value) is None:
@@ -300,6 +341,33 @@ def load_mcp(path: Path) -> McpServers:
     except FileNotFoundError:
         return {}
     return _MCP_SERVERS.validate_python(data.get("mcp", {}))
+
+
+PROTECTED_SETTINGS = frozenset(
+    {
+        "providers",
+        "model_provider",
+        "model_name",
+        "model_profile",
+        "model_base_url",
+        "trusted_projects",
+        "shell",
+        "web",
+    }
+)
+"""Top-level settings the browser's ``config.raw.set`` may not change (ADR-037).
+
+Each one decides where a key goes, what a project may run, or where a sandbox's
+walls are. ``skills.extra_dirs`` and ``skills.claude_dirs`` are protected too,
+see ``PROTECTED_SKILL_SETTINGS``.
+"""
+
+PROTECTED_SKILL_SETTINGS = frozenset({"extra_dirs", "claude_dirs"})
+
+BROWSER_SETTINGS = frozenset(
+    {"log_level", "default_model", "models", "session_titles", "rule", "mcp", "skills", "ollama"}
+)
+"""Top-level settings the browser may edit. Every ``GolemSettings`` field is in one list."""
 
 
 class GolemSettings(BaseSettings):

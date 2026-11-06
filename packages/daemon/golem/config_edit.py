@@ -29,6 +29,10 @@ class McpExistsError(ValueError):
     """The file already has an ``[mcp.<name>]`` table."""
 
 
+class RawConflictError(ValueError):
+    """The file changed on disk since the text being written was read."""
+
+
 def add_mcp_server(config_file: Path, name: str, table: dict[str, Any]) -> None:
     """Add ``[mcp.<name>]`` with the keys of ``table``. Creates the file when it is missing."""
     document = _read(config_file)
@@ -38,6 +42,62 @@ def add_mcp_server(config_file: Path, name: str, table: dict[str, Any]) -> None:
         document["mcp"] = servers
     if name in servers:
         raise McpExistsError(f"{config_file} already has [mcp.{name}]")
+    added = _mcp_table(table)
+    servers[name] = added
+    _write(config_file, document)
+
+
+def replace_mcp_server(
+    config_file: Path, name: str, table: dict[str, Any], new_name: str | None = None
+) -> None:
+    """Replace the keys of ``[mcp.<name>]`` with ``table``, keeping its place and comments.
+
+    ``new_name`` renames the table, which then goes last in ``[mcp]``.
+    """
+    document = _read(config_file)
+    servers = cast(object, document.get("mcp"))  # pyright: ignore[reportUnknownMemberType]
+    existing = cast(object, servers.get(name)) if isinstance(servers, Table) else None  # pyright: ignore[reportUnknownMemberType]
+    if not isinstance(servers, Table) or not isinstance(existing, Table):
+        raise McpTableError(f"{config_file} has no [mcp.{name}]")
+    if new_name is not None and new_name != name:
+        if new_name in servers:
+            raise McpExistsError(f"{config_file} already has [mcp.{new_name}]")
+        del servers[name]
+        servers[new_name] = _mcp_table(table)
+    else:
+        for key in [str(key) for key in existing]:
+            del existing[key]
+        for key, value in cast(dict[str, Any], _mcp_table(table)).items():
+            existing[key] = value
+    _write(config_file, document)
+
+
+def read_raw(config_file: Path) -> tuple[str, int | None]:
+    """The file's text and its ``mtime_ns``. A missing file is empty, with no mtime."""
+    try:
+        text = config_file.read_text("utf-8")
+        return text, config_file.stat().st_mtime_ns
+    except FileNotFoundError:
+        return "", None
+
+
+def write_raw(config_file: Path, text: str, base_mtime_ns: int | None) -> int:
+    """Write ``text`` when the file is still as it was read, and return the new ``mtime_ns``.
+
+    Raises :class:`RawConflictError` when its ``mtime_ns`` is not ``base_mtime_ns``
+    (None for a file that did not exist).
+    """
+    try:
+        current = config_file.stat().st_mtime_ns
+    except FileNotFoundError:
+        current = None
+    if current != base_mtime_ns:
+        raise RawConflictError("config.toml changed on disk; reload")
+    _write(config_file, tomlkit.parse(text))
+    return config_file.stat().st_mtime_ns
+
+
+def _mcp_table(table: dict[str, Any]) -> Table:
     added = tomlkit.table()
     for key, value in table.items():
         if isinstance(value, dict):
@@ -47,8 +107,7 @@ def add_mcp_server(config_file: Path, name: str, table: dict[str, Any]) -> None:
             added[key] = inline
         else:
             added[key] = value
-    servers[name] = added
-    _write(config_file, document)
+    return added
 
 
 def has_mcp_server(config_file: Path, name: str) -> bool:

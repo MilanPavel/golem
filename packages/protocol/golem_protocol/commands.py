@@ -775,7 +775,9 @@ class McpServer(BaseModel):
     sees, ``mcp__<server>__<tool>``, while it is ``running``, and
     ``schema_tokens`` roughly what their schemas cost in each prompt.
     ``error`` says why it is ``failed``, and ``retry_seconds`` when golem
-    tries again. ``config`` is the file that names the server.
+    tries again. ``config`` is the file that names the server. ``tools_hidden``
+    counts the tools its ``tools`` filter keeps from the model, and
+    ``approval`` is ``"allow"`` when its calls run without asking.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -791,6 +793,8 @@ class McpServer(BaseModel):
     schema_tokens: int | None = Field(default=None, ge=0)
     retry_seconds: float | None = Field(default=None, ge=0)
     config: str | None = None
+    tools_hidden: int = Field(default=0, ge=0)
+    approval: Literal["ask", "allow"] = "ask"
 
 
 class McpServerParams(BaseModel):
@@ -803,12 +807,18 @@ class McpServerParams(BaseModel):
 
 
 class McpToolInfo(BaseModel):
-    """One of a server's tools: the name the model sees, and what it says it does."""
+    """One of a server's tools: the name the model sees, and what it says it does.
+
+    A ``hidden`` tool is one the server's ``tools`` filter keeps from the model.
+    ``schema_tokens`` roughly what its schema costs in each prompt.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     name: str = Field(min_length=1)
     description: str
+    hidden: bool = False
+    schema_tokens: int = Field(default=0, ge=0)
 
 
 class McpToolsResult(BaseModel):
@@ -818,6 +828,69 @@ class McpToolsResult(BaseModel):
 
     name: str = Field(min_length=1)
     tools: list[McpToolInfo]
+
+
+class McpToolFilterConfig(BaseModel):
+    """``tools`` of ``[mcp.<name>]``: ``fnmatch`` patterns on the server's own tool names.
+
+    An empty ``include`` means every tool, and ``exclude`` wins.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    include: list[str] = Field(default_factory=list[str])
+    exclude: list[str] = Field(default_factory=list[str])
+
+
+class McpServerConfig(BaseModel):
+    """Every field of ``[mcp.<name>]``, as it goes over the wire.
+
+    The daemon's settings model has the same fields, and a test keeps the two
+    equal. A value in ``env`` or ``headers`` names a secret as
+    ``keychain:mcp/<name>``, never the secret itself.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    command: str | None = Field(default=None, min_length=1)
+    args: list[str] = Field(default_factory=list[str])
+    env: dict[str, str] = Field(default_factory=dict[str, str])
+    cwd: str | None = Field(default=None, min_length=1)
+    url: str | None = Field(default=None, min_length=1)
+    headers: dict[str, str] = Field(default_factory=dict[str, str])
+    enabled: bool | Literal["on_demand"] = True
+    timeout_seconds: int = Field(default=120, gt=0, le=3600)
+    tools: McpToolFilterConfig = Field(default_factory=McpToolFilterConfig)
+    approval: Literal["ask", "allow"] = "ask"
+    env_passthrough: list[str] = Field(default_factory=list[str])
+
+
+class McpSecretInfo(BaseModel):
+    """A secret a server names, ``ref`` as ``mcp/<name>``, and whether the store has it.
+
+    The value is never sent.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    ref: str = Field(min_length=1)
+    stored: bool
+
+
+class McpServerDetail(BaseModel):
+    """``mcp.get``. One server's status, its whole config, and where it is written.
+
+    ``scope`` is ``"project"`` for a server in a project's ``.golem/config.toml``,
+    and ``path`` is the file that names it.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    server: McpServer
+    config: McpServerConfig
+    scope: Literal["user", "project"]
+    path: str
+    secrets: list[McpSecretInfo]
 
 
 class McpSetEnabledParams(BaseModel):
@@ -835,13 +908,21 @@ class McpSetEnabledParams(BaseModel):
 
 
 class McpAddParams(BaseModel):
-    """``mcp.add``. Write ``[mcp.<name>]`` into the user's config, and start the server.
+    """``mcp.add``. Write ``[mcp.<name>]`` into a config file, and start the server.
 
-    Give a ``command`` with its ``args`` for a stdio server, or a ``url`` for an
-    HTTP one. A ``token`` goes into the OS credential store as ``mcp/<name>``,
-    never into the file: an HTTP server sends it as a Bearer header, and a
-    command gets it in the variable ``token_env``. A client never logs or
-    displays ``token``.
+    There are two forms, and sending both is an error.
+
+    The short form gives a ``command`` with its ``args`` for a stdio server, or a
+    ``url`` for an HTTP one, and writes the user's file. A ``token`` goes into
+    the OS credential store as ``mcp/<name>``, never into the file: an HTTP
+    server sends it as a Bearer header, and a command gets it in the variable
+    ``token_env``.
+
+    The full form gives the whole ``config``, and ``secrets`` by reference
+    (``mcp/github``). Each secret must appear in ``config`` as
+    ``keychain:<ref>``, and may only be ``mcp/<name>`` or ``mcp/<name>-…`` for
+    this server. ``scope = "project"`` writes the trusted project of
+    ``session_id``. A client never logs or displays a token.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -852,17 +933,58 @@ class McpAddParams(BaseModel):
     url: str | None = Field(default=None, min_length=1)
     token: SecretStr | None = Field(default=None, min_length=1, max_length=4096)
     token_env: str | None = Field(default=None, pattern=r"^[A-Za-z_][A-Za-z0-9_]*$")
+    config: McpServerConfig | None = None
+    secrets: dict[str, SecretStr] = Field(default_factory=dict[str, SecretStr])
+    scope: Literal["user", "project"] = "user"
+    session_id: str | None = Field(default=None, min_length=1)
+
+    @model_validator(mode="after")
+    def _one_form(self) -> Self:
+        short = (
+            self.command is not None
+            or self.url is not None
+            or self.token is not None
+            or self.token_env is not None
+            or bool(self.args)
+        )
+        if self.config is not None and short:
+            raise ValueError("send either config, or command, args, url, token, and token_env")
+        if self.config is None and (self.secrets or self.scope != "user"):
+            raise ValueError("secrets and scope go with config")
+        return self
 
 
-class McpRemoveParams(BaseModel):
-    """``mcp.remove``. Delete ``[mcp.<name>]`` from the user's config, and stop the server.
+class McpUpdateParams(BaseModel):
+    """``mcp.update``. Replace the ``[mcp.<name>]`` table in the file that names it.
 
-    The server's ``mcp/<name>`` token goes from the credential store too.
+    ``secrets`` are stored first, and only the ones sent change. A secret the
+    server already names and the request leaves out is kept, unless the request
+    changes the server's address (``url``, ``command``, ``args``, or ``cwd``):
+    then it must be sent again. ``new_name`` renames the server and moves its
+    ``mcp/<name>`` secrets.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     name: str = Field(min_length=1)
+    config: McpServerConfig
+    secrets: dict[str, SecretStr] = Field(default_factory=dict[str, SecretStr])
+    new_name: str | None = Field(default=None, pattern=r"^[A-Za-z0-9][A-Za-z0-9-]{0,31}$")
+    session_id: str | None = Field(default=None, min_length=1)
+
+
+class McpRemoveParams(BaseModel):
+    """``mcp.remove``. Delete ``[mcp.<name>]`` from the user's config, and stop the server.
+
+    The server's ``mcp/<name>`` secrets go from the credential store too, unless
+    another server names them. With ``session_id``, a trusted project's server
+    can be removed.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    session_id: str | None = Field(default=None, min_length=1)
 
 
 class McpRemoveResult(BaseModel):
@@ -898,6 +1020,77 @@ class McpListResult(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     servers: list[McpServer]
+
+
+class ConfigRawGetParams(BaseModel):
+    """``config.raw.get``. The text of ``config.toml``, with ``keychain:`` references as written.
+
+    ``scope = "project"`` reads the trusted project of ``session_id``.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    scope: Literal["user", "project"] = "user"
+    session_id: str | None = Field(default=None, min_length=1)
+
+
+class ConfigRawGetResult(BaseModel):
+    """The file's path and text, and its ``mtime_ns`` for a later ``config.raw.set``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    path: str
+    text: str
+    mtime_ns: int | None = None
+    exists: bool
+
+
+class ConfigRawSetParams(BaseModel):
+    """``config.raw.set`` and ``config.raw.set_protected``. Check a new text, and write it.
+
+    ``base_mtime_ns`` is the ``mtime_ns`` the text was read at, null for a file
+    that did not exist. A file changed since is refused. ``dry_run`` checks and
+    writes nothing. ``config.raw.set`` refuses a change inside the protected
+    sections (providers, trusted projects, shell, web, skill folders), and
+    ``config.raw.set_protected``, which only a local client may call, does not.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    scope: Literal["user", "project"] = "user"
+    session_id: str | None = Field(default=None, min_length=1)
+    text: str
+    base_mtime_ns: int | None = None
+    dry_run: bool = False
+
+
+class ConfigError(BaseModel):
+    """One problem in a config text. ``line`` and ``column`` count from 1, when known.
+
+    ``path`` is the setting, as ``mcp.github.headers.Authorization``.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    line: int | None = Field(default=None, ge=1)
+    column: int | None = Field(default=None, ge=1)
+    path: str | None = None
+    message: str
+
+
+class ConfigRawResult(BaseModel):
+    """``ok`` is false when anything was wrong, and the file is then untouched.
+
+    ``restart_needed`` names the top-level sections that changed and are read
+    only when the daemon starts. ``mtime_ns`` is the new file's.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    ok: bool
+    errors: list[ConfigError] = Field(default_factory=list[ConfigError])
+    restart_needed: list[str] = Field(default_factory=list[str])
+    mtime_ns: int | None = None
 
 
 class ConfigGetParams(BaseModel):
@@ -1190,8 +1383,13 @@ __all__ = [
     "AuthSetParams",
     "AuthSetResult",
     "ConfigAllowance",
+    "ConfigError",
     "ConfigGetParams",
     "ConfigGetResult",
+    "ConfigRawGetParams",
+    "ConfigRawGetResult",
+    "ConfigRawResult",
+    "ConfigRawSetParams",
     "ConfigRule",
     "DaemonStatus",
     "HelloParams",
@@ -1206,14 +1404,19 @@ __all__ = [
     "McpListResult",
     "McpRemoveParams",
     "McpRemoveResult",
+    "McpSecretInfo",
     "McpServer",
+    "McpServerConfig",
+    "McpServerDetail",
     "McpServerParams",
     "McpServerState",
     "McpSetEnabledParams",
     "McpToggleParams",
     "McpToggleResult",
+    "McpToolFilterConfig",
     "McpToolInfo",
     "McpToolsResult",
+    "McpUpdateParams",
     "MessageSendParams",
     "MessageSendResult",
     "ModelDeleteParams",

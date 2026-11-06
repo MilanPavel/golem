@@ -289,7 +289,8 @@ async def test_a_server_lists_its_tools_restarts_and_names_its_file(
     supervisor.start()
     await supervisor.prepare(EVERYONE)
     tools = supervisor.tool_list(EVERYONE, "fake")
-    assert tools[0] == ("mcp__fake__echo", "Says the text back.")
+    assert (tools[0].name, tools[0].description) == ("mcp__fake__echo", "Says the text back.")
+    assert not tools[0].hidden and tools[0].schema_tokens > 0
     assert supervisor.config_file(EVERYONE, "fake") == config
     assert supervisor.status(EVERYONE, "fake").config == str(config)
 
@@ -318,3 +319,87 @@ async def test_a_project_server_names_the_projects_file(
     assert supervisor.config_file(here, "fake") == tmp_path / ".golem" / "config.toml"
     with pytest.raises(McpServerError, match="no MCP server named fake"):
         supervisor.config_file(EVERYONE, "fake")
+
+
+async def test_the_tool_filter_hides_tools_from_the_model_but_not_from_the_list(
+    running: list[McpSupervisor],
+) -> None:
+    filtered = _settings(tools={"include": ["echo", "fail", "p*"], "exclude": ["fail", "pid"]})
+    supervisor = McpSupervisor({"fake": filtered}, timing=FAST)
+    running.append(supervisor)
+    supervisor.start()
+    await supervisor.prepare(EVERYONE)
+    await _until(lambda: _state(supervisor, "fake").state == "running")
+    assert [tool.name for tool in supervisor.tools(EVERYONE)] == ["mcp__fake__echo"]
+    status = _state(supervisor, "fake")
+    assert status.tools == ["mcp__fake__echo"]
+    assert status.tools_hidden == 8
+    listed = {tool.name: tool for tool in supervisor.tool_list(EVERYONE, "fake")}
+    assert len(listed) == 9
+    assert not listed["mcp__fake__echo"].hidden
+    assert listed["mcp__fake__fail"].hidden and listed["mcp__fake__pid"].hidden
+    assert all(tool.schema_tokens > 0 for tool in listed.values())
+    unfiltered = McpSupervisor({"fake": _settings()}, timing=FAST)
+    running.append(unfiltered)
+    unfiltered.start()
+    await unfiltered.prepare(EVERYONE)
+    await _until(lambda: _state(unfiltered, "fake").state == "running")
+    assert _state(unfiltered, "fake").schema_tokens is not None
+    assert (_state(supervisor, "fake").schema_tokens or 0) < (
+        _state(unfiltered, "fake").schema_tokens or 0
+    )
+
+
+async def test_exclude_wins_over_include() -> None:
+    from golem.config import McpToolFilter
+
+    tools = McpToolFilter(include=["git_*"], exclude=["git_push"])
+    assert tools.allows("git_log") and not tools.allows("git_push") and not tools.allows("ls")
+    assert McpToolFilter().allows("anything")
+
+
+async def test_env_passthrough_hands_the_server_a_daemon_variable(
+    running: list[McpSupervisor],
+) -> None:
+    supervisor = McpSupervisor(
+        {"fake": _settings(env_passthrough=["FROM_DAEMON"])},
+        environ={"FROM_DAEMON": "yes", "OTHER": "no", "HOME": str(Path.home())},
+        timing=FAST,
+    )
+    running.append(supervisor)
+    supervisor.start()
+    await supervisor.prepare(EVERYONE)
+    assert await _call(supervisor, EVERYONE, "mcp__fake__env", name="FROM_DAEMON") == "yes"
+    assert await _call(supervisor, EVERYONE, "mcp__fake__env", name="OTHER") == "(unset)"
+
+
+def test_env_passthrough_is_checked() -> None:
+    with pytest.raises(ValueError, match="not a variable name"):
+        _settings(env_passthrough=["BAD NAME"])
+    with pytest.raises(ValueError, match="looks like a secret"):
+        _settings(env_passthrough=["GITHUB_TOKEN"])
+    with pytest.raises(ValueError, match="for a command"):
+        McpServerSettings.model_validate({"url": "http://x.test", "env_passthrough": ["HOME"]})
+
+
+async def test_approval_allow_names_the_servers_that_run_without_asking(
+    running: list[McpSupervisor], tmp_path: Path
+) -> None:
+    project = tmp_path / "project"
+    (project / ".golem").mkdir(parents=True)
+    (project / ".golem" / "config.toml").write_text(
+        _toml("mine", extra='approval = "allow"\n'), encoding="utf-8"
+    )
+    trusted = {project}
+    supervisor = McpSupervisor(
+        {"fake": _settings(approval="allow"), "careful": _settings()},
+        trusted=lambda root: root in trusted,
+        timing=FAST,
+    )
+    running.append(supervisor)
+    assert supervisor.allowed_servers(None) == ["fake"]
+    assert supervisor.allowed_servers(project) == ["fake", "mine"]
+    trusted.clear()
+    assert supervisor.allowed_servers(project) == ["fake"]
+    assert _state(supervisor, "fake").approval == "allow"
+    assert _state(supervisor, "careful").approval == "ask"

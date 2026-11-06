@@ -1,7 +1,16 @@
 {
   "additionalProperties": false,
-  "description": "One MCP server from ``[mcp.<name>]``.\n\n``command`` is the command line golem runs, or the URL it reaches.\n``project`` is the folder whose ``.golem/config.toml`` names the server,\nor null for the user's own. ``on_demand`` servers are ``idle`` until a\nsession turns one on, and ``enabled`` says whether the asking session\nhas it, when ``mcp.list`` named one. ``tools`` are the names the model\nsees, ``mcp__<server>__<tool>``, while it is ``running``, and\n``schema_tokens`` roughly what their schemas cost in each prompt.\n``error`` says why it is ``failed``, and ``retry_seconds`` when golem\ntries again. ``config`` is the file that names the server.",
+  "description": "One MCP server from ``[mcp.<name>]``.\n\n``command`` is the command line golem runs, or the URL it reaches.\n``project`` is the folder whose ``.golem/config.toml`` names the server,\nor null for the user's own. ``on_demand`` servers are ``idle`` until a\nsession turns one on, and ``enabled`` says whether the asking session\nhas it, when ``mcp.list`` named one. ``tools`` are the names the model\nsees, ``mcp__<server>__<tool>``, while it is ``running``, and\n``schema_tokens`` roughly what their schemas cost in each prompt.\n``error`` says why it is ``failed``, and ``retry_seconds`` when golem\ntries again. ``config`` is the file that names the server. ``tools_hidden``\ncounts the tools its ``tools`` filter keeps from the model, and\n``approval`` is ``\"allow\"`` when its calls run without asking.",
   "properties": {
+    "approval": {
+      "default": "ask",
+      "enum": [
+        "ask",
+        "allow"
+      ],
+      "title": "Approval",
+      "type": "string"
+    },
     "command": {
       "title": "Command",
       "type": "string"
@@ -107,6 +116,12 @@
       },
       "title": "Tools",
       "type": "array"
+    },
+    "tools_hidden": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Tools Hidden",
+      "type": "integer"
     }
   },
   "required": [

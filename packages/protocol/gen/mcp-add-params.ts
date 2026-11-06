@@ -2,25 +2,93 @@
 
 export type Args = string[];
 export type Command = string | null;
+export type Approval = 'ask' | 'allow';
+export type Args1 = string[];
+export type Command1 = string | null;
+export type Cwd = string | null;
+export type Enabled = boolean | 'on_demand';
+export type EnvPassthrough = string[];
+export type TimeoutSeconds = number;
+export type Exclude = string[];
+export type Include = string[];
+export type Url = string | null;
 export type Name = string;
+export type Scope = 'user' | 'project';
+export type SessionId = string | null;
 export type Token = string | null;
 export type TokenEnv = string | null;
-export type Url = string | null;
+export type Url1 = string | null;
 
 /**
- * ``mcp.add``. Write ``[mcp.<name>]`` into the user's config, and start the server.
+ * ``mcp.add``. Write ``[mcp.<name>]`` into a config file, and start the server.
  *
- * Give a ``command`` with its ``args`` for a stdio server, or a ``url`` for an
- * HTTP one. A ``token`` goes into the OS credential store as ``mcp/<name>``,
- * never into the file: an HTTP server sends it as a Bearer header, and a
- * command gets it in the variable ``token_env``. A client never logs or
- * displays ``token``.
+ * There are two forms, and sending both is an error.
+ *
+ * The short form gives a ``command`` with its ``args`` for a stdio server, or a
+ * ``url`` for an HTTP one, and writes the user's file. A ``token`` goes into
+ * the OS credential store as ``mcp/<name>``, never into the file: an HTTP
+ * server sends it as a Bearer header, and a command gets it in the variable
+ * ``token_env``.
+ *
+ * The full form gives the whole ``config``, and ``secrets`` by reference
+ * (``mcp/github``). Each secret must appear in ``config`` as
+ * ``keychain:<ref>``, and may only be ``mcp/<name>`` or ``mcp/<name>-…`` for
+ * this server. ``scope = "project"`` writes the trusted project of
+ * ``session_id``. A client never logs or displays a token.
  */
 export interface McpAddParams {
   args?: Args;
   command?: Command;
+  config?: McpServerConfig | null;
   name: Name;
+  scope?: Scope;
+  secrets?: Secrets;
+  session_id?: SessionId;
   token?: Token;
   token_env?: TokenEnv;
+  url?: Url1;
+}
+/**
+ * Every field of ``[mcp.<name>]``, as it goes over the wire.
+ *
+ * The daemon's settings model has the same fields, and a test keeps the two
+ * equal. A value in ``env`` or ``headers`` names a secret as
+ * ``keychain:mcp/<name>``, never the secret itself.
+ *
+ * This interface was referenced by `McpAddParams`'s JSON-Schema
+ * via the `definition` "McpServerConfig".
+ */
+export interface McpServerConfig {
+  approval?: Approval;
+  args?: Args1;
+  command?: Command1;
+  cwd?: Cwd;
+  enabled?: Enabled;
+  env?: Env;
+  env_passthrough?: EnvPassthrough;
+  headers?: Headers;
+  timeout_seconds?: TimeoutSeconds;
+  tools?: McpToolFilterConfig;
   url?: Url;
+}
+export interface Env {
+  [k: string]: string;
+}
+export interface Headers {
+  [k: string]: string;
+}
+/**
+ * ``tools`` of ``[mcp.<name>]``: ``fnmatch`` patterns on the server's own tool names.
+ *
+ * An empty ``include`` means every tool, and ``exclude`` wins.
+ *
+ * This interface was referenced by `McpAddParams`'s JSON-Schema
+ * via the `definition` "McpToolFilterConfig".
+ */
+export interface McpToolFilterConfig {
+  exclude?: Exclude;
+  include?: Include;
+}
+export interface Secrets {
+  [k: string]: string;
 }

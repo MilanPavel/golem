@@ -7,7 +7,8 @@ Order, first match wins:
    so a cloned repository cannot allow itself anything. Its ``ask`` and
    ``deny`` rules always apply.
 2. ``[[rule]]`` in the user's ``config.toml``.
-3. The built-in defaults: read-only and internal tools are allowed, the rest asks.
+3. An MCP server with ``approval = "allow"``: its tools are allowed.
+4. The built-in defaults: read-only and internal tools are allowed, the rest asks.
 
 Each file is read again when it changes. A user file that stops validating
 keeps its last good rules. A project file that does not validate makes every
@@ -18,7 +19,7 @@ from __future__ import annotations
 
 import logging
 import tomllib
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -73,6 +74,8 @@ class Policy:
         self._user: _UserFile = _UserFile()
         self._user_stamp: _Stamp | None = None
         self._projects: dict[Path, tuple[_Stamp | None, list[Rule]]] = {}
+        self.mcp_allowed: Callable[[Path | None], list[str]] = lambda _root: []
+        """Names of the MCP servers with ``approval = "allow"`` that ``root`` sees."""
 
     def rules(self, root: Path | None, registry: ToolRegistry) -> list[Rule]:
         """Every rule for a call in ``root``, in the order they are checked."""
@@ -84,6 +87,13 @@ class Policy:
         found.extend(
             Rule(rule, f"{label} rule {index}", file="user", index=index)
             for index, rule in enumerate(user.rule, start=1)
+        )
+        found.extend(
+            Rule(
+                PolicyRule(tool=f"mcp__{server}__*", action="allow"),
+                f"mcp.{server} approval = allow",
+            )
+            for server in self.mcp_allowed(root.resolve() if root is not None else None)
         )
         found.extend(default_rules(registry.default_allowed()))
         return found

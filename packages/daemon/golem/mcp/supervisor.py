@@ -75,6 +75,16 @@ class Timing:
 DEFAULT_TIMING = Timing()
 
 
+@dataclass(frozen=True, slots=True)
+class ListedTool:
+    """One tool of a running server. A ``hidden`` one is kept from the model by ``tools``."""
+
+    name: str
+    description: str
+    hidden: bool
+    schema_tokens: int
+
+
 @dataclass
 class _Server:
     name: str
@@ -83,6 +93,7 @@ class _Server:
     status: McpServer
     client: McpClient | None = None
     tools: list[Tool[Any]] = field(default_factory=list[Tool[Any]])
+    hidden: list[Tool[Any]] = field(default_factory=list[Tool[Any]])
     task: asyncio.Task[None] | None = None
 
     @property
@@ -172,9 +183,26 @@ class McpSupervisor:
         if server.settings.enabled is False:
             raise McpServerError(f"{name} is turned off in config.toml (enabled = false)")
 
-    def tool_list(self, scope: ToolScope, name: str) -> list[tuple[str, str]]:
-        """Each running tool of server ``name``: its name and its description."""
-        return [(tool.name, tool.description) for tool in self._find(scope, name).tools]
+    def tool_list(self, scope: ToolScope, name: str) -> list[ListedTool]:
+        """Each running tool of server ``name``, the hidden ones too, marked."""
+        server = self._find(scope, name)
+        return [
+            ListedTool(tool.name, tool.description, hidden, _tool_tokens(tool))
+            for hidden, tools in ((False, server.tools), (True, server.hidden))
+            for tool in tools
+        ]
+
+    def allowed_servers(self, root: Path | None) -> list[str]:
+        """Names of the servers with ``approval = "allow"`` that ``root`` sees.
+
+        A project's server counts only when the project is trusted, which
+        :meth:`_shown` already checks.
+        """
+        return [server.name for server in self._shown(root) if server.settings.approval == "allow"]
+
+    def settings(self, scope: ToolScope, name: str) -> McpServerSettings:
+        """The settings of server ``name``, as ``scope`` sees it."""
+        return self._find(scope, name).settings
 
     def restart(self, scope: ToolScope, name: str) -> McpServer:
         """Start server ``name`` again now, or start it when it has not started yet."""
@@ -307,6 +335,7 @@ class McpSupervisor:
                     command=settings.target,
                     project=None if project is None else str(project),
                     on_demand=settings.enabled == "on_demand",
+                    approval=settings.approval,
                     config=self._config_label(project),
                 ),
             )
@@ -334,7 +363,7 @@ class McpSupervisor:
 
     def _stop_soon(self, server: _Server) -> None:
         task, client = server.task, server.client
-        server.task, server.client, server.tools = None, None, []
+        server.task, server.client, server.tools, server.hidden = None, None, [], []
 
         async def stop() -> None:
             if task is not None:
@@ -376,7 +405,7 @@ class McpSupervisor:
             log.exception("mcp server %s broke", server.name)
             return f"{type(exc).__name__}: {exc}"
         finally:
-            server.tools = []
+            server.tools, server.hidden = [], []
             if server.client is not None:
                 await server.client.close()
                 server.client = None
@@ -402,7 +431,12 @@ class McpSupervisor:
             return await client.call_tool(name, arguments, timeout)
 
         listed = await client.list_tools(LIST_SECONDS)
-        server.tools = mcp_tools(server.name, listed, call)
+        wanted = server.settings.tools
+        server.tools = mcp_tools(server.name, [t for t in listed if wanted.allows(t.name)], call)
+        shown = {tool.name for tool in server.tools}
+        server.hidden = [
+            tool for tool in mcp_tools(server.name, listed, call) if tool.name not in shown
+        ]
         log.info("mcp server %s is running with %d tools", server.name, len(server.tools))
         self._set(server, "running")
 
@@ -438,6 +472,8 @@ class McpSupervisor:
                 "state": state,
                 "tools": [tool.name for tool in server.tools] if running else [],
                 "schema_tokens": _schema_tokens(server.tools) if running else None,
+                "tools_hidden": len(server.hidden) if running else 0,
+                "approval": server.settings.approval,
                 "error": error,
                 "retry_seconds": retry,
             }
@@ -465,6 +501,10 @@ def _schema_tokens(tools: list[Tool[Any]]) -> int:
     return sum(len(json.dumps(tool.schema())) for tool in tools) // CHARS_PER_TOKEN
 
 
+def _tool_tokens(tool: Tool[Any]) -> int:
+    return len(json.dumps(tool.schema())) // CHARS_PER_TOKEN
+
+
 def _project_config(root: Path) -> Path:
     return root / ".golem" / "config.toml"
 
@@ -477,4 +517,4 @@ def _stamp(path: Path) -> tuple[int, int] | None:
     return info.st_mtime_ns, info.st_size
 
 
-__all__ = ["McpServerError", "McpSupervisor", "Timing"]
+__all__ = ["ListedTool", "McpServerError", "McpSupervisor", "Timing"]
