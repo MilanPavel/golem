@@ -98,7 +98,11 @@ async def _login_shell(
         ending = f"[exit code {done.exit_code}]"
         summary = "exit 0" if done.exit_code == 0 else f"exit {done.exit_code}"
     output = done.output.rstrip("\n")
-    return ToolResult(output=f"{output}\n{ending}" if output else ending, summary=summary)
+    blocked = sandbox.refusals(output, root, ctx.shell, home=Path.home()) if sandboxed else []
+    if blocked:
+        summary += ", blocked by the sandbox"
+    tail = "\n".join([*(f"[{line}]" for line in blocked), ending])
+    return ToolResult(output=f"{output}\n{tail}" if output else tail, summary=summary)
 
 
 async def _git_status(args: GitStatusArgs, ctx: ToolContext) -> ToolResult:
