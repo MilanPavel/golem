@@ -2,16 +2,27 @@
   "$defs": {
     "McpToolInfo": {
       "additionalProperties": false,
-      "description": "One of a server's tools: the name the model sees, and what it says it does.",
+      "description": "One of a server's tools: the name the model sees, and what it says it does.\n\nA ``hidden`` tool is one the server's ``tools`` filter keeps from the model.\n``schema_tokens`` roughly what its schema costs in each prompt.",
       "properties": {
         "description": {
           "title": "Description",
           "type": "string"
         },
+        "hidden": {
+          "default": false,
+          "title": "Hidden",
+          "type": "boolean"
+        },
         "name": {
           "minLength": 1,
           "title": "Name",
           "type": "string"
+        },
+        "schema_tokens": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Schema Tokens",
+          "type": "integer"
         }
       },
       "required": [

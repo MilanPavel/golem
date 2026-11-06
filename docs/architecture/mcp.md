@@ -215,6 +215,8 @@ For contributors: the reference for the client, the transports, the tools, scopi
 
 - **Health.** Each running server answers `ping` every 30 seconds. One that exits or stops answering is `failed`, and starts again after 1 second, then 2, 4, up to a minute between tries, back to 1 after a minute of running.
 - **Reload.** It reads `config.toml` and each project's file again when they change. A changed server restarts, a new one starts, and a removed one stops. A file that does not validate keeps the last good servers.
+- **Tool filter.** `tools.include` and `tools.exclude` are `fnmatch` patterns on the server's own tool names, and `exclude` wins. A hidden tool is never turned into a golem tool, so its schema costs the model nothing. The supervisor keeps the hidden ones too, so `mcp.tools` can list them with `hidden: true`, each with its `schema_tokens`, and `McpServer.tools_hidden` counts them.
+- **Approval.** `approval = "allow"` adds the rule `mcp__<name>__*` to `allow`, after the user's own `[[rule]]`s and before the default `ask` (`Policy.rules`). A project server's `allow` counts only when its project is trusted, because the supervisor only shows trusted projects' servers.
 - **Changed tools.** A server that says `notifications/tools/list_changed` is listed again.
 - **Costs.** A server that never comes up costs the 10-second wait on every call until it does, or until the session turns it off. A project server keeps running after the last session in that folder ends, until the daemon restarts or the file changes.
 
@@ -223,7 +225,7 @@ For contributors: the reference for the client, the transports, the tools, scopi
 `golem/mcp/launch.py`:
 
 - **The command.** launchd gives the daemon a short `PATH`, so a command is also looked for in `/opt/homebrew/bin`, `/usr/local/bin`, and `~/.local/bin`.
-- **The environment.** A stdio server gets `HOME`, `PATH`, `USER`, `LOGNAME`, `SHELL`, `TERM`, `LANG`, and `TMPDIR`, plus its own `env`, and nothing else from the daemon's environment.
+- **The environment.** A stdio server gets `HOME`, `PATH`, `USER`, `LOGNAME`, `SHELL`, `TERM`, `LANG`, and `TMPDIR`, plus the daemon's variables its `env_passthrough` names, plus its own `env`, and nothing else from the daemon's environment. A name in `env_passthrough` that looks like a secret does not load, because a secret goes through the Keychain. There is no `${VAR}` in a value: under launchd the daemon has no shell environment, so it would mislead.
 - **Secrets.** A value in `env` or `headers` can name `keychain:mcp/<name>`, alone or inside the text (`Bearer keychain:mcp/github`), and the secret replaces it when the server starts. `golem auth set mcp/<name>` or `/login mcp/<name>` stores it, restarts the servers that use it, and `golem auth list` shows whether each one is stored.
 - **What a project can't do.** A variable or header whose name looks like a secret must name one, and a reference outside `mcp/` does not load, so a project's server can never be handed a model provider's key.
 
@@ -235,7 +237,16 @@ MCP servers are listed with `mcp.list`: each one's name, state (`idle`, `startin
 
 `mcp.set_enabled` writes through `golem/config_edit.py`, which keeps the file's comments, and applies the change at once.
 
-`mcp.add` and `mcp.remove` do the same for a whole `[mcp.<name>]` table, in the user's config only. `mcp.add` checks the table against the settings model first, stores a token as `mcp/<name>` before it writes, and refuses a name that exists. `mcp.remove` also deletes the token. A token sent to `mcp.add` is stored before the file is written and never returned. These two are `local` today. [ADR-037](../adr/037-browser-manages-mcp-and-config.md) lets the browser call them, with the daemon refusing an edit that points a stored secret at another address, and step 1.12.4 makes that change.
+`mcp.add` and `mcp.remove` do the same for a whole `[mcp.<name>]` table. `mcp.add` has two forms, and sending both is an error. The short one (`command`, `args`, `url`, `token`, `token_env`) is what the CLI sends, and writes the user's file. The full one sends `config`, a `McpServerConfig` with every field of `[mcp.<name>]`, with `secrets` by reference (`mcp/github`). With `scope = "project"` and a `session_id` in a trusted folder, it writes that project's `.golem/config.toml`. Both check the table against the settings model first, store each secret before they write, and refuse a name that exists. `mcp.remove` takes an optional `session_id` to remove a project's server, and deletes a secret only when no other server names it.
+
+`mcp.get` returns one server's `McpServerDetail`: its status, its whole config, whether it is the user's or a project's, the file, and each secret it names with `stored: true` or `false`. A value is never returned. `mcp.update` replaces the table in the file that names it, keeping its comments and place (`replace_mcp_server`), and `new_name` renames it and carries its `mcp/<name>` secrets over.
+
+`config.raw.get` returns the text of `config.toml` (or a trusted project's) with its `mtime_ns`. `config.raw.set` checks a new text (`golem/config_raw.py`) and writes it atomically when the file's `mtime_ns` is still `base_mtime_ns`. It returns every problem with its line, column, and setting path: TOML that does not parse, settings that do not validate, a literal secret, and the two rules below. `dry_run` checks and writes nothing, so an editor can call it as you type. `restart_needed` lists the changed sections the daemon reads only at start (`providers`, `models`, `ollama`, `web`, `log_level`, and the old flat model keys). After a write the supervisor reads the file again at once.
+
+[ADR-037](../adr/037-browser-manages-mcp-and-config.md) lets the browser call all of these, because the daemon holds two checks for every client:
+
+- **Protected sections.** The browser's `config.raw.set` refuses a change inside `providers`, the model keys, `trusted_projects`, `shell`, `web`, `skills.extra_dirs`, and `skills.claude_dirs` (`PROTECTED_SETTINGS` in `config.py`, and a test fails for a setting in neither list). `config.raw.set_protected` is `local`, and the terminal uses it.
+- **Secrets stay where they were meant to go.** A server may name only `mcp/<name>` and `mcp/<name>-…`. `mcp.update` that changes `url`, `command`, `args`, or `cwd` of a server naming a stored secret must send the secret again, and a raw edit that does so is refused. A rename counts too, so it cannot copy a secret to a new address.
 
 ### In the TUI and the CLI
 
@@ -247,7 +258,7 @@ MCP servers are listed with `mcp.list`: each one's name, state (`idle`, `startin
 
 ### The settings
 
-- `[mcp.<name>]`: an MCP server. A stdio one has `command`, optional `args`, `env`, and `cwd`. An HTTP one has `url` and optional `headers`. A value in `env` or `headers` may name `keychain:mcp/<name>`, and a name that looks like a secret must. `enabled` is `true` (default), `"on_demand"`, or `false`, and `timeout_seconds` (default 120) bounds one tool call. The name may use letters, digits, and `-`. The daemon reads the user's file and, for sessions in a folder in `trusted_projects`, the project's `.golem/config.toml`, again whenever they change ([ADR-023](../adr/023-mcp-client.md)).
+- `[mcp.<name>]`: an MCP server. A stdio one has `command`, optional `args`, `env`, and `cwd`. An HTTP one has `url` and optional `headers`. A value in `env` or `headers` may name `keychain:mcp/<name>`, and a name that looks like a secret must. `enabled` is `true` (default), `"on_demand"`, or `false`, and `timeout_seconds` (default 120) bounds one tool call. `tools = { include, exclude }` hides tools from the model, `approval = "allow"` lets the server's calls run without asking, and `env_passthrough` lists the daemon's variables a stdio server gets. The name may use letters, digits, and `-`. The daemon reads the user's file and, for sessions in a folder in `trusted_projects`, the project's `.golem/config.toml`, again whenever they change ([ADR-023](../adr/023-mcp-client.md)).
 
 ### Limits
 

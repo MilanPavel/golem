@@ -1,0 +1,54 @@
+{
+  "additionalProperties": false,
+  "description": "``config.raw.set`` and ``config.raw.set_protected``. Check a new text, and write it.\n\n``base_mtime_ns`` is the ``mtime_ns`` the text was read at, null for a file\nthat did not exist. A file changed since is refused. ``dry_run`` checks and\nwrites nothing. ``config.raw.set`` refuses a change inside the protected\nsections (providers, trusted projects, shell, web, skill folders), and\n``config.raw.set_protected``, which only a local client may call, does not.",
+  "properties": {
+    "base_mtime_ns": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Base Mtime Ns"
+    },
+    "dry_run": {
+      "default": false,
+      "title": "Dry Run",
+      "type": "boolean"
+    },
+    "scope": {
+      "default": "user",
+      "enum": [
+        "user",
+        "project"
+      ],
+      "title": "Scope",
+      "type": "string"
+    },
+    "session_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Session Id"
+    },
+    "text": {
+      "title": "Text",
+      "type": "string"
+    }
+  },
+  "required": [
+    "text"
+  ],
+  "title": "ConfigRawSetParams",
+  "type": "object"
+}

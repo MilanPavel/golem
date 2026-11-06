@@ -248,3 +248,17 @@ async def _never(args: _ShellArgs, ctx: ToolContext) -> ToolResult:
 def _registry_with_shell() -> ToolRegistry:
     shell = Tool(name="shell", description="", args=_ShellArgs, run=_never, match_arg="command")
     return ToolRegistry([*READ_ONLY_TOOLS, shell])
+
+
+def test_an_mcp_server_with_approval_allow_runs_without_asking_after_the_users_rules(
+    tmp_path: Path,
+) -> None:
+    user = tmp_path / "config.toml"
+    _write(user, '[[rule]]\ntool = "mcp__fake__fail"\naction = "deny"\n')
+    policy = Policy(user, home=tmp_path)
+    policy.mcp_allowed = lambda _root: ["fake"]
+    registry = default_registry()
+    echo = policy.check(registry, "mcp__fake__echo", {}, None)
+    assert (echo.action, echo.source) == ("allow", "mcp.fake approval = allow")
+    assert policy.check(registry, "mcp__fake__fail", {}, None).action == "deny"
+    assert policy.check(registry, "mcp__other__echo", {}, None).action == "ask"
