@@ -4,6 +4,10 @@
 A rule's ``match`` is checked against the command, so ``match = "git status"``
 or ``match = "pnpm test*"`` can allow one command and no other.
 
+``shell_unsandboxed`` runs a command without the sandbox, with the user's
+credentials and the network, for ``gh`` and ``git push``. It is a tool of its
+own, so a rule or an allowance for ``shell`` never lets a command out.
+
 The git helpers only read. They run git directly, not through a shell, with
 the repository settings that run code switched off: fsmonitor, hooks,
 external diff drivers, and text conversion.
@@ -67,7 +71,16 @@ class GitLogArgs(BaseModel):
 
 
 async def _shell(args: ShellArgs, ctx: ToolContext) -> ToolResult:
-    root = _sandboxed_root(ctx)
+    return await _login_shell(args, ctx, _sandboxed_root(ctx), sandboxed=True)
+
+
+async def _shell_unsandboxed(args: ShellArgs, ctx: ToolContext) -> ToolResult:
+    return await _login_shell(args, ctx, session_root(ctx), sandboxed=False)
+
+
+async def _login_shell(
+    args: ShellArgs, ctx: ToolContext, root: Path, *, sandboxed: bool
+) -> ToolResult:
     timeout = min(args.timeout_seconds or ctx.shell.timeout_seconds, ctx.shell.timeout_seconds)
     login = os.environ.get("SHELL") or "/bin/zsh"
     done = await sandbox.run(
@@ -76,6 +89,7 @@ async def _shell(args: ShellArgs, ctx: ToolContext) -> ToolResult:
         settings=ctx.shell,
         timeout=timeout,
         on_output=ctx.output,
+        sandboxed=sandboxed,
     )
     if done.timed_out:
         ending = f"[killed after {timeout} seconds]"
@@ -162,10 +176,22 @@ SHELL = Tool(
     description=(
         "Run a shell command in the project folder, such as tests or a build. Network "
         "is off and writes outside the project are refused. Output is stdout and stderr "
-        "together, and ends with the exit code."
+        "together, and ends with the exit code. A command that needs the user's "
+        "credentials or the network, such as gh or git push, needs shell_unsandboxed."
     ),
     args=ShellArgs,
     run=_shell,
+    match_arg="command",
+)
+SHELL_UNSANDBOXED = Tool(
+    name="shell_unsandboxed",
+    description=(
+        "Run a shell command in the project folder outside the sandbox, with the user's "
+        "credentials and the network. Use it only for a command that needs them, such as "
+        "gh or git push, and use shell for everything else. The user approves each command."
+    ),
+    args=ShellArgs,
+    run=_shell_unsandboxed,
     match_arg="command",
 )
 GIT_STATUS = Tool(
@@ -192,7 +218,7 @@ GIT_LOG = Tool(
     path_arg="path",
 )
 
-SHELL_TOOLS = (SHELL, GIT_STATUS, GIT_DIFF, GIT_LOG)
+SHELL_TOOLS = (SHELL, SHELL_UNSANDBOXED, GIT_STATUS, GIT_DIFF, GIT_LOG)
 
 __all__ = [
     "GIT_DIFF",
@@ -201,6 +227,7 @@ __all__ = [
     "NO_SANDBOX",
     "SHELL",
     "SHELL_TOOLS",
+    "SHELL_UNSANDBOXED",
     "GitDiffArgs",
     "GitLogArgs",
     "ShellArgs",
