@@ -1,6 +1,137 @@
 {
+  "$defs": {
+    "McpServerConfig": {
+      "additionalProperties": false,
+      "description": "Every field of ``[mcp.<name>]``, as it goes over the wire.\n\nThe daemon's settings model has the same fields, and a test keeps the two\nequal. A value in ``env`` or ``headers`` names a secret as\n``keychain:mcp/<name>``, never the secret itself.",
+      "properties": {
+        "approval": {
+          "default": "ask",
+          "enum": [
+            "ask",
+            "allow"
+          ],
+          "title": "Approval",
+          "type": "string"
+        },
+        "args": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Args",
+          "type": "array"
+        },
+        "command": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Command"
+        },
+        "cwd": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cwd"
+        },
+        "enabled": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "const": "on_demand",
+              "type": "string"
+            }
+          ],
+          "default": true,
+          "title": "Enabled"
+        },
+        "env": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Env",
+          "type": "object"
+        },
+        "env_passthrough": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Env Passthrough",
+          "type": "array"
+        },
+        "headers": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Headers",
+          "type": "object"
+        },
+        "timeout_seconds": {
+          "default": 120,
+          "exclusiveMinimum": 0,
+          "maximum": 3600,
+          "title": "Timeout Seconds",
+          "type": "integer"
+        },
+        "tools": {
+          "$ref": "#/$defs/McpToolFilterConfig"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Url"
+        }
+      },
+      "title": "McpServerConfig",
+      "type": "object"
+    },
+    "McpToolFilterConfig": {
+      "additionalProperties": false,
+      "description": "``tools`` of ``[mcp.<name>]``: ``fnmatch`` patterns on the server's own tool names.\n\nAn empty ``include`` means every tool, and ``exclude`` wins.",
+      "properties": {
+        "exclude": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Exclude",
+          "type": "array"
+        },
+        "include": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Include",
+          "type": "array"
+        }
+      },
+      "title": "McpToolFilterConfig",
+      "type": "object"
+    }
+  },
   "additionalProperties": false,
-  "description": "``mcp.add``. Write ``[mcp.<name>]`` into the user's config, and start the server.\n\nGive a ``command`` with its ``args`` for a stdio server, or a ``url`` for an\nHTTP one. A ``token`` goes into the OS credential store as ``mcp/<name>``,\nnever into the file: an HTTP server sends it as a Bearer header, and a\ncommand gets it in the variable ``token_env``. A client never logs or\ndisplays ``token``.",
+  "description": "``mcp.add``. Write ``[mcp.<name>]`` into a config file, and start the server.\n\nThere are two forms, and sending both is an error.\n\nThe short form gives a ``command`` with its ``args`` for a stdio server, or a\n``url`` for an HTTP one, and writes the user's file. A ``token`` goes into\nthe OS credential store as ``mcp/<name>``, never into the file: an HTTP\nserver sends it as a Bearer header, and a command gets it in the variable\n``token_env``.\n\nThe full form gives the whole ``config``, and ``secrets`` by reference\n(``mcp/github``). Each secret must appear in ``config`` as\n``keychain:<ref>``, and may only be ``mcp/<name>`` or ``mcp/<name>-…`` for\nthis server. ``scope = \"project\"`` writes the trusted project of\n``session_id``. A client never logs or displays a token.",
   "properties": {
     "args": {
       "items": {
@@ -22,10 +153,52 @@
       "default": null,
       "title": "Command"
     },
+    "config": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/McpServerConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
     "name": {
       "pattern": "^[A-Za-z0-9][A-Za-z0-9-]{0,31}$",
       "title": "Name",
       "type": "string"
+    },
+    "scope": {
+      "default": "user",
+      "enum": [
+        "user",
+        "project"
+      ],
+      "title": "Scope",
+      "type": "string"
+    },
+    "secrets": {
+      "additionalProperties": {
+        "format": "password",
+        "type": "string",
+        "writeOnly": true
+      },
+      "title": "Secrets",
+      "type": "object"
+    },
+    "session_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Session Id"
     },
     "token": {
       "anyOf": [

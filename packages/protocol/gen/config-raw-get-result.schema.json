@@ -1,0 +1,37 @@
+{
+  "additionalProperties": false,
+  "description": "The file's path and text, and its ``mtime_ns`` for a later ``config.raw.set``.",
+  "properties": {
+    "exists": {
+      "title": "Exists",
+      "type": "boolean"
+    },
+    "mtime_ns": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Mtime Ns"
+    },
+    "path": {
+      "title": "Path",
+      "type": "string"
+    },
+    "text": {
+      "title": "Text",
+      "type": "string"
+    }
+  },
+  "required": [
+    "path",
+    "text",
+    "exists"
+  ],
+  "title": "ConfigRawGetResult",
+  "type": "object"
+}
