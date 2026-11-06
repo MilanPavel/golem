@@ -101,6 +101,8 @@ A command you allow still runs in a sandbox (`sandbox-exec`, built into macOS). 
 - **No secrets.** It cannot read `~/.ssh`, `~/.gnupg`, `~/.aws`, `~/.config/gh`, `~/.golem`, your Keychains, and similar folders. Variables that look like credentials are removed from its environment.
 - **A time limit** of 120 seconds by default, `[shell] timeout_seconds`.
 
+When the sandbox refuses something, the result says so: the tool line reads `exit 1, blocked by the sandbox`, and the output names what was blocked and how to allow it. The model reads the same line, so it can tell you.
+
 `git_status`, `git_diff`, and `git_log` run git directly, in the same sandbox, with hooks and other ways for a repository to run code switched off.
 
 ```toml
