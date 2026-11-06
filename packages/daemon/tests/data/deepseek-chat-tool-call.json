@@ -1,0 +1,33 @@
+{
+  "id": "4f1e6a0c-9d57-4a44-8d4f-7a5c0c2f9b11",
+  "object": "chat.completion",
+  "created": 1762430000,
+  "model": "deepseek-chat",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "",
+        "tool_calls": [
+          {
+            "index": 0,
+            "id": "call_0_6e1d0a54-2b0c-4b1b-9a4e-0f5a0f3c7d21",
+            "type": "function",
+            "function": {"name": "read_file", "arguments": "{\"path\": \"notes.txt\"}"}
+          }
+        ]
+      },
+      "logprobs": null,
+      "finish_reason": "tool_calls"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 71,
+    "completion_tokens": 21,
+    "total_tokens": 92,
+    "prompt_cache_hit_tokens": 0,
+    "prompt_cache_miss_tokens": 71
+  },
+  "system_fingerprint": "fp_ffc7281d48_prod0820_fp8_kvcache"
+}

@@ -30,7 +30,7 @@ CACHE_NAME = "litellm-prices.json"
 MAX_AGE_SECONDS = 24 * 3600
 
 # LiteLLM provider names golem has a provider for. Golem's google is LiteLLM's gemini.
-_KEPT_PROVIDERS = frozenset({"anthropic", "openai", "gemini"})
+_KEPT_PROVIDERS = frozenset({"anthropic", "openai", "gemini", "deepseek"})
 _PREFIXES = {"google": "gemini"}
 _KEPT_FIELDS = (
     "input_cost_per_token",
