@@ -40,7 +40,7 @@ from pydantic import BaseModel
 
 from golem.config import McpServers, McpServerSettings, load_mcp
 from golem.mcp.client import CallResult, McpClient, McpError
-from golem.mcp.launch import Secrets, transport_for
+from golem.mcp.launch import Secrets, find_command, transport_for
 from golem.mcp.probe import DEFAULT_TIMEOUTS, ProbeResult, Step, Timeouts, probe
 from golem.mcp.tools import mcp_tools
 from golem.tools.registry import Tool, ToolScope
@@ -209,6 +209,10 @@ class McpSupervisor:
         :meth:`_shown` already checks.
         """
         return [server.name for server in self._shown(root) if server.settings.approval == "allow"]
+
+    def has_command(self, program: str) -> bool:
+        """Whether ``program`` is where a server would find it, on the launch search path."""
+        return find_command(program, self._environ) is not None
 
     def settings(self, scope: ToolScope, name: str) -> McpServerSettings:
         """The settings of server ``name``, as ``scope`` sees it."""
