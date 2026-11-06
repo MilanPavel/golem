@@ -62,6 +62,7 @@ from golem.server.mcp_edit import (
     mcp_remove,
     mcp_update,
 )
+from golem.server.mcp_try import mcp_call, mcp_logs, mcp_test
 from golem.sessions.manager import (
     ApprovalNotFoundError,
     BlankTitleError,
@@ -105,12 +106,15 @@ from golem_protocol.commands import (
     ListedProvider,
     LocalServer,
     McpAddParams,
+    McpCallParams,
     McpListParams,
     McpListResult,
+    McpLogsParams,
     McpRemoveParams,
     McpServer,
     McpServerParams,
     McpSetEnabledParams,
+    McpTestParams,
     McpToggleParams,
     McpToggleResult,
     McpToolInfo,
@@ -843,6 +847,7 @@ async def _setup_status(ctx: RequestContext, _params: SetupStatusParams) -> Setu
         MacPlatform(),
         keys,
         (lambda _name: None) if secrets is None else secrets.get,
+        live_mcp=None if ctx.state.mcp is None else ctx.state.mcp.statuses(),
     )
     return SetupStatusResult(
         rows=[
@@ -952,6 +957,9 @@ def standard_methods() -> dict[str, Method]:
         "mcp.remove": Method("mcp.remove", McpRemoveParams, True, mcp_remove),
         "mcp.get": Method("mcp.get", McpServerParams, True, mcp_get),
         "mcp.update": Method("mcp.update", McpUpdateParams, True, mcp_update),
+        "mcp.test": Method("mcp.test", McpTestParams, True, mcp_test),
+        "mcp.logs": Method("mcp.logs", McpLogsParams, True, mcp_logs),
+        "mcp.call": Method("mcp.call", McpCallParams, True, mcp_call),
         "config.raw.get": Method("config.raw.get", ConfigRawGetParams, True, config_raw_get),
         "config.raw.set": Method("config.raw.set", ConfigRawSetParams, True, config_raw_set),
         "config.raw.set_protected": Method(

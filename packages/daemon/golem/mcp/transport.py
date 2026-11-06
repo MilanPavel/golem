@@ -26,7 +26,7 @@ log = logging.getLogger(__name__)
 
 MAX_LINE_BYTES = 16 * 1024 * 1024
 """The longest message golem reads. A tool result is one line, and it can be big."""
-STDERR_LINES = 20
+STDERR_LINES = 500
 STOP_SECONDS = 2.0
 HTTP_ERROR = -32000
 
@@ -85,14 +85,22 @@ class StdioTransport:
 
     The child runs in its own process group, so stopping it also stops what it
     started, such as ``npx``'s ``node``. Its stderr goes to the log, and its
-    last line explains an exit. ``stop_seconds`` is how long :meth:`close`
-    waits after closing stdin, then after SIGTERM, before SIGKILL.
+    last line explains an exit. ``on_stderr`` gets each line as it comes.
+    ``stop_seconds`` is how long :meth:`close` waits after closing stdin, then
+    after SIGTERM, before SIGKILL.
     """
 
-    def __init__(self, launch: Launch, *, stop_seconds: float = STOP_SECONDS) -> None:
+    def __init__(
+        self,
+        launch: Launch,
+        *,
+        stop_seconds: float = STOP_SECONDS,
+        on_stderr: Callable[[str], None] | None = None,
+    ) -> None:
         self.protocol_version: str | None = None
         self._launch = launch
         self._stop_seconds = stop_seconds
+        self._on_stderr = on_stderr
         self._process: asyncio.subprocess.Process | None = None
         self._stderr: deque[str] = deque(maxlen=STDERR_LINES)
         self._tasks: list[asyncio.Task[None]] = []
@@ -127,6 +135,10 @@ class StdioTransport:
             await process.stdin.drain()
         except (BrokenPipeError, ConnectionResetError) as exc:
             raise McpError(self._exit_reason()) from exc
+
+    def stderr_tail(self, count: int) -> list[str]:
+        """The last ``count`` lines the server wrote to stderr."""
+        return list(self._stderr)[-count:]
 
     async def wait_closed(self) -> str:
         await self._state.closed.wait()
@@ -180,6 +192,8 @@ class StdioTransport:
                 if text:
                     self._stderr.append(text)
                     log.debug("mcp %s: %s", self._launch.argv[0], text)
+                    if self._on_stderr is not None:
+                        self._on_stderr(text)
 
     def _exit_reason(self) -> str:
         process = self._process
@@ -215,6 +229,10 @@ class HttpTransport:
         self._client: httpx.AsyncClient | None = None
         self._deliver: Deliver | None = None
         self._session_id: str | None = None
+        self.status: int | None = None
+        """The last HTTP status of 400 or more, for a test's hint."""
+        self.authenticate: str | None = None
+        """The ``WWW-Authenticate`` header that came with it, when there was one."""
         self._posts: set[asyncio.Task[None]] = set()
         self._state = _Closing()
 
@@ -265,6 +283,8 @@ class HttpTransport:
                     await self._answer_error(request_id, "the server ended the session")
                     return
                 if response.status_code >= 400:
+                    self.status = response.status_code
+                    self.authenticate = response.headers.get("www-authenticate")
                     body = (await response.aread()).decode(errors="replace").strip()
                     reason = f"HTTP {response.status_code}" + (f": {body[:200]}" if body else "")
                     if request_id is None:

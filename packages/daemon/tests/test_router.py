@@ -59,9 +59,9 @@ def test_a_ref_resolves_without_a_profile() -> None:
 
 
 def test_a_ref_splits_on_the_first_slash() -> None:
-    resolved = ModelRouter(GolemSettings()).resolve("openrouter/qwen/qwen3-235b-a22b")
-    assert resolved.provider_name == "openrouter"
-    assert resolved.model_id == "qwen/qwen3-235b-a22b"
+    resolved = ModelRouter(GolemSettings()).resolve("ollama/library/qwen3")
+    assert resolved.provider_name == "ollama"
+    assert resolved.model_id == "library/qwen3"
 
 
 def test_every_resolvable_name_has_an_identity() -> None:
@@ -176,26 +176,22 @@ def test_an_unreadable_store_is_a_config_error(monkeypatch: pytest.MonkeyPatch) 
 
 
 def test_a_custom_provider_uses_a_stored_key() -> None:
-    settings = GolemSettings(providers={"mine": ProviderSettings(base_url="http://127.0.0.1:9/v1")})
-    router = ModelRouter(settings, keys=MemoryKeyStore({"mine": "sk-mine"}))
-    model = router.chat_model("mine/model-x")
+    settings = GolemSettings(providers={"xai": ProviderSettings(base_url="http://127.0.0.1:9/v1")})
+    router = ModelRouter(settings, keys=MemoryKeyStore({"xai": "sk-xai"}))
+    model = router.chat_model("xai/model-x")
     assert isinstance(model, ChatOpenAI)
     assert isinstance(model.openai_api_key, SecretStr)
-    assert model.openai_api_key.get_secret_value() == "sk-mine"
+    assert model.openai_api_key.get_secret_value() == "sk-xai"
 
 
 def test_key_statuses_report_where_each_key_is(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("OPENAI_API_KEY", "sk-env")
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     router = ModelRouter(GolemSettings(), keys=MemoryKeyStore({"anthropic": "sk-stored"}))
     statuses = {status.provider: status for status in router.key_statuses()}
     assert statuses["anthropic"].source == "keychain"
     assert statuses["openai"].source == "env"
-    assert statuses["openrouter"].source is None
-    assert statuses["openrouter"].needs_key
     assert not statuses["ollama"].takes_key
-    assert not statuses["lmstudio"].needs_key
     assert list(statuses) == sorted(statuses)
 
 
@@ -205,38 +201,40 @@ def test_missing_openai_key_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None
         ModelRouter(GolemSettings()).chat_model("openai/gpt-test")
 
 
-def test_openrouter_preset_needs_its_key(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
-    router = ModelRouter(GolemSettings())
-    with pytest.raises(ModelConfigError, match="OPENROUTER_API_KEY"):
-        router.chat_model("openrouter/qwen/qwen3-235b-a22b")
-    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or")
-    model = router.chat_model("openrouter/qwen/qwen3-235b-a22b")
-    assert isinstance(model, ChatOpenAI)
-    assert model.model_name == "qwen/qwen3-235b-a22b"
-    assert model.openai_api_base == "https://openrouter.ai/api/v1"
+def test_the_removed_providers_are_gone() -> None:
+    for name in ("openrouter", "groq", "together", "lmstudio"):
+        assert name not in ModelRouter(GolemSettings()).providers()
+        with pytest.raises(ModelConfigError, match="unknown model provider"):
+            ModelRouter(GolemSettings()).resolve(f"{name}/some-model")
 
 
-def test_lmstudio_preset_needs_no_key() -> None:
-    model = ModelRouter(GolemSettings()).chat_model("lmstudio/gemma")
-    assert isinstance(model, ChatOpenAI)
-    assert model.openai_api_base == "http://127.0.0.1:1234/v1"
+def test_an_unknown_provider_lists_the_six() -> None:
+    with pytest.raises(ModelConfigError) as caught:
+        ModelRouter(GolemSettings()).resolve("groq/llama")
+    assert "openai, anthropic, google, deepseek, xai, moonshot" in str(caught.value)
+
+
+def test_a_provider_section_for_another_name_is_rejected() -> None:
+    with pytest.raises(
+        ValueError, match=r"unknown model provider: groq\. Choose one of .*moonshot"
+    ):
+        GolemSettings(providers={"groq": ProviderSettings(base_url="http://127.0.0.1:9/v1")})
 
 
 def test_a_new_provider_is_openai_compatible(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("MY_KEY", "secret")
     settings = GolemSettings(
-        providers={"mine": ProviderSettings(base_url="http://127.0.0.1:9/v1", api_key_env="MY_KEY")}
+        providers={"xai": ProviderSettings(base_url="http://127.0.0.1:9/v1", api_key_env="MY_KEY")}
     )
-    model = ModelRouter(settings).chat_model("mine/model-x")
+    model = ModelRouter(settings).chat_model("xai/model-x")
     assert isinstance(model, ChatOpenAI)
     assert model.openai_api_base == "http://127.0.0.1:9/v1"
 
 
 def test_a_new_provider_without_base_url_is_rejected() -> None:
-    settings = GolemSettings(providers={"mine": ProviderSettings()})
-    with pytest.raises(ModelConfigError, match="mine needs base_url"):
-        ModelRouter(settings).chat_model("mine/model-x")
+    settings = GolemSettings(providers={"xai": ProviderSettings()})
+    with pytest.raises(ModelConfigError, match="xai needs base_url"):
+        ModelRouter(settings).chat_model("xai/model-x")
 
 
 def test_legacy_ollama_settings_become_a_native_profile() -> None:

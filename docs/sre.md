@@ -25,8 +25,8 @@ flowchart LR
   launchd["launchd<br/>(macOS service manager)"] -->|"starts at login,<br/>restarts after a crash"| daemon
   daemon --> data[("~/.golem<br/>settings, chats, logs")]
   daemon --> keychain[("macOS Keychain<br/>API keys")]
-  daemon -->|internet| cloud["Anthropic, OpenAI,<br/>OpenRouter, ..."]
-  daemon -->|this computer| local["Ollama, LM Studio"]
+  daemon -->|internet| cloud["Anthropic, OpenAI, ..."]
+  daemon -->|this computer| local["Ollama"]
 ```
 
 Why split it this way? Closing the chat screen does not stop the work. An answer keeps streaming, or a question keeps waiting for your approval, while the screen is closed. Open it again and everything is still there.
@@ -551,7 +551,7 @@ stateDiagram-v2
 | `golem daemon uninstall` | Stops it and deletes the launchd file. Your data in `~/.golem` stays |
 | `golem daemon logs` | Shows the log and follows new lines |
 | `golem status` | Shows pid, version, and uptime. Exits with code 1 if the daemon is not running, and prints why it could not start or the one command that starts it. `models`, `config`, `skills list`, and `auth` do the same |
-| `golem doctor` | Checks the install and prints a fix under each problem (section 12). Exits with code 1 if anything failed |
+| `golem doctor` | Checks the install and prints a fix under each problem (section 12). Exits with code 1 if anything failed. `golem doctor --mcp` also starts each MCP server and says what stopped it |
 
 `kill` is not a way to stop it: launchd starts it again within seconds. Use `golem daemon stop`.
 

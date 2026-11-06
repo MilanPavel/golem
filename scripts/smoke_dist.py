@@ -55,9 +55,9 @@ def main() -> int:
         "\n".join(
             [
                 "session_titles = false",
-                'default_model = "stub/fake"',
+                'default_model = "deepseek/fake"',
                 "",
-                "[providers.stub]",
+                "[providers.deepseek]",
                 'kind = "openai_compat"',
                 f'base_url = "http://127.0.0.1:{port}/v1"',
                 'api_key_env = "GOLEM_SMOKE_KEY"',

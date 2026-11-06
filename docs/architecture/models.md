@@ -57,7 +57,7 @@ golem uses a wrapper library, LangChain's chat models, behind its own **model ro
 One model call, in the order it runs:
 
 1. **A name.** Each session stores a model name. It is either a *profile* from your `config.toml`, such as `qwen`, or a *ref*, a provider and a model id, such as `ollama/qwen3:8b`.
-2. **The router resolves it.** It looks the profile up, splits the ref on its first `/`, and finds the provider: a built-in one, such as `anthropic`, `openai`, `ollama`, or `openrouter`, or one you added.
+2. **The router resolves it.** It looks the profile up, splits the ref on its first `/`, and finds the provider: a built-in one, such as `anthropic`, `openai`, or `ollama`.
 3. **A key, if it needs one.** For a hosted provider, the router reads the API key at the moment of the call, from an environment variable or from the macOS Keychain. The key is never written into the chat's saved state.
 4. **A local server, if it needs one.** For a model in Ollama on this Mac, golem starts Ollama when nothing answers, and keeps it running while the call holds it.
 5. **The call streams.** The chat model streams tokens back. golem sends each piece to your screen as a `message.delta` event.
@@ -189,7 +189,7 @@ Downloads go through Ollama (`golem/models/pulls.py`):
   - each keyed provider's own list: Anthropic and OpenAI `/v1/models`, and `<base_url>/models` for an OpenAI-compatible provider;
   - profiles and `default_model`, so a configured model is always listed.
 - **What an entry carries:** its status (`ready`, `needs_key`, `not_installed`, or `server_down`), the profile names that point at it, context size, tool support, price in USD per million tokens, download size, and whether it fits in memory.
-- **Price and context precedence:** the profile, then the provider's own list (Ollama, OpenRouter), then LiteLLM (`golem/models/prices.py`).
+- **Price and context precedence:** the profile, then the provider's own list (Ollama), then LiteLLM (`golem/models/prices.py`).
 - **Caching and time limit:** hosted lists are cached for a day under `cache/`. A listing waits at most 2 seconds for the network. A slower fetch keeps running, and its result is used next time, with `stale` set on what was shown meanwhile. `refresh: true` skips the cache.
 
 | File | What it does |

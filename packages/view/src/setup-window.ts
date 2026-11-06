@@ -492,9 +492,6 @@ export type EngineChoice = "local" | "key" | "later";
 const PROVIDER_NAMES: Record<string, string> = {
   anthropic: "Anthropic",
   openai: "OpenAI",
-  openrouter: "OpenRouter",
-  groq: "Groq",
-  together: "Together",
   ollama: "Ollama",
 };
 

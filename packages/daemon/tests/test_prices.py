@@ -28,19 +28,19 @@ def test_a_bare_id_must_belong_to_the_provider() -> None:
     book = PriceBook(
         {
             "llama-x": {
-                "litellm_provider": "groq",
+                "litellm_provider": "anthropic",
                 "input_cost_per_token": 1e-06,
                 "output_cost_per_token": 1e-06,
             },
-            "together_ai/meta/llama": {
-                "litellm_provider": "together_ai",
+            "openai/meta/llama": {
+                "litellm_provider": "openai",
                 "input_cost_per_token": 2e-06,
                 "output_cost_per_token": 2e-06,
             },
         }
     )
     assert book.lookup("openai", "llama-x") is None
-    found = book.lookup("together", "meta/llama")
+    found = book.lookup("openai", "meta/llama")
     assert found is not None and found.price is not None
     assert found.price.input == pytest.approx(2.0)
 
@@ -50,8 +50,6 @@ def test_a_bare_id_must_belong_to_the_provider() -> None:
     [
         ("anthropic", "anthropic"),
         ("openai", "openai"),
-        ("groq", "groq"),
-        ("together", "together_ai"),
     ],
 )
 def test_every_bundled_chat_model_resolves_from_a_golem_ref(

@@ -38,7 +38,7 @@ const LISTING: ModelListResult = {
     model("anthropic/claude-haiku-5-5", { label: "Claude Haiku 5.5" }),
     model("anthropic/claude-sonnet-5-5", { label: "Claude Sonnet 5.5" }),
     model("anthropic/claude-opus-5-5", { label: "Claude Opus 5.5" }),
-    model("groq/llama-3.3-70b-versatile"),
+    model("openai/gpt-5"),
   ],
   providers: [{ provider: "anthropic", status: "ready" }],
   setup: { ollama_installed: false, ollama_running: false, keys: [], default_status: null },
@@ -49,11 +49,11 @@ test("the Provider panel lists the hosted providers, with a saved key noted and 
   assert.deepEqual(lines[0], { kind: "title", text: "With an API key · which provider?" });
   assert.deepEqual(lines[2], { kind: "option", label: "Anthropic", detail: "Claude", selected: true });
   assert.equal(lines.length, 2 + HOSTED_PROVIDERS.length);
-  const keyed = { ...LISTING, setup: { ...LISTING.setup, keys: ["groq"] } };
-  assert.equal(providerSelected(keyed), 2);
-  assert.ok(providerLines(keyed, 2).some((line) => line.kind === "option" && line.detail === "fast open models · key saved"));
+  const keyed = { ...LISTING, setup: { ...LISTING.setup, keys: ["openai"] } };
+  assert.equal(providerSelected(keyed), 1);
+  assert.ok(providerLines(keyed, 1).some((line) => line.kind === "option" && line.detail === "GPT · key saved"));
   assert.deepEqual(pressProvider(LISTING, 0, "down"), { selected: 1, provider: null });
-  assert.deepEqual(pressProvider(LISTING, 3, "enter"), { selected: 3, provider: "openrouter" });
+  assert.deepEqual(pressProvider(LISTING, 1, "enter"), { selected: 1, provider: "openai" });
 });
 
 test("a key in the shell is offered first, else the field opens, with where to get one", () => {
@@ -103,8 +103,8 @@ test("the check shows a spinner, the Keychain note after a moment, and the provi
 
 test("the provider's models put the recommended one first", () => {
   assert.equal(recommendedHosted(LISTING.models, "anthropic")?.ref, "anthropic/claude-sonnet-5-5");
-  assert.equal(recommendedHosted(LISTING.models, "groq")?.ref, "groq/llama-3.3-70b-versatile");
-  assert.equal(recommendedHosted(LISTING.models, "together"), null);
+  assert.equal(recommendedHosted(LISTING.models, "openai")?.ref, "openai/gpt-5");
+  assert.equal(recommendedHosted(LISTING.models, "nobody"), null);
   const choices = modelChoices(LISTING, { kind: "provider", provider: "anthropic" }, false);
   assert.deepEqual(
     choices.map((choice) => (choice.kind === "model" ? `${choice.label}|${choice.detail}` : choice.label)),
@@ -117,8 +117,8 @@ test("the provider's models put the recommended one first", () => {
 });
 
 test("a long list scrolls with the selection", () => {
-  const many = { ...LISTING, models: Array.from({ length: 40 }, (_, index) => model(`openrouter/m${index}`)) };
-  const lines = modelLines(many, { kind: "provider", provider: "openrouter" }, { phase: "pick", selected: 20, all: true }, 0);
+  const many = { ...LISTING, models: Array.from({ length: 40 }, (_, index) => model(`openai/m${index}`)) };
+  const lines = modelLines(many, { kind: "provider", provider: "openai" }, { phase: "pick", selected: 20, all: true }, 0);
   const options = lines.filter((line) => line.kind === "option");
   assert.equal(options.length, 12);
   assert.ok(lines.some((line) => line.kind === "text" && line.text.includes("↑")));
@@ -128,7 +128,7 @@ test("a long list scrolls with the selection", () => {
 
 test("alone, Provider leads to Key, and Key ends where it was opened from", () => {
   const provider = single("provider", "overview");
-  const key = advance(provider, { kind: "provider", provider: "groq" }, { ollamaRunning: false });
+  const key = advance(provider, { kind: "provider", provider: "openai" }, { ollamaRunning: false });
   assert.equal(key.kind === "window" && key.window.view === "panel" && key.window.panel, "key");
   if (key.kind !== "window") {
     return;
@@ -148,8 +148,8 @@ test("a Keychain read waiting on macOS is named in the band and under the panel"
     "macOS is asking whether golem may use your OpenAI and Anthropic keys · choose Always Allow",
   );
   assert.equal(keychainNotice(["mcp/github"]), "macOS is asking whether golem may use your github token · choose Always Allow");
-  const lines = keychainLines(["provider/groq"]);
-  assert.deepEqual(lines[1], { kind: "status", mark: "attn", text: "macOS is asking whether golem may use your Groq key." });
+  const lines = keychainLines(["provider/openai"]);
+  assert.deepEqual(lines[1], { kind: "status", mark: "attn", text: "macOS is asking whether golem may use your OpenAI key." });
   assert.equal(lines[2]?.kind === "text" && lines[2].text, '  Choose "Always Allow" in the dialog.');
 });
 
@@ -174,9 +174,9 @@ test("Check again checks, Esc goes back, and the arrows do nothing", () => {
 test("after a check the panel is done with a key, and says so without one", () => {
   assert.equal(pageKeyChecked(false), "done");
   assert.deepEqual(pageKeyChecked(true), { phase: "absent" });
-  const absent = pageKeyLines("groq", { phase: "absent" });
+  const absent = pageKeyLines("openai", { phase: "absent" });
   assert.ok(absent.some((line) => line.kind === "status" && line.mark === "attn" && line.text === "the key isn't there yet"));
-  assert.ok(pageKeyLines("groq", { phase: "checking" }).some((line) => line.kind === "status" && line.mark === "spin"));
+  assert.ok(pageKeyLines("openai", { phase: "checking" }).some((line) => line.kind === "status" && line.mark === "spin"));
 });
 
 test("a key already saved shows Continue and no command, and Enter is done", () => {

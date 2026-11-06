@@ -131,6 +131,20 @@ A project's `.golem/config.toml` can add servers for chats in that folder, once 
 
 - **Secrets.** A value in `env` or `headers` can name a Keychain secret, `keychain:mcp/<name>`, alone or inside the text. A name that looks like a secret, such as `GITHUB_TOKEN`, must.
 - **Names.** A server name may use letters, digits, and `-`.
-- **Checks.** `golem doctor` checks that each server's command is found and its secrets are stored.
+- **Checks.** `golem doctor` checks that each server's command is found and its secrets are stored. When the daemon is running, it also says whether each server is running or why it failed.
+
+## When a server doesn't work
+
+`golem doctor --mcp` tries each server that is not turned off, the way golem starts it, and prints one line for each with what stopped it and what to do:
+
+```text
+✓ mcp git      fake answers with 9 tools
+✗ mcp github   initialize: HTTP 401
+               The token was refused: paste a new one
+✗ mcp notes    resolve: command not found: npx
+               Node is missing: golem can install it
+```
+
+A test goes through five steps: it finds the command (or the host), starts the process (or connects), shakes hands, lists the tools, and pings. The first step that fails stops the test, and the hint is about that step. A server that is still downloading its package on the first run can time out: try again. The web UI shows the same steps as they happen, and keeps the last 500 lines of each server's log, with its secrets hidden.
 
 How golem talks to servers is in [MCP](../architecture/mcp.md), and why in [ADR-023](../adr/023-mcp-client.md).

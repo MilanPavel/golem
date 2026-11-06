@@ -34,8 +34,6 @@ A local model runs in [Ollama](https://ollama.com), on your Mac. It's free, it n
 - **golem starts Ollama** when a local model needs it, and stops it after 30 minutes unused. Its log is `~/.golem/logs/ollama.log`.
 - **Your own Ollama wins.** If you run Ollama yourself, for example with `brew services start ollama`, golem uses that one and never stops it.
 
-[LM Studio](https://lmstudio.ai) works too: keep the app running with its server on, and its models appear in the picker.
-
 ## Hosted models and API keys
 
 A hosted model needs an API key from its provider. golem keeps the key in the macOS Keychain, never in a file.
@@ -52,9 +50,8 @@ In the chat, `/login` opens the key panel: pick the provider, then paste the key
 
 | Provider | What you need |
 |---|---|
-| `ollama`, `lmstudio` | The app running on your Mac. No key |
+| `ollama` | The app running on your Mac. No key |
 | `anthropic`, `openai` | An API key |
-| `openrouter`, `groq`, `together` | An API key, for hosted open models |
 
 An environment variable such as `ANTHROPIC_API_KEY` wins over the Keychain, which helps in scripts.
 

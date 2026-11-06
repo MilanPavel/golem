@@ -76,6 +76,7 @@ def _parser() -> argparse.ArgumentParser:
     logs.set_defaults(func=_logs)
 
     doctor = sub.add_parser("doctor", help="check this install, as JSON for `golem doctor`")
+    doctor.add_argument("--mcp", action="store_true", help="also try each MCP server")
     doctor.set_defaults(func=_doctor)
 
     skills = sub.add_parser("skills", help="work with skills")
@@ -127,14 +128,22 @@ def _uninstall(_args: argparse.Namespace) -> int:
     return 0
 
 
-def _doctor(_args: argparse.Namespace) -> int:
+def _doctor(args: argparse.Namespace) -> int:
     """Print the checks as one JSON array. The CLI decides the exit code."""
-    from golem.doctor import MacPlatform, run_checks
+    from golem.doctor import MacPlatform, live_mcp, run_checks
     from golem.models.keys import ProviderKeys
     from golem.secrets import KeychainSecrets
 
     secrets = KeychainSecrets()
-    checks = run_checks(resolve_paths(), MacPlatform(), ProviderKeys(secrets), secrets.get)
+    paths = resolve_paths()
+    checks = run_checks(
+        paths,
+        MacPlatform(),
+        ProviderKeys(secrets),
+        secrets.get,
+        live_mcp=None if args.mcp else live_mcp(paths),
+        probe_mcp=args.mcp,
+    )
     print(json.dumps([asdict(check) for check in checks]))
     return 0
 

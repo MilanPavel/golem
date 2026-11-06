@@ -38,30 +38,6 @@ export const HOSTED_PROVIDERS: readonly HostedProvider[] = [
     env: "OPENAI_API_KEY",
     prefer: [/^gpt-5(\.\d+)?$/i, /^gpt-5/i, /^gpt-4\.1$/i, /^gpt-4o$/i],
   },
-  {
-    id: "groq",
-    name: "Groq",
-    blurb: "fast open models",
-    console: "console.groq.com/keys",
-    env: "GROQ_API_KEY",
-    prefer: [/llama-3\.3-70b/i, /gpt-oss-120b/i, /llama/i],
-  },
-  {
-    id: "openrouter",
-    name: "OpenRouter",
-    blurb: "many providers, one key",
-    console: "openrouter.ai/keys",
-    env: "OPENROUTER_API_KEY",
-    prefer: [/anthropic\/claude-sonnet/i, /openai\/gpt-5/i],
-  },
-  {
-    id: "together",
-    name: "Together",
-    blurb: "open models",
-    console: "api.together.ai/settings/api-keys",
-    env: "TOGETHER_API_KEY",
-    prefer: [/llama-3\.3-70b/i, /qwen/i, /llama/i],
-  },
 ];
 
 export function hostedProvider(id: string): HostedProvider | null {

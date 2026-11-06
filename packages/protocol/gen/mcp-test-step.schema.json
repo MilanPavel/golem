@@ -1,0 +1,52 @@
+{
+  "additionalProperties": false,
+  "description": "One step of ``mcp.test``: what it was, how it ended, and how long it took.\n\nA stdio server goes ``resolve`` (the command is found), ``spawn``,\n``initialize``, ``tools``, ``ping``. An HTTP server goes ``resolve`` (the\nhost is found), ``connect``, then the same three. A step after a failed one\nis ``skipped``.",
+  "properties": {
+    "detail": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Detail"
+    },
+    "elapsed_ms": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Elapsed Ms",
+      "type": "integer"
+    },
+    "state": {
+      "enum": [
+        "running",
+        "ok",
+        "failed",
+        "skipped"
+      ],
+      "title": "State",
+      "type": "string"
+    },
+    "step": {
+      "enum": [
+        "resolve",
+        "spawn",
+        "connect",
+        "initialize",
+        "tools",
+        "ping"
+      ],
+      "title": "Step",
+      "type": "string"
+    }
+  },
+  "required": [
+    "step",
+    "state"
+  ],
+  "title": "McpTestStep",
+  "type": "object"
+}

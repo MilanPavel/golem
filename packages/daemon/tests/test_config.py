@@ -121,8 +121,8 @@ def test_profiles_and_providers_load_from_toml(tmp_path: Path) -> None:
     _write(
         home / "config.toml",
         'default_model = "qwen"\n'
-        "[providers.openrouter]\n"
-        'api_key_env = "MY_OPENROUTER_KEY"\n'
+        "[providers.deepseek]\n"
+        'api_key_env = "MY_DEEPSEEK_KEY"\n'
         "[models.qwen]\n"
         'model = "ollama/qwen3:8b"\n'
         "ctx = 32768\n"
@@ -131,7 +131,7 @@ def test_profiles_and_providers_load_from_toml(tmp_path: Path) -> None:
     )
     settings = load_settings(home=home, project_dir=tmp_path / "project")
     assert settings.default_model == "qwen"
-    assert settings.providers["openrouter"].api_key_env == "MY_OPENROUTER_KEY"
+    assert settings.providers["deepseek"].api_key_env == "MY_DEEPSEEK_KEY"
     assert settings.models["qwen"].model == "ollama/qwen3:8b"
     assert settings.models["qwen"].ctx == 32768
     assert settings.models["sonnet"].ctx is None
