@@ -25,6 +25,7 @@ import {
   recommendedHosted,
   type KeyState,
 } from "./setup-key.ts";
+import { KEY_PROVIDERS } from "./commands.ts";
 import { modelChoices, modelLines, START_MODEL_PANEL } from "./setup-local.ts";
 import { advance, single } from "./setup-window.ts";
 
@@ -136,6 +137,12 @@ test("xAI recommends the plain Grok model over its variants", () => {
 test("Moonshot recommends the plain Kimi model over its variants", () => {
   const models = [model("moonshot/kimi-k3.1-pro"), model("moonshot/moonshot-v1-8k"), model("moonshot/kimi-k3")];
   assert.equal(recommendedHosted(models, "moonshot")?.ref, "moonshot/kimi-k3");
+});
+
+test("the Provider panel and /login offer the six hosted providers", () => {
+  const six = ["anthropic", "openai", "google", "deepseek", "xai", "moonshot"];
+  assert.deepEqual(HOSTED_PROVIDERS.map((provider) => provider.id), six);
+  assert.deepEqual([...KEY_PROVIDERS], six);
 });
 
 test("a long list scrolls with the selection", () => {

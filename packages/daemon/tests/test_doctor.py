@@ -303,6 +303,30 @@ def test_a_hosted_model_needs_its_key_in_the_keychain(
     )
 
 
+@pytest.mark.parametrize(
+    ("provider", "env"),
+    [
+        ("openai", "OPENAI_API_KEY"),
+        ("google", "GOOGLE_API_KEY"),
+        ("deepseek", "DEEPSEEK_API_KEY"),
+        ("xai", "XAI_API_KEY"),
+        ("moonshot", "MOONSHOT_API_KEY"),
+    ],
+)
+def test_every_hosted_provider_is_checked_for_its_key(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, provider: str, env: str
+) -> None:
+    monkeypatch.delenv(env, raising=False)
+    config = f"default_model = '{provider}/some-model'\n"
+    assert _models(tmp_path, config, FakePlatform())[-1] == Check(
+        provider, "fail", "no API key", f"golem auth set {provider}"
+    )
+    keys = MemoryKeyStore({provider: "sk-test"})
+    assert _models(tmp_path, config, FakePlatform(), keys)[-1] == Check(
+        provider, "ok", "API key in the Keychain"
+    )
+
+
 def test_a_key_only_in_the_shell_is_a_warning(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
