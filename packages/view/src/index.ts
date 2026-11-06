@@ -104,6 +104,7 @@ export {
   serviceTimedOut,
   setupAtStart,
   setupBand,
+  setupProblem,
   SETUP_STEPS,
   shortStepper,
   single,

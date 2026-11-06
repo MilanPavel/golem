@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { createRouter, parseRoute, sessionPath } from "./router.ts";
+import { createRouter, parseRoute, sessionPath, settingsPath } from "./router.ts";
 
 afterEach(() => {
   history.replaceState(null, "", "/");
@@ -12,6 +12,45 @@ test("parseRoute", () => {
   for (const bad of ["/s/", "/s", "/s/a/b", "/s/a%2Fb", "/other", "/gallery", "/s/%E0%A4%A"]) {
     expect(parseRoute(bad)).toEqual({ name: "not-found" });
   }
+});
+
+test("parseRoute reads the settings page and its sections", () => {
+  expect(parseRoute("/settings")).toEqual({ name: "settings", section: "setup" });
+  expect(parseRoute("/settings/setup")).toEqual({ name: "settings", section: "setup" });
+  expect(parseRoute("/settings/mcp")).toEqual({ name: "settings", section: "mcp" });
+  expect(parseRoute("/settings/tool-rules")).toEqual({ name: "settings", section: "tool-rules" });
+  for (const bad of ["/settings/", "/settings/a/b", "/settings/A", "/settings/a1", "/settingsx"]) {
+    expect(parseRoute(bad)).toEqual({ name: "not-found" });
+  }
+});
+
+test("settingsPath round-trips through parseRoute", () => {
+  expect(settingsPath()).toBe("/settings");
+  expect(settingsPath("setup")).toBe("/settings");
+  expect(settingsPath("appearance")).toBe("/settings/appearance");
+  expect(parseRoute(settingsPath("appearance"))).toEqual({ name: "settings", section: "appearance" });
+});
+
+test("moving between sections is a new route, and back reaches the section, then the session", async () => {
+  const router = createRouter();
+  router.navigate("/s/one");
+  router.navigate("/settings");
+  const first = router.getSnapshot();
+  router.navigate("/settings/setup", { replace: true });
+  expect(router.getSnapshot()).toBe(first);
+  router.navigate("/settings/appearance");
+  expect(router.getSnapshot()).toEqual({ name: "settings", section: "appearance" });
+  for (const expected of [{ name: "settings", section: "setup" }, { name: "session", id: "one" }]) {
+    const popped = new Promise<void>((resolve) => window.addEventListener("popstate", () => resolve(), { once: true }));
+    history.back();
+    await popped;
+    expect(router.getSnapshot()).toEqual(expected);
+  }
+  // Go back to the end of the history, so a later test's push does not cut it.
+  const forward = new Promise<void>((resolve) => window.addEventListener("popstate", () => resolve(), { once: true }));
+  history.go(2);
+  await forward;
+  router.stop();
 });
 
 test("sessionPath round-trips through parseRoute", () => {

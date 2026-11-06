@@ -11,6 +11,7 @@ import { SessionDock } from "../composer/index.ts";
 import { Drawer, DRAWER_ID, useDrawerOpen } from "../drawer/index.ts";
 import { closeModelDialog, ModelDialog, openModelDialog, useModelDialogOpen } from "../models/index.ts";
 import { folderName, useSessionActions } from "../sessions/index.ts";
+import { useRememberSettingsContext } from "../settings/index.ts";
 import { SessionTitle } from "./session-title.tsx";
 
 type Header = Pick<SessionView, "title" | "cwd" | "model" | "status">;
@@ -196,6 +197,7 @@ export function SessionScreen({ id }: { id: string }) {
       remember(cwd);
     }
   }, [cwd, remember]);
+  useRememberSettingsContext(id, cwd);
 
   if (header.status === "gone") {
     return <GoneScreen />;
