@@ -1,0 +1,58 @@
+{
+  "additionalProperties": false,
+  "description": "``mcp.test.progress``: a step of a running test started or ended. Not stored.",
+  "properties": {
+    "detail": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Detail"
+    },
+    "elapsed_ms": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Elapsed Ms",
+      "type": "integer"
+    },
+    "state": {
+      "enum": [
+        "running",
+        "ok",
+        "failed",
+        "skipped"
+      ],
+      "title": "State",
+      "type": "string"
+    },
+    "step": {
+      "enum": [
+        "resolve",
+        "spawn",
+        "connect",
+        "initialize",
+        "tools",
+        "ping"
+      ],
+      "title": "Step",
+      "type": "string"
+    },
+    "test_id": {
+      "minLength": 1,
+      "title": "Test Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "test_id",
+    "step",
+    "state"
+  ],
+  "title": "McpTestProgress",
+  "type": "object"
+}

@@ -1,0 +1,36 @@
+{
+  "additionalProperties": false,
+  "description": "``mcp.logs``. The last ``limit`` lines of a server's log, oldest first.",
+  "properties": {
+    "limit": {
+      "default": 200,
+      "maximum": 500,
+      "minimum": 1,
+      "title": "Limit",
+      "type": "integer"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "session_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Session Id"
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "title": "McpLogsParams",
+  "type": "object"
+}

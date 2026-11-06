@@ -1,0 +1,207 @@
+{
+  "$defs": {
+    "McpImplementation": {
+      "additionalProperties": false,
+      "description": "The server's own name and version, from its ``initialize`` answer.",
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Version"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "McpImplementation",
+      "type": "object"
+    },
+    "McpTestStep": {
+      "additionalProperties": false,
+      "description": "One step of ``mcp.test``: what it was, how it ended, and how long it took.\n\nA stdio server goes ``resolve`` (the command is found), ``spawn``,\n``initialize``, ``tools``, ``ping``. An HTTP server goes ``resolve`` (the\nhost is found), ``connect``, then the same three. A step after a failed one\nis ``skipped``.",
+      "properties": {
+        "detail": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Detail"
+        },
+        "elapsed_ms": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Elapsed Ms",
+          "type": "integer"
+        },
+        "state": {
+          "enum": [
+            "running",
+            "ok",
+            "failed",
+            "skipped"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "step": {
+          "enum": [
+            "resolve",
+            "spawn",
+            "connect",
+            "initialize",
+            "tools",
+            "ping"
+          ],
+          "title": "Step",
+          "type": "string"
+        }
+      },
+      "required": [
+        "step",
+        "state"
+      ],
+      "title": "McpTestStep",
+      "type": "object"
+    },
+    "McpToolInfo": {
+      "additionalProperties": false,
+      "description": "One of a server's tools: the name the model sees, and what it says it does.\n\nA ``hidden`` tool is one the server's ``tools`` filter keeps from the model.\n``schema_tokens`` roughly what its schema costs in each prompt.",
+      "properties": {
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "hidden": {
+          "default": false,
+          "title": "Hidden",
+          "type": "boolean"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "schema_tokens": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Schema Tokens",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "description"
+      ],
+      "title": "McpToolInfo",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "What ``mcp.test`` found.\n\n``steps`` has every step, with the ones after a failure ``skipped``.\n``stderr_tail`` is the server's last 50 lines of stderr, with secrets\nreplaced by ``•••``. ``hint`` is one next step for the person, and\n``runtime`` says which runtime (``node`` or ``uv``) a UI can offer to\ninstall when that is the hint.",
+  "properties": {
+    "hint": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Hint"
+    },
+    "ok": {
+      "title": "Ok",
+      "type": "boolean"
+    },
+    "protocol_version": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Protocol Version"
+    },
+    "runtime": {
+      "anyOf": [
+        {
+          "enum": [
+            "node",
+            "uv"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Runtime"
+    },
+    "server_info": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/McpImplementation"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "stderr_tail": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Stderr Tail",
+      "type": "array"
+    },
+    "steps": {
+      "items": {
+        "$ref": "#/$defs/McpTestStep"
+      },
+      "title": "Steps",
+      "type": "array"
+    },
+    "test_id": {
+      "minLength": 1,
+      "title": "Test Id",
+      "type": "string"
+    },
+    "tools": {
+      "items": {
+        "$ref": "#/$defs/McpToolInfo"
+      },
+      "title": "Tools",
+      "type": "array"
+    }
+  },
+  "required": [
+    "test_id",
+    "ok",
+    "steps"
+  ],
+  "title": "McpTestResult",
+  "type": "object"
+}

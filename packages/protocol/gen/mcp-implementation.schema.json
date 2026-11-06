@@ -1,0 +1,27 @@
+{
+  "additionalProperties": false,
+  "description": "The server's own name and version, from its ``initialize`` answer.",
+  "properties": {
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "version": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Version"
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "title": "McpImplementation",
+  "type": "object"
+}

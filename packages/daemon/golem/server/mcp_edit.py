@@ -63,8 +63,8 @@ MCP_PREFIX = "mcp/"
 
 
 async def mcp_get(ctx: RequestContext, params: McpServerParams) -> McpServerDetail:
-    mcp = _mcp(ctx)
-    scope = await _scope(ctx, params.session_id)
+    mcp = get_mcp(ctx)
+    scope = await get_scope(ctx, params.session_id)
     try:
         path = mcp.config_file(scope, params.name)
         settings = mcp.settings(scope, params.name)
@@ -82,7 +82,7 @@ async def mcp_get(ctx: RequestContext, params: McpServerParams) -> McpServerDeta
 
 
 async def mcp_add(ctx: RequestContext, params: McpAddParams) -> McpServer:
-    mcp = _mcp(ctx)
+    mcp = get_mcp(ctx)
     scope = ToolScope()
     if params.config is None:
         table = _short_table(params)
@@ -90,13 +90,13 @@ async def mcp_add(ctx: RequestContext, params: McpAddParams) -> McpServer:
         sent = {f"{MCP_PREFIX}{params.name}": params.token} if params.token is not None else {}
         values = {ref: value.get_secret_value() for ref, value in sent.items()}
     else:
-        table = _table(params.config)
-        scope = await _scope(ctx, params.session_id)
+        table = to_table(params.config)
+        scope = await get_scope(ctx, params.session_id)
         path = await _target(ctx, params.scope, scope)
         values = {ref: value.get_secret_value() for ref, value in params.secrets.items()}
-    settings = _validate(table)
+    settings = to_settings(table)
     _own_secrets(params.name, settings)
-    _sent_are_named(values, settings)
+    check_sent(values, settings)
     if params.scope == "user" and mcp.config_files(params.name):
         raise RpcCallError(
             INVALID_PARAMS,
@@ -127,8 +127,8 @@ async def mcp_add(ctx: RequestContext, params: McpAddParams) -> McpServer:
 
 
 async def mcp_update(ctx: RequestContext, params: McpUpdateParams) -> McpServer:
-    mcp = _mcp(ctx)
-    scope = await _scope(ctx, params.session_id)
+    mcp = get_mcp(ctx)
+    scope = await get_scope(ctx, params.session_id)
     try:
         path = mcp.config_file(scope, params.name)
         old = mcp.settings(scope, params.name)
@@ -136,11 +136,11 @@ async def mcp_update(ctx: RequestContext, params: McpUpdateParams) -> McpServer:
         raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
     name = params.new_name or params.name
     renamed = name != params.name
-    table = _table(params.config)
-    new = _validate(table)
+    table = to_table(params.config)
+    new = to_settings(table)
     _own_secrets(name, new)
     values = {ref: value.get_secret_value() for ref, value in params.secrets.items()}
-    _sent_are_named(values, new)
+    check_sent(values, new)
     if renamed:
         try:
             clash = await asyncio.to_thread(has_mcp_server, path, name)
@@ -188,8 +188,8 @@ async def mcp_update(ctx: RequestContext, params: McpUpdateParams) -> McpServer:
 
 
 async def mcp_remove(ctx: RequestContext, params: McpRemoveParams) -> McpRemoveResult:
-    mcp = _mcp(ctx)
-    scope = await _scope(ctx, params.session_id)
+    mcp = get_mcp(ctx)
+    scope = await get_scope(ctx, params.session_id)
     user = ctx.state.paths.config_file
     files = mcp.config_files(params.name)
     if params.session_id is not None:
@@ -222,7 +222,7 @@ async def mcp_remove(ctx: RequestContext, params: McpRemoveParams) -> McpRemoveR
 
 
 async def config_raw_get(ctx: RequestContext, params: ConfigRawGetParams) -> ConfigRawGetResult:
-    path = await _target(ctx, params.scope, await _scope(ctx, params.session_id))
+    path = await _target(ctx, params.scope, await get_scope(ctx, params.session_id))
     try:
         text, mtime = await asyncio.to_thread(read_raw, path)
     except (OSError, ValueError) as exc:
@@ -245,7 +245,7 @@ async def config_raw_set_protected(
 async def _raw_set(
     ctx: RequestContext, params: ConfigRawSetParams, *, protected: bool
 ) -> ConfigRawResult:
-    path = await _target(ctx, params.scope, await _scope(ctx, params.session_id))
+    path = await _target(ctx, params.scope, await get_scope(ctx, params.session_id))
     try:
         current, mtime = await asyncio.to_thread(read_raw, path)
     except (OSError, ValueError) as exc:
@@ -312,16 +312,16 @@ def _short_table(params: McpAddParams) -> dict[str, Any]:
             table["env"] = {params.token_env: secret}
     if params.token is None and params.token_env is not None:
         raise RpcCallError(INVALID_PARAMS, "token_env needs a token to put in it")
-    _validate(table)
+    to_settings(table)
     return table
 
 
-def _table(config: McpServerConfig) -> dict[str, Any]:
+def to_table(config: McpServerConfig) -> dict[str, Any]:
     """The keys to write: what differs from the defaults."""
     return config.model_dump(mode="json", exclude_defaults=True)
 
 
-def _validate(table: dict[str, Any]) -> McpServerSettings:
+def to_settings(table: dict[str, Any]) -> McpServerSettings:
     try:
         return McpServerSettings.model_validate(table)
     except ValidationError as exc:
@@ -341,7 +341,7 @@ def _own_secrets(name: str, settings: McpServerSettings) -> None:
             )
 
 
-def _sent_are_named(values: dict[str, str], settings: McpServerSettings) -> None:
+def check_sent(values: dict[str, str], settings: McpServerSettings) -> None:
     for ref in values:
         try:
             check_name(ref)
@@ -417,13 +417,13 @@ def _secret_store(ctx: RequestContext) -> SecretStore:
     return ctx.state.secrets
 
 
-def _mcp(ctx: RequestContext) -> McpSupervisor:
+def get_mcp(ctx: RequestContext) -> McpSupervisor:
     if ctx.state.mcp is None:
         raise RpcCallError(INTERNAL_ERROR, "MCP servers are not ready")
     return ctx.state.mcp
 
 
-async def _scope(ctx: RequestContext, session_id: str | None) -> ToolScope:
+async def get_scope(ctx: RequestContext, session_id: str | None) -> ToolScope:
     if session_id is None:
         return ToolScope()
     sessions = ctx.state.sessions

@@ -30,20 +30,22 @@ import json
 import logging
 import os
 import time
+from collections import deque
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel
 
 from golem.config import McpServers, McpServerSettings, load_mcp
 from golem.mcp.client import CallResult, McpClient, McpError
 from golem.mcp.launch import Secrets, transport_for
+from golem.mcp.probe import DEFAULT_TIMEOUTS, ProbeResult, Step, Timeouts, probe
 from golem.mcp.tools import mcp_tools
 from golem.tools.registry import Tool, ToolScope
-from golem_protocol.commands import McpServer, McpServerState
-from golem_protocol.rpc import McpServerStatusNotification
+from golem_protocol.commands import McpLogLine, McpServer, McpServerLog, McpServerState
+from golem_protocol.rpc import McpServerLogNotification, McpServerStatusNotification
 
 log = logging.getLogger(__name__)
 
@@ -51,6 +53,8 @@ START_SECONDS = 60.0
 """How long a server may take to answer ``initialize``. ``npx`` may download it first."""
 LIST_SECONDS = 30.0
 STABLE_SECONDS = 60.0
+LOG_LINES = 500
+REDACTED = "•••"
 CHARS_PER_TOKEN = 4
 
 Broadcast = Callable[[BaseModel], None]
@@ -70,6 +74,7 @@ class Timing:
     reload_seconds: float = 2.0
     prepare_seconds: float = 10.0
     ping_seconds: float = 10.0
+    log_batch_seconds: float = 0.25
 
 
 DEFAULT_TIMING = Timing()
@@ -95,6 +100,11 @@ class _Server:
     tools: list[Tool[Any]] = field(default_factory=list[Tool[Any]])
     hidden: list[Tool[Any]] = field(default_factory=list[Tool[Any]])
     task: asyncio.Task[None] | None = None
+    # The log outlives a restart, and a changed config table keeps it too.
+    log: deque[McpLogLine] = field(default_factory=lambda: deque(maxlen=LOG_LINES))
+    unsent: list[McpLogLine] = field(default_factory=list[McpLogLine])
+    flushing: bool = False
+    redact: list[str] = field(default_factory=list[str])
 
     @property
     def on_demand(self) -> bool:
@@ -204,6 +214,52 @@ class McpSupervisor:
         """The settings of server ``name``, as ``scope`` sees it."""
         return self._find(scope, name).settings
 
+    async def test(
+        self,
+        settings: McpServerSettings,
+        *,
+        sent: Mapping[str, str],
+        keychain: bool,
+        project: Path | None = None,
+        progress: Callable[[Step], None] | None = None,
+        timeouts: Timeouts = DEFAULT_TIMEOUTS,
+    ) -> ProbeResult:
+        """Try ``settings`` as the supervisor would, saving nothing. See :mod:`golem.mcp.probe`.
+
+        ``sent`` secrets are used for this one test. ``keychain`` lets the test read the
+        Keychain for the others, which only a server that is already saved may do: a
+        config that is not saved could point a stored secret at any address.
+        """
+        secrets: Secrets = self._secrets if keychain else (lambda _ref: None)
+        return await probe(
+            settings,
+            self._environ,
+            secrets,
+            sent=sent,
+            project=project,
+            progress=progress,
+            timeouts=timeouts,
+        )
+
+    def logs(self, scope: ToolScope, name: str, limit: int) -> list[McpLogLine]:
+        """The last ``limit`` log lines of server ``name``, oldest first."""
+        return list(self._find(scope, name).log)[-limit:]
+
+    async def call(
+        self, scope: ToolScope, name: str, tool: str, arguments: Mapping[str, object]
+    ) -> CallResult:
+        """Run ``tool`` (the server's own name for it) once, for a person who pressed Run.
+
+        It is not a model's call: no session records it. Raises
+        :class:`McpServerError` when the server is not running, and
+        :class:`McpError` when it does not answer in time.
+        """
+        server = self._find(scope, name)
+        client = server.client
+        if client is None or server.status.state != "running":
+            raise McpServerError(f"{name} is not running")
+        return await client.call_tool(tool, arguments, float(server.settings.timeout_seconds))
+
     def restart(self, scope: ToolScope, name: str) -> McpServer:
         """Start server ``name`` again now, or start it when it has not started yet."""
         server = self._find(scope, name)
@@ -312,6 +368,7 @@ class McpSupervisor:
 
     def _replace(self, project: Path | None, servers: McpServers) -> None:
         """Make ``project``'s servers (the user's for None) match ``servers``."""
+        kept: dict[tuple[str, Path | None], deque[McpLogLine]] = {}
         for (name, owner), server in list(self._servers.items()):
             if owner != project:
                 continue
@@ -322,6 +379,8 @@ class McpSupervisor:
             del self._servers[(name, owner)]
             if settings is None:
                 log.info("mcp server %s was removed", name)
+            else:
+                kept[(name, owner)] = server.log
         for name, settings in sorted(servers.items()):
             if (name, project) in self._servers:
                 continue
@@ -339,6 +398,8 @@ class McpSupervisor:
                     config=self._config_label(project),
                 ),
             )
+            if (name, project) in kept:
+                server.log = kept[(name, project)]
             self._servers[(name, project)] = server
             if self._started and settings.enabled is True:
                 self._start(server)
@@ -353,6 +414,7 @@ class McpSupervisor:
     def _start(self, server: _Server) -> None:
         if server.task is not None or server.settings.enabled is False:
             return
+        self._log(server, "event", "starting")
         self._set(server, "starting")
         server.task = asyncio.create_task(self._run(server), name=f"mcp-{server.name}")
 
@@ -386,13 +448,20 @@ class McpSupervisor:
             self._set(server, "failed", error=reason, retry=delay)
             await asyncio.sleep(delay)
             delay = min(delay * 2, self._timing.backoff_max)
+            self._log(server, "event", "starting")
             self._set(server, "starting")
 
     async def _serve(self, server: _Server) -> str:
         """Run the server once, until it exits or stops answering. Returns why it went down."""
         try:
+            server.redact = await asyncio.to_thread(self._secret_values, server)
             transport = await asyncio.to_thread(
-                transport_for, server.settings, self._environ, self._secrets, project=server.project
+                transport_for,
+                server.settings,
+                self._environ,
+                self._secrets,
+                project=server.project,
+                on_stderr=lambda text: self._log(server, "stderr", text),
             )
             client = McpClient(transport, on_tools_changed=lambda: self._relist_soon(server))
             server.client = client
@@ -467,6 +536,7 @@ class McpSupervisor:
         retry: float | None = None,
     ) -> None:
         running = state == "running"
+        self._lifecycle(server, state, error, retry, len(server.tools))
         server.status = server.status.model_copy(
             update={
                 "state": state,
@@ -482,6 +552,58 @@ class McpSupervisor:
             self.broadcast(McpServerStatusNotification(params=server.status))
         except Exception:
             log.debug("broadcast failed", exc_info=True)
+
+    def _secret_values(self, server: _Server) -> list[str]:
+        """The values of the secrets ``server`` names, longest first, to keep out of its log."""
+        values: list[str] = []
+        for ref in server.settings.secrets:
+            value = self._secrets(ref)
+            if value:
+                values.append(value)
+        return sorted(values, key=len, reverse=True)
+
+    def _log(self, server: _Server, kind: Literal["stderr", "event"], text: str) -> None:
+        for value in server.redact:
+            text = text.replace(value, REDACTED)
+        line = McpLogLine(ts=time.time(), kind=kind, text=text)
+        server.log.append(line)
+        server.unsent.append(line)
+        if not server.flushing:
+            server.flushing = True
+            try:
+                asyncio.get_running_loop().call_later(
+                    self._timing.log_batch_seconds, self._flush_log, server
+                )
+            except RuntimeError:
+                server.flushing = False
+
+    def _flush_log(self, server: _Server) -> None:
+        """Send what was logged since the last batch, as one notification."""
+        server.flushing = False
+        lines, server.unsent = server.unsent, []
+        if not lines:
+            return
+        project = None if server.project is None else str(server.project)
+        batch = McpServerLog(name=server.name, project=project, lines=lines)
+        try:
+            self.broadcast(McpServerLogNotification(params=batch))
+        except Exception:
+            log.debug("broadcast failed", exc_info=True)
+
+    def _lifecycle(
+        self,
+        server: _Server,
+        state: McpServerState,
+        error: str | None,
+        retry: float | None,
+        tools: int,
+    ) -> None:
+        if state == "running":
+            self._log(server, "event", f"running ({tools} tool{'' if tools == 1 else 's'})")
+        elif state == "failed":
+            self._log(server, "event", f"failed: {error}")
+            if retry is not None:
+                self._log(server, "event", f"retry in {retry:g} s")
 
     def _spawn(self, work: Any, name: str, *, stopping: bool = False) -> None:
         task: asyncio.Task[None] = asyncio.create_task(work, name=name)

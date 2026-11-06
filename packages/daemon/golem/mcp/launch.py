@@ -47,15 +47,17 @@ def transport_for(
     secrets: Secrets,
     *,
     project: Path | None = None,
+    on_stderr: Callable[[str], None] | None = None,
 ) -> Transport:
     """The transport for ``settings``. Raises :class:`McpError` when it cannot be built.
 
     A project server's relative ``cwd`` is relative to the project folder.
+    ``on_stderr`` gets each line a stdio server writes to stderr.
     """
     if settings.url is not None:
         headers = {key: _with_secrets(value, secrets) for key, value in settings.headers.items()}
         return HttpTransport(settings.url, headers)
-    return StdioTransport(launch(settings, environ, secrets, project=project))
+    return StdioTransport(launch(settings, environ, secrets, project=project), on_stderr=on_stderr)
 
 
 def launch(
