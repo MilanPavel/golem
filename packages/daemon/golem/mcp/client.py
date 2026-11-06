@@ -58,11 +58,22 @@ class McpClient:
         self._next_id = 0
         self._failure: str | None = None
         self._watch: asyncio.Task[None] | None = None
+        self.server_info: Mapping[str, object] = {}
+        """The server's ``serverInfo`` (name and version), once it has answered ``initialize``."""
+        self.protocol_version: str | None = None
 
     async def start(self, timeout: float) -> None:
         """Open the transport and finish MCP's handshake. Raises :class:`McpError`."""
+        await self.open()
+        await self.initialize(timeout)
+
+    async def open(self) -> None:
+        """Open the transport: start the process, or get ready to post. Raises :class:`McpError`."""
         await self._transport.open(self._handle)
         self._watch = asyncio.create_task(self._watch_transport(), name="mcp-watch")
+
+    async def initialize(self, timeout: float) -> None:
+        """MCP's handshake, after :meth:`open`. Raises :class:`McpError`."""
         params = {
             "protocolVersion": PROTOCOL_VERSION,
             "capabilities": {},
@@ -70,7 +81,10 @@ class McpClient:
         }
         result = await self._request("initialize", params, timeout)
         version = result.get("protocolVersion")
-        self._transport.protocol_version = version if isinstance(version, str) else PROTOCOL_VERSION
+        self.protocol_version = version if isinstance(version, str) else PROTOCOL_VERSION
+        self._transport.protocol_version = self.protocol_version
+        info = result.get("serverInfo")
+        self.server_info = cast(dict[str, object], info) if isinstance(info, dict) else {}
         await self._send({"jsonrpc": "2.0", "method": "notifications/initialized"})
 
     async def list_tools(self, timeout: float) -> list[McpTool]:

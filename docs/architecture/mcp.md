@@ -260,6 +260,18 @@ MCP servers are listed with `mcp.list`: each one's name, state (`idle`, `startin
 
 - `[mcp.<name>]`: an MCP server. A stdio one has `command`, optional `args`, `env`, and `cwd`. An HTTP one has `url` and optional `headers`. A value in `env` or `headers` may name `keychain:mcp/<name>`, and a name that looks like a secret must. `enabled` is `true` (default), `"on_demand"`, or `false`, and `timeout_seconds` (default 120) bounds one tool call. `tools = { include, exclude }` hides tools from the model, `approval = "allow"` lets the server's calls run without asking, and `env_passthrough` lists the daemon's variables a stdio server gets. The name may use letters, digits, and `-`. The daemon reads the user's file and, for sessions in a folder in `trusted_projects`, the project's `.golem/config.toml`, again whenever they change ([ADR-023](../adr/023-mcp-client.md)).
 
+### Testing, logs, and trying a tool
+
+`golem/mcp/probe.py` tries a server outside the supervisor, so one that is not saved yet, or one that fails, can be looked at step by step. `mcp.test` runs it with `{test_id, name}` for a saved server, or `{test_id, config, secrets}` for one that is not. The steps are `resolve` (the command is on the search path, or the host resolves), `spawn` or `connect`, `initialize` (60 s), `tools` (30 s), and `ping` (10 s). Each has its own timeout and timing, a failure skips the rest, and `mcp.test.progress` carries each change to every connection while the call is open. The result has the steps, the server's name and version, its tools (with `hidden` for a saved server's filter), the last 50 lines of stderr, and one `hint`, from a pure function (`test_hint`) over the failed step and the error: Node or uv missing (with `runtime`, so a UI can offer to install it), Docker missing, HTTP 401 or 403 (a refused token, or OAuth when the answer has `WWW-Authenticate`), a first run that is still downloading, an exit with its last stderr line, or a host that cannot be reached.
+
+Secrets sent with `mcp.test` are used for that test and forgotten. A saved server may also read its stored secrets. A config that is not saved may not: otherwise a stored token could be sent to any address the page names, which is what ADR-037's second check stops for `mcp.update`. Every line that leaves the probe, the stderr tail included, has the values of the secrets replaced by `•••`.
+
+The supervisor keeps a log for each server, up to 500 lines: its stderr, and lines for what golem did (`starting`, `running (12 tools)`, `failed: …`, `retry in 4 s`). The log belongs to the server's entry, so it survives restarts and a changed table, and the values of the server's secrets are replaced by `•••` in every line. `mcp.logs {name, limit}` returns the last lines, and `mcp.server.log` sends new ones to every connection in batches of at most one every 250 ms for each server.
+
+`mcp.call {name, tool, arguments}` runs one tool of a running server, by the server's own name for it, through the client the supervisor already holds. It is for a form where a person presses Run, so it asks no approval ([ADR-037](../adr/037-browser-manages-mcp-and-config.md)). It is recorded in no session and the model never sees it.
+
+`golem doctor --mcp` runs the same steps for each enabled server and prints the hint. Without it, `golem doctor` and `setup.status` use what the running daemon says about its servers (`running`, or `failed` with the error), and fall back to checking that the command exists.
+
 ### Limits
 
 golem's client follows one protocol version. A server that answers with another is used anyway, and a later MCP change that breaks the five messages above needs a change here. golem uses a server's tools only: not its resources or prompts, and it offers no sampling or elicitation.
@@ -272,6 +284,8 @@ golem's client follows one protocol version. A server that answers with another 
 | `packages/daemon/golem/mcp/transport.py` | `StdioTransport` and `HttpTransport` |
 | `packages/daemon/golem/mcp/supervisor.py` | `McpSupervisor`: start, health, backoff, reload, and the scoped tools |
 | `packages/daemon/golem/mcp/tools.py` | A server's tools as golem tools: names, schemas, and the marked output |
+| `packages/daemon/golem/mcp/probe.py` | `probe`: the steps of `mcp.test`, and `test_hint` |
+| `packages/daemon/golem/server/mcp_try.py` | The handlers of `mcp.test`, `mcp.logs`, and `mcp.call` |
 | `packages/daemon/golem/mcp/launch.py` | Finding the command, the environment, and the Keychain secrets |
 | `packages/daemon/golem/tools/registry.py` | `ToolScope` and `ToolRegistry.scoped` |
 | `packages/daemon/golem/config_edit.py` | `mcp.set_enabled`, `mcp.add`, and `mcp.remove`, written with the comments kept |

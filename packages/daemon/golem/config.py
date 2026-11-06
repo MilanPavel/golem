@@ -51,7 +51,7 @@ def unknown_provider_message(name: str) -> str:
     return f"unknown model provider: {name}. Choose one of {', '.join(HOSTED_PROVIDERS)}, or ollama"
 
 
-ProviderKind = Literal["anthropic", "openai", "ollama", "openai_compat"]
+ProviderKind = Literal["anthropic", "openai", "google", "ollama", "openai_compat"]
 RuleAction = Literal["allow", "ask", "deny"]
 
 

@@ -29,8 +29,9 @@ LITELLM_URL = (
 CACHE_NAME = "litellm-prices.json"
 MAX_AGE_SECONDS = 24 * 3600
 
-# LiteLLM provider names golem has a provider for.
-_KEPT_PROVIDERS = frozenset({"anthropic", "openai"})
+# LiteLLM provider names golem has a provider for. Golem's google is LiteLLM's gemini.
+_KEPT_PROVIDERS = frozenset({"anthropic", "openai", "gemini"})
+_PREFIXES = {"google": "gemini"}
 _KEPT_FIELDS = (
     "input_cost_per_token",
     "output_cost_per_token",
@@ -98,10 +99,11 @@ class PriceBook:
 
     def lookup(self, provider: str, model_id: str) -> PriceInfo | None:
         """``<provider>/<id>`` first, then the bare id when LiteLLM files it under that provider."""
-        entry = self._entries.get(f"{provider}/{model_id}")
+        litellm_provider = _PREFIXES.get(provider, provider)
+        entry = self._entries.get(f"{litellm_provider}/{model_id}")
         if entry is None:
             bare = self._entries.get(model_id)
-            if bare is not None and bare.get("litellm_provider") == provider:
+            if bare is not None and bare.get("litellm_provider") == litellm_provider:
                 entry = bare
         if entry is None:
             return None

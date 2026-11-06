@@ -1,0 +1,40 @@
+{
+  "additionalProperties": false,
+  "description": "``mcp.call``. Run one tool of a running server, by the server's own tool name.\n\nIt is for a form where a person presses Run, so it asks no approval. It is\nrecorded in no session and the model never sees it.",
+  "properties": {
+    "arguments": {
+      "additionalProperties": true,
+      "title": "Arguments",
+      "type": "object"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "session_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Session Id"
+    },
+    "tool": {
+      "minLength": 1,
+      "title": "Tool",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "tool"
+  ],
+  "title": "McpCallParams",
+  "type": "object"
+}

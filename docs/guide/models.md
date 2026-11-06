@@ -51,7 +51,7 @@ In the chat, `/login` opens the key panel: pick the provider, then paste the key
 | Provider | What you need |
 |---|---|
 | `ollama` | The app running on your Mac. No key |
-| `anthropic`, `openai` | An API key |
+| `anthropic`, `openai`, `google` | An API key |
 
 An environment variable such as `ANTHROPIC_API_KEY` wins over the Keychain, which helps in scripts.
 
@@ -87,7 +87,7 @@ All settings live in `~/.golem/config.toml`. `golem config show` prints the ones
 |---|---|---|
 | `default_model` | picked on first start | A profile name, or a `provider/model-id` |
 | `[models.<name>]` | none | `model`, optional `ctx`, optional `price = { input = 3.0, output = 15.0 }` in USD per million tokens |
-| `[providers.<name>]` | built-in | `kind` (`anthropic`, `openai`, `ollama`, `openai_compat`), `base_url`, `api_key_env` |
+| `[providers.<name>]` | built-in | `kind` (`anthropic`, `openai`, `google`, `ollama`, `openai_compat`), `base_url`, `api_key_env` |
 | `[ollama]` | | `start = true` lets golem start a local Ollama, `idle_stop_minutes = 30` stops the one it started (0 never) |
 | `session_titles` | `true` | Name each chat after its first answer, with one extra model call |
 | `log_level` | `INFO` | `DEBUG`, `INFO`, `WARNING`, or `ERROR` |

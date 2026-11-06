@@ -5,8 +5,9 @@ has a name providers do not take, ``slow`` never answers in time, ``crash``
 exits, ``grow`` adds a tool and says the list changed, ``replies`` shows
 what golem answered to the server's own requests, ``pid`` is the process id,
 and ``env`` reads an environment variable. ``tools/list`` comes in
-pages of two. ``--exit-at-start`` exits before the handshake, and ``--deaf``
-never answers ``ping``.
+pages of two. ``--exit-at-start`` exits before the handshake, ``--deaf``
+never answers ``ping``, ``--hang`` never answers ``initialize``, and ``--noise``
+writes the variable ``NOISE`` to stderr at the start.
 """
 
 from __future__ import annotations
@@ -89,6 +90,8 @@ def handle(message: dict[str, Any]) -> None:
         return
     params: dict[str, Any] = message.get("params") or {}
     if method == "initialize":
+        if "--hang" in sys.argv:
+            return
         result: dict[str, Any] = {
             "protocolVersion": params.get("protocolVersion"),
             "capabilities": {"tools": {"listChanged": True}},
@@ -120,6 +123,9 @@ def main() -> None:
     if "--exit-at-start" in sys.argv:
         sys.stderr.write("cannot start: no config\n")
         sys.exit(2)
+    if "--noise" in sys.argv:
+        sys.stderr.write(f"starting with {os.environ.get('NOISE', '')}\n")
+        sys.stderr.flush()
     print("not json, a stray log line", flush=True)
     for line in sys.stdin:
         handle(json.loads(line))
