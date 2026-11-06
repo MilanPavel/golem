@@ -426,7 +426,7 @@ Choices that hold for the whole phase:
 
 ```mermaid
 flowchart LR
-  s1[12.1 ADR and design] --> s2[12.2 Six providers] --> s3[12.3 Curated hosted list]
+  s1[12.1 ADR and design] --> s3[12.3 Curated hosted list]
   s1 --> s4[12.4 Categories] --> s5[12.5 A better local list]
   s1 --> s6[12.6 Options in the daemon] --> s7[12.7 /tune in the TUI]
   s6 --> s8[12.8 Tune in the web]
@@ -440,7 +440,7 @@ flowchart LR
   s5 & s7 & s8 & s9 & s10 & s12 & s13 & s14 --> s15[12.15 Check]
 ```
 
-After 12.1, three tracks can run side by side, each in its own worktree: providers (12.2, 12.3), categories (12.4, 12.5), and options (12.6 to 12.9).
+After 12.1, three tracks can run side by side, each in its own worktree: providers (12.3), categories (12.4, 12.5), and options (12.6 to 12.9).
 
 ### 12.1 ADR and a design for tuning — [#394](https://github.com/MilanPavel/golem/issues/394)
 
@@ -450,17 +450,6 @@ After 12.1, three tracks can run side by side, each in its own worktree: provide
   - ADR-037. It covers the six providers and which LangChain package each one uses (a native package where it carries thinking content, `openai_compat` where that is enough), the catalog format, the hosted filter, and option storage (`[ollama.models."<name>"]` in `config.toml`, written by the daemon through [config_edit.py](../packages/daemon/golem/config_edit.py), and session overrides as events in the log).
   - `docs/design/tune.md`: the TUI panel and the web tab, presets, the memory gauge, and the wording of every option's explanation.
 - **Done when:** the ADR and the design are merged.
-
-### 12.2 Six providers — [#395](https://github.com/MilanPavel/golem/issues/395)
-
-- **Goal:** Google, DeepSeek, xAI, and Moonshot work like OpenAI and Anthropic, and the providers golem no longer offers are gone.
-- **You can:** run `golem auth set google` (or `deepseek`, `xai`, `moonshot`), see the key checked, and chat with that provider's models.
-- **Build:**
-  - Remove the `openrouter`, `groq`, `together`, and `lmstudio` presets from `PRESETS`, the OpenRouter key check, and their providers in the trimmed LiteLLM file ([prices.py](../packages/daemon/golem/models/prices.py)).
-  - One ticket per new provider: the preset, the model list, `check_key`, chat, prices, and a contract test on a recorded response.
-  - The setup window, `/login`, `golem auth set`, and `golem doctor` list the six.
-- **Done when:** a key for each of the six is checked, lists its models, and answers a message that uses a tool.
-- **Watch out:** every new LangChain package must load in the frozen daemon. Run `just smoke-dist`.
 
 ### 12.3 A curated hosted list — [#396](https://github.com/MilanPavel/golem/issues/396)
 

@@ -54,7 +54,7 @@ run.completed      seq 12
 Where should golem think?
 
 › On this Mac      private, free · uses Ollama
-  With an API key  Anthropic, OpenAI, Groq, OpenRouter…
+  With an API key  Anthropic, OpenAI, Google…
   Later            golem can't answer until you pick
 
 ⠸ brew install ollama                              41s

@@ -195,6 +195,27 @@ def test_key_statuses_report_where_each_key_is(monkeypatch: pytest.MonkeyPatch) 
     assert list(statuses) == sorted(statuses)
 
 
+def test_key_statuses_list_the_six_providers_and_ollama() -> None:
+    statuses = {s.provider: s for s in ModelRouter(GolemSettings()).key_statuses()}
+    assert sorted(statuses) == [
+        "anthropic",
+        "deepseek",
+        "google",
+        "moonshot",
+        "ollama",
+        "openai",
+        "xai",
+    ]
+    assert {name: s.env_var for name, s in statuses.items() if s.takes_key} == {
+        "anthropic": "ANTHROPIC_API_KEY",
+        "deepseek": "DEEPSEEK_API_KEY",
+        "google": "GOOGLE_API_KEY",
+        "moonshot": "MOONSHOT_API_KEY",
+        "openai": "OPENAI_API_KEY",
+        "xai": "XAI_API_KEY",
+    }
+
+
 def test_missing_openai_key_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     with pytest.raises(ModelConfigError, match="OPENAI_API_KEY"):
