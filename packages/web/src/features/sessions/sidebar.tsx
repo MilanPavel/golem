@@ -1,9 +1,10 @@
+import { setupProblem } from "@golem/view";
 import { useId, useMemo, useRef, useState } from "react";
 import { cn } from "../../ui/cn.ts";
 import { Button } from "../../ui/button.tsx";
 import { GOLEM_STATE_LABEL } from "../../ui/golem-state.ts";
 import { IconButton } from "../../ui/icon-button.tsx";
-import { FolderIcon, MoreIcon, PlusIcon, SearchIcon } from "../../ui/icons.tsx";
+import { FolderIcon, GearIcon, MoreIcon, PlusIcon, SearchIcon } from "../../ui/icons.tsx";
 import { Kbd } from "../../ui/kbd.tsx";
 import { Link } from "../../ui/link.tsx";
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "../../ui/menu.tsx";
@@ -12,9 +13,9 @@ import { isMac, modShortcut } from "../../ui/platform.ts";
 import { ThemeSwitch } from "../../theme-switch.tsx";
 import type { ConnectionSnapshot } from "../../store/connection.ts";
 import { useConnection } from "../../store/connection-context.tsx";
-import { useNavigate, useRoute, useSessionList } from "../../store/page-context.tsx";
+import { useNavigate, useRoute, useSessionList, useSetupStatus } from "../../store/page-context.tsx";
 import { groupByFolder, type SessionSummary } from "../../store/session-list.ts";
-import { sessionPath } from "../../store/router.ts";
+import { sessionPath, settingsPath } from "../../store/router.ts";
 import { ConnectionLine } from "../connection/index.ts";
 import { CloseSessionDialog } from "./close-dialog.tsx";
 import { folderName } from "./folder.ts";
@@ -224,10 +225,46 @@ export type SidebarViewProps = {
   actions?: SidebarActions;
   /** Opens the command palette; `trigger` is the button, for focus afterwards. Without it there is no Search button. */
   onSearch?: (trigger: HTMLElement) => void;
+  /** What is wrong with the setup, in a line, or null. It shows under the Settings button. */
+  setupProblem?: string | null;
+  /** The settings page is the one in view. */
+  settingsOpen?: boolean;
 };
 
+/** The Settings button: a gear, and when the setup has a problem, a dot and the problem as text. */
+function SettingsButton({ problem, open, onNavigate }: { problem: string | null; open: boolean; onNavigate: (path: string) => void }) {
+  return (
+    <Button kind="ghost" className="w-full justify-start" aria-current={open ? "page" : undefined} onClick={() => onNavigate(settingsPath())}>
+      <GearIcon />
+      <span className="flex min-w-0 flex-col items-start text-left">
+        <span className="flex items-center gap-2">
+          {problem === null ? null : <span aria-hidden="true" className="size-2 rounded-xs bg-wait" />}
+          Settings
+          {problem === null ? null : <span className="sr-only">, {problem}</span>}
+        </span>
+        {problem === null ? null : (
+          <span aria-hidden="true" title={problem} className="max-w-full truncate text-xs text-muted">
+            {problem}
+          </span>
+        )}
+      </span>
+    </Button>
+  );
+}
+
 /** The sidebar of docs/design/web.md: golem's state, New session, sessions by folder, the connection and the theme. */
-export function SidebarView({ sessions, selectedId, connection, now, onNavigate, label = "Sessions", actions, onSearch }: SidebarViewProps) {
+export function SidebarView({
+  sessions,
+  selectedId,
+  connection,
+  now,
+  onNavigate,
+  label = "Sessions",
+  actions,
+  onSearch,
+  setupProblem: problem = null,
+  settingsOpen = false,
+}: SidebarViewProps) {
   const [closing, setClosing] = useState<SessionSummary | null>(null);
   // Where focus goes when the dialog shuts: the row's menu button, or New session once the row is gone.
   const closeTrigger = useRef<HTMLButtonElement | null>(null);
@@ -281,6 +318,7 @@ export function SidebarView({ sessions, selectedId, connection, now, onNavigate,
         ))}
       </div>
       <div className="flex flex-col gap-2 border-t border-line px-2 pt-2.5">
+        <SettingsButton problem={problem} open={settingsOpen} onNavigate={onNavigate} />
         <ConnectionLine snapshot={connection} />
         <ThemeSwitch compact />
       </div>
@@ -312,6 +350,9 @@ export function Sidebar({ onSearch }: { onSearch?: (trigger: HTMLElement) => voi
   const now = useNow();
   const { rename, close } = useSessionActions();
   const actions = useMemo(() => ({ rename, close }), [rename, close]);
+  // A failed or loading query shows nothing: the connection line already says when the daemon is gone.
+  const status = useSetupStatus();
+  const problem = status.isError || status.data === undefined ? null : setupProblem(status.data.rows);
   return (
     <SidebarView
       sessions={sessions}
@@ -321,6 +362,8 @@ export function Sidebar({ onSearch }: { onSearch?: (trigger: HTMLElement) => voi
       onNavigate={navigate}
       actions={actions}
       onSearch={onSearch}
+      setupProblem={problem}
+      settingsOpen={route.name === "settings"}
     />
   );
 }

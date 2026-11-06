@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { cn } from "./ui/cn.ts";
-import { applyTheme, readTheme, type ThemeChoice } from "./styles/theme.ts";
+import { applyTheme, onThemeApplied, readTheme, type ThemeChoice } from "./styles/theme.ts";
 
 const CHOICES: { value: ThemeChoice; label: string }[] = [
   { value: "system", label: "System" },
@@ -11,9 +11,10 @@ const CHOICES: { value: ThemeChoice; label: string }[] = [
 /** `compact` is for the sidebar: no top margin, no visible label, smaller buttons. */
 export function ThemeSwitch({ compact = false }: { compact?: boolean }) {
   const [theme, setTheme] = useState<ThemeChoice>(readTheme);
+  // The sidebar and Settings each have a switch: a choice in one shows in the other.
+  useEffect(() => onThemeApplied(setTheme), []);
   const choose = (value: ThemeChoice) => {
     applyTheme(value);
-    setTheme(value);
   };
   return (
     <div role="group" aria-label="Theme" className={cn("flex items-center gap-2", !compact && "mt-6")}>
