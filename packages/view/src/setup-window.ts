@@ -493,6 +493,7 @@ const PROVIDER_NAMES: Record<string, string> = {
   anthropic: "Anthropic",
   openai: "OpenAI",
   google: "Google",
+  deepseek: "DeepSeek",
   ollama: "Ollama",
 };
 

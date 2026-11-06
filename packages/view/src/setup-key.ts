@@ -46,6 +46,14 @@ export const HOSTED_PROVIDERS: readonly HostedProvider[] = [
     env: "GOOGLE_API_KEY",
     prefer: [/^gemini-\d+(\.\d+)?-pro$/i, /^gemini-\d+(\.\d+)?-flash$/i, /^gemini-/i],
   },
+  {
+    id: "deepseek",
+    name: "DeepSeek",
+    blurb: "DeepSeek V3 and R1",
+    console: "platform.deepseek.com/api_keys",
+    env: "DEEPSEEK_API_KEY",
+    prefer: [/^deepseek-chat$/i, /^deepseek-v\d/i, /^deepseek-/i],
+  },
 ];
 
 export function hostedProvider(id: string): HostedProvider | null {
