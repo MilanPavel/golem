@@ -168,7 +168,10 @@ test("an expired cookie on a session asks for a fresh link", async ({ page, rig,
 test("a model's answer cannot run script or leave hostile markup in the page", async ({ page, rig, tolerate, tolerateCsp }) => {
   // The sanitizer parses the "base href" case in a scratch document that shares the page's policy,
   // so Chrome reports base-uri for it although no <base> reaches the page (asserted below).
-  tolerateCsp.push(/^base-uri https:\/\/example\.com\/$/);
+  // The same goes for event-handler attributes (img onerror, svg onload, a link's onclick): Chrome reports
+  // script-src-attr when the sanitizer parses them, and the asserts below show none reach the page.
+  tolerateCsp.push(/^base-uri https:\/\/example\.com\/$/, /^script-src-attr inline$/);
+  tolerate.push(/^Executing inline event handler violates .* 'script-src 'self''/);
   tolerate.push(/Setting the document's base URI to 'https:\/\/example\.com\/' violates .* "base-uri 'none'"/);
   test.setTimeout(180_000);
   const { model, gateway } = await startStack(rig);

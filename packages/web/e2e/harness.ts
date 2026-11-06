@@ -90,14 +90,24 @@ export function writeModelConfig(home: string, model: Pick<FakeModel, "baseUrl">
   writeFileSync(path.join(home, "config.toml"), lines.join("\n"));
 }
 
+/** Writes `config.toml` in `home` from these lines. */
+export function writeConfig(home: string, lines: string[]): void {
+  writeFileSync(path.join(home, "config.toml"), `${lines.join("\n")}\n`);
+}
+
 export interface Daemon {
   pid: number;
   stop(): Promise<void>;
 }
 
-export async function startDaemon(home: string): Promise<Daemon> {
+export interface DaemonOptions {
+  /** Merged over the environment the daemon gets. */
+  env?: Record<string, string>;
+}
+
+export async function startDaemon(home: string, options: DaemonOptions = {}): Promise<Daemon> {
   const child = spawn("uv", ["run", "--project", REPO, "golem-daemon", "serve"], {
-    env: envFor(home),
+    env: { ...envFor(home), ...options.env },
     stdio: "ignore",
     cwd: REPO,
   });
