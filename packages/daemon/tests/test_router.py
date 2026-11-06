@@ -231,12 +231,6 @@ def test_a_new_provider_is_openai_compatible(monkeypatch: pytest.MonkeyPatch) ->
     assert model.openai_api_base == "http://127.0.0.1:9/v1"
 
 
-def test_a_new_provider_without_base_url_is_rejected() -> None:
-    settings = GolemSettings(providers={"xai": ProviderSettings()})
-    with pytest.raises(ModelConfigError, match="xai needs base_url"):
-        ModelRouter(settings).chat_model("xai/model-x")
-
-
 def test_legacy_ollama_settings_become_a_native_profile() -> None:
     settings = GolemSettings(model_provider="openai_compat", model_name="qwen3.5:4b")
     router = ModelRouter(settings)

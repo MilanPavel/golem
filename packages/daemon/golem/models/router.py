@@ -59,6 +59,7 @@ class Provider:
 OLLAMA_BASE_URL = "http://127.0.0.1:11434"
 GOOGLE_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
 DEEPSEEK_BASE_URL = "https://api.deepseek.com"
+XAI_BASE_URL = "https://api.x.ai/v1"
 
 PRESETS: dict[str, Provider] = {
     "anthropic": Provider(kind="anthropic", api_key_env="ANTHROPIC_API_KEY"),
@@ -67,6 +68,7 @@ PRESETS: dict[str, Provider] = {
     "deepseek": Provider(
         kind="openai_compat", base_url=DEEPSEEK_BASE_URL, api_key_env="DEEPSEEK_API_KEY"
     ),
+    "xai": Provider(kind="xai", base_url=XAI_BASE_URL, api_key_env="XAI_API_KEY"),
     "ollama": Provider(kind="ollama", base_url=OLLAMA_BASE_URL),
 }
 
@@ -243,6 +245,16 @@ class ModelRouter:
             if provider.base_url is not None:
                 options["base_url"] = provider.base_url
             return ChatOpenAI.model_validate(options)
+        if provider.kind == "xai":
+            from langchain_openai import ChatOpenAI
+
+            return ChatOpenAI.model_validate(
+                {
+                    "model": resolved.model_id,
+                    "base_url": provider.base_url or XAI_BASE_URL,
+                    "api_key": key,
+                }
+            )
         if provider.kind == "google":
             from langchain_openai import ChatOpenAI
 

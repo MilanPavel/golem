@@ -41,6 +41,7 @@ from golem.models.ollama import LocalServers
 from golem.models.router import (
     GOOGLE_BASE_URL,
     OLLAMA_BASE_URL,
+    XAI_BASE_URL,
     ModelConfigError,
     ModelRouter,
     Provider,
@@ -522,7 +523,7 @@ class ModelDiscovery:
             remote = await self._fetch_remote(name, provider, key)
         except httpx.HTTPStatusError as exc:
             reason = _http_reason(exc.response)
-            if exc.response.status_code in (401, 403) or _google_bad_key(provider, exc.response):
+            if exc.response.status_code in (401, 403) or _bad_key_as_400(provider, exc.response):
                 raise KeyRejected(f"{name} rejected the key ({reason})") from exc
             raise KeyUnchecked(f"{name} answered {reason}") from exc
         except (httpx.HTTPError, ValueError) as exc:
@@ -545,6 +546,8 @@ class ModelDiscovery:
             found = await _openai_models(client, provider, key, self._prices)
         elif provider.kind == "google":
             found = await _google_models(client, provider, key)
+        elif provider.kind == "xai":
+            found = await _xai_models(client, provider, key)
         else:
             found = await _compatible_models(client, provider, key)
         remote = _Remote(fetched_at=self._clock(), models=found)
@@ -680,12 +683,31 @@ async def _google_models(
     return found
 
 
-def _google_bad_key(provider: Provider, response: httpx.Response) -> bool:
-    """Google answers 400, not 401, when the key does not exist."""
+async def _xai_models(
+    client: httpx.AsyncClient, provider: Provider, key: str | None
+) -> list[_Found]:
+    """xAI's ``/language-models`` lists chat models only. ``/models`` adds image and video."""
+    base = (provider.base_url or XAI_BASE_URL).rstrip("/")
+    response = await client.get(
+        f"{base}/language-models",
+        headers={"authorization": f"Bearer {key}"},
+        timeout=_REMOTE_TIMEOUT,
+    )
+    response.raise_for_status()
+    found: list[_Found] = []
+    for item in _list(_dict(response.json()).get("models")):
+        model_id = item.get("id")
+        if isinstance(model_id, str) and model_id:
+            found.append(_Found(model_id=model_id))
+    return found
+
+
+def _bad_key_as_400(provider: Provider, response: httpx.Response) -> bool:
+    """Google and xAI answer 400, not 401, when the key does not exist."""
     return (
-        provider.kind == "google"
+        provider.kind in ("google", "xai")
         and response.status_code == 400
-        and "api key" in (_http_reason(response).lower())
+        and "api key" in _http_reason(response).lower()
     )
 
 
