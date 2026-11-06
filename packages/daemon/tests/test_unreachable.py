@@ -57,8 +57,7 @@ def _settings(**models: str) -> GolemSettings:
         default_model="ollama/qwen3:8b",
         models={name: ModelSettings(model=ref) for name, ref in models.items()},
         providers={
-            "far": ProviderSettings(kind="ollama", base_url="http://gpu-box:11434"),
-            "lan": ProviderSettings(kind="openai_compat", base_url="http://localhost:1234/v1"),
+            "xai": ProviderSettings(kind="openai_compat", base_url="http://localhost:1234/v1"),
         },
     )
 
@@ -110,14 +109,14 @@ def test_other_failures_are_not_unreachable(error: Exception) -> None:
 
 
 async def test_an_openai_compatible_server_that_is_down_is_unreachable() -> None:
-    down = ModelRouter(_settings(studio="lan/qwen")).unreachable(
+    down = ModelRouter(_settings(studio="xai/qwen")).unreachable(
         "studio", await _openai_connect_error()
     )
-    assert down is not None and down.provider == "lan"
+    assert down is not None and down.provider == "xai"
 
 
 def test_the_hint_fits_where_the_server_is(installed: Callable[[bool], None]) -> None:
-    router = ModelRouter(_settings(gpu="far/llama3", studio="lan/qwen", gpt="openai/gpt-5"))
+    router = ModelRouter(_settings(studio="xai/qwen", gpt="openai/gpt-5"))
 
     def says(profile: str) -> tuple[str, str | None, str]:
         down = router.unreachable(profile, _connect_error())
@@ -132,16 +131,9 @@ def test_the_hint_fits_where_the_server_is(installed: Callable[[bool], None]) ->
     )
     missing = router.unreachable("ollama/qwen3:8b", _connect_error())
     assert missing is not None and missing.code == "not_installed"
-    far = router.unreachable("gpu", _connect_error())
-    assert far is not None and far.code == "model_unreachable"
-    assert says("gpu") == (
-        "Ollama at http://gpu-box:11434 is not answering",
-        "far",
-        "check that it is running",
-    )
     assert says("studio") == (
-        "lan at http://localhost:1234/v1 is not answering",
-        "lan",
+        "xai at http://localhost:1234/v1 is not answering",
+        "xai",
         "check that it is running",
     )
     assert says("gpt") == ("openai is not answering", "openai", "check your network connection")
@@ -265,3 +257,14 @@ async def test_any_other_failure_stays_a_plain_message(database: Database, tmp_p
         "provider": None,
         "hint": None,
     }
+
+
+def test_a_remote_ollama_is_unreachable_not_missing(installed: Callable[[bool], None]) -> None:
+    settings = GolemSettings(
+        providers={"ollama": ProviderSettings(base_url="http://gpu-box:11434")}
+    )
+    installed(False)
+    far = ModelRouter(settings).unreachable("ollama/llama3", _connect_error())
+    assert far is not None and far.code == "model_unreachable"
+    assert far.message == "Ollama at http://gpu-box:11434 is not answering"
+    assert far.hint == "check that it is running"

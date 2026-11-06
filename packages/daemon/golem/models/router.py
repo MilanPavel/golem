@@ -1,7 +1,7 @@
 """Resolve a model name to a chat model.
 
 A name is a profile from ``[models.<name>]`` or a ``provider/model`` ref, such
-as ``ollama/qwen3:8b`` or ``openrouter/qwen/qwen3-235b-a22b``. A ref splits on
+as ``ollama/qwen3:8b`` or ``openai/gpt-5``. A ref splits on
 its first ``/``. The flat settings from before profiles load as one profile
 named ``model_profile``, so sessions that stored that name keep resolving.
 
@@ -28,6 +28,7 @@ from golem.config import (
     ProviderKind,
     ProviderSettings,
     load_settings,
+    unknown_provider_message,
 )
 from golem.models import ollama
 from golem.models.errors import ModelUnreachable
@@ -61,22 +62,6 @@ PRESETS: dict[str, Provider] = {
     "anthropic": Provider(kind="anthropic", api_key_env="ANTHROPIC_API_KEY"),
     "openai": Provider(kind="openai", api_key_env="OPENAI_API_KEY"),
     "ollama": Provider(kind="ollama", base_url=OLLAMA_BASE_URL),
-    "openrouter": Provider(
-        kind="openai_compat",
-        base_url="https://openrouter.ai/api/v1",
-        api_key_env="OPENROUTER_API_KEY",
-    ),
-    "groq": Provider(
-        kind="openai_compat",
-        base_url="https://api.groq.com/openai/v1",
-        api_key_env="GROQ_API_KEY",
-    ),
-    "together": Provider(
-        kind="openai_compat",
-        base_url="https://api.together.xyz/v1",
-        api_key_env="TOGETHER_API_KEY",
-    ),
-    "lmstudio": Provider(kind="openai_compat", base_url="http://127.0.0.1:1234/v1"),
 }
 
 # The name of the flat settings' profile when model_profile is unset. A session
@@ -206,7 +191,7 @@ class ModelRouter:
             raise ModelConfigError(f"unknown model: {name}")
         provider = catalog.providers.get(provider_name)
         if provider is None:
-            raise ModelConfigError(f"unknown model provider: {provider_name}")
+            raise ModelConfigError(unknown_provider_message(provider_name))
         return ResolvedModel(
             name=name,
             provider_name=provider_name,

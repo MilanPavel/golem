@@ -290,9 +290,9 @@ test("keys and clicks agree on a list of choices", async () => {
   await clicks.user.click(choice(/With an API key/));
   await within(dialog()).findByText("With an API key · which provider?");
   expect(current()?.textContent).toContain("Anthropic");
-  // From the second to the fourth: the same moves as the keys, then Enter.
-  await clicks.user.click(choice(/OpenRouter/));
-  await within(dialog()).findByText("OpenRouter · API key");
+  // The second: the same moves as the keys, then Enter.
+  await clicks.user.click(choice(/OpenAI/));
+  await within(dialog()).findByText("OpenAI · API key");
 });
 
 // Ollama

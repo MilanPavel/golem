@@ -51,7 +51,7 @@ golem starts Ollama when a local model needs it, and stops it after 30 minutes u
 
 You choose the model in step 4, from inside golem.
 
-**A hosted model** (Anthropic, OpenAI, OpenRouter, Groq, or Together). You need an API key from that provider. golem saves it in the macOS Keychain, never in a file:
+**A hosted model** (Anthropic or OpenAI). You need an API key from that provider. golem saves it in the macOS Keychain, never in a file:
 
 ```bash
 golem auth set anthropic    # paste the key; nothing is echoed
