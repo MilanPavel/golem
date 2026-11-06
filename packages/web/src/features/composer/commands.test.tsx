@@ -129,8 +129,17 @@ test("/help opens the Commands dialog, grouped, with the terminal-only ones mark
   expect(mcp.textContent).toContain("In the terminal for now");
   const fork = within(dialog).getByText("/fork").closest("li") as HTMLElement;
   expect(fork.textContent).not.toContain("In the terminal for now");
+  const permissions = within(dialog).getByText("/permissions").closest("li") as HTMLElement;
+  expect(permissions.textContent).not.toContain("In the terminal for now");
   await userEvent.keyboard("{Escape}");
   await waitFor(() => expect(document.activeElement).toBe(box()));
+});
+
+test("/permissions opens Settings on the tool rules", async () => {
+  const { user } = await session();
+  await say(user, "/permissions");
+  expect(location.pathname).toBe("/settings/rules");
+  expect(screen.getByRole("heading", { level: 2, name: "Tool rules" })).toBeTruthy();
 });
 
 test("/new goes to the start page", async () => {
@@ -393,7 +402,6 @@ const NOT_YET: [string, string][] = [
   ["/mcp", "MCP servers are managed in the terminal for now: run golem, then /mcp. To add one, use /mcp add."],
   ["/mcp enable x", "MCP servers are managed in the terminal for now: run golem, then /mcp. To add one, use /mcp add."],
   ["/skills", "The skills list is in the terminal for now: run golem, then /skills."],
-  ["/permissions", "Rules are shown in the terminal for now: run golem, then /permissions."],
   ["/artifact", "Tool output opens in the terminal for now: run golem, then /artifact."],
   ["/sessions", "The sidebar lists your sessions."],
   ["/debug", "The debug panel is in the terminal for now: run golem, then /debug."],
