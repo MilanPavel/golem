@@ -3,7 +3,7 @@
 launchd starts the daemon with a short ``PATH``, so a command is also looked
 for where Homebrew, ``pipx``, and ``uv tool`` put programs. A stdio server
 gets a small environment, not the daemon's: nothing such as an API key in the
-daemon's environment reaches it unless ``env`` names it. ``keychain:mcp/…``
+daemon's environment reaches it unless ``env_passthrough`` names it. ``keychain:mcp/…``
 in ``env`` or ``headers`` is replaced by the secret when the server starts.
 """
 
@@ -70,6 +70,7 @@ def launch(
     path = search_path(environ)
     env = {key: environ[key] for key in PASSED_ENV if key in environ}
     env["PATH"] = path
+    env.update({key: environ[key] for key in settings.env_passthrough if key in environ})
     env.update({key: _with_secrets(value, secrets) for key, value in settings.env.items()})
     command = find_command(settings.command, environ)
     if command is None:

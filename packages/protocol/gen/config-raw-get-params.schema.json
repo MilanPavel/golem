@@ -1,0 +1,30 @@
+{
+  "additionalProperties": false,
+  "description": "``config.raw.get``. The text of ``config.toml``, with ``keychain:`` references as written.\n\n``scope = \"project\"`` reads the trusted project of ``session_id``.",
+  "properties": {
+    "scope": {
+      "default": "user",
+      "enum": [
+        "user",
+        "project"
+      ],
+      "title": "Scope",
+      "type": "string"
+    },
+    "session_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Session Id"
+    }
+  },
+  "title": "ConfigRawGetParams",
+  "type": "object"
+}

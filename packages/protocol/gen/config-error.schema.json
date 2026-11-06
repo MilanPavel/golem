@@ -1,0 +1,53 @@
+{
+  "additionalProperties": false,
+  "description": "One problem in a config text. ``line`` and ``column`` count from 1, when known.\n\n``path`` is the setting, as ``mcp.github.headers.Authorization``.",
+  "properties": {
+    "column": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Column"
+    },
+    "line": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Line"
+    },
+    "message": {
+      "title": "Message",
+      "type": "string"
+    },
+    "path": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Path"
+    }
+  },
+  "required": [
+    "message"
+  ],
+  "title": "ConfigError",
+  "type": "object"
+}

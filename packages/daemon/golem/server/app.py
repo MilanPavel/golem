@@ -163,6 +163,7 @@ class DaemonApp:
                 secrets=self._secret,
             )
             mcp.broadcast = self._broadcast
+            policy.mcp_allowed = mcp.allowed_servers
             self.state.mcp = mcp
             local = self._local or LocalServers(
                 settings.ollama, log_file=self.paths.ollama_log_file, run_dir=self.paths.run_dir
