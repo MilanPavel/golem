@@ -272,6 +272,14 @@ The supervisor keeps a log for each server, up to 500 lines: its stderr, and lin
 
 `golem doctor --mcp` runs the same steps for each enabled server and prints the hint. Without it, `golem doctor` and `setup.status` use what the running daemon says about its servers (`running`, or `failed` with the error), and fall back to checking that the command exists.
 
+### The catalog, and what servers need
+
+`golem/mcp/data/catalog.toml` lists the servers golem offers: filesystem, fetch, git, time, memory, sequential-thinking, GitHub, Playwright, Context7, and Brave Search. Each `[[entry]]` has a `template`, a partial `[mcp.<name>]` table, and `inputs` to ask for. A template string may hold `{folder}` (the session's folder), `{name}`, `{input.<id>}`, and `{secret.<id>}`, which becomes `keychain:mcp/<name>` so the value never reaches the file. Entries are `on_demand` by default, so they cost no tokens until a chat turns one on. `starter = true` marks the ones the setup window will offer: fetch, Context7, and Playwright.
+
+`mcp.catalog` returns the entries with whether each can be added and what is missing (`node`, `uv`, or `docker`, from the launch search path), and whether a server of that name exists. `mcp.add` has a third form, `{name, catalog_id, inputs, secrets}`: the daemon fills the template (`golem/mcp/catalog.py`), validates it with the settings model, stores the secrets, and writes the table. `just catalog` fills every entry with sample inputs, so a typo in a template fails there, and checks that each npm and PyPI package is still published and not deprecated.
+
+`runtime.install {name}` installs Node or uv with Homebrew, the way `ollama.install` installs Ollama: `BrewInstaller` in `golem/models/install.py` runs one `brew install` at a time and streams `runtime.install.output` and `runtime.install.done`. The name is a closed list, `node` or `uv`, so a page cannot ask brew for anything else ([ADR-035](../adr/035-daemon-installs-ollama.md)). Docker is never installed.
+
 ### Limits
 
 golem's client follows one protocol version. A server that answers with another is used anyway, and a later MCP change that breaks the five messages above needs a change here. golem uses a server's tools only: not its resources or prompts, and it offers no sampling or elicitation.
@@ -284,6 +292,9 @@ golem's client follows one protocol version. A server that answers with another 
 | `packages/daemon/golem/mcp/transport.py` | `StdioTransport` and `HttpTransport` |
 | `packages/daemon/golem/mcp/supervisor.py` | `McpSupervisor`: start, health, backoff, reload, and the scoped tools |
 | `packages/daemon/golem/mcp/tools.py` | A server's tools as golem tools: names, schemas, and the marked output |
+| `packages/daemon/golem/mcp/catalog.py` | The catalog entries and how one becomes `[mcp.<name>]` |
+| `packages/daemon/golem/mcp/data/catalog.toml` | The servers on offer |
+| `packages/daemon/golem/server/mcp_catalog.py` | The handlers of `mcp.catalog` and `runtime.install` |
 | `packages/daemon/golem/mcp/probe.py` | `probe`: the steps of `mcp.test`, and `test_hint` |
 | `packages/daemon/golem/server/mcp_try.py` | The handlers of `mcp.test`, `mcp.logs`, and `mcp.call` |
 | `packages/daemon/golem/mcp/launch.py` | Finding the command, the environment, and the Keychain secrets |

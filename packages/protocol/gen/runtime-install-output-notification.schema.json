@@ -1,0 +1,52 @@
+{
+  "$defs": {
+    "RuntimeInstallOutput": {
+      "additionalProperties": false,
+      "description": "Output from ``brew install`` as it came, carriage returns included.",
+      "properties": {
+        "name": {
+          "enum": [
+            "node",
+            "uv"
+          ],
+          "title": "Name",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "text"
+      ],
+      "title": "RuntimeInstallOutput",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Server → every connection: output from a running Node or uv install. Not stored.",
+  "properties": {
+    "jsonrpc": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Jsonrpc",
+      "type": "string"
+    },
+    "method": {
+      "const": "runtime.install.output",
+      "default": "runtime.install.output",
+      "title": "Method",
+      "type": "string"
+    },
+    "params": {
+      "$ref": "#/$defs/RuntimeInstallOutput"
+    }
+  },
+  "required": [
+    "params"
+  ],
+  "title": "RuntimeInstallOutputNotification",
+  "type": "object"
+}
