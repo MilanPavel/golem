@@ -38,6 +38,22 @@ export const HOSTED_PROVIDERS: readonly HostedProvider[] = [
     env: "OPENAI_API_KEY",
     prefer: [/^gpt-5(\.\d+)?$/i, /^gpt-5/i, /^gpt-4\.1$/i, /^gpt-4o$/i],
   },
+  {
+    id: "google",
+    name: "Google",
+    blurb: "Gemini",
+    console: "aistudio.google.com/apikey",
+    env: "GOOGLE_API_KEY",
+    prefer: [/^gemini-\d+(\.\d+)?-pro$/i, /^gemini-\d+(\.\d+)?-flash$/i, /^gemini-/i],
+  },
+  {
+    id: "deepseek",
+    name: "DeepSeek",
+    blurb: "DeepSeek V3 and R1",
+    console: "platform.deepseek.com/api_keys",
+    env: "DEEPSEEK_API_KEY",
+    prefer: [/^deepseek-chat$/i, /^deepseek-v\d/i, /^deepseek-/i],
+  },
 ];
 
 export function hostedProvider(id: string): HostedProvider | null {

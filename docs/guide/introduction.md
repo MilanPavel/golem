@@ -34,7 +34,7 @@ flowchart LR
 - **The chat** connects to the daemon. Close it mid-answer and nothing is lost: open it again and the answer is still streaming. You can open the same chat in several terminals, or in the browser, at once.
 - **golem asks first.** Before it changes a file, runs a command, or fetches a page, you see exactly what it wants to do. You allow it once, for the session, or always, or you deny it.
 
-The models are yours to choose. A local one runs in [Ollama](https://ollama.com) on your Mac, for free, and nothing leaves the machine. A hosted one (Anthropic or OpenAI) needs an API key, which golem keeps in the macOS Keychain.
+The models are yours to choose. A local one runs in [Ollama](https://ollama.com) on your Mac, for free, and nothing leaves the machine. A hosted one (Anthropic, OpenAI, Google, or DeepSeek) needs an API key, which golem keeps in the macOS Keychain.
 
 ## What you need
 

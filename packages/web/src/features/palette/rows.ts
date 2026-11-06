@@ -17,11 +17,12 @@ export const COMMAND_KEYS: Readonly<Record<string, string>> = { "/help": "?" };
 export type PaletteRow = SearchListItem &
   (
     | { kind: "command"; command: Command; key: string | null }
-    | { kind: "page"; page: "keys"; name: string; description: string; key: string | null }
+    | { kind: "page"; page: "keys" | "settings"; name: string; description: string; key: string | null }
     | { kind: "message"; text: string }
   );
 
 const KEYS = { name: "Keys", description: "The keys this page uses.", key: "?" };
+const SETTINGS = { name: "Settings", description: "Setup, appearance, and the rest of the settings.", key: null };
 
 /** How well the query fits a name, or null for no fit: 0 when the name starts with it, 1 when the text holds it. */
 function rank(name: string, args: string, description: string, query: string): 0 | 1 | null {
@@ -49,6 +50,10 @@ export function paletteRows(commands: readonly Command[], query: string): Palett
       }
     }
     if (group === "view") {
+      const settings = rank(SETTINGS.name, "", SETTINGS.description, needle);
+      if (settings !== null) {
+        found.push({ row: { id: "page:settings", group: title, kind: "page", page: "settings", ...SETTINGS }, rank: settings });
+      }
       const at = rank(KEYS.name, "", KEYS.description, needle);
       if (at !== null) found.push({ row: { id: "page:keys", group: title, kind: "page", page: "keys", ...KEYS }, rank: at });
     }

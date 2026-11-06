@@ -23,7 +23,7 @@ flowchart LR
 ## What the code does today
 
 - **The profile** is built in `golem/tools/sandbox.py`. It allows everything, then:
-  - denies every file write except to the session folder, `/private/tmp`, `/private/var/folders` (macOS temp), the usual caches (`~/.cache`, `~/Library/Caches`, `~/.npm`, `~/Library/pnpm`, `~/.cargo/registry`), and `[shell] writable`;
+  - denies every file write except to the session folder, `/private/tmp`, `/private/var/folders` (macOS temp), the usual caches (`~/.cache`, `~/Library/Caches`, `~/.npm`, `~/Library/pnpm`, `~/.cargo/registry`), `[shell] writable`, and the git folders of the checkout the session folder is in when they are outside it (step 2.8.1);
   - denies the network except local Unix sockets, unless `[shell] network = true`;
   - denies reads of `~/.ssh`, `~/.gnupg`, `~/.aws`, `~/.azure`, `~/.kube`, `~/.docker`, `~/.netrc`, `~/.config/gh`, `~/.config/gcloud`, `~/.golem`, and `~/Library/Keychains`.
   - Paths are resolved first, because the profile matches real paths (`/tmp` is `/private/tmp`).
@@ -49,6 +49,8 @@ flowchart LR
 `sandbox-exec` is deprecated. If Apple removes it, the shell stops working until another sandbox replaces it.
 
 Reads are allowed outside the denied folders, so an approved command can still read and print other files in the home folder to the model.
+
+A command may write the git folders of its checkout, and they hold the hooks and the config. A hook it writes runs later, outside the sandbox, when you run git yourself. That was already true in a clone, whose `.git` is inside the session folder. In a git worktree it is now true of the main checkout's shared git folder too.
 
 Tools that need the network (`pnpm install`, `uv sync` with new packages) fail until you set `[shell] network = true`, and that setting applies to every command.
 

@@ -95,7 +95,7 @@ trusted_projects = ["~/repos/my-app"]
 
 A command you allow still runs in a sandbox (`sandbox-exec`, built into macOS). If the sandbox cannot start, the command does not run.
 
-- **Writes** only to the project folder, the temp folders, the usual caches (`~/.cache`, `~/.npm`, and others), and any folder in `[shell] writable`.
+- **Writes** only to the project folder, the temp folders, the usual caches (`~/.cache`, `~/.npm`, and others), and any folder in `[shell] writable`. In a git worktree, it may also write the worktree's git folders in the main checkout, so `git commit` works.
 - **No network,** unless `[shell] network = true`.
 - **No secrets.** It cannot read `~/.ssh`, `~/.gnupg`, `~/.aws`, `~/.config/gh`, `~/.golem`, your Keychains, and similar folders. Variables that look like credentials are removed from its environment.
 - **A time limit** of 120 seconds by default, `[shell] timeout_seconds`.

@@ -71,7 +71,8 @@ function Body({ hasComposer, onPick, commands, initialQuery }: Omit<CommandPalet
         activeId={active?.id ?? null}
         onActiveChange={setActiveId}
         onActivate={(row) => {
-          if (hasComposer) onPick(row);
+          // A page row (Keys, Settings) needs no composer; a command or a message does.
+          if (hasComposer || row.kind === "page") onPick(row);
         }}
         renderItem={(row) => <Row row={row} />}
         empty={<p className="px-3 py-2 text-sm text-muted">Nothing to show.</p>}

@@ -127,7 +127,14 @@ export function useModelList(enabled = true): UseQueryResult<ModelListResult> {
 /** The overview rows: fresh until the model list or the model server changes, shared by every user of the hook. */
 export function useSetupStatus(enabled = true): UseQueryResult<SetupStatusResult> {
   const { queries } = usePage();
-  return useQuery({ queryKey: [...SETUP_STATUS_KEY], queryFn: queries.setupStatus, enabled });
+  // A key set in a terminal pushes no event, so this answer is looked at again whenever the tab is seen.
+  return useQuery({
+    queryKey: [...SETUP_STATUS_KEY],
+    queryFn: queries.setupStatus,
+    enabled,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+  });
 }
 
 /**

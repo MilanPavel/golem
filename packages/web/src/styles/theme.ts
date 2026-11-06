@@ -15,6 +15,16 @@ export function readTheme(): ThemeChoice {
   }
 }
 
+const listeners = new Set<(choice: ThemeChoice) => void>();
+
+/** Calls `listener` with each theme that is applied, so switches in two places stay in step. Returns the unsubscribe. */
+export function onThemeApplied(listener: (choice: ThemeChoice) => void): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
 export function applyTheme(choice: ThemeChoice): void {
   const root = document.documentElement;
   if (choice === "system") root.removeAttribute("data-theme");
@@ -25,4 +35,5 @@ export function applyTheme(choice: ThemeChoice): void {
   } catch {
     // Storage may be blocked; the choice then lasts until the page closes.
   }
+  for (const listener of [...listeners]) listener(choice);
 }

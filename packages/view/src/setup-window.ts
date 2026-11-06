@@ -492,6 +492,8 @@ export type EngineChoice = "local" | "key" | "later";
 const PROVIDER_NAMES: Record<string, string> = {
   anthropic: "Anthropic",
   openai: "OpenAI",
+  google: "Google",
+  deepseek: "DeepSeek",
   ollama: "Ollama",
 };
 
@@ -744,16 +746,40 @@ export function overviewLines(
  * The service is the band's own business, and no model chosen has its own line.
  */
 export function setupBand(rows: readonly SetupRow[]): string | null {
-  const wrong = rows.find((row) => row.state !== "ok" && row.part !== "service" && row.part !== "socket");
+  const wrong = wrongRow(rows);
   if (wrong === undefined) {
     return null;
   }
-  if (wrong.part === "model" && wrong.state === "warn") {
+  if (isNoModel(wrong)) {
     return NO_MODEL_BAND;
   }
-  const named = wrong.part === "engine" || wrong.part === "tools" || (wrong.part === "model" && wrong.name !== "model");
-  const what = named ? `${providerName(wrong.name)}: ` : "";
-  return `! ${what}${wrong.detail} · /setup`;
+  return `! ${problemText(wrong)} · /setup`;
+}
+
+/**
+ * The first row that is wrong, as a short line: the band without its `! ` and its `/setup` hint.
+ * Null when all is well. No model chosen is `no model yet`.
+ */
+export function setupProblem(rows: readonly SetupRow[]): string | null {
+  const wrong = wrongRow(rows);
+  if (wrong === undefined) {
+    return null;
+  }
+  return isNoModel(wrong) ? "no model yet" : problemText(wrong);
+}
+
+function wrongRow(rows: readonly SetupRow[]): SetupRow | undefined {
+  return rows.find((row) => row.state !== "ok" && row.part !== "service" && row.part !== "socket");
+}
+
+function isNoModel(row: SetupRow): boolean {
+  return row.part === "model" && row.state === "warn";
+}
+
+function problemText(row: SetupRow): string {
+  const named = row.part === "engine" || row.part === "tools" || (row.part === "model" && row.name !== "model");
+  const what = named ? `${providerName(row.name)}: ` : "";
+  return `${what}${row.detail}`;
 }
 
 /** The band after Later, and after a start with nothing chosen. */
