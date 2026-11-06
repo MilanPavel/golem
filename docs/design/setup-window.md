@@ -579,4 +579,15 @@ The TUI fills the Service row itself, from the launch agent and `run/last-error`
 
 ### The web UI
 
-The web uses the same navigation table, panels, lines, and `setup.status`, and draws them as a centred dialog ([web.md](web.md#the-setup-window)). It differs in two panels, since [ADR-028](../adr/028-web-gateway.md) keeps both out of the browser. Service is already running, so it only shows `golem daemon install` with a copy button when launchd doesn't keep it, and its row comes from the daemon's launchd check with the version added. Key never takes a key: it shows `golem auth set <provider>` with a copy button and a `Check again` button. Tools needs no such change: it is the same panel, and a token for GitHub may be typed into the page, because [ADR-037](../adr/037-browser-manages-mcp-and-config.md) allows MCP tokens, not model keys. There is no Quit-setup question, and the dialog's close button is the same as Later.
+The web uses the same `setup.status`, rows, lines, guided order, and start rule (`setupAtStart`), but draws them as pages, not as this window ([ADR-039](../adr/039-web-setup-as-pages.md), [web.md](web.md#setup-in-settings)):
+
+- **The overview is Settings → Setup,** a form. Its Tools card opens the H6 offer in place, and links to `/settings/mcp`. Each row is a card with its fix in place: a button, a command to copy, or a link. The navigation table does not apply: a page has Tab and buttons.
+- **Guided mode is the page `/welcome`,** with Engine, Model, Tools, and Ready. Tools is the H panels as one page step, offered only when no MCP server exists. Service is left out, because the page is connected, so the service runs. When launchd doesn't keep it, Ready and the Service card show `golem daemon install` with a copy button.
+- **What opens at the start** is the same decision as the terminal's, but it navigates: a fresh home goes to `/welcome`, a default that is gone goes to `/welcome?step=model`, and a send that fails for no model goes to `/welcome?from=send` with the draft kept. `/setup` opens Settings → Setup.
+
+Two panels differ, since [ADR-028](../adr/028-web-gateway.md) keeps both out of the browser:
+
+- **Service** only shows `golem daemon install` with a copy button. Its row comes from the daemon's launchd check, with the version added.
+- **Key** never takes a key. It shows `golem auth set <provider>` with a copy button and `Check again`.
+
+Tools needs no such change, and a token for GitHub may be typed into the page, because [ADR-037](../adr/037-browser-manages-mcp-and-config.md) allows MCP tokens, not model keys. There is no Quit-setup question: `Later` leaves at any step, and a download keeps running.
