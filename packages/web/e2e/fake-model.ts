@@ -61,6 +61,12 @@ export async function startFakeModel(): Promise<FakeModel> {
 
   async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const raw = await readBody(req);
+    // The daemon lists models with a GET. That is not a chat, so it must not use up a queued reply.
+    if (req.method === "GET") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ object: "list", data: [{ id: "fake", object: "model" }] }));
+      return;
+    }
     try {
       requests.push(JSON.parse(raw));
     } catch {
