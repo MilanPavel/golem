@@ -54,6 +54,14 @@ export const HOSTED_PROVIDERS: readonly HostedProvider[] = [
     env: "DEEPSEEK_API_KEY",
     prefer: [/^deepseek-chat$/i, /^deepseek-v\d/i, /^deepseek-/i],
   },
+  {
+    id: "xai",
+    name: "xAI",
+    blurb: "Grok",
+    console: "console.x.ai",
+    env: "XAI_API_KEY",
+    prefer: [/^grok-\d+(\.\d+)?$/i, /^grok-\d/i, /^grok-/i],
+  },
 ];
 
 export function hostedProvider(id: string): HostedProvider | null {

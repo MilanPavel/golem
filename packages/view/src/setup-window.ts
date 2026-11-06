@@ -494,6 +494,7 @@ const PROVIDER_NAMES: Record<string, string> = {
   openai: "OpenAI",
   google: "Google",
   deepseek: "DeepSeek",
+  xai: "xAI",
   ollama: "Ollama",
 };
 
