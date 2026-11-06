@@ -400,7 +400,7 @@ pre.code {
   right: max(14px, env(safe-area-inset-right, 0px)); bottom: max(14px, env(safe-area-inset-bottom, 0px));
   background: var(--ink); color: var(--bg); border-radius: 14px; padding: 10px; width: 236px;
   font: 12px/1.3 var(--font-ui); box-shadow: 0 12px 32px -10px rgba(0,0,0,.5);
-  display: flex; flex-direction: column; gap: 8px;
+  display: flex; flex-direction: column; gap: 8px; max-height: calc(100vh - 28px); overflow-y: auto;
 }
 .proto.min > :not(.proto-head) { display: none; }
 .proto-head { display: flex; align-items: center; gap: 8px; font: 11px/1 var(--font-pixel); letter-spacing: .03em; }
@@ -438,6 +438,182 @@ pre.code {
   .hint { display: none; }
   .proto { width: calc(100vw - 28px); max-width: 300px; }
 }
+
+/* ---------- 10.15: downloads, new-session choices, setup as pages ---------- */
+.vh { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.btn.sm { padding: 6px 10px; font-size: 13px; }
+.btn.clay { background: var(--clay-ink); border-color: var(--clay-ink); color: var(--bg); }
+.btn.clay:hover { filter: brightness(1.08); border-color: var(--clay-ink); }
+.linkbtn { color: var(--clay-ink); text-decoration: underline; text-underline-offset: 3px; font-weight: 500; padding: 4px 2px; }
+.linkbtn:hover { color: var(--ink); }
+.chip.warn { color: var(--wait); border-color: var(--wait); background: var(--wait-soft); }
+.chip .caret { color: var(--faint); margin-left: 2px; }
+.field {
+  width: 100%; border: 1px solid var(--line-strong); border-radius: var(--r-md); background: var(--bg); color: var(--ink);
+  padding: 8px 10px; font: 13.5px/1.3 var(--font-ui); outline: 0;
+}
+.field:focus { border-color: var(--clay); }
+.field::placeholder { color: var(--faint); }
+
+/* screens that have no drawer; /welcome has no sidebar either */
+@media (min-width: 1101px) { .app.plain { grid-template-columns: var(--sidebar) minmax(0, 1fr) 0; } }
+.app.plain .drawer, .app.plain .topbar .chips, .app.plain #drawer-btn { display: none; }
+.app.bare, .app.bare.plain { grid-template-columns: minmax(0, 1fr); }
+.app.bare .sidebar, .app.bare .drawer, .app.bare .topbar { display: none; }
+
+/* sidebar footer: download row, then Settings */
+.foot-stack { display: flex; flex-direction: column; gap: 6px; }
+.dl-live:empty { display: none; }
+.dl { display: flex; align-items: flex-start; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface); }
+.dl:hover { border-color: var(--line-strong); }
+.dl-main { flex: 1; min-width: 0; text-align: left; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; border-radius: var(--r-md); }
+.dl-name { font-weight: 500; font-size: 13px; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dl-stat { font: 11px/1 var(--font-mono); color: var(--muted); }
+.dl .pull { background: var(--line); }
+.dl.fail { background: var(--wait-soft); border-color: var(--wait); }
+.dl.fail .dl-name { color: var(--wait); white-space: normal; }
+.dl-x { flex: none; width: 28px; height: 28px; margin: 4px 4px 0 0; color: var(--wait); font-size: 16px; line-height: 1; }
+.set-btn { display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 10px; border-radius: var(--r-md); color: var(--muted); font-size: 13px; }
+.set-btn:hover { background: var(--line); color: var(--ink); }
+.set-btn[aria-current="page"] { background: var(--surface); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+
+/* the pull bar */
+.pull { flex: 1; height: 4px; border-radius: 2px; background: var(--sunken); overflow: hidden; display: block; }
+.pull i { display: block; height: 100%; background: var(--clay); border-radius: 2px; }
+
+/* home: two chips under the composer, and the folder menu and browser */
+.chiprow { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; width: 100%; }
+.anchor { position: relative; display: inline-flex; }
+.fmenu, .fpop {
+  position: absolute; left: 0; z-index: 10; text-align: left;
+  background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--r-lg); box-shadow: var(--shadow);
+}
+.fmenu { top: calc(100% + 6px); min-width: 15rem; padding: 6px; display: flex; flex-direction: column; }
+.fmenu button { text-align: left; padding: 8px 10px; border-radius: var(--r-sm); display: flex; gap: 8px; align-items: center; }
+.fmenu button:hover { background: var(--sunken); }
+.fmenu .sep { height: 1px; background: var(--line); margin: 4px 0; }
+.fpop { bottom: calc(100% + 10px); width: min(25rem, calc(100vw - 32px)); overflow: hidden; }
+.crumbs { display: flex; align-items: center; gap: 4px; padding: 12px 14px 8px; font: 500 12.5px/1 var(--font-mono); color: var(--faint); flex-wrap: wrap; }
+.crumbs button { color: var(--muted); padding: 3px 5px; border-radius: 4px; font: inherit; }
+.crumbs button:hover { background: var(--sunken); color: var(--ink); }
+.crumbs button[aria-current] { color: var(--ink); }
+.fpop .field { margin: 0 14px; width: calc(100% - 28px); }
+.flist { list-style: none; margin: 8px 0 0; padding: 0 8px; display: flex; flex-direction: column; gap: 1px; max-height: 14rem; overflow-y: auto; }
+.frow { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border-radius: var(--r-sm); text-align: left; color: var(--muted); }
+.frow:hover { background: var(--sunken); color: var(--ink); }
+.frow.active { background: var(--sunken); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line-strong); }
+.frow .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.badge { margin-left: auto; font: 500 11px/1 var(--font-mono); color: var(--clay-ink); background: var(--clay-soft); padding: 3px 6px; border-radius: 999px; }
+.fpop-foot { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; padding: 12px 14px; margin-top: 8px; border-top: 1px solid var(--line); }
+.keys { padding: 0 14px 12px; margin: 0; font: 11px/1.4 var(--font-mono); color: var(--faint); }
+@media (max-width: 760px) {
+  .fpop { position: fixed; left: 16px; right: 16px; top: 64px; bottom: auto; width: auto; }
+}
+
+/* model dialog, and the same list inline on /welcome */
+.dialog { width: min(34rem, 100%); max-height: calc(100vh - 12vh - 32px); display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--r-lg); box-shadow: var(--shadow); overflow: hidden; }
+.dialog-head { display: flex; align-items: flex-start; gap: 10px; padding: 16px 16px 10px 18px; }
+.dialog-head h2 { margin: 0; font: 600 15px/1.35 var(--font-ui); }
+.dialog-head p { margin: 2px 0 0; color: var(--muted); font: 12.5px/1.4 var(--font-mono); overflow-wrap: anywhere; }
+.dialog-head .icon-btn { margin-left: auto; font-size: 18px; flex: none; }
+.dialog-foot { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 16px 14px; border-top: 1px solid var(--line); align-items: center; }
+.dialog-foot .sp { flex: 1; }
+.mlist { list-style: none; margin: 0; padding: 6px; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; min-height: 0; }
+.mlist.inline { width: 100%; text-align: left; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); }
+.mrow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; align-items: center; border-radius: var(--r-md); padding: 2px 6px 2px 2px; }
+.mrow.on { background: var(--sunken); box-shadow: inset 0 0 0 1px var(--line-strong); }
+.mrow.on .pull { background: var(--line); }
+.mpick { text-align: left; padding: 7px 8px; border-radius: var(--r-sm); min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.mname { font-weight: 500; }
+.mid { font: 12px/1.4 var(--font-mono); color: var(--muted); overflow-wrap: anywhere; }
+.mbar { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; padding: 0 8px 8px; font: 12px/1 var(--font-mono); color: var(--muted); }
+.tag { font: 500 11px/1 var(--font-mono); padding: 3px 6px; border-radius: 999px; background: var(--clay-soft); color: var(--clay-ink); margin-left: 6px; vertical-align: 1px; }
+
+/* Settings */
+.settings { max-width: 56rem; margin: 0 auto; padding: 28px max(20px, env(safe-area-inset-right, 0px)) 32px max(20px, env(safe-area-inset-left, 0px)); display: grid; grid-template-columns: 10rem minmax(0, 1fr); gap: 28px; }
+.snav { display: flex; flex-direction: column; gap: 2px; align-self: start; }
+.snav button { text-align: left; padding: 8px 10px; border-radius: var(--r-md); color: var(--muted); }
+.snav button:hover { background: var(--sunken); color: var(--ink); }
+.snav button[aria-current="page"] { background: var(--surface); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+.spanel { min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+.spanel h2 { margin: 0; font: 400 24px/1.25 var(--font-prose); letter-spacing: -.01em; }
+.spanel .lede { margin: -6px 0 0; color: var(--muted); }
+.cards { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.scard { display: flex; flex-wrap: wrap; gap: 10px 12px; align-items: flex-start; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); padding: 14px 16px; }
+.scard.warn { border-color: var(--wait); }
+.scard.fail { border-color: var(--deny); }
+.mark { flex: none; width: 24px; height: 24px; border-radius: 6px; display: grid; place-items: center; font: 600 13px/1 var(--font-mono); }
+.mark.ok { background: var(--allow-soft); color: var(--allow); }
+.mark.warn { background: var(--wait-soft); color: var(--wait); }
+.mark.fail { background: var(--deny-soft); color: var(--deny); }
+.sbody { flex: 1 1 12rem; min-width: 0; }
+.sname { font-weight: 600; }
+.sdetail { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+.scard.warn .sdetail { color: var(--wait); }
+.scard.fail .sdetail { color: var(--deny); }
+.fix { margin-left: auto; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; min-width: 0; max-width: 100%; }
+.fix .cmd { min-width: 0; padding: 7px 12px; }
+.sub { flex: 1 0 100%; padding-left: 36px; min-width: 0; }
+details.out summary { cursor: pointer; font: 500 12px/1.4 var(--font-mono); color: var(--muted); }
+details.out .tablet { margin: 6px 0 0; }
+.sextra { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px; border: 1px dashed var(--line-strong); border-radius: var(--r-md); }
+.sextra .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; min-width: 0; }
+.sextra .row > b { font-weight: 600; }
+.sextra select.field { width: auto; min-width: 9rem; }
+.sextra .cmd { min-width: 0; padding: 7px 12px; }
+.themes { display: flex; flex-wrap: wrap; gap: 8px; }
+.themes .btn[aria-pressed="true"] { border-color: var(--clay); box-shadow: inset 0 0 0 1px var(--clay); }
+@media (max-width: 760px) {
+  .settings { grid-template-columns: minmax(0, 1fr); gap: 14px; padding-top: 16px; }
+  .snav { flex-direction: row; }
+  .fix { margin-left: 36px; max-width: calc(100% - 36px); justify-content: flex-start; }
+  .sub { padding-left: 0; }
+}
+
+/* /welcome */
+.later { position: absolute; top: 14px; right: max(18px, env(safe-area-inset-right, 0px)); z-index: 2; }
+.steps { list-style: none; margin: 0; padding: 0; display: flex; align-items: flex-start; justify-content: center; gap: 8px; }
+.steps li.arrow { color: var(--faint); padding-top: 2px; }
+.steps li.step { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 5rem; padding-bottom: 6px; border-bottom: 2px solid transparent; }
+.steps .nm { font-weight: 600; }
+.steps .wd { font: 11px/1 var(--font-mono); color: var(--faint); }
+.steps li.done .wd { color: var(--allow); }
+.steps li.cur { border-bottom-color: var(--clay); }
+.steps li.cur .wd { color: var(--clay-ink); }
+.steps li.todo .nm { color: var(--faint); }
+.choices { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; text-align: left; }
+.choice { border: 1px solid var(--line-strong); background: var(--surface); border-radius: var(--r-md); padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; text-align: left; }
+.choice b { font-weight: 600; }
+.choice span { color: var(--muted); font-size: 13px; }
+.choice[aria-pressed="true"] { border-color: var(--clay); box-shadow: inset 0 0 0 1px var(--clay); }
+.stage .scard { width: 100%; text-align: left; }
+.stage .note { display: flex; flex-direction: column; align-items: center; gap: 10px; color: var(--muted); }
+.wel-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+/* Tools step, and the same checklist inline in Settings */
+.tools { width: 100%; display: flex; flex-direction: column; gap: 14px; text-align: left; }
+.tlist { display: flex; flex-direction: column; gap: 6px; }
+.trow { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface); cursor: pointer; min-width: 0; }
+.trow input { flex: none; margin: 3px 0 0; width: 16px; height: 16px; accent-color: var(--clay); }
+.trow span { min-width: 0; display: flex; flex-wrap: wrap; gap: 0 10px; }
+.trow b { font-weight: 600; }
+.trow em { font-style: normal; font-family: var(--font-ui); color: var(--muted); font-size: 13px; }
+.ttoken { display: flex; flex-direction: column; gap: 6px; margin: 0 0 2px 26px; padding: 10px 12px; border: 1px dashed var(--line-strong); border-radius: var(--r-md); min-width: 0; }
+.ttoken label { font-weight: 600; }
+.ttoken small { color: var(--muted); font-size: 12.5px; overflow-wrap: anywhere; }
+.tbtns { display: flex; flex-wrap: wrap; gap: 10px; }
+.stage .tools h2, .stage .tools p { text-align: left; }
+.sprog { display: flex; align-items: center; gap: 10px; margin-top: 6px; font: 12px/1 var(--font-mono); color: var(--muted); }
+.mark.run { background: var(--clay-soft); color: var(--clay-ink); }
+.mark.run i { width: 8px; height: 8px; background: var(--clay); border-radius: 2px; animation: pulse 1.4s infinite; }
+.mark.wait { background: var(--sunken); color: var(--faint); }
+@media (prefers-reduced-motion: reduce) { .mark.run i { animation: pulse 1.4s infinite; } }
+@media (max-width: 760px) {
+  .choices { grid-template-columns: minmax(0, 1fr); }
+  .steps { gap: 2px; }
+  .steps li.step { min-width: 0; padding: 0 6px 6px; text-align: center; }
+  .steps .wd { overflow-wrap: anywhere; }
+  .stage { min-width: 0; }
+}
 </style>
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -452,6 +628,7 @@ pre.code {
     <symbol id="i-seal" viewBox="0 0 16 16"><path d="M8 1.8 13.2 4v4.1c0 3-2.2 5.2-5.2 6.1-3-.9-5.2-3.1-5.2-6.1V4z" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linejoin="round"/><path d="m5.6 8 1.7 1.7L10.6 6.4" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-folder" viewBox="0 0 16 16"><path d="M2 4.5c0-.6.4-1 1-1h3l1.5 1.5H13c.6 0 1 .4 1 1V12c0 .6-.4 1-1 1H3c-.6 0-1-.4-1-1z" stroke="currentColor" stroke-width="1.3" fill="none"/></symbol>
     <symbol id="i-copy" viewBox="0 0 16 16"><rect x="5" y="5" width="8.5" height="8.5" rx="1.5" stroke="currentColor" stroke-width="1.3" fill="none"/><path d="M3 10.5V3.8C3 3.4 3.4 3 3.8 3h6.7" stroke="currentColor" stroke-width="1.3" fill="none"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 16 16"><path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="5.5" cy="4.5" r="1.6" fill="var(--sunken)" stroke="currentColor" stroke-width="1.3"/><circle cx="10.5" cy="8" r="1.6" fill="var(--sunken)" stroke="currentColor" stroke-width="1.3"/><circle cx="6.5" cy="11.5" r="1.6" fill="var(--sunken)" stroke="currentColor" stroke-width="1.3"/></symbol>
   </defs>
 </svg>
 
@@ -492,6 +669,10 @@ pre.code {
       </section>
     </nav>
 
+    <div class="foot-stack">
+      <div class="dl-live" id="dl-live" aria-live="polite"></div>
+      <button class="set-btn" type="button" id="settings-btn" data-go="setup"><svg width="16" height="16"><use href="#i-sliders"/></svg>Settings</button>
+    </div>
     <div class="sidebar-foot">
       <span class="conn"><i></i>connected</span><span>· v0.4.0 · up 3h</span>
       <button class="icon-btn" type="button" id="theme-btn" aria-label="Switch theme"><svg><use href="#i-sun"/></svg></button>
@@ -620,6 +801,103 @@ buffer += decoder.decode(chunk, { stream: <span class="k">true</span> });</pre>
       </div>
     </div>
 
+    <!-- home: the new-session screen, with its two chips -->
+    <div class="stage-wrap" id="view-home" hidden>
+      <div class="center-stage" aria-hidden="true"></div>
+      <div class="stage-content">
+        <div class="stage">
+          <svg class="golem" data-golem width="90" height="60" aria-hidden="true"></svg>
+          <h2>What should golem work on?</h2>
+          <div class="composer">
+            <textarea id="home-input" rows="2" placeholder='Try "explain this repo"' aria-label="Message"></textarea>
+            <div class="composer-row">
+              <span class="sp"></span>
+              <button class="send" type="button" aria-label="Send"><svg><use href="#i-up"/></svg></button>
+            </div>
+          </div>
+          <div class="chiprow">
+            <span class="anchor">
+              <button class="chip" type="button" id="folder-chip" aria-haspopup="true" aria-expanded="false"><svg width="12" height="12"><use href="#i-folder"/></svg>milan.pavel<span class="caret" aria-hidden="true">⌄</span></button>
+              <div class="fmenu" id="fmenu" hidden>
+                <button type="button"><svg width="12" height="12"><use href="#i-folder"/></svg>~/repos/golem</button>
+                <button type="button"><svg width="12" height="12"><use href="#i-folder"/></svg>~/notes</button>
+                <span class="sep"></span>
+                <button type="button" id="fchoose">Choose a folder…</button>
+              </div>
+              <div class="fpop" id="fpop" role="dialog" aria-label="Choose a folder" hidden>
+                <nav class="crumbs" aria-label="Path"><button type="button">~</button><span aria-hidden="true">/</span><button type="button" aria-current="location">repos</button></nav>
+                <input class="field" id="ffilter" placeholder="Filter, or type a path" aria-label="Filter, or type a path" autocomplete="off">
+                <ul class="flist" id="flist">
+                  <li><button class="frow active" type="button"><svg width="14" height="14"><use href="#i-folder"/></svg><span class="nm">golem</span><span class="badge">git</span></button></li>
+                  <li><button class="frow" type="button"><svg width="14" height="14"><use href="#i-folder"/></svg><span class="nm">golem-plan</span><span class="badge">git</span></button></li>
+                  <li><button class="frow" type="button"><svg width="14" height="14"><use href="#i-folder"/></svg><span class="nm">notes</span></button></li>
+                  <li><button class="frow" type="button"><svg width="14" height="14"><use href="#i-folder"/></svg><span class="nm">scratch</span></button></li>
+                </ul>
+                <div class="fpop-foot">
+                  <button class="btn" type="button" id="fcancel">Cancel</button>
+                  <button class="btn primary clay" type="button" id="fuse">Use this folder</button>
+                </div>
+                <p class="keys">↑↓ move · → open · ← up · Esc close</p>
+              </div>
+            </span>
+            <button class="chip" type="button" id="model-chip" data-open-models><span aria-hidden="true">◇</span><span id="model-chip-text">qwen3.5:4b · default</span><span class="caret" aria-hidden="true">⌄</span></button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings -->
+    <div class="scroll" id="view-settings" hidden>
+      <div class="settings">
+        <nav class="snav" aria-label="Settings sections">
+          <button type="button" aria-current="page" data-sec="setup">Setup</button>
+          <button type="button" data-sec="appearance">Appearance</button>
+          <button type="button" data-sec="mcp">MCP servers</button>
+          <button type="button" data-sec="config">Config file</button>
+        </nav>
+        <section class="spanel" data-secpanel="setup" aria-label="Setup">
+          <h2>Setup</h2>
+          <p class="lede">What golem needs to work, and how to fix what is missing.</p>
+          <ul class="cards" id="setup-cards"></ul>
+          <div class="sextra">
+            <div class="row">
+              <b>Add an API key</b>
+              <select class="field" id="key-provider" aria-label="Provider"><option>openai</option><option>anthropic</option><option>xai</option><option>deepseek</option></select>
+              <span class="cmd"><code id="key-cmd">golem auth set openai</code></span>
+              <button class="btn sm" type="button" id="key-copy" data-copy="golem auth set openai">Copy</button>
+            </div>
+            <div class="row"><button class="linkbtn" type="button" data-go="w1">Run setup again</button></div>
+          </div>
+        </section>
+        <section class="spanel" data-secpanel="appearance" aria-label="Appearance" hidden>
+          <h2>Appearance</h2>
+          <p class="lede">Match system, Light, or Dark.</p>
+          <div class="themes" data-seg="theme">
+            <button class="btn" type="button" aria-pressed="true" data-v="system">Match system</button>
+            <button class="btn" type="button" aria-pressed="false" data-v="light">Light</button>
+            <button class="btn" type="button" aria-pressed="false" data-v="dark">Dark</button>
+          </div>
+        </section>
+        <section class="spanel" data-secpanel="mcp" aria-label="MCP servers" hidden>
+          <h2>MCP servers</h2>
+          <p class="lede">See <a class="linkbtn" href="mcp-prototype.html">mcp-prototype.html</a>.</p>
+        </section>
+        <section class="spanel" data-secpanel="config" aria-label="Config file" hidden>
+          <h2>Config file</h2>
+          <p class="lede">See <a class="linkbtn" href="mcp-prototype.html">mcp-prototype.html</a>.</p>
+        </section>
+      </div>
+    </div>
+
+    <!-- /welcome: first run, no sidebar -->
+    <div class="stage-wrap" id="view-welcome" hidden>
+      <div class="center-stage" aria-hidden="true"></div>
+      <button class="linkbtn later" type="button" data-go="home">Later</button>
+      <div class="stage-content">
+        <div class="stage" id="welcome-stage"></div>
+      </div>
+    </div>
+
     <!-- full-screen states -->
     <div class="stage-wrap" id="view-state" hidden>
       <div class="stage-content">
@@ -692,6 +970,23 @@ buffer += decoder.decode(chunk, { stream: <span class="k">true</span> });</pre>
   </div>
 </div>
 
+<!-- model dialog -->
+<div class="overlay" id="models" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="models-title">
+    <header class="dialog-head">
+      <div><h2 id="models-title">Models</h2><p id="models-sub">New sessions use ollama/qwen3.5:4b.</p></div>
+      <button class="icon-btn" type="button" id="models-x" aria-label="Close"><span aria-hidden="true">×</span></button>
+    </header>
+    <ul class="mlist" id="models-list"></ul>
+    <footer class="dialog-foot">
+      <button class="btn deny" type="button">Remove</button>
+      <span class="sp"></span>
+      <button class="btn" type="button" id="models-default">Make default</button>
+      <button class="btn primary" type="button" id="models-primary">Use for the new session</button>
+    </footer>
+  </div>
+</div>
+
 <!-- prototype controls -->
 <div class="proto" id="proto" data-state="thinking">
   <div class="proto-head"><svg class="golem" data-golem width="15" height="10" aria-hidden="true"></svg>prototype<button type="button" id="proto-min" aria-label="Hide prototype controls">hide</button></div>
@@ -702,6 +997,33 @@ buffer += decoder.decode(chunk, { stream: <span class="k">true</span> });</pre>
     <button type="button" aria-pressed="false" data-v="unauthorized">Unauthorized</button>
     <button type="button" aria-pressed="false" data-v="mismatch">Old daemon</button>
     <button type="button" aria-pressed="false" data-v="down">Daemon down</button>
+  </div>
+  <label>New session</label>
+  <div class="seg" data-seg="screen">
+    <button type="button" aria-pressed="false" data-v="home">Home</button>
+    <button type="button" aria-pressed="false" data-v="nodef">No default</button>
+    <button type="button" aria-pressed="false" data-v="folders">Folders</button>
+    <button type="button" aria-pressed="false" data-v="models">Model dialog</button>
+  </div>
+  <label>Settings · Setup</label>
+  <div class="seg" data-seg="screen">
+    <button type="button" aria-pressed="false" data-v="setup">All set</button>
+    <button type="button" aria-pressed="false" data-v="problems">Problems</button>
+  </div>
+  <label>/welcome</label>
+  <div class="seg" data-seg="screen">
+    <button type="button" aria-pressed="false" data-v="w1">Engine</button>
+    <button type="button" aria-pressed="false" data-v="w2">Model</button>
+    <button type="button" aria-pressed="false" data-v="w3">Tools</button>
+    <button type="button" aria-pressed="false" data-v="w3b">Tools: adding</button>
+    <button type="button" aria-pressed="false" data-v="w4">Ready</button>
+  </div>
+  <label>Sidebar downloads</label>
+  <div class="seg" data-seg="dl">
+    <button type="button" aria-pressed="false" data-v="none">None</button>
+    <button type="button" aria-pressed="true" data-v="one">One</button>
+    <button type="button" aria-pressed="false" data-v="two">Two</button>
+    <button type="button" aria-pressed="false" data-v="failed">Failed</button>
   </div>
   <label>Golem's state</label>
   <div class="seg" data-seg="state">
@@ -795,12 +1117,27 @@ buffer += decoder.decode(chunk, { stream: <span class="k">true</span> });</pre>
       cmd: "golem daemon start", eye: "disconnected",
     },
   };
+  const SCREENS = {
+    home: { view: "home" }, nodef: { view: "home", nodef: true }, folders: { view: "home", pop: true }, models: { view: "home", dialog: true },
+    setup: { view: "settings", rows: "ok" }, problems: { view: "settings", rows: "issues" },
+    w1: { view: "welcome", step: 1 }, w2: { view: "welcome", step: 2 }, w3: { view: "welcome", step: 3 }, w3b: { view: "welcome", step: 3, adding: true }, w4: { view: "welcome", step: 4 },
+  };
+  let current = "chat";
   function setScreen(v) {
-    $("#view-chat").hidden = v !== "chat";
-    $("#view-empty").hidden = v !== "empty";
+    current = v;
+    const sc = SCREENS[v], view = sc ? sc.view : v;
+    $("#view-chat").hidden = view !== "chat";
+    $("#view-empty").hidden = view !== "empty";
+    $("#view-home").hidden = view !== "home";
+    $("#view-settings").hidden = view !== "settings";
+    $("#view-welcome").hidden = view !== "welcome";
     $("#view-state").hidden = !STATES[v];
-    $("#dock").hidden = v !== "chat";
-    $("#title").textContent = v === "empty" ? "New session" : (STATES[v] ? "golem" : "UTF-8 split in the socket client");
+    $("#dock").hidden = view !== "chat";
+    app.classList.toggle("plain", ["home", "settings", "welcome"].includes(view));
+    app.classList.toggle("bare", view === "welcome");
+    $("#settings-btn").toggleAttribute("aria-current", view === "settings");
+    closeFloat();
+    $("#title").textContent = view === "empty" || view === "home" ? "New session" : view === "settings" ? "Settings" : (STATES[v] ? "golem" : "UTF-8 split in the socket client");
     if (STATES[v]) {
       const s = STATES[v];
       $("#state-card").innerHTML =
@@ -816,8 +1153,17 @@ buffer += decoder.decode(chunk, { stream: <span class="k">true</span> });</pre>
         r.setAttribute("class", c === "d" ? "e" : "b"); svg.appendChild(r);
       }));
       setState(s.eye);
-    } else if (v === "empty") setState("idle");
+    } else if (view !== "chat") setState("idle");
     else setState(app.dataset.state === "disconnected" ? "waiting" : app.dataset.state);
+    if (view === "home") {
+      const chip = $("#model-chip");
+      chip.classList.toggle("warn", !!sc.nodef);
+      $("#model-chip-text").textContent = sc.nodef ? "Choose a model" : "qwen3.5:4b · default";
+    }
+    if (view === "settings") renderSetup(sc.rows);
+    if (view === "welcome") renderWelcome(sc.step, sc.adding);
+    if (sc && sc.pop) openPop();
+    if (sc && sc.dialog) openModels("new");
     pressed("screen", v);
   }
 
@@ -833,6 +1179,7 @@ buffer += decoder.decode(chunk, { stream: <span class="k">true</span> });</pre>
   $$("[data-seg] button").forEach(b => b.addEventListener("click", () => {
     const seg = b.parentElement.dataset.seg;
     if (seg === "screen") setScreen(b.dataset.v);
+    if (seg === "dl") setDl(b.dataset.v);
     if (seg === "state") setState(b.dataset.v);
     if (seg === "theme") setTheme(b.dataset.v);
     if (seg === "wordmark") { document.documentElement.dataset.wordmark = b.dataset.v; pressed("wordmark", b.dataset.v); }
@@ -978,9 +1325,9 @@ buffer += decoder.decode(chunk, { stream: <span class="k">true</span> });</pre>
   });
   document.addEventListener("keydown", e => {
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); $("#palette").hidden ? openPalette() : closePalette(); }
-    if (e.key === "Escape") closePalette();
+    if (e.key === "Escape") { closePalette(); closeFloat(); }
     const typing = e.target.closest("textarea, input");
-    if (!typing && $("#palette").hidden && !$("#shem").classList.contains("resolved") && !$("#view-chat").hidden) {
+    if (!typing && $("#palette").hidden && $("#models").hidden && !$("#shem").classList.contains("resolved") && !$("#view-chat").hidden) {
       const map = { Enter: "Allowed once", s: "Allowed for this session", w: "Always allowed: a rule was written", d: "Denied" };
       if (map[e.key]) { e.preventDefault(); answer(map[e.key]); }
     }
@@ -996,10 +1343,221 @@ buffer += decoder.decode(chunk, { stream: <span class="k">true</span> });</pre>
   /* Composer grows with its text */
   $$("textarea").forEach(t => t.addEventListener("input", () => { t.style.height = "auto"; t.style.height = Math.min(t.scrollHeight, innerHeight * .4) + "px"; }));
 
+
+  /* ---------- 10.15 ---------- */
+  const pull = p => `<span class="pull" role="progressbar" aria-label="Download progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${p}"><i style="width:${p}%"></i></span>`;
+  const cmdBox = c => `<span class="cmd"><code>${c}</code></span><button class="btn sm" type="button" data-copy="${c}">Copy</button>`;
+
+  /* Sidebar download row: a button that opens the model dialog, and a separate dismiss for a failure */
+  const DL = {
+    none: "",
+    one: `<div class="dl"><button class="dl-main" type="button" data-open-models><span class="dl-name"><span aria-hidden="true">↓</span> Qwen3 Coder 30B</span>${pull(12)}<span class="dl-stat">12% · 38 min</span></button></div>`,
+    two: `<div class="dl"><button class="dl-main" type="button" data-open-models><span class="dl-name"><span aria-hidden="true">↓</span> 2 downloads</span>${pull(8)}<span class="dl-stat">8% · 41 min</span></button></div>`,
+    failed: `<div class="dl fail"><button class="dl-main" type="button" data-open-models><span class="dl-name">Download of Gemma 4 26B failed</span></button><button class="icon-btn dl-x" type="button" data-dl="none" aria-label="Dismiss"><span aria-hidden="true">×</span></button></div>`,
+  };
+  function setDl(k) { $("#dl-live").innerHTML = DL[k]; pressed("dl", k); }
+
+  /* Model dialog: the list is shared with /welcome */
+  const MODELS = [
+    { label: "Qwen3.5 4B", id: "ollama/qwen3.5:4b", size: "2.6 GB", s: "ready", def: true },
+    { label: "Qwen3 Coder 30B", id: "ollama/qwen3-coder:30b", size: "18 GB", s: "pull", pct: 12, eta: "38 min" },
+    { label: "Gemma 4 26B", id: "ollama/gemma4:26b", size: "16 GB", s: "none" },
+  ];
+  const FIRST = [
+    { label: "Qwen3.5 4B", id: "ollama/qwen3.5:4b", size: "2.6 GB", s: "pull", pct: 34, eta: "2 min" },
+    { label: "Qwen3 Coder 30B", id: "ollama/qwen3-coder:30b", size: "18 GB", s: "none" },
+    { label: "Gemma 4 26B", id: "ollama/gemma4:26b", size: "16 GB", s: "none" },
+  ];
+  const WORD = { ready: "ready", pull: "downloading", none: "not downloaded" };
+  const modelRows = (list, sel) => list.map(m => `<li class="mrow${m.id === sel ? " on" : ""}">
+      <button class="mpick" type="button" aria-pressed="${m.id === sel}"><span class="mname">${m.label}${m.def ? '<span class="tag">default</span>' : ""}</span><span class="mid">${m.id} · ${m.size} · ${WORD[m.s]}</span></button>
+      ${m.s === "pull" ? '<button class="btn sm" type="button">Stop</button>' : m.s === "none" ? '<button class="btn sm" type="button">Download</button>' : ""}
+      ${m.s === "pull" ? `<div class="mbar">${pull(m.pct)}<span>${m.pct}% · ${m.eta}</span></div>` : ""}
+    </li>`).join("");
+  const MODES = {
+    new: ["New sessions use ollama/qwen3.5:4b.", "Use for the new session"],
+    session: ["This session uses ollama/qwen3-coder:30b.", "Use for this session"],
+    default: ["New sessions use ollama/qwen3.5:4b.", "Make default"],
+  };
+  function openModels(mode) {
+    const m = MODES[mode];
+    $("#models-sub").textContent = mode === "new" && current === "nodef" ? "There is no default model yet." : m[0];
+    $("#models-primary").textContent = m[1];
+    $("#models-default").hidden = mode === "default";
+    $("#models-list").innerHTML = modelRows(MODELS, mode === "session" ? "ollama/qwen3-coder:30b" : "ollama/qwen3.5:4b");
+    $("#models").hidden = false;
+    $("#models-primary").focus();
+  }
+  const closeModels = () => { $("#models").hidden = true; };
+  $("#models").addEventListener("click", e => { if (e.target.id === "models") closeModels(); });
+  $("#models-x").addEventListener("click", closeModels);
+  $("#models-primary").addEventListener("click", closeModels);
+  $("#models-list").addEventListener("click", e => {
+    const b = e.target.closest(".mpick"); if (!b) return;
+    $$("#models-list .mrow").forEach(r => { r.classList.toggle("on", r.contains(b)); r.querySelector(".mpick").setAttribute("aria-pressed", String(r.contains(b))); });
+  });
+
+  /* Folder chip, its menu, and the folder browser */
+  const closeFloat = () => { $("#fmenu").hidden = true; $("#fpop").hidden = true; $("#folder-chip").setAttribute("aria-expanded", "false"); closeModels(); };
+  function openPop() { $("#fmenu").hidden = true; $("#fpop").hidden = false; $("#folder-chip").setAttribute("aria-expanded", "true"); }
+  $("#folder-chip").addEventListener("click", () => {
+    const open = !$("#fmenu").hidden || !$("#fpop").hidden;
+    closeFloat();
+    if (!open) { $("#fmenu").hidden = false; $("#folder-chip").setAttribute("aria-expanded", "true"); }
+  });
+  $("#fchoose").addEventListener("click", openPop);
+  $("#fcancel").addEventListener("click", closeFloat);
+  $("#fuse").addEventListener("click", closeFloat);
+  $("#flist").addEventListener("click", e => {
+    const b = e.target.closest(".frow"); if (!b) return;
+    $$("#flist .frow").forEach(x => x.classList.toggle("active", x === b));
+  });
+  $("#ffilter").addEventListener("input", e => {
+    const q = e.target.value.toLowerCase();
+    $$("#flist li").forEach(li => { li.hidden = !li.textContent.toLowerCase().includes(q); });
+  });
+  $("#ffilter").addEventListener("keydown", e => {
+    const rows = $$("#flist li:not([hidden]) .frow"); if (!rows.length) return;
+    let i = rows.findIndex(r => r.classList.contains("active"));
+    if (e.key === "ArrowDown") i = (i + 1) % rows.length;
+    else if (e.key === "ArrowUp") i = (i - 1 + rows.length) % rows.length;
+    else return;
+    e.preventDefault();
+    $$("#flist .frow").forEach(x => x.classList.toggle("active", x === rows[i]));
+  });
+  document.addEventListener("click", e => {
+    if (!e.target.closest(".anchor")) { $("#fmenu").hidden = true; if (current !== "folders") $("#fpop").hidden = true; }
+  });
+
+  /* Settings → Setup: one card per row */
+  const MARKS = { ok: ["✓", "done"], warn: ["!", "needs attention"], fail: ["×", "failed"] };
+  const ROWS = {
+    ok: [
+      { k: "ok", n: "Service", d: "running · v0.4.0 · kept at login" },
+      { k: "ok", n: "Engine", d: "Ollama · running, 2 models" },
+      { k: "ok", n: "Model", d: "new chats start on ollama/qwen3.5:4b", fix: '<button class="btn sm" type="button" data-open-models data-mode="default">Change…</button>' },
+      { k: "ok", n: "Tools", d: "3 MCP servers · 2 on demand", fix: '<a class="linkbtn" href="mcp-prototype.html">Manage</a>' },
+      { k: "ok", n: "Disk", d: "150.2 GB free" },
+    ],
+    issues: [
+      { k: "warn", n: "Service", d: "not kept at login", fix: cmdBox("golem daemon install") + '<button class="btn sm" type="button">Check again</button>' },
+      { k: "fail", n: "Engine", d: "Ollama is not installed", fix: '<button class="btn primary sm" type="button">Install Ollama</button>',
+        sub: '<details class="out" open><summary>Output</summary><pre class="tablet">==> Fetching ollama\n==> Downloading ollama 0.12.6\n==> Pouring ollama bottle</pre></details>' },
+      { k: "ok", n: "Model", d: "new chats start on ollama/qwen3.5:4b", fix: '<button class="btn sm" type="button" data-open-models data-mode="default">Change…</button>' },
+      { k: "warn", n: "Key", d: "openai needs a key", fix: cmdBox("golem auth set openai") + '<button class="btn sm" type="button">Check again</button>' },
+      { k: "warn", n: "Tools", d: "no tools yet", fix: '<button class="btn primary sm" type="button" data-add-tools>Add tools</button>' },
+      { k: "ok", n: "Disk", d: "150.2 GB free" },
+    ],
+  };
+  function renderSetup(which) {
+    $("#setup-cards").innerHTML = ROWS[which].map(r => `<li class="scard ${r.k}">
+      <span class="mark ${r.k}"><span aria-hidden="true">${MARKS[r.k][0]}</span><span class="vh">${MARKS[r.k][1]}</span></span>
+      <div class="sbody"><div class="sname">${r.n}</div><div class="sdetail">${r.d}</div></div>
+      ${r.fix ? `<div class="fix">${r.fix}</div>` : ""}
+      ${r.sub ? `<div class="sub">${r.sub}</div>` : ""}
+    </li>`).join("");
+  }
+  $$("[data-sec]").forEach(b => b.addEventListener("click", () => {
+    $$("[data-sec]").forEach(x => x.toggleAttribute("aria-current", x === b));
+    $$("[data-secpanel]").forEach(p => { p.hidden = p.dataset.secpanel !== b.dataset.sec; });
+  }));
+  $("#key-provider").addEventListener("change", e => {
+    const c = "golem auth set " + e.target.value;
+    $("#key-cmd").textContent = c; $("#key-copy").dataset.copy = c;
+  });
+
+  /* Tools: the starter checklist, on /welcome and inline in Settings */
+  const STARTERS = [
+    ["Fetch", "read any web page", true], ["Context7", "up-to-date library docs", true],
+    ["Playwright", "browse and test web pages", true], ["GitHub", "repos, issues, pull requests", true],
+  ];
+  function toolsChecklist(token) {
+    const n = STARTERS.filter(x => x[2] && (token || x[0] !== "GitHub")).length;
+    const rows = STARTERS.map(([nm, d, on]) => {
+      const gh = nm === "GitHub" && token;
+      return `<label class="trow"><input type="checkbox" ${on && (token || nm !== "GitHub") ? "checked" : ""} data-tool="${nm}"><span><b>${nm}</b><em>${d}</em></span></label>` +
+        (gh ? `<div class="ttoken" data-token><label for="gh-token">GitHub token</label><input class="field" id="gh-token" type="password" autocomplete="off">
+          <small>Make one at github.com/settings/personal-access-tokens/new</small><small>Stored in your macOS Keychain, never in a file.</small></div>` : "");
+    }).join("");
+    return `<div class="tlist" role="group" aria-label="Starter tools">${rows}</div>
+      <div class="tbtns"><button class="btn primary" type="button" data-add-count ${token ? 'data-go="w3b"' : ""}>Add ${n}</button><button class="btn" type="button" ${token ? 'data-go="w4"' : "data-skip-tools"}>Skip</button></div>`;
+  }
+  const trow = (cls, mk, mkword, name, detail, extra) => `<li class="scard ${cls}"><span class="mark ${mk}"><span aria-hidden="true">${mkword[0]}</span><span class="vh">${mkword[1]}</span></span>
+    <div class="sbody"><div class="sname">${name}</div><div class="sdetail">${detail}</div>${extra || ""}</div></li>`;
+  function toolsAdding() {
+    return `<h2>Adding 4 tools</h2>
+      <ul class="cards" style="width:100%">
+        ${trow("ok", "ok", ["✓", "done"], "Fetch", "added · 1 tool · on demand")}
+        ${trow("", "run", ["", "working"], "Node", "installing · brew install node", `<div class="sprog"><span class="pull" role="progressbar" aria-label="Node download" aria-valuemin="0" aria-valuemax="98" aria-valuenow="41"><i style="width:42%"></i></span><span>41 / 98 MB</span></div>`).replace('<span aria-hidden="true"></span>', '<i aria-hidden="true"></i>')}
+        ${trow("", "wait", ["○", "waiting"], "Context7", "waiting")}
+        ${trow("fail", "fail", ["×", "failed"], "GitHub", "the token was refused", `<div class="tbtns" style="margin-top:8px"><button class="btn sm" type="button">Try again</button><button class="btn sm" type="button" data-go="w4">Skip</button></div>`)}
+      </ul>`;
+  }
+
+  /* /welcome: Engine, Model, Tools, Ready */
+  function renderWelcome(step, adding) {
+    const words = ["Engine", "Model", "Tools", "Ready"];
+    const st = i => i + 1 < step ? ["done", "done"] : i + 1 === step ? ["cur", "current step"] : ["todo", "to do"];
+    const stepper = `<ol class="steps" aria-label="Setup steps">${words.map((w, i) => {
+      const [c, t] = st(i);
+      return `${i ? '<li class="arrow" aria-hidden="true">→</li>' : ""}<li class="step ${c}"${c === "cur" ? ' aria-current="step"' : ""}><span class="nm">${w}</span><span class="wd">${t}</span></li>`;
+    }).join("")}</ol>`;
+    const body = [
+      `<h2>How should golem think?</h2>
+       <div class="choices" role="group" aria-label="Engine">
+         <button class="choice" type="button" aria-pressed="true"><b>On this Mac (Ollama)</b><span>Models run on your computer. Nothing leaves it.</span></button>
+         <button class="choice" type="button" aria-pressed="false"><b>With an API key</b><span>OpenAI, Anthropic and others. You pay per use.</span></button>
+       </div>
+       <ul class="cards" style="width:100%"><li class="scard ok"><span class="mark ok"><span aria-hidden="true">✓</span><span class="vh">done</span></span><div class="sbody"><div class="sname">Ollama</div><div class="sdetail">running, no models yet</div></div></li></ul>
+       <div class="wel-actions"><button class="btn primary" type="button" data-go="w2">Continue</button></div>`,
+      `<h2>Pick a model</h2>
+       <p>It downloads in the background. You can chat once one is ready.</p>
+       <ul class="mlist inline">${modelRows(FIRST, "ollama/qwen3.5:4b")}</ul>
+       <div class="wel-actions"><button class="btn primary" type="button" data-go="w3">Continue</button></div>`,
+      adding ? toolsAdding() : `<div class="tools"><div><h2>Give golem some tools?</h2><p>They cost nothing until a chat turns one on.</p></div>${toolsChecklist(true)}</div>`,
+      `<h2>golem is ready.</h2>
+       <div class="wel-actions"><button class="btn primary" type="button" data-go="home">Start chatting</button></div>
+       <div class="note"><span>golem stops when you log out. To keep it running:</span><span class="cmd"><code>golem daemon install</code><button class="icon-btn" type="button" aria-label="Copy command" data-copy="golem daemon install"><svg><use href="#i-copy"/></svg></button></span></div>`,
+    ][step - 1];
+    $("#welcome-stage").innerHTML = `<svg class="golem" data-golem width="90" height="60" aria-hidden="true"></svg>${stepper}${body}`;
+    drawGolem($("#welcome-stage [data-golem]"));
+  }
+
+  /* Delegated clicks: download row, dialog openers, dismiss, screen links */
+  document.addEventListener("click", e => {
+    const o = e.target.closest("[data-open-models]");
+    if (o) openModels(o.dataset.mode || (!$("#view-chat").hidden ? "session" : "new"));
+    const d = e.target.closest("[data-dl]"); if (d) setDl(d.dataset.dl);
+    const g = e.target.closest("[data-go]"); if (g) setScreen(g.dataset.go);
+    const c = e.target.closest(".choice");
+    if (c) $$(".choice").forEach(x => x.setAttribute("aria-pressed", String(x === c)));
+    const a = e.target.closest("[data-add-tools]");
+    if (a) {
+      const card = a.closest(".scard");
+      a.hidden = true;
+      card.insertAdjacentHTML("beforeend", `<div class="sub tools">${toolsChecklist(false)}</div>`);
+    }
+    if (e.target.closest("[data-skip-tools]")) {
+      const sub = e.target.closest(".sub"), card = sub.closest(".scard");
+      sub.remove(); card.querySelector("[data-add-tools]").hidden = false;
+    }
+  });
+  document.addEventListener("change", e => {
+    const t = e.target.closest("[data-tool]"); if (!t) return;
+    const box = t.closest(".tools") || t.closest(".sub");
+    if (t.dataset.tool === "GitHub") { const tok = box.querySelector("[data-token]"); if (tok) tok.hidden = !t.checked; }
+    const n = $$("[data-tool]", box).filter(x => x.checked).length;
+    box.querySelector("[data-add-count]").textContent = "Add " + n;
+  });
+  setDl("one");
+
   /* #kiln or #slip picks a theme, #shot hides these controls (for screenshots) */
   const h = location.hash.slice(1).split(",");
   if (h.includes("kiln")) setTheme("dark");
   if (h.includes("slip")) setTheme("light");
+  Object.keys(SCREENS).forEach(k => { if (h.includes(k)) setScreen(k); });
+  ["none", "one", "two", "failed"].forEach(k => { if (h.includes("dl-" + k)) setDl(k); });
+  if (h.includes("menu")) $("#app").classList.add("sidebar-open");
   if (h.includes("shot")) $("#proto").hidden = true;
   if (h.includes("end")) requestAnimationFrame(() => { const v = $("#view-chat"); v.scrollTop = v.scrollHeight; });
 
