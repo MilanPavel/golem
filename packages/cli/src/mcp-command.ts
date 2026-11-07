@@ -7,7 +7,21 @@ export type McpArgs =
   | { kind: "remove"; name: string }
   /** The servers as the `mcpServers` JSON of another app. */
   | { kind: "export"; format: "claude" | "vscode"; scope: "user" | "project" }
+  | { kind: "list"; json: boolean }
+  | { kind: "show"; name: string; json: boolean }
+  | { kind: "test"; name: string }
+  | { kind: "logs"; name: string; follow: boolean }
+  | { kind: "enable"; name: string; onDemand: boolean }
+  | { kind: "disable"; name: string }
+  | { kind: "restart"; name: string }
+  /** The tools of a server, and patterns to hide or show (`tools.exclude`) when any are given. */
+  | { kind: "tools"; name: string; hide: string[]; show: string[] }
   | { kind: "error"; message: string };
+
+export const MCP_USAGE =
+  "usage: golem mcp list|show|test|logs|enable|disable|restart|tools|add|remove|export (golem --help lists the options)";
+
+const SERVER_ACTIONS = new Set(["show", "test", "logs", "enable", "disable", "restart", "tools"]);
 
 const ENV_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
@@ -28,8 +42,14 @@ export function parseMcpArgs(args: string[]): McpArgs {
   if (action === "export") {
     return parseExportArgs(rest);
   }
+  if (action !== undefined && SERVER_ACTIONS.has(action)) {
+    return parseServerArgs(action, rest);
+  }
+  if (action === "list") {
+    return parseServerArgs("list", rest);
+  }
   if (action !== "add") {
-    return fail("usage: golem mcp add|remove <name> | golem mcp export [--format claude|vscode] [--scope user|project]");
+    return fail(MCP_USAGE);
   }
   const split = rest.indexOf("--");
   const before = split === -1 ? rest : rest.slice(0, split);
@@ -141,4 +161,68 @@ function parseExportArgs(words: string[]): McpArgs {
     }
   }
   return { kind: "export", format, scope };
+}
+
+/** `list`, and the commands that take one server's name: `show`, `test`, `logs`, `enable`, `disable`, `restart`, `tools`. */
+function parseServerArgs(action: string, words: string[]): McpArgs {
+  const usage: Record<string, string> = {
+    list: "golem mcp list [--json]",
+    show: "golem mcp show <name> [--json]",
+    test: "golem mcp test <name>",
+    logs: "golem mcp logs <name> [-f]",
+    enable: "golem mcp enable <name> [--on-demand]",
+    disable: "golem mcp disable <name>",
+    restart: "golem mcp restart <name>",
+    tools: "golem mcp tools <name> [--hide <glob>]… [--show <glob>]…",
+  };
+  const allowed: Record<string, readonly string[]> = {
+    list: ["--json"],
+    show: ["--json"],
+    test: [],
+    logs: ["-f", "--follow"],
+    enable: ["--on-demand"],
+    disable: [],
+    restart: [],
+    tools: ["--hide", "--show"],
+  };
+  let name: string | null = null;
+  const flags = new Set<string>();
+  const hide: string[] = [];
+  const show: string[] = [];
+  for (let index = 0; index < words.length; index += 1) {
+    const word = words[index] ?? "";
+    if (word.startsWith("-")) {
+      if (!(allowed[action] ?? []).includes(word)) return fail(`unknown option ${word}: usage: ${usage[action]}`);
+      if (word === "--hide" || word === "--show") {
+        const value = words[index + 1];
+        if (value === undefined || value.length === 0 || value.startsWith("--")) return fail(`${word} needs a pattern`);
+        index += 1;
+        (word === "--hide" ? hide : show).push(value);
+      } else {
+        flags.add(word);
+      }
+    } else if (action === "list" || name !== null) {
+      return fail(`unexpected ${word}: usage: ${usage[action]}`);
+    } else {
+      name = word;
+    }
+  }
+  if (action === "list") return { kind: "list", json: flags.has("--json") };
+  if (name === null) return fail(`usage: ${usage[action]}`);
+  switch (action) {
+    case "show":
+      return { kind: "show", name, json: flags.has("--json") };
+    case "test":
+      return { kind: "test", name };
+    case "logs":
+      return { kind: "logs", name, follow: flags.has("-f") || flags.has("--follow") };
+    case "enable":
+      return { kind: "enable", name, onDemand: flags.has("--on-demand") };
+    case "disable":
+      return { kind: "disable", name };
+    case "restart":
+      return { kind: "restart", name };
+    default:
+      return { kind: "tools", name, hide, show };
+  }
 }

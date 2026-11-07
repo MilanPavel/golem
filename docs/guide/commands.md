@@ -24,6 +24,13 @@ golem has commands in two places: `golem …` in your shell, and `/…` inside t
 | `golem mcp add --catalog <id>` | Adds a server from golem's list. It asks for a token, hidden, and keeps it in the Keychain. `--input <id>=<value>` fills an input and `--name` renames the server |
 | `golem mcp add <name> -- <command…>` / `--url <url>` | Adds an MCP server to `config.toml` and starts it. `--token` (web) or `--token-env VAR` (command) asks for a token and keeps it in the Keychain |
 | `golem mcp export` | Prints your servers as the `mcpServers` JSON of Claude Desktop, Claude Code, Cursor, or Windsurf. `--format vscode` gives VS Code's `servers`, and `--scope project` the project's. Secrets become `${MCP_…}` variables and are never printed |
+| `golem mcp list [--json]` | Lists your MCP servers: state, tools, token cost, and marks such as `on demand`, `hidden N tools`, and `allow` |
+| `golem mcp show <name> [--json]` | One server's command or URL, settings, and which secrets are stored. A secret's value is never shown |
+| `golem mcp test <name>` | Starts the server, lists its tools, and pings it, printing each step. It exits 1 when the test fails and says what to try |
+| `golem mcp logs <name> [-f]` | The server's recent log. `-f` follows new lines until Ctrl-C |
+| `golem mcp enable <name> [--on-demand]` / `disable <name>` | Turns a server on for every chat, on for the chats that ask, or off. It applies at once |
+| `golem mcp restart <name>` | Starts a server again now |
+| `golem mcp tools <name> [--hide <glob>] [--show <glob>]` | Lists a server's tools with their token cost. `--hide` keeps tools matching a pattern from the model, and `--show` takes a pattern back out |
 | `golem mcp remove <name>` | Removes the server from `config.toml`, stops it, and deletes its token |
 | `golem auth list` | Which providers have a key |
 | `golem models` | Every model you can use or download, with size, price, and context. `--refresh` asks the providers again |
