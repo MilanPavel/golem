@@ -42,6 +42,11 @@ import type { McpServerLog } from "../../protocol/gen/mcp-server-log.ts";
 import type { McpTestProgress } from "../../protocol/gen/mcp-test-progress.ts";
 import type { McpTestResult } from "../../protocol/gen/mcp-test-result.ts";
 import type { McpUpdateParams } from "../../protocol/gen/mcp-update-params.ts";
+import type { ConfigRawGetResult } from "../../protocol/gen/config-raw-get-result.ts";
+import type { ConfigRawResult } from "../../protocol/gen/config-raw-result.ts";
+import type { McpImportApplyParams } from "../../protocol/gen/mcp-import-apply-params.ts";
+import type { McpImportApplyResult } from "../../protocol/gen/mcp-import-apply-result.ts";
+import type { McpImportScanResult } from "../../protocol/gen/mcp-import-scan-result.ts";
 import type { MessageSendResult } from "../../protocol/gen/message-send-result.ts";
 import type { ModelListResult } from "../../protocol/gen/model-list-result.ts";
 import type { ModelDeleteResult } from "../../protocol/gen/model-delete-result.ts";
@@ -84,6 +89,10 @@ import {
   isMcpServer,
   isMcpToggleResult,
   isSessionSetSkillsResult,
+  isConfigRawGetResult,
+  isConfigRawResult,
+  isMcpImportApplyResult,
+  isMcpImportScanResult,
   isMcpLogsResult,
   isMcpServerLog,
   isMcpTestProgress,
@@ -294,13 +303,30 @@ export interface GolemClient {
    * reaches `onProgress` as it starts and ends. `secrets` (by reference) are used for this test only.
    */
   mcpTest(
-    params: { name: string; sessionId?: string } | { config: McpServerConfig; secrets?: Record<string, string>; sessionId?: string },
+    params:
+      | { name: string; sessionId?: string }
+      | { config: McpServerConfig; secrets?: Record<string, string>; sessionId?: string }
+      | { catalogId: string; inputs?: Record<string, string>; secrets?: Record<string, string>; name?: string; sessionId?: string },
     onProgress?: (progress: McpTestProgress) => void,
   ): Promise<McpTestResult>;
   /** The last lines of a server's log, oldest first. New lines reach {@link GolemClient.onMcpLog}. */
   mcpLogs(name: string, options?: { sessionId?: string; limit?: number }): Promise<McpLogsResult>;
   /** `mcp.server.log`: new log lines of any server, at most one batch every 250 ms. */
   onMcpLog(listener: (log: McpServerLog) => void): () => void;
+  /** The text of `config.toml` (a trusted project's with `scope: "project"` and a session), and its `mtime_ns`. */
+  configRawGet(options?: { scope?: "user" | "project"; sessionId?: string }): Promise<ConfigRawGetResult>;
+  /**
+   * Check a new text, and write it when the file is still at `baseMtimeNs`. `local` uses the terminal's write,
+   * which may also change the protected sections (`config.raw.set_protected`).
+   */
+  configRawSet(
+    params: { text: string; baseMtimeNs: number | null; scope?: "user" | "project"; sessionId?: string; dryRun?: boolean },
+    options?: { local?: boolean },
+  ): Promise<ConfigRawResult>;
+  /** Find the servers other apps have, or read pasted JSON. Secret values stay in the daemon under `scan_id`. */
+  scanMcpImport(params?: { sessionId?: string; text?: string }): Promise<McpImportScanResult>;
+  /** Add the picked servers of a scan, once. The wire view shows `secrets` redacted. */
+  applyMcpImport(params: McpImportApplyParams): Promise<McpImportApplyResult>;
   /** Replace `[mcp.<name>]` in the file that names it. Send a secret again only to change it. */
   updateMcpServer(params: McpUpdateParams): Promise<McpServer>;
   /** One server's status, its whole config (secrets as `keychain:mcp/…` references), and where it is written. */
@@ -1275,10 +1301,18 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       };
       testListeners.add(listener);
       try {
+        const secrets = "secrets" in params && params.secrets !== undefined ? { secrets: params.secrets } : {};
         const body =
-          "name" in params
-            ? { name: params.name }
-            : { config: params.config, ...(params.secrets === undefined ? {} : { secrets: params.secrets }) };
+          "catalogId" in params
+            ? {
+                catalog_id: params.catalogId,
+                ...(params.inputs === undefined ? {} : { inputs: params.inputs }),
+                ...(params.name === undefined ? {} : { name: params.name }),
+                ...secrets,
+              }
+            : "name" in params
+              ? { name: params.name }
+              : { config: params.config, ...secrets };
         const result = await call("mcp.test", withSession({ test_id: testId, ...body }, params.sessionId));
         if (!isMcpTestResult(result)) {
           throw new Error("invalid mcp.test result");
@@ -1302,6 +1336,48 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       return () => {
         logListeners.delete(listener);
       };
+    },
+    async configRawGet(options?: { scope?: "user" | "project"; sessionId?: string }): Promise<ConfigRawGetResult> {
+      await ready;
+      const result = await call("config.raw.get", withSession({ scope: options?.scope ?? "user" }, options?.sessionId));
+      if (!isConfigRawGetResult(result)) {
+        throw new Error("invalid config.raw.get result");
+      }
+      return result;
+    },
+    async configRawSet(params, options): Promise<ConfigRawResult> {
+      await ready;
+      const body = withSession(
+        {
+          scope: params.scope ?? "user",
+          text: params.text,
+          base_mtime_ns: params.baseMtimeNs,
+          ...(params.dryRun === true ? { dry_run: true } : {}),
+        },
+        params.sessionId,
+      );
+      const result = await call(options?.local === true ? "config.raw.set_protected" : "config.raw.set", body);
+      if (!isConfigRawResult(result)) {
+        throw new Error("invalid config.raw.set result");
+      }
+      return result;
+    },
+    async scanMcpImport(params?: { sessionId?: string; text?: string }): Promise<McpImportScanResult> {
+      await ready;
+      const body = withSession(params?.text === undefined ? {} : { text: params.text }, params?.sessionId);
+      const result = await call("mcp.import.scan", body);
+      if (!isMcpImportScanResult(result)) {
+        throw new Error("invalid mcp.import.scan result");
+      }
+      return result;
+    },
+    async applyMcpImport(params: McpImportApplyParams): Promise<McpImportApplyResult> {
+      await ready;
+      const result = await call("mcp.import.apply", { ...params });
+      if (!isMcpImportApplyResult(result)) {
+        throw new Error("invalid mcp.import.apply result");
+      }
+      return result;
     },
     async updateMcpServer(params: McpUpdateParams): Promise<McpServer> {
       return mcpServerCall("mcp.update", { ...params });

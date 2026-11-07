@@ -17,6 +17,7 @@ from test_server import HELLO, RpcClient, error_code, rpc_result, start_daemon, 
 
 from golem.config import McpServerSettings
 from golem.mcp import McpSupervisor, Timing
+from golem.mcp.catalog import CatalogEntry
 from golem.mcp.probe import Hint, Step, Timeouts, probe
 from golem.mcp.probe import test_hint as hint_for
 from golem.models.router import ModelRouter
@@ -436,6 +437,53 @@ async def test_logs_and_call_over_the_socket(short_home: Path) -> None:
             error_code(await client.call("mcp.call", {"name": "x", "tool": "echo"}))
             == INVALID_PARAMS
         )
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+
+
+async def test_mcp_test_of_a_catalog_entry_uses_the_secret_it_is_sent_and_stores_nothing(
+    short_home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    entry = CatalogEntry.model_validate(
+        {
+            "id": "fakeserver",
+            "name": "fakeserver",
+            "title": "Fake",
+            "description": "a fake",
+            "category": "other",
+            "homepage": "https://example.test",
+            "runtime": "uvx",
+            "auth": "token",
+            "template": {
+                "command": sys.executable,
+                "args": [SERVER, "--noise"],
+                "env": {"NOISE": "{secret.token}"},
+            },
+            "inputs": [{"id": "token", "kind": "secret", "label": "Token"}],
+        }
+    )
+    monkeypatch.setattr("golem.mcp.catalog.load_catalog", lambda: [entry])
+    secrets = MemorySecrets()
+    app, task, client = await _daemon(short_home, secrets)
+    try:
+        params = {"test_id": "c1", "catalog_id": "fakeserver", "secrets": {"token": "typed-secret"}}
+        response = await client.call("mcp.test", params)
+        result = rpc_result(response)
+        assert result["ok"] is True
+        assert result["stderr_tail"] == ["starting with •••"]
+        assert "typed-secret" not in json.dumps(response)
+        assert secrets.secrets == {}
+        assert not (short_home / "config.toml").exists()
+
+        missing = await client.call("mcp.test", {"test_id": "c2", "catalog_id": "fakeserver"})
+        assert error_code(missing) == INVALID_PARAMS
+        unknown = await client.call("mcp.test", {"test_id": "c3", "catalog_id": "nope"})
+        assert error_code(unknown) == INVALID_PARAMS
+        both = {"test_id": "c4", "catalog_id": "fakeserver", "config": {"url": "http://x.test"}}
+        assert error_code(await client.call("mcp.test", both)) == INVALID_PARAMS
+        stray = {"test_id": "c5", "name": "x", "inputs": {"a": "b"}}
+        assert error_code(await client.call("mcp.test", stray)) == INVALID_PARAMS
     finally:
         await client.close()
         await stop_daemon(app, task)

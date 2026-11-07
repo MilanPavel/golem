@@ -131,8 +131,21 @@
     }
   },
   "additionalProperties": false,
-  "description": "``mcp.test``. Start a server, list its tools, and ping it, without saving anything.\n\nGive ``name`` for a saved server, or ``config`` for one not saved yet, not\nboth. ``secrets`` (by reference, ``mcp/github``) are used for this test\nfirst and then the Keychain, and are never stored. ``test_id`` ties the\n``mcp.test.progress`` notifications to this call.",
+  "description": "``mcp.test``. Start a server, list its tools, and ping it, without saving anything.\n\nThere are three forms, and sending more than one is an error. ``name`` is a\nsaved server. ``config`` is one not saved yet, with ``secrets`` by reference\n(``mcp/github``). ``catalog_id`` is a catalog entry, with ``inputs`` and\n``secrets`` by input id as in ``mcp.add``, and ``name`` (optional) naming the\ndraft. Secrets are used for this test first and then, for a saved server,\nthe Keychain, and are never stored. ``test_id`` ties the\n``mcp.test.progress`` notifications to this call.",
   "properties": {
+    "catalog_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Catalog Id"
+    },
     "config": {
       "anyOf": [
         {
@@ -143,6 +156,13 @@
         }
       ],
       "default": null
+    },
+    "inputs": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Inputs",
+      "type": "object"
     },
     "name": {
       "anyOf": [

@@ -12,11 +12,20 @@ from collections.abc import Callable
 from pathlib import Path
 
 from golem.mcp import McpServerError
+from golem.mcp.catalog import find_entry
 from golem.mcp.client import McpError, McpTool
 from golem.mcp.probe import Step
 from golem.mcp.tools import result_text
 from golem.server.dispatcher import INTERNAL_ERROR, INVALID_PARAMS, RequestContext, RpcCallError
-from golem.server.mcp_edit import check_sent, get_mcp, get_scope, to_settings, to_table
+from golem.server.mcp_edit import (
+    catalog_table,
+    check_sent,
+    get_mcp,
+    get_scope,
+    own_secrets,
+    to_settings,
+    to_table,
+)
 from golem_protocol.commands import (
     McpCallParams,
     McpCallResult,
@@ -38,9 +47,21 @@ async def mcp_test(ctx: RequestContext, params: McpTestParams) -> McpTestResult:
     mcp = get_mcp(ctx)
     scope = await get_scope(ctx, params.session_id)
     values = {ref: value.get_secret_value() for ref, value in params.secrets.items()}
+    draft = False
     project: Path | None = None
     hidden: Callable[[str], bool] = lambda _name: False  # noqa: E731
-    if params.name is not None:
+    if params.catalog_id is not None:
+        # An entry that is not saved: its secrets come by input id, and only this request's.
+        draft = True
+        table, values = catalog_table(
+            params.catalog_id, params.inputs, values, name=params.name, scope=scope
+        )
+        settings = to_settings(table)
+        entry = find_entry(params.catalog_id)
+        assert entry is not None
+        own_secrets(params.name or entry.name, settings)
+        check_sent(values, settings)
+    elif params.name is not None:
         try:
             settings = mcp.settings(scope, params.name)
             root = mcp.status(scope, params.name).project
@@ -66,7 +87,11 @@ async def mcp_test(ctx: RequestContext, params: McpTestParams) -> McpTestResult:
     # A saved server may read its stored secrets. A config that is not saved may use
     # only what this request sends, so it cannot point a stored secret at a new address.
     found = await mcp.test(
-        settings, sent=values, keychain=params.name is not None, project=project, progress=progress
+        settings,
+        sent=values,
+        keychain=not draft and params.name is not None,
+        project=project,
+        progress=progress,
     )
     return McpTestResult(
         test_id=params.test_id,

@@ -29,6 +29,7 @@ import { formatSkills } from "./format-skills.ts";
 import { formatStatus } from "./format-status.ts";
 import { formatCliVersion } from "./format-version.ts";
 import { parseMcpArgs, type McpArgs } from "./mcp-command.ts";
+import { planAdd } from "./add-plan.ts";
 import { exportServers } from "./mcp-export.ts";
 import {
   changeToolFilter,
@@ -39,6 +40,7 @@ import {
   formatTestResult,
   formatTestStep,
 } from "./mcp-format.ts";
+import { projectSession, runConfigEdit, runMcpEdit, runMcpImport, testAfterAdd } from "./mcp-run.ts";
 import { readChoice } from "./read-choice.ts";
 import { readSecret } from "./read-secret.ts";
 import { type Gate, gateService, type SessionDaemon } from "./service-gate.ts";
@@ -58,9 +60,9 @@ const USAGE =
   "       golem --version | golem --help | golem status | golem doctor [--mcp]\n" +
   "       golem daemon install|start|stop|restart|uninstall|logs\n" +
   "       golem auth set <provider> [--no-check] | golem auth remove <provider> | golem auth list | golem models [--refresh]\n" +
-  "       golem mcp add <name> -- <command…> [--token-env VAR] | golem mcp add <name> --url <url> [--token] | golem mcp add --catalog <id> [--input <id>=<value>] | golem mcp remove <name> | golem mcp export [--format claude|vscode] [--scope user|project]\n" +
-  "       golem mcp list [--json] | show <name> [--json] | test <name> | logs <name> [-f] | enable <name> [--on-demand] | disable <name> | restart <name> | tools <name> [--hide <glob>] [--show <glob>]\n" +
-  "       golem config show [--resolved] | golem skills [list] | golem skills check <path>\n" +
+  "       golem mcp add <name> -- <command…> [--token-env VAR] | golem mcp add <name> --url <url> [--token] [--env K=V] [--header K=V] [--cwd D] [--on-demand] [--project] [--timeout S] [--approval allow] | golem mcp add --catalog <id> [--input <id>=<value>] | golem mcp remove <name> | golem mcp export [--format claude|vscode] [--scope user|project]\n" +
+  "       golem mcp list [--json] | show <name> [--json] | test <name> | test --catalog <id> | edit <name> [--project] | import [--from <app>|<file>] [--all] | logs <name> [-f] | enable <name> [--on-demand] | disable <name> | restart <name> | tools <name> [--hide <glob>] [--show <glob>]\n" +
+  "       golem config show [--resolved] | golem config edit [--project] | golem skills [list] | golem skills check <path>\n" +
   "       golem web [--port N] [--no-open] [--json]";
 
 // exitCode, not exit(): exit() drops output a pipe has not read yet.
@@ -109,9 +111,31 @@ async function run(args: string[]): Promise<number> {
   if (command === "config" && rest[0] === "show" && (rest.length === 1 || (rest.length === 2 && rest[1] === "--resolved"))) {
     return runConfigShow();
   }
+  if (command === "config" && rest[0] === "edit" && (rest.length === 1 || (rest.length === 2 && rest[1] === "--project"))) {
+    return runWithClient((client) => runConfigEdit(client, rest[1] === "--project", RUN_DEPS));
+  }
   process.stderr.write(`${USAGE}\n`);
   return 1;
 }
+
+/** Runs `body` with a client, says what went wrong, and always closes the client. */
+async function runWithClient(body: (client: ReturnType<typeof connectOnce>) => Promise<number>): Promise<number> {
+  const client = connectOnce();
+  try {
+    return await body(client);
+  } catch (error) {
+    process.stderr.write(`${explainClient(error)}\n`);
+    return 1;
+  } finally {
+    client.close();
+  }
+}
+
+const RUN_DEPS = {
+  restartDaemon: async (): Promise<void> => {
+    await runDaemon(["restart"]);
+  },
+};
 
 async function runConfigShow(): Promise<number> {
   const client = connectOnce();
@@ -230,6 +254,12 @@ async function runMcp(given: string[]): Promise<number> {
   if (parsed.kind === "export") {
     return runMcpExport(parsed);
   }
+  if (parsed.kind === "testCatalog") {
+    return runMcpTestCatalog(parsed);
+  }
+  if (parsed.kind === "add" && parsed.options !== undefined) {
+    return runMcpAddWithOptions(parsed);
+  }
   if (parsed.kind !== "add" && parsed.kind !== "remove") {
     return runMcpServer(parsed);
   }
@@ -266,6 +296,7 @@ async function runMcp(given: string[]): Promise<number> {
             },
       );
       process.stdout.write(`added ${parsed.name} · ${added.state}\n`);
+      await testAfterAdd(client, parsed.name);
     }
     return 0;
   } catch (error) {
@@ -276,7 +307,7 @@ async function runMcp(given: string[]): Promise<number> {
   }
 }
 
-type ServerCommand = Exclude<McpArgs, { kind: "add" | "remove" | "catalog" | "export" | "error" }>;
+type ServerCommand = Exclude<McpArgs, { kind: "add" | "remove" | "catalog" | "testCatalog" | "export" | "error" }>;
 
 /** `golem mcp list|show|test|logs|enable|disable|restart|tools`: read and control the servers that are there. */
 async function runMcpServer(parsed: ServerCommand): Promise<number> {
@@ -303,6 +334,10 @@ async function runMcpServer(parsed: ServerCommand): Promise<number> {
       }
       case "logs":
         return await runMcpLogs(client, parsed.name, parsed.follow);
+      case "edit":
+        return await runMcpEdit(client, parsed.name, parsed.project, RUN_DEPS);
+      case "import":
+        return await runMcpImport(client, parsed.from, parsed.all, parsed.project);
       case "enable":
       case "disable": {
         const enabled = parsed.kind === "disable" ? false : parsed.onDemand ? "on_demand" : true;
@@ -383,49 +418,111 @@ async function runMcpExport(parsed: Extract<McpArgs, { kind: "export" }>): Promi
   }
 }
 
-/** `golem mcp add --catalog <id>`: the daemon fills the entry's template. Secrets are asked for, hidden. */
-async function runMcpCatalogAdd(parsed: Extract<McpArgs, { kind: "catalog" }>): Promise<number> {
-  const client = connectOnce();
-  try {
-    const { entries } = await client.mcpCatalog();
-    const entry = findEntry(entries, parsed.id);
-    if (entry === null) {
-      process.stderr.write(`${parsed.id} is not in the catalog. It has: ${entries.map((each) => each.id).join(", ")}\n`);
-      return 1;
-    }
-    if (!entryAvailable(entry)) {
-      process.stderr.write(`${entry.title}: ${entry.reason ?? "not available"}\n`);
-      return 1;
-    }
-    const values: Record<string, string> = {};
-    for (const input of entryInputs(entry)) {
-      const given = parsed.inputs[input.id];
-      if (input.kind === "secret") {
-        values[input.id] = await readSecret(`${input.label.toLowerCase()} for ${parsed.name ?? entry.name}: `);
-      } else {
-        values[input.id] = given ?? inputDefault(input, process.cwd());
-      }
-      const error = inputError(input, values[input.id] ?? "");
-      if (error !== null) {
-        process.stderr.write(`${error}${input.kind === "secret" ? "" : ` Give it with --input ${input.id}=<value>.`}\n`);
-        return 1;
-      }
-    }
-    const unknown = Object.keys(parsed.inputs).filter((key) => !entryInputs(entry).some((input) => input.id === key));
-    if (unknown.length > 0) {
-      process.stderr.write(`${entry.id} has no input ${unknown.join(", ")}\n`);
-      return 1;
-    }
-    const params = entryParams(entry, values);
-    const added = await client.addMcpServer(parsed.name === null ? params : { ...params, name: parsed.name });
-    process.stdout.write(`added ${added.name} · ${added.state}\n`);
-    return 0;
-  } catch (error) {
-    process.stderr.write(`${explainClient(error)}\n`);
-    return 1;
-  } finally {
-    client.close();
+/** The answers a catalog entry asks for: typed values from `--input` or their defaults, and each secret, hidden. */
+async function catalogAnswers(
+  client: ReturnType<typeof connectOnce>,
+  id: string,
+  name: string | null,
+  given: Record<string, string>,
+): Promise<ReturnType<typeof entryParams> | null> {
+  const { entries } = await client.mcpCatalog();
+  const entry = findEntry(entries, id);
+  if (entry === null) {
+    process.stderr.write(`${id} is not in the catalog. It has: ${entries.map((each) => each.id).join(", ")}\n`);
+    return null;
   }
+  if (!entryAvailable(entry)) {
+    process.stderr.write(`${entry.title}: ${entry.reason ?? "not available"}\n`);
+    return null;
+  }
+  const unknown = Object.keys(given).filter((key) => !entryInputs(entry).some((input) => input.id === key));
+  if (unknown.length > 0) {
+    process.stderr.write(`${entry.id} has no input ${unknown.join(", ")}\n`);
+    return null;
+  }
+  const values: Record<string, string> = {};
+  for (const input of entryInputs(entry)) {
+    if (input.kind === "secret") {
+      values[input.id] = await readSecret(`${input.label.toLowerCase()} for ${name ?? entry.name}: `);
+    } else {
+      values[input.id] = given[input.id] ?? inputDefault(input, process.cwd());
+    }
+    const error = inputError(input, values[input.id] ?? "");
+    if (error !== null) {
+      process.stderr.write(`${error}${input.kind === "secret" ? "" : ` Give it with --input ${input.id}=<value>.`}\n`);
+      return null;
+    }
+  }
+  const params = entryParams(entry, values);
+  return name === null ? params : { ...params, name };
+}
+
+/** `golem mcp add --catalog <id>`: the daemon fills the entry's template. Secrets are asked for, hidden. Then the server is tested. */
+async function runMcpCatalogAdd(parsed: Extract<McpArgs, { kind: "catalog" }>): Promise<number> {
+  return runWithClient(async (client) => {
+    const params = await catalogAnswers(client, parsed.id, parsed.name, parsed.inputs);
+    if (params === null) return 1;
+    const added = await client.addMcpServer(params);
+    process.stdout.write(`added ${added.name} · ${added.state}\n`);
+    await testAfterAdd(client, added.name);
+    return 0;
+  });
+}
+
+/** `golem mcp test --catalog <id>`: start a catalog entry without saving it. */
+async function runMcpTestCatalog(parsed: Extract<McpArgs, { kind: "testCatalog" }>): Promise<number> {
+  return runWithClient(async (client) => {
+    const params = await catalogAnswers(client, parsed.id, parsed.name, parsed.inputs);
+    if (params === null) return 1;
+    const result = await client.mcpTest(
+      { catalogId: parsed.id, inputs: params.inputs ?? {}, secrets: params.secrets ?? {}, ...(parsed.name === null ? {} : { name: parsed.name }) },
+      (progress) => {
+        const line = formatTestStep(progress);
+        if (line !== null) process.stdout.write(`${line}\n`);
+      },
+    );
+    process.stdout.write(`${formatTestResult(result)}\n`);
+    return result.ok ? 0 : 1;
+  });
+}
+
+/** `golem mcp add` with `--env`, `--header`, `--cwd`, `--on-demand`, `--project`, `--timeout`, or `--approval`. */
+async function runMcpAddWithOptions(parsed: Extract<McpArgs, { kind: "add" }>): Promise<number> {
+  const made = planAdd(parsed);
+  if (!made.ok) {
+    process.stderr.write(`${made.message}\n`);
+    return 1;
+  }
+  const { plan } = made;
+  if (plan.secrets.some((slot) => slot.value !== null)) {
+    process.stderr.write("a value on the command line shows in your shell's history: give just the name (--env NAME) to be asked, hidden\n");
+  }
+  const secrets: Record<string, string> = {};
+  for (const slot of plan.secrets) {
+    const value = slot.value ?? (await readSecret(`${slot.label}: `));
+    if (value.length === 0) {
+      process.stderr.write(`no value given for ${slot.label}\n`);
+      return 1;
+    }
+    secrets[slot.ref] = value;
+  }
+  return runWithClient(async (client) => {
+    const sessionId = plan.scope === "project" ? await projectSession(client) : undefined;
+    try {
+      const added = await client.addMcpServer({
+        name: parsed.name,
+        config: plan.config,
+        secrets,
+        scope: plan.scope,
+        ...(sessionId === undefined ? {} : { session_id: sessionId }),
+      });
+      process.stdout.write(`added ${added.name} · ${added.state}\n`);
+      await testAfterAdd(client, parsed.name, sessionId);
+      return 0;
+    } finally {
+      if (sessionId !== undefined) await client.closeSession(sessionId).catch(() => undefined);
+    }
+  });
 }
 
 async function runVersion(): Promise<number> {

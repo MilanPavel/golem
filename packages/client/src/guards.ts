@@ -1,6 +1,10 @@
 import type { KeychainWait } from "../../protocol/gen/keychain-wait.ts";
 import type { McpCatalogResult } from "../../protocol/gen/mcp-catalog-result.ts";
 import type { McpServerDetail } from "../../protocol/gen/mcp-server-detail.ts";
+import type { ConfigRawGetResult } from "../../protocol/gen/config-raw-get-result.ts";
+import type { ConfigRawResult } from "../../protocol/gen/config-raw-result.ts";
+import type { McpImportApplyResult } from "../../protocol/gen/mcp-import-apply-result.ts";
+import type { McpImportScanResult } from "../../protocol/gen/mcp-import-scan-result.ts";
 import type { McpLogsResult } from "../../protocol/gen/mcp-logs-result.ts";
 import type { McpServerLog } from "../../protocol/gen/mcp-server-log.ts";
 import type { McpTestProgress } from "../../protocol/gen/mcp-test-progress.ts";
@@ -455,6 +459,62 @@ export function isMcpServerLog(value: unknown): value is McpServerLog {
     typeof value["name"] === "string" &&
     Array.isArray(value["lines"]) &&
     value["lines"].every(isLogLine)
+  );
+}
+
+export function isConfigRawGetResult(value: unknown): value is ConfigRawGetResult {
+  return (
+    isRecord(value) &&
+    typeof value["path"] === "string" &&
+    typeof value["text"] === "string" &&
+    typeof value["exists"] === "boolean" &&
+    (value["mtime_ns"] === null || value["mtime_ns"] === undefined || typeof value["mtime_ns"] === "number")
+  );
+}
+
+export function isConfigRawResult(value: unknown): value is ConfigRawResult {
+  return (
+    isRecord(value) &&
+    typeof value["ok"] === "boolean" &&
+    (value["errors"] === undefined || Array.isArray(value["errors"])) &&
+    (value["restart_needed"] === undefined || Array.isArray(value["restart_needed"]))
+  );
+}
+
+function isImportCandidate(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    typeof value["key"] === "string" &&
+    typeof value["name"] === "string" &&
+    typeof value["original_name"] === "string" &&
+    isRecord(value["config"])
+  );
+}
+
+export function isMcpImportScanResult(value: unknown): value is McpImportScanResult {
+  return (
+    isRecord(value) &&
+    typeof value["scan_id"] === "string" &&
+    Array.isArray(value["sources"]) &&
+    value["sources"].every(
+      (source) =>
+        isRecord(source) &&
+        typeof source["id"] === "string" &&
+        typeof source["label"] === "string" &&
+        Array.isArray(source["candidates"]) &&
+        source["candidates"].every(isImportCandidate),
+    )
+  );
+}
+
+export function isMcpImportApplyResult(value: unknown): value is McpImportApplyResult {
+  return (
+    isRecord(value) &&
+    Array.isArray(value["added"]) &&
+    value["added"].every(isMcpServer) &&
+    (value["failed"] === undefined ||
+      (Array.isArray(value["failed"]) &&
+        value["failed"].every((each) => isRecord(each) && typeof each["key"] === "string" && typeof each["error"] === "string")))
   );
 }
 

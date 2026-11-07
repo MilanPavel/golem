@@ -1,12 +1,30 @@
 /** What `golem mcp …` was asked to do, or why the arguments do not make sense. */
+/** What `golem mcp add` takes beyond the command or URL. It is present only when one of them was given. */
+export interface AddOptions {
+  /** `K=V`, or `K` alone for a secret that is asked for. */
+  env: string[];
+  headers: string[];
+  cwd: string | null;
+  onDemand: boolean;
+  project: boolean;
+  timeout: number | null;
+  approval: "ask" | "allow" | null;
+}
+
 export type McpArgs =
-  | { kind: "add"; name: string; command: string; args: string[]; tokenEnv: string | null }
-  | { kind: "add"; name: string; url: string; token: boolean }
+  | { kind: "add"; name: string; command: string; args: string[]; tokenEnv: string | null; options?: AddOptions }
+  | { kind: "add"; name: string; url: string; token: boolean; options?: AddOptions }
   /** A server from the daemon's catalog: its id, the name to give it (the entry's own when null), and typed inputs. */
   | { kind: "catalog"; id: string; name: string | null; inputs: Record<string, string> }
   | { kind: "remove"; name: string }
   /** The servers as the `mcpServers` JSON of another app. */
   | { kind: "export"; format: "claude" | "vscode"; scope: "user" | "project" }
+  /** A catalog entry that is not saved: test it with the inputs and secrets it asks for. */
+  | { kind: "testCatalog"; id: string; name: string | null; inputs: Record<string, string> }
+  /** `$EDITOR` on a server's tables, saved through the daemon's checks. */
+  | { kind: "edit"; name: string; project: boolean }
+  /** Servers other apps have: from one app or a file (`from`), all the new ones at once, with this folder's files. */
+  | { kind: "import"; from: string | null; all: boolean; project: boolean }
   | { kind: "list"; json: boolean }
   | { kind: "show"; name: string; json: boolean }
   | { kind: "test"; name: string }
@@ -21,7 +39,7 @@ export type McpArgs =
 export const MCP_USAGE =
   "usage: golem mcp list|show|test|logs|enable|disable|restart|tools|add|remove|export (golem --help lists the options)";
 
-const SERVER_ACTIONS = new Set(["show", "test", "logs", "enable", "disable", "restart", "tools"]);
+const SERVER_ACTIONS = new Set(["show", "test", "logs", "enable", "disable", "restart", "tools", "edit"]);
 
 const ENV_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
@@ -42,6 +60,13 @@ export function parseMcpArgs(args: string[]): McpArgs {
   if (action === "export") {
     return parseExportArgs(rest);
   }
+  if (action === "test" && rest.includes("--catalog")) {
+    const parsed = parseCatalogArgs(rest);
+    return parsed.kind === "catalog" ? { kind: "testCatalog", id: parsed.id, name: parsed.name, inputs: parsed.inputs } : parsed;
+  }
+  if (action === "import") {
+    return parseImportArgs(rest);
+  }
   if (action !== undefined && SERVER_ACTIONS.has(action)) {
     return parseServerArgs(action, rest);
   }
@@ -61,9 +86,33 @@ export function parseMcpArgs(args: string[]): McpArgs {
   let url: string | null = null;
   let token = false;
   let tokenEnv: string | null = null;
+  const options: AddOptions = { env: [], headers: [], cwd: null, onDemand: false, project: false, timeout: null, approval: null };
+  let optioned = false;
   for (let index = 0; index < before.length; index += 1) {
     const word = before[index] ?? "";
-    if (word === "--url" || word === "--token-env") {
+    if (word === "--env" || word === "--header" || word === "--cwd" || word === "--timeout" || word === "--approval") {
+      const value = before[index + 1];
+      if (value === undefined || value.length === 0 || value.startsWith("--")) {
+        return fail(`${word} needs a value`);
+      }
+      index += 1;
+      optioned = true;
+      if (word === "--env") options.env.push(value);
+      else if (word === "--header") options.headers.push(value);
+      else if (word === "--cwd") options.cwd = value;
+      else if (word === "--timeout") {
+        const seconds = Number(value);
+        if (!Number.isInteger(seconds) || seconds < 1 || seconds > 3600) return fail("--timeout is a whole number of seconds, 1 to 3600");
+        options.timeout = seconds;
+      } else {
+        if (value !== "ask" && value !== "allow") return fail("--approval is ask or allow");
+        options.approval = value;
+      }
+    } else if (word === "--on-demand" || word === "--project") {
+      optioned = true;
+      if (word === "--on-demand") options.onDemand = true;
+      else options.project = true;
+    } else if (word === "--url" || word === "--token-env") {
       const value = before[index + 1];
       if (value === undefined || value.length === 0 || value.startsWith("--")) {
         return fail(`${word} needs a value`);
@@ -87,7 +136,7 @@ export function parseMcpArgs(args: string[]): McpArgs {
   if (url !== null) {
     if (after !== null) return fail("give either --url or a command after --, not both");
     if (tokenEnv !== null) return fail("--token-env is for a command; a url server sends its token as a header");
-    return { kind: "add", name, url, token };
+    return { kind: "add", name, url, token, ...(optioned ? { options } : {}) };
   }
   if (after === null) {
     return fail("give a command after -- or a server with --url");
@@ -102,7 +151,7 @@ export function parseMcpArgs(args: string[]): McpArgs {
   if (tokenEnv !== null && !ENV_NAME.test(tokenEnv)) {
     return fail(`${tokenEnv} is not a variable name`);
   }
-  return { kind: "add", name, command, args: commandArgs, tokenEnv };
+  return { kind: "add", name, command, args: commandArgs, tokenEnv, ...(optioned ? { options } : {}) };
 }
 
 const INPUT_ID = /^[A-Za-z][A-Za-z0-9_-]*$/;
@@ -174,6 +223,7 @@ function parseServerArgs(action: string, words: string[]): McpArgs {
     disable: "golem mcp disable <name>",
     restart: "golem mcp restart <name>",
     tools: "golem mcp tools <name> [--hide <glob>]… [--show <glob>]…",
+    edit: "golem mcp edit <name> [--project]",
   };
   const allowed: Record<string, readonly string[]> = {
     list: ["--json"],
@@ -184,6 +234,7 @@ function parseServerArgs(action: string, words: string[]): McpArgs {
     disable: [],
     restart: [],
     tools: ["--hide", "--show"],
+    edit: ["--project"],
   };
   let name: string | null = null;
   const flags = new Set<string>();
@@ -222,7 +273,31 @@ function parseServerArgs(action: string, words: string[]): McpArgs {
       return { kind: "disable", name };
     case "restart":
       return { kind: "restart", name };
+    case "edit":
+      return { kind: "edit", name, project: flags.has("--project") };
     default:
       return { kind: "tools", name, hide, show };
   }
+}
+
+/** `golem mcp import [--from <app>|<file>] [--all] [--project]` */
+function parseImportArgs(words: string[]): McpArgs {
+  const usage = "usage: golem mcp import [--from claude-desktop|claude-code|cursor|vscode|windsurf|<file>] [--all] [--project]";
+  let from: string | null = null;
+  let all = false;
+  let project = false;
+  for (let index = 0; index < words.length; index += 1) {
+    const word = words[index] ?? "";
+    if (word === "--all") all = true;
+    else if (word === "--project") project = true;
+    else if (word === "--from") {
+      const value = words[index + 1];
+      if (value === undefined || value.length === 0 || value.startsWith("--")) return fail("--from needs an app or a file");
+      index += 1;
+      from = value;
+    } else {
+      return fail(word.startsWith("-") ? `unknown option ${word}: ${usage}` : `unexpected ${word}: ${usage}`);
+    }
+  }
+  return { kind: "import", from, all, project };
 }
