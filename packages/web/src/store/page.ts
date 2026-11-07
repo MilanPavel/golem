@@ -84,6 +84,8 @@ export type PageActions = {
   defaultWhenPulled(ref: string, name: string): void;
   /** Stops a download. Ollama keeps the bytes for the next try. */
   cancelPull(ref: string): Promise<void>;
+  /** Dismiss the failure of a download. */
+  forgetPull(ref: string): void;
   remove(ref: string): Promise<void>;
   /** Sets an existing rule's action. `cwd` goes with a rule of the folder's `.golem/policy.toml` only. */
   updateRule(target: "user" | "project", index: number, action: "allow" | "ask" | "deny", cwd: string | undefined): Promise<void>;
@@ -253,6 +255,9 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       },
       defaultWhenPulled(ref, name) {
         pulls.defaultWhenDone(ref, name);
+      },
+      forgetPull(ref) {
+        pulls.forget(ref);
       },
       async cancelPull(ref) {
         pulls.forget(ref);

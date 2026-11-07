@@ -1,5 +1,5 @@
 import { setupProblem } from "@golem/view";
-import { useId, useMemo, useRef, useState } from "react";
+import { useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { cn } from "../../ui/cn.ts";
 import { Button } from "../../ui/button.tsx";
 import { GOLEM_STATE_LABEL } from "../../ui/golem-state.ts";
@@ -16,6 +16,7 @@ import { useNavigate, useRoute, useSessionList, useSetupStatus } from "../../sto
 import { groupByFolder, type SessionSummary } from "../../store/session-list.ts";
 import { sessionPath, settingsPath } from "../../store/router.ts";
 import { ConnectionLine } from "../connection/index.ts";
+import { NoSessionModelDialog, PullStatus } from "../models/index.ts";
 import { CloseSessionDialog } from "./close-dialog.tsx";
 import { folderName } from "./folder.ts";
 import { forkRows, type ForkRow } from "./fork-tree.ts";
@@ -228,6 +229,8 @@ export type SidebarViewProps = {
   setupProblem?: string | null;
   /** The settings page is the one in view. */
   settingsOpen?: boolean;
+  /** The download row. It shows above the Settings button. */
+  downloads?: ReactNode;
 };
 
 /** The Settings button: a gear, and when the setup has a problem, a dot and the problem as text. */
@@ -263,6 +266,7 @@ export function SidebarView({
   onSearch,
   setupProblem: problem = null,
   settingsOpen = false,
+  downloads,
 }: SidebarViewProps) {
   const [closing, setClosing] = useState<SessionSummary | null>(null);
   // Where focus goes when the dialog shuts: the row's menu button, or New session once the row is gone.
@@ -317,6 +321,7 @@ export function SidebarView({
         ))}
       </div>
       <div className="flex flex-col gap-2 border-t border-line px-2 pt-2.5">
+        {downloads}
         <SettingsButton problem={problem} open={settingsOpen} onNavigate={onNavigate} />
         <ConnectionLine snapshot={connection} />
       </div>
@@ -362,6 +367,12 @@ export function Sidebar({ onSearch }: { onSearch?: (trigger: HTMLElement) => voi
       onSearch={onSearch}
       setupProblem={problem}
       settingsOpen={route.name === "settings"}
+      downloads={
+        <>
+          <PullStatus />
+          <NoSessionModelDialog />
+        </>
+      }
     />
   );
 }
