@@ -749,3 +749,52 @@ async def test_a_hosted_model_takes_categories_from_the_catalog_or_from_litellm(
         "long-context",
     ]
     assert _categories(models, "openai/gpt-plain") == ["general"]
+
+
+async def test_each_category_recommends_the_biggest_model_this_mac_can_run(
+    tmp_path: Path,
+) -> None:
+    def entry(ref: str, size: float, ram: int, *categories: str) -> CatalogEntry:
+        return CatalogEntry(
+            ref=ref, label=ref, size_gb=size, min_ram_gb=ram, categories=categories, tags=()
+        )
+
+    catalog = [
+        entry("ollama/tiny:1b", 1.0, 8, "general", "fast"),
+        entry("ollama/coder:7b", 4.7, 16, "coding"),
+        entry("ollama/coder:30b", 18.6, 48, "coding"),
+        entry("ollama/mid:9b", 6.6, 16, "general"),
+        entry("ollama/think:8b", 5.2, 16, "reasoning"),
+    ]
+    network = Network(_ollama_routes())
+    router = ModelRouter(GolemSettings(), keys=MemoryKeyStore())
+    expected = {
+        8.0: {"ollama/tiny:1b": ("general", "fast")},
+        16.0: {
+            "ollama/tiny:1b": ("fast",),
+            "ollama/coder:7b": ("coding",),
+            "ollama/mid:9b": ("general",),
+            "ollama/think:8b": ("reasoning",),
+        },
+        64.0: {
+            "ollama/tiny:1b": ("fast",),
+            "ollama/coder:30b": ("coding",),
+            "ollama/mid:9b": ("general",),
+            "ollama/think:8b": ("reasoning",),
+        },
+    }
+    for ram, picks in expected.items():
+        discovery = ModelDiscovery(
+            router,
+            tmp_path / f"picks-{ram}",
+            transport=httpx.MockTransport(network),
+            ram_gb=ram,
+            catalog=catalog,
+            price_book=PRICES,
+            fetch_prices=False,
+            ollama_installed=lambda: True,
+        )
+        listing = await discovery.list()
+        found = {m.ref: m.recommended_for for m in listing.models if m.recommended_for}
+        assert found == picks, ram
+        await discovery.aclose()

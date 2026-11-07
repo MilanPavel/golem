@@ -1,4 +1,4 @@
-import { categoryName, contextLabel, priceLabel, sizeLabel, statusLabel } from "@golem/view";
+import { type Category, categoryName, contextLabel, priceLabel, recommendedLabel, sizeLabel, statusLabel } from "@golem/view";
 import type { ReactNode } from "react";
 import type { ListedModel } from "../../store/models.ts";
 import type { PullEntry } from "../../store/pulls.ts";
@@ -55,6 +55,8 @@ export type ModelRowProps = {
   current: boolean;
   /** New sessions use it. */
   isDefault: boolean;
+  /** The category filter, so a pick for it can be named. */
+  category: Category | null;
   /** The download in flight, from the pulls store. */
   pull: PullEntry | undefined;
   /** Why the last download failed. */
@@ -62,7 +64,7 @@ export type ModelRowProps = {
 };
 
 /** One line of the list: the name, the facts, and under them what stops it or how far it is. */
-export function ModelRow({ model, providerMissing, current, isDefault, pull, failed }: ModelRowProps) {
+export function ModelRow({ model, providerMissing, current, isDefault, category, pull, failed }: ModelRowProps) {
   const profiles = model.profiles ?? [];
   const label = profiles.length > 0 ? profiles.join(", ") : model.label;
   const detail = profiles.length > 0 || model.label !== model.ref ? model.ref : "";
@@ -71,6 +73,7 @@ export function ModelRow({ model, providerMissing, current, isDefault, pull, fai
     .join("  ");
   // General is what every model is without another mark, so it is left to the filter.
   const categories = (model.categories ?? []).filter((category) => category !== "general");
+  const recommended = recommendedLabel(model, category);
   const why = reason(model, providerMissing);
   const ready = model.status === "ready";
   return (
@@ -88,6 +91,7 @@ export function ModelRow({ model, providerMissing, current, isDefault, pull, fai
           <span className={cn("text-sm font-medium", ready ? "text-ink" : "text-muted")}>{label}</span>
           {detail === "" ? null : <span className="font-mono text-xs text-faint">{detail}</span>}
           {isDefault ? <Badge className="px-1.5 py-0">default</Badge> : null}
+          {recommended === "" ? null : <Badge className="px-1.5 py-0 text-allow">{recommended}</Badge>}
           {categories.map((category) => (
             <Badge key={category} className="px-1.5 py-0 text-faint">
               {categoryName(category)}

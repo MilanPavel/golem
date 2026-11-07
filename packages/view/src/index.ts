@@ -222,6 +222,7 @@ export {
   CATEGORIES,
   categoriesLabel,
   categoryName,
+  recommendedLabel,
   contextLabel,
   modelNames,
   nextCategory,

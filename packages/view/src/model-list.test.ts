@@ -17,6 +17,7 @@ import {
   keyMissing,
   priceLabel,
   providerMissing,
+  recommendedLabel,
   sizeLabel,
   statusLabel,
   withPulls,
@@ -196,4 +197,14 @@ test("a model's categories are shown short, without the general mark", () => {
   assert.equal(categoriesLabel(model("a/b", { categories: ["general", "coding", "long-context"] })), "coding·long");
   assert.equal(categoriesLabel(model("a/b", { categories: ["general"] })), "");
   assert.equal(categoriesLabel(model("a/b")), "");
+});
+
+test("a pick is named for what is being looked at", () => {
+  const pick = model("ollama/a", { recommended: true, recommended_for: ["coding", "fast"] });
+  assert.equal(recommendedLabel(pick, null), "recommended");
+  assert.equal(recommendedLabel(pick, "coding"), "recommended for coding");
+  assert.equal(recommendedLabel(pick, "fast"), "recommended for fast");
+  assert.equal(recommendedLabel(pick, "vision"), "");
+  assert.equal(recommendedLabel(model("ollama/b", { recommended_for: ["long-context"] }), "long-context"), "recommended for long context");
+  assert.equal(recommendedLabel(model("ollama/c"), null), "");
 });

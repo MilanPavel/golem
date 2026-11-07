@@ -54,6 +54,17 @@ export function categoriesLabel(model: ListedModel): string {
     .join("·");
 }
 
+/**
+ * `recommended` on the All tab, `recommended for coding` on the Coding tab: the model golem
+ * suggests for this Mac, for what is being looked at. Empty for any other model.
+ */
+export function recommendedLabel(model: ListedModel, category: Category | null): string {
+  if (category === null) {
+    return model.recommended === true ? "recommended" : "";
+  }
+  return (model.recommended_for ?? []).includes(category) ? `recommended for ${categoryName(category).toLowerCase()}` : "";
+}
+
 /** The listing with live download progress laid over it. */
 export function withPulls(listing: ModelListResult | null, pulls: Readonly<Record<string, PullState>>): ModelListResult | null {
   if (listing === null) {
