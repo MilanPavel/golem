@@ -309,9 +309,27 @@ html.dark .golem-why-card img {
   font-size: 15px;
   color: var(--golem-muted);
 }
+.golem-why-card--wide {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 28px;
+  align-items: center;
+}
+.vp-doc .golem-why-card--wide h3 {
+  margin-top: 0;
+  font-size: 22px;
+}
+.vp-doc .golem-why-card--wide p {
+  font-size: 16px;
+}
 @media (max-width: 640px) {
-  .golem-why {
+  .golem-why,
+  .golem-why-card--wide {
     grid-template-columns: 1fr;
+  }
+  .vp-doc .golem-why-card--wide h3 {
+    margin-top: 18px;
   }
 }
 
@@ -354,10 +372,41 @@ html.dark .golem-why-card img {
   font-size: 12px;
   color: var(--golem-muted);
 }
-.golem-terminal img {
+.golem-terminal img,
+.golem-terminal video {
   display: block;
   width: 100%;
   height: auto;
+}
+
+/* The demo's Terminal | Browser switch. */
+.golem-demo-tabs {
+  display: inline-flex;
+  gap: 2px;
+  margin-top: 16px;
+  padding: 3px;
+  border: 1px solid var(--golem-line);
+  border-radius: 8px;
+  background: var(--golem-sunken);
+}
+.golem-demo-tabs button {
+  padding: 4px 14px;
+  border-radius: 6px;
+  font-family: var(--golem-font-ui);
+  font-size: 13px;
+  color: var(--golem-muted);
+}
+.golem-demo-tabs button.active {
+  background: var(--golem-surface);
+  color: var(--golem-ink);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+}
+.golem-demo-tabs button:focus-visible {
+  outline: 2px solid var(--golem-clay);
+  outline-offset: 1px;
+}
+.golem-demo .golem-terminal {
+  margin-top: 12px;
 }
 
 /* VitePress's callouts title in the interface face, not the prose serif. */
