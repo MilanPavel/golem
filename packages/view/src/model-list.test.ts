@@ -4,8 +4,13 @@ import { test } from "node:test";
 import type { ListedModel, ModelListResult } from "@golem/client";
 
 import {
+  CATEGORIES,
+  categoriesLabel,
+  categoryName,
   contextLabel,
   modelNames,
+  nextCategory,
+  previousCategory,
   pickerGroups,
   pickerModels,
   pickerName,
@@ -150,4 +155,45 @@ test("a key is missing while the provider needs one, is not listed, or there is 
   assert.ok(keyMissing(null, "anthropic"));
   // A provider that is not installed is the other predicate's business.
   assert.ok(!providerMissing(listing, "anthropic"));
+});
+
+test("a category filter keeps only the models of that category, and still honours the query", () => {
+  const listing = {
+    default: null,
+    ram_gb: null,
+    providers: [],
+    setup: { ollama_installed: true, ollama_running: true, keys: [], default_status: null },
+    models: [
+      model("ollama/coder:7b", { source: "installed", categories: ["general", "coding"] }),
+      model("ollama/seer:7b", { source: "installed", categories: ["general", "vision"] }),
+      model("ollama/old:7b", { source: "installed" }),
+    ],
+  } as ModelListResult;
+  const refs = (query: string, category: Parameters<typeof pickerModels>[2]) =>
+    pickerModels(listing, query, category).map((item) => item.ref);
+  assert.deepEqual(refs("", null), ["ollama/coder:7b", "ollama/seer:7b", "ollama/old:7b"]);
+  assert.deepEqual(refs("", "coding"), ["ollama/coder:7b"]);
+  assert.deepEqual(refs("", "general"), ["ollama/coder:7b", "ollama/seer:7b"]);
+  assert.deepEqual(refs("seer", "coding"), []);
+  assert.deepEqual(refs("seer", "vision"), ["ollama/seer:7b"]);
+});
+
+test("the category filter cycles through all of them and back to none", () => {
+  const order: (string | null)[] = [];
+  let current = nextCategory(null);
+  while (current !== null) {
+    order.push(current);
+    current = nextCategory(current);
+  }
+  assert.deepEqual(order, [...CATEGORIES]);
+  assert.equal(categoryName("long-context"), "Long context");
+  assert.equal(previousCategory(null), "long-context");
+  assert.equal(previousCategory("general"), null);
+  assert.equal(previousCategory("coding"), "general");
+});
+
+test("a model's categories are shown short, without the general mark", () => {
+  assert.equal(categoriesLabel(model("a/b", { categories: ["general", "coding", "long-context"] })), "coding·long");
+  assert.equal(categoriesLabel(model("a/b", { categories: ["general"] })), "");
+  assert.equal(categoriesLabel(model("a/b")), "");
 });

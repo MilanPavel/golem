@@ -7,6 +7,53 @@ export type PullState = { progress: number | null; status: string };
 
 export type PickerGroup = { title: string; models: ListedModel[] };
 
+/** What a model is for. The daemon fills `categories` from this fixed set. */
+export type Category = NonNullable<ListedModel["categories"]>[number];
+
+/** Every category, in the order the daemon lists them and the filters cycle. */
+export const CATEGORIES: readonly Category[] = ["general", "coding", "reasoning", "vision", "fast", "long-context"];
+
+const CATEGORY_NAMES: Record<Category, string> = {
+  general: "General",
+  coding: "Coding",
+  reasoning: "Reasoning",
+  vision: "Vision",
+  fast: "Fast",
+  "long-context": "Long context",
+};
+
+export function categoryName(category: Category): string {
+  return CATEGORY_NAMES[category];
+}
+
+/** The filter after `current`: each category in turn, then none. */
+export function nextCategory(current: Category | null): Category | null {
+  if (current === null) {
+    return CATEGORIES[0] ?? null;
+  }
+  return CATEGORIES[CATEGORIES.indexOf(current) + 1] ?? null;
+}
+
+/** The filter before `current`: the last category from none, none from the first. */
+export function previousCategory(current: Category | null): Category | null {
+  if (current === null) {
+    return CATEGORIES[CATEGORIES.length - 1] ?? null;
+  }
+  const at = CATEGORIES.indexOf(current);
+  return at <= 0 ? null : (CATEGORIES[at - 1] ?? null);
+}
+
+/**
+ * The categories worth showing beside a model, such as `coding · vision`. General is what a model
+ * is without any other mark, so it is left out here and kept for the filter.
+ */
+export function categoriesLabel(model: ListedModel): string {
+  return (model.categories ?? [])
+    .filter((category) => category !== "general")
+    .map((category) => category.replace("-context", ""))
+    .join("·");
+}
+
 /** The listing with live download progress laid over it. */
 export function withPulls(listing: ModelListResult | null, pulls: Readonly<Record<string, PullState>>): ModelListResult | null {
   if (listing === null) {
@@ -64,14 +111,18 @@ export function keyMissing(listing: ModelListResult | null, provider: string): b
   return found === undefined || found.status === "needs_key";
 }
 
-/** Groups in display order, filtered by `query` on ref, label, and profile names. */
-export function pickerGroups(listing: ModelListResult, query: string): PickerGroup[] {
+/**
+ * Groups in display order, filtered by `query` on ref, label, and profile names, and by
+ * `category` when one is chosen.
+ */
+export function pickerGroups(listing: ModelListResult, query: string, category: Category | null = null): PickerGroup[] {
   const needle = query.toLowerCase();
   const matches = (model: ListedModel): boolean =>
-    needle.length === 0 ||
-    model.ref.toLowerCase().includes(needle) ||
-    model.label.toLowerCase().includes(needle) ||
-    (model.profiles ?? []).some((name) => name.toLowerCase().includes(needle));
+    (category === null || (model.categories ?? []).includes(category)) &&
+    (needle.length === 0 ||
+      model.ref.toLowerCase().includes(needle) ||
+      model.label.toLowerCase().includes(needle) ||
+      (model.profiles ?? []).some((name) => name.toLowerCase().includes(needle)));
   const shown = listing.models.filter(matches);
   const profiled = shown.filter((model) => (model.profiles ?? []).length > 0 || model.source === "profile");
   const rest = shown.filter((model) => !profiled.includes(model));
@@ -88,8 +139,12 @@ export function pickerGroups(listing: ModelListResult, query: string): PickerGro
 }
 
 /** Every selectable model, in display order. */
-export function pickerModels(listing: ModelListResult | null, query: string): ListedModel[] {
-  return listing === null ? [] : pickerGroups(listing, query).flatMap((group) => group.models);
+export function pickerModels(
+  listing: ModelListResult | null,
+  query: string,
+  category: Category | null = null,
+): ListedModel[] {
+  return listing === null ? [] : pickerGroups(listing, query, category).flatMap((group) => group.models);
 }
 
 export function contextLabel(ctx: number | null | undefined): string {

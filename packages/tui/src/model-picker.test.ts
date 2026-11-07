@@ -299,3 +299,88 @@ test("a plain a is still typed into the filter, and a closed picker is not showi
   assert.equal(closedPicker.showAll, false);
   assert.equal(openPicker("qwen", false, null, true).showAll, true);
 });
+
+const CATEGORIZED: ModelListResult = {
+  ...LISTING,
+  models: [
+    model("ollama/coder:7b", { source: "installed", categories: ["general", "coding"] }),
+    model("ollama/seer:7b", { source: "installed", categories: ["general", "reasoning", "vision", "long-context"] }),
+    model("ollama/plain:7b", { source: "installed" }),
+  ],
+};
+
+function rowRefs(state: PickerState): string[] {
+  const rows = layoutPicker({ state, listing: CATEGORIZED, current: null, columns: 100, rows: 40 });
+  return rows.flatMap((row) => (row.kind === "model" ? [row.ref] : []));
+}
+
+test("Tab cycles the category filter through each category and back to all", () => {
+  let state = openPicker(null);
+  assert.equal(pickerKeyOf(state, press("tab")), "category");
+  const seen: (string | null)[] = [state.category];
+  for (let step = 0; step < 7; step += 1) {
+    state = pressPicker(state, CATEGORIZED, "category").state;
+    seen.push(state.category);
+  }
+  assert.deepEqual(seen, [null, "general", "coding", "reasoning", "vision", "fast", "long-context", null]);
+});
+
+test("filtering to Coding or Vision lists only those models, and Enter chooses from the filtered list", () => {
+  const coding = { ...openPicker(null), category: "coding" as const };
+  assert.deepEqual(rowRefs(coding), ["ollama/coder:7b"]);
+  const vision = { ...openPicker(null), category: "vision" as const };
+  assert.deepEqual(rowRefs(vision), ["ollama/seer:7b"]);
+  const chosen = pressPicker(vision, CATEGORIZED, "enter").action;
+  assert.equal(chosen.kind === "choose" ? chosen.model.ref : null, "ollama/seer:7b");
+  assert.deepEqual(rowRefs({ ...openPicker(null), category: "fast" }), []);
+});
+
+test("each row shows its categories", () => {
+  const rows = layoutPicker({ state: openPicker(null), listing: CATEGORIZED, current: null, columns: 100, rows: 40 });
+  const facts = Object.fromEntries(rows.flatMap((row) => (row.kind === "model" ? [[row.ref, row.facts]] : [])));
+  assert.match(facts["ollama/coder:7b"] ?? "", /^coding/);
+  assert.match(facts["ollama/seer:7b"] ?? "", /^reasoning·vision·long/);
+  assert.doesNotMatch(facts["ollama/plain:7b"] ?? "", /general|coding/);
+  assert.match(pickerHint(openPicker(null)), /Tab category/);
+  const empty = layoutPicker({ state: { ...openPicker(null), category: "fast" }, listing: CATEGORIZED, current: null, columns: 100, rows: 40 });
+  assert.deepEqual(empty[1], { kind: "note", text: "No matching models." });
+});
+
+test("the first line is a row of tabs, All and each category, with the chosen one marked", () => {
+  const tabsOf = (state: PickerState) => {
+    const first = layoutPicker({ state, listing: CATEGORIZED, current: null, columns: 100, rows: 40 })[0];
+    assert.equal(first?.kind, "tabs");
+    return first?.kind === "tabs" ? first.tabs : [];
+  };
+  const all = tabsOf(openPicker(null));
+  assert.deepEqual(
+    all.map((tab) => tab.label),
+    ["All", "General", "Coding", "Reasoning", "Vision", "Fast", "Long context"],
+  );
+  assert.deepEqual(all.filter((tab) => tab.active).map((tab) => tab.label), ["All"]);
+  const vision = tabsOf({ ...openPicker(null), category: "vision" });
+  assert.deepEqual(vision.filter((tab) => tab.active).map((tab) => tab.label), ["Vision"]);
+  // The list below the tabs keeps to the rows it was given.
+  const short = layoutPicker({ state: openPicker(null), listing: CATEGORIZED, current: null, columns: 100, rows: 3 });
+  assert.equal(short.length, 3);
+});
+
+test("Tab and Right go to the next tab, Shift-Tab and Left to the one before, and they wrap through All", () => {
+  const step = (state: PickerState, item: Press) => {
+    const key = pickerKeyOf(state, item);
+    assert.ok(key !== null);
+    return pressPicker(state, CATEGORIZED, key).state;
+  };
+  const shiftTab: Press = { name: "tab", input: "", ctrl: false, meta: false, shift: true };
+  let state = openPicker(null);
+  state = step(state, press("right"));
+  assert.equal(state.category, "general");
+  state = step(state, press("tab"));
+  assert.equal(state.category, "coding");
+  state = step(state, shiftTab);
+  assert.equal(state.category, "general");
+  state = step(state, press("left"));
+  assert.equal(state.category, null);
+  state = step(state, press("left"));
+  assert.equal(state.category, "long-context");
+});

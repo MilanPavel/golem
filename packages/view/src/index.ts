@@ -211,8 +211,13 @@ export {
   type KeyState,
 } from "./setup-key.ts";
 export {
+  CATEGORIES,
+  categoriesLabel,
+  categoryName,
   contextLabel,
   modelNames,
+  nextCategory,
+  previousCategory,
   pickerGroups,
   pickerModels,
   pickerName,
@@ -222,6 +227,7 @@ export {
   sizeLabel,
   statusLabel,
   withPulls,
+  type Category,
   type PickerGroup,
   type PullState,
 } from "./model-list.ts";

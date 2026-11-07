@@ -21,6 +21,17 @@ export function ModelPickerView({
         {`Models  ${hint}`}
       </Text>
       {rows.map((row, index) => {
+        if (row.kind === "tabs") {
+          return (
+            <Text key="tabs" wrap="truncate-end">
+              {row.tabs.map((tab, at) => (
+                <Text key={tab.label} color={tab.active ? CLAY : undefined} bold={tab.active} inverse={tab.active} dimColor={!tab.active}>
+                  {`${at === 0 ? "" : " "} ${tab.label} `}
+                </Text>
+              ))}
+            </Text>
+          );
+        }
         if (row.kind === "header") {
           return (
             <Text key={`h${index}`} bold wrap="truncate-end">
