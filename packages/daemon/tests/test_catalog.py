@@ -56,3 +56,11 @@ def test_the_schema_check_names_what_is_wrong() -> None:
 def test_local_and_hosted_entries_share_one_file_without_mixing() -> None:
     assert all(entry.ref.startswith("ollama/") for entry in load_local_catalog())
     assert not any(entry.ref.startswith("ollama/") for entry in load_hosted_catalog())
+
+
+def test_no_catalog_model_is_marked_retired_in_the_bundled_prices() -> None:
+    book = PriceBook.bundled()
+    for entry in load_hosted_catalog():
+        provider, _, model = entry.ref.partition("/")
+        info = book.lookup(provider, model)
+        assert info is not None and info.deprecation_date is None, entry.ref

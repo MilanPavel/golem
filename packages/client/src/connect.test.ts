@@ -714,7 +714,7 @@ test("setKey sends the key to the daemon and never to the wire log", async () =>
   }
 });
 
-test("listModels asks for a refresh only when told to, and takes a listing with no default", async () => {
+test("listModels asks for a refresh or show all only when told to, and takes a listing with no default", async () => {
   const sent: Record<string, unknown>[] = [];
   const listed = {
     default: null,
@@ -738,7 +738,8 @@ test("listModels asks for a refresh only when told to, and takes a listing with 
   try {
     assert.equal((await client.listModels()).models[0]?.ref, "ollama/qwen3:8b");
     await client.listModels(true);
-    assert.deepEqual(sent, [{}, { refresh: true }]);
+    await client.listModels(false, true);
+    assert.deepEqual(sent, [{}, { refresh: true }, { show_all: true }]);
   } finally {
     client.close();
     await server.close();
@@ -974,6 +975,38 @@ test("mcp.catalog lists the entries, and a catalog add keeps its secrets off the
     assert.ok(!shown.includes("ghp-very-secret"));
   } finally {
     stop();
+    client.close();
+    await server.close();
+  }
+});
+
+test("mcp.get returns one server's config, and a malformed result is refused", async () => {
+  const sent: Record<string, unknown>[] = [];
+  const detail = {
+    server: { name: "github", state: "running", command: "npx", tools: [] },
+    config: { command: "npx", env: { TOKEN: "keychain:mcp/github" } },
+    scope: "user",
+    path: "/h/config.toml",
+    secrets: [{ ref: "mcp/github", stored: true }],
+  };
+  const results: Record<string, unknown> = { "mcp.get": detail };
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results,
+      onRequest: (_socket, method, params) => {
+        if (method === "mcp.get") sent.push(params);
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    assert.equal((await client.mcpGet("github")).secrets[0]?.ref, "mcp/github");
+    await client.mcpGet("github", "s1");
+    assert.deepEqual(sent, [{ name: "github" }, { name: "github", session_id: "s1" }]);
+    results["mcp.get"] = { ...detail, scope: "team" };
+    await assert.rejects(client.mcpGet("github"), /invalid mcp.get result/);
+  } finally {
     client.close();
     await server.close();
   }

@@ -2384,7 +2384,8 @@ export function App({
   }
 
   function loadModels(refresh: boolean): void {
-    void client.listModels(refresh).then(
+    // Show all belongs to the open picker. Anything else lists the catalog's models.
+    void client.listModels(refresh, pickerRef.current.showAll).then(
       (result) => {
         listingRef.current = result;
         setListing(result);
@@ -2725,6 +2726,12 @@ export function App({
     if (action.kind === "refresh") {
       setChat((current) => ({ ...current, notice: "refreshing models…" }));
       loadModels(true);
+    } else if (action.kind === "show-all") {
+      setChat((current) => ({
+        ...current,
+        notice: action.on ? "showing every live model that calls tools" : "showing the current models",
+      }));
+      loadModels(false);
     } else if (action.kind === "choose") {
       chooseModel(action.model, action.name, action.setDefault);
     } else if (action.kind === "notice") {

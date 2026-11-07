@@ -1,0 +1,6 @@
+{
+  "mcpServers": {
+    "figma": { "serverUrl": "https://figma.example.test/mcp", "headers": { "Authorization": "Bearer figma_fixture_token_4" } },
+    "broken": { "args": ["nothing to run"] }
+  }
+}

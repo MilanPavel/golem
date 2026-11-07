@@ -6,6 +6,7 @@ import type { AuthSetResult } from "../../protocol/gen/auth-set-result.ts";
 import type { McpAddParams } from "../../protocol/gen/mcp-add-params.ts";
 import type { McpCatalogParams } from "../../protocol/gen/mcp-catalog-params.ts";
 import type { McpCatalogResult } from "../../protocol/gen/mcp-catalog-result.ts";
+import type { McpServerDetail } from "../../protocol/gen/mcp-server-detail.ts";
 import type { RuntimeInstallCancelResult } from "../../protocol/gen/runtime-install-cancel-result.ts";
 import type { RuntimeInstallDone } from "../../protocol/gen/runtime-install-done.ts";
 import type { RuntimeInstallResult } from "../../protocol/gen/runtime-install-result.ts";
@@ -66,6 +67,7 @@ import {
   isKeychainWait,
   isOllamaInstallDone,
   isMcpCatalogResult,
+  isMcpServerDetail,
   isRuntimeInstallDone,
   isRuntimeName,
   isFsListDirsResult,
@@ -242,7 +244,8 @@ export interface GolemClient {
   /** Stop allowing `tool` (with `subject`) for the rest of the session. Resolves whether it was allowed. */
   revokeAllowance(sessionId: string, tool: string, subject: string | null): Promise<boolean>;
   /** Every model golem knows of. `refresh` fetches hosted lists and prices again, past their cache. */
-  listModels(refresh?: boolean): Promise<ModelListResult>;
+  /** `refresh` asks the providers again, past the daemon's cache. `showAll` adds every live chat model that calls tools. */
+  listModels(refresh?: boolean, showAll?: boolean): Promise<ModelListResult>;
   /** Use `model` (a profile or a ref) from the session's next run. The daemon emits `model.selected`. */
   setSessionModel(sessionId: string, model: string): Promise<SessionSetModelResult>;
   /** Write `default_model` to the user's config.toml. New sessions start on it. */
@@ -277,6 +280,8 @@ export interface GolemClient {
   removeMcpServer(name: string): Promise<McpRemoveResult>;
   /** The servers golem offers, each with whether it can run here and whether it is already added. */
   mcpCatalog(sessionId?: string): Promise<McpCatalogResult>;
+  /** One server's status, its whole config (secrets as `keychain:mcp/…` references), and where it is written. */
+  mcpGet(name: string, sessionId?: string): Promise<McpServerDetail>;
   /** Install Node or uv with Homebrew, run by the daemon. Output reaches {@link GolemClient.onRuntimeInstall}. */
   installRuntime(name: RuntimeName): Promise<RuntimeInstallResult>;
   cancelRuntimeInstall(name: RuntimeName): Promise<RuntimeInstallCancelResult>;
@@ -1093,9 +1098,12 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       }
       return result;
     },
-    async listModels(refresh = false): Promise<ModelListResult> {
+    async listModels(refresh = false, showAll = false): Promise<ModelListResult> {
       await ready;
-      const result = await call("model.list", refresh ? { refresh: true } : {});
+      const result = await call("model.list", {
+        ...(refresh ? { refresh: true } : {}),
+        ...(showAll ? { show_all: true } : {}),
+      });
       if (!isModelListResult(result)) {
         throw new Error("invalid model.list result");
       }
@@ -1203,6 +1211,14 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("mcp.catalog", { ...params });
       if (!isMcpCatalogResult(result)) {
         throw new Error("invalid mcp.catalog result");
+      }
+      return result;
+    },
+    async mcpGet(name: string, sessionId?: string): Promise<McpServerDetail> {
+      await ready;
+      const result = await call("mcp.get", withSession({ name }, sessionId));
+      if (!isMcpServerDetail(result)) {
+        throw new Error("invalid mcp.get result");
       }
       return result;
     },

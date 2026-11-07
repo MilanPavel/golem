@@ -1,5 +1,6 @@
 import type { KeychainWait } from "../../protocol/gen/keychain-wait.ts";
 import type { McpCatalogResult } from "../../protocol/gen/mcp-catalog-result.ts";
+import type { McpServerDetail } from "../../protocol/gen/mcp-server-detail.ts";
 import type { RuntimeInstallDone } from "../../protocol/gen/runtime-install-done.ts";
 import type { OllamaInstallDone } from "../../protocol/gen/ollama-install-done.ts";
 import type { DirEntry, FsListDirsResult } from "../../protocol/gen/fs-list-dirs-result.ts";
@@ -397,6 +398,17 @@ export function isRuntimeName(value: unknown): value is "node" | "uv" {
 
 export function isRuntimeInstallDone(value: unknown): value is RuntimeInstallDone {
   return isRecord(value) && isRuntimeName(value["name"]) && typeof value["ok"] === "boolean";
+}
+
+export function isMcpServerDetail(value: unknown): value is McpServerDetail {
+  return (
+    isRecord(value) &&
+    isMcpServer(value["server"]) &&
+    isRecord(value["config"]) &&
+    typeof value["path"] === "string" &&
+    (value["scope"] === "user" || value["scope"] === "project") &&
+    Array.isArray(value["secrets"])
+  );
 }
 
 export function isMcpCatalogResult(value: unknown): value is McpCatalogResult {

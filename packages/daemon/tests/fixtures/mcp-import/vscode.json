@@ -1,0 +1,15 @@
+{
+  // VS Code writes comments and trailing commas in this file.
+  "inputs": [
+    { "type": "promptString", "id": "gh-token", "description": "GitHub token", "password": true },
+  ],
+  "servers": {
+    "github": {
+      "type": "stdio",
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "ghcr.io/github/github-mcp-server"],
+      "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "${input:gh-token}" },
+    },
+    "legacy": { "type": "sse", "url": "https://legacy.example.test/sse" },
+  },
+}

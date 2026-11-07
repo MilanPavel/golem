@@ -64,6 +64,7 @@ from golem.server.mcp_edit import (
     mcp_remove,
     mcp_update,
 )
+from golem.server.mcp_import import mcp_import_apply, mcp_import_scan
 from golem.server.mcp_try import mcp_call, mcp_logs, mcp_test
 from golem.sessions.manager import (
     ApprovalNotFoundError,
@@ -112,6 +113,8 @@ from golem_protocol.commands import (
     McpAddParams,
     McpCallParams,
     McpCatalogParams,
+    McpImportApplyParams,
+    McpImportScanParams,
     McpListParams,
     McpListResult,
     McpLogsParams,
@@ -535,7 +538,7 @@ async def _model_list(ctx: RequestContext, params: ModelListParams) -> ModelList
     models = ctx.state.models
     if models is None:
         raise RpcCallError(INTERNAL_ERROR, "models are not ready")
-    listing = await models.list(refresh=params.refresh)
+    listing = await models.list(refresh=params.refresh, show_all=params.show_all)
     return ModelListResult(
         default=listing.default,
         ram_gb=listing.ram_gb,
@@ -983,6 +986,10 @@ def standard_methods() -> dict[str, Method]:
         "mcp.update": Method("mcp.update", McpUpdateParams, True, mcp_update),
         "mcp.test": Method("mcp.test", McpTestParams, True, mcp_test),
         "mcp.catalog": Method("mcp.catalog", McpCatalogParams, True, mcp_catalog),
+        "mcp.import.scan": Method("mcp.import.scan", McpImportScanParams, True, mcp_import_scan),
+        "mcp.import.apply": Method(
+            "mcp.import.apply", McpImportApplyParams, True, mcp_import_apply
+        ),
         "runtime.install": Method("runtime.install", RuntimeInstallParams, True, runtime_install),
         "runtime.install_cancel": Method(
             "runtime.install_cancel", RuntimeInstallCancelParams, True, runtime_install_cancel

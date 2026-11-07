@@ -15,6 +15,7 @@ from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
 
 from golem.config import GolemSettings
+from golem.models.catalog import HostedEntry
 from golem.models.discovery import KeyRejected, ModelDiscovery
 from golem.models.keys import MemoryKeyStore
 from golem.models.prices import PriceBook
@@ -37,6 +38,12 @@ def _discovery(
         detect_ram=False,
         fetch_prices=False,
         price_book=PriceBook.bundled(),
+        # Before any model here was retired, and with the fixture's models in the catalog.
+        clock=lambda: 1_700_000_000.0,
+        hosted=[
+            HostedEntry("deepseek/deepseek-chat", "deepseek-chat", "b", ("general",)),
+            HostedEntry("deepseek/deepseek-reasoner", "deepseek-reasoner", "b", ("general",)),
+        ],
     )
 
 

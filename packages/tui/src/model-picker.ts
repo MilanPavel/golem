@@ -39,9 +39,18 @@ export type PickerState = {
   /** Opened because no model is configured. Choosing also sets the default. */
   firstRun: boolean;
   confirm: Confirm | null;
+  /** The list shows every live chat model that calls tools, not only the catalog's. */
+  showAll: boolean;
 };
 
-export const closedPicker: PickerState = { open: false, selected: null, query: "", firstRun: false, confirm: null };
+export const closedPicker: PickerState = {
+  open: false,
+  selected: null,
+  query: "",
+  firstRun: false,
+  confirm: null,
+  showAll: false,
+};
 
 export type PickerKey =
   | "up"
@@ -54,6 +63,7 @@ export type PickerKey =
   | "clear-query"
   | "close"
   | "refresh"
+  | "show-all"
   | "remove"
   | { kind: "type"; text: string };
 
@@ -61,6 +71,7 @@ export type PickerAction =
   | { kind: "none" }
   | { kind: "close" }
   | { kind: "refresh" }
+  | { kind: "show-all"; on: boolean }
   | { kind: "notice"; text: string }
   | { kind: "choose"; model: ListedModel; name: string; setDefault: boolean }
   | { kind: "pull"; ref: string; use: boolean; setDefault: boolean }
@@ -85,8 +96,13 @@ export type PickerRow =
 const QUERY_MAX = 200;
 const PAGE = 10;
 
-export function openPicker(current: string | null, firstRun = false, confirm: Confirm | null = null): PickerState {
-  return { open: true, selected: confirm?.ref ?? current, query: "", firstRun, confirm };
+export function openPicker(
+  current: string | null,
+  firstRun = false,
+  confirm: Confirm | null = null,
+  showAll = false,
+): PickerState {
+  return { open: true, selected: confirm?.ref ?? current, query: "", firstRun, confirm, showAll };
 }
 
 /** What follows a finished install, once the model list is fresh: download, use, or say why not. */
@@ -143,7 +159,8 @@ export function pickerHint(state: PickerState, ramGb: number | null = null): str
     return `filter: ${state.query}  ↑↓ move · Enter use · Esc clear`;
   }
   const head = state.firstRun ? "Pick a model to start. " : "";
-  return `${head}↑↓ move · Enter use or download · d also make default · x stop or remove · type to filter · Ctrl-R refresh · Esc close`;
+  const all = state.showAll ? "Ctrl-A current only" : "Ctrl-A show all";
+  return `${head}↑↓ move · Enter use or download · d also make default · x stop or remove · type to filter · ${all} · Ctrl-R refresh · Esc close`;
 }
 
 function confirmHint(confirm: Confirm, ramGb: number | null): string {
@@ -191,6 +208,9 @@ export function pickerKeyOf(state: PickerState, press: Press): PickerKey | null 
   }
   if (press.ctrl && press.input === "r") {
     return "refresh";
+  }
+  if (press.ctrl && press.input === "a") {
+    return "show-all";
   }
   if (press.ctrl || press.meta || press.input.length === 0 || /[\r\n]/.test(press.input)) {
     return null;
@@ -257,6 +277,9 @@ export function pressPicker(
   }
   if (key === "refresh") {
     return { state, action: { kind: "refresh" } };
+  }
+  if (key === "show-all") {
+    return { state: { ...state, showAll: !state.showAll }, action: { kind: "show-all", on: !state.showAll } };
   }
   if (key === "clear-query") {
     return { state: { ...state, query: "" }, action: { kind: "none" } };

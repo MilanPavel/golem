@@ -67,7 +67,7 @@ def _blank_to_none(value: object) -> object:
     return value
 
 
-_SECRET_KEY = re.compile(
+SECRET_KEY = re.compile(
     r"(^|_)(api_?key|key|token|password|passwd|secret|credentials?|authorization|bearer)$",
     re.IGNORECASE,
 )
@@ -82,7 +82,7 @@ def _no_inline_secrets(data: object) -> object:
     """Refuse a table with a key such as ``api_key`` or ``token`` before anything else."""
     if isinstance(data, dict):
         for key in cast(dict[object, object], data):
-            if isinstance(key, str) and _SECRET_KEY.search(key):
+            if isinstance(key, str) and SECRET_KEY.search(key):
                 raise ValueError(INLINE_SECRET.format(key=key))
     return cast(object, data)
 
@@ -293,14 +293,14 @@ class McpServerSettings(BaseModel):
         for name in self.env_passthrough:
             if ENV_NAME.match(name) is None:
                 raise ValueError(f"{name!r} is not a variable name in env_passthrough")
-            if _SECRET_KEY.search(name):
+            if SECRET_KEY.search(name):
                 raise ValueError(
                     f"{name} looks like a secret: set it in env as keychain:mcp/<name> "
                     "instead of passing it through"
                 )
         for table in (self.env, self.headers):
             for key, value in table.items():
-                if _SECRET_KEY.search(key) and MCP_SECRET.search(value) is None:
+                if SECRET_KEY.search(key) and MCP_SECRET.search(value) is None:
                     raise ValueError(
                         f"{key} looks like a secret: set it to keychain:mcp/<name> and store "
                         "the value with golem auth set mcp/<name>"
