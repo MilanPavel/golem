@@ -42,6 +42,8 @@ export type Press = {
   input: string;
   ctrl: boolean;
   meta: boolean;
+  /** Set on a Tab press that had Shift held: a tab backwards. */
+  shift?: boolean;
 };
 
 /** The flags Ink reports. Extra flags on Ink's Key are ignored. */
@@ -700,7 +702,7 @@ export function classifyPress(input: string, key: KeyFlags): Press {
     return { ...press, name: "escape" };
   }
   if (key.tab) {
-    return { ...press, name: "tab" };
+    return key.shift ? { ...press, name: "tab", shift: true } : { ...press, name: "tab" };
   }
   if (key.return) {
     return { ...press, name: key.meta || key.shift ? "alt-return" : "return" };

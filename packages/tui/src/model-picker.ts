@@ -1,8 +1,13 @@
 import type { ListedModel, ModelListResult } from "@golem/client";
 import {
+  CATEGORIES,
+  categoriesLabel,
+  categoryName,
   contextLabel,
   modelNames,
   namesModel,
+  nextCategory,
+  previousCategory,
   pickerGroups,
   pickerModels,
   pickerName,
@@ -11,6 +16,7 @@ import {
   sizeLabel,
   statusLabel,
   withPulls,
+  type Category,
   type PullState,
 } from "@golem/view";
 
@@ -41,6 +47,8 @@ export type PickerState = {
   confirm: Confirm | null;
   /** The list shows every live chat model that calls tools, not only the catalog's. */
   showAll: boolean;
+  /** Only models of this category are listed, or all of them when null. */
+  category: Category | null;
 };
 
 export const closedPicker: PickerState = {
@@ -50,6 +58,7 @@ export const closedPicker: PickerState = {
   firstRun: false,
   confirm: null,
   showAll: false,
+  category: null,
 };
 
 export type PickerKey =
@@ -64,6 +73,8 @@ export type PickerKey =
   | "close"
   | "refresh"
   | "show-all"
+  | "category"
+  | "category-back"
   | "remove"
   | { kind: "type"; text: string };
 
@@ -80,6 +91,7 @@ export type PickerAction =
   | { kind: "delete"; ref: string };
 
 export type PickerRow =
+  | { kind: "tabs"; tabs: { label: string; active: boolean }[] }
   | { kind: "header"; text: string }
   | { kind: "note"; text: string }
   | {
@@ -102,7 +114,7 @@ export function openPicker(
   confirm: Confirm | null = null,
   showAll = false,
 ): PickerState {
-  return { open: true, selected: confirm?.ref ?? current, query: "", firstRun, confirm, showAll };
+  return { open: true, selected: confirm?.ref ?? current, query: "", firstRun, confirm, showAll, category: null };
 }
 
 /** What follows a finished install, once the model list is fresh: download, use, or say why not. */
@@ -156,11 +168,11 @@ export function pickerHint(state: PickerState, ramGb: number | null = null): str
     return confirmHint(confirm, ramGb);
   }
   if (state.query.length > 0) {
-    return `filter: ${state.query}  ↑↓ move · Enter use · Esc clear`;
+    return `filter: ${state.query}  ↑↓ move · Enter use · Tab category · Esc clear`;
   }
   const head = state.firstRun ? "Pick a model to start. " : "";
   const all = state.showAll ? "Ctrl-A current only" : "Ctrl-A show all";
-  return `${head}↑↓ move · Enter use or download · d also make default · x stop or remove · type to filter · ${all} · Ctrl-R refresh · Esc close`;
+  return `${head}↑↓ move · Enter use or download · d also make default · x stop or remove · type to filter · Tab category · ${all} · Ctrl-R refresh · Esc close`;
 }
 
 function confirmHint(confirm: Confirm, ramGb: number | null): string {
@@ -195,6 +207,12 @@ export function pickerKeyOf(state: PickerState, press: Press): PickerKey | null 
       return "page-up";
     case "page-down":
       return "page-down";
+    case "tab":
+      return press.shift === true ? "category-back" : "category";
+    case "left":
+      return "category-back";
+    case "right":
+      return "category";
     case "return":
       return "enter";
     case "backspace":
@@ -281,6 +299,10 @@ export function pressPicker(
   if (key === "show-all") {
     return { state: { ...state, showAll: !state.showAll }, action: { kind: "show-all", on: !state.showAll } };
   }
+  if (key === "category" || key === "category-back") {
+    const category = key === "category" ? nextCategory(state.category) : previousCategory(state.category);
+    return { state: { ...state, category }, action: { kind: "none" } };
+  }
   if (key === "clear-query") {
     return { state: { ...state, query: "" }, action: { kind: "none" } };
   }
@@ -290,7 +312,7 @@ export function pressPicker(
   if (typeof key === "object") {
     return { state: { ...state, query: (state.query + key.text).slice(0, QUERY_MAX) }, action: { kind: "none" } };
   }
-  const models = pickerModels(listing, state.query);
+  const models = pickerModels(listing, state.query, state.category);
   const index = selectedIndex(state, models);
   if (key === "enter" || key === "default" || key === "remove") {
     const chosen = models[index];
@@ -338,11 +360,12 @@ export function layoutPicker(input: {
   if (listing === null) {
     return [{ kind: "note", text: "Loading models…" }];
   }
-  const models = pickerModels(listing, input.state.query);
+  const { query, category } = input.state;
+  const models = pickerModels(listing, query, category);
   const index = selectedIndex(input.state, models);
   const selectedRef = models[index]?.ref ?? null;
   const lines: PickerRow[] = [];
-  for (const group of pickerGroups(listing, input.state.query)) {
+  for (const group of pickerGroups(listing, query, category)) {
     lines.push({ kind: "header", text: group.title });
     for (const model of group.models) {
       const missing = providerMissing(listing, model.provider);
@@ -350,7 +373,8 @@ export function layoutPicker(input: {
     }
   }
   if (models.length === 0) {
-    lines.push({ kind: "note", text: input.state.query.length > 0 ? "No matching models." : "No models found." });
+    const none = query.length > 0 || category !== null ? "No matching models." : "No models found.";
+    lines.push({ kind: "note", text: none });
   }
   for (const provider of listing.providers) {
     if (provider.status === "needs_key") {
@@ -361,13 +385,24 @@ export function layoutPicker(input: {
       lines.push({ kind: "note", text: `${provider.provider}: not installed · Enter on one of its models installs it` });
     }
   }
+  // The first line is the category tabs. The list scrolls in the lines below it.
+  const room = rows - 1;
   const at = lines.findIndex((line) => line.kind === "model" && line.selected);
-  const start = Math.min(Math.max(0, at - rows + 2), Math.max(0, lines.length - rows));
-  return lines.slice(start, start + rows);
+  const start = Math.min(Math.max(0, at - room + 2), Math.max(0, lines.length - room));
+  return [categoryTabs(category), ...lines.slice(start, start + room)];
+}
+
+/** `All` and each category, with the chosen one marked. */
+function categoryTabs(category: Category | null): PickerRow {
+  const tabs = [{ label: "All", active: category === null }];
+  for (const name of CATEGORIES) {
+    tabs.push({ label: categoryName(name), active: name === category });
+  }
+  return { kind: "tabs", tabs };
 }
 
 function modelRow(model: ListedModel, selected: boolean, current: boolean, columns: number, missing: boolean): PickerRow {
-  const facts = [contextLabel(model.ctx), priceLabel(model), sizeLabel(model), statusLabel(model, missing)]
+  const facts = [categoriesLabel(model), contextLabel(model.ctx), priceLabel(model), sizeLabel(model), statusLabel(model, missing)]
     .filter((part) => part.length > 0)
     .join("  ");
   const profiles = model.profiles ?? [];
