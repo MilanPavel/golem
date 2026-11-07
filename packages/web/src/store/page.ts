@@ -1,11 +1,11 @@
-import { OLLAMA_FAILED, RpcError, type ApprovalChoice, type ConfigGetResult, type FsListDirsResult, type McpCallResult, type McpListResult, type McpLogsResult, type McpServerLog, type McpTestProgress, type McpTestResult, type GolemClient, type SetupStatusResult, type SkillListResult, type TraceGetResult } from "@golem/client";
+import { OLLAMA_FAILED, RpcError, type ApprovalChoice, type ConfigGetResult, type FsListDirsResult, type McpAddParams, type McpCallResult, type McpCatalogResult, type McpListResult, type McpLogsResult, type McpServerConfig, type McpServerDetail, type McpServerLog, type McpTestProgress, type McpTestResult, type GolemClient, type RuntimeName, type SetupStatusResult, type SkillListResult, type TraceGetResult } from "@golem/client";
 import { changeToolFilter, installEventOf, type InstallEvent } from "@golem/view";
 import type { QueryClient } from "@tanstack/react-query";
 import { createDrafts, type Drafts } from "./drafts.ts";
 import { createConnectionStore, type ConnectionStore } from "./connection.ts";
 import { createNewSession, type NewSessionStore } from "./new-session.ts";
 import { CONFIG_KEY } from "./config.ts";
-import { MCP_LIST_KEY, MCP_TOOLS_KEY, type McpToolsResult } from "./mcp.ts";
+import { MCP_CATALOG_KEY, MCP_LIST_KEY, MCP_TOOLS_KEY, type McpToolsResult } from "./mcp.ts";
 import { MODEL_LIST_ALL_KEY, MODEL_LIST_KEY, SETUP_STATUS_KEY, type ModelListResult } from "./models.ts";
 import { createPulls, type Pulls } from "./pulls.ts";
 import { createQueryClient, keepQueriesHonest } from "./query.ts";
@@ -54,6 +54,11 @@ export type PageClient = Pick<
   | "mcpCall"
   | "mcpGet"
   | "updateMcpServer"
+  | "addMcpServer"
+  | "mcpCatalog"
+  | "installRuntime"
+  | "cancelRuntimeInstall"
+  | "onRuntimeInstall"
   | "removeMcpServer"
   | "listDirs"
   | "updateRule"
@@ -129,6 +134,24 @@ export type PageActions = {
   setMcpToolHidden(name: string, tool: string, hide: boolean, sessionId: string | null): Promise<void>;
   /** Removes a server from the user's config, with the token it stored. */
   removeMcp(name: string): Promise<void>;
+  /** One server's whole config, with secrets as Keychain references, and the file that names it. */
+  getMcp(name: string, sessionId: string | null): Promise<McpServerDetail>;
+  /** Replaces the server's `[mcp.<name>]`. `secrets` (by reference) are stored first, and only those sent change. */
+  updateMcp(name: string, config: McpServerConfig, secrets: Record<string, string>, sessionId: string | null): Promise<void>;
+  /** Adds a server to the user's config and starts it. Rejects with the daemon's reason. */
+  addMcp(params: McpAddParams): Promise<void>;
+  /** Tries a server that is not saved yet, saving nothing. `onStep` gets each step as it ends. */
+  testMcpDraft(
+    draft: { catalogId: string; inputs: Record<string, string>; secrets: Record<string, string>; name: string } | { config: McpServerConfig; secrets: Record<string, string> },
+    sessionId: string | null,
+    onStep: (step: McpTestProgress) => void,
+  ): Promise<McpTestResult>;
+  /**
+   * Installs Node or uv with Homebrew, run by the daemon. `onEvent` gets the output and the end, and
+   * the subscription ends with it. Resolves false when an install of it was already running.
+   */
+  installRuntime(name: RuntimeName, onEvent: (event: InstallEvent) => void): Promise<boolean>;
+  cancelRuntimeInstall(name: RuntimeName): Promise<void>;
   /** Turns an on-demand server on or off for one session. */
   toggleMcp(sessionId: string, name: string, on: boolean): Promise<void>;
   /** Asks the providers again, past the daemon's cache, puts the answer in the listing, and returns it. */
@@ -160,6 +183,8 @@ export type PageQueries = {
   mcpTools(name: string, sessionId: string | null): Promise<McpToolsResult>;
   /** A session's runs as a tree of spans. */
   trace(sessionId: string): Promise<TraceGetResult>;
+  /** The servers golem offers to add, with what each needs here. */
+  mcpCatalog(sessionId: string | null): Promise<McpCatalogResult>;
   /** The folders directly under `path` in the home folder; `null` is home itself. */
   dirs(path: string | null): Promise<FsListDirsResult>;
 };
@@ -230,6 +255,7 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       mcpList: (sessionId) => client.listMcp(sessionId ?? undefined),
       mcpTools: (name, sessionId) => client.mcpTools(name, sessionId ?? undefined),
       trace: (sessionId) => client.getTrace(sessionId),
+      mcpCatalog: (sessionId) => client.mcpCatalog(sessionId ?? undefined),
       dirs: (path) => (path === null ? client.listDirs() : client.listDirs(path)),
     },
     router,
@@ -315,7 +341,73 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
           await client.removeMcpServer(name);
         } finally {
           await queryClient.invalidateQueries({ queryKey: MCP_LIST_KEY });
+          await queryClient.invalidateQueries({ queryKey: MCP_CATALOG_KEY });
         }
+      },
+      getMcp: (name, sessionId) => client.mcpGet(name, sessionId ?? undefined),
+      async updateMcp(name, config, secrets, sessionId) {
+        try {
+          await client.updateMcpServer({
+            name,
+            config,
+            ...(Object.keys(secrets).length === 0 ? {} : { secrets }),
+            ...(sessionId === null ? {} : { session_id: sessionId }),
+          });
+        } finally {
+          await queryClient.invalidateQueries({ queryKey: MCP_LIST_KEY });
+          await queryClient.invalidateQueries({ queryKey: MCP_TOOLS_KEY });
+        }
+      },
+      async addMcp(params) {
+        try {
+          await client.addMcpServer(params);
+        } finally {
+          await queryClient.invalidateQueries({ queryKey: MCP_LIST_KEY });
+          await queryClient.invalidateQueries({ queryKey: MCP_CATALOG_KEY });
+        }
+      },
+      testMcpDraft: (draft, sessionId, onStep) => {
+        const session = sessionId === null ? {} : { sessionId };
+        return client.mcpTest(
+          "catalogId" in draft
+            ? { catalogId: draft.catalogId, inputs: draft.inputs, secrets: draft.secrets, name: draft.name, ...session }
+            : { config: draft.config, secrets: draft.secrets, ...session },
+          onStep,
+        );
+      },
+      async installRuntime(name, onEvent) {
+        let off: (() => void) | null = null;
+        const end = (): void => {
+          off?.();
+          off = null;
+        };
+        off = client.onRuntimeInstall((update) => {
+          if (update.kind === "output") {
+            if (update.name === name) onEvent({ kind: "output", text: update.text });
+            return;
+          }
+          if (update.done.name !== name) return;
+          end();
+          onEvent(
+            update.done.ok
+              ? { kind: "exit", code: 0, stopped: false }
+              : update.done.error == null
+                ? { kind: "exit", code: null, stopped: true }
+                : { kind: "error", message: update.done.error },
+          );
+          void queryClient.invalidateQueries({ queryKey: MCP_CATALOG_KEY });
+        });
+        try {
+          const result = await client.installRuntime(name);
+          if (!result.started) end();
+          return result.started;
+        } catch (failure) {
+          end();
+          throw failure;
+        }
+      },
+      async cancelRuntimeInstall(name) {
+        await client.cancelRuntimeInstall(name);
       },
       async toggleMcp(sessionId, name, on) {
         try {

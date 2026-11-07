@@ -46,16 +46,20 @@ export {
   type SkillChoice,
 } from "./commands.ts";
 export {
+  CATEGORY_TITLES,
   cliCommand,
+  draftLine,
   entryAvailable,
   entryInputs,
   entryLabel,
   entryNote,
   entryParams,
   findEntry,
+  groupEntries,
   inputDefault,
   inputError,
   mcpNameError,
+  missingRuntime,
   OTHER_ID,
   otherSpec,
   shellQuote,
@@ -64,6 +68,7 @@ export {
   type McpCatalogEntry,
   type McpCatalogInput,
 } from "./mcp-catalog.ts";
+export { editForm, updateFromForm, type EditForm, type EditPair } from "./mcp-edit.ts";
 export {
   changeToolFilter,
   formatLogLine,

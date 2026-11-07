@@ -171,3 +171,48 @@ function quoteIsOpen(text: string): boolean {
 export function shellQuote(word: string): string {
   return /^[A-Za-z0-9_@%+=:,./-]+$/.test(word) ? word : `'${word.replaceAll("'", `'\\''`)}'`;
 }
+
+/** The catalog's categories, in the order a list shows them. */
+export const CATEGORY_TITLES: Readonly<Record<McpCatalogEntry["category"], string>> = {
+  files: "Files",
+  code: "Code",
+  web: "Web",
+  data: "Data",
+  productivity: "Productivity",
+  other: "Other",
+};
+
+const CATEGORY_ORDER = Object.keys(CATEGORY_TITLES) as McpCatalogEntry["category"][];
+
+/**
+ * The entries a search leaves, by category in a fixed order, each category in the daemon's order.
+ * The search matches the title, the description, and the id, ignoring case.
+ */
+export function groupEntries(
+  entries: readonly McpCatalogEntry[],
+  query: string,
+): { category: McpCatalogEntry["category"]; title: string; entries: McpCatalogEntry[] }[] {
+  const words = query.toLowerCase().split(/\s+/).filter((word) => word.length > 0);
+  const shown = entries.filter((entry) => {
+    const text = `${entry.title} ${entry.description} ${entry.id}`.toLowerCase();
+    return words.every((word) => text.includes(word));
+  });
+  return CATEGORY_ORDER.map((category) => ({
+    category,
+    title: CATEGORY_TITLES[category],
+    entries: shown.filter((entry) => entry.category === category),
+  })).filter((group) => group.entries.length > 0);
+}
+
+/** The program an entry needs and the machine lacks, as the install button names it. */
+export function missingRuntime(entry: McpCatalogEntry): "node" | "uv" | null {
+  return entry.missing === "node" || entry.missing === "uv" ? entry.missing : null;
+}
+
+/** The command a draft will run, as a line a person can read before saving. A URL is its own line. */
+export function draftLine(spec: McpAddSpec): string {
+  if (spec.url != null) {
+    return spec.url;
+  }
+  return [spec.command ?? "", ...(spec.args ?? [])].map(shellQuote).join(" ");
+}

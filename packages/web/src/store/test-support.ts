@@ -1,4 +1,4 @@
-import { OLLAMA_FAILED, RpcError, SESSION_BUSY, type ChatEvent, type ConnectionState, type OllamaInstallUpdate, type McpServerLog, type ModelServerStatus, type PullUpdate, type SessionSummary } from "@golem/client";
+import { OLLAMA_FAILED, RpcError, SESSION_BUSY, type ChatEvent, type ConnectionState, type OllamaInstallUpdate, type RuntimeInstallUpdate, type McpServerLog, type ModelServerStatus, type PullUpdate, type SessionSummary } from "@golem/client";
 import { vi } from "vitest";
 import type { ModelListResult } from "./models.ts";
 import type { PageClient } from "./page.ts";
@@ -79,6 +79,7 @@ export function fakeClient() {
   const skills = listeners<string | null>();
   const mcp = listeners<unknown>();
   const mcpLog = listeners<McpServerLog>();
+  const runtime = listeners<RuntimeInstallUpdate>();
   const pull = listeners<PullUpdate>();
   const server = listeners<ModelServerStatus>();
   const install = listeners<OllamaInstallUpdate>();
@@ -127,6 +128,11 @@ export function fakeClient() {
     onMcpLog: mcpLog.on,
     mcpCall: vi.fn<PageClient["mcpCall"]>(async () => ({ text: "", is_error: false })),
     mcpGet: vi.fn<PageClient["mcpGet"]>(async () => ({}) as never),
+    addMcpServer: vi.fn<PageClient["addMcpServer"]>(async () => ({}) as never),
+    mcpCatalog: vi.fn<PageClient["mcpCatalog"]>(async () => ({ entries: [] })),
+    installRuntime: vi.fn<PageClient["installRuntime"]>(async (name) => ({ name, started: true })),
+    cancelRuntimeInstall: vi.fn<PageClient["cancelRuntimeInstall"]>(async (name) => ({ name, cancelled: true })),
+    onRuntimeInstall: runtime.on,
     updateMcpServer: vi.fn<PageClient["updateMcpServer"]>(async () => ({}) as never),
     removeMcpServer: vi.fn<PageClient["removeMcpServer"]>(async (name) => ({ name, secret: false })),
     updateRule: vi.fn<PageClient["updateRule"]>(async () => ({}) as never),
@@ -154,6 +160,7 @@ export function fakeClient() {
       skills.emit(root);
     },
     emitMcpLog: mcpLog.emit,
+    emitRuntime: runtime.emit,
     emitMcp: () => {
       mcp.emit({});
     },

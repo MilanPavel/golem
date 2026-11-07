@@ -128,3 +128,16 @@ test("shell quoting leaves plain words and quotes the rest", () => {
   assert.equal(shellQuote("$HOME"), "'$HOME'");
   assert.equal(shellQuote(""), "''");
 });
+
+test("groupEntries sorts by category and filters on a search", async () => {
+  const { groupEntries, draftLine, missingRuntime } = await import("./mcp-catalog.ts");
+  const web: McpCatalogEntry = { ...FILESYSTEM, id: "fetch", title: "Fetch", description: "Read web pages.", category: "web" };
+  const groups = groupEntries([web, FILESYSTEM], "");
+  assert.deepEqual(groups.map((group) => group.title), ["Files", "Web"]);
+  assert.deepEqual(groupEntries([web, FILESYSTEM], "PAGES").map((group) => group.entries[0]?.id), ["fetch"]);
+  assert.deepEqual(groupEntries([web, FILESYSTEM], "nothing here"), []);
+  assert.equal(draftLine({ name: "x", command: "npx", args: ["-y", "a b"] }), "npx -y 'a b'");
+  assert.equal(draftLine({ name: "x", url: "https://x.example" }), "https://x.example");
+  assert.equal(missingRuntime({ ...FILESYSTEM, missing: "node" }), "node");
+  assert.equal(missingRuntime({ ...FILESYSTEM, missing: "docker" }), null);
+});

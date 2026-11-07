@@ -10,7 +10,7 @@ import type { PullsSnapshot } from "./pulls.ts";
 import type { Route } from "./router.ts";
 import type { McpListResult, SessionSummary, SetupStatusResult, SkillListResult } from "@golem/client";
 import { traceKey, type TraceGetResult } from "./trace.ts";
-import { mcpListKey, mcpToolsKey, type McpToolsResult } from "./mcp.ts";
+import { mcpCatalogKey, mcpListKey, mcpToolsKey, type McpCatalogResult, type McpToolsResult } from "./mcp.ts";
 import type { Pastes } from "@golem/view";
 import { distinctFolders, resolveFolder } from "./new-session.ts";
 import type { SetupStart } from "./setup-start.ts";
@@ -198,6 +198,12 @@ export function useMcpList(sessionId: string | null, enabled = true): UseQueryRe
 export function useMcpTools(name: string, sessionId: string | null, enabled = true): UseQueryResult<McpToolsResult> {
   const { queries } = usePage();
   return useQuery({ queryKey: mcpToolsKey(name, sessionId), queryFn: () => queries.mcpTools(name, sessionId), enabled });
+}
+
+/** The servers the Add dialog offers. Fetched only once `enabled`, and again after an add, a remove, or a runtime install. */
+export function useMcpCatalog(sessionId: string | null, enabled = true): UseQueryResult<McpCatalogResult> {
+  const { queries } = usePage();
+  return useQuery({ queryKey: mcpCatalogKey(sessionId), queryFn: () => queries.mcpCatalog(sessionId), enabled });
 }
 
 /** The folders under `path` in the home folder (`null` is home). Fetched only once `enabled`. */

@@ -20,7 +20,7 @@ Type `/mcp add`. golem lists the servers it knows, each with one line on what it
 
 A server you already added says so, and one that can't be added says why. Servers added this way are **on demand**: they cost no tokens until a chat turns them on.
 
-`/mcp add github` goes straight to that server. With no servers yet, `/mcp` shows the same list. The web UI cannot add a server. `/mcp add` there shows the `golem mcp add --catalog` command to copy.
+`/mcp add github` goes straight to that server. With no servers yet, `/mcp` shows the same list. In the web UI, **Add a server** in Settings → MCP servers does the same, and `/mcp add [id]` opens it.
 
 ### From a terminal
 
@@ -124,7 +124,7 @@ Type `/mcp` to see your servers:
 - read the server's log, which keeps coming in while it is open;
 - reconnect one, turn it off, or remove it. Remove asks first, and drops the token it stored in the Keychain. A project's server is not removed from here: change that project's `.golem/config.toml`.
 
-The web UI has the same list at Settings → MCP servers, and `/mcp` there opens it. You can open a server, see its tools, hide a tool from the model, try one with a form, test the connection, read the log, reconnect it, turn it on or off, and remove it. Turning on a server that was off asks first and shows the command golem will run.
+The web UI has the same list at Settings → MCP servers, and `/mcp` there opens it. You can open a server, see its tools, hide a tool from the model, try one with a form, test the connection, read the log, reconnect it, turn it on or off, edit it, and remove it. **Add a server** lists what golem offers by category, with a search, and Another server for a command or a URL. It asks for what the server needs (a secret is hidden, and a folder has Browse), shows the command golem will run, and has Test before Add. A server that needs Node or uv offers to install it with Homebrew and shows the output. **Edit** changes the command or URL, the working folder, the timeout, whether tool calls ask first, the variables and headers (a stored secret shows as stored, and typing replaces it), and the tool patterns. Turning on a server that was off asks first and shows the command golem will run.
 
 A server that crashes or stops answering starts again by itself. While it is down, the status line shows `mcp ✗ <name>` in red.
 

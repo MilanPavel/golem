@@ -32,6 +32,7 @@ import { downloadText } from "./copy-text.ts";
 import { CommandsDialog } from "./help-dialog.tsx";
 import type { CommandNotice } from "./notice-line.tsx";
 import { settingsPath } from "../../store/router.ts";
+import { requestMcpAdd } from "../settings/mcp-add-request.ts";
 import { NEEDS_SESSION, NOT_YET } from "./terminal-only.ts";
 
 /**
@@ -152,11 +153,9 @@ export function useCommands({ session, cwd, typing, send }: UseCommandsOptions):
             navigate(settingsPath("mcp"));
             return "handled";
           case "mcp-add":
-            return found.id === null
-              ? say("MCP servers are added in a terminal. Pick one from golem's list, then run:", "golem mcp add --catalog <id>")
-              : found.id === "other"
-                ? say("MCP servers are added in a terminal. Run:", "golem mcp add <name> -- <command…>")
-                : say("Add it in a terminal. It asks for the token there when the server needs one.", `golem mcp add --catalog ${found.id}`);
+            requestMcpAdd(found.id);
+            navigate(settingsPath("mcp"));
+            return "handled";
           case "skills":
             return say(NOT_YET.skills);
           case "permissions":
