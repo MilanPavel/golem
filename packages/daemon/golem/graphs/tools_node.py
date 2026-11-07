@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -184,6 +185,7 @@ def tools_node(
                 )
                 continue
             write({STREAM_KEY: "tool.started", "call_id": call_id})
+            started = time.monotonic()
             ctx = replace(
                 base, output=_streamer(write, call_id), approved_diff=verdict.approved_diff
             )
@@ -192,15 +194,16 @@ def tools_node(
                 result = await session_tools.call(call["name"], args, ctx)
             except ToolError as exc:
                 message = str(exc) or type(exc).__name__
-                write({STREAM_KEY: "tool.failed", "call_id": call_id, "message": message})
+                write(_failure(call_id, message, started))
                 results.append(_result(call_id, call["name"], f"error: {message}", error=True))
                 continue
             except Exception as exc:
                 log.exception("tool %s failed", call["name"])
                 message = f"{type(exc).__name__}: {exc}"
-                write({STREAM_KEY: "tool.failed", "call_id": call_id, "message": message})
+                write(_failure(call_id, message, started))
                 results.append(_result(call_id, call["name"], f"error: {message}", error=True))
                 continue
+            duration_ms = _ms(started)
             tool = session_tools.get(call["name"])
             kind = "untrusted" if tool is not None and tool.untrusted else "tool_output"
             output, artifact_id = await _for_model(
@@ -216,6 +219,7 @@ def tools_node(
                     "truncated": len(preview) < len(result.output),
                     "artifact_id": artifact_id,
                     "failed": result.failed,
+                    "duration_ms": duration_ms,
                 }
             )
             if verdict.args is not None:
@@ -320,6 +324,20 @@ async def _for_model(
         f"{artifact_id}. Read it with read_artifact(artifact_id, offset, limit).]"
     )
     return f"{output[:HEAD_CHARS]}\n{note}\n{output[-TAIL_CHARS:]}", artifact_id
+
+
+def _ms(started: float) -> int:
+    """Milliseconds since ``started``, a ``time.monotonic()`` reading."""
+    return round((time.monotonic() - started) * 1000)
+
+
+def _failure(call_id: str, message: str, started: float) -> dict[str, object]:
+    return {
+        STREAM_KEY: "tool.failed",
+        "call_id": call_id,
+        "message": message,
+        "duration_ms": _ms(started),
+    }
 
 
 def _edited(args: Mapping[str, object], output: str) -> str:

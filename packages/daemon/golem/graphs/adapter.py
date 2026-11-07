@@ -91,12 +91,14 @@ class ToolFinished:
     truncated: bool
     artifact_id: str | None = None
     failed: bool = False
+    duration_ms: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class ToolErrored:
     call_id: str
     message: str
+    duration_ms: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -374,6 +376,7 @@ def _custom(data: object) -> Fact | None:
             item.get("truncated") is True,
             artifact_id if isinstance(artifact_id, str) else None,
             item.get("failed") is True,
+            _duration(item),
         )
     if kind == "todos.updated":
         todos = item.get("todos")
@@ -387,8 +390,15 @@ def _custom(data: object) -> Fact | None:
         return TodosChanged(call_id, rows)
     if kind == "tool.failed":
         message = item.get("message")
-        return ToolErrored(call_id, message if isinstance(message, str) and message else "failed")
+        return ToolErrored(
+            call_id, message if isinstance(message, str) and message else "failed", _duration(item)
+        )
     return None
+
+
+def _duration(item: Mapping[str, object]) -> int | None:
+    value = item.get("duration_ms")
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
 
 
 def _request(message_id: str, item: Mapping[str, object]) -> ModelRequested:
