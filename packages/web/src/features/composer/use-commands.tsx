@@ -149,8 +149,8 @@ export function useCommands({ session, cwd, typing, send }: UseCommandsOptions):
             setHelpOpen(true);
             return "handled";
           case "mcp":
-          case "mcp-toggle":
-            return say(NOT_YET.mcp);
+            navigate(settingsPath("mcp"));
+            return "handled";
           case "mcp-add":
             return found.id === null
               ? say("MCP servers are added in a terminal. Pick one from golem's list, then run:", "golem mcp add --catalog <id>")
@@ -209,6 +209,13 @@ export function useCommands({ session, cwd, typing, send }: UseCommandsOptions):
           return say(NEEDS_SESSION);
         }
         switch (found.kind) {
+          case "mcp-toggle":
+            try {
+              await actions.toggleMcp(sessionId, found.name, found.on);
+              return say(`${found.name} is ${found.on ? "on" : "off"} for this chat.`);
+            } catch (err) {
+              return fail(err, `Could not turn ${found.name} ${found.on ? "on" : "off"}.`);
+            }
           case "todos": {
             const next = !drawerOpenStore.getSnapshot();
             setDrawerOpen(next);

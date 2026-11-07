@@ -72,6 +72,24 @@ export {
   ownToolName,
   type ToolsChange,
 } from "./mcp-tools.ts";
+export {
+  detailChoices,
+  firstLine,
+  formatSeconds,
+  formatTokens,
+  mcpAlert,
+  MCP_HINT,
+  mcpStatusMark,
+  mcpStatusWord,
+  mcpSummary,
+  mergeMcp,
+  orderedServers,
+  shortPath,
+  type DetailChoice,
+  type McpDetailAction,
+  type McpList,
+  type McpTone,
+} from "./mcp-servers.ts";
 export { applySuggestion, moveSuggestion, suggest, type Suggestion, type SuggestCommand } from "./suggest.ts";
 export { connectionLabel, serviceProblem, type ServiceProblem } from "./connection.ts";
 export { parseDiff, type DiffLine, type DiffTone } from "./diff.ts";

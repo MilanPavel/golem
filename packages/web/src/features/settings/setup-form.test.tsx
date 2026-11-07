@@ -291,11 +291,11 @@ test("Run setup again opens the guided window, and closing it gives focus back",
   await waitFor(() => expect(document.activeElement).toBe(again));
 });
 
-test("Tools has no link until the page has a section for it", async () => {
+test("Tools links to the MCP servers section", async () => {
   mount([...OK_ROWS.filter((row) => row.part !== "tools")]);
   const tools = await waitFor(() => card("Tools"));
   expect(tools.getByText("no MCP servers yet")).toBeTruthy();
-  expect(tools.queryByRole("link")).toBeNull();
+  expect(tools.getByRole("link").getAttribute("href")).toBe("/settings/mcp");
   expect(tools.queryByRole("button")).toBeNull();
 });
 
