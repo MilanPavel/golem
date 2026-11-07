@@ -1,5 +1,6 @@
 import type { McpAddParams, McpServer, McpToolsResult } from "@golem/client";
 import {
+  ownToolName,
   entryAvailable,
   entryInputs,
   entryNote,
@@ -26,7 +27,26 @@ import type { Press } from "./keys.ts";
 export type McpManagerView =
   | { kind: "list"; selected: number }
   | { kind: "detail"; name: string; project: string | null; selected: number }
-  | { kind: "tools"; name: string; project: string | null; offset: number }
+  /** `selected` is the tool the cursor is on. */
+  | { kind: "tools"; name: string; project: string | null; selected: number }
+  /** A test of the saved server. `steps` are the lines of the steps so far; `result` is set at the end. */
+  | { kind: "test"; name: string; project: string | null; steps: readonly string[]; result: readonly string[] | null; ok: boolean | null }
+  /** The server's log. `lines` is null while it loads, and `offset` is how many lines up from the newest it is scrolled. */
+  | { kind: "logs"; name: string; project: string | null; lines: readonly string[] | null; offset: number }
+  /** Asks before the server's config and secrets go. `selected` 0 is Remove, 1 is Keep. */
+  | { kind: "remove"; name: string; project: string | null; selected: number }
+  /** One tool, run by hand. `args` is JSON text. A run is not asked about and not recorded in a chat. */
+  | {
+      kind: "try";
+      name: string;
+      project: string | null;
+      tool: string;
+      args: string;
+      phase: "edit" | "running" | "done";
+      output: readonly string[];
+      failed: boolean;
+      error: string | null;
+    }
   /** The catalog, then Other, to pick one to add. */
   | { kind: "add"; selected: number; error: string | null }
   /**
@@ -71,6 +91,7 @@ export type McpManagerKey =
   | "enter"
   | "back"
   | "add"
+  | "space"
   | "delete"
   | "clear"
   | { text: string }
@@ -82,6 +103,12 @@ export type McpManagerAction =
   | { kind: "load-tools"; name: string }
   | { kind: "session"; name: string; on: boolean }
   | { kind: "restart"; name: string }
+  | { kind: "test"; name: string }
+  | { kind: "load-logs"; name: string }
+  | { kind: "remove"; name: string }
+  /** Hide a tool from the model, or show it again: `tools.exclude` of the server. `tool` is the server's own name. */
+  | { kind: "toggle-tool"; name: string; tool: string; hide: boolean }
+  | { kind: "call"; name: string; tool: string; arguments: Record<string, unknown> }
   | { kind: "set-enabled"; name: string; enabled: boolean | "on_demand" }
   /** Add a server. `params.token`, when set, is a secret: never show or log it. */
   | { kind: "add"; params: McpAddParams };
@@ -104,9 +131,14 @@ const ADD_HINT = "↑/↓ to navigate · Enter to add · Esc to go back";
 const PROMPT_HINT = "Enter to add · Esc to go back";
 const ADDING_HINT = "Esc is off until the server answers";
 const DETAIL_HINT = "↑/↓ to navigate · Enter to select · Esc to go back";
-const TOOLS_HINT = "↑/↓ to scroll · Esc to go back";
+const TOOLS_HINT = "↑/↓ to navigate · Space to hide or show · Enter to try · Esc to go back";
+const TEST_HINT = "Esc to go back";
+const LOGS_HINT = "↑/↓ to scroll · Esc to go back";
+const REMOVE_HINT = "↑/↓ to navigate · Enter to select · Esc to keep it";
+const TRY_HINT = "Enter to run · Esc to go back";
+const TRY_DONE_HINT = "Enter to run again · Esc to go back";
 
-type DetailChoice = { label: string; action: McpManagerAction | "view-tools" };
+type DetailChoice = { label: string; action: McpManagerAction | "view-tools" | "view-logs" | "ask-remove" | "run-test" };
 
 export function openMcpManager(folder = ""): McpManagerState {
   return { ...closedMcpManager, open: true, folder };
@@ -144,7 +176,8 @@ function picks(catalog: readonly McpCatalogEntry[]): (McpCatalogEntry | null)[] 
 
 /** Whether the screen is a prompt, where a key is text and not a command. */
 export function mcpManagerTyping(state: McpManagerState): boolean {
-  return state.open && (state.view.kind === "form" || state.view.kind === "other");
+  const view = state.view;
+  return state.open && (view.kind === "form" || view.kind === "other" || (view.kind === "try" && view.phase === "edit"));
 }
 
 export function mcpManagerKeyOf(press: Press, typing = false): McpManagerKey | null {
@@ -172,6 +205,9 @@ export function mcpManagerKeyOf(press: Press, typing = false): McpManagerKey | n
   }
   if (!press.ctrl && !press.meta && /^[1-9]$/.test(press.input)) {
     return Number(press.input);
+  }
+  if (!press.ctrl && !press.meta && press.input === " ") {
+    return "space";
   }
   if (!press.ctrl && !press.meta && press.input === "a") {
     return "add";
@@ -411,15 +447,13 @@ export function pressMcpManager(
     return { state: backToList, action: none };
   }
   if (view.kind === "tools") {
-    if (key === "back") {
-      return { state: { ...state, view: { kind: "detail", name: view.name, project: view.project, selected: 0 } }, action: none };
-    }
-    if (key === "up" || key === "down") {
-      const count = state.tools?.tools.length ?? 0;
-      const offset = clamp(view.offset + (key === "up" ? -1 : 1), count);
-      return { state: { ...state, view: { ...view, offset } }, action: none };
-    }
-    return { state, action: none };
+    return pressTools(state, view, key);
+  }
+  if (view.kind === "try") {
+    return pressTry(state, view, key);
+  }
+  if (view.kind === "test" || view.kind === "logs" || view.kind === "remove") {
+    return pressInfo(state, view, key);
   }
   const choices = detailChoices(server);
   if (key === "back") {
@@ -434,8 +468,18 @@ export function pressMcpManager(
   if (picked === undefined) {
     return { state, action: none };
   }
+  const open = (next: McpManagerView, action: McpManagerAction = none) => ({ state: { ...state, view: next }, action });
+  if (picked.action === "run-test") {
+    return open({ kind: "test", name: view.name, project: view.project, steps: [], result: null, ok: null }, { kind: "test", name: view.name });
+  }
+  if (picked.action === "view-logs") {
+    return open({ kind: "logs", name: view.name, project: view.project, lines: null, offset: 0 }, { kind: "load-logs", name: view.name });
+  }
+  if (picked.action === "ask-remove") {
+    return open({ kind: "remove", name: view.name, project: view.project, selected: 1 });
+  }
   if (picked.action === "view-tools") {
-    const tools: McpManagerView = { kind: "tools", name: view.name, project: view.project, offset: 0 };
+    const tools: McpManagerView = { kind: "tools", name: view.name, project: view.project, selected: 0 };
     return { state: { ...state, view: tools, tools: null }, action: { kind: "load-tools", name: view.name } };
   }
   return { state, action: picked.action };
@@ -448,10 +492,16 @@ export function detailChoices(server: McpServer): DetailChoice[] {
   if (server.state === "running" && (server.tools?.length ?? 0) > 0) {
     choices.push({ label: "View tools", action: "view-tools" });
   }
+  const inspect: DetailChoice[] = [
+    { label: "Test the connection", action: "run-test" },
+    { label: "View the log", action: "view-logs" },
+  ];
+  // A project's server lives in that project's file: it is changed there, not removed from here.
+  const remove: DetailChoice[] = server.project ? [] : [{ label: "Remove", action: "ask-remove" }];
   if (server.state === "disabled") {
     choices.push({ label: "Enable for every chat", action: { kind: "set-enabled", name, enabled: true } });
     choices.push({ label: "Enable on demand", action: { kind: "set-enabled", name, enabled: "on_demand" } });
-    return choices;
+    return [...choices, ...inspect, ...remove];
   }
   if (server.on_demand) {
     const on = server.enabled === true;
@@ -464,7 +514,185 @@ export function detailChoices(server: McpServer): DetailChoice[] {
     choices.push({ label: "Reconnect", action: { kind: "restart", name } });
   }
   choices.push({ label: "Disable everywhere", action: { kind: "set-enabled", name, enabled: false } });
-  return choices;
+  return [...choices, ...inspect, ...remove];
+}
+
+function toDetail(view: { name: string; project: string | null }): McpManagerView {
+  return { kind: "detail", name: view.name, project: view.project, selected: 0 };
+}
+
+function pressTools(
+  state: McpManagerState,
+  view: Extract<McpManagerView, { kind: "tools" }>,
+  key: McpManagerKey,
+): { state: McpManagerState; action: McpManagerAction } {
+  const none = { kind: "none" } as const;
+  const tools = state.tools?.tools ?? [];
+  if (key === "back") {
+    return { state: { ...state, view: toDetail(view) }, action: none };
+  }
+  if (key === "up" || key === "down") {
+    const selected = clamp(view.selected + (key === "up" ? -1 : 1), tools.length);
+    return { state: { ...state, view: { ...view, selected } }, action: none };
+  }
+  const tool = tools[clamp(view.selected, tools.length)];
+  if (tool === undefined) {
+    return { state, action: none };
+  }
+  const own = ownToolName(view.name, tool.name);
+  if (key === "space") {
+    return { state, action: { kind: "toggle-tool", name: view.name, tool: own, hide: tool.hidden !== true } };
+  }
+  if (key === "enter") {
+    const next: McpManagerView = {
+      kind: "try",
+      name: view.name,
+      project: view.project,
+      tool: own,
+      args: "",
+      phase: "edit",
+      output: [],
+      failed: false,
+      error: null,
+    };
+    return { state: { ...state, view: next }, action: none };
+  }
+  return { state, action: none };
+}
+
+/** `text` as the arguments of a tool call: nothing is `{}`, and anything but an object is an error. */
+function parseArguments(text: string): { arguments: Record<string, unknown> } | { error: string } {
+  const trimmed = text.trim();
+  if (trimmed === "") {
+    return { arguments: {} };
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(trimmed);
+  } catch {
+    return { error: 'Arguments are JSON, such as {"path": "/tmp"}.' };
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    return { error: 'Arguments must be a JSON object, such as {"path": "/tmp"}.' };
+  }
+  return { arguments: parsed as Record<string, unknown> };
+}
+
+function pressTry(
+  state: McpManagerState,
+  view: Extract<McpManagerView, { kind: "try" }>,
+  key: McpManagerKey,
+): { state: McpManagerState; action: McpManagerAction } {
+  const none = { kind: "none" } as const;
+  const at = (next: McpManagerView) => ({ state: { ...state, view: next }, action: none });
+  if (key === "back") {
+    const selected = Math.max(0, (state.tools?.tools ?? []).findIndex((tool) => ownToolName(view.name, tool.name) === view.tool));
+    return at({ kind: "tools", name: view.name, project: view.project, selected });
+  }
+  if (view.phase === "running") {
+    return { state, action: none };
+  }
+  if (view.phase === "done") {
+    return key === "enter" ? at({ ...view, phase: "edit", output: [], failed: false, error: null }) : { state, action: none };
+  }
+  const withArgs = (args: string): McpManagerView => ({ ...view, args, error: null });
+  if (typeof key === "object") {
+    return at(withArgs(view.args + key.text));
+  }
+  if (key === "delete") {
+    return at(withArgs([...view.args].slice(0, -1).join("")));
+  }
+  if (key === "clear") {
+    return at(withArgs(""));
+  }
+  if (key !== "enter") {
+    return { state, action: none };
+  }
+  const parsed = parseArguments(view.args);
+  if ("error" in parsed) {
+    return at({ ...view, error: parsed.error });
+  }
+  return {
+    state: { ...state, view: { ...view, phase: "running", output: [], failed: false, error: null } },
+    action: { kind: "call", name: view.name, tool: view.tool, arguments: parsed.arguments },
+  };
+}
+
+function pressInfo(
+  state: McpManagerState,
+  view: Extract<McpManagerView, { kind: "test" | "logs" | "remove" }>,
+  key: McpManagerKey,
+): { state: McpManagerState; action: McpManagerAction } {
+  const none = { kind: "none" } as const;
+  if (key === "back") {
+    return { state: { ...state, view: toDetail(view) }, action: none };
+  }
+  if (view.kind === "logs") {
+    if (key === "up" || key === "down") {
+      const offset = Math.min(Math.max(0, view.offset + (key === "up" ? 1 : -1)), Math.max(0, (view.lines?.length ?? 0) - 1));
+      return { state: { ...state, view: { ...view, offset } }, action: none };
+    }
+    return { state, action: none };
+  }
+  if (view.kind === "remove") {
+    if (key === "up" || key === "down") {
+      return { state: { ...state, view: { ...view, selected: key === "up" ? 0 : 1 } }, action: none };
+    }
+    const picked = key === "enter" ? view.selected : typeof key === "number" ? key - 1 : -1;
+    if (picked === 0) {
+      return { state: { ...state, view: { kind: "list", selected: 0 }, tools: null }, action: { kind: "remove", name: view.name } };
+    }
+    return picked === 1 ? { state: { ...state, view: toDetail(view) }, action: none } : { state, action: none };
+  }
+  return { state, action: none };
+}
+
+/** A step of a running test ended. Ignored if the person has left the test. */
+export function mcpTestStep(state: McpManagerState, name: string, line: string): McpManagerState {
+  const view = state.view;
+  return view.kind === "test" && view.name === name ? { ...state, view: { ...view, steps: [...view.steps, line] } } : state;
+}
+
+/** The test ended: `result` is what it found, drawn under its steps. */
+export function mcpTestDone(state: McpManagerState, name: string, ok: boolean, result: readonly string[]): McpManagerState {
+  const view = state.view;
+  return view.kind === "test" && view.name === name ? { ...state, view: { ...view, ok, result } } : state;
+}
+
+export function mcpLogsLoaded(state: McpManagerState, name: string, lines: readonly string[]): McpManagerState {
+  const view = state.view;
+  return view.kind === "logs" && view.name === name ? { ...state, view: { ...view, lines, offset: 0 } } : state;
+}
+
+const LOG_KEPT = 500;
+
+/** New log lines while the log is open. A log scrolled up stays where it is. */
+export function mcpLogsAppended(state: McpManagerState, name: string, added: readonly string[]): McpManagerState {
+  const view = state.view;
+  if (view.kind !== "logs" || view.name !== name || view.lines === null || added.length === 0) {
+    return state;
+  }
+  const lines = [...view.lines, ...added].slice(-LOG_KEPT);
+  const offset = view.offset === 0 ? 0 : Math.min(view.offset + added.length, lines.length - 1);
+  return { ...state, view: { ...view, lines, offset } };
+}
+
+/** A tool call ended, with its text, or with the message of why it could not run. */
+export function mcpCallDone(
+  state: McpManagerState,
+  name: string,
+  tool: string,
+  result: { text: string; failed: boolean } | { error: string },
+): McpManagerState {
+  const view = state.view;
+  if (view.kind !== "try" || view.name !== name || view.tool !== tool || view.phase !== "running") {
+    return state;
+  }
+  if ("error" in result) {
+    return { ...state, view: { ...view, phase: "edit", error: result.error } };
+  }
+  const output = result.text.length === 0 ? ["(no text)"] : result.text.split("\n");
+  return { ...state, view: { ...view, phase: "done", output, failed: result.failed } };
 }
 
 export function layoutMcpManager(input: {
@@ -493,18 +721,31 @@ export function layoutMcpManager(input: {
     hint = servers.length === 0 ? ADD_HINT : LIST_HINT;
   } else {
     const view = state.view;
-    if (view.kind !== "detail" && view.kind !== "tools") {
+    if (view.kind === "add" || view.kind === "form" || view.kind === "other" || view.kind === "adding") {
       return [];
     }
     const server = servers.find((item) => item.name === view.name && (item.project ?? null) === view.project);
+    const room = Math.max(1, input.rows - 2);
     if (server === undefined) {
       body = listLines(servers, 0, home, state.catalog);
     } else if (view.kind === "detail") {
       body = detailLines(server, view.selected, home);
       hint = DETAIL_HINT;
-    } else {
-      body = toolLines(server, state.tools, view.offset, input.rows - 2);
+    } else if (view.kind === "tools") {
+      body = toolLines(server, state.tools, view.selected);
       hint = TOOLS_HINT;
+    } else if (view.kind === "test") {
+      body = testLines(server, view);
+      hint = TEST_HINT;
+    } else if (view.kind === "logs") {
+      body = logLines(server, view, room);
+      hint = LOGS_HINT;
+    } else if (view.kind === "remove") {
+      body = removeLines(server, view);
+      hint = REMOVE_HINT;
+    } else {
+      body = tryLines(view, room);
+      hint = view.phase === "done" ? TRY_DONE_HINT : TRY_HINT;
     }
   }
   const room = Math.max(0, input.rows - 2);
@@ -647,6 +888,13 @@ function detailLines(server: McpServer, selected: number, home: string): McpMana
     const tokens = server.schema_tokens == null ? "" : ` · ≈${formatTokens(server.schema_tokens)} tokens per prompt`;
     lines.push({ text: `${label("Tools")}${count} ${count === 1 ? "tool" : "tools"}${tokens}` });
   }
+  const hidden = server.tools_hidden ?? 0;
+  if (hidden > 0) {
+    lines.push({ text: `${label("Hidden")}${hidden} ${hidden === 1 ? "tool" : "tools"} kept from the model` });
+  }
+  if (server.approval === "allow") {
+    lines.push({ text: `${label("Approval")}calls run without asking` });
+  }
   if (server.state === "failed") {
     lines.push({ text: `${label("Error")}${server.error ?? "failed"}` });
     if (server.retry_seconds != null) {
@@ -667,12 +915,7 @@ function detailLines(server: McpServer, selected: number, home: string): McpMana
   return lines;
 }
 
-function toolLines(
-  server: McpServer,
-  tools: McpToolsResult | null,
-  offset: number,
-  rows: number,
-): McpManagerLine[] {
+function toolLines(server: McpServer, tools: McpToolsResult | null, selected: number): McpManagerLine[] {
   const head: McpManagerLine[] = [{ text: `${server.name} tools`, bold: true }, { text: "" }];
   if (tools === null) {
     return [...head, { text: "loading…", dim: true }];
@@ -680,22 +923,97 @@ function toolLines(
   if (tools.tools.length === 0) {
     return [...head, { text: "No tools while the server is not running.", dim: true }];
   }
-  const prefix = `mcp__${server.name}__`;
-  const names = tools.tools.map((tool) => tool.name.replace(prefix, ""));
+  const names = tools.tools.map((tool) => ownToolName(server.name, tool.name));
   const nameWidth = Math.max(...names.map((name) => name.length));
-  const room = Math.max(1, rows - head.length);
-  const start = Math.min(clamp(offset, tools.tools.length), Math.max(0, tools.tools.length - room));
-  const shown = tools.tools.slice(start, start + room).map((tool, index) => ({
-    text: `${(names[start + index] ?? tool.name).padEnd(nameWidth)}  ${firstLine(tool.description)}`,
-  }));
-  return [...head, ...shown];
+  const chosen = clamp(selected, tools.tools.length);
+  const hidden = tools.tools.filter((tool) => tool.hidden === true).length;
+  const lines = tools.tools.map(
+    (tool, index): McpManagerLine => ({
+      prefix: index === chosen ? "❯ " : "  ",
+      mark: tool.hidden === true ? { text: "–", tone: "off" } : { text: "✔", tone: "ok" },
+      text: `${(names[index] ?? tool.name).padEnd(nameWidth)}  ${firstLine(tool.description)}`,
+      selected: index === chosen,
+      dim: tool.hidden === true,
+    }),
+  );
+  const note = hidden === 0 ? [] : [{ text: "" }, { text: `${hidden} hidden from the model (tools.exclude).`, dim: true }];
+  return [...head, ...lines, ...note];
+}
+
+function testLines(server: McpServer, view: Extract<McpManagerView, { kind: "test" }>): McpManagerLine[] {
+  const lines: McpManagerLine[] = [{ text: `Test ${server.name}`, bold: true }, { text: "" }];
+  lines.push(...view.steps.map((text) => ({ text })));
+  if (view.result === null) {
+    return [...lines, { text: "testing…", dim: true }];
+  }
+  return [
+    ...lines,
+    { text: "" },
+    ...view.result.map((text, index): McpManagerLine =>
+      index === 0 ? { text, mark: { text: view.ok === true ? "✔" : "✘", tone: view.ok === true ? "ok" : "bad" } } : { text },
+    ),
+  ];
+}
+
+function logLines(server: McpServer, view: Extract<McpManagerView, { kind: "logs" }>, room: number): McpManagerLine[] {
+  const head: McpManagerLine[] = [{ text: `${server.name} log`, bold: true }, { text: "" }];
+  if (view.lines === null) {
+    return [...head, { text: "loading…", dim: true }];
+  }
+  if (view.lines.length === 0) {
+    return [...head, { text: "Nothing logged yet.", dim: true }];
+  }
+  const space = Math.max(1, room - head.length);
+  const end = view.lines.length - Math.min(view.offset, view.lines.length - 1);
+  return [...head, ...view.lines.slice(Math.max(0, end - space), end).map((text) => ({ text }))];
+}
+
+function removeLines(server: McpServer, view: Extract<McpManagerView, { kind: "remove" }>): McpManagerLine[] {
+  const choices = [`Remove ${server.name}`, "Keep it"];
+  return [
+    { text: `Remove ${server.name}?`, bold: true },
+    { text: "" },
+    { text: "Its entry leaves ~/.golem/config.toml, and the token it stored leaves the Keychain.", dim: true },
+    { text: "" },
+    ...choices.map((label, index): McpManagerLine => ({
+      text: `${index === view.selected ? "❯ " : "  "}${index + 1}. ${label}`,
+      selected: index === view.selected,
+    })),
+  ];
+}
+
+function tryLines(view: Extract<McpManagerView, { kind: "try" }>, room: number): McpManagerLine[] {
+  const lines: McpManagerLine[] = [
+    { text: `Try ${view.tool}`, bold: true },
+    { text: "Runs now, without asking. It is not part of any chat.", dim: true },
+    { text: "" },
+    { prefix: view.phase === "edit" ? "❯ " : "  ", text: `Arguments (JSON): ${view.args}` },
+  ];
+  if (view.error !== null) {
+    lines.push({ text: "" }, { text: view.error, mark: { text: "✘", tone: "bad" } });
+  }
+  if (view.phase === "running") {
+    lines.push({ text: "" }, { text: "running…", dim: true });
+  }
+  if (view.phase === "done") {
+    const space = Math.max(1, room - lines.length - 2);
+    const shown = view.output.slice(0, space);
+    const more = view.output.length - shown.length;
+    lines.push(
+      { text: "" },
+      { text: view.failed ? "The tool reported an error:" : "Result:", bold: true, ...(view.failed ? { mark: { text: "✘", tone: "bad" as const } } : {}) },
+      ...shown.map((text) => ({ text })),
+      ...(more > 0 ? [{ text: `… ${more} more ${more === 1 ? "line" : "lines"}`, dim: true }] : []),
+    );
+  }
+  return lines;
 }
 
 function summary(server: McpServer): string {
   if (server.state === "running") {
     const count = server.tools?.length ?? 0;
     const tokens = server.schema_tokens == null ? "" : ` · ≈${formatTokens(server.schema_tokens)} tokens`;
-    return `${count} ${count === 1 ? "tool" : "tools"}${tokens}${hereNote(server)}`;
+    return `${count} ${count === 1 ? "tool" : "tools"}${tokens}${markNote(server)}${hereNote(server)}`;
   }
   if (server.state === "failed") {
     const retry = server.retry_seconds == null ? "" : ` · retrying in ${formatSeconds(server.retry_seconds)}`;
@@ -708,6 +1026,13 @@ function summary(server: McpServer): string {
     return "disabled";
   }
   return "starting…";
+}
+
+/** What limits the server: tools kept from the model, and calls that run without asking. */
+function markNote(server: McpServer): string {
+  const count = server.tools_hidden ?? 0;
+  const hidden = count > 0 ? ` · ${count} hidden` : "";
+  return `${hidden}${server.approval === "allow" ? " · allow" : ""}`;
 }
 
 function hereNote(server: McpServer): string {

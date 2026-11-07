@@ -89,7 +89,7 @@ Type `/` and suggestions appear, with each command's arguments. `/help` lists ev
 | `/skill run <name> [args]` | Run a skill once, also one named like a command, such as `help` |
 | `/skill pin <name>`, `/skill unpin <name>` | Keep a skill on for the whole chat, or turn it off |
 | `/skill` | List the pinned skills |
-| `/mcp` | Manage MCP servers: view tools, reconnect, turn on or off |
+| `/mcp` | Manage MCP servers: view and try tools, hide a tool, test, read the log, reconnect, turn on or off, remove |
 | `/mcp add [id]` | Add a server from golem's list, or Other. The web UI shows the `golem mcp add --catalog` command instead |
 | `/mcp enable <name>`, `/mcp disable <name>` | Turn a server on or off for this chat |
 
