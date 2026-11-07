@@ -264,6 +264,12 @@ class ModelCallStartedData(BaseModel):
     ``message_id`` is the assistant reply's id, which identifies the model
     call. ``index`` counts the calls of this run from 1. ``provider`` and
     ``model`` are None when the profile does not resolve.
+
+    ``system_prompt_sha`` and ``tools_sha`` are the sha256 of the system
+    prompt and of the tool schemas (compact JSON, sorted keys) sent with the
+    call, which the daemon keeps by hash. Each is None when it was not sent.
+    ``message_ids`` are the history messages sent, in order, not counting the
+    system prompt.
     """
 
     model_config = _CONFIG
@@ -273,6 +279,9 @@ class ModelCallStartedData(BaseModel):
     profile: str = Field(min_length=1)
     provider: str | None = None
     model: str | None = None
+    system_prompt_sha: str | None = None
+    tools_sha: str | None = None
+    message_ids: list[str] = Field(default_factory=list[str])
 
 
 class TokenUsage(BaseModel):

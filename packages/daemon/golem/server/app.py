@@ -54,6 +54,7 @@ from golem.sessions.titles import ModelTitles, TitleGenerator
 from golem.skills.pinned import pinned_section
 from golem.skills.registry import SkillRegistry
 from golem.store.artifacts import ArtifactStore
+from golem.store.blobs import BlobStore
 from golem.store.checkpoints import open_checkpoints
 from golem.store.database import Database, DatabaseTooNewError
 from golem.store.events import EventLog
@@ -198,6 +199,7 @@ class DaemonApp:
                         self.state.artifacts,
                         local,
                         SystemPrompt(sections=(pinned_section(self.state.skills),)),
+                        BlobStore(database),
                     ),
                     self._titles,
                     self.state.skills,

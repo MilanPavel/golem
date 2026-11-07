@@ -369,6 +369,9 @@ async def _apply(
                 profile=model.profile if model else "",
                 provider=model.provider if model else None,
                 model=model.name if model else None,
+                system_prompt_sha=fact.system_prompt_sha,
+                tools_sha=fact.tools_sha,
+                message_ids=list(fact.message_ids),
             ),
         )
     elif isinstance(fact, TextDelta) and progress.open is not None:

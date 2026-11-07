@@ -2,9 +2,12 @@
 
 export type Index = number;
 export type MessageId = string;
+export type MessageIds = string[];
 export type Model = string | null;
 export type Profile = string;
 export type Provider = string | null;
+export type SystemPromptSha = string | null;
+export type ToolsSha = string | null;
 
 /**
  * A request went to the model.
@@ -12,11 +15,20 @@ export type Provider = string | null;
  * ``message_id`` is the assistant reply's id, which identifies the model
  * call. ``index`` counts the calls of this run from 1. ``provider`` and
  * ``model`` are None when the profile does not resolve.
+ *
+ * ``system_prompt_sha`` and ``tools_sha`` are the sha256 of the system
+ * prompt and of the tool schemas (compact JSON, sorted keys) sent with the
+ * call, which the daemon keeps by hash. Each is None when it was not sent.
+ * ``message_ids`` are the history messages sent, in order, not counting the
+ * system prompt.
  */
 export interface ModelCallStartedData {
   index: Index;
   message_id: MessageId;
+  message_ids?: MessageIds;
   model?: Model;
   profile: Profile;
   provider?: Provider;
+  system_prompt_sha?: SystemPromptSha;
+  tools_sha?: ToolsSha;
 }
