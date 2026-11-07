@@ -124,6 +124,7 @@
       "data": {
         "artifact_id": null,
         "call_id": "call_1",
+        "duration_ms": 0,
         "failed": false,
         "preview": "     1|the answer is 42",
         "summary": "1 line",
@@ -330,6 +331,7 @@
       "data": {
         "artifact_id": null,
         "call_id": "call_1",
+        "duration_ms": 0,
         "failed": false,
         "preview": "     1|the answer is 42",
         "summary": "1 line",

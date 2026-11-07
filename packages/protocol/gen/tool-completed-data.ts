@@ -2,6 +2,7 @@
 
 export type ArtifactId = string | null;
 export type CallId = string;
+export type DurationMs = number | null;
 export type Failed = boolean;
 export type Preview = string;
 export type Summary = string;
@@ -18,10 +19,14 @@ export type Truncated = boolean;
  * ``failed`` is true when the call ran but what it ran did not succeed,
  * such as a shell command that exited non-zero or timed out. The model
  * still gets the output.
+ *
+ * ``duration_ms`` is how long the tool ran, from ``tool.started`` to its
+ * result, without the wait for an approval. None means it was not measured.
  */
 export interface ToolCompletedData {
   artifact_id?: ArtifactId;
   call_id: CallId;
+  duration_ms?: DurationMs;
   failed?: Failed;
   preview: Preview;
   summary: Summary;

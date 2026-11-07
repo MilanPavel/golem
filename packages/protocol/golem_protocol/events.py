@@ -324,6 +324,9 @@ class ToolCompletedData(BaseModel):
     ``failed`` is true when the call ran but what it ran did not succeed,
     such as a shell command that exited non-zero or timed out. The model
     still gets the output.
+
+    ``duration_ms`` is how long the tool ran, from ``tool.started`` to its
+    result, without the wait for an approval. None means it was not measured.
     """
 
     model_config = _CONFIG
@@ -334,15 +337,21 @@ class ToolCompletedData(BaseModel):
     truncated: bool = False
     artifact_id: str | None = Field(default=None, min_length=1)
     failed: bool = False
+    duration_ms: int | None = Field(default=None, ge=0)
 
 
 class ToolFailedData(BaseModel):
-    """A tool call did not run, or stopped with an error. The model sees the same message."""
+    """A tool call did not run, or stopped with an error. The model sees the same message.
+
+    ``duration_ms`` is how long the tool ran before it raised. None means a
+    call that was denied or cut off, which never ran or was not timed.
+    """
 
     model_config = _CONFIG
 
     call_id: str = Field(min_length=1)
     message: str = Field(min_length=1)
+    duration_ms: int | None = Field(default=None, ge=0)
 
 
 ApprovalDecision = Literal["allow", "allow_session", "allow_always", "deny"]
