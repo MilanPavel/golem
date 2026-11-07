@@ -1504,7 +1504,7 @@
     },
     "ToolCompletedData": {
       "additionalProperties": false,
-      "description": "A tool call finished.\n\n``summary`` is one short line, such as ``42 lines``. ``preview`` is the\nstart of the output, cut at a few kilobytes, and ``truncated`` says\nwhether it was cut. Output too long for the model is stored whole in the\nartifact ``artifact_id``, which ``artifact.read`` reads.",
+      "description": "A tool call finished.\n\n``summary`` is one short line, such as ``42 lines``. ``preview`` is the\nstart of the output, cut at a few kilobytes, and ``truncated`` says\nwhether it was cut. Output too long for the model is stored whole in the\nartifact ``artifact_id``, which ``artifact.read`` reads.\n\n``failed`` is true when the call ran but what it ran did not succeed,\nsuch as a shell command that exited non-zero or timed out. The model\nstill gets the output.",
       "properties": {
         "artifact_id": {
           "anyOf": [
@@ -1523,6 +1523,11 @@
           "minLength": 1,
           "title": "Call Id",
           "type": "string"
+        },
+        "failed": {
+          "default": false,
+          "title": "Failed",
+          "type": "boolean"
         },
         "preview": {
           "title": "Preview",

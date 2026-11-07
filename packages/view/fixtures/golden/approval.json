@@ -123,6 +123,7 @@
       "data": {
         "artifact_id": null,
         "call_id": "call_1",
+        "failed": false,
         "preview": "     1|the answer is 42",
         "summary": "1 line",
         "truncated": false
@@ -291,6 +292,7 @@
       "data": {
         "artifact_id": null,
         "call_id": "call_1",
+        "failed": false,
         "preview": "     1|the answer is 42",
         "summary": "1 line",
         "truncated": false

@@ -74,6 +74,7 @@ class ToolFinished:
     preview: str
     truncated: bool
     artifact_id: str | None = None
+    failed: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -319,6 +320,7 @@ def _custom(data: object) -> Fact | None:
             preview if isinstance(preview, str) else "",
             item.get("truncated") is True,
             artifact_id if isinstance(artifact_id, str) else None,
+            item.get("failed") is True,
         )
     if kind == "todos.updated":
         todos = item.get("todos")

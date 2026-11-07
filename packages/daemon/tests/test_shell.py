@@ -180,11 +180,11 @@ async def _call(root: Path, name: str, **args: object) -> ToolResult:
 @needs_sandbox
 async def test_the_shell_tool_ends_with_the_exit_code(root: Path) -> None:
     ok = await _call(root, "shell", command="echo hello")
-    assert (ok.output, ok.summary) == ("hello\n[exit code 0]", "exit 0")
+    assert (ok.output, ok.summary, ok.failed) == ("hello\n[exit code 0]", "exit 0", False)
     failed = await _call(root, "shell", command="echo boom >&2; exit 2")
-    assert (failed.output, failed.summary) == ("boom\n[exit code 2]", "exit 2")
+    assert (failed.output, failed.summary, failed.failed) == ("boom\n[exit code 2]", "exit 2", True)
     slow = await _call(root, "shell", command="sleep 5", timeout_seconds=1)
-    assert slow.summary == "timed out after 1s"
+    assert (slow.summary, slow.failed) == ("timed out after 1s", True)
 
 
 def _git(root: Path, *args: str) -> None:
