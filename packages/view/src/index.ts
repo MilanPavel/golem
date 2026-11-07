@@ -175,6 +175,14 @@ export {
   type PullTrack,
 } from "./setup-local.ts";
 export {
+  setupFormRows,
+  TOOLS_PATH,
+  type FormButtonId,
+  type FormFix,
+  type FormMark,
+  type FormRow,
+} from "./setup-form.ts";
+export {
   ASK_PAGE_KEY,
   HOSTED_PROVIDERS,
   hostedProvider,

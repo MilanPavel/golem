@@ -22,11 +22,13 @@ golem has commands in two places: `golem …` in your shell, and `/…` inside t
 | `golem daemon logs` | Follows the daemon's log |
 | `golem auth set <provider>` / `remove <provider>` | Saves or deletes an API key, or an MCP token (`mcp/<name>`), in the Keychain. A model key is tried first; `--no-check` skips that |
 | `golem mcp add --catalog <id>` | Adds a server from golem's list. It asks for a token, hidden, and keeps it in the Keychain. `--input <id>=<value>` fills an input and `--name` renames the server |
-| `golem mcp add <name> -- <command…>` / `--url <url>` | Adds an MCP server to `config.toml` and starts it. `--token` (web) or `--token-env VAR` (command) asks for a token and keeps it in the Keychain |
+| `golem mcp add <name> -- <command…>` / `--url <url>` | Adds an MCP server to `config.toml` and starts it. `--token` (web) or `--token-env VAR` (command) asks for a token and keeps it in the Keychain. `--env K=V` and `--header K=V` (repeatable), `--cwd`, `--on-demand`, `--project`, `--timeout <seconds>`, and `--approval allow` set the rest. Once added, golem tests the server and says what to try if it fails |
+| `golem mcp edit <name> [--project]` | Opens the server's tables in `$EDITOR`, and saves them only when the daemon accepts the text. An error shows its line, and you can edit again or discard |
+| `golem mcp import [--from <app>\|<file>] [--all] [--project]` | Lists the servers in Claude Desktop, Claude Code, Cursor, VS Code, and Windsurf (or a JSON file) and adds the ones you pick. `--all` adds every new one. Tokens go to the Keychain |
 | `golem mcp export` | Prints your servers as the `mcpServers` JSON of Claude Desktop, Claude Code, Cursor, or Windsurf. `--format vscode` gives VS Code's `servers`, and `--scope project` the project's. Secrets become `${MCP_…}` variables and are never printed |
 | `golem mcp list [--json]` | Lists your MCP servers: state, tools, token cost, and marks such as `on demand`, `hidden N tools`, and `allow` |
 | `golem mcp show <name> [--json]` | One server's command or URL, settings, and which secrets are stored. A secret's value is never shown |
-| `golem mcp test <name>` | Starts the server, lists its tools, and pings it, printing each step. It exits 1 when the test fails and says what to try |
+| `golem mcp test <name>` / `--catalog <id>` | Starts the server, lists its tools, and pings it, printing each step. It exits 1 when the test fails and says what to try. With `--catalog`, it tests an entry from golem's list before you add it (`--input`, `--name` as for add) |
 | `golem mcp logs <name> [-f]` | The server's recent log. `-f` follows new lines until Ctrl-C |
 | `golem mcp enable <name> [--on-demand]` / `disable <name>` | Turns a server on for every chat, on for the chats that ask, or off. It applies at once |
 | `golem mcp restart <name>` | Starts a server again now |
@@ -34,6 +36,7 @@ golem has commands in two places: `golem …` in your shell, and `/…` inside t
 | `golem mcp remove <name>` | Removes the server from `config.toml`, stops it, and deletes its token |
 | `golem auth list` | Which providers have a key |
 | `golem models` | Every model you can use or download, with size, price, and context. `--refresh` asks the providers again |
+| `golem config edit [--project]` | Opens `config.toml` (or the project's) in `$EDITOR`, and saves it only when the daemon accepts it. If a setting needs a restart, it offers one |
 | `golem config show` | The settings and tool rules in effect for this folder. `--resolved` is accepted and prints the same |
 | `golem skills` | The skills this folder sees, and why one is not used. `golem skills list` is the same |
 | `golem skills check <path>` | Checks a skill, its `SKILL.md`, or a folder of skills. Needs no daemon |

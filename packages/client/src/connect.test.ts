@@ -1099,6 +1099,101 @@ test("mcp.update sends the whole config and keeps its secrets off the wire log",
   }
 });
 
+test("config.raw reads the text, and the terminal's write is the protected one", async () => {
+  const methods: string[] = [];
+  const bodies: Record<string, unknown>[] = [];
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: {
+        "config.raw.get": { path: "/h/config.toml", text: "a = 1\n", mtime_ns: 5, exists: true },
+        "config.raw.set": { ok: false, errors: [{ line: 2, message: "bad" }] },
+        "config.raw.set_protected": { ok: true, restart_needed: ["web"], mtime_ns: 6 },
+      },
+      onRequest: (_socket, method, params) => {
+        if (method.startsWith("config.raw")) {
+          methods.push(method);
+          bodies.push(params);
+        }
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    const got = await client.configRawGet({ scope: "project", sessionId: "s1" });
+    assert.equal(got.mtime_ns, 5);
+    assert.equal((await client.configRawSet({ text: "x", baseMtimeNs: 5 })).ok, false);
+    const local = await client.configRawSet({ text: "x", baseMtimeNs: 5, dryRun: true }, { local: true });
+    assert.deepEqual(local.restart_needed, ["web"]);
+    assert.deepEqual(methods, ["config.raw.get", "config.raw.set", "config.raw.set_protected"]);
+    assert.deepEqual(bodies[0], { scope: "project", session_id: "s1" });
+    assert.deepEqual(bodies[2], { scope: "user", text: "x", base_mtime_ns: 5, dry_run: true });
+  } finally {
+    client.close();
+    await server.close();
+  }
+});
+
+test("mcp.import scans and applies, and the wire view hides the secrets it is given", async () => {
+  const sent: Record<string, unknown>[] = [];
+  const candidate = { key: "k", name: "github", original_name: "github", scope: "user", config: { command: "npx" } };
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: {
+        "mcp.import.scan": { scan_id: "abc", sources: [{ id: "paste", label: "Pasted text", candidates: [candidate] }] },
+        "mcp.import.apply": { added: [{ name: "github", state: "starting", command: "npx", tools: [] }], failed: [] },
+      },
+      onRequest: (_socket, method, params) => {
+        if (method.startsWith("mcp.import")) sent.push({ method, ...params });
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
+  let shown = "";
+  client.onWire((lines) => {
+    shown = lines.map(formatWireLine).join("\n");
+  });
+  try {
+    const scan = await client.scanMcpImport({ text: "{}", sessionId: "s1" });
+    assert.equal(scan.sources[0]?.candidates?.[0]?.name, "github");
+    const applied = await client.applyMcpImport({
+      scan_id: scan.scan_id,
+      picks: [{ key: "k", name: "github" }],
+      secrets: { "mcp/github": "ghp-very-secret" },
+    });
+    assert.equal(applied.added[0]?.name, "github");
+    assert.deepEqual(sent[0], { method: "mcp.import.scan", text: "{}", session_id: "s1" });
+    assert.ok(!shown.includes("ghp-very-secret"));
+  } finally {
+    client.close();
+    await server.close();
+  }
+});
+
+test("mcp.test of a catalog entry sends the entry, its inputs, and its secrets", async () => {
+  const sent: Record<string, unknown>[] = [];
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: { "mcp.test": { test_id: "x", ok: true, steps: [] } },
+      onRequest: (_socket, method, params) => {
+        if (method === "mcp.test") sent.push(params);
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    await client.mcpTest({ catalogId: "github", inputs: { a: "b" }, secrets: { token: "t" }, name: "gh" });
+    const body = { ...sent[0] };
+    delete body["test_id"];
+    assert.deepEqual(body, { catalog_id: "github", inputs: { a: "b" }, name: "gh", secrets: { token: "t" } });
+  } finally {
+    client.close();
+    await server.close();
+  }
+});
+
 test("runtime.install starts, and its output and end reach onRuntimeInstall", async () => {
   const server = await listen((socket) => {
     attach(socket, {

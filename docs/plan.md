@@ -610,7 +610,7 @@ Later, outside this phase: disk hygiene (installed models with size and last use
 
 ## Phase 13 — Tracing
 
-See how an answer was made. A session's trace in the browser shows each model call: what was in its context, what it replied, which tools ran, and the time and tokens of each step. It is a tree of spans with a waterfall, like LangSmith, but local and for golem's own sessions. Today the daemon throws most of this away. The system prompt and the tool schemas are rebuilt for every call and never stored ([chat.py](../packages/daemon/golem/graphs/chat.py)). No model call has an event, so its tokens, stop reason, and latency are lost. A tool's time includes the wait for approval. So the phase records first, then shows. It runs after the web UI, because its page builds on 10.11. The details are in [#TBD](https://github.com/MilanPavel/golem/issues/TBD), and each step is one commit and one pull request.
+See how an answer was made. A session's trace in the browser shows each model call: what was in its context, what it replied, which tools ran, and the time and tokens of each step. It is a tree of spans with a waterfall, like LangSmith, but local and for golem's own sessions. Today the daemon throws most of this away. The system prompt and the tool schemas are rebuilt for every call and never stored ([chat.py](../packages/daemon/golem/graphs/chat.py)). No model call has an event, so its tokens, stop reason, and latency are lost. So the phase records first, then shows. It runs after the web UI, because its page builds on 10.11. The details are in [#532](https://github.com/MilanPavel/golem/issues/532), and each step's issue says exactly what to build, and each step is one commit and one pull request.
 
 Choices that hold for the whole phase:
 
@@ -626,14 +626,14 @@ Choices that hold for the whole phase:
 ```mermaid
 flowchart LR
   s1[13.1 ADR and design] --> s2[13.2 Model calls]
-  s1 --> s3[13.3 Exact request]
-  s1 --> s4[13.4 Tool duration]
+  s2 --> s3[13.3 Exact request]
+  s2 --> s4[13.4 Tool duration]
   s2 & s3 & s4 --> s5[13.5 trace.get and trace.span] --> s6[13.6 Trace page] --> s7[13.7 Span detail] --> s8[13.8 Chapter 14, Tracing]
 ```
 
-After 13.1, steps 13.2 to 13.4 can run side by side, each in its own worktree.
+13.3 and 13.4 add fields to what 13.2 records, so 13.2 comes before them. Then 13.3 and 13.4 can run side by side, each in its own worktree.
 
-### 13.1 ADR-041 and a design for the trace page — [#TBD](https://github.com/MilanPavel/golem/issues/TBD)
+### 13.1 ADR-041 and a design for the trace page — [#533](https://github.com/MilanPavel/golem/issues/533)
 
 - **Goal:** every choice the trace code depends on is written down and agreed before it is written.
 - **You can:** open the trace page in the prototype, in both themes and at phone width.
@@ -642,26 +642,26 @@ After 13.1, steps 13.2 to 13.4 can run side by side, each in its own worktree.
   - **The design:** a *Trace* section in `docs/design/web.md`, and the page in `docs/design/prototype.html`.
 - **Done when:** the ADR and the design are merged, and the prototype is approved.
 
-### 13.2 Record each model call — [#TBD](https://github.com/MilanPavel/golem/issues/TBD)
+### 13.2 Record each model call — [#534](https://github.com/MilanPavel/golem/issues/534)
 
 - **Goal:** every model call leaves a record of which model ran, when, how many tokens it used, and why it stopped.
-- **Build:** `model.call.started` (`call_id`, `message_id`, `provider`, `model`, `index`) and `model.call.completed` (`usage` with input, output, cache read, and cache write; `stop_reason`, `ttft_ms`, `latency_ms`, `failed`), written from `call_model` and stored by the runner. `stream_usage` is turned on for OpenAI-style providers.
+- **Build:** `model.call.started` (`message_id`, which identifies the call; `index`, `profile`, `provider`, `model`) and `model.call.completed` (`usage` with input, output, cache read, and cache write; `stop_reason`, `first_token_ms`, `latency_ms`, `failed`). The graph marks the moment the request is sent, and the runner times the call and stores both events. `stream_usage` is turned on for OpenAI-style providers.
 - **Done when:** each model call in a new session has both events, with tokens wherever the provider reports them, and the TUI and the transcript are unchanged.
 - **Watch out:** a provider with no usage leaves `usage` empty, not zero. This changes the wire, so it bumps the protocol minor version.
 
-### 13.3 Record the exact request of each model call — [#TBD](https://github.com/MilanPavel/golem/issues/TBD)
+### 13.3 Record the exact request of each model call — [#535](https://github.com/MilanPavel/golem/issues/535)
 
 - **Goal:** golem can later show exactly what each model call was sent.
 - **Build:** a `blobs` table (`sha256`, `kind`, `text`) with `store/blobs.py`. `model.call.started` gains `system_prompt_sha`, `tools_sha`, and `message_ids`. Backups include `blobs`.
 - **Done when:** a call's system prompt and tools read back byte for byte, and two calls with the same prompt store it once.
 
-### 13.4 Tool duration without the wait for approval — [#TBD](https://github.com/MilanPavel/golem/issues/TBD)
+### 13.4 Exact tool duration — [#536](https://github.com/MilanPavel/golem/issues/536)
 
-- **Goal:** a tool's time is the time it ran.
-- **Build:** `duration_ms` on `tool.completed` and `tool.failed`, timed in `tools_node.py` from after approval. The wait itself stays the gap between `approval.needed` and `approval.resolved`.
-- **Done when:** a tool that waited for approval reports only its run time.
+- **Goal:** each tool call records exactly how long it ran.
+- **Build:** `duration_ms` on `tool.completed` and `tool.failed`, timed in `tools_node.py` around the tool's run. `tool.started` is already written after approval, so the wait is not counted. The wait is shown from the gap between `approval.needed` and `approval.resolved`.
+- **Done when:** every tool that ran has `duration_ms`, and a denied call has none.
 
-### 13.5 `trace.get` and `trace.span` — [#TBD](https://github.com/MilanPavel/golem/issues/TBD)
+### 13.5 `trace.get` and `trace.span` — [#537](https://github.com/MilanPavel/golem/issues/537)
 
 - **Goal:** a client reads a session as a tree of spans, and loads one span's full input and output on demand.
 - **Build:**
@@ -670,7 +670,7 @@ After 13.1, steps 13.2 to 13.4 can run side by side, each in its own worktree.
   - `getTrace` and `getTraceSpan` in `@golem/client`.
 - **Done when:** golden event logs (a new session, an old one, a failed tool, an approval wait, a cancelled run, and 25 calls) give the expected trees, and both methods work through the gateway.
 
-### 13.6 The trace page: tree and waterfall — [#TBD](https://github.com/MilanPavel/golem/issues/TBD)
+### 13.6 The trace page: tree and waterfall — [#538](https://github.com/MilanPavel/golem/issues/538)
 
 - **Goal:** open a session's trace and see its runs, model calls, and tool calls at a glance.
 - **You can:**
@@ -680,7 +680,7 @@ After 13.1, steps 13.2 to 13.4 can run side by side, each in its own worktree.
 - **Build:** the route, the entry points, `trace.get` as a TanStack Query in `store/`, and `features/trace/` (a header with runs, time, and tokens, then the tree with waterfall bars). Gallery entries.
 - **Done when:** e2e opens the trace of a fixture session, axe finds nothing, and it works in both themes.
 
-### 13.7 Span detail: context, reply, metadata — [#TBD](https://github.com/MilanPavel/golem/issues/TBD)
+### 13.7 Span detail: context, reply, metadata — [#539](https://github.com/MilanPavel/golem/issues/539)
 
 - **Goal:** click a span and read what went in and what came out, as easily as a chat.
 - **You can:**
@@ -689,7 +689,7 @@ After 13.1, steps 13.2 to 13.4 can run side by side, each in its own worktree.
 - **Build:** the right pane from `trace.span`, with markdown through DOMPurify and Shiki as in the transcript, the artifact viewer for a large result, Pretty/JSON, and copy. At phone width it is a sheet.
 - **Done when:** e2e selects a tool span and sees its args and result, and an old session shows "not recorded" where data is missing.
 
-### 13.8 Chapter 14 of How golem works: Tracing — [#TBD](https://github.com/MilanPavel/golem/issues/TBD)
+### 13.8 Chapter 14 of How golem works: Tracing — [#540](https://github.com/MilanPavel/golem/issues/540)
 
 - **Goal:** a user knows how to read a trace, and a contributor knows where its data comes from.
 - **Build:**
