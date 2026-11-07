@@ -9,6 +9,7 @@ import type { Page, PageActions } from "./page.ts";
 import type { PullsSnapshot } from "./pulls.ts";
 import type { Route } from "./router.ts";
 import type { McpListResult, SessionSummary, SetupStatusResult, SkillListResult } from "@golem/client";
+import { traceKey, type TraceGetResult } from "./trace.ts";
 import { mcpListKey, mcpToolsKey, type McpToolsResult } from "./mcp.ts";
 import type { Pastes } from "@golem/view";
 import { distinctFolders, resolveFolder } from "./new-session.ts";
@@ -172,6 +173,13 @@ export function useSessionReader(id: string | null): () => { view: SessionView; 
 export function useSkillList(cwd: string | null, enabled = true): UseQueryResult<SkillListResult> {
   const { queries } = usePage();
   return useQuery({ queryKey: ["skill.list", cwd], queryFn: () => queries.skillList(cwd), enabled });
+}
+
+/** A session's trace, read once. It does not follow a run as it streams; the page's Refresh reads it again. */
+export function useTrace(sessionId: string): UseQueryResult<TraceGetResult> {
+  const { queries } = usePage();
+  // Read again on every visit: the answer is only as new as its last read.
+  return useQuery({ queryKey: traceKey(sessionId), queryFn: () => queries.trace(sessionId), staleTime: 0, retry: false });
 }
 
 /** The tool rules and what the session allows. Fetched only once `enabled`; the rule edits and `approval.resolved` refresh it. */

@@ -115,6 +115,7 @@ export function fakeClient() {
     setSkills: vi.fn<PageClient["setSkills"]>(async () => ({}) as never),
     getConfig: vi.fn<PageClient["getConfig"]>(async () => ({ rules: [] }) as never),
     listDirs: vi.fn<PageClient["listDirs"]>(async () => ({ path: "/home/me", home: "/home/me", parent: null, entries: [], truncated: false })),
+    getTrace: vi.fn<PageClient["getTrace"]>(async (sessionId) => ({ session_id: sessionId, title: null, runs: [] })),
     listMcp: vi.fn<PageClient["listMcp"]>(async () => ({ servers: [] })),
     mcpTools: vi.fn<PageClient["mcpTools"]>(async (name) => ({ name, tools: [] })),
     restartMcp: vi.fn<PageClient["restartMcp"]>(async () => ({}) as never),

@@ -17,11 +17,12 @@ export const COMMAND_KEYS: Readonly<Record<string, string>> = { "/help": "?" };
 export type PaletteRow = SearchListItem &
   (
     | { kind: "command"; command: Command; key: string | null }
-    | { kind: "page"; page: "keys" | "settings"; name: string; description: string; key: string | null }
+    | { kind: "page"; page: "keys" | "settings" | "trace"; name: string; description: string; key: string | null }
     | { kind: "message"; text: string }
   );
 
 const KEYS = { name: "Keys", description: "The keys this page uses.", key: "?" };
+const TRACE = { name: "Trace", description: "Model calls, context, tools, and timings of this session", key: null };
 const SETTINGS = { name: "Settings", description: "Setup, appearance, and the rest of the settings.", key: null };
 
 /** How well the query fits a name, or null for no fit: 0 when the name starts with it, 1 when the text holds it. */
@@ -34,9 +35,9 @@ function rank(name: string, args: string, description: string, query: string): 0
 
 /**
  * The rows for a query: the commands and the Keys row, grouped as Session, Model, Tools, and View,
- * names that start with the query first. A query that fits nothing is one row that sends it as a message.
+ * names that start with the query first. The Trace row is there only with a session open. A query that fits nothing is one row that sends it as a message.
  */
-export function paletteRows(commands: readonly Command[], query: string): PaletteRow[] {
+export function paletteRows(commands: readonly Command[], query: string, hasSession = false): PaletteRow[] {
   const typed = query.trim();
   const needle = typed.toLowerCase();
   const out: PaletteRow[] = [];
@@ -50,6 +51,10 @@ export function paletteRows(commands: readonly Command[], query: string): Palett
       }
     }
     if (group === "view") {
+      const trace = hasSession ? rank(TRACE.name, "", TRACE.description, needle) : null;
+      if (trace !== null) {
+        found.push({ row: { id: "page:trace", group: title, kind: "page", page: "trace", ...TRACE }, rank: trace });
+      }
       const settings = rank(SETTINGS.name, "", SETTINGS.description, needle);
       if (settings !== null) {
         found.push({ row: { id: "page:settings", group: title, kind: "page", page: "settings", ...SETTINGS }, rank: settings });

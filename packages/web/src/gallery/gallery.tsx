@@ -32,6 +32,9 @@ import { FolderBrowserView } from "../features/shell/folder-browser.tsx";
 import { CommandPaletteView, KeysDialog } from "../features/palette/index.ts";
 import { ModelDialogView, type ModelDialogViewProps } from "../features/models/index.ts";
 import { SetupDialogView } from "../features/setup/index.ts";
+import { TraceTree } from "../features/trace/index.ts";
+import { APPROVAL_TRACE, FAILED_TRACE, LONG_TRACE, OLD_TRACE, SHORT_TRACE } from "../features/trace/sample.ts";
+import type { TraceRunSpan } from "../store/trace.ts";
 import { FORM_CASES, SETUP_CASES } from "../features/setup/sample.ts";
 import { AddKey, SetupFormView } from "../features/setup/setup-form.tsx";
 import { panelView } from "../features/setup/setup-ui.ts";
@@ -510,10 +513,30 @@ function SetupFormDemo() {
   );
 }
 
+function TraceDemo({ label, runs }: { label: string; runs: TraceRunSpan[] }) {
+  const [selected, setSelected] = useState<string | null>(null);
+  return (
+    <figure className="w-full">
+      <figcaption className="mb-1 font-mono text-xs text-faint">{label}</figcaption>
+      <div className="flex h-64 flex-col overflow-hidden rounded-md border border-line bg-bg">
+        <TraceTree runs={runs} selected={selected} onSelect={setSelected} />
+      </div>
+    </figure>
+  );
+}
+
 function Panel({ theme }: { theme: "slip" | "kiln" }) {
   return (
     <section data-theme={theme} aria-label={`${theme} theme`} className="rounded-lg border border-line bg-bg p-4 text-ink">
       <h2 className="font-prose text-xl">{theme}</h2>
+
+      <Group title="Trace">
+        <TraceDemo label="Short trace" runs={SHORT_TRACE} />
+        <TraceDemo label="Long trace, 25 model calls" runs={LONG_TRACE} />
+        <TraceDemo label="A failed and a denied tool" runs={FAILED_TRACE} />
+        <TraceDemo label="A tool with an approval wait" runs={APPROVAL_TRACE} />
+        <TraceDemo label="A session from before traces" runs={OLD_TRACE} />
+      </Group>
 
       <Group title="Button">
         <Button kind="primary">Primary</Button>

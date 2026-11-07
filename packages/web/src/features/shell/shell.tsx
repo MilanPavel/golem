@@ -4,6 +4,7 @@ import { openPalette, PaletteHost } from "../palette/index.ts";
 import { Sidebar } from "../sessions/index.ts";
 import { SettingsScreen } from "../settings/index.ts";
 import { SetupHost } from "../setup/index.ts";
+import { TraceScreen } from "../trace/index.ts";
 import { HomeScreen } from "./home-screen.tsx";
 import { SessionScreen } from "./session-screen.tsx";
 
@@ -30,6 +31,8 @@ function Content() {
     case "session":
       // The key gives each session its own state, so the folder is remembered per opening.
       return <SessionScreen key={route.id} id={route.id} />;
+    case "trace":
+      return <TraceScreen key={route.id} id={route.id} span={route.span} />;
     case "settings":
       return <SettingsScreen section={route.section} />;
     case "not-found":
