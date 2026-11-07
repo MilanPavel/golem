@@ -3,7 +3,7 @@ import { installEventOf, type InstallEvent } from "@golem/view";
 import type { QueryClient } from "@tanstack/react-query";
 import { createDrafts, type Drafts } from "./drafts.ts";
 import { createConnectionStore, type ConnectionStore } from "./connection.ts";
-import { createNewSessionFolder, type NewSessionFolderStore } from "./new-session.ts";
+import { createNewSession, type NewSessionStore } from "./new-session.ts";
 import { CONFIG_KEY } from "./config.ts";
 import { MODEL_LIST_KEY, SETUP_STATUS_KEY, type ModelListResult } from "./models.ts";
 import { createPulls, type Pulls } from "./pulls.ts";
@@ -60,7 +60,8 @@ export type PageClient = Pick<
 
 /** Thin calls on the client. Their results arrive as events, so there is nothing to merge. */
 export type PageActions = {
-  createSession(cwd: string | null): Promise<string>;
+  /** Starts a session in `cwd` on `model` (null: the default). */
+  createSession(cwd: string | null, model: string | null): Promise<string>;
   /** Sends a message. With `skill`, the daemon fills the skill's body in from `args`. */
   send(sessionId: string, text: string, skill?: { name: string; args: string }): Promise<void>;
   /** Pins a skill for the session, or unpins it. The pinned list arrives as `chat.activeSkills`. */
@@ -122,7 +123,7 @@ export type Page = {
   connection: ConnectionStore;
   sessions: Sessions;
   sessionList: SessionList;
-  newSession: NewSessionFolderStore;
+  newSession: NewSessionStore;
   drafts: Drafts;
   pulls: Pulls;
   setupStart: SetupStart;
@@ -147,7 +148,7 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
   const connection = createConnectionStore(() => client);
   const sessions = createSessions(client, options.frame);
   const sessionList = createSessionList(client);
-  const newSession = createNewSessionFolder();
+  const newSession = createNewSession();
   const drafts = createDrafts();
   const queryClient = createQueryClient();
   const pulls = createPulls(client, Date.now, () => {
@@ -184,8 +185,11 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
     },
     router,
     actions: {
-      async createSession(cwd) {
-        const created = await client.createSession(cwd === null ? undefined : { cwd });
+      async createSession(cwd, model) {
+        const options: { cwd?: string; modelProfile?: string } = {};
+        if (cwd !== null) options.cwd = cwd;
+        if (model !== null) options.modelProfile = model;
+        const created = await client.createSession(Object.keys(options).length === 0 ? undefined : options);
         return created.session_id;
       },
       async send(sessionId, text, skill) {

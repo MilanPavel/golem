@@ -214,3 +214,30 @@ def test_set_default_model_creates_and_updates_the_file(tmp_path: Path) -> None:
     assert parsed["default_model"] == "x"
     assert parsed["models"] == {"x": {"model": "a/b"}}
     assert config.stat().st_mode & 0o777 == 0o600
+
+
+async def test_create_checks_the_model_as_set_model_does(short_home: Path) -> None:
+    router = _TwoModels(SETTINGS, {"ollama/qwen3:8b": ScriptedChatModel(replies=[])})
+    app, task = await start_daemon(short_home, router=router)
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        by_default = rpc_result(await client.call("session.create", {}))
+        assert cast(str, by_default["session_id"]).startswith("s_")
+        for model in ("local", "ollama/qwen3:8b"):
+            made = rpc_result(await client.call("session.create", {"model_profile": model}))
+            assert cast(str, made["session_id"]).startswith("s_")
+        for model in ("remote", "nowhere", "nobody/model"):
+            create = await client.call("session.create", {"model_profile": model})
+            session = await _open(client)
+            set_model = await client.call(
+                "session.set_model", {"session_id": session, "model": model}
+            )
+            assert error_code(create) == MODEL_NOT_CONFIGURED
+            assert (
+                _record(_record(create)["error"])["message"]
+                == (_record(_record(set_model)["error"])["message"])
+            )
+    finally:
+        await client.close()
+        await stop_daemon(app, task)

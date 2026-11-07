@@ -9,6 +9,11 @@ export type ModelProfile = string | null;
  * ``cwd`` is the session's project folder, an absolute path. File tools work
  * only inside it, and a session without one has no file tools.
  *
+ * ``model_profile`` is a profile name or a ``provider/model`` ref, and null
+ * uses the default. The daemon checks it as ``session.set_model`` does, so a
+ * model that does not resolve, or whose provider has no key, fails here with
+ * the same error code and message.
+ *
  * The caller is not attached. ``session.attach`` replays ``session.created``.
  */
 export interface SessionCreateParams {

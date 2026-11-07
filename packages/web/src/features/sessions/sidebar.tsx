@@ -16,7 +16,7 @@ import { useNavigate, useRoute, useSessionList, useSetupStatus } from "../../sto
 import { groupByFolder, type SessionSummary } from "../../store/session-list.ts";
 import { sessionPath, settingsPath } from "../../store/router.ts";
 import { ConnectionLine } from "../connection/index.ts";
-import { NoSessionModelDialog, PullStatus } from "../models/index.ts";
+import { NewSessionModelDialog, PullStatus } from "../models/index.ts";
 import { CloseSessionDialog } from "./close-dialog.tsx";
 import { folderName } from "./folder.ts";
 import { forkRows, type ForkRow } from "./fork-tree.ts";
@@ -370,7 +370,7 @@ export function Sidebar({ onSearch }: { onSearch?: (trigger: HTMLElement) => voi
       downloads={
         <>
           <PullStatus />
-          <NoSessionModelDialog />
+          <NewSessionModelDialog />
         </>
       }
     />

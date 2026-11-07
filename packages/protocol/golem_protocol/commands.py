@@ -96,6 +96,11 @@ class SessionCreateParams(BaseModel):
     ``cwd`` is the session's project folder, an absolute path. File tools work
     only inside it, and a session without one has no file tools.
 
+    ``model_profile`` is a profile name or a ``provider/model`` ref, and null
+    uses the default. The daemon checks it as ``session.set_model`` does, so a
+    model that does not resolve, or whose provider has no key, fails here with
+    the same error code and message.
+
     The caller is not attached. ``session.attach`` replays ``session.created``.
     """
 
@@ -447,11 +452,17 @@ class AuthListResult(BaseModel):
 
 
 class ModelListParams(BaseModel):
-    """``model.list``. ``refresh`` fetches hosted model lists and prices again, past their cache."""
+    """``model.list``.
+
+    ``refresh`` fetches hosted model lists and prices again, past their cache. A hosted model is
+    listed when the provider's live list and the catalog both have it. ``show_all`` adds the live
+    chat models that call tools. A model past its retirement date is never listed.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     refresh: bool = False
+    show_all: bool = False
 
 
 class ModelPriceInfo(BaseModel):

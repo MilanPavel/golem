@@ -174,8 +174,18 @@ class SessionManager:
         """Store a new session and its ``session.created``. Nobody is attached yet.
 
         ``cwd`` is the folder its file tools work in. None gives it no file tools.
+        ``model_profile`` is a profile name or a ``provider/model`` ref, or None
+        for the default.
+
+        Raises :class:`~golem.models.router.ModelConfigError` when
+        ``model_profile`` does not resolve or its provider has no key, as
+        :meth:`set_model` does.
         """
-        profile = self._runtime.router.profile_name if model_profile is None else model_profile
+        if model_profile is None:
+            profile = self._runtime.router.profile_name
+        else:
+            self._runtime.router.chat_model(model_profile)
+            profile = model_profile
         async with self._lock:
             session = _LiveSession(
                 session_id=new_id("s"),

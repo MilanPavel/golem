@@ -10,6 +10,11 @@ export function isInvalidParams(error: unknown): error is RpcError {
   return error instanceof RpcError && error.code === INVALID_PARAMS;
 }
 
+/** The daemon refused a new session's model: it does not resolve, or its provider has no key. */
+export function isModelRefused(error: unknown): error is RpcError {
+  return error instanceof RpcError && error.code === MODEL_NOT_CONFIGURED;
+}
+
 /** The daemon refused a message because no model was ever chosen: the setup window picks one. */
 export function isNoModelChosen(error: unknown): boolean {
   return error instanceof RpcError && noModelChosen(error.code, error.message, MODEL_NOT_CONFIGURED);

@@ -1,10 +1,15 @@
 {
   "additionalProperties": false,
-  "description": "``model.list``. ``refresh`` fetches hosted model lists and prices again, past their cache.",
+  "description": "``model.list``.\n\n``refresh`` fetches hosted model lists and prices again, past their cache. A hosted model is\nlisted when the provider's live list and the catalog both have it. ``show_all`` adds the live\nchat models that call tools. A model past its retirement date is never listed.",
   "properties": {
     "refresh": {
       "default": false,
       "title": "Refresh",
+      "type": "boolean"
+    },
+    "show_all": {
+      "default": false,
+      "title": "Show All",
       "type": "boolean"
     }
   },

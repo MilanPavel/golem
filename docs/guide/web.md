@@ -27,6 +27,7 @@ Run `golem web` again while one is running, and it opens the same server instead
 
 ## What you can do today
 
+- **Choose a model for a new session** with the chip next to the folder chip on the empty screen, or with `/model`. It shows the default until you pick another. The pick is for that session only, and a refused model shows under the chips.
 - **Sessions,** grouped by folder in the sidebar, the same list as `/sessions` in the terminal.
 - **Read a chat:** answers in a book serif, with highlighted code, and each tool line opens into its arguments and output.
 - **Write:** the composer sends a message, keeps your history, takes pastes, and stops an answer.

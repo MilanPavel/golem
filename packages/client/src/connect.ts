@@ -179,7 +179,7 @@ export interface GolemClient {
    * Create a session. Its events arrive only after {@link GolemClient.attachSession}.
    * `cwd` is its project folder, an absolute path. File tools work only inside it.
    */
-  createSession(options?: { cwd?: string }): Promise<SessionCreateResult>;
+  createSession(options?: { cwd?: string; modelProfile?: string }): Promise<SessionCreateResult>;
   /**
    * Replay the session's events after `afterSeq`, then stream new ones.
    * The client attaches again after a reconnect, from the last `seq` it saw.
@@ -891,9 +891,12 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       }
       return result;
     },
-    async createSession(options?: { cwd?: string }): Promise<SessionCreateResult> {
+    async createSession(options?: { cwd?: string; modelProfile?: string }): Promise<SessionCreateResult> {
       await ready;
-      const result = await call("session.create", options?.cwd === undefined ? {} : { cwd: options.cwd });
+      const params: { cwd?: string; model_profile?: string } = {};
+      if (options?.cwd !== undefined) params.cwd = options.cwd;
+      if (options?.modelProfile !== undefined) params.model_profile = options.modelProfile;
+      const result = await call("session.create", params);
       if (!isSessionCreateResult(result)) {
         throw new Error("invalid session.create result");
       }

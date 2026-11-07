@@ -8,7 +8,7 @@ import type { ModelDialogViewProps } from "./model-dialog.tsx";
  * chip, or the element that had focus when the command ran, which is the composer.
  */
 export type ModelDialogOpen = {
-  /** The session it is for, or null when none is in view. */
+  /** The session it is for, or null for the model of the next new session (new-session mode). */
   sessionId: string | null;
   returnTo: "chip" | HTMLElement | null;
   initial?: ModelDialogViewProps["initial"];
