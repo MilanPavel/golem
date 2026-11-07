@@ -49,6 +49,20 @@
     },
     {
       "data": {
+        "index": 1,
+        "message_id": "id-4",
+        "model": null,
+        "profile": "remote",
+        "provider": null
+      },
+      "run_id": "id-2",
+      "seq": 5,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:04Z",
+      "type": "model.call.started"
+    },
+    {
+      "data": {
         "interrupted": false,
         "message_id": "id-4",
         "role": "assistant",
@@ -56,10 +70,25 @@
         "text": ""
       },
       "run_id": "id-2",
-      "seq": 5,
+      "seq": 6,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:04Z",
+      "ts": "2026-01-01T00:00:05Z",
       "type": "message.completed"
+    },
+    {
+      "data": {
+        "failed": false,
+        "first_token_ms": null,
+        "latency_ms": 0,
+        "message_id": "id-4",
+        "stop_reason": null,
+        "usage": null
+      },
+      "run_id": "id-2",
+      "seq": 7,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:06Z",
+      "type": "model.call.completed"
     },
     {
       "data": {
@@ -71,9 +100,9 @@
         "name": "read_file"
       },
       "run_id": "id-2",
-      "seq": 6,
+      "seq": 8,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:05Z",
+      "ts": "2026-01-01T00:00:07Z",
       "type": "tool.requested"
     },
     {
@@ -81,9 +110,9 @@
         "call_id": "call_1"
       },
       "run_id": "id-2",
-      "seq": 7,
+      "seq": 9,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:06Z",
+      "ts": "2026-01-01T00:00:08Z",
       "type": "tool.started"
     },
     {
@@ -96,9 +125,9 @@
         "truncated": false
       },
       "run_id": "id-2",
-      "seq": 8,
+      "seq": 10,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:07Z",
+      "ts": "2026-01-01T00:00:09Z",
       "type": "tool.completed"
     },
     {
@@ -107,10 +136,24 @@
         "role": "assistant"
       },
       "run_id": "id-2",
-      "seq": 9,
+      "seq": 11,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:08Z",
+      "ts": "2026-01-01T00:00:10Z",
       "type": "message.started"
+    },
+    {
+      "data": {
+        "index": 2,
+        "message_id": "id-5",
+        "model": null,
+        "profile": "remote",
+        "provider": null
+      },
+      "run_id": "id-2",
+      "seq": 12,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:11Z",
+      "type": "model.call.started"
     },
     {
       "data": {
@@ -121,17 +164,32 @@
         "text": "It is 42."
       },
       "run_id": "id-2",
-      "seq": 10,
+      "seq": 13,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:09Z",
+      "ts": "2026-01-01T00:00:12Z",
       "type": "message.completed"
+    },
+    {
+      "data": {
+        "failed": false,
+        "first_token_ms": null,
+        "latency_ms": 0,
+        "message_id": "id-5",
+        "stop_reason": null,
+        "usage": null
+      },
+      "run_id": "id-2",
+      "seq": 14,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:13Z",
+      "type": "model.call.completed"
     },
     {
       "data": {},
       "run_id": "id-2",
-      "seq": 11,
+      "seq": 15,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:10Z",
+      "ts": "2026-01-01T00:00:14Z",
       "type": "run.completed"
     }
   ],
@@ -185,6 +243,20 @@
     },
     {
       "data": {
+        "index": 1,
+        "message_id": "id-4",
+        "model": null,
+        "profile": "remote",
+        "provider": null
+      },
+      "run_id": "id-2",
+      "seq": 5,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:04Z",
+      "type": "model.call.started"
+    },
+    {
+      "data": {
         "interrupted": false,
         "message_id": "id-4",
         "role": "assistant",
@@ -192,10 +264,25 @@
         "text": ""
       },
       "run_id": "id-2",
-      "seq": 5,
+      "seq": 6,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:04Z",
+      "ts": "2026-01-01T00:00:05Z",
       "type": "message.completed"
+    },
+    {
+      "data": {
+        "failed": false,
+        "first_token_ms": null,
+        "latency_ms": 0,
+        "message_id": "id-4",
+        "stop_reason": null,
+        "usage": null
+      },
+      "run_id": "id-2",
+      "seq": 7,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:06Z",
+      "type": "model.call.completed"
     },
     {
       "data": {
@@ -207,9 +294,9 @@
         "name": "read_file"
       },
       "run_id": "id-2",
-      "seq": 6,
+      "seq": 8,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:05Z",
+      "ts": "2026-01-01T00:00:07Z",
       "type": "tool.requested"
     },
     {
@@ -217,9 +304,9 @@
         "call_id": "call_1"
       },
       "run_id": "id-2",
-      "seq": 7,
+      "seq": 9,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:06Z",
+      "ts": "2026-01-01T00:00:08Z",
       "type": "tool.started"
     },
     {
@@ -232,9 +319,9 @@
         "truncated": false
       },
       "run_id": "id-2",
-      "seq": 8,
+      "seq": 10,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:07Z",
+      "ts": "2026-01-01T00:00:09Z",
       "type": "tool.completed"
     },
     {
@@ -243,10 +330,24 @@
         "role": "assistant"
       },
       "run_id": "id-2",
-      "seq": 9,
+      "seq": 11,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:08Z",
+      "ts": "2026-01-01T00:00:10Z",
       "type": "message.started"
+    },
+    {
+      "data": {
+        "index": 2,
+        "message_id": "id-5",
+        "model": null,
+        "profile": "remote",
+        "provider": null
+      },
+      "run_id": "id-2",
+      "seq": 12,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:11Z",
+      "type": "model.call.started"
     },
     {
       "data": {
@@ -257,17 +358,32 @@
         "text": "It is 42."
       },
       "run_id": "id-2",
-      "seq": 10,
+      "seq": 13,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:09Z",
+      "ts": "2026-01-01T00:00:12Z",
       "type": "message.completed"
+    },
+    {
+      "data": {
+        "failed": false,
+        "first_token_ms": null,
+        "latency_ms": 0,
+        "message_id": "id-5",
+        "stop_reason": null,
+        "usage": null
+      },
+      "run_id": "id-2",
+      "seq": 14,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:13Z",
+      "type": "model.call.completed"
     },
     {
       "data": {},
       "run_id": "id-2",
-      "seq": 11,
+      "seq": 15,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:10Z",
+      "ts": "2026-01-01T00:00:14Z",
       "type": "run.completed"
     }
   ]

@@ -49,19 +49,22 @@
     },
     {
       "data": {
+        "index": 1,
         "message_id": "id-4",
-        "text": "H"
+        "model": null,
+        "profile": "remote",
+        "provider": null
       },
       "run_id": "id-2",
       "seq": 5,
       "session_id": "id-1",
       "ts": "2026-01-01T00:00:04Z",
-      "type": "message.delta"
+      "type": "model.call.started"
     },
     {
       "data": {
         "message_id": "id-4",
-        "text": "e"
+        "text": "H"
       },
       "run_id": "id-2",
       "seq": 6,
@@ -72,13 +75,39 @@
     {
       "data": {
         "message_id": "id-4",
-        "text": "l"
+        "text": "e"
       },
       "run_id": "id-2",
       "seq": 7,
       "session_id": "id-1",
       "ts": "2026-01-01T00:00:06Z",
       "type": "message.delta"
+    },
+    {
+      "data": {
+        "message_id": "id-4",
+        "text": "l"
+      },
+      "run_id": "id-2",
+      "seq": 8,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:07Z",
+      "type": "message.delta"
+    },
+    {
+      "data": {
+        "failed": true,
+        "first_token_ms": 0,
+        "latency_ms": 0,
+        "message_id": "id-4",
+        "stop_reason": null,
+        "usage": null
+      },
+      "run_id": "id-2",
+      "seq": 9,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:08Z",
+      "type": "model.call.completed"
     },
     {
       "data": {
@@ -89,9 +118,9 @@
         "text": "Hel"
       },
       "run_id": "id-2",
-      "seq": 8,
+      "seq": 10,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:07Z",
+      "ts": "2026-01-01T00:00:09Z",
       "type": "message.completed"
     },
     {
@@ -99,9 +128,9 @@
         "reason": "user"
       },
       "run_id": "id-2",
-      "seq": 9,
+      "seq": 11,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:08Z",
+      "ts": "2026-01-01T00:00:10Z",
       "type": "run.cancelled"
     }
   ],
@@ -155,6 +184,35 @@
     },
     {
       "data": {
+        "index": 1,
+        "message_id": "id-4",
+        "model": null,
+        "profile": "remote",
+        "provider": null
+      },
+      "run_id": "id-2",
+      "seq": 5,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:04Z",
+      "type": "model.call.started"
+    },
+    {
+      "data": {
+        "failed": true,
+        "first_token_ms": 0,
+        "latency_ms": 0,
+        "message_id": "id-4",
+        "stop_reason": null,
+        "usage": null
+      },
+      "run_id": "id-2",
+      "seq": 9,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:08Z",
+      "type": "model.call.completed"
+    },
+    {
+      "data": {
         "interrupted": true,
         "message_id": "id-4",
         "role": "assistant",
@@ -162,9 +220,9 @@
         "text": "Hel"
       },
       "run_id": "id-2",
-      "seq": 8,
+      "seq": 10,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:07Z",
+      "ts": "2026-01-01T00:00:09Z",
       "type": "message.completed"
     },
     {
@@ -172,9 +230,9 @@
         "reason": "user"
       },
       "run_id": "id-2",
-      "seq": 9,
+      "seq": 11,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:08Z",
+      "ts": "2026-01-01T00:00:10Z",
       "type": "run.cancelled"
     }
   ]

@@ -34,6 +34,13 @@ class ModelStarted:
 
 
 @dataclass(frozen=True, slots=True)
+class ModelRequested:
+    """The request of the model call with this ``message_id`` is about to be sent."""
+
+    message_id: str
+
+
+@dataclass(frozen=True, slots=True)
 class TextDelta:
     """Incremental assistant text. Empty chunks are not represented."""
 
@@ -54,6 +61,8 @@ class TextCompleted:
     text: str
     message_id: str | None = None
     calls: tuple[RequestedCall, ...] = field(default=())
+    usage: dict[str, int] | None = None
+    stop_reason: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -125,6 +134,7 @@ class PinSkipped:
 
 Fact = (
     ModelStarted
+    | ModelRequested
     | TextDelta
     | TextCompleted
     | ToolStarted
@@ -260,7 +270,41 @@ def _completed(data: object) -> TextCompleted | ApprovalAsked | None:
                 )
                 for call in message.tool_calls
             )
-            return TextCompleted(message_text(message), message.id, calls)
+            return TextCompleted(
+                message_text(message),
+                message.id,
+                calls,
+                _usage(message),
+                _stop_reason(message),
+            )
+    return None
+
+
+def _usage(message: AIMessage) -> dict[str, int] | None:
+    """Token counts of ``message``: ``input``, ``output``, ``cache_read``, ``cache_write``."""
+    raw = message.usage_metadata
+    if raw is None:
+        return None
+    usage: dict[str, int] = {}
+    for key, name in (("input_tokens", "input"), ("output_tokens", "output")):
+        count = raw.get(key)
+        if isinstance(count, int):
+            usage[name] = count
+    details = raw.get("input_token_details")
+    if details:
+        for key, name in (("cache_read", "cache_read"), ("cache_creation", "cache_write")):
+            count = details.get(key)
+            if isinstance(count, int):
+                usage[name] = count
+    return usage or None
+
+
+def _stop_reason(message: AIMessage) -> str | None:
+    """Why the model stopped: Anthropic's ``stop_reason`` or OpenAI's ``finish_reason``."""
+    for key in ("stop_reason", "finish_reason"):
+        reason = message.response_metadata.get(key)
+        if isinstance(reason, str) and reason:
+            return reason
     return None
 
 
@@ -301,6 +345,8 @@ def _custom(data: object) -> Fact | None:
     call_id = item.get("call_id")
     if kind == "model.started" and isinstance(message_id, str):
         return ModelStarted(message_id)
+    if kind == "model.request" and isinstance(message_id, str):
+        return ModelRequested(message_id)
     if kind in (PIN_READ_KIND, PIN_SKIPPED_KIND):
         return _pin(kind, item)
     if not isinstance(call_id, str):
@@ -358,6 +404,7 @@ __all__ = [
     "STREAM_KEY",
     "ApprovalAsked",
     "Fact",
+    "ModelRequested",
     "ModelStarted",
     "PinRead",
     "PinSkipped",

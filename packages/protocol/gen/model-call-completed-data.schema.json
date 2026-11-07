@@ -1,0 +1,125 @@
+{
+  "$defs": {
+    "TokenUsage": {
+      "additionalProperties": false,
+      "description": "Tokens one model call used. A field is None when the provider did not report it.",
+      "properties": {
+        "cache_read": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cache Read"
+        },
+        "cache_write": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cache Write"
+        },
+        "input": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Input"
+        },
+        "output": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Output"
+        }
+      },
+      "title": "TokenUsage",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "A model call ended.\n\n``first_token_ms`` is the time from the request to the first text, and\nNone when no text came. ``latency_ms`` is the time to the end.\n``failed`` is true when the call raised or was stopped.",
+  "properties": {
+    "failed": {
+      "default": false,
+      "title": "Failed",
+      "type": "boolean"
+    },
+    "first_token_ms": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "First Token Ms"
+    },
+    "latency_ms": {
+      "minimum": 0,
+      "title": "Latency Ms",
+      "type": "integer"
+    },
+    "message_id": {
+      "minLength": 1,
+      "title": "Message Id",
+      "type": "string"
+    },
+    "stop_reason": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Stop Reason"
+    },
+    "usage": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/TokenUsage"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "required": [
+    "message_id",
+    "latency_ms"
+  ],
+  "title": "ModelCallCompletedData",
+  "type": "object"
+}

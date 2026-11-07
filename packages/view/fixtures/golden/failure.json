@@ -49,15 +49,44 @@
     },
     {
       "data": {
-        "code": null,
-        "hint": null,
-        "message": "no scripted reply",
+        "index": 1,
+        "message_id": "id-4",
+        "model": null,
+        "profile": "remote",
         "provider": null
       },
       "run_id": "id-2",
       "seq": 5,
       "session_id": "id-1",
       "ts": "2026-01-01T00:00:04Z",
+      "type": "model.call.started"
+    },
+    {
+      "data": {
+        "failed": true,
+        "first_token_ms": null,
+        "latency_ms": 0,
+        "message_id": "id-4",
+        "stop_reason": null,
+        "usage": null
+      },
+      "run_id": "id-2",
+      "seq": 6,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:05Z",
+      "type": "model.call.completed"
+    },
+    {
+      "data": {
+        "code": null,
+        "hint": null,
+        "message": "no scripted reply",
+        "provider": null
+      },
+      "run_id": "id-2",
+      "seq": 7,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:06Z",
       "type": "run.failed"
     }
   ],
@@ -111,15 +140,44 @@
     },
     {
       "data": {
-        "code": null,
-        "hint": null,
-        "message": "no scripted reply",
+        "index": 1,
+        "message_id": "id-4",
+        "model": null,
+        "profile": "remote",
         "provider": null
       },
       "run_id": "id-2",
       "seq": 5,
       "session_id": "id-1",
       "ts": "2026-01-01T00:00:04Z",
+      "type": "model.call.started"
+    },
+    {
+      "data": {
+        "failed": true,
+        "first_token_ms": null,
+        "latency_ms": 0,
+        "message_id": "id-4",
+        "stop_reason": null,
+        "usage": null
+      },
+      "run_id": "id-2",
+      "seq": 6,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:05Z",
+      "type": "model.call.completed"
+    },
+    {
+      "data": {
+        "code": null,
+        "hint": null,
+        "message": "no scripted reply",
+        "provider": null
+      },
+      "run_id": "id-2",
+      "seq": 7,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:06Z",
       "type": "run.failed"
     }
   ]

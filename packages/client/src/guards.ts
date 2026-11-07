@@ -53,6 +53,8 @@ const EVENT_TYPES = new Set([
   "message.started",
   "message.delta",
   "message.completed",
+  "model.call.started",
+  "model.call.completed",
   "run.started",
   "run.completed",
   "run.failed",

@@ -75,6 +75,8 @@ class ToolCallingChatModel(BaseChatModel):
     seen: list[list[BaseMessage]] = Field(default_factory=_no_histories)
     bound: list[str] = Field(default_factory=list[str])
     calls_made: int = 0
+    usage: dict[str, Any] | None = None
+    response_metadata: dict[str, Any] = Field(default_factory=dict[str, Any])
 
     @property
     def _llm_type(self) -> str:
@@ -106,6 +108,8 @@ class ToolCallingChatModel(BaseChatModel):
                 self.calls_made += 1
                 calls.append(ToolCall(name=name, args=args, id=f"call_{self.calls_made}"))
             message = AIMessage(content="", tool_calls=calls)
+        message.usage_metadata = self.usage  # type: ignore[assignment]
+        message.response_metadata = dict(self.response_metadata)
         return ChatResult(generations=[ChatGeneration(message=message)])
 
 

@@ -245,7 +245,11 @@ class ModelRouter:
         if provider.kind == "openai":
             from langchain_openai import ChatOpenAI
 
-            options: dict[str, object] = {"model": resolved.model_id, "api_key": key}
+            options: dict[str, object] = {
+                "model": resolved.model_id,
+                "api_key": key,
+                "stream_usage": True,
+            }
             if provider.base_url is not None:
                 options["base_url"] = provider.base_url
             return ChatOpenAI.model_validate(options)
@@ -257,6 +261,7 @@ class ModelRouter:
                     "model": resolved.model_id,
                     "base_url": provider.base_url or XAI_BASE_URL,
                     "api_key": key,
+                    "stream_usage": True,
                 }
             )
         if provider.kind == "google":
@@ -265,7 +270,12 @@ class ModelRouter:
             # Gemini's OpenAI-compatible endpoint, next to the native one that lists the models.
             base = (provider.base_url or GOOGLE_BASE_URL).rstrip("/")
             return ChatOpenAI.model_validate(
-                {"model": resolved.model_id, "base_url": f"{base}/openai/", "api_key": key}
+                {
+                    "model": resolved.model_id,
+                    "base_url": f"{base}/openai/",
+                    "api_key": key,
+                    "stream_usage": True,
+                }
             )
         if provider.kind == "ollama":
             from langchain_ollama import ChatOllama
@@ -283,7 +293,12 @@ class ModelRouter:
             raise ModelConfigError(f"provider {resolved.provider_name} needs base_url")
         # A local OpenAI-compatible server ignores the key, and the client needs one.
         return ChatOpenAI.model_validate(
-            {"model": resolved.model_id, "base_url": provider.base_url, "api_key": key or "none"},
+            {
+                "model": resolved.model_id,
+                "base_url": provider.base_url,
+                "api_key": key or "none",
+                "stream_usage": True,
+            },
         )
 
     def ollama_server(self, profile: str) -> tuple[str, str] | None:
