@@ -1342,6 +1342,55 @@ test("forkSession sends the message id and reads the new session", async () => {
   }
 });
 
+test("getTrace and getTraceSpan send their ids and check what comes back", async () => {
+  const sent: [string, Record<string, unknown>][] = [];
+  const span = { id: "m_1", kind: "model", name: "model 1", start: "t", status: "ok" };
+  const trace = {
+    session_id: "s_test",
+    title: null,
+    runs: [{ id: "r_1", kind: "run", name: "hi", start: "t", status: "ok", children: [span] }],
+  };
+  const detail = { span, messages: [], reply: null, system_prompt: null };
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: { "trace.get": trace, "trace.span": detail },
+      onRequest: (_socket, method, params) => {
+        if (method.startsWith("trace.")) sent.push([method, params]);
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "web", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    assert.deepEqual(await client.getTrace("s_test"), trace);
+    assert.deepEqual(await client.getTraceSpan("s_test", "m_1"), detail);
+    assert.deepEqual(sent, [
+      ["trace.get", { session_id: "s_test" }],
+      ["trace.span", { session_id: "s_test", span_id: "m_1" }],
+    ]);
+  } finally {
+    client.close();
+    await server.close();
+  }
+  const bad = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: {
+        "trace.get": { ...trace, runs: [{ ...trace.runs[0], status: "stuck" }] },
+        "trace.span": { ...detail, span: { ...span, kind: "other" } },
+      },
+    });
+  });
+  const refused = connectGolem({ socketPath: bad.socketPath, clientName: "web", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    await assert.rejects(() => refused.getTrace("s_test"), /invalid trace.get result/);
+    await assert.rejects(() => refused.getTraceSpan("s_test", "m_1"), /invalid trace.span result/);
+  } finally {
+    refused.close();
+    await bad.close();
+  }
+});
+
 test("createSession sends the folder and the model only when they are given", async () => {
   const seen: Record<string, unknown>[] = [];
   const daemon = await listen((socket) => {

@@ -1,0 +1,190 @@
+"""Reading one span: a model call's context and reply, a tool call's arguments and result."""
+
+from __future__ import annotations
+
+import asyncio
+from collections.abc import Awaitable, Callable
+from pathlib import Path
+
+import pytest
+from fakes import ToolCallingChatModel
+from langgraph.checkpoint.memory import InMemorySaver
+from pydantic import BaseModel
+
+from golem.graphs.chat import open_chat
+from golem.graphs.prompt import SystemPrompt
+from golem.graphs.tools_node import ARTIFACT_CHARS
+from golem.models.router import ModelRouter
+from golem.sessions.bus import EventBus
+from golem.sessions.log import SessionLog
+from golem.sessions.manager import SessionManager, SessionNotFoundError, SpanNotFoundError
+from golem.store.artifacts import ArtifactStore
+from golem.store.blobs import BlobStore
+from golem.store.database import Database
+from golem.store.events import EventLog
+from golem.store.records import RunRecords, SessionRecords
+from golem.tools import default_registry
+from golem.tools.registry import Tool, ToolContext, ToolRegistry, ToolResult
+from golem_protocol.commands import TraceRunSpan
+
+
+class _NoArgs(BaseModel):
+    pass
+
+
+async def _big(args: _NoArgs, ctx: ToolContext) -> ToolResult:
+    del args, ctx
+    return ToolResult(output="y" * (ARTIFACT_CHARS * 2), summary="big")
+
+
+_BIG = Tool(name="big", description="lots", args=_NoArgs, run=_big, read_only=True)
+
+
+class _Chat:
+    def __init__(
+        self, database: Database, model: ToolCallingChatModel, tools: ToolRegistry
+    ) -> None:
+        self.database = database
+        self.runtime = open_chat(
+            ModelRouter(model=model),
+            InMemorySaver(),
+            tools,
+            artifacts=ArtifactStore(database),
+            prompt=SystemPrompt((lambda _: "You are golem.",)),
+            blobs=BlobStore(database),
+        )
+        self.runs = RunRecords(database)
+        records = SessionRecords(database)
+        self.manager = SessionManager(
+            self.runtime,
+            SessionLog(EventLog(database), EventBus(), records),
+            records,
+            self.runs,
+            blobs=BlobStore(database),
+        )
+
+    async def ask(self, text: str, cwd: Path, session_id: str | None = None) -> tuple[str, str]:
+        if session_id is None:
+            session_id = await self.manager.create(None, cwd=str(cwd))
+        run_id = await self.manager.send(session_id, text)
+
+        async def done() -> bool:
+            run = await self.runs.get(run_id)
+            return run is not None and run.status != "running"
+
+        async with asyncio.timeout(5):
+            await _until(done)
+        return session_id, run_id
+
+
+async def _until(check: Callable[[], Awaitable[bool]]) -> None:
+    while not await check():
+        await asyncio.sleep(0.01)
+
+
+def _models(runs: list[TraceRunSpan]) -> list[str]:
+    return [m.id for run in runs for m in run.children]
+
+
+async def test_a_model_span_reads_its_context_reply_prompt_and_tools(
+    database: Database, tmp_path: Path
+) -> None:
+    (tmp_path / "notes.txt").write_text("the answer is 42\n", encoding="utf-8")
+    model = ToolCallingChatModel(replies=[[("read_file", {"path": "notes.txt"})], "It says 42."])
+    chat = _Chat(database, model, default_registry())
+    session_id, _ = await chat.ask("what is in notes?", tmp_path)
+    _, runs = await chat.manager.trace(session_id)
+    first_id, second_id = _models(runs)
+
+    first = await chat.manager.trace_span(session_id, first_id)
+    assert [m.role for m in first.messages] == ["user"]
+    assert first.messages[0].text == "what is in notes?"
+    assert first.new_from == 0
+    assert first.reply is not None and first.reply.id == first_id
+    assert [call["name"] for call in first.reply.tool_calls] == ["read_file"]
+    assert first.system_prompt == "You are golem."
+    assert first.tools is not None
+    assert "read_file" in [tool["function"]["name"] for tool in first.tools]  # type: ignore[index]
+
+    second = await chat.manager.trace_span(session_id, second_id)
+    assert [m.role for m in second.messages] == ["user", "assistant", "tool"]
+    assert second.new_from == 1  # the reply and the tool result are new
+    assert second.messages[2].call_id == first.reply.tool_calls[0]["call_id"]
+    assert second.reply is not None and second.reply.text == "It says 42."
+    assert second.span.id == second_id and second.span.name == "model 2"
+    assert second.provider is None
+
+
+async def test_a_second_run_starts_after_the_first(database: Database, tmp_path: Path) -> None:
+    model = ToolCallingChatModel(replies=["one", "two"])
+    chat = _Chat(database, model, default_registry())
+    session_id, _ = await chat.ask("first", tmp_path)
+    await chat.ask("second", tmp_path, session_id)
+    _, runs = await chat.manager.trace(session_id)
+    assert len(runs) == 2
+    _, last = _models(runs)
+    detail = await chat.manager.trace_span(session_id, last)
+    assert [m.text for m in detail.messages] == ["first", "one", "second"]
+    assert detail.new_from == 1
+
+
+async def test_a_tool_span_reads_its_arguments_and_result(
+    database: Database, tmp_path: Path
+) -> None:
+    (tmp_path / "notes.txt").write_text("the answer is 42\n", encoding="utf-8")
+    model = ToolCallingChatModel(replies=[[("read_file", {"path": "notes.txt"})], "ok"])
+    chat = _Chat(database, model, default_registry())
+    session_id, _ = await chat.ask("read it", tmp_path)
+    _, runs = await chat.manager.trace(session_id)
+    (tool,) = runs[0].children[0].children
+
+    detail = await chat.manager.trace_span(session_id, tool.id)
+    assert (detail.span.kind, detail.span.name) == ("tool", "read_file")
+    assert detail.args == {"path": "notes.txt"}
+    assert detail.result is not None and "the answer is 42" in detail.result
+    assert detail.artifact_id is None
+    assert detail.approval is None
+    assert detail.messages == []
+
+
+async def test_a_big_tool_output_names_its_artifact(database: Database, tmp_path: Path) -> None:
+    model = ToolCallingChatModel(replies=[[("big", {})], "ok"])
+    chat = _Chat(database, model, ToolRegistry([_BIG]))
+    session_id, _ = await chat.ask("go", tmp_path)
+    _, runs = await chat.manager.trace(session_id)
+    (tool,) = runs[0].children[0].children
+
+    detail = await chat.manager.trace_span(session_id, tool.id)
+    assert detail.artifact_id is not None
+    assert detail.result is not None and len(detail.result) < ARTIFACT_CHARS * 2
+    assert detail.artifact_id in detail.result
+
+
+async def test_an_old_session_without_model_call_events_still_reads(
+    database: Database, tmp_path: Path
+) -> None:
+    model = ToolCallingChatModel(replies=["hello"])
+    chat = _Chat(database, model, default_registry())
+    session_id, _ = await chat.ask("hi", tmp_path)
+    async with database.transaction() as tx:
+        await tx.execute("DELETE FROM events WHERE type LIKE 'model.call.%'")
+    _, runs = await chat.manager.trace(session_id)
+    (span,) = runs[0].children
+    assert span.recorded is False
+
+    detail = await chat.manager.trace_span(session_id, span.id)
+    assert [m.text for m in detail.messages] == ["hi"]
+    assert detail.reply is not None and detail.reply.text == "hello"
+    assert (detail.system_prompt, detail.tools, detail.new_from) == (None, None, 0)
+
+
+async def test_an_unknown_span_or_session_is_an_error(database: Database, tmp_path: Path) -> None:
+    model = ToolCallingChatModel(replies=["hello"])
+    chat = _Chat(database, model, default_registry())
+    session_id, _ = await chat.ask("hi", tmp_path)
+    with pytest.raises(SpanNotFoundError):
+        await chat.manager.trace_span(session_id, "m_nope")
+    with pytest.raises(SessionNotFoundError):
+        await chat.manager.trace_span("s_nope", "m_nope")
+    with pytest.raises(SessionNotFoundError):
+        await chat.manager.trace("s_nope")

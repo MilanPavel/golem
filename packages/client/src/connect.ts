@@ -65,6 +65,8 @@ import type { SessionCloseResult } from "../../protocol/gen/session-close-result
 import type { SessionCreateResult } from "../../protocol/gen/session-create-result.ts";
 import type { SessionForkResult } from "../../protocol/gen/session-fork-result.ts";
 import type { SessionInspectResult } from "../../protocol/gen/session-inspect-result.ts";
+import type { TraceGetResult } from "../../protocol/gen/trace-get-result.ts";
+import type { TraceSpanResult } from "../../protocol/gen/trace-span-result.ts";
 import type { SessionListResult, SessionSummary } from "../../protocol/gen/session-list-result.ts";
 import type { SessionRenameResult } from "../../protocol/gen/session-rename-result.ts";
 import { PROTOCOL_MAJOR, PROTOCOL_MINOR } from "../../protocol/gen/version.ts";
@@ -118,6 +120,8 @@ import {
   isSessionCreateResult,
   isSessionForkResult,
   isSessionInspectResult,
+  isTraceGetResult,
+  isTraceSpanResult,
   isSessionListResult,
   isSessionRenameResult,
   isSessionSummary,
@@ -231,6 +235,10 @@ export interface GolemClient {
   /** Stop a run. Resolves after `run.cancelled` is in the log; `cancelled` is false when it had ended. */
   cancelRun(runId: string): Promise<RunCancelResult>;
   inspectSession(sessionId: string): Promise<SessionInspectResult>;
+  /** A session's runs as a tree: run, then model call, then tool call. Oldest run first. */
+  getTrace(sessionId: string): Promise<TraceGetResult>;
+  /** The full input and output of one model or tool span, by the `id` that `getTrace` gave. */
+  getTraceSpan(sessionId: string, spanId: string): Promise<TraceSpanResult>;
   /** Store a provider's API key in the daemon's credential store. The wire view shows it redacted. */
   /**
    * Store an API key. With `check` (the default), the daemon tries it against
@@ -1094,6 +1102,22 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("session.inspect", { session_id: sessionId });
       if (!isSessionInspectResult(result)) {
         throw new Error("invalid session.inspect result");
+      }
+      return result;
+    },
+    async getTrace(sessionId: string): Promise<TraceGetResult> {
+      await ready;
+      const result = await call("trace.get", { session_id: sessionId });
+      if (!isTraceGetResult(result)) {
+        throw new Error("invalid trace.get result");
+      }
+      return result;
+    },
+    async getTraceSpan(sessionId: string, spanId: string): Promise<TraceSpanResult> {
+      await ready;
+      const result = await call("trace.span", { session_id: sessionId, span_id: spanId });
+      if (!isTraceSpanResult(result)) {
+        throw new Error("invalid trace.span result");
       }
       return result;
     },
