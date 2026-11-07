@@ -177,10 +177,10 @@ blurb = "xAI's newest general model."
 categories = ["general", "reasoning", "coding", "long-context"]
 
 [[hosted]]
-ref = "xai/grok-code-fast-1"
-label = "Grok Code Fast"
-blurb = "A quick model built for coding."
-categories = ["coding", "fast"]
+ref = "xai/grok-4.6"
+label = "Grok 4.6"
+blurb = "The previous xAI generation, a little cheaper to run."
+categories = ["general", "reasoning", "coding", "long-context"]
 
 [[hosted]]
 ref = "moonshot/kimi-k3.1-pro"

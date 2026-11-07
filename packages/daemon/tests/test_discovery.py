@@ -13,7 +13,7 @@ import pytest
 from test_server import HELLO, RpcClient, rpc_result, start_daemon, stop_daemon
 
 from golem.config import GolemSettings, ModelPrice, ModelSettings, ProviderSettings
-from golem.models.catalog import CatalogEntry
+from golem.models.catalog import CatalogEntry, HostedEntry
 from golem.models.discovery import ListedModel, ModelDiscovery, openai_chat_model
 from golem.models.keys import MemoryKeyStore
 from golem.models.prices import PriceBook
@@ -25,6 +25,17 @@ CATALOG = [
     CatalogEntry(ref="ollama/small:1b", label="Small 1B", size_gb=1.0, tags=("small",)),
     CatalogEntry(ref="ollama/qwen3:8b", label="Qwen3 8B", size_gb=5.2, tags=()),
     CatalogEntry(ref="ollama/huge:70b", label="Huge 70B", size_gb=40.0, tags=()),
+]
+
+HOSTED = [
+    HostedEntry(ref=ref, label=label, blurb="a blurb", categories=("general",))
+    for ref, label in [
+        ("anthropic/claude-test", "Claude Test"),
+        ("anthropic/claude-next", "Claude Next"),
+        ("deepseek/deepseek-chat", "DeepSeek Chat"),
+        ("deepseek/a/b", "A B"),
+        ("openai/gpt-test", "GPT Test"),
+    ]
 ]
 
 PRICES = PriceBook(
@@ -45,6 +56,28 @@ PRICES = PriceBook(
             "output_cost_per_token": 2e-06,
         },
         "gpt-image-test": {"litellm_provider": "openai", "mode": "image_generation"},
+        "gpt-extra": {
+            "litellm_provider": "openai",
+            "mode": "chat",
+            "supports_function_calling": True,
+        },
+        "gpt-notools": {
+            "litellm_provider": "openai",
+            "mode": "chat",
+            "supports_function_calling": False,
+        },
+        "gpt-retired": {
+            "litellm_provider": "openai",
+            "mode": "chat",
+            "supports_function_calling": True,
+            "deprecation_date": "2026-01-01",
+        },
+        "gpt-retiring": {
+            "litellm_provider": "openai",
+            "mode": "chat",
+            "supports_function_calling": True,
+            "deprecation_date": "2027-01-01",
+        },
     }
 )
 
@@ -119,6 +152,7 @@ def _discovery(
         budget=budget,
         clock=clock,
         catalog=CATALOG,
+        hosted=HOSTED,
         price_book=PRICES,
         fetch_prices=False,
         ollama_installed=lambda: ollama_installed,
@@ -333,7 +367,7 @@ async def test_a_provider_list_brings_its_own_prices(tmp_path: Path) -> None:
     model = _by_ref((await discovery.list()).models)["deepseek/deepseek-chat"]
     assert model.price is not None
     assert (model.price.input, model.price.output) == (pytest.approx(0.2), pytest.approx(0.6))
-    assert (model.ctx, model.tools, model.label) == (131072, True, "Qwen3 235B")
+    assert (model.ctx, model.tools, model.label) == (131072, True, "DeepSeek Chat")
     await discovery.aclose()
 
 
@@ -416,6 +450,7 @@ async def test_a_slow_provider_does_not_hold_the_list(tmp_path: Path) -> None:
         ram_gb=36.0,
         budget=0.05,
         catalog=CATALOG,
+        hosted=HOSTED,
         price_book=PRICES,
         fetch_prices=False,
     )
@@ -492,3 +527,105 @@ async def test_a_ref_as_default_is_listed(tmp_path: Path, monkeypatch: pytest.Mo
     assert listing.default == "anthropic/claude-test"
     assert _by_ref(listing.models)["anthropic/claude-test"].status == "needs_key"
     await discovery.aclose()
+
+
+OPENAI_LIVE = {
+    "data": [
+        {"id": "gpt-test"},
+        {"id": "gpt-test-2026-02-03"},
+        {"id": "gpt-extra"},
+        {"id": "gpt-notools"},
+        {"id": "gpt-retired"},
+        {"id": "gpt-retiring"},
+        {"id": "gpt-unknown"},
+        {"id": "gpt-image-test"},
+    ]
+}
+SEPTEMBER_2026 = 1_790_000_000.0
+
+
+async def _openai_refs(*, show_all: bool, hosted: list[HostedEntry] | None = None) -> list[str]:
+    network = Network({**_ollama_routes(), "api.openai.com/v1/models": _json(OPENAI_LIVE)})
+    discovery = ModelDiscovery(
+        ModelRouter(GolemSettings(), keys=MemoryKeyStore({"openai": "sk-test"})),
+        None,
+        transport=httpx.MockTransport(network),
+        detect_ram=False,
+        clock=lambda: SEPTEMBER_2026,
+        catalog=CATALOG,
+        hosted=HOSTED if hosted is None else hosted,
+        price_book=PRICES,
+        fetch_prices=False,
+    )
+    try:
+        listing = await discovery.list(show_all=show_all)
+    finally:
+        await discovery.aclose()
+    return sorted(model.ref for model in listing.models if model.provider == "openai")
+
+
+async def test_a_key_lists_only_the_catalog_models_it_can_call() -> None:
+    assert await _openai_refs(show_all=False) == ["openai/gpt-test"]
+
+
+async def test_a_dated_snapshot_stands_for_its_catalog_model() -> None:
+    live = {"data": [{"id": "claude-test-20260101", "display_name": "Snapshot"}]}
+    network = Network({**_ollama_routes(), "api.anthropic.com/v1/models": _json(live)})
+    discovery = ModelDiscovery(
+        ModelRouter(GolemSettings(), keys=MemoryKeyStore({"anthropic": "sk-ant"})),
+        None,
+        transport=httpx.MockTransport(network),
+        detect_ram=False,
+        catalog=CATALOG,
+        hosted=HOSTED,
+        price_book=PRICES,
+        fetch_prices=False,
+    )
+    try:
+        found = _by_ref((await discovery.list()).models)
+    finally:
+        await discovery.aclose()
+    assert [ref for ref in found if ref.startswith("anthropic/")] == ["anthropic/claude-test"]
+    assert found["anthropic/claude-test"].label == "Claude Test"
+    assert found["anthropic/claude-test"].ctx == 200000
+
+
+async def test_show_all_adds_live_chat_models_that_call_tools() -> None:
+    assert await _openai_refs(show_all=True) == [
+        "openai/gpt-extra",
+        "openai/gpt-retiring",
+        "openai/gpt-test",
+    ]
+
+
+async def test_a_retired_model_is_not_offered_even_when_the_catalog_names_it() -> None:
+    hosted = [
+        *HOSTED,
+        HostedEntry("openai/gpt-retired", "Retired", "gone", ("general",)),
+        HostedEntry("openai/gpt-retiring", "Retiring", "soon", ("general",)),
+    ]
+    assert await _openai_refs(show_all=False, hosted=hosted) == [
+        "openai/gpt-retiring",
+        "openai/gpt-test",
+    ]
+    assert "openai/gpt-retired" not in await _openai_refs(show_all=True, hosted=hosted)
+
+
+async def test_a_model_you_name_is_listed_though_the_catalog_does_not() -> None:
+    network = Network({**_ollama_routes(), "api.openai.com/v1/models": _json(OPENAI_LIVE)})
+    settings = GolemSettings(default_model="openai/gpt-unknown")
+    discovery = ModelDiscovery(
+        ModelRouter(settings, keys=MemoryKeyStore({"openai": "sk-test"})),
+        None,
+        transport=httpx.MockTransport(network),
+        detect_ram=False,
+        catalog=CATALOG,
+        hosted=HOSTED,
+        price_book=PRICES,
+        fetch_prices=False,
+    )
+    try:
+        found = _by_ref((await discovery.list()).models)
+    finally:
+        await discovery.aclose()
+    assert found["openai/gpt-unknown"].source == "profile"
