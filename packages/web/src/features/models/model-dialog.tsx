@@ -2,7 +2,7 @@ import { namesModel, pickerGroups, pickerName, providerMissing } from "@golem/vi
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { actionErrorText } from "../../store/errors.ts";
 import type { ListedModel, ModelListResult } from "../../store/models.ts";
-import { useModelList, usePageActions, usePulls } from "../../store/page-context.tsx";
+import { useModelList, useNewSessionModel, usePageActions, usePulls } from "../../store/page-context.tsx";
 import type { PullsSnapshot } from "../../store/pulls.ts";
 import { Button } from "../../ui/button.tsx";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "../../ui/dialog.tsx";
@@ -34,7 +34,12 @@ export type ModelDialogViewProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCloseAutoFocus?: (event: Event) => void;
-  /** The session's model: the profile to match on, and the name to show. */
+  /**
+   * "session" changes one session's model. "new" picks the model of the next new session: `session`
+   * then holds the pick, if there is one, and the main button says `Use for the new session`.
+   */
+  mode?: "session" | "new";
+  /** The session's model (or, in new mode, the pick): the profile to match on, and the name to show. */
   session: { profile: string; name: string | null } | null;
   listing: ModelListResult | null;
   /** Why the first fetch failed. Ignored while there is a listing. */
@@ -87,6 +92,7 @@ function Content({
   close: () => void;
 }) {
   const { session, listing, loadError, onRetry, pulls, actions, initial } = props;
+  const isNew = props.mode === "new";
   const [query, setQuery] = useState(initial?.query ?? "");
   const [activeId, setActiveId] = useState<string | null>(initial?.activeId ?? null);
   const [confirmState, setConfirm] = useState<ModelConfirm | null>(initial?.confirm ?? null);
@@ -209,7 +215,7 @@ function Content({
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           <DialogTitle>Choose a model</DialogTitle>
-          <DialogDescription>{description(session, listing)}</DialogDescription>
+          <DialogDescription>{description(isNew ? null : session, listing)}</DialogDescription>
         </div>
         <IconButton
           label="Refresh the list"
@@ -256,6 +262,7 @@ function Content({
             confirm={confirm}
             model={model}
             listing={shown}
+            use={!isNew}
             busy={busy}
             buttonRef={confirmButton}
             onAccept={accept}
@@ -265,6 +272,7 @@ function Content({
           <ActionBar
             model={model}
             missing={missing}
+            useLabel={isNew ? "Use for the new session" : "Use for this session"}
             isCurrent={namesModel(model, profile)}
             isDefault={namesModel(model, listing?.default ?? null)}
             busy={busy}
@@ -284,6 +292,7 @@ function ConfirmBar({
   confirm,
   model,
   listing,
+  use,
   busy,
   buttonRef,
   onAccept,
@@ -292,13 +301,15 @@ function ConfirmBar({
   confirm: ModelConfirm;
   model: ListedModel;
   listing: ModelListResult;
+  /** The download is followed by using the model; a new session's pick is not. */
+  use: boolean;
   busy: string | null;
   buttonRef: RefObject<HTMLButtonElement | null>;
   onAccept: () => void;
   onCancel: () => void;
 }) {
   const tooBig = confirm.kind === "pull" && confirm.step === 1 ? tooBigText(model, listing) : null;
-  const text = confirm.kind === "remove" ? removeText(model) : (tooBig ?? downloadText(model));
+  const text = confirm.kind === "remove" ? removeText(model) : (tooBig ?? downloadText(model, use));
   const disk = confirm.kind === "pull" && tooBig === null ? diskText(model, listing) : null;
   const label = confirm.kind === "remove" ? "Remove" : tooBig === null ? "Download" : "Download anyway";
   return (
@@ -326,6 +337,7 @@ function ConfirmBar({
 function ActionBar({
   model,
   missing,
+  useLabel,
   isCurrent,
   isDefault,
   busy,
@@ -337,6 +349,7 @@ function ActionBar({
 }: {
   model: ListedModel;
   missing: boolean;
+  useLabel: string;
   isCurrent: boolean;
   isDefault: boolean;
   busy: string | null;
@@ -360,7 +373,7 @@ function ActionBar({
           {isDefault ? "Default" : "Make default"}
         </Button>
         <Button kind="ink" disabled={!idle || isCurrent} aria-busy={busy === "use"} onClick={onUse}>
-          {isCurrent ? "In use" : "Use for this session"}
+          {isCurrent ? "In use" : useLabel}
         </Button>
       </>
     );
@@ -422,7 +435,7 @@ export function ModelDialog({
   onCloseAutoFocus,
   initial,
 }: {
-  /** The session the model is for, or null when none is in view: nothing can be switched then. */
+  /** The session the model is for, or null to pick the model of the next new session. */
   sessionId: string | null;
   session: { profile: string; name: string | null } | null;
   open: boolean;
@@ -434,10 +447,14 @@ export function ModelDialog({
   const query = useModelList(open);
   const pulls = usePulls();
   const page = usePageActions();
+  const [pick, choosePick] = useNewSessionModel();
   const actions = useMemo<ModelDialogActions>(
     () => ({
-      use: (name) =>
-        sessionId === null ? Promise.reject(new Error("Start a session first: send a message.")) : page.useModel(sessionId, name),
+      use: (name) => {
+        if (sessionId !== null) return page.useModel(sessionId, name);
+        choosePick(name);
+        return Promise.resolve();
+      },
       setDefault: (name) => page.setDefault(name),
       pull: (ref) => page.pull(ref, sessionId === null ? undefined : { sessionId }),
       stop: (ref) => page.cancelPull(ref),
@@ -446,14 +463,15 @@ export function ModelDialog({
         await page.refreshModels();
       },
     }),
-    [page, sessionId],
+    [page, sessionId, choosePick],
   );
   return (
     <ModelDialogView
       open={open}
       onOpenChange={onOpenChange}
       onCloseAutoFocus={onCloseAutoFocus}
-      session={session}
+      mode={sessionId === null ? "new" : "session"}
+      session={sessionId === null ? (pick === null ? null : { profile: pick, name: null }) : session}
       listing={query.data ?? null}
       loadError={query.error === null ? null : query.error.message}
       onRetry={() => void query.refetch()}

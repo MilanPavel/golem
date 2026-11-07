@@ -55,10 +55,10 @@ export function tooBigText(model: ListedModel, listing: ModelListResult): string
   return model.fit === "too_big" ? `${shortName(model.ref)} (${sizeText(model)}) is too big for ${memoryText(listing)}.` : null;
 }
 
-/** `Download qwen3:8b (5.2 GB, fits) and use it?` */
-export function downloadText(model: ListedModel): string {
+/** `Download qwen3:8b (5.2 GB, fits) and use it?` With `use` false: `Download qwen3:8b (5.2 GB, fits)?` */
+export function downloadText(model: ListedModel, use = true): string {
   const fit = model.fit === null || model.fit === undefined ? "" : `, ${model.fit === "too_big" ? "too big" : model.fit}`;
-  return `Download ${shortName(model.ref)} (${sizeText(model)}${fit}) and use it?`;
+  return `Download ${shortName(model.ref)} (${sizeText(model)}${fit})${use ? " and use it" : ""}?`;
 }
 
 /** A warning when the disk may not hold the download, else null. */

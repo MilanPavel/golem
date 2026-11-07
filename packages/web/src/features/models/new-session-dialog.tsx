@@ -2,8 +2,8 @@ import { useEffect, useRef } from "react";
 import { closeModelDialog, useModelDialogOpen } from "./model-dialog-open.ts";
 import { ModelDialog } from "./model-dialog.tsx";
 
-/** The model dialog for a screen with no session in view, opened by the sidebar's download row. */
-export function NoSessionModelDialog() {
+/** The model dialog in new-session mode: opened by the home screen's chip and by the sidebar's download row off a session screen. */
+export function NewSessionModelDialog() {
   const open = useModelDialogOpen(null);
   // The store is cleared before the dialog reports its close, so remember where focus goes back to.
   const returnTo = useRef<HTMLElement | null>(null);

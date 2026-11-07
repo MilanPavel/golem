@@ -27,7 +27,7 @@ import { Drawer, TodoList } from "../features/drawer/index.ts";
 import { Composer, DockView, Meter } from "../features/composer/index.ts";
 import { createHistory } from "../features/composer/history.ts";
 import { CommandsDialog } from "../features/composer/help-dialog.tsx";
-import { HomeView, SessionTitle } from "../features/shell/index.ts";
+import { HomeView, NewSessionModelChipView, SessionTitle } from "../features/shell/index.ts";
 import { CommandPaletteView, KeysDialog } from "../features/palette/index.ts";
 import { ModelDialogView, type ModelDialogViewProps } from "../features/models/index.ts";
 import { SetupDialogView } from "../features/setup/index.ts";
@@ -281,6 +281,9 @@ function SessionActionsDemo({ theme }: { theme: string }) {
 
 const MODEL_CASES: { label: string; props: Partial<ModelDialogViewProps> }[] = [
   { label: "The list", props: {} },
+  { label: "New session", props: { mode: "new", session: null } },
+  { label: "New session, a pick", props: { mode: "new", session: { profile: "ollama/qwen3:8b", name: null }, initial: { activeId: "ollama/qwen3:8b" } } },
+  { label: "New session, not ready", props: { mode: "new", session: null, initial: { activeId: "ollama/qwen3:14b" } } },
   { label: "Download question", props: { initial: { activeId: "ollama/qwen3:14b", confirm: { kind: "pull", ref: "ollama/qwen3:14b", step: 1 } } } },
   { label: "Too big, first question", props: { initial: { activeId: "ollama/qwen3:32b", confirm: { kind: "pull", ref: "ollama/qwen3:32b", step: 1 } } } },
   { label: "Too big, second question", props: { initial: { activeId: "ollama/qwen3:32b", confirm: { kind: "pull", ref: "ollama/qwen3:32b", step: 2 } } } },
@@ -512,7 +515,13 @@ function Panel({ theme }: { theme: "slip" | "kiln" }) {
             folders={["/Users/you/repos/golem", "/Users/you/notes"]}
             onChange={() => {}}
             composer={<DemoComposer size="large" />}
+            modelChip={<NewSessionModelChipView label={{ kind: "default", text: "Gemma 4 E4B" }} onOpen={() => {}} />}
           />
+        </div>
+        <div className="mt-2 flex flex-wrap gap-2 rounded-lg border border-line bg-bg p-4">
+          <NewSessionModelChipView label={{ kind: "default", text: "Gemma 4 E4B" }} onOpen={() => {}} />
+          <NewSessionModelChipView label={{ kind: "pick", text: "Qwen3 8B" }} onOpen={() => {}} />
+          <NewSessionModelChipView label={{ kind: "none" }} onOpen={() => {}} />
         </div>
       </section>
 

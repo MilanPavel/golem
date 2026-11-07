@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 
 import { expect, test } from "./fixtures.ts";
-import { answers, firstMessage, startStack, type Stack } from "./stack.ts";
+import { answers, firstMessage, send, startStack, type Stack } from "./stack.ts";
 
 const NAME = "llama3.2:3b";
 
@@ -83,4 +83,24 @@ test("a download shows in the sidebar after the dialog is closed, and goes when 
   await closePicker(page);
   stack.ollama?.releasePulls();
   await expect(row).toBeHidden();
+});
+
+test("a model picked on the home screen is the session's model, and the next new session starts from the default", async ({ page, rig }) => {
+  const stack = await startStack(rig, { ollama: { installed: [NAME] } });
+  await page.goto(stack.gateway.url);
+  const homeChip = page.getByRole("button", { name: /^Model: / });
+  await expect(homeChip).toBeVisible();
+  await homeChip.click();
+  await expect(picker(page)).toBeVisible();
+  await search(page).fill("llama");
+  await picker(page).getByRole("option", { name: new RegExp(NAME.replace(".", "\\.")) }).first().click();
+  await picker(page).getByRole("button", { name: "Use for the new session" }).click();
+  await expect(picker(page)).toBeHidden();
+  await expect(page.getByRole("button", { name: /^Model: Llama 3\.2/i })).toBeVisible();
+  await send(page, "hello");
+  await page.waitForURL(/\/s\/[^/]+$/);
+  // The stub Ollama does not chat, so the run is not waited for: the session's model is what counts.
+  await expect(chip(page)).toHaveAccessibleName(/^Model: .*llama3\.2/i);
+  await page.getByRole("complementary", { name: "Sessions" }).getByRole("button", { name: "New session", exact: true }).click();
+  await expect(page.getByRole("button", { name: /^Model: .*, default$/ })).toBeVisible();
 });

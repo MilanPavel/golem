@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { createNewSessionFolder, distinctFolders, resolveFolder } from "./new-session.ts";
+import { createNewSession, distinctFolders, resolveFolder } from "./new-session.ts";
 import { summary } from "./test-support.ts";
 
 const list = [
@@ -11,14 +11,14 @@ const list = [
 ];
 
 test("with nothing chosen or opened, the newest session's folder", () => {
-  const store = createNewSessionFolder();
+  const store = createNewSession();
   expect(resolveFolder(store.getSnapshot(), list)).toBe("/x/golem");
   expect(resolveFolder(store.getSnapshot(), [])).toBeNull();
   expect(resolveFolder(store.getSnapshot(), [list[4]!])).toBeNull();
 });
 
 test("the last opened session's folder beats the newest, including no folder", () => {
-  const store = createNewSessionFolder();
+  const store = createNewSession();
   store.opened("/x/other");
   expect(resolveFolder(store.getSnapshot(), list)).toBe("/x/other");
   store.opened(null);
@@ -26,7 +26,7 @@ test("the last opened session's folder beats the newest, including no folder", (
 });
 
 test("a pick beats both, and opening a session drops it", () => {
-  const store = createNewSessionFolder();
+  const store = createNewSession();
   store.opened("/x/other");
   store.choose("/typed");
   expect(resolveFolder(store.getSnapshot(), list)).toBe("/typed");
@@ -37,7 +37,7 @@ test("a pick beats both, and opening a session drops it", () => {
 });
 
 test("the snapshot is stable when nothing changes", () => {
-  const store = createNewSessionFolder();
+  const store = createNewSession();
   store.opened("/a");
   const before = store.getSnapshot();
   store.opened("/a");
@@ -46,4 +46,18 @@ test("the snapshot is stable when nothing changes", () => {
 
 test("distinct folders skip closed sessions and no folder, newest first", () => {
   expect(distinctFolders(list)).toEqual(["/x/golem", "/x/other"]);
+});
+
+test("a model pick is kept, reset to null, and survives opening a session", () => {
+  const store = createNewSession();
+  expect(store.getSnapshot().model).toBeNull();
+  store.chooseModel("ollama/qwen3:8b");
+  expect(store.getSnapshot().model).toBe("ollama/qwen3:8b");
+  store.opened("/x/golem");
+  expect(store.getSnapshot().model).toBe("ollama/qwen3:8b");
+  const before = store.getSnapshot();
+  store.chooseModel("ollama/qwen3:8b");
+  expect(store.getSnapshot()).toBe(before);
+  store.chooseModel(null);
+  expect(store.getSnapshot().model).toBeNull();
 });
