@@ -11,14 +11,16 @@ Any [MCP](https://modelcontextprotocol.io) server gives golem new tools: a git s
 
 ### From a chat
 
-Type `/mcp add`. golem shows four choices:
+Type `/mcp add`. golem lists the servers it knows, each with one line on what it does:
 
-- **Filesystem** lets golem read and write files in the chat's folder.
-- **GitHub** asks for a token. The prompt hides what you type, and the token goes to the Keychain. It says how to make one: at github.com/settings/personal-access-tokens/new, pick the repos under Repository access, then add Contents, Issues, and Pull requests.
-- **Fetch** reads web pages as text.
-- **Other** asks for a name, then a command or a URL. For a token, use `golem mcp add --token` below.
+- **Filesystem** and **Git** ask for a folder. It starts at the chat's folder, so Enter takes it.
+- **Fetch**, **Time**, **Memory**, **Sequential Thinking**, **Playwright**, and **Context7** ask for nothing.
+- **GitHub** and **Brave Search** ask for a token. The prompt hides what you type, and the token goes to the Keychain. GitHub's prompt says how to make one: at github.com/settings/personal-access-tokens/new, pick the repos under Repository access, then add Contents, Issues, and Pull requests.
+- **Other** asks for a name, then a command or a URL.
 
-`/mcp add github` goes straight to the token. With no servers yet, `/mcp` shows the same choices. The web UI cannot add a server. `/mcp add` there shows the `golem mcp add` command to copy.
+A server you already added says so, and one that can't be added says why. Servers added this way are **on demand**: they cost no tokens until a chat turns them on.
+
+`/mcp add github` goes straight to that server. With no servers yet, `/mcp` shows the same list. The web UI cannot add a server. `/mcp add` there shows the `golem mcp add --catalog` command to copy.
 
 ### From a terminal
 
@@ -28,7 +30,14 @@ Run `golem mcp add`. Put the server's command after `--`:
 golem mcp add git -- uvx mcp-server-git --repository /path/to/your/repo
 ```
 
-For a server on the web, give its URL. With `--token`, golem asks for the token and keeps it in the Keychain:
+To add one from the same list, give its id. golem asks for a token, hidden, when the server needs one. Give an input with `--input`, and a different name with `--name`:
+
+```bash
+golem mcp add --catalog github
+golem mcp add --catalog filesystem --input folder=/path/to/docs --name docs
+```
+
+For a server that is not on the list, give its URL. With `--token`, golem asks for the token and keeps it in the Keychain:
 
 ```bash
 golem mcp add github --url https://api.githubcopilot.com/mcp/ --token

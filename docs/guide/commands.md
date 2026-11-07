@@ -21,6 +21,7 @@ golem has commands in two places: `golem …` in your shell, and `/…` inside t
 | `golem daemon start` / `stop` / `restart` | Controls the daemon. `restart` after an upgrade |
 | `golem daemon logs` | Follows the daemon's log |
 | `golem auth set <provider>` / `remove <provider>` | Saves or deletes an API key, or an MCP token (`mcp/<name>`), in the Keychain. A model key is tried first; `--no-check` skips that |
+| `golem mcp add --catalog <id>` | Adds a server from golem's list. It asks for a token, hidden, and keeps it in the Keychain. `--input <id>=<value>` fills an input and `--name` renames the server |
 | `golem mcp add <name> -- <command…>` / `--url <url>` | Adds an MCP server to `config.toml` and starts it. `--token` (web) or `--token-env VAR` (command) asks for a token and keeps it in the Keychain |
 | `golem mcp remove <name>` | Removes the server from `config.toml`, stops it, and deletes its token |
 | `golem auth list` | Which providers have a key |
@@ -78,7 +79,7 @@ Type `/` and suggestions appear, with each command's arguments. `/help` lists ev
 | `/skill pin <name>`, `/skill unpin <name>` | Keep a skill on for the whole chat, or turn it off |
 | `/skill` | List the pinned skills |
 | `/mcp` | Manage MCP servers: view tools, reconnect, turn on or off |
-| `/mcp add [filesystem\|github\|fetch\|other]` | Add a server from a short list. The web UI shows the `golem mcp add` command instead |
+| `/mcp add [id]` | Add a server from golem's list, or Other. The web UI shows the `golem mcp add --catalog` command instead |
 | `/mcp enable <name>`, `/mcp disable <name>` | Turn a server on or off for this chat |
 
 [Tools and permissions](./permissions.md), [Skills](./skills.md), and [MCP servers](./mcp.md) have the details.

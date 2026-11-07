@@ -46,17 +46,23 @@ export {
   type SkillChoice,
 } from "./commands.ts";
 export {
-  catalogEntry,
-  GITHUB_TOKEN_HINT,
-  MCP_CATALOG,
-  MCP_CATALOG_IDS,
+  cliCommand,
+  entryAvailable,
+  entryInputs,
+  entryLabel,
+  entryNote,
+  entryParams,
+  findEntry,
+  inputDefault,
+  inputError,
   mcpNameError,
+  OTHER_ID,
   otherSpec,
   shellQuote,
   splitCommandLine,
   type McpAddSpec,
   type McpCatalogEntry,
-  type McpCatalogId,
+  type McpCatalogInput,
 } from "./mcp-catalog.ts";
 export { applySuggestion, moveSuggestion, suggest, type Suggestion, type SuggestCommand } from "./suggest.ts";
 export { connectionLabel, serviceProblem, type ServiceProblem } from "./connection.ts";

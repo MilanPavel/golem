@@ -2,6 +2,8 @@
 export type McpArgs =
   | { kind: "add"; name: string; command: string; args: string[]; tokenEnv: string | null }
   | { kind: "add"; name: string; url: string; token: boolean }
+  /** A server from the daemon's catalog: its id, the name to give it (the entry's own when null), and typed inputs. */
+  | { kind: "catalog"; id: string; name: string | null; inputs: Record<string, string> }
   | { kind: "remove"; name: string }
   | { kind: "error"; message: string };
 
@@ -26,6 +28,9 @@ export function parseMcpArgs(args: string[]): McpArgs {
   }
   const split = rest.indexOf("--");
   const before = split === -1 ? rest : rest.slice(0, split);
+  if (before.includes("--catalog")) {
+    return split === -1 ? parseCatalogArgs(before) : fail("--catalog takes no command after --");
+  }
   const after = split === -1 ? null : rest.slice(split + 1);
   let name: string | null = null;
   let url: string | null = null;
@@ -73,4 +78,38 @@ export function parseMcpArgs(args: string[]): McpArgs {
     return fail(`${tokenEnv} is not a variable name`);
   }
   return { kind: "add", name, command, args: commandArgs, tokenEnv };
+}
+
+const INPUT_ID = /^[A-Za-z][A-Za-z0-9_-]*$/;
+
+/** `golem mcp add --catalog <id> [--name <name>] [--input <id>=<value>]…` */
+function parseCatalogArgs(words: string[]): McpArgs {
+  const usage = "usage: golem mcp add --catalog <id> [--name <name>] [--input <id>=<value>]…";
+  let id: string | null = null;
+  let name: string | null = null;
+  const inputs: Record<string, string> = {};
+  for (let index = 0; index < words.length; index += 1) {
+    const word = words[index] ?? "";
+    if (word !== "--catalog" && word !== "--name" && word !== "--input") {
+      return fail(word.startsWith("-") ? `unknown option ${word}` : `unexpected ${word}: ${usage}`);
+    }
+    const value = words[index + 1];
+    if (value === undefined || value.length === 0 || value.startsWith("--")) {
+      return fail(`${word} needs a value`);
+    }
+    index += 1;
+    if (word === "--catalog") {
+      id = value;
+    } else if (word === "--name") {
+      name = value;
+    } else {
+      const at = value.indexOf("=");
+      const key = at === -1 ? "" : value.slice(0, at);
+      if (!INPUT_ID.test(key)) {
+        return fail(`--input takes <id>=<value>, not ${value}`);
+      }
+      inputs[key] = value.slice(at + 1);
+    }
+  }
+  return id === null ? fail(usage) : { kind: "catalog", id, name, inputs };
 }

@@ -31,10 +31,15 @@ export function shownParams(method: string, params: Record<string, unknown>): Re
   if (method === "auth.set" && "key" in params) {
     return { ...params, key: REDACTED };
   }
-  if (method === "mcp.add" && "token" in params) {
-    return { ...params, token: REDACTED };
+  let shown = params;
+  if (method === "mcp.add" && "token" in shown) {
+    shown = { ...shown, token: REDACTED };
   }
-  return params;
+  const secrets = shown["secrets"];
+  if (method.startsWith("mcp.") && isRecord(secrets)) {
+    shown = { ...shown, secrets: Object.fromEntries(Object.keys(secrets).map((ref) => [ref, REDACTED])) };
+  }
+  return shown;
 }
 
 export function outgoingDetail(method: string, params: Record<string, unknown>): string {

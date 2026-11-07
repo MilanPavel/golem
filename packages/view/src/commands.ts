@@ -1,6 +1,5 @@
 import type { ListedSkill } from "@golem/client";
 
-import { catalogEntry, MCP_CATALOG_IDS } from "./mcp-catalog.ts";
 
 export type DebugTab = "wire" | "model";
 
@@ -201,9 +200,8 @@ export const COMMANDS: readonly Command[] = [
     name: "/mcp",
     group: "tools",
     args: "[add|enable|disable]",
-    description: "Manages the MCP servers: tools, reconnect, on or off. add picks one from a short list.",
+    description: "Manages the MCP servers: tools, reconnect, on or off. add picks one from the catalog.",
     choices: ["add", "enable", "disable"],
-    subChoices: { add: MCP_CATALOG_IDS },
     run: (_debug, args) => {
       const [action, name, ...extra] = args;
       if (action === undefined) {
@@ -212,13 +210,13 @@ export const COMMANDS: readonly Command[] = [
       if (action === "add" && name === undefined) {
         return { kind: "mcp-add", id: null };
       }
-      if (action === "add" && name !== undefined && extra.length === 0 && catalogEntry(name) !== null) {
+      if (action === "add" && name !== undefined && extra.length === 0) {
         return { kind: "mcp-add", id: name };
       }
       if ((action === "enable" || action === "disable") && name !== undefined && extra.length === 0) {
         return { kind: "mcp-toggle", on: action === "enable", name };
       }
-      return { kind: "unknown", notice: `/mcp, /mcp add [${MCP_CATALOG_IDS.join("|")}], /mcp enable <name>, or /mcp disable <name>` };
+      return { kind: "unknown", notice: "/mcp, /mcp add [id], /mcp enable <name>, or /mcp disable <name>" };
     },
   },
   {

@@ -4,6 +4,12 @@ import type { AuthListResult } from "../../protocol/gen/auth-list-result.ts";
 import type { AuthRemoveResult } from "../../protocol/gen/auth-remove-result.ts";
 import type { AuthSetResult } from "../../protocol/gen/auth-set-result.ts";
 import type { McpAddParams } from "../../protocol/gen/mcp-add-params.ts";
+import type { McpCatalogParams } from "../../protocol/gen/mcp-catalog-params.ts";
+import type { McpCatalogResult } from "../../protocol/gen/mcp-catalog-result.ts";
+import type { RuntimeInstallCancelResult } from "../../protocol/gen/runtime-install-cancel-result.ts";
+import type { RuntimeInstallDone } from "../../protocol/gen/runtime-install-done.ts";
+import type { RuntimeInstallResult } from "../../protocol/gen/runtime-install-result.ts";
+import type { RuntimeName } from "./runtime.ts";
 import type { McpRemoveResult } from "../../protocol/gen/mcp-remove-result.ts";
 import type { OllamaInstallCancelResult } from "../../protocol/gen/ollama-install-cancel-result.ts";
 import type { KeychainWait } from "../../protocol/gen/keychain-wait.ts";
@@ -58,6 +64,9 @@ import {
   isAuthSetResult,
   isKeychainWait,
   isOllamaInstallDone,
+  isMcpCatalogResult,
+  isRuntimeInstallDone,
+  isRuntimeName,
   isSetupStatusResult,
   isDaemonStatus,
   isHelloResult,
@@ -264,6 +273,13 @@ export interface GolemClient {
   addMcpServer(params: McpAddParams): Promise<McpServer>;
   /** Remove `[mcp.<name>]` from the user's config, stop the server, and drop its stored token. */
   removeMcpServer(name: string): Promise<McpRemoveResult>;
+  /** The servers golem offers, each with whether it can run here and whether it is already added. */
+  mcpCatalog(sessionId?: string): Promise<McpCatalogResult>;
+  /** Install Node or uv with Homebrew, run by the daemon. Output reaches {@link GolemClient.onRuntimeInstall}. */
+  installRuntime(name: RuntimeName): Promise<RuntimeInstallResult>;
+  cancelRuntimeInstall(name: RuntimeName): Promise<RuntimeInstallCancelResult>;
+  /** `runtime.install.output` and `runtime.install.done`, from any client's install. */
+  onRuntimeInstall(listener: (update: RuntimeInstallUpdate) => void): () => void;
   /** `mcp.server.status`: a server started, failed, or changed its tools. */
   onMcpStatus(listener: (server: McpServer) => void): () => void;
   /** `model.server.status`: a local model server such as Ollama started, failed, or stopped. */
@@ -297,6 +313,10 @@ export interface GolemClient {
 export type OllamaInstallUpdate =
   | { kind: "output"; text: string }
   | { kind: "done"; done: OllamaInstallDone };
+
+export type RuntimeInstallUpdate =
+  | { kind: "output"; name: RuntimeName; text: string }
+  | { kind: "done"; done: RuntimeInstallDone };
 
 export type PullUpdate =
   | { kind: "progress"; progress: ModelPullProgress }
@@ -336,6 +356,7 @@ export function connectGolem(options: ConnectOptions): GolemClient {
   const skillListeners = new Set<(root: string | null) => void>();
   const serverListeners = new Set<(status: ModelServerStatus) => void>();
   const installListeners = new Set<(update: OllamaInstallUpdate) => void>();
+  const runtimeListeners = new Set<(update: RuntimeInstallUpdate) => void>();
   const keychainListeners = new Set<(wait: KeychainWait) => void>();
   const pending = new Map<number, Pending>();
   const attachments = new Attachments();
@@ -538,6 +559,34 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       }
       if (update !== undefined) {
         for (const listener of installListeners) {
+          try {
+            listener(update);
+          } catch {
+            // A listener must not tear the socket down.
+          }
+        }
+      }
+      return;
+    }
+    if (
+      isRecord(message) &&
+      (message["method"] === "runtime.install.output" || message["method"] === "runtime.install.done")
+    ) {
+      const params = message["params"];
+      record({ direction: "in", kind: message["method"], detail: "", json: line });
+      let update: RuntimeInstallUpdate | undefined;
+      if (
+        message["method"] === "runtime.install.output" &&
+        isRecord(params) &&
+        isRuntimeName(params["name"]) &&
+        typeof params["text"] === "string"
+      ) {
+        update = { kind: "output", name: params["name"], text: params["text"] };
+      } else if (message["method"] === "runtime.install.done" && isRuntimeInstallDone(params)) {
+        update = { kind: "done", done: params };
+      }
+      if (update !== undefined) {
+        for (const listener of runtimeListeners) {
           try {
             listener(update);
           } catch {
@@ -1137,6 +1186,37 @@ export function connectGolem(options: ConnectOptions): GolemClient {
     },
     async addMcpServer(params: McpAddParams): Promise<McpServer> {
       return mcpServerCall("mcp.add", { ...params });
+    },
+    async mcpCatalog(sessionId?: string): Promise<McpCatalogResult> {
+      await ready;
+      const params: McpCatalogParams = sessionId === undefined ? {} : { session_id: sessionId };
+      const result = await call("mcp.catalog", { ...params });
+      if (!isMcpCatalogResult(result)) {
+        throw new Error("invalid mcp.catalog result");
+      }
+      return result;
+    },
+    async installRuntime(name: RuntimeName): Promise<RuntimeInstallResult> {
+      await ready;
+      const result = await call("runtime.install", { name });
+      if (!isRecord(result) || typeof result["started"] !== "boolean") {
+        throw new Error("invalid runtime.install result");
+      }
+      return { name, started: result["started"] };
+    },
+    async cancelRuntimeInstall(name: RuntimeName): Promise<RuntimeInstallCancelResult> {
+      await ready;
+      const result = await call("runtime.install_cancel", { name });
+      if (!isRecord(result) || typeof result["cancelled"] !== "boolean") {
+        throw new Error("invalid runtime.install_cancel result");
+      }
+      return { name, cancelled: result["cancelled"] };
+    },
+    onRuntimeInstall(listener: (update: RuntimeInstallUpdate) => void): () => void {
+      runtimeListeners.add(listener);
+      return () => {
+        runtimeListeners.delete(listener);
+      };
     },
     async removeMcpServer(name: string): Promise<McpRemoveResult> {
       await ready;

@@ -65,6 +65,9 @@ importers:
       '@golem/tui':
         specifier: workspace:*
         version: link:../tui
+      '@golem/view':
+        specifier: workspace:*
+        version: link:../view
     devDependencies:
       '@types/bun':
         specifier: 1.3.10
