@@ -1255,3 +1255,36 @@ test("createSession sends the folder and the model only when they are given", as
     await daemon.close();
   }
 });
+
+test("listDirs sends the path only when given, and rejects a malformed listing", async () => {
+  const seen: Record<string, unknown>[] = [];
+  const listing = { path: "/home/me", home: "/home/me", parent: null, entries: [{ name: "code", path: "/home/me/code", git: true }], truncated: false };
+  const daemon = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: { "fs.list_dirs": listing },
+      onRequest: (_socket, method, params) => {
+        if (method === "fs.list_dirs") seen.push(params);
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: daemon.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    assert.deepEqual(await client.listDirs(), listing);
+    await client.listDirs("/home/me/code");
+    assert.deepEqual(seen, [{}, { path: "/home/me/code" }]);
+  } finally {
+    client.close();
+    await daemon.close();
+  }
+  const bad = await listen((socket) => {
+    attach(socket, { answerPing: true, results: { "fs.list_dirs": { ...listing, entries: [{ name: "x" }] } } });
+  });
+  const refused = connectGolem({ socketPath: bad.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    await assert.rejects(() => refused.listDirs(), /invalid fs.list_dirs result/);
+  } finally {
+    refused.close();
+    await bad.close();
+  }
+});

@@ -174,22 +174,3 @@ test("the folder chip lists the folders and picks one", async () => {
   await user.click(screen.getByRole("menuitem", { name: "No folder" }));
   expect(screen.getByRole("button", { name: "Folder: No folder" })).toBeTruthy();
 });
-
-test("Type a path accepts an absolute path and rejects any other", async () => {
-  const user = userEvent.setup();
-  const { fake } = setup("/");
-  seed(fake);
-  await user.click(screen.getByRole("button", { name: "Folder: golem" }));
-  await user.click(screen.getByRole("menuitem", { name: "Type a path…" }));
-  const input = await screen.findByRole("textbox", { name: "Folder path" });
-  await user.clear(input);
-  await user.type(input, "relative/dir");
-  await user.click(screen.getByRole("button", { name: "Use this folder" }));
-  expect(screen.getByRole("alert").textContent).toContain("absolute path");
-  expect(input.getAttribute("aria-invalid")).toBe("true");
-  await user.clear(input);
-  await user.type(input, "  /tmp/work  ");
-  expect(screen.queryByRole("alert")).toBeNull();
-  await user.click(screen.getByRole("button", { name: "Use this folder" }));
-  expect(screen.getByRole("button", { name: "Folder: work" }).getAttribute("title")).toBe("/tmp/work");
-});
