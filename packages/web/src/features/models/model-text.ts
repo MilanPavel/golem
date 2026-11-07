@@ -90,3 +90,87 @@ export function withActivePulls(listing: ModelListResult | null, pulls: PullsSna
   }
   return withPulls(listing, record);
 }
+
+/** What the sidebar's download row says. `ref` names the download a failed row is about. */
+export type PullSummary = {
+  kind: "one" | "many" | "failed";
+  title: string;
+  share: number | null;
+  text: string;
+  /** What a screen reader says of it: `Downloading Qwen3, 12 percent, 38 minutes left`. */
+  spoken: string;
+  ref?: string;
+};
+
+function secondsLeft(entry: PullEntry): number | null {
+  const { track } = entry;
+  const speed = pullSpeed(track);
+  if (speed === null || track.total === null || track.total <= track.completed) {
+    return null;
+  }
+  return (track.total - track.completed) / speed;
+}
+
+function plural(count: number, unit: string): string {
+  return `${count} ${unit}${count === 1 ? "" : "s"}`;
+}
+
+function percentText(share: number | null): string | null {
+  return share === null ? null : `${Math.floor(share * 100)}%`;
+}
+
+/**
+ * The one line of the sidebar's download row, or null when there is nothing to show. With
+ * downloads running it is about them; with none it is about the first failure. A stop is not a
+ * failure. `labels` maps a ref to its name, and a ref without one is shown as it is.
+ */
+export function pullSummary(
+  active: ReadonlyMap<string, PullEntry>,
+  failed: ReadonlyMap<string, string>,
+  labels: ReadonlyMap<string, string>,
+): PullSummary | null {
+  const name = (ref: string) => labels.get(ref) ?? ref;
+  const entries = [...active.entries()];
+  if (entries.length === 0) {
+    const first = [...failed.entries()].find(([, error]) => error !== "cancelled");
+    return first === undefined
+      ? null
+      : {
+          kind: "failed",
+          title: `Download of ${name(first[0])} failed`,
+          share: null,
+          text: first[1],
+          spoken: `Download of ${name(first[0])} failed: ${first[1]}`,
+          ref: first[0],
+        };
+  }
+  let completed = 0;
+  let total = 0;
+  let longest: number | null = null;
+  for (const [, entry] of entries) {
+    if (entry.track.total !== null && entry.track.total > 0) {
+      completed += Math.min(entry.track.completed, entry.track.total);
+      total += entry.track.total;
+    }
+    const left = secondsLeft(entry);
+    if (left !== null && (longest === null || left > longest)) {
+      longest = left;
+    }
+  }
+  const one = entries.length === 1 ? entries[0] : undefined;
+  const share = one === undefined ? (total > 0 ? completed / total : null) : pullShare(one[1], null);
+  const text = [percentText(share), longest === null ? null : timeLeft(longest)].filter((part) => part !== null).join(" · ");
+  const title = one === undefined ? `${entries.length} downloads` : name(one[0]);
+  const said = text
+    .replace("%", " percent")
+    .replace(" · ", ", ")
+    .replace(/(\d+) h (\d+) min$/, (_, h: string, m: string) => `${plural(Number(h), "hour")} ${plural(Number(m), "minute")}`)
+    .replace(/(\d+) min$/, (_, m: string) => plural(Number(m), "minute"));
+  return {
+    kind: one === undefined ? "many" : "one",
+    title,
+    share,
+    text: text === "" ? "starting…" : text,
+    spoken: `Downloading ${title}${text === "" ? "" : `, ${said}${longest === null ? "" : " left"}`}`,
+  };
+}

@@ -499,6 +499,29 @@ test("tool events draw blocks under the reply that asked", () => {
       ["c2", "failed", "outside"],
     ],
   );
+  assert.equal(tools[0]?.unsuccessful, undefined);
+});
+
+test("a call that ran but failed is done and unsuccessful", () => {
+  const base = { session_id: "s", run_id: "r", ts: "t" } as const;
+  const events: ChatEvent[] = [
+    { ...base, seq: 1, type: "message.started", data: { message_id: "a", role: "assistant" } },
+    { ...base, seq: 2, type: "message.completed", data: { message_id: "a", role: "assistant", text: "" } },
+    {
+      ...base,
+      seq: 3,
+      type: "tool.requested",
+      data: { call_id: "c1", message_id: "a", name: "shell", args: { command: "false" } },
+    },
+    {
+      ...base,
+      seq: 4,
+      type: "tool.completed",
+      data: { call_id: "c1", summary: "exit 1", preview: "[exit code 1]", failed: true },
+    },
+  ];
+  const tool = events.reduce(reduceChat, emptyChat).messages[0]?.tools?.[0];
+  assert.deepEqual([tool?.status, tool?.summary, tool?.unsuccessful], ["done", "exit 1", true]);
 });
 
 test("approval events set and clear the waiting call", () => {

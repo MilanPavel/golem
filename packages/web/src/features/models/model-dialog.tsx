@@ -422,7 +422,8 @@ export function ModelDialog({
   onCloseAutoFocus,
   initial,
 }: {
-  sessionId: string;
+  /** The session the model is for, or null when none is in view: nothing can be switched then. */
+  sessionId: string | null;
   session: { profile: string; name: string | null } | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -435,9 +436,10 @@ export function ModelDialog({
   const page = usePageActions();
   const actions = useMemo<ModelDialogActions>(
     () => ({
-      use: (name) => page.useModel(sessionId, name),
+      use: (name) =>
+        sessionId === null ? Promise.reject(new Error("Start a session first: send a message.")) : page.useModel(sessionId, name),
       setDefault: (name) => page.setDefault(name),
-      pull: (ref) => page.pull(ref, { sessionId }),
+      pull: (ref) => page.pull(ref, sessionId === null ? undefined : { sessionId }),
       stop: (ref) => page.cancelPull(ref),
       remove: (ref) => page.remove(ref),
       refresh: async () => {

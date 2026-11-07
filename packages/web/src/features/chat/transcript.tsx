@@ -19,6 +19,14 @@ import { Markdown } from "./markdown-view.tsx";
 function ToolResult({ tool }: { tool: ToolBlock }) {
   switch (tool.status) {
     case "done":
+      if (tool.unsuccessful === true) {
+        return (
+          <span className="whitespace-nowrap text-deny">
+            <span aria-hidden="true">✗ </span>
+            {tool.summary ?? "failed"}
+          </span>
+        );
+      }
       return (
         <span className="whitespace-nowrap text-allow">
           <span aria-hidden="true">✓ </span>
