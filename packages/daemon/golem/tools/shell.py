@@ -102,7 +102,11 @@ async def _login_shell(
     if blocked:
         summary += ", blocked by the sandbox"
     tail = "\n".join([*(f"[{line}]" for line in blocked), ending])
-    return ToolResult(output=f"{output}\n{tail}" if output else tail, summary=summary)
+    return ToolResult(
+        output=f"{output}\n{tail}" if output else tail,
+        summary=summary,
+        failed=done.timed_out or done.exit_code != 0,
+    )
 
 
 async def _git_status(args: GitStatusArgs, ctx: ToolContext) -> ToolResult:
