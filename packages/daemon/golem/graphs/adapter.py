@@ -35,9 +35,16 @@ class ModelStarted:
 
 @dataclass(frozen=True, slots=True)
 class ModelRequested:
-    """The request of the model call with this ``message_id`` is about to be sent."""
+    """The request of the model call with this ``message_id`` is about to be sent.
+
+    ``system_prompt_sha`` and ``tools_sha`` are the hashes of the stored system
+    prompt and tool schemas, and ``message_ids`` the history sent.
+    """
 
     message_id: str
+    system_prompt_sha: str | None = None
+    tools_sha: str | None = None
+    message_ids: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -346,7 +353,7 @@ def _custom(data: object) -> Fact | None:
     if kind == "model.started" and isinstance(message_id, str):
         return ModelStarted(message_id)
     if kind == "model.request" and isinstance(message_id, str):
-        return ModelRequested(message_id)
+        return _request(message_id, item)
     if kind in (PIN_READ_KIND, PIN_SKIPPED_KIND):
         return _pin(kind, item)
     if not isinstance(call_id, str):
@@ -382,6 +389,22 @@ def _custom(data: object) -> Fact | None:
         message = item.get("message")
         return ToolErrored(call_id, message if isinstance(message, str) and message else "failed")
     return None
+
+
+def _request(message_id: str, item: Mapping[str, object]) -> ModelRequested:
+    system, tools, ids = (
+        item.get("system_prompt_sha"),
+        item.get("tools_sha"),
+        item.get("message_ids"),
+    )
+    return ModelRequested(
+        message_id,
+        system if isinstance(system, str) else None,
+        tools if isinstance(tools, str) else None,
+        tuple(i for i in cast(list[object], ids) if isinstance(i, str))
+        if isinstance(ids, list)
+        else (),
+    )
 
 
 def _pin(kind: object, item: Mapping[str, object]) -> PinRead | PinSkipped | None:
