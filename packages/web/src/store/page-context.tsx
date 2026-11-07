@@ -1,9 +1,9 @@
-import { QueryClientProvider, useQuery, type UseQueryResult } from "@tanstack/react-query";
+import { keepPreviousData, QueryClientProvider, useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { createContext, useCallback, useContext, useSyncExternalStore, type ReactNode } from "react";
 import { useSyncExternalStoreWithSelector } from "use-sync-external-store/with-selector";
 import { ConnectionProvider } from "./connection-context.tsx";
 import { configKey, type ConfigGetResult } from "./config.ts";
-import { MODEL_LIST_KEY, SETUP_STATUS_KEY, type ModelListResult } from "./models.ts";
+import { MODEL_LIST_ALL_KEY, MODEL_LIST_KEY, SETUP_STATUS_KEY, type ModelListResult } from "./models.ts";
 import type { Page, PageActions } from "./page.ts";
 import type { PullsSnapshot } from "./pulls.ts";
 import type { Route } from "./router.ts";
@@ -127,9 +127,15 @@ export function useDraftReader(key: string): () => string {
 }
 
 /** The model listing: fresh until a pushed event says otherwise, shared by every user of the hook. */
-export function useModelList(enabled = true): UseQueryResult<ModelListResult> {
+export function useModelList(enabled = true, showAll = false): UseQueryResult<ModelListResult> {
   const { queries } = usePage();
-  return useQuery({ queryKey: [...MODEL_LIST_KEY], queryFn: queries.modelList, enabled });
+  return useQuery({
+    queryKey: showAll ? [...MODEL_LIST_ALL_KEY] : [...MODEL_LIST_KEY],
+    queryFn: () => queries.modelList(showAll),
+    // Turning show all on or off keeps the list on screen until the other one arrives.
+    placeholderData: keepPreviousData,
+    enabled,
+  });
 }
 
 /** The overview rows: fresh until the model list or the model server changes, shared by every user of the hook. */

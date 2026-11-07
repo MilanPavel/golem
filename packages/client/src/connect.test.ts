@@ -714,7 +714,7 @@ test("setKey sends the key to the daemon and never to the wire log", async () =>
   }
 });
 
-test("listModels asks for a refresh only when told to, and takes a listing with no default", async () => {
+test("listModels asks for a refresh or show all only when told to, and takes a listing with no default", async () => {
   const sent: Record<string, unknown>[] = [];
   const listed = {
     default: null,
@@ -738,7 +738,8 @@ test("listModels asks for a refresh only when told to, and takes a listing with 
   try {
     assert.equal((await client.listModels()).models[0]?.ref, "ollama/qwen3:8b");
     await client.listModels(true);
-    assert.deepEqual(sent, [{}, { refresh: true }]);
+    await client.listModels(false, true);
+    assert.deepEqual(sent, [{}, { refresh: true }, { show_all: true }]);
   } finally {
     client.close();
     await server.close();

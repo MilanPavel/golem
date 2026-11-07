@@ -44,14 +44,14 @@ test("refreshModels asks past the cache and stores the answer", async () => {
   const fresh = { default: "x", models: [], providers: [], setup: { ollama_installed: true, ollama_running: true } };
   fake.raw.listModels.mockResolvedValueOnce(fresh);
   await page.actions.refreshModels();
-  expect(fake.raw.listModels).toHaveBeenCalledWith(true);
+  expect(fake.raw.listModels).toHaveBeenCalledWith(true, false);
   expect(page.queryClient.getQueryData(["model.list"])).toBe(fresh);
 });
 
 test("the listing query asks the daemon without refreshing", async () => {
   const { fake, page } = setup();
   await page.queries.modelList();
-  expect(fake.raw.listModels).toHaveBeenCalledWith();
+  expect(fake.raw.listModels).toHaveBeenCalledWith(false, false);
 });
 
 test("pull shows the row at once, and with a session it switches it when the download ends well", async () => {

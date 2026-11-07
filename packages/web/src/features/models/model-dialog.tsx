@@ -47,6 +47,10 @@ export type ModelDialogViewProps = {
   onRetry: () => void;
   pulls: PullsSnapshot;
   actions: ModelDialogActions;
+  /** The list shows every live chat model that calls tools, not only the catalog's. */
+  showAll?: boolean;
+  /** Turns show all on or off. Without it the dialog has no such switch. */
+  onShowAll?: (on: boolean) => void;
   /** Where the dialog starts, for the gallery. */
   initial?: { query?: string; activeId?: string; confirm?: ModelConfirm; failure?: string };
 };
@@ -91,7 +95,7 @@ function Content({
   guardRef: RefObject<Guard | null>;
   close: () => void;
 }) {
-  const { session, listing, loadError, onRetry, pulls, actions, initial } = props;
+  const { session, listing, loadError, onRetry, pulls, actions, initial, showAll, onShowAll } = props;
   const isNew = props.mode === "new";
   const [query, setQuery] = useState(initial?.query ?? "");
   const [activeId, setActiveId] = useState<string | null>(initial?.activeId ?? null);
@@ -226,6 +230,17 @@ function Content({
           <RefreshIcon />
         </IconButton>
       </div>
+      {onShowAll === undefined ? null : (
+        <label className="mt-3 flex items-center gap-2 text-sm text-muted">
+          <input
+            type="checkbox"
+            checked={showAll === true}
+            disabled={busy !== null}
+            onChange={(event) => onShowAll(event.target.checked)}
+          />
+          Show all models
+        </label>
+      )}
       <SearchList
         className="mt-4"
         listClassName="max-h-64 sm:max-h-96"
@@ -444,7 +459,8 @@ export function ModelDialog({
   /** Where the dialog starts: a model made active, and the question asked of it. */
   initial?: ModelDialogViewProps["initial"];
 }) {
-  const query = useModelList(open);
+  const [showAll, setShowAll] = useState(false);
+  const query = useModelList(open, showAll);
   const pulls = usePulls();
   const page = usePageActions();
   const [pick, choosePick] = useNewSessionModel();
@@ -460,10 +476,10 @@ export function ModelDialog({
       stop: (ref) => page.cancelPull(ref),
       remove: (ref) => page.remove(ref),
       refresh: async () => {
-        await page.refreshModels();
+        await page.refreshModels(showAll);
       },
     }),
-    [page, sessionId, choosePick],
+    [page, sessionId, choosePick, showAll],
   );
   return (
     <ModelDialogView
@@ -477,6 +493,8 @@ export function ModelDialog({
       onRetry={() => void query.refetch()}
       pulls={pulls}
       actions={actions}
+      showAll={showAll}
+      onShowAll={setShowAll}
       initial={initial}
     />
   );
