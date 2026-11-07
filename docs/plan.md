@@ -150,7 +150,7 @@ flowchart LR
 - **You can:** run `golem` on a bare Mac and be led one panel at a time to a model that answers, on this Mac or with an API key, with every wait shown. Later, type `/setup` to see every part of golem, fix a broken one with Enter, change the model, or run the setup again.
 - **Build:** four tickets, each a whole slice. 1.9.1 ([#344](https://github.com/MilanPavel/golem/issues/344)): the daemon's `setup.status` (the `golem doctor` checks behind one call), a key checked before it is stored, and an Ollama install the daemon runs and streams. 1.9.2 ([#345](https://github.com/MilanPavel/golem/issues/345)): the window and its navigation in `packages/view`, the Service panel with live progress, Engine, Ready, the overview, `/setup`, the `welcome back` line, and band lines for a broken part. 1.9.3 ([#346](https://github.com/MilanPavel/golem/issues/346)): the Ollama panel (install, start, or the website) and the Model panel (sized for the Mac, download with time left, a missing default named), and `starting Ollama…` in the band. 1.9.4 ([#347](https://github.com/MilanPavel/golem/issues/347)): the Provider and Key panels, with the shell's key, the check, and the Keychain prompt explained.
 - **Done when:** on a bare Mac, `golem` reaches a first answer through the window both ways with no command typed, and `/setup` shows every part and fixes a broken one with Enter.
-- **Watch out:** the screens and the navigation table are in [design/setup-window.md](design/setup-window.md); build to them. This step replaces the old 1.9 (API key in the picker, [#233](https://github.com/MilanPavel/golem/issues/233)) and 1.10 (local model, [#238](https://github.com/MilanPavel/golem/issues/238)), so there is no 1.10. The web UI uses the same navigation and `setup.status` in 10.10, and shows a command to copy for the service and the key ([ADR-028](adr/028-web-gateway.md)). Under launchd the daemon has no `PATH`, so brew is called by its absolute path.
+- **Watch out:** the screens and the navigation table are in [design/setup-window.md](design/setup-window.md); build to them. This step replaces the old 1.9 (API key in the picker, [#233](https://github.com/MilanPavel/golem/issues/233)) and 1.10 (local model, [#238](https://github.com/MilanPavel/golem/issues/238)), so there is no 1.10. The web UI uses the same `setup.status`, rows, and guided order, but draws them as pages: a form in Settings → Setup and a first-run page, `/welcome` (10.15, ADR-039). It shows a command to copy for the service and the key ([ADR-028](adr/028-web-gateway.md)). Under launchd the daemon has no `PATH`, so brew is called by its absolute path.
 
 ### 1.11 An empty chat that teaches — [#242](https://github.com/MilanPavel/golem/issues/242)
 
@@ -178,10 +178,11 @@ flowchart LR
   - 1.12.6 ([#485](https://github.com/MilanPavel/golem/issues/485)): the catalog as daemon data, with about 13 entries, input forms, and `mcp.catalog`; `runtime.install` for Node and uv; and a Tools panel in the setup window.
   - 1.12.7 ([#486](https://github.com/MilanPavel/golem/issues/486)): import from other apps' `mcpServers` JSON, with secrets moved to the Keychain, and export.
   - 1.12.8 ([#487](https://github.com/MilanPavel/golem/issues/487)): `/mcp` v2 and `/config` in the TUI, and the full `golem mcp` CLI.
-  - 1.12.9 ([#488](https://github.com/MilanPavel/golem/issues/488)): a web Settings view, with MCP servers and a config editor.
+  - 1.12.9 ([#488](https://github.com/MilanPavel/golem/issues/488)): MCP servers and the config file as Settings sections in the web, on top of 10.11.3's list ([#461](https://github.com/MilanPavel/golem/issues/461)).
   - 1.12.10 ([#489](https://github.com/MilanPavel/golem/issues/489)): OAuth for remote servers.
   - 1.12.11 ([#490](https://github.com/MilanPavel/golem/issues/490)): the model turns on an on-demand server with `mcp_enable`, after an approval.
   - 1.12.12 ([#491](https://github.com/MilanPavel/golem/issues/491)): prompts, resources, and elicitation.
+  - 1.12.13 ([#515](https://github.com/MilanPavel/golem/issues/515)): the Tools panel in the setup window, split out of 1.12.6: the navigation and the panel model in `packages/view`, and the TUI's drawing. The web draws it in 10.15.
 - **Done when:**
   - Playwright can be added from the catalog on a Mac without Node, then tested, a tool hidden, its logs read, the server edited, and removed. This works in the TUI and the browser, with no file opened by hand.
   - A Claude Desktop config imports in one pick.
@@ -307,7 +308,7 @@ flowchart LR
   s6 --> s7
   s4[10.4 packages/view] --> s8[10.8 Chat]
   s7 --> s8 --> s9[10.9 Tools and approvals] --> s10[10.10 Models and sessions] --> s11[10.11 Artifacts and settings]
-  s11 --> s12[10.12 Responsive and accessible]
+  s11 --> s15[10.15 From first use] --> s12[10.12 Responsive and accessible]
   s11 --> s13[10.13 PWA]
   s11 --> s14[10.14 golem web install]
 ```
@@ -390,6 +391,21 @@ flowchart LR
 - **Goal:** the rest of what the TUI can show.
 - **Build:** an artifact viewer, the tool rules, and skills (each a query, refreshed by `skill.registry.changed`; MCP servers are in 1.12.9, [#488](https://github.com/MilanPavel/golem/issues/488)), where each API key is stored (read-only, from `auth.list`), and the wire view with secrets redacted as in the TUI.
 - **Done when:** each view matches its TUI command.
+- **Watch out:** Settings holds these views, the MCP section from 1.12.9, and the setup form from 10.15.5, each as one entry in `sections.ts`.
+
+### 10.15 The browser from first use — [#507](https://github.com/MilanPavel/golem/issues/507)
+
+- **Goal:** the browser feels made for a page, not ported from the terminal: downloads, new sessions, and setup.
+- **You can:** see a download from any screen, start a session on a model and a folder you chose before you send, browse to that folder, fix each part of setup in place in Settings, and set up a fresh install on a page.
+- **Build:** one ticket each. Every issue lists the files, functions, RPC shapes, and tests.
+  - 10.15.1 ([#509](https://github.com/MilanPavel/golem/issues/509)): the design in `docs/design/web.md`, `setup-window.md`, and the prototype, plus ADR-039 (the browser sets up on pages, not in a dialog) and ADR-040 (the browser may list folders under your home).
+  - 10.15.2 ([#510](https://github.com/MilanPavel/golem/issues/510)): download progress in the sidebar footer, from the page-wide pull store. No protocol change.
+  - 10.15.3 ([#511](https://github.com/MilanPavel/golem/issues/511)): a Model chip beside the Folder chip on the new-session screen, sent as `session.create`'s `model_profile`, which the daemon now validates. `/model` works on the home screen.
+  - 10.15.4 ([#512](https://github.com/MilanPavel/golem/issues/512)): `fs.list_dirs` (folders under home only), and a folder browser in the folder chip.
+  - 10.15.5 ([#513](https://github.com/MilanPavel/golem/issues/513)): Settings → Setup as a form, with each fix in place, and the setup actions in one hook.
+  - 10.15.6 ([#514](https://github.com/MilanPavel/golem/issues/514)): first run as the page `/welcome` (Engine, Model, Tools, Ready), `/setup` opens Settings, and the web setup dialog is removed.
+- **Done when:** a fresh install opened with `golem web` lands on `/welcome` and reaches a first answer, and a later session can be started on a chosen model and a browsed folder, with no setup dialog in the browser.
+- **Watch out:** first run is still decided by the client from `model.list` (`setupAtStart`). `brew install` starts nothing, so the first `golem` or `golem web` runs it. The TUI's setup window does not change. 10.15.1 comes first; 10.15.2 to 10.15.5 can then run side by side, and 10.15.6 needs 10.15.5 and the shared Tools panel of 1.12.13. The MCP pages of 1.12.9 are Settings sections beside Setup, and reuse the folder browser. `fs.list_dirs` changes the wire, so it bumps the protocol minor version.
 
 ### 10.12 Phone-sized screens and accessibility — [#185](https://github.com/MilanPavel/golem/issues/185)
 
