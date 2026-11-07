@@ -20,6 +20,12 @@ A project's `allow` rules count only when the folder is in `trusted_projects`. I
 
 Environment variables are read from the daemon's environment, not your shell's. A daemon that launchd started doesn't see what you export in a terminal.
 
+## Edit the file
+
+In the web UI, Settings → Config file (or `/config`) shows `config.toml` as text, in colour, with line numbers. **This project** switches to that folder's `.golem/config.toml` when you opened Settings from a chat. As you type, the daemon checks the text and lists each problem with its line, and a line with a problem is marked. **Review changes** shows what changes, line by line, and **Save** writes the file. If the file changed on disk after you opened it, nothing is written, and you can reload it or keep editing. A setting that is read only when the daemon starts says so after the save, with `golem daemon restart` to copy.
+
+The page cannot change a few sections: `providers`, the model keys, `trusted_projects`, `shell`, `web`, `skills.extra_dirs`, and `skills.claude_dirs`. A change inside one is a problem, and the file is left as it was. Edit those in a terminal with `golem config edit`.
+
 ## See what is in effect
 
 ```sh

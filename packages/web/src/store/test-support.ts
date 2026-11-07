@@ -128,6 +128,8 @@ export function fakeClient() {
     mcpCall: vi.fn<PageClient["mcpCall"]>(async () => ({ text: "", is_error: false })),
     mcpGet: vi.fn<PageClient["mcpGet"]>(async () => ({}) as never),
     addMcpServer: vi.fn<PageClient["addMcpServer"]>(async () => ({}) as never),
+    configRawGet: vi.fn<PageClient["configRawGet"]>(async () => ({ exists: true, mtime_ns: 1, path: "/Users/me/.golem/config.toml", text: "" })),
+    configRawSet: vi.fn<PageClient["configRawSet"]>(async () => ({ ok: true, mtime_ns: 2 })),
     scanMcpImport: vi.fn<PageClient["scanMcpImport"]>(async () => ({ scan_id: "scan", sources: [] })),
     applyMcpImport: vi.fn<PageClient["applyMcpImport"]>(async () => ({ added: [] })),
     mcpCatalog: vi.fn<PageClient["mcpCatalog"]>(async () => ({ entries: [] })),

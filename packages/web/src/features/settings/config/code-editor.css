@@ -1,0 +1,38 @@
+/* The editor draws its text twice, at the same size: coloured below, and in a transparent textarea above. */
+.code-editor {
+  /* Shiki's CSS-variables theme reads these. Each token is light-dark() already, so one set serves both themes. */
+  --shiki-foreground: var(--color-ink);
+  --shiki-background: transparent;
+  --shiki-token-constant: var(--color-wait);
+  --shiki-token-string: var(--color-allow);
+  --shiki-token-comment: var(--color-faint);
+  --shiki-token-keyword: var(--color-clay-ink);
+  --shiki-token-parameter: var(--color-muted);
+  --shiki-token-function: var(--color-ink);
+  --shiki-token-string-expression: var(--color-allow);
+  --shiki-token-punctuation: var(--color-muted);
+  --shiki-token-link: var(--color-clay-ink);
+}
+
+.code-editor-layer {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+  white-space: pre;
+  tab-size: 2;
+  letter-spacing: 0;
+}
+
+.code-editor textarea {
+  color: transparent;
+  caret-color: var(--color-ink);
+  background: transparent;
+  resize: none;
+  overflow: auto;
+}
+
+.code-editor textarea::selection {
+  background: color-mix(in srgb, var(--color-clay) 30%, transparent);
+}

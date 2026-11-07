@@ -32,6 +32,7 @@ import { downloadText } from "./copy-text.ts";
 import { CommandsDialog } from "./help-dialog.tsx";
 import type { CommandNotice } from "./notice-line.tsx";
 import { settingsPath } from "../../store/router.ts";
+import { requestConfig } from "../settings/config-request.ts";
 import { requestMcpAdd } from "../settings/mcp-add-request.ts";
 import { NEEDS_SESSION, NOT_YET } from "./terminal-only.ts";
 
@@ -155,6 +156,10 @@ export function useCommands({ session, cwd, typing, send }: UseCommandsOptions):
           case "mcp-add":
             requestMcpAdd(found.id);
             navigate(settingsPath("mcp"));
+            return "handled";
+          case "config":
+            requestConfig(found.project);
+            navigate(settingsPath("config"));
             return "handled";
           case "skills":
             return say(NOT_YET.skills);

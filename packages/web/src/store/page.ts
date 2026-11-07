@@ -1,4 +1,4 @@
-import { OLLAMA_FAILED, RpcError, type ApprovalChoice, type ConfigGetResult, type FsListDirsResult, type McpAddParams, type McpCallResult, type McpImportApplyParams, type McpImportApplyResult, type McpImportScanResult, type McpCatalogResult, type McpListResult, type McpLogsResult, type McpServerConfig, type McpServerDetail, type McpServerLog, type McpTestProgress, type McpTestResult, type GolemClient, type RuntimeName, type SetupStatusResult, type SkillListResult } from "@golem/client";
+import { OLLAMA_FAILED, RpcError, type ApprovalChoice, type ConfigGetResult, type ConfigRawGetResult, type ConfigRawResult, type FsListDirsResult, type McpAddParams, type McpCallResult, type McpImportApplyParams, type McpImportApplyResult, type McpImportScanResult, type McpCatalogResult, type McpListResult, type McpLogsResult, type McpServerConfig, type McpServerDetail, type McpServerLog, type McpTestProgress, type McpTestResult, type GolemClient, type RuntimeName, type SetupStatusResult, type SkillListResult } from "@golem/client";
 import { changeToolFilter, installEventOf, type InstallEvent } from "@golem/view";
 import type { QueryClient } from "@tanstack/react-query";
 import { createDrafts, type Drafts } from "./drafts.ts";
@@ -54,6 +54,8 @@ export type PageClient = Pick<
   | "mcpGet"
   | "updateMcpServer"
   | "addMcpServer"
+  | "configRawGet"
+  | "configRawSet"
   | "scanMcpImport"
   | "applyMcpImport"
   | "mcpCatalog"
@@ -146,6 +148,16 @@ export type PageActions = {
   scanMcpImport(sessionId: string | null, text: string | null): Promise<McpImportScanResult>;
   /** Adds the picked candidates of a scan, once. A pick that fails is in `failed`, and the rest are added. */
   applyMcpImport(params: McpImportApplyParams, sessionId: string | null): Promise<McpImportApplyResult>;
+  /** The text of `config.toml` (the session's project's with `project`), and its `mtime_ns`. */
+  getConfigRaw(project: boolean, sessionId: string | null): Promise<ConfigRawGetResult>;
+  /**
+   * Checks a new text and, unless `dryRun`, writes it when the file is still at `baseMtimeNs`. The page's write
+   * may not change the protected sections. A refusal is in the result (`ok: false`), not a rejection.
+   */
+  setConfigRaw(
+    params: { text: string; baseMtimeNs: number | null; project: boolean; dryRun: boolean },
+    sessionId: string | null,
+  ): Promise<ConfigRawResult>;
   /** Adds a server to the user's config and starts it. Rejects with the daemon's reason. */
   addMcp(params: McpAddParams): Promise<void>;
   /** Tries a server that is not saved yet, saving nothing. `onStep` gets each step as it ends. */
@@ -371,6 +383,23 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
           await queryClient.invalidateQueries({ queryKey: MCP_LIST_KEY });
           await queryClient.invalidateQueries({ queryKey: MCP_CATALOG_KEY });
         }
+      },
+      getConfigRaw: (project, sessionId) => client.configRawGet({ scope: project ? "project" : "user", ...(sessionId === null ? {} : { sessionId }) }),
+      async setConfigRaw(params, sessionId) {
+        const result = await client.configRawSet({
+          text: params.text,
+          baseMtimeNs: params.baseMtimeNs,
+          scope: params.project ? "project" : "user",
+          dryRun: params.dryRun,
+          ...(sessionId === null ? {} : { sessionId }),
+        });
+        if (!params.dryRun && result.ok) {
+          // The file may have changed servers, the catalog's "added", and the rules.
+          await queryClient.invalidateQueries({ queryKey: MCP_LIST_KEY });
+          await queryClient.invalidateQueries({ queryKey: MCP_CATALOG_KEY });
+          await queryClient.invalidateQueries({ queryKey: CONFIG_KEY });
+        }
+        return result;
       },
       async addMcp(params) {
         try {

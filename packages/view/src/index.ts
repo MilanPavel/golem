@@ -68,6 +68,7 @@ export {
   type McpCatalogEntry,
   type McpCatalogInput,
 } from "./mcp-catalog.ts";
+export { changedOnDisk, problemLine, problemLines, unifiedDiff, type RawProblem } from "./config-diff.ts";
 export {
   applyParams,
   candidateNotes,

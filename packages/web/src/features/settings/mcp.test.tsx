@@ -61,7 +61,7 @@ const mine: McpServer = {
   enabled: true,
 };
 
-function mount(path: string, servers: readonly McpServer[], session: string | null = null, failing = false) {
+function mount(path: string, servers: readonly McpServer[], session: string | null = null, failing = false, prepare?: (fake: ReturnType<typeof fakeClient>) => void) {
   history.replaceState(null, "", path);
   const fake = fakeClient();
   fake.raw.listModels.mockResolvedValue(WORKING_LISTING);
@@ -69,6 +69,7 @@ function mount(path: string, servers: readonly McpServer[], session: string | nu
   fake.raw.status.mockResolvedValue({ version: "0.5.0" });
   if (failing) fake.raw.listMcp.mockRejectedValue(new Error("daemon is down"));
   else fake.raw.listMcp.mockResolvedValue({ servers: [...servers] });
+  prepare?.(fake);
   if (session !== null) settingsContextStore.set({ sessionId: session, cwd: "/work/app" });
   const doc = new EventTarget() as unknown as Document;
   (doc as { visibilityState: string }).visibilityState = "visible";
@@ -811,6 +812,147 @@ test("axe finds nothing on the import dialog, in both themes", async () => {
     document.documentElement.dataset.theme = theme;
     const dialog = await openImport(fake, user);
     await within(dialog).findByText("3 servers in 1 place");
+    expect((await axe.run(document.body, noContrast)).violations).toEqual([]);
+    unmount();
+  }
+});
+
+const TOML = '[mcp.git]\ncommand = "uvx"\nargs = ["mcp-server-git"]\n';
+
+function fileOf(text: string, mtime = 100) {
+  return { exists: true, mtime_ns: mtime, path: "/Users/me/.golem/config.toml", text };
+}
+
+function mountConfig(text = TOML, session: string | null = null, file: ReturnType<typeof fileOf> = fileOf(text)) {
+  return mount("/settings/config", [], session, false, (fake) => fake.raw.configRawGet.mockResolvedValue(file));
+}
+const configBox = () => screen.findByRole("textbox", { name: "Config file text" });
+
+test("Config file shows the file as text, with its path, and says there are no changes", async () => {
+  const { fake } = mountConfig();
+  const box = (await configBox()) as HTMLTextAreaElement;
+  expect(box.value).toBe(TOML);
+  expect(screen.getByText("/Users/me/.golem/config.toml")).toBeTruthy();
+  expect(screen.getByText("no changes")).toBeTruthy();
+  expect((screen.getByRole("button", { name: "Review changes" }) as HTMLButtonElement).disabled).toBe(true);
+  expect(fake.raw.configRawGet).toHaveBeenCalledWith({ scope: "user" });
+});
+
+test("typing asks the daemon to check the text after a pause, writing nothing, and a good text is valid", async () => {
+  const { fake, user } = mountConfig();
+  const box = await configBox();
+  await user.type(box, "# hi");
+  expect(screen.getByText("checking…")).toBeTruthy();
+  await waitFor(() => expect(fake.raw.configRawSet).toHaveBeenCalled());
+  expect(fake.raw.configRawSet.mock.calls.at(-1)![0]).toMatchObject({ text: `${TOML}# hi`, baseMtimeNs: 100, scope: "user", dryRun: true });
+  expect(await screen.findByText("✔ valid")).toBeTruthy();
+  expect((screen.getByRole("button", { name: "Review changes" }) as HTMLButtonElement).disabled).toBe(false);
+});
+
+test("a problem is listed with its line, marks the gutter, and keeps Review off", async () => {
+  const { fake, user } = mountConfig();
+  fake.raw.configRawSet.mockResolvedValue({ ok: false, errors: [{ line: 2, column: 11, path: "mcp.git.command", message: "not a command" }] });
+  const box = await configBox();
+  await user.type(box, "x");
+  expect(await screen.findByText("1 problem")).toBeTruthy();
+  expect(within(screen.getByRole("list", { name: "Problems" })).getByText("line 2:11: not a command (mcp.git.command)")).toBeTruthy();
+  expect(screen.getByText("✘2")).toBeTruthy();
+  expect((screen.getByRole("button", { name: "Review changes" }) as HTMLButtonElement).disabled).toBe(true);
+});
+
+test("Review shows what changes as a diff, and Save writes with the file's mtime, then reloads and says saved", async () => {
+  const { fake, user } = mountConfig();
+  const box = await configBox();
+  await user.clear(box);
+  await user.click(box);
+  await user.paste('[mcp.git]\ncommand = "git-mcp"\nargs = ["mcp-server-git"]\n');
+  await screen.findByText("✔ valid");
+  fake.raw.configRawGet.mockResolvedValue(fileOf('[mcp.git]\ncommand = "git-mcp"\nargs = ["mcp-server-git"]\n', 200));
+  await user.click(screen.getByRole("button", { name: "Review changes" }));
+  const dialog = await screen.findByRole("dialog");
+  expect(within(dialog).getByText("Save /Users/me/.golem/config.toml?")).toBeTruthy();
+  expect(within(dialog).getByText('command = "git-mcp"')).toBeTruthy();
+  expect(within(dialog).getByText('command = "uvx"')).toBeTruthy();
+  await user.click(within(dialog).getByRole("button", { name: "Save" }));
+  expect(await screen.findByText("Saved.")).toBeTruthy();
+  const last = fake.raw.configRawSet.mock.calls.at(-1)![0];
+  expect(last).toMatchObject({ baseMtimeNs: 100, scope: "user", dryRun: false });
+  expect(((await screen.findByRole("textbox", { name: "Config file text" })) as HTMLTextAreaElement).value).toContain("git-mcp");
+});
+
+test("a save that needs a restart says which settings and gives the command", async () => {
+  const { fake, user } = mountConfig();
+  fake.raw.configRawSet.mockResolvedValue({ ok: true, mtime_ns: 3, restart_needed: ["ollama"] });
+  const box = await configBox();
+  await user.type(box, "# x");
+  await screen.findByText("Saving changes settings that are read only when the daemon starts: ollama.");
+  await user.click(screen.getByRole("button", { name: "Review changes" }));
+  await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Save" }));
+  const status = (await screen.findByText(/Saved\./)).closest("div") as HTMLElement;
+  expect(status.textContent).toContain("read only when the daemon starts: ollama");
+  expect(within(status).getByText("golem daemon restart")).toBeTruthy();
+});
+
+test("a file that changed on disk offers Reload or Keep editing, and Reload drops the edits", async () => {
+  const { fake, user } = mountConfig();
+  const box = await configBox();
+  await user.type(box, "# mine");
+  await screen.findByText("✔ valid");
+  fake.raw.configRawSet.mockResolvedValue({ ok: false, errors: [{ message: "config.toml changed on disk since it was read" }] });
+  await user.click(screen.getByRole("button", { name: "Review changes" }));
+  await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Save" }));
+  expect((await screen.findByRole("alert")).textContent).toContain("The file changed on disk");
+  fake.raw.configRawGet.mockResolvedValue(fileOf("[mcp.other]\ncommand = \"x\"\n", 300));
+  await user.click(screen.getByRole("button", { name: "Reload the file" }));
+  await waitFor(() => expect(((screen.getByRole("textbox", { name: "Config file text" })) as HTMLTextAreaElement).value).toContain("mcp.other"));
+  expect(screen.queryByText(/changed on disk/)).toBeNull();
+});
+
+test("a refused save shows the daemon's message and Discard puts the text back", async () => {
+  const { fake, user } = mountConfig();
+  const box = (await configBox()) as HTMLTextAreaElement;
+  await user.type(box, "# x");
+  await screen.findByText("✔ valid");
+  fake.raw.configRawSet.mockRejectedValue(new Error("the daemon is busy"));
+  await user.click(screen.getByRole("button", { name: "Review changes" }));
+  await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Save" }));
+  expect((await screen.findByRole("alert")).textContent).toContain("the daemon is busy");
+  await user.click(screen.getByRole("button", { name: "Discard changes" }));
+  expect(box.value).toBe(TOML);
+});
+
+test("a file that cannot be read says so, with Retry; a missing one says saving creates it", async () => {
+  const first = mount("/settings/config", [], null, false, (fake) => fake.raw.configRawGet.mockRejectedValue(new Error("no access")));
+  expect((await screen.findByRole("alert", {}, { timeout: 4000 })).textContent).toContain("no access");
+  first.fake.raw.configRawGet.mockResolvedValue({ exists: false, path: "/Users/me/.golem/config.toml", text: "" });
+  await first.user.click(screen.getByRole("button", { name: "Retry" }));
+  expect(await screen.findByText(/does not exist yet: saving creates it/)).toBeTruthy();
+});
+
+test("This project is off without a session, and with one it reads the project's file", async () => {
+  const first = mountConfig();
+  await configBox();
+  expect((screen.getByRole("button", { name: "This project" }) as HTMLButtonElement).disabled).toBe(true);
+  first.unmount();
+  const { fake, user } = mountConfig(TOML, "s1");
+  await configBox();
+  fake.raw.configRawGet.mockResolvedValue({ exists: true, mtime_ns: 5, path: "/work/app/.golem/config.toml", text: "[mcp.db]\ncommand = \"db\"\n" });
+  await user.click(screen.getByRole("button", { name: "This project" }));
+  await waitFor(() => expect(fake.raw.configRawGet).toHaveBeenLastCalledWith({ scope: "project", sessionId: "s1" }));
+  expect(((await screen.findByRole("textbox", { name: "Config file text" })) as HTMLTextAreaElement).value).toContain("mcp.db");
+  expect(screen.getByRole("button", { name: "This project" }).getAttribute("aria-pressed")).toBe("true");
+});
+
+test("axe finds nothing on the config editor, with a problem and the diff, in both themes", async () => {
+  for (const theme of ["slip", "kiln"]) {
+    const { user, unmount } = mountConfig(TOML, "s1");
+    document.documentElement.dataset.theme = theme;
+    const box = await configBox();
+    expect((await axe.run(document.body, noContrast)).violations).toEqual([]);
+    await user.type(box, "# x");
+    await screen.findByText("✔ valid");
+    await user.click(screen.getByRole("button", { name: "Review changes" }));
+    await screen.findByRole("dialog");
     expect((await axe.run(document.body, noContrast)).violations).toEqual([]);
     unmount();
   }
