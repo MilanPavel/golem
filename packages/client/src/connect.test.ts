@@ -1012,6 +1012,31 @@ test("mcp.get returns one server's config, and a malformed result is refused", a
   }
 });
 
+test("mcpCall sends the tool and its arguments, and refuses a result that is not one", async () => {
+  const sent: unknown[] = [];
+  const results: Record<string, unknown> = { "mcp.call": { text: "hi", is_error: false } };
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results,
+      onRequest: (_socket, method, params) => {
+        if (method === "mcp.call") sent.push(params);
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    assert.equal((await client.mcpCall({ name: "gh", tool: "get", arguments: { id: 1 }, sessionId: "s1" })).text, "hi");
+    await client.mcpCall({ name: "gh", tool: "list" });
+    assert.deepEqual(sent, [{ name: "gh", tool: "get", arguments: { id: 1 }, session_id: "s1" }, { name: "gh", tool: "list" }]);
+    results["mcp.call"] = { text: 1 };
+    await assert.rejects(client.mcpCall({ name: "gh", tool: "list" }), /invalid mcp.call result/);
+  } finally {
+    client.close();
+    await server.close();
+  }
+});
+
 test("mcp.test streams its steps to the caller and ignores another test's", async () => {
   const server = await listen((socket) => {
     attach(socket, {
