@@ -381,19 +381,18 @@ test("a clipboard that fails selects the command and does not throw", async () =
   expect(window.getSelection()?.toString()).toBe("golem auth set openai");
 });
 
-test("/mcp add shows the golem command to run in a terminal", async () => {
-  const { user } = await session();
+test("/mcp add opens the Add dialog in Settings, on the server named, or on the list", async () => {
+  const { fake, user } = await session();
+  fake.raw.mcpCatalog.mockResolvedValue({
+    entries: [
+      { id: "github", name: "github", title: "GitHub", description: "Issues and PRs.", category: "code", homepage: "https://example.com", runtime: "url", auth: "token", inputs: [{ id: "token", kind: "secret", label: "Token" }] },
+    ],
+  });
   await say(user, "/mcp add github");
-  const line = within(screen.getByText(/Add it in a terminal\./).closest("p") as HTMLElement);
-  expect(screen.getByText(/asks for the token there/)).toBeTruthy();
-  expect(line.getByText("golem mcp add --catalog github").tagName).toBe("CODE");
-  await say(user, "/mcp add filesystem");
-  expect(screen.getByText("golem mcp add --catalog filesystem")).toBeTruthy();
-  await say(user, "/mcp add");
-  expect(screen.getByText(/MCP servers are added in a terminal\. Pick one from golem's list/)).toBeTruthy();
-  expect(screen.getByText("golem mcp add --catalog <id>")).toBeTruthy();
-  await say(user, "/mcp add other");
-  expect(screen.getByText("golem mcp add <name> -- <command…>")).toBeTruthy();
+  expect(location.pathname).toBe("/settings/mcp");
+  expect((await screen.findByRole("heading", { name: "Add GitHub" })).textContent).toBe("Add GitHub");
+  await user.click(screen.getByRole("button", { name: "Cancel" }));
+  expect(screen.queryByRole("dialog")).toBeNull();
 });
 
 const NOT_YET: [string, string][] = [

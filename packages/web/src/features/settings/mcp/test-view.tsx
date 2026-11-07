@@ -1,12 +1,13 @@
 import { formatTestResult, formatTestStep } from "@golem/view";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { actionErrorText } from "../../../store/errors.ts";
-import type { McpServer, McpTestResult } from "../../../store/mcp.ts";
+import type { McpServer, McpTestProgress, McpTestResult } from "../../../store/mcp.ts";
 import { usePageActions } from "../../../store/page-context.tsx";
 import { Button } from "../../../ui/button.tsx";
 
 /** A test of the saved server, each step shown as it ends, and then what it found. */
 export function TestView({ server, sessionId, onBack }: { server: McpServer; sessionId: string | null; onBack: () => void }) {
+  const actions = usePageActions();
   const [round, setRound] = useState(0);
   return (
     <div className="flex flex-col gap-3">
@@ -19,20 +20,20 @@ export function TestView({ server, sessionId, onBack }: { server: McpServer; ses
         </Button>
       </div>
       <h3 className="font-mono text-base font-semibold wrap-anywhere">Test {server.name}</h3>
-      <Run key={round} name={server.name} sessionId={sessionId} />
+      <TestRun key={round} start={(onStep) => actions.testMcp(server.name, sessionId, onStep)} />
     </div>
   );
 }
 
-/** One run. A new `key` starts another, and leaving ends the listening. */
-function Run({ name, sessionId }: { name: string; sessionId: string | null }) {
-  const actions = usePageActions();
+/** One run of a test (`start`), as it goes. A new `key` starts another, and leaving ends the listening. */
+export function TestRun({ start }: { start: (onStep: (step: McpTestProgress) => void) => Promise<McpTestResult> }) {
+  const starter = useRef(start);
   const [steps, setSteps] = useState<readonly string[]>([]);
   const [outcome, setOutcome] = useState<McpTestResult | { error: string } | null>(null);
   useEffect(() => {
     let live = true;
-    actions
-      .testMcp(name, sessionId, (step) => {
+    starter
+      .current((step) => {
         const line = formatTestStep(step);
         if (live && line !== null) setSteps((now) => [...now, line]);
       })
@@ -47,7 +48,7 @@ function Run({ name, sessionId }: { name: string; sessionId: string | null }) {
     return () => {
       live = false;
     };
-  }, [actions, name, sessionId]);
+  }, []);
   return (
     <>
       <ol aria-label="Test steps" aria-live="polite" className="flex flex-col gap-1 font-mono text-sm">
