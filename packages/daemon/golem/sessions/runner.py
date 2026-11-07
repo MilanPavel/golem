@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from collections.abc import AsyncGenerator, Awaitable, Callable, Sequence
 from contextlib import aclosing
 from dataclasses import dataclass, field
@@ -28,6 +29,7 @@ from pydantic import BaseModel
 
 from golem.graphs.adapter import (
     ApprovalAsked,
+    ModelRequested,
     ModelStarted,
     PinRead,
     PinSkipped,
@@ -43,6 +45,7 @@ from golem.graphs.adapter import (
 from golem.graphs.chat import ChatRuntime
 from golem.graphs.tools_node import Answer
 from golem.models.errors import ModelUnreachable
+from golem.models.router import ModelIdentity
 from golem.permissions.engine import Allowance
 from golem.sessions.interrupted import close_reply
 from golem.sessions.log import SessionLog
@@ -57,11 +60,14 @@ from golem_protocol.events import (
     MessageCompletedData,
     MessageDeltaData,
     MessageStartedData,
+    ModelCallCompletedData,
+    ModelCallStartedData,
     RunCancelledData,
     RunFailedData,
     SkillActivatedData,
     SkillSkippedData,
     TodosUpdatedData,
+    TokenUsage,
     ToolCompletedData,
     ToolFailedData,
     ToolOutputData,
@@ -151,6 +157,11 @@ class _Progress:
 
     ``reply`` is the text of the newest finished one. ``calls`` are tool
     calls requested and not yet finished.
+
+    ``model`` names the model that answers. ``call`` is the message id of the
+    model call sent and not yet ended, ``sent_at`` when it was sent
+    (``time.monotonic()``), and ``first_at`` when its first text came.
+    ``index`` counts the calls sent so far.
     """
 
     run_started: bool = False
@@ -160,6 +171,11 @@ class _Progress:
     calls: list[str] = field(default_factory=list[str])
     waiting: bool = False
     pins: PinMemory = field(default_factory=PinMemory)
+    model: ModelIdentity | None = None
+    index: int = 0
+    call: str | None = None
+    sent_at: float = 0.0
+    first_at: float | None = None
 
 
 async def run_turn(
@@ -171,7 +187,7 @@ async def run_turn(
     waits for an approval. Cancellation is re-raised after ``run.cancelled``
     is in the log.
     """
-    progress = _Progress(pins=turn.pins)
+    progress = _Progress(pins=turn.pins, model=runtime.router.identity(turn.model_profile))
 
     async def emit(kind: EventType, data: BaseModel) -> None:
         await events.emit(turn.session_id, turn.run_id, kind, data)
@@ -234,7 +250,7 @@ async def run_turn(
         )
         raise
     except Exception as exc:
-        return await _failed(turn.run_id, exc, emit)
+        return await _failed(turn.run_id, exc, progress, emit)
 
 
 async def resume_turn(
@@ -244,7 +260,12 @@ async def resume_turn(
 
     Returns what :func:`run_turn` returns.
     """
-    progress = _Progress(run_started=True, calls=list(resume.open_calls), pins=resume.pins)
+    progress = _Progress(
+        run_started=True,
+        calls=list(resume.open_calls),
+        pins=resume.pins,
+        model=runtime.router.identity(),
+    )
 
     async def emit(kind: EventType, data: BaseModel) -> None:
         await events.emit(resume.session_id, resume.run_id, kind, data)
@@ -285,7 +306,7 @@ async def resume_turn(
         )
         raise
     except Exception as exc:
-        return await _failed(resume.run_id, exc, emit)
+        return await _failed(resume.run_id, exc, progress, emit)
 
 
 async def _finish(
@@ -303,8 +324,12 @@ async def _finish(
 
 
 async def _failed(
-    run_id: str, exc: Exception, emit: Callable[[EventType, BaseModel], Awaitable[None]]
+    run_id: str,
+    exc: Exception,
+    progress: _Progress,
+    emit: Callable[[EventType, BaseModel], Awaitable[None]],
 ) -> None:
+    await _end_call(progress, emit, failed=True)
     if isinstance(exc, ModelUnreachable):
         log.warning("run %s failed: %s (%s)", run_id, exc.message, exc.__cause__)
         data = RunFailedData(
@@ -330,7 +355,25 @@ async def _apply(
         await emit(
             "message.started", MessageStartedData(message_id=fact.message_id, role="assistant")
         )
+    elif isinstance(fact, ModelRequested):
+        progress.index += 1
+        progress.call = fact.message_id
+        progress.sent_at = time.monotonic()
+        progress.first_at = None
+        model = progress.model
+        await emit(
+            "model.call.started",
+            ModelCallStartedData(
+                message_id=fact.message_id,
+                index=progress.index,
+                profile=model.profile if model else "",
+                provider=model.provider if model else None,
+                model=model.name if model else None,
+            ),
+        )
     elif isinstance(fact, TextDelta) and progress.open is not None:
+        if progress.call is not None and progress.first_at is None:
+            progress.first_at = time.monotonic()
         progress.parts.append(fact.text)
         await emit("message.delta", MessageDeltaData(message_id=progress.open, text=fact.text))
     elif isinstance(fact, TextCompleted):
@@ -343,6 +386,7 @@ async def _apply(
             "message.completed",
             MessageCompletedData(message_id=message_id, role="assistant", text=fact.text),
         )
+        await _end_call(progress, emit, fact)
         for call in fact.calls:
             progress.calls.append(call.call_id)
             await emit(
@@ -402,6 +446,38 @@ async def _apply(
         )
 
 
+async def _end_call(
+    progress: _Progress,
+    emit: Callable[[EventType, BaseModel], Awaitable[None]],
+    done: TextCompleted | None = None,
+    *,
+    failed: bool = False,
+) -> None:
+    """``model.call.completed`` for the call sent and not ended, if there is one."""
+    message_id = progress.call
+    if message_id is None:
+        return
+    progress.call = None
+    now = time.monotonic()
+    first = progress.first_at
+    usage = None if done is None or done.usage is None else TokenUsage(**done.usage)
+    await emit(
+        "model.call.completed",
+        ModelCallCompletedData(
+            message_id=message_id,
+            usage=usage,
+            stop_reason=None if done is None else done.stop_reason,
+            first_token_ms=None if first is None else _ms(first - progress.sent_at),
+            latency_ms=_ms(now - progress.sent_at),
+            failed=failed,
+        ),
+    )
+
+
+def _ms(seconds: float) -> int:
+    return max(0, round(seconds * 1000))
+
+
 def _done(progress: _Progress, call_id: str) -> None:
     if call_id in progress.calls:
         progress.calls.remove(call_id)
@@ -420,6 +496,11 @@ async def _stopped(
     try:
         if not progress.run_started:
             await events.emit(session_id, run_id, "run.started", EmptyEventData())
+
+        async def emit(kind: EventType, data: BaseModel) -> None:
+            await events.emit(session_id, run_id, kind, data)
+
+        await _end_call(progress, emit, failed=True)
         await fail_calls(events, session_id, run_id, progress.calls, CANCELLED_TOOL)
         if progress.open is not None:
             await close_reply(

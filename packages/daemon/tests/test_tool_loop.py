@@ -35,6 +35,8 @@ from golem_protocol.events import (
     ChatEvent,
     MessageCompletedEvent,
     MessageStartedEvent,
+    ModelCallCompletedEvent,
+    ModelCallStartedEvent,
     RunFailedEvent,
     SessionCreatedEvent,
     ToolCompletedEvent,
@@ -98,26 +100,30 @@ async def test_the_model_reads_a_file_then_answers(database: Database, project: 
         "message.completed",
         "run.started",
         "message.started",
+        "model.call.started",
         "message.completed",
+        "model.call.completed",
         "tool.requested",
         "tool.started",
         "tool.completed",
         "message.started",
+        "model.call.started",
         "message.completed",
+        "model.call.completed",
         "run.completed",
     ]
-    requested = events[4]
+    requested = events[6]
     assert isinstance(requested, ToolRequestedEvent)
     assert (requested.data.name, requested.data.args) == ("read_file", {"path": "notes.txt"})
-    assert requested.data.message_id == events[3].data.message_id  # type: ignore[union-attr]
-    completed = events[6]
+    assert requested.data.message_id == events[4].data.message_id  # type: ignore[union-attr]
+    completed = events[8]
     assert isinstance(completed, ToolCompletedEvent)
     assert completed.data.summary == "1 line"
     assert "the answer is 42" in completed.data.preview
-    first, second = events[2], events[7]
+    first, second = events[2], events[9]
     assert isinstance(first, MessageStartedEvent) and isinstance(second, MessageStartedEvent)
     assert first.data.message_id != second.data.message_id
-    final = events[8]
+    final = events[11]
     assert isinstance(final, MessageCompletedEvent)
     assert (final.data.message_id, final.data.text) == (second.data.message_id, "It says 42.")
 
@@ -269,7 +275,7 @@ async def test_a_model_that_refuses_tools_is_asked_without_them(database: Databa
     chat = _chat(database, model)
     session_id = await chat.manager.create(None)
     events = await chat.finished(await chat.manager.send(session_id, "hi"))
-    final = events[-2]
+    final = events[-3]
     assert isinstance(final, MessageCompletedEvent)
     assert final.data.text == "plain answer"
     assert events[-1].type == "run.completed"
@@ -331,7 +337,7 @@ async def test_the_folder_is_stored_and_a_fork_keeps_it(database: Database, proj
     chat = _chat(database, model)
     session_id = await chat.manager.create(None, cwd=str(project))
     events = await chat.finished(await chat.manager.send(session_id, "hi"))
-    reply = events[-2]
+    reply = events[-3]
     assert isinstance(reply, MessageCompletedEvent)
 
     record = await chat.records.get(session_id)
@@ -438,3 +444,72 @@ async def test_a_call_that_ran_but_failed_is_marked_and_the_model_still_gets_the
     assert "tool.failed" not in [event.type for event in events]
     result = model.seen[1][-1]
     assert isinstance(result, ToolMessage) and result.text == "boom\n[exit code 1]"
+
+
+async def test_each_model_call_records_its_usage_and_stop_reason(
+    database: Database, project: Path
+) -> None:
+    usage = {
+        "input_tokens": 120,
+        "output_tokens": 30,
+        "total_tokens": 150,
+        "input_token_details": {"cache_read": 100, "cache_creation": 20},
+    }
+    model = ToolCallingChatModel(
+        replies=[[("read_file", {"path": "notes.txt"})], "It says 42."],
+        usage=usage,
+        response_metadata={"stop_reason": "end_turn"},
+    )
+    chat = _chat(database, model)
+    session_id = await chat.manager.create(None, cwd=str(project))
+    events = await chat.finished(await chat.manager.send(session_id, "what is in notes?"))
+
+    kinds = [event.type for event in events]
+    assert kinds[2:7] == [
+        "message.started",
+        "model.call.started",
+        "message.completed",
+        "model.call.completed",
+        "tool.requested",
+    ]
+    started = [e for e in events if isinstance(e, ModelCallStartedEvent)]
+    done = [e for e in events if isinstance(e, ModelCallCompletedEvent)]
+    assert [e.data.index for e in started] == [1, 2]
+    assert [e.data.message_id for e in done] == [e.data.message_id for e in started]
+    assert started[0].data.profile == ModelRouter(model=model).profile_name
+    assert (started[0].data.provider, started[0].data.model) == (None, None)
+    first = done[0].data
+    assert first.usage is not None
+    assert (first.usage.input, first.usage.output) == (120, 30)
+    assert (first.usage.cache_read, first.usage.cache_write) == (100, 20)
+    assert first.stop_reason == "end_turn"
+    assert not first.failed
+    assert first.latency_ms >= 0
+
+
+async def test_a_model_without_usage_records_none_not_zeros(
+    database: Database, project: Path
+) -> None:
+    chat = _chat(database, ToolCallingChatModel(replies=["hi"]))
+    session_id = await chat.manager.create(None, cwd=str(project))
+    events = await chat.finished(await chat.manager.send(session_id, "hello"))
+
+    (done,) = [e for e in events if isinstance(e, ModelCallCompletedEvent)]
+    assert done.data.usage is None
+    assert done.data.stop_reason is None
+
+
+async def test_a_model_call_that_raises_is_recorded_as_failed(
+    database: Database, project: Path
+) -> None:
+    chat = _chat(database, ToolCallingChatModel(replies=[]))
+    session_id = await chat.manager.create(None, cwd=str(project))
+    events = await chat.finished(await chat.manager.send(session_id, "hello"))
+
+    kinds = [event.type for event in events]
+    assert kinds[-2:] == ["model.call.completed", "run.failed"]
+    done = events[-2]
+    assert isinstance(done, ModelCallCompletedEvent)
+    assert done.data.failed
+    assert done.data.usage is None
+    assert isinstance(events[-1], RunFailedEvent)

@@ -258,6 +258,52 @@ class ToolOutputData(BaseModel):
     text: str = Field(min_length=1)
 
 
+class ModelCallStartedData(BaseModel):
+    """A request went to the model.
+
+    ``message_id`` is the assistant reply's id, which identifies the model
+    call. ``index`` counts the calls of this run from 1. ``provider`` and
+    ``model`` are None when the profile does not resolve.
+    """
+
+    model_config = _CONFIG
+
+    message_id: str = Field(min_length=1)
+    index: int = Field(ge=1)
+    profile: str = Field(min_length=1)
+    provider: str | None = None
+    model: str | None = None
+
+
+class TokenUsage(BaseModel):
+    """Tokens one model call used. A field is None when the provider did not report it."""
+
+    model_config = _CONFIG
+
+    input: int | None = Field(default=None, ge=0)
+    output: int | None = Field(default=None, ge=0)
+    cache_read: int | None = Field(default=None, ge=0)
+    cache_write: int | None = Field(default=None, ge=0)
+
+
+class ModelCallCompletedData(BaseModel):
+    """A model call ended.
+
+    ``first_token_ms`` is the time from the request to the first text, and
+    None when no text came. ``latency_ms`` is the time to the end.
+    ``failed`` is true when the call raised or was stopped.
+    """
+
+    model_config = _CONFIG
+
+    message_id: str = Field(min_length=1)
+    usage: TokenUsage | None = None
+    stop_reason: str | None = None
+    first_token_ms: int | None = Field(default=None, ge=0)
+    latency_ms: int = Field(ge=0)
+    failed: bool = False
+
+
 class ToolCompletedData(BaseModel):
     """A tool call finished.
 
@@ -452,6 +498,32 @@ class MessageCompletedEvent(BaseModel):
     ts: str = Field(min_length=1)
     type: Literal["message.completed"]
     data: MessageCompletedData
+
+
+class ModelCallStartedEvent(BaseModel):
+    """The request for one assistant message went to the model."""
+
+    model_config = _CONFIG
+
+    seq: int = Field(ge=1)
+    session_id: str = Field(min_length=1)
+    run_id: str = Field(min_length=1)
+    ts: str = Field(min_length=1)
+    type: Literal["model.call.started"]
+    data: ModelCallStartedData
+
+
+class ModelCallCompletedEvent(BaseModel):
+    """The model call ended. Comes before the call's ``tool.requested`` events."""
+
+    model_config = _CONFIG
+
+    seq: int = Field(ge=1)
+    session_id: str = Field(min_length=1)
+    run_id: str = Field(min_length=1)
+    ts: str = Field(min_length=1)
+    type: Literal["model.call.completed"]
+    data: ModelCallCompletedData
 
 
 class RunStartedEvent(BaseModel):
@@ -664,6 +736,8 @@ EventType = Literal[
     "message.started",
     "message.delta",
     "message.completed",
+    "model.call.started",
+    "model.call.completed",
     "run.started",
     "run.completed",
     "run.failed",
@@ -691,6 +765,8 @@ ChatEvent = Annotated[
     | MessageStartedEvent
     | MessageDeltaEvent
     | MessageCompletedEvent
+    | ModelCallStartedEvent
+    | ModelCallCompletedEvent
     | RunStartedEvent
     | RunCompletedEvent
     | RunFailedEvent
@@ -730,6 +806,10 @@ __all__ = [
     "MessageDeltaEvent",
     "MessageStartedData",
     "MessageStartedEvent",
+    "ModelCallCompletedData",
+    "ModelCallCompletedEvent",
+    "ModelCallStartedData",
+    "ModelCallStartedEvent",
     "ModelSelectedData",
     "ModelSelectedEvent",
     "Ping",
@@ -757,6 +837,7 @@ __all__ = [
     "TodoStatus",
     "TodosUpdatedData",
     "TodosUpdatedEvent",
+    "TokenUsage",
     "ToolCompletedData",
     "ToolCompletedEvent",
     "ToolFailedData",

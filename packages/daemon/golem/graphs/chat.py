@@ -366,6 +366,7 @@ def open_chat(
         # The system message is sent, never returned, so it stays out of the checkpoint.
         sent = messages if system is None else [system, *messages]
         async with _held(router, local, profile):
+            get_stream_writer()({STREAM_KEY: "model.request", "message_id": message_id})
             try:
                 response = await binder.invoke(profile, router.chat_model(profile), sent, tools)
             except Exception as exc:

@@ -7,6 +7,7 @@ from langchain_core.messages import (
 )
 
 from golem.graphs.adapter import (
+    ModelRequested,
     ModelStarted,
     PlainMessage,
     RequestedCall,
@@ -113,3 +114,38 @@ def test_a_reply_with_tool_calls_lists_them() -> None:
     assert plain_messages({"messages": [reply]}) == [
         PlainMessage("assistant", '→ read_file(path="a.py")')
     ]
+
+
+def _completed_update(message: AIMessage) -> dict[str, object]:
+    return {"type": "updates", "data": {"call_model": {"messages": [message]}}}
+
+
+def test_completed_reads_usage_and_anthropic_stop_reason() -> None:
+    message = AIMessage(
+        content="hi",
+        id="m1",
+        usage_metadata={
+            "input_tokens": 10,
+            "output_tokens": 4,
+            "total_tokens": 14,
+            "input_token_details": {"cache_read": 6, "cache_creation": 2},
+        },
+        response_metadata={"stop_reason": "tool_use"},
+    )
+    fact = translate(_completed_update(message))
+    assert isinstance(fact, TextCompleted)
+    assert fact.usage == {"input": 10, "output": 4, "cache_read": 6, "cache_write": 2}
+    assert fact.stop_reason == "tool_use"
+
+
+def test_completed_reads_openai_finish_reason_and_no_usage() -> None:
+    message = AIMessage(content="hi", id="m1", response_metadata={"finish_reason": "stop"})
+    fact = translate(_completed_update(message))
+    assert isinstance(fact, TextCompleted)
+    assert fact.usage is None
+    assert fact.stop_reason == "stop"
+
+
+def test_a_model_request_item_becomes_a_fact() -> None:
+    part = {"type": "custom", "data": {"golem": "model.request", "message_id": "m1"}}
+    assert translate(part) == ModelRequested("m1")

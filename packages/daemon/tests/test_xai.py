@@ -103,6 +103,7 @@ def test_xai_chats_through_its_openai_compatible_api() -> None:
     assert isinstance(model, ChatOpenAI)
     assert model.model_name == "grok-4.3"
     assert model.openai_api_base == "https://api.x.ai/v1"
+    assert model.stream_usage is True
 
 
 async def test_a_recorded_reply_that_calls_a_tool_becomes_a_tool_call() -> None:

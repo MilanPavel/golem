@@ -178,6 +178,10 @@ async def _record(name: str, scenario: Scenario, home: Path) -> dict[str, list[E
         await stop_daemon(app, task)
 
 
+TIMES = ("duration_ms", "elapsed_ms", "first_token_ms", "latency_ms")
+"""Keys of a measured time. Its number is zero in a fixture; a missing one stays null."""
+
+
 def normalize(logs: dict[str, list[Event]], home: Path) -> dict[str, list[Event]]:
     """Replace what varies between runs; one id map and one clock for the whole scenario."""
     ids: dict[str, str] = {}
@@ -200,7 +204,7 @@ def normalize(logs: dict[str, list[Event]], home: Path) -> dict[str, list[Event]
             return [walk(item) for item in cast(list[Any], value)]
         if isinstance(value, dict):
             return {
-                k: 0 if k in ("duration_ms", "elapsed_ms") else walk(v, k)
+                k: 0 if k in TIMES and isinstance(v, int) else walk(v, k)
                 for k, v in cast(dict[str, Any], value).items()
             }
         return value

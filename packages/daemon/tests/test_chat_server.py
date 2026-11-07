@@ -713,7 +713,7 @@ async def test_fork_returns_a_session_whose_replay_is_the_copied_history(short_h
         source = await _open(client)
         await client.call("message.send", {"session_id": source, "text": "hello"})
         await client.wait_for_event("run.completed")
-        reply = _event_data(client.events[-2])
+        reply = _event_data(client.events[-3])
         assert reply["role"] == "assistant"
 
         missing = await client.call("session.fork", {"session_id": source, "at_message_id": "m_x"})
@@ -748,7 +748,7 @@ async def test_list_names_the_session_a_fork_came_from(short_home: Path) -> None
         source = await _open(client)
         await client.call("message.send", {"session_id": source, "text": "hello"})
         await client.wait_for_event("run.completed")
-        reply = _event_data(client.events[-2])
+        reply = _event_data(client.events[-3])
         forked = rpc_result(
             await client.call(
                 "session.fork", {"session_id": source, "at_message_id": reply["message_id"]}
