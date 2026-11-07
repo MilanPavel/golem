@@ -1,4 +1,4 @@
-import { contextLabel, priceLabel, sizeLabel, statusLabel } from "@golem/view";
+import { categoryName, contextLabel, priceLabel, sizeLabel, statusLabel } from "@golem/view";
 import type { ReactNode } from "react";
 import type { ListedModel } from "../../store/models.ts";
 import type { PullEntry } from "../../store/pulls.ts";
@@ -69,6 +69,8 @@ export function ModelRow({ model, providerMissing, current, isDefault, pull, fai
   const facts = [contextLabel(model.ctx), priceLabel(model), sizeLabel(model), statusLabel(model, providerMissing)]
     .filter((part) => part.length > 0)
     .join("  ");
+  // General is what every model is without another mark, so it is left to the filter.
+  const categories = (model.categories ?? []).filter((category) => category !== "general");
   const why = reason(model, providerMissing);
   const ready = model.status === "ready";
   return (
@@ -86,6 +88,11 @@ export function ModelRow({ model, providerMissing, current, isDefault, pull, fai
           <span className={cn("text-sm font-medium", ready ? "text-ink" : "text-muted")}>{label}</span>
           {detail === "" ? null : <span className="font-mono text-xs text-faint">{detail}</span>}
           {isDefault ? <Badge className="px-1.5 py-0">default</Badge> : null}
+          {categories.map((category) => (
+            <Badge key={category} className="px-1.5 py-0 text-faint">
+              {categoryName(category)}
+            </Badge>
+          ))}
         </div>
         {why === null ? null : <p className="mt-0.5 text-xs text-muted">{why}</p>}
         {model.status === "pulling" ? <Progress model={model} entry={pull} /> : null}

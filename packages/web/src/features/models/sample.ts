@@ -20,10 +20,10 @@ export const SAMPLE_LISTING: ModelListResult = {
   ram_gb: 16,
   disk_free_gb: 120,
   models: [
-    model("ollama/qwen3:8b", { label: "Qwen3 8B", source: "installed", profiles: ["local"], price: FREE, size_gb: 5.2, fit: "fits", ctx: 40960 }),
+    model("ollama/qwen3:8b", { label: "Qwen3 8B", source: "installed", profiles: ["local"], categories: ["general", "reasoning"], price: FREE, size_gb: 5.2, fit: "fits", ctx: 40960 }),
     model("anthropic/claude-sonnet-4", { label: "Claude Sonnet 4", source: "profile", status: "needs_key", profiles: ["sonnet"], ctx: 200000, price: { input: 3, output: 15 } }),
-    model("ollama/gemma4:e4b", { label: "Gemma 4 E4B", source: "installed", price: FREE, size_gb: 9.6, fit: "fits", ctx: 131072 }),
-    model("ollama/qwen3:14b", { label: "Qwen3 14B", source: "catalog", status: "not_installed", price: FREE, size_gb: 9.3, fit: "fits", ctx: 40960 }),
+    model("ollama/gemma4:e4b", { label: "Gemma 4 E4B", source: "installed", categories: ["general", "vision", "long-context"], price: FREE, size_gb: 9.6, fit: "fits", ctx: 131072 }),
+    model("ollama/qwen3:14b", { label: "Qwen3 14B", source: "catalog", categories: ["coding"], status: "not_installed", price: FREE, size_gb: 9.3, fit: "fits", ctx: 40960 }),
     model("ollama/qwen3:32b", { label: "Qwen3 32B", source: "catalog", status: "not_installed", price: FREE, size_gb: 20, fit: "too_big", ctx: 40960 }),
     model("ollama/gemma3:12b", { label: "Gemma 3 12B", source: "catalog", status: "not_installed", price: FREE, size_gb: 6.6, fit: "fits", ctx: 131072 }),
     model("openrouter/qwen/qwen3-235b", { label: "Qwen3 235B", price: { input: 0.2, output: 0.6 }, ctx: 131072 }),

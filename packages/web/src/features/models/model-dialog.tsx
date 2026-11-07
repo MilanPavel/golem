@@ -1,4 +1,4 @@
-import { namesModel, pickerGroups, pickerName, providerMissing } from "@golem/view";
+import { namesModel, pickerGroups, pickerName, providerMissing, type Category } from "@golem/view";
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { actionErrorText } from "../../store/errors.ts";
 import type { ListedModel, ModelListResult } from "../../store/models.ts";
@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "../../ui/
 import { IconButton } from "../../ui/icon-button.tsx";
 import { RefreshIcon } from "../../ui/icons.tsx";
 import { resolveActive, SearchList, type SearchListItem } from "../../ui/search-list.tsx";
+import { CategoryChips } from "./category-chips.tsx";
 import { ModelRow } from "./model-row.tsx";
 import { diskText, downloadText, removable, removeText, shortName, tooBigText, withActivePulls } from "./model-text.ts";
 
@@ -54,7 +55,7 @@ export type ModelDialogViewProps = {
   /** Turns show all on or off. Without it the dialog has no such switch. */
   onShowAll?: (on: boolean) => void;
   /** Where the dialog starts, for the gallery. */
-  initial?: { query?: string; activeId?: string; confirm?: ModelConfirm; failure?: string };
+  initial?: { query?: string; category?: Category; activeId?: string; confirm?: ModelConfirm; failure?: string };
 };
 
 type Guard = { busy: boolean; escape: (event: Event) => void };
@@ -101,6 +102,7 @@ function Content({
   const isNew = props.mode === "new";
   const isDefaultMode = props.mode === "default";
   const [query, setQuery] = useState(initial?.query ?? "");
+  const [category, setCategory] = useState<Category | null>(initial?.category ?? null);
   const [activeId, setActiveId] = useState<string | null>(initial?.activeId ?? null);
   const [confirmState, setConfirm] = useState<ModelConfirm | null>(initial?.confirm ?? null);
   const [failure, setFailure] = useState<Failure | null>(
@@ -115,10 +117,10 @@ function Content({
     () =>
       shown === null
         ? []
-        : pickerGroups(shown, query).flatMap((group) =>
+        : pickerGroups(shown, query, category).flatMap((group) =>
             group.models.map((model) => ({ id: model.ref, group: group.title, model })),
           ),
-    [shown, query],
+    [shown, query, category],
   );
   const active = resolveActive(rows, activeId);
   const model = active?.model ?? null;
@@ -218,7 +220,7 @@ function Content({
         </div>
       )
     ) : (
-      <p className="px-3 py-6 text-center text-sm text-muted">{query === "" ? "No models found." : "No matching models."}</p>
+      <p className="px-3 py-6 text-center text-sm text-muted">{query === "" && category === null ? "No models found." : "No matching models."}</p>
     );
 
   return (
@@ -248,8 +250,9 @@ function Content({
           Show all models
         </label>
       )}
+      <CategoryChips className="mt-3" value={category} onChange={setCategory} disabled={busy !== null} />
       <SearchList
-        className="mt-4"
+        className="mt-3"
         listClassName="max-h-64 sm:max-h-96"
         label="Search models"
         placeholder="Search models"
