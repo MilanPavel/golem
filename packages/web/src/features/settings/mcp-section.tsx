@@ -17,16 +17,19 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { actionErrorText } from "../../store/errors.ts";
 import type { McpServer } from "../../store/mcp.ts";
 import { useMcpList, useMcpTools, usePageActions } from "../../store/page-context.tsx";
+import { AddDialog } from "./mcp/add-dialog.tsx";
+import { EditServer } from "./mcp/edit-form.tsx";
 import { LogsView } from "./mcp/logs-view.tsx";
 import { TestView } from "./mcp/test-view.tsx";
 import { TryTool } from "./mcp/try-tool.tsx";
 import { Button } from "../../ui/button.tsx";
 import { cn } from "../../ui/cn.ts";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "../../ui/dialog.tsx";
-import { useSettingsContext } from "./context.ts";
+import { useSettingsContext, useSettingsFolder } from "./context.ts";
+import { mcpAddRequestStore, useMcpAddRequest } from "./mcp-add-request.ts";
 
 type Selected = { name: string; project: string | null };
-type View = { kind: "list" } | { kind: "detail" | "tools" | "test" | "logs"; at: Selected };
+type View = { kind: "list" } | { kind: "detail" | "tools" | "test" | "logs" | "edit"; at: Selected };
 
 const TONE = { ok: "text-allow", bad: "text-deny", wait: "text-wait", off: "text-faint" } as const;
 const DEFAULT_FILE = "~/.golem/config.toml";
@@ -44,7 +47,11 @@ export function McpSection() {
   const context = useSettingsContext();
   const sessionId = context?.sessionId ?? null;
   const list = useMcpList(sessionId);
+  const folder = useSettingsFolder();
   const [view, setView] = useState<View>({ kind: "list" });
+  const [adding, setAdding] = useState<{ id: string | null } | null>(null);
+  const [added, setAdded] = useState<string | null>(null);
+  const request = useMcpAddRequest();
   const rows = useRef(new Map<string, HTMLButtonElement>());
   /** The row to give focus back to when the list shows again. */
   const back = useRef<string | null>(null);
@@ -59,6 +66,25 @@ export function McpSection() {
     back.current = null;
   }, [view]);
 
+  // `/mcp add` in a chat asks for the dialog through the request store; closing it takes the request.
+  const wanted = adding ?? request;
+  const closeAdd = (): void => {
+    setAdding(null);
+    mcpAddRequestStore.set(null);
+  };
+  const dialog = (
+    <AddDialog
+      open={wanted !== null}
+      onOpenChange={(open) => (open ? undefined : closeAdd())}
+      sessionId={sessionId}
+      folder={folder}
+      initial={wanted?.id ?? null}
+      onAdded={(name) => {
+        closeAdd();
+        setAdded(name);
+      }}
+    />
+  );
   if (list.isError) {
     return (
       <div className="flex flex-col items-start gap-2">
@@ -79,11 +105,16 @@ export function McpSection() {
   const server = at === null ? undefined : servers.find((item) => same(item, at));
   if (view.kind === "list" || server === undefined) {
     return (
-      <ServerList
-        servers={servers}
-        register={register}
-        onOpen={(item) => setView({ kind: "detail", at: { name: item.name, project: item.project ?? null } })}
-      />
+      <>
+        <ServerList
+          servers={servers}
+          register={register}
+          added={added}
+          onAdd={() => setAdding({ id: null })}
+          onOpen={(item) => setView({ kind: "detail", at: { name: item.name, project: item.project ?? null } })}
+        />
+        {dialog}
+      </>
     );
   }
   const leave = (): void => {
@@ -91,6 +122,9 @@ export function McpSection() {
     setView({ kind: "list" });
   };
   const toDetail = (): void => setView({ kind: "detail", at: view.at });
+  if (view.kind === "edit") {
+    return <EditServer server={server} sessionId={sessionId} onBack={toDetail} onSaved={toDetail} />;
+  }
   if (view.kind === "tools") {
     return <ToolsView server={server} sessionId={sessionId} onBack={toDetail} />;
   }
@@ -113,17 +147,32 @@ export function McpSection() {
 function ServerList({
   servers,
   register,
+  added,
+  onAdd,
   onOpen,
 }: {
   servers: readonly McpServer[];
   register: (key: string, node: HTMLButtonElement | null) => void;
+  added: string | null;
+  onAdd: () => void;
   onOpen: (server: McpServer) => void;
 }) {
+  const addButton = (
+    <div className="flex flex-wrap items-center gap-3">
+      <Button kind="primary" onClick={onAdd}>
+        Add a server
+      </Button>
+      <p role="status" aria-live="polite" className="font-mono text-xs text-muted">
+        {added === null ? null : `added ${added}`}
+      </p>
+    </div>
+  );
   if (servers.length === 0) {
     return (
       <div className="flex flex-col gap-2">
         <p className="text-sm text-muted">0 servers</p>
         <p className="text-sm text-muted">{MCP_HINT}</p>
+        {addButton}
       </div>
     );
   }
@@ -139,6 +188,7 @@ function ServerList({
       <p className="text-sm text-muted">
         {servers.length} {servers.length === 1 ? "server" : "servers"}
       </p>
+      {addButton}
       {groups.map((group) => (
         <section key={group.project ?? ""} aria-label={group.project === null ? "Yours" : "This project"} className="flex flex-col gap-2">
           <h3 className="text-sm font-semibold">
@@ -187,7 +237,7 @@ function Fact({ label, children }: { label: string; children: React.ReactNode })
   );
 }
 
-function Detail({ server, sessionId, onBack, onOpen }: { server: McpServer; sessionId: string | null; onBack: () => void; onOpen: (screen: "tools" | "test" | "logs") => void }) {
+function Detail({ server, sessionId, onBack, onOpen }: { server: McpServer; sessionId: string | null; onBack: () => void; onOpen: (screen: "tools" | "test" | "logs" | "edit") => void }) {
   const actions = usePageActions();
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -296,6 +346,11 @@ function Detail({ server, sessionId, onBack, onOpen }: { server: McpServer; sess
         </p>
       )}
       <div className="flex flex-wrap gap-2">
+        {server.project != null && sessionId === null ? null : (
+          <Button kind="secondary" onClick={() => onOpen("edit")}>
+            Edit
+          </Button>
+        )}
         {choices.map((choice) => (
           <Button key={choice.label} kind={choice.action === "ask-remove" ? "danger" : "secondary"} onClick={() => press(choice)}>
             {choice.label}

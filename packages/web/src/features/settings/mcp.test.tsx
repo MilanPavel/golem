@@ -449,3 +449,237 @@ test("axe finds nothing on the tools, the try dialog, the test, and the log, in 
     unmount();
   }
 });
+
+const detailOf = (server: McpServer, config: Record<string, unknown>) => ({ config, path: server.config ?? "", scope: "user" as const, secrets: [], server }) as never;
+
+test("Edit shows the config as a form, and Save sends the change with a stored secret kept as it is", async () => {
+  const { fake, user } = mount("/settings/mcp", [git]);
+  fake.raw.mcpGet.mockResolvedValue(
+    detailOf(git, { command: "mcp-server-git", args: ["--repository", "/Users/me/repo"], env: { TOKEN: "keychain:mcp/git-token", MODE: "fast" }, timeout_seconds: 30 }),
+  );
+  await user.click(await screen.findByRole("button", { name: GIT_ROW }));
+  await user.click(screen.getByRole("button", { name: "Edit" }));
+  const command = await screen.findByLabelText("Command");
+  expect((command as HTMLInputElement).value).toBe("mcp-server-git --repository /Users/me/repo");
+  expect((screen.getByLabelText("variable 1 value") as HTMLInputElement).placeholder).toContain("stored in the Keychain");
+  await user.clear(screen.getByLabelText("Timeout (seconds)"));
+  await user.type(screen.getByLabelText("Timeout (seconds)"), "60");
+  await user.click(screen.getByRole("button", { name: "Save" }));
+  expect(fake.raw.updateMcpServer).toHaveBeenCalledTimes(1);
+  const sent = fake.raw.updateMcpServer.mock.calls[0]![0];
+  expect(sent.name).toBe("git");
+  expect(sent.config.timeout_seconds).toBe(60);
+  expect(sent.config.env).toEqual({ TOKEN: "keychain:mcp/git-token", MODE: "fast" });
+  expect(sent.secrets).toBeUndefined();
+  expect(await screen.findByRole("heading", { name: "git" })).toBeTruthy();
+});
+
+test("Edit replaces a secret only when a new one is typed, and says what is wrong before sending", async () => {
+  const { fake, user } = mount("/settings/mcp", [git]);
+  fake.raw.mcpGet.mockResolvedValue(detailOf(git, { command: "x", env: { TOKEN: "keychain:mcp/git-token" } }));
+  await user.click(await screen.findByRole("button", { name: GIT_ROW }));
+  await user.click(screen.getByRole("button", { name: "Edit" }));
+  await user.type(await screen.findByLabelText("variable 1 value"), "s3cret");
+  await user.clear(screen.getByLabelText("Command"));
+  await user.click(screen.getByRole("button", { name: "Save" }));
+  expect((await screen.findByRole("alert")).textContent).toBe("Type a command or an https:// URL.");
+  expect(fake.raw.updateMcpServer).not.toHaveBeenCalled();
+  await user.type(screen.getByLabelText("Command"), "x");
+  await user.click(screen.getByRole("button", { name: "Save" }));
+  expect(fake.raw.updateMcpServer.mock.calls[0]![0].secrets).toEqual({ "mcp/git-token": "s3cret" });
+});
+
+test("a refused save shows the daemon's message and keeps the form", async () => {
+  const { fake, user } = mount("/settings/mcp", [git]);
+  fake.raw.mcpGet.mockResolvedValue(detailOf(git, { command: "x" }));
+  fake.raw.updateMcpServer.mockRejectedValue(new Error("the file changed"));
+  await user.click(await screen.findByRole("button", { name: GIT_ROW }));
+  await user.click(screen.getByRole("button", { name: "Edit" }));
+  await user.click(await screen.findByRole("button", { name: "Save" }));
+  expect((await screen.findByRole("alert")).textContent).toContain("the file changed");
+  expect(screen.getByLabelText("Command")).toBeTruthy();
+});
+
+test("a project's server has no Edit without a session, and has it with one", async () => {
+  const first = mount("/settings/mcp", [mine]);
+  await first.user.click(await screen.findByRole("button", { name: DB_ROW }));
+  expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
+  first.unmount();
+  mount("/settings/mcp", [mine], "s1");
+  await userEvent.setup().click(await screen.findByRole("button", { name: DB_ROW }));
+  expect(screen.getByRole("button", { name: "Edit" })).toBeTruthy();
+});
+
+const FILES = {
+  id: "filesystem",
+  name: "filesystem",
+  title: "Filesystem",
+  description: "Read and write files in a folder.",
+  category: "files",
+  homepage: "https://example.com/fs",
+  runtime: "npx",
+  auth: "none",
+  inputs: [{ id: "folder", kind: "path", label: "Folder", default: "{folder}", required: true }],
+} as const;
+const GITHUB = {
+  id: "github",
+  name: "github",
+  title: "GitHub",
+  description: "Issues and pull requests.",
+  category: "code",
+  homepage: "https://example.com/gh",
+  runtime: "url",
+  auth: "token",
+  inputs: [{ id: "token", kind: "secret", label: "Token", hint: "A personal access token." }],
+} as const;
+const NEEDS_NODE = { ...FILES, id: "memory", name: "memory", title: "Memory", description: "Remember things.", category: "other", inputs: [], available: true, missing: "node" } as const;
+
+test("Add lists what golem offers by category, searches it, and greys out what cannot be added", async () => {
+  const { fake, user } = mount("/settings/mcp", [git]);
+  fake.raw.mcpCatalog.mockResolvedValue({ entries: [FILES, GITHUB, { ...NEEDS_NODE, available: false, reason: "Needs sign-in." }, { ...FILES, id: "done", title: "Done", added: true }] as never });
+  await user.click(await screen.findByRole("button", { name: "Add a server" }));
+  const dialog = await screen.findByRole("dialog");
+  expect(await within(dialog).findByRole("region", { name: "Files" })).toBeTruthy();
+  expect(within(dialog).getByRole("region", { name: "Code" })).toBeTruthy();
+  expect((within(dialog).getByRole("button", { name: /Memory/ }) as HTMLButtonElement).disabled).toBe(true);
+  expect(within(dialog).getByText(/Needs sign-in\./)).toBeTruthy();
+  expect((within(dialog).getByRole("button", { name: /Done/ }) as HTMLButtonElement).disabled).toBe(true);
+  await user.type(within(dialog).getByRole("textbox", { name: "Search the list" }), "pull");
+  expect(within(dialog).queryByRole("region", { name: "Files" })).toBeNull();
+  expect(within(dialog).getByRole("button", { name: /GitHub/ })).toBeTruthy();
+  await user.clear(within(dialog).getByRole("textbox", { name: "Search the list" }));
+  await user.type(within(dialog).getByRole("textbox", { name: "Search the list" }), "zzz");
+  expect(within(dialog).getByText(/Nothing in the list matches/)).toBeTruthy();
+});
+
+test("adding a catalog server fills the folder, keeps the token apart, tests the draft, and saves", async () => {
+  const { fake, user } = mount("/settings/mcp", [git], "s1");
+  fake.raw.mcpCatalog.mockResolvedValue({ entries: [FILES, GITHUB] as never });
+  await user.click(await screen.findByRole("button", { name: "Add a server" }));
+  await user.click(await screen.findByRole("button", { name: /Filesystem/ }));
+  const folder = screen.getByLabelText("Folder") as HTMLInputElement;
+  expect(folder.value).toBe("/work/app");
+  await user.clear(folder);
+  await user.type(folder, "/work/other");
+  await user.click(screen.getByRole("button", { name: "Test" }));
+  await waitFor(() => expect(fake.raw.mcpTest).toHaveBeenCalled());
+  expect(fake.raw.mcpTest.mock.calls[0]![0]).toMatchObject({ catalogId: "filesystem", inputs: { folder: "/work/other" }, name: "filesystem" });
+  await user.click(screen.getByRole("button", { name: "Add" }));
+  await waitFor(() => expect(fake.raw.addMcpServer).toHaveBeenCalled());
+  expect(fake.raw.addMcpServer.mock.calls[0]![0]).toEqual({ name: "filesystem", catalog_id: "filesystem", inputs: { folder: "/work/other" }, secrets: {} });
+  expect(await screen.findByText("added filesystem")).toBeTruthy();
+  expect(screen.queryByRole("dialog")).toBeNull();
+});
+
+test("a secret input is hidden and goes in secrets, and a missing one is named", async () => {
+  const { fake, user } = mount("/settings/mcp", [git]);
+  fake.raw.mcpCatalog.mockResolvedValue({ entries: [GITHUB] as never });
+  await user.click(await screen.findByRole("button", { name: "Add a server" }));
+  await user.click(await screen.findByRole("button", { name: /GitHub/ }));
+  const token = screen.getByLabelText("Token") as HTMLInputElement;
+  expect(token.type).toBe("password");
+  await user.click(screen.getByRole("button", { name: "Add" }));
+  expect((await screen.findByRole("alert")).textContent).toBe("Token is needed.");
+  expect(fake.raw.addMcpServer).not.toHaveBeenCalled();
+  await user.type(token, "ghp_abc");
+  await user.click(screen.getByRole("button", { name: "Add" }));
+  await waitFor(() => expect(fake.raw.addMcpServer).toHaveBeenCalled());
+  expect(fake.raw.addMcpServer.mock.calls[0]![0]).toMatchObject({ catalog_id: "github", inputs: {}, secrets: { token: "ghp_abc" } });
+});
+
+test("a refused add shows the daemon's message and keeps the dialog", async () => {
+  const { fake, user } = mount("/settings/mcp", [git]);
+  fake.raw.mcpCatalog.mockResolvedValue({ entries: [FILES] as never });
+  fake.raw.addMcpServer.mockRejectedValue(new Error("filesystem is already there"));
+  await user.click(await screen.findByRole("button", { name: "Add a server" }));
+  await user.click(await screen.findByRole("button", { name: /Filesystem/ }));
+  await user.type(screen.getByLabelText("Folder"), "/x");
+  await user.click(screen.getByRole("button", { name: "Add" }));
+  expect((await screen.findByRole("alert")).textContent).toContain("filesystem is already there");
+  expect(screen.getByRole("dialog")).toBeTruthy();
+});
+
+test("another server takes a name and a command or URL, shows what will run, tests it, and saves it", async () => {
+  const { fake, user } = mount("/settings/mcp", [git]);
+  fake.raw.mcpCatalog.mockResolvedValue({ entries: [FILES] as never });
+  await user.click(await screen.findByRole("button", { name: "Add a server" }));
+  await user.click(await screen.findByRole("button", { name: /Another server/ }));
+  await user.type(screen.getByLabelText("Name"), "mine");
+  await user.click(screen.getByRole("button", { name: "Add" }));
+  expect((await screen.findByRole("alert")).textContent).toBe("Type a command or an https:// URL.");
+  await user.type(screen.getByLabelText("Command or URL"), "npx -y @x/server 'a b'");
+  expect(screen.getByText("npx -y @x/server 'a b'")).toBeTruthy();
+  expect(screen.getByText("golem will run this on your Mac.")).toBeTruthy();
+  await user.click(screen.getByRole("button", { name: "Test" }));
+  await waitFor(() => expect(fake.raw.mcpTest).toHaveBeenCalled());
+  expect(fake.raw.mcpTest.mock.calls[0]![0]).toMatchObject({ config: { command: "npx", args: ["-y", "@x/server", "a b"] } });
+  await user.click(screen.getByRole("button", { name: "Add" }));
+  await waitFor(() => expect(fake.raw.addMcpServer).toHaveBeenCalled());
+  expect(fake.raw.addMcpServer.mock.calls[0]![0]).toEqual({ name: "mine", command: "npx", args: ["-y", "@x/server", "a b"] });
+});
+
+test("a URL says golem will connect, and a bad name is refused", async () => {
+  const { fake, user } = mount("/settings/mcp", [git]);
+  fake.raw.mcpCatalog.mockResolvedValue({ entries: [] });
+  await user.click(await screen.findByRole("button", { name: "Add a server" }));
+  await user.click(await screen.findByRole("button", { name: /Another server/ }));
+  await user.type(screen.getByLabelText("Name"), "-bad");
+  expect(screen.getByText(/Use letters, digits, and dashes/)).toBeTruthy();
+  await user.type(screen.getByLabelText("Command or URL"), "https://x.example/mcp");
+  expect(screen.getByText("golem will connect to this address.")).toBeTruthy();
+  await user.click(screen.getByRole("button", { name: "Add" }));
+  expect(fake.raw.addMcpServer).not.toHaveBeenCalled();
+});
+
+test("a server that needs Node offers to install it, shows the output, and adds only once it is there", async () => {
+  const { fake, user } = mount("/settings/mcp", [git]);
+  fake.raw.mcpCatalog.mockResolvedValue({ entries: [NEEDS_NODE] as never });
+  await user.click(await screen.findByRole("button", { name: "Add a server" }));
+  await user.click(await screen.findByRole("button", { name: /Memory/ }));
+  expect((screen.getByRole("button", { name: "Add" }) as HTMLButtonElement).disabled).toBe(true);
+  await user.click(screen.getByRole("button", { name: "Install Node" }));
+  expect(fake.raw.installRuntime).toHaveBeenCalledWith("node");
+  act(() => {
+    fake.emitRuntime({ kind: "output", name: "node", text: "==> Downloading node\n" });
+  });
+  await waitFor(() => expect(within(screen.getByRole("dialog")).getByText(/Downloading node/)).toBeTruthy());
+  fake.raw.mcpCatalog.mockResolvedValue({ entries: [{ ...NEEDS_NODE, missing: null }] as never });
+  act(() => {
+    fake.emitRuntime({ kind: "done", done: { name: "node", ok: true } });
+  });
+  await waitFor(() => expect((screen.getByRole("button", { name: "Add" }) as HTMLButtonElement).disabled).toBe(false));
+  expect(screen.queryByRole("button", { name: "Install Node" })).toBeNull();
+});
+
+test("a failed install says why", async () => {
+  const { fake, user } = mount("/settings/mcp", [git]);
+  fake.raw.mcpCatalog.mockResolvedValue({ entries: [NEEDS_NODE] as never });
+  await user.click(await screen.findByRole("button", { name: "Add a server" }));
+  await user.click(await screen.findByRole("button", { name: /Memory/ }));
+  await user.click(screen.getByRole("button", { name: "Install Node" }));
+  act(() => {
+    fake.emitRuntime({ kind: "done", done: { name: "node", ok: false, error: "brew is not installed" } });
+  });
+  expect((await screen.findByRole("alert")).textContent).toContain("brew is not installed");
+});
+
+test("axe finds nothing on the edit form, the list of servers to add, and the add forms, in both themes", async () => {
+  for (const theme of ["slip", "kiln"]) {
+    const { fake, user, unmount } = mount("/settings/mcp", [git]);
+    document.documentElement.dataset.theme = theme;
+    fake.raw.mcpGet.mockResolvedValue(detailOf(git, { command: "x", env: { A: "keychain:mcp/git-a", B: "b" } }));
+    fake.raw.mcpCatalog.mockResolvedValue({ entries: [FILES, GITHUB] as never });
+    await user.click(await screen.findByRole("button", { name: GIT_ROW }));
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+    await screen.findByLabelText("Command");
+    expect((await axe.run(document.body, noContrast)).violations).toEqual([]);
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await user.click(screen.getByRole("button", { name: "Back" }));
+    await user.click(screen.getByRole("button", { name: "Add a server" }));
+    await screen.findByRole("region", { name: "Files" });
+    expect((await axe.run(document.body, noContrast)).violations).toEqual([]);
+    await user.click(screen.getByRole("button", { name: /GitHub/ }));
+    expect((await axe.run(document.body, noContrast)).violations).toEqual([]);
+    unmount();
+  }
+});
