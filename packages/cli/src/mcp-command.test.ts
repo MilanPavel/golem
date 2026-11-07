@@ -119,3 +119,38 @@ test("export refuses an unknown format, scope, or word", () => {
   assert.match(message(["export", "--all"]), /unknown option --all/);
   assert.match(message(["export", "github"]), /unexpected github/);
 });
+
+test("list, show, test, logs, enable, disable, restart, and tools read their words", () => {
+  assert.deepEqual(parseMcpArgs(["list"]), { kind: "list", json: false });
+  assert.deepEqual(parseMcpArgs(["list", "--json"]), { kind: "list", json: true });
+  assert.deepEqual(parseMcpArgs(["show", "git", "--json"]), { kind: "show", name: "git", json: true });
+  assert.deepEqual(parseMcpArgs(["test", "git"]), { kind: "test", name: "git" });
+  assert.deepEqual(parseMcpArgs(["logs", "git", "-f"]), { kind: "logs", name: "git", follow: true });
+  assert.deepEqual(parseMcpArgs(["logs", "--follow", "git"]), { kind: "logs", name: "git", follow: true });
+  assert.deepEqual(parseMcpArgs(["enable", "git", "--on-demand"]), { kind: "enable", name: "git", onDemand: true });
+  assert.deepEqual(parseMcpArgs(["enable", "git"]), { kind: "enable", name: "git", onDemand: false });
+  assert.deepEqual(parseMcpArgs(["disable", "git"]), { kind: "disable", name: "git" });
+  assert.deepEqual(parseMcpArgs(["restart", "git"]), { kind: "restart", name: "git" });
+  assert.deepEqual(parseMcpArgs(["tools", "git"]), { kind: "tools", name: "git", hide: [], show: [] });
+  assert.deepEqual(parseMcpArgs(["tools", "git", "--hide", "a_*", "--hide", "b", "--show", "c"]), {
+    kind: "tools",
+    name: "git",
+    hide: ["a_*", "b"],
+    show: ["c"],
+  });
+});
+
+test("these commands refuse a missing name, a stray word, and an option they do not have", () => {
+  const message = (words: string[]): string => {
+    const parsed = parseMcpArgs(words);
+    assert.equal(parsed.kind, "error");
+    return parsed.kind === "error" ? parsed.message : "";
+  };
+  assert.match(message(["show"]), /usage: golem mcp show <name>/);
+  assert.match(message(["list", "git"]), /unexpected git/);
+  assert.match(message(["show", "a", "b"]), /unexpected b/);
+  assert.match(message(["disable", "git", "--on-demand"]), /unknown option --on-demand/);
+  assert.match(message(["tools", "git", "--hide"]), /needs a pattern/);
+  assert.match(message(["tools", "git", "--hide", "--show", "x"]), /needs a pattern/);
+  assert.match(message(["nope"]), /usage: golem mcp list/);
+});

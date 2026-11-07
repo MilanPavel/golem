@@ -1012,6 +1012,93 @@ test("mcp.get returns one server's config, and a malformed result is refused", a
   }
 });
 
+test("mcp.test streams its steps to the caller and ignores another test's", async () => {
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: { "mcp.test": { test_id: "ignored", ok: true, steps: [{ step: "resolve", state: "ok" }] } },
+      onRequest: (current, method, params) => {
+        if (method !== "mcp.test") return;
+        const id = (params as { test_id: string }).test_id;
+        write(current, { jsonrpc: "2.0", method: "mcp.test.progress", params: { test_id: "other", step: "spawn", state: "ok" } });
+        write(current, { jsonrpc: "2.0", method: "mcp.test.progress", params: { test_id: id, step: "resolve", state: "ok", elapsed_ms: 4 } });
+        write(current, { jsonrpc: "2.0", method: "mcp.test.progress", params: { test_id: id, step: "bogus", state: "ok" } });
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    const seen: string[] = [];
+    const result = await client.mcpTest({ name: "github" }, (progress) => seen.push(`${progress.step}:${progress.state}`));
+    assert.equal(result.ok, true);
+    assert.deepEqual(seen, ["resolve:ok"]);
+  } finally {
+    client.close();
+    await server.close();
+  }
+});
+
+test("mcp.logs returns the lines, and new ones reach onMcpLog", async () => {
+  const sent: Record<string, unknown>[] = [];
+  const line = { ts: 1, kind: "stderr", text: "hello" };
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: { "mcp.logs": { name: "git", lines: [line] } },
+      onRequest: (current, method, params) => {
+        if (method !== "mcp.logs") return;
+        sent.push(params);
+        write(current, { jsonrpc: "2.0", method: "mcp.server.log", params: { name: "git", lines: [{ ts: 2, kind: "event", text: "restarted" }] } });
+        write(current, { jsonrpc: "2.0", method: "mcp.server.log", params: { name: "git", lines: [{ ts: 3, kind: "other", text: "x" }] } });
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    const live: string[] = [];
+    const stop = client.onMcpLog((batch) => live.push(...batch.lines.map((each) => each.text)));
+    const logs = await client.mcpLogs("git", { limit: 20 });
+    assert.deepEqual(logs.lines, [line]);
+    assert.deepEqual(sent, [{ name: "git", limit: 20 }]);
+    assert.deepEqual(live, ["restarted"]);
+    stop();
+  } finally {
+    client.close();
+    await server.close();
+  }
+});
+
+test("mcp.update sends the whole config and keeps its secrets off the wire log", async () => {
+  const sent: Record<string, unknown>[] = [];
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: { "mcp.update": { name: "git", state: "starting", command: "uvx x", tools: [] } },
+      onRequest: (_socket, method, params) => {
+        if (method === "mcp.update") sent.push(params);
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
+  let shown = "";
+  client.onWire((lines) => {
+    shown = lines.map(formatWireLine).join("\n");
+  });
+  try {
+    const updated = await client.updateMcpServer({
+      name: "git",
+      config: { command: "uvx", tools: { exclude: ["drop_*"] } },
+      secrets: { "mcp/git": "ghp-very-secret" },
+    });
+    assert.equal(updated.name, "git");
+    assert.deepEqual((sent[0]?.["config"] as { tools: unknown }).tools, { exclude: ["drop_*"] });
+    assert.ok(!shown.includes("ghp-very-secret"));
+  } finally {
+    client.close();
+    await server.close();
+  }
+});
+
 test("runtime.install starts, and its output and end reach onRuntimeInstall", async () => {
   const server = await listen((socket) => {
     attach(socket, {
