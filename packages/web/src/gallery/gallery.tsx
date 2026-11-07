@@ -33,6 +33,7 @@ import { ModelDialogView, type ModelDialogViewProps } from "../features/models/i
 import { SetupDialogView } from "../features/setup/index.ts";
 import { SETUP_CASES } from "../features/setup/sample.ts";
 import { panelView } from "../features/setup/setup-ui.ts";
+import { PullStatusView, pullSummary } from "../features/models/index.ts";
 import { NO_OLLAMA_LISTING, OLLAMA_DOWN_LISTING, SAMPLE_LISTING, SAMPLE_PULLS } from "../features/models/sample.ts";
 import { CloseSessionDialog, RenameField, SidebarView } from "../features/sessions/index.ts";
 import { faviconHref, tabTitle } from "../features/tab-status/index.ts";
@@ -373,6 +374,38 @@ function ModelDialogDemo({ theme }: { theme: string }) {
   );
 }
 
+const SAMPLE_ENTRY = [...SAMPLE_PULLS.active.values()][0]!;
+const SAMPLE_LABELS = new Map([
+  ["ollama/gemma3:12b", "Gemma 3 12B"],
+  ["ollama/qwen3:14b", "Qwen3 14B"],
+]);
+const DOWNLOAD_ROWS = [
+  { label: "One download", summary: pullSummary(SAMPLE_PULLS.active, new Map(), SAMPLE_LABELS) },
+  {
+    label: "Two downloads",
+    summary: pullSummary(
+      new Map([...SAMPLE_PULLS.active, ["ollama/qwen3:14b", { ...SAMPLE_ENTRY, track: { ...SAMPLE_ENTRY.track, completed: 900_000_000, total: 9_300_000_000 } }]]),
+      new Map(),
+      SAMPLE_LABELS,
+    ),
+  },
+  { label: "Failed", summary: pullSummary(new Map(), SAMPLE_PULLS.failed, SAMPLE_LABELS) },
+] as const;
+
+/** The sidebar's download row in each state it can show. */
+function DownloadRowDemo() {
+  return (
+    <div className="flex flex-wrap gap-4">
+      {DOWNLOAD_ROWS.map(({ label, summary }) => (
+        <div key={label} className="flex w-sidebar flex-col gap-2 rounded-lg border border-line bg-sunken p-2.5">
+          <span className="font-mono text-xs text-faint">{label}</span>
+          <PullStatusView summary={summary} announcement="" onOpen={() => {}} onDismiss={() => {}} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /** The setup window in each state the page draws it. */
 function SetupDemo({ theme }: { theme: string }) {
   const [shown, setShown] = useState<string | null>(null);
@@ -458,6 +491,11 @@ function Panel({ theme }: { theme: "slip" | "kiln" }) {
             onSearch={() => {}}
           />
         </div>
+      </section>
+
+      <section className="mt-6">
+        <h3 className="mb-2 font-mono text-xs text-faint">Download row</h3>
+        <DownloadRowDemo />
       </section>
 
       <section className="mt-6">

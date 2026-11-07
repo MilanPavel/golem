@@ -10,6 +10,14 @@ const picker = (page: Page) => page.getByRole("dialog", { name: "Choose a model"
 const search = (page: Page) => picker(page).getByRole("combobox", { name: "Search models" });
 const downloadBar = (page: Page) => picker(page).getByRole("progressbar", { name: `Downloading ${NAME}` });
 
+/** Esc clears a question, then the search, then closes: press it until the dialog is gone. */
+async function closePicker(page: Page): Promise<void> {
+  await expect(async () => {
+    await page.keyboard.press("Escape");
+    await expect(picker(page)).toBeHidden({ timeout: 500 });
+  }).toPass({ timeout: 5_000 });
+}
+
 /** A session with one answer, and the model picker open and searched for the stub's model. */
 async function openPicker(page: Page, stack: Stack): Promise<void> {
   stack.model.reply("Done.");
@@ -57,4 +65,22 @@ test("a download started from the page asks first, then shows its bar", async ({
   await expect(downloadBar(page)).toBeHidden();
   await expect(picker(page).getByRole("button", { name: "In use" })).toBeVisible();
   expect(stack.ollama?.pulls).toEqual([NAME]);
+});
+
+test("a download shows in the sidebar after the dialog is closed, and goes when it ends", async ({ page, rig }) => {
+  const stack = await startStack(rig, { ollama: {} });
+  await openPicker(page, stack);
+  stack.ollama?.holdPulls();
+  await picker(page).getByRole("button", { name: "Download", exact: true }).click();
+  const confirm = picker(page).getByRole("group", { name: "Confirm" });
+  await confirm.getByRole("button", { name: "Download", exact: true }).click();
+  await expect(downloadBar(page)).toBeVisible();
+  await closePicker(page);
+  const row = page.getByRole("complementary", { name: "Sessions" }).getByRole("button", { name: /^Downloading / });
+  await expect(row).toBeVisible();
+  await row.click();
+  await expect(picker(page)).toBeVisible();
+  await closePicker(page);
+  stack.ollama?.releasePulls();
+  await expect(row).toBeHidden();
 });
