@@ -85,4 +85,15 @@ MIGRATIONS: tuple[tuple[str, ...], ...] = (
     ),
     ("ALTER TABLE sessions ADD COLUMN mcp_servers TEXT",),
     ("ALTER TABLE sessions ADD COLUMN skills TEXT",),
+    (
+        """
+        CREATE TABLE blobs (
+            sha256 TEXT PRIMARY KEY,
+            kind TEXT NOT NULL,
+            size INTEGER NOT NULL,
+            created_at TEXT NOT NULL,
+            text TEXT NOT NULL
+        )
+        """,
+    ),
 )

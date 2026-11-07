@@ -10,6 +10,7 @@ where to cut a thread's history.
 
 from __future__ import annotations
 
+import json
 import logging
 from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable, Mapping, Sequence
 from contextlib import AbstractAsyncContextManager, aclosing, nullcontext
@@ -338,6 +339,7 @@ def open_chat(
     artifacts: Artifacts | None = None,
     local: LocalServers | None = None,
     prompt: SystemPrompt | None = None,
+    blobs: Blobs | None = None,
 ) -> ChatRuntime:
     """Compile the chat graph against ``checkpointer``.
 
@@ -346,7 +348,8 @@ def open_chat(
     big tool output is cut instead of stored. With ``local``, a model call to
     an Ollama on this machine starts it first, and holds it while it answers.
     ``prompt`` builds the system prompt for each model call. It defaults to
-    none, so the model sees only the stored history.
+    none, so the model sees only the stored history. With ``blobs``, each model
+    call stores its system prompt and tool schemas there, and reports their hashes.
     """
     registry = default_registry() if tools is None else tools
     rules = Policy(None) if policy is None else policy
@@ -361,14 +364,23 @@ def open_chat(
         scope = scope_of(config)
         await registry.prepare(scope)
         tools = registry.scoped(scope)
+        schemas = tools.schemas()
         context = PromptContext(state, _cwd(config), _pinned(config), get_stream_writer())
         system = system_prompt.message(context)
         # The system message is sent, never returned, so it stays out of the checkpoint.
         sent = messages if system is None else [system, *messages]
         async with _held(router, local, profile):
-            get_stream_writer()({STREAM_KEY: "model.request", "message_id": message_id})
+            request: dict[str, object] = {STREAM_KEY: "model.request", "message_id": message_id}
+            request["message_ids"] = [m.id for m in messages if m.id]
+            if blobs is not None:
+                if system is not None and isinstance(system.content, str):
+                    request["system_prompt_sha"] = await blobs.put("system_prompt", system.content)
+                if schemas and binder.offers(profile):
+                    text = json.dumps(schemas, sort_keys=True, separators=(",", ":"))
+                    request["tools_sha"] = await blobs.put("tools", text)
+            get_stream_writer()(request)
             try:
-                response = await binder.invoke(profile, router.chat_model(profile), sent, tools)
+                response = await binder.invoke(profile, router.chat_model(profile), sent, schemas)
             except Exception as exc:
                 down = router.unreachable(profile, exc)
                 if down is None:
@@ -396,6 +408,12 @@ def open_chat(
     )
 
 
+class Blobs(Protocol):
+    """Keeps text by its hash. ``put`` returns the sha256 hex of ``text``."""
+
+    async def put(self, kind: str, text: str) -> str: ...
+
+
 class _ToolBinder:
     """Offers the session's tools to each model that takes them, on every call.
 
@@ -407,14 +425,17 @@ class _ToolBinder:
     def __init__(self) -> None:
         self._refused: set[str] = set()
 
+    def offers(self, profile: str) -> bool:
+        """Whether ``profile`` is still offered tools, as far as is known."""
+        return profile not in self._refused
+
     async def invoke(
         self,
         profile: str,
         model: BaseChatModel,
         messages: Sequence[BaseMessage],
-        tools: ToolRegistry,
+        schemas: list[dict[str, object]],
     ) -> AIMessage:
-        schemas = tools.schemas()
         if schemas and profile not in self._refused:
             try:
                 bound = model.bind_tools(schemas)

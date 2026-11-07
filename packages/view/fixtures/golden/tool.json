@@ -51,9 +51,14 @@
       "data": {
         "index": 1,
         "message_id": "id-4",
+        "message_ids": [
+          "id-3"
+        ],
         "model": null,
         "profile": "remote",
-        "provider": null
+        "provider": null,
+        "system_prompt_sha": null,
+        "tools_sha": "310002311a2a5a2409ce7ef36bd1231772ad4a573e63572c677e4673b6356342"
       },
       "run_id": "id-2",
       "seq": 5,
@@ -145,9 +150,16 @@
       "data": {
         "index": 2,
         "message_id": "id-5",
+        "message_ids": [
+          "id-3",
+          "id-4",
+          "t_call_1"
+        ],
         "model": null,
         "profile": "remote",
-        "provider": null
+        "provider": null,
+        "system_prompt_sha": null,
+        "tools_sha": "310002311a2a5a2409ce7ef36bd1231772ad4a573e63572c677e4673b6356342"
       },
       "run_id": "id-2",
       "seq": 12,
@@ -245,9 +257,14 @@
       "data": {
         "index": 1,
         "message_id": "id-4",
+        "message_ids": [
+          "id-3"
+        ],
         "model": null,
         "profile": "remote",
-        "provider": null
+        "provider": null,
+        "system_prompt_sha": null,
+        "tools_sha": "310002311a2a5a2409ce7ef36bd1231772ad4a573e63572c677e4673b6356342"
       },
       "run_id": "id-2",
       "seq": 5,
@@ -339,9 +356,16 @@
       "data": {
         "index": 2,
         "message_id": "id-5",
+        "message_ids": [
+          "id-3",
+          "id-4",
+          "t_call_1"
+        ],
         "model": null,
         "profile": "remote",
-        "provider": null
+        "provider": null,
+        "system_prompt_sha": null,
+        "tools_sha": "310002311a2a5a2409ce7ef36bd1231772ad4a573e63572c677e4673b6356342"
       },
       "run_id": "id-2",
       "seq": 12,
