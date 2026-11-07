@@ -1,6 +1,5 @@
 import {
   advance,
-  appendInstallOutput,
   daemonServiceRow,
   keyMissing,
   modelPullFailed,
@@ -19,7 +18,6 @@ import {
   providerName,
   single,
   guided,
-  type InstallTail,
   type PanelKey,
   type PanelWindow,
   type SetupNext,
@@ -32,6 +30,7 @@ import type { ModelListResult } from "../../store/models.ts";
 import type { PullEntry } from "../../store/pulls.ts";
 import { useModelList, usePageActions, usePulls, useSetupStatus } from "../../store/page-context.tsx";
 import { withActivePulls } from "../models/index.ts";
+import { runOllamaInstall, startOllamaAndList } from "./use-setup-actions.ts";
 import { arrive, modelScopeOf, newSetupUi, panelView, type PanelView, type SetupUi } from "./setup-ui.ts";
 
 const TICK_MS = 1000;
@@ -106,11 +105,9 @@ export function useSetup(start: SetupWindow, onClose: () => void): Setup {
       ...current,
       ollama: { phase: "starting", since: Date.now(), installed: current.ollama.phase === "starting" && current.ollama.installed },
     }));
-    void actions
-      .startOllama()
-      .then(async (running) => {
-        if (!running) throw new Error("Ollama didn't start");
-        await refreshListing();
+    void startOllamaAndList(actions)
+      .then((listed) => {
+        listingRef.current = listed;
         const current = uiRef.current;
         const window = panelOf(current.window);
         if (mounted.current && window?.panel === "ollama") go(advance(window, { kind: "done" }, { ollamaRunning: true }), current);
@@ -130,31 +127,17 @@ export function useSetup(start: SetupWindow, onClose: () => void): Setup {
 
   /** The daemon installs Ollama with Homebrew; its output reaches every window. */
   function installOllama(): void {
-    let tail: InstallTail = { last: "", partial: "" };
-    actions
-      .installOllama((event) => {
-        if (event.kind === "output") {
-          tail = appendInstallOutput(tail, event.text);
-          const last = tail.last;
-          update((current) => (current.ollama.phase === "installing" ? { ...current, ollama: { ...current.ollama, last } } : current));
-          return;
-        }
-        const outcome = event.kind === "error" ? "failed" : event.stopped ? "stopped" : event.code === 0 ? "installed" : "failed";
-        const reason = event.kind === "error" ? event.message : tail.last.length > 0 ? tail.last : "brew install ollama failed";
+    runOllamaInstall(actions, {
+      onOutput: (_text, tail) => {
+        const last = tail.last;
+        update((current) => (current.ollama.phase === "installing" ? { ...current, ollama: { ...current.ollama, last } } : current));
+      },
+      onEnd: ({ outcome, reason }) => {
         update((current) => ({ ...current, ollama: ollamaInstallEnded(current.ollama, outcome, reason, Date.now()) }));
         if (outcome === "installed" && mounted.current) startOllamaNow();
-      })
-      .then(
-        (result) => {
-          if (result === "no_brew") {
-            update((current) => ({ ...current, ollama: ollamaInstallEnded(current.ollama, "no_brew", "", Date.now()) }));
-            openDownloadPage();
-          }
-        },
-        (error: unknown) => {
-          update((current) => ({ ...current, ollama: ollamaInstallEnded(current.ollama, "failed", actionErrorText(error, "brew install ollama failed"), Date.now()) }));
-        },
-      );
+        if (outcome === "no_brew") openDownloadPage();
+      },
+    });
   }
 
   /** Go where the navigation table says. */

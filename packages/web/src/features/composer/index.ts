@@ -5,4 +5,3 @@ export { NewSessionComposer } from "./new-session-composer.tsx";
 export { SessionDock } from "./session-dock.tsx";
 export { useStartSession } from "./start-session.ts";
 export { activeComposer, registerComposer, useHasComposer, type ActiveComposer } from "./active-composer.ts";
-export { CopyCommand } from "./notice-line.tsx";

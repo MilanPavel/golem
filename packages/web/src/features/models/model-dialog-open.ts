@@ -10,6 +10,8 @@ import type { ModelDialogViewProps } from "./model-dialog.tsx";
 export type ModelDialogOpen = {
   /** The session it is for, or null for the model of the next new session (new-session mode). */
   sessionId: string | null;
+  /** "default" is for the default model of new sessions: Settings opens it. It has no session, so `sessionId` is null. */
+  mode?: "default";
   returnTo: "chip" | HTMLElement | null;
   initial?: ModelDialogViewProps["initial"];
 };

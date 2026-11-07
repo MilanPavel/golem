@@ -107,16 +107,15 @@ test("a section the page does not list says so, with a way back", async () => {
   expect(screen.getByRole("heading", { level: 2, name: "Setup" })).toBeTruthy();
 });
 
-test("the Setup section says all is set, or the problem, and its button opens the overview and gets focus back", async () => {
-  const { user, fake } = mount("/settings", STATUS_ROWS);
+test("the Setup section says the problem in a status line, and all set once it is fixed", async () => {
+  const { fake } = mount("/settings", STATUS_ROWS);
   expect(await screen.findByText(PROBLEM, { selector: "p" })).toBeTruthy();
   fake.raw.setupStatus.mockResolvedValue({ rows: OK_ROWS });
-  const open = screen.getByRole("button", { name: "Open setup" });
-  await user.click(open);
-  const dialog = await screen.findByRole("dialog", { name: "Setup" });
-  await user.click(within(dialog).getByRole("button", { name: "Close setup" }));
-  await waitFor(() => expect(screen.queryByRole("dialog", { name: "Setup" })).toBeNull());
-  await waitFor(() => expect(document.activeElement).toBe(open));
+  act(() => {
+    focusManager.setFocused(false);
+    focusManager.setFocused(true);
+  });
+  expect(await screen.findByText("all set", { selector: "p" })).toBeTruthy();
 });
 
 test("the Setup section reads all set when nothing is wrong", async () => {

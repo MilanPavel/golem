@@ -37,8 +37,10 @@ export type ModelDialogViewProps = {
   /**
    * "session" changes one session's model. "new" picks the model of the next new session: `session`
    * then holds the pick, if there is one, and the main button says `Use for the new session`.
+   * "default" changes the model that new sessions start with: `Make default` is the main button, and
+   * there is no session to use it for.
    */
-  mode?: "session" | "new";
+  mode?: "session" | "new" | "default";
   /** The session's model (or, in new mode, the pick): the profile to match on, and the name to show. */
   session: { profile: string; name: string | null } | null;
   listing: ModelListResult | null;
@@ -97,6 +99,7 @@ function Content({
 }) {
   const { session, listing, loadError, onRetry, pulls, actions, initial, showAll, onShowAll } = props;
   const isNew = props.mode === "new";
+  const isDefaultMode = props.mode === "default";
   const [query, setQuery] = useState(initial?.query ?? "");
   const [activeId, setActiveId] = useState<string | null>(initial?.activeId ?? null);
   const [confirmState, setConfirm] = useState<ModelConfirm | null>(initial?.confirm ?? null);
@@ -190,7 +193,11 @@ function Content({
     if (confirm !== null) {
       accept();
     } else if (target.status === "ready") {
-      if (!namesModel(target, profile)) void switchTo(target);
+      if (isDefaultMode) {
+        if (!namesModel(target, listing?.default ?? null)) void makeDefault(target);
+      } else if (!namesModel(target, profile)) {
+        void switchTo(target);
+      }
     } else if (target.status === "not_installed" && !providerMissing(shown, target.provider)) {
       ask({ kind: "pull", ref: target.ref, step: 1 });
     }
@@ -219,7 +226,7 @@ function Content({
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           <DialogTitle>Choose a model</DialogTitle>
-          <DialogDescription>{description(isNew ? null : session, listing)}</DialogDescription>
+          <DialogDescription>{description(isNew || isDefaultMode ? null : session, listing)}</DialogDescription>
         </div>
         <IconButton
           label="Refresh the list"
@@ -277,7 +284,7 @@ function Content({
             confirm={confirm}
             model={model}
             listing={shown}
-            use={!isNew}
+            use={!isNew && !isDefaultMode}
             busy={busy}
             buttonRef={confirmButton}
             onAccept={accept}
@@ -288,6 +295,7 @@ function Content({
             model={model}
             missing={missing}
             useLabel={isNew ? "Use for the new session" : "Use for this session"}
+            defaultOnly={isDefaultMode}
             isCurrent={namesModel(model, profile)}
             isDefault={namesModel(model, listing?.default ?? null)}
             busy={busy}
@@ -353,6 +361,7 @@ function ActionBar({
   model,
   missing,
   useLabel,
+  defaultOnly,
   isCurrent,
   isDefault,
   busy,
@@ -365,6 +374,8 @@ function ActionBar({
   model: ListedModel;
   missing: boolean;
   useLabel: string;
+  /** Changing the default: it is the main button, and there is no session to use the model for. */
+  defaultOnly: boolean;
   isCurrent: boolean;
   isDefault: boolean;
   busy: string | null;
@@ -384,12 +395,19 @@ function ActionBar({
             Remove
           </Button>
         ) : null}
-        <Button kind="secondary" disabled={!idle || isDefault} aria-busy={busy === "default"} onClick={onDefault}>
+        <Button
+          kind={defaultOnly ? "ink" : "secondary"}
+          disabled={!idle || isDefault}
+          aria-busy={busy === "default"}
+          onClick={onDefault}
+        >
           {isDefault ? "Default" : "Make default"}
         </Button>
-        <Button kind="ink" disabled={!idle || isCurrent} aria-busy={busy === "use"} onClick={onUse}>
-          {isCurrent ? "In use" : useLabel}
-        </Button>
+        {defaultOnly ? null : (
+          <Button kind="ink" disabled={!idle || isCurrent} aria-busy={busy === "use"} onClick={onUse}>
+            {isCurrent ? "In use" : useLabel}
+          </Button>
+        )}
       </>
     );
   } else if (model.status === "not_installed" && !missing) {
@@ -449,9 +467,12 @@ export function ModelDialog({
   onOpenChange,
   onCloseAutoFocus,
   initial,
+  mode,
 }: {
   /** The session the model is for, or null to pick the model of the next new session. */
   sessionId: string | null;
+  /** "default" changes the default model instead: no session, and no pick for the next one. */
+  mode?: "default";
   session: { profile: string; name: string | null } | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -486,8 +507,8 @@ export function ModelDialog({
       open={open}
       onOpenChange={onOpenChange}
       onCloseAutoFocus={onCloseAutoFocus}
-      mode={sessionId === null ? "new" : "session"}
-      session={sessionId === null ? (pick === null ? null : { profile: pick, name: null }) : session}
+      mode={mode ?? (sessionId === null ? "new" : "session")}
+      session={mode === "default" ? null : sessionId === null ? (pick === null ? null : { profile: pick, name: null }) : session}
       listing={query.data ?? null}
       loadError={query.error === null ? null : query.error.message}
       onRetry={() => void query.refetch()}
