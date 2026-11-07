@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import cast
 
 from fakes import GatedChatModel, ScriptedChatModel, ToolCallingChatModel
+from langchain_core.language_models import BaseChatModel
 from test_server import HELLO, RpcClient, error_code, rpc_result, start_daemon, stop_daemon
 
 from golem.config import GolemSettings
@@ -176,9 +177,17 @@ async def test_status_and_session_name_the_configured_model(short_home: Path) ->
         await stop_daemon(app, task)
 
 
+class _KeyedRouter(ModelRouter):
+    """Real name resolution, and a scripted model for every name, as if each key were set."""
+
+    def chat_model(self, profile: str) -> BaseChatModel:
+        self.resolve(profile)
+        return ScriptedChatModel(replies=[])
+
+
 async def test_a_session_pinned_to_another_model_names_it(short_home: Path) -> None:
     settings = GolemSettings(model_provider="openai_compat", model_name="qwen3.5:4b")
-    app, task = await start_daemon(short_home, router=ModelRouter(settings))
+    app, task = await start_daemon(short_home, router=_KeyedRouter(settings))
     client = await RpcClient.connect(app.paths.socket_path)
     try:
         await client.call("hello", HELLO)

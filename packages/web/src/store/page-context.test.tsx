@@ -133,10 +133,14 @@ test("routes, actions, and the visibility check", async () => {
   expect(probe.result.current.route).toEqual({ name: "session", id: "x" });
   const { actions } = probe.result.current;
 
-  await expect(actions.createSession("/repo")).resolves.toBe("s_new");
+  await expect(actions.createSession("/repo", null)).resolves.toBe("s_new");
   expect(fake.raw.createSession).toHaveBeenCalledWith({ cwd: "/repo" });
-  await actions.createSession(null);
+  await actions.createSession(null, null);
   expect(fake.raw.createSession).toHaveBeenLastCalledWith(undefined);
+  await actions.createSession("/repo", "local");
+  expect(fake.raw.createSession).toHaveBeenLastCalledWith({ cwd: "/repo", modelProfile: "local" });
+  await actions.createSession(null, "ollama/qwen3:8b");
+  expect(fake.raw.createSession).toHaveBeenLastCalledWith({ modelProfile: "ollama/qwen3:8b" });
   await actions.send("s", "hi");
   expect(fake.raw.sendMessage).toHaveBeenCalledWith("s", "hi");
   await actions.cancel("r");

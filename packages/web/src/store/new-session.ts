@@ -2,23 +2,28 @@ import type { SessionSummary } from "@golem/client";
 import { createStore, type StoreSource } from "./create-store.ts";
 
 /**
- * Where the next new session will run. `chosen` is what the person picked on the empty screen;
- * `lastOpened` is the folder of the session they last looked at. `undefined` means not known yet.
+ * Where the next new session will run and on what model. `chosen` is the folder the person picked
+ * on the empty screen; `lastOpened` is the folder of the session they last looked at. `undefined`
+ * means not known yet. `model` is the model they picked, or null for the default. It is shown and
+ * not stored: a reload starts from the default again.
  */
-export type NewSessionFolderState = {
+export type NewSessionState = {
   chosen: string | null | undefined;
   lastOpened: string | null | undefined;
+  model: string | null;
 };
 
-export type NewSessionFolderStore = StoreSource<NewSessionFolderState> & {
+export type NewSessionStore = StoreSource<NewSessionState> & {
   /** The person picks a folder (null for none). */
   choose(folder: string | null): void;
   /** A session was opened. Its folder becomes the default, and an earlier pick is dropped. */
   opened(cwd: string | null): void;
+  /** The person picks a model for the next session (null for the default). */
+  chooseModel(model: string | null): void;
 };
 
-export function createNewSessionFolder(): NewSessionFolderStore {
-  const store = createStore<NewSessionFolderState>({ chosen: undefined, lastOpened: undefined });
+export function createNewSession(): NewSessionStore {
+  const store = createStore<NewSessionState>({ chosen: undefined, lastOpened: undefined, model: null });
   return {
     getSnapshot: store.getSnapshot,
     subscribe: store.subscribe,
@@ -31,7 +36,13 @@ export function createNewSessionFolder(): NewSessionFolderStore {
     opened(cwd) {
       const state = store.getSnapshot();
       if (state.chosen !== undefined || state.lastOpened !== cwd) {
-        store.set({ chosen: undefined, lastOpened: cwd });
+        store.set({ ...state, chosen: undefined, lastOpened: cwd });
+      }
+    },
+    chooseModel(model) {
+      const state = store.getSnapshot();
+      if (state.model !== model) {
+        store.set({ ...state, model });
       }
     },
   };
@@ -43,7 +54,7 @@ function open(list: readonly SessionSummary[]): SessionSummary[] {
 }
 
 /** The folder a new session gets: the pick, else the last opened session's, else the newest session's, else none. */
-export function resolveFolder(state: NewSessionFolderState, list: readonly SessionSummary[]): string | null {
+export function resolveFolder(state: NewSessionState, list: readonly SessionSummary[]): string | null {
   if (state.chosen !== undefined) {
     return state.chosen;
   }

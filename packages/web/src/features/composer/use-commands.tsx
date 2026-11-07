@@ -10,6 +10,8 @@ import {
   forkPoint,
   invocableSkills,
   modelNames,
+  namesModel,
+  pickerName,
   pinnableSkills,
   sessionMarkdown,
   withModelChoices,
@@ -19,7 +21,7 @@ import {
 } from "@golem/view";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { actionErrorText, isNoModelChosen } from "../../store/errors.ts";
-import { useModelList, useNavigate, usePageActions, useSessionReader, useSkillList } from "../../store/page-context.tsx";
+import { useModelList, useNavigate, useNewSessionModel, usePageActions, useSessionReader, useSkillList } from "../../store/page-context.tsx";
 import { setTimesShown, timesShownStore } from "../chat/index.ts";
 import { drawerOpenStore, useDrawerOpen } from "../drawer/index.ts";
 import { openModelDialog } from "../models/index.ts";
@@ -73,6 +75,7 @@ export function useCommands({ session, cwd, typing, send }: UseCommandsOptions):
   const sessionId = session?.id ?? null;
   const actions = usePageActions();
   const navigate = useNavigate();
+  const [, chooseModel] = useNewSessionModel();
   const sessionActions = useSessionActions();
   const read = useSessionReader(sessionId);
   const models = useModelList(typing);
@@ -182,6 +185,24 @@ export function useCommands({ session, cwd, typing, send }: UseCommandsOptions):
             return "handled";
           default:
             break;
+        }
+        if (sessionId === null && found.kind === "model") {
+          // The empty screen has no session: the model is the next new session's.
+          if (found.name === null) {
+            openModelDialog({ sessionId: null, returnTo: focused() });
+            return "handled";
+          }
+          const named = found.name;
+          const listing = modelQuery.data ?? (await modelQuery.refetch()).data;
+          const model = listing?.models.find((item) => namesModel(item, named) || item.ref === `ollama/${named}`);
+          if (model === undefined) {
+            return say(`No model named ${named}. /model lists them.`);
+          }
+          if (model.status !== "ready") {
+            return say(`${model.label} is not ready. /model opens the list, where it can be downloaded.`);
+          }
+          chooseModel(pickerName(model));
+          return say(`New sessions use ${model.label}.`);
         }
         if (sessionId === null) {
           return say(NEEDS_SESSION);
@@ -299,7 +320,7 @@ export function useCommands({ session, cwd, typing, send }: UseCommandsOptions):
       }
       return runOutcome(outcome);
     },
-    [actions, clear, navigate, read, sessionActions, sessionId, setDrawerOpen],
+    [actions, chooseModel, clear, navigate, read, sessionActions, sessionId, setDrawerOpen],
   );
 
   const dialogs = (
