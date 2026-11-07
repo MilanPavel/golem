@@ -1785,6 +1785,48 @@ class OllamaStartResult(BaseModel):
     running: bool
 
 
+class FsListDirsParams(BaseModel):
+    """``fs.list_dirs``. The folders directly under ``path``, for a folder picker.
+
+    ``path`` is an absolute path under the user's home folder. Null lists the
+    home folder. The daemon resolves it first (symlinks and ``..``), and refuses
+    one outside home or one that is not a folder (ADR-040).
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    path: str | None = Field(default=None, min_length=1)
+
+
+class DirEntry(BaseModel):
+    """A folder in a listing. ``git`` is true when it has a ``.git`` entry."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    path: str = Field(min_length=1)
+    git: bool
+
+
+class FsListDirsResult(BaseModel):
+    """The folders under ``path``, sorted without regard to case.
+
+    ``home`` is the user's home folder and ``parent`` is the folder above
+    ``path``, or null at home. Only folders are listed: no file names, sizes,
+    times, or contents. Dot-folders, ``~/Library``, secret folders, and entries
+    that resolve outside home are left out. A list stops at 500 entries, and
+    ``truncated`` says it was cut.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    path: str = Field(min_length=1)
+    home: str = Field(min_length=1)
+    parent: str | None = Field(default=None, min_length=1)
+    entries: list[DirEntry]
+    truncated: bool
+
+
 __all__ = [
     "ApprovalRespondParams",
     "ApprovalRespondResult",
@@ -1807,6 +1849,9 @@ __all__ = [
     "ConfigRawSetParams",
     "ConfigRule",
     "DaemonStatus",
+    "DirEntry",
+    "FsListDirsParams",
+    "FsListDirsResult",
     "HelloParams",
     "HelloResult",
     "InspectMessage",

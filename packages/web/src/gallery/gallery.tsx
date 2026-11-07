@@ -28,6 +28,7 @@ import { Composer, DockView, Meter } from "../features/composer/index.ts";
 import { createHistory } from "../features/composer/history.ts";
 import { CommandsDialog } from "../features/composer/help-dialog.tsx";
 import { HomeView, NewSessionModelChipView, SessionTitle } from "../features/shell/index.ts";
+import { FolderBrowserView } from "../features/shell/folder-browser.tsx";
 import { CommandPaletteView, KeysDialog } from "../features/palette/index.ts";
 import { ModelDialogView, type ModelDialogViewProps } from "../features/models/index.ts";
 import { SetupDialogView } from "../features/setup/index.ts";
@@ -395,6 +396,57 @@ const DOWNLOAD_ROWS = [
   { label: "Failed", summary: pullSummary(new Map(), SAMPLE_PULLS.failed, SAMPLE_LABELS) },
 ] as const;
 
+const BROWSER_HOME = "/Users/you";
+function browserListing(path: string, names: string[], truncated = false) {
+  return {
+    path,
+    home: BROWSER_HOME,
+    parent: path === BROWSER_HOME ? null : path.slice(0, path.lastIndexOf("/")),
+    entries: names.map((name) => ({ name, path: `${path}/${name}`, git: name === "golem" || name === "notes-site" })),
+    truncated,
+  };
+}
+const BROWSER_CASES = [
+  { label: "At home", listing: browserListing(BROWSER_HOME, ["Desktop", "Documents", "notes", "repos"]) },
+  { label: "Deep in a tree", listing: browserListing(`${BROWSER_HOME}/repos/work/clients`, ["golem", "notes-site", "scratch"]) },
+  { label: "Empty", listing: browserListing(`${BROWSER_HOME}/repos/empty`, []) },
+  {
+    label: "Truncated",
+    listing: browserListing(BROWSER_HOME, Array.from({ length: 500 }, (_, index) => `project-${String(index).padStart(3, "0")}`), true),
+  },
+  { label: "Loading", listing: null, loading: true },
+  { label: "Error", listing: null, error: "golem can't read /Users/you/repos/locked." },
+] as const;
+
+/** The folder browser in each state it can show. */
+function FolderBrowserDemo({ theme }: { theme: string }) {
+  const none = () => {};
+  return (
+    <div className="flex flex-wrap gap-4">
+      {BROWSER_CASES.map((item) => (
+        <div key={item.label} className="w-96 rounded-lg border border-line bg-surface p-4 text-sm">
+          <p className="mb-2 font-mono text-xs text-faint">{item.label}</p>
+          <FolderBrowserView
+            listing={item.listing}
+            loading={"loading" in item}
+            error={"error" in item ? item.error : null}
+            query=""
+            onQueryChange={none}
+            onOpen={none}
+            onUp={none}
+            onGoTyped={none}
+            onRetry={none}
+            onPick={none}
+            onCancel={none}
+            autoFocus={false}
+            navLabel={`Folder path, ${item.label}, ${theme}`}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /** The sidebar's download row in each state it can show. */
 function DownloadRowDemo() {
   return (
@@ -494,6 +546,11 @@ function Panel({ theme }: { theme: "slip" | "kiln" }) {
             onSearch={() => {}}
           />
         </div>
+      </section>
+
+      <section className="mt-6">
+        <h3 className="mb-2 font-mono text-xs text-faint">Folder browser</h3>
+        <FolderBrowserDemo theme={theme} />
       </section>
 
       <section className="mt-6">

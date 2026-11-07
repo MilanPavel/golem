@@ -3,6 +3,7 @@ import type { McpCatalogResult } from "../../protocol/gen/mcp-catalog-result.ts"
 import type { McpServerDetail } from "../../protocol/gen/mcp-server-detail.ts";
 import type { RuntimeInstallDone } from "../../protocol/gen/runtime-install-done.ts";
 import type { OllamaInstallDone } from "../../protocol/gen/ollama-install-done.ts";
+import type { DirEntry, FsListDirsResult } from "../../protocol/gen/fs-list-dirs-result.ts";
 import type { SetupRow, SetupStatusResult } from "../../protocol/gen/setup-status-result.ts";
 import type { McpListResult } from "../../protocol/gen/mcp-list-result.ts";
 import type { McpServer } from "../../protocol/gen/mcp-server.ts";
@@ -238,6 +239,22 @@ function isSetupRow(value: unknown): value is SetupRow {
 
 export function isSetupStatusResult(value: unknown): value is SetupStatusResult {
   return isRecord(value) && Array.isArray(value["rows"]) && value["rows"].every(isSetupRow);
+}
+
+function isDirEntry(value: unknown): value is DirEntry {
+  return isRecord(value) && typeof value["name"] === "string" && typeof value["path"] === "string" && typeof value["git"] === "boolean";
+}
+
+export function isFsListDirsResult(value: unknown): value is FsListDirsResult {
+  return (
+    isRecord(value) &&
+    typeof value["path"] === "string" &&
+    typeof value["home"] === "string" &&
+    (value["parent"] === undefined || value["parent"] === null || typeof value["parent"] === "string") &&
+    Array.isArray(value["entries"]) &&
+    value["entries"].every(isDirEntry) &&
+    typeof value["truncated"] === "boolean"
+  );
 }
 
 export function isKeychainWait(value: unknown): value is KeychainWait {

@@ -3,6 +3,7 @@ import { createContext, useCallback, useContext, useSyncExternalStore, type Reac
 import { useSyncExternalStoreWithSelector } from "use-sync-external-store/with-selector";
 import { ConnectionProvider } from "./connection-context.tsx";
 import { configKey, type ConfigGetResult } from "./config.ts";
+import type { FsListDirsResult } from "./dirs.ts";
 import { MODEL_LIST_ALL_KEY, MODEL_LIST_KEY, SETUP_STATUS_KEY, type ModelListResult } from "./models.ts";
 import type { Page, PageActions } from "./page.ts";
 import type { PullsSnapshot } from "./pulls.ts";
@@ -176,6 +177,12 @@ export function useSkillList(cwd: string | null, enabled = true): UseQueryResult
 export function useConfig(cwd: string | null, sessionId: string | null, enabled = true): UseQueryResult<ConfigGetResult> {
   const { queries } = usePage();
   return useQuery({ queryKey: configKey(cwd, sessionId), queryFn: () => queries.config(cwd, sessionId), enabled });
+}
+
+/** The folders under `path` in the home folder (`null` is home). Fetched only once `enabled`. */
+export function useDirs(path: string | null, enabled = true): UseQueryResult<FsListDirsResult> {
+  const { queries } = usePage();
+  return useQuery({ queryKey: ["fs.list_dirs", path], queryFn: () => queries.dirs(path), enabled, staleTime: 0, retry: false });
 }
 
 /** The downloads in flight and the last failures, from every connection. */
