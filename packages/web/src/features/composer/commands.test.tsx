@@ -441,7 +441,7 @@ test("the empty screen: suggestions work, /new does nothing, /help and /login wo
   expect(box().value).toBe("");
   await say(user, "/login anthropic");
   expect(screen.getByText("golem auth set anthropic")).toBeTruthy();
-  for (const line of ["/fork", "/title x", "/close", "/copy", "/export", "/model", "/model pull x", "/todos"]) {
+  for (const line of ["/fork", "/title x", "/close", "/copy", "/export", "/model pull x", "/todos"]) {
     await say(user, line);
     expect(dockNotice()).toBe("Start a session first: send a message.");
     expect(box().value).toBe("");
@@ -452,6 +452,27 @@ test("the empty screen: suggestions work, /new does nothing, /help and /login wo
   expect(dockNotice()).toContain("terminal for now");
   await say(user, "/help");
   expect(screen.getByRole("dialog", { name: "Commands" })).toBeTruthy();
+  expect(fake.raw.createSession).not.toHaveBeenCalled();
+});
+
+test("the empty screen: /model opens the dialog for the new session, and /model <name> sets the pick", async () => {
+  const { fake, user } = setup("/");
+  await say(user, "/model");
+  const dialog = await screen.findByRole("dialog", { name: "Choose a model" });
+  expect(within(dialog).queryByText(/This session uses/)).toBeNull();
+  expect(within(dialog).getByText(/New sessions use ollama\/gemma4:e4b/)).toBeTruthy();
+  await user.keyboard("{Escape}");
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect(document.activeElement).toBe(box());
+
+  await say(user, "/model nothing");
+  expect(dockNotice()).toBe("No model named nothing. /model lists them.");
+  await say(user, "/model ollama/qwen3:14b");
+  expect(dockNotice()).toBe("Qwen3 14B is not ready. /model opens the list, where it can be downloaded.");
+  await say(user, "/model ollama/qwen3:8b");
+  expect(dockNotice()).toBe("New sessions use Qwen3 8B.");
+  expect(screen.getByRole("button", { name: "Model: Qwen3 8B" })).toBeTruthy();
+  expect(fake.raw.setSessionModel).not.toHaveBeenCalled();
   expect(fake.raw.createSession).not.toHaveBeenCalled();
 });
 

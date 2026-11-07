@@ -1101,3 +1101,37 @@ test("forkSession sends the message id and reads the new session", async () => {
     await server.close();
   }
 });
+
+test("createSession sends the folder and the model only when they are given", async () => {
+  const seen: Record<string, unknown>[] = [];
+  const daemon = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: { "session.create": { session_id: "s_new" } },
+      onRequest: (_socket, method, params) => {
+        if (method === "session.create") seen.push(params);
+      },
+    });
+  });
+  const client = connectGolem({
+    socketPath: daemon.socketPath,
+    clientName: "tui",
+    reconnect: false,
+    heartbeatMs: 60_000,
+  });
+  try {
+    await client.createSession();
+    await client.createSession({ cwd: "/repo" });
+    await client.createSession({ modelProfile: "local" });
+    await client.createSession({ cwd: "/repo", modelProfile: "ollama/qwen3:8b" });
+    assert.deepEqual(seen, [
+      {},
+      { cwd: "/repo" },
+      { model_profile: "local" },
+      { cwd: "/repo", model_profile: "ollama/qwen3:8b" },
+    ]);
+  } finally {
+    client.close();
+    await daemon.close();
+  }
+});

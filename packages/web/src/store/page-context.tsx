@@ -86,6 +86,13 @@ export function useNewSessionFolder(): [string | null, (folder: string | null) =
   return [resolveFolder(state, list), newSession.choose];
 }
 
+/** The model picked for the next new session, or null for the default, and a setter for it. */
+export function useNewSessionModel(): [string | null, (model: string | null) => void] {
+  const { newSession } = usePage();
+  const state = useSyncExternalStore(newSession.subscribe, newSession.getSnapshot);
+  return [state.model, newSession.chooseModel];
+}
+
 /** The folders to offer for a new session, newest first. */
 export function useKnownFolders(): string[] {
   const list = useSessionList();

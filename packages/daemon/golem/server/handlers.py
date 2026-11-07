@@ -263,7 +263,10 @@ async def _session_create(ctx: RequestContext, params: SessionCreateParams) -> S
     sessions = _sessions(ctx)
     if params.cwd is not None and not Path(params.cwd).is_absolute():
         raise RpcCallError(INVALID_PARAMS, "cwd must be an absolute path")
-    session_id = await sessions.create(params.model_profile, cwd=params.cwd)
+    try:
+        session_id = await sessions.create(params.model_profile, cwd=params.cwd)
+    except ModelConfigError as exc:
+        raise RpcCallError(MODEL_NOT_CONFIGURED, str(exc)) from exc
     return SessionCreateResult(session_id=session_id)
 
 
