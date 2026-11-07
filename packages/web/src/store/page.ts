@@ -1,11 +1,11 @@
-import { OLLAMA_FAILED, RpcError, type ApprovalChoice, type ConfigGetResult, type FsListDirsResult, type McpListResult, type GolemClient, type SetupStatusResult, type SkillListResult } from "@golem/client";
-import { installEventOf, type InstallEvent } from "@golem/view";
+import { OLLAMA_FAILED, RpcError, type ApprovalChoice, type ConfigGetResult, type FsListDirsResult, type McpCallResult, type McpListResult, type McpLogsResult, type McpServerLog, type McpTestProgress, type McpTestResult, type GolemClient, type SetupStatusResult, type SkillListResult } from "@golem/client";
+import { changeToolFilter, installEventOf, type InstallEvent } from "@golem/view";
 import type { QueryClient } from "@tanstack/react-query";
 import { createDrafts, type Drafts } from "./drafts.ts";
 import { createConnectionStore, type ConnectionStore } from "./connection.ts";
 import { createNewSession, type NewSessionStore } from "./new-session.ts";
 import { CONFIG_KEY } from "./config.ts";
-import { MCP_LIST_KEY, type McpToolsResult } from "./mcp.ts";
+import { MCP_LIST_KEY, MCP_TOOLS_KEY, type McpToolsResult } from "./mcp.ts";
 import { MODEL_LIST_ALL_KEY, MODEL_LIST_KEY, SETUP_STATUS_KEY, type ModelListResult } from "./models.ts";
 import { createPulls, type Pulls } from "./pulls.ts";
 import { createQueryClient, keepQueriesHonest } from "./query.ts";
@@ -47,6 +47,13 @@ export type PageClient = Pick<
   | "setMcpEnabled"
   | "enableMcp"
   | "disableMcp"
+  | "mcpTest"
+  | "mcpLogs"
+  | "onMcpLog"
+  | "mcpCall"
+  | "mcpGet"
+  | "updateMcpServer"
+  | "removeMcpServer"
   | "listDirs"
   | "updateRule"
   | "removeRule"
@@ -106,6 +113,21 @@ export type PageActions = {
   restartMcp(name: string, sessionId: string | null): Promise<void>;
   /** Writes `enabled` into the file that names the server: on for every chat, off everywhere, or on demand. */
   setMcpEnabled(name: string, enabled: boolean | "on_demand", sessionId: string | null): Promise<void>;
+  /** Tests a saved server. `onStep` gets each step as it ends. */
+  testMcp(name: string, sessionId: string | null, onStep: (step: McpTestProgress) => void): Promise<McpTestResult>;
+  /** The server's last log lines, oldest first. */
+  mcpLogs(name: string, sessionId: string | null): Promise<McpLogsResult>;
+  /** New log lines of any server, until the returned function is called. */
+  watchMcpLog(listener: (log: McpServerLog) => void): () => void;
+  /** Runs one tool by hand, by the server's own tool name. No approval, and no session records it. */
+  callMcp(name: string, tool: string, args: Record<string, unknown>, sessionId: string | null): Promise<McpCallResult>;
+  /**
+   * Hides a tool from the model, or shows it again, by writing the server's `tools.exclude`. Rejects
+   * with the reason when the tool is hidden by a pattern the page cannot take out.
+   */
+  setMcpToolHidden(name: string, tool: string, hide: boolean, sessionId: string | null): Promise<void>;
+  /** Removes a server from the user's config, with the token it stored. */
+  removeMcp(name: string): Promise<void>;
   /** Turns an on-demand server on or off for one session. */
   toggleMcp(sessionId: string, name: string, on: boolean): Promise<void>;
   /** Asks the providers again, past the daemon's cache, puts the answer in the listing, and returns it. */
@@ -265,6 +287,28 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       async setMcpEnabled(name, enabled, sessionId) {
         try {
           await client.setMcpEnabled(name, enabled, sessionId ?? undefined);
+        } finally {
+          await queryClient.invalidateQueries({ queryKey: MCP_LIST_KEY });
+        }
+      },
+      testMcp: (name, sessionId, onStep) => client.mcpTest({ name, ...(sessionId === null ? {} : { sessionId }) }, onStep),
+      mcpLogs: (name, sessionId) => client.mcpLogs(name, sessionId === null ? {} : { sessionId }),
+      watchMcpLog: (listener) => client.onMcpLog(listener),
+      callMcp: (name, tool, args, sessionId) => client.mcpCall({ name, tool, arguments: args, ...(sessionId === null ? {} : { sessionId }) }),
+      async setMcpToolHidden(name, tool, hide, sessionId) {
+        const detail = await client.mcpGet(name, sessionId ?? undefined);
+        const change = hide ? changeToolFilter(detail.config, [tool], []) : changeToolFilter(detail.config, [], [tool]);
+        if (!change.ok) throw new Error(change.message);
+        try {
+          await client.updateMcpServer({ name, config: change.config, ...(sessionId === null ? {} : { session_id: sessionId }) });
+        } finally {
+          await queryClient.invalidateQueries({ queryKey: MCP_TOOLS_KEY });
+          await queryClient.invalidateQueries({ queryKey: MCP_LIST_KEY });
+        }
+      },
+      async removeMcp(name) {
+        try {
+          await client.removeMcpServer(name);
         } finally {
           await queryClient.invalidateQueries({ queryKey: MCP_LIST_KEY });
         }

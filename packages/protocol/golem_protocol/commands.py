@@ -829,6 +829,7 @@ class McpToolInfo(BaseModel):
 
     A ``hidden`` tool is one the server's ``tools`` filter keeps from the model.
     ``schema_tokens`` roughly what its schema costs in each prompt.
+    ``input_schema`` is the JSON Schema of its arguments, for a form that tries it.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -837,6 +838,7 @@ class McpToolInfo(BaseModel):
     description: str
     hidden: bool = False
     schema_tokens: int = Field(default=0, ge=0)
+    input_schema: dict[str, Any] | None = None
 
 
 class McpToolsResult(BaseModel):

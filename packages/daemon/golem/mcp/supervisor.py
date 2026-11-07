@@ -88,6 +88,7 @@ class ListedTool:
     description: str
     hidden: bool
     schema_tokens: int
+    input_schema: dict[str, Any] | None = None
 
 
 @dataclass
@@ -197,7 +198,13 @@ class McpSupervisor:
         """Each running tool of server ``name``, the hidden ones too, marked."""
         server = self._find(scope, name)
         return [
-            ListedTool(tool.name, tool.description, hidden, _tool_tokens(tool))
+            ListedTool(
+                tool.name,
+                tool.description,
+                hidden,
+                _tool_tokens(tool),
+                None if tool.parameters is None else dict(tool.parameters),
+            )
             for hidden, tools in ((False, server.tools), (True, server.hidden))
             for tool in tools
         ]

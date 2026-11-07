@@ -773,6 +773,7 @@ async def _mcp_tools(ctx: RequestContext, params: McpServerParams) -> McpToolsRe
             description=tool.description,
             hidden=tool.hidden,
             schema_tokens=tool.schema_tokens,
+            input_schema=tool.input_schema,
         )
         for tool in listed
     ]
