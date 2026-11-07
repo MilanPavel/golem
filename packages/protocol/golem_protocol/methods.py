@@ -50,6 +50,8 @@ METHOD_ACCESS: Final[Mapping[str, Access]] = {
     "mcp.get": "browser",
     "mcp.test": "browser",
     "mcp.catalog": "browser",
+    "mcp.import.scan": "browser",
+    "mcp.import.apply": "browser",
     "runtime.install": "browser",
     "runtime.install_cancel": "browser",
     "mcp.logs": "browser",

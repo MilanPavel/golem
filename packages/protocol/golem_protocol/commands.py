@@ -1111,6 +1111,119 @@ class McpCatalogResult(BaseModel):
     entries: list[McpCatalogEntry]
 
 
+class McpImportScanParams(BaseModel):
+    """``mcp.import.scan``. Find the MCP servers other apps have, or read pasted JSON.
+
+    Without ``text``, the daemon reads the config files of Claude Desktop, Claude
+    Code, Cursor, VS Code, and Windsurf that exist, and with ``session_id`` also
+    that project's files. With ``text``, it reads only the text: any of those
+    files' shapes, or one bare server. Nothing is written, and no file of
+    another app is ever changed.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str | None = Field(default=None, min_length=1)
+    text: str | None = Field(default=None, min_length=1, max_length=1_000_000)
+
+
+class McpImportCandidate(BaseModel):
+    """A server found in another app, as golem would add it.
+
+    ``config`` names a secret as ``keychain:mcp/<name>``, never its value.
+    ``secret_refs`` are all the secrets it names, and ``missing_refs`` the ones
+    the source did not hold a value for (a ``${input:token}``): send them in
+    ``secrets`` of ``mcp.import.apply``, or set them later. ``clash`` says
+    ``name`` was changed to fit an existing server or another candidate, and
+    ``already_same`` says golem has a server with the same command or url.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    key: str
+    name: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9-]{0,31}$")
+    original_name: str
+    scope: Literal["user", "project"]
+    config: McpServerConfig
+    secret_refs: list[str] = Field(default_factory=list[str])
+    missing_refs: list[str] = Field(default_factory=list[str])
+    warnings: list[str] = Field(default_factory=list[str])
+    clash: bool = False
+    already_same: bool = False
+
+
+class McpImportSource(BaseModel):
+    """One file of another app, or the pasted text, and the servers in it.
+
+    ``skipped`` lists servers that could not be turned into a golem server, with
+    the reason. ``error`` is set when the file could not be read.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str
+    label: str
+    path: str | None = None
+    candidates: list[McpImportCandidate] = Field(default_factory=list[McpImportCandidate])
+    skipped: list[str] = Field(default_factory=list[str])
+    error: str | None = None
+
+
+class McpImportScanResult(BaseModel):
+    """The sources found. Secret values stay in the daemon under ``scan_id`` for ten minutes."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    scan_id: str
+    sources: list[McpImportSource]
+
+
+class McpImportPick(BaseModel):
+    """A candidate to add, by ``key``, under ``name`` (the candidate's own, or another)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    key: str
+    name: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9-]{0,31}$")
+    scope: Literal["user", "project"] = "user"
+
+
+class McpImportApplyParams(BaseModel):
+    """``mcp.import.apply``. Add the picked candidates of a scan, once.
+
+    Each pick stores its secrets, writes ``[mcp.<name>]``, and the daemon reloads
+    the servers once. A pick that fails, such as a name already in use, is
+    reported in ``failed`` and the others are still added. ``secrets`` gives
+    values by reference for a candidate's ``missing_refs``. ``scope = "project"``
+    needs ``session_id`` of a trusted project. The scan is used up by the call.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    scan_id: str = Field(min_length=1)
+    picks: list[McpImportPick] = Field(min_length=1, max_length=200)
+    secrets: dict[str, SecretStr] = Field(default_factory=dict[str, SecretStr])
+    session_id: str | None = Field(default=None, min_length=1)
+
+
+class McpImportFailure(BaseModel):
+    """A pick that was not added, and why."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    key: str
+    error: str
+
+
+class McpImportApplyResult(BaseModel):
+    """The servers added, and the picks that failed."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    added: list[McpServer]
+    failed: list[McpImportFailure] = Field(default_factory=list[McpImportFailure])
+
+
 RuntimeName = Literal["node", "uv"]
 
 
@@ -1699,6 +1812,14 @@ __all__ = [
     "McpCatalogParams",
     "McpCatalogResult",
     "McpImplementation",
+    "McpImportApplyParams",
+    "McpImportApplyResult",
+    "McpImportCandidate",
+    "McpImportFailure",
+    "McpImportPick",
+    "McpImportScanParams",
+    "McpImportScanResult",
+    "McpImportSource",
     "McpListParams",
     "McpListResult",
     "McpLogLine",

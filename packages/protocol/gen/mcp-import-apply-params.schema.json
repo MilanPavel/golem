@@ -1,0 +1,80 @@
+{
+  "$defs": {
+    "McpImportPick": {
+      "additionalProperties": false,
+      "description": "A candidate to add, by ``key``, under ``name`` (the candidate's own, or another).",
+      "properties": {
+        "key": {
+          "title": "Key",
+          "type": "string"
+        },
+        "name": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9-]{0,31}$",
+          "title": "Name",
+          "type": "string"
+        },
+        "scope": {
+          "default": "user",
+          "enum": [
+            "user",
+            "project"
+          ],
+          "title": "Scope",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "name"
+      ],
+      "title": "McpImportPick",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "``mcp.import.apply``. Add the picked candidates of a scan, once.\n\nEach pick stores its secrets, writes ``[mcp.<name>]``, and the daemon reloads\nthe servers once. A pick that fails, such as a name already in use, is\nreported in ``failed`` and the others are still added. ``secrets`` gives\nvalues by reference for a candidate's ``missing_refs``. ``scope = \"project\"``\nneeds ``session_id`` of a trusted project. The scan is used up by the call.",
+  "properties": {
+    "picks": {
+      "items": {
+        "$ref": "#/$defs/McpImportPick"
+      },
+      "maxItems": 200,
+      "minItems": 1,
+      "title": "Picks",
+      "type": "array"
+    },
+    "scan_id": {
+      "minLength": 1,
+      "title": "Scan Id",
+      "type": "string"
+    },
+    "secrets": {
+      "additionalProperties": {
+        "format": "password",
+        "type": "string",
+        "writeOnly": true
+      },
+      "title": "Secrets",
+      "type": "object"
+    },
+    "session_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Session Id"
+    }
+  },
+  "required": [
+    "scan_id",
+    "picks"
+  ],
+  "title": "McpImportApplyParams",
+  "type": "object"
+}

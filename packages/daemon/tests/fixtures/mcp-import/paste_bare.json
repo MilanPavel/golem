@@ -1,0 +1,1 @@
+{ "command": "uvx", "args": ["mcp-server-time"], "env": { "TZ": "Europe/Prague" } }

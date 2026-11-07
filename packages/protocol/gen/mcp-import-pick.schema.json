@@ -1,0 +1,30 @@
+{
+  "additionalProperties": false,
+  "description": "A candidate to add, by ``key``, under ``name`` (the candidate's own, or another).",
+  "properties": {
+    "key": {
+      "title": "Key",
+      "type": "string"
+    },
+    "name": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9-]{0,31}$",
+      "title": "Name",
+      "type": "string"
+    },
+    "scope": {
+      "default": "user",
+      "enum": [
+        "user",
+        "project"
+      ],
+      "title": "Scope",
+      "type": "string"
+    }
+  },
+  "required": [
+    "key",
+    "name"
+  ],
+  "title": "McpImportPick",
+  "type": "object"
+}

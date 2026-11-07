@@ -5,6 +5,8 @@ export type McpArgs =
   /** A server from the daemon's catalog: its id, the name to give it (the entry's own when null), and typed inputs. */
   | { kind: "catalog"; id: string; name: string | null; inputs: Record<string, string> }
   | { kind: "remove"; name: string }
+  /** The servers as the `mcpServers` JSON of another app. */
+  | { kind: "export"; format: "claude" | "vscode"; scope: "user" | "project" }
   | { kind: "error"; message: string };
 
 const ENV_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -23,8 +25,11 @@ export function parseMcpArgs(args: string[]): McpArgs {
     }
     return { kind: "remove", name };
   }
+  if (action === "export") {
+    return parseExportArgs(rest);
+  }
   if (action !== "add") {
-    return fail("usage: golem mcp add|remove <name>");
+    return fail("usage: golem mcp add|remove <name> | golem mcp export [--format claude|vscode] [--scope user|project]");
   }
   const split = rest.indexOf("--");
   const before = split === -1 ? rest : rest.slice(0, split);
@@ -112,4 +117,28 @@ function parseCatalogArgs(words: string[]): McpArgs {
     }
   }
   return id === null ? fail(usage) : { kind: "catalog", id, name, inputs };
+}
+
+/** `golem mcp export [--json] [--format claude|vscode] [--scope user|project]`. The output is always JSON. */
+function parseExportArgs(words: string[]): McpArgs {
+  const usage = "usage: golem mcp export [--json] [--format claude|vscode] [--scope user|project]";
+  let format: "claude" | "vscode" = "claude";
+  let scope: "user" | "project" = "user";
+  for (let index = 0; index < words.length; index += 1) {
+    const word = words[index] ?? "";
+    if (word === "--json") continue;
+    if (word !== "--format" && word !== "--scope") {
+      return fail(word.startsWith("-") ? `unknown option ${word}` : `unexpected ${word}: ${usage}`);
+    }
+    const value = words[index + 1];
+    index += 1;
+    if (word === "--format") {
+      if (value !== "claude" && value !== "vscode") return fail(`--format is claude or vscode: ${usage}`);
+      format = value;
+    } else {
+      if (value !== "user" && value !== "project") return fail(`--scope is user or project: ${usage}`);
+      scope = value;
+    }
+  }
+  return { kind: "export", format, scope };
 }

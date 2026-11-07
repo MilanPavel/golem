@@ -15,6 +15,8 @@ export const BROWSER_METHODS: ReadonlySet<string> = new Set([
   "mcp.disable",
   "mcp.enable",
   "mcp.get",
+  "mcp.import.apply",
+  "mcp.import.scan",
   "mcp.list",
   "mcp.logs",
   "mcp.remove",

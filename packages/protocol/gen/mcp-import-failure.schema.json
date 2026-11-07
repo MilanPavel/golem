@@ -1,0 +1,20 @@
+{
+  "additionalProperties": false,
+  "description": "A pick that was not added, and why.",
+  "properties": {
+    "error": {
+      "title": "Error",
+      "type": "string"
+    },
+    "key": {
+      "title": "Key",
+      "type": "string"
+    }
+  },
+  "required": [
+    "key",
+    "error"
+  ],
+  "title": "McpImportFailure",
+  "type": "object"
+}

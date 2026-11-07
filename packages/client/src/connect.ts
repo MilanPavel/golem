@@ -6,6 +6,7 @@ import type { AuthSetResult } from "../../protocol/gen/auth-set-result.ts";
 import type { McpAddParams } from "../../protocol/gen/mcp-add-params.ts";
 import type { McpCatalogParams } from "../../protocol/gen/mcp-catalog-params.ts";
 import type { McpCatalogResult } from "../../protocol/gen/mcp-catalog-result.ts";
+import type { McpServerDetail } from "../../protocol/gen/mcp-server-detail.ts";
 import type { RuntimeInstallCancelResult } from "../../protocol/gen/runtime-install-cancel-result.ts";
 import type { RuntimeInstallDone } from "../../protocol/gen/runtime-install-done.ts";
 import type { RuntimeInstallResult } from "../../protocol/gen/runtime-install-result.ts";
@@ -65,6 +66,7 @@ import {
   isKeychainWait,
   isOllamaInstallDone,
   isMcpCatalogResult,
+  isMcpServerDetail,
   isRuntimeInstallDone,
   isRuntimeName,
   isSetupStatusResult,
@@ -275,6 +277,8 @@ export interface GolemClient {
   removeMcpServer(name: string): Promise<McpRemoveResult>;
   /** The servers golem offers, each with whether it can run here and whether it is already added. */
   mcpCatalog(sessionId?: string): Promise<McpCatalogResult>;
+  /** One server's status, its whole config (secrets as `keychain:mcp/…` references), and where it is written. */
+  mcpGet(name: string, sessionId?: string): Promise<McpServerDetail>;
   /** Install Node or uv with Homebrew, run by the daemon. Output reaches {@link GolemClient.onRuntimeInstall}. */
   installRuntime(name: RuntimeName): Promise<RuntimeInstallResult>;
   cancelRuntimeInstall(name: RuntimeName): Promise<RuntimeInstallCancelResult>;
@@ -1193,6 +1197,14 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("mcp.catalog", { ...params });
       if (!isMcpCatalogResult(result)) {
         throw new Error("invalid mcp.catalog result");
+      }
+      return result;
+    },
+    async mcpGet(name: string, sessionId?: string): Promise<McpServerDetail> {
+      await ready;
+      const result = await call("mcp.get", withSession({ name }, sessionId));
+      if (!isMcpServerDetail(result)) {
+        throw new Error("invalid mcp.get result");
       }
       return result;
     },
