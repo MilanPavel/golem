@@ -11,7 +11,7 @@ golem works with a local model on your Mac, a hosted one, or both. Each chat run
 
 The easiest way is inside the chat: type `/model`.
 
-- The picker lists your Ollama models, popular ones to download, and every hosted model you have a key for. A model to download shows its size, and whether it fits in your Mac's memory.
+- The picker lists your Ollama models, popular ones to download, and the current hosted models you have a key for. Press Ctrl-A in the picker, or tick **Show all models** in the browser, to also see every other model your key can call. A model to download shows its size, and whether it fits in your Mac's memory.
 - **Enter** switches the current chat. The next message uses the new model.
 - **`d`** switches it, and also makes it the default for new chats.
 - **`x`** removes a downloaded model.

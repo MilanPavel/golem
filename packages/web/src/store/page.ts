@@ -5,7 +5,7 @@ import { createDrafts, type Drafts } from "./drafts.ts";
 import { createConnectionStore, type ConnectionStore } from "./connection.ts";
 import { createNewSession, type NewSessionStore } from "./new-session.ts";
 import { CONFIG_KEY } from "./config.ts";
-import { MODEL_LIST_KEY, SETUP_STATUS_KEY, type ModelListResult } from "./models.ts";
+import { MODEL_LIST_ALL_KEY, MODEL_LIST_KEY, SETUP_STATUS_KEY, type ModelListResult } from "./models.ts";
 import { createPulls, type Pulls } from "./pulls.ts";
 import { createQueryClient, keepQueriesHonest } from "./query.ts";
 import { createRouter, type Router } from "./router.ts";
@@ -95,7 +95,7 @@ export type PageActions = {
   /** Drops something the session allows for the rest of the session. */
   revokeAllowance(sessionId: string, tool: string, subject: string | null): Promise<void>;
   /** Asks the providers again, past the daemon's cache, puts the answer in the listing, and returns it. */
-  refreshModels(): Promise<ModelListResult>;
+  refreshModels(showAll?: boolean): Promise<ModelListResult>;
   /** Starts Ollama. True when it answers afterwards. */
   startOllama(): Promise<boolean>;
   /**
@@ -110,7 +110,7 @@ export type PageActions = {
 
 /** What each query key fetches. */
 export type PageQueries = {
-  modelList(): Promise<ModelListResult>;
+  modelList(showAll?: boolean): Promise<ModelListResult>;
   /** The overview rows, from the same checks as `golem doctor`. */
   setupStatus(): Promise<SetupStatusResult>;
   /** The skills a folder sees. `null` is no folder. */
@@ -178,7 +178,7 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
     setupStart,
     queryClient,
     queries: {
-      modelList: () => client.listModels(),
+      modelList: (showAll = false) => client.listModels(false, showAll),
       setupStatus: () => client.setupStatus(),
       skillList: (cwd) => (cwd === null ? client.listSkills() : client.listSkills(cwd)),
       config: (cwd, sessionId) => client.getConfig(cwd ?? undefined, sessionId ?? undefined),
@@ -271,9 +271,9 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
         await client.deleteModel(ref);
         await queryClient.invalidateQueries({ queryKey: MODEL_LIST_KEY });
       },
-      async refreshModels() {
-        const listing = await client.listModels(true);
-        queryClient.setQueryData(MODEL_LIST_KEY, listing);
+      async refreshModels(showAll = false) {
+        const listing = await client.listModels(true, showAll);
+        queryClient.setQueryData(showAll ? MODEL_LIST_ALL_KEY : MODEL_LIST_KEY, listing);
         void queryClient.invalidateQueries({ queryKey: SETUP_STATUS_KEY });
         return listing;
       },

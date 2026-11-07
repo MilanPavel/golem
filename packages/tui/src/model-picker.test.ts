@@ -279,3 +279,23 @@ test("after the install the picker asks to download, uses a ready model, or says
     text: "Ollama is installed: /model to pick a model",
   });
 });
+
+test("Ctrl-A toggles show all, asks for a new list, and the hint says what it will do", () => {
+  const opened = openPicker(null);
+  assert.equal(opened.showAll, false);
+  assert.match(pickerHint(opened), /Ctrl-A show all/);
+  assert.equal(pickerKeyOf(opened, press(null, "a", true)), "show-all");
+  const on = pressPicker(opened, LISTING, "show-all");
+  assert.equal(on.state.showAll, true);
+  assert.deepEqual(on.action, { kind: "show-all", on: true });
+  assert.match(pickerHint(on.state), /Ctrl-A current only/);
+  const off = pressPicker(on.state, LISTING, "show-all");
+  assert.equal(off.state.showAll, false);
+  assert.deepEqual(off.action, { kind: "show-all", on: false });
+});
+
+test("a plain a is still typed into the filter, and a closed picker is not showing all", () => {
+  assert.deepEqual(pickerKeyOf(openPicker(null), press(null, "a")), { kind: "type", text: "a" });
+  assert.equal(closedPicker.showAll, false);
+  assert.equal(openPicker("qwen", false, null, true).showAll, true);
+});

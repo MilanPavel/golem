@@ -62,7 +62,7 @@ test("refreshModels returns the listing it put in the cache", async () => {
   const listing = { default: null, models: [], providers: [], setup: { ollama_installed: true, ollama_running: true } };
   fake.raw.listModels.mockResolvedValueOnce(listing);
   await expect(page.actions.refreshModels()).resolves.toBe(listing);
-  expect(fake.raw.listModels).toHaveBeenCalledWith(true);
+  expect(fake.raw.listModels).toHaveBeenCalledWith(true, false);
   expect(page.queryClient.getQueryData(["model.list"])).toBe(listing);
 });
 

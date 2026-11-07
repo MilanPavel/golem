@@ -461,9 +461,26 @@ test("Refresh asks the providers again and shows the answer", async () => {
   const { fake, user } = await openDialog();
   fake.raw.listModels.mockResolvedValueOnce({ ...SAMPLE_LISTING, default: "local", models: SAMPLE_LISTING.models.slice(0, 3) });
   await user.click(within(dialog()).getByRole("button", { name: "Refresh the list" }));
-  expect(fake.raw.listModels).toHaveBeenLastCalledWith(true);
+  expect(fake.raw.listModels).toHaveBeenLastCalledWith(true, false);
   await waitFor(() => expect(options()).toHaveLength(3));
   expect(dialog().textContent).toContain("New sessions use local.");
+});
+
+test("Show all asks for every live model, and turning it off goes back to the short list", async () => {
+  const { fake, user } = await openDialog();
+  const extra = { ...SAMPLE_LISTING.models[0]!, ref: "openai/gpt-extra", label: "gpt-extra", provider: "openai", source: "remote" as const };
+  fake.raw.listModels.mockImplementation((_refresh?: boolean, showAll?: boolean) =>
+    Promise.resolve(showAll === true ? { ...SAMPLE_LISTING, models: [...SAMPLE_LISTING.models, extra] } : SAMPLE_LISTING),
+  );
+  const before = options().length;
+  const box = within(dialog()).getByRole("checkbox", { name: "Show all models" });
+  expect((box as HTMLInputElement).checked).toBe(false);
+  await user.click(box);
+  expect(fake.raw.listModels).toHaveBeenLastCalledWith(false, true);
+  await waitFor(() => expect(options()).toHaveLength(before + 1));
+  expect(optionOf("gpt-extra")).toBeDefined();
+  await user.click(box);
+  await waitFor(() => expect(options()).toHaveLength(before));
 });
 
 test("it says Loading models… until the first answer", async () => {
