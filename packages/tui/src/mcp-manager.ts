@@ -1,6 +1,16 @@
 import type { McpAddParams, McpServer, McpToolsResult } from "@golem/client";
 import {
+  detailChoices,
+  firstLine,
+  formatSeconds,
+  formatTokens,
+  mcpStatusMark as statusMark,
+  mcpStatusWord as statusWord,
+  mcpSummary as summary,
+  orderedServers,
   ownToolName,
+  shortPath,
+  type McpTone,
   entryAvailable,
   entryInputs,
   entryNote,
@@ -17,6 +27,8 @@ import {
 } from "@golem/view";
 
 import type { Press } from "./keys.ts";
+
+export { detailChoices, orderedServers, type McpTone };
 
 /**
  * `/mcp`: the servers by where they come from, then one server's details and
@@ -113,8 +125,6 @@ export type McpManagerAction =
   /** Add a server. `params.token`, when set, is a secret: never show or log it. */
   | { kind: "add"; params: McpAddParams };
 
-export type McpTone = "ok" | "bad" | "wait" | "off";
-
 export type McpManagerLine = {
   text: string;
   /** Drawn before the mark, such as the selection pointer or a label. */
@@ -138,7 +148,6 @@ const REMOVE_HINT = "↑/↓ to navigate · Enter to select · Esc to keep it";
 const TRY_HINT = "Enter to run · Esc to go back";
 const TRY_DONE_HINT = "Enter to run again · Esc to go back";
 
-type DetailChoice = { label: string; action: McpManagerAction | "view-tools" | "view-logs" | "ask-remove" | "run-test" };
 
 export function openMcpManager(folder = ""): McpManagerState {
   return { ...closedMcpManager, open: true, folder };
@@ -385,13 +394,6 @@ function pressOther(
   return { state: { ...state, view: { kind: "adding", name: view.name, back } }, action: { kind: "add", params: spec.spec } };
 }
 
-/** The user's servers first, then the project's, each sorted by name, as the list shows them. */
-export function orderedServers(servers: readonly McpServer[]): McpServer[] {
-  const mine = servers.filter((server) => !server.project);
-  const project = servers.filter((server) => server.project);
-  return [...mine, ...project];
-}
-
 export function pressMcpManager(
   state: McpManagerState,
   servers: readonly McpServer[],
@@ -483,38 +485,6 @@ export function pressMcpManager(
     return { state: { ...state, view: tools, tools: null }, action: { kind: "load-tools", name: view.name } };
   }
   return { state, action: picked.action };
-}
-
-/** What can be done with `server`, in the order the screen numbers it. */
-export function detailChoices(server: McpServer): DetailChoice[] {
-  const name = server.name;
-  const choices: DetailChoice[] = [];
-  if (server.state === "running" && (server.tools?.length ?? 0) > 0) {
-    choices.push({ label: "View tools", action: "view-tools" });
-  }
-  const inspect: DetailChoice[] = [
-    { label: "Test the connection", action: "run-test" },
-    { label: "View the log", action: "view-logs" },
-  ];
-  // A project's server lives in that project's file: it is changed there, not removed from here.
-  const remove: DetailChoice[] = server.project ? [] : [{ label: "Remove", action: "ask-remove" }];
-  if (server.state === "disabled") {
-    choices.push({ label: "Enable for every chat", action: { kind: "set-enabled", name, enabled: true } });
-    choices.push({ label: "Enable on demand", action: { kind: "set-enabled", name, enabled: "on_demand" } });
-    return [...choices, ...inspect, ...remove];
-  }
-  if (server.on_demand) {
-    const on = server.enabled === true;
-    choices.push({
-      label: on ? "Turn off for this chat" : "Turn on for this chat",
-      action: { kind: "session", name, on: !on },
-    });
-  }
-  if (server.state !== "idle") {
-    choices.push({ label: "Reconnect", action: { kind: "restart", name } });
-  }
-  choices.push({ label: "Disable everywhere", action: { kind: "set-enabled", name, enabled: false } });
-  return [...choices, ...inspect, ...remove];
 }
 
 function toDetail(view: { name: string; project: string | null }): McpManagerView {
@@ -1009,59 +979,6 @@ function tryLines(view: Extract<McpManagerView, { kind: "try" }>, room: number):
   return lines;
 }
 
-function summary(server: McpServer): string {
-  if (server.state === "running") {
-    const count = server.tools?.length ?? 0;
-    const tokens = server.schema_tokens == null ? "" : ` · ≈${formatTokens(server.schema_tokens)} tokens`;
-    return `${count} ${count === 1 ? "tool" : "tools"}${tokens}${markNote(server)}${hereNote(server)}`;
-  }
-  if (server.state === "failed") {
-    const retry = server.retry_seconds == null ? "" : ` · retrying in ${formatSeconds(server.retry_seconds)}`;
-    return `${server.error ?? "failed"}${retry}`;
-  }
-  if (server.state === "idle") {
-    return `on demand${hereNote(server)}`;
-  }
-  if (server.state === "disabled") {
-    return "disabled";
-  }
-  return "starting…";
-}
-
-/** What limits the server: tools kept from the model, and calls that run without asking. */
-function markNote(server: McpServer): string {
-  const count = server.tools_hidden ?? 0;
-  const hidden = count > 0 ? ` · ${count} hidden` : "";
-  return `${hidden}${server.approval === "allow" ? " · allow" : ""}`;
-}
-
-function hereNote(server: McpServer): string {
-  if (!server.on_demand) {
-    return "";
-  }
-  return server.enabled === true ? " · on here" : " · off here";
-}
-
-function statusMark(server: McpServer): { text: string; tone: McpTone } {
-  if (server.state === "running") {
-    return { text: "✔", tone: "ok" };
-  }
-  if (server.state === "failed") {
-    return { text: "✘", tone: "bad" };
-  }
-  if (server.state === "starting") {
-    return { text: "◌", tone: "wait" };
-  }
-  return { text: server.state === "idle" ? "○" : "–", tone: "off" };
-}
-
-function statusWord(server: McpServer): string {
-  if (server.state === "idle") {
-    return "idle (on demand)";
-  }
-  return server.state;
-}
-
 /** Keep the selected line on screen, with the title lines above it when they fit. */
 function scrollToSelected(lines: McpManagerLine[], room: number): McpManagerLine[] {
   if (lines.length <= room) {
@@ -1070,22 +987,6 @@ function scrollToSelected(lines: McpManagerLine[], room: number): McpManagerLine
   const selected = Math.max(0, lines.findIndex((line) => line.selected === true));
   const start = Math.min(Math.max(0, selected - room + 1), lines.length - room);
   return lines.slice(start, start + room);
-}
-
-function shortPath(path: string, home: string): string {
-  return home.length > 0 && path.startsWith(`${home}/`) ? `~${path.slice(home.length)}` : path;
-}
-
-function firstLine(text: string): string {
-  return text.trim().split("\n")[0] ?? "";
-}
-
-function formatTokens(tokens: number): string {
-  return tokens < 1000 ? String(tokens) : `${(tokens / 1000).toFixed(1)}k`;
-}
-
-function formatSeconds(seconds: number): string {
-  return seconds < 1 ? "<1s" : `${Math.round(seconds)}s`;
 }
 
 function clamp(index: number, count: number): number {

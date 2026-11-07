@@ -124,6 +124,8 @@ Type `/mcp` to see your servers:
 - read the server's log, which keeps coming in while it is open;
 - reconnect one, turn it off, or remove it. Remove asks first, and drops the token it stored in the Keychain. A project's server is not removed from here: change that project's `.golem/config.toml`.
 
+The web UI has the same list at Settings → MCP servers, and `/mcp` there opens it. You can open a server, see its tools, reconnect it, and turn it on or off. Turning on a server that was off asks first and shows the command golem will run.
+
 A server that crashes or stops answering starts again by itself. While it is down, the status line shows `mcp ✗ <name>` in red.
 
 ## Approvals
