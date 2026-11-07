@@ -33,6 +33,12 @@ Run `golem web` again while one is running, and it opens the same server instead
 - **Read a chat:** answers in a book serif, with highlighted code, and each tool line opens into its arguments and output.
 - **Write:** the composer sends a message, keeps your history, takes pastes, and stops an answer.
 - **See what golem is doing:** the pixel golem's eyes, the tab's icon, and its title follow the chat's state: idle, working, waiting for you, or failed.
+- **See and fix your setup** in Settings → Setup: a card for each part, with a mark and a word (`done`, `needs attention`, `failed`), the detail, and the fix beside it.
+  - **Engine:** `Install Ollama` installs it with Homebrew and shows what it prints under the row; `Start Ollama` starts it. With no Homebrew, the row links to ollama.com/download.
+  - **Model:** `Change…` opens the model list, where `Make default` picks the model new sessions start on.
+  - **Service and keys** are commands to copy, such as `golem daemon install` and `golem auth set anthropic`, with `Check again`. The page never installs a service or takes a key.
+  - **API keys** lists every provider with `key saved` or `no key`, and the command to store or replace the key of the one you pick. The page knows only that a key is saved, never its value.
+  - **Run setup again** walks the steps from the start.
 - **See a model download** in the sidebar, above Settings, on every screen, even when the download began in the terminal. Press it to open the models.
 - **Two themes:** slip (light) and kiln (dark). The switch at the bottom of the sidebar picks one, or follows your system.
 

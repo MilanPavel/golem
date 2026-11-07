@@ -2,8 +2,8 @@ import type { Mark, SetupLine } from "@golem/view";
 import { useEffect, useRef, type ReactNode } from "react";
 import type { PullEntry } from "../../store/pulls.ts";
 import { cn } from "../../ui/cn.ts";
+import { CopyCommand } from "../../ui/copy-command.tsx";
 import { CheckIcon } from "../../ui/icons.tsx";
-import { CopyCommand } from "../composer/index.ts";
 import { PullBar, pullShare, pullText } from "../models/index.ts";
 import type { PanelView } from "./setup-ui.ts";
 import "./setup.css";
@@ -11,7 +11,8 @@ import "./setup.css";
 /** What a mark means in words, so colour is never the only signal. */
 const MARK_WORDS: Record<Mark, string> = { ok: "done", fail: "failed", attn: "needs attention", spin: "working" };
 
-function MarkGlyph({ mark }: { mark: Mark }) {
+/** The mark of a line with its word for a screen reader. The Settings form uses it for its cards too. */
+export function MarkGlyph({ mark }: { mark: Mark }) {
   const word = <span className="sr-only">{MARK_WORDS[mark]}: </span>;
   switch (mark) {
     case "ok":

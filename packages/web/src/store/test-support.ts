@@ -1,4 +1,4 @@
-import { RpcError, SESSION_BUSY, type ChatEvent, type ConnectionState, type OllamaInstallUpdate, type ModelServerStatus, type PullUpdate, type SessionSummary } from "@golem/client";
+import { OLLAMA_FAILED, RpcError, SESSION_BUSY, type ChatEvent, type ConnectionState, type OllamaInstallUpdate, type ModelServerStatus, type PullUpdate, type SessionSummary } from "@golem/client";
 import { vi } from "vitest";
 import type { ModelListResult } from "./models.ts";
 import type { PageClient } from "./page.ts";
@@ -6,9 +6,12 @@ import type { PageClient } from "./page.ts";
 let seq = 0;
 
 /** A failed call, as the client rejects it. */
-export function rpcError(code: number, message: string): RpcError {
-  return new RpcError(code, message);
+export function rpcError(code: number, message: string, data?: Record<string, unknown>): RpcError {
+  return new RpcError(code, message, data);
 }
+
+/** The code of a failed Ollama install; with `{ no_brew: true }` in its data, Homebrew is missing. */
+export const OLLAMA_FAILED_CODE = OLLAMA_FAILED;
 
 export const SESSION_BUSY_CODE = SESSION_BUSY;
 export const INVALID_PARAMS_CODE = -32602;

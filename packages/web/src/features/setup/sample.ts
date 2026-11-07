@@ -1,7 +1,9 @@
-import { ASK_PAGE_KEY, guided, OVERVIEW, pageServiceRow, single, type SetupWindow } from "@golem/view";
+import { ASK_PAGE_KEY, guided, OVERVIEW, pageServiceRow, setupFormRows, single, type FormRow, type SetupWindow } from "@golem/view";
 import type { ListedModel, ModelListResult, SetupRow } from "../../store/models.ts";
 import type { PullsSnapshot } from "../../store/pulls.ts";
 import { newSetupUi, type PanelContext, type SetupUi } from "./setup-ui.ts";
+import type { KeyProvider } from "./setup-form.tsx";
+import type { SetupActionsState } from "./use-setup-actions.ts";
 
 const FREE = { input: 0, output: 0 };
 
@@ -173,4 +175,45 @@ export const SETUP_CASES: SetupCase[] = [
     ctx: ctx(WORKING_LISTING),
   },
   { label: "Service, not kept", ui: at(single("service", "overview"), WORKING_LISTING), ctx: ctx(WORKING_LISTING, { service: pageServiceRow(null, "0.5.0") }) },
+];
+
+export type FormCase = { label: string; rows: FormRow[]; actions: SetupActionsState; providers: KeyProvider[] };
+
+const key = (id: string, name: string, blurb: string, saved: boolean): KeyProvider => ({ id, name, blurb, saved });
+const NO_KEYS = [key("anthropic", "Anthropic", "Claude", false), key("openai", "OpenAI", "GPT", false), key("google", "Google", "Gemini", false)];
+const OPENAI_SAVED = [key("anthropic", "Anthropic", "Claude", false), key("openai", "OpenAI", "GPT", true), key("google", "Google", "Gemini", false)];
+
+const NO_ACTION: SetupActionsState = { running: null, output: "", noBrew: false, error: null, from: null };
+
+const PROBLEM_ROWS: SetupRow[] = [
+  ...STATUS_ROWS.slice(0, 4),
+  { part: "engine", name: "anthropic", state: "fail", detail: "no API key", action: "set_key", target: "anthropic" },
+  ...STATUS_ROWS.slice(4),
+];
+
+/** Settings → Setup in the states the form draws, for the gallery. */
+export const FORM_CASES: FormCase[] = [
+  { label: "All set", rows: setupFormRows(OK_ROWS, KEPT), actions: NO_ACTION, providers: OPENAI_SAVED },
+  {
+    label: "Ollama missing, service not kept, a key missing",
+    rows: setupFormRows(PROBLEM_ROWS, pageServiceRow(null, "0.5.0")),
+    actions: NO_ACTION,
+    providers: NO_KEYS,
+  },
+  {
+    label: "Installing Ollama",
+    rows: setupFormRows(PROBLEM_ROWS, KEPT),
+    actions: {
+      ...NO_ACTION,
+      running: "install",
+      output: "==> Fetching ollama\n==> Downloading https://ghcr.io/v2/homebrew/core/ollama\n==> Pouring ollama--0.12.0.arm64_sequoia.bottle.tar.gz\n",
+    },
+    providers: NO_KEYS,
+  },
+  {
+    label: "Install failed",
+    rows: setupFormRows(PROBLEM_ROWS, KEPT),
+    actions: { ...NO_ACTION, error: { action: "install", text: "Error: no space left on device" } },
+    providers: OPENAI_SAVED,
+  },
 ];
