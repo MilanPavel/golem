@@ -8,6 +8,7 @@ export const BROWSER_METHODS: ReadonlySet<string> = new Set([
   "config.raw.get",
   "config.raw.set",
   "daemon.status",
+  "fs.list_dirs",
   "hello",
   "mcp.add",
   "mcp.call",

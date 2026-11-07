@@ -1,8 +1,13 @@
 import type { KeychainWait } from "../../protocol/gen/keychain-wait.ts";
 import type { McpCatalogResult } from "../../protocol/gen/mcp-catalog-result.ts";
 import type { McpServerDetail } from "../../protocol/gen/mcp-server-detail.ts";
+import type { McpLogsResult } from "../../protocol/gen/mcp-logs-result.ts";
+import type { McpServerLog } from "../../protocol/gen/mcp-server-log.ts";
+import type { McpTestProgress } from "../../protocol/gen/mcp-test-progress.ts";
+import type { McpTestResult } from "../../protocol/gen/mcp-test-result.ts";
 import type { RuntimeInstallDone } from "../../protocol/gen/runtime-install-done.ts";
 import type { OllamaInstallDone } from "../../protocol/gen/ollama-install-done.ts";
+import type { DirEntry, FsListDirsResult } from "../../protocol/gen/fs-list-dirs-result.ts";
 import type { SetupRow, SetupStatusResult } from "../../protocol/gen/setup-status-result.ts";
 import type { McpListResult } from "../../protocol/gen/mcp-list-result.ts";
 import type { McpServer } from "../../protocol/gen/mcp-server.ts";
@@ -240,6 +245,22 @@ export function isSetupStatusResult(value: unknown): value is SetupStatusResult 
   return isRecord(value) && Array.isArray(value["rows"]) && value["rows"].every(isSetupRow);
 }
 
+function isDirEntry(value: unknown): value is DirEntry {
+  return isRecord(value) && typeof value["name"] === "string" && typeof value["path"] === "string" && typeof value["git"] === "boolean";
+}
+
+export function isFsListDirsResult(value: unknown): value is FsListDirsResult {
+  return (
+    isRecord(value) &&
+    typeof value["path"] === "string" &&
+    typeof value["home"] === "string" &&
+    (value["parent"] === undefined || value["parent"] === null || typeof value["parent"] === "string") &&
+    Array.isArray(value["entries"]) &&
+    value["entries"].every(isDirEntry) &&
+    typeof value["truncated"] === "boolean"
+  );
+}
+
 export function isKeychainWait(value: unknown): value is KeychainWait {
   return (
     isRecord(value) &&
@@ -381,6 +402,60 @@ export function isRuntimeName(value: unknown): value is "node" | "uv" {
 
 export function isRuntimeInstallDone(value: unknown): value is RuntimeInstallDone {
   return isRecord(value) && isRuntimeName(value["name"]) && typeof value["ok"] === "boolean";
+}
+
+const TEST_STEPS = new Set(["resolve", "spawn", "connect", "initialize", "tools", "ping"]);
+const STEP_STATES = new Set(["running", "ok", "failed", "skipped"]);
+
+function isTestStep(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    typeof value["step"] === "string" &&
+    TEST_STEPS.has(value["step"]) &&
+    typeof value["state"] === "string" &&
+    STEP_STATES.has(value["state"])
+  );
+}
+
+export function isMcpTestProgress(value: unknown): value is McpTestProgress {
+  return isRecord(value) && typeof value["test_id"] === "string" && isTestStep(value);
+}
+
+export function isMcpTestResult(value: unknown): value is McpTestResult {
+  return (
+    isRecord(value) &&
+    typeof value["test_id"] === "string" &&
+    typeof value["ok"] === "boolean" &&
+    Array.isArray(value["steps"]) &&
+    value["steps"].every(isTestStep)
+  );
+}
+
+function isLogLine(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    typeof value["ts"] === "number" &&
+    (value["kind"] === "stderr" || value["kind"] === "event") &&
+    typeof value["text"] === "string"
+  );
+}
+
+export function isMcpLogsResult(value: unknown): value is McpLogsResult {
+  return (
+    isRecord(value) &&
+    typeof value["name"] === "string" &&
+    Array.isArray(value["lines"]) &&
+    value["lines"].every(isLogLine)
+  );
+}
+
+export function isMcpServerLog(value: unknown): value is McpServerLog {
+  return (
+    isRecord(value) &&
+    typeof value["name"] === "string" &&
+    Array.isArray(value["lines"]) &&
+    value["lines"].every(isLogLine)
+  );
 }
 
 export function isMcpServerDetail(value: unknown): value is McpServerDetail {

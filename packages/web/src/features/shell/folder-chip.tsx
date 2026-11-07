@@ -1,58 +1,31 @@
-import { useId, useRef, useState, type FormEvent } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { badgeVariants } from "../../ui/badge.tsx";
-import { Button } from "../../ui/button.tsx";
 import { cn } from "../../ui/cn.ts";
 import { ChevronDownIcon, FolderIcon } from "../../ui/icons.tsx";
-import { Input } from "../../ui/input.tsx";
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from "../../ui/menu.tsx";
 import { Popover, PopoverAnchor, PopoverContent } from "../../ui/popover.tsx";
 import { folderName } from "../sessions/folder.ts";
+import type { FolderBrowserProps } from "./folder-browser.tsx";
 
-export const PATH_ERROR = "Enter an absolute path, starting with /.";
-
-/** A typed path is a string that starts with `/` once trimmed. The daemon checks the rest. */
-export function parseTypedPath(text: string): string | null {
-  const path = text.trim();
-  return path.startsWith("/") ? path : null;
-}
+export { parseTypedPath } from "./folder-browser.tsx";
 
 export type FolderChipProps = {
   folder: string | null;
   /** The folders to offer, newest first. */
   folders: readonly string[];
   onChange: (folder: string | null) => void;
+  /** The folder browser, for `Choose a folder…`. Without it the item is not offered. */
+  browser?: (props: FolderBrowserProps) => ReactNode;
 };
 
 /** The folder the next session will run in, with a menu to change it. Read-only chips are Badges. */
-export function FolderChip({ folder, folders, onChange }: FolderChipProps) {
-  const [typing, setTyping] = useState(false);
-  const [text, setText] = useState("");
-  const [error, setError] = useState(false);
-  const wantsInput = useRef(false);
-  const errorId = useId();
-
-  function submit(event: FormEvent): void {
-    event.preventDefault();
-    const path = parseTypedPath(text);
-    if (path === null) {
-      setError(true);
-      return;
-    }
-    onChange(path);
-    setTyping(false);
-  }
+export function FolderChip({ folder, folders, onChange, browser }: FolderChipProps) {
+  const [browsing, setBrowsing] = useState(false);
+  const wantsBrowser = useRef(false);
+  const content = useRef<HTMLDivElement>(null);
 
   return (
-    <Popover
-      open={typing}
-      onOpenChange={(open) => {
-        setTyping(open);
-        if (open) {
-          setText(folder ?? "");
-          setError(false);
-        }
-      }}
-    >
+    <Popover open={browsing} onOpenChange={setBrowsing}>
       <Menu>
         <PopoverAnchor asChild>
           <MenuTrigger
@@ -67,9 +40,11 @@ export function FolderChip({ folder, folders, onChange }: FolderChipProps) {
         </PopoverAnchor>
         <MenuContent
           onCloseAutoFocus={(event) => {
-            if (wantsInput.current) {
-              wantsInput.current = false;
+            if (wantsBrowser.current) {
+              // The browser opens once the menu has closed, so the two do not fight over focus.
+              wantsBrowser.current = false;
               event.preventDefault();
+              setBrowsing(true);
             }
           }}
         >
@@ -83,52 +58,42 @@ export function FolderChip({ folder, folders, onChange }: FolderChipProps) {
             No folder
             {folder === null ? <span aria-hidden="true" className="ml-auto text-clay-ink">✓</span> : null}
           </MenuItem>
-          <MenuSeparator />
-          <MenuItem
-            onSelect={() => {
-              wantsInput.current = true;
-              setText(folder ?? "");
-              setError(false);
-              setTyping(true);
-            }}
-          >
-            Type a path…
-          </MenuItem>
+          {browser === undefined ? null : (
+            <>
+              <MenuSeparator />
+              <MenuItem
+                onSelect={() => {
+                  wantsBrowser.current = true;
+                }}
+              >
+                Choose a folder…
+              </MenuItem>
+            </>
+          )}
         </MenuContent>
       </Menu>
-      <PopoverContent align="start" className="w-80">
-        <form onSubmit={submit} className="flex flex-col gap-2">
-          <label htmlFor={`${errorId}-path`} className="text-xs text-muted">
-            Folder path
-          </label>
-          <Input
-            id={`${errorId}-path`}
-            value={text}
-            placeholder="/Users/you/project"
-            autoComplete="off"
-            spellCheck={false}
-            aria-invalid={error ? "true" : undefined}
-            aria-describedby={error ? errorId : undefined}
-            className="font-mono"
-            onChange={(event) => {
-              setText(event.target.value);
-              setError(false);
-            }}
-          />
-          {error ? (
-            <p id={errorId} role="alert" className="text-xs text-deny">
-              {PATH_ERROR}
-            </p>
-          ) : null}
-          <div className="flex justify-end gap-2">
-            <Button size="sm" kind="ghost" onClick={() => setTyping(false)}>
-              Cancel
-            </Button>
-            <Button size="sm" kind="primary" type="submit">
-              Use this folder
-            </Button>
-          </div>
-        </form>
+      <PopoverContent
+        ref={content}
+        align="start"
+        aria-label="Choose a folder"
+        className="w-96"
+        onOpenAutoFocus={(event) => {
+          // Focus goes to the filter field, which takes the keys.
+          event.preventDefault();
+          content.current?.querySelector("input")?.focus();
+        }}
+      >
+        {browsing && browser !== undefined
+          ? browser({
+              initialPath: folder,
+              autoFocus: false,
+              onPick: (path) => {
+                onChange(path);
+                setBrowsing(false);
+              },
+              onCancel: () => setBrowsing(false),
+            })
+          : null}
       </PopoverContent>
     </Popover>
   );

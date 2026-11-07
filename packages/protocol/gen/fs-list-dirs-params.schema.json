@@ -1,0 +1,21 @@
+{
+  "additionalProperties": false,
+  "description": "``fs.list_dirs``. The folders directly under ``path``, for a folder picker.\n\n``path`` is an absolute path under the user's home folder. Null lists the\nhome folder. The daemon resolves it first (symlinks and ``..``), and refuses\none outside home or one that is not a folder (ADR-040).",
+  "properties": {
+    "path": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Path"
+    }
+  },
+  "title": "FsListDirsParams",
+  "type": "object"
+}

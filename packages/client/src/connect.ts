@@ -6,7 +6,7 @@ import type { AuthSetResult } from "../../protocol/gen/auth-set-result.ts";
 import type { McpAddParams } from "../../protocol/gen/mcp-add-params.ts";
 import type { McpCatalogParams } from "../../protocol/gen/mcp-catalog-params.ts";
 import type { McpCatalogResult } from "../../protocol/gen/mcp-catalog-result.ts";
-import type { McpServerDetail } from "../../protocol/gen/mcp-server-detail.ts";
+import type { McpServerConfig, McpServerDetail } from "../../protocol/gen/mcp-server-detail.ts";
 import type { RuntimeInstallCancelResult } from "../../protocol/gen/runtime-install-cancel-result.ts";
 import type { RuntimeInstallDone } from "../../protocol/gen/runtime-install-done.ts";
 import type { RuntimeInstallResult } from "../../protocol/gen/runtime-install-result.ts";
@@ -17,6 +17,7 @@ import type { KeychainWait } from "../../protocol/gen/keychain-wait.ts";
 import type { OllamaInstallDone } from "../../protocol/gen/ollama-install-done.ts";
 import type { OllamaInstallResult } from "../../protocol/gen/ollama-install-result.ts";
 import type { OllamaStartResult } from "../../protocol/gen/ollama-start-result.ts";
+import type { FsListDirsResult } from "../../protocol/gen/fs-list-dirs-result.ts";
 import type { SetupStatusResult } from "../../protocol/gen/setup-status-result.ts";
 import type { ApprovalRespondResult } from "../../protocol/gen/approval-respond-result.ts";
 import type { ArtifactReadResult } from "../../protocol/gen/artifact-read-result.ts";
@@ -36,6 +37,11 @@ import type { SkillListResult } from "../../protocol/gen/skill-list-result.ts";
 import type { McpToggleResult } from "../../protocol/gen/mcp-toggle-result.ts";
 import type { SessionSetSkillsResult } from "../../protocol/gen/session-set-skills-result.ts";
 import type { McpToolsResult } from "../../protocol/gen/mcp-tools-result.ts";
+import type { McpLogsResult } from "../../protocol/gen/mcp-logs-result.ts";
+import type { McpServerLog } from "../../protocol/gen/mcp-server-log.ts";
+import type { McpTestProgress } from "../../protocol/gen/mcp-test-progress.ts";
+import type { McpTestResult } from "../../protocol/gen/mcp-test-result.ts";
+import type { McpUpdateParams } from "../../protocol/gen/mcp-update-params.ts";
 import type { MessageSendResult } from "../../protocol/gen/message-send-result.ts";
 import type { ModelListResult } from "../../protocol/gen/model-list-result.ts";
 import type { ModelDeleteResult } from "../../protocol/gen/model-delete-result.ts";
@@ -69,6 +75,7 @@ import {
   isMcpServerDetail,
   isRuntimeInstallDone,
   isRuntimeName,
+  isFsListDirsResult,
   isSetupStatusResult,
   isDaemonStatus,
   isHelloResult,
@@ -77,6 +84,10 @@ import {
   isMcpServer,
   isMcpToggleResult,
   isSessionSetSkillsResult,
+  isMcpLogsResult,
+  isMcpServerLog,
+  isMcpTestProgress,
+  isMcpTestResult,
   isMcpToolsResult,
   isMessageSendResult,
   isModelListResult,
@@ -278,6 +289,20 @@ export interface GolemClient {
   removeMcpServer(name: string): Promise<McpRemoveResult>;
   /** The servers golem offers, each with whether it can run here and whether it is already added. */
   mcpCatalog(sessionId?: string): Promise<McpCatalogResult>;
+  /**
+   * Start a saved server (`name`) or a draft (`config`), list its tools, and ping it, saving nothing. Each step
+   * reaches `onProgress` as it starts and ends. `secrets` (by reference) are used for this test only.
+   */
+  mcpTest(
+    params: { name: string; sessionId?: string } | { config: McpServerConfig; secrets?: Record<string, string>; sessionId?: string },
+    onProgress?: (progress: McpTestProgress) => void,
+  ): Promise<McpTestResult>;
+  /** The last lines of a server's log, oldest first. New lines reach {@link GolemClient.onMcpLog}. */
+  mcpLogs(name: string, options?: { sessionId?: string; limit?: number }): Promise<McpLogsResult>;
+  /** `mcp.server.log`: new log lines of any server, at most one batch every 250 ms. */
+  onMcpLog(listener: (log: McpServerLog) => void): () => void;
+  /** Replace `[mcp.<name>]` in the file that names it. Send a secret again only to change it. */
+  updateMcpServer(params: McpUpdateParams): Promise<McpServer>;
   /** One server's status, its whole config (secrets as `keychain:mcp/…` references), and where it is written. */
   mcpGet(name: string, sessionId?: string): Promise<McpServerDetail>;
   /** Install Node or uv with Homebrew, run by the daemon. Output reaches {@link GolemClient.onRuntimeInstall}. */
@@ -289,6 +314,11 @@ export interface GolemClient {
   onMcpStatus(listener: (server: McpServer) => void): () => void;
   /** `model.server.status`: a local model server such as Ollama started, failed, or stopped. */
   onModelServer(listener: (status: ModelServerStatus) => void): () => void;
+  /**
+   * The folders directly under `path`, for a folder picker. `path` is an absolute path under the
+   * home folder; without one the home folder is listed. A path outside home is refused.
+   */
+  listDirs(path?: string): Promise<FsListDirsResult>;
   /** Every part of golem's setup, as `golem doctor` checks it. */
   setupStatus(): Promise<SetupStatusResult>;
   /** Install Ollama with Homebrew, run by the daemon. Output reaches {@link GolemClient.onOllamaInstall}. */
@@ -358,6 +388,8 @@ export function connectGolem(options: ConnectOptions): GolemClient {
   const wireListeners = new Set<(lines: readonly WireLine[]) => void>();
   const pullListeners = new Set<(update: PullUpdate) => void>();
   const mcpListeners = new Set<(server: McpServer) => void>();
+  const testListeners = new Set<(progress: McpTestProgress) => void>();
+  const logListeners = new Set<(log: McpServerLog) => void>();
   const skillListeners = new Set<(root: string | null) => void>();
   const serverListeners = new Set<(status: ModelServerStatus) => void>();
   const installListeners = new Set<(update: OllamaInstallUpdate) => void>();
@@ -514,6 +546,34 @@ export function connectGolem(options: ConnectOptions): GolemClient {
         for (const listener of pullListeners) {
           try {
             listener(update);
+          } catch {
+            // A listener must not tear the socket down.
+          }
+        }
+      }
+      return;
+    }
+    if (isRecord(message) && message["method"] === "mcp.test.progress") {
+      const params = message["params"];
+      record({ direction: "in", kind: "mcp.test.progress", detail: isMcpTestProgress(params) ? params.step : "", json: line });
+      if (isMcpTestProgress(params)) {
+        for (const listener of testListeners) {
+          try {
+            listener(params);
+          } catch {
+            // A listener must not tear the socket down.
+          }
+        }
+      }
+      return;
+    }
+    if (isRecord(message) && message["method"] === "mcp.server.log") {
+      const params = message["params"];
+      record({ direction: "in", kind: "mcp.server.log", detail: isMcpServerLog(params) ? params.name : "", json: line });
+      if (isMcpServerLog(params)) {
+        for (const listener of logListeners) {
+          try {
+            listener(params);
           } catch {
             // A listener must not tear the socket down.
           }
@@ -1207,6 +1267,45 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       }
       return result;
     },
+    async mcpTest(params, onProgress): Promise<McpTestResult> {
+      await ready;
+      const testId = `t${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+      const listener = (progress: McpTestProgress): void => {
+        if (progress.test_id === testId) onProgress?.(progress);
+      };
+      testListeners.add(listener);
+      try {
+        const body =
+          "name" in params
+            ? { name: params.name }
+            : { config: params.config, ...(params.secrets === undefined ? {} : { secrets: params.secrets }) };
+        const result = await call("mcp.test", withSession({ test_id: testId, ...body }, params.sessionId));
+        if (!isMcpTestResult(result)) {
+          throw new Error("invalid mcp.test result");
+        }
+        return result;
+      } finally {
+        testListeners.delete(listener);
+      }
+    },
+    async mcpLogs(name: string, options?: { sessionId?: string; limit?: number }): Promise<McpLogsResult> {
+      await ready;
+      const params = withSession({ name, ...(options?.limit === undefined ? {} : { limit: options.limit }) }, options?.sessionId);
+      const result = await call("mcp.logs", params);
+      if (!isMcpLogsResult(result)) {
+        throw new Error("invalid mcp.logs result");
+      }
+      return result;
+    },
+    onMcpLog(listener: (log: McpServerLog) => void): () => void {
+      logListeners.add(listener);
+      return () => {
+        logListeners.delete(listener);
+      };
+    },
+    async updateMcpServer(params: McpUpdateParams): Promise<McpServer> {
+      return mcpServerCall("mcp.update", { ...params });
+    },
     async mcpGet(name: string, sessionId?: string): Promise<McpServerDetail> {
       await ready;
       const result = await call("mcp.get", withSession({ name }, sessionId));
@@ -1256,6 +1355,14 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       return () => {
         serverListeners.delete(listener);
       };
+    },
+    async listDirs(path?: string): Promise<FsListDirsResult> {
+      await ready;
+      const result = await call("fs.list_dirs", path === undefined ? {} : { path });
+      if (!isFsListDirsResult(result)) {
+        throw new Error("invalid fs.list_dirs result");
+      }
+      return result;
     },
     async setupStatus(): Promise<SetupStatusResult> {
       await ready;
