@@ -31,6 +31,7 @@ Run `golem web` again while one is running, and it opens the same server instead
 - **Read a chat:** answers in a book serif, with highlighted code, and each tool line opens into its arguments and output.
 - **Write:** the composer sends a message, keeps your history, takes pastes, and stops an answer.
 - **See what golem is doing:** the pixel golem's eyes, the tab's icon, and its title follow the chat's state: idle, working, waiting for you, or failed.
+- **See a model download** in the sidebar, above Settings, on every screen, even when the download began in the terminal. Press it to open the models.
 - **Two themes:** slip (light) and kiln (dark). The switch at the bottom of the sidebar picks one, or follows your system.
 
 The web UI is new, and it grows step by step in [Phase 10](../plan.md#phase-10--web-ui). **Approvals, diffs, and the todo drawer** come next. Until then, answer an approval in the terminal: run `golem` in the same folder, and the waiting question is there. After that come models and a command palette, then settings, a layout for phones, and installing the page as an app.

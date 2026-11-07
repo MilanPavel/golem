@@ -220,3 +220,12 @@ test("defaultWhenDone sets the default when the download ends well, and not when
   await Promise.resolve();
   expect(fake.raw.setDefaultModel).not.toHaveBeenCalled();
 });
+
+test("forget drops a failure, so the person can dismiss it", () => {
+  const { pulls, progress, done } = setup();
+  progress(0);
+  done(false, "no space");
+  expect(pulls.getSnapshot().failed.get(REF)).toBe("no space");
+  pulls.forget(REF);
+  expect(pulls.getSnapshot().failed.has(REF)).toBe(false);
+});

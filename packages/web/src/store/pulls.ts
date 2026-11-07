@@ -23,7 +23,7 @@ export type Pulls = StoreSource<PullsSnapshot> & {
   switchWhenDone(ref: string, sessionId: string): void;
   /** Make `name` the default model once the download ends well. A failed or stopped one sets nothing. */
   defaultWhenDone(ref: string, name: string): void;
-  /** Drop the wish for a download the person stopped. */
+  /** Drop the wishes for a download the person stopped, and its failure if it has one. */
   forget(ref: string): void;
   start(): void;
   stop(): void;
@@ -118,6 +118,8 @@ export function createPulls(client: PullsClient, now: () => number = Date.now, o
     forget(ref) {
       wishes.delete(ref);
       defaults.delete(ref);
+      const snapshot = store.getSnapshot();
+      commit(snapshot.active, without(snapshot.failed, ref));
     },
     start() {
       if (offs !== undefined) {
