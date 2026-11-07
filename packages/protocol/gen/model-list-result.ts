@@ -2,6 +2,7 @@
 
 export type Default = string | null;
 export type DiskFreeGb = number | null;
+export type Categories = ('general' | 'coding' | 'reasoning' | 'vision' | 'fast' | 'long-context')[];
 export type Ctx = number | null;
 export type Fit = ('fits' | 'tight' | 'too_big') | null;
 export type Label = string;
@@ -54,6 +55,9 @@ export interface ModelListResult {
  * ``fit`` says whether a local model fits in this machine's memory.
  * ``tags`` are a catalog model's tags, such as ``coding``, and
  * ``recommended`` marks the one catalog model golem suggests for this Mac.
+ * ``categories`` say what the model is for, in a fixed order: the catalog's
+ * own for a model it lists, else what Ollama's ``capabilities`` and
+ * LiteLLM's ``supports_*`` fields and context size show.
  * ``stale`` means a cached list was shown because the provider did not
  * answer in time.
  *
@@ -61,6 +65,7 @@ export interface ModelListResult {
  * via the `definition` "ListedModel".
  */
 export interface ListedModel {
+  categories?: Categories;
   ctx?: Ctx;
   fit?: Fit;
   label: Label;

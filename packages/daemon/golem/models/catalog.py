@@ -12,6 +12,31 @@ from golem.config import HOSTED_PROVIDERS
 # The fixed set a model can be filed under.
 CATEGORIES = ("general", "coding", "reasoning", "vision", "fast", "long-context")
 
+# A model whose context holds at least this many tokens is filed under long-context.
+LONG_CONTEXT_TOKENS = 200_000
+
+
+def in_order(names: tuple[str, ...]) -> tuple[str, ...]:
+    """The categories in the fixed order of ``CATEGORIES``."""
+    return tuple(name for name in CATEGORIES if name in names)
+
+
+def categories_of(
+    *,
+    vision: bool | None,
+    reasoning: bool | None,
+    ctx: int | None,
+) -> tuple[str, ...]:
+    """What the facts say about a model the catalog does not list."""
+    found = {"general"}
+    if vision:
+        found.add("vision")
+    if reasoning:
+        found.add("reasoning")
+    if ctx is not None and ctx >= LONG_CONTEXT_TOKENS:
+        found.add("long-context")
+    return tuple(name for name in CATEGORIES if name in found)
+
 
 @dataclass(frozen=True, slots=True)
 class CatalogEntry:
@@ -20,6 +45,7 @@ class CatalogEntry:
     size_gb: float
     tags: tuple[str, ...]
     min_ram_gb: float | None = None
+    categories: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,6 +76,7 @@ def load_local_catalog() -> list[CatalogEntry]:
                 size_gb=float(item["size_gb"]),
                 tags=tuple(str(tag) for tag in item.get("tags", [])),
                 min_ram_gb=float(item["min_ram_gb"]) if "min_ram_gb" in item else None,
+                categories=tuple(str(name) for name in item.get("categories", [])),
             )
         )
     return entries

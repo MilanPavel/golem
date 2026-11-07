@@ -64,3 +64,17 @@ def test_no_catalog_model_is_marked_retired_in_the_bundled_prices() -> None:
         provider, _, model = entry.ref.partition("/")
         info = book.lookup(provider, model)
         assert info is not None and info.deprecation_date is None, entry.ref
+
+
+def test_every_local_entry_has_known_categories() -> None:
+    for entry in load_local_catalog():
+        assert entry.categories, entry.ref
+        assert set(entry.categories) <= set(CATEGORIES), entry.ref
+
+
+def test_the_protocol_and_the_catalog_agree_on_the_categories() -> None:
+    from typing import get_args
+
+    from golem_protocol.commands import ModelCategory
+
+    assert get_args(ModelCategory) == CATEGORIES
