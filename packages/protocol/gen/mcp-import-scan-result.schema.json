@@ -1,0 +1,282 @@
+{
+  "$defs": {
+    "McpImportCandidate": {
+      "additionalProperties": false,
+      "description": "A server found in another app, as golem would add it.\n\n``config`` names a secret as ``keychain:mcp/<name>``, never its value.\n``secret_refs`` are all the secrets it names, and ``missing_refs`` the ones\nthe source did not hold a value for (a ``${input:token}``): send them in\n``secrets`` of ``mcp.import.apply``, or set them later. ``clash`` says\n``name`` was changed to fit an existing server or another candidate, and\n``already_same`` says golem has a server with the same command or url.",
+      "properties": {
+        "already_same": {
+          "default": false,
+          "title": "Already Same",
+          "type": "boolean"
+        },
+        "clash": {
+          "default": false,
+          "title": "Clash",
+          "type": "boolean"
+        },
+        "config": {
+          "$ref": "#/$defs/McpServerConfig"
+        },
+        "key": {
+          "title": "Key",
+          "type": "string"
+        },
+        "missing_refs": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Missing Refs",
+          "type": "array"
+        },
+        "name": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9-]{0,31}$",
+          "title": "Name",
+          "type": "string"
+        },
+        "original_name": {
+          "title": "Original Name",
+          "type": "string"
+        },
+        "scope": {
+          "enum": [
+            "user",
+            "project"
+          ],
+          "title": "Scope",
+          "type": "string"
+        },
+        "secret_refs": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Secret Refs",
+          "type": "array"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "key",
+        "name",
+        "original_name",
+        "scope",
+        "config"
+      ],
+      "title": "McpImportCandidate",
+      "type": "object"
+    },
+    "McpImportSource": {
+      "additionalProperties": false,
+      "description": "One file of another app, or the pasted text, and the servers in it.\n\n``skipped`` lists servers that could not be turned into a golem server, with\nthe reason. ``error`` is set when the file could not be read.",
+      "properties": {
+        "candidates": {
+          "items": {
+            "$ref": "#/$defs/McpImportCandidate"
+          },
+          "title": "Candidates",
+          "type": "array"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Path"
+        },
+        "skipped": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Skipped",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "label"
+      ],
+      "title": "McpImportSource",
+      "type": "object"
+    },
+    "McpServerConfig": {
+      "additionalProperties": false,
+      "description": "Every field of ``[mcp.<name>]``, as it goes over the wire.\n\nThe daemon's settings model has the same fields, and a test keeps the two\nequal. A value in ``env`` or ``headers`` names a secret as\n``keychain:mcp/<name>``, never the secret itself.",
+      "properties": {
+        "approval": {
+          "default": "ask",
+          "enum": [
+            "ask",
+            "allow"
+          ],
+          "title": "Approval",
+          "type": "string"
+        },
+        "args": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Args",
+          "type": "array"
+        },
+        "command": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Command"
+        },
+        "cwd": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cwd"
+        },
+        "enabled": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "const": "on_demand",
+              "type": "string"
+            }
+          ],
+          "default": true,
+          "title": "Enabled"
+        },
+        "env": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Env",
+          "type": "object"
+        },
+        "env_passthrough": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Env Passthrough",
+          "type": "array"
+        },
+        "headers": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Headers",
+          "type": "object"
+        },
+        "timeout_seconds": {
+          "default": 120,
+          "exclusiveMinimum": 0,
+          "maximum": 3600,
+          "title": "Timeout Seconds",
+          "type": "integer"
+        },
+        "tools": {
+          "$ref": "#/$defs/McpToolFilterConfig"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Url"
+        }
+      },
+      "title": "McpServerConfig",
+      "type": "object"
+    },
+    "McpToolFilterConfig": {
+      "additionalProperties": false,
+      "description": "``tools`` of ``[mcp.<name>]``: ``fnmatch`` patterns on the server's own tool names.\n\nAn empty ``include`` means every tool, and ``exclude`` wins.",
+      "properties": {
+        "exclude": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Exclude",
+          "type": "array"
+        },
+        "include": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Include",
+          "type": "array"
+        }
+      },
+      "title": "McpToolFilterConfig",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The sources found. Secret values stay in the daemon under ``scan_id`` for ten minutes.",
+  "properties": {
+    "scan_id": {
+      "title": "Scan Id",
+      "type": "string"
+    },
+    "sources": {
+      "items": {
+        "$ref": "#/$defs/McpImportSource"
+      },
+      "title": "Sources",
+      "type": "array"
+    }
+  },
+  "required": [
+    "scan_id",
+    "sources"
+  ],
+  "title": "McpImportScanResult",
+  "type": "object"
+}

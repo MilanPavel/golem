@@ -1,0 +1,5 @@
+{
+  "mcpServers": {
+    "context7": { "url": "https://mcp.context7.test/mcp", "headers": { "X-API-Key": "ctx_fixture_key_3" } }
+  }
+}

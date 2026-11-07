@@ -87,7 +87,7 @@ async def mcp_add(ctx: RequestContext, params: McpAddParams) -> McpServer:
     scope = ToolScope()
     if params.catalog_id is not None:
         scope = await get_scope(ctx, params.session_id)
-        path = await _target(ctx, params.scope, scope)
+        path = await config_target(ctx, params.scope, scope)
         table, values = _catalog_table(params, scope)
     elif params.config is None:
         table = _short_table(params)
@@ -97,10 +97,10 @@ async def mcp_add(ctx: RequestContext, params: McpAddParams) -> McpServer:
     else:
         table = to_table(params.config)
         scope = await get_scope(ctx, params.session_id)
-        path = await _target(ctx, params.scope, scope)
+        path = await config_target(ctx, params.scope, scope)
         values = {ref: value.get_secret_value() for ref, value in params.secrets.items()}
     settings = to_settings(table)
-    _own_secrets(params.name, settings)
+    own_secrets(params.name, settings)
     check_sent(values, settings)
     if params.scope == "user" and mcp.config_files(params.name):
         raise RpcCallError(
@@ -117,7 +117,7 @@ async def mcp_add(ctx: RequestContext, params: McpAddParams) -> McpServer:
             INVALID_PARAMS, f"{path} already has [mcp.{params.name}]: fix or remove it"
         )
     # Stored first, so the server never starts without them.
-    await _store(ctx, values)
+    await store_secrets(ctx, values)
     try:
         await asyncio.to_thread(add_mcp_server, path, params.name, table)
     except McpExistsError as exc:
@@ -143,7 +143,7 @@ async def mcp_update(ctx: RequestContext, params: McpUpdateParams) -> McpServer:
     renamed = name != params.name
     table = to_table(params.config)
     new = to_settings(table)
-    _own_secrets(name, new)
+    own_secrets(name, new)
     values = {ref: value.get_secret_value() for ref, value in params.secrets.items()}
     check_sent(values, new)
     if renamed:
@@ -173,7 +173,7 @@ async def mcp_update(ctx: RequestContext, params: McpUpdateParams) -> McpServer:
                     f"{params.name} changed where it runs or connects, and it names the stored "
                     f"secret {ref}: send the secret again in secrets",
                 )
-    await _store(ctx, values)
+    await store_secrets(ctx, values)
     if renamed:
         await _carry_secrets(ctx, new.secrets, values, counterpart)
     try:
@@ -227,7 +227,7 @@ async def mcp_remove(ctx: RequestContext, params: McpRemoveParams) -> McpRemoveR
 
 
 async def config_raw_get(ctx: RequestContext, params: ConfigRawGetParams) -> ConfigRawGetResult:
-    path = await _target(ctx, params.scope, await get_scope(ctx, params.session_id))
+    path = await config_target(ctx, params.scope, await get_scope(ctx, params.session_id))
     try:
         text, mtime = await asyncio.to_thread(read_raw, path)
     except (OSError, ValueError) as exc:
@@ -250,7 +250,7 @@ async def config_raw_set_protected(
 async def _raw_set(
     ctx: RequestContext, params: ConfigRawSetParams, *, protected: bool
 ) -> ConfigRawResult:
-    path = await _target(ctx, params.scope, await get_scope(ctx, params.session_id))
+    path = await config_target(ctx, params.scope, await get_scope(ctx, params.session_id))
     try:
         current, mtime = await asyncio.to_thread(read_raw, path)
     except (OSError, ValueError) as exc:
@@ -352,7 +352,7 @@ def to_settings(table: dict[str, Any]) -> McpServerSettings:
         raise RpcCallError(INVALID_PARAMS, message) from exc
 
 
-def _own_secrets(name: str, settings: McpServerSettings) -> None:
+def own_secrets(name: str, settings: McpServerSettings) -> None:
     """A server names only its own secrets, so it cannot be sent another one's value."""
     for ref in settings.secrets:
         if not owns(name, ref):
@@ -372,7 +372,7 @@ def check_sent(values: dict[str, str], settings: McpServerSettings) -> None:
             raise RpcCallError(INVALID_PARAMS, f"{ref} is sent, but config does not name it")
 
 
-async def _store(ctx: RequestContext, values: dict[str, str]) -> None:
+async def store_secrets(ctx: RequestContext, values: dict[str, str]) -> None:
     if not values:
         return
     store = _secret_store(ctx)
@@ -456,7 +456,9 @@ async def get_scope(ctx: RequestContext, session_id: str | None) -> ToolScope:
         raise RpcCallError(SESSION_NOT_FOUND, f"session not found: {session_id}") from exc
 
 
-async def _target(ctx: RequestContext, kind: Literal["user", "project"], scope: ToolScope) -> Path:
+async def config_target(
+    ctx: RequestContext, kind: Literal["user", "project"], scope: ToolScope
+) -> Path:
     """The config file for ``kind``. A project's needs a session in a trusted folder."""
     if kind == "user":
         return ctx.state.paths.config_file

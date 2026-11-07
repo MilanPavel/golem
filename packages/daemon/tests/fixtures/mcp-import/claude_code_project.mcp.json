@@ -1,0 +1,5 @@
+{
+  "mcpServers": {
+    "shared-tool": { "command": "npx", "args": ["-y", "shared-tool"], "env": { "API_KEY": "${SHARED_API_KEY}" } }
+  }
+}

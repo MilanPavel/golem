@@ -96,3 +96,26 @@ test("a --catalog after -- is part of the server's command", () => {
     tokenEnv: null,
   });
 });
+
+test("export defaults to the Claude format and the user's servers", () => {
+  assert.deepEqual(parseMcpArgs(["export"]), { kind: "export", format: "claude", scope: "user" });
+  assert.deepEqual(parseMcpArgs(["export", "--json"]), { kind: "export", format: "claude", scope: "user" });
+  assert.deepEqual(parseMcpArgs(["export", "--format", "vscode", "--scope", "project"]), {
+    kind: "export",
+    format: "vscode",
+    scope: "project",
+  });
+});
+
+test("export refuses an unknown format, scope, or word", () => {
+  const message = (words: string[]): string => {
+    const parsed = parseMcpArgs(words);
+    assert.equal(parsed.kind, "error");
+    return parsed.kind === "error" ? parsed.message : "";
+  };
+  assert.match(message(["export", "--format", "toml"]), /claude or vscode/);
+  assert.match(message(["export", "--format"]), /claude or vscode/);
+  assert.match(message(["export", "--scope", "team"]), /user or project/);
+  assert.match(message(["export", "--all"]), /unknown option --all/);
+  assert.match(message(["export", "github"]), /unexpected github/);
+});

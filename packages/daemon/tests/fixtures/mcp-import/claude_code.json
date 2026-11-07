@@ -1,0 +1,17 @@
+{
+  "numStartups": 12,
+  "mcpServers": {
+    "memory": { "type": "stdio", "command": "npx", "args": ["-y", "@modelcontextprotocol/server-memory"], "env": {} }
+  },
+  "projects": {
+    "{project}": {
+      "allowedTools": [],
+      "mcpServers": {
+        "local-db": { "command": "uvx", "args": ["mcp-server-sqlite", "--db-path", "test.db"], "disabled": true }
+      }
+    },
+    "/somewhere/else": {
+      "mcpServers": { "other": { "command": "npx", "args": ["other"] } }
+    }
+  }
+}

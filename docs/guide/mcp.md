@@ -57,6 +57,34 @@ args = ["mcp-server-git", "--repository", "/path/to/your/repo"]
 
 golem notices the change and starts it, with no restart. The model sees its tools as `mcp__git__<tool>`.
 
+## Bring your servers from another app
+
+If you already set servers up in Claude Desktop, Claude Code, Cursor, VS Code, or Windsurf, golem can read them. It looks at each app's config file and, for the project you are in, that project's own files. Pasted JSON works too: any of those files' shapes, or one server on its own.
+
+golem only reads those files. It never changes one.
+
+What happens to each server:
+
+- A command or URL server comes over as it is. A server marked `disabled` comes in turned off.
+- A token in `env`, or in a header such as `Authorization: Bearer …`, goes to your Keychain and the config names it as `keychain:mcp/<name>`. The value is never written to `config.toml` and never sent back to the screen.
+- A value that only names a secret, such as VS Code's `${input:token}`, comes in without a value. golem says so, and you type the value when you import it, or set it later.
+- A server that uses the old SSE transport is imported with a warning, because golem doesn't speak it yet.
+- Names are made to fit: `_`, `.`, and spaces become `-`, and a name that is already taken gets `-2`. A server golem already has with the same command or URL is marked as already added.
+
+The terminal and web screens for this come with `/mcp` and Settings. The daemon's `mcp.import.scan` and `mcp.import.apply` do the work for them.
+
+### Send your servers to another app
+
+`golem mcp export` prints your servers as the JSON those apps read:
+
+```bash
+golem mcp export                       # Claude Desktop, Claude Code, Cursor, Windsurf: mcpServers
+golem mcp export --format vscode       # VS Code: servers
+golem mcp export --scope project       # the project you are in, not your own servers
+```
+
+A secret is never printed. `keychain:mcp/github` becomes `${MCP_GITHUB}` (`${env:MCP_GITHUB}` for VS Code), and golem tells you on stderr which variable to set. A tool filter and an approval setting have no place in those formats, so they are left out, and golem says so.
+
 ## Manage servers in the chat
 
 Type `/mcp` to see your servers:
