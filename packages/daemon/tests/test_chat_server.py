@@ -548,6 +548,8 @@ async def test_list_with_cwd_keeps_only_that_folder(short_home: Path, tmp_path: 
     client = await RpcClient.connect(app.paths.socket_path)
     try:
         await client.call("hello", HELLO)
+        (tmp_path / "here").mkdir()
+        (tmp_path / "elsewhere").mkdir()
         here, elsewhere = str(tmp_path / "here"), str(tmp_path / "elsewhere")
         mine = rpc_result(await client.call("session.create", {"cwd": here}))["session_id"]
         await client.call("session.create", {"cwd": elsewhere})

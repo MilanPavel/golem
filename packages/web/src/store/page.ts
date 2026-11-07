@@ -1,4 +1,4 @@
-import { OLLAMA_FAILED, RpcError, type ApprovalChoice, type ConfigGetResult, type GolemClient, type SetupStatusResult, type SkillListResult } from "@golem/client";
+import { OLLAMA_FAILED, RpcError, type ApprovalChoice, type ConfigGetResult, type FsListDirsResult, type GolemClient, type SetupStatusResult, type SkillListResult } from "@golem/client";
 import { installEventOf, type InstallEvent } from "@golem/view";
 import type { QueryClient } from "@tanstack/react-query";
 import { createDrafts, type Drafts } from "./drafts.ts";
@@ -40,6 +40,7 @@ export type PageClient = Pick<
   | "listSkills"
   | "setSkills"
   | "getConfig"
+  | "listDirs"
   | "updateRule"
   | "removeRule"
   | "revokeAllowance"
@@ -117,6 +118,8 @@ export type PageQueries = {
   skillList(cwd: string | null): Promise<SkillListResult>;
   /** The tool rules in check order, and what the session allows. `null` is no folder or no session. */
   config(cwd: string | null, sessionId: string | null): Promise<ConfigGetResult>;
+  /** The folders directly under `path` in the home folder; `null` is home itself. */
+  dirs(path: string | null): Promise<FsListDirsResult>;
 };
 
 export type Page = {
@@ -182,6 +185,7 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       setupStatus: () => client.setupStatus(),
       skillList: (cwd) => (cwd === null ? client.listSkills() : client.listSkills(cwd)),
       config: (cwd, sessionId) => client.getConfig(cwd ?? undefined, sessionId ?? undefined),
+      dirs: (path) => (path === null ? client.listDirs() : client.listDirs(path)),
     },
     router,
     actions: {

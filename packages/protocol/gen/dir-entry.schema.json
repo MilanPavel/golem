@@ -1,0 +1,27 @@
+{
+  "additionalProperties": false,
+  "description": "A folder in a listing. ``git`` is true when it has a ``.git`` entry.",
+  "properties": {
+    "git": {
+      "title": "Git",
+      "type": "boolean"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "path": {
+      "minLength": 1,
+      "title": "Path",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "path",
+    "git"
+  ],
+  "title": "DirEntry",
+  "type": "object"
+}

@@ -21,6 +21,7 @@ from golem.config_edit import (
     set_mcp_enabled,
 )
 from golem.doctor import MacPlatform, run_checks
+from golem.folders import FolderError, list_dirs
 from golem.mcp import McpServerError, McpSupervisor
 from golem.models import ollama
 from golem.models.discovery import KeyRejected, KeyUnchecked
@@ -100,6 +101,8 @@ from golem_protocol.commands import (
     ConfigRawSetParams,
     ConfigRule,
     DaemonStatus,
+    FsListDirsParams,
+    FsListDirsResult,
     HelloParams,
     HelloResult,
     InspectMessage,
@@ -254,6 +257,16 @@ def _configured_model(ctx: RequestContext) -> tuple[str | None, str | None, str 
     return identity.profile, identity.provider, identity.name
 
 
+def _check_cwd(cwd: str | None) -> None:
+    """Refuse a project folder that is not an absolute path to a folder that exists."""
+    if cwd is None:
+        return
+    if not Path(cwd).is_absolute():
+        raise RpcCallError(INVALID_PARAMS, "cwd must be an absolute path")
+    if not Path(cwd).is_dir():
+        raise RpcCallError(INVALID_PARAMS, f"There is no folder at {cwd}.")
+
+
 async def _ping(ctx: RequestContext, params: PingParams) -> Ping:
     del ctx
     return Ping(type="system.ping", nonce=params.nonce)
@@ -261,8 +274,7 @@ async def _ping(ctx: RequestContext, params: PingParams) -> Ping:
 
 async def _session_create(ctx: RequestContext, params: SessionCreateParams) -> SessionCreateResult:
     sessions = _sessions(ctx)
-    if params.cwd is not None and not Path(params.cwd).is_absolute():
-        raise RpcCallError(INVALID_PARAMS, "cwd must be an absolute path")
+    _check_cwd(params.cwd)
     try:
         session_id = await sessions.create(params.model_profile, cwd=params.cwd)
     except ModelConfigError as exc:
@@ -287,8 +299,7 @@ async def _session_detach(ctx: RequestContext, params: SessionDetachParams) -> S
 
 
 async def _session_list(ctx: RequestContext, params: SessionListParams) -> SessionListResult:
-    if params.cwd is not None and not Path(params.cwd).is_absolute():
-        raise RpcCallError(INVALID_PARAMS, "cwd must be an absolute path")
+    _check_cwd(params.cwd)
     sessions = _sessions(ctx)
     if params.watch:
         found = await sessions.watch(params.limit, ctx.connection)
@@ -331,8 +342,7 @@ async def _session_rename(ctx: RequestContext, params: SessionRenameParams) -> S
 
 async def _message_send(ctx: RequestContext, params: MessageSendParams) -> MessageSendResult:
     sessions = _sessions(ctx)
-    if params.cwd is not None and not Path(params.cwd).is_absolute():
-        raise RpcCallError(INVALID_PARAMS, "cwd must be an absolute path")
+    _check_cwd(params.cwd)
     try:
         run_id = await sessions.send(
             params.session_id, params.text, cwd=params.cwd, skill=params.skill
@@ -348,6 +358,16 @@ async def _message_send(ctx: RequestContext, params: MessageSendParams) -> Messa
     except SkillInvokeError as exc:
         raise RpcCallError(SKILL_NOT_FOUND, str(exc)) from exc
     return MessageSendResult(run_id=run_id)
+
+
+async def _fs_list_dirs(ctx: RequestContext, params: FsListDirsParams) -> FsListDirsResult:
+    del ctx
+    if params.path is not None and not Path(params.path).is_absolute():
+        raise RpcCallError(INVALID_PARAMS, "path must be an absolute path")
+    try:
+        return list_dirs(None if params.path is None else Path(params.path), Path.home())
+    except FolderError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
 
 
 async def _approval_respond(
@@ -594,8 +614,7 @@ async def _config_get(ctx: RequestContext, params: ConfigGetParams) -> ConfigGet
     policy, tools = ctx.state.policy, ctx.state.tools
     if policy is None or tools is None:
         raise RpcCallError(INTERNAL_ERROR, "tools are not ready")
-    if params.cwd is not None and not Path(params.cwd).is_absolute():
-        raise RpcCallError(INVALID_PARAMS, "cwd must be an absolute path")
+    _check_cwd(params.cwd)
     paths = ctx.state.paths
     try:
         settings = await asyncio.to_thread(load_settings, home=paths.home, project_dir=paths.home)
@@ -654,8 +673,7 @@ async def _edit_policy(
     policy = ctx.state.policy
     if policy is None:
         raise RpcCallError(INTERNAL_ERROR, "tools are not ready")
-    if cwd is not None and not Path(cwd).is_absolute():
-        raise RpcCallError(INVALID_PARAMS, "cwd must be an absolute path")
+    _check_cwd(cwd)
     root = None if cwd is None else Path(cwd)
     try:
         path = policy.file(target, root)
@@ -689,8 +707,7 @@ async def _mcp_list(ctx: RequestContext, params: McpListParams) -> McpListResult
 
 
 async def _skill_list(ctx: RequestContext, params: SkillListParams) -> SkillListResult:
-    if params.cwd is not None and not Path(params.cwd).is_absolute():
-        raise RpcCallError(INVALID_PARAMS, "cwd must be an absolute path")
+    _check_cwd(params.cwd)
     skills = ctx.state.skills
     if skills is None:
         return SkillListResult(skills=[])
@@ -990,6 +1007,7 @@ def standard_methods() -> dict[str, Method]:
         "model.set_default": Method(
             "model.set_default", ModelSetDefaultParams, True, _model_set_default
         ),
+        "fs.list_dirs": Method("fs.list_dirs", FsListDirsParams, True, _fs_list_dirs),
         "setup.status": Method("setup.status", SetupStatusParams, True, _setup_status),
         "ollama.install": Method("ollama.install", OllamaInstallParams, True, _ollama_install),
         "ollama.install_cancel": Method(

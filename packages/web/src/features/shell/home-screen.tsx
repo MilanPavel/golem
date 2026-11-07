@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { NewSessionComposer, useStartSession } from "../composer/index.ts";
 import { PixelGolem } from "../../ui/pixel-golem.tsx";
 import { useKnownFolders, useNewSessionFolder, useNewSessionModel } from "../../store/page-context.tsx";
+import { FolderBrowser } from "./folder-browser.tsx";
 import { FolderChip, type FolderChipProps } from "./folder-chip.tsx";
 import { NewSessionModelChip } from "./model-chip-new.tsx";
 import "./shell.css";
@@ -54,6 +55,7 @@ export function HomeScreen() {
       folder={folder}
       folders={folders}
       onChange={setFolder}
+      browser={(props) => <FolderBrowser {...props} />}
       composer={<NewSessionComposer start={start} />}
       modelChip={<NewSessionModelChip />}
       folderError={start.folderError}

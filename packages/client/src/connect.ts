@@ -16,6 +16,7 @@ import type { KeychainWait } from "../../protocol/gen/keychain-wait.ts";
 import type { OllamaInstallDone } from "../../protocol/gen/ollama-install-done.ts";
 import type { OllamaInstallResult } from "../../protocol/gen/ollama-install-result.ts";
 import type { OllamaStartResult } from "../../protocol/gen/ollama-start-result.ts";
+import type { FsListDirsResult } from "../../protocol/gen/fs-list-dirs-result.ts";
 import type { SetupStatusResult } from "../../protocol/gen/setup-status-result.ts";
 import type { ApprovalRespondResult } from "../../protocol/gen/approval-respond-result.ts";
 import type { ArtifactReadResult } from "../../protocol/gen/artifact-read-result.ts";
@@ -67,6 +68,7 @@ import {
   isMcpCatalogResult,
   isRuntimeInstallDone,
   isRuntimeName,
+  isFsListDirsResult,
   isSetupStatusResult,
   isDaemonStatus,
   isHelloResult,
@@ -284,6 +286,11 @@ export interface GolemClient {
   onMcpStatus(listener: (server: McpServer) => void): () => void;
   /** `model.server.status`: a local model server such as Ollama started, failed, or stopped. */
   onModelServer(listener: (status: ModelServerStatus) => void): () => void;
+  /**
+   * The folders directly under `path`, for a folder picker. `path` is an absolute path under the
+   * home folder; without one the home folder is listed. A path outside home is refused.
+   */
+  listDirs(path?: string): Promise<FsListDirsResult>;
   /** Every part of golem's setup, as `golem doctor` checks it. */
   setupStatus(): Promise<SetupStatusResult>;
   /** Install Ollama with Homebrew, run by the daemon. Output reaches {@link GolemClient.onOllamaInstall}. */
@@ -1240,6 +1247,14 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       return () => {
         serverListeners.delete(listener);
       };
+    },
+    async listDirs(path?: string): Promise<FsListDirsResult> {
+      await ready;
+      const result = await call("fs.list_dirs", path === undefined ? {} : { path });
+      if (!isFsListDirsResult(result)) {
+        throw new Error("invalid fs.list_dirs result");
+      }
+      return result;
     },
     async setupStatus(): Promise<SetupStatusResult> {
       await ready;
