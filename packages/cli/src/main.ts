@@ -30,6 +30,15 @@ import { formatStatus } from "./format-status.ts";
 import { formatCliVersion } from "./format-version.ts";
 import { parseMcpArgs, type McpArgs } from "./mcp-command.ts";
 import { exportServers } from "./mcp-export.ts";
+import {
+  changeToolFilter,
+  formatLogLine,
+  formatMcpDetail,
+  formatMcpList,
+  formatMcpTools,
+  formatTestResult,
+  formatTestStep,
+} from "./mcp-format.ts";
 import { readChoice } from "./read-choice.ts";
 import { readSecret } from "./read-secret.ts";
 import { type Gate, gateService, type SessionDaemon } from "./service-gate.ts";
@@ -50,6 +59,7 @@ const USAGE =
   "       golem daemon install|start|stop|restart|uninstall|logs\n" +
   "       golem auth set <provider> [--no-check] | golem auth remove <provider> | golem auth list | golem models [--refresh]\n" +
   "       golem mcp add <name> -- <command…> [--token-env VAR] | golem mcp add <name> --url <url> [--token] | golem mcp add --catalog <id> [--input <id>=<value>] | golem mcp remove <name> | golem mcp export [--format claude|vscode] [--scope user|project]\n" +
+  "       golem mcp list [--json] | show <name> [--json] | test <name> | logs <name> [-f] | enable <name> [--on-demand] | disable <name> | restart <name> | tools <name> [--hide <glob>] [--show <glob>]\n" +
   "       golem config show [--resolved] | golem skills [list] | golem skills check <path>\n" +
   "       golem web [--port N] [--no-open] [--json]";
 
@@ -220,6 +230,9 @@ async function runMcp(given: string[]): Promise<number> {
   if (parsed.kind === "export") {
     return runMcpExport(parsed);
   }
+  if (parsed.kind !== "add" && parsed.kind !== "remove") {
+    return runMcpServer(parsed);
+  }
   let token = "";
   const wantsToken = parsed.kind === "add" && ("url" in parsed ? parsed.token : parsed.tokenEnv !== null);
   if (wantsToken) {
@@ -261,6 +274,85 @@ async function runMcp(given: string[]): Promise<number> {
   } finally {
     client.close();
   }
+}
+
+type ServerCommand = Exclude<McpArgs, { kind: "add" | "remove" | "catalog" | "export" | "error" }>;
+
+/** `golem mcp list|show|test|logs|enable|disable|restart|tools`: read and control the servers that are there. */
+async function runMcpServer(parsed: ServerCommand): Promise<number> {
+  const client = connectOnce();
+  try {
+    switch (parsed.kind) {
+      case "list": {
+        const { servers } = await client.listMcp();
+        process.stdout.write(`${parsed.json ? JSON.stringify(servers, null, 2) : formatMcpList(servers)}\n`);
+        return 0;
+      }
+      case "show": {
+        const detail = await client.mcpGet(parsed.name);
+        process.stdout.write(`${parsed.json ? JSON.stringify(detail, null, 2) : formatMcpDetail(detail)}\n`);
+        return 0;
+      }
+      case "test": {
+        const result = await client.mcpTest({ name: parsed.name }, (progress) => {
+          const line = formatTestStep(progress);
+          if (line !== null) process.stdout.write(`${line}\n`);
+        });
+        process.stdout.write(`${formatTestResult(result)}\n`);
+        return result.ok ? 0 : 1;
+      }
+      case "logs":
+        return await runMcpLogs(client, parsed.name, parsed.follow);
+      case "enable":
+      case "disable": {
+        const enabled = parsed.kind === "disable" ? false : parsed.onDemand ? "on_demand" : true;
+        const server = await client.setMcpEnabled(parsed.name, enabled);
+        const how = enabled === "on_demand" ? "on demand" : enabled ? "on" : "off";
+        process.stdout.write(`${parsed.name} is ${how} · ${server.state}\n`);
+        return 0;
+      }
+      case "restart": {
+        const server = await client.restartMcp(parsed.name);
+        process.stdout.write(`${parsed.name} · ${server.state}\n`);
+        return 0;
+      }
+      case "tools": {
+        if (parsed.hide.length === 0 && parsed.show.length === 0) {
+          process.stdout.write(`${formatMcpTools(await client.mcpTools(parsed.name))}\n`);
+          return 0;
+        }
+        const detail = await client.mcpGet(parsed.name);
+        const change = changeToolFilter(detail.config, parsed.hide, parsed.show);
+        if (!change.ok) {
+          process.stderr.write(`${change.message}\n`);
+          return 1;
+        }
+        await client.updateMcpServer({ name: parsed.name, config: change.config });
+        process.stdout.write(`${formatMcpTools(await client.mcpTools(parsed.name))}\n`);
+        return 0;
+      }
+    }
+  } catch (error) {
+    process.stderr.write(`${explainClient(error)}\n`);
+    return 1;
+  } finally {
+    client.close();
+  }
+}
+
+/** The last lines of a server's log, then with `-f` the new ones until Ctrl-C. */
+async function runMcpLogs(client: ReturnType<typeof connectOnce>, name: string, follow: boolean): Promise<number> {
+  const stop = follow
+    ? client.onMcpLog((batch) => {
+        if (batch.name === name) for (const line of batch.lines) process.stdout.write(`${formatLogLine(line)}\n`);
+      })
+    : () => undefined;
+  const { lines } = await client.mcpLogs(name);
+  for (const line of lines) process.stdout.write(`${formatLogLine(line)}\n`);
+  if (!follow) return 0;
+  await new Promise<void>((done) => process.once("SIGINT", () => done()));
+  stop();
+  return 0;
 }
 
 /** `golem mcp export`: print the servers as another app's JSON. Secret values never leave the Keychain. */

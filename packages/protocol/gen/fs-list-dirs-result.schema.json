@@ -1,0 +1,77 @@
+{
+  "$defs": {
+    "DirEntry": {
+      "additionalProperties": false,
+      "description": "A folder in a listing. ``git`` is true when it has a ``.git`` entry.",
+      "properties": {
+        "git": {
+          "title": "Git",
+          "type": "boolean"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "path",
+        "git"
+      ],
+      "title": "DirEntry",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The folders under ``path``, sorted without regard to case.\n\n``home`` is the user's home folder and ``parent`` is the folder above\n``path``, or null at home. Only folders are listed: no file names, sizes,\ntimes, or contents. Dot-folders, ``~/Library``, secret folders, and entries\nthat resolve outside home are left out. A list stops at 500 entries, and\n``truncated`` says it was cut.",
+  "properties": {
+    "entries": {
+      "items": {
+        "$ref": "#/$defs/DirEntry"
+      },
+      "title": "Entries",
+      "type": "array"
+    },
+    "home": {
+      "minLength": 1,
+      "title": "Home",
+      "type": "string"
+    },
+    "parent": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Parent"
+    },
+    "path": {
+      "minLength": 1,
+      "title": "Path",
+      "type": "string"
+    },
+    "truncated": {
+      "title": "Truncated",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "path",
+    "home",
+    "entries",
+    "truncated"
+  ],
+  "title": "FsListDirsResult",
+  "type": "object"
+}
