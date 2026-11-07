@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { createRouter, parseRoute, sessionPath, settingsPath } from "./router.ts";
+import { createRouter, parseRoute, sessionPath, settingsPath, tracePath } from "./router.ts";
 
 afterEach(() => {
   history.replaceState(null, "", "/");
@@ -102,4 +102,32 @@ test("back and forward update the route, and stop ends it", async () => {
   history.forward();
   await again;
   expect(router.getSnapshot()).toEqual({ name: "home" });
+});
+
+test("parseRoute reads a session's trace and the span in the query", () => {
+  expect(parseRoute("/s/abc/trace")).toEqual({ name: "trace", id: "abc", span: null });
+  expect(parseRoute("/s/abc/trace", "?span=x")).toEqual({ name: "trace", id: "abc", span: "x" });
+  expect(parseRoute("/s/abc/trace", "?span=")).toEqual({ name: "trace", id: "abc", span: null });
+  expect(parseRoute("/s/a%20b/trace", "?span=m%201")).toEqual({ name: "trace", id: "a b", span: "m 1" });
+  for (const bad of ["/s/abc/trace/", "/s/abc/other", "/s//trace", "/s/a%2Fb/trace"]) {
+    expect(parseRoute(bad)).toEqual({ name: "not-found" });
+  }
+});
+
+test("tracePath round-trips through parseRoute", () => {
+  expect(tracePath("s_1")).toBe("/s/s_1/trace");
+  const path = tracePath("s_1 x", "m_2&3");
+  const [pathname, search] = path.split("?");
+  expect(parseRoute(pathname ?? "", `?${search ?? ""}`)).toEqual({ name: "trace", id: "s_1 x", span: "m_2&3" });
+});
+
+test("selecting a span is a new route, and the same span is the same route", () => {
+  const router = createRouter();
+  router.navigate("/s/one/trace");
+  const first = router.getSnapshot();
+  router.navigate("/s/one/trace", { replace: true });
+  expect(router.getSnapshot()).toBe(first);
+  router.navigate(tracePath("one", "m_1"), { replace: true });
+  expect(router.getSnapshot()).toEqual({ name: "trace", id: "one", span: "m_1" });
+  router.stop();
 });

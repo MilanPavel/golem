@@ -41,6 +41,8 @@
 
   /* From here the details drawer sits beside the column (1100 px). */
   --breakpoint-wide: 68.75rem;
+  /* Below this the trace page is a single column: 760 px. */
+  --breakpoint-narrow: 47.5rem;
 
   --radius-xs: 2px;
   --radius-sm: 6px;
