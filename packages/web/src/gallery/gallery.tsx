@@ -32,7 +32,8 @@ import { FolderBrowserView } from "../features/shell/folder-browser.tsx";
 import { CommandPaletteView, KeysDialog } from "../features/palette/index.ts";
 import { ModelDialogView, type ModelDialogViewProps } from "../features/models/index.ts";
 import { SetupDialogView } from "../features/setup/index.ts";
-import { SETUP_CASES } from "../features/setup/sample.ts";
+import { FORM_CASES, SETUP_CASES } from "../features/setup/sample.ts";
+import { AddKey, SetupFormView } from "../features/setup/setup-form.tsx";
 import { panelView } from "../features/setup/setup-ui.ts";
 import { PullStatusView, pullSummary } from "../features/models/index.ts";
 import { NO_OLLAMA_LISTING, OLLAMA_DOWN_LISTING, SAMPLE_LISTING, SAMPLE_PULLS } from "../features/models/sample.ts";
@@ -487,6 +488,28 @@ function SetupDemo({ theme }: { theme: string }) {
   );
 }
 
+/** Settings → Setup: the cards with their fixes, and the key command under them. */
+function SetupFormDemo() {
+  return (
+    <div className="flex flex-col gap-4">
+      {FORM_CASES.map(({ label, rows, actions, providers }) => (
+        <div key={label} className="flex flex-col gap-2 rounded-lg border border-line bg-bg p-4">
+          <span className="font-mono text-xs text-faint">{label}</span>
+          <SetupFormView
+            rows={rows}
+            actions={actions}
+            onButton={() => {}}
+            onCancelInstall={() => {}}
+            onNavigate={() => {}}
+            hasPage={() => false}
+          />
+          <AddKey providers={providers} actions={actions} onCheck={() => {}} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function Panel({ theme }: { theme: "slip" | "kiln" }) {
   return (
     <section data-theme={theme} aria-label={`${theme} theme`} className="rounded-lg border border-line bg-bg p-4 text-ink">
@@ -551,6 +574,11 @@ function Panel({ theme }: { theme: "slip" | "kiln" }) {
       <section className="mt-6">
         <h3 className="mb-2 font-mono text-xs text-faint">Folder browser</h3>
         <FolderBrowserDemo theme={theme} />
+      </section>
+
+      <section className="mt-6">
+        <h3 className="mb-2 font-mono text-xs text-faint">Setup form</h3>
+        <SetupFormDemo />
       </section>
 
       <section className="mt-6">
