@@ -4,7 +4,7 @@ Sources, merged by ref:
 
 - Installed local models, from Ollama's ``/api/tags`` (``/api/show`` fills in
   context size and capabilities when an older Ollama leaves them out).
-- Local models to download, from the bundled ``local-catalog.toml``.
+- Local models to download, from the bundled ``catalog.toml``.
 - Hosted models, from each provider's model list once it has a key:
   Anthropic and OpenAI ``/v1/models``, and ``<base_url>/models`` for an
   OpenAI-compatible provider such as DeepSeek or xAI.
