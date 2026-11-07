@@ -1,4 +1,4 @@
-import { OLLAMA_FAILED, RpcError, SESSION_BUSY, type ChatEvent, type ConnectionState, type OllamaInstallUpdate, type ModelServerStatus, type PullUpdate, type SessionSummary } from "@golem/client";
+import { OLLAMA_FAILED, RpcError, SESSION_BUSY, type ChatEvent, type ConnectionState, type OllamaInstallUpdate, type McpServerLog, type ModelServerStatus, type PullUpdate, type SessionSummary } from "@golem/client";
 import { vi } from "vitest";
 import type { ModelListResult } from "./models.ts";
 import type { PageClient } from "./page.ts";
@@ -78,6 +78,7 @@ export function fakeClient() {
   const summaries = listeners<SessionSummary>();
   const skills = listeners<string | null>();
   const mcp = listeners<unknown>();
+  const mcpLog = listeners<McpServerLog>();
   const pull = listeners<PullUpdate>();
   const server = listeners<ModelServerStatus>();
   const install = listeners<OllamaInstallUpdate>();
@@ -120,6 +121,13 @@ export function fakeClient() {
     setMcpEnabled: vi.fn<PageClient["setMcpEnabled"]>(async () => ({}) as never),
     enableMcp: vi.fn<PageClient["enableMcp"]>(async () => ({}) as never),
     disableMcp: vi.fn<PageClient["disableMcp"]>(async () => ({}) as never),
+    mcpTest: vi.fn<PageClient["mcpTest"]>(async () => ({ test_id: "t", ok: true, steps: [], tools: [], stderr_tail: [] })),
+    mcpLogs: vi.fn<PageClient["mcpLogs"]>(async (name) => ({ name, lines: [] })),
+    onMcpLog: mcpLog.on,
+    mcpCall: vi.fn<PageClient["mcpCall"]>(async () => ({ text: "", is_error: false })),
+    mcpGet: vi.fn<PageClient["mcpGet"]>(async () => ({}) as never),
+    updateMcpServer: vi.fn<PageClient["updateMcpServer"]>(async () => ({}) as never),
+    removeMcpServer: vi.fn<PageClient["removeMcpServer"]>(async (name) => ({ name, secret: false })),
     updateRule: vi.fn<PageClient["updateRule"]>(async () => ({}) as never),
     removeRule: vi.fn<PageClient["removeRule"]>(async () => ({}) as never),
     revokeAllowance: vi.fn<PageClient["revokeAllowance"]>(async () => true),
@@ -144,6 +152,7 @@ export function fakeClient() {
     emitSkills: (root: string | null = null) => {
       skills.emit(root);
     },
+    emitMcpLog: mcpLog.emit,
     emitMcp: () => {
       mcp.emit({});
     },

@@ -17,13 +17,16 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { actionErrorText } from "../../store/errors.ts";
 import type { McpServer } from "../../store/mcp.ts";
 import { useMcpList, useMcpTools, usePageActions } from "../../store/page-context.tsx";
+import { LogsView } from "./mcp/logs-view.tsx";
+import { TestView } from "./mcp/test-view.tsx";
+import { TryTool } from "./mcp/try-tool.tsx";
 import { Button } from "../../ui/button.tsx";
 import { cn } from "../../ui/cn.ts";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "../../ui/dialog.tsx";
 import { useSettingsContext } from "./context.ts";
 
 type Selected = { name: string; project: string | null };
-type View = { kind: "list" } | { kind: "detail"; at: Selected } | { kind: "tools"; at: Selected };
+type View = { kind: "list" } | { kind: "detail" | "tools" | "test" | "logs"; at: Selected };
 
 const TONE = { ok: "text-allow", bad: "text-deny", wait: "text-wait", off: "text-faint" } as const;
 const DEFAULT_FILE = "~/.golem/config.toml";
@@ -34,11 +37,6 @@ function same(server: McpServer, at: Selected): boolean {
 
 function keyOf(server: McpServer): string {
   return `${server.project ?? ""}\u0000${server.name}`;
-}
-
-/** The screens a choice opens are not here yet: only the choices that act on the config or the session are drawn. */
-function drawn(choice: DetailChoice): choice is DetailChoice & { action: McpDetailAction | "view-tools" } {
-  return choice.action === "view-tools" || typeof choice.action === "object";
 }
 
 /** The MCP servers, as `/mcp` lists them: by the file that names each, then one server's details and its tools. */
@@ -92,15 +90,22 @@ export function McpSection() {
     back.current = keyOf(server);
     setView({ kind: "list" });
   };
+  const toDetail = (): void => setView({ kind: "detail", at: view.at });
   if (view.kind === "tools") {
-    return <ToolsView server={server} sessionId={sessionId} onBack={() => setView({ kind: "detail", at: view.at })} />;
+    return <ToolsView server={server} sessionId={sessionId} onBack={toDetail} />;
+  }
+  if (view.kind === "test") {
+    return <TestView server={server} sessionId={sessionId} onBack={toDetail} />;
+  }
+  if (view.kind === "logs") {
+    return <LogsView server={server} sessionId={sessionId} onBack={toDetail} />;
   }
   return (
     <Detail
       server={server}
       sessionId={sessionId}
       onBack={leave}
-      onTools={() => setView({ kind: "tools", at: view.at })}
+      onOpen={(next) => setView({ kind: next, at: view.at })}
     />
   );
 }
@@ -182,17 +187,18 @@ function Fact({ label, children }: { label: string; children: React.ReactNode })
   );
 }
 
-function Detail({ server, sessionId, onBack, onTools }: { server: McpServer; sessionId: string | null; onBack: () => void; onTools: () => void }) {
+function Detail({ server, sessionId, onBack, onOpen }: { server: McpServer; sessionId: string | null; onBack: () => void; onOpen: (screen: "tools" | "test" | "logs") => void }) {
   const actions = usePageActions();
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [asking, setAsking] = useState<(DetailChoice & { action: McpDetailAction }) | null>(null);
+  const [removing, setRemoving] = useState(false);
   const mark = mcpStatusMark(server);
   const isUrl = /^https?:\/\//.test(server.command);
   const count = server.tools?.length ?? 0;
   // Without a session there is no chat to turn a server on for, so those choices are not offered.
   const shown = sessionId === null ? { ...server, on_demand: false } : server;
-  const choices = detailChoices(shown).filter(drawn);
+  const choices = detailChoices(shown);
 
   async function run(action: McpDetailAction): Promise<void> {
     try {
@@ -220,11 +226,20 @@ function Detail({ server, sessionId, onBack, onTools }: { server: McpServer; ses
     }
   }
 
-  function press(choice: DetailChoice & { action: McpDetailAction | "view-tools" }): void {
-    if (choice.action === "view-tools") {
-      onTools();
-      return;
+  async function remove(): Promise<void> {
+    try {
+      await actions.removeMcp(server.name);
+    } catch (failure) {
+      setNotice(null);
+      setError(actionErrorText(failure, `Could not remove ${server.name}.`));
     }
+  }
+
+  function press(choice: DetailChoice): void {
+    if (choice.action === "view-tools") return onOpen("tools");
+    if (choice.action === "run-test") return onOpen("test");
+    if (choice.action === "view-logs") return onOpen("logs");
+    if (choice.action === "ask-remove") return setRemoving(true);
     // Enabling starts a process the file named earlier, from a click in a browser, so it asks first.
     if (choice.action.kind === "set-enabled" && choice.action.enabled !== false) {
       setAsking({ ...choice, action: choice.action });
@@ -282,11 +297,33 @@ function Detail({ server, sessionId, onBack, onTools }: { server: McpServer; ses
       )}
       <div className="flex flex-wrap gap-2">
         {choices.map((choice) => (
-          <Button key={choice.label} onClick={() => press(choice)}>
+          <Button key={choice.label} kind={choice.action === "ask-remove" ? "danger" : "secondary"} onClick={() => press(choice)}>
             {choice.label}
           </Button>
         ))}
       </div>
+      <Dialog open={removing} onOpenChange={setRemoving}>
+        <DialogContent>
+          <DialogTitle>Remove {server.name}?</DialogTitle>
+          <DialogDescription>
+            Its entry leaves <span className="font-mono wrap-anywhere">{shortPath(server.config ?? "~/.golem/config.toml", "")}</span>, and the token it stored leaves the Keychain.
+          </DialogDescription>
+          <div className="mt-4 flex justify-end gap-2">
+            <Button autoFocus onClick={() => setRemoving(false)}>
+              Cancel
+            </Button>
+            <Button
+              kind="danger"
+              onClick={() => {
+                setRemoving(false);
+                void remove();
+              }}
+            >
+              Remove
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       <Dialog open={asking !== null} onOpenChange={(open) => (open ? undefined : setAsking(null))}>
         <DialogContent>
           {asking === null ? null : (
@@ -322,8 +359,31 @@ function Detail({ server, sessionId, onBack, onTools }: { server: McpServer; ses
 
 function ToolsView({ server, sessionId, onBack }: { server: McpServer; sessionId: string | null; onBack: () => void }) {
   const tools = useMcpTools(server.name, sessionId);
-  const names = (tools.data?.tools ?? []).map((tool) => ownToolName(server.name, tool.name));
-  const width = Math.max(0, ...names.map((name) => name.length));
+  const actions = usePageActions();
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [trying, setTrying] = useState<string | null>(null);
+  const list = tools.data?.tools ?? [];
+  const hidden = list.filter((tool) => tool.hidden === true).length;
+  const tried = list.find((tool) => tool.name === trying);
+
+  async function toggle(tool: (typeof list)[number]): Promise<void> {
+    const own = ownToolName(server.name, tool.name);
+    const hide = tool.hidden !== true;
+    setBusy(tool.name);
+    try {
+      await actions.setMcpToolHidden(server.name, own, hide, sessionId);
+      setError(null);
+      setNotice(`${own} is ${hide ? "hidden from" : "shown to"} the model`);
+    } catch (failure) {
+      setNotice(null);
+      setError(actionErrorText(failure, `Could not change ${own}.`));
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
     <div className="flex flex-col gap-3">
       <div>
@@ -332,6 +392,14 @@ function ToolsView({ server, sessionId, onBack }: { server: McpServer; sessionId
         </Button>
       </div>
       <h3 className="font-mono text-base font-semibold wrap-anywhere">{server.name} tools</h3>
+      <p role="status" aria-live="polite" className="min-h-5 font-mono text-xs text-muted">
+        {notice}
+      </p>
+      {error === null ? null : (
+        <p role="alert" className="text-sm text-deny">
+          {error}
+        </p>
+      )}
       {tools.isError ? (
         <div className="flex flex-col items-start gap-2">
           <p role="alert" className="text-sm text-deny">
@@ -343,18 +411,45 @@ function ToolsView({ server, sessionId, onBack }: { server: McpServer; sessionId
         </div>
       ) : tools.data === undefined ? (
         <p className="font-mono text-sm text-muted">loading…</p>
-      ) : tools.data.tools.length === 0 ? (
+      ) : list.length === 0 ? (
         <p className="text-sm text-muted">No tools while the server is not running.</p>
       ) : (
-        <ul aria-label={`${server.name} tools`} className="flex flex-col gap-1">
-          {tools.data.tools.map((tool, index) => (
-            <li key={tool.name} className="flex flex-wrap gap-x-3 font-mono text-sm">
-              <span style={{ minWidth: `${width}ch` }}>{names[index]}</span>
-              <span className="min-w-0 flex-1 text-muted wrap-anywhere">{firstLine(tool.description)}</span>
-            </li>
-          ))}
-        </ul>
+        <>
+          <ul aria-label={`${server.name} tools`} className="flex flex-col gap-2">
+            {list.map((tool) => {
+              const own = ownToolName(server.name, tool.name);
+              const shown = tool.hidden !== true;
+              return (
+                <li key={tool.name} className={cn("flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-line bg-surface px-3 py-2", !shown && "opacity-70")}>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={shown}
+                    aria-label={`Show ${own} to the model`}
+                    disabled={busy !== null}
+                    onClick={() => void toggle(tool)}
+                    className="rounded-md border border-line-strong px-2 py-0.5 font-mono text-xs outline-offset-2 outline-clay focus-visible:outline-2 disabled:opacity-50"
+                  >
+                    {shown ? "shown" : "hidden"}
+                  </button>
+                  <span className="font-mono text-sm">{own}</span>
+                  <span className="font-mono text-xs text-muted">≈{formatTokens(tool.schema_tokens ?? 0)} tokens</span>
+                  <span className="min-w-0 flex-1 text-xs text-muted wrap-anywhere">{firstLine(tool.description)}</span>
+                  <Button size="sm" aria-label={`Try ${own}`} onClick={() => setTrying(tool.name)}>
+                    Try
+                  </Button>
+                </li>
+              );
+            })}
+          </ul>
+          {hidden === 0 ? null : <p className="text-xs text-muted">{hidden} hidden from the model (tools.exclude).</p>}
+        </>
       )}
+      <Dialog open={tried !== undefined} onOpenChange={(open) => (open ? undefined : setTrying(null))}>
+        <DialogContent>
+          {tried === undefined ? null : <TryTool key={tried.name} server={server} tool={tried} sessionId={sessionId} onClose={() => setTrying(null)} />}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
