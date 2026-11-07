@@ -16,6 +16,7 @@ from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
 
 from golem.config import GolemSettings
+from golem.models.catalog import HostedEntry
 from golem.models.discovery import KeyRejected, ModelDiscovery
 from golem.models.keys import MemoryKeyStore
 from golem.models.prices import PriceBook
@@ -36,6 +37,10 @@ def _discovery(handler: httpx.MockTransport, store: MemoryKeyStore | None = None
         transport=handler,
         detect_ram=False,
         fetch_prices=False,
+        hosted=[
+            HostedEntry("google/gemini-2.5-flash", "Gemini 2.5 Flash", "b", ("general",)),
+            HostedEntry("google/gemini-2.5-pro", "Gemini 2.5 Pro", "b", ("general",)),
+        ],
     )
 
 

@@ -512,7 +512,7 @@ async def _model_list(ctx: RequestContext, params: ModelListParams) -> ModelList
     models = ctx.state.models
     if models is None:
         raise RpcCallError(INTERNAL_ERROR, "models are not ready")
-    listing = await models.list(refresh=params.refresh)
+    listing = await models.list(refresh=params.refresh, show_all=params.show_all)
     return ModelListResult(
         default=listing.default,
         ram_gb=listing.ram_gb,

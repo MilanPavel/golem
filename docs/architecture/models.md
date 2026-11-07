@@ -186,7 +186,7 @@ Downloads go through Ollama (`golem/models/pulls.py`):
 - **Where entries come from** (`golem/models/discovery.py`):
   - installed Ollama models, from `/api/tags`, with `/api/show` filling in what an older Ollama leaves out;
   - local models to download, from the bundled `catalog.toml`;
-  - each keyed provider's own list: Anthropic and OpenAI `/v1/models`, and `<base_url>/models` for an OpenAI-compatible provider;
+  - each keyed provider's own list (Anthropic, OpenAI, Google, xAI, and `<base_url>/models` for DeepSeek and Moonshot), cut down to the hosted models of `catalog.toml`. A dated snapshot such as `gpt-6-luna-2026-05-01` stands for its catalog ref. `model.list` with `show_all: true` also lists the live models LiteLLM marks as chat models that call tools. A model whose LiteLLM `deprecation_date` has come is never listed;
   - profiles and `default_model`, so a configured model is always listed.
 - **What an entry carries:** its status (`ready`, `needs_key`, `not_installed`, or `server_down`), the profile names that point at it, context size, tool support, price in USD per million tokens, download size, and whether it fits in memory.
 - **Price and context precedence:** the profile, then the provider's own list (Ollama), then LiteLLM (`golem/models/prices.py`).

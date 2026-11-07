@@ -13,6 +13,7 @@ import json
 import logging
 import time
 from dataclasses import dataclass
+from datetime import date
 from importlib import resources
 from pathlib import Path
 from typing import Any, cast
@@ -39,6 +40,9 @@ _KEPT_FIELDS = (
     "max_input_tokens",
     "mode",
     "supports_function_calling",
+    "supports_reasoning",
+    "supports_vision",
+    "deprecation_date",
     "litellm_provider",
 )
 _PER_MILLION = 1_000_000
@@ -52,6 +56,13 @@ class PriceInfo:
     ctx: int | None
     tools: bool | None
     mode: str | None
+    reasoning: bool | None = None
+    vision: bool | None = None
+    deprecation_date: date | None = None
+
+    def retired(self, today: date) -> bool:
+        """The provider's own retirement date has come."""
+        return self.deprecation_date is not None and self.deprecation_date <= today
 
 
 def trim(raw: object) -> dict[str, dict[str, object]]:
@@ -113,6 +124,9 @@ class PriceBook:
             ctx=_int(entry.get("max_input_tokens")),
             tools=_bool(entry.get("supports_function_calling")),
             mode=mode if isinstance(mode, str) else None,
+            reasoning=_bool(entry.get("supports_reasoning")),
+            vision=_bool(entry.get("supports_vision")),
+            deprecation_date=_date(entry.get("deprecation_date")),
         )
 
 
@@ -152,6 +166,15 @@ def _int(value: object) -> int | None:
 
 def _bool(value: object) -> bool | None:
     return value if isinstance(value, bool) else None
+
+
+def _date(value: object) -> date | None:
+    if not isinstance(value, str):
+        return None
+    try:
+        return date.fromisoformat(value)
+    except ValueError:
+        return None
 
 
 def _write_bundled() -> None:

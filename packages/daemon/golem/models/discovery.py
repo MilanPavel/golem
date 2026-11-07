@@ -27,6 +27,7 @@ import shutil
 import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field, replace
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal, cast
 
@@ -34,7 +35,7 @@ import httpx
 
 from golem.config import ModelPrice, ModelSettings
 from golem.models import hardware, ollama, prices
-from golem.models.catalog import CatalogEntry, load_local_catalog
+from golem.models.catalog import CatalogEntry, HostedEntry, load_hosted_catalog, load_local_catalog
 from golem.models.errors import ModelUnreachable
 from golem.models.keys import KeyStoreError
 from golem.models.ollama import LocalServers
@@ -59,6 +60,7 @@ _REMOTE_TIMEOUT = 10.0
 _ANTHROPIC_URL = "https://api.anthropic.com/v1"
 _OPENAI_URL = "https://api.openai.com/v1"
 _FREE = ModelPrice(input=0.0, output=0.0)
+_SNAPSHOT = re.compile(r"-(\d{8}|\d{4}-\d{2}-\d{2})$")
 _OPENAI_CHAT = re.compile(r"^(gpt-|o\d|chatgpt-)")
 _NOT_CHAT = (
     "audio",
@@ -184,6 +186,7 @@ class ModelDiscovery:
         budget: float = 2.0,
         clock: Callable[[], float] = time.time,
         catalog: list[CatalogEntry] | None = None,
+        hosted: list[HostedEntry] | None = None,
         price_book: prices.PriceBook | None = None,
         fetch_prices: bool = True,
         pulling: Callable[[], dict[str, float | None]] | None = None,
@@ -202,6 +205,7 @@ class ModelDiscovery:
         self._budget = budget
         self._clock = clock
         self._catalog = load_local_catalog() if catalog is None else catalog
+        self._hosted = load_hosted_catalog() if hosted is None else hosted
         self._prices = prices.PriceBook.load(cache_dir) if price_book is None else price_book
         self._remote: dict[str, _Remote] = {}
         self._fetching: dict[str, asyncio.Task[_Remote]] = {}
@@ -224,8 +228,13 @@ class ModelDiscovery:
             await self._client.aclose()
             self._client = None
 
-    async def list(self, *, refresh: bool = False) -> ModelListing:
-        """Every model golem knows of right now. Never waits on the network past ``budget``."""
+    async def list(self, *, refresh: bool = False, show_all: bool = False) -> ModelListing:
+        """Every model golem offers right now. Never waits on the network past ``budget``.
+
+        A hosted model is offered when the provider's live list and the catalog both have it.
+        ``show_all`` adds the live chat models LiteLLM says call tools. A model past its
+        retirement date is never offered.
+        """
         router = self._router
         providers = router.providers()
         profiles = router.profiles()
@@ -265,7 +274,8 @@ class ModelDiscovery:
             )
             states[name] = ListedProvider(name, status, stale=result.stale)
         models = _with_pulls(
-            self._merge(providers, profiles, default, keys, results, states), self.pulling()
+            self._merge(providers, profiles, default, keys, results, states, show_all),
+            self.pulling(),
         )
         ollama_state = states.get("ollama")
         running = ollama_state is not None and ollama_state.status == "ready"
@@ -292,12 +302,18 @@ class ModelDiscovery:
         keys: dict[str, str | None],
         results: dict[str, _ProviderResult],
         states: dict[str, ListedProvider],
+        show_all: bool = False,
     ) -> list[ListedModel]:
         by_ref: dict[str, ListedModel] = {}
-        labels = {entry.ref: entry.label for entry in self._catalog}
+        labels = {entry.ref: entry.label for entry in [*self._catalog, *self._hosted]}
         for name, result in results.items():
             kind = providers[name].kind
-            for found in result.found:
+            offered = (
+                result.found
+                if kind == "ollama"
+                else self._offered(name, result.found, show_all=show_all)
+            )
+            for found in offered:
                 ref = f"{name}/{found.model_id}"
                 by_ref[ref] = self._listed(
                     ref,
@@ -360,6 +376,31 @@ class ModelDiscovery:
                     listed = replace(listed, price=price)
                 by_ref[ref] = listed
         return sorted(by_ref.values(), key=_order)
+
+    def _offered(self, name: str, live: list[_Found], *, show_all: bool) -> list[_Found]:
+        """The live models of a hosted provider that golem puts in the picker."""
+        today = datetime.fromtimestamp(self._clock(), UTC).date()
+        curated = {entry.ref for entry in self._hosted}
+        offered: dict[str, _Found] = {}
+        for found in live:
+            info = self._prices.lookup(name, found.model_id)
+            if info is not None and info.retired(today):
+                continue
+            # A dated snapshot of a catalog model stands for the catalog's ref.
+            base = _SNAPSHOT.sub("", found.model_id)
+            catalogued = f"{name}/{found.model_id}" in curated
+            if not catalogued and f"{name}/{base}" in curated:
+                base_info = self._prices.lookup(name, base)
+                if base_info is not None and base_info.retired(today):
+                    continue
+                if base not in offered:
+                    offered[base] = replace(found, model_id=base, label=None)
+                continue
+            if catalogued or (
+                show_all and info is not None and info.mode == "chat" and info.tools is True
+            ):
+                offered[found.model_id] = found
+        return list(offered.values())
 
     def _listed(
         self,

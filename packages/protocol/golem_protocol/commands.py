@@ -447,11 +447,17 @@ class AuthListResult(BaseModel):
 
 
 class ModelListParams(BaseModel):
-    """``model.list``. ``refresh`` fetches hosted model lists and prices again, past their cache."""
+    """``model.list``.
+
+    ``refresh`` fetches hosted model lists and prices again, past their cache. A hosted model is
+    listed when the provider's live list and the catalog both have it. ``show_all`` adds the live
+    chat models that call tools. A model past its retirement date is never listed.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     refresh: bool = False
+    show_all: bool = False
 
 
 class ModelPriceInfo(BaseModel):
