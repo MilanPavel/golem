@@ -291,20 +291,31 @@ def _failed(message: str) -> ConfigRawResult:
     return ConfigRawResult(ok=False, errors=[ConfigError(message=message)])
 
 
-def _catalog_table(params: McpAddParams, scope: ToolScope) -> tuple[dict[str, Any], dict[str, str]]:
+def catalog_table(
+    catalog_id: str,
+    inputs: dict[str, str],
+    secrets: dict[str, str],
+    *,
+    name: str | None,
+    scope: ToolScope,
+) -> tuple[dict[str, Any], dict[str, str]]:
     """The table for a catalog entry, and the secrets to store by reference."""
-    assert params.catalog_id is not None
-    entry = find_entry(params.catalog_id)
+    entry = find_entry(catalog_id)
     if entry is None:
-        raise RpcCallError(INVALID_PARAMS, f"there is no catalog entry {params.catalog_id}")
+        raise RpcCallError(INVALID_PARAMS, f"there is no catalog entry {catalog_id}")
     if (why := unavailable(entry)) is not None:
         raise RpcCallError(INVALID_PARAMS, f"{entry.title} is not available yet: {why}")
     folder = None if scope.root is None else str(scope.root)
-    secrets = {key: value.get_secret_value() for key, value in params.secrets.items()}
     try:
-        return build(entry, params.inputs, secrets, name=params.name, folder=folder)
+        return build(entry, inputs, secrets, name=name, folder=folder)
     except CatalogError as exc:
         raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+
+
+def _catalog_table(params: McpAddParams, scope: ToolScope) -> tuple[dict[str, Any], dict[str, str]]:
+    assert params.catalog_id is not None
+    secrets = {key: value.get_secret_value() for key, value in params.secrets.items()}
+    return catalog_table(params.catalog_id, params.inputs, secrets, name=params.name, scope=scope)
 
 
 def _short_table(params: McpAddParams) -> dict[str, Any]:

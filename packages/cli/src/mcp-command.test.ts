@@ -154,3 +154,64 @@ test("these commands refuse a missing name, a stray word, and an option they do 
   assert.match(message(["tools", "git", "--hide", "--show", "x"]), /needs a pattern/);
   assert.match(message(["nope"]), /usage: golem mcp list/);
 });
+
+test("add takes env, header, cwd, on-demand, project, timeout, and approval before the command", () => {
+  assert.deepEqual(
+    parseMcpArgs(["add", "x", "--env", "A=1", "--env", "TOKEN", "--cwd", "/w", "--on-demand", "--project", "--timeout", "30", "--approval", "allow", "--", "run", "--env", "kept"]),
+    {
+      kind: "add",
+      name: "x",
+      command: "run",
+      args: ["--env", "kept"],
+      tokenEnv: null,
+      options: { env: ["A=1", "TOKEN"], headers: [], cwd: "/w", onDemand: true, project: true, timeout: 30, approval: "allow" },
+    },
+  );
+  assert.deepEqual(parseMcpArgs(["add", "h", "--url", "https://x.test/mcp", "--header", "X-Team=blue", "--token"]), {
+    kind: "add",
+    name: "h",
+    url: "https://x.test/mcp",
+    token: true,
+    options: { env: [], headers: ["X-Team=blue"], cwd: null, onDemand: false, project: false, timeout: null, approval: null },
+  });
+});
+
+test("a bad timeout, approval, or a flag with no value is refused", () => {
+  const message = (words: string[]): string => {
+    const parsed = parseMcpArgs(words);
+    assert.equal(parsed.kind, "error");
+    return parsed.kind === "error" ? parsed.message : "";
+  };
+  assert.match(message(["add", "x", "--timeout", "0", "--", "run"]), /1 to 3600/);
+  assert.match(message(["add", "x", "--timeout", "soon", "--", "run"]), /whole number/);
+  assert.match(message(["add", "x", "--approval", "never", "--", "run"]), /ask or allow/);
+  assert.match(message(["add", "x", "--env", "--", "run"]), /--env needs a value/);
+  assert.match(message(["add", "x", "--cwd"]), /--cwd needs a value/);
+});
+
+test("test --catalog, edit, and import read their words", () => {
+  assert.deepEqual(parseMcpArgs(["test", "--catalog", "github", "--input", "a=b", "--name", "gh"]), {
+    kind: "testCatalog",
+    id: "github",
+    name: "gh",
+    inputs: { a: "b" },
+  });
+  assert.deepEqual(parseMcpArgs(["edit", "git"]), { kind: "edit", name: "git", project: false });
+  assert.deepEqual(parseMcpArgs(["edit", "git", "--project"]), { kind: "edit", name: "git", project: true });
+  assert.deepEqual(parseMcpArgs(["import"]), { kind: "import", from: null, all: false, project: false });
+  assert.deepEqual(parseMcpArgs(["import", "--from", "cursor", "--all", "--project"]), { kind: "import", from: "cursor", all: true, project: true });
+  assert.deepEqual(parseMcpArgs(["import", "--from", "./servers.json"]), { kind: "import", from: "./servers.json", all: false, project: false });
+});
+
+test("import refuses what it does not know", () => {
+  const message = (words: string[]): string => {
+    const parsed = parseMcpArgs(words);
+    assert.equal(parsed.kind, "error");
+    return parsed.kind === "error" ? parsed.message : "";
+  };
+  assert.match(message(["import", "--from"]), /--from needs/);
+  assert.match(message(["import", "cursor"]), /unexpected cursor/);
+  assert.match(message(["import", "--wat"]), /unknown option --wat/);
+  assert.match(message(["edit"]), /usage: golem mcp edit <name>/);
+  assert.match(message(["edit", "git", "--all"]), /unknown option --all/);
+});

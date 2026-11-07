@@ -64,7 +64,7 @@ golem speaks **JSON-RPC 2.0, one object per line, over the daemon's Unix socket*
 
 - **Framing.** Each message is one line of UTF-8 JSON, ended by `\n`. JSON writes a line break inside a string as `\n`, so a message never contains one. A line over 1 MiB closes the connection.
 - **The envelope.** A command is a JSON-RPC request with an `id`. Its reply has the same `id`, with `result` or `error`. An event is a notification with method `event`, and no `id`.
-- **`hello` first.** The client sends its protocol version. A different major number is refused, and any minor on the same major is accepted. Today it is `2.40`.
+- **`hello` first.** The client sends its protocol version. A different major number is refused, and any minor on the same major is accepted. Today it is `2.42`.
 - **Events carry `seq`.** A rising number per session, from the event log, so it survives a restart. Each event is written to `golem.db` before it is sent ([Sessions that survive](./sessions.md#the-event-log)).
 - **Attach and replay.** A connection gets a session's events only after `session.attach` with `after_seq`. The daemon sends the stored events after that number, then the reply with `last_seq`, then live events. One lock per session covers both, so no event lands in between ([ADR-007](../adr/007-attach-and-fan-out.md)).
 - **Fan-out.** Every connection attached to a session gets every event. Each connection has its own queue and writer, so a slow one never blocks a run, and one that falls 20 000 lines behind is dropped. It reconnects, and attaches from its last `seq`.

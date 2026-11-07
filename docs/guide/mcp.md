@@ -57,6 +57,19 @@ args = ["mcp-server-git", "--repository", "/path/to/your/repo"]
 
 golem notices the change and starts it, with no restart. The model sees its tools as `mcp__git__<tool>`.
 
+### Add with more settings
+
+The same command takes the other settings of a server:
+
+```bash
+golem mcp add github --url https://api.githubcopilot.com/mcp/ --token --on-demand
+golem mcp add db --env DB_URL=postgres://localhost/app --env DB_PASSWORD --timeout 60 -- uvx mcp-server-postgres
+```
+
+A variable or header whose name looks like a secret (`TOKEN`, `KEY`, `PASSWORD`, `Authorization`) goes to the Keychain. Give just its name, as `--env DB_PASSWORD`, and golem asks for the value, hidden, so it never lands in your shell's history. `--project` writes the folder's `.golem/config.toml`, which needs a trusted project. When the server is written, golem starts it once and shows each step. If that fails it tells you what to try, and the server stays.
+
+To try a server from the list first, run `golem mcp test --catalog fetch`. It starts the entry without saving it.
+
 ### See and control your servers from a terminal
 
 ```bash
@@ -67,6 +80,8 @@ golem mcp logs github -f                # its log, and new lines as they come
 golem mcp tools github --hide 'delete_*'   # keep some tools from the model
 golem mcp enable github --on-demand     # on only in the chats that turn it on
 golem mcp restart github
+golem mcp edit github                  # its tables in $EDITOR
+golem config edit                       # the whole file, with the same checks
 ```
 
 `golem mcp test` prints each step as it ends. When it fails it shows what the server said on stderr and one next step, such as installing Node. A pattern in `--hide` is written to `tools.exclude` of the server, and `--show` with the same pattern takes it out again.
@@ -85,7 +100,7 @@ What happens to each server:
 - A server that uses the old SSE transport is imported with a warning, because golem doesn't speak it yet.
 - Names are made to fit: `_`, `.`, and spaces become `-`, and a name that is already taken gets `-2`. A server golem already has with the same command or URL is marked as already added.
 
-The terminal and web screens for this come with `/mcp` and Settings. The daemon's `mcp.import.scan` and `mcp.import.apply` do the work for them.
+In a terminal, run `golem mcp import`. It lists what it found, numbered, and asks which to add. Type numbers, `2=my-name` to rename one, or `a` for every new one. `--from cursor` looks at one app, `--from ./servers.json` reads a file, and `--all` adds every new server without asking. A value another app only named, such as `${input:token}`, is asked for, hidden.
 
 ### Send your servers to another app
 

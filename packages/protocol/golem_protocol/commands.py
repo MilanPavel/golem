@@ -935,9 +935,12 @@ class McpTestStep(BaseModel):
 class McpTestParams(BaseModel):
     """``mcp.test``. Start a server, list its tools, and ping it, without saving anything.
 
-    Give ``name`` for a saved server, or ``config`` for one not saved yet, not
-    both. ``secrets`` (by reference, ``mcp/github``) are used for this test
-    first and then the Keychain, and are never stored. ``test_id`` ties the
+    There are three forms, and sending more than one is an error. ``name`` is a
+    saved server. ``config`` is one not saved yet, with ``secrets`` by reference
+    (``mcp/github``). ``catalog_id`` is a catalog entry, with ``inputs`` and
+    ``secrets`` by input id as in ``mcp.add``, and ``name`` (optional) naming the
+    draft. Secrets are used for this test first and then, for a saved server,
+    the Keychain, and are never stored. ``test_id`` ties the
     ``mcp.test.progress`` notifications to this call.
     """
 
@@ -946,11 +949,19 @@ class McpTestParams(BaseModel):
     test_id: str = Field(min_length=1)
     name: str | None = Field(default=None, min_length=1)
     config: McpServerConfig | None = None
+    catalog_id: str | None = Field(default=None, min_length=1)
+    inputs: dict[str, str] = Field(default_factory=dict[str, str])
     secrets: dict[str, SecretStr] = Field(default_factory=dict[str, SecretStr])
     session_id: str | None = Field(default=None, min_length=1)
 
     @model_validator(mode="after")
     def _one_source(self) -> Self:
+        if self.catalog_id is not None:
+            if self.config is not None:
+                raise ValueError("send either catalog_id or config, not both")
+            return self
+        if self.inputs:
+            raise ValueError("inputs are for a catalog_id")
         if (self.name is None) == (self.config is None):
             raise ValueError("send either name or config")
         return self
