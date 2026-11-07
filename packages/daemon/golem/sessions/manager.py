@@ -11,12 +11,14 @@ task that does not keep the session busy.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from collections.abc import Coroutine, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import cast
 
-from golem.graphs.adapter import PlainMessage, plain_messages
+from golem.graphs.adapter import PlainMessage, plain_messages, trace_messages
 from golem.graphs.chat import ChatRuntime
 from golem.graphs.state import SCHEMA_VERSION
 from golem.models.router import ModelIdentity, ModelRouter
@@ -36,11 +38,14 @@ from golem.sessions.runner import (
     run_turn,
 )
 from golem.sessions.titles import TitleGenerator, choose_title, clean_title, fork_title
+from golem.sessions.trace import build_trace, read_span
 from golem.skills.invoke import Invocation, SkillInvokeError, invoke
 from golem.skills.pinned import PinMemory, SkillPinError, pinnable, pinned_folders
 from golem.skills.registry import SkillRegistry
+from golem.store.blobs import BlobStore
 from golem.store.records import RunRecords, SessionActivity, SessionRecords
 from golem.tools.registry import ToolError, ToolScope
+from golem_protocol.commands import TraceRunSpan, TraceSpanResult
 from golem_protocol.events import (
     ApprovalDecision,
     ChatEvent,
@@ -67,6 +72,10 @@ log = logging.getLogger("golem.sessions")
 
 class SessionNotFoundError(Exception):
     """No session row and no checkpoint for this id."""
+
+
+class SpanNotFoundError(Exception):
+    """No span of this session has the id."""
 
 
 class SessionBusyError(Exception):
@@ -140,6 +149,22 @@ class _LiveSession:
     task: asyncio.Task[None] | None = None
 
 
+def _schemas(text: str | None) -> list[dict[str, object]] | None:
+    """The tool schemas stored as JSON, or None when absent or not a list of objects."""
+    if text is None:
+        return None
+    try:
+        found = json.loads(text)
+    except ValueError:
+        return None
+    if not isinstance(found, list):
+        return None
+    items = cast(list[object], found)
+    if not all(isinstance(item, dict) for item in items):
+        return None
+    return cast(list[dict[str, object]], items)
+
+
 @dataclass(frozen=True, slots=True)
 class _LiveRun:
     task: asyncio.Task[None]
@@ -158,8 +183,10 @@ class SessionManager:
         *,
         titles: TitleGenerator | None = None,
         skills: SkillRegistry | None = None,
+        blobs: BlobStore | None = None,
     ) -> None:
         self._runtime = runtime
+        self._blobs = blobs
         self._skills = skills
         self._events = events
         self._records = records
@@ -298,6 +325,43 @@ class SessionManager:
                 model_name=identity.name,
                 messages=[PlainMessage("system", system), *messages] if system else messages,
             )
+
+    async def trace(self, session_id: str) -> tuple[str | None, list[TraceRunSpan]]:
+        """The session's title and its runs as a tree of spans. Does not start a run.
+
+        Raises :class:`SessionNotFoundError` and :class:`SchemaMismatchError`, as
+        :meth:`inspect` does.
+        """
+        async with self._lock:
+            session = await self._resolve(session_id)
+            return session.title, build_trace(await self._events.stored(session_id))
+
+    async def trace_span(self, session_id: str, span_id: str) -> TraceSpanResult:
+        """The input and output of one span, with the stored system prompt and tools.
+
+        Raises :class:`SessionNotFoundError`, :class:`SchemaMismatchError`, and
+        :class:`SpanNotFoundError` when no span of the session has ``span_id``.
+        """
+        async with self._lock:
+            await self._resolve(session_id)
+            events = await self._events.stored(session_id)
+            messages = trace_messages(await self._runtime.values(session_id))
+        found = read_span(build_trace(events), events, messages, span_id)
+        if found is None:
+            raise SpanNotFoundError(span_id)
+        updates: dict[str, object] = {}
+        if self._blobs is not None:
+            prompt = await self._blob(found.system_prompt_sha)
+            tools = await self._blob(found.tools_sha)
+            updates["system_prompt"] = prompt
+            updates["tools"] = _schemas(tools)
+        return found.result.model_copy(update=updates)
+
+    async def _blob(self, sha256: str | None) -> str | None:
+        if sha256 is None or self._blobs is None:
+            return None
+        found = await self._blobs.get(sha256)
+        return None if found is None else found[1]
 
     async def close(self, session_id: str) -> str:
         """Hide ``session_id`` from the list. Its events stay in the log.

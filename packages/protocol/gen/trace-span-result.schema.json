@@ -1,0 +1,397 @@
+{
+  "$defs": {
+    "TraceMessage": {
+      "additionalProperties": false,
+      "description": "One checkpoint message with its id, as plain text.",
+      "properties": {
+        "call_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Call Id"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Id"
+        },
+        "role": {
+          "enum": [
+            "user",
+            "assistant",
+            "tool"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "tool_calls": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Tool Calls",
+          "type": "array"
+        }
+      },
+      "required": [
+        "role",
+        "text"
+      ],
+      "title": "TraceMessage",
+      "type": "object"
+    },
+    "TraceSpan": {
+      "additionalProperties": false,
+      "description": "One run, model call, or tool call, without its children.\n\n``id`` is the run id for a run, the assistant ``message_id`` for a model\ncall, and the ``call_id`` for a tool call. ``end`` is null while the span\nis open, or when its run was cut off. ``duration_ms`` is the model's\nlatency or the tool's own time when the daemon measured it, else\n``end - start``. ``approval_wait_ms`` is the time a tool call waited for\nthe user. ``recorded`` is false for a model span rebuilt from the message\nevents of a session that has no ``model.call.*`` events.",
+      "properties": {
+        "approval_wait_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Approval Wait Ms"
+        },
+        "duration_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duration Ms"
+        },
+        "end": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End"
+        },
+        "first_token_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "First Token Ms"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "run",
+            "model",
+            "tool"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "preview": {
+          "default": "",
+          "maxLength": 200,
+          "title": "Preview",
+          "type": "string"
+        },
+        "recorded": {
+          "default": true,
+          "title": "Recorded",
+          "type": "boolean"
+        },
+        "start": {
+          "minLength": 1,
+          "title": "Start",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "ok",
+            "failed",
+            "cancelled",
+            "denied",
+            "running"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "tokens": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TraceTokens"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "name",
+        "start",
+        "status"
+      ],
+      "title": "TraceSpan",
+      "type": "object"
+    },
+    "TraceTokens": {
+      "additionalProperties": false,
+      "description": "Tokens one model call used. A field is null when the provider did not report it.",
+      "properties": {
+        "cache_read": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cache Read"
+        },
+        "cache_write": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cache Write"
+        },
+        "input": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Input"
+        },
+        "output": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Output"
+        }
+      },
+      "title": "TraceTokens",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "What a span took in and gave out. ``span`` has no children.\n\nFor a model span, ``messages`` is the context sent, in order, and\n``new_from`` is where the part new since the previous model call\nbegins. ``system_prompt`` and ``tools`` are null when they were not\nrecorded. For a tool span, ``result`` is the text the model got back, and\n``artifact_id`` is set when the output was too big for the model: open it\nwith ``artifact.read``.",
+  "properties": {
+    "approval": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Approval"
+    },
+    "args": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Args"
+    },
+    "artifact_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Artifact Id"
+    },
+    "messages": {
+      "items": {
+        "$ref": "#/$defs/TraceMessage"
+      },
+      "title": "Messages",
+      "type": "array"
+    },
+    "new_from": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "New From"
+    },
+    "provider": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Provider"
+    },
+    "reply": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/TraceMessage"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "result": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Result"
+    },
+    "span": {
+      "$ref": "#/$defs/TraceSpan"
+    },
+    "stop_reason": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Stop Reason"
+    },
+    "system_prompt": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "System Prompt"
+    },
+    "tools": {
+      "anyOf": [
+        {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Tools"
+    }
+  },
+  "required": [
+    "span"
+  ],
+  "title": "TraceSpanResult",
+  "type": "object"
+}

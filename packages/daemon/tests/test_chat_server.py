@@ -6,7 +6,7 @@ import asyncio
 import sqlite3
 from collections.abc import Callable
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 from fakes import GatedChatModel, ScriptedChatModel, ToolCallingChatModel
 from langchain_core.language_models import BaseChatModel
@@ -126,6 +126,43 @@ async def test_inspect_reads_checkpoint_messages(short_home: Path) -> None:
             {"role": "user", "text": "hello"},
             {"role": "assistant", "text": "Hi"},
         ]
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+
+
+async def test_trace_reads_the_tree_and_one_span(short_home: Path) -> None:
+    model = ScriptedChatModel(replies=["Hi"])
+    app, task = await start_daemon(short_home, router=ModelRouter(model=model))
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        missing = await client.call("trace.get", {"session_id": "s_missing"})
+        assert error_code(missing) == SESSION_NOT_FOUND
+        span_missing = await client.call("trace.span", {"session_id": "s_missing", "span_id": "x"})
+        assert error_code(span_missing) == SESSION_NOT_FOUND
+        session_id = await _open(client)
+        empty = rpc_result(await client.call("trace.get", {"session_id": session_id}))
+        assert empty["runs"] == []
+        await client.call("message.send", {"session_id": session_id, "text": "hello"})
+        await client.wait_for_event("run.completed")
+        traced = rpc_result(await client.call("trace.get", {"session_id": session_id}))
+        (run,) = cast(list[dict[str, Any]], traced["runs"])
+        assert (run["kind"], run["name"], run["status"]) == ("run", "hello", "ok")
+        (model_span,) = run["children"]
+        assert (model_span["kind"], model_span["name"], model_span["preview"]) == (
+            "model",
+            "model 1",
+            "Hi",
+        )
+        detail = rpc_result(
+            await client.call("trace.span", {"session_id": session_id, "span_id": model_span["id"]})
+        )
+        assert [m["text"] for m in cast(list[dict[str, Any]], detail["messages"])] == ["hello"]
+        assert cast(dict[str, Any], detail["reply"])["text"] == "Hi"
+        unknown = await client.call("trace.span", {"session_id": session_id, "span_id": "nope"})
+        assert error_code(unknown) == INVALID_PARAMS
+        assert unknown["error"]["message"] == "span not found"  # type: ignore[index]
     finally:
         await client.close()
         await stop_daemon(app, task)

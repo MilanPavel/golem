@@ -42,6 +42,8 @@ import type { SessionAttachResult } from "../../protocol/gen/session-attach-resu
 import type { SessionCloseResult } from "../../protocol/gen/session-close-result.ts";
 import type { SessionCreateResult } from "../../protocol/gen/session-create-result.ts";
 import type { SessionForkResult } from "../../protocol/gen/session-fork-result.ts";
+import type { TraceGetResult } from "../../protocol/gen/trace-get-result.ts";
+import type { TraceSpanResult } from "../../protocol/gen/trace-span-result.ts";
 import type { SessionInspectResult } from "../../protocol/gen/session-inspect-result.ts";
 import type { SessionListResult, SessionSummary } from "../../protocol/gen/session-list-result.ts";
 import type { SessionRenameResult } from "../../protocol/gen/session-rename-result.ts";
@@ -381,6 +383,44 @@ export function isSessionInspectResult(value: unknown): value is SessionInspectR
     Array.isArray(value["messages"]) &&
     isOptionalString(value["model_provider"]) &&
     isOptionalString(value["model_name"])
+  );
+}
+
+const SPAN_KINDS = new Set(["run", "model", "tool"]);
+const SPAN_STATUSES = new Set(["ok", "failed", "cancelled", "denied", "running"]);
+
+function isTraceSpan(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    typeof value["id"] === "string" &&
+    typeof value["kind"] === "string" &&
+    SPAN_KINDS.has(value["kind"]) &&
+    typeof value["name"] === "string" &&
+    typeof value["start"] === "string" &&
+    typeof value["status"] === "string" &&
+    SPAN_STATUSES.has(value["status"]) &&
+    (value["children"] === undefined ||
+      (Array.isArray(value["children"]) && value["children"].every(isTraceSpan)))
+  );
+}
+
+export function isTraceGetResult(value: unknown): value is TraceGetResult {
+  return (
+    isRecord(value) &&
+    typeof value["session_id"] === "string" &&
+    Array.isArray(value["runs"]) &&
+    value["runs"].every(isTraceSpan)
+  );
+}
+
+export function isTraceSpanResult(value: unknown): value is TraceSpanResult {
+  return (
+    isRecord(value) &&
+    isTraceSpan(value["span"]) &&
+    Array.isArray(value["messages"]) &&
+    isOptionalString(value["system_prompt"]) &&
+    isOptionalString(value["result"]) &&
+    isOptionalString(value["artifact_id"])
   );
 }
 
