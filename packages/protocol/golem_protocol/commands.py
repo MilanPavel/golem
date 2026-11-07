@@ -475,6 +475,9 @@ class ModelPriceInfo(BaseModel):
     cached_input: float | None = Field(default=None, ge=0)
 
 
+ModelCategory = Literal["general", "coding", "reasoning", "vision", "fast", "long-context"]
+
+
 class ListedModel(BaseModel):
     """One model, by ``provider/model`` ref.
 
@@ -485,6 +488,9 @@ class ListedModel(BaseModel):
     ``fit`` says whether a local model fits in this machine's memory.
     ``tags`` are a catalog model's tags, such as ``coding``, and
     ``recommended`` marks the one catalog model golem suggests for this Mac.
+    ``categories`` say what the model is for, in a fixed order: the catalog's
+    own for a model it lists, else what Ollama's ``capabilities`` and
+    LiteLLM's ``supports_*`` fields and context size show.
     ``stale`` means a cached list was shown because the provider did not
     answer in time.
     """
@@ -505,6 +511,7 @@ class ListedModel(BaseModel):
     fit: Literal["fits", "tight", "too_big"] | None = None
     stale: bool = False
     tags: list[str] = Field(default_factory=list)
+    categories: list[ModelCategory] = Field(default_factory=list[ModelCategory])
     recommended: bool = False
 
 

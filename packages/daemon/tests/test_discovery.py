@@ -629,3 +629,123 @@ async def test_a_model_you_name_is_listed_though_the_catalog_does_not() -> None:
     finally:
         await discovery.aclose()
     assert found["openai/gpt-unknown"].source == "profile"
+
+
+def _categories(listing_models: list[ListedModel], ref: str) -> list[str]:
+    return list(_by_ref(listing_models)[ref].categories)
+
+
+async def test_an_installed_model_with_no_catalog_entry_gets_categories_from_ollama() -> None:
+    tags: dict[str, list[dict[str, object]]] = {
+        "models": [
+            {"name": "seer:7b", "size": 4_000_000_000, "digest": "s1", "details": {}},
+            {"name": "plain:7b", "size": 4_000_000_000, "digest": "p1", "details": {}},
+        ]
+    }
+
+    def show(request: httpx.Request) -> httpx.Response:
+        name = json.loads(request.content)["model"]
+        caps = (
+            ["completion", "tools", "vision", "thinking"] if name == "seer:7b" else ["completion"]
+        )
+        return httpx.Response(
+            200, json={"model_info": {"llama.context_length": 262144}, "capabilities": caps}
+        )
+
+    network = Network({"127.0.0.1/api/tags": _json(tags), "127.0.0.1/api/show": show})
+    discovery = _discovery(ModelRouter(GolemSettings()), network, Path("/nonexistent"))
+    try:
+        models = (await discovery.list()).models
+    finally:
+        await discovery.aclose()
+    assert _categories(models, "ollama/seer:7b") == [
+        "general",
+        "reasoning",
+        "vision",
+        "long-context",
+    ]
+    assert _categories(models, "ollama/plain:7b") == ["general", "long-context"]
+
+
+async def test_a_catalog_model_has_the_catalogs_categories_whatever_the_facts_say(
+    tmp_path: Path,
+) -> None:
+    catalog = [
+        CatalogEntry(
+            ref="ollama/qwen3:8b", label="Q", size_gb=5.2, tags=(), categories=("coding",)
+        ),
+        CatalogEntry(
+            ref="ollama/huge:70b", label="Huge", size_gb=40.0, tags=(), categories=("reasoning",)
+        ),
+    ]
+    network = Network(_ollama_routes())
+    discovery = ModelDiscovery(
+        ModelRouter(GolemSettings()),
+        tmp_path / "cache",
+        transport=httpx.MockTransport(network),
+        ram_gb=36.0,
+        catalog=catalog,
+        hosted=HOSTED,
+        price_book=PRICES,
+        fetch_prices=False,
+    )
+    try:
+        models = (await discovery.list()).models
+    finally:
+        await discovery.aclose()
+    assert _categories(models, "ollama/qwen3:8b") == ["coding"]
+    assert _categories(models, "ollama/huge:70b") == ["reasoning"]
+
+
+async def test_a_hosted_model_takes_categories_from_the_catalog_or_from_litellm() -> None:
+    hosted = [
+        HostedEntry("openai/gpt-test", "GPT Test", "b", ("fast", "general")),
+    ]
+    live = {"data": [{"id": "gpt-test"}, {"id": "gpt-smart"}, {"id": "gpt-plain"}]}
+    prices = PriceBook(
+        {
+            "gpt-test": {
+                "litellm_provider": "openai",
+                "mode": "chat",
+                "supports_function_calling": True,
+                "supports_reasoning": True,
+            },
+            "gpt-smart": {
+                "litellm_provider": "openai",
+                "mode": "chat",
+                "supports_function_calling": True,
+                "supports_reasoning": True,
+                "supports_vision": True,
+                "max_input_tokens": 1_000_000,
+            },
+            "gpt-plain": {
+                "litellm_provider": "openai",
+                "mode": "chat",
+                "supports_function_calling": True,
+                "max_input_tokens": 128_000,
+            },
+        }
+    )
+    network = Network({**_ollama_routes(), "api.openai.com/v1/models": _json(live)})
+    discovery = ModelDiscovery(
+        ModelRouter(GolemSettings(), keys=MemoryKeyStore({"openai": "sk-test"})),
+        None,
+        transport=httpx.MockTransport(network),
+        detect_ram=False,
+        catalog=CATALOG,
+        hosted=hosted,
+        price_book=prices,
+        fetch_prices=False,
+    )
+    try:
+        models = (await discovery.list(show_all=True)).models
+    finally:
+        await discovery.aclose()
+    assert _categories(models, "openai/gpt-test") == ["general", "fast"]
+    assert _categories(models, "openai/gpt-smart") == [
+        "general",
+        "reasoning",
+        "vision",
+        "long-context",
+    ]
+    assert _categories(models, "openai/gpt-plain") == ["general"]

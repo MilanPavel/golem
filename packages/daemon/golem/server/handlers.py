@@ -8,7 +8,7 @@ import os
 import time
 from dataclasses import replace
 from pathlib import Path
-from typing import Literal
+from typing import Literal, cast
 
 from pydantic import BaseModel, ConfigDict
 
@@ -127,6 +127,7 @@ from golem_protocol.commands import (
     McpUpdateParams,
     MessageSendParams,
     MessageSendResult,
+    ModelCategory,
     ModelDeleteParams,
     ModelDeleteResult,
     ModelListParams,
@@ -538,6 +539,7 @@ async def _model_list(ctx: RequestContext, params: ModelListParams) -> ModelList
                 fit=model.fit,
                 stale=model.stale,
                 tags=list(model.tags),
+                categories=cast(list[ModelCategory], list(model.categories)),
                 recommended=model.recommended,
             )
             for model in listing.models
