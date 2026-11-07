@@ -614,6 +614,94 @@ details.out .tablet { margin: 6px 0 0; }
   .steps .wd { overflow-wrap: anywhere; }
   .stage { min-width: 0; }
 }
+
+/* ---------- 13.1: the trace ---------- */
+.vswitch { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 999px; padding: 2px; gap: 2px; }
+.vswitch button { padding: 3px 11px; border-radius: 999px; font-size: 12.5px; color: var(--muted); }
+.vswitch button:hover { color: var(--ink); }
+.vswitch button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.trace { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.tr-sum { display: flex; align-items: center; gap: 10px; padding: 9px 16px; border-bottom: 1px solid var(--line); font: 12px/1 var(--font-mono); color: var(--muted); }
+.tr-sum .spacer { flex: 1; }
+.tr-sum .linkbtn { font: 500 12.5px/1 var(--font-ui); text-decoration: none; display: inline-flex; gap: 6px; align-items: center; }
+.tr-panes { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 55fr) minmax(0, 45fr); }
+.tr-tree { overflow-y: auto; padding: 6px 0 24px; border-right: 1px solid var(--line); outline: 0; }
+.tr-tree:focus-visible { box-shadow: inset 0 0 0 2px var(--clay); border-radius: 0; }
+.tr-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(90px, 34%) 92px; align-items: center; gap: 10px; padding: 4px 14px 4px 0; cursor: pointer; min-height: 30px; }
+.tr-row:hover { background: color-mix(in srgb, var(--sunken) 70%, transparent); }
+.tr-row[aria-selected="true"] { background: var(--clay-soft); }
+.tr-name { display: flex; align-items: center; gap: 6px; min-width: 0; white-space: nowrap; }
+.tr-name .fold { width: 14px; flex: none; color: var(--faint); font-size: 11px; text-align: center; transition: transform .15s; }
+.tr-row[aria-expanded="true"] .fold { transform: rotate(90deg); }
+.tr-name .mk { flex: none; width: 12px; text-align: center; font-size: 11px; }
+.tr-name .mk.model { color: var(--clay); }
+.tr-name .mk.tool { color: var(--muted); }
+.tr-name .nm { overflow: hidden; text-overflow: ellipsis; }
+.tr-row.run .nm { font-weight: 500; }
+.tr-row.tool .nm { font: 12.5px/1.3 var(--font-mono); }
+.tr-name .tag { font: 10.5px/1 var(--font-mono); color: var(--faint); border: 1px solid var(--line); border-radius: 4px; padding: 2px 4px; }
+.tr-name .x { color: var(--deny); font-size: 12px; }
+.tr-name .dn { color: var(--deny); font: 11px/1 var(--font-mono); }
+.tr-track { position: relative; height: 10px; }
+.tr-track::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px dashed var(--line); }
+.tr-bar { position: absolute; top: 1px; bottom: 1px; min-width: 2px; border-radius: 2px; }
+.tr-bar.model { background: var(--clay); }
+.tr-bar.tool { background: var(--line-strong); }
+.tr-bar.failed { background: var(--deny); }
+.tr-bar.run { top: 4px; bottom: 4px; background: var(--muted); opacity: .55; }
+.tr-bar.waitseg { background: repeating-linear-gradient(135deg, var(--wait) 0 2px, transparent 2px 5px); opacity: .8; }
+.tr-num { text-align: right; font: 11.5px/1 var(--font-mono); color: var(--muted); white-space: nowrap; }
+.tr-num b { font-weight: 500; color: var(--ink); }
+.tr-detail { overflow-y: auto; min-width: 0; padding: 14px 18px 32px; display: flex; flex-direction: column; gap: 12px; }
+.tr-empty { margin: auto; color: var(--faint); text-align: center; max-width: 18rem; }
+.tr-dh h2 { margin: 0 0 4px; font: 600 15px/1.3 var(--font-ui); display: flex; gap: 8px; align-items: center; }
+.tr-dh .mk.model { color: var(--clay); }
+.tr-dh .meta { font: 12px/1.5 var(--font-mono); color: var(--muted); }
+.tr-tabs { display: flex; align-items: center; gap: 2px; border-bottom: 1px solid var(--line); }
+.tr-tabs [role="tab"] { padding: 7px 10px; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; font-size: 13px; }
+.tr-tabs [role="tab"][aria-selected="true"] { color: var(--ink); border-bottom-color: var(--clay); }
+.tr-tabs .spacer { flex: 1; }
+.tr-tabs .mini { display: inline-flex; border: 1px solid var(--line); border-radius: var(--r-sm); overflow: hidden; }
+.tr-tabs .mini button { padding: 3px 8px; font: 11px/1.2 var(--font-mono); color: var(--muted); }
+.tr-tabs .mini button[aria-pressed="true"] { background: var(--sunken); color: var(--ink); }
+.tr-copy { font: 500 12px/1 var(--font-ui); color: var(--muted); padding: 5px 8px; border-radius: var(--r-sm); }
+.tr-copy:hover { background: var(--sunken); color: var(--ink); }
+.tr-disc { border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface); }
+.tr-disc summary { cursor: pointer; padding: 8px 10px; font-size: 13px; display: flex; gap: 8px; align-items: center; list-style: none; }
+.tr-disc summary::-webkit-details-marker { display: none; }
+.tr-disc summary::before { content: "›"; color: var(--faint); transition: transform .15s; }
+.tr-disc[open] summary::before { transform: rotate(90deg); }
+.tr-disc summary .sz { margin-left: auto; font: 11px/1 var(--font-mono); color: var(--faint); }
+.tr-pre { margin: 0; padding: 10px 12px; background: var(--code-bg); border-radius: var(--r-sm); font: 12px/1.55 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; color: var(--ink); }
+.tr-disc .tr-pre { margin: 0 10px 10px; }
+.tr-msgs { display: flex; flex-direction: column; }
+.tr-msg { display: grid; grid-template-columns: 4.5rem minmax(0, 1fr); gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 13px; }
+.tr-msg:first-child { border-top: 0; }
+.tr-msg .who { font: 11.5px/1.6 var(--font-mono); color: var(--faint); }
+.tr-msg.you .who { color: var(--muted); }
+.tr-msg.golem .who { color: var(--clay-ink); }
+.tr-msg .call { display: block; font: 12px/1.6 var(--font-mono); color: var(--clay-ink); }
+.tr-msg .tr-pre { padding: 6px 8px; }
+.tr-new { display: flex; align-items: center; gap: 8px; font: 11px/1 var(--font-mono); color: var(--clay-ink); padding: 6px 0; }
+.tr-new::before, .tr-new::after { content: ""; flex: 1; border-top: 1px solid var(--clay); opacity: .5; }
+.tr-kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 16px; margin: 0; font: 12px/1.4 var(--font-mono); }
+.tr-kv dt { color: var(--faint); }
+.tr-kv dd { margin: 0; overflow-wrap: anywhere; }
+.tr-nr { color: var(--faint); font-size: 13px; padding: 8px 10px; border: 1px dashed var(--line-strong); border-radius: var(--r-md); }
+.tr-close { display: none; }
+@media (max-width: 760px) {
+  .tr-panes { grid-template-columns: minmax(0, 1fr); }
+  .tr-tree { border-right: 0; }
+  .tr-row { grid-template-columns: minmax(0, 1fr) 56px auto; padding-right: 12px; }
+  .tr-num .tk { display: none; }
+  .tr-detail { display: none; position: fixed; left: 0; right: 0; bottom: 0; max-height: 78vh; z-index: 30; background: var(--surface);
+    border-top: 1px solid var(--line-strong); border-radius: var(--r-lg) var(--r-lg) 0 0; box-shadow: var(--shadow);
+    padding-bottom: max(32px, env(safe-area-inset-bottom, 0px)); }
+  .trace.open .tr-detail { display: flex; }
+  .tr-close { display: inline-flex; margin-left: auto; }
+  .topbar .vswitch button { padding: 3px 8px; }
+  .app:not(.plain) .topbar .vswitch { display: none; }
+}
 </style>
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -685,6 +773,7 @@ details.out .tablet { margin: 6px 0 0; }
       <button class="icon-btn menu" type="button" id="menu-btn" aria-label="Sessions"><svg><use href="#i-menu"/></svg></button>
       <h1 id="title">UTF-8 split in the socket client</h1>
       <div class="spacer"></div>
+      <div class="vswitch" id="vswitch" role="group" aria-label="View"><button type="button" aria-pressed="true" data-go="chat">Chat</button><button type="button" aria-pressed="false" data-go="trace">Trace</button></div>
       <div class="chips">
         <button class="chip" type="button"><span class="sw"></span>qwen3-coder:30b · local</button>
         <span class="chip folder"><svg width="12" height="12"><use href="#i-folder"/></svg>~/repos/golem</span>
@@ -843,6 +932,15 @@ buffer += decoder.decode(chunk, { stream: <span class="k">true</span> });</pre>
             <button class="chip" type="button" id="model-chip" data-open-models><span aria-hidden="true">◇</span><span id="model-chip-text">qwen3.5:4b · default</span><span class="caret" aria-hidden="true">⌄</span></button>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- Trace (13.1) -->
+    <div class="trace" id="view-trace" hidden>
+      <div class="tr-sum"><span id="tr-sum"></span><span class="spacer"></span><button class="linkbtn" type="button" id="tr-refresh">↻ Refresh</button></div>
+      <div class="tr-panes">
+        <div class="tr-tree" id="tr-tree" role="tree" aria-label="Spans" tabindex="0"></div>
+        <section class="tr-detail" id="tr-detail" aria-label="Span detail"></section>
       </div>
     </div>
 
@@ -1018,6 +1116,12 @@ buffer += decoder.decode(chunk, { stream: <span class="k">true</span> });</pre>
     <button type="button" aria-pressed="false" data-v="w3b">Tools: adding</button>
     <button type="button" aria-pressed="false" data-v="w4">Ready</button>
   </div>
+  <label>Trace</label>
+  <div class="seg" data-seg="screen">
+    <button type="button" aria-pressed="false" data-v="trace">Model call</button>
+    <button type="button" aria-pressed="false" data-v="tracetool">Tool call</button>
+    <button type="button" aria-pressed="false" data-v="traceold">Not recorded</button>
+  </div>
   <label>Sidebar downloads</label>
   <div class="seg" data-seg="dl">
     <button type="button" aria-pressed="false" data-v="none">None</button>
@@ -1120,6 +1224,7 @@ buffer += decoder.decode(chunk, { stream: <span class="k">true</span> });</pre>
   const SCREENS = {
     home: { view: "home" }, nodef: { view: "home", nodef: true }, folders: { view: "home", pop: true }, models: { view: "home", dialog: true },
     setup: { view: "settings", rows: "ok" }, problems: { view: "settings", rows: "issues" },
+    trace: { view: "trace", sel: "m2" }, tracetool: { view: "trace", sel: "t3" }, traceold: { view: "trace", sel: "m2", old: true },
     w1: { view: "welcome", step: 1 }, w2: { view: "welcome", step: 2 }, w3: { view: "welcome", step: 3 }, w3b: { view: "welcome", step: 3, adding: true }, w4: { view: "welcome", step: 4 },
   };
   let current = "chat";
@@ -1131,9 +1236,12 @@ buffer += decoder.decode(chunk, { stream: <span class="k">true</span> });</pre>
     $("#view-home").hidden = view !== "home";
     $("#view-settings").hidden = view !== "settings";
     $("#view-welcome").hidden = view !== "welcome";
+    $("#view-trace").hidden = view !== "trace";
+    $("#vswitch").hidden = view !== "chat" && view !== "trace";
+    $$("#vswitch button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.go === view)));
     $("#view-state").hidden = !STATES[v];
     $("#dock").hidden = view !== "chat";
-    app.classList.toggle("plain", ["home", "settings", "welcome"].includes(view));
+    app.classList.toggle("plain", ["home", "settings", "welcome", "trace"].includes(view));
     app.classList.toggle("bare", view === "welcome");
     $("#settings-btn").toggleAttribute("aria-current", view === "settings");
     closeFloat();
@@ -1162,6 +1270,7 @@ buffer += decoder.decode(chunk, { stream: <span class="k">true</span> });</pre>
     }
     if (view === "settings") renderSetup(sc.rows);
     if (view === "welcome") renderWelcome(sc.step, sc.adding);
+    if (view === "trace") renderTrace(sc ? sc : { sel: null });
     if (sc && sc.pop) openPop();
     if (sc && sc.dialog) openModels("new");
     pressed("screen", v);
@@ -1522,6 +1631,176 @@ buffer += decoder.decode(chunk, { stream: <span class="k">true</span> });</pre>
     $("#welcome-stage").innerHTML = `<svg class="golem" data-golem width="90" height="60" aria-hidden="true"></svg>${stepper}${body}`;
     drawGolem($("#welcome-stage [data-golem]"));
   }
+
+  /* ---------- 13.1: the trace ---------- */
+  const TRACE = [
+    { id: "r1", kind: "run", name: "A character that is two or three bytes in UTF-8 sometimes shows up as � in the TUI", start: 0, dur: 18400, children: [
+      { id: "m1", kind: "model", name: "model 1", start: 0, dur: 2100, tin: 8240, tout: 146, ftt: 640, stop: "tool_use", children: [
+        { id: "t1", kind: "tool", name: "grep", start: 2120, dur: 48, sum: "2 matches" },
+        { id: "t2", kind: "tool", name: "read_file", start: 2175, dur: 12, sum: "41 lines" },
+      ] },
+      { id: "m2", kind: "model", name: "model 2", start: 2200, dur: 4700, tin: 9610, tout: 612, ftt: 820, cache: 8100, stop: "tool_use", children: [
+        { id: "t3", kind: "tool", name: "edit_file", start: 6950, wait: 8020, dur: 30, sum: "+2 −1" },
+      ] },
+      { id: "m3", kind: "model", name: "model 3", start: 15100, dur: 3300, tin: 10480, tout: 380, ftt: 540, stop: "end_turn" },
+    ] },
+    { id: "r2", kind: "run", name: "Run the client tests", start: 0, dur: 6200, children: [
+      { id: "m4", kind: "model", name: "model 1", start: 0, dur: 1300, tin: 10950, tout: 58, ftt: 610, stop: "tool_use", children: [
+        { id: "t4", kind: "tool", name: "shell", start: 1320, dur: 3600, failed: true, sum: "exit 1" },
+      ] },
+      { id: "m5", kind: "model", name: "model 2", start: 4950, dur: 1250, tin: 11320, tout: 214, ftt: 480, stop: "end_turn" },
+    ] },
+  ];
+  const SYSTEM_TEXT = `You are golem, a coding agent running on the user's Mac.\nThe working folder is ~/repos/golem. Use the tools to read and change files there.\nAsk before you run a command that changes anything outside the folder.\n\nPinned skill: ship\n  Take local changes to an open pull request that follows CONTRIBUTING.md …\n\n(2,140 characters in all)`;
+  const TOOLS_TEXT = `read_file   {path: string, start?: integer, end?: integer}\ngrep        {pattern: string, path?: string}\nglob        {pattern: string}\nedit_file   {path: string, old: string, new: string}\nwrite_file  {path: string, text: string}\nshell       {command: string, timeout?: integer}\nweb_fetch   {url: string}\ntodo_write  {todos: Todo[]}\nskill       {name: string}`;
+  const trState = { sel: null, open: new Set(["r1", "r2", "m1", "m2", "m4"]), old: false, tab: {}, json: false };
+  const esc = t => String(t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  const fmtMs = ms => ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(1)} s`;
+  const fmtK = n => n >= 1000 ? `${(n / 1000).toFixed(1)}K` : String(n);
+  function trIndex() {
+    const map = new Map();
+    const walk = (sp, parent, run) => { map.set(sp.id, { sp, parent, run }); (sp.children || []).forEach(c => walk(c, sp, run)); };
+    TRACE.forEach(r => walk(r, null, r));
+    return map;
+  }
+  const TRI = trIndex();
+  function trVisible() {
+    const out = [];
+    const walk = (sp, depth) => { out.push({ sp, depth }); if (sp.children && trState.open.has(sp.id)) sp.children.forEach(c => walk(c, depth + 1)); };
+    TRACE.forEach(r => walk(r, 0));
+    return out;
+  }
+  function trBars(sp, run) {
+    const pct = v => (v / run.dur * 100).toFixed(2) + "%";
+    if (sp.kind === "run") return `<i class="tr-bar run" style="left:0;width:100%"></i>`;
+    let h = "";
+    let start = sp.start;
+    if (sp.wait) { h += `<i class="tr-bar waitseg" style="left:${pct(start)};width:${pct(sp.wait)}"></i>`; start += sp.wait; }
+    const cls = sp.failed ? "failed" : sp.kind;
+    return h + `<i class="tr-bar ${cls}" style="left:${pct(start)};width:${pct(sp.dur)}"></i>`;
+  }
+  function trRow({ sp, depth }) {
+    const run = TRI.get(sp.id).run;
+    const has = !!(sp.children && sp.children.length);
+    const mk = sp.kind === "model" ? `<span class="mk model" aria-hidden="true">◆</span>` : sp.kind === "tool" ? `<span class="mk tool" aria-hidden="true">⚙</span>` : "";
+    const tag = trState.old && sp.kind === "model" ? `<span class="tag">not recorded</span>` : "";
+    const x = sp.failed ? `<span class="x" aria-label="failed">✗</span>` : "";
+    let num = `<b>${fmtMs(sp.dur)}</b>`;
+    if (sp.kind === "model") num += `<span class="tk"> · ${trState.old ? "—" : fmtK(sp.tin + sp.tout)}</span>`;
+    if (sp.kind === "run") {
+      const tok = sp.children.reduce((a, m) => a + m.tin + m.tout, 0);
+      num += `<span class="tk"> · ${trState.old ? "—" : fmtK(tok)}</span>`;
+    }
+    return `<div class="tr-row ${sp.kind}" role="treeitem" id="tr-${sp.id}" data-span="${sp.id}" aria-level="${depth + 1}" aria-selected="${trState.sel === sp.id}"${has ? ` aria-expanded="${trState.open.has(sp.id)}"` : ""}>
+      <span class="tr-name" style="padding-left:${12 + depth * 16}px"><span class="fold" aria-hidden="true">${has ? "›" : ""}</span>${mk}<span class="nm">${esc(sp.name)}</span>${tag}${x}</span>
+      <span class="tr-track" aria-hidden="true">${trBars(sp, run)}</span>
+      <span class="tr-num">${num}</span></div>`;
+  }
+  function trJson(sp) {
+    const base = { id: sp.id, kind: sp.kind, name: sp.name, duration_ms: sp.dur, recorded: !trState.old };
+    if (sp.kind === "model") Object.assign(base, trState.old ? { tokens: null, stop_reason: null } : { model: "ollama/qwen3-coder:30b", tokens: { input: sp.tin, output: sp.tout, cache_read: sp.cache || null, cache_write: null }, first_token_ms: sp.ftt, stop_reason: sp.stop });
+    if (sp.kind === "tool") Object.assign(base, { status: sp.failed ? "failed" : "ok", approval_wait_ms: sp.wait || null });
+    return base;
+  }
+  function trContext(sp) {
+    const nr = `<div class="tr-nr">Not recorded. This session ran before golem kept traces.</div>`;
+    const sys = trState.old ? nr : `<details class="tr-disc"><summary>System prompt<span class="sz">2,140 characters</span></summary><pre class="tr-pre">${esc(SYSTEM_TEXT)}</pre></details>
+      <details class="tr-disc"><summary>Tools<span class="sz">9</span></summary><pre class="tr-pre">${esc(TOOLS_TEXT)}</pre></details>`;
+    const you = `<div class="tr-msg you"><span class="who">you</span><div>A character that is two or three bytes in UTF-8 sometimes shows up as � in the TUI, only on long answers. Can you find why?</div></div>`;
+    if (sp.id === "m1" || sp.id === "m4") return sys + `<div class="tr-msgs">${sp.id === "m1" ? you : `<div class="tr-msg you"><span class="who">you</span><div>Run the client tests</div></div>`}</div>`;
+    return sys + `<div class="tr-msgs">${you}
+      <div class="tr-new">new since the last call</div>
+      <div class="tr-msg golem"><span class="who">golem</span><div><span class="call">→ grep(pattern: "toString(\\"utf8\\")", path: "packages/")</span><span class="call">→ read_file(path: "packages/client/src/connect.ts", start: 600, end: 640)</span></div></div>
+      <div class="tr-msg"><span class="who">grep</span><pre class="tr-pre">packages/client/src/connect.ts:619:      buffer += chunk.toString("utf8");\npackages/daemon/golem/mcp/stdio.py:88:        line = chunk.decode("utf-8")</pre></div>
+      <div class="tr-msg"><span class="who">read_file</span><pre class="tr-pre">605  function openSocket(): net.Socket {\n606    const current = net.createConnection(options.socketPath);\n …\n619      buffer += chunk.toString("utf8");</pre></div></div>`;
+  }
+  function trPretty(sp, tab) {
+    if (sp.kind === "model") {
+      if (tab === "Context") return trContext(sp);
+      if (tab === "Reply") return `<div class="tr-msgs"><div class="tr-msg golem"><span class="who">golem</span><div>${sp.id === "m2"
+        ? `The client decodes each socket chunk on its own, so a character split across two chunks becomes two �. I'll keep a <code>StringDecoder</code> across chunks.<span class="call">→ edit_file(path: "packages/client/src/connect.ts", …)</span>`
+        : sp.stop === "end_turn" ? "Fixed. The decoder now keeps the half of a character until the next chunk comes." : `<span class="call">→ ${sp.id === "m4" ? `shell(command: "pnpm --filter @golem/client test")` : `grep(…)  read_file(…)`}</span>`}</div></div></div>`;
+      const kv = [["model", "qwen3-coder:30b"], ["provider", "ollama"], ["profile", "default"], ["latency", fmtMs(sp.dur)],
+        ["first token", trState.old ? "not recorded" : fmtMs(sp.ftt)], ["input", trState.old ? "not recorded" : sp.tin.toLocaleString("en")],
+        ["output", trState.old ? "not recorded" : sp.tout.toLocaleString("en")], ["cache read", trState.old ? "not recorded" : (sp.cache ? sp.cache.toLocaleString("en") : "—")],
+        ["stop reason", trState.old ? "not recorded" : sp.stop], ["message id", "msg_" + sp.id + "7f3a"]];
+      return `<dl class="tr-kv">${kv.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("")}</dl>`;
+    }
+    if (tab === "Args") return `<pre class="tr-pre">${esc(sp.name === "edit_file" ? `{\n  "path": "packages/client/src/connect.ts",\n  "old": "buffer += chunk.toString(\\"utf8\\");",\n  "new": "buffer += decoder.write(chunk);"\n}` : sp.name === "shell" ? `{\n  "command": "pnpm --filter @golem/client test"\n}` : sp.name === "grep" ? `{\n  "pattern": "toString(\\"utf8\\")",\n  "path": "packages/"\n}` : `{\n  "path": "packages/client/src/connect.ts",\n  "start": 600,\n  "end": 640\n}`)}</pre>`;
+    if (tab === "Result") return `<pre class="tr-pre">${esc(sp.name === "edit_file" ? "Edited packages/client/src/connect.ts (+2 −1)" : sp.name === "shell" ? " FAIL  src/connect.test.ts > decodes a split character\n   expected 'é' but got '��'\n\n Tests  1 failed | 47 passed (48)\nexit 1" : sp.name === "grep" ? 'packages/client/src/connect.ts:619:      buffer += chunk.toString("utf8");\npackages/daemon/golem/mcp/stdio.py:88:        line = chunk.decode("utf-8")' : "605  function openSocket(): net.Socket {\n …\n640  }")}</pre>`;
+    return `<dl class="tr-kv"><dt>decision</dt><dd>allow once</dd><dt>rule</dt><dd>ask edit_file (built-in)</dd><dt>waited</dt><dd>${fmtMs(sp.wait)}</dd><dt>args</dt><dd>as asked</dd></dl>`;
+  }
+  function renderDetail() {
+    const d = $("#tr-detail");
+    const sp = trState.sel && TRI.get(trState.sel) ? TRI.get(trState.sel).sp : null;
+    if (!sp || sp.kind === "run") {
+      d.innerHTML = `<p class="tr-empty">${sp ? `${esc(sp.name)}<br><span class="mono">${fmtMs(sp.dur)} · ${sp.children.length} model calls</span><br><br>` : ""}Select a span to see what went in and what came out.</p>`;
+      return;
+    }
+    const tabs = sp.kind === "model" ? ["Context", "Reply", "Metadata"] : ["Args", "Result", ...(sp.wait ? ["Approval"] : [])];
+    const tab = tabs.includes(trState.tab[sp.kind]) ? trState.tab[sp.kind] : tabs[0];
+    let meta;
+    if (sp.kind === "model") meta = trState.old ? `qwen3-coder:30b · ${fmtMs(sp.dur)} · tokens not recorded`
+      : `qwen3-coder:30b · ollama · ${fmtMs(sp.dur)} · first token ${fmtMs(sp.ftt)} · ${fmtK(sp.tin)} → ${sp.tout} tok${sp.cache ? ` · cache read ${fmtK(sp.cache)}` : ""}`;
+    else meta = `${sp.failed ? "✗ failed" : "✓ " + sp.sum} · ${fmtMs(sp.dur)}${sp.wait ? ` · waited ${fmtMs(sp.wait)} for approval` : ""}`;
+    const body = trState.json ? `<pre class="tr-pre">${esc(JSON.stringify(trJson(sp), null, 2))}</pre>` : trPretty(sp, tab);
+    d.innerHTML = `<div class="tr-dh"><h2>${sp.kind === "model" ? `<span class="mk model" aria-hidden="true">◆</span>` : `<span aria-hidden="true">⚙</span>`}<span class="${sp.kind === "tool" ? "mono" : ""}">${esc(sp.name)}</span>
+        <button class="icon-btn tr-close" type="button" aria-label="Close" data-tr-close>×</button></h2><div class="meta">${esc(meta)}</div></div>
+      <div class="tr-tabs" role="tablist">${tabs.map(t => `<button type="button" role="tab" aria-selected="${t === tab}" data-tr-tab="${t}">${t}</button>`).join("")}
+        <span class="spacer"></span><span class="mini" role="group" aria-label="Format"><button type="button" aria-pressed="${!trState.json}" data-tr-json="0">Pretty</button><button type="button" aria-pressed="${trState.json}" data-tr-json="1">JSON</button></span>
+        <button class="tr-copy" type="button" data-tr-copy>Copy</button></div>
+      <div class="tr-body" role="tabpanel">${body}</div>`;
+    d.querySelector("[data-tr-tab]") && $$("[data-tr-tab]", d).forEach(b => b.addEventListener("click", () => { trState.tab[sp.kind] = b.dataset.trTab; renderDetail(); }));
+    $$("[data-tr-json]", d).forEach(b => b.addEventListener("click", () => { trState.json = b.dataset.trJson === "1"; renderDetail(); }));
+    $("[data-tr-copy]", d).addEventListener("click", e => {
+      const btn = e.currentTarget;
+      try { navigator.clipboard.writeText($(".tr-body", d).innerText); } catch (err) {}
+      btn.textContent = "Copied"; setTimeout(() => { btn.textContent = "Copy"; }, 2000);
+    });
+    $("[data-tr-close]", d).addEventListener("click", () => { $("#view-trace").classList.remove("open"); });
+  }
+  function renderTreeRows() {
+    $("#tr-tree").innerHTML = trVisible().map(trRow).join("");
+    if (trState.sel) $("#tr-tree").setAttribute("aria-activedescendant", "tr-" + trState.sel);
+  }
+  function trSelect(id, fromClick) {
+    trState.sel = id;
+    renderTreeRows(); renderDetail();
+    const row = document.getElementById("tr-" + id); if (row) row.scrollIntoView({ block: "nearest" });
+    if (fromClick || id) $("#view-trace").classList.toggle("open", TRI.get(id).sp.kind !== "run");
+  }
+  function renderTrace(sc) {
+    trState.old = !!sc.old;
+    const ms = TRACE.reduce((a, r) => a + r.dur, 0);
+    const tok = TRACE.reduce((a, r) => a + r.children.reduce((b, m) => b + m.tin + m.tout, 0), 0);
+    $("#tr-sum").textContent = `${TRACE.length} runs · ${fmtMs(ms)} · ${trState.old ? "— tokens" : fmtK(tok) + " tokens"}`;
+    trState.sel = sc.sel; trState.json = false;
+    renderTreeRows(); renderDetail();
+    $("#view-trace").classList.remove("open");
+  }
+  $("#tr-tree").addEventListener("click", e => {
+    const row = e.target.closest("[data-span]"); if (!row) return;
+    const id = row.dataset.span;
+    if (e.target.closest(".fold") && row.hasAttribute("aria-expanded")) {
+      trState.open.has(id) ? trState.open.delete(id) : trState.open.add(id);
+      renderTreeRows(); return;
+    }
+    trSelect(id, true);
+  });
+  $("#tr-tree").addEventListener("keydown", e => {
+    const vis = trVisible().map(v => v.sp.id);
+    const i = Math.max(0, vis.indexOf(trState.sel));
+    const cur = TRI.get(vis[i]);
+    const has = !!(cur.sp.children && cur.sp.children.length);
+    if (e.key === "ArrowDown") { e.preventDefault(); trSelect(vis[Math.min(vis.length - 1, i + 1)]); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); trSelect(vis[Math.max(0, i - 1)]); }
+    else if (e.key === "ArrowRight" && has) { e.preventDefault(); if (!trState.open.has(cur.sp.id)) { trState.open.add(cur.sp.id); renderTreeRows(); } else trSelect(cur.sp.children[0].id); }
+    else if (e.key === "ArrowLeft") { e.preventDefault(); if (has && trState.open.has(cur.sp.id)) { trState.open.delete(cur.sp.id); renderTreeRows(); } else if (cur.parent) trSelect(cur.parent.id); }
+    else if (e.key === "Enter" && has) { e.preventDefault(); trState.open.has(cur.sp.id) ? trState.open.delete(cur.sp.id) : trState.open.add(cur.sp.id); renderTreeRows(); }
+  });
+  $("#tr-refresh").addEventListener("click", e => {
+    const b = e.currentTarget; b.textContent = "↻ Refreshed"; setTimeout(() => { b.textContent = "↻ Refresh"; }, 1200);
+  });
 
   /* Delegated clicks: download row, dialog openers, dismiss, screen links */
   document.addEventListener("click", e => {

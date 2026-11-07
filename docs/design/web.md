@@ -230,6 +230,91 @@ The browser sets up golem on pages, not in a dialog ([ADR-039](../adr/039-web-se
 - **Where it was opened from:** the route carries no session or folder. A session screen remembers its session and folder in memory, so the sections that depend on a folder (tool rules, MCP, skills) use that one, else the folder of the next new session, else none.
 - **Ways in:** the sidebar's Settings button and the palette's `Settings` row. There is no `/settings` slash command, because the terminal has no such page.
 
+## The trace
+
+How an answer was made: each model call with its context and reply, each tool call with its args and result, and the time and tokens of each. What is recorded, and how older sessions fall back, is in [ADR-041](../adr/041-session-trace.md). Phase 13 builds it.
+
+```
+┌ UTF-8 split in the socket client                     [Chat|Trace]    ┐
+├────────────────────────────────────────────────────────────────────────┤
+│ 2 runs · 24.6 s · 52.0K tokens                              ↻ Refresh  │
+├──────────────────────────────────────────┬─────────────────────────────┤
+│ ▾ Run 1  A character that is two…  18.4s │ ◆ model 2                   │
+│   ▾ ◆ model 1   ███                2.1s  │ qwen3-coder:30b · 4.7s ·    │
+│        ⚙ grep      ▍               48ms  │ first token 820ms · 9.6K→612│
+│        ⚙ read_file ▍               12ms  │ [Context] [Reply] [Metadata]│
+│   ▾ ◆ model 2      ██████          4.7s ◀│ ▸ System prompt · 2,140 ch  │
+│        ⚙ edit_file      ▨▨▨▨▨▨▨▨▍  30ms  │ ▸ Tools · 9                 │
+│   ▸ ◆ model 3                 ████ 3.3s  │ you   A character that is … │
+│ ▸ Run 2  Run the client tests       6.2s │ ── new since the last call ─│
+│                                          │ golem → grep(…) read_file(…)│
+│                                          │ grep  2 matches             │
+│                                          │           [Pretty|JSON] Copy│
+└──────────────────────────────────────────┴─────────────────────────────┘
+```
+
+- **In the prototype:** the panel's *Trace* row has three screens: a model call, a tool call, and a session from before traces (`prototype.html#trace`, `#tracetool`, `#traceold`).
+- **Route:** `/s/:id/trace`, with `?span=<id>` for the selected span, so a link opens the same span. Like Settings, it has no drawer and no chips. The sidebar stays.
+- **Ways in:**
+  - A `Chat | Trace` switch in the top bar of a session, at its right. It shows on both views, and the current one is pressed.
+  - The palette's `Trace` row, which is shown only when a session is open.
+  - There is no slash command, because the terminal has no trace.
+- **Summary line:** the number of runs, the total time, and the total tokens (input plus output; `—` when none are recorded), with `Refresh` at the right. The page shows finished data and does not update while a run streams. A running run shows its open spans as `running`, and Refresh reads again.
+- **Two panes:**
+  - The tree, about 55%, and the detail beside it.
+  - The tree scrolls on its own, and the detail keeps its place.
+  - With nothing selected, the detail says `Select a span to see what went in and what came out.`
+- **A row:**
+  - Indented 16 px per level, with a fold arrow on a run and on a model call that has tools.
+  - The mark: a clay `◆` for a model call, a muted `⚙` for a tool, nothing for a run.
+  - The name: a run's first words in the UI font; `model 1`, `model 2` …; a tool's name in mono.
+  - The waterfall track, the time, and for a model call the tokens (`9.6K`).
+  - A failed span ends with `✗` in `deny`, and a denied one with `denied`.
+  - The selected row has the `clay-soft` ground.
+  - Runs are folded, except the last one and the one with the selected span.
+- **The waterfall:**
+  - Each bar sits on its run's time line, with its left edge and width as a share of the run. A bar is at least 2 px wide, so a 3 ms tool still shows.
+  - Colours:
+    - `clay` for a model call;
+    - `line-strong` for a tool;
+    - `deny` for a failed span;
+    - the wait for approval in front of a tool, hatched in `wait`.
+  - A run's own bar is a thin `muted` line.
+  - No axis or grid lines. The time is on the row.
+- **The detail header:**
+  - **A model call:** the name, then a mono line: the model and provider, the time, the time to the first token, `input → output` tokens, and cache read and cache write when there are any.
+  - **A tool:** the tool's name, `✓` or `✗`, its time, and its approval wait.
+- **Model call tabs:**
+  - **Context**, in the order it was sent:
+    1. `System prompt · 2,140 characters` and `Tools · 9`, each a closed disclosure. They open into mono blocks, the tools one schema each.
+    2. The messages as a compact transcript. A label column holds `you`, `golem`, or the tool's name. Text is in the UI font, not Literata, because this is for reading closely, not for reading through.
+    3. An assistant message lists its tool calls as `→ name(args)` in mono.
+    4. A tool result is in a `code-bg` block, closed after 12 lines with `Show all`.
+    5. A divider, `new since the last call`, comes before the first message the previous call did not have.
+  - **Reply:** the reply, the same way.
+  - **Metadata:** a two-column list of every field, in mono.
+- **Tool call tabs:**
+  - **Args:** pretty JSON.
+  - **Result:** the full text. A large result shows its first part and `Open full output`, which opens the artifact viewer.
+  - **Approval**, shown only when there was one: the decision, the rule that asked, the wait, and the args if they were edited.
+- **On every tab:**
+  - `Pretty | JSON` and `Copy` sit at the top right.
+  - JSON shows the raw part of `trace.span` for that tab.
+  - Copy copies what is shown and says `Copied` for 2 s.
+- **Not recorded:** a session from before Phase 13 has no tokens, stop reason, system prompt, or tools.
+  - Its rows show `—` for tokens.
+  - Its model calls carry a faint `not recorded` tag.
+  - Where the missing part would be, the detail says `Not recorded. This session ran before golem kept traces.` in `faint`.
+- **Keys:**
+  - The tree is a `tree` with one tab stop.
+  - Up and Down move the selection.
+  - Right opens a row, or moves to its first child.
+  - Left closes a row, or moves to its parent.
+  - Enter opens or closes a row, and a click selects it.
+  - In the detail, the tabs follow the tablist pattern.
+- **Narrow windows:** below 760 px the tree fills the page, rows show the time but not the tokens, and the detail is a sheet from the bottom with a close button. Closing it clears `?span=`. The chat's top bar has no room for the switch at this width, so there it hides, and the trace opens from the palette. The trace page keeps its switch to go back.
+- **Empty:** a session with no runs says `Nothing to trace yet. Send a message first.`, with a link back to the chat.
+
 ## Slash commands in the composer
 
 - Typing `/` at the start of the message opens a list above the composer: the `/name` in clay mono, the description in muted text, at most about eight rows, then it scrolls. Up and Down move, Tab completes, Enter runs (a partial match fills in first), and Esc closes it for that text. Typing again opens it again. `//` is a message and never suggests. The list stays closed while a run is in progress or while you browse the history with Up and Down.
