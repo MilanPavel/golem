@@ -16,20 +16,21 @@ This file is about what comes next. How the existing pieces are built is in [arc
 | 2. Skills | Claude Code compatible `SKILL.md` skills | M4 — Skilled |
 | 10. Web UI | The chat in your browser, served by `golem web` | M7 — In the browser |
 | 12. Models | Curated local and hosted lists by category, six providers, local models you can tune and learn from | M8 — Models |
+| 13. Tracing | A session's trace in the browser: context, replies, tools, time, and tokens per model call | M9 — Traced |
 | 3. Flows | Durable workflows written in Python, resumable after a crash | M5 — Works alone |
 | 4. Triggers | Schedules, file watchers, and notifications | M5 — Works alone |
 | 5. Memory | Long-term memory that you can see and edit | M6 — Remembers |
-| 6. Evals and hardening | Tracing, eval suites, crash tests, backups, a security pass | M6 — Remembers |
+| 6. Evals and hardening | Trace export, eval suites, crash tests, backups, a security pass | M6 — Remembers |
 | 7. TUI polish | A render cache for long sessions, themes, and search in the transcript | Later |
 | 8. Platforms | One interface for everything OS-specific, then Linux and Windows | Later |
 | 9. Model routing and long sessions | Token and cost display, a cheap profile for small jobs, budgets, escalation, compaction | Later |
 | 11. Docs (parallel track) | A docs site in golem's look, a short README, and "How golem works" | Any time |
 
-What is built is in [architecture.md](architecture.md) and the ADRs, and how to install, run, and release it is in [sre.md](sre.md). Steps 1.1 to 1.6 of Phase 1, the first run and the terminal UX, are built ([#62](https://github.com/MilanPavel/golem/issues/62)). Steps 1.7 to 1.14 finish the first run from `brew install`, so they come first, then skills, then the web UI, then the model work in Phase 12. Phase 11, the docs, runs beside them and blocks nothing.
+What is built is in [architecture.md](architecture.md) and the ADRs, and how to install, run, and release it is in [sre.md](sre.md). Steps 1.1 to 1.6 of Phase 1, the first run and the terminal UX, are built ([#62](https://github.com/MilanPavel/golem/issues/62)). Steps 1.7 to 1.14 finish the first run from `brew install`, so they come first, then skills, then the web UI, then the model work in Phase 12, then tracing in Phase 13. Phase 11, the docs, runs beside them and blocks nothing.
 
 ```mermaid
 flowchart LR
-  p1[1 First run, continued] --> p2[2 Skills] --> p10[10 Web UI] --> p12[12 Models] --> p3[3 Flows] --> p4[4 Triggers] --> p5[5 Memory] --> p6[6 Evals and hardening] --> p7[7 TUI polish] --> p8[8 Platforms] --> p9[9 Model routing and long sessions]
+  p1[1 First run, continued] --> p2[2 Skills] --> p10[10 Web UI] --> p12[12 Models] --> p13[13 Tracing] --> p3[3 Flows] --> p4[4 Triggers] --> p5[5 Memory] --> p6[6 Evals and hardening] --> p7[7 TUI polish] --> p8[8 Platforms] --> p9[9 Model routing and long sessions]
 ```
 
 ### How to read a phase
@@ -88,11 +89,13 @@ JSON-RPC 2.0, one JSON object per line, over `~/.golem/run/golem.sock`. Protocol
 | Group | New events | Phase |
 |---|---|---|
 | Models | `model.options.changed` (12.6), `model.speed` (12.11) | 12 |
-| Models | `usage.reported` (tokens, cost) | 9.1 |
+| Models | `model.call.started`, `model.call.completed` (model, tokens, stop reason, timings) | 13.2 |
+| Tools | `duration_ms` on `tool.completed` and `tool.failed` | 13.4 |
+| Models | `usage.reported` (cost, from 13.2's tokens) | 9.1 |
 | System | `warning`, `error` | 9.4 |
 | Runs and flows | `run.step.started`, `run.step.completed`, `run.interrupted` | 3.2, 3.4 |
 
-New commands: `model.options.get | set` and `session.set_options` (12.6), `model.card` (12.10), `model.compare` (12.14), `skill.trust | untrust` (2.6), `flow.list | start | status` (3.1), and `daemon.shutdown` (8.1).
+New commands: `trace.get` and `trace.span` (13.5), `model.options.get | set` and `session.set_options` (12.6), `model.card` (12.10), `model.compare` (12.14), `skill.trust | untrust` (2.6), `flow.list | start | status` (3.1), and `daemon.shutdown` (8.1).
 
 Rules:
 
@@ -605,6 +608,98 @@ Later, outside this phase: disk hygiene (installed models with size and last use
 
 ---
 
+## Phase 13 — Tracing
+
+See how an answer was made. A session's trace in the browser shows each model call: what was in its context, what it replied, which tools ran, and the time and tokens of each step. It is a tree of spans with a waterfall, like LangSmith, but local and for golem's own sessions. Today the daemon throws most of this away. The system prompt and the tool schemas are rebuilt for every call and never stored ([chat.py](../packages/daemon/golem/graphs/chat.py)). No model call has an event, so its tokens, stop reason, and latency are lost. A tool's time includes the wait for approval. So the phase records first, then shows. It runs after the web UI, because its page builds on 10.11. The details are in [#TBD](https://github.com/MilanPavel/golem/issues/TBD), and each step is one commit and one pull request.
+
+Choices that hold for the whole phase:
+
+- **Web only.** The TUI keeps `/debug`, which shows the wire and the model's state as it is now.
+- **Record from now on, and fall back for older sessions.** A session from before this phase still has a tree, timings from event `ts` gaps, and its context from the checkpoint. Where data is missing, the page says "not recorded".
+- **The exact request is stored once per content.** A `blobs` table, keyed by sha256, holds system prompts and tool schemas. Each model call keeps the hashes and the ids of the messages in its context. The messages themselves stay in the checkpoint.
+- **The daemon builds the tree.** `trace.get` returns a small tree of summaries, and `trace.span` returns the full input and output of one span when it is clicked.
+- **Its own page, `/s/:id/trace`, with finished data only.** It has a refresh button and does not update while a run streams.
+- **No chart library.** The waterfall is plain CSS on golem's tokens: clay for a model call, neutral for a tool, the error colour for a failure, and a hatched segment for the wait for approval.
+- **Context reads like a chat, not JSON.** Messages are drawn as in the transcript, with a line where the new part begins. A Pretty/JSON switch and copy sit on every tab.
+- **This phase owns the per-call record.** 9.1 adds cost on top of `model.call.completed`'s usage, and 6.1 only exports these spans.
+
+```mermaid
+flowchart LR
+  s1[13.1 ADR and design] --> s2[13.2 Model calls]
+  s1 --> s3[13.3 Exact request]
+  s1 --> s4[13.4 Tool duration]
+  s2 & s3 & s4 --> s5[13.5 trace.get and trace.span] --> s6[13.6 Trace page] --> s7[13.7 Span detail] --> s8[13.8 Chapter 14, Tracing]
+```
+
+After 13.1, steps 13.2 to 13.4 can run side by side, each in its own worktree.
+
+### 13.1 ADR-041 and a design for the trace page — [#TBD](https://github.com/MilanPavel/golem/issues/TBD)
+
+- **Goal:** every choice the trace code depends on is written down and agreed before it is written.
+- **You can:** open the trace page in the prototype, in both themes and at phone width.
+- **Build:**
+  - **ADR-041:** what a span is (run, model call, tool call) and the ids that join them. What is recorded and where, and why the request is stored as hashes plus message ids. How older sessions fall back. Why not LangSmith, Langfuse, or an OpenTelemetry exporter now. Where the prompts are stored, and that they never leave `~/.golem`.
+  - **The design:** a *Trace* section in `docs/design/web.md`, and the page in `docs/design/prototype.html`.
+- **Done when:** the ADR and the design are merged, and the prototype is approved.
+
+### 13.2 Record each model call — [#TBD](https://github.com/MilanPavel/golem/issues/TBD)
+
+- **Goal:** every model call leaves a record of which model ran, when, how many tokens it used, and why it stopped.
+- **Build:** `model.call.started` (`call_id`, `message_id`, `provider`, `model`, `index`) and `model.call.completed` (`usage` with input, output, cache read, and cache write; `stop_reason`, `ttft_ms`, `latency_ms`, `failed`), written from `call_model` and stored by the runner. `stream_usage` is turned on for OpenAI-style providers.
+- **Done when:** each model call in a new session has both events, with tokens wherever the provider reports them, and the TUI and the transcript are unchanged.
+- **Watch out:** a provider with no usage leaves `usage` empty, not zero. This changes the wire, so it bumps the protocol minor version.
+
+### 13.3 Record the exact request of each model call — [#TBD](https://github.com/MilanPavel/golem/issues/TBD)
+
+- **Goal:** golem can later show exactly what each model call was sent.
+- **Build:** a `blobs` table (`sha256`, `kind`, `text`) with `store/blobs.py`. `model.call.started` gains `system_prompt_sha`, `tools_sha`, and `message_ids`. Backups include `blobs`.
+- **Done when:** a call's system prompt and tools read back byte for byte, and two calls with the same prompt store it once.
+
+### 13.4 Tool duration without the wait for approval — [#TBD](https://github.com/MilanPavel/golem/issues/TBD)
+
+- **Goal:** a tool's time is the time it ran.
+- **Build:** `duration_ms` on `tool.completed` and `tool.failed`, timed in `tools_node.py` from after approval. The wait itself stays the gap between `approval.needed` and `approval.resolved`.
+- **Done when:** a tool that waited for approval reports only its run time.
+
+### 13.5 `trace.get` and `trace.span` — [#TBD](https://github.com/MilanPavel/golem/issues/TBD)
+
+- **Goal:** a client reads a session as a tree of spans, and loads one span's full input and output on demand.
+- **Build:**
+  - `sessions/trace.py`: a pure builder from events, checkpoint messages, and blobs, with the fallback for older sessions.
+  - The two methods in `commands.py` and `methods.py`, on the browser allowlist.
+  - `getTrace` and `getTraceSpan` in `@golem/client`.
+- **Done when:** golden event logs (a new session, an old one, a failed tool, an approval wait, a cancelled run, and 25 calls) give the expected trees, and both methods work through the gateway.
+
+### 13.6 The trace page: tree and waterfall — [#TBD](https://github.com/MilanPavel/golem/issues/TBD)
+
+- **Goal:** open a session's trace and see its runs, model calls, and tool calls at a glance.
+- **You can:**
+  - Open `/s/:id/trace` from a Chat/Trace switch in the session header, or from ⌘K.
+  - Fold runs, and move with ↑/↓ and ←/→.
+  - Link to one span with `?span=`.
+- **Build:** the route, the entry points, `trace.get` as a TanStack Query in `store/`, and `features/trace/` (a header with runs, time, and tokens, then the tree with waterfall bars). Gallery entries.
+- **Done when:** e2e opens the trace of a fixture session, axe finds nothing, and it works in both themes.
+
+### 13.7 Span detail: context, reply, metadata — [#TBD](https://github.com/MilanPavel/golem/issues/TBD)
+
+- **Goal:** click a span and read what went in and what came out, as easily as a chat.
+- **You can:**
+  - **A model call:** read its context (system prompt and tools folded, then the messages, with the new part marked), its reply, and its metadata (model, tokens, stop reason, latency, and time to first token).
+  - **A tool call:** read its args, its full result, and its approval.
+- **Build:** the right pane from `trace.span`, with markdown through DOMPurify and Shiki as in the transcript, the artifact viewer for a large result, Pretty/JSON, and copy. At phone width it is a sheet.
+- **Done when:** e2e selects a tool span and sees its args and result, and an old session shows "not recorded" where data is missing.
+
+### 13.8 Chapter 14 of How golem works: Tracing — [#TBD](https://github.com/MilanPavel/golem/issues/TBD)
+
+- **Goal:** a user knows how to read a trace, and a contributor knows where its data comes from.
+- **Build:**
+  - `docs/architecture/tracing.md`, the last chapter, from `_template.md` with `order: 14` and `adrs: [41]`. It covers tracing in agents generally, then golem's events, blobs, and the two methods, with a diagram and a real trace.
+  - The chapter in the sidebar in `docs/.vitepress/config.mts`, with Next and Before links to 13. The web UI.
+  - A *Trace a session* section in `docs/guide/web.md`.
+- **Done when:** chapter 14 shows last in the sidebar, and the docs site builds.
+
+---
+
 ## Phase 11 — Docs
 
 A docs site with a side menu, search, and both themes, in golem's own look. A short README that points to it. A series, "How golem works", that explains one common agent idea per chapter, then shows how golem builds it, and holds golem's architecture. The details are in [#264](https://github.com/MilanPavel/golem/issues/264) and in each step's issue, and every ticket is a sub-issue of its step. One ticket per commit and per PR.
@@ -689,6 +784,7 @@ flowchart LR
   | 11.6.8 | Two chapters: The daemon, and The protocol | the daemon, the socket, the pid lock, and what it owns; the protocol, attach and fan-out, what is on the wire, and the protocol package | [ADR-001](adr/001-process-split.md), [003](adr/003-protocol.md), [004](adr/004-pid-lock.md), [007](adr/007-attach-and-fan-out.md) |
   | 11.6.9 | The terminal app: drawing a session from its events | the TUI and the shared client | [ADR-005](adr/005-client-package.md) |
   | 11.6.10 | The web UI: a browser on a local socket | the web gateway and the browser app | [ADR-028](adr/028-web-gateway.md), [029](adr/029-web-stack.md) |
+  | 13.8 | Tracing: how an answer was made | nothing; written new in Phase 13 | ADR-041, written in 13.1 |
   | 11.6.11 | What comes next: memory, evals, routing, compaction | "planned next" | Phases 5, 6, and 9 of this plan |
   | 11.6.12 | The overview | only the system on one machine, the map you can click with its tour of one message, and where to go next. The pointer sections go. The settings list becomes the Settings guide, `docs/guide/settings.md`, under Use golem | |
 
@@ -874,10 +970,10 @@ Useful long-term memory that you can inspect and edit, and that never surprises 
 
 This runs alongside the other phases. It gets a dedicated pass after Phase 4.
 
-### 6.1 Tracing
+### 6.1 Trace export
 
-- **Goal:** you can answer what happened, why, and what it cost.
-- **Build:** OpenTelemetry spans per run, node or task, model call, and tool call. Export to self-hosted Langfuse, or to JSONL for zero infrastructure. A cost dashboard in the TUI by model and by flow.
+- **Goal:** you can answer what happened, why, and what it cost, outside golem too.
+- **Build:** export the spans of Phase 13 as OpenTelemetry, to self-hosted Langfuse or to JSONL for zero infrastructure. Add flow and task spans from Phase 3, and a cost dashboard by model and by flow.
 - **Done when:** one slow answer can be broken down into its spans.
 
 ### 6.2 Eval harness
@@ -1029,7 +1125,7 @@ These steps were the second half of the model work, after `/model`. Tools and ap
 - **Goal:** you always know what a session has cost.
 - **You can:** see tokens and cost per answer, and `/cost` for today, this week, and this session.
 - **Build:**
-  - `usage.reported` per model call, and a `costs` table. Prices come from `model.list`, and a profile's `price` overrides them.
+  - `usage.reported` per model call, from the tokens that 13.2 records, and a `costs` table. Prices come from `model.list`, and a profile's `price` overrides them.
   - The meter shows tokens while writing. The finished answer shows `1.2k tok · $0.004` next to its duration.
   - `/cost` prints a short table.
 - **Done when:** the cost of a day of use matches the provider's dashboard within a few percent.

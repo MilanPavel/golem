@@ -35,7 +35,14 @@ import httpx
 
 from golem.config import ModelPrice, ModelSettings
 from golem.models import hardware, ollama, prices
-from golem.models.catalog import CatalogEntry, HostedEntry, load_hosted_catalog, load_local_catalog
+from golem.models.catalog import (
+    CatalogEntry,
+    HostedEntry,
+    categories_of,
+    in_order,
+    load_hosted_catalog,
+    load_local_catalog,
+)
 from golem.models.errors import ModelUnreachable
 from golem.models.keys import KeyStoreError
 from golem.models.ollama import LocalServers
@@ -103,6 +110,7 @@ class ListedModel:
     fit: hardware.Fit | None = None
     stale: bool = False
     tags: tuple[str, ...] = ()
+    categories: tuple[str, ...] = ()
     recommended: bool = False
 
 
@@ -151,6 +159,16 @@ class _Found:
     tools: bool | None = None
     price: ModelPrice | None = None
     size_gb: float | None = None
+    # What Ollama's /api/show says the model can do: completion, tools, vision, thinking.
+    capabilities: tuple[str, ...] | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class _Shown:
+    """What ``/api/show`` added for one installed model."""
+
+    ctx: int | None
+    capabilities: tuple[str, ...] | None
 
 
 @dataclass(slots=True)
@@ -210,7 +228,7 @@ class ModelDiscovery:
         self._remote: dict[str, _Remote] = {}
         self._fetching: dict[str, asyncio.Task[_Remote]] = {}
         self._price_task: asyncio.Task[None] | None = None
-        self._shown: dict[str, tuple[int | None, bool | None]] = {}
+        self._shown: dict[str, _Shown] = {}
 
     @property
     def ram_gb(self) -> float | None:
@@ -327,7 +345,10 @@ class ModelDiscovery:
         for entry in self._catalog:
             if entry.ref in by_ref:
                 by_ref[entry.ref] = replace(
-                    by_ref[entry.ref], tags=entry.tags, recommended=entry.ref == recommended
+                    by_ref[entry.ref],
+                    tags=entry.tags,
+                    categories=in_order(entry.categories) or by_ref[entry.ref].categories,
+                    recommended=entry.ref == recommended,
                 )
                 continue
             name, _, model_id = entry.ref.partition("/")
@@ -345,8 +366,17 @@ class ModelDiscovery:
                 status="not_installed" if ready else "server_down",
             )
             by_ref[entry.ref] = replace(
-                by_ref[entry.ref], tags=entry.tags, recommended=entry.ref == recommended
+                by_ref[entry.ref],
+                tags=entry.tags,
+                categories=in_order(entry.categories) or by_ref[entry.ref].categories,
+                recommended=entry.ref == recommended,
             )
+        # The catalog's own categories win over what the facts suggest.
+        for hosted in self._hosted:
+            if hosted.ref in by_ref:
+                by_ref[hosted.ref] = replace(
+                    by_ref[hosted.ref], categories=in_order(hosted.categories)
+                )
         aliases: dict[str, list[str]] = {}
         ctx_overrides: dict[str, int] = {}
         price_overrides: dict[str, ModelPrice] = {}
@@ -418,6 +448,12 @@ class ModelDiscovery:
         price = _FREE if local else found.price or (info.price if info else None)
         ctx = found.ctx or (info.ctx if info else None)
         tools = found.tools if found.tools is not None else (info.tools if info else None)
+        if found.capabilities is not None:
+            vision = "vision" in found.capabilities
+            reasoning = "thinking" in found.capabilities
+        else:
+            vision = info.vision if info else None
+            reasoning = info.reasoning if info else None
         return ListedModel(
             ref=ref,
             label=label or found.label or found.model_id,
@@ -431,6 +467,7 @@ class ModelDiscovery:
             # A model's maximum context is not what Ollama allocates. A profile's ctx is.
             fit=self._fit(found.size_gb, None),
             stale=stale,
+            categories=categories_of(vision=vision, reasoning=reasoning, ctx=ctx),
         )
 
     def _recommended(self) -> str | None:
@@ -483,16 +520,22 @@ class ModelDiscovery:
             return None
         details = _dict(item.get("details"))
         ctx = _positive_int(details.get("context_length"))
-        capabilities = item.get("capabilities")
-        tools = "tools" in capabilities if isinstance(capabilities, list) else None
-        if ctx is None or tools is None:
-            ctx, tools = await self._ollama_show(client, base, name, item.get("digest"), ctx, tools)
+        capabilities = _names(item.get("capabilities"))
+        tools = "tools" in capabilities if capabilities is not None else None
+        if ctx is None or capabilities is None:
+            shown = await self._ollama_show(
+                client, base, name, item.get("digest"), ctx, capabilities
+            )
+            ctx, capabilities = shown.ctx, shown.capabilities
+            if tools is None and capabilities is not None:
+                tools = "tools" in capabilities
         size = item.get("size")
         return _Found(
             model_id=name,
             ctx=ctx,
             tools=tools,
             size_gb=round(size / 1e9, 1) if isinstance(size, int) else None,
+            capabilities=capabilities,
         )
 
     async def _ollama_show(
@@ -502,8 +545,8 @@ class ModelDiscovery:
         name: str,
         digest: object,
         ctx: int | None,
-        tools: bool | None,
-    ) -> tuple[int | None, bool | None]:
+        capabilities: tuple[str, ...] | None,
+    ) -> _Shown:
         key = digest if isinstance(digest, str) else name
         if key in self._shown:
             return self._shown[key]
@@ -514,16 +557,15 @@ class ModelDiscovery:
             response.raise_for_status()
             shown = _dict(response.json())
         except (httpx.HTTPError, ValueError):
-            return ctx, tools
+            return _Shown(ctx, capabilities)
         info = _dict(shown.get("model_info"))
         for field_name, value in info.items():
             if ctx is None and field_name.endswith(".context_length"):
                 ctx = _positive_int(value)
-        capabilities = shown.get("capabilities")
-        if tools is None and isinstance(capabilities, list):
-            tools = "tools" in capabilities
-        self._shown[key] = (ctx, tools)
-        return ctx, tools
+        if capabilities is None:
+            capabilities = _names(shown.get("capabilities"))
+        self._shown[key] = _Shown(ctx, capabilities)
+        return self._shown[key]
 
     async def _remote_models(
         self, name: str, provider: Provider, key: str | None, refresh: bool
@@ -927,6 +969,13 @@ def _found_from_json(raw: object) -> _Found:
         tools=item.get("tools") if isinstance(item.get("tools"), bool) else None,
         price=ModelPrice.model_validate(price) if isinstance(price, dict) else None,
     )
+
+
+def _names(values: object) -> tuple[str, ...] | None:
+    """The strings of a JSON list, or None when it is not a list."""
+    if not isinstance(values, list):
+        return None
+    return tuple(item for item in cast(list[object], values) if isinstance(item, str))
 
 
 def _dict(value: object) -> dict[str, Any]:

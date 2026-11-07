@@ -57,6 +57,20 @@ args = ["mcp-server-git", "--repository", "/path/to/your/repo"]
 
 golem notices the change and starts it, with no restart. The model sees its tools as `mcp__git__<tool>`.
 
+### See and control your servers from a terminal
+
+```bash
+golem mcp list                          # state, tools, token cost, and marks
+golem mcp show github                   # its setup, and which secrets are stored
+golem mcp test github                   # start it, list its tools, ping it
+golem mcp logs github -f                # its log, and new lines as they come
+golem mcp tools github --hide 'delete_*'   # keep some tools from the model
+golem mcp enable github --on-demand     # on only in the chats that turn it on
+golem mcp restart github
+```
+
+`golem mcp test` prints each step as it ends. When it fails it shows what the server said on stderr and one next step, such as installing Node. A pattern in `--hide` is written to `tools.exclude` of the server, and `--show` with the same pattern takes it out again.
+
 ## Bring your servers from another app
 
 If you already set servers up in Claude Desktop, Claude Code, Cursor, VS Code, or Windsurf, golem can read them. It looks at each app's config file and, for the project you are in, that project's own files. Pasted JSON works too: any of those files' shapes, or one server on its own.
