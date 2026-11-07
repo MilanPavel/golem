@@ -188,17 +188,17 @@ test("/mcp shows the servers, and enable or disable takes one name", () => {
   assert.deepEqual(applyComposer(closedDebug, "/mcp"), { kind: "mcp" });
   assert.deepEqual(applyComposer(closedDebug, "/mcp enable git"), { kind: "mcp-toggle", on: true, name: "git" });
   assert.deepEqual(applyComposer(closedDebug, "/mcp disable git"), { kind: "mcp-toggle", on: false, name: "git" });
-  for (const wrong of ["/mcp enable", "/mcp restart git", "/mcp enable a b", "/mcp add nope", "/mcp add github x"]) {
+  for (const wrong of ["/mcp enable", "/mcp restart git", "/mcp enable a b", "/mcp add github x"]) {
     assert.deepEqual(applyComposer(closedDebug, wrong), {
       kind: "unknown",
-      notice: "/mcp, /mcp add [filesystem|github|fetch|other], /mcp enable <name>, or /mcp disable <name>",
+      notice: "/mcp, /mcp add [id], /mcp enable <name>, or /mcp disable <name>",
     });
   }
 });
 
 test("/mcp add opens the list, or goes to one entry", () => {
   assert.deepEqual(applyComposer(closedDebug, "/mcp add"), { kind: "mcp-add", id: null });
-  for (const id of ["filesystem", "github", "fetch", "other"]) {
+  for (const id of ["filesystem", "github", "fetch", "other", "anything-the-daemon-lists"]) {
     assert.deepEqual(applyComposer(closedDebug, `/mcp add ${id}`), { kind: "mcp-add", id });
   }
 });

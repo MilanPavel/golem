@@ -216,6 +216,7 @@ import {
   type McpManagerLine,
   mcpAdded,
   mcpAddFailed,
+  mcpCatalogLoaded,
   mcpManagerKeyOf,
   mcpManagerTyping,
   type McpManagerAction,
@@ -1251,6 +1252,21 @@ export function App({
     );
   }
 
+  /** Ask the daemon for the catalog. A pick waiting from `/mcp add <id>` goes on when it arrives. */
+  function loadMcpCatalog(): void {
+    client.mcpCatalog(sessionRef.current ?? undefined).then(
+      (listed) => {
+        const loaded = mcpCatalogLoaded(mcpManagerRef.current, listed.entries);
+        mcpManagerRef.current = loaded.state;
+        setMcpManager(loaded.state);
+        runMcpAction(loaded.action);
+      },
+      (error: unknown) => {
+        setChat((state) => ({ ...state, notice: `can't load the catalog: ${messageOf(error)}` }));
+      },
+    );
+  }
+
   /** The folder whose skills this screen shows: the session's, or where the TUI started. */
   function skillsFolder(): string {
     return sessionCwdRef.current ?? process.cwd();
@@ -1302,6 +1318,7 @@ export function App({
       mcpManagerRef.current = opened;
       setMcpManager(opened);
       loadMcp();
+      loadMcpCatalog();
       return;
     }
     if (outcome.kind === "mcp-add") {
@@ -1309,10 +1326,10 @@ export function App({
       setKeysOpen(false);
       setSwitcher(closedSwitcher);
       const opened = openMcpAdd(sessionCwdRef.current ?? process.cwd(), outcome.id);
-      mcpManagerRef.current = opened.state;
-      setMcpManager(opened.state);
+      mcpManagerRef.current = opened;
+      setMcpManager(opened);
       loadMcp();
-      runMcpAction(opened.action);
+      loadMcpCatalog();
       return;
     }
     if (outcome.kind === "skills") {
@@ -2657,6 +2674,7 @@ export function App({
           mcpManagerRef.current = next;
           setMcpManager(next);
           done(`added ${server.name} · ${server.state}`)();
+          loadMcpCatalog();
         },
         (error: unknown) => {
           const next = mcpAddFailed(mcpManagerRef.current, messageOf(error));

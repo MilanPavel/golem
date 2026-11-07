@@ -1,32 +1,18 @@
-import type { McpAddParams } from "@golem/client";
+import type { McpAddParams, McpCatalogEntry, McpCatalogInput } from "@golem/client";
 
 /**
- * The short list `/mcp add` offers (step 1.12.2): common servers, one pick away. Pure,
- * so the terminal app adds them and the web UI shows the command to run.
+ * The servers `/mcp add` offers. The list lives in the daemon (`mcp.catalog`), so this file
+ * only turns an entry into what a screen needs: a label, the inputs to ask, the params to
+ * send, and the command line that does the same. Pure, so every UI shares it.
  */
 
-/** What an entry adds: `mcp.add`'s params without the token, which is typed apart and never kept here. */
+export type { McpCatalogEntry, McpCatalogInput };
+
+/** What an add sends: `mcp.add`'s params without the token, which is typed apart and never kept here. */
 export type McpAddSpec = Omit<McpAddParams, "token">;
 
-export type McpCatalogId = "filesystem" | "github" | "fetch" | "other";
-
-export type McpCatalogEntry = {
-  id: McpCatalogId;
-  /** The name of the server, as `/mcp` lists it. `other` has none: the user picks it. */
-  name: string | null;
-  label: (folder: string) => string;
-  description: string;
-  needsToken: boolean;
-  /** `null` for `other`, which asks for a name and a command or URL. */
-  params: ((folder: string) => McpAddSpec) | null;
-  /** The exact `golem mcp add …` line for the same server. With no folder, it says `<folder>`. */
-  cliCommand: (folder: string | null) => string;
-};
-
-export const GITHUB_TOKEN_HINT =
-  "Make a token at github.com/settings/personal-access-tokens/new: pick the repos under Repository access, then add Contents, Issues, and Pull requests.";
-
-export const GITHUB_URL = "https://api.githubcopilot.com/mcp/";
+/** The pick that is not a catalog entry: a name, then a command or a URL. */
+export const OTHER_ID = "other";
 
 /** The daemon's rule for a server name. */
 const NAME = /^[A-Za-z0-9][A-Za-z0-9-]{0,31}$/;
@@ -38,50 +24,84 @@ export function mcpNameError(name: string): string | null {
   return NAME.test(name) ? null : "Use letters, digits, and dashes, up to 32, starting with a letter or digit.";
 }
 
-export const MCP_CATALOG: readonly McpCatalogEntry[] = [
-  {
-    id: "filesystem",
-    name: "filesystem",
-    label: (folder) => `Filesystem: ${folder}`,
-    description: "Read and write files in the session folder.",
-    needsToken: false,
-    params: (folder) => ({ name: "filesystem", command: "npx", args: ["-y", "@modelcontextprotocol/server-filesystem", folder] }),
-    cliCommand: (folder) =>
-      `golem mcp add filesystem -- npx -y @modelcontextprotocol/server-filesystem ${folder === null ? "<folder>" : shellQuote(folder)}`,
-  },
-  {
-    id: "github",
-    name: "github",
-    label: () => "GitHub",
-    description: "Repos, issues, and pull requests. Asks for a token.",
-    needsToken: true,
-    params: () => ({ name: "github", url: GITHUB_URL }),
-    cliCommand: () => `golem mcp add github --url ${GITHUB_URL} --token`,
-  },
-  {
-    id: "fetch",
-    name: "fetch",
-    label: () => "Fetch",
-    description: "Read web pages as text.",
-    needsToken: false,
-    params: () => ({ name: "fetch", command: "uvx", args: ["mcp-server-fetch"] }),
-    cliCommand: () => "golem mcp add fetch -- uvx mcp-server-fetch",
-  },
-  {
-    id: "other",
-    name: null,
-    label: () => "Other",
-    description: "Type a name, then a command or a URL.",
-    needsToken: false,
-    params: null,
-    cliCommand: () => "golem mcp add <name> -- <command…>",
-  },
-];
+export function findEntry(entries: readonly McpCatalogEntry[], id: string | null): McpCatalogEntry | null {
+  return entries.find((entry) => entry.id === id) ?? null;
+}
 
-export const MCP_CATALOG_IDS: readonly string[] = MCP_CATALOG.map((entry) => entry.id);
+/** Whether the user can pick it now: the daemon says what an entry lacks, such as sign-in. */
+export function entryAvailable(entry: McpCatalogEntry): boolean {
+  return entry.available !== false;
+}
 
-export function catalogEntry(id: string): McpCatalogEntry | null {
-  return MCP_CATALOG.find((entry) => entry.id === id) ?? null;
+/** The entry's title, with where it will point when it has a path input. */
+export function entryLabel(entry: McpCatalogEntry): string {
+  return entry.title;
+}
+
+/**
+ * The entry's one-line description, with what is missing or why it can't be added. A server
+ * that is already there says so.
+ */
+export function entryNote(entry: McpCatalogEntry): string {
+  if (entry.added === true) {
+    return `${entry.description} Already added.`;
+  }
+  if (!entryAvailable(entry)) {
+    return `${entry.description} ${entry.reason ?? "Not available."}`;
+  }
+  return entry.description;
+}
+
+/** An input's starting text, with `{folder}` filled in. */
+export function inputDefault(input: McpCatalogInput, folder: string): string {
+  return (input.default ?? "").replaceAll("{folder}", folder);
+}
+
+/** The inputs a person types, in the entry's order. */
+export function entryInputs(entry: McpCatalogEntry): readonly McpCatalogInput[] {
+  return entry.inputs ?? [];
+}
+
+/** Why `value` can't fill `input`, or null. */
+export function inputError(input: McpCatalogInput, value: string): string | null {
+  if (value.trim().length === 0) {
+    return input.required === false ? null : `${input.label} is needed.`;
+  }
+  if (input.kind === "choice" && !(input.choices ?? []).includes(value.trim())) {
+    return `Pick one of: ${(input.choices ?? []).join(", ")}.`;
+  }
+  return null;
+}
+
+/**
+ * The `mcp.add` params for an entry: text inputs go in `inputs`, secret inputs in `secrets`
+ * (keyed by input id). The daemon fills the template and stores secrets in the Keychain.
+ */
+export function entryParams(entry: McpCatalogEntry, values: Readonly<Record<string, string>>): McpAddParams {
+  const inputs: Record<string, string> = {};
+  const secrets: Record<string, string> = {};
+  for (const input of entryInputs(entry)) {
+    const value = (values[input.id] ?? "").trim();
+    if (value.length === 0) {
+      continue;
+    }
+    if (input.kind === "secret") {
+      secrets[input.id] = value;
+    } else {
+      inputs[input.id] = value;
+    }
+  }
+  return { name: entry.name, catalog_id: entry.id, inputs, secrets };
+}
+
+/** The `golem mcp add --catalog …` line for the same server. It asks for any secret, hidden. */
+export function cliCommand(entry: McpCatalogEntry | null): string {
+  if (entry === null) {
+    return "golem mcp add <name> -- <command…>";
+  }
+  const inputs = entryInputs(entry).filter((input) => input.kind !== "secret" && input.required !== false && input.default == null);
+  const flags = inputs.map((input) => ` --input ${input.id}=<${input.label.toLowerCase()}>`).join("");
+  return `golem mcp add --catalog ${entry.id}${flags}`;
 }
 
 /** Split a command line on whitespace; '…' and "…" keep their spaces. No escapes. */

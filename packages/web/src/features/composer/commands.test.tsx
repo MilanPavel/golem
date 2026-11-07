@@ -374,17 +374,13 @@ test("/mcp add shows the golem command to run in a terminal", async () => {
   const { user } = await session();
   await say(user, "/mcp add github");
   const line = within(screen.getByText(/Add it in a terminal\./).closest("p") as HTMLElement);
-  expect(screen.getByText(/asks for the token/)).toBeTruthy();
-  expect(line.getByText("golem mcp add github --url https://api.githubcopilot.com/mcp/ --token").tagName).toBe("CODE");
-  await say(user, "/mcp add fetch");
-  expect(screen.getByText("golem mcp add fetch -- uvx mcp-server-fetch")).toBeTruthy();
+  expect(screen.getByText(/asks for the token there/)).toBeTruthy();
+  expect(line.getByText("golem mcp add --catalog github").tagName).toBe("CODE");
   await say(user, "/mcp add filesystem");
-  expect(
-    screen.getByText(`golem mcp add filesystem -- npx -y @modelcontextprotocol/server-filesystem ${CWD}`),
-  ).toBeTruthy();
+  expect(screen.getByText("golem mcp add --catalog filesystem")).toBeTruthy();
   await say(user, "/mcp add");
-  expect(screen.getByText(/MCP servers are added in a terminal\. Pick one: \/mcp add filesystem, github, or fetch/)).toBeTruthy();
-  expect(screen.getByText("golem mcp add <name> -- <command…>")).toBeTruthy();
+  expect(screen.getByText(/MCP servers are added in a terminal\. Pick one from golem's list/)).toBeTruthy();
+  expect(screen.getByText("golem mcp add --catalog <id>")).toBeTruthy();
   await say(user, "/mcp add other");
   expect(screen.getByText("golem mcp add <name> -- <command…>")).toBeTruthy();
 });

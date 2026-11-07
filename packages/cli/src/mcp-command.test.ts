@@ -64,3 +64,35 @@ test("bad combinations say what to change", () => {
   assert.match(message(["add", "x", "--nope", "--", "cmd"]), /unknown option/);
   assert.match(message(["add", "x", "y", "--", "cmd"]), /after --/);
 });
+
+test("--catalog takes an id, an optional name, and typed inputs", () => {
+  assert.deepEqual(parseMcpArgs(["add", "--catalog", "github"]), { kind: "catalog", id: "github", name: null, inputs: {} });
+  assert.deepEqual(
+    parseMcpArgs(["add", "--catalog", "filesystem", "--name", "docs", "--input", "folder=/a b", "--input", "x=y=z"]),
+    { kind: "catalog", id: "filesystem", name: "docs", inputs: { folder: "/a b", x: "y=z" } },
+  );
+});
+
+test("--catalog says what is wrong", () => {
+  const message = (args: string[]): string => {
+    const parsed = parseMcpArgs(args);
+    assert.equal(parsed.kind, "error");
+    return parsed.kind === "error" ? parsed.message : "";
+  };
+  assert.match(message(["add", "--catalog"]), /needs a value/);
+  assert.match(message(["add", "--input", "a=b", "--catalog"]), /needs a value/);
+  assert.match(message(["add", "--catalog", "x", "--input", "nope"]), /<id>=<value>/);
+  assert.match(message(["add", "--catalog", "x", "--url", "https://e.com"]), /unknown option --url/);
+  assert.match(message(["add", "--catalog", "x", "extra"]), /unexpected extra/);
+  assert.match(message(["add", "--catalog", "x", "--", "cmd"]), /takes no command/);
+});
+
+test("a --catalog after -- is part of the server's command", () => {
+  assert.deepEqual(parseMcpArgs(["add", "x", "--", "run", "--catalog", "y"]), {
+    kind: "add",
+    name: "x",
+    command: "run",
+    args: ["--catalog", "y"],
+    tokenEnv: null,
+  });
+});

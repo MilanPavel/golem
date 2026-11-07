@@ -1,4 +1,6 @@
 import type { KeychainWait } from "../../protocol/gen/keychain-wait.ts";
+import type { McpCatalogResult } from "../../protocol/gen/mcp-catalog-result.ts";
+import type { RuntimeInstallDone } from "../../protocol/gen/runtime-install-done.ts";
 import type { OllamaInstallDone } from "../../protocol/gen/ollama-install-done.ts";
 import type { SetupRow, SetupStatusResult } from "../../protocol/gen/setup-status-result.ts";
 import type { McpListResult } from "../../protocol/gen/mcp-list-result.ts";
@@ -370,4 +372,27 @@ export function isDaemonStatus(value: unknown): value is DaemonStatus {
 
 function isOptionalString(value: unknown): boolean {
   return value === undefined || value === null || (typeof value === "string" && value.length > 0);
+}
+
+export function isRuntimeName(value: unknown): value is "node" | "uv" {
+  return value === "node" || value === "uv";
+}
+
+export function isRuntimeInstallDone(value: unknown): value is RuntimeInstallDone {
+  return isRecord(value) && isRuntimeName(value["name"]) && typeof value["ok"] === "boolean";
+}
+
+export function isMcpCatalogResult(value: unknown): value is McpCatalogResult {
+  return (
+    isRecord(value) &&
+    Array.isArray(value["entries"]) &&
+    value["entries"].every(
+      (entry) =>
+        isRecord(entry) &&
+        typeof entry["id"] === "string" &&
+        typeof entry["name"] === "string" &&
+        typeof entry["title"] === "string" &&
+        typeof entry["description"] === "string",
+    )
+  );
 }
