@@ -298,6 +298,8 @@ async def test_a_server_lists_its_tools_restarts_and_names_its_file(
     tools = supervisor.tool_list(EVERYONE, "fake")
     assert (tools[0].name, tools[0].description) == ("mcp__fake__echo", "Says the text back.")
     assert not tools[0].hidden and tools[0].schema_tokens > 0
+    assert tools[0].input_schema is not None and tools[0].input_schema["type"] == "object"
+    assert "text" in tools[0].input_schema["properties"]
     assert supervisor.config_file(EVERYONE, "fake") == config
     assert supervisor.status(EVERYONE, "fake").config == str(config)
 

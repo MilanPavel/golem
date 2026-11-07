@@ -3,6 +3,9 @@
 export type Name = string;
 export type Description = string;
 export type Hidden = boolean;
+export type InputSchema = {
+  [k: string]: unknown;
+} | null;
 export type Name1 = string;
 export type SchemaTokens = number;
 export type Tools = McpToolInfo[];
@@ -19,6 +22,7 @@ export interface McpToolsResult {
  *
  * A ``hidden`` tool is one the server's ``tools`` filter keeps from the model.
  * ``schema_tokens`` roughly what its schema costs in each prompt.
+ * ``input_schema`` is the JSON Schema of its arguments, for a form that tries it.
  *
  * This interface was referenced by `McpToolsResult`'s JSON-Schema
  * via the `definition` "McpToolInfo".
@@ -26,6 +30,7 @@ export interface McpToolsResult {
 export interface McpToolInfo {
   description: Description;
   hidden?: Hidden;
+  input_schema?: InputSchema;
   name: Name1;
   schema_tokens?: SchemaTokens;
 }
