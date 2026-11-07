@@ -1,5 +1,7 @@
 # Architecture
 
+![Lay out the parts. On parchment, the golem's parts float apart and come back together. On a blueprint the same parts are numbered: 1 head, the agent loop; 2 torso, the daemon; 3 hips, the protocol; 4 left arm, tools; 5 right arm, MCP; 6 left foot, sessions; 7 right foot, sandboxes; 8 scroll, the model](images/arch-parts.svg)
+
 ## The system on one machine
 
 Everything runs on your machine, except the model when you pick a remote provider. There are two kinds of process: one daemon, and any number of clients.

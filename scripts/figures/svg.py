@@ -104,3 +104,28 @@ def facts(items: list[str], x: float, y: float, gap: float = 22) -> str:
 def arrow_left(x1: float, x2: float, y: float, back: bool = False) -> str:
     cls = "wire back" if back else "wire"
     return f'<path class="{cls}" d="M{x1} {y} H{x2 + 1}"/><path class="head" d="M{x2 + 7} {y - 4} L{x2} {y} L{x2 + 7} {y + 4} Z"/>'
+
+
+# The pixel golem of logo.svg and the why cards: nine cells wide, six tall. "o" is an eye.
+GOLEM = ["...###...", "..#o#o#..", "#########", "#.#####.#", "#.#####.#", "..##.##.."]
+
+
+def pixel_golem(x: float, y: float, cell: float = 8, body: str = "var(--clay)", eye: str = "var(--ink)") -> str:
+    """The golem with its top-left corner at (x, y). It is 9 cells wide and 6 tall."""
+    parts = []
+    for r, row in enumerate(GOLEM):
+        for c, ch in enumerate(row):
+            if ch != ".":
+                fill = eye if ch == "o" else body
+                parts.append(f'<rect x="{x + c * cell:g}" y="{y + r * cell:g}" width="{cell:g}" height="{cell:g}" fill="{fill}"/>')
+    return f'<g shape-rendering="crispEdges">{"".join(parts)}</g>'
+
+
+def grow(x: float, y: float, w: float, h: float, keys: list[tuple[float, float]], cls: str = "dot") -> str:
+    """A bar that grows from ``x``: ``keys`` are (time, fraction of ``w``) pairs, from 0 to 1."""
+    times = ";".join(f"{t:.4f}" for t, _ in keys)
+    widths = ";".join(f"{f * w:g}" for _, f in keys)
+    return (
+        f'<rect class="{cls}" x="{x}" y="{y}" width="0" height="{h}">'
+        f'<animate attributeName="width" dur="{DUR}" repeatCount="indefinite" keyTimes="{times}" values="{widths}"/></rect>'
+    )

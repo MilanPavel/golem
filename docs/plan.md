@@ -282,7 +282,7 @@ Later phases pick up the rest: `model:` frontmatter (9.3), `context: fork` (3.6)
 
 ## Phase 10 — Web UI
 
-The chat in your browser, served by the `golem` command. `golem web` starts a gateway on `127.0.0.1` inside the `golem` binary. It serves a page built from a new `packages/web` and bridges each browser WebSocket to its own connection on the daemon's socket. The daemon does not change. The details are in [#150](https://github.com/MilanPavel/golem/issues/150), and the why is in [vision.md, chapter 1](vision.md#1-web-ui). It runs after Skills. Each ticket is one commit and one pull request.
+The chat in your browser, served by the `golem` command. `golem web` starts a gateway on `127.0.0.1` inside the `golem` binary. It serves a page built from a new `packages/web` and bridges each browser WebSocket to its own connection on the daemon's socket. The daemon does not change. The details are in [#150](https://github.com/MilanPavel/golem/issues/150), and the why is in [the web UI chapter](architecture/web.md). It runs after Skills. Each ticket is one commit and one pull request.
 
 Choices that hold for the whole phase:
 

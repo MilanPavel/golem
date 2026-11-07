@@ -5,7 +5,7 @@
 
 ## The idea
 
-The web UI ([vision, chapter 1](../vision.md#1-web-ui)) is a second screen for the same events the TUI draws. It is written almost entirely with a model's help, by one person, and it has to keep a look of its own: golem's clay, its pixel figure, and two themes. Three choices follow:
+The web UI ([how it works](../architecture/web.md)) is a second screen for the same events the TUI draws. It is written almost entirely with a model's help, by one person, and it has to keep a look of its own: golem's clay, its pixel figure, and two themes. Three choices follow:
 
 1. **Use well-known tools,** so the code a model writes is ordinary code: React 19, Vite, TypeScript, Tailwind v4, Radix, TanStack Query.
 2. **Make golem's look a set of tokens, and make everything else impossible.** Tailwind's own colours and sizes are removed, so a component can only use golem's.
