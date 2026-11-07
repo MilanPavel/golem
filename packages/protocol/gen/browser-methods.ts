@@ -55,6 +55,8 @@ export const BROWSER_METHODS: ReadonlySet<string> = new Set([
   "session.set_skills",
   "setup.status",
   "skill.list",
+  "trace.get",
+  "trace.span",
 ]);
 
 export const LOCAL_ONLY_METHODS: ReadonlySet<string> = new Set([

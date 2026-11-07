@@ -11,7 +11,9 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Literal, cast
 
-from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage
+from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage, ToolMessage
+
+from golem_protocol.commands import TraceMessage
 
 STREAM_KEY = "golem"
 """Key of every golem item on the custom stream. The graph writes, the adapter reads."""
@@ -208,6 +210,40 @@ def plain_messages(values: Mapping[str, object]) -> list[PlainMessage]:
             calls = [f"→ {call['name']}({_args_text(call['args'])})" for call in item.tool_calls]
             text = "\n".join([text, *calls] if text else calls)
         found.append(PlainMessage(role, text))
+    return found
+
+
+def trace_messages(values: Mapping[str, object]) -> list[TraceMessage]:
+    """Messages stored for a session with their ids, tool calls, and call ids.
+
+    Unlike :func:`plain_messages`, a reply's tool calls stay apart from its
+    text, and system messages are left out.
+    """
+    raw = values.get("messages")
+    if not isinstance(raw, list):
+        return []
+    found: list[TraceMessage] = []
+    for item in cast(list[object], raw):
+        if not isinstance(item, BaseMessage):
+            continue
+        role = _ROLES.get(item.type)
+        if role is None or role == "system":
+            continue
+        calls: list[dict[str, object]] = []
+        if isinstance(item, AIMessage):
+            calls = [
+                {"call_id": call.get("id"), "name": call["name"], "args": call["args"]}
+                for call in item.tool_calls
+            ]
+        found.append(
+            TraceMessage(
+                id=item.id,
+                role=role,
+                text=message_text(item),
+                tool_calls=calls,
+                call_id=item.tool_call_id if isinstance(item, ToolMessage) else None,
+            )
+        )
     return found
 
 

@@ -35,6 +35,8 @@ METHOD_ACCESS: Final[Mapping[str, Access]] = {
     "run.cancel": "browser",
     "artifact.read": "browser",
     "session.inspect": "browser",
+    "trace.get": "browser",
+    "trace.span": "browser",
     "auth.set": "local",
     "auth.remove": "local",
     "auth.list": "browser",

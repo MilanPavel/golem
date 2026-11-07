@@ -1,0 +1,333 @@
+{
+  "$defs": {
+    "TraceTokens": {
+      "additionalProperties": false,
+      "description": "Tokens one model call used. A field is null when the provider did not report it.",
+      "properties": {
+        "cache_read": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cache Read"
+        },
+        "cache_write": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cache Write"
+        },
+        "input": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Input"
+        },
+        "output": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Output"
+        }
+      },
+      "title": "TraceTokens",
+      "type": "object"
+    },
+    "TraceToolSpan": {
+      "additionalProperties": false,
+      "description": "A tool call. It has no children.",
+      "properties": {
+        "approval_wait_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Approval Wait Ms"
+        },
+        "duration_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duration Ms"
+        },
+        "end": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End"
+        },
+        "first_token_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "First Token Ms"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "run",
+            "model",
+            "tool"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "preview": {
+          "default": "",
+          "maxLength": 200,
+          "title": "Preview",
+          "type": "string"
+        },
+        "recorded": {
+          "default": true,
+          "title": "Recorded",
+          "type": "boolean"
+        },
+        "start": {
+          "minLength": 1,
+          "title": "Start",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "ok",
+            "failed",
+            "cancelled",
+            "denied",
+            "running"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "tokens": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TraceTokens"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "name",
+        "start",
+        "status"
+      ],
+      "title": "TraceToolSpan",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "A model call, with the tool calls it asked for, in request order.",
+  "properties": {
+    "approval_wait_ms": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Approval Wait Ms"
+    },
+    "children": {
+      "items": {
+        "$ref": "#/$defs/TraceToolSpan"
+      },
+      "title": "Children",
+      "type": "array"
+    },
+    "duration_ms": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Duration Ms"
+    },
+    "end": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "End"
+    },
+    "first_token_ms": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "First Token Ms"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "kind": {
+      "enum": [
+        "run",
+        "model",
+        "tool"
+      ],
+      "title": "Kind",
+      "type": "string"
+    },
+    "model": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Model"
+    },
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "preview": {
+      "default": "",
+      "maxLength": 200,
+      "title": "Preview",
+      "type": "string"
+    },
+    "recorded": {
+      "default": true,
+      "title": "Recorded",
+      "type": "boolean"
+    },
+    "start": {
+      "minLength": 1,
+      "title": "Start",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "ok",
+        "failed",
+        "cancelled",
+        "denied",
+        "running"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "tokens": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/TraceTokens"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "required": [
+    "id",
+    "kind",
+    "name",
+    "start",
+    "status"
+  ],
+  "title": "TraceModelSpan",
+  "type": "object"
+}

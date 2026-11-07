@@ -61,3 +61,7 @@ def test_export_browser_methods_is_sorted_and_deterministic(tmp_path: Path) -> N
     assert first == second
     names = [line.strip(' ",') for line in first.split("LOCAL_ONLY_METHODS")[0].splitlines()[3:-3]]
     assert names == sorted(BROWSER_METHODS)
+
+
+def test_a_browser_may_read_traces() -> None:
+    assert {"trace.get", "trace.span"} <= BROWSER_METHODS

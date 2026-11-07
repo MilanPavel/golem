@@ -77,6 +77,7 @@ from golem.sessions.manager import (
     SessionBusyError,
     SessionManager,
     SessionNotFoundError,
+    SpanNotFoundError,
 )
 from golem.sessions.summaries import summarize
 from golem.skills.invoke import SkillInvokeError
@@ -186,6 +187,10 @@ from golem_protocol.commands import (
     SetupStatusResult,
     SkillListParams,
     SkillListResult,
+    TraceGetParams,
+    TraceGetResult,
+    TraceSpanParams,
+    TraceSpanResult,
 )
 from golem_protocol.events import Ping
 from golem_protocol.version import PROTOCOL_MAJOR, PROTOCOL_MINOR
@@ -435,6 +440,27 @@ async def _session_inspect(
             InspectMessage(role=message.role, text=message.text) for message in view.messages
         ],
     )
+
+
+async def _trace_get(ctx: RequestContext, params: TraceGetParams) -> TraceGetResult:
+    try:
+        title, runs = await _sessions(ctx).trace(params.session_id)
+    except SessionNotFoundError as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
+    except SchemaMismatchError as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, str(exc)) from exc
+    return TraceGetResult(session_id=params.session_id, title=title, runs=runs)
+
+
+async def _trace_span(ctx: RequestContext, params: TraceSpanParams) -> TraceSpanResult:
+    try:
+        return await _sessions(ctx).trace_span(params.session_id, params.span_id)
+    except SessionNotFoundError as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
+    except SchemaMismatchError as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, str(exc)) from exc
+    except SpanNotFoundError as exc:
+        raise RpcCallError(INVALID_PARAMS, "span not found") from exc
 
 
 async def _auth_set(ctx: RequestContext, params: AuthSetParams) -> AuthSetResult:
@@ -972,6 +998,8 @@ def standard_methods() -> dict[str, Method]:
         "run.cancel": Method("run.cancel", RunCancelParams, True, _run_cancel),
         "artifact.read": Method("artifact.read", ArtifactReadParams, True, _artifact_read),
         "session.inspect": Method("session.inspect", SessionInspectParams, True, _session_inspect),
+        "trace.get": Method("trace.get", TraceGetParams, True, _trace_get),
+        "trace.span": Method("trace.span", TraceSpanParams, True, _trace_span),
         "auth.set": Method("auth.set", AuthSetParams, True, _auth_set),
         "auth.remove": Method("auth.remove", AuthRemoveParams, True, _auth_remove),
         "auth.list": Method("auth.list", AuthListParams, True, _auth_list),
