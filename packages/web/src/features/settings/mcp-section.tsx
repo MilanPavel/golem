@@ -18,6 +18,7 @@ import { actionErrorText } from "../../store/errors.ts";
 import type { McpServer } from "../../store/mcp.ts";
 import { useMcpList, useMcpTools, usePageActions } from "../../store/page-context.tsx";
 import { AddDialog } from "./mcp/add-dialog.tsx";
+import { ImportDialog } from "./mcp/import-dialog.tsx";
 import { EditServer } from "./mcp/edit-form.tsx";
 import { LogsView } from "./mcp/logs-view.tsx";
 import { TestView } from "./mcp/test-view.tsx";
@@ -51,6 +52,7 @@ export function McpSection() {
   const [view, setView] = useState<View>({ kind: "list" });
   const [adding, setAdding] = useState<{ id: string | null } | null>(null);
   const [added, setAdded] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
   const request = useMcpAddRequest();
   const rows = useRef(new Map<string, HTMLButtonElement>());
   /** The row to give focus back to when the list shows again. */
@@ -85,6 +87,14 @@ export function McpSection() {
       }}
     />
   );
+  const importDialog = (
+    <ImportDialog
+      open={importing}
+      onOpenChange={setImporting}
+      sessionId={sessionId}
+      onImported={(names) => setAdded(names.join(", "))}
+    />
+  );
   if (list.isError) {
     return (
       <div className="flex flex-col items-start gap-2">
@@ -111,9 +121,11 @@ export function McpSection() {
           register={register}
           added={added}
           onAdd={() => setAdding({ id: null })}
+          onImport={() => setImporting(true)}
           onOpen={(item) => setView({ kind: "detail", at: { name: item.name, project: item.project ?? null } })}
         />
         {dialog}
+        {importDialog}
       </>
     );
   }
@@ -149,12 +161,14 @@ function ServerList({
   register,
   added,
   onAdd,
+  onImport,
   onOpen,
 }: {
   servers: readonly McpServer[];
   register: (key: string, node: HTMLButtonElement | null) => void;
   added: string | null;
   onAdd: () => void;
+  onImport: () => void;
   onOpen: (server: McpServer) => void;
 }) {
   const addButton = (
@@ -162,6 +176,7 @@ function ServerList({
       <Button kind="primary" onClick={onAdd}>
         Add a server
       </Button>
+      <Button onClick={onImport}>Import from other apps</Button>
       <p role="status" aria-live="polite" className="font-mono text-xs text-muted">
         {added === null ? null : `added ${added}`}
       </p>

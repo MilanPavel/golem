@@ -1,4 +1,4 @@
-import { OLLAMA_FAILED, RpcError, type ApprovalChoice, type ConfigGetResult, type FsListDirsResult, type McpAddParams, type McpCallResult, type McpCatalogResult, type McpListResult, type McpLogsResult, type McpServerConfig, type McpServerDetail, type McpServerLog, type McpTestProgress, type McpTestResult, type GolemClient, type RuntimeName, type SetupStatusResult, type SkillListResult, type TraceGetResult } from "@golem/client";
+import { OLLAMA_FAILED, RpcError, type ApprovalChoice, type ConfigGetResult, type FsListDirsResult, type McpAddParams, type McpCallResult, type McpImportApplyParams, type McpImportApplyResult, type McpImportScanResult, type McpCatalogResult, type McpListResult, type McpLogsResult, type McpServerConfig, type McpServerDetail, type McpServerLog, type McpTestProgress, type McpTestResult, type GolemClient, type RuntimeName, type SetupStatusResult, type SkillListResult, type TraceGetResult } from "@golem/client";
 import { changeToolFilter, installEventOf, type InstallEvent } from "@golem/view";
 import type { QueryClient } from "@tanstack/react-query";
 import { createDrafts, type Drafts } from "./drafts.ts";
@@ -55,6 +55,8 @@ export type PageClient = Pick<
   | "mcpGet"
   | "updateMcpServer"
   | "addMcpServer"
+  | "scanMcpImport"
+  | "applyMcpImport"
   | "mcpCatalog"
   | "installRuntime"
   | "cancelRuntimeInstall"
@@ -138,6 +140,13 @@ export type PageActions = {
   getMcp(name: string, sessionId: string | null): Promise<McpServerDetail>;
   /** Replaces the server's `[mcp.<name>]`. `secrets` (by reference) are stored first, and only those sent change. */
   updateMcp(name: string, config: McpServerConfig, secrets: Record<string, string>, sessionId: string | null): Promise<void>;
+  /**
+   * Finds the servers other apps have (with a session, also that project's files), or reads pasted JSON.
+   * Reading changes nothing. The scan's secret values stay in the daemon.
+   */
+  scanMcpImport(sessionId: string | null, text: string | null): Promise<McpImportScanResult>;
+  /** Adds the picked candidates of a scan, once. A pick that fails is in `failed`, and the rest are added. */
+  applyMcpImport(params: McpImportApplyParams, sessionId: string | null): Promise<McpImportApplyResult>;
   /** Adds a server to the user's config and starts it. Rejects with the daemon's reason. */
   addMcp(params: McpAddParams): Promise<void>;
   /** Tries a server that is not saved yet, saving nothing. `onStep` gets each step as it ends. */
@@ -356,6 +365,15 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
         } finally {
           await queryClient.invalidateQueries({ queryKey: MCP_LIST_KEY });
           await queryClient.invalidateQueries({ queryKey: MCP_TOOLS_KEY });
+        }
+      },
+      scanMcpImport: (sessionId, text) => client.scanMcpImport({ ...(sessionId === null ? {} : { sessionId }), ...(text === null ? {} : { text }) }),
+      async applyMcpImport(params, sessionId) {
+        try {
+          return await client.applyMcpImport({ ...params, ...(sessionId === null ? {} : { session_id: sessionId }) });
+        } finally {
+          await queryClient.invalidateQueries({ queryKey: MCP_LIST_KEY });
+          await queryClient.invalidateQueries({ queryKey: MCP_CATALOG_KEY });
         }
       },
       async addMcp(params) {

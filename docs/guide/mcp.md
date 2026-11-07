@@ -100,7 +100,7 @@ What happens to each server:
 - A server that uses the old SSE transport is imported with a warning, because golem doesn't speak it yet.
 - Names are made to fit: `_`, `.`, and spaces become `-`, and a name that is already taken gets `-2`. A server golem already has with the same command or URL is marked as already added.
 
-In a terminal, run `golem mcp import`. It lists what it found, numbered, and asks which to add. Type numbers, `2=my-name` to rename one, or `a` for every new one. `--from cursor` looks at one app, `--from ./servers.json` reads a file, and `--all` adds every new server without asking. A value another app only named, such as `${input:token}`, is asked for, hidden.
+In the web UI, **Import from other apps** in Settings → MCP servers lists them with a tick box each. You can rename one, type a value another app only named, paste JSON or choose a file instead, and add the ticked ones. In a terminal, run `golem mcp import`. It lists what it found, numbered, and asks which to add. Type numbers, `2=my-name` to rename one, or `a` for every new one. `--from cursor` looks at one app, `--from ./servers.json` reads a file, and `--all` adds every new server without asking. A value another app only named, such as `${input:token}`, is asked for, hidden.
 
 ### Send your servers to another app
 
