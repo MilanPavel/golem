@@ -118,9 +118,11 @@ A secret is never printed. `keychain:mcp/github` becomes `${MCP_GITHUB}` (`${env
 
 Type `/mcp` to see your servers:
 
-- which are running, and what their tools cost in each prompt;
-- open one to see its tools;
-- reconnect one, or turn it off.
+- which are running, and what their tools cost in each prompt. A row also says how many tools are hidden from the model, and `allow` when its calls run without asking;
+- open one to see its tools. Press Space on a tool to hide it from the model, or to show it again. This edits `tools.exclude` of the server. Press Enter on a tool to try it: type its arguments as JSON, and golem runs it at once, without asking. A try is not part of any chat;
+- test the connection, and watch each step as it ends, so you see why a server fails;
+- read the server's log, which keeps coming in while it is open;
+- reconnect one, turn it off, or remove it. Remove asks first, and drops the token it stored in the Keychain. A project's server is not removed from here: change that project's `.golem/config.toml`.
 
 A server that crashes or stops answering starts again by itself. While it is down, the status line shows `mcp ✗ <name>` in red.
 

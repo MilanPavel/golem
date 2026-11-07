@@ -5,6 +5,7 @@ import type { ConfigRawGetResult } from "../../protocol/gen/config-raw-get-resul
 import type { ConfigRawResult } from "../../protocol/gen/config-raw-result.ts";
 import type { McpImportApplyResult } from "../../protocol/gen/mcp-import-apply-result.ts";
 import type { McpImportScanResult } from "../../protocol/gen/mcp-import-scan-result.ts";
+import type { McpCallResult } from "../../protocol/gen/mcp-call-result.ts";
 import type { McpLogsResult } from "../../protocol/gen/mcp-logs-result.ts";
 import type { McpServerLog } from "../../protocol/gen/mcp-server-log.ts";
 import type { McpTestProgress } from "../../protocol/gen/mcp-test-progress.ts";
@@ -444,6 +445,10 @@ function isLogLine(value: unknown): boolean {
     (value["kind"] === "stderr" || value["kind"] === "event") &&
     typeof value["text"] === "string"
   );
+}
+
+export function isMcpCallResult(value: unknown): value is McpCallResult {
+  return isRecord(value) && typeof value["text"] === "string" && typeof value["is_error"] === "boolean";
 }
 
 export function isMcpLogsResult(value: unknown): value is McpLogsResult {

@@ -45,6 +45,7 @@ export type { McpImportApplyParams } from "../../protocol/gen/mcp-import-apply-p
 export type { McpImportApplyResult } from "../../protocol/gen/mcp-import-apply-result.ts";
 export type { McpImportCandidate } from "../../protocol/gen/mcp-import-candidate.ts";
 export type { McpImportScanResult } from "../../protocol/gen/mcp-import-scan-result.ts";
+export type { McpCallResult } from "../../protocol/gen/mcp-call-result.ts";
 export type { McpLogsResult } from "../../protocol/gen/mcp-logs-result.ts";
 export type { McpServerLog } from "../../protocol/gen/mcp-server-log.ts";
 export type { McpTestProgress } from "../../protocol/gen/mcp-test-progress.ts";

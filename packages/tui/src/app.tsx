@@ -112,6 +112,10 @@ import {
   startersShown,
   type StarterKey,
   type StarterPick,
+  changeToolFilter,
+  formatLogLine,
+  formatTestResult,
+  formatTestStep,
 } from "@golem/view";
 import { folderFacts } from "./folder-facts.ts";
 import {
@@ -216,9 +220,14 @@ import {
   type McpManagerLine,
   mcpAdded,
   mcpAddFailed,
+  mcpCallDone,
   mcpCatalogLoaded,
+  mcpLogsAppended,
+  mcpLogsLoaded,
   mcpManagerKeyOf,
   mcpManagerTyping,
+  mcpTestDone,
+  mcpTestStep,
   type McpManagerAction,
   type McpManagerState,
   type McpTone,
@@ -982,6 +991,12 @@ export function App({
       setMcp((current) =>
         current.servers === null ? current : { servers: mergeMcp(current.servers, server), error: null },
       );
+    });
+  }, [client]);
+
+  useEffect(() => {
+    return client.onMcpLog((log) => {
+      setMcpManager((state) => mcpLogsAppended(state, log.name, log.lines.map(formatLogLine)));
     });
   }, [client]);
 
@@ -2687,6 +2702,48 @@ export function App({
       client.mcpTools(action.name, session).then((tools) => {
         setMcpManager((state) => (state.view.kind === "tools" && state.view.name === action.name ? { ...state, tools } : state));
       }, failed);
+    } else if (action.kind === "test") {
+      client
+        .mcpTest({ name: action.name, ...(session === undefined ? {} : { sessionId: session }) }, (progress) => {
+          const line = formatTestStep(progress);
+          if (line !== null) {
+            setMcpManager((state) => mcpTestStep(state, action.name, line));
+          }
+        })
+        .then(
+          (result) => setMcpManager((state) => mcpTestDone(state, action.name, result.ok, formatTestResult(result).split("\n"))),
+          (error: unknown) => setMcpManager((state) => mcpTestDone(state, action.name, false, [messageOf(error)])),
+        );
+    } else if (action.kind === "load-logs") {
+      client.mcpLogs(action.name, session === undefined ? {} : { sessionId: session }).then(
+        (logs) => setMcpManager((state) => mcpLogsLoaded(state, action.name, logs.lines.map(formatLogLine))),
+        (error: unknown) => setMcpManager((state) => mcpLogsLoaded(state, action.name, [messageOf(error)])),
+      );
+    } else if (action.kind === "remove") {
+      client.removeMcpServer(action.name).then(done(`removed ${action.name}`), failed);
+    } else if (action.kind === "toggle-tool") {
+      void (async () => {
+        const detail = await client.mcpGet(action.name, session);
+        const change = action.hide
+          ? changeToolFilter(detail.config, [action.tool], [])
+          : changeToolFilter(detail.config, [], [action.tool]);
+        if (!change.ok) {
+          setChat((state) => ({ ...state, notice: change.message }));
+          return;
+        }
+        await client.updateMcpServer({ name: action.name, config: change.config, ...(session === undefined ? {} : { session_id: session }) });
+        const tools = await client.mcpTools(action.name, session);
+        setMcpManager((state) => (state.view.kind === "tools" && state.view.name === action.name ? { ...state, tools } : state));
+        done(`${action.tool} is ${action.hide ? "hidden from" : "shown to"} the model`)();
+      })().catch(failed);
+    } else if (action.kind === "call") {
+      client
+        .mcpCall({ name: action.name, tool: action.tool, arguments: action.arguments, ...(session === undefined ? {} : { sessionId: session }) })
+        .then(
+          (result) =>
+            setMcpManager((state) => mcpCallDone(state, action.name, action.tool, { text: result.text, failed: result.is_error })),
+          (error: unknown) => setMcpManager((state) => mcpCallDone(state, action.name, action.tool, { error: messageOf(error) })),
+        );
     } else if (action.kind === "session") {
       if (session === undefined) {
         setChat((state) => ({ ...state, notice: "open a session first" }));
