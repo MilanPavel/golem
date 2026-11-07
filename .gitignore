@@ -26,3 +26,6 @@ packages/daemon/golem/_build.py
 # Local data
 *.db
 .test-socks/
+
+# Demo recordings in progress (just demo-tui, just demo-web).
+scripts/demo/out/

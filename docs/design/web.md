@@ -45,7 +45,7 @@ It borrows the calm, centred reading column and generous input from Claude's cha
    268 px            column at most 46 rem                 320 px
 ```
 
-- **Sidebar** (`sunken`): the wordmark with golem's state, New session, a Search button (`Search or run a command`, with its key, ⌘K or Ctrl K) that opens the palette, then sessions grouped by folder. Each session has a small square for its state, its title, and how long ago it was active. A fork is indented under its parent with `⑂`. At the bottom are the Settings button, the connection, and the version. The theme is chosen in Settings. The Settings button has a gear and opens `/settings`. When `setup.status` has a problem, it shows a warning dot (`wait`) and the problem under the name as a line of text, with the same text in its name for a screen reader (`Settings, <problem>`), so colour is not the only signal. While the query loads or if it fails, the button is plain.
+- **Sidebar** (`sunken`): the wordmark with golem's state, New session, a Search button (`Search or run a command`, with its key, ⌘K or Ctrl K) that opens the palette, then sessions grouped by folder. Each session has a small square for its state, its title, and how long ago it was active. A fork is indented under its parent with `⑂`. At the bottom are the download row (while a model downloads, see [Downloads](#downloads)), the Settings button, the connection, and the version. The theme is chosen in Settings. The Settings button has a gear and opens `/settings`. When `setup.status` has a problem, it shows a warning dot (`wait`) and the problem under the name as a line of text, with the same text in its name for a screen reader (`Settings, <problem>`), so colour is not the only signal. While the query loads or if it fails, the button is plain.
 - **Top bar:** the session title, the model chip, the folder chip, and the drawer toggle.
 - **Column:**
   - Your messages are right-aligned slips in `slip`.
@@ -56,7 +56,7 @@ It borrows the calm, centred reading column and generous input from Claude's cha
   - **Session:** model, folder, what this session allows, pinned skills, MCP servers.
   - **Wire:** the last protocol lines, as in the TUI's `/debug wire`.
 
-**One composer per screen.** The empty screen has a large centred composer. Once you send, the chat's docked composer takes its place. The full-screen states have none, because nothing can be sent without a connection.
+**One composer per screen.** The empty screen has a large centred composer, with the folder and model chips under it ([The new-session screen](#the-new-session-screen)). Once you send, the chat's docked composer takes its place. The full-screen states have none, because nothing can be sent without a connection.
 
 **Narrow windows:**
 - Below 1100 px the drawer becomes a sheet from the right.
@@ -144,6 +144,39 @@ The page keeps retrying behind "daemon down", and the screen goes away by itself
   - **Model dialog:** ↑↓ move, ↵ use or download, Esc clear the search, then close.
 - ⌘ is Ctrl off macOS, everywhere a key is shown.
 
+## Downloads
+
+- A model download shows in the sidebar footer, above the Settings button, on every screen. The model dialog shows it too, on its row. Progress reaches every connection, so a download started in the terminal shows here as well.
+- **One download:** `↓ <label>`, the same bar as the model dialog's, then `12% · 38 min` in mono. With no speed yet, the text is the percent only.
+- **Two or more:** `↓ 2 downloads`, with the combined share (completed over total, counting only the downloads whose size is known) and the longest time left.
+- **Failed:** `Download of <label> failed` in `wait`, with a × that dismisses it. It stays until dismissed. A stopped download is not a failure and shows nothing.
+- The row is a button that opens the model dialog: for the session on a session screen, otherwise for the new session. Its name for a screen reader says it all, such as `Downloading Qwen3 Coder 30B, 12 percent, 38 minutes left. Open models`.
+- A polite live region says only `Downloading <label>`, `<label> downloaded`, and `Download of <label> failed`, never each percent.
+- Below 760 px the row is in the sidebar's sheet.
+
+## The new-session screen
+
+- The heading `Start a new session`, the large composer, and under it a row of two chips: the folder (`📁 milan.pavel ⌄`) and the model (`◇ qwen3.5:4b · default ⌄`).
+- **Folder chip:** a menu with the folders of earlier sessions, `No folder`, and `Choose a folder…`, which opens [the folder browser](#the-folder-browser).
+- **Model chip:** the model the new session will use. It shows the default with a `default` tag, or a model you picked without the tag. With no default it says `Choose a model` in `wait`. It opens the model dialog for the new session.
+- The pick holds until the session is created. The next new session starts from the default again, and so does a reload.
+- `/model` on this screen opens the same dialog, and `/model <name>` picks that model.
+- An error from starting the session (a folder that is not there, a model that is not known) shows under the chips in the red line, and the draft stays.
+
+## The folder browser
+
+- `Choose a folder…` opens a popover under the folder chip, named `Choose a folder`.
+- From the top:
+  - a breadcrumb from `~`, each part a button
+  - a filter field, `Filter, or type a path`
+  - the subfolders, each with a `git` badge when it has `.git`
+  - `Cancel` and `Use this folder`, which picks the folder shown in the breadcrumb.
+- It opens at the current folder when that is under home, else at home.
+- The filter narrows the list as you type. A value that starts with `/` or `~/`, then Enter, goes to that path. A path outside home is used as typed, with no list, as before.
+- The list is a listbox, and focus stays in the filter. Up and Down move, Right or Enter opens the active folder, Left or Backspace in an empty filter goes up, and Esc closes.
+- It lists only folders under home, and leaves out hidden ones, `Library`, and the secret folders ([ADR-040](../adr/040-browser-lists-home-folders.md)). A long folder ends with `Showing the first 500 folders. Type to narrow.`
+- Loading says `loading…`. An error shows its line and a `Retry` button.
+
 ## The model dialog
 
 - The model chip in the top bar is a button, `Model: <name>`. It opens a centred dialog, `Choose a model`, and focus returns to the chip when it closes.
@@ -151,22 +184,48 @@ The page keeps retrying behind "daemon down", and the screen goes away by itself
 - The groups are the TUI picker's: Profiles, Installed, Download, then each provider. A row has the label, the ref in faint mono, and the facts in mono. The session's model has a check, the default a `default` badge.
 - A row that is not ready is muted and says why. The page never takes a key, so it names the command: `golem auth set <provider>`, `/setup`, `ollama serve`.
 - A download shows a bar, `2.1 / 6.6 GB · 12 MB/s · 6 min`, and it is the same one the terminal shows, because progress reaches every connection.
-- The footer acts on the active row: Use for this session, Make default, Download, Stop download, Remove. Download and Remove ask first, in the footer; a model too big for the machine asks twice.
+- It has three modes, which change only the header line and the main button. **Session** (from the top bar's chip): `Use for this session`. **New session** (from the home screen's chip): `New sessions use <default>.` and `Use for the new session`. **Default** (from Settings → Setup): `Make default`. A row that is not ready offers `Download` as its main action in every mode.
+- The footer acts on the active row: the mode's main button, Make default, Download, Stop download, Remove. Download and Remove ask first, in the footer; a model too big for the machine asks twice.
 
-## The setup window
+## Setup in Settings
 
-- One centred dialog, `Setup`, drawn from the same panels, lines, and navigation table as the terminal's ([setup-window.md](setup-window.md)). Guided mode shows the stepper, with a word for each step (`done`, `current step`, `to do`, `skipped`) as well as its mark. Marked lines say `done`, `failed`, `needs attention`, or `working` to a screen reader, and `working` is a small clay square that pulses, still under reduced motion.
-- It opens from `/setup` and the palette's `/setup` row (the overview), from a send that fails for no model (guided from Engine, with the draft kept in the composer), and by itself at the start, once per page load: a fresh home opens guided from Engine, a default that is gone opens the Model panel alone, and a working setup opens nothing. It never opens over another dialog; a start-time opening waits until none is open.
-- Choices are a list of buttons. Up and Down move, Enter chooses, Esc goes back as the table says, and a click is the same as moving there and pressing Enter. Esc on the guided Service panel at the start, and Ready's Enter, close the window. The close button closes it at any point, like Later: the page goes on, and a download keeps running.
-- This Mac works from the page: the daemon installs Ollama with Homebrew and streams its output, starts it, and pulls the model, and a download shows the same bar as the model dialog. With no Homebrew, a link opens ollama.com/download in a new tab and the panel waits for Ollama to appear.
-- Service and Key are commands, not controls, because the page never installs a service or takes a key ([ADR-028](../adr/028-web-gateway.md)). The page is connected, so the service runs. The Service row says so with the version, and when launchd does not keep it the row needs attention and the panel shows `golem daemon install` with a Copy button. The Key panel shows `golem auth set <provider>` with Copy and a `Check again` button: it is done once the provider no longer needs a key, and says `the key isn't there yet` until then.
+The browser sets up golem on pages, not in a dialog ([ADR-039](../adr/039-web-setup-as-pages.md)). Settings → Setup is the overview, and [the welcome page](#the-welcome-page) is the first run. Both use the terminal's `setup.status`, rows, and words ([setup-window.md](setup-window.md)).
+
+- One card for each row of `setup.status`: the mark with its word (`done`, `needs attention`, `failed`), the name, the detail, and the fix on the right. Below 768 px the fix wraps under the detail.
+
+| Row | The fix in place |
+|---|---|
+| Service, not kept at login | `golem daemon install` in mono with `Copy`, and `Check again` |
+| Engine | `Install Ollama`, with its streamed output in an `Output` disclosure under the row; `Start Ollama`; or, with no Homebrew, a link to ollama.com/download in a new tab |
+| Model | the default's label, and `Change…`, which opens the model dialog in its default mode |
+| A key | `golem auth set <provider>` with `Copy`, and `Check again` |
+| Tools | with no server yet, `Add tools`, which opens the starter offer from [the welcome page's Tools step](#the-welcome-page) in place, with the servers already added shown as done; then `Manage`, a link to `/settings/mcp` |
+| Disk | none |
+
+- Under the cards: `Add an API key` (a select of the providers that need a key, then its `golem auth set <provider>` with `Copy`) and `Run setup again`, a link to `/welcome`.
+- A running fix shows the `working` square, a small clay square that pulses, still under reduced motion. Its error is a red line in its card.
+- Service and keys are commands, not controls, because the page never installs a service or takes a key ([ADR-028](../adr/028-web-gateway.md)). Everything else, the page does: the daemon installs Ollama with Homebrew, starts it, and pulls a model.
+
+## The welcome page
+
+- `/welcome` is the first run. A full page with no sidebar, laid out like the empty screen: the faint grid, the pixel golem, and `Welcome to golem`. `Later` is a quiet link at the top right of every step.
+- A stepper: Engine, Model, Tools, Ready. Each step has a word as well as its mark (`done`, `current step`, `to do`, `skipped`). It follows the terminal's guided order ([setup-window.md](setup-window.md)). Service is left out, because a connected page means the service runs.
+  - **Engine:** `On this Mac` (Ollama) or `With an API key`. On this Mac, Ollama is installed and started from the page. With a key, the step shows `golem auth set <provider>` with `Copy` and `Check again`, and is done once the provider no longer needs a key.
+  - **Model:** the same list as the model dialog, inline, sized for the Mac. A download shows its bar here and in the sidebar.
+  - **Tools:** offered only when no MCP server is set up yet, as the terminal's H panels do; otherwise it is `skipped`. `Give golem some tools?` and the starter servers from the catalog (`mcp.catalog`, `starter = true`) as checkboxes, with the starters ticked except those that need a secret. Ticking GitHub opens its token field under it, an `<input type="password">` that is never prefilled and is cleared once the call returns ([ADR-037](../adr/037-browser-manages-mcp-and-config.md)); empty skips it. `Add 3` adds them: Node or uv is installed first when a server needs it (`runtime.install`, with its output, as Ollama's), and each row says what it is doing, then `added · 1 tool · on demand`, or the one hint `mcp.test` gives when it fails, with `Try again` and `Skip`. `Skip` moves on.
+  - **Ready:** `golem is ready.` and `Start chatting`. When launchd does not keep the service, a note suggests `golem daemon install` with `Copy`. It never blocks.
+- **When it opens:** once per page load, as the terminal decides (`setupAtStart`). A fresh home goes to `/welcome`, and a default that is gone goes to `/welcome?step=model`. One ready model is made the default with a notice, and nothing opens. A working setup opens nothing.
+- **From a send with no model:** the page goes to `/welcome?from=send` and keeps the draft. `Start chatting` goes back to it, and nothing is sent by itself.
+- `Later` and `Start chatting` go to `/` (or back, after a send), and a download keeps running.
+- `brew install` opens nothing. The first `golem` sets up in the terminal. The first `golem web` asks about the service in the terminal, and then the page opens on `/welcome`.
 
 ## The Settings page
 
 - **Route:** `/settings` and `/settings/<section>`, a section being lowercase letters and dashes. `/settings` is the `setup` section. The router does not know the sections: a name the page does not list shows `There is no such section.` with a link back to `/settings`.
 - **Layout:** a `Settings` heading, a list of sections on the left (`Settings sections`, a link each, the current one marked), and the section's heading and body beside it. Below 768 px the list is a row above the body. The session's top bar is not reused.
-- **Sections:** `Setup` and `Appearance`. A later ticket adds its section with one entry in `sections.ts` and one case in the screen.
-  - **Setup:** one status line in mono (`all set`, or the first problem, as the sidebar button shows it) and an `Open setup` button that opens the overview window. The page reads `setup.status` again when the section opens, and again whenever the tab is seen again, because a key set in a terminal pushes no event.
+- **Sections:** `Setup`, `Tool rules`, and `Appearance`. A later ticket adds its section with one entry in `sections.ts` and one case in the screen.
+  - **Setup:** [the setup form](#setup-in-settings). The page reads `setup.status` again when the section opens, and again whenever the tab is seen again, because a key set in a terminal pushes no event.
+  - **Tool rules** (`/settings/rules`): the folder and the session of the context in muted mono, then the rules in check order, then what the session allows, as `/permissions` lists them: the action in its colour (`allow`, `ask` in `wait`, `deny`), the tool with its `match` and `path`, and the source, with `ignored: <why>` when a rule never matches. Built-in defaults and ignored rules are dimmed, and a default has no buttons, only the note that it cannot be changed. A user or project rule has `Allow`, `Ask`, `Deny` (the current one pressed) and `Remove`; an allowance has `Revoke`. The page cannot add a rule, reorder one, or edit `match` or `path`, as in the terminal. A change that loosens (a rule set to allow, or a `deny` or `ask` rule removed) first asks in a dialog: `golem will not ask before it runs this on your Mac.` Tightening and revoking act at once. A one-line notice (`rule 3 now asks`) says what happened and a red line shows a refusal, and the list is read again either way. With no folder the page says `Open a session to see its folder's rules.`, and it says when the folder is not trusted yet, so its allow rules do not count. `Refresh` reads again, and so does an answer to an approval.
   - **Appearance:** the theme: `Match system` (the default, follows the OS), `Light` (`slip`), or `Dark` (`kiln`). The stored value stays `slip` or `kiln`, so an earlier choice holds.
 - **Where it was opened from:** the route carries no session or folder. A session screen remembers its session and folder in memory, so the sections that depend on a folder (tool rules, MCP, skills) use that one, else the folder of the next new session, else none.
 - **Ways in:** the sidebar's Settings button and the palette's `Settings` row. There is no `/settings` slash command, because the terminal has no such page.
@@ -178,10 +237,11 @@ The page keeps retrying behind "daemon down", and the screen goes away by itself
 - After `/model ` the list offers model names, and after `/skill run ` skill names. The model and skill lists are fetched only once the text starts with `/`.
 - A command answers in one muted line above the key hints, such as `Renamed.` or `Copied the last answer.`. It clears when you type or run the next command. An error stays in the red line. A notice may carry a command for a terminal, such as `golem auth set anthropic`, in mono with a `Copy` button that says `Copied` for two seconds.
 - `/help` opens a `Commands` dialog with the table grouped as Session, Model, Tools, and View.
-- `/model`, `/close`, `/fork`, `/title`, `/skill`, `/copy`, `/export` (a markdown download), `/time`, and `/todos` act on the page. On the empty screen the ones that need a session say `Start a session first: send a message.`
+- `/model`, `/close`, `/fork`, `/title`, `/skill`, `/copy`, `/export` (a markdown download), `/time`, and `/todos` act on the page. `/permissions` opens Settings → Tool rules. On the empty screen `/model` picks the new session's model, and the others that need a session say `Start a session first: send a message.`
+- `/setup` and the palette's `/setup` row open Settings → Setup.
 - The page has no key entry, so `/login` and `/logout` show the `golem auth` command to copy ([ADR-028](../adr/028-web-gateway.md)).
 - `/mcp add [filesystem|github|fetch]` shows the `golem mcp add` command to copy, with the session's folder for the filesystem one, for the same reason. `/mcp add` alone says servers are added in a terminal.
-- Not on the page yet, so each says where it lives: `/mcp` (but `/mcp add` shows its command), `/skills`, `/permissions`, `/artifact`, and `/debug` are in the terminal (run `golem`, then the command); `/sessions` points at the sidebar. The Commands dialog marks the terminal ones `In the terminal for now`.
+- Not on the page yet, so each says where it lives: `/mcp` (but `/mcp add` shows its command), `/skills`, `/artifact`, and `/debug` are in the terminal (run `golem`, then the command); `/sessions` points at the sidebar. The Commands dialog marks the terminal ones `In the terminal for now`.
 
 ## Type
 

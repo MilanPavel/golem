@@ -5,7 +5,7 @@
 
 ## The idea
 
-The web UI ([vision, chapter 1](../vision.md#1-web-ui)) is the first client that is not a program you started in your own terminal. It is a page in a browser, and the browser also runs every other website you have open. Any of those sites can try to open a WebSocket to `127.0.0.1`. The daemon's rule so far, "the socket file's mode is the login", does not reach into a browser.
+The web UI ([how it works](../architecture/web.md)) is the first client that is not a program you started in your own terminal. It is a page in a browser, and the browser also runs every other website you have open. Any of those sites can try to open a WebSocket to `127.0.0.1`. The daemon's rule so far, "the socket file's mode is the login", does not reach into a browser.
 
 So the daemon stays as it is, listening only on its Unix socket, and a **gateway** stands in front of it. The gateway is part of the `golem` bun binary ([ADR-019](019-single-binary.md)), started by `golem web`. It has three jobs:
 

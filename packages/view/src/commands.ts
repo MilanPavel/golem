@@ -116,7 +116,7 @@ const SKILL_USAGE = "/skill run <name> [args] \u00b7 /skill pin <name> \u00b7 /s
 const HELD_SKILL = "a skill is not held \u2014 /debug hold turns hold off";
 
 /** Built-in providers that take an API key. A provider added in config.toml works too. */
-export const KEY_PROVIDERS: readonly string[] = ["anthropic", "openai", "google", "deepseek", "xai"];
+export const KEY_PROVIDERS: readonly string[] = ["anthropic", "openai", "google", "deepseek", "xai", "moonshot"];
 
 /** Every slash command. A name not in this table is an unknown command, not a message. */
 export const COMMANDS: readonly Command[] = [

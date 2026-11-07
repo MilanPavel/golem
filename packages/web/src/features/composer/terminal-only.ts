@@ -3,7 +3,6 @@ export const TERMINAL_ONLY: ReadonlySet<string> = new Set([
   "/artifact",
   "/debug",
   "/mcp",
-  "/permissions",
   "/skills",
 ]);
 
@@ -17,7 +16,6 @@ function inTerminal(what: string, name: string): string {
 export const NOT_YET = {
   mcp: `${inTerminal("MCP servers are managed", "/mcp")} To add one, use /mcp add.`,
   skills: inTerminal("The skills list is", "/skills"),
-  permissions: inTerminal("Rules are shown", "/permissions"),
   artifact: inTerminal("Tool output opens", "/artifact"),
   debug: inTerminal("The debug panel is", "/debug"),
   sessions: "The sidebar lists your sessions.",

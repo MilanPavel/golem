@@ -22,6 +22,7 @@ import asyncio
 import contextlib
 import functools
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -92,12 +93,18 @@ class Finished:
     cut: bool
 
 
-def profile(root: Path, settings: ShellSettings, *, home: Path) -> str:
-    """The SBPL profile for a command in ``root``."""
+def writable_dirs(root: Path, settings: ShellSettings, *, home: Path) -> list[Path]:
+    """The folders a command in ``root`` may write to, resolved."""
     writable = [root.resolve(), Path("/private/tmp"), Path("/private/var/folders")]
     writable += [(home / name).resolve() for name in CACHE_DIRS]
     writable += [_expand(raw, home) for raw in settings.writable]
     writable += [folder for folder in git_dirs(root) if not folder.is_relative_to(root.resolve())]
+    return writable
+
+
+def profile(root: Path, settings: ShellSettings, *, home: Path) -> str:
+    """The SBPL profile for a command in ``root``."""
+    writable = writable_dirs(root, settings, home=home)
     lines = [
         "(version 1)",
         "(allow default)",
@@ -116,6 +123,63 @@ def profile(root: Path, settings: ShellSettings, *, home: Path) -> str:
     if not settings.network:
         lines += ["(deny network*)", "(allow network* (remote unix-socket))"]
     return "\n".join(lines) + "\n"
+
+
+UNSANDBOXED_HINT = "or run the command with shell_unsandboxed, which the user approves first"
+
+_DENIED = re.compile(r"operation not permitted", re.IGNORECASE)
+_PATH = re.compile(r"(?<![\w.~/-])(~?/[^\s:'\"`,;()\[\]]+)")
+_NO_NETWORK = re.compile(
+    r"couldn't connect to server|could not connect to server|failed to connect to"
+    r"|could not resolve host|network is unreachable|connection refused|econnrefused"
+    r"|enotfound|getaddrinfo|nodename nor servname|temporary failure in name resolution"
+    r"|name or service not known",
+    re.IGNORECASE,
+)
+
+
+def refusals(output: str, root: Path, settings: ShellSettings, *, home: Path) -> list[str]:
+    """What golem's sandbox blocked, by the errors in ``output``: one line each, with the fix.
+
+    A path in an ``Operation not permitted`` line counts only when the profile
+    closes it: a credentials folder, or a folder outside the writable ones.
+    A connection error counts only while ``[shell] network`` is off.
+    """
+    home = home.resolve()
+    secrets = [((home / name).resolve(), name) for name in SECRET_DIRS]
+    readable = [(home / name).resolve() for name in SKILL_DIRS]
+    writable = writable_dirs(root, settings, home=home)
+    found: dict[str, str] = {}
+    for line in output.splitlines():
+        if not _DENIED.search(line):
+            continue
+        for raw in _PATH.findall(line):
+            path = (home / raw[2:]).resolve() if raw.startswith("~/") else Path(raw).resolve()
+            secret = next((name for folder, name in secrets if path.is_relative_to(folder)), None)
+            if secret is not None and not any(path.is_relative_to(r) for r in readable):
+                found.setdefault(
+                    f"secret:{secret}",
+                    f"golem's sandbox blocked {path}: ~/{secret} holds credentials, so a "
+                    f"sandboxed command may not read it. A command that needs it, such as gh "
+                    f"or git push, can run with shell_unsandboxed, which the user approves first.",
+                )
+                break
+            if secret is None and not any(path.is_relative_to(w) for w in writable):
+                found.setdefault(
+                    "write",
+                    f"golem's sandbox lets a command write only in the project folder, the temp "
+                    f"folders, and [shell] writable, and {path} is outside them. If the command "
+                    f"wrote there, add the folder to [shell] writable in the user's config.toml, "
+                    f"{UNSANDBOXED_HINT}.",
+                )
+                break
+    if not settings.network and _NO_NETWORK.search(output):
+        found["network"] = (
+            "golem's sandbox blocked the network, because [shell] network is off. To allow it, "
+            "set [shell] network = true in the user's config.toml, "
+            f"{UNSANDBOXED_HINT}."
+        )
+    return list(found.values())
 
 
 def git_dirs(root: Path) -> list[Path]:
@@ -329,5 +393,7 @@ __all__ = [
     "environment",
     "git_dirs",
     "profile",
+    "refusals",
     "run",
+    "writable_dirs",
 ]

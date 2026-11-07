@@ -6,7 +6,7 @@ titleTemplate: Your own AI agent, living on your Mac
 hero:
   name: golem
   text: Your own AI agent, living on your Mac.
-  tagline: Local models first. Hosted ones when the task needs them. Your data stays home.
+  tagline: Learn how an agent is built. Run it on your own models. Put it behind your apps.
   actions:
     - theme: brand
       text: Get started
@@ -22,7 +22,7 @@ hero:
 
 <HomeWhy />
 
-Much of this is still the road ahead. [The plan](./plan.md) lists what comes next, step by step.
+Some of this is still the road ahead. [The vision](./vision.md) says where golem is going, and [the plan](./plan.md) lists the steps.
 
 ## See it work
 
@@ -34,8 +34,8 @@ You need an Apple Silicon Mac and [Homebrew](https://brew.sh).
 
 ```bash
 brew install milanpavel/golem/golem   # install
-golem daemon install                  # start golem's background service
-cd ~/my-project && golem              # open the chat, and pick a model
+cd ~/my-project && golem              # open the chat in your project folder
+golem web                             # or open the same chats in your browser
 ```
 
-[Install golem on a Mac](./install.md) walks through every step, plus upgrading and removing.
+The first time, golem asks to start its background service. Press Enter, then pick a model: a local one downloads right there, and a hosted one asks for your API key. [Install golem on a Mac](./install.md) walks through every step, plus upgrading and removing.

@@ -1,40 +1,29 @@
 ---
 title: Introduction
-description: What golem is, why it exists, and how its parts fit together.
+description: What golem is, and why it exists.
 ---
 
 # Introduction
 
-golem is an AI agent that lives on your Mac. You chat with it in your terminal or your browser, and it works in the folder you open it in: it reads and searches your files, edits them, runs commands, and looks things up on the web. It asks you first before it does anything that matters.
+Golem is an AI agent that lives on your Mac. You chat with it in your terminal or your browser, and it works in the folder you open it in: it reads and searches your files, edits them, runs commands, and looks things up on the web. It asks you first before it does anything that matters.
 
-## Why golem
+![Golem, wake up! On parchment under a crescent moon, the golem sleeps with its head bowed, and the shem, a small scroll, slides into the slot in its forehead. On a dark screen the shem glows in the same golem's forehead, its eyes light up, and a prompt types: $ golem, then hello](../images/intro-wake.svg)
 
-**Local models first.** Most agent tools assume a huge hosted model. golem gets real work out of the model on your laptop, and calls a hosted one only when the task needs it. Every answer shows what it cost.
+## What golem is for
 
-**It asks before it acts.** Files, the shell, git, and the web are built in. Every tool call passes one permission layer, so a change to a file shows as a diff, and a command waits for your yes. Commands run in a sandbox.
+**Learning how a modern agent is built.** Golem builds every hard part itself, in the open, to find out what a reliable agent really needs: the agent loop, the protocol, sessions, permissions, sandboxes, context, skills. Each part is a chapter in [How golem works](../architecture.md): the idea in agents generally, then golem's version. Read it, then change it.
+
+**Your own models, and your privacy.** Most agent tools assume a huge hosted model. Golem gets real work out of the model on your laptop, for free, and nothing leaves the machine. A hosted model (Anthropic, OpenAI, Google, and others) is a choice you make per task.
+
+**Clever routing, when cost matters.** The cheapest model that can do a job should do it. Golem shows what every answer cost, and grows toward trying a small model first, stepping up only when it struggles, and keeping to a budget.
 
 **Nothing is lost.** Every chat is written to disk as it happens. Close the terminal in the middle of an answer and the answer keeps going. A crash, a restart, or an upgrade picks up where it left off.
 
-**Built from scratch, to learn.** golem builds the hard parts itself, to find out what a reliable agent really needs. Memory and skills it writes for itself, routing between models, and testing its own answers are the road ahead. [The plan](../plan.md) lists each step.
+**Work that runs without you.** Next come workflows that run on a schedule and act exactly once, sub-agents that split a big task into small ones a local model can do, and approvals that reach you on your phone.
 
-## How it works
+**The agent behind your application.** The same agent you shape in your terminal can be deployed behind an app, with its rules and tools, while the models stay outside it as endpoints you can swap.
 
-golem has two parts: a **daemon** that does the work, and the **chat** that you see.
-
-```mermaid
-flowchart LR
-  tui["golem<br/>(the chat in your terminal)"] <-->|local socket| daemon["daemon<br/>(runs in the background)"]
-  web["your browser<br/>(golem web)"] <-->|"127.0.0.1, through golem web"| daemon
-  daemon <--> models["Ollama, Anthropic,<br/>OpenAI, ..."]
-  daemon <--> mcp["MCP servers<br/>(more tools)"]
-  daemon <--> data[("~/.golem<br/>chats, settings")]
-```
-
-- **The daemon** talks to the model, runs the tools, and stores every chat in `~/.golem`. macOS keeps it running and restarts it after a crash.
-- **The chat** connects to the daemon. Close it mid-answer and nothing is lost: open it again and the answer is still streaming. You can open the same chat in several terminals, or in the browser, at once.
-- **golem asks first.** Before it changes a file, runs a command, or fetches a page, you see exactly what it wants to do. You allow it once, for the session, or always, or you deny it.
-
-The models are yours to choose. A local one runs in [Ollama](https://ollama.com) on your Mac, for free, and nothing leaves the machine. A hosted one (Anthropic, OpenAI, Google, DeepSeek, or xAI) needs an API key, which golem keeps in the macOS Keychain.
+Some of this is built, and some is the road ahead. [The vision](../vision.md) says where golem is going, and [the plan](../plan.md) lists the steps.
 
 ## What you need
 

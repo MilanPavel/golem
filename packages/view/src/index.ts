@@ -253,3 +253,14 @@ export {
   type StarterPress,
 } from "./starter-prompts.ts";
 export { parseTipCount, tipAt, TIPS } from "./tips.ts";
+export {
+  DEFAULT_LOCKED,
+  isLoosening,
+  itemText,
+  permissionItems,
+  ruleChange,
+  type Action,
+  type PermissionItem,
+  type PermissionsAction,
+  type RuleKey,
+} from "./permissions.ts";

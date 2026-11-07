@@ -652,15 +652,16 @@ Enter sends · Esc declines
 
 ## J · The browser
 
-Everything in A to I is also in the browser, in one place: **Settings**. It has two tabs, **MCP servers** and **Config file**. It is the same view with the same words, drawn the way [the web UI](web.md) draws everything: a quiet reading column, one clay accent, and the status words next to every colour.
+Everything in A to I is also in the browser, in one place: **Settings** ([web.md](web.md#the-settings-page)). It is two sections in the Settings list, **MCP servers** (`/settings/mcp`) and **Config file** (`/settings/config`), beside Setup, Tool rules, and Appearance. It is the same view with the same words, drawn the way [the web UI](web.md) draws everything: a quiet reading column, one clay accent, and the status words next to every colour.
 
 ### Where it opens
 
-- A **gear button** at the bottom of the sidebar, next to the theme switch.
+- The **Settings button** at the bottom of the sidebar, then the section.
+- Settings → Setup: the Tools card's `Manage`.
 - `/mcp` and `/config` in the composer. `/mcp add <name>` opens the add dialog on that entry.
 - The **⌘K palette**, as two rows in the Tools group: `MCP servers` and `Config file`.
 - A link in the drawer's **Session** tab, next to the MCP servers that session uses.
-- **Esc** or the close button goes back to the chat, and the chat is exactly as it was.
+- Leaving Settings goes back to the chat, and the chat is exactly as it was.
 
 ### The prototype
 
@@ -674,10 +675,10 @@ The prototype in [mcp-prototype.html](mcp-prototype.html) is a working Settings 
 
 ```
 ┌──────────────┬────────────────────────────────────────────────────────┐
-│ ▞ golem      │ Settings                                           ✕   │
-│ + New        │ ┌─────────────┬─────────────┐                          │
-│ Search  ⌘K   │ │ MCP servers │ Config file │                          │
-│              │ └─────────────┴─────────────┘                          │
+│ ▞ golem      │ Settings: Setup · Appearance · MCP servers · Config    │
+│ + New        │                                                        │
+│ Search  ⌘K   │ MCP servers                                            │
+│              │                                                        │
 │ ~/repos/golem├───────────────────────┬────────────────────────────────┤
 │ ■ UTF-8 …    │ [ Add a server ] Import│ github              ✓ running │
 │   ⑂ gateway… │                       │ api.githubcopilot.com/mcp      │
@@ -689,7 +690,7 @@ The prototype in [mcp-prototype.html](mcp-prototype.html) is a working Settings 
 │              │                       │ ───────────────────────────    │
 │              │ This project          │ 29 of 41 on · about 4.1k tokens│
 │ ● connected  │ ✗ docs-search retry 12s│ ☑ get_me                  120 │
-│ v0.9.0 ⚙ ☼   │                       │ ☑ list_issues             410  │
+│ ⚙ Settings   │                       │ ☑ list_issues             410  │
 └──────────────┴───────────────────────┴────────────────────────────────┘
    268 px          320 px list                 detail, at most 46 rem
 ```
@@ -717,7 +718,7 @@ The prototype in [mcp-prototype.html](mcp-prototype.html) is a working Settings 
 
 - **Cards by category,** the catalog's own order. A card has the name, one line, and one fact: `needs a token`, `sign in`, `installs Node`, `added`.
 - **Picking a card** replaces the dialog's body with the entry's form, then the test, then Save. The steps are a small header, `Details · Test · Save`, with the current one marked and a word for each.
-- **The form** is the terminal's C2 and C3: labelled fields, a path or text input, a choice, and a secret in `<input type="password">` with `autocomplete="off"`. A secret is never prefilled, and is cleared the moment the call returns.
+- **The form** is the terminal's C2 and C3: labelled fields, a path input with the [folder browser](web.md#the-folder-browser) for a folder, a choice, and a secret in `<input type="password">` with `autocomplete="off"`. A secret is never prefilled, and is cleared the moment the call returns.
 - **`Your own`** is the C9 form.
 
 ### The test report

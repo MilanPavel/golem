@@ -62,6 +62,7 @@ One shell command, in the order it runs:
 3. **golem cleans the environment.** Variables whose names look like credentials are removed.
 4. **The command runs** as `$SHELL -lc <command>` in the project folder, under `sandbox-exec`, in its own process group.
 5. **A blocked action fails inside the command.** macOS answers `Operation not permitted`, the command prints it, and it exits with an error. The model reads that as the result, and the run goes on.
+6. **golem says it was the sandbox.** When the output shows a refusal the profile explains, golem adds one line before the exit code: what it blocked, why, and the setting or tool that allows it. The summary becomes `exit 1, blocked by the sandbox`. So the model can tell you what to do, instead of telling you to check your permissions.
 
 Here is a real run, recorded against a throwaway home with `qwen3-coder:30b` on a local Ollama. A rule in `config.toml` allowed every `shell` call, so the sandbox was the only guard. The daemon was started with `DEMO_API_KEY=not-a-real-key` in its environment, and the home folder is shown as `~`.
 
@@ -74,6 +75,14 @@ Here is a real run, recorded against a throwaway home with `qwen3-coder:30b` on 
 | 23 | `printenv DEMO_API_KEY` | `exit 1`, and nothing printed |
 
 One write in the project, and four things the sandbox kept out: a write to the home folder, a read of `~/.ssh`, the network, and a key in the environment. Afterwards, `~/golem-sandbox-probe` did not exist.
+
+This run was recorded before step 6. Now the three refused commands also end with golem's line, for example:
+
+```text
+ls: /Users/you/.ssh: Operation not permitted
+[golem's sandbox blocked /Users/you/.ssh: ~/.ssh holds credentials, so a sandboxed command may not read it. A command that needs it, such as gh or git push, can run with shell_unsandboxed, which the user approves first.]
+[exit code 1]
+```
 
 **Where it lives in the code:**
 
@@ -98,7 +107,7 @@ One write in the project, and four things the sandbox kept out: a write to the h
 ## Try it
 
 1. Open the chat with `golem` in a project folder.
-2. Ask: `Run ls ~/.ssh in the shell.` Allow it. The result is `Operation not permitted`.
+2. Ask: `Run ls ~/.ssh in the shell.` Allow it. The result is `Operation not permitted`, and golem's line says `~/.ssh` holds credentials.
 3. Ask: `Run curl -sI https://example.com in the shell.` Allow it. It can't connect, because the network is off.
 4. To let commands use the network, add this to `~/.golem/config.toml`, and restart the daemon with `golem daemon restart`:
 
@@ -116,6 +125,7 @@ For contributors: the reference for the shell sandbox, the git tools, and the fi
 `shell` runs the user's login shell (`$SHELL -lc`) in the session folder, under `sandbox-exec` ([ADR-014](../adr/014-shell-sandbox.md)):
 - **The sandbox** allows writes only to the folder, the temp folders, the usual tool caches, and `[shell] writable`. When the folder is in a git checkout whose git folders are outside it, it may write those too, so `git fetch` and `git commit` work. In a git worktree they are its own folder, from the `gitdir:` line of its `.git` file, and the folder it shares with the main checkout, from `commondir`. The rest of the main checkout stays closed. golem reads the two files itself and does not run git (`sandbox.git_dirs`). The shared folder holds the main checkout's hooks and config, so a command could change them. A command in a plain clone could always do that, since its `.git` is inside the session folder. It denies the network unless `[shell] network = true`, except local Unix sockets. It denies reads of folders that hold credentials, `~/.ssh` and `~/.golem` among them, but allows reads of `~/.golem/skills`, so a skill can run its scripts ([ADR-030](../adr/030-skill-read-roots.md)). Variables that look like credentials (`*_API_KEY`, `*_TOKEN`, `*_SECRET`, `*PASSWORD*`) are removed from the environment.
 - **Policy.** `shell` is not read-only, so by default every command asks. A rule's `match` is checked against the command, so `match = "git status|pnpm test*"` allows those and nothing else. Allowing a command for the session allows that exact command, not every command.
+- **Refusals** (`refusals`). After a sandboxed command, golem looks at its output. An `Operation not permitted` line whose path is in a credentials folder, or outside the writable folders, gets a line that names the folder and the fix: `shell_unsandboxed`, or `[shell] writable`. A connection error while `[shell] network` is off gets one that names `network = true`. A path the profile allows is never blamed on it, and the line is added once per kind. It reads the output, so a command that only prints such an error gets the line too.
 - **Where there is no sandbox**, for example inside another sandbox or off macOS, `shell` and the git helpers refuse to run and say why.
 - **Outside the sandbox.** `shell_unsandboxed` runs the same way without `sandbox-exec`, and keeps the variables that hold credentials, so `gh` and `git push` work ([ADR-038](../adr/038-shell-unsandboxed.md)). It needs no sandbox, so it runs where `shell` cannot. It is a tool of its own, so a rule or a session allowance for `shell` never lets a command out. An `allow` rule covers it only when it names it (`NAMED_ONLY` in `golem/permissions/engine.py`), so `tool = "*"` does not.
 

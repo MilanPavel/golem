@@ -42,7 +42,9 @@ An Architecture Decision Record (ADR) is a short note of one choice: what was de
 | [036](036-setup-window-asks-for-the-service.md) | The setup window asks for the service, inside the chat screen | accepted | 2026-11-03 |
 | [037](037-browser-manages-mcp-and-config.md) | The browser manages MCP servers and `config.toml`, but cannot move a secret or widen trust | accepted | 2026-11-05 |
 | [038](038-shell-unsandboxed.md) | A command you approve may run outside the sandbox, as a tool of its own | accepted | 2026-11-06 |
+| [039](039-web-setup-as-pages.md) | The browser sets up golem on pages, not in a dialog | accepted | 2026-11-06 |
+| [040](040-browser-lists-home-folders.md) | The browser may list folders under your home | accepted | 2026-11-06 |
 
 How the running code fits together is in [../architecture.md](../architecture.md).
 
-New records use [template.md](template.md). Number the next file `038-….md` and add a row here.
+New records use [template.md](template.md). Number the next file `041-….md` and add a row here.
