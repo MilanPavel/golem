@@ -1,10 +1,11 @@
-import { OLLAMA_FAILED, RpcError, type ApprovalChoice, type ConfigGetResult, type FsListDirsResult, type GolemClient, type SetupStatusResult, type SkillListResult } from "@golem/client";
+import { OLLAMA_FAILED, RpcError, type ApprovalChoice, type ConfigGetResult, type FsListDirsResult, type McpListResult, type GolemClient, type SetupStatusResult, type SkillListResult } from "@golem/client";
 import { installEventOf, type InstallEvent } from "@golem/view";
 import type { QueryClient } from "@tanstack/react-query";
 import { createDrafts, type Drafts } from "./drafts.ts";
 import { createConnectionStore, type ConnectionStore } from "./connection.ts";
 import { createNewSession, type NewSessionStore } from "./new-session.ts";
 import { CONFIG_KEY } from "./config.ts";
+import { MCP_LIST_KEY, type McpToolsResult } from "./mcp.ts";
 import { MODEL_LIST_ALL_KEY, MODEL_LIST_KEY, SETUP_STATUS_KEY, type ModelListResult } from "./models.ts";
 import { createPulls, type Pulls } from "./pulls.ts";
 import { createQueryClient, keepQueriesHonest } from "./query.ts";
@@ -40,6 +41,12 @@ export type PageClient = Pick<
   | "listSkills"
   | "setSkills"
   | "getConfig"
+  | "listMcp"
+  | "mcpTools"
+  | "restartMcp"
+  | "setMcpEnabled"
+  | "enableMcp"
+  | "disableMcp"
   | "listDirs"
   | "updateRule"
   | "removeRule"
@@ -95,6 +102,12 @@ export type PageActions = {
   removeRule(target: "user" | "project", index: number, cwd: string | undefined): Promise<void>;
   /** Drops something the session allows for the rest of the session. */
   revokeAllowance(sessionId: string, tool: string, subject: string | null): Promise<void>;
+  /** Starts a server again. `sessionId` is the one whose project the server may belong to. */
+  restartMcp(name: string, sessionId: string | null): Promise<void>;
+  /** Writes `enabled` into the file that names the server: on for every chat, off everywhere, or on demand. */
+  setMcpEnabled(name: string, enabled: boolean | "on_demand", sessionId: string | null): Promise<void>;
+  /** Turns an on-demand server on or off for one session. */
+  toggleMcp(sessionId: string, name: string, on: boolean): Promise<void>;
   /** Asks the providers again, past the daemon's cache, puts the answer in the listing, and returns it. */
   refreshModels(showAll?: boolean): Promise<ModelListResult>;
   /** Starts Ollama. True when it answers afterwards. */
@@ -118,6 +131,10 @@ export type PageQueries = {
   skillList(cwd: string | null): Promise<SkillListResult>;
   /** The tool rules in check order, and what the session allows. `null` is no folder or no session. */
   config(cwd: string | null, sessionId: string | null): Promise<ConfigGetResult>;
+  /** The MCP servers a session sees. `null` is no session. */
+  mcpList(sessionId: string | null): Promise<McpListResult>;
+  /** One server's tools, with their descriptions. */
+  mcpTools(name: string, sessionId: string | null): Promise<McpToolsResult>;
   /** The folders directly under `path` in the home folder; `null` is home itself. */
   dirs(path: string | null): Promise<FsListDirsResult>;
 };
@@ -185,6 +202,8 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       setupStatus: () => client.setupStatus(),
       skillList: (cwd) => (cwd === null ? client.listSkills() : client.listSkills(cwd)),
       config: (cwd, sessionId) => client.getConfig(cwd ?? undefined, sessionId ?? undefined),
+      mcpList: (sessionId) => client.listMcp(sessionId ?? undefined),
+      mcpTools: (name, sessionId) => client.mcpTools(name, sessionId ?? undefined),
       dirs: (path) => (path === null ? client.listDirs() : client.listDirs(path)),
     },
     router,
@@ -234,6 +253,27 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
           else await client.removeRule(target, index, cwd);
         } finally {
           await queryClient.invalidateQueries({ queryKey: CONFIG_KEY });
+        }
+      },
+      async restartMcp(name, sessionId) {
+        try {
+          await client.restartMcp(name, sessionId ?? undefined);
+        } finally {
+          await queryClient.invalidateQueries({ queryKey: MCP_LIST_KEY });
+        }
+      },
+      async setMcpEnabled(name, enabled, sessionId) {
+        try {
+          await client.setMcpEnabled(name, enabled, sessionId ?? undefined);
+        } finally {
+          await queryClient.invalidateQueries({ queryKey: MCP_LIST_KEY });
+        }
+      },
+      async toggleMcp(sessionId, name, on) {
+        try {
+          await (on ? client.enableMcp(sessionId, name) : client.disableMcp(sessionId, name));
+        } finally {
+          await queryClient.invalidateQueries({ queryKey: MCP_LIST_KEY });
         }
       },
       async revokeAllowance(sessionId, tool, subject) {

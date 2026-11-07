@@ -146,8 +146,10 @@ test("a row shows the name, the arguments, the description, and a key; terminal 
   expect(help?.querySelector("kbd")?.textContent).toBe("?");
   const logout = options().find((option) => option.textContent?.includes("/logout"));
   expect(logout?.textContent).toContain("<provider>");
+  const skills = options().find((option) => option.textContent?.includes("/skills"));
+  expect(skills?.textContent).toContain("In the terminal for now");
   const mcp = options().find((option) => option.textContent?.includes("/mcp"));
-  expect(mcp?.textContent).toContain("In the terminal for now");
+  expect(mcp?.textContent).not.toContain("In the terminal for now");
   expect(help?.textContent).not.toContain("In the terminal for now");
 });
 
