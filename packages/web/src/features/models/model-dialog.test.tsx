@@ -466,6 +466,53 @@ test("Refresh asks the providers again and shows the answer", async () => {
   expect(dialog().textContent).toContain("New sessions use local.");
 });
 
+const chips = () => within(dialog()).getByRole("group", { name: "Filter by category" });
+const chipOf = (name: string) => within(chips()).getByRole("button", { name });
+
+test("category chips filter the list, All brings it back, and the search narrows within a category", async () => {
+  const { user } = await openDialog();
+  const all = options().length;
+  expect(chipOf("All").getAttribute("aria-pressed")).toBe("true");
+  expect(within(chips()).getAllByRole("button").map((chip) => chip.textContent)).toEqual([
+    "All",
+    "General",
+    "Coding",
+    "Reasoning",
+    "Vision",
+    "Fast",
+    "Long context",
+  ]);
+  await user.click(chipOf("Coding"));
+  expect(chipOf("Coding").getAttribute("aria-pressed")).toBe("true");
+  expect(chipOf("All").getAttribute("aria-pressed")).toBe("false");
+  expect(options().map((option) => option.textContent)).toEqual([expect.stringContaining("Qwen3 14B")]);
+  await user.click(chipOf("Vision"));
+  expect(options()).toHaveLength(1);
+  expect(optionOf("Gemma 4 E4B")).toBeDefined();
+  await user.click(chipOf("General"));
+  await user.type(search(), "gemma");
+  expect(options().every((option) => option.textContent?.includes("Gemma"))).toBe(true);
+  await user.clear(search());
+  await user.click(chipOf("Fast"));
+  expect(within(dialog()).getByText("No matching models.")).toBeDefined();
+  await user.click(chipOf("All"));
+  expect(options()).toHaveLength(all);
+});
+
+test("each model shows its categories beside it, without the general mark", async () => {
+  await openDialog();
+  expect(optionOf("Gemma 4 E4B").textContent).toContain("Vision");
+  expect(optionOf("Gemma 4 E4B").textContent).toContain("Long context");
+  expect(optionOf("Gemma 4 E4B").textContent).not.toContain("General");
+  expect(optionOf("Qwen3 14B").textContent).toContain("Coding");
+});
+
+test("the dialog with a category chosen has no axe violations", async () => {
+  const { user } = await openDialog();
+  await user.click(chipOf("Vision"));
+  expect((await axe.run(document.body, popup)).violations).toEqual([]);
+});
+
 test("Show all asks for every live model, and turning it off goes back to the short list", async () => {
   const { fake, user } = await openDialog();
   const extra = { ...SAMPLE_LISTING.models[0]!, ref: "openai/gpt-extra", label: "gpt-extra", provider: "openai", source: "remote" as const };
