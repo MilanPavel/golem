@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import type { McpServer } from "@golem/client";
+import type { McpCatalogEntry, McpServer } from "@golem/client";
 
 import type { Press } from "./keys.ts";
 
@@ -11,6 +11,8 @@ import {
   layoutMcpManager,
   mcpAdded,
   mcpAddFailed,
+  mcpCatalogLoaded,
+  type McpManagerAction,
   mcpManagerTyping,
   mcpManagerKeyOf,
   type McpManagerState,
@@ -106,18 +108,20 @@ test("the list groups the user's servers, then the project's", () => {
 });
 
 test("no servers shows the catalog, and the wait says so", () => {
-  const lines = shown(openMcpManager("/Users/me/app"), []);
+  const state = { ...openMcpManager("/Users/me/app"), catalog: CATALOG };
+  const lines = shown(state, []);
   assert.deepEqual(lines.slice(0, 8), [
     "Manage MCP servers",
     "0 servers",
     "",
     "Add one:",
-    "❯ 1. Filesystem: /Users/me/app",
-    "     Read and write files in the session folder.",
-    "  2. GitHub",
-    "     Repos, issues, and pull requests. Asks for a token.",
+    "❯ 1. Filesystem",
+    "     Read and write files in a folder.",
+    "  2. Fetch",
+    "     Read web pages as text.",
   ]);
   assert.ok(!lines.join("\n").includes("config.toml"));
+  assert.ok(shown(openMcpManager(), []).includes("loading the catalog…"));
   assert.equal(shown(openMcpManager(), null)[2], "asking the daemon…");
 });
 
@@ -215,15 +219,68 @@ test("a long list scrolls to keep the selection on screen", () => {
 });
 
 const typed = (text: string) => ({ text });
-const NONE = { kind: "none" } as const;
 
-function pressNone(state: McpManagerState, servers: readonly McpServer[], ...keys: Parameters<typeof pressMcpManager>[2][]) {
-  let current = state;
-  let action: ReturnType<typeof pressMcpManager>["action"] = NONE;
-  for (const key of keys) {
-    ({ state: current, action } = pressMcpManager(current, servers, key));
-  }
-  return { state: current, action };
+const CATALOG: McpCatalogEntry[] = [
+  {
+    id: "filesystem",
+    name: "filesystem",
+    title: "Filesystem",
+    description: "Read and write files in a folder.",
+    category: "files",
+    homepage: "https://example.com",
+    runtime: "npx",
+    auth: "none",
+    inputs: [{ id: "folder", kind: "path", label: "Folder", default: "{folder}", required: true }],
+  },
+  {
+    id: "fetch",
+    name: "fetch",
+    title: "Fetch",
+    description: "Read web pages as text.",
+    category: "web",
+    homepage: "https://example.com",
+    runtime: "uvx",
+    auth: "none",
+  },
+  {
+    id: "github",
+    name: "github",
+    title: "GitHub",
+    description: "Repos, issues, and pull requests.",
+    category: "code",
+    homepage: "https://example.com",
+    runtime: "url",
+    auth: "token",
+    inputs: [{ id: "token", kind: "secret", label: "GitHub token", hint: "Make a token at github.com/settings.", required: true }],
+  },
+  {
+    id: "linear",
+    name: "linear",
+    title: "Linear",
+    description: "Issues.",
+    category: "productivity",
+    homepage: "https://example.com",
+    runtime: "url",
+    auth: "oauth",
+    available: false,
+    reason: "needs sign-in",
+  },
+  {
+    id: "notes",
+    name: "notes",
+    title: "Notes",
+    description: "Notes.",
+    category: "other",
+    homepage: "https://example.com",
+    runtime: "npx",
+    auth: "none",
+    added: true,
+  },
+];
+
+/** The add screen with the daemon's catalog loaded, as `/mcp add` shows it. */
+function loaded(id: string | null = null, folder = "/f"): { state: McpManagerState; action: McpManagerAction } {
+  return mcpCatalogLoaded(openMcpAdd(folder, id), CATALOG);
 }
 
 test("a is Add a server, the last row of the list, and it opens the catalog", () => {
@@ -248,85 +305,150 @@ test("keys: a is add on a list, and text on a prompt", () => {
   assert.equal(key("escape", "", true), "back");
   assert.equal(mcpManagerKeyOf({ name: null, input: "x", ctrl: true, meta: false }, true), null);
   assert.equal(mcpManagerTyping(openMcpManager()), false);
-  assert.equal(mcpManagerTyping(openMcpAdd("/f", "github").state), true);
+  assert.equal(mcpManagerTyping(loaded("github").state), true);
 });
 
-test("the empty list takes a number or Enter to pick, and Esc closes", () => {
-  const first = pressNone(openMcpManager("/Users/me/app"), [], 1);
-  assert.deepEqual(first.action, {
-    kind: "add",
-    params: { name: "filesystem", command: "npx", args: ["-y", "@modelcontextprotocol/server-filesystem", "/Users/me/app"] },
-  });
-  assert.deepEqual(first.state.view, {
-    kind: "adding",
-    name: "filesystem",
-    back: { kind: "add", selected: 0, error: null },
-  });
-  assert.deepEqual(pressNone(openMcpManager("/f"), [], "down", "down", "enter").action, {
-    kind: "add",
-    params: { name: "fetch", command: "uvx", args: ["mcp-server-fetch"] },
-  });
-  assert.deepEqual(pressNone(openMcpManager(), [], "back").action, { kind: "close" });
+test("the catalog loads first: the add screen says so, and keys wait", () => {
+  const waiting = openMcpAdd("/f", null);
+  assert.ok(shown(waiting).includes("loading the catalog…"));
+  assert.equal(press(waiting, "enter").state, waiting);
+  assert.equal(press(waiting, 1).action.kind, "none");
 });
 
-test("the add view picks by Enter or number, and Esc goes back", () => {
-  const view = openMcpAdd("/f", null);
-  assert.deepEqual(view.state.view, { kind: "add", selected: 0, error: null });
-  assert.equal(view.action.kind, "none");
-  assert.deepEqual(press(view.state, 3).action, { kind: "add", params: { name: "fetch", command: "uvx", args: ["mcp-server-fetch"] } });
-  assert.deepEqual(press(view.state, "down", "enter").state.view, { kind: "token", id: "github", value: "", error: null });
-  assert.equal(press(view.state, 4).state.view.kind, "other");
-  assert.equal(press(view.state, 9).state, view.state);
-  assert.deepEqual(shown(view.state, SERVERS).slice(0, 4), [
+test("the add screen lists the catalog, then Other, and picks by Enter or number", () => {
+  const { state, action } = loaded();
+  assert.equal(action.kind, "none");
+  assert.deepEqual(shown(state).slice(0, 6), [
     "Add an MCP server",
     "",
-    "❯ 1. Filesystem: /f",
-    "     Read and write files in the session folder.",
+    "❯ 1. Filesystem",
+    "     Read and write files in a folder.",
+    "  2. Fetch",
+    "     Read web pages as text.",
   ]);
+  const text = shown(state).join("\n");
+  assert.ok(text.includes("4. Linear"));
+  assert.ok(text.includes("Issues. needs sign-in"));
+  assert.ok(text.includes("Notes. Already added."));
+  assert.ok(text.includes("6. Other"));
+  assert.deepEqual(press(state, 2).action, {
+    kind: "add",
+    params: { name: "fetch", catalog_id: "fetch", inputs: {}, secrets: {} },
+  });
+  assert.equal(press(state, "down", "down", "enter").state.view.kind, "form");
+  assert.equal(press(state, 6).state.view.kind, "other");
+  assert.equal(press(state, 9).state, state);
+  assert.deepEqual(press(state, "back").state.view, { kind: "list", selected: 0 });
+});
+
+test("an entry that can't be added says why, and stays on the catalog", () => {
+  const { state } = loaded();
+  assert.deepEqual(press(state, 4).state.view, { kind: "add", selected: 3, error: "needs sign-in" });
+  assert.equal(press(state, 4).action.kind, "none");
+  const added = press(state, 5);
+  assert.equal(added.action.kind, "none");
+  assert.ok(shown(added.state).some((line) => line.startsWith("✘ notes is already added")));
+});
+
+test("filesystem asks for the folder, starting at the session's", () => {
+  const { state } = loaded("filesystem", "/Users/me/app");
+  assert.deepEqual(state.view, { kind: "form", id: "filesystem", index: 0, values: { folder: "/Users/me/app" }, error: null });
+  assert.ok(shown(state).includes("Folder: /Users/me/app"));
+  const sent = press(state, "enter");
+  assert.deepEqual(sent.action, {
+    kind: "add",
+    params: { name: "filesystem", catalog_id: "filesystem", inputs: { folder: "/Users/me/app" }, secrets: {} },
+  });
+  const edited = press(state, "clear", typed("/other"), "enter");
+  assert.deepEqual(edited.action, {
+    kind: "add",
+    params: { name: "filesystem", catalog_id: "filesystem", inputs: { folder: "/other" }, secrets: {} },
+  });
+  const empty = press(state, "clear", "enter");
+  assert.equal(empty.action.kind, "none");
+  assert.ok(shown(empty.state).some((line) => line.startsWith("✘ Folder is needed")));
 });
 
 test("/mcp add github goes to the token, which is masked and sent on Enter", () => {
-  const { state } = openMcpAdd("/f", "github");
-  assert.deepEqual(state.view, { kind: "token", id: "github", value: "", error: null });
+  const { state } = loaded("github");
+  assert.deepEqual(state.view, { kind: "form", id: "github", index: 0, values: { token: "" }, error: null });
   assert.equal(press(state, "enter").action.kind, "none");
   assert.equal(press(state, typed("  "), "enter").action.kind, "none");
-  const typedIn = press(state, typed("ghp_secret"), typed("12"));
+  const typedIn = press(state, typed("ghp_zzz"), typed("12"));
   const lines = shown(typedIn.state);
-  assert.ok(lines.includes("Token: ••••••••••••"));
-  assert.ok(!lines.join("\n").includes("secret"));
-  assert.ok(lines.join("\n").includes("github.com/settings/personal-access-tokens/new"));
-  assert.ok(lines.join("\n").includes("Pull requests."));
+  assert.ok(lines.includes("GitHub token: •••••••••"));
+  assert.ok(!lines.join("\n").includes("zzz"));
+  assert.ok(lines.join("\n").includes("github.com/settings"));
+  assert.ok(lines.includes("Stored in your Keychain, never in a file."));
   const sent = press(typedIn.state, "enter");
   assert.deepEqual(sent.action, {
     kind: "add",
-    params: { name: "github", url: "https://api.githubcopilot.com/mcp/", token: "ghp_secret12" },
+    params: { name: "github", catalog_id: "github", inputs: {}, secrets: { token: "ghp_zzz12" } },
   });
   assert.equal(sent.state.view.kind, "adding");
-  assert.ok(!JSON.stringify(sent.state).includes("secret"));
+  assert.ok(!JSON.stringify(sent.state).includes("zzz"));
   assert.deepEqual(shown(sent.state), ["Add an MCP server", "", "adding github…", "", "Esc is off until the server answers"]);
 });
 
-test("the token prompt edits: delete, clear, and Esc back to the catalog", () => {
-  const { state } = openMcpAdd("/f", "github");
-  const view = (s: McpManagerState) => (s.view.kind === "token" ? s.view.value : null);
-  assert.equal(view(press(state, typed("abc"), "delete").state), "ab");
-  assert.equal(view(press(state, typed("abc"), "clear").state), "");
-  assert.deepEqual(press(state, typed("abc"), "back").state.view, { kind: "add", selected: 1, error: null });
+test("a form with two inputs goes through them in order, and Esc goes back one", () => {
+  const two: McpCatalogEntry = {
+    ...CATALOG[0]!,
+    id: "two",
+    name: "two",
+    inputs: [
+      { id: "a", kind: "text", label: "First", required: true },
+      { id: "b", kind: "secret", label: "Second", required: true },
+    ],
+  };
+  const { state } = mcpCatalogLoaded(openMcpAdd("/f", "two"), [two]);
+  const second = press(state, typed("one"), "enter");
+  assert.equal(second.state.view.kind === "form" && second.state.view.index, 1);
+  assert.ok(shown(second.state)[0]?.includes("2 of 2"));
+  const back = press(second.state, "back").state.view;
+  assert.equal(back.kind === "form" && back.index, 0);
+  const sent = press(second.state, typed("s3"), "enter");
+  assert.deepEqual(sent.action, {
+    kind: "add",
+    params: { name: "two", catalog_id: "two", inputs: { a: "one" }, secrets: { b: "s3" } },
+  });
+});
+
+test("the form edits: delete, clear, and Esc back to the catalog", () => {
+  const { state } = loaded("github");
+  const value = (s: McpManagerState) => (s.view.kind === "form" ? s.view.values["token"] : null);
+  assert.equal(value(press(state, typed("abc"), "delete").state), "ab");
+  assert.equal(value(press(state, typed("abc"), "clear").state), "");
+  assert.deepEqual(press(state, typed("abc"), "back").state.view, { kind: "add", selected: 2, error: null });
 });
 
 test("a failed add returns to the screen it came from with the daemon's message, and asks again", () => {
-  const sent = press(openMcpAdd("/f", "github").state, typed("tok"), "enter").state;
+  const sent = press(loaded("github").state, typed("ghp_zzz"), "enter").state;
   const failed = mcpAddFailed(sent, "an MCP server named github already exists");
-  assert.deepEqual(failed.view, { kind: "token", id: "github", value: "", error: "an MCP server named github already exists" });
+  assert.deepEqual(failed.view, {
+    kind: "form",
+    id: "github",
+    index: 0,
+    values: {},
+    error: "an MCP server named github already exists",
+  });
   assert.ok(shown(failed).includes("✘ an MCP server named github already exists"));
-  assert.deepEqual(press(failed, typed("x")).state.view, { kind: "token", id: "github", value: "x", error: null });
-  const fetching = mcpAddFailed(openMcpAdd("/f", "fetch").state, "boom");
-  assert.deepEqual(fetching.view, { kind: "add", selected: 2, error: "boom" });
+  assert.ok(!JSON.stringify(failed).includes("zzz"));
+  const again = press(failed, typed("x")).state.view;
+  assert.equal(again.kind === "form" && again.values["token"], "x");
+  const fetching = mcpAddFailed(loaded("fetch").state, "boom");
+  assert.deepEqual(fetching.view, { kind: "add", selected: 1, error: "boom" });
   assert.equal(mcpAddFailed(openMcpManager(), "x").view.kind, "list");
 });
 
+test("an id the catalog lacks says so", () => {
+  const { state, action } = loaded("nope");
+  assert.equal(action.kind, "none");
+  assert.deepEqual(state.view, { kind: "add", selected: 0, error: "nope is not in the catalog." });
+});
+
 test("while adding, keys do nothing", () => {
-  const adding = openMcpAdd("/f", "fetch").state;
+  const adding = loaded("fetch").state;
+  assert.equal(adding.view.kind, "adding");
   for (const key of ["up", "down", "enter", "back", "add", 1] as const) {
     assert.equal(press(adding, key).state, adding);
     assert.equal(press(adding, key).action.kind, "none");
@@ -334,7 +456,7 @@ test("while adding, keys do nothing", () => {
 });
 
 test("other asks for a name, then a command or a URL, and says what is wrong", () => {
-  const start = openMcpAdd("/f", "other").state;
+  const start = loaded("other").state;
   assert.deepEqual(start.view, { kind: "other", field: "name", name: "", command: "", error: null });
   const bad = press(start, typed("my server"), "enter").state;
   assert.equal(bad.view.kind === "other" && bad.view.field, "name");
@@ -357,13 +479,13 @@ test("other asks for a name, then a command or a URL, and says what is wrong", (
     command: "",
     error: null,
   });
-  assert.deepEqual(press(start, "back").state.view, { kind: "add", selected: 3, error: null });
+  assert.deepEqual(press(start, "back").state.view, { kind: "add", selected: 5, error: null });
 });
 
 test("an added server shows in the list, selected", () => {
   const added: McpServer = { ...git, name: "fetch" };
   const servers = [...SERVERS, added];
-  const sent = pressNone(openMcpAdd("/f", "fetch").state, servers).state;
+  const sent = loaded("fetch").state;
   const state = mcpAdded(sent, servers, "fetch");
   assert.deepEqual(state.view, { kind: "list", selected: 3 });
   assert.ok(shown(state, servers).some((line) => line.startsWith("❯ ✔ fetch")));

@@ -251,8 +251,8 @@ MCP servers are listed with `mcp.list`: each one's name, state (`idle`, `startin
 ### In the TUI and the CLI
 
 - **`/mcp`** opens a manager (`packages/tui/src/mcp-manager.ts`): the servers grouped by the file that names them, then one server's status, command, file, tools, and token cost, with View tools, Turn on or off for this chat, Reconnect, and Disable everywhere (or Enable, for a disabled one). `/mcp enable|disable <name>` stays as a shortcut.
-- **`/mcp add [id]`**, or **Add a server** (`a`) in the manager, opens the add view: `filesystem` (the session's folder), `github`, `fetch`, and `other`. GitHub goes on to a hidden token prompt, drawn with `maskKey` from the key panel, and `other` asks for a name, then a command line or a URL. The pick sends `mcp.add`, and the daemon's message shows in the view if it fails. With no servers, `/mcp` shows the same list. The list itself is `packages/view/src/mcp-catalog.ts`, shared with the web UI, which cannot send `mcp.add` and shows the `golem mcp add` line instead.
-- **`golem mcp add <name> -- <command…>`** or **`--url <url>`** sends `mcp.add` (`packages/cli/src/mcp-command.ts` reads the arguments). `--token` and `--token-env VAR` ask for the token with hidden input. **`golem mcp remove <name>`** sends `mcp.remove`.
+- **`/mcp add [id]`**, or **Add a server** (`a`) in the manager, opens the add view. It asks the daemon for `mcp.catalog` and lists the entries, then Other. An entry that is already added or not available says so and can't be picked. An entry with inputs goes to one prompt per input (`form`), starting at the entry's default, with `{folder}` filled in from the session. A secret input is drawn with `maskKey` from the key panel and leaves the state as the call starts, so a failure asks again. `other` asks for a name, then a command line or a URL. The pick sends `mcp.add` with `catalog_id`, `inputs`, and `secrets`, and the daemon's message shows in the view if it fails. `/mcp add <id>` waits for the list and goes straight to that entry. `packages/view/src/mcp-catalog.ts` holds what every UI shares: labels, input checks, the `mcp.add` params, and the `golem mcp add` line. The web UI cannot send `mcp.add` and shows that line instead.
+- **`golem mcp add <name> -- <command…>`** or **`--url <url>`** sends `mcp.add` (`packages/cli/src/mcp-command.ts` reads the arguments). `--token` and `--token-env VAR` ask for the token with hidden input. **`golem mcp add --catalog <id> [--name <name>] [--input <id>=<value>]…`** reads `mcp.catalog`, checks the inputs the same way the TUI does, asks for each secret with hidden input, and sends `mcp.add` with `catalog_id`. A path input with no `--input` starts at the shell's folder. **`golem mcp remove <name>`** sends `mcp.remove`.
 - **The status line** shows `mcp ✗ <name>` in red while a server the session uses is down.
 - **`golem doctor`** checks each server that may start: its command is found, and its secrets are stored.
 
@@ -301,7 +301,7 @@ golem's client follows one protocol version. A server that answers with another 
 | `packages/daemon/golem/tools/registry.py` | `ToolScope` and `ToolRegistry.scoped` |
 | `packages/daemon/golem/config_edit.py` | `mcp.set_enabled`, `mcp.add`, and `mcp.remove`, written with the comments kept |
 | `packages/tui/src/mcp-manager.ts` | `/mcp`, with the add view |
-| `packages/view/src/mcp-catalog.ts` | The servers `/mcp add` offers, and the `golem mcp add` line for each |
+| `packages/view/src/mcp-catalog.ts` | What every UI does with a catalog entry: its inputs, the `mcp.add` params, and the `golem mcp add` line |
 | `packages/cli/src/mcp-command.ts` | The arguments of `golem mcp add` and `golem mcp remove` |
 
 ## Read more

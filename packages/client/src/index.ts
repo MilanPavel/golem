@@ -26,6 +26,7 @@ export {
   type ConnectOptions,
   type GolemClient,
   type OllamaInstallUpdate,
+  type RuntimeInstallUpdate,
   type PullUpdate,
   type SessionSummary,
 } from "./connect.ts";
@@ -33,6 +34,11 @@ export type { Dial, Link } from "./link.ts";
 export { wsDial } from "./ws-link.ts";
 export type { ModelProbeResult } from "../../protocol/gen/model-probe-result.ts";
 export type { McpListResult } from "../../protocol/gen/mcp-list-result.ts";
+export type { McpCatalogEntry } from "../../protocol/gen/mcp-catalog-entry.ts";
+export type { McpCatalogInput } from "../../protocol/gen/mcp-catalog-input.ts";
+export type { McpCatalogResult } from "../../protocol/gen/mcp-catalog-result.ts";
+export type { RuntimeName } from "./runtime.ts";
+export type { RuntimeInstallDone } from "../../protocol/gen/runtime-install-done.ts";
 export type { McpAddParams } from "../../protocol/gen/mcp-add-params.ts";
 export type { McpRemoveResult } from "../../protocol/gen/mcp-remove-result.ts";
 export type { McpServer } from "../../protocol/gen/mcp-server.ts";

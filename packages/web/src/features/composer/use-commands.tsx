@@ -1,6 +1,5 @@
 import {
   applyComposer,
-  catalogEntry,
   guided,
   OVERVIEW,
   closedDebug,
@@ -115,7 +114,7 @@ export function useCommands({ session, cwd, typing, send }: UseCommandsOptions):
 
   const run = useCallback(
     async (raw: string): Promise<RunResult> => {
-      const { send: sendMessage, skills: skillQuery, models: modelQuery, cwd: folder } = latest.current;
+      const { send: sendMessage, skills: skillQuery, models: modelQuery } = latest.current;
       clear();
       const line = raw.trim();
       let listed = skillQuery.data?.skills;
@@ -148,17 +147,12 @@ export function useCommands({ session, cwd, typing, send }: UseCommandsOptions):
           case "mcp":
           case "mcp-toggle":
             return say(NOT_YET.mcp);
-          case "mcp-add": {
-            const entry = found.id === null ? null : catalogEntry(found.id);
-            if (entry === null) {
-              return say(
-                "MCP servers are added in a terminal. Pick one: /mcp add filesystem, github, or fetch, or run:",
-                "golem mcp add <name> -- <command…>",
-              );
-            }
-            const token = entry.needsToken ? " It asks for the token there." : "";
-            return say(`Add it in a terminal.${token}`, entry.cliCommand(folder));
-          }
+          case "mcp-add":
+            return found.id === null
+              ? say("MCP servers are added in a terminal. Pick one from golem's list, then run:", "golem mcp add --catalog <id>")
+              : found.id === "other"
+                ? say("MCP servers are added in a terminal. Run:", "golem mcp add <name> -- <command…>")
+                : say("Add it in a terminal. It asks for the token there when the server needs one.", `golem mcp add --catalog ${found.id}`);
           case "skills":
             return say(NOT_YET.skills);
           case "permissions":

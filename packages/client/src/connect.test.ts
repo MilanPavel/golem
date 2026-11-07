@@ -929,6 +929,89 @@ test("addMcpServer keeps the token off the wire log, and removeMcpServer reports
   }
 });
 
+test("mcp.catalog lists the entries, and a catalog add keeps its secrets off the wire log", async () => {
+  const sent: Record<string, unknown>[] = [];
+  const entry = {
+    id: "github",
+    name: "github",
+    title: "GitHub",
+    description: "Repos.",
+    category: "code",
+    homepage: "https://example.com",
+    runtime: "url",
+    auth: "token",
+    inputs: [{ id: "token", kind: "secret", label: "GitHub token" }],
+    available: true,
+    added: false,
+  };
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: {
+        "mcp.catalog": { entries: [entry] },
+        "mcp.add": { name: "github", state: "starting", command: "https://example.com/mcp", tools: [] },
+      },
+      onRequest: (_socket, method, params) => {
+        if (method.startsWith("mcp.")) {
+          sent.push({ method, ...params });
+        }
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
+  let shown = "";
+  const stop = client.onWire((lines) => {
+    shown = lines.map(formatWireLine).join("\n");
+  });
+  try {
+    assert.deepEqual((await client.mcpCatalog()).entries.map((each) => each.id), ["github"]);
+    await client.mcpCatalog("s1");
+    await client.addMcpServer({ name: "github", catalog_id: "github", inputs: {}, secrets: { token: "ghp-very-secret" } });
+    assert.deepEqual(sent[0], { method: "mcp.catalog" });
+    assert.deepEqual(sent[1], { method: "mcp.catalog", session_id: "s1" });
+    assert.deepEqual(sent[2]?.["secrets"], { token: "ghp-very-secret" });
+    assert.ok(shown.includes("[redacted]"));
+    assert.ok(!shown.includes("ghp-very-secret"));
+  } finally {
+    stop();
+    client.close();
+    await server.close();
+  }
+});
+
+test("runtime.install starts, and its output and end reach onRuntimeInstall", async () => {
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: {
+        "runtime.install": { name: "node", started: true },
+        "runtime.install_cancel": { name: "node", cancelled: false },
+      },
+      onHello: (current) => {
+        write(current, { jsonrpc: "2.0", method: "runtime.install.output", params: { name: "node", text: "==> Pouring\n" } });
+        write(current, { jsonrpc: "2.0", method: "runtime.install.output", params: { name: "docker", text: "ignored" } });
+        write(current, { jsonrpc: "2.0", method: "runtime.install.done", params: { name: "node", ok: true } });
+        write(current, { jsonrpc: "2.0", method: "runtime.install.done", params: { name: "node" } });
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
+  const updates: string[] = [];
+  const stop = client.onRuntimeInstall((update) => {
+    updates.push(update.kind === "output" ? `${update.name}: ${update.text}` : `${update.done.name} ${update.done.ok}`);
+  });
+  try {
+    assert.deepEqual(await client.installRuntime("node"), { name: "node", started: true });
+    assert.deepEqual(await client.cancelRuntimeInstall("node"), { name: "node", cancelled: false });
+    await waitFor(() => updates.length >= 2);
+    assert.deepEqual(updates, ["node: ==> Pouring\n", "node true"]);
+  } finally {
+    stop();
+    client.close();
+    await server.close();
+  }
+});
+
 test("model.server.status reaches onModelServer, and a malformed one does not", async () => {
   const base = { provider: "ollama", base_url: "http://127.0.0.1:11434" };
   const server = await listen((socket) => {
