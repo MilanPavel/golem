@@ -37,6 +37,8 @@ export type { McpListResult } from "../../protocol/gen/mcp-list-result.ts";
 export type { McpCatalogEntry } from "../../protocol/gen/mcp-catalog-entry.ts";
 export type { McpCatalogInput } from "../../protocol/gen/mcp-catalog-input.ts";
 export type { McpCatalogResult } from "../../protocol/gen/mcp-catalog-result.ts";
+export type { McpServerDetail } from "../../protocol/gen/mcp-server-detail.ts";
+export type { McpServerConfig } from "../../protocol/gen/mcp-server-detail.ts";
 export type { RuntimeName } from "./runtime.ts";
 export type { RuntimeInstallDone } from "../../protocol/gen/runtime-install-done.ts";
 export type { McpAddParams } from "../../protocol/gen/mcp-add-params.ts";

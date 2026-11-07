@@ -280,6 +280,20 @@ The supervisor keeps a log for each server, up to 500 lines: its stderr, and lin
 
 `runtime.install {name}` installs Node or uv with Homebrew, the way `ollama.install` installs Ollama: `BrewInstaller` in `golem/models/install.py` runs one `brew install` at a time and streams `runtime.install.output` and `runtime.install.done`. The name is a closed list, `node` or `uv`, so a page cannot ask brew for anything else ([ADR-035](../adr/035-daemon-installs-ollama.md)). Docker is never installed.
 
+### Importing from other apps
+
+`mcp.import.scan {session_id?, text?}` finds the servers other apps have, and `mcp.import.apply {scan_id, picks, secrets?, session_id?}` adds the picked ones. The browser may call both ([ADR-037](../adr/037-browser-manages-mcp-and-config.md)): a scan reads fixed files in the user's home and the session's folder, never a path a client names, and returns no secret value.
+
+`golem/mcp/importer.py` is pure apart from `discover`. `SOURCES` is the one table of paths (macOS today, so Phase 8 adds Linux and Windows rows): Claude Desktop's `claude_desktop_config.json`, Claude Code's `~/.claude.json` (its top-level `mcpServers`, and `projects[<folder>].mcpServers` as project scope) and the project's `.mcp.json`, Cursor's `mcp.json` in both places, VS Code's `mcp.json` (key `servers`, with comments and trailing commas allowed, and its `inputs`), and Windsurf's `mcp_config.json`. With `text`, only the text is read, in any of those shapes or as one bare server. `convert` turns one server into the table for `[mcp.<name>]`:
+
+- `command`, `args`, `env`, and `cwd` map as they are. `url`, `serverUrl`, or `httpUrl`, with `headers`, is an HTTP server, and `type: "sse"` is kept with a warning. `disabled: true` is `enabled = false`.
+- A value in `env` or `headers` is a secret when its key matches `SECRET_KEY` (dashes count as `_`, so `X-API-Key` does), when it is `Bearer …`, or when it is a `${input:…}` of a password input. The first one is `mcp/<name>`, the next ones `mcp/<name>-<key lowercased>`. The value goes to a `secrets` dictionary, never into the table. A value that is empty or only a `${…}` placeholder has no value to move, so its reference is listed in `missing_refs` and the client may send it in `secrets` of `mcp.import.apply`.
+- Any other `${…}` is left as written with a warning, because golem doesn't fill it in. The table must pass `McpServerSettings`, or the server is listed in `skipped` with the reason.
+
+`fit_name` makes names fit `MCP_SERVER_NAME` and adds `-2` on a clash with an existing server or an earlier candidate. A scan keeps each server's source text, which may hold secret values, in `ScanStore` for ten minutes (`DaemonState.mcp_imports`), and an apply uses it up. The apply runs each pick through the checks of `mcp.add`: the server names only its own secrets, a secret is stored before the file names it, a name that exists fails that pick alone, and the supervisor reloads each written file once at the end.
+
+`golem mcp export` builds its output from `mcp.list` and `mcp.get`, so there is no `mcp.export`. `packages/cli/src/mcp-export.ts` turns each `keychain:mcp/<x>` into `${MCP_<X>}` and lists the variables on stderr.
+
 ### Limits
 
 golem's client follows one protocol version. A server that answers with another is used anyway, and a later MCP change that breaks the five messages above needs a change here. golem uses a server's tools only: not its resources or prompts, and it offers no sampling or elicitation.
@@ -295,6 +309,8 @@ golem's client follows one protocol version. A server that answers with another 
 | `packages/daemon/golem/mcp/catalog.py` | The catalog entries and how one becomes `[mcp.<name>]` |
 | `packages/daemon/golem/mcp/data/catalog.toml` | The servers on offer |
 | `packages/daemon/golem/server/mcp_catalog.py` | The handlers of `mcp.catalog` and `runtime.install` |
+| `packages/daemon/golem/mcp/importer.py` | The other apps' config files, and one of their servers as `[mcp.<name>]` |
+| `packages/daemon/golem/server/mcp_import.py` | The handlers of `mcp.import.scan` and `mcp.import.apply` |
 | `packages/daemon/golem/mcp/probe.py` | `probe`: the steps of `mcp.test`, and `test_hint` |
 | `packages/daemon/golem/server/mcp_try.py` | The handlers of `mcp.test`, `mcp.logs`, and `mcp.call` |
 | `packages/daemon/golem/mcp/launch.py` | Finding the command, the environment, and the Keychain secrets |
@@ -302,7 +318,8 @@ golem's client follows one protocol version. A server that answers with another 
 | `packages/daemon/golem/config_edit.py` | `mcp.set_enabled`, `mcp.add`, and `mcp.remove`, written with the comments kept |
 | `packages/tui/src/mcp-manager.ts` | `/mcp`, with the add view |
 | `packages/view/src/mcp-catalog.ts` | What every UI does with a catalog entry: its inputs, the `mcp.add` params, and the `golem mcp add` line |
-| `packages/cli/src/mcp-command.ts` | The arguments of `golem mcp add` and `golem mcp remove` |
+| `packages/cli/src/mcp-command.ts` | The arguments of `golem mcp add`, `remove`, and `export` |
+| `packages/cli/src/mcp-export.ts` | Servers as another app's JSON, with secrets as variables |
 
 ## Read more
 

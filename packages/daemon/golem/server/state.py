@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Literal
 
 from golem.mcp import McpSupervisor
+from golem.mcp.importer import ScanStore
 from golem.models.discovery import ModelDiscovery
 from golem.models.install import BrewInstaller, OllamaInstaller
 from golem.models.ollama import LocalServers
@@ -38,3 +40,6 @@ class DaemonState:
     local_servers: LocalServers | None = None
     installer: OllamaInstaller | None = None
     runtimes: dict[str, BrewInstaller] = field(default_factory=dict[str, BrewInstaller])
+    user_home: Path | None = None
+    """The home folder other apps keep their config in. None means the real one."""
+    mcp_imports: ScanStore = field(default_factory=ScanStore)

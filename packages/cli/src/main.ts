@@ -29,6 +29,7 @@ import { formatSkills } from "./format-skills.ts";
 import { formatStatus } from "./format-status.ts";
 import { formatCliVersion } from "./format-version.ts";
 import { parseMcpArgs, type McpArgs } from "./mcp-command.ts";
+import { exportServers } from "./mcp-export.ts";
 import { readChoice } from "./read-choice.ts";
 import { readSecret } from "./read-secret.ts";
 import { type Gate, gateService, type SessionDaemon } from "./service-gate.ts";
@@ -48,7 +49,7 @@ const USAGE =
   "       golem --version | golem --help | golem status | golem doctor [--mcp]\n" +
   "       golem daemon install|start|stop|restart|uninstall|logs\n" +
   "       golem auth set <provider> [--no-check] | golem auth remove <provider> | golem auth list | golem models [--refresh]\n" +
-  "       golem mcp add <name> -- <command…> [--token-env VAR] | golem mcp add <name> --url <url> [--token] | golem mcp add --catalog <id> [--input <id>=<value>] | golem mcp remove <name>\n" +
+  "       golem mcp add <name> -- <command…> [--token-env VAR] | golem mcp add <name> --url <url> [--token] | golem mcp add --catalog <id> [--input <id>=<value>] | golem mcp remove <name> | golem mcp export [--format claude|vscode] [--scope user|project]\n" +
   "       golem config show [--resolved] | golem skills [list] | golem skills check <path>\n" +
   "       golem web [--port N] [--no-open] [--json]";
 
@@ -216,6 +217,9 @@ async function runMcp(given: string[]): Promise<number> {
   if (parsed.kind === "catalog") {
     return runMcpCatalogAdd(parsed);
   }
+  if (parsed.kind === "export") {
+    return runMcpExport(parsed);
+  }
   let token = "";
   const wantsToken = parsed.kind === "add" && ("url" in parsed ? parsed.token : parsed.tokenEnv !== null);
   if (wantsToken) {
@@ -255,6 +259,34 @@ async function runMcp(given: string[]): Promise<number> {
     process.stderr.write(`${explainClient(error)}\n`);
     return 1;
   } finally {
+    client.close();
+  }
+}
+
+/** `golem mcp export`: print the servers as another app's JSON. Secret values never leave the Keychain. */
+async function runMcpExport(parsed: Extract<McpArgs, { kind: "export" }>): Promise<number> {
+  const client = connectOnce();
+  let sessionId: string | undefined;
+  try {
+    if (parsed.scope === "project") {
+      sessionId = (await client.createSession({ cwd: process.cwd() })).session_id;
+    }
+    const { servers } = await client.listMcp(sessionId);
+    const details = [];
+    for (const server of servers) {
+      const detail = await client.mcpGet(server.name, sessionId);
+      if (detail.scope === parsed.scope) details.push(detail);
+    }
+    const made = exportServers(details, parsed.format);
+    process.stdout.write(`${made.json}\n`);
+    if (details.length === 0) process.stderr.write(`no ${parsed.scope} servers to export\n`);
+    for (const note of made.notes) process.stderr.write(`${note}\n`);
+    return 0;
+  } catch (error) {
+    process.stderr.write(`${explainClient(error)}\n`);
+    return 1;
+  } finally {
+    if (sessionId !== undefined) await client.closeSession(sessionId).catch(() => undefined);
     client.close();
   }
 }

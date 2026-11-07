@@ -1,0 +1,35 @@
+{
+  "additionalProperties": false,
+  "description": "``mcp.import.scan``. Find the MCP servers other apps have, or read pasted JSON.\n\nWithout ``text``, the daemon reads the config files of Claude Desktop, Claude\nCode, Cursor, VS Code, and Windsurf that exist, and with ``session_id`` also\nthat project's files. With ``text``, it reads only the text: any of those\nfiles' shapes, or one bare server. Nothing is written, and no file of\nanother app is ever changed.",
+  "properties": {
+    "session_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Session Id"
+    },
+    "text": {
+      "anyOf": [
+        {
+          "maxLength": 1000000,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Text"
+    }
+  },
+  "title": "McpImportScanParams",
+  "type": "object"
+}

@@ -1,0 +1,19 @@
+{
+  "globalShortcut": "Ctrl+Space",
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_fixture_token_1", "GITHUB_API_URL": "https://api.github.com" }
+    },
+    "my files": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/Users/demo/Documents"]
+    },
+    "remote_docs": {
+      "type": "http",
+      "url": "https://docs.example.test/mcp",
+      "headers": { "Authorization": "Bearer docs_fixture_token_2" }
+    }
+  }
+}
