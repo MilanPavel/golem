@@ -64,6 +64,14 @@ export {
   type McpCatalogEntry,
   type McpCatalogInput,
 } from "./mcp-catalog.ts";
+export {
+  changeToolFilter,
+  formatLogLine,
+  formatTestResult,
+  formatTestStep,
+  ownToolName,
+  type ToolsChange,
+} from "./mcp-tools.ts";
 export { applySuggestion, moveSuggestion, suggest, type Suggestion, type SuggestCommand } from "./suggest.ts";
 export { connectionLabel, serviceProblem, type ServiceProblem } from "./connection.ts";
 export { parseDiff, type DiffLine, type DiffTone } from "./diff.ts";

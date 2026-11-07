@@ -37,6 +37,7 @@ import type { SkillListResult } from "../../protocol/gen/skill-list-result.ts";
 import type { McpToggleResult } from "../../protocol/gen/mcp-toggle-result.ts";
 import type { SessionSetSkillsResult } from "../../protocol/gen/session-set-skills-result.ts";
 import type { McpToolsResult } from "../../protocol/gen/mcp-tools-result.ts";
+import type { McpCallResult } from "../../protocol/gen/mcp-call-result.ts";
 import type { McpLogsResult } from "../../protocol/gen/mcp-logs-result.ts";
 import type { McpServerLog } from "../../protocol/gen/mcp-server-log.ts";
 import type { McpTestProgress } from "../../protocol/gen/mcp-test-progress.ts";
@@ -93,6 +94,7 @@ import {
   isConfigRawResult,
   isMcpImportApplyResult,
   isMcpImportScanResult,
+  isMcpCallResult,
   isMcpLogsResult,
   isMcpServerLog,
   isMcpTestProgress,
@@ -311,6 +313,8 @@ export interface GolemClient {
   ): Promise<McpTestResult>;
   /** The last lines of a server's log, oldest first. New lines reach {@link GolemClient.onMcpLog}. */
   mcpLogs(name: string, options?: { sessionId?: string; limit?: number }): Promise<McpLogsResult>;
+  /** Run one tool of a running server for a person who pressed Run: no approval, no session record. */
+  mcpCall(params: { name: string; tool: string; arguments?: Record<string, unknown>; sessionId?: string }): Promise<McpCallResult>;
   /** `mcp.server.log`: new log lines of any server, at most one batch every 250 ms. */
   onMcpLog(listener: (log: McpServerLog) => void): () => void;
   /** The text of `config.toml` (a trusted project's with `scope: "project"` and a session), and its `mtime_ns`. */
@@ -1328,6 +1332,15 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("mcp.logs", params);
       if (!isMcpLogsResult(result)) {
         throw new Error("invalid mcp.logs result");
+      }
+      return result;
+    },
+    async mcpCall(params): Promise<McpCallResult> {
+      await ready;
+      const body = { name: params.name, tool: params.tool, ...(params.arguments === undefined ? {} : { arguments: params.arguments }) };
+      const result = await call("mcp.call", withSession(body, params.sessionId));
+      if (!isMcpCallResult(result)) {
+        throw new Error("invalid mcp.call result");
       }
       return result;
     },
