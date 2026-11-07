@@ -206,6 +206,9 @@ function firstLine(text: string): string {
   return visibleText(line.trim().replace(/\s+/g, " "));
 }
 
+/** The mark of a call that ran but did not succeed, such as `shell false`. */
+export const UNSUCCESSFUL_MARK = "✗";
+
 /** `read_file src/a.ts ✓  12 lines`, then the output while Ctrl-O is on. */
 export function toolLines(tool: ToolBlock, width: number, expanded: boolean): Span[][] {
   const head: Span[] = [{ text: tool.name, bold: true }];
@@ -213,7 +216,9 @@ export function toolLines(tool: ToolBlock, width: number, expanded: boolean): Sp
   if (label.length > 0) {
     head.push({ text: ` ${label}` });
   }
-  head.push({ text: ` ${TOOL_MARKS[tool.status]}`, dim: tool.status !== "failed" });
+  const failed = tool.status === "failed" || (tool.status === "done" && tool.unsuccessful === true);
+  const mark = tool.status === "done" && tool.unsuccessful === true ? UNSUCCESSFUL_MARK : TOOL_MARKS[tool.status];
+  head.push({ text: ` ${mark}`, dim: !failed });
   if (tool.status === "done" && tool.summary !== undefined && tool.summary.length > 0) {
     head.push({ text: `  ${tool.summary}`, dim: true });
   }

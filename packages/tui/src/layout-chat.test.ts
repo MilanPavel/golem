@@ -198,6 +198,15 @@ test("tool calls are one line each, with output only while expanded", () => {
       },
       { callId: "c2", name: "grep", args: { pattern: "x" }, status: "failed", error: "bad regex" },
       { callId: "c3", name: "list_dir", args: {}, status: "running" },
+      { callId: "c4", name: "shell", args: { command: "true" }, status: "done", summary: "exit 0" },
+      {
+        callId: "c5",
+        name: "shell",
+        args: { command: "false" },
+        status: "done",
+        summary: "exit 1",
+        unsuccessful: true,
+      },
     ],
   };
   const collapsed = layoutMessages([reply], 60).map((line) => textOf(line.spans));
@@ -206,6 +215,8 @@ test("tool calls are one line each, with output only while expanded", () => {
     "read_file src/a.ts ✓  2 lines",
     "grep x ✗  bad regex",
     "list_dir …",
+    "shell true ✓  exit 0",
+    "shell false ✗  exit 1",
   ]);
   const expanded = layoutMessages([reply], 60, { times: false, now: 0, toolOutput: true }).map((line) =>
     textOf(line.spans),

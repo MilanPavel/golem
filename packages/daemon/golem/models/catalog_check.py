@@ -1,4 +1,4 @@
-"""``just catalog``: keep ``local-catalog.toml`` honest.
+"""``just catalog``: keep ``catalog.toml`` honest.
 
 Checks every entry against the Ollama registry and rewrites ``size_gb`` when
 the download changed size. Then it tries the next version numbers of each
@@ -20,7 +20,7 @@ import tomlkit
 
 from golem.models import registry
 
-CATALOG = Path(__file__).resolve().parent / "data" / "local-catalog.toml"
+CATALOG = Path(__file__).resolve().parent / "data" / "catalog.toml"
 _FAMILY = re.compile(r"^(?P<prefix>[a-z]+?)(?P<major>\d+)(?:\.(?P<minor>\d+))?(?P<suffix>.*)$")
 
 
@@ -39,7 +39,7 @@ def next_versions(family: str) -> list[str]:
 async def check(path: Path = CATALOG) -> int:
     document = tomlkit.parse(path.read_text("utf-8"))
     table = cast(dict[str, Any], document)
-    entries = cast(list[dict[str, Any]], table.get("model", []))
+    entries = cast(list[dict[str, Any]], table.get("local", []))
     changed = 0
     missing: list[str] = []
     families: dict[str, set[str]] = {}

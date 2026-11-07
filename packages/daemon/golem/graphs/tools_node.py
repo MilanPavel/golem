@@ -215,6 +215,7 @@ def tools_node(
                     "preview": preview,
                     "truncated": len(preview) < len(result.output),
                     "artifact_id": artifact_id,
+                    "failed": result.failed,
                 }
             )
             if verdict.args is not None:

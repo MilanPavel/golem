@@ -418,3 +418,23 @@ async def test_tool_output_streams_and_leaves_the_log_when_the_call_ends(
     assert live == ["step 1\n", "step 2\n"]
     assert "tool.output" not in [event.type for event in events]
     assert events[-1].type == "run.completed"
+
+
+async def test_a_call_that_ran_but_failed_is_marked_and_the_model_still_gets_the_output(
+    database: Database, project: Path
+) -> None:
+    async def run(args: _SlowArgs, ctx: ToolContext) -> ToolResult:
+        del args, ctx
+        return ToolResult(output="boom\n[exit code 1]", summary="exit 1", failed=True)
+
+    failing = Tool(name="failing", description="fails", args=_SlowArgs, run=run, read_only=True)
+    model = ToolCallingChatModel(replies=[[("failing", {})], "it failed"])
+    chat = _chat(database, model, ToolRegistry([*READ_ONLY_TOOLS, failing]))
+    session_id = await chat.manager.create(None, cwd=str(project))
+    events = await chat.finished(await chat.manager.send(session_id, "go"))
+
+    completed = [event for event in events if isinstance(event, ToolCompletedEvent)]
+    assert [(event.data.summary, event.data.failed) for event in completed] == [("exit 1", True)]
+    assert "tool.failed" not in [event.type for event in events]
+    result = model.seen[1][-1]
+    assert isinstance(result, ToolMessage) and result.text == "boom\n[exit code 1]"

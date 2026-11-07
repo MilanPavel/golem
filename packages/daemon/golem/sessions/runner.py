@@ -365,6 +365,7 @@ async def _apply(
                 preview=fact.preview,
                 truncated=fact.truncated,
                 artifact_id=fact.artifact_id,
+                failed=fact.failed,
             ),
         )
     elif isinstance(fact, ToolErrored):

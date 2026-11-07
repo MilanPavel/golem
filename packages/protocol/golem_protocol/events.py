@@ -265,6 +265,10 @@ class ToolCompletedData(BaseModel):
     start of the output, cut at a few kilobytes, and ``truncated`` says
     whether it was cut. Output too long for the model is stored whole in the
     artifact ``artifact_id``, which ``artifact.read`` reads.
+
+    ``failed`` is true when the call ran but what it ran did not succeed,
+    such as a shell command that exited non-zero or timed out. The model
+    still gets the output.
     """
 
     model_config = _CONFIG
@@ -274,6 +278,7 @@ class ToolCompletedData(BaseModel):
     preview: str
     truncated: bool = False
     artifact_id: str | None = Field(default=None, min_length=1)
+    failed: bool = False
 
 
 class ToolFailedData(BaseModel):

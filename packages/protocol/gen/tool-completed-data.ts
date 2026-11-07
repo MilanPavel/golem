@@ -2,6 +2,7 @@
 
 export type ArtifactId = string | null;
 export type CallId = string;
+export type Failed = boolean;
 export type Preview = string;
 export type Summary = string;
 export type Truncated = boolean;
@@ -13,10 +14,15 @@ export type Truncated = boolean;
  * start of the output, cut at a few kilobytes, and ``truncated`` says
  * whether it was cut. Output too long for the model is stored whole in the
  * artifact ``artifact_id``, which ``artifact.read`` reads.
+ *
+ * ``failed`` is true when the call ran but what it ran did not succeed,
+ * such as a shell command that exited non-zero or timed out. The model
+ * still gets the output.
  */
 export interface ToolCompletedData {
   artifact_id?: ArtifactId;
   call_id: CallId;
+  failed?: Failed;
   preview: Preview;
   summary: Summary;
   truncated?: Truncated;
