@@ -163,6 +163,7 @@ export type Ts15 = string;
 export type Type15 = 'tool.output';
 export type ArtifactId = string | null;
 export type CallId3 = string;
+export type DurationMs = number | null;
 export type Failed1 = boolean;
 export type Preview = string;
 export type Summary = string;
@@ -173,6 +174,7 @@ export type SessionId17 = string;
 export type Ts16 = string;
 export type Type16 = 'tool.completed';
 export type CallId4 = string;
+export type DurationMs1 = number | null;
 export type Message1 = string;
 export type RunId17 = string;
 export type Seq17 = number;
@@ -750,12 +752,16 @@ export interface ToolCompletedEvent {
  * such as a shell command that exited non-zero or timed out. The model
  * still gets the output.
  *
+ * ``duration_ms`` is how long the tool ran, from ``tool.started`` to its
+ * result, without the wait for an approval. None means it was not measured.
+ *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "ToolCompletedData".
  */
 export interface ToolCompletedData {
   artifact_id?: ArtifactId;
   call_id: CallId3;
+  duration_ms?: DurationMs;
   failed?: Failed1;
   preview: Preview;
   summary: Summary;
@@ -778,11 +784,15 @@ export interface ToolFailedEvent {
 /**
  * A tool call did not run, or stopped with an error. The model sees the same message.
  *
+ * ``duration_ms`` is how long the tool ran before it raised. None means a
+ * call that was denied or cut off, which never ran or was not timed.
+ *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "ToolFailedData".
  */
 export interface ToolFailedData {
   call_id: CallId4;
+  duration_ms?: DurationMs1;
   message: Message1;
 }
 /**

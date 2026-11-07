@@ -34,6 +34,7 @@ from golem_protocol.events import (
     ApprovalNeededEvent,
     ApprovalResolvedEvent,
     ChatEvent,
+    ToolCompletedEvent,
     ToolFailedEvent,
 )
 
@@ -179,6 +180,26 @@ async def test_mixed_decisions_in_one_turn_run_each_call_once(
         "risky_a ran",
         f"error: {DENIED_RESULT}",
     ]
+
+
+async def test_the_duration_of_an_approved_call_leaves_out_the_wait(
+    database: Database, counter: _Counter, tmp_path: Path
+) -> None:
+    model = ToolCallingChatModel(replies=[[("risky_a", {}), ("risky_b", {})], "done"])
+    daemon = _daemon(database, model, counter, tmp_path)
+    session_id = await daemon.manager.create(None)
+    run_id = await daemon.manager.send(session_id, "go")
+    first = await daemon.settled(run_id)
+    await asyncio.sleep(0.3)  # the user is slow to answer
+    await daemon.manager.respond(session_id, _needed(first)[0].data.call_id, "allow")
+    second = await daemon.settled(run_id)
+    await daemon.manager.respond(session_id, _needed(second)[-1].data.call_id, "deny")
+    events = await daemon.settled(run_id)
+
+    (completed,) = [e for e in events if isinstance(e, ToolCompletedEvent)]
+    assert completed.data.duration_ms is not None and completed.data.duration_ms < 250
+    (denied,) = [e for e in events if isinstance(e, ToolFailedEvent)]
+    assert denied.data.duration_ms is None
 
 
 async def test_allow_for_the_session_covers_later_calls(

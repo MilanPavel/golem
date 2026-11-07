@@ -1798,7 +1798,7 @@
     },
     "ToolCompletedData": {
       "additionalProperties": false,
-      "description": "A tool call finished.\n\n``summary`` is one short line, such as ``42 lines``. ``preview`` is the\nstart of the output, cut at a few kilobytes, and ``truncated`` says\nwhether it was cut. Output too long for the model is stored whole in the\nartifact ``artifact_id``, which ``artifact.read`` reads.\n\n``failed`` is true when the call ran but what it ran did not succeed,\nsuch as a shell command that exited non-zero or timed out. The model\nstill gets the output.",
+      "description": "A tool call finished.\n\n``summary`` is one short line, such as ``42 lines``. ``preview`` is the\nstart of the output, cut at a few kilobytes, and ``truncated`` says\nwhether it was cut. Output too long for the model is stored whole in the\nartifact ``artifact_id``, which ``artifact.read`` reads.\n\n``failed`` is true when the call ran but what it ran did not succeed,\nsuch as a shell command that exited non-zero or timed out. The model\nstill gets the output.\n\n``duration_ms`` is how long the tool ran, from ``tool.started`` to its\nresult, without the wait for an approval. None means it was not measured.",
       "properties": {
         "artifact_id": {
           "anyOf": [
@@ -1817,6 +1817,19 @@
           "minLength": 1,
           "title": "Call Id",
           "type": "string"
+        },
+        "duration_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duration Ms"
         },
         "failed": {
           "default": false,
@@ -1891,12 +1904,25 @@
     },
     "ToolFailedData": {
       "additionalProperties": false,
-      "description": "A tool call did not run, or stopped with an error. The model sees the same message.",
+      "description": "A tool call did not run, or stopped with an error. The model sees the same message.\n\n``duration_ms`` is how long the tool ran before it raised. None means a\ncall that was denied or cut off, which never ran or was not timed.",
       "properties": {
         "call_id": {
           "minLength": 1,
           "title": "Call Id",
           "type": "string"
+        },
+        "duration_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duration Ms"
         },
         "message": {
           "minLength": 1,

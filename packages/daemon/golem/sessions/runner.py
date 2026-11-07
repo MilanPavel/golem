@@ -413,11 +413,17 @@ async def _apply(
                 truncated=fact.truncated,
                 artifact_id=fact.artifact_id,
                 failed=fact.failed,
+                duration_ms=fact.duration_ms,
             ),
         )
     elif isinstance(fact, ToolErrored):
         _done(progress, fact.call_id)
-        await emit("tool.failed", ToolFailedData(call_id=fact.call_id, message=fact.message))
+        await emit(
+            "tool.failed",
+            ToolFailedData(
+                call_id=fact.call_id, message=fact.message, duration_ms=fact.duration_ms
+            ),
+        )
     elif isinstance(fact, TodosChanged):
         await emit(
             "todos.updated",
