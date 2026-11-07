@@ -68,6 +68,17 @@ export {
   type McpCatalogEntry,
   type McpCatalogInput,
 } from "./mcp-catalog.ts";
+export {
+  applyParams,
+  candidateNotes,
+  candidateTarget,
+  importItems,
+  initialPicks,
+  missingRefsOf,
+  scanSummary,
+  type ImportItem,
+  type ImportSource,
+} from "./mcp-import.ts";
 export { editForm, updateFromForm, type EditForm, type EditPair } from "./mcp-edit.ts";
 export {
   changeToolFilter,

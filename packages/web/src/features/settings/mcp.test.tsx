@@ -683,3 +683,135 @@ test("axe finds nothing on the edit form, the list of servers to add, and the ad
     unmount();
   }
 });
+
+const SCAN = {
+  scan_id: "scan1",
+  sources: [
+    {
+      id: "cursor",
+      label: "Cursor",
+      path: "/Users/me/.cursor/mcp.json",
+      candidates: [
+        { key: "a", name: "git", original_name: "git", scope: "user", config: { command: "uvx", args: ["mcp-server-git"] } },
+        { key: "b", name: "gh-2", original_name: "gh", scope: "user", clash: true, config: { url: "https://x.example/mcp", headers: { Authorization: "keychain:mcp/gh-2" } }, secret_refs: ["mcp/gh-2"], missing_refs: ["mcp/gh-2"], warnings: ["Uses the old SSE transport."] },
+        { key: "c", name: "old", original_name: "old", scope: "user", already_same: true, config: { command: "old" } },
+      ],
+      skipped: ["broken: no command"],
+    },
+    { id: "vscode", label: "VS Code", error: "not valid JSON" },
+  ],
+} as never;
+
+async function openImport(fake: ReturnType<typeof mount>["fake"], user: ReturnType<typeof mount>["user"], scan: unknown = SCAN) {
+  fake.raw.scanMcpImport.mockResolvedValue(scan as never);
+  await user.click(await screen.findByRole("button", { name: "Import from other apps" }));
+  return screen.findByRole("dialog");
+}
+
+test("Import lists what other apps have, picks every server golem lacks, and notes the rest", async () => {
+  const { fake, user } = mount("/settings/mcp", [git]);
+  const dialog = await openImport(fake, user);
+  expect(await within(dialog).findByText("3 servers in 1 place")).toBeTruthy();
+  expect(within(dialog).getByText("/Users/me/.cursor/mcp.json", { exact: false })).toBeTruthy();
+  expect((within(dialog).getByRole("checkbox", { name: "Import git" }) as HTMLInputElement).checked).toBe(true);
+  expect((within(dialog).getByRole("checkbox", { name: "Import old" }) as HTMLInputElement).checked).toBe(false);
+  expect(within(dialog).getByText("already added")).toBeTruthy();
+  expect(within(dialog).getByText("will be named gh-2")).toBeTruthy();
+  expect(within(dialog).getByText("! Uses the old SSE transport.")).toBeTruthy();
+  expect(within(dialog).getByText("uvx mcp-server-git")).toBeTruthy();
+  expect(within(dialog).getByText("Skipped broken: no command")).toBeTruthy();
+  expect(within(dialog).getByText("not valid JSON")).toBeTruthy();
+  expect(fake.raw.scanMcpImport).toHaveBeenCalledWith({});
+});
+
+test("Import adds the picked servers under the names typed, with a typed secret apart, and shows what happened", async () => {
+  const { fake, user } = mount("/settings/mcp", [git]);
+  fake.raw.applyMcpImport.mockResolvedValue({ added: [{ name: "my-git", state: "running", command: "uvx" }, { name: "gh-2", state: "starting", command: "x" }], failed: [] } as never);
+  const dialog = await openImport(fake, user);
+  const name = await within(dialog).findByLabelText("Name of git");
+  await user.clear(name);
+  await user.type(name, "my-git");
+  await user.type(within(dialog).getByLabelText("Value for mcp/gh-2"), "tok");
+  await user.click(within(dialog).getByRole("button", { name: "Import 2 servers" }));
+  await waitFor(() => expect(fake.raw.applyMcpImport).toHaveBeenCalled());
+  expect(fake.raw.applyMcpImport.mock.calls[0]![0]).toEqual({
+    scan_id: "scan1",
+    picks: [
+      { key: "a", name: "my-git", scope: "user" },
+      { key: "b", name: "gh-2", scope: "user" },
+    ],
+    secrets: { "mcp/gh-2": "tok" },
+  });
+  expect(await within(screen.getByRole("dialog")).findByText("Added 2 servers.")).toBeTruthy();
+  expect(within(screen.getByRole("dialog")).getByText("my-git · running")).toBeTruthy();
+  await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Done" }));
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(await screen.findByText("added my-git, gh-2")).toBeTruthy();
+});
+
+test("Import says what is wrong before sending, and unticking a server drops it and its secret", async () => {
+  const { fake, user } = mount("/settings/mcp", [git]);
+  const dialog = await openImport(fake, user);
+  await user.clear(await within(dialog).findByLabelText("Name of git"));
+  await user.type(within(dialog).getByLabelText("Name of git"), "bad name");
+  await user.click(within(dialog).getByRole("button", { name: "Import 2 servers" }));
+  expect((await within(dialog).findByRole("alert")).textContent).toContain("git: Use letters, digits, and dashes");
+  expect(fake.raw.applyMcpImport).not.toHaveBeenCalled();
+  await user.click(within(dialog).getByRole("checkbox", { name: "Import gh" }));
+  expect(within(dialog).queryByLabelText("Value for mcp/gh-2")).toBeNull();
+  await user.click(within(dialog).getByRole("checkbox", { name: "Import git" }));
+  expect((within(dialog).getByRole("button", { name: "Import 0 servers" }) as HTMLButtonElement).disabled).toBe(true);
+});
+
+test("a pick that failed is shown with the daemon's reason, and the rest are still added", async () => {
+  const { fake, user } = mount("/settings/mcp", [git]);
+  fake.raw.applyMcpImport.mockResolvedValue({ added: [{ name: "git", state: "running", command: "x" }], failed: [{ key: "b", error: "gh-2 is already in use" }] } as never);
+  const dialog = await openImport(fake, user);
+  await user.click(await within(dialog).findByRole("button", { name: "Import 2 servers" }));
+  expect((await screen.findByRole("alert")).textContent).toContain("gh-2 is already in use");
+  expect(screen.getByText("git · running")).toBeTruthy();
+});
+
+test("a refused import keeps the dialog and shows the message", async () => {
+  const { fake, user } = mount("/settings/mcp", [git]);
+  fake.raw.applyMcpImport.mockRejectedValue(new Error("the scan expired"));
+  const dialog = await openImport(fake, user);
+  await user.click(await within(dialog).findByRole("button", { name: "Import 2 servers" }));
+  expect((await within(dialog).findByRole("alert")).textContent).toContain("the scan expired");
+});
+
+test("Import with nothing found, and a scan that fails, say so", async () => {
+  const first = mount("/settings/mcp", [git]);
+  const dialog = await openImport(first.fake, first.user, { scan_id: "s", sources: [] });
+  expect(await within(dialog).findByText("No config files of other apps were found.")).toBeTruthy();
+  first.unmount();
+  const second = mount("/settings/mcp", [git]);
+  second.fake.raw.scanMcpImport.mockRejectedValue(new Error("daemon is down"));
+  await second.user.click(await screen.findByRole("button", { name: "Import from other apps" }));
+  expect((await screen.findByRole("alert")).textContent).toContain("daemon is down");
+  second.fake.raw.scanMcpImport.mockResolvedValue({ scan_id: "s", sources: [] });
+  await second.user.click(screen.getByRole("button", { name: "Try again" }));
+  expect(await screen.findByText("No config files of other apps were found.")).toBeTruthy();
+});
+
+test("pasted JSON is read by the daemon alone, and a session adds its project's files", async () => {
+  const { fake, user } = mount("/settings/mcp", [git], "s1");
+  const dialog = await openImport(fake, user);
+  expect(fake.raw.scanMcpImport).toHaveBeenCalledWith({ sessionId: "s1" });
+  await user.click(within(dialog).getByText("Paste JSON or choose a file"));
+  await user.click(within(dialog).getByLabelText("JSON"));
+  await user.paste('{"mcpServers": {"x": {"command": "x"}}}');
+  await user.click(within(dialog).getByRole("button", { name: "Read it" }));
+  await waitFor(() => expect(fake.raw.scanMcpImport).toHaveBeenLastCalledWith({ sessionId: "s1", text: '{"mcpServers": {"x": {"command": "x"}}}' }));
+});
+
+test("axe finds nothing on the import dialog, in both themes", async () => {
+  for (const theme of ["slip", "kiln"]) {
+    const { fake, user, unmount } = mount("/settings/mcp", [git]);
+    document.documentElement.dataset.theme = theme;
+    const dialog = await openImport(fake, user);
+    await within(dialog).findByText("3 servers in 1 place");
+    expect((await axe.run(document.body, noContrast)).violations).toEqual([]);
+    unmount();
+  }
+});
