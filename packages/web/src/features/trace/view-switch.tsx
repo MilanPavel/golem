@@ -1,31 +1,30 @@
+import type { ReactNode } from "react";
 import { useNavigate } from "../../store/page-context.tsx";
 import { sessionPath, tracePath } from "../../store/router.ts";
-import { Button } from "../../ui/button.tsx";
+import { cn } from "../../ui/cn.ts";
+import { Link } from "../../ui/link.tsx";
+import { TAB_LOOK } from "../../ui/tabs.tsx";
+
+const TAB = cn(TAB_LOOK, "aria-[current=page]:border-clay aria-[current=page]:text-ink");
 
 /**
- * The `Chat | Trace` switch in a session's top bar. The current view is pressed. On the chat it
- * hides below 760 px, where the bar has no room; the trace page keeps it to go back.
+ * The second row of a session, on both views: the `Chat | Trace` tabs on the left, the view's own
+ * summary on the right. Each tab is a link to its route, so the current one is `aria-current="page"`
+ * and a modified click opens a new browser tab.
  */
-export function ViewSwitch({ id, view }: { id: string; view: "chat" | "trace" }) {
+export function SessionViewBar({ id, view, children }: { id: string; view: "chat" | "trace"; children?: ReactNode }) {
   const navigate = useNavigate();
   return (
-    <div role="group" aria-label="View" className={`flex gap-0.5 ${view === "chat" ? "max-narrow:hidden" : ""}`}>
-      <Button
-        kind={view === "chat" ? "secondary" : "ghost"}
-        size="sm"
-        aria-pressed={view === "chat"}
-        onClick={() => view !== "chat" && navigate(sessionPath(id))}
-      >
-        Chat
-      </Button>
-      <Button
-        kind={view === "trace" ? "secondary" : "ghost"}
-        size="sm"
-        aria-pressed={view === "trace"}
-        onClick={() => view !== "trace" && navigate(tracePath(id))}
-      >
-        Trace
-      </Button>
+    <div className="flex items-center gap-3 border-b border-line px-4">
+      <nav aria-label="View" className="flex gap-1 self-end">
+        <Link href={sessionPath(id)} onNavigate={navigate} aria-current={view === "chat" ? "page" : undefined} className={TAB}>
+          Chat
+        </Link>
+        <Link href={tracePath(id)} onNavigate={navigate} aria-current={view === "trace" ? "page" : undefined} className={TAB}>
+          Trace
+        </Link>
+      </nav>
+      <div className="flex min-w-0 flex-1 items-center justify-end gap-3 py-1">{children}</div>
     </div>
   );
 }

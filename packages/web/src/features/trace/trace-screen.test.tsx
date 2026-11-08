@@ -88,17 +88,28 @@ test("a link with a span opens with that span selected", async () => {
   expect(await screen.findByRole("treeitem", { name: /model 2/, selected: true })).toBeTruthy();
 });
 
-test("the Chat and Trace switch moves between the views, and the current one is pressed", async () => {
+test("the Chat and Trace tabs move between the views, and the current one is aria-current", async () => {
   const { user } = await open("/s/a/trace");
-  const group = await screen.findByRole("group", { name: "View" });
-  expect(within(group).getByRole("button", { name: "Trace" }).getAttribute("aria-pressed")).toBe("true");
-  expect(within(group).getByRole("button", { name: "Chat" }).getAttribute("aria-pressed")).toBe("false");
-  await user.click(within(group).getByRole("button", { name: "Chat" }));
+  const nav = await screen.findByRole("navigation", { name: "View" });
+  expect(within(nav).getByRole("link", { name: "Trace" }).getAttribute("aria-current")).toBe("page");
+  expect(within(nav).getByRole("link", { name: "Chat" }).hasAttribute("aria-current")).toBe(false);
+  await user.click(within(nav).getByRole("link", { name: "Chat" }));
   await waitFor(() => expect(location.pathname).toBe("/s/a"));
-  const chat = await screen.findByRole("group", { name: "View" });
-  expect(within(chat).getByRole("button", { name: "Chat" }).getAttribute("aria-pressed")).toBe("true");
-  await user.click(within(chat).getByRole("button", { name: "Trace" }));
+  const chat = await screen.findByRole("navigation", { name: "View" });
+  expect(within(chat).getByRole("link", { name: "Chat" }).getAttribute("aria-current")).toBe("page");
+  expect(within(chat).getByRole("link", { name: "Trace" }).hasAttribute("aria-current")).toBe(false);
+  await user.click(within(chat).getByRole("link", { name: "Trace" }));
   await waitFor(() => expect(location.pathname).toBe("/s/a/trace"));
+});
+
+test("the title row holds only the title; the summary and Refresh sit with the tabs", async () => {
+  await open("/s/a/trace");
+  const nav = await screen.findByRole("navigation", { name: "View" });
+  const titleRow = screen.getByRole("heading", { level: 1 }).parentElement as HTMLElement;
+  expect(within(titleRow).queryByRole("link", { name: "Chat" })).toBeNull();
+  const row = nav.parentElement as HTMLElement;
+  expect(within(row).getByRole("button", { name: "Refresh" })).toBeTruthy();
+  expect(within(row).getByText(/runs?/)).toBeTruthy();
 });
 
 test("the page has no accessibility violations", async () => {

@@ -137,3 +137,17 @@ for (const theme of ["slip", "kiln"] as const) {
     }
   });
 }
+
+test("the chat shows the View tabs at every width, with Chat current", async () => {
+  await open();
+  const nav = screen.getByRole("navigation", { name: "View" });
+  expect(within(nav).getByRole("link", { name: "Chat" }).getAttribute("aria-current")).toBe("page");
+  expect(within(nav).getByRole("link", { name: "Trace" }).hasAttribute("aria-current")).toBe(false);
+  expect(nav.className).not.toContain("max-narrow:hidden");
+  expect((nav.parentElement as HTMLElement).className).not.toContain("max-narrow:hidden");
+});
+
+test("the chat has no accessibility violations", async () => {
+  const { container } = await open();
+  expect((await axe.run(container, noContrast)).violations).toEqual([]);
+});
