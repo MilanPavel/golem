@@ -99,7 +99,7 @@ test("the list groups the user's servers, then the project's", () => {
     "4 servers",
     "",
     "  Yours (~/.golem/config.toml)",
-    "❯ ✔ git     2 tools · ≈1.3k tokens",
+    "❯ ✔ git     2 tools · ≈1.3K tokens",
     "  ✘ github  HTTP 401: bad token · retrying in 4s",
     "  ○ lazy    on demand · off here",
     "",
@@ -139,7 +139,7 @@ test("Enter opens a server, its details, and what can be done with it", () => {
     "Status:        ✔ running",
     "Command:       mcp-server-git --repository /Users/me/repo",
     "Config:        ~/.golem/config.toml",
-    "Tools:         2 tools · ≈1.3k tokens per prompt",
+    "Tools:         2 tools · ≈1.3K tokens per prompt",
     "In this chat:  on · every chat",
     "",
     "❯ 1. View tools",
@@ -590,7 +590,7 @@ test("Remove asks first, and Keep is what Enter or Esc does", () => {
 test("a list row and the details say what limits a server", () => {
   const limited: McpServer = { ...git, tools_hidden: 2, approval: "allow" };
   const row = shown(openMcpManager(), [limited]).find((line) => line.includes("git"));
-  assert.ok(row?.includes("2 tools · ≈1.3k tokens · 2 hidden · allow"));
+  assert.ok(row?.includes("2 tools · ≈1.3K tokens · 2 hidden · allow"));
   const detail = shown(press(openMcpManager(), "enter").state, [limited]).join("\n");
   assert.ok(detail.includes("Hidden:        2 tools kept from the model"));
   assert.ok(detail.includes("Approval:      calls run without asking"));

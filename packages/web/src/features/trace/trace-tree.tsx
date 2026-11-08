@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { formatTokens } from "@golem/view";
 import { modelsOf, toolsOf, type TraceNode, type TraceRunSpan } from "../../store/trace.ts";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../ui/tooltip.tsx";
-import { formatDuration, formatTokens, spanTokens } from "./format.ts";
+import { formatDuration, spanTokens } from "./format.ts";
 import { NOT_RECORDED_LINE } from "./span-text.ts";
 import { barFor } from "./waterfall.ts";
 import { WaterfallBar } from "./waterfall-bar.tsx";

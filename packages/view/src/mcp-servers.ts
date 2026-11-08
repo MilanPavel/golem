@@ -1,5 +1,7 @@
 import type { McpServer } from "@golem/client";
 
+import { formatTokens } from "./context.ts";
+
 export type McpTone = "ok" | "bad" | "wait" | "off";
 
 /** The session's MCP servers once `mcp.list` answers, or why it did not. `/mcp` and the status line read it. */
@@ -136,10 +138,6 @@ export function shortPath(path: string, home: string): string {
 
 export function firstLine(text: string): string {
   return text.trim().split("\n")[0] ?? "";
-}
-
-export function formatTokens(tokens: number): string {
-  return tokens < 1000 ? String(tokens) : `${(tokens / 1000).toFixed(1)}k`;
 }
 
 export function formatSeconds(seconds: number): string {

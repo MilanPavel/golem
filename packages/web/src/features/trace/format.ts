@@ -1,15 +1,10 @@
-import { formatDuration as formatViewDuration } from "@golem/view";
+import { formatDuration as formatViewDuration, formatTokens } from "@golem/view";
 import { modelsOf, type TraceNode, type TraceRunSpan } from "../../store/trace.ts";
 
 /** `—` for an unknown time, else minutes and seconds: `0m 00.048s` under a second, `0m 18.4s`, `2m 30.8s`. */
 export function formatDuration(ms: number | null | undefined): string {
   if (ms === null || ms === undefined) return "—";
   return formatViewDuration(ms);
-}
-
-/** `612`, then `9.1K` from a thousand on. */
-export function formatTokens(count: number): string {
-  return count < 1000 ? String(count) : `${(count / 1000).toFixed(1)}K`;
 }
 
 /** Input and output tokens of one span, or null when the provider reported neither. */

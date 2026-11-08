@@ -111,7 +111,7 @@ test("the list groups servers by the file that names them, with each state in wo
   expect(project.textContent).toContain("(/work/app/.golem/config.toml)");
   expect(within(project).getByRole("button", { name: /db/ })).toBeTruthy();
   expect(within(yours).getAllByRole("button").map((button) => button.textContent)).toEqual([
-    "✔running, git2 tools · ≈1.3k tokens",
+    "✔running, git2 tools · ≈1.3K tokens",
     "✘failed, github401 Unauthorized · retrying in 5s",
     "○idle (on demand), lazyon demand · off here",
     "–disabled, offdisabled",
@@ -155,7 +155,7 @@ test("a server's detail shows what the terminal shows, and a failed one says why
   expect(facts.queryByText("In this chat")).toBeNull();
   await user.click(facts.getByRole("button", { name: "Back" }));
   await user.click(await screen.findByRole("button", { name: /^running,\s*git(?!hub)/ }));
-  expect(within(main()).getByText("2 tools · ≈1.3k tokens per prompt")).toBeTruthy();
+  expect(within(main()).getByText("2 tools · ≈1.3K tokens per prompt")).toBeTruthy();
 });
 
 test("with no session there is no per-chat choice, and with one there is", async () => {
