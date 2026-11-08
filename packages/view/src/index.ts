@@ -1,4 +1,5 @@
 export type { ApprovalChoice } from "@golem/client";
+export { formatDuration, formatElapsed } from "./duration.ts";
 export { editedArgs, parseArgs, type ParsedArgs } from "./approval-args.ts";
 export {
   appendDelta,
@@ -131,7 +132,6 @@ export {
   agentInstalled,
   defaultGone,
   askService,
-  elapsed,
   engineChoices,
   engineLines,
   engineSelected,

@@ -1,9 +1,10 @@
+import { formatDuration as formatViewDuration } from "@golem/view";
 import { modelsOf, type TraceNode, type TraceRunSpan } from "../../store/trace.ts";
 
-/** `—` for an unknown time, `48ms` under a second, else `1.2s`. */
+/** `—` for an unknown time, else minutes and seconds: `0m 00.048s` under a second, `0m 18.4s`, `2m 30.8s`. */
 export function formatDuration(ms: number | null | undefined): string {
   if (ms === null || ms === undefined) return "—";
-  return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`;
+  return formatViewDuration(ms);
 }
 
 /** `612`, then `9.1K` from a thousand on. */
@@ -36,7 +37,7 @@ export function totalDuration(runs: readonly TraceRunSpan[]): number {
   return runs.reduce((sum, run) => sum + (run.duration_ms ?? 0), 0);
 }
 
-/** `2 runs · 24.6s · 52.0K tokens`, with `—` where no tokens were recorded. */
+/** `2 runs · 0m 24.6s · 52.0K tokens`, with `—` where no tokens were recorded. */
 export function summaryLine(runs: readonly TraceRunSpan[]): string {
   const tokens = totalTokens(runs);
   const count = `${runs.length} ${runs.length === 1 ? "run" : "runs"}`;

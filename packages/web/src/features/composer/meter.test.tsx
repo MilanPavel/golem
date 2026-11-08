@@ -11,9 +11,9 @@ const START = "2026-11-01T10:00:00+00:00";
 test("working shows the seconds since the run began, ticking once a second", () => {
   vi.useFakeTimers({ now: Date.parse(START) + 12_000 });
   render(<Meter state="thinking" runStartedAt={START} />);
-  expect(screen.getByText("working · 12s")).toBeTruthy();
+  expect(screen.getByText("working · 0m 12s")).toBeTruthy();
   act(() => vi.advanceTimersByTime(3000));
-  expect(screen.getByText("working · 15s")).toBeTruthy();
+  expect(screen.getByText("working · 0m 15s")).toBeTruthy();
 });
 
 test("it does not tick when idle, and says idle", () => {

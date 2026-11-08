@@ -14,7 +14,7 @@ test("writing names the characters and the seconds, thinking does not invent a p
   assert.match(thinking, /^thinking {2}█/);
   assert.doesNotMatch(thinking, /%/);
   const writing = meterLine("writing", 1204, 4, 1, 48);
-  assert.match(writing, /^writing · 1,204 chars · 4s {2}/);
+  assert.match(writing, /^writing · 1,204 chars · 0m 04s {2}/);
   assert.notEqual(shuttle(0, 10), shuttle(1, 10));
 });
 

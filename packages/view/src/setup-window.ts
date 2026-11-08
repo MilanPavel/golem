@@ -1,5 +1,6 @@
 import type { ListedModel, ModelListResult, SetupRow } from "@golem/client";
 
+import { formatElapsed } from "./duration.ts";
 import { firstRunChoice, hostedProviders, namesModel } from "./first-run.ts";
 
 /**
@@ -245,15 +246,6 @@ function options<T>(choices: readonly Choice<T>[], selected: number): SetupLine[
   }));
 }
 
-/** Seconds as the screens show them: `3s`, `1m 04s`. */
-export function elapsed(ms: number): string {
-  const seconds = Math.max(0, Math.floor(ms / 1000));
-  if (seconds < 60) {
-    return `${seconds}s`;
-  }
-  return `${Math.floor(seconds / 60)}m ${String(seconds % 60).padStart(2, "0")}s`;
-}
-
 // Service
 
 /** Who runs the service when it answers: launchd, this window, or someone else (a checkout's `uv run`). */
@@ -358,7 +350,7 @@ export function serviceLines(state: ServiceState, now: number): SetupLine[] {
         ...options(serviceChoices(state), state.selected),
       ];
     case "starting": {
-      const took = elapsed(now - state.since);
+      const took = formatElapsed(now - state.since);
       const lines: SetupLine[] = [];
       if (state.how === "install") {
         lines.push(

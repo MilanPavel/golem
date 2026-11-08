@@ -18,7 +18,7 @@ const tab = (name: string) => screen.getByRole("tab", { name });
 test("a model call shows its header, with the model, time, first token, and tokens", () => {
   show(MODEL_DETAIL);
   expect(screen.getByRole("heading", { name: /model 2/ })).toBeTruthy();
-  expect(document.body.textContent).toContain("ollama/qwen3-coder:30b · 1.9s · first token 120ms · 3.4K → 210");
+  expect(document.body.textContent).toContain("ollama/qwen3-coder:30b · 0m 01.9s · first token 0m 00.120s · 3.4K → 210");
   expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Context", "Reply", "Metadata"]);
 });
 
@@ -84,7 +84,7 @@ test("a call that had an approval has the tab, with the decision, the rule, and 
   const text = document.body.textContent ?? "";
   expect(text).toContain("allow");
   expect(text).toContain("built-in default");
-  expect(text).toContain("waited12.0s");
+  expect(text).toContain("waited0m 12.0s");
   expect(text).toContain('"new_string": "edited"');
 });
 
