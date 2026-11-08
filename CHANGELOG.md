@@ -2,6 +2,76 @@
 
 What changed in each release of golem, newest first. `just release` writes each section from the commit messages on `main` ([CONTRIBUTING.md](CONTRIBUTING.md)), and the release pull request is the place to edit it. The GitHub release shows the same section. How a release is made is in [docs/sre.md](docs/sre.md), section 5.
 
+## [0.10.0] - 2026-11-08
+
+### Features
+
+- **mcp:** edit every field of a server and the whole config over RPC ([#494](https://github.com/MilanPavel/golem/pull/494))
+- **mcp:** test a server step by step, read its log, and try a tool ([#497](https://github.com/MilanPavel/golem/pull/497))
+- **models:** add Google (Gemini) as a provider ([#499](https://github.com/MilanPavel/golem/pull/499))
+- **web:** Settings page with Setup and Appearance, and a Settings button in the sidebar ([#500](https://github.com/MilanPavel/golem/pull/500))
+- **models:** add DeepSeek as a provider ([#501](https://github.com/MilanPavel/golem/pull/501))
+- **models:** add xAI (Grok) as a provider ([#504](https://github.com/MilanPavel/golem/pull/504))
+- **web:** choose Match system, Light, or Dark in Settings, and drop the sidebar theme switch ([#505](https://github.com/MilanPavel/golem/pull/505))
+- **mcp:** a catalog of servers, and Node and uv installs from the daemon ([#502](https://github.com/MilanPavel/golem/pull/502))
+- **tools:** gh and git push run outside the sandbox with your credentials, after you approve ([#503](https://github.com/MilanPavel/golem/pull/503))
+- **models:** add Moonshot (Kimi) as a provider ([#506](https://github.com/MilanPavel/golem/pull/506))
+- **web:** tool rules in Settings, with a question before a change that loosens one ([#508](https://github.com/MilanPavel/golem/pull/508))
+- **models:** setup, /login, auth, and doctor list the six providers ([#517](https://github.com/MilanPavel/golem/pull/517))
+- **mcp:** add servers from the daemon's catalog in /mcp add and golem mcp add ([#521](https://github.com/MilanPavel/golem/pull/521))
+- **web:** show a model download in the sidebar on every screen ([#522](https://github.com/MilanPavel/golem/pull/522))
+- **models:** list current hosted models for the six providers in the catalog ([#524](https://github.com/MilanPavel/golem/pull/524))
+- **web:** choose the model of a new session, and refuse an unknown one at session.create ([#525](https://github.com/MilanPavel/golem/pull/525))
+- **models:** offer only catalog models by default, and never a retired one ([#526](https://github.com/MilanPavel/golem/pull/526))
+- **mcp:** import servers from other apps, and export them ([#527](https://github.com/MilanPavel/golem/pull/527))
+- **tui:** show all models from the picker and the web dialog ([#528](https://github.com/MilanPavel/golem/pull/528))
+- **web:** browse your home folder to choose a session's folder ([#529](https://github.com/MilanPavel/golem/pull/529))
+- **cli:** golem mcp list, show, test, logs, enable, restart, and tools ([#530](https://github.com/MilanPavel/golem/pull/530))
+- **models:** list each model's categories, from the catalog, Ollama, and LiteLLM ([#541](https://github.com/MilanPavel/golem/pull/541))
+- **web:** see and fix each part of setup in Settings → Setup, without a dialog ([#542](https://github.com/MilanPavel/golem/pull/542))
+- **cli:** golem mcp edit, import, config edit, and add with env, headers, and a test ([#544](https://github.com/MilanPavel/golem/pull/544))
+- **tui:** filter the model picker by category tabs, and show each model's categories ([#545](https://github.com/MilanPavel/golem/pull/545))
+- **web:** filter the model dialog by category, and show each model's categories ([#546](https://github.com/MilanPavel/golem/pull/546))
+- **tui:** test, read the log, hide or try a tool, and remove a server in /mcp ([#547](https://github.com/MilanPavel/golem/pull/547))
+- **models:** add local models for coding, reasoning, vision, and fast at each memory size ([#548](https://github.com/MilanPavel/golem/pull/548))
+- **daemon:** record each model call with its model, timing, tokens, and stop reason ([#549](https://github.com/MilanPavel/golem/pull/549))
+- **daemon:** store each model call's system prompt and tool schemas by hash ([#550](https://github.com/MilanPavel/golem/pull/550))
+- **web:** see and manage MCP servers in Settings, and /mcp opens it ([#551](https://github.com/MilanPavel/golem/pull/551))
+- **daemon:** record how long each tool call ran ([#552](https://github.com/MilanPavel/golem/pull/552))
+- **web:** test a server, read its log, hide or try a tool, and remove it in Settings ([#553](https://github.com/MilanPavel/golem/pull/553))
+- **daemon:** read a session as a tree of spans, and one span in full ([#554](https://github.com/MilanPavel/golem/pull/554))
+- **web:** add a server, and edit one, in Settings ([#555](https://github.com/MilanPavel/golem/pull/555))
+- **web:** import servers from other apps in Settings ([#556](https://github.com/MilanPavel/golem/pull/556))
+- **web:** open a session's trace as a tree with a waterfall ([#557](https://github.com/MilanPavel/golem/pull/557))
+- **web:** read and edit the config file in Settings, and /config opens it ([#558](https://github.com/MilanPavel/golem/pull/558))
+- **web:** read what a span took in and gave out, on the trace page ([#559](https://github.com/MilanPavel/golem/pull/559))
+- **models:** recommend a local model for each category on the model picker ([#560](https://github.com/MilanPavel/golem/pull/560))
+- show every duration as minutes and seconds ([#571](https://github.com/MilanPavel/golem/pull/571))
+- **protocol:** record the context window and prompt sections of each model call ([#574](https://github.com/MilanPavel/golem/pull/574))
+- **web:** show Chat and Trace as tabs below the session title ([#573](https://github.com/MilanPavel/golem/pull/573))
+- **sessions:** break down what fills the context in trace.get and trace.span ([#575](https://github.com/MilanPavel/golem/pull/575))
+- **web:** show the system prompt by section and the size of each message ([#576](https://github.com/MilanPavel/golem/pull/576))
+- **web:** show how full the context is on a model span, and what the tools cost ([#577](https://github.com/MilanPavel/golem/pull/577))
+- **web:** keep the session's top bar in the trace view ([#578](https://github.com/MilanPavel/golem/pull/578))
+- **web:** show how much context the session has spent, in the trace header and the chat ([#579](https://github.com/MilanPavel/golem/pull/579))
+- **web:** polish the trace with fill bars, run totals, rendered replies and a time axis ([#580](https://github.com/MilanPavel/golem/pull/580))
+
+### Fixes
+
+- **tools:** git fetch, add, and commit work in a git worktree under the sandbox ([#498](https://github.com/MilanPavel/golem/pull/498))
+- **tools:** a sandbox refusal says it was the sandbox, and how to allow it ([#516](https://github.com/MilanPavel/golem/pull/516))
+- **tools:** a shell command that fails is marked ✗, not ✓ ([#523](https://github.com/MilanPavel/golem/pull/523))
+- **web:** give the gallery tests 60 s, so they do not time out on CI ([#581](https://github.com/MilanPavel/golem/pull/581))
+- **web:** draw the Settings icon as a cog, not a sun ([#582](https://github.com/MilanPavel/golem/pull/582))
+
+### Docs
+
+- a picture at the top of the vision, and two sections removed ([#480](https://github.com/MilanPavel/golem/pull/480))
+- new mcp plan ([#492](https://github.com/MilanPavel/golem/pull/492))
+- **mcp:** ADR-037 and the screens for MCP from anywhere ([#493](https://github.com/MilanPavel/golem/pull/493))
+- **web:** design downloads, new-session choices, and setup as pages ([#519](https://github.com/MilanPavel/golem/pull/519))
+- rework the vision, the home page, and the demos ([#520](https://github.com/MilanPavel/golem/pull/520))
+
 ## [0.9.0] - 2026-11-05
 
 ### Features
