@@ -1,6 +1,6 @@
-import type { TraceGetResult, TraceModelSpan, TraceRunSpan, TraceTokens, TraceToolSpan } from "@golem/client";
+import type { ArtifactReadResult, TraceGetResult, TraceMessage, TraceModelSpan, TraceRunSpan, TraceSpan, TraceSpanResult, TraceTokens, TraceToolSpan } from "@golem/client";
 
-export type { TraceGetResult, TraceModelSpan, TraceRunSpan, TraceTokens, TraceToolSpan };
+export type { ArtifactReadResult, TraceGetResult, TraceMessage, TraceModelSpan, TraceRunSpan, TraceSpan, TraceSpanResult, TraceTokens, TraceToolSpan };
 
 /** Any span of the tree. */
 export type TraceNode = TraceRunSpan | TraceModelSpan | TraceToolSpan;
@@ -27,3 +27,16 @@ export function modelsOf(run: TraceRunSpan): readonly TraceModelSpan[] {
 export function toolsOf(model: TraceModelSpan): readonly TraceToolSpan[] {
   return model.children ?? [];
 }
+
+/** The query key of `trace.span`. The page's Refresh reads it again with the tree. */
+export function traceSpanKey(sessionId: string, spanId: string): readonly unknown[] {
+  return ["trace.span", sessionId, spanId];
+}
+
+/** The query key of one artifact, read in pages. */
+export function artifactKey(sessionId: string, artifactId: string): readonly unknown[] {
+  return ["artifact.read", sessionId, artifactId];
+}
+
+/** Characters one page of an artifact holds. */
+export const ARTIFACT_PAGE = 20_000;

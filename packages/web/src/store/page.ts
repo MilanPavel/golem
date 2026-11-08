@@ -1,4 +1,4 @@
-import { OLLAMA_FAILED, RpcError, type ApprovalChoice, type ConfigGetResult, type ConfigRawGetResult, type ConfigRawResult, type FsListDirsResult, type McpAddParams, type McpCallResult, type McpImportApplyParams, type McpImportApplyResult, type McpImportScanResult, type McpCatalogResult, type McpListResult, type McpLogsResult, type McpServerConfig, type McpServerDetail, type McpServerLog, type McpTestProgress, type McpTestResult, type GolemClient, type RuntimeName, type SetupStatusResult, type SkillListResult, type TraceGetResult } from "@golem/client";
+import { OLLAMA_FAILED, RpcError, type ApprovalChoice, type ConfigGetResult, type ConfigRawGetResult, type ConfigRawResult, type FsListDirsResult, type McpAddParams, type McpCallResult, type McpImportApplyParams, type McpImportApplyResult, type McpImportScanResult, type McpCatalogResult, type McpListResult, type McpLogsResult, type McpServerConfig, type McpServerDetail, type McpServerLog, type McpTestProgress, type McpTestResult, type GolemClient, type RuntimeName, type SetupStatusResult, type SkillListResult, type TraceGetResult, type TraceSpanResult, type ArtifactReadResult } from "@golem/client";
 import { changeToolFilter, installEventOf, type InstallEvent } from "@golem/view";
 import type { QueryClient } from "@tanstack/react-query";
 import { createDrafts, type Drafts } from "./drafts.ts";
@@ -44,6 +44,8 @@ export type PageClient = Pick<
   | "listMcp"
   | "mcpTools"
   | "getTrace"
+  | "getTraceSpan"
+  | "readArtifact"
   | "restartMcp"
   | "setMcpEnabled"
   | "enableMcp"
@@ -206,6 +208,10 @@ export type PageQueries = {
   trace(sessionId: string): Promise<TraceGetResult>;
   /** The servers golem offers to add, with what each needs here. */
   mcpCatalog(sessionId: string | null): Promise<McpCatalogResult>;
+  /** What one span took in and gave out. */
+  traceSpan(sessionId: string, spanId: string): Promise<TraceSpanResult>;
+  /** `limit` characters of a session's artifact from `offset`. */
+  artifact(sessionId: string, artifactId: string, offset: number, limit: number): Promise<ArtifactReadResult>;
   /** The folders directly under `path` in the home folder; `null` is home itself. */
   dirs(path: string | null): Promise<FsListDirsResult>;
 };
@@ -276,6 +282,8 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       mcpList: (sessionId) => client.listMcp(sessionId ?? undefined),
       mcpTools: (name, sessionId) => client.mcpTools(name, sessionId ?? undefined),
       trace: (sessionId) => client.getTrace(sessionId),
+      traceSpan: (sessionId, spanId) => client.getTraceSpan(sessionId, spanId),
+      artifact: (sessionId, artifactId, offset, limit) => client.readArtifact(sessionId, artifactId, offset, limit),
       mcpCatalog: (sessionId) => client.mcpCatalog(sessionId ?? undefined),
       dirs: (path) => (path === null ? client.listDirs() : client.listDirs(path)),
     },
