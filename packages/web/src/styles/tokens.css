@@ -30,6 +30,12 @@
   --color-wait-soft: light-dark(#F3E7C9, #30271A);
   --color-on-clay: light-dark(#2A1408, #0E0704);
   --color-code-bg: light-dark(#EFEDE9, #191512);
+  /* Context parts: data colours, used only by the context meter and its legend. */
+  --color-ctx-system: light-dark(#6B7A8F, #8E9DB3);
+  --color-ctx-tools: light-dark(#AE6B34, #D08549);
+  --color-ctx-user: light-dark(#59855C, #8DB88A);
+  --color-ctx-replies: light-dark(#95752F, #D9B45E);
+  --color-ctx-results: light-dark(#8A5A86, #B98BB4);
 
   --font-ui: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
   --font-prose: "Literata Variable", Georgia, serif;

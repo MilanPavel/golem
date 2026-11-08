@@ -1,14 +1,10 @@
 import { expect, test } from "vitest";
-import { formatDuration, formatTokens, summaryLine, totalTokens } from "./format.ts";
+import { formatDuration, summaryLine, totalTokens } from "./format.ts";
 import { LONG_TRACE, OLD_TRACE, SHORT_TRACE } from "./sample.ts";
 
 test("durations: minutes and seconds, and a dash when unknown", () => {
   expect([0, 4, 999, 1000, 1234, 18400].map(formatDuration)).toEqual(["0m 00.000s", "0m 00.004s", "0m 00.999s", "0m 01.0s", "0m 01.2s", "0m 18.4s"]);
   expect(formatDuration(null)).toBe("—");
-});
-
-test("tokens: plain under a thousand, then thousands with a tenth", () => {
-  expect([612, 999, 1000, 9100, 52000].map(formatTokens)).toEqual(["612", "999", "1.0K", "9.1K", "52.0K"]);
 });
 
 test("the summary line counts runs, time, and tokens, and shows a dash for none", () => {

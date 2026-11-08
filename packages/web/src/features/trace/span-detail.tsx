@@ -1,11 +1,13 @@
 import { Fragment, useState, type ComponentType, type ReactNode } from "react";
+import { formatTokens } from "@golem/view";
 import type { TraceMessage, TraceSpanResult } from "../../store/trace.ts";
 import { Button } from "../../ui/button.tsx";
 import { writeClipboard } from "../../ui/clipboard.ts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../ui/tabs.tsx";
 import { Markdown } from "../chat/index.ts";
 import { ArtifactDialog } from "./artifact-dialog.tsx";
-import { formatDuration, formatTokens } from "./format.ts";
+import { ContextMeter } from "./context-meter.tsx";
+import { formatDuration } from "./format.ts";
 import {
   callLine,
   copyText,
@@ -20,8 +22,10 @@ import {
   sectionLabel,
   sectionTokens,
   showValue,
+  type ToolEntry,
   TAB_LABEL,
   tabsOf,
+  toolGroups,
   toolNames,
   usedTokens,
   type Mode,
@@ -45,13 +49,6 @@ function Fold({ title, children }: { title: string; children: ReactNode }) {
       <div className="border-t border-line p-3">{children}</div>
     </details>
   );
-}
-
-function schemaName(schema: Record<string, unknown>, index: number): string {
-  const fn = schema["function"];
-  const inner = fn !== null && typeof fn === "object" ? (fn as Record<string, unknown>)["name"] : undefined;
-  const name = inner ?? schema["name"];
-  return typeof name === "string" ? name : `tool ${index + 1}`;
 }
 
 /** A tool result in its block, closed after `FOLD_LINES` lines. */
@@ -174,6 +171,42 @@ function SystemPrompt({ result, prompt }: { result: TraceSpanResult; prompt: str
   );
 }
 
+function ToolFold({ tool }: { tool: ToolEntry }) {
+  return (
+    <Fold title={tool.tokens === null ? tool.label : `${tool.label} · ≈${formatTokens(tool.tokens)}`}>
+      <pre className={BLOCK}>{JSON.stringify(tool.schema, null, 2)}</pre>
+    </Fold>
+  );
+}
+
+/** The tools of a call, grouped by MCP server with each one's token cost. Built-in tools alone are listed flat. */
+function Tools({ result }: { result: TraceSpanResult }) {
+  const tools = result.tools ?? [];
+  const part = result.context?.parts.find((p) => p.key === "tools");
+  const groups = toolGroups(tools, part?.items ?? []);
+  const flat = groups.every((group) => group.group === null);
+  return (
+    <Fold title={part === undefined ? `Tools · ${tools.length}` : `Tools · ${tools.length} · ≈${formatTokens(part.tokens)} tokens`}>
+      <div className="flex flex-col gap-2">
+        {flat
+          ? groups.flatMap((group) => group.tools).map((tool, index) => <ToolFold key={index} tool={tool} />)
+          : groups.map((group) => (
+              <Fold
+                key={group.label}
+                title={`${group.label} · ${group.tools.length} ${group.tools.length === 1 ? "tool" : "tools"}${group.tokens === null ? "" : ` · ≈${formatTokens(group.tokens)}`}`}
+              >
+                <div className="flex flex-col gap-2">
+                  {group.tools.map((tool, index) => (
+                    <ToolFold key={index} tool={tool} />
+                  ))}
+                </div>
+              </Fold>
+            ))}
+      </div>
+    </Fold>
+  );
+}
+
 function Context({ result }: { result: TraceSpanResult }) {
   const messages = result.messages ?? [];
   const names = toolNames(messages);
@@ -188,17 +221,7 @@ function Context({ result }: { result: TraceSpanResult }) {
       ) : (
         <SystemPrompt result={result} prompt={prompt} />
       )}
-      {tools === null || tools === undefined ? null : (
-        <Fold title={`Tools · ${tools.length}`}>
-          <div className="flex flex-col gap-2">
-            {tools.map((tool, index) => (
-              <Fold key={index} title={schemaName(tool, index)}>
-                <pre className={BLOCK}>{JSON.stringify(tool, null, 2)}</pre>
-              </Fold>
-            ))}
-          </div>
-        </Fold>
-      )}
+      {tools === null || tools === undefined ? null : <Tools result={result} />}
       {messages.length === 0 ? <p className="text-sm text-faint">No messages.</p> : <Messages messages={messages} newFrom={result.new_from ?? null} names={names} total={usedTokens(result)} />}
     </div>
   );
@@ -373,6 +396,7 @@ export function SpanDetail({ result, sessionId, Artifact = ArtifactDialog }: { r
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
       <Header result={result} />
+      {result.span.kind === "model" && result.context ? <ContextMeter context={result.context} provider={result.provider ?? null} /> : null}
       {first === undefined ? (
         <p className="p-4 text-sm text-faint">A run has no input or output of its own. Select a model call or a tool.</p>
       ) : (

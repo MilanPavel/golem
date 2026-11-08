@@ -33,7 +33,7 @@ import { CommandPaletteView, KeysDialog } from "../features/palette/index.ts";
 import { ModelDialogView, type ModelDialogViewProps } from "../features/models/index.ts";
 import { SetupDialogView } from "../features/setup/index.ts";
 import { SpanDetail, TraceTree } from "../features/trace/index.ts";
-import { APPROVAL_DETAIL, APPROVAL_TRACE, MODEL_DETAIL, NO_PROMPT_DETAIL, OLD_DETAIL, SECTIONS_DETAIL, TOOL_DETAIL, FAILED_TRACE, LONG_TRACE, OLD_TRACE, SHORT_TRACE } from "../features/trace/sample.ts";
+import { APPROVAL_DETAIL, APPROVAL_TRACE, FULL_DETAIL, MODEL_DETAIL, NO_PROMPT_DETAIL, NUM_CTX_DETAIL, OLD_DETAIL, SECTIONS_DETAIL, TOOL_DETAIL, UNKNOWN_WINDOW_DETAIL, FAILED_TRACE, LONG_TRACE, OLD_TRACE, SHORT_TRACE } from "../features/trace/sample.ts";
 import type { TraceRunSpan, TraceSpanResult } from "../store/trace.ts";
 import { FORM_CASES, SETUP_CASES } from "../features/setup/sample.ts";
 import { AddKey, SetupFormView } from "../features/setup/setup-form.tsx";
@@ -563,6 +563,9 @@ function Panel({ theme }: { theme: "slip" | "kiln" }) {
         <TraceDemo label="A tool with an approval wait" runs={APPROVAL_TRACE} />
         <TraceDemo label="A session from before traces" runs={OLD_TRACE} />
         <DetailDemo label="A model call: context, reply, metadata" result={MODEL_DETAIL} />
+        <DetailDemo label="A model call, nearly full, with MCP tools" result={FULL_DETAIL} />
+        <DetailDemo label="Ollama input over num_ctx" result={NUM_CTX_DETAIL} />
+        <DetailDemo label="Ollama with no ctx: window unknown" result={UNKNOWN_WINDOW_DETAIL} />
         <DetailDemo label="A tool with a big output" result={TOOL_DETAIL} />
         <DetailDemo label="A tool with an edited approval" result={APPROVAL_DETAIL} />
         <DetailDemo label="Not recorded" result={OLD_DETAIL} />
