@@ -7,10 +7,24 @@ export type Args = {
   [k: string]: unknown;
 } | null;
 export type ArtifactId = string | null;
+export type Estimated = boolean;
+export type NumCtx = number | null;
+export type Chars = number;
+export type Group = string | null;
+export type Name = string;
+export type Tokens = number;
+export type Items = TraceContextItem[];
+export type Key = 'system' | 'tools' | 'user' | 'assistant' | 'tool_results';
+export type Tokens1 = number;
+export type Parts = TraceContextPart[];
+export type Used = number | null;
+export type Window = number | null;
+export type WindowEstimated = boolean;
 export type CallId = string | null;
 export type Id = string | null;
 export type Role = 'user' | 'assistant' | 'tool';
 export type Text = string;
+export type Tokens2 = number | null;
 export type ToolCalls = {
   [k: string]: unknown;
 }[];
@@ -25,7 +39,7 @@ export type FirstTokenMs = number | null;
 export type Id1 = string;
 export type Kind = 'run' | 'model' | 'tool';
 export type Model = string | null;
-export type Name = string;
+export type Name1 = string;
 export type Preview = string;
 export type Recorded = boolean;
 export type Start = string;
@@ -36,6 +50,9 @@ export type Input = number | null;
 export type Output = number | null;
 export type StopReason = string | null;
 export type SystemPrompt = string | null;
+export type SystemSections = PromptSectionInfo[] | null;
+export type Chars1 = number;
+export type Name2 = string;
 export type Tools =
   | {
       [k: string]: unknown;
@@ -50,12 +67,14 @@ export type Tools =
  * begins. ``system_prompt`` and ``tools`` are null when they were not
  * recorded. For a tool span, ``result`` is the text the model got back, and
  * ``artifact_id`` is set when the output was too big for the model: open it
- * with ``artifact.read``.
+ * with ``artifact.read``. ``context`` is set for every model span, and
+ * ``system_sections`` is null when the call recorded none.
  */
 export interface TraceSpanResult {
   approval?: Approval;
   args?: Args;
   artifact_id?: ArtifactId;
+  context?: TraceContext | null;
   messages?: Messages;
   new_from?: NewFrom;
   provider?: Provider;
@@ -64,7 +83,49 @@ export interface TraceSpanResult {
   span: TraceSpan;
   stop_reason?: StopReason;
   system_prompt?: SystemPrompt;
+  system_sections?: SystemSections;
   tools?: Tools;
+}
+/**
+ * What filled one model call's context, and how big the window was.
+ *
+ * ``parts`` always has the five keys, in order. They add up to ``used``
+ * when it is known. The split between them is an estimate (about four
+ * characters a token, scaled to ``used``), so ``estimated`` is always true.
+ *
+ * This interface was referenced by `TraceSpanResult`'s JSON-Schema
+ * via the `definition` "TraceContext".
+ */
+export interface TraceContext {
+  estimated?: Estimated;
+  num_ctx?: NumCtx;
+  parts: Parts;
+  used?: Used;
+  window?: Window;
+  window_estimated?: WindowEstimated;
+}
+/**
+ * One kind of content in the context.
+ *
+ * This interface was referenced by `TraceSpanResult`'s JSON-Schema
+ * via the `definition` "TraceContextPart".
+ */
+export interface TraceContextPart {
+  chars: Chars;
+  items?: Items;
+  key: Key;
+  tokens: Tokens1;
+}
+/**
+ * One tool or one prompt section, with its share of the tokens.
+ *
+ * This interface was referenced by `TraceSpanResult`'s JSON-Schema
+ * via the `definition` "TraceContextItem".
+ */
+export interface TraceContextItem {
+  group?: Group;
+  name: Name;
+  tokens: Tokens;
 }
 /**
  * One checkpoint message with its id, as plain text.
@@ -77,6 +138,7 @@ export interface TraceMessage {
   id?: Id;
   role: Role;
   text: Text;
+  tokens?: Tokens2;
   tool_calls?: ToolCalls;
 }
 /**
@@ -101,7 +163,7 @@ export interface TraceSpan {
   id: Id1;
   kind: Kind;
   model?: Model;
-  name: Name;
+  name: Name1;
   preview?: Preview;
   recorded?: Recorded;
   start: Start;
@@ -119,4 +181,19 @@ export interface TraceTokens {
   cache_write?: CacheWrite;
   input?: Input;
   output?: Output;
+}
+/**
+ * One non-empty section of the system prompt sent with a model call.
+ *
+ * ``chars`` is the length of the section's text after strip, counted as
+ * Python counts it (Unicode code points). The prompt is the sections' texts,
+ * in order, joined with "\n\n", so the lengths split the stored prompt
+ * exactly.
+ *
+ * This interface was referenced by `TraceSpanResult`'s JSON-Schema
+ * via the `definition` "PromptSectionInfo".
+ */
+export interface PromptSectionInfo {
+  chars: Chars1;
+  name: Name2;
 }

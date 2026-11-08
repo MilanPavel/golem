@@ -1,0 +1,34 @@
+{
+  "additionalProperties": false,
+  "description": "One tool or one prompt section, with its share of the tokens.",
+  "properties": {
+    "group": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Group"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "tokens": {
+      "minimum": 0,
+      "title": "Tokens",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "name",
+    "tokens"
+  ],
+  "title": "TraceContextItem",
+  "type": "object"
+}

@@ -43,6 +43,18 @@ def tool_name(server: str, tool: str) -> str:
     return f"{PREFIX}{server}__{cleaned}"[:MAX_NAME]
 
 
+def server_of(name: str) -> str | None:
+    """The MCP server a tool name belongs to, or None for a built-in tool.
+
+    A server name never has ``_`` in it, so the first ``__`` after the prefix
+    ends it.
+    """
+    if not name.startswith(PREFIX):
+        return None
+    server, found, _ = name[len(PREFIX) :].partition("__")
+    return server if found and server else None
+
+
 def mcp_tools(server: str, listed: list[McpTool], call: CallTool) -> list[Tool[Any]]:
     """golem tools for ``listed``. A tool whose cleaned name is taken is left out."""
     tools: dict[str, Tool[Any]] = {}
@@ -122,4 +134,12 @@ def _item_text(item: Mapping[str, object]) -> str:
     return ""
 
 
-__all__ = ["PREFIX", "McpArguments", "mcp_tools", "result_text", "subject", "tool_name"]
+__all__ = [
+    "PREFIX",
+    "McpArguments",
+    "mcp_tools",
+    "result_text",
+    "server_of",
+    "subject",
+    "tool_name",
+]

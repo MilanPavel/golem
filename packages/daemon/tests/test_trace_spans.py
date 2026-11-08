@@ -15,6 +15,7 @@ from golem.graphs.chat import open_chat
 from golem.graphs.prompt import SystemPrompt
 from golem.graphs.tools_node import ARTIFACT_CHARS
 from golem.models.router import ModelRouter
+from golem.models.window import ContextWindow
 from golem.sessions.bus import EventBus
 from golem.sessions.log import SessionLog
 from golem.sessions.manager import SessionManager, SessionNotFoundError, SpanNotFoundError
@@ -42,7 +43,11 @@ _BIG = Tool(name="big", description="lots", args=_NoArgs, run=_big, read_only=Tr
 
 class _Chat:
     def __init__(
-        self, database: Database, model: ToolCallingChatModel, tools: ToolRegistry
+        self,
+        database: Database,
+        model: ToolCallingChatModel,
+        tools: ToolRegistry,
+        window: ContextWindow | None = None,
     ) -> None:
         self.database = database
         self.runtime = open_chat(
@@ -52,6 +57,7 @@ class _Chat:
             artifacts=ArtifactStore(database),
             prompt=SystemPrompt((lambda _: "You are golem.",)),
             blobs=BlobStore(database),
+            window_of=lambda _: window or ContextWindow(8192, None),
         )
         self.runs = RunRecords(database)
         records = SessionRecords(database)
@@ -91,6 +97,7 @@ async def test_a_model_span_reads_its_context_reply_prompt_and_tools(
 ) -> None:
     (tmp_path / "notes.txt").write_text("the answer is 42\n", encoding="utf-8")
     model = ToolCallingChatModel(replies=[[("read_file", {"path": "notes.txt"})], "It says 42."])
+    model.usage = {"input_tokens": 900, "output_tokens": 20, "total_tokens": 920}
     chat = _Chat(database, model, default_registry())
     session_id, _ = await chat.ask("what is in notes?", tmp_path)
     _, runs = await chat.manager.trace(session_id)
@@ -105,6 +112,23 @@ async def test_a_model_span_reads_its_context_reply_prompt_and_tools(
     assert first.system_prompt == "You are golem."
     assert first.tools is not None
     assert "read_file" in [tool["function"]["name"] for tool in first.tools]  # type: ignore[index]
+    assert first.context is not None
+    assert first.context.window == 8192 and first.context.window_estimated is False
+    assert first.context.used == 900
+    assert [p.key for p in first.context.parts] == [
+        "system",
+        "tools",
+        "user",
+        "assistant",
+        "tool_results",
+    ]
+    assert sum(p.tokens for p in first.context.parts) == 900
+    tools_part = first.context.parts[1]
+    assert ("read_file", None) in [(i.name, i.group) for i in tools_part.items]
+    assert [i.name for i in first.context.parts[0].items] == ["section_1"]
+    assert first.system_sections is not None and len(first.system_sections) == 1
+    assert first.system_sections[0].chars == len("You are golem.")
+    assert all(m.tokens is not None for m in first.messages)
 
     second = await chat.manager.trace_span(session_id, second_id)
     assert [m.role for m in second.messages] == ["user", "assistant", "tool"]
@@ -171,8 +195,12 @@ async def test_an_old_session_without_model_call_events_still_reads(
     _, runs = await chat.manager.trace(session_id)
     (span,) = runs[0].children
     assert span.recorded is False
+    assert span.context_window == 8192 and span.context_window_estimated is True
 
     detail = await chat.manager.trace_span(session_id, span.id)
+    assert detail.context is not None
+    assert detail.context.used is None and detail.context.window_estimated is True
+    assert detail.context.window == 8192
     assert [m.text for m in detail.messages] == ["hi"]
     assert detail.reply is not None and detail.reply.text == "hello"
     assert (detail.system_prompt, detail.tools, detail.new_from) == (None, None, 0)
@@ -188,3 +216,28 @@ async def test_an_unknown_span_or_session_is_an_error(database: Database, tmp_pa
         await chat.manager.trace_span("s_nope", "m_nope")
     with pytest.raises(SessionNotFoundError):
         await chat.manager.trace("s_nope")
+
+
+async def test_a_tool_span_has_no_context(database: Database, tmp_path: Path) -> None:
+    (tmp_path / "notes.txt").write_text("x\n", encoding="utf-8")
+    model = ToolCallingChatModel(replies=[[("read_file", {"path": "notes.txt"})], "ok"])
+    chat = _Chat(database, model, default_registry())
+    session_id, _ = await chat.ask("read", tmp_path)
+    _, runs = await chat.manager.trace(session_id)
+    (tool,) = runs[0].children[0].children
+    detail = await chat.manager.trace_span(session_id, tool.id)
+    assert detail.context is None
+
+
+async def test_an_ollama_profile_without_ctx_has_no_window(
+    database: Database, tmp_path: Path
+) -> None:
+    model = ToolCallingChatModel(replies=["hello"])
+    chat = _Chat(database, model, default_registry(), ContextWindow())
+    session_id, _ = await chat.ask("hi", tmp_path)
+    _, runs = await chat.manager.trace(session_id)
+    (span,) = runs[0].children
+    assert (span.context_window, span.context_window_estimated) == (None, False)
+    detail = await chat.manager.trace_span(session_id, span.id)
+    assert detail.context is not None
+    assert (detail.context.window, detail.context.window_estimated) == (None, False)

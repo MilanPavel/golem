@@ -1,0 +1,77 @@
+{
+  "$defs": {
+    "TraceContextItem": {
+      "additionalProperties": false,
+      "description": "One tool or one prompt section, with its share of the tokens.",
+      "properties": {
+        "group": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Group"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "tokens": {
+          "minimum": 0,
+          "title": "Tokens",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "tokens"
+      ],
+      "title": "TraceContextItem",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "One kind of content in the context.",
+  "properties": {
+    "chars": {
+      "minimum": 0,
+      "title": "Chars",
+      "type": "integer"
+    },
+    "items": {
+      "items": {
+        "$ref": "#/$defs/TraceContextItem"
+      },
+      "title": "Items",
+      "type": "array"
+    },
+    "key": {
+      "enum": [
+        "system",
+        "tools",
+        "user",
+        "assistant",
+        "tool_results"
+      ],
+      "title": "Key",
+      "type": "string"
+    },
+    "tokens": {
+      "minimum": 0,
+      "title": "Tokens",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "key",
+    "tokens",
+    "chars"
+  ],
+  "title": "TraceContextPart",
+  "type": "object"
+}
