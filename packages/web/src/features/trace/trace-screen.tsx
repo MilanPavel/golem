@@ -10,26 +10,24 @@ import { summaryLine } from "./format.ts";
 import { SpanDetail } from "./span-detail.tsx";
 import { TraceTree } from "./trace-tree.tsx";
 import { useNarrow } from "./use-narrow.ts";
-import { ViewSwitch } from "./view-switch.tsx";
+import { SessionViewBar } from "./view-switch.tsx";
 
 export const SELECT_A_SPAN = "Select a span to see what went in and what came out.";
 export const NOTHING_TO_TRACE = "Nothing to trace yet. Send a message first.";
 
 function Header({ id, title, summary, refreshing, onRefresh }: { id: string; title: string; summary: string | null; refreshing: boolean; onRefresh: () => void }) {
   return (
-    <header className="flex flex-col border-b border-line">
-      <div className="flex min-h-13 items-center gap-2.5 px-4 py-2.5">
+    <header className="flex flex-col">
+      <div className="flex min-h-13 items-center gap-2.5 border-b border-line px-4 py-2.5">
         <h1 className="min-w-0 truncate text-base font-medium">{title}</h1>
-        <div className="flex-1" />
-        <ViewSwitch id={id} view="trace" />
       </div>
-      <div className="flex items-center gap-3 border-t border-line px-4 py-1.5">
+      <SessionViewBar id={id} view="trace">
         <p className="min-w-0 flex-1 truncate font-mono text-xs text-muted">{summary ?? ""}</p>
         <Button kind="ghost" size="sm" onClick={onRefresh} disabled={refreshing} aria-label="Refresh">
           <RefreshIcon className="size-3.5" />
           <span className="max-narrow:hidden">Refresh</span>
         </Button>
-      </div>
+      </SessionViewBar>
     </header>
   );
 }

@@ -46,7 +46,7 @@ It borrows the calm, centred reading column and generous input from Claude's cha
 ```
 
 - **Sidebar** (`sunken`): the wordmark with golem's state, New session, a Search button (`Search or run a command`, with its key, ⌘K or Ctrl K) that opens the palette, then sessions grouped by folder. Each session has a small square for its state, its title, and how long ago it was active. A fork is indented under its parent with `⑂`. At the bottom are the download row (while a model downloads, see [Downloads](#downloads)), the Settings button, the connection, and the version. The theme is chosen in Settings. The Settings button has a gear and opens `/settings`. When `setup.status` has a problem, it shows a warning dot (`wait`) and the problem under the name as a line of text, with the same text in its name for a screen reader (`Settings, <problem>`), so colour is not the only signal. While the query loads or if it fails, the button is plain.
-- **Top bar:** the session title, the model chip, the folder chip, and the drawer toggle.
+- **Top bar:** the session title, the model chip, the folder chip, and the drawer toggle. Below it, a row with the `Chat | Trace` tabs; see [The trace](#the-trace).
 - **Column:**
   - Your messages are right-aligned slips in `slip`.
   - Golem's answers are full width: the small golem, then tool lines, then the text, then the duration and tool count.
@@ -237,9 +237,9 @@ The browser sets up golem on pages, not in a dialog ([ADR-039](../adr/039-web-se
 How an answer was made: each model call with its context and reply, each tool call with its args and result, and the time and tokens of each. What is recorded, and how older sessions fall back, is in [ADR-041](../adr/041-session-trace.md). Phase 13 builds it.
 
 ```
-┌ UTF-8 split in the socket client                     [Chat|Trace]    ┐
+┌ UTF-8 split in the socket client                                       ┐
 ├────────────────────────────────────────────────────────────────────────┤
-│ 2 runs · 24.6 s · 52.0K tokens                              ↻ Refresh  │
+│ Chat   Trace          2 runs · 24.6 s · 52.0K tokens   ↻ Refresh       │
 ├──────────────────────────────────────────┬─────────────────────────────┤
 │ ▾ Run 1  A character that is two…  18.4s │ ◆ model 2                   │
 │   ▾ ◆ model 1   ███                2.1s  │ qwen3-coder:30b · 4.7s ·    │
@@ -258,10 +258,10 @@ How an answer was made: each model call with its context and reply, each tool ca
 - **In the prototype:** the panel's *Trace* row has three screens: a model call, a tool call, and a session from before traces (`prototype.html#trace`, `#tracetool`, `#traceold`).
 - **Route:** `/s/:id/trace`, with `?span=<id>` for the selected span, so a link opens the same span. Like Settings, it has no drawer and no chips. The sidebar stays.
 - **Ways in:**
-  - A `Chat | Trace` switch in the top bar of a session, at its right. It shows on both views, and the current one is pressed.
+  - A `Chat | Trace` row of underline tabs under the session's title, on both views. It is a `nav` named `View`, and the current tab is `aria-current="page"`. The right side of the row belongs to the view: the trace puts its summary line and Refresh there.
   - The palette's `Trace` row, which is shown only when a session is open.
   - There is no slash command, because the terminal has no trace.
-- **Summary line:** the number of runs, the total time, and the total tokens (input plus output; `—` when none are recorded), with `Refresh` at the right. The page shows finished data and does not update while a run streams. A running run shows its open spans as `running`, and Refresh reads again.
+- **Summary line:** the number of runs, the total time, and the total tokens (input plus output; `—` when none are recorded), with `Refresh`, on the right of the tabs row. The page shows finished data and does not update while a run streams. A running run shows its open spans as `running`, and Refresh reads again.
 - **Two panes:**
   - The tree, about 55%, and the detail beside it.
   - The tree scrolls on its own, and the detail keeps its place.
@@ -314,7 +314,7 @@ How an answer was made: each model call with its context and reply, each tool ca
   - Left closes a row, or moves to its parent.
   - Enter opens or closes a row, and a click selects it.
   - In the detail, the tabs follow the tablist pattern.
-- **Narrow windows:** below 760 px the tree fills the page, rows show the time but not the tokens, and the detail is a sheet from the bottom with a close button. Closing it clears `?span=`. The chat's top bar has no room for the switch at this width, so there it hides, and the trace opens from the palette. The trace page keeps its switch to go back.
+- **Narrow windows:** below 760 px the tree fills the page, rows show the time but not the tokens, and the detail is a sheet from the bottom with a close button. Closing it clears `?span=`. The tabs row shows at every width; the summary truncates and Refresh is icon-only.
 - **Empty:** a session with no runs says `Nothing to trace yet. Send a message first.`, with a link back to the chat.
 
 ## Slash commands in the composer

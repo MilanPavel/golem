@@ -28,9 +28,9 @@ test("a run that used a tool shows as a run, a model call, and a tool call on th
   await expect(answers(page).last()).toContainText("It says 42.");
 
   // The chat's switch opens the trace.
-  const view = page.getByRole("group", { name: "View" });
-  await expect(view.getByRole("button", { name: "Chat" })).toHaveAttribute("aria-pressed", "true");
-  await view.getByRole("button", { name: "Trace" }).click();
+  const view = page.getByRole("navigation", { name: "View" });
+  await expect(view.getByRole("link", { name: "Chat" })).toHaveAttribute("aria-current", "page");
+  await view.getByRole("link", { name: "Trace" }).click();
   await expect(page).toHaveURL(new RegExp(`/s/${sessionId}/trace$`));
 
   const tree = page.getByRole("tree", { name: "Trace" });
@@ -72,7 +72,7 @@ test("a run that used a tool shows as a run, a model call, and a tool call on th
   expect(await axeViolations(page)).toEqual([]);
   await setTheme(page, "slip");
 
-  await page.getByRole("group", { name: "View" }).getByRole("button", { name: "Chat" }).click();
+  await page.getByRole("navigation", { name: "View" }).getByRole("link", { name: "Chat" }).click();
   await expect(page).toHaveURL(new RegExp(`/s/${sessionId}$`));
 });
 

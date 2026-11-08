@@ -80,7 +80,9 @@ test("the selected session is current, and a click navigates without a page load
   const { fake } = setup("/s/b");
   seed(fake);
   await wait();
-  const current = screen.getAllByRole("link").filter((link) => link.getAttribute("aria-current") === "page");
+  const current = screen
+    .getAllByRole("link")
+    .filter((link) => link.getAttribute("aria-current") === "page" && !link.closest("nav[aria-label='View']"));
   expect(current).toHaveLength(1);
   expect(current[0]!.textContent).toContain("PR digest");
 

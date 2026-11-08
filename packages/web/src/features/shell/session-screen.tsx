@@ -1,5 +1,5 @@
 import { forkPoint, type TodoItem } from "@golem/view";
-import { ViewSwitch } from "../trace/index.ts";
+import { SessionViewBar } from "../trace/index.ts";
 import { useEffect, useMemo, useRef, type ReactNode, type Ref, type RefObject } from "react";
 import { Badge, badgeVariants } from "../../ui/badge.tsx";
 import { Button } from "../../ui/button.tsx";
@@ -214,9 +214,9 @@ export function SessionScreen({ id }: { id: string }) {
               {folderName(cwd)}
             </Badge>
           )}
-          <ViewSwitch id={id} view="chat" />
           <DrawerToggle ref={toggle} open={drawerOpen} todos={todos} onToggle={() => setDrawerOpen(!drawerOpen)} />
         </TopBar>
+        <SessionViewBar id={id} view="chat" />
         <TranscriptSlot id={id} />
         <div className="mx-auto w-full max-w-column px-5 pb-4">
           <DockSlot id={id} />
