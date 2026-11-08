@@ -1,8 +1,8 @@
 import type { SkillCall } from "@golem/client";
 import { Lexer, type Token, type Tokens } from "marked";
 
-import { visibleText, type ChatMessage, type ToolBlock } from "@golem/view";
-import { formatDuration, formatMessageTime } from "./transcript.ts";
+import { formatDuration, visibleText, type ChatMessage, type ToolBlock } from "@golem/view";
+import { formatMessageTime } from "./transcript.ts";
 
 export type Span = {
   text: string;

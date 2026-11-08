@@ -29,19 +29,6 @@ export function exportDestination(input: {
   return join(golemDir(input.env, input.home), "exports", exportFileName(input.title));
 }
 
-export function formatDuration(ms: number): string {
-  if (!Number.isFinite(ms) || ms < 0) {
-    return "";
-  }
-  const seconds = ms / 1000;
-  if (seconds < 60) {
-    return `${seconds.toFixed(1)}s`;
-  }
-  const whole = Math.round(seconds);
-  const minutes = Math.floor(whole / 60);
-  return `${minutes}m ${whole % 60}s`;
-}
-
 /** `14:02` today, `2026-10-16 14:02` on an earlier day. Local time. */
 export function formatMessageTime(iso: string, nowMs: number): string {
   const at = Date.parse(iso);

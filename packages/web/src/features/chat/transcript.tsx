@@ -1,4 +1,4 @@
-import { LIVE_OUTPUT_CHARS, type ChatMessage, type ChatState, type ToolBlock, type ApprovalChoice } from "@golem/view";
+import { formatDuration, LIVE_OUTPUT_CHARS, type ChatMessage, type ChatState, type ToolBlock, type ApprovalChoice } from "@golem/view";
 import { memo, useCallback, useId, useLayoutEffect, useRef, useState } from "react";
 import { usePageActions, useDraftReader, useSession } from "../../store/page-context.tsx";
 import { ApprovalCard } from "../approval/approval-card.tsx";
@@ -9,7 +9,7 @@ import { cn } from "../../ui/cn.ts";
 import type { GolemState } from "../../ui/golem-state.ts";
 import { PixelGolem } from "../../ui/pixel-golem.tsx";
 import { useTimesShown } from "./times-shown.ts";
-import { formatClock, formatDuration, shouldStick, squeezeArgs } from "./format.ts";
+import { formatClock, shouldStick, squeezeArgs } from "./format.ts";
 import type { DiffMode } from "../diff/diff-mode.ts";
 import { DiffModeSwitch } from "../diff/diff-mode-switch.tsx";
 import { useDiffMode } from "../diff/diff-mode.ts";

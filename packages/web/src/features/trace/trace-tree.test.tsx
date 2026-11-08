@@ -20,12 +20,12 @@ test("a row for each run, model call, and tool, indented by depth", () => {
   expect(items().map((item) => item.getAttribute("aria-level"))).toEqual(["1", "2", "3", "3", "2"]);
   const [run, model, tool] = items();
   expect(run?.textContent).toContain("Run · What is in notes.txt?");
-  expect(run?.textContent).toContain("4.2s");
+  expect(run?.textContent).toContain("0m 04.2s");
   expect(model?.textContent).toContain("model 1");
-  expect(model?.textContent).toContain("2.1s");
+  expect(model?.textContent).toContain("0m 02.1s");
   expect(model?.textContent).toContain("3.3K");
   expect(tool?.textContent).toContain("grep");
-  expect(tool?.textContent).toContain("48ms");
+  expect(tool?.textContent).toContain("0m 00.048s");
   expect(within(tool as HTMLElement).getByText("ok")).toBeTruthy();
   expect(model?.getAttribute("aria-expanded")).toBe("true");
   expect(tool?.getAttribute("aria-expanded")).toBeNull();

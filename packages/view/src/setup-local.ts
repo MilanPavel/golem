@@ -2,7 +2,8 @@ import type { ListedModel, ModelListResult } from "@golem/client";
 
 import { namesModel } from "./first-run.ts";
 import { hostedProvider, recommendedHosted } from "./setup-key.ts";
-import { elapsed, move, providerName, type Choice, type PanelKey, type SetupLine } from "./setup-window.ts";
+import { formatElapsed } from "./duration.ts";
+import { move, providerName, type Choice, type PanelKey, type SetupLine } from "./setup-window.ts";
 
 /**
  * On this Mac: the Ollama panel (A5–A6′) and the Model panel (A7, A8, D2,
@@ -58,14 +59,14 @@ export function ollamaLines(state: OllamaState, now: number): SetupLine[] {
     case "installing":
       return [
         ...head,
-        { kind: "status", mark: "spin", text: "brew install ollama", right: elapsed(now - state.since) },
+        { kind: "status", mark: "spin", text: "brew install ollama", right: formatElapsed(now - state.since) },
         { kind: "text", text: state.last.length > 0 ? state.last : "asking Homebrew…", dim: true },
       ];
     case "starting":
       return [
         ...head,
         ...(state.installed ? [{ kind: "status", mark: "ok", text: "Ollama installed" } as const] : []),
-        { kind: "status", mark: "spin", text: "starting Ollama…", right: elapsed(now - state.since) },
+        { kind: "status", mark: "spin", text: "starting Ollama…", right: formatElapsed(now - state.since) },
       ];
     case "waiting":
       return [
@@ -73,7 +74,7 @@ export function ollamaLines(state: OllamaState, now: number): SetupLine[] {
         { kind: "text", text: "Opened ollama.com/download in your browser." },
         { kind: "text", text: "Install it, and golem continues on its own." },
         { kind: "blank" },
-        { kind: "status", mark: "spin", text: "waiting for Ollama…", right: elapsed(now - state.since) },
+        { kind: "status", mark: "spin", text: "waiting for Ollama…", right: formatElapsed(now - state.since) },
       ];
     case "failed":
       return [
