@@ -355,7 +355,7 @@ test("Test the connection shows each step as it ends, then what it found, and ru
   await user.click(await screen.findByRole("button", { name: GIT_ROW }));
   await user.click(screen.getByRole("button", { name: "Test the connection" }));
   const steps = await screen.findByRole("list", { name: "Test steps" });
-  expect(within(steps).getAllByRole("listitem").map((item) => item.textContent)).toEqual(["✓ resolve 3 ms"]);
+  expect(within(steps).getAllByRole("listitem").map((item) => item.textContent)).toEqual(["✓ resolve 0m 00.003s"]);
   expect(await screen.findByText(/ok: git 1.0, 1 tools/)).toBeTruthy();
   expect(fake.raw.mcpTest).toHaveBeenCalledWith({ name: "git" }, expect.any(Function));
   await user.click(screen.getByRole("button", { name: "Test again" }));

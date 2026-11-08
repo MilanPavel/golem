@@ -798,3 +798,14 @@ async def test_each_category_recommends_the_biggest_model_this_mac_can_run(
         found = {m.ref: m.recommended_for for m in listing.models if m.recommended_for}
         assert found == picks, ram
         await discovery.aclose()
+
+
+async def test_known_ctx_reads_the_listing_then_the_price_book(tmp_path: Path) -> None:
+    router = ModelRouter(GolemSettings(), keys=MemoryKeyStore())
+    discovery = _discovery(router, Network(_ollama_routes()), tmp_path)
+    assert discovery.known_ctx("anthropic/claude-test") == 200000
+    assert discovery.known_ctx("ollama/qwen3:8b") is None
+    assert discovery.known_ctx("anthropic/unknown") is None
+    await discovery.list()
+    assert discovery.known_ctx("ollama/qwen3:8b") == 40960
+    await discovery.aclose()

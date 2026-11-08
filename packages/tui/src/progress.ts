@@ -1,4 +1,4 @@
-import type { ChatMessage, RunPhase } from "@golem/view";
+import { formatElapsed, type ChatMessage, type RunPhase } from "@golem/view";
 
 export type MeterPhase = RunPhase;
 
@@ -63,7 +63,7 @@ export function meterLine(
         : `starting ${starting}`
       : phase === "waiting"
         ? "waiting for your approval"
-        : `writing · ${chars.toLocaleString("en-US")} chars · ${elapsed}s`;
+        : `writing · ${chars.toLocaleString("en-US")} chars · ${formatElapsed(elapsed * 1000)}`;
   if (columns <= 0) {
     return "";
   }

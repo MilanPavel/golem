@@ -13,8 +13,9 @@ from langchain_core.messages import BaseMessage
 from langgraph.checkpoint.memory import InMemorySaver
 
 from golem.graphs.chat import open_chat
-from golem.graphs.prompt import PromptContext, SystemPrompt
+from golem.graphs.prompt import PromptContext, Section, SystemPrompt
 from golem.models.router import ModelRouter
+from golem.models.window import ContextWindow, WindowOf
 from golem.sessions.bus import EventBus
 from golem.sessions.log import SessionLog
 from golem.sessions.manager import SessionManager
@@ -23,7 +24,7 @@ from golem.store.database import Database
 from golem.store.events import EventLog
 from golem.store.records import RunRecords, SessionRecords
 from golem.tools import default_registry
-from golem_protocol.events import ChatEvent, ModelCallStartedEvent
+from golem_protocol.events import ChatEvent, ModelCallStartedEvent, PromptSectionInfo
 
 
 class _RefusesTools(ToolCallingChatModel):
@@ -43,7 +44,11 @@ class _RefusesTools(ToolCallingChatModel):
 
 class _Chat:
     def __init__(
-        self, database: Database, model: ToolCallingChatModel, prompt: SystemPrompt | None
+        self,
+        database: Database,
+        model: ToolCallingChatModel,
+        prompt: SystemPrompt | None,
+        window_of: WindowOf | None = None,
     ) -> None:
         self.database = database
         self.runtime = open_chat(
@@ -52,6 +57,7 @@ class _Chat:
             default_registry(),
             prompt=prompt,
             blobs=BlobStore(database),
+            window_of=window_of,
         )
         self.events = EventLog(database)
         self.runs = RunRecords(database)
@@ -181,3 +187,42 @@ async def test_without_a_store_nothing_is_recorded(database: Database) -> None:
     await manager.cancel_all()
     assert (started.data.system_prompt_sha, started.data.tools_sha) == (None, None)
     assert await database.fetch_all("SELECT 1 FROM blobs") == []
+
+
+async def test_the_sections_are_recorded_with_their_lengths(database: Database) -> None:
+    prompt = SystemPrompt((Section("rules", lambda _: "Be brief."), lambda _: "Use tools."))
+    chat = _Chat(database, ToolCallingChatModel(replies=["hi"]), prompt)
+    session_id = await chat.manager.create(None)
+    (first,) = await chat.send(session_id, "hello")
+    await chat.manager.cancel_all()
+    assert first.data.system_sections == [
+        PromptSectionInfo(name="rules", chars=9),
+        PromptSectionInfo(name="section_2", chars=10),
+    ]
+
+
+async def test_no_prompt_records_no_sections(database: Database) -> None:
+    chat = _Chat(database, ToolCallingChatModel(replies=["hi"]), None)
+    session_id = await chat.manager.create(None)
+    (first,) = await chat.send(session_id, "hello")
+    await chat.manager.cancel_all()
+    assert first.data.system_sections is None
+
+
+async def test_the_window_is_recorded_when_it_is_known(database: Database) -> None:
+    chat = _Chat(
+        database,
+        ToolCallingChatModel(replies=["hi"]),
+        None,
+        window_of=lambda _: ContextWindow(8192, 8192),
+    )
+    session_id = await chat.manager.create(None)
+    (first,) = await chat.send(session_id, "hello")
+    await chat.manager.cancel_all()
+    assert (first.data.context_window, first.data.num_ctx) == (8192, 8192)
+
+    plain = _Chat(database, ToolCallingChatModel(replies=["hi"]), None)
+    other = await plain.manager.create(None)
+    (second,) = await plain.send(other, "hello")
+    await plain.manager.cancel_all()
+    assert (second.data.context_window, second.data.num_ctx) == (None, None)

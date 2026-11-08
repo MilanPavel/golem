@@ -1,15 +1,5 @@
 import type { ToolBlock } from "@golem/view";
 
-/** `4.2s` under a minute, then `1m 03s`. Empty when the number is not a duration. */
-export function formatDuration(ms: number): string {
-  if (!Number.isFinite(ms) || ms < 0) return "";
-  const seconds = ms / 1000;
-  if (seconds < 59.95) return `${seconds.toFixed(1)}s`;
-  const whole = Math.round(seconds);
-  const minutes = Math.floor(whole / 60);
-  return `${minutes}m ${String(whole % 60).padStart(2, "0")}s`;
-}
-
 /** `14:02` in the viewer's time zone. Empty when the time is missing or not a date. */
 export function formatClock(iso: string | undefined): string {
   if (!iso) return "";

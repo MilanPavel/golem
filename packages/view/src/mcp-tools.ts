@@ -1,5 +1,7 @@
 import type { McpLogsResult, McpServerConfig, McpTestProgress, McpTestResult } from "@golem/client";
 
+import { formatDuration } from "./duration.ts";
+
 /**
  * What a test, a log, and a tool filter look like to a person. Pure, so the CLI and the TUI
  * say the same thing.
@@ -10,7 +12,7 @@ type LogLine = McpLogsResult["lines"][number];
 export function formatTestStep(progress: McpTestProgress): string | null {
   if (progress.state === "running") return null;
   const mark = progress.state === "ok" ? "✓" : progress.state === "failed" ? "✗" : "-";
-  const took = progress.state === "skipped" ? "" : ` ${progress.elapsed_ms ?? 0} ms`;
+  const took = progress.state === "skipped" ? "" : ` ${formatDuration(progress.elapsed_ms ?? 0)}`;
   return `${mark} ${progress.step}${took}${progress.detail ? `  ${progress.detail}` : ""}`;
 }
 

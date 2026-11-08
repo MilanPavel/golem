@@ -65,10 +65,10 @@ test("show names each secret and says whether it is stored, never what it is", (
 
 test("a test prints each step as it ends, then what it found or why it failed", () => {
   assert.equal(formatTestStep({ test_id: "t", step: "spawn", state: "running" }), null);
-  assert.equal(formatTestStep({ test_id: "t", step: "resolve", state: "ok", elapsed_ms: 4 }), "✓ resolve 4 ms");
+  assert.equal(formatTestStep({ test_id: "t", step: "resolve", state: "ok", elapsed_ms: 4 }), "✓ resolve 0m 00.004s");
   assert.equal(
     formatTestStep({ test_id: "t", step: "spawn", state: "failed", elapsed_ms: 9, detail: "no such file" }),
-    "✗ spawn 9 ms  no such file",
+    "✗ spawn 0m 00.009s  no such file",
   );
   assert.equal(formatTestStep({ test_id: "t", step: "ping", state: "skipped" }), "- ping");
   const ok = formatTestResult({

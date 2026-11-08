@@ -47,12 +47,12 @@ test("a finished answer: idle golem, markdown, duration and tool count, no curso
   expect(container.querySelector(".prose strong")?.textContent).toBe("bold");
   expect(golemState(container)).toBe("idle");
   expect(container.querySelector("[data-cursor]")).toBeNull();
-  expect(screen.getByText("4.2s · 1 tool")).toBeTruthy();
+  expect(screen.getByText("0m 04.2s · 1 tool")).toBeTruthy();
 });
 
-test("the duration line has no tool count when there are no tools, and says 1m 03s", () => {
+test("the duration line has no tool count when there are no tools, and says 1m 03.0s", () => {
   render(<TranscriptMessages chat={chat([answer({ durationMs: 63_000 })])} />);
-  expect(screen.getByText("1m 03s")).toBeTruthy();
+  expect(screen.getByText("1m 03.0s")).toBeTruthy();
 });
 
 test("a streaming answer has the cursor, a thinking golem, and no footer", () => {

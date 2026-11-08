@@ -231,6 +231,19 @@ class ModelDiscovery:
         self._fetching: dict[str, asyncio.Task[_Remote]] = {}
         self._price_task: asyncio.Task[None] | None = None
         self._shown: dict[str, _Shown] = {}
+        self._ctx: dict[str, int] = {}
+
+    def known_ctx(self, ref: str) -> int | None:
+        """The tokens ``ref`` can take in, as last listed or from the price book. No I/O."""
+        listed = self._ctx.get(ref)
+        if listed is not None:
+            return listed
+        provider, _, model_id = ref.partition("/")
+        configured = self._router.provider(provider)
+        if model_id == "" or (configured is not None and configured.kind == "ollama"):
+            return None
+        info = self._prices.lookup(provider, model_id)
+        return None if info is None else info.ctx
 
     @property
     def ram_gb(self) -> float | None:
@@ -297,6 +310,7 @@ class ModelDiscovery:
             self._merge(providers, profiles, default, keys, results, states, show_all),
             self.pulling(),
         )
+        self._ctx = {m.ref: m.ctx for m in models if m.ctx is not None}
         ollama_state = states.get("ollama")
         running = ollama_state is not None and ollama_state.status == "ready"
         setup = ModelSetup(

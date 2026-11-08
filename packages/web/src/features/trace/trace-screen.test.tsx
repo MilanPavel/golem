@@ -41,7 +41,7 @@ afterEach(() => {
 test("the page shows the title, the summary line, the tree, and the empty detail", async () => {
   const { fake } = await open("/s/a/trace");
   expect(await screen.findByRole("heading", { name: "UTF-8 split" })).toBeTruthy();
-  expect(await screen.findByText("1 run · 4.2s · 6.9K tokens")).toBeTruthy();
+  expect(await screen.findByText("1 run · 0m 04.2s · 6.9K tokens")).toBeTruthy();
   expect(screen.getAllByRole("treeitem")).toHaveLength(5);
   expect(screen.getByText(SELECT_A_SPAN)).toBeTruthy();
   expect(fake.raw.getTrace).toHaveBeenCalledWith("a");

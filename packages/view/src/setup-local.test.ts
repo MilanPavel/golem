@@ -60,7 +60,7 @@ test("install shows brew's last line, Esc stops it, and the end moves the panel 
   const installing = pressOllama(missing, "enter", 1_000);
   assert.deepEqual(installing.effect, { kind: "install" });
   const lines = ollamaLines({ phase: "installing", since: 1_000, last: "==> Downloading ollama" }, 42_000);
-  assert.deepEqual(lines[2], { kind: "status", mark: "spin", text: "brew install ollama", right: "41s" });
+  assert.deepEqual(lines[2], { kind: "status", mark: "spin", text: "brew install ollama", right: "0m 41s" });
   assert.deepEqual(lines[3], { kind: "text", text: "==> Downloading ollama", dim: true });
   assert.deepEqual(pressOllama(installing.state, "back", 0).effect, { kind: "cancel" });
   assert.deepEqual(ollamaInstallEnded(installing.state, "installed", "", 9), { phase: "starting", since: 9, installed: true });

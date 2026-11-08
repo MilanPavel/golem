@@ -1,6 +1,7 @@
 import type { ListedModel, ModelListResult } from "@golem/client";
 
-import { elapsed, move, providerName, type Choice, type MoveKey, type PanelKey, type SetupLine } from "./setup-window.ts";
+import { formatElapsed } from "./duration.ts";
+import { move, providerName, type Choice, type MoveKey, type PanelKey, type SetupLine } from "./setup-window.ts";
 
 /**
  * With an API key: the Provider panel (B1) and the Key panel (B2–B3′) of
@@ -214,7 +215,7 @@ export function keyLines(state: KeyState, now: number): SetupLine[] {
     case "checking":
       return [
         ...head,
-        { kind: "status", mark: "spin", text: `checking the key with ${name}…`, right: elapsed(now - state.since) },
+        { kind: "status", mark: "spin", text: `checking the key with ${name}…`, right: formatElapsed(now - state.since) },
         ...(now - state.since >= KEYCHAIN_HINT_MS ? KEYCHAIN_DIALOG : []),
       ];
     case "works": {
@@ -222,7 +223,7 @@ export function keyLines(state: KeyState, now: number): SetupLine[] {
       return [
         ...head,
         { kind: "status", mark: "ok", text: `key works${count}` },
-        { kind: "status", mark: "spin", text: "listing them…", right: elapsed(now - state.since) },
+        { kind: "status", mark: "spin", text: "listing them…", right: formatElapsed(now - state.since) },
         ...(now - state.since >= KEYCHAIN_HINT_MS ? KEYCHAIN_DIALOG : []),
       ];
     }

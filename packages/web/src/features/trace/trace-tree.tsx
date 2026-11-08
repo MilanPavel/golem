@@ -145,7 +145,7 @@ function TreeRow({
         ) : null}
       </span>
       <WaterfallBar span={span} bar={barFor(row.run, span)} />
-      <span className="w-14 shrink-0 text-right font-mono text-xs text-muted tabular-nums">{formatDuration(span.duration_ms)}</span>
+      <span className="w-20 shrink-0 text-right font-mono text-xs text-muted tabular-nums">{formatDuration(span.duration_ms)}</span>
       <span className="w-12 shrink-0 text-right font-mono text-xs text-muted tabular-nums max-narrow:hidden">
         {span.kind === "model" ? (tokens === null ? "—" : formatTokens(tokens)) : ""}
       </span>

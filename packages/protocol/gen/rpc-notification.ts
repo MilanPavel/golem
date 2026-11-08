@@ -88,13 +88,18 @@ export type Seq6 = number;
 export type SessionId7 = string;
 export type Ts6 = string;
 export type Type6 = 'message.completed';
+export type ContextWindow = number | null;
 export type Index = number;
 export type MessageId4 = string;
 export type MessageIds = string[];
 export type Model = string | null;
+export type NumCtx = number | null;
 export type Profile = string;
 export type Provider = string | null;
 export type SystemPromptSha = string | null;
+export type SystemSections = PromptSectionInfo[] | null;
+export type Chars = number;
+export type Name1 = string;
 export type ToolsSha = string | null;
 export type RunId7 = string;
 export type Seq7 = number;
@@ -142,7 +147,7 @@ export type Ts12 = string;
 export type Type12 = 'run.cancelled';
 export type CallId = string;
 export type MessageId6 = string;
-export type Name1 = string;
+export type Name2 = string;
 export type RunId13 = string;
 export type Seq13 = number;
 export type SessionId14 = string;
@@ -184,7 +189,7 @@ export type Type17 = 'tool.failed';
 export type CallId5 = string;
 export type Diff = string | null;
 export type MessageId7 = string | null;
-export type Name2 = string;
+export type Name3 = string;
 export type Source = string;
 export type Subject1 = string | null;
 export type RunId18 = string;
@@ -197,7 +202,7 @@ export type Args3 = {
 } | null;
 export type CallId6 = string;
 export type Decision = 'allow' | 'allow_session' | 'allow_always' | 'deny';
-export type Name3 = string;
+export type Name4 = string;
 export type Rule = string | null;
 export type Subject2 = string | null;
 export type RunId19 = string;
@@ -217,7 +222,7 @@ export type Ts20 = string;
 export type Type20 = 'todos.updated';
 export type Hash = string;
 export type How = 'invoked' | 'pinned';
-export type Name4 = string;
+export type Name5 = string;
 export type Path = string;
 export type Source1 = 'project' | 'user' | 'bundled';
 export type RunId21 = string | null;
@@ -225,7 +230,7 @@ export type Seq21 = number;
 export type SessionId22 = string;
 export type Ts21 = string;
 export type Type21 = 'skill.activated';
-export type Name5 = string;
+export type Name6 = string;
 export type Reason2 = 'unpinned';
 export type RunId22 = string | null;
 export type Seq22 = number;
@@ -233,7 +238,7 @@ export type SessionId23 = string;
 export type Ts22 = string;
 export type Type22 = 'skill.deactivated';
 export type Message2 = string;
-export type Name6 = string;
+export type Name7 = string;
 export type Reason3 = 'missing' | 'disabled' | 'broken';
 export type RunId23 = string | null;
 export type Seq23 = number;
@@ -511,14 +516,32 @@ export interface ModelCallStartedEvent {
  * via the `definition` "ModelCallStartedData".
  */
 export interface ModelCallStartedData {
+  context_window?: ContextWindow;
   index: Index;
   message_id: MessageId4;
   message_ids?: MessageIds;
   model?: Model;
+  num_ctx?: NumCtx;
   profile: Profile;
   provider?: Provider;
   system_prompt_sha?: SystemPromptSha;
+  system_sections?: SystemSections;
   tools_sha?: ToolsSha;
+}
+/**
+ * One non-empty section of the system prompt sent with a model call.
+ *
+ * ``chars`` is the length of the section's text after strip, counted as
+ * Python counts it (Unicode code points). The prompt is the sections' texts,
+ * in order, joined with "\n\n", so the lengths split the stored prompt
+ * exactly.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "PromptSectionInfo".
+ */
+export interface PromptSectionInfo {
+  chars: Chars;
+  name: Name1;
 }
 /**
  * The model call ended. Comes before the call's ``tool.requested`` events.
@@ -674,7 +697,7 @@ export interface ToolRequestedData {
   args: Args1;
   call_id: CallId;
   message_id: MessageId6;
-  name: Name1;
+  name: Name2;
 }
 export interface Args1 {
   [k: string]: unknown;
@@ -825,7 +848,7 @@ export interface ApprovalNeededData {
   call_id: CallId5;
   diff?: Diff;
   message_id?: MessageId7;
-  name: Name2;
+  name: Name3;
   source: Source;
   subject?: Subject1;
 }
@@ -861,7 +884,7 @@ export interface ApprovalResolvedData {
   args?: Args3;
   call_id: CallId6;
   decision: Decision;
-  name: Name3;
+  name: Name4;
   rule?: Rule;
   subject?: Subject2;
 }
@@ -937,7 +960,7 @@ export interface SkillActivatedEvent {
 export interface SkillActivatedData {
   hash: Hash;
   how: How;
-  name: Name4;
+  name: Name5;
   path: Path;
   source: Source1;
 }
@@ -962,7 +985,7 @@ export interface SkillDeactivatedEvent {
  * via the `definition` "SkillDeactivatedData".
  */
 export interface SkillDeactivatedData {
-  name: Name5;
+  name: Name6;
   reason: Reason2;
 }
 /**
@@ -994,6 +1017,6 @@ export interface SkillSkippedEvent {
  */
 export interface SkillSkippedData {
   message: Message2;
-  name: Name6;
+  name: Name7;
   reason: Reason3;
 }

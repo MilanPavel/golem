@@ -29,6 +29,8 @@ from golem_protocol.events import (
     SkillSkippedEvent,
 )
 
+PINNED_SECTION = "pinned_skills"
+
 PINNED_INTRO = "The user pinned these skills for this session. Follow them whenever they apply."
 
 SkipReason = Literal["missing", "disabled", "broken"]
@@ -91,7 +93,7 @@ def pinned_section(registry: SkillRegistry) -> Section:
             return None
         return "\n\n".join([PINNED_INTRO, *blocks])
 
-    return section
+    return Section(PINNED_SECTION, section)
 
 
 def pinned_folders(registry: SkillRegistry, cwd: str | None, names: Iterable[str]) -> list[str]:

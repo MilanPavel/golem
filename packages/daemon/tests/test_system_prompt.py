@@ -12,7 +12,7 @@ from langchain_core.messages import BaseMessage, SystemMessage
 from langgraph.checkpoint.memory import InMemorySaver
 
 from golem.graphs.chat import open_chat
-from golem.graphs.prompt import PromptContext, SystemPrompt
+from golem.graphs.prompt import PromptContext, Section, SystemPrompt
 from golem.models.router import ModelRouter
 from golem.sessions.bus import EventBus
 from golem.sessions.log import SessionLog
@@ -62,6 +62,46 @@ def test_sections_are_joined_and_empty_ones_left_out() -> None:
     )
     assert prompt.text(PromptContext(state={})) == "First.\n\nSecond."
     assert SystemPrompt().message(PromptContext(state={})) is None
+
+
+def _mixed() -> SystemPrompt:
+    return SystemPrompt(
+        sections=(
+            Section("a", lambda _: "First."),
+            lambda _: None,
+            lambda _: "  \n",
+            lambda _: "\nSecond.\n",
+        )
+    )
+
+
+def test_parts_name_each_section_and_bare_functions_by_place() -> None:
+    context = PromptContext(state={})
+    assert _mixed().parts(context) == [("a", "First."), ("section_4", "Second.")]
+    assert _mixed().text(context) == "First.\n\nSecond."
+
+
+def test_each_section_is_called_once_per_parts() -> None:
+    calls: list[int] = []
+
+    def build(_: PromptContext) -> str:
+        calls.append(1)
+        return "x"
+
+    SystemPrompt(sections=(Section("a", build),)).parts(PromptContext(state={}))
+    assert calls == [1]
+
+
+def test_the_lengths_split_the_text() -> None:
+    context = PromptContext(state={})
+    prompt = _mixed()
+    text = prompt.text(context)
+    slices: list[str] = []
+    at = 0
+    for _, chars in ((n, len(t)) for n, t in prompt.parts(context)):
+        slices.append(text[at : at + chars])
+        at += chars + 2
+    assert "\n\n".join(slices) == text
 
 
 async def test_without_a_prompt_the_model_sees_only_the_history(database: Database) -> None:
