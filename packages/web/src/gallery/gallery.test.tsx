@@ -1,9 +1,13 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
 import { SETUP_CASES } from "../features/setup/sample.ts";
 import { Gallery } from "./gallery.tsx";
+
+// Each test renders the whole gallery, in both themes, and axe walks all of it. On a shared CI
+// runner that now takes over 20 s, while other files keep the shorter limit from vite.config.ts.
+vi.setConfig({ testTimeout: 60_000 });
 
 test("the gallery shows both themes and has no accessibility violations", async () => {
   const { container } = render(<Gallery />);
