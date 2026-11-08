@@ -7,7 +7,7 @@ from typing import Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
 
-from golem_protocol.events import SkillCall, SkillSource
+from golem_protocol.events import PromptSectionInfo, SkillCall, SkillSource
 
 
 class HelloParams(BaseModel):
@@ -435,6 +435,9 @@ class TraceModelSpan(TraceSpan):
     """A model call, with the tool calls it asked for, in request order."""
 
     children: list[TraceToolSpan] = Field(default_factory=list[TraceToolSpan])
+    context_window: int | None = Field(default=None, ge=1)
+    num_ctx: int | None = Field(default=None, ge=1)
+    context_window_estimated: bool = False
 
 
 class TraceRunSpan(TraceSpan):
@@ -466,6 +469,45 @@ class TraceSpanParams(BaseModel):
     span_id: str = Field(min_length=1)
 
 
+class TraceContextItem(BaseModel):
+    """One tool or one prompt section, with its share of the tokens."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    group: str | None = None
+    tokens: int = Field(ge=0)
+
+
+class TraceContextPart(BaseModel):
+    """One kind of content in the context."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    key: Literal["system", "tools", "user", "assistant", "tool_results"]
+    tokens: int = Field(ge=0)
+    chars: int = Field(ge=0)
+    items: list[TraceContextItem] = Field(default_factory=list[TraceContextItem])
+
+
+class TraceContext(BaseModel):
+    """What filled one model call's context, and how big the window was.
+
+    ``parts`` always has the five keys, in order. They add up to ``used``
+    when it is known. The split between them is an estimate (about four
+    characters a token, scaled to ``used``), so ``estimated`` is always true.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    used: int | None = Field(default=None, ge=0)
+    window: int | None = Field(default=None, ge=1)
+    window_estimated: bool = False
+    num_ctx: int | None = Field(default=None, ge=1)
+    estimated: bool = True
+    parts: list[TraceContextPart]
+
+
 class TraceMessage(BaseModel):
     """One checkpoint message with its id, as plain text."""
 
@@ -476,6 +518,7 @@ class TraceMessage(BaseModel):
     text: str
     tool_calls: list[dict[str, Any]] = Field(default_factory=list[dict[str, Any]])
     call_id: str | None = None
+    tokens: int | None = Field(default=None, ge=0)
 
 
 class TraceSpanResult(BaseModel):
@@ -486,7 +529,8 @@ class TraceSpanResult(BaseModel):
     begins. ``system_prompt`` and ``tools`` are null when they were not
     recorded. For a tool span, ``result`` is the text the model got back, and
     ``artifact_id`` is set when the output was too big for the model: open it
-    with ``artifact.read``.
+    with ``artifact.read``. ``context`` is set for every model span, and
+    ``system_sections`` is null when the call recorded none.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -503,6 +547,8 @@ class TraceSpanResult(BaseModel):
     approval: dict[str, Any] | None = None
     stop_reason: str | None = None
     provider: str | None = None
+    context: TraceContext | None = None
+    system_sections: list[PromptSectionInfo] | None = None
 
 
 class AuthSetParams(BaseModel):
@@ -2123,6 +2169,9 @@ __all__ = [
     "SkillListResult",
     "SkillRegistryChanged",
     "SkillSource",
+    "TraceContext",
+    "TraceContextItem",
+    "TraceContextPart",
     "TraceGetParams",
     "TraceGetResult",
     "TraceMessage",

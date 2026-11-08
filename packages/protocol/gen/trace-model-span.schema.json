@@ -214,6 +214,24 @@
       "title": "Children",
       "type": "array"
     },
+    "context_window": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Context Window"
+    },
+    "context_window_estimated": {
+      "default": false,
+      "title": "Context Window Estimated",
+      "type": "boolean"
+    },
     "duration_ms": {
       "anyOf": [
         {
@@ -281,6 +299,19 @@
     "name": {
       "title": "Name",
       "type": "string"
+    },
+    "num_ctx": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Num Ctx"
     },
     "preview": {
       "default": "",

@@ -43,6 +43,7 @@ from golem.mcp.client import CallResult, McpClient, McpError
 from golem.mcp.launch import Secrets, find_command, transport_for
 from golem.mcp.probe import DEFAULT_TIMEOUTS, ProbeResult, Step, Timeouts, probe
 from golem.mcp.tools import mcp_tools
+from golem.tokens import CHARS_PER_TOKEN
 from golem.tools.registry import Tool, ToolScope
 from golem_protocol.commands import McpLogLine, McpServer, McpServerLog, McpServerState
 from golem_protocol.rpc import McpServerLogNotification, McpServerStatusNotification
@@ -55,7 +56,6 @@ LIST_SECONDS = 30.0
 STABLE_SECONDS = 60.0
 LOG_LINES = 500
 REDACTED = "•••"
-CHARS_PER_TOKEN = 4
 
 Broadcast = Callable[[BaseModel], None]
 

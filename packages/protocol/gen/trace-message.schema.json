@@ -39,6 +39,19 @@
       "title": "Text",
       "type": "string"
     },
+    "tokens": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Tokens"
+    },
     "tool_calls": {
       "items": {
         "additionalProperties": true,

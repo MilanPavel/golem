@@ -26,6 +26,7 @@ from golem.permissions.engine import Allowance
 from golem.permissions.policy import explain
 from golem.sessions.approvals import pending_approval
 from golem.sessions.bus import EventTarget, SummaryTarget
+from golem.sessions.context import context_breakdown
 from golem.sessions.ids import new_id
 from golem.sessions.log import SessionLog
 from golem.sessions.runner import (
@@ -38,7 +39,7 @@ from golem.sessions.runner import (
     run_turn,
 )
 from golem.sessions.titles import TitleGenerator, choose_title, clean_title, fork_title
-from golem.sessions.trace import build_trace, read_span
+from golem.sessions.trace import build_trace, filled_window, read_span, with_windows
 from golem.skills.invoke import Invocation, SkillInvokeError, invoke
 from golem.skills.pinned import PinMemory, SkillPinError, pinnable, pinned_folders
 from golem.skills.registry import SkillRegistry
@@ -329,32 +330,67 @@ class SessionManager:
     async def trace(self, session_id: str) -> tuple[str | None, list[TraceRunSpan]]:
         """The session's title and its runs as a tree of spans. Does not start a run.
 
+        A model span has its context window. One the event did not record gets
+        today's window, marked estimated.
+
         Raises :class:`SessionNotFoundError` and :class:`SchemaMismatchError`, as
         :meth:`inspect` does.
         """
         async with self._lock:
             session = await self._resolve(session_id)
-            return session.title, build_trace(await self._events.stored(session_id))
+            runs = build_trace(await self._events.stored(session_id))
+            window_of = self._runtime.window_of
+            if window_of is not None:
+                runs = with_windows(
+                    runs, lambda name: window_of(name).window, session.model_profile
+                )
+            return session.title, runs
 
     async def trace_span(self, session_id: str, span_id: str) -> TraceSpanResult:
         """The input and output of one span, with the stored system prompt and tools.
+
+        A model span also has ``context``: what filled the call, by part, each
+        estimated and scaled to the tokens the provider counted.
 
         Raises :class:`SessionNotFoundError`, :class:`SchemaMismatchError`, and
         :class:`SpanNotFoundError` when no span of the session has ``span_id``.
         """
         async with self._lock:
-            await self._resolve(session_id)
+            session = await self._resolve(session_id)
             events = await self._events.stored(session_id)
             messages = trace_messages(await self._runtime.values(session_id))
         found = read_span(build_trace(events), events, messages, span_id)
         if found is None:
             raise SpanNotFoundError(span_id)
         updates: dict[str, object] = {}
+        prompt: str | None = None
+        tools: list[dict[str, object]] | None = None
         if self._blobs is not None:
             prompt = await self._blob(found.system_prompt_sha)
-            tools = await self._blob(found.tools_sha)
+            tools = _schemas(await self._blob(found.tools_sha))
             updates["system_prompt"] = prompt
-            updates["tools"] = _schemas(tools)
+            updates["tools"] = tools
+        span = found.result.span
+        if span.kind == "model":
+            window, estimated = found.context_window, False
+            num_ctx = found.num_ctx
+            window_of = self._runtime.window_of
+            if window is None and window_of is not None:
+                window, estimated = filled_window(
+                    span, None, session.model_profile, lambda name: window_of(name).window
+                )
+            context, sized = context_breakdown(
+                used=None if span.tokens is None else span.tokens.input,
+                window=window,
+                window_estimated=estimated,
+                num_ctx=num_ctx,
+                system_prompt=prompt,
+                sections=found.result.system_sections,
+                tools=tools,
+                messages=found.result.messages,
+            )
+            updates["context"] = context
+            updates["messages"] = sized
         return found.result.model_copy(update=updates)
 
     async def _blob(self, sha256: str | None) -> str | None:

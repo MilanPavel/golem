@@ -1,5 +1,169 @@
 {
   "$defs": {
+    "PromptSectionInfo": {
+      "additionalProperties": false,
+      "description": "One non-empty section of the system prompt sent with a model call.\n\n``chars`` is the length of the section's text after strip, counted as\nPython counts it (Unicode code points). The prompt is the sections' texts,\nin order, joined with \"\\n\\n\", so the lengths split the stored prompt\nexactly.",
+      "properties": {
+        "chars": {
+          "minimum": 0,
+          "title": "Chars",
+          "type": "integer"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "chars"
+      ],
+      "title": "PromptSectionInfo",
+      "type": "object"
+    },
+    "TraceContext": {
+      "additionalProperties": false,
+      "description": "What filled one model call's context, and how big the window was.\n\n``parts`` always has the five keys, in order. They add up to ``used``\nwhen it is known. The split between them is an estimate (about four\ncharacters a token, scaled to ``used``), so ``estimated`` is always true.",
+      "properties": {
+        "estimated": {
+          "default": true,
+          "title": "Estimated",
+          "type": "boolean"
+        },
+        "num_ctx": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Num Ctx"
+        },
+        "parts": {
+          "items": {
+            "$ref": "#/$defs/TraceContextPart"
+          },
+          "title": "Parts",
+          "type": "array"
+        },
+        "used": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Used"
+        },
+        "window": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Window"
+        },
+        "window_estimated": {
+          "default": false,
+          "title": "Window Estimated",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "parts"
+      ],
+      "title": "TraceContext",
+      "type": "object"
+    },
+    "TraceContextItem": {
+      "additionalProperties": false,
+      "description": "One tool or one prompt section, with its share of the tokens.",
+      "properties": {
+        "group": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Group"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "tokens": {
+          "minimum": 0,
+          "title": "Tokens",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "tokens"
+      ],
+      "title": "TraceContextItem",
+      "type": "object"
+    },
+    "TraceContextPart": {
+      "additionalProperties": false,
+      "description": "One kind of content in the context.",
+      "properties": {
+        "chars": {
+          "minimum": 0,
+          "title": "Chars",
+          "type": "integer"
+        },
+        "items": {
+          "items": {
+            "$ref": "#/$defs/TraceContextItem"
+          },
+          "title": "Items",
+          "type": "array"
+        },
+        "key": {
+          "enum": [
+            "system",
+            "tools",
+            "user",
+            "assistant",
+            "tool_results"
+          ],
+          "title": "Key",
+          "type": "string"
+        },
+        "tokens": {
+          "minimum": 0,
+          "title": "Tokens",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "key",
+        "tokens",
+        "chars"
+      ],
+      "title": "TraceContextPart",
+      "type": "object"
+    },
     "TraceMessage": {
       "additionalProperties": false,
       "description": "One checkpoint message with its id, as plain text.",
@@ -40,6 +204,19 @@
         "text": {
           "title": "Text",
           "type": "string"
+        },
+        "tokens": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tokens"
         },
         "tool_calls": {
           "items": {
@@ -249,7 +426,7 @@
     }
   },
   "additionalProperties": false,
-  "description": "What a span took in and gave out. ``span`` has no children.\n\nFor a model span, ``messages`` is the context sent, in order, and\n``new_from`` is where the part new since the previous model call\nbegins. ``system_prompt`` and ``tools`` are null when they were not\nrecorded. For a tool span, ``result`` is the text the model got back, and\n``artifact_id`` is set when the output was too big for the model: open it\nwith ``artifact.read``.",
+  "description": "What a span took in and gave out. ``span`` has no children.\n\nFor a model span, ``messages`` is the context sent, in order, and\n``new_from`` is where the part new since the previous model call\nbegins. ``system_prompt`` and ``tools`` are null when they were not\nrecorded. For a tool span, ``result`` is the text the model got back, and\n``artifact_id`` is set when the output was too big for the model: open it\nwith ``artifact.read``. ``context`` is set for every model span, and\n``system_sections`` is null when the call recorded none.",
   "properties": {
     "approval": {
       "anyOf": [
@@ -289,6 +466,17 @@
       ],
       "default": null,
       "title": "Artifact Id"
+    },
+    "context": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/TraceContext"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "messages": {
       "items": {
@@ -371,6 +559,21 @@
       ],
       "default": null,
       "title": "System Prompt"
+    },
+    "system_sections": {
+      "anyOf": [
+        {
+          "items": {
+            "$ref": "#/$defs/PromptSectionInfo"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "System Sections"
     },
     "tools": {
       "anyOf": [

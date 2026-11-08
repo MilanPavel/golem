@@ -6,7 +6,7 @@ from typing import Any
 
 from pydantic import TypeAdapter
 
-from golem.sessions.trace import build_trace
+from golem.sessions.trace import build_trace, with_windows
 from golem_protocol.events import ChatEvent
 
 _EVENT: TypeAdapter[ChatEvent] = TypeAdapter(ChatEvent)
@@ -41,7 +41,13 @@ class _Log:
         self.add("run.started", {}, run)
 
     def model(
-        self, message_id: str, *, recorded: bool = True, text: str = "ok", run: str = "r1"
+        self,
+        message_id: str,
+        *,
+        recorded: bool = True,
+        text: str = "ok",
+        run: str = "r1",
+        window: dict[str, int] | None = None,
     ) -> None:
         self.add("message.started", {"message_id": message_id, "role": "assistant"}, run)
         if recorded:
@@ -53,6 +59,7 @@ class _Log:
                     "profile": "p",
                     "provider": "x",
                     "model": "y",
+                    **(window or {}),
                 },
                 run,
             )
@@ -277,3 +284,46 @@ def test_two_runs_come_out_oldest_first() -> None:
     ]
     assert _ids(first.children) == ["m_1"]
     assert _ids(second.children) == ["m_2"]
+
+
+def test_a_recorded_span_takes_its_window_and_num_ctx_from_the_event() -> None:
+    log = _Log()
+    log.user("hi")
+    log.model("m1", window={"context_window": 8192, "num_ctx": 4096})
+    log.model("m2")
+    (run,) = build_trace(log.events)
+    first, second = run.children
+    assert (first.context_window, first.num_ctx) == (8192, 4096)
+    assert (second.context_window, second.num_ctx) == (None, None)
+    assert first.context_window_estimated is False
+
+
+def test_with_windows_fills_only_spans_without_one() -> None:
+    log = _Log()
+    log.user("hi")
+    log.model("m1", window={"context_window": 8192})
+    log.model("m2")
+    log.model("m3")
+    log.user("again", "r2")
+    log.model("m4", recorded=False, run="r2")
+    asked: list[str] = []
+
+    def window_of(name: str) -> int | None:
+        asked.append(name)
+        return 1000 if name == "x/y" else 2000
+
+    runs = with_windows(build_trace(log.events), window_of, "prof")
+    got = [(m.context_window, m.context_window_estimated) for r in runs for m in r.children]
+    assert got == [(8192, False), (1000, True), (1000, True), (2000, True)]
+    assert sorted(asked) == ["prof", "x/y"]
+
+
+def test_with_windows_leaves_a_span_whose_window_is_unknown() -> None:
+    log = _Log()
+    log.user("hi")
+    log.model("m1")
+    (run,) = with_windows(build_trace(log.events), lambda _: None, "prof")
+    assert (run.children[0].context_window, run.children[0].context_window_estimated) == (
+        None,
+        False,
+    )

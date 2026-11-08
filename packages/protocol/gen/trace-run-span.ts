@@ -19,6 +19,8 @@ export type CacheWrite = number | null;
 export type Input = number | null;
 export type Output = number | null;
 export type Children1 = TraceToolSpan[];
+export type ContextWindow = number | null;
+export type ContextWindowEstimated = boolean;
 export type DurationMs1 = number | null;
 export type End1 = string | null;
 export type FirstTokenMs1 = number | null;
@@ -26,6 +28,7 @@ export type Id1 = string;
 export type Kind1 = 'run' | 'model' | 'tool';
 export type Model1 = string | null;
 export type Name1 = string;
+export type NumCtx = number | null;
 export type Preview1 = string;
 export type Recorded1 = boolean;
 export type Start1 = string;
@@ -71,6 +74,8 @@ export interface TraceRunSpan {
 export interface TraceModelSpan {
   approval_wait_ms?: ApprovalWaitMs1;
   children?: Children1;
+  context_window?: ContextWindow;
+  context_window_estimated?: ContextWindowEstimated;
   duration_ms?: DurationMs1;
   end?: End1;
   first_token_ms?: FirstTokenMs1;
@@ -78,6 +83,7 @@ export interface TraceModelSpan {
   kind: Kind1;
   model?: Model1;
   name: Name1;
+  num_ctx?: NumCtx;
   preview?: Preview1;
   recorded?: Recorded1;
   start: Start1;

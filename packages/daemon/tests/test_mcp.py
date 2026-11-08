@@ -15,7 +15,7 @@ from pydantic import BaseModel
 from golem.config import McpServerSettings, load_mcp, load_settings
 from golem.mcp.client import CallResult, McpClient, McpError, McpTool
 from golem.mcp.launch import launch, transport_for
-from golem.mcp.tools import mcp_tools, result_text, subject, tool_name
+from golem.mcp.tools import mcp_tools, result_text, server_of, subject, tool_name
 from golem.mcp.transport import HttpTransport, Launch, StdioTransport
 from golem.tools.registry import (
     Tool,
@@ -108,6 +108,17 @@ def test_tool_names_fit_what_providers_take() -> None:
     assert tool_name("git", "git_status") == "mcp__git__git_status"
     assert tool_name("fs", "weird.name/x") == "mcp__fs__weird_name_x"
     assert len(tool_name("server", "x" * 100)) == 64
+
+
+def test_server_of_reads_the_server_out_of_a_tool_name() -> None:
+    assert server_of("mcp__github__create_issue") == "github"
+    assert server_of("mcp__my-db__q__x") == "my-db"
+    assert server_of("read_file") is None
+    assert server_of("mcp__") is None
+    assert server_of("mcp__github") is None
+    assert server_of("mcp____x") is None
+    server = "a" * 32
+    assert server_of(tool_name(server, "t" * 100)) == server
 
 
 class _Source:

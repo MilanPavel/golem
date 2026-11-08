@@ -11,6 +11,8 @@ from golem_protocol.commands import (
     ModelServerStatus,
     PingParams,
     SessionInspectResult,
+    TraceContextPart,
+    TraceSpanResult,
 )
 from golem_protocol.events import Ping
 from golem_protocol.rpc import (
@@ -142,3 +144,15 @@ def test_rpc_success_carries_ping_result() -> None:
     success = RpcSuccess(result=ping.model_dump(mode="json"), id="req-1")
     restored = RpcSuccess.model_validate_json(success.model_dump_json())
     assert restored.result == {"type": "system.ping", "nonce": "abc"}
+
+
+def test_trace_span_result_without_the_context_fields_validates() -> None:
+    result = TraceSpanResult.model_validate(
+        {"span": {"id": "m1", "kind": "model", "name": "model 1", "start": "t", "status": "ok"}}
+    )
+    assert result.context is None and result.system_sections is None
+
+
+def test_a_context_part_with_an_unknown_key_is_rejected() -> None:
+    with pytest.raises(ValidationError):
+        TraceContextPart.model_validate({"key": "memory", "tokens": 1, "chars": 4})

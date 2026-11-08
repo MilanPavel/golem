@@ -26,6 +26,7 @@ from golem.server.mcp_edit import (
     to_settings,
     to_table,
 )
+from golem.tokens import CHARS_PER_TOKEN
 from golem_protocol.commands import (
     McpCallParams,
     McpCallResult,
@@ -39,8 +40,6 @@ from golem_protocol.commands import (
     McpToolInfo,
 )
 from golem_protocol.rpc import McpTestProgressNotification
-
-CHARS_PER_TOKEN = 4
 
 
 async def mcp_test(ctx: RequestContext, params: McpTestParams) -> McpTestResult:

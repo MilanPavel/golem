@@ -6,11 +6,14 @@ is run, then model call, then tool call.
 A session recorded before ``model.call.*`` events existed has none. Its model
 spans are rebuilt from each assistant message's ``message.started`` and
 ``message.completed``, with ``recorded`` false.
+
+A model span carries the context window of its call. A window the event did
+not record is filled from today's config, and marked estimated.
 """
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal
@@ -157,6 +160,8 @@ def _recorded_models(
                 model=model,
                 tokens=tokens,
                 first_token_ms=first,
+                context_window=data.context_window,
+                num_ctx=data.num_ctx,
                 preview=replies.get(data.message_id, "")[:_PREVIEW_CHARS],
             )
         )
@@ -273,6 +278,55 @@ def _bare(span: TraceSpan) -> TraceSpan:
     return TraceSpan(**{name: getattr(span, name) for name in TraceSpan.model_fields})
 
 
+def window_name(span: TraceSpan, profile: str) -> str | None:
+    """The name to look a missing window up by: the span's model, else the session's profile."""
+    if span.recorded:
+        return span.model or None
+    return profile or None
+
+
+def filled_window(
+    span: TraceSpan, window: int | None, profile: str, window_of: Callable[[str], int | None]
+) -> tuple[int | None, bool]:
+    """``(window, estimated)``: ``window`` when it is set, else today's window for the span."""
+    if window is not None:
+        return window, False
+    name = window_name(span, profile)
+    if name is None:
+        return None, False
+    found = window_of(name)
+    return found, found is not None
+
+
+def with_windows(
+    runs: Sequence[TraceRunSpan], window_of: Callable[[str], int | None], profile: str
+) -> list[TraceRunSpan]:
+    """``runs`` with a window on each model span that had none, marked estimated.
+
+    ``window_of`` is called at most once for each name.
+    """
+    known: dict[str, int | None] = {}
+
+    def lookup(name: str) -> int | None:
+        if name not in known:
+            known[name] = window_of(name)
+        return known[name]
+
+    filled: list[TraceRunSpan] = []
+    for run in runs:
+        models: list[TraceModelSpan] = []
+        for model in run.children:
+            if model.context_window is None:
+                window, estimated = filled_window(model, None, profile, lookup)
+                if window is not None:
+                    model = model.model_copy(
+                        update={"context_window": window, "context_window_estimated": estimated}
+                    )
+            models.append(model)
+        filled.append(run.model_copy(update={"children": models}))
+    return filled
+
+
 @dataclass(frozen=True, slots=True)
 class SpanRead:
     """A span's input and output. The system prompt and tools are named by hash, not loaded."""
@@ -280,6 +334,8 @@ class SpanRead:
     result: TraceSpanResult
     system_prompt_sha: str | None = None
     tools_sha: str | None = None
+    context_window: int | None = None
+    num_ctx: int | None = None
 
 
 def read_span(
@@ -360,9 +416,12 @@ def _model_read(
             reply=next((m for m in messages if m.id == span.id), None),
             stop_reason=None if done is None else done.stop_reason,
             provider=None if here is None else here.provider,
+            system_sections=None if here is None else here.system_sections,
         ),
         system_prompt_sha=None if here is None else here.system_prompt_sha,
         tools_sha=None if here is None else here.tools_sha,
+        context_window=None if here is None else here.context_window,
+        num_ctx=None if here is None else here.num_ctx,
     )
 
 

@@ -70,6 +70,8 @@ Two browser methods, added in 13.5:
 
 The daemon builds the tree in Python from the events, the checkpoint, and the blobs, so the browser does no joining.
 
+The daemon also returns what filled each model call's context. Each part (system prompt, tools, your messages, replies, tool results) is estimated at four characters a token, then scaled so the parts add up to the tokens the provider counted. The split is marked estimated, and a window filled from today's config, for a call recorded without one, is marked estimated too. The daemon does it because it already has the prompt, the tools and the messages, and the web and the TUI then show the same numbers.
+
 ### Older sessions
 
 A session from before Phase 13 still has a trace:
