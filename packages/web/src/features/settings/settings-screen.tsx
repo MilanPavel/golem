@@ -2,6 +2,7 @@ import { ThemeSwitch } from "../../theme-switch.tsx";
 import { settingsPath } from "../../store/router.ts";
 import { useNavigate } from "../../store/page-context.tsx";
 import { Link } from "../../ui/link.tsx";
+import { ConfigSection } from "./config-section.tsx";
 import { McpSection } from "./mcp-section.tsx";
 import { RulesSection } from "./rules-section.tsx";
 import { SECTIONS } from "./sections.ts";
@@ -15,6 +16,8 @@ function Body({ section }: { section: string }) {
       return <McpSection />;
     case "rules":
       return <RulesSection />;
+    case "config":
+      return <ConfigSection />;
     case "appearance":
       return <ThemeSwitch />;
     default:
