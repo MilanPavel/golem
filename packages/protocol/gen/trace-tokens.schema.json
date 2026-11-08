@@ -1,0 +1,56 @@
+{
+  "additionalProperties": false,
+  "description": "Tokens one model call used. A field is null when the provider did not report it.",
+  "properties": {
+    "cache_read": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cache Read"
+    },
+    "cache_write": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cache Write"
+    },
+    "input": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Input"
+    },
+    "output": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Output"
+    }
+  },
+  "title": "TraceTokens",
+  "type": "object"
+}

@@ -20,7 +20,7 @@ Type `/mcp add`. golem lists the servers it knows, each with one line on what it
 
 A server you already added says so, and one that can't be added says why. Servers added this way are **on demand**: they cost no tokens until a chat turns them on.
 
-`/mcp add github` goes straight to that server. With no servers yet, `/mcp` shows the same list. The web UI cannot add a server. `/mcp add` there shows the `golem mcp add --catalog` command to copy.
+`/mcp add github` goes straight to that server. With no servers yet, `/mcp` shows the same list. In the web UI, **Add a server** in Settings → MCP servers does the same, and `/mcp add [id]` opens it.
 
 ### From a terminal
 
@@ -100,7 +100,7 @@ What happens to each server:
 - A server that uses the old SSE transport is imported with a warning, because golem doesn't speak it yet.
 - Names are made to fit: `_`, `.`, and spaces become `-`, and a name that is already taken gets `-2`. A server golem already has with the same command or URL is marked as already added.
 
-In a terminal, run `golem mcp import`. It lists what it found, numbered, and asks which to add. Type numbers, `2=my-name` to rename one, or `a` for every new one. `--from cursor` looks at one app, `--from ./servers.json` reads a file, and `--all` adds every new server without asking. A value another app only named, such as `${input:token}`, is asked for, hidden.
+In the web UI, **Import from other apps** in Settings → MCP servers lists them with a tick box each. You can rename one, type a value another app only named, paste JSON or choose a file instead, and add the ticked ones. In a terminal, run `golem mcp import`. It lists what it found, numbered, and asks which to add. Type numbers, `2=my-name` to rename one, or `a` for every new one. `--from cursor` looks at one app, `--from ./servers.json` reads a file, and `--all` adds every new server without asking. A value another app only named, such as `${input:token}`, is asked for, hidden.
 
 ### Send your servers to another app
 
@@ -123,6 +123,8 @@ Type `/mcp` to see your servers:
 - test the connection, and watch each step as it ends, so you see why a server fails;
 - read the server's log, which keeps coming in while it is open;
 - reconnect one, turn it off, or remove it. Remove asks first, and drops the token it stored in the Keychain. A project's server is not removed from here: change that project's `.golem/config.toml`.
+
+The web UI has the same list at Settings → MCP servers, and `/mcp` there opens it. You can open a server, see its tools, hide a tool from the model, try one with a form, test the connection, read the log, reconnect it, turn it on or off, edit it, and remove it. **Add a server** lists what golem offers by category, with a search, and Another server for a command or a URL. It asks for what the server needs (a secret is hidden, and a folder has Browse), shows the command golem will run, and has Test before Add. A server that needs Node or uv offers to install it with Homebrew and shows the output. **Edit** changes the command or URL, the working folder, the timeout, whether tool calls ask first, the variables and headers (a stored secret shows as stored, and typing replaces it), and the tool patterns. Turning on a server that was off asks first and shows the command golem will run.
 
 A server that crashes or stops answering starts again by itself. While it is down, the status line shows `mcp ✗ <name>` in red.
 

@@ -588,7 +588,7 @@
     },
     "ModelCallStartedData": {
       "additionalProperties": false,
-      "description": "A request went to the model.\n\n``message_id`` is the assistant reply's id, which identifies the model\ncall. ``index`` counts the calls of this run from 1. ``provider`` and\n``model`` are None when the profile does not resolve.",
+      "description": "A request went to the model.\n\n``message_id`` is the assistant reply's id, which identifies the model\ncall. ``index`` counts the calls of this run from 1. ``provider`` and\n``model`` are None when the profile does not resolve.\n\n``system_prompt_sha`` and ``tools_sha`` are the sha256 of the system\nprompt and of the tool schemas (compact JSON, sorted keys) sent with the\ncall, which the daemon keeps by hash. Each is None when it was not sent.\n``message_ids`` are the history messages sent, in order, not counting the\nsystem prompt.",
       "properties": {
         "index": {
           "minimum": 1,
@@ -599,6 +599,13 @@
           "minLength": 1,
           "title": "Message Id",
           "type": "string"
+        },
+        "message_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Message Ids",
+          "type": "array"
         },
         "model": {
           "anyOf": [
@@ -628,6 +635,30 @@
           ],
           "default": null,
           "title": "Provider"
+        },
+        "system_prompt_sha": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "System Prompt Sha"
+        },
+        "tools_sha": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tools Sha"
         }
       },
       "required": [
@@ -1767,7 +1798,7 @@
     },
     "ToolCompletedData": {
       "additionalProperties": false,
-      "description": "A tool call finished.\n\n``summary`` is one short line, such as ``42 lines``. ``preview`` is the\nstart of the output, cut at a few kilobytes, and ``truncated`` says\nwhether it was cut. Output too long for the model is stored whole in the\nartifact ``artifact_id``, which ``artifact.read`` reads.\n\n``failed`` is true when the call ran but what it ran did not succeed,\nsuch as a shell command that exited non-zero or timed out. The model\nstill gets the output.",
+      "description": "A tool call finished.\n\n``summary`` is one short line, such as ``42 lines``. ``preview`` is the\nstart of the output, cut at a few kilobytes, and ``truncated`` says\nwhether it was cut. Output too long for the model is stored whole in the\nartifact ``artifact_id``, which ``artifact.read`` reads.\n\n``failed`` is true when the call ran but what it ran did not succeed,\nsuch as a shell command that exited non-zero or timed out. The model\nstill gets the output.\n\n``duration_ms`` is how long the tool ran, from ``tool.started`` to its\nresult, without the wait for an approval. None means it was not measured.",
       "properties": {
         "artifact_id": {
           "anyOf": [
@@ -1786,6 +1817,19 @@
           "minLength": 1,
           "title": "Call Id",
           "type": "string"
+        },
+        "duration_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duration Ms"
         },
         "failed": {
           "default": false,
@@ -1860,12 +1904,25 @@
     },
     "ToolFailedData": {
       "additionalProperties": false,
-      "description": "A tool call did not run, or stopped with an error. The model sees the same message.",
+      "description": "A tool call did not run, or stopped with an error. The model sees the same message.\n\n``duration_ms`` is how long the tool ran before it raised. None means a\ncall that was denied or cut off, which never ran or was not timed.",
       "properties": {
         "call_id": {
           "minLength": 1,
           "title": "Call Id",
           "type": "string"
+        },
+        "duration_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duration Ms"
         },
         "message": {
           "minLength": 1,

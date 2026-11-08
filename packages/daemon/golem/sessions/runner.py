@@ -369,6 +369,9 @@ async def _apply(
                 profile=model.profile if model else "",
                 provider=model.provider if model else None,
                 model=model.name if model else None,
+                system_prompt_sha=fact.system_prompt_sha,
+                tools_sha=fact.tools_sha,
+                message_ids=list(fact.message_ids),
             ),
         )
     elif isinstance(fact, TextDelta) and progress.open is not None:
@@ -410,11 +413,17 @@ async def _apply(
                 truncated=fact.truncated,
                 artifact_id=fact.artifact_id,
                 failed=fact.failed,
+                duration_ms=fact.duration_ms,
             ),
         )
     elif isinstance(fact, ToolErrored):
         _done(progress, fact.call_id)
-        await emit("tool.failed", ToolFailedData(call_id=fact.call_id, message=fact.message))
+        await emit(
+            "tool.failed",
+            ToolFailedData(
+                call_id=fact.call_id, message=fact.message, duration_ms=fact.duration_ms
+            ),
+        )
     elif isinstance(fact, TodosChanged):
         await emit(
             "todos.updated",

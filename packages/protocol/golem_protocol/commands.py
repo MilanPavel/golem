@@ -379,6 +379,132 @@ class SessionInspectResult(BaseModel):
     messages: list[InspectMessage]
 
 
+class TraceGetParams(BaseModel):
+    """``trace.get``. Read one session as a tree of spans. Does not call the model."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+
+
+class TraceTokens(BaseModel):
+    """Tokens one model call used. A field is null when the provider did not report it."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    input: int | None = None
+    output: int | None = None
+    cache_read: int | None = None
+    cache_write: int | None = None
+
+
+class TraceSpan(BaseModel):
+    """One run, model call, or tool call, without its children.
+
+    ``id`` is the run id for a run, the assistant ``message_id`` for a model
+    call, and the ``call_id`` for a tool call. ``end`` is null while the span
+    is open, or when its run was cut off. ``duration_ms`` is the model's
+    latency or the tool's own time when the daemon measured it, else
+    ``end - start``. ``approval_wait_ms`` is the time a tool call waited for
+    the user. ``recorded`` is false for a model span rebuilt from the message
+    events of a session that has no ``model.call.*`` events.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str = Field(min_length=1)
+    kind: Literal["run", "model", "tool"]
+    name: str
+    start: str = Field(min_length=1)
+    end: str | None = None
+    duration_ms: int | None = Field(default=None, ge=0)
+    status: Literal["ok", "failed", "cancelled", "denied", "running"]
+    model: str | None = None
+    tokens: TraceTokens | None = None
+    first_token_ms: int | None = Field(default=None, ge=0)
+    approval_wait_ms: int | None = Field(default=None, ge=0)
+    preview: str = Field(default="", max_length=200)
+    recorded: bool = True
+
+
+class TraceToolSpan(TraceSpan):
+    """A tool call. It has no children."""
+
+
+class TraceModelSpan(TraceSpan):
+    """A model call, with the tool calls it asked for, in request order."""
+
+    children: list[TraceToolSpan] = Field(default_factory=list[TraceToolSpan])
+
+
+class TraceRunSpan(TraceSpan):
+    """A run, with its model calls in order."""
+
+    children: list[TraceModelSpan] = Field(default_factory=list[TraceModelSpan])
+
+
+class TraceGetResult(BaseModel):
+    """Runs of a session, oldest first.
+
+    The tree is run, then model call, then tool call. A client picks a span
+    by ``id`` and loads it with ``trace.span``.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    title: str | None = None
+    runs: list[TraceRunSpan]
+
+
+class TraceSpanParams(BaseModel):
+    """``trace.span``. Read the full input and output of one model or tool span."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    span_id: str = Field(min_length=1)
+
+
+class TraceMessage(BaseModel):
+    """One checkpoint message with its id, as plain text."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str | None = None
+    role: Literal["user", "assistant", "tool"]
+    text: str
+    tool_calls: list[dict[str, Any]] = Field(default_factory=list[dict[str, Any]])
+    call_id: str | None = None
+
+
+class TraceSpanResult(BaseModel):
+    """What a span took in and gave out. ``span`` has no children.
+
+    For a model span, ``messages`` is the context sent, in order, and
+    ``new_from`` is where the part new since the previous model call
+    begins. ``system_prompt`` and ``tools`` are null when they were not
+    recorded. For a tool span, ``result`` is the text the model got back, and
+    ``artifact_id`` is set when the output was too big for the model: open it
+    with ``artifact.read``.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    span: TraceSpan
+    system_prompt: str | None = None
+    tools: list[dict[str, Any]] | None = None
+    messages: list[TraceMessage] = Field(default_factory=list[TraceMessage])
+    new_from: int | None = Field(default=None, ge=0)
+    reply: TraceMessage | None = None
+    args: dict[str, Any] | None = None
+    result: str | None = None
+    artifact_id: str | None = Field(default=None, min_length=1)
+    approval: dict[str, Any] | None = None
+    stop_reason: str | None = None
+    provider: str | None = None
+
+
 class AuthSetParams(BaseModel):
     """``auth.set``. Store an API key for ``provider`` in the OS credential store.
 
@@ -832,6 +958,7 @@ class McpToolInfo(BaseModel):
 
     A ``hidden`` tool is one the server's ``tools`` filter keeps from the model.
     ``schema_tokens`` roughly what its schema costs in each prompt.
+    ``input_schema`` is the JSON Schema of its arguments, for a form that tries it.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -840,6 +967,7 @@ class McpToolInfo(BaseModel):
     description: str
     hidden: bool = False
     schema_tokens: int = Field(default=0, ge=0)
+    input_schema: dict[str, Any] | None = None
 
 
 class McpToolsResult(BaseModel):
@@ -1995,4 +2123,14 @@ __all__ = [
     "SkillListResult",
     "SkillRegistryChanged",
     "SkillSource",
+    "TraceGetParams",
+    "TraceGetResult",
+    "TraceMessage",
+    "TraceModelSpan",
+    "TraceRunSpan",
+    "TraceSpan",
+    "TraceSpanParams",
+    "TraceSpanResult",
+    "TraceTokens",
+    "TraceToolSpan",
 ]

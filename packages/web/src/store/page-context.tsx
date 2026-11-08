@@ -8,7 +8,9 @@ import { MODEL_LIST_ALL_KEY, MODEL_LIST_KEY, SETUP_STATUS_KEY, type ModelListRes
 import type { Page, PageActions } from "./page.ts";
 import type { PullsSnapshot } from "./pulls.ts";
 import type { Route } from "./router.ts";
-import type { SessionSummary, SetupStatusResult, SkillListResult } from "@golem/client";
+import type { McpListResult, SessionSummary, SetupStatusResult, SkillListResult } from "@golem/client";
+import { traceKey, type TraceGetResult } from "./trace.ts";
+import { mcpCatalogKey, mcpListKey, mcpToolsKey, type McpCatalogResult, type McpToolsResult } from "./mcp.ts";
 import type { Pastes } from "@golem/view";
 import { distinctFolders, resolveFolder } from "./new-session.ts";
 import type { SetupStart } from "./setup-start.ts";
@@ -173,10 +175,35 @@ export function useSkillList(cwd: string | null, enabled = true): UseQueryResult
   return useQuery({ queryKey: ["skill.list", cwd], queryFn: () => queries.skillList(cwd), enabled });
 }
 
+/** A session's trace, read once. It does not follow a run as it streams; the page's Refresh reads it again. */
+export function useTrace(sessionId: string): UseQueryResult<TraceGetResult> {
+  const { queries } = usePage();
+  // Read again on every visit: the answer is only as new as its last read.
+  return useQuery({ queryKey: traceKey(sessionId), queryFn: () => queries.trace(sessionId), staleTime: 0, retry: false });
+}
+
 /** The tool rules and what the session allows. Fetched only once `enabled`; the rule edits and `approval.resolved` refresh it. */
 export function useConfig(cwd: string | null, sessionId: string | null, enabled = true): UseQueryResult<ConfigGetResult> {
   const { queries } = usePage();
   return useQuery({ queryKey: configKey(cwd, sessionId), queryFn: () => queries.config(cwd, sessionId), enabled });
+}
+
+/** The MCP servers a session sees (`null`: the user's own). Fresh until `mcp.server.status` or an action says otherwise. */
+export function useMcpList(sessionId: string | null, enabled = true): UseQueryResult<McpListResult> {
+  const { queries } = usePage();
+  return useQuery({ queryKey: mcpListKey(sessionId), queryFn: () => queries.mcpList(sessionId), enabled });
+}
+
+/** One server's tools. Fetched only once `enabled`, and again after a status change. */
+export function useMcpTools(name: string, sessionId: string | null, enabled = true): UseQueryResult<McpToolsResult> {
+  const { queries } = usePage();
+  return useQuery({ queryKey: mcpToolsKey(name, sessionId), queryFn: () => queries.mcpTools(name, sessionId), enabled });
+}
+
+/** The servers the Add dialog offers. Fetched only once `enabled`, and again after an add, a remove, or a runtime install. */
+export function useMcpCatalog(sessionId: string | null, enabled = true): UseQueryResult<McpCatalogResult> {
+  const { queries } = usePage();
+  return useQuery({ queryKey: mcpCatalogKey(sessionId), queryFn: () => queries.mcpCatalog(sessionId), enabled });
 }
 
 /** The folders under `path` in the home folder (`null` is home). Fetched only once `enabled`. */

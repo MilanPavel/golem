@@ -1,4 +1,4 @@
-import { OLLAMA_FAILED, RpcError, SESSION_BUSY, type ChatEvent, type ConnectionState, type OllamaInstallUpdate, type ModelServerStatus, type PullUpdate, type SessionSummary } from "@golem/client";
+import { OLLAMA_FAILED, RpcError, SESSION_BUSY, type ChatEvent, type ConnectionState, type OllamaInstallUpdate, type RuntimeInstallUpdate, type McpServerLog, type ModelServerStatus, type PullUpdate, type SessionSummary } from "@golem/client";
 import { vi } from "vitest";
 import type { ModelListResult } from "./models.ts";
 import type { PageClient } from "./page.ts";
@@ -78,6 +78,8 @@ export function fakeClient() {
   const summaries = listeners<SessionSummary>();
   const skills = listeners<string | null>();
   const mcp = listeners<unknown>();
+  const mcpLog = listeners<McpServerLog>();
+  const runtime = listeners<RuntimeInstallUpdate>();
   const pull = listeners<PullUpdate>();
   const server = listeners<ModelServerStatus>();
   const install = listeners<OllamaInstallUpdate>();
@@ -114,6 +116,29 @@ export function fakeClient() {
     setSkills: vi.fn<PageClient["setSkills"]>(async () => ({}) as never),
     getConfig: vi.fn<PageClient["getConfig"]>(async () => ({ rules: [] }) as never),
     listDirs: vi.fn<PageClient["listDirs"]>(async () => ({ path: "/home/me", home: "/home/me", parent: null, entries: [], truncated: false })),
+    getTrace: vi.fn<PageClient["getTrace"]>(async (sessionId) => ({ session_id: sessionId, title: null, runs: [] })),
+    listMcp: vi.fn<PageClient["listMcp"]>(async () => ({ servers: [] })),
+    mcpTools: vi.fn<PageClient["mcpTools"]>(async (name) => ({ name, tools: [] })),
+    restartMcp: vi.fn<PageClient["restartMcp"]>(async () => ({}) as never),
+    setMcpEnabled: vi.fn<PageClient["setMcpEnabled"]>(async () => ({}) as never),
+    enableMcp: vi.fn<PageClient["enableMcp"]>(async () => ({}) as never),
+    disableMcp: vi.fn<PageClient["disableMcp"]>(async () => ({}) as never),
+    mcpTest: vi.fn<PageClient["mcpTest"]>(async () => ({ test_id: "t", ok: true, steps: [], tools: [], stderr_tail: [] })),
+    mcpLogs: vi.fn<PageClient["mcpLogs"]>(async (name) => ({ name, lines: [] })),
+    onMcpLog: mcpLog.on,
+    mcpCall: vi.fn<PageClient["mcpCall"]>(async () => ({ text: "", is_error: false })),
+    mcpGet: vi.fn<PageClient["mcpGet"]>(async () => ({}) as never),
+    addMcpServer: vi.fn<PageClient["addMcpServer"]>(async () => ({}) as never),
+    configRawGet: vi.fn<PageClient["configRawGet"]>(async () => ({ exists: true, mtime_ns: 1, path: "/Users/me/.golem/config.toml", text: "" })),
+    configRawSet: vi.fn<PageClient["configRawSet"]>(async () => ({ ok: true, mtime_ns: 2 })),
+    scanMcpImport: vi.fn<PageClient["scanMcpImport"]>(async () => ({ scan_id: "scan", sources: [] })),
+    applyMcpImport: vi.fn<PageClient["applyMcpImport"]>(async () => ({ added: [] })),
+    mcpCatalog: vi.fn<PageClient["mcpCatalog"]>(async () => ({ entries: [] })),
+    installRuntime: vi.fn<PageClient["installRuntime"]>(async (name) => ({ name, started: true })),
+    cancelRuntimeInstall: vi.fn<PageClient["cancelRuntimeInstall"]>(async (name) => ({ name, cancelled: true })),
+    onRuntimeInstall: runtime.on,
+    updateMcpServer: vi.fn<PageClient["updateMcpServer"]>(async () => ({}) as never),
+    removeMcpServer: vi.fn<PageClient["removeMcpServer"]>(async (name) => ({ name, secret: false })),
     updateRule: vi.fn<PageClient["updateRule"]>(async () => ({}) as never),
     removeRule: vi.fn<PageClient["removeRule"]>(async () => ({}) as never),
     revokeAllowance: vi.fn<PageClient["revokeAllowance"]>(async () => true),
@@ -138,6 +163,8 @@ export function fakeClient() {
     emitSkills: (root: string | null = null) => {
       skills.emit(root);
     },
+    emitMcpLog: mcpLog.emit,
+    emitRuntime: runtime.emit,
     emitMcp: () => {
       mcp.emit({});
     },

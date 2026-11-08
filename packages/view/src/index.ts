@@ -46,16 +46,20 @@ export {
   type SkillChoice,
 } from "./commands.ts";
 export {
+  CATEGORY_TITLES,
   cliCommand,
+  draftLine,
   entryAvailable,
   entryInputs,
   entryLabel,
   entryNote,
   entryParams,
   findEntry,
+  groupEntries,
   inputDefault,
   inputError,
   mcpNameError,
+  missingRuntime,
   OTHER_ID,
   otherSpec,
   shellQuote,
@@ -64,6 +68,19 @@ export {
   type McpCatalogEntry,
   type McpCatalogInput,
 } from "./mcp-catalog.ts";
+export { changedOnDisk, problemLine, problemLines, unifiedDiff, type RawProblem } from "./config-diff.ts";
+export {
+  applyParams,
+  candidateNotes,
+  candidateTarget,
+  importItems,
+  initialPicks,
+  missingRefsOf,
+  scanSummary,
+  type ImportItem,
+  type ImportSource,
+} from "./mcp-import.ts";
+export { editForm, updateFromForm, type EditForm, type EditPair } from "./mcp-edit.ts";
 export {
   changeToolFilter,
   formatLogLine,
@@ -72,6 +89,32 @@ export {
   ownToolName,
   type ToolsChange,
 } from "./mcp-tools.ts";
+export {
+  detailChoices,
+  firstLine,
+  formatSeconds,
+  formatTokens,
+  mcpAlert,
+  MCP_HINT,
+  mcpStatusMark,
+  mcpStatusWord,
+  mcpSummary,
+  mergeMcp,
+  orderedServers,
+  shortPath,
+  type DetailChoice,
+  type McpDetailAction,
+  type McpList,
+  type McpTone,
+} from "./mcp-servers.ts";
+export {
+  parseJsonArguments,
+  tryArguments,
+  tryFields,
+  tryInitial,
+  type TryArguments,
+  type TryField,
+} from "./mcp-try.ts";
 export { applySuggestion, moveSuggestion, suggest, type Suggestion, type SuggestCommand } from "./suggest.ts";
 export { connectionLabel, serviceProblem, type ServiceProblem } from "./connection.ts";
 export { parseDiff, type DiffLine, type DiffTone } from "./diff.ts";

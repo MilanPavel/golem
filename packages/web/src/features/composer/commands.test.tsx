@@ -125,8 +125,10 @@ test("/help opens the Commands dialog, grouped, with the terminal-only ones mark
   await say(user, "/help");
   const dialog = screen.getByRole("dialog", { name: "Commands" });
   expect(within(dialog).getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual(["Session", "Model", "Tools", "View"]);
+  const skills = within(dialog).getByText("/skills").closest("li") as HTMLElement;
+  expect(skills.textContent).toContain("In the terminal for now");
   const mcp = within(dialog).getByText("/mcp").closest("li") as HTMLElement;
-  expect(mcp.textContent).toContain("In the terminal for now");
+  expect(mcp.textContent).not.toContain("In the terminal for now");
   const fork = within(dialog).getByText("/fork").closest("li") as HTMLElement;
   expect(fork.textContent).not.toContain("In the terminal for now");
   const permissions = within(dialog).getByText("/permissions").closest("li") as HTMLElement;
@@ -379,24 +381,21 @@ test("a clipboard that fails selects the command and does not throw", async () =
   expect(window.getSelection()?.toString()).toBe("golem auth set openai");
 });
 
-test("/mcp add shows the golem command to run in a terminal", async () => {
-  const { user } = await session();
+test("/mcp add opens the Add dialog in Settings, on the server named, or on the list", async () => {
+  const { fake, user } = await session();
+  fake.raw.mcpCatalog.mockResolvedValue({
+    entries: [
+      { id: "github", name: "github", title: "GitHub", description: "Issues and PRs.", category: "code", homepage: "https://example.com", runtime: "url", auth: "token", inputs: [{ id: "token", kind: "secret", label: "Token" }] },
+    ],
+  });
   await say(user, "/mcp add github");
-  const line = within(screen.getByText(/Add it in a terminal\./).closest("p") as HTMLElement);
-  expect(screen.getByText(/asks for the token there/)).toBeTruthy();
-  expect(line.getByText("golem mcp add --catalog github").tagName).toBe("CODE");
-  await say(user, "/mcp add filesystem");
-  expect(screen.getByText("golem mcp add --catalog filesystem")).toBeTruthy();
-  await say(user, "/mcp add");
-  expect(screen.getByText(/MCP servers are added in a terminal\. Pick one from golem's list/)).toBeTruthy();
-  expect(screen.getByText("golem mcp add --catalog <id>")).toBeTruthy();
-  await say(user, "/mcp add other");
-  expect(screen.getByText("golem mcp add <name> -- <command…>")).toBeTruthy();
+  expect(location.pathname).toBe("/settings/mcp");
+  expect((await screen.findByRole("heading", { name: "Add GitHub" })).textContent).toBe("Add GitHub");
+  await user.click(screen.getByRole("button", { name: "Cancel" }));
+  expect(screen.queryByRole("dialog")).toBeNull();
 });
 
 const NOT_YET: [string, string][] = [
-  ["/mcp", "MCP servers are managed in the terminal for now: run golem, then /mcp. To add one, use /mcp add."],
-  ["/mcp enable x", "MCP servers are managed in the terminal for now: run golem, then /mcp. To add one, use /mcp add."],
   ["/skills", "The skills list is in the terminal for now: run golem, then /skills."],
   ["/artifact", "Tool output opens in the terminal for now: run golem, then /artifact."],
   ["/sessions", "The sidebar lists your sessions."],
@@ -441,15 +440,13 @@ test("the empty screen: suggestions work, /new does nothing, /help and /login wo
   expect(box().value).toBe("");
   await say(user, "/login anthropic");
   expect(screen.getByText("golem auth set anthropic")).toBeTruthy();
-  for (const line of ["/fork", "/title x", "/close", "/copy", "/export", "/model pull x", "/todos"]) {
+  for (const line of ["/fork", "/title x", "/close", "/copy", "/export", "/model pull x", "/todos", "/mcp enable x"]) {
     await say(user, line);
     expect(dockNotice()).toBe("Start a session first: send a message.");
     expect(box().value).toBe("");
   }
   await say(user, "/time");
   expect(dockNotice()).toBe("Times hidden.");
-  await say(user, "/mcp");
-  expect(dockNotice()).toContain("terminal for now");
   await say(user, "/help");
   expect(screen.getByRole("dialog", { name: "Commands" })).toBeTruthy();
   expect(fake.raw.createSession).not.toHaveBeenCalled();
@@ -494,3 +491,31 @@ for (const theme of ["slip", "kiln"]) {
     expect((await axe.run(document.body, popup)).violations).toEqual([]);
   });
 }
+
+test("/mcp opens the MCP servers section of Settings", async () => {
+  const { user } = await session();
+  await say(user, "/mcp");
+  expect(location.pathname).toBe("/settings/mcp");
+});
+
+test("/mcp enable and /mcp disable turn a server on or off for this chat, and say so", async () => {
+  const { fake, user } = await session();
+  await say(user, "/mcp enable github");
+  expect(fake.raw.enableMcp).toHaveBeenCalledWith("a", "github");
+  expect(dockNotice()).toBe("github is on for this chat.");
+  await say(user, "/mcp disable github");
+  expect(fake.raw.disableMcp).toHaveBeenCalledWith("a", "github");
+  expect(dockNotice()).toBe("github is off for this chat.");
+  fake.raw.enableMcp.mockRejectedValueOnce(new Error("no server named nope"));
+  await say(user, "/mcp enable nope");
+  expect(screen.getByRole("alert").textContent).toContain("no server named nope");
+});
+
+test("/config opens Settings → Config file, and /config project opens the project's file", async () => {
+  const { fake, user } = await session();
+  fake.raw.configRawGet.mockResolvedValue({ exists: true, mtime_ns: 1, path: "/work/app/.golem/config.toml", text: "a = 1\n" });
+  await say(user, "/config project");
+  expect(location.pathname).toBe("/settings/config");
+  expect(await screen.findByRole("textbox", { name: "Config file text" })).toBeTruthy();
+  await waitFor(() => expect(fake.raw.configRawGet).toHaveBeenLastCalledWith({ scope: "project", sessionId: expect.any(String) }));
+});

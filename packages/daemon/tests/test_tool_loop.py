@@ -30,7 +30,7 @@ from golem.store.events import EventLog
 from golem.store.records import RunRecords, SessionRecords
 from golem.tools import default_registry
 from golem.tools.fs import READ_ONLY_TOOLS
-from golem.tools.registry import Tool, ToolContext, ToolRegistry, ToolResult
+from golem.tools.registry import Tool, ToolContext, ToolError, ToolRegistry, ToolResult
 from golem_protocol.events import (
     ChatEvent,
     MessageCompletedEvent,
@@ -391,6 +391,7 @@ async def test_a_denied_call_never_runs_and_the_model_hears_why(
     failed = tool_events[1]
     assert isinstance(failed, ToolFailedEvent)
     assert failed.data.message == "read_file is denied by ~/project/.golem/policy.toml rule 1"
+    assert failed.data.duration_ms is None
     result = model.seen[1][-1]
     assert isinstance(result, ToolMessage)
     assert result.text == f"error: {failed.data.message}"
@@ -444,6 +445,32 @@ async def test_a_call_that_ran_but_failed_is_marked_and_the_model_still_gets_the
     assert "tool.failed" not in [event.type for event in events]
     result = model.seen[1][-1]
     assert isinstance(result, ToolMessage) and result.text == "boom\n[exit code 1]"
+
+
+async def test_a_tool_records_how_long_it_ran(database: Database, project: Path) -> None:
+    async def nap(args: _SlowArgs, ctx: ToolContext) -> ToolResult:
+        del args, ctx
+        await asyncio.sleep(0.05)
+        return ToolResult(output="rested", summary="rested")
+
+    async def refuse(args: _SlowArgs, ctx: ToolContext) -> ToolResult:
+        del args, ctx
+        await asyncio.sleep(0.05)
+        raise ToolError("no")
+
+    tools = [
+        Tool(name="nap", description="sleeps", args=_SlowArgs, run=nap, read_only=True),
+        Tool(name="refuse", description="raises", args=_SlowArgs, run=refuse, read_only=True),
+    ]
+    model = ToolCallingChatModel(replies=[[("nap", {}), ("refuse", {})], "done"])
+    chat = _chat(database, model, ToolRegistry([*READ_ONLY_TOOLS, *tools]))
+    session_id = await chat.manager.create(None, cwd=str(project))
+    events = await chat.finished(await chat.manager.send(session_id, "go"))
+
+    (completed,) = [e for e in events if isinstance(e, ToolCompletedEvent)]
+    (failed,) = [e for e in events if isinstance(e, ToolFailedEvent)]
+    assert completed.data.duration_ms is not None and completed.data.duration_ms >= 50
+    assert failed.data.duration_ms is not None and failed.data.duration_ms >= 50
 
 
 async def test_each_model_call_records_its_usage_and_stop_reason(

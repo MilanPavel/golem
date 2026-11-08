@@ -90,9 +90,12 @@ export type Ts6 = string;
 export type Type6 = 'message.completed';
 export type Index = number;
 export type MessageId4 = string;
+export type MessageIds = string[];
 export type Model = string | null;
 export type Profile = string;
 export type Provider = string | null;
+export type SystemPromptSha = string | null;
+export type ToolsSha = string | null;
 export type RunId7 = string;
 export type Seq7 = number;
 export type SessionId8 = string;
@@ -160,6 +163,7 @@ export type Ts15 = string;
 export type Type15 = 'tool.output';
 export type ArtifactId = string | null;
 export type CallId3 = string;
+export type DurationMs = number | null;
 export type Failed1 = boolean;
 export type Preview = string;
 export type Summary = string;
@@ -170,6 +174,7 @@ export type SessionId17 = string;
 export type Ts16 = string;
 export type Type16 = 'tool.completed';
 export type CallId4 = string;
+export type DurationMs1 = number | null;
 export type Message1 = string;
 export type RunId17 = string;
 export type Seq17 = number;
@@ -496,15 +501,24 @@ export interface ModelCallStartedEvent {
  * call. ``index`` counts the calls of this run from 1. ``provider`` and
  * ``model`` are None when the profile does not resolve.
  *
+ * ``system_prompt_sha`` and ``tools_sha`` are the sha256 of the system
+ * prompt and of the tool schemas (compact JSON, sorted keys) sent with the
+ * call, which the daemon keeps by hash. Each is None when it was not sent.
+ * ``message_ids`` are the history messages sent, in order, not counting the
+ * system prompt.
+ *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "ModelCallStartedData".
  */
 export interface ModelCallStartedData {
   index: Index;
   message_id: MessageId4;
+  message_ids?: MessageIds;
   model?: Model;
   profile: Profile;
   provider?: Provider;
+  system_prompt_sha?: SystemPromptSha;
+  tools_sha?: ToolsSha;
 }
 /**
  * The model call ended. Comes before the call's ``tool.requested`` events.
@@ -738,12 +752,16 @@ export interface ToolCompletedEvent {
  * such as a shell command that exited non-zero or timed out. The model
  * still gets the output.
  *
+ * ``duration_ms`` is how long the tool ran, from ``tool.started`` to its
+ * result, without the wait for an approval. None means it was not measured.
+ *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "ToolCompletedData".
  */
 export interface ToolCompletedData {
   artifact_id?: ArtifactId;
   call_id: CallId3;
+  duration_ms?: DurationMs;
   failed?: Failed1;
   preview: Preview;
   summary: Summary;
@@ -766,11 +784,15 @@ export interface ToolFailedEvent {
 /**
  * A tool call did not run, or stopped with an error. The model sees the same message.
  *
+ * ``duration_ms`` is how long the tool ran before it raised. None means a
+ * call that was denied or cut off, which never ran or was not timed.
+ *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "ToolFailedData".
  */
 export interface ToolFailedData {
   call_id: CallId4;
+  duration_ms?: DurationMs1;
   message: Message1;
 }
 /**

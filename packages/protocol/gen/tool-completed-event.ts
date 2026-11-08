@@ -2,6 +2,7 @@
 
 export type ArtifactId = string | null;
 export type CallId = string;
+export type DurationMs = number | null;
 export type Failed = boolean;
 export type Preview = string;
 export type Summary = string;
@@ -35,12 +36,16 @@ export interface ToolCompletedEvent {
  * such as a shell command that exited non-zero or timed out. The model
  * still gets the output.
  *
+ * ``duration_ms`` is how long the tool ran, from ``tool.started`` to its
+ * result, without the wait for an approval. None means it was not measured.
+ *
  * This interface was referenced by `ToolCompletedEvent`'s JSON-Schema
  * via the `definition` "ToolCompletedData".
  */
 export interface ToolCompletedData {
   artifact_id?: ArtifactId;
   call_id: CallId;
+  duration_ms?: DurationMs;
   failed?: Failed;
   preview: Preview;
   summary: Summary;

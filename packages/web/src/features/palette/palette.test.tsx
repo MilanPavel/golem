@@ -146,8 +146,10 @@ test("a row shows the name, the arguments, the description, and a key; terminal 
   expect(help?.querySelector("kbd")?.textContent).toBe("?");
   const logout = options().find((option) => option.textContent?.includes("/logout"));
   expect(logout?.textContent).toContain("<provider>");
+  const skills = options().find((option) => option.textContent?.includes("/skills"));
+  expect(skills?.textContent).toContain("In the terminal for now");
   const mcp = options().find((option) => option.textContent?.includes("/mcp"));
-  expect(mcp?.textContent).toContain("In the terminal for now");
+  expect(mcp?.textContent).not.toContain("In the terminal for now");
   expect(help?.textContent).not.toContain("In the terminal for now");
 });
 
@@ -339,3 +341,24 @@ for (const theme of ["slip", "kiln"]) {
     expect((await axe.run(keys, popup)).violations).toEqual([]);
   });
 }
+
+test("the Trace row is offered with a session open, and picking it opens that session's trace", async () => {
+  const { user, fake } = await session();
+  fake.raw.getTrace.mockResolvedValue({ session_id: "a", title: null, runs: [] } as never);
+  await openPalette(user);
+  await user.type(search(), "trace");
+  const row = options().find((option) => option.textContent?.includes("Model calls, context, tools, and timings of this session"));
+  expect(row?.textContent).toContain("Trace");
+  await user.keyboard("{Enter}");
+  await gone();
+  await waitFor(() => expect(location.pathname).toBe("/s/a/trace"));
+  expect(await screen.findByText("Nothing to trace yet. Send a message first.")).toBeTruthy();
+});
+
+test("the Trace row is not on the start page", async () => {
+  const { user } = setup("/");
+  await wait();
+  await openPalette(user);
+  await user.type(search(), "trace");
+  expect(options().some((option) => option.textContent?.includes("timings of this session"))).toBe(false);
+});

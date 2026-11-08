@@ -32,6 +32,8 @@ import { downloadText } from "./copy-text.ts";
 import { CommandsDialog } from "./help-dialog.tsx";
 import type { CommandNotice } from "./notice-line.tsx";
 import { settingsPath } from "../../store/router.ts";
+import { requestConfig } from "../settings/config-request.ts";
+import { requestMcpAdd } from "../settings/mcp-add-request.ts";
 import { NEEDS_SESSION, NOT_YET } from "./terminal-only.ts";
 
 /**
@@ -149,14 +151,16 @@ export function useCommands({ session, cwd, typing, send }: UseCommandsOptions):
             setHelpOpen(true);
             return "handled";
           case "mcp":
-          case "mcp-toggle":
-            return say(NOT_YET.mcp);
+            navigate(settingsPath("mcp"));
+            return "handled";
           case "mcp-add":
-            return found.id === null
-              ? say("MCP servers are added in a terminal. Pick one from golem's list, then run:", "golem mcp add --catalog <id>")
-              : found.id === "other"
-                ? say("MCP servers are added in a terminal. Run:", "golem mcp add <name> -- <command…>")
-                : say("Add it in a terminal. It asks for the token there when the server needs one.", `golem mcp add --catalog ${found.id}`);
+            requestMcpAdd(found.id);
+            navigate(settingsPath("mcp"));
+            return "handled";
+          case "config":
+            requestConfig(found.project);
+            navigate(settingsPath("config"));
+            return "handled";
           case "skills":
             return say(NOT_YET.skills);
           case "permissions":
@@ -209,6 +213,13 @@ export function useCommands({ session, cwd, typing, send }: UseCommandsOptions):
           return say(NEEDS_SESSION);
         }
         switch (found.kind) {
+          case "mcp-toggle":
+            try {
+              await actions.toggleMcp(sessionId, found.name, found.on);
+              return say(`${found.name} is ${found.on ? "on" : "off"} for this chat.`);
+            } catch (err) {
+              return fail(err, `Could not turn ${found.name} ${found.on ? "on" : "off"}.`);
+            }
           case "todos": {
             const next = !drawerOpenStore.getSnapshot();
             setDrawerOpen(next);

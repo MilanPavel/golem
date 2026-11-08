@@ -1,11 +1,24 @@
 {
   "additionalProperties": false,
-  "description": "A tool call did not run, or stopped with an error. The model sees the same message.",
+  "description": "A tool call did not run, or stopped with an error. The model sees the same message.\n\n``duration_ms`` is how long the tool ran before it raised. None means a\ncall that was denied or cut off, which never ran or was not timed.",
   "properties": {
     "call_id": {
       "minLength": 1,
       "title": "Call Id",
       "type": "string"
+    },
+    "duration_ms": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Duration Ms"
     },
     "message": {
       "minLength": 1,

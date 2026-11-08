@@ -54,6 +54,7 @@ from golem.sessions.titles import ModelTitles, TitleGenerator
 from golem.skills.pinned import pinned_section
 from golem.skills.registry import SkillRegistry
 from golem.store.artifacts import ArtifactStore
+from golem.store.blobs import BlobStore
 from golem.store.checkpoints import open_checkpoints
 from golem.store.database import Database, DatabaseTooNewError
 from golem.store.events import EventLog
@@ -198,9 +199,11 @@ class DaemonApp:
                         self.state.artifacts,
                         local,
                         SystemPrompt(sections=(pinned_section(self.state.skills),)),
+                        BlobStore(database),
                     ),
                     self._titles,
                     self.state.skills,
+                    BlobStore(database),
                 )
                 if self._discovery is None:
                     models = ModelDiscovery(router, self.paths.cache_dir)
@@ -426,13 +429,16 @@ async def _open_sessions(
     runtime: ChatRuntime,
     titles: TitleGenerator | None,
     skills: SkillRegistry | None,
+    blobs: BlobStore,
 ) -> SessionManager:
     events = EventLog(database)
     records = SessionRecords(database)
     session_log = SessionLog(events, EventBus(), records)
     runs = RunRecords(database)
     await recover_runs(runs, events, session_log, runtime)
-    return SessionManager(runtime, session_log, records, runs, titles=titles, skills=skills)
+    return SessionManager(
+        runtime, session_log, records, runs, titles=titles, skills=skills, blobs=blobs
+    )
 
 
 def _install_signals(

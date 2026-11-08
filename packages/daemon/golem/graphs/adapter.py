@@ -11,7 +11,9 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Literal, cast
 
-from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage
+from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage, ToolMessage
+
+from golem_protocol.commands import TraceMessage
 
 STREAM_KEY = "golem"
 """Key of every golem item on the custom stream. The graph writes, the adapter reads."""
@@ -35,9 +37,16 @@ class ModelStarted:
 
 @dataclass(frozen=True, slots=True)
 class ModelRequested:
-    """The request of the model call with this ``message_id`` is about to be sent."""
+    """The request of the model call with this ``message_id`` is about to be sent.
+
+    ``system_prompt_sha`` and ``tools_sha`` are the hashes of the stored system
+    prompt and tool schemas, and ``message_ids`` the history sent.
+    """
 
     message_id: str
+    system_prompt_sha: str | None = None
+    tools_sha: str | None = None
+    message_ids: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,12 +93,14 @@ class ToolFinished:
     truncated: bool
     artifact_id: str | None = None
     failed: bool = False
+    duration_ms: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class ToolErrored:
     call_id: str
     message: str
+    duration_ms: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -199,6 +210,40 @@ def plain_messages(values: Mapping[str, object]) -> list[PlainMessage]:
             calls = [f"→ {call['name']}({_args_text(call['args'])})" for call in item.tool_calls]
             text = "\n".join([text, *calls] if text else calls)
         found.append(PlainMessage(role, text))
+    return found
+
+
+def trace_messages(values: Mapping[str, object]) -> list[TraceMessage]:
+    """Messages stored for a session with their ids, tool calls, and call ids.
+
+    Unlike :func:`plain_messages`, a reply's tool calls stay apart from its
+    text, and system messages are left out.
+    """
+    raw = values.get("messages")
+    if not isinstance(raw, list):
+        return []
+    found: list[TraceMessage] = []
+    for item in cast(list[object], raw):
+        if not isinstance(item, BaseMessage):
+            continue
+        role = _ROLES.get(item.type)
+        if role is None or role == "system":
+            continue
+        calls: list[dict[str, object]] = []
+        if isinstance(item, AIMessage):
+            calls = [
+                {"call_id": call.get("id"), "name": call["name"], "args": call["args"]}
+                for call in item.tool_calls
+            ]
+        found.append(
+            TraceMessage(
+                id=item.id,
+                role=role,
+                text=message_text(item),
+                tool_calls=calls,
+                call_id=item.tool_call_id if isinstance(item, ToolMessage) else None,
+            )
+        )
     return found
 
 
@@ -346,7 +391,7 @@ def _custom(data: object) -> Fact | None:
     if kind == "model.started" and isinstance(message_id, str):
         return ModelStarted(message_id)
     if kind == "model.request" and isinstance(message_id, str):
-        return ModelRequested(message_id)
+        return _request(message_id, item)
     if kind in (PIN_READ_KIND, PIN_SKIPPED_KIND):
         return _pin(kind, item)
     if not isinstance(call_id, str):
@@ -367,6 +412,7 @@ def _custom(data: object) -> Fact | None:
             item.get("truncated") is True,
             artifact_id if isinstance(artifact_id, str) else None,
             item.get("failed") is True,
+            _duration(item),
         )
     if kind == "todos.updated":
         todos = item.get("todos")
@@ -380,8 +426,31 @@ def _custom(data: object) -> Fact | None:
         return TodosChanged(call_id, rows)
     if kind == "tool.failed":
         message = item.get("message")
-        return ToolErrored(call_id, message if isinstance(message, str) and message else "failed")
+        return ToolErrored(
+            call_id, message if isinstance(message, str) and message else "failed", _duration(item)
+        )
     return None
+
+
+def _duration(item: Mapping[str, object]) -> int | None:
+    value = item.get("duration_ms")
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+
+def _request(message_id: str, item: Mapping[str, object]) -> ModelRequested:
+    system, tools, ids = (
+        item.get("system_prompt_sha"),
+        item.get("tools_sha"),
+        item.get("message_ids"),
+    )
+    return ModelRequested(
+        message_id,
+        system if isinstance(system, str) else None,
+        tools if isinstance(tools, str) else None,
+        tuple(i for i in cast(list[object], ids) if isinstance(i, str))
+        if isinstance(ids, list)
+        else (),
+    )
 
 
 def _pin(kind: object, item: Mapping[str, object]) -> PinRead | PinSkipped | None:
