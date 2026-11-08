@@ -5,7 +5,7 @@ import { afterEach, expect, test, vi } from "vitest";
 import { App } from "../../app.tsx";
 import { createPage } from "../../store/page.ts";
 import { PageProvider } from "../../store/page-context.tsx";
-import { fakeClient, fakeFrame, summary } from "../../store/test-support.ts";
+import { ev, fakeClient, fakeFrame, summary } from "../../store/test-support.ts";
 import { FAILED_TRACE, MODEL_DETAIL, SHORT_TRACE, TOOL_DETAIL } from "./sample.ts";
 import { SELECT_A_SPAN } from "./trace-screen.tsx";
 import type { TraceRunSpan } from "../../store/trace.ts";
@@ -40,11 +40,27 @@ afterEach(() => {
 
 test("the page shows the title, the summary line, the tree, and the empty detail", async () => {
   const { fake } = await open("/s/a/trace");
-  expect(await screen.findByRole("heading", { name: "UTF-8 split" })).toBeTruthy();
+  expect(await within(screen.getByRole("banner")).findByRole("heading", { name: "UTF-8 split" })).toBeTruthy();
   expect(await screen.findByText("1 run · 0m 04.2s · 6.9K tokens")).toBeTruthy();
   expect(screen.getAllByRole("treeitem")).toHaveLength(5);
   expect(screen.getByText(SELECT_A_SPAN)).toBeTruthy();
   expect(fake.raw.getTrace).toHaveBeenCalledWith("a");
+});
+
+test("the top bar of the chat stays on the trace: title actions, model, folder, and drawer toggle", async () => {
+  const { fake, user } = await open("/s/a/trace");
+  await screen.findByRole("tree");
+  act(() => {
+    fake.emitEvent(ev("a", "session.created", { cwd: "/Users/you/repos/golem", model_profile: "local", model_name: "m" }));
+  });
+  const bar = within(screen.getByRole("banner"));
+  expect(bar.getByRole("button", { name: "Model: m" })).toBeTruthy();
+  expect(bar.getByText("golem")).toBeTruthy();
+  expect(bar.getByRole("button", { name: /^(Show|Hide) details$/ })).toBeTruthy();
+  expect(bar.getByRole("button", { name: /^Session actions/ })).toBeTruthy();
+  await user.click(screen.getByRole("link", { name: "Chat" }));
+  expect(within(screen.getByRole("banner")).getByRole("button", { name: "Model: m" })).toBeTruthy();
+  expect(location.pathname).toBe("/s/a");
 });
 
 test("a session with no runs says there is nothing to trace, and links back to the chat", async () => {

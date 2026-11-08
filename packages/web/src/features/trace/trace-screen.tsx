@@ -1,6 +1,6 @@
 import type { UseQueryResult } from "@tanstack/react-query";
 import type { TraceGetResult, TraceSpanResult } from "../../store/trace.ts";
-import { useNavigate, useSessionList, useTrace, useTraceSpan } from "../../store/page-context.tsx";
+import { useNavigate, useTrace, useTraceSpan } from "../../store/page-context.tsx";
 import { sessionPath, tracePath } from "../../store/router.ts";
 import { Button } from "../../ui/button.tsx";
 import { RefreshIcon } from "../../ui/icons.tsx";
@@ -15,12 +15,9 @@ import { SessionViewBar } from "./view-switch.tsx";
 export const SELECT_A_SPAN = "Select a span to see what went in and what came out.";
 export const NOTHING_TO_TRACE = "Nothing to trace yet. Send a message first.";
 
-function Header({ id, title, summary, refreshing, onRefresh }: { id: string; title: string; summary: string | null; refreshing: boolean; onRefresh: () => void }) {
+function Header({ id, summary, refreshing, onRefresh }: { id: string; summary: string | null; refreshing: boolean; onRefresh: () => void }) {
   return (
-    <header className="flex flex-col">
-      <div className="flex min-h-13 items-center gap-2.5 border-b border-line px-4 py-2.5">
-        <h1 className="min-w-0 truncate text-base font-medium">{title}</h1>
-      </div>
+    <div className="flex flex-col">
       <SessionViewBar id={id} view="trace">
         <p className="min-w-0 flex-1 truncate font-mono text-xs text-muted">{summary ?? ""}</p>
         <Button kind="ghost" size="sm" onClick={onRefresh} disabled={refreshing} aria-label="Refresh">
@@ -28,7 +25,7 @@ function Header({ id, title, summary, refreshing, onRefresh }: { id: string; tit
           <span className="max-narrow:hidden">Refresh</span>
         </Button>
       </SessionViewBar>
-    </header>
+    </div>
   );
 }
 
@@ -102,16 +99,14 @@ function Panes({ id, trace, span, query }: { id: string; trace: TraceGetResult; 
   );
 }
 
-/** A session's trace: the summary line, the tree with its waterfall, and the detail beside it. */
+/** A session's trace, below the session's top bar: the summary line, the tree with its waterfall, and the detail beside it. */
 export function TraceScreen({ id, span }: { id: string; span: string | null }) {
   const trace = useTrace(id);
   const detail = useTraceSpan(id, span);
-  const summary = useSessionList().find((session) => session.session_id === id);
-  const title = trace.data?.title ?? summary?.title ?? "Untitled session";
   const line = trace.data === undefined ? null : summaryLine(trace.data.runs);
   return (
     <div data-screen="trace" className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <Header id={id} title={title} summary={line} refreshing={trace.isFetching || detail.isFetching}
+      <Header id={id} summary={line} refreshing={trace.isFetching || detail.isFetching}
         onRefresh={() => {
           void trace.refetch();
           if (span !== null) void detail.refetch();

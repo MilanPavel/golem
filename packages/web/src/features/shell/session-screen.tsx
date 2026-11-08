@@ -168,8 +168,12 @@ function DrawerToggle({
   );
 }
 
-/** A session: the top bar, then the column with the transcript's and the dock's slots. */
-export function SessionScreen({ id }: { id: string }) {
+/**
+ * The chrome both views of a session share: the top bar with the title, the model chip, the
+ * folder, and the drawer toggle, the model dialog, and the drawer. The view goes in the column
+ * below the top bar. A session the daemon no longer has shows the gone screen instead.
+ */
+export function SessionFrame({ id, children }: { id: string; children: ReactNode }) {
   const header = useSession(id, selectHeader, sameHeader);
   const summary = useSessionList().find((session) => session.session_id === id);
   const remember = useRememberOpenedFolder();
@@ -216,11 +220,7 @@ export function SessionScreen({ id }: { id: string }) {
           )}
           <DrawerToggle ref={toggle} open={drawerOpen} todos={todos} onToggle={() => setDrawerOpen(!drawerOpen)} />
         </TopBar>
-        <SessionViewBar id={id} view="chat" />
-        <TranscriptSlot id={id} />
-        <div className="mx-auto w-full max-w-column px-5 pb-4">
-          <DockSlot id={id} />
-        </div>
+        {children}
       </div>
       <SessionModelDialog sessionId={id} model={model} chip={chip} />
       {drawerOpen ? (
@@ -234,5 +234,27 @@ export function SessionScreen({ id }: { id: string }) {
         />
       ) : null}
     </div>
+  );
+}
+
+/** The chat view's part of the column: the tabs, the transcript, and the dock. */
+export function ChatView({ id }: { id: string }) {
+  return (
+    <>
+      <SessionViewBar id={id} view="chat" />
+      <TranscriptSlot id={id} />
+      <div className="mx-auto w-full max-w-column px-5 pb-4">
+        <DockSlot id={id} />
+      </div>
+    </>
+  );
+}
+
+/** The chat view in the session's frame. */
+export function SessionScreen({ id }: { id: string }) {
+  return (
+    <SessionFrame id={id}>
+      <ChatView id={id} />
+    </SessionFrame>
   );
 }

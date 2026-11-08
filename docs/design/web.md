@@ -256,9 +256,9 @@ How an answer was made: each model call with its context and reply, each tool ca
 ```
 
 - **In the prototype:** the panel's *Trace* row has three screens: a model call, a tool call, and a session from before traces (`prototype.html#trace`, `#tracetool`, `#traceold`).
-- **Route:** `/s/:id/trace`, with `?span=<id>` for the selected span, so a link opens the same span. Like Settings, it has no drawer and no chips. The sidebar stays.
+- **Route:** `/s/:id/trace`, with `?span=<id>` for the selected span, so a link opens the same span. It sits in the same frame as the chat: the top bar (title and its actions, model chip, folder chip, drawer toggle) and the drawer stay as they are when the tab changes, and only what is below the `Chat | Trace` row changes. The sidebar stays.
 - **Ways in:**
-  - A `Chat | Trace` row of underline tabs under the session's title, on both views. It is a `nav` named `View`, and the current tab is `aria-current="page"`. The right side of the row belongs to the view: the trace puts its summary line and Refresh there.
+  - A `Chat | Trace` row of underline tabs under the top bar, on both views. It is a `nav` named `View`, and the current tab is `aria-current="page"`. The right side of the row belongs to the view: the trace puts its summary line and Refresh there.
   - The palette's `Trace` row, which is shown only when a session is open.
   - There is no slash command, because the terminal has no trace.
 - **Summary line:** the number of runs, the total time, and the total tokens (input plus output; `—` when none are recorded), with `Refresh`, on the right of the tabs row. The page shows finished data and does not update while a run streams. A running run shows its open spans as `running`, and Refresh reads again.
