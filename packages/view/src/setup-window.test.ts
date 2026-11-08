@@ -7,7 +7,6 @@ import {
   advance,
   agentInstalled,
   askService,
-  elapsed,
   engineChoices,
   engineSelected,
   guided,
@@ -137,11 +136,6 @@ test("welcome back names the model and the chats", () => {
   assert.equal(welcomeBack("Gemma 4 E4B", 0), "welcome back · Gemma 4 E4B");
 });
 
-test("elapsed reads as the screens show it", () => {
-  assert.equal(elapsed(3_400), "3s");
-  assert.equal(elapsed(64_000), "1m 04s");
-});
-
 test("the Service question installs or runs for this terminal, and each sub-step shows", () => {
   const ask = askService(null);
   assert.deepEqual(pressService(ask, "up", 0).state, ask);
@@ -151,12 +145,12 @@ test("the Service question installs or runs for this terminal, and each sub-step
     kind: "status",
     mark: "spin",
     text: "installing the launch agent…",
-    right: "2s",
+    right: "0m 02s",
   });
   const starting = agentInstalled(install.state, 2_000);
   const lines = serviceLines(starting, 5_000);
   assert.deepEqual(lines[0], { kind: "status", mark: "ok", text: "launch agent installed" });
-  assert.deepEqual(lines[1], { kind: "status", mark: "spin", text: "starting the service…", right: "3s" });
+  assert.deepEqual(lines[1], { kind: "status", mark: "spin", text: "starting the service…", right: "0m 03s" });
   assert.equal(lines[2]?.kind === "text" && lines[2].text, "waiting for it to answer");
   const slow = serviceLines(starting, 2_000 + SLOW_START_MS);
   assert.ok(slow.some((line) => line.kind === "text" && line.text.includes("macOS checks")));

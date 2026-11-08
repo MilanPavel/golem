@@ -91,7 +91,7 @@ test("Use it checks the shell's key, and Paste a different key opens the field",
 
 test("the check shows a spinner, the Keychain note after a moment, and the provider's reason when refused", () => {
   const checking: KeyState = { phase: "checking", provider: "anthropic", since: 0 };
-  assert.deepEqual(keyLines(checking, 0)[2], { kind: "status", mark: "spin", text: "checking the key with Anthropic…", right: "0s" });
+  assert.deepEqual(keyLines(checking, 0)[2], { kind: "status", mark: "spin", text: "checking the key with Anthropic…", right: "0m 00s" });
   assert.ok(!keyLines(checking, 0).some((line) => line.kind === "status" && line.mark === "attn"));
   assert.ok(keyLines(checking, KEYCHAIN_HINT_MS).some((line) => line.kind === "status" && line.mark === "attn"));
   const refused = keyChecked(checking, { ok: false, reason: "anthropic rejected the key (401 · invalid x-api-key)" }, 0);

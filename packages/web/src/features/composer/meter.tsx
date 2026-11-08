@@ -1,4 +1,4 @@
-import type { GolemState } from "@golem/view";
+import { formatElapsed, type GolemState } from "@golem/view";
 import { useEffect, useState } from "react";
 import { GOLEM_STATE_LABEL } from "../../ui/golem-state.ts";
 import { PixelGolem } from "../../ui/pixel-golem.tsx";
@@ -34,7 +34,7 @@ export function meterText(state: GolemState, seconds: number): string {
     case "idle":
       return GOLEM_STATE_LABEL.idle;
     case "thinking":
-      return `working · ${seconds}s`;
+      return `working · ${formatElapsed(seconds * 1000)}`;
     case "waiting":
       return "waiting for you";
     default:

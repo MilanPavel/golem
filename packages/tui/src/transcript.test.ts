@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { exportDestination, followTail, formatDuration, formatMessageTime, newLinesLabel } from "./transcript.ts";
+import { exportDestination, followTail, formatMessageTime, newLinesLabel } from "./transcript.ts";
 
 test("export goes to the given path, or the exports folder", () => {
   assert.equal(
@@ -14,11 +14,7 @@ test("export goes to the given path, or the exports folder", () => {
   );
 });
 
-test("duration and message time format for the transcript", () => {
-  assert.equal(formatDuration(12_400), "12.4s");
-  assert.equal(formatDuration(400), "0.4s");
-  assert.equal(formatDuration(90_400), "1m 30s");
-  assert.equal(formatDuration(Number.NaN), "");
+test("message time formats for the transcript", () => {
   const now = new Date(2026, 9, 17, 18, 0, 0).getTime();
   const today = new Date(2026, 9, 17, 14, 2, 30).toISOString();
   const older = new Date(2026, 9, 16, 14, 2, 0).toISOString();
