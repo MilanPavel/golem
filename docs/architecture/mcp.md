@@ -260,7 +260,7 @@ MCP servers are listed with `mcp.list`: each one's name, state (`idle`, `startin
 
 ### The settings
 
-- `[mcp.<name>]`: an MCP server. A stdio one has `command`, optional `args`, `env`, and `cwd`. An HTTP one has `url` and optional `headers`. A value in `env` or `headers` may name `keychain:mcp/<name>`, and a name that looks like a secret must. `enabled` is `true` (default), `"on_demand"`, or `false`, and `timeout_seconds` (default 120) bounds one tool call. `tools = { include, exclude }` hides tools from the model, `approval = "allow"` lets the server's calls run without asking, and `env_passthrough` lists the daemon's variables a stdio server gets. The name may use letters, digits, and `-`. The daemon reads the user's file and, for sessions in a folder in `trusted_projects`, the project's `.golem/config.toml`, again whenever they change ([ADR-023](../adr/023-mcp-client.md)).
+- `[mcp.<name>]`: an MCP server. A stdio one has `command`, optional `args`, `env`, and `cwd`. An HTTP one has `url` and optional `headers`. A value in `env` or `headers` may name `keychain:mcp/<name>`, and a name that looks like a secret must. `enabled` is `true` (default), `"on_demand"`, or `false`, and `timeout_seconds` (default 120) bounds one tool call. `tools = { include, exclude }` hides tools from the model, `approval = "allow"` lets the server's calls run without asking, and `env_passthrough` lists the daemon's variables a stdio server gets. An HTTP one may have `oauth = { client_id, scopes }` ([ADR-049](../adr/049-mcp-oauth.md)). The name may use letters, digits, and `-`. The daemon reads the user's file and, for sessions in a folder in `trusted_projects`, the project's `.golem/config.toml`, again whenever they change ([ADR-023](../adr/023-mcp-client.md)).
 
 ### Testing, logs, and trying a tool
 
@@ -312,6 +312,10 @@ The supervisor keeps a log for each server, up to 500 lines: its stderr, and lin
 `fit_name` makes names fit `MCP_SERVER_NAME` and adds `-2` on a clash with an existing server or an earlier candidate. A scan keeps each server's source text, which may hold secret values, in `ScanStore` for ten minutes (`DaemonState.mcp_imports`), and an apply uses it up. The apply runs each pick through the checks of `mcp.add`: the server names only its own secrets, a secret is stored before the file names it, a name that exists fails that pick alone, and the supervisor reloads each written file once at the end.
 
 `golem mcp export` builds its output from `mcp.list` and `mcp.get`, so there is no `mcp.export`. `packages/cli/src/mcp-export.ts` turns each `keychain:mcp/<x>` into `${MCP_<X>}` and lists the variables on stderr.
+
+### OAuth
+
+`golem/mcp/oauth.py` signs in to a hosted server ([ADR-049](../adr/049-mcp-oauth.md)). `discover` reads `resource_metadata` from the 401's `WWW-Authenticate` (or `/.well-known/oauth-protected-resource`), then the authorization server's metadata (RFC 8414, then OpenID). `begin` binds a one-shot `Callback` listener on `127.0.0.1`, registers golem as a public client (RFC 7591) unless `oauth.client_id` is set, and returns a `Login` with the address to open. `Login.finish` waits up to 5 minutes, checks `state`, and trades the code (PKCE `S256`, `resource=` the server's URL) for tokens. `Tokens` is the JSON of the Keychain item `mcp/<name>-oauth`. A `TokenSource` returns the access token, renewing it 60 s before it expires or when the server answers 401, and raises `NeedsAuth` when it cannot. Tests use a fake authorization server in `tests/test_mcp_oauth.py`.
 
 ### Limits
 

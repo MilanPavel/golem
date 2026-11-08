@@ -291,6 +291,21 @@ class McpToolFilter(BaseModel):
 McpApproval = Literal["ask", "read-only", "allow"]
 
 
+class McpOAuthSettings(BaseModel):
+    """``oauth`` in an HTTP server's table: a client id for a server that cannot register one.
+
+    A hosted server that signs in with OAuth needs nothing here when it
+    registers clients by itself. ``client_id`` is for one that does not, and
+    ``scopes`` asks for scopes other than the server's own list. The tokens are
+    kept in the Keychain as ``mcp/<name>-oauth``, never in the file.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    client_id: str | None = Field(default=None, min_length=1)
+    scopes: list[str] = Field(default_factory=list[str])
+
+
 class McpServerSettings(BaseModel):
     """``[mcp.<name>]``. An MCP server golem starts over stdio, or reaches over HTTP.
 
@@ -329,6 +344,7 @@ class McpServerSettings(BaseModel):
     tools: McpToolFilter = Field(default_factory=McpToolFilter)
     approval: McpApproval = "ask"
     env_passthrough: list[str] = Field(default_factory=list[str])
+    oauth: McpOAuthSettings | None = None
 
     @model_validator(mode="after")
     def _one_transport(self) -> McpServerSettings:
@@ -340,6 +356,8 @@ class McpServerSettings(BaseModel):
             raise ValueError("headers are for an HTTP server; a command takes env")
         if self.url is not None and self.env_passthrough:
             raise ValueError("env_passthrough is for a command; an HTTP server takes headers")
+        if self.command is not None and self.oauth is not None:
+            raise ValueError("oauth is for an HTTP server; a command takes env")
         for name in self.env_passthrough:
             if ENV_NAME.match(name) is None:
                 raise ValueError(f"{name!r} is not a variable name in env_passthrough")
