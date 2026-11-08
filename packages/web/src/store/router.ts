@@ -3,6 +3,7 @@ import { createStore, type StoreSource } from "./create-store.ts";
 export type Route =
   | { name: "home" }
   | { name: "session"; id: string }
+  | { name: "trace"; id: string; span: string | null }
   | { name: "settings"; section: string }
   | { name: "not-found" };
 
@@ -19,8 +20,9 @@ export type Router = StoreSource<Route> & {
  * `/` is home, `/s/:id` a session (id decoded, not empty, no further `/`), `/settings` and
  * `/settings/:section` (lowercase letters and dashes) the settings page, anything else is not found.
  * The router does not know which sections exist; the page says so for a name it does not list.
+ * `/s/:id/trace` is a session's trace, and `?span=` in `search` names the selected span.
  */
-export function parseRoute(pathname: string): Route {
+export function parseRoute(pathname: string, search = ""): Route {
   if (pathname === "/") {
     return { name: "home" };
   }
@@ -31,12 +33,14 @@ export function parseRoute(pathname: string): Route {
   if (section !== undefined) {
     return { name: "settings", section };
   }
-  const match = /^\/s\/([^/]+)$/.exec(pathname);
+  const match = /^\/s\/([^/]+)(\/trace)?$/.exec(pathname);
   if (match?.[1] !== undefined) {
     try {
       const id = decodeURIComponent(match[1]);
       if (id !== "" && !id.includes("/")) {
-        return { name: "session", id };
+        if (match[2] === undefined) return { name: "session", id };
+        const span = new URLSearchParams(search).get("span");
+        return { name: "trace", id, span: span === null || span === "" ? null : span };
       }
     } catch {
       // A malformed escape is not a session.
@@ -50,6 +54,12 @@ export function sessionPath(id: string): string {
   return `/s/${encodeURIComponent(id)}`;
 }
 
+/** The path of a session's trace, with `span` selected when given. */
+export function tracePath(id: string, span?: string | null): string {
+  const base = `${sessionPath(id)}/trace`;
+  return span === undefined || span === null ? base : `${base}?span=${encodeURIComponent(span)}`;
+}
+
 /** The path of a settings section. The default section is `/settings`. */
 export function settingsPath(section: string = DEFAULT_SETTINGS_SECTION): string {
   return section === DEFAULT_SETTINGS_SECTION ? "/settings" : `/settings/${section}`;
@@ -57,16 +67,17 @@ export function settingsPath(section: string = DEFAULT_SETTINGS_SECTION): string
 
 function sameRoute(a: Route, b: Route): boolean {
   if (a.name === "session") return b.name === "session" && a.id === b.id;
+  if (a.name === "trace") return b.name === "trace" && a.id === b.id && a.span === b.span;
   if (a.name === "settings") return b.name === "settings" && a.section === b.section;
   return a.name === b.name;
 }
 
 /** The current route, from `location` and the history. */
 export function createRouter(): Router {
-  const store = createStore<Route>(parseRoute(location.pathname));
+  const store = createStore<Route>(parseRoute(location.pathname, location.search));
 
   function sync(): void {
-    const next = parseRoute(location.pathname);
+    const next = parseRoute(location.pathname, location.search);
     if (!sameRoute(next, store.getSnapshot())) {
       store.set(next);
     }

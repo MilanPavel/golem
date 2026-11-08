@@ -61,6 +61,13 @@ export type { ModelServerStatus } from "../../protocol/gen/model-server-status.t
 export type { McpToggleResult } from "../../protocol/gen/mcp-toggle-result.ts";
 export type { SessionSetSkillsResult } from "../../protocol/gen/session-set-skills-result.ts";
 export type { McpToolInfo, McpToolsResult } from "../../protocol/gen/mcp-tools-result.ts";
+export type { TraceGetResult } from "../../protocol/gen/trace-get-result.ts";
+export type { TraceModelSpan } from "../../protocol/gen/trace-model-span.ts";
+export type { TraceRunSpan } from "../../protocol/gen/trace-run-span.ts";
+export type { TraceSpan } from "../../protocol/gen/trace-span.ts";
+export type { TraceSpanResult } from "../../protocol/gen/trace-span-result.ts";
+export type { TraceTokens } from "../../protocol/gen/trace-tokens.ts";
+export type { TraceToolSpan } from "../../protocol/gen/trace-tool-span.ts";
 export type { SkillCall } from "../../protocol/gen/skill-call.ts";
 export type { ListedSkill, SkillListResult } from "../../protocol/gen/skill-list-result.ts";
 export type { ConfigAllowance, ConfigGetResult, ConfigRule } from "../../protocol/gen/config-get-result.ts";

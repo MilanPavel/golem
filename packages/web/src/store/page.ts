@@ -1,4 +1,4 @@
-import { OLLAMA_FAILED, RpcError, type ApprovalChoice, type ConfigGetResult, type ConfigRawGetResult, type ConfigRawResult, type FsListDirsResult, type McpAddParams, type McpCallResult, type McpImportApplyParams, type McpImportApplyResult, type McpImportScanResult, type McpCatalogResult, type McpListResult, type McpLogsResult, type McpServerConfig, type McpServerDetail, type McpServerLog, type McpTestProgress, type McpTestResult, type GolemClient, type RuntimeName, type SetupStatusResult, type SkillListResult } from "@golem/client";
+import { OLLAMA_FAILED, RpcError, type ApprovalChoice, type ConfigGetResult, type ConfigRawGetResult, type ConfigRawResult, type FsListDirsResult, type McpAddParams, type McpCallResult, type McpImportApplyParams, type McpImportApplyResult, type McpImportScanResult, type McpCatalogResult, type McpListResult, type McpLogsResult, type McpServerConfig, type McpServerDetail, type McpServerLog, type McpTestProgress, type McpTestResult, type GolemClient, type RuntimeName, type SetupStatusResult, type SkillListResult, type TraceGetResult } from "@golem/client";
 import { changeToolFilter, installEventOf, type InstallEvent } from "@golem/view";
 import type { QueryClient } from "@tanstack/react-query";
 import { createDrafts, type Drafts } from "./drafts.ts";
@@ -43,6 +43,7 @@ export type PageClient = Pick<
   | "getConfig"
   | "listMcp"
   | "mcpTools"
+  | "getTrace"
   | "restartMcp"
   | "setMcpEnabled"
   | "enableMcp"
@@ -201,6 +202,8 @@ export type PageQueries = {
   mcpList(sessionId: string | null): Promise<McpListResult>;
   /** One server's tools, with their descriptions. */
   mcpTools(name: string, sessionId: string | null): Promise<McpToolsResult>;
+  /** A session's runs as a tree of spans. */
+  trace(sessionId: string): Promise<TraceGetResult>;
   /** The servers golem offers to add, with what each needs here. */
   mcpCatalog(sessionId: string | null): Promise<McpCatalogResult>;
   /** The folders directly under `path` in the home folder; `null` is home itself. */
@@ -272,6 +275,7 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       config: (cwd, sessionId) => client.getConfig(cwd ?? undefined, sessionId ?? undefined),
       mcpList: (sessionId) => client.listMcp(sessionId ?? undefined),
       mcpTools: (name, sessionId) => client.mcpTools(name, sessionId ?? undefined),
+      trace: (sessionId) => client.getTrace(sessionId),
       mcpCatalog: (sessionId) => client.mcpCatalog(sessionId ?? undefined),
       dirs: (path) => (path === null ? client.listDirs() : client.listDirs(path)),
     },

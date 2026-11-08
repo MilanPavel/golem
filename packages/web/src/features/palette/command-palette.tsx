@@ -17,6 +17,8 @@ export type CommandPaletteViewProps = {
   /** Enter on a row, or a double click. Only called when `hasComposer`. */
   onPick: (row: PaletteRow) => void;
   commands?: readonly Command[];
+  /** A session is open, so the Trace row is offered. */
+  hasSession?: boolean;
   /** Where the search starts, for the gallery. */
   initialQuery?: string;
 };
@@ -53,10 +55,10 @@ function Row({ row }: { row: PaletteRow }) {
   }
 }
 
-function Body({ hasComposer, onPick, commands, initialQuery }: Omit<CommandPaletteViewProps, "open" | "onOpenChange" | "onCloseAutoFocus">) {
+function Body({ hasComposer, hasSession = false, onPick, commands, initialQuery }: Omit<CommandPaletteViewProps, "open" | "onOpenChange" | "onCloseAutoFocus">) {
   const [query, setQuery] = useState(initialQuery ?? "");
   const [activeId, setActiveId] = useState<string | null>(null);
-  const rows = paletteRows(commands ?? COMMANDS, query);
+  const rows = paletteRows(commands ?? COMMANDS, query, hasSession);
   const active = resolveActive(rows, activeId);
   return (
     <>
