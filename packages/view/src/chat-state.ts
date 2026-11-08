@@ -1,5 +1,6 @@
 import type { ApprovalChoice, ChatEvent, SkillCall } from "@golem/client";
 
+import { emptyLiveContext, foldLiveContext, type LiveContextState } from "./context.ts";
 import type { TodoItem } from "./todos.ts";
 
 export type ToolStatus = "requested" | "waiting" | "running" | "done" | "failed";
@@ -93,6 +94,8 @@ export type ChatState = {
    * `not_installed`. The banner offers to install Ollama and send it again.
    */
   retry: { text: string; provider: string } | null;
+  /** The context of the newest model call that reported its input, from the `model.call.*` events. */
+  context: LiveContextState;
 };
 
 export const emptyChat: ChatState = {
@@ -108,6 +111,7 @@ export const emptyChat: ChatState = {
   skippedSkills: [],
   down: null,
   retry: null,
+  context: emptyLiveContext,
 };
 
 /** What to do after a model server did not answer, besides fixing it. */
@@ -201,6 +205,12 @@ function retryFor(messages: readonly ChatMessage[], data: RunFailure): ChatState
 }
 
 export function reduceChat(state: ChatState, event: ChatEvent): ChatState {
+  const next = reduceChatEvent(state, event);
+  const context = foldLiveContext(state.context, event);
+  return context === state.context ? next : { ...next, context };
+}
+
+function reduceChatEvent(state: ChatState, event: ChatEvent): ChatState {
   switch (event.type) {
     case "session.created":
     case "session.updated":

@@ -116,6 +116,8 @@ import {
   formatLogLine,
   formatTestResult,
   formatTestStep,
+  latestModelSpan,
+  type ContextReport,
 } from "@golem/view";
 import { folderFacts } from "./folder-facts.ts";
 import {
@@ -124,6 +126,7 @@ import {
   pinnableSkills,
   closedDebug,
   COMMANDS,
+  contextLines,
   helpLines,
   toggleDebugTab,
   withModelChoices,
@@ -422,7 +425,9 @@ export function App({
   const [modelMessages, setModelMessages] = useState<CheckpointMessage[]>([]);
   const [modelCount, setModelCount] = useState<number | null>(null);
   const [switcher, setSwitcher] = useState<SwitcherState>(closedSwitcher);
-  const [panel, setPanel] = useState<"help" | null>(null);
+  const [panel, setPanel] = useState<"help" | "context" | null>(null);
+  const [contextReport, setContextReport] = useState<ContextReport>({ kind: "loading" });
+  const contextGen = useRef(0);
   const [mcpManager, setMcpManager] = useState<McpManagerState>(closedMcpManager);
   const mcpManagerRef = useRef(mcpManager);
   mcpManagerRef.current = mcpManager;
@@ -613,7 +618,8 @@ export function App({
   };
   overlayFrame.current = { columns, body: budget.body };
   const diffOffset = chat.approval !== null && diffScroll.callId === chat.approval.callId ? diffScroll.offset : 0;
-  const panelLines = panel === "help" ? helpLines(COMMANDS, columns) : [];
+  const panelLines =
+    panel === "help" ? helpLines(COMMANDS, columns) : panel === "context" ? contextLines(contextReport, columns) : [];
   const helpText = !keysOpen && !switcher.open ? panelLines : [];
   const helpHeight = Math.min(helpText.length, budget.body);
   const chatHeight = budget.body - helpHeight;
@@ -654,6 +660,7 @@ export function App({
       batcher.current?.flush();
       setLiveTitle(null);
       setPanel(null);
+      contextGen.current += 1;
       setKeysOpen(false);
       historyCursorRef.current = null;
       setHistoryCursor(null);
@@ -722,6 +729,7 @@ export function App({
       alert: alertLabel(chat.down, mcpAlert(mcp.servers)),
       skills: sessionId === null ? [] : chat.activeSkills,
       skippedSkills: chat.skippedSkills,
+      context: sessionId === null ? null : chat.context.last,
     }),
     columns,
   );
@@ -1267,6 +1275,36 @@ export function App({
     );
   }
 
+  /** Read the newest model call's context for the `/context` panel: `trace.get`, then `trace.span`. */
+  function loadContext(): void {
+    const gen = ++contextGen.current;
+    const id = sessionRef.current;
+    if (id === null) {
+      setContextReport({ kind: "none" });
+      return;
+    }
+    if (connectionRef.current.status !== "connected") {
+      setContextReport({ kind: "error", message: "not connected" });
+      return;
+    }
+    setContextReport({ kind: "loading" });
+    const current = (): boolean => gen === contextGen.current && sessionRef.current === id;
+    void (async () => {
+      try {
+        const trace = await client.getTrace(id);
+        const span = latestModelSpan(trace.runs);
+        if (span === null) {
+          if (current()) setContextReport({ kind: "none" });
+          return;
+        }
+        const result = await client.getTraceSpan(id, span.id);
+        if (current()) setContextReport({ kind: "ready", model: span.model ?? null, context: result.context ?? null });
+      } catch (error) {
+        if (current()) setContextReport({ kind: "error", message: messageOf(error) });
+      }
+    })();
+  }
+
   /** Ask the daemon for the catalog. A pick waiting from `/mcp add <id>` goes on when it arrives. */
   function loadMcpCatalog(): void {
     client.mcpCatalog(sessionRef.current ?? undefined).then(
@@ -1322,6 +1360,15 @@ export function App({
       setKeysOpen(false);
       setSwitcher(closedSwitcher);
       setChat((current) => ({ ...current, notice: null }));
+      return;
+    }
+    if (outcome.kind === "context") {
+      setDraft(draftAt(""));
+      setPanel("context");
+      setKeysOpen(false);
+      setSwitcher(closedSwitcher);
+      setChat((current) => ({ ...current, notice: null }));
+      loadContext();
       return;
     }
     setPanel(null);
@@ -3884,7 +3931,7 @@ function StatusSegmentView({
   if (segment.tone === "title") {
     return <Text bold>{text}</Text>;
   }
-  if (segment.tone === "fresh") {
+  if (segment.tone === "fresh" || segment.tone === "warn") {
     return <Text color="yellow">{text}</Text>;
   }
   if (segment.tone === "alert") {

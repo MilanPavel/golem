@@ -3,6 +3,8 @@ import { test } from "node:test";
 
 import {
   alertLabel,
+  contextLabel,
+  contextTone,
   fitSegments,
   formatMessageCount,
   formatUptime,
@@ -247,4 +249,53 @@ test("a pinned skill the model call left out is marked skipped, in its place", (
   assert.equal(skillsLabel(["ship", "setup"], ["ship"]), "skills: ship (skipped), setup");
   assert.equal(skillsLabel(["setup"], ["ship"]), "skills: setup");
   assert.equal(skillsLabel([], []), "");
+});
+
+test("contextLabel: percent rounded down, <1% for a sliver, empty when unknown", () => {
+  assert.equal(contextLabel(null), "");
+  assert.equal(contextLabel({ used: 1000, window: null }), "");
+  assert.equal(contextLabel({ used: null, window: 8000 }), "");
+  assert.equal(contextLabel({ used: 0, window: 8000 }), "ctx 0%");
+  assert.equal(contextLabel({ used: 300, window: 100_000 }), "ctx <1%");
+  assert.equal(contextLabel({ used: 32_000, window: 128_000 }), "ctx 25%");
+  assert.equal(contextLabel({ used: 123_000, window: 128_000 }), "ctx 96%");
+});
+
+test("contextTone: dim below 80%, warn from 80%, alert from 95% or at num_ctx", () => {
+  const at = (used: number, numCtx: number | null = null) => contextTone({ spanId: "m", used, window: 100, numCtx });
+  assert.equal(contextTone(null), "dim");
+  assert.equal(at(25), "dim");
+  assert.equal(at(80), "warn");
+  assert.equal(at(94), "warn");
+  assert.equal(at(95), "alert");
+  assert.equal(at(10, 8), "alert");
+  assert.equal(at(7, 8), "dim");
+  assert.equal(contextTone({ spanId: "m", used: 50, window: null, numCtx: null }), "dim");
+});
+
+test("context sits after the model and leaves the line after the skills and before new lines", () => {
+  const segments = statusSegments({
+    connection: "connected",
+    title: "Trip",
+    model: "qwen",
+    folder: "~/repos/golem",
+    messageCount: null,
+    uptimeSeconds: null,
+    freshLines: 3,
+    skills: ["ship"],
+    context: { spanId: "m", used: 85, window: 100, numCtx: null },
+  });
+  assert.deepEqual(
+    segments.map((segment) => segment.id).slice(0, 5),
+    ["connection", "alert", "title", "model", "context"],
+  );
+  const context = segments.find((segment) => segment.id === "context");
+  assert.equal(context?.text, "ctx 85%");
+  assert.equal(context?.tone, "warn");
+  const ids = (columns: number) => fitSegments(segments, columns).map((segment) => segment.id);
+  const order = [80, 70, 60, 50, 45, 40, 36, 30, 25, 20, 15].map(ids);
+  const last = (id: string) => order.reduce((at, list, index) => (list.includes(id) ? index : at), -1);
+  assert.ok(last("skills") < last("context"));
+  assert.ok(last("context") < last("fresh"));
+  assert.ok(last("fresh") < last("model"));
 });
