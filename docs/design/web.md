@@ -271,7 +271,7 @@ How an answer was made: each model call with its context and reply, each tool ca
   - Indented 16 px per level, with a fold arrow on a run and on a model call that has tools.
   - The mark: a clay `◆` for a model call, a muted `⚙` for a tool, nothing for a run.
   - The name: a run's first words in the UI font; `model 1`, `model 2` …; a tool's name in mono.
-  - The waterfall track, the time, and for a model call the tokens (`9.6K`).
+  - The waterfall track, the time, and the tokens: for a model call its input, a small fill bar and the share of its window (`21.7K · 17%`); for a run its total tokens and the context at its end (`126.6K · 25%`).
   - A failed span ends with `✗` in `deny`, and a denied one with `denied`.
   - The selected row has the `clay-soft` ground.
   - Runs are folded, except the last one and the one with the selected span.
@@ -283,9 +283,9 @@ How an answer was made: each model call with its context and reply, each tool ca
     - `deny` for a failed span;
     - the wait for approval in front of a tool, hatched in `wait`.
   - A run's own bar is a thin `muted` line.
-  - No axis or grid lines. The time is on the row.
+  - A run's row carries up to three time ticks (`0m 30s`, `1m 00s`) for its own time line. Their labels hide below 1100 px. There are no grid lines.
 - **The detail header:**
-  - **A model call:** the name, then a mono line: the model and provider, the time, the time to the first token, `input → output` tokens, and cache read and cache write when there are any.
+  - **A model call:** the name, then a mono line: the model and provider, the time, the time to the first token, the throughput (`≈ 72 tok/s`), `input → output` tokens, and cache read and cache write when there are any.
   - **A tool:** the tool's name, `✓` or `✗`, its time, and its approval wait.
 - **Context meter:** a model call with a recorded context shows it right under the header, above the tabs, so it stays on Context, Reply and Metadata. A tool, a run, and a call from before the context was recorded have none.
   - **Title:** `Context · 3.4K / 32K · 10%` in mono, with `≈` before the window when it comes from today's catalog, and `Context · 3.4K · window unknown` when no window is known. At the right, a faint `estimated split`, because the provider reports only the total and golem splits it by characters.
@@ -300,8 +300,8 @@ How an answer was made: each model call with its context and reply, each tool ca
     3. An assistant message lists its tool calls as `→ name(args)` in mono.
     4. A tool result is in a `code-bg` block, closed after 12 lines with `Show all`.
     5. A divider, `new since the last call`, comes before the first message the previous call did not have.
-  - **Reply:** the reply, the same way.
-  - **Metadata:** a two-column list of every field, in mono.
+  - **Reply:** the reply, the same way. The reply and the messages render Markdown in the UI font.
+  - **Metadata:** a two-column list of the fields that have a value, in mono. Times are local, and durations show the raw ms and the formatted time. JSON shows every field.
 - **Tool call tabs:**
   - **Args:** pretty JSON.
   - **Result:** the full text. A large result shows its first part and `Open full output`, which opens the artifact viewer.

@@ -42,7 +42,7 @@ export function sampleModel(
     model: recorded ? "ollama/qwen3-coder:30b" : null,
     tokens: recorded && options.tokens ? { input: options.tokens[0], output: options.tokens[1], cache_read: null, cache_write: null } : null,
     first_token_ms: recorded ? 120 : null,
-    context_window: recorded ? (options.window ?? 32768) : null,
+    context_window: recorded ? (options.window === undefined ? 32768 : options.window) : null,
     num_ctx: null,
     context_window_estimated: false,
     preview: "",
@@ -58,8 +58,8 @@ export function sampleRun(id: string, name: string, start: number, duration: num
 /** One run: two model calls, and the two tools the first asked for. */
 export const SHORT_TRACE: TraceRunSpan[] = [
   sampleRun("r_1", "What is in notes.txt?", 0, 4200, [
-    sampleModel("m_1", 1, 0, 2100, [sampleTool("c_1", "grep", 2100, 48), sampleTool("c_2", "read_file", 2160, 12)], { tokens: [3200, 90] }),
-    sampleModel("m_2", 2, 2300, 1900, [], { tokens: [3400, 210] }),
+    sampleModel("m_1", 1, 0, 2100, [sampleTool("c_1", "grep", 2100, 48), sampleTool("c_2", "read_file", 2160, 12)], { tokens: [3200, 90], window: 128_000 }),
+    sampleModel("m_2", 2, 2300, 1900, [], { tokens: [3400, 210], window: 128_000 }),
   ]),
 ];
 
@@ -83,10 +83,10 @@ export const LONG_TRACE: TraceRunSpan[] = [
     0,
     25 * 900,
     Array.from({ length: 25 }, (_, i) =>
-      sampleModel(`m_${i + 1}`, i + 1, i * 900, 600, [sampleTool(`c_${i + 1}`, "read_file", i * 900 + 600, 120)], { tokens: [1000 + i * 100, 80] }),
+      sampleModel(`m_${i + 1}`, i + 1, i * 900, 600, [sampleTool(`c_${i + 1}`, "read_file", i * 900 + 600, 120)], { tokens: [i === 24 ? 110_000 : 1000 + i * 100, 80], window: 128_000 }),
     ),
   ),
-  sampleRun("r_2", "Thanks", 25 * 900 + 1000, 1500, [sampleModel("m_26", 26, 25 * 900 + 1000, 1500, [], { tokens: [3900, 20] })]),
+  sampleRun("r_2", "Thanks", 25 * 900 + 1000, 1500, [sampleModel("m_26", 26, 25 * 900 + 1000, 1500, [], { tokens: [3900, 20], window: 128_000 })]),
 ];
 
 /** A tool that ran and failed, and one the model asked for and the user denied. */
@@ -137,7 +137,7 @@ export const MODEL_DETAIL: TraceSpanResult = {
   ],
   messages: [USER, ASKED, SEEN],
   new_from: 1,
-  reply: { id: "m_2", role: "assistant", text: "It says **42**.", tool_calls: [], tokens: 12 },
+  reply: { id: "m_2", role: "assistant", text: "It says **42**.\n\n## Why\n\n- notes.txt has 30 lines\n- each line gives the answer\n\n```sh\ngrep answer notes.txt\n```", tool_calls: [], tokens: 12 },
   stop_reason: "end_turn",
   provider: "ollama",
   context: {

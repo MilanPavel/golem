@@ -23,7 +23,7 @@ test("a row for each run, model call, and tool, indented by depth", () => {
   expect(run?.textContent).toContain("0m 04.2s");
   expect(model?.textContent).toContain("model 1");
   expect(model?.textContent).toContain("0m 02.1s");
-  expect(model?.textContent).toContain("3.3K");
+  expect(model?.textContent).toContain("3.2K");
   expect(tool?.textContent).toContain("grep");
   expect(tool?.textContent).toContain("0m 00.048s");
   expect(within(tool as HTMLElement).getByText("ok")).toBeTruthy();
@@ -117,4 +117,22 @@ test("the tree has no accessibility violations", async () => {
   const results = await axe.run(container, { rules: { "color-contrast": { enabled: false }, region: { enabled: false } } });
   expect(results.violations).toEqual([]);
   expect(names().length).toBeGreaterThan(0);
+});
+
+test("a model row has a fill bar and its input with the share of the window", () => {
+  render(<Tree runs={SHORT_TRACE} />);
+  const second = items()[4] as HTMLElement;
+  expect(second.textContent).toContain("3.4K · 2%");
+  expect(second.querySelector("[data-part=fill]")).not.toBeNull();
+  expect(second.querySelector("[title]")?.getAttribute("title")).toBe("3.4K in · 210 out · 2% of 128K");
+});
+
+test("a run row has its total and its end context, and a track with ticks", () => {
+  render(<Tree runs={SHORT_TRACE} />);
+  const run = items()[0] as HTMLElement;
+  expect(run.textContent).toContain("6.9K · 2%");
+  expect(run.querySelector("[title]")?.getAttribute("title")).toContain("context at the end 3.4K / 128K (2%)");
+  expect(run.querySelectorAll("[data-part=tick]")).toHaveLength(1);
+  expect(run.querySelector("[data-part=tick-label]")?.textContent).toBe("0m 02s");
+  expect(items()[1]?.querySelector("[data-part=tick]")).toBeNull();
 });

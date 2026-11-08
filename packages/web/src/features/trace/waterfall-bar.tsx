@@ -1,5 +1,5 @@
 import type { TraceNode } from "../../store/trace.ts";
-import type { Bar } from "./waterfall.ts";
+import type { Bar, Tick } from "./waterfall.ts";
 
 /** The look of a bar: clay for a model call, a neutral line for a tool, red for a failure. */
 function barClass(span: TraceNode): string {
@@ -12,8 +12,9 @@ function barClass(span: TraceNode): string {
  * One span on its run's time line. The position is a share of the run, which only a style can
  * say; every colour is a token.
  */
-export function WaterfallBar({ span, bar }: { span: TraceNode; bar: Bar }) {
+export function WaterfallBar({ span, bar, ticks }: { span: TraceNode; bar: Bar; ticks?: Tick[] }) {
   const thin = span.kind === "run";
+  const scale = thin && ticks !== undefined && ticks.length > 0 ? ticks : null;
   return (
     <span aria-hidden="true" className="relative block h-4 min-w-0 flex-1">
       {bar.wait === null ? null : (
@@ -30,9 +31,23 @@ export function WaterfallBar({ span, bar }: { span: TraceNode; bar: Bar }) {
       )}
       <span
         data-part="bar"
-        className={`absolute top-1/2 block min-w-0.5 -translate-y-1/2 rounded-xs ${thin ? "h-px" : "h-2.5"} ${barClass(span)}`}
+        className={`absolute block min-w-0.5 rounded-xs ${
+          thin ? (scale === null ? "top-1/2 h-px -translate-y-1/2" : "bottom-0 h-px") : "top-1/2 h-2.5 -translate-y-1/2"
+        } ${barClass(span)}`}
         style={{ left: `${bar.left}%`, width: `${bar.width}%` }}
       />
+      {scale?.map((tick) => (
+        <span key={tick.left} data-part="tick">
+          <span className="absolute bottom-0 block h-1.5 w-px bg-line-strong" style={{ left: `${tick.left}%` }} />
+          <span
+            data-part="tick-label"
+            className="absolute top-0 -translate-x-1/2 font-mono text-xs leading-none text-faint max-wide:hidden"
+            style={{ left: `${tick.left}%` }}
+          >
+            {tick.label}
+          </span>
+        </span>
+      ))}
     </span>
   );
 }

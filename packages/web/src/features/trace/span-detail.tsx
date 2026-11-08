@@ -104,7 +104,11 @@ function MessageRow({ message, names, total }: { message: TraceMessage; names: R
           <FoldedBlock text={message.text} />
         ) : (
           <>
-            {message.text === "" ? null : <Markdown text={message.text} />}
+            {message.text === "" ? null : (
+              <div className="prose prose-trace">
+                <Markdown text={message.text} />
+              </div>
+            )}
             {calls.map((call, index) => (
               <p key={index} className="font-mono text-xs text-muted">
                 {callLine(call)}

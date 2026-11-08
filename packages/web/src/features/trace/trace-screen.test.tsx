@@ -41,8 +41,8 @@ afterEach(() => {
 test("the page shows the title, the summary line, the tree, and the empty detail", async () => {
   const { fake } = await open("/s/a/trace");
   expect(await within(screen.getByRole("banner")).findByRole("heading", { name: "UTF-8 split" })).toBeTruthy();
-  expect(await screen.findByText("1 run · 0m 04.2s · 6.9K tokens · context 3.4K / 32K · 10%")).toBeTruthy();
-  expect(screen.getByRole("meter", { name: "Context used" }).getAttribute("aria-valuenow")).toBe("10");
+  expect(await screen.findByText("1 run · 0m 04.2s · 6.9K tokens · context 3.4K / 128K · 2%")).toBeTruthy();
+  expect(screen.getByRole("meter", { name: "Context used" }).getAttribute("aria-valuenow")).toBe("2");
   expect(screen.getAllByRole("treeitem")).toHaveLength(5);
   expect(screen.getByText(SELECT_A_SPAN)).toBeTruthy();
   expect(fake.raw.getTrace).toHaveBeenCalledWith("a");

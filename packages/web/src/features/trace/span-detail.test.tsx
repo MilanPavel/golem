@@ -18,7 +18,7 @@ const tab = (name: string) => screen.getByRole("tab", { name });
 test("a model call shows its header, with the model, time, first token, and tokens", () => {
   show(MODEL_DETAIL);
   expect(screen.getByRole("heading", { name: /model 2/ })).toBeTruthy();
-  expect(document.body.textContent).toContain("ollama/qwen3-coder:30b · 0m 01.9s · first token 0m 00.120s · 3.4K → 210");
+  expect(document.body.textContent).toContain("ollama/qwen3-coder:30b · 0m 01.9s · first token 0m 00.120s · ≈ 118 tok/s · 3.4K → 210");
   expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Context", "Reply", "Metadata"]);
 });
 
@@ -60,15 +60,27 @@ test("the first call has no divider, and the Reply tab shows the reply", async (
   expect(within(screen.getByRole("list", { name: "Reply" })).getByText("42", { selector: "strong" })).toBeTruthy();
 });
 
-test("Metadata lists every field, with the provider and why the call stopped", async () => {
+test("Metadata lists the fields that have a value, with the provider and why the call stopped", async () => {
   const { user } = show(MODEL_DETAIL);
   await user.click(tab("Metadata"));
   const text = document.body.textContent ?? "";
-  for (const label of ["id", "duration_ms", "first_token_ms", "tokens.input", "tokens.cache_read", "stop_reason", "provider", "recorded"]) {
+  for (const label of ["id", "duration_ms", "first_token_ms", "tokens.input", "stop_reason", "provider", "recorded"]) {
     expect(text, label).toContain(label);
   }
   expect(text).toContain("end_turn");
   expect(text).toContain("ollama");
+  expect(text).toContain("1900 · 0m 01.9s");
+  expect(text).not.toContain("tokens.cache_read");
+  await user.click(screen.getByRole("button", { name: "JSON" }));
+  expect(document.body.textContent).toContain("cache_read");
+});
+
+test("the Reply renders Markdown in the trace style, and the header has the throughput", async () => {
+  const { user } = show(MODEL_DETAIL);
+  expect(document.body.textContent).toContain("tok/s");
+  await user.click(tab("Reply"));
+  const heading = screen.getByRole("heading", { name: "Why", level: 2 });
+  expect(heading.closest(".prose-trace")).not.toBeNull();
 });
 
 test("a tool shows its args and its result, and has no Approval tab without an approval", async () => {
@@ -151,7 +163,7 @@ test("the text helpers: tabs, raw parts, copy, and the model line", () => {
   expect(tabsOf(APPROVAL_DETAIL)).toEqual(["args", "result", "approval"]);
   expect(jsonOf(OLD_DETAIL, "context")).toMatchObject({ system_prompt: null, tools: null, new_from: 0 });
   expect(copyText(MODEL_DETAIL, "context", "pretty")).toContain("--- new since the last call ---");
-  expect(copyText(MODEL_DETAIL, "reply", "pretty")).toBe("golem: It says **42**.");
+  expect(copyText(MODEL_DETAIL, "reply", "pretty")).toContain("golem: It says **42**.");
   const cached = { ...MODEL_DETAIL, span: { ...MODEL_DETAIL.span, tokens: { input: 1000, output: 5, cache_read: 800, cache_write: 200 } } };
   expect(modelLine(cached)).toContain("cache read 800 · cache write 200");
 });

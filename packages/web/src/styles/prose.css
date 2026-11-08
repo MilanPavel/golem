@@ -250,3 +250,23 @@
     transition: none;
   }
 }
+
+/* The trace reads closely, so it keeps the UI font and a smaller size (design/web.md, The trace). */
+.prose.prose-trace {
+  max-width: none;
+  font-family: var(--font-ui);
+  font-size: 0.875rem;
+  line-height: 1.55;
+}
+
+.prose.prose-trace h1 {
+  font-size: 1.125rem;
+}
+
+.prose.prose-trace h2 {
+  font-size: 1rem;
+}
+
+.prose.prose-trace h3 {
+  font-size: 0.9375rem;
+}
