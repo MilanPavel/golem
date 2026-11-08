@@ -510,3 +510,12 @@ test("/mcp enable and /mcp disable turn a server on or off for this chat, and sa
   await say(user, "/mcp enable nope");
   expect(screen.getByRole("alert").textContent).toContain("no server named nope");
 });
+
+test("/config opens Settings → Config file, and /config project opens the project's file", async () => {
+  const { fake, user } = await session();
+  fake.raw.configRawGet.mockResolvedValue({ exists: true, mtime_ns: 1, path: "/work/app/.golem/config.toml", text: "a = 1\n" });
+  await say(user, "/config project");
+  expect(location.pathname).toBe("/settings/config");
+  expect(await screen.findByRole("textbox", { name: "Config file text" })).toBeTruthy();
+  await waitFor(() => expect(fake.raw.configRawGet).toHaveBeenLastCalledWith({ scope: "project", sessionId: expect.any(String) }));
+});

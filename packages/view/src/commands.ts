@@ -24,6 +24,8 @@ export type ComposerOutcome =
   | { kind: "mcp" }
   | { kind: "mcp-add"; id: string | null }
   | { kind: "mcp-toggle"; on: boolean; name: string }
+  /** Open the config file: the user's, or with `project` the session's project. */
+  | { kind: "config"; project: boolean }
   | { kind: "send"; text: string; debug: DebugState }
   /** Run a skill once. `text` is the line as typed, and the daemon fills in the body from `args`. */
   | { kind: "skill"; name: string; args: string; text: string; debug: DebugState }
@@ -217,6 +219,23 @@ export const COMMANDS: readonly Command[] = [
         return { kind: "mcp-toggle", on: action === "enable", name };
       }
       return { kind: "unknown", notice: "/mcp, /mcp add [id], /mcp enable <name>, or /mcp disable <name>" };
+    },
+  },
+  {
+    name: "/config",
+    group: "tools",
+    args: "[project]",
+    description: "Opens the config file to read and edit. project is the folder's own.",
+    choices: ["project"],
+    run: (_debug, args) => {
+      const [which, ...extra] = args;
+      if (which === undefined) {
+        return { kind: "config", project: false };
+      }
+      if (which === "project" && extra.length === 0) {
+        return { kind: "config", project: true };
+      }
+      return { kind: "unknown", notice: "/config or /config project" };
     },
   },
   {

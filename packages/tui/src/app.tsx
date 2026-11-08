@@ -1347,6 +1347,14 @@ export function App({
       loadMcpCatalog();
       return;
     }
+    if (outcome.kind === "config") {
+      setDraft(draftAt(""));
+      setChat((current) => ({
+        ...current,
+        notice: `The config file opens in your editor with: golem config edit${outcome.project ? " --project" : ""}`,
+      }));
+      return;
+    }
     if (outcome.kind === "skills") {
       setDraft(draftAt(""));
       setKeysOpen(false);
