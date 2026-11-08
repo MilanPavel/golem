@@ -288,8 +288,8 @@ How an answer was made: each model call with its context and reply, each tool ca
   - **A tool:** the tool's name, `✓` or `✗`, its time, and its approval wait.
 - **Model call tabs:**
   - **Context**, in the order it was sent:
-    1. `System prompt · 2,140 characters` and `Tools · 9`, each a closed disclosure. They open into mono blocks, the tools one schema each.
-    2. The messages as a compact transcript. A label column holds `you`, `golem`, or the tool's name. Text is in the UI font, not Literata, because this is for reading closely, not for reading through.
+    1. `System prompt · ≈1.1K tokens` and `Tools · 9`, each a closed disclosure. The prompt opens into one closed disclosure per section, titled `Pinned skills · ≈1.1K`, with a `Copy` button at the right and the section in a mono block. A prompt that cannot be split exactly shows whole, with one `Copy`. Before the call has a token count, the title is `System prompt · 2,140 characters`. The tools open into mono blocks, one schema each.
+    2. The messages as a compact transcript. A label column holds `you`, `golem`, or the tool's name, and under it the message's size, `≈3.2K`. A faint bar above the message is as long as its share of the context, so a big tool result stands out. Text is in the UI font, not Literata, because this is for reading closely, not for reading through.
     3. An assistant message lists its tool calls as `→ name(args)` in mono.
     4. A tool result is in a `code-bg` block, closed after 12 lines with `Show all`.
     5. A divider, `new since the last call`, comes before the first message the previous call did not have.
@@ -307,6 +307,7 @@ How an answer was made: each model call with its context and reply, each tool ca
   - Its rows show `—` for tokens.
   - Its model calls carry a faint `not recorded` tag.
   - Where the missing part would be, the detail says `Not recorded. This session ran before golem kept traces.` in `faint`.
+- **No system prompt:** a recorded call that sent none says `No system prompt was sent on this call. golem sends one only when a skill is pinned.` in `faint`. `Not recorded` shows only for a session from before traces.
 - **Keys:**
   - The tree is a `tree` with one tab stop.
   - Up and Down move the selection.

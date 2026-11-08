@@ -101,26 +101,28 @@ export const OLD_TRACE: TraceRunSpan[] = [
   ]),
 ];
 
-const USER: TraceMessage = { id: "u_1", role: "user", text: "What is in **notes.txt**?" };
+const USER: TraceMessage = { id: "u_1", role: "user", text: "What is in **notes.txt**?", tokens: 8 };
 const ASKED: TraceMessage = {
   id: "m_1",
   role: "assistant",
   text: "Let me look.",
+  tokens: 30,
   tool_calls: [{ call_id: "c_1", name: "read_file", args: { path: "notes.txt" } }],
 };
-const SEEN: TraceMessage = { id: "t_1", role: "tool", text: Array.from({ length: 30 }, (_, i) => `line ${i + 1}: the answer is 42`).join("\n"), call_id: "c_1" };
+const SEEN: TraceMessage = { id: "t_1", role: "tool", text: Array.from({ length: 30 }, (_, i) => `line ${i + 1}: the answer is 42`).join("\n"), call_id: "c_1", tokens: 3254 };
 
 /** The second model call: the system prompt and two tools, three messages, and the last two are new. */
 export const MODEL_DETAIL: TraceSpanResult = {
   span: SHORT_TRACE[0]?.children?.[1] as TraceModelSpan,
   system_prompt: "You are golem, a coding agent. Work in the folder you are given.",
+  system_sections: [{ name: "pinned_skills", chars: 64 }],
   tools: [
     { type: "function", function: { name: "read_file", description: "Read a file.", parameters: { type: "object", properties: { path: { type: "string" } } } } },
     { type: "function", function: { name: "grep", description: "Search files.", parameters: { type: "object", properties: { pattern: { type: "string" } } } } },
   ],
   messages: [USER, ASKED, SEEN],
   new_from: 1,
-  reply: { id: "m_2", role: "assistant", text: "It says **42**.", tool_calls: [] },
+  reply: { id: "m_2", role: "assistant", text: "It says **42**.", tool_calls: [], tokens: 12 },
   stop_reason: "end_turn",
   provider: "ollama",
 };
@@ -148,3 +150,27 @@ export const OLD_DETAIL: TraceSpanResult = {
   new_from: 0,
   reply: { id: "m_1", role: "assistant", text: "It is an off-by-one.", tool_calls: [] },
 };
+
+/** The prompt in two sections. The `✅` counts as one code point, so the split must count code points. */
+export const SECTIONS_DETAIL: TraceSpanResult = {
+  ...MODEL_DETAIL,
+  system_prompt: "## Pinned skills\n\nreview: read the diff first ✅\n\nRules: answer in English.",
+  system_sections: [
+    { name: "pinned_skills", chars: 47 },
+    { name: "section_2", chars: 25 },
+  ],
+  context: {
+    used: 3400,
+    window: 32768,
+    parts: [
+      { key: "system", tokens: 1100, chars: 4400, items: [{ name: "pinned_skills", group: null, tokens: 1050 }, { name: "section_2", group: null, tokens: 50 }] },
+      { key: "tools", tokens: 300, chars: 1200, items: [] },
+      { key: "user", tokens: 8, chars: 32, items: [] },
+      { key: "assistant", tokens: 30, chars: 120, items: [] },
+      { key: "tool_results", tokens: 1962, chars: 7850, items: [] },
+    ],
+  },
+};
+
+/** A recorded call that sent no system prompt. */
+export const NO_PROMPT_DETAIL: TraceSpanResult = { ...MODEL_DETAIL, system_prompt: null, system_sections: null };
