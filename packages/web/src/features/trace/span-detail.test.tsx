@@ -3,9 +3,9 @@ import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
 import { expect, test } from "vitest";
 import type { TraceSpanResult } from "../../store/trace.ts";
-import { APPROVAL_DETAIL, MODEL_DETAIL, OLD_DETAIL, TOOL_DETAIL } from "./sample.ts";
+import { APPROVAL_DETAIL, MODEL_DETAIL, NO_PROMPT_DETAIL, OLD_DETAIL, SECTIONS_DETAIL, TOOL_DETAIL } from "./sample.ts";
 import { SpanDetail } from "./span-detail.tsx";
-import { copyText, jsonOf, modelLine, tabsOf } from "./span-text.ts";
+import { copyText, jsonOf, modelLine, promptSections, sectionLabel, tabsOf } from "./span-text.ts";
 
 function show(result: TraceSpanResult) {
   const user = userEvent.setup();
@@ -36,6 +36,9 @@ test("Context has the system prompt row, the tools row, the messages, and the di
   const rows = messages.getAllByRole("listitem");
   // you, the divider, golem, and the tool result.
   expect(rows.map((row) => row.textContent?.slice(0, 3))).toEqual(["you", "new", "gol", "rea"]);
+  expect(rows[0]?.textContent).toContain("≈8");
+  expect(rows[3]?.textContent).toContain("≈3.3K");
+  expect(rows[3]?.querySelector("span[aria-hidden='true'][style]")).toBeTruthy();
   expect(rows[1]?.textContent).toBe("new since the last call");
   expect(messages.getByText("→ read_file(path=\"notes.txt\")")).toBeTruthy();
   expect(messages.getByText("notes.txt", { selector: "strong" })).toBeTruthy();
@@ -160,3 +163,41 @@ for (const [name, result] of [["a model call", MODEL_DETAIL], ["a tool with an a
     expect(results.violations).toEqual([]);
   });
 }
+
+test("a recorded call with no system prompt says why, and not Not recorded", () => {
+  show(NO_PROMPT_DETAIL);
+  expect(screen.getByText("No system prompt was sent on this call. golem sends one only when a skill is pinned.")).toBeTruthy();
+  expect(document.body.textContent).not.toContain("Not recorded");
+});
+
+test("a prompt in two sections opens to two folds, each with Copy", async () => {
+  const { user } = show(SECTIONS_DETAIL);
+  await user.click(screen.getByText(/^System prompt/));
+  expect(screen.getByText("Pinned skills · ≈1.1K", { selector: "summary" })).toBeTruthy();
+  expect(screen.getByText("Section 2 · ≈50", { selector: "summary" })).toBeTruthy();
+  await user.click(screen.getByText(/^Pinned skills/));
+  expect(document.body.textContent).toContain("review: read the diff first ✅");
+  const block = screen.getByText(/review: read the diff first/, { selector: "pre" });
+  expect(block.textContent).not.toContain("Rules:");
+  await user.click(screen.getByRole("button", { name: "Copy Pinned skills" }));
+  expect(await navigator.clipboard.readText()).toBe("## Pinned skills\n\nreview: read the diff first ✅");
+});
+
+test("promptSections splits by code points and refuses a wrong total", () => {
+  expect(promptSections("a ✅\n\nb", [{ name: "x", chars: 3 }, { name: "y", chars: 1 }])).toEqual([
+    { name: "x", text: "a ✅" },
+    { name: "y", text: "b" },
+  ]);
+  expect(promptSections("ab\n\ncd", [{ name: "x", chars: 2 }, { name: "y", chars: 2 }])).toEqual([
+    { name: "x", text: "ab" },
+    { name: "y", text: "cd" },
+  ]);
+  expect(promptSections("a ✅\n\nb", [{ name: "x", chars: 4 }, { name: "y", chars: 1 }])).toBeNull();
+  expect(promptSections("ab", null)).toBeNull();
+  expect(promptSections("ab", [])).toBeNull();
+});
+
+test("sectionLabel", () => {
+  expect(sectionLabel("pinned_skills")).toBe("Pinned skills");
+  expect(sectionLabel("section_2")).toBe("Section 2");
+});

@@ -5,7 +5,7 @@ import { writeClipboard } from "../../ui/clipboard.ts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../ui/tabs.tsx";
 import { Markdown } from "../chat/index.ts";
 import { ArtifactDialog } from "./artifact-dialog.tsx";
-import { formatDuration } from "./format.ts";
+import { formatDuration, formatTokens } from "./format.ts";
 import {
   callLine,
   copyText,
@@ -14,11 +14,16 @@ import {
   labelOf,
   metadataRows,
   modelLine,
+  NO_SYSTEM_PROMPT_LINE,
   NOT_RECORDED_LINE,
+  promptSections,
+  sectionLabel,
+  sectionTokens,
   showValue,
   TAB_LABEL,
   tabsOf,
   toolNames,
+  usedTokens,
   type Mode,
   type Tab,
 } from "./span-text.ts";
@@ -66,12 +71,38 @@ function FoldedBlock({ text }: { text: string }) {
   );
 }
 
-function MessageRow({ message, names }: { message: TraceMessage; names: ReadonlyMap<string, string> }) {
+/** Copies one text, and says so: Copy, then Copied for 2 s, or Copy failed. */
+function CopySection({ text, label }: { text: string; label: string }) {
+  const [copied, setCopied] = useState<"idle" | "done" | "failed">("idle");
+  function copy(): void {
+    void writeClipboard(text).then(
+      () => {
+        setCopied("done");
+        window.setTimeout(() => setCopied("idle"), 2000);
+      },
+      () => setCopied("failed"),
+    );
+  }
+  return (
+    <Button kind="ghost" size="sm" aria-label={`Copy ${label}`} onClick={copy}>
+      {copied === "done" ? "Copied" : copied === "failed" ? "Copy failed" : "Copy"}
+    </Button>
+  );
+}
+
+function MessageRow({ message, names, total }: { message: TraceMessage; names: ReadonlyMap<string, string>; total: number | null }) {
   const calls = message.tool_calls ?? [];
+  const tokens = typeof message.tokens === "number" ? message.tokens : null;
   return (
     <li className="flex gap-3">
-      <span className="w-16 shrink-0 pt-0.5 text-right font-mono text-xs text-faint">{labelOf(message, names)}</span>
+      <span className="flex w-16 shrink-0 flex-col items-end pt-0.5 font-mono text-xs text-faint">
+        <span>{labelOf(message, names)}</span>
+        {tokens === null ? null : <span>{`≈${formatTokens(tokens)}`}</span>}
+      </span>
       <div className="min-w-0 flex-1 text-sm">
+        {tokens !== null && total !== null && total > 0 ? (
+          <span aria-hidden="true" className="mb-1 block h-0.5 rounded-full bg-line-strong" style={{ width: `${Math.max(1, (tokens / total) * 100)}%` }} />
+        ) : null}
         {message.role === "tool" ? (
           <FoldedBlock text={message.text} />
         ) : (
@@ -89,7 +120,7 @@ function MessageRow({ message, names }: { message: TraceMessage; names: Readonly
   );
 }
 
-function Messages({ messages, newFrom, names }: { messages: readonly TraceMessage[]; newFrom: number | null; names: ReadonlyMap<string, string> }) {
+function Messages({ messages, newFrom, names, total }: { messages: readonly TraceMessage[]; newFrom: number | null; names: ReadonlyMap<string, string>; total: number | null }) {
   return (
     <ul aria-label="Messages" className="flex flex-col gap-3">
       {messages.map((message, index) => (
@@ -101,10 +132,45 @@ function Messages({ messages, newFrom, names }: { messages: readonly TraceMessag
               <span aria-hidden="true" className="h-px flex-1 bg-line" />
             </li>
           ) : null}
-          <MessageRow message={message} names={names} />
+          <MessageRow message={message} names={names} total={total} />
         </Fragment>
       ))}
     </ul>
+  );
+}
+
+function SystemPrompt({ result, prompt }: { result: TraceSpanResult; prompt: string }) {
+  const part = result.context?.parts.find((p) => p.key === "system");
+  const title = part ? `System prompt · ≈${formatTokens(part.tokens)} tokens` : `System prompt · ${prompt.length.toLocaleString("en-US")} characters`;
+  const sections = promptSections(prompt, result.system_sections);
+  return (
+    <Fold title={title}>
+      {sections === null ? (
+        <div className="flex flex-col gap-2">
+          <div className="flex justify-end">
+            <CopySection text={prompt} label="system prompt" />
+          </div>
+          <pre className={BLOCK}>{prompt}</pre>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {sections.map((section, index) => {
+            const label = sectionLabel(section.name);
+            const tokens = sectionTokens(result, section.name);
+            return (
+              <Fold key={index} title={tokens === null ? label : `${label} · ≈${formatTokens(tokens)}`}>
+                <div className="flex flex-col gap-2">
+                  <div className="flex justify-end">
+                    <CopySection text={section.text} label={label} />
+                  </div>
+                  <pre className={BLOCK}>{section.text}</pre>
+                </div>
+              </Fold>
+            );
+          })}
+        </div>
+      )}
+    </Fold>
   );
 }
 
@@ -115,12 +181,12 @@ function Context({ result }: { result: TraceSpanResult }) {
   const tools = result.tools;
   return (
     <div className="flex flex-col gap-3">
-      {prompt === null || prompt === undefined ? (
+      {result.span.recorded === false ? (
         <NotRecorded />
+      ) : prompt === null || prompt === undefined ? (
+        <p className="text-sm text-faint">{NO_SYSTEM_PROMPT_LINE}</p>
       ) : (
-        <Fold title={`System prompt · ${prompt.length.toLocaleString("en-US")} characters`}>
-          <pre className={BLOCK}>{prompt}</pre>
-        </Fold>
+        <SystemPrompt result={result} prompt={prompt} />
       )}
       {tools === null || tools === undefined ? null : (
         <Fold title={`Tools · ${tools.length}`}>
@@ -133,7 +199,7 @@ function Context({ result }: { result: TraceSpanResult }) {
           </div>
         </Fold>
       )}
-      {messages.length === 0 ? <p className="text-sm text-faint">No messages.</p> : <Messages messages={messages} newFrom={result.new_from ?? null} names={names} />}
+      {messages.length === 0 ? <p className="text-sm text-faint">No messages.</p> : <Messages messages={messages} newFrom={result.new_from ?? null} names={names} total={usedTokens(result)} />}
     </div>
   );
 }
@@ -143,7 +209,7 @@ function Reply({ result }: { result: TraceSpanResult }) {
   const names = toolNames(result.messages ?? []);
   return (
     <ul aria-label="Reply" className="flex flex-col gap-3">
-      <MessageRow message={result.reply} names={names} />
+      <MessageRow message={result.reply} names={names} total={usedTokens(result)} />
     </ul>
   );
 }

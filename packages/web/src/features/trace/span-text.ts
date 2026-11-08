@@ -7,6 +7,7 @@ export type Tab = ModelTab | ToolTab;
 export type Mode = "pretty" | "json";
 
 export const NOT_RECORDED_LINE = "Not recorded. This session ran before golem kept traces.";
+export const NO_SYSTEM_PROMPT_LINE = "No system prompt was sent on this call. golem sends one only when a skill is pinned.";
 
 /** Lines a tool result shows before it folds. */
 export const FOLD_LINES = 20;
@@ -101,6 +102,7 @@ export function jsonOf(result: TraceSpanResult, tab: Tab): unknown {
     case "context":
       return {
         system_prompt: result.system_prompt ?? null,
+        system_sections: result.system_sections ?? null,
         tools: result.tools ?? null,
         messages: result.messages ?? [],
         new_from: result.new_from ?? null,
@@ -178,4 +180,47 @@ export function modelLine(result: TraceSpanResult): string {
   if (read) parts.push(`cache read ${formatTokens(read)}`);
   if (write) parts.push(`cache write ${formatTokens(write)}`);
   return parts.join(" · ");
+}
+
+/**
+ * The system prompt cut into its sections. The daemon joins them with a blank line and counts
+ * code points, so the cut counts code points too. Null when the numbers do not match: show the
+ * prompt whole, never a wrong split.
+ */
+export function promptSections(prompt: string, sections: readonly { name: string; chars: number }[] | null | undefined): { name: string; text: string }[] | null {
+  if (!sections || sections.length === 0) return null;
+  const points = Array.from(prompt);
+  const total = sections.reduce((sum, s) => sum + s.chars, 0) + 2 * (sections.length - 1);
+  if (total !== points.length) return null;
+  let at = 0;
+  return sections.map((s) => {
+    const text = points.slice(at, at + s.chars).join("");
+    at += s.chars + 2;
+    return { name: s.name, text };
+  });
+}
+
+/** `pinned_skills` is `Pinned skills`, and `section_2` is `Section 2`. */
+export function sectionLabel(name: string): string {
+  const spaced = name.replaceAll("_", " ");
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
+/** The tokens of one prompt section, from the context's `system` part, or null. */
+export function sectionTokens(result: TraceSpanResult, name: string): number | null {
+  const part = result.context?.parts.find((p) => p.key === "system");
+  return part?.items?.find((item) => item.name === name)?.tokens ?? null;
+}
+
+/** The tokens a call took in: the context's own count, else the sum of its parts, else the sum of the messages. */
+// `contextUsed` from `@golem/view` replaces this once it is available.
+export function usedTokens(result: TraceSpanResult): number | null {
+  const context = result.context;
+  if (context) {
+    if (context.used !== null && context.used !== undefined) return context.used;
+    return context.parts.reduce((sum, p) => sum + p.tokens, 0);
+  }
+  let sum: number | null = null;
+  for (const m of result.messages ?? []) if (typeof m.tokens === "number") sum = (sum ?? 0) + m.tokens;
+  return sum;
 }

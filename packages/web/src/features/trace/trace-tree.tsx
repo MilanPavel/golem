@@ -2,10 +2,9 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react"
 import { modelsOf, toolsOf, type TraceNode, type TraceRunSpan } from "../../store/trace.ts";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../ui/tooltip.tsx";
 import { formatDuration, formatTokens, spanTokens } from "./format.ts";
+import { NOT_RECORDED_LINE } from "./span-text.ts";
 import { barFor } from "./waterfall.ts";
 import { WaterfallBar } from "./waterfall-bar.tsx";
-
-export const NOT_RECORDED = "Not recorded. This session ran before golem kept traces.";
 
 type Row = {
   span: TraceNode;
@@ -140,7 +139,7 @@ function TreeRow({
             <TooltipTrigger asChild>
               <span className="shrink-0 text-xs text-faint">not recorded</span>
             </TooltipTrigger>
-            <TooltipContent>{NOT_RECORDED}</TooltipContent>
+            <TooltipContent>{NOT_RECORDED_LINE}</TooltipContent>
           </Tooltip>
         ) : null}
       </span>
