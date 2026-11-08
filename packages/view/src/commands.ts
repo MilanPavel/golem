@@ -21,6 +21,7 @@ export type ComposerOutcome =
   | { kind: "idle" }
   | { kind: "unknown"; notice: string }
   | { kind: "help" }
+  | { kind: "context" }
   | { kind: "mcp" }
   | { kind: "mcp-add"; id: string | null }
   | { kind: "mcp-toggle"; on: boolean; name: string }
@@ -152,6 +153,13 @@ export const COMMANDS: readonly Command[] = [
       }
       return arg === "code" ? { kind: "copy", code: true } : unknown();
     },
+  },
+  {
+    name: "/context",
+    group: "view",
+    args: "",
+    description: "Shows what fills the model's context: the prompt, the tools, and the messages.",
+    run: withoutArgs({ kind: "context" }),
   },
   {
     name: "/debug",

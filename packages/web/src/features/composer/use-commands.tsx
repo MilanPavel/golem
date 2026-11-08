@@ -31,7 +31,7 @@ import { writeClipboard } from "../../ui/clipboard.ts";
 import { downloadText } from "./copy-text.ts";
 import { CommandsDialog } from "./help-dialog.tsx";
 import type { CommandNotice } from "./notice-line.tsx";
-import { settingsPath } from "../../store/router.ts";
+import { settingsPath, tracePath } from "../../store/router.ts";
 import { requestConfig } from "../settings/config-request.ts";
 import { requestMcpAdd } from "../settings/mcp-add-request.ts";
 import { NEEDS_SESSION, NOT_YET } from "./terminal-only.ts";
@@ -213,6 +213,9 @@ export function useCommands({ session, cwd, typing, send }: UseCommandsOptions):
           return say(NEEDS_SESSION);
         }
         switch (found.kind) {
+          case "context":
+            navigate(tracePath(sessionId, view.context.last?.spanId ?? null));
+            return "handled";
           case "mcp-toggle":
             try {
               await actions.toggleMcp(sessionId, found.name, found.on);

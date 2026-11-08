@@ -144,6 +144,24 @@ test("/permissions opens Settings on the tool rules", async () => {
   expect(screen.getByRole("heading", { level: 2, name: "Tool rules" })).toBeTruthy();
 });
 
+test("/context opens the trace before any model call", async () => {
+  const { user } = await session();
+  await say(user, "/context");
+  expect(location.pathname).toBe("/s/a/trace");
+  expect(location.search).toBe("");
+});
+
+test("/context opens the trace with the newest model call selected", async () => {
+  const { fake, user } = await session();
+  act(() => {
+    fake.emitEvent(ev("a", "model.call.started", { message_id: "m_3", context_window: 32768 }));
+    fake.emitEvent(ev("a", "model.call.completed", { message_id: "m_3", usage: { input: 3400, output: 20 } }));
+  });
+  await say(user, "/context");
+  expect(location.pathname).toBe("/s/a/trace");
+  expect(location.search).toBe("?span=m_3");
+});
+
 test("/new goes to the start page", async () => {
   const { user } = await session();
   await say(user, "/new");
