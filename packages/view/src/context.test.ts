@@ -1,12 +1,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
+import type { ChatEvent } from "@golem/client";
 import {
   contextBar,
   contextCells,
   contextLevel,
   contextSummary,
   contextWarning,
+  emptyLiveContext,
+  foldLiveContext,
   formatTokens,
   formatWindow,
   type TraceContext,
@@ -81,4 +84,28 @@ test("contextCells and contextBar: largest remainder, free at the end", () => {
   assert.equal(contextBar(parts, 200, 20), "██████████░░░░░░░░░░");
   assert.equal(contextBar(parts, 50, 10), "██████████");
   assert.deepEqual(contextCells([], null, 6), [{ key: "free", cells: 6 }]);
+});
+
+function event(type: string, data: Record<string, unknown>): ChatEvent {
+  return { seq: 1, session_id: "s", run_id: "r", ts: "2026-11-01T10:00:00+00:00", type, data } as ChatEvent;
+}
+const started = (id: string, window: number | null = 128000) => event("model.call.started", { message_id: id, index: 1, profile: "p", context_window: window });
+const completed = (id: string, usage?: Record<string, unknown>) => event("model.call.completed", { message_id: id, latency_ms: 5, usage });
+
+test("foldLiveContext: started then completed gives the last context", () => {
+  const state = foldLiveContext(foldLiveContext(emptyLiveContext, started("m1")), completed("m1", { input: 32000, output: 10 }));
+  assert.deepEqual(state, { last: { spanId: "m1", used: 32000, window: 128000, numCtx: null }, pending: null });
+});
+
+test("foldLiveContext: a call with no usage keeps the previous last", () => {
+  const first = foldLiveContext(foldLiveContext(emptyLiveContext, started("m1")), completed("m1", { input: 100 }));
+  const state = foldLiveContext(foldLiveContext(first, started("m2")), completed("m2"));
+  assert.deepEqual(state.last, first.last);
+  assert.equal(state.pending, null);
+});
+
+test("foldLiveContext: a completed event for another id changes nothing, and so does an unrelated event", () => {
+  const pending = foldLiveContext(emptyLiveContext, started("m1"));
+  assert.equal(foldLiveContext(pending, completed("m9", { input: 5 })), pending);
+  assert.equal(foldLiveContext(pending, event("message.started", { message_id: "x", role: "assistant" })), pending);
 });

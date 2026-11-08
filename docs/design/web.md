@@ -50,7 +50,8 @@ It borrows the calm, centred reading column and generous input from Claude's cha
 - **Column:**
   - Your messages are right-aligned slips in `slip`.
   - Golem's answers are full width: the small golem, then tool lines, then the text, then the duration and tool count.
-- **Dock:** the meter (the small golem and what it is doing), the composer (a rounded card that turns clay when focused), and a row of key hints.
+- **Dock:** the meter (the small golem and what it is doing, and at its right end a `ctx 25%` chip), the composer (a rounded card that turns clay when focused), and a row of key hints.
+  - **Context chip:** in the chat, `ctx 25%` at the right end of the meter row, built from the live `model.call.started` and `model.call.completed` events, so it appears after the first model call, updates after each one, and comes back after a reload. It is neutral, `wait` from 80%, and `deny` from 95%. With no known window it reads `ctx 32.0K`. It is a button that opens the trace with the latest model call selected.
 - **Drawer:**
   - **Todos:** progress in segments, then the list. A done item is ticked in moss, the current one is hatched in clay, and the rest are empty.
   - **Session:** model, folder, what this session allows, pinned skills, MCP servers.
@@ -261,7 +262,7 @@ How an answer was made: each model call with its context and reply, each tool ca
   - A `Chat | Trace` row of underline tabs under the top bar, on both views. It is a `nav` named `View`, and the current tab is `aria-current="page"`. The right side of the row belongs to the view: the trace puts its summary line and Refresh there.
   - The palette's `Trace` row, which is shown only when a session is open.
   - There is no slash command, because the terminal has no trace.
-- **Summary line:** the number of runs, the total time, and the total tokens (input plus output; `—` when none are recorded), with `Refresh`, on the right of the tabs row. The page shows finished data and does not update while a run streams. A running run shows its open spans as `running`, and Refresh reads again.
+- **Summary line:** the number of runs, the total time, the total tokens (input plus output; `—` when none are recorded), and the context of the latest model call that reported its input, such as `2 runs · 2m 30.8s · 110.7K tokens · context 32.0K / 128K · 25%`. A session from before traces has no context part. Beside the line sit a thin bar of how full the window is (clay, `wait` from 80%, `deny` from 95%; none when the window is unknown) and a sparkline of the input tokens per model call (plain SVG, hidden below 760 px), then `Refresh`, on the right of the tabs row. The page shows finished data and does not update while a run streams. A running run shows its open spans as `running`, and Refresh reads again.
 - **Two panes:**
   - The tree, about 55%, and the detail beside it.
   - The tree scrolls on its own, and the detail keeps its place.

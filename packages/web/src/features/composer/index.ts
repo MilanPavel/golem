@@ -1,4 +1,5 @@
 export { Composer, type ComposerProps } from "./composer.tsx";
+export { ContextChip, ContextChipView } from "./context-chip.tsx";
 export { DockView } from "./dock.tsx";
 export { Meter } from "./meter.tsx";
 export { NewSessionComposer } from "./new-session-composer.tsx";

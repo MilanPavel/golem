@@ -151,3 +151,17 @@ test("the chat has no accessibility violations", async () => {
   const { container } = await open();
   expect((await axe.run(container, noContrast)).violations).toEqual([]);
 });
+
+test("the chat shows ctx after a model call, and the chip opens the trace on that call", async () => {
+  const { fake, container } = await open();
+  act(() => {
+    fake.emitEvent(ev("a", "model.call.started", { message_id: "m_1", index: 1, profile: "default", context_window: 128000 }));
+    fake.emitEvent(ev("a", "model.call.completed", { message_id: "m_1", latency_ms: 900, usage: { input: 32000, output: 10 } }));
+  });
+  const chip = screen.getByRole("button", { name: /^Context 32\.0K \/ 128K · 25%/ });
+  expect(chip.textContent).toBe("ctx 25%");
+  expect((await axe.run(container, noContrast)).violations).toEqual([]);
+  await userEvent.setup().click(chip);
+  expect(location.pathname).toBe("/s/a/trace");
+  expect(location.search).toBe("?span=m_1");
+});

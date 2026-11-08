@@ -20,7 +20,7 @@ export function sampleTool(id: string, name: string, start: number, duration: nu
   };
 }
 
-type ModelOptions = { tokens?: [number, number]; recorded?: boolean; status?: TraceModelSpan["status"] };
+type ModelOptions = { tokens?: [number, number]; recorded?: boolean; status?: TraceModelSpan["status"]; window?: number | null };
 
 export function sampleModel(
   id: string,
@@ -42,6 +42,9 @@ export function sampleModel(
     model: recorded ? "ollama/qwen3-coder:30b" : null,
     tokens: recorded && options.tokens ? { input: options.tokens[0], output: options.tokens[1], cache_read: null, cache_write: null } : null,
     first_token_ms: recorded ? 120 : null,
+    context_window: recorded ? (options.window ?? 32768) : null,
+    num_ctx: null,
+    context_window_estimated: false,
     preview: "",
     recorded,
     children,
@@ -57,6 +60,18 @@ export const SHORT_TRACE: TraceRunSpan[] = [
   sampleRun("r_1", "What is in notes.txt?", 0, 4200, [
     sampleModel("m_1", 1, 0, 2100, [sampleTool("c_1", "grep", 2100, 48), sampleTool("c_2", "read_file", 2160, 12)], { tokens: [3200, 90] }),
     sampleModel("m_2", 2, 2300, 1900, [], { tokens: [3400, 210] }),
+  ]),
+];
+
+/** Two runs whose input grows from 21.7K to 32.0K of a 128K window. */
+export const GROWING_TRACE: TraceRunSpan[] = [
+  sampleRun("r_1", "Find the slow query", 0, 60000, [
+    sampleModel("m_1", 1, 0, 20000, [], { tokens: [21700, 900], window: 128000 }),
+    sampleModel("m_2", 2, 30000, 30000, [], { tokens: [24000, 1100], window: 128000 }),
+  ]),
+  sampleRun("r_2", "Now fix it", 70000, 90800, [
+    sampleModel("m_3", 3, 70000, 40000, [], { tokens: [28400, 800], window: 128000 }),
+    sampleModel("m_4", 4, 120000, 40800, [], { tokens: [32000, 1800], window: 128000 }),
   ]),
 ];
 

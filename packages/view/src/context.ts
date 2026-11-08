@@ -1,4 +1,4 @@
-import type { TraceContext, TraceContextPart } from "@golem/client";
+import type { ChatEvent, TraceContext, TraceContextPart } from "@golem/client";
 
 export type { TraceContext, TraceContextPart };
 export type ContextKey = TraceContextPart["key"];
@@ -124,4 +124,36 @@ export function contextBar(parts: readonly TraceContextPart[], window: number | 
   return contextCells(parts, window, width)
     .map(({ key, cells }) => (key === "free" ? "░" : "█").repeat(cells))
     .join("");
+}
+
+/** The context of the latest model call that reported its input tokens. */
+export type LiveContext = { spanId: string; used: number; window: number | null; numCtx: number | null };
+
+/** `pending` is the call that started and has not ended: its window waits for its usage. */
+export type LiveContextState = {
+  last: LiveContext | null;
+  pending: { spanId: string; window: number | null; numCtx: number | null } | null;
+};
+
+export const emptyLiveContext: LiveContextState = { last: null, pending: null };
+
+/**
+ * Fold one event into the live context. A call that ends with no usage keeps the previous `last`.
+ * Any event that changes nothing returns `state` itself.
+ */
+export function foldLiveContext(state: LiveContextState, event: ChatEvent): LiveContextState {
+  if (event.type === "model.call.started") {
+    return {
+      ...state,
+      pending: { spanId: event.data.message_id, window: event.data.context_window ?? null, numCtx: event.data.num_ctx ?? null },
+    };
+  }
+  if (event.type === "model.call.completed") {
+    const pending = state.pending;
+    if (pending === null || pending.spanId !== event.data.message_id) return state;
+    const input = event.data.usage?.input;
+    if (typeof input !== "number") return { ...state, pending: null };
+    return { last: { spanId: pending.spanId, used: input, window: pending.window, numCtx: pending.numCtx }, pending: null };
+  }
+  return state;
 }

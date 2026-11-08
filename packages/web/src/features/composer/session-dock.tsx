@@ -5,6 +5,7 @@ import { sendErrorText } from "../../store/errors.ts";
 import { useDraft, useDraftPastes, usePageActions, useSession } from "../../store/page-context.tsx";
 import type { SessionView } from "../../store/session-store.ts";
 import { Composer } from "./composer.tsx";
+import { ContextChip } from "./context-chip.tsx";
 import { useCommands } from "./use-commands.tsx";
 import { DockView } from "./dock.tsx";
 import { browserHistory } from "./history.ts";
@@ -75,7 +76,7 @@ export function SessionDock({ sessionId }: { sessionId: string }) {
         busy={run.busy}
         error={line}
         notice={commands.notice}
-        meter={<Meter state={state} runStartedAt={run.runStartedAt} />}
+        meter={<Meter state={state} runStartedAt={run.runStartedAt} aside={<ContextChip sessionId={sessionId} />} />}
         composer={
           <Composer
             forPalette

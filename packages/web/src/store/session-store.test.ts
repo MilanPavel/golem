@@ -92,3 +92,10 @@ test("dispose cancels a pending frame", () => {
   expect(frame.cancel).toHaveBeenCalledTimes(1);
   expect(frame.pending()).toBe(0);
 });
+
+test("a model call that started and ended gives the live context", () => {
+  const store = createSessionStore(fakeFrame());
+  store.dispatch(ev("s", "model.call.started", { message_id: "m1", index: 1, profile: "p", context_window: 128000 }));
+  store.dispatch(ev("s", "model.call.completed", { message_id: "m1", latency_ms: 10, usage: { input: 32000, output: 5 } }));
+  expect(store.getSnapshot().context.last).toEqual({ spanId: "m1", used: 32000, window: 128000, numCtx: null });
+});
