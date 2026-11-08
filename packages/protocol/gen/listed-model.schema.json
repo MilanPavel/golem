@@ -37,7 +37,7 @@
     }
   },
   "additionalProperties": false,
-  "description": "One model, by ``provider/model`` ref.\n\n``source`` is where golem found it: ``installed`` on a local server,\n``catalog`` for a local model to download, ``remote`` from a provider's\nlist, or ``profile`` when only config names it. ``progress`` is set while\nit is ``pulling``. ``profiles`` are the profile names that point at it.\n``fit`` says whether a local model fits in this machine's memory.\n``tags`` are a catalog model's tags, such as ``coding``, and\n``recommended`` marks the one catalog model golem suggests for this Mac.\n``categories`` say what the model is for, in a fixed order: the catalog's\nown for a model it lists, else what Ollama's ``capabilities`` and\nLiteLLM's ``supports_*`` fields and context size show.\n``stale`` means a cached list was shown because the provider did not\nanswer in time.",
+  "description": "One model, by ``provider/model`` ref.\n\n``source`` is where golem found it: ``installed`` on a local server,\n``catalog`` for a local model to download, ``remote`` from a provider's\nlist, or ``profile`` when only config names it. ``progress`` is set while\nit is ``pulling``. ``profiles`` are the profile names that point at it.\n``fit`` says whether a local model fits in this machine's memory.\n``tags`` are a catalog model's tags, such as ``coding``, and\n``recommended`` marks the one catalog model golem suggests for this Mac.\n``categories`` say what the model is for, in a fixed order: the catalog's\nown for a model it lists, else what Ollama's ``capabilities`` and\nLiteLLM's ``supports_*`` fields and context size show.\n``recommended_for`` lists the categories this catalog model is the pick for on\nthis Mac: the largest model of that category it has the memory for.\n``stale`` means a cached list was shown because the provider did not\nanswer in time.",
   "properties": {
     "categories": {
       "items": {
@@ -130,6 +130,21 @@
       "default": false,
       "title": "Recommended",
       "type": "boolean"
+    },
+    "recommended_for": {
+      "items": {
+        "enum": [
+          "general",
+          "coding",
+          "reasoning",
+          "vision",
+          "fast",
+          "long-context"
+        ],
+        "type": "string"
+      },
+      "title": "Recommended For",
+      "type": "array"
     },
     "ref": {
       "minLength": 3,

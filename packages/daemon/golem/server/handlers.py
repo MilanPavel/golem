@@ -587,6 +587,7 @@ async def _model_list(ctx: RequestContext, params: ModelListParams) -> ModelList
                 tags=list(model.tags),
                 categories=cast(list[ModelCategory], list(model.categories)),
                 recommended=model.recommended,
+                recommended_for=cast(list[ModelCategory], list(model.recommended_for)),
             )
             for model in listing.models
         ],

@@ -36,6 +36,7 @@ import httpx
 from golem.config import ModelPrice, ModelSettings
 from golem.models import hardware, ollama, prices
 from golem.models.catalog import (
+    CATEGORIES,
     CatalogEntry,
     HostedEntry,
     categories_of,
@@ -112,6 +113,7 @@ class ListedModel:
     tags: tuple[str, ...] = ()
     categories: tuple[str, ...] = ()
     recommended: bool = False
+    recommended_for: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -342,6 +344,7 @@ class ModelDiscovery:
                     stale=result.stale,
                 )
         recommended = self._recommended()
+        picks = self._picks()
         for entry in self._catalog:
             if entry.ref in by_ref:
                 by_ref[entry.ref] = replace(
@@ -349,6 +352,7 @@ class ModelDiscovery:
                     tags=entry.tags,
                     categories=in_order(entry.categories) or by_ref[entry.ref].categories,
                     recommended=entry.ref == recommended,
+                    recommended_for=picks.get(entry.ref, ()),
                 )
                 continue
             name, _, model_id = entry.ref.partition("/")
@@ -370,6 +374,7 @@ class ModelDiscovery:
                 tags=entry.tags,
                 categories=in_order(entry.categories) or by_ref[entry.ref].categories,
                 recommended=entry.ref == recommended,
+                recommended_for=picks.get(entry.ref, ()),
             )
         # The catalog's own categories win over what the facts suggest.
         for hosted in self._hosted:
@@ -480,6 +485,31 @@ class ModelDiscovery:
             entry for entry in starters if entry.min_ram_gb is not None and entry.min_ram_gb <= ram
         ]
         return max(fitting, key=lambda entry: entry.min_ram_gb or 0).ref if fitting else None
+
+    def _picks(self) -> dict[str, tuple[str, ...]]:
+        """The categories each catalog model is this Mac's pick for.
+
+        A category's pick is its biggest model, by memory need, that this Mac can run well.
+        A category with no such model has no pick. With memory unknown, the smallest model of
+        the category is the pick, as for ``_recommended``.
+        """
+        picks: dict[str, list[str]] = {}
+        for category in CATEGORIES:
+            of_category = [entry for entry in self._catalog if category in entry.categories]
+            if self._ram_gb is None:
+                fitting = of_category[:1]
+            else:
+                ram = self._ram_gb
+                fitting = [
+                    entry
+                    for entry in of_category
+                    if entry.min_ram_gb is not None and entry.min_ram_gb <= ram
+                ]
+                fitting = sorted(fitting, key=lambda entry: (entry.min_ram_gb or 0, entry.size_gb))
+                fitting = fitting[-1:]
+            for entry in fitting:
+                picks.setdefault(entry.ref, []).append(category)
+        return {ref: tuple(names) for ref, names in picks.items()}
 
     def _fit(self, size_gb: float | None, ctx: int | None) -> hardware.Fit | None:
         if size_gb is None or self._ram_gb is None:

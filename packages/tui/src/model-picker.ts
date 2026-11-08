@@ -12,6 +12,7 @@ import {
   pickerModels,
   pickerName,
   priceLabel,
+  recommendedLabel,
   providerMissing,
   sizeLabel,
   statusLabel,
@@ -369,7 +370,7 @@ export function layoutPicker(input: {
     lines.push({ kind: "header", text: group.title });
     for (const model of group.models) {
       const missing = providerMissing(listing, model.provider);
-      lines.push(modelRow(model, model.ref === selectedRef, namesModel(model, input.current), input.columns, missing));
+      lines.push(modelRow(model, model.ref === selectedRef, namesModel(model, input.current), input.columns, missing, category));
     }
   }
   if (models.length === 0) {
@@ -401,8 +402,8 @@ function categoryTabs(category: Category | null): PickerRow {
   return { kind: "tabs", tabs };
 }
 
-function modelRow(model: ListedModel, selected: boolean, current: boolean, columns: number, missing: boolean): PickerRow {
-  const facts = [categoriesLabel(model), contextLabel(model.ctx), priceLabel(model), sizeLabel(model), statusLabel(model, missing)]
+function modelRow(model: ListedModel, selected: boolean, current: boolean, columns: number, missing: boolean, category: Category | null): PickerRow {
+  const facts = [recommendedLabel(model, category), categoriesLabel(model), contextLabel(model.ctx), priceLabel(model), sizeLabel(model), statusLabel(model, missing)]
     .filter((part) => part.length > 0)
     .join("  ");
   const profiles = model.profiles ?? [];

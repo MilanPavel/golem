@@ -271,6 +271,7 @@ function Content({
             providerMissing={providerMissing(shown, row.model.provider)}
             current={namesModel(row.model, profile)}
             isDefault={namesModel(row.model, listing?.default ?? null)}
+            category={category}
             pull={pulls.active.get(row.model.ref)}
             failed={pulls.failed.get(row.model.ref)}
           />

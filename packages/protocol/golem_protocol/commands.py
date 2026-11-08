@@ -617,6 +617,8 @@ class ListedModel(BaseModel):
     ``categories`` say what the model is for, in a fixed order: the catalog's
     own for a model it lists, else what Ollama's ``capabilities`` and
     LiteLLM's ``supports_*`` fields and context size show.
+    ``recommended_for`` lists the categories this catalog model is the pick for on
+    this Mac: the largest model of that category it has the memory for.
     ``stale`` means a cached list was shown because the provider did not
     answer in time.
     """
@@ -639,6 +641,7 @@ class ListedModel(BaseModel):
     tags: list[str] = Field(default_factory=list)
     categories: list[ModelCategory] = Field(default_factory=list[ModelCategory])
     recommended: bool = False
+    recommended_for: list[ModelCategory] = Field(default_factory=list[ModelCategory])
 
 
 class ListedProvider(BaseModel):

@@ -11,6 +11,7 @@ export type Profiles = string[];
 export type Progress = number | null;
 export type Provider = string;
 export type Recommended = boolean;
+export type RecommendedFor = ('general' | 'coding' | 'reasoning' | 'vision' | 'fast' | 'long-context')[];
 export type Ref = string;
 export type SizeGb = number | null;
 export type Source = 'installed' | 'catalog' | 'remote' | 'profile';
@@ -32,6 +33,8 @@ export type Tools = boolean | null;
  * ``categories`` say what the model is for, in a fixed order: the catalog's
  * own for a model it lists, else what Ollama's ``capabilities`` and
  * LiteLLM's ``supports_*`` fields and context size show.
+ * ``recommended_for`` lists the categories this catalog model is the pick for on
+ * this Mac: the largest model of that category it has the memory for.
  * ``stale`` means a cached list was shown because the provider did not
  * answer in time.
  */
@@ -45,6 +48,7 @@ export interface ListedModel {
   progress?: Progress;
   provider: Provider;
   recommended?: Recommended;
+  recommended_for?: RecommendedFor;
   ref: Ref;
   size_gb?: SizeGb;
   source: Source;
