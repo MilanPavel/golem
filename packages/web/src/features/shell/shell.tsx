@@ -6,7 +6,7 @@ import { SettingsScreen } from "../settings/index.ts";
 import { SetupHost } from "../setup/index.ts";
 import { TraceScreen } from "../trace/index.ts";
 import { HomeScreen } from "./home-screen.tsx";
-import { SessionScreen } from "./session-screen.tsx";
+import { ChatView, SessionFrame } from "./session-screen.tsx";
 
 export function NotFoundScreen() {
   const navigate = useNavigate();
@@ -29,10 +29,15 @@ function Content() {
     case "home":
       return <HomeScreen />;
     case "session":
-      // The key gives each session its own state, so the folder is remembered per opening.
-      return <SessionScreen key={route.id} id={route.id} />;
     case "trace":
-      return <TraceScreen key={route.id} id={route.id} span={route.span} />;
+      // Both views of a session sit in one frame at one place in the tree, so the top bar, the
+      // drawer, and the model dialog stay as they are when the tab changes. The key gives each
+      // session its own state, so the folder is remembered per opening.
+      return (
+        <SessionFrame key={route.id} id={route.id}>
+          {route.name === "session" ? <ChatView id={route.id} /> : <TraceScreen id={route.id} span={route.span} />}
+        </SessionFrame>
+      );
     case "settings":
       return <SettingsScreen section={route.section} />;
     case "not-found":
