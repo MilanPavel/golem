@@ -17,6 +17,8 @@ from golem_protocol.events import (
     MessageCompletedEvent,
     MessageDeltaData,
     MessageDeltaEvent,
+    ModelCallStartedData,
+    PromptSectionInfo,
     RunFailedData,
     RunFailedEvent,
     SessionCreatedData,
@@ -182,3 +184,21 @@ def test_session_updated_names_what_changed() -> None:
     assert SessionUpdatedData(title="Named").cwd is None
     with pytest.raises(ValidationError):
         SessionUpdatedData()
+
+
+def test_model_call_started_context_fields_are_optional_and_round_trip() -> None:
+    old = ModelCallStartedData.model_validate({"message_id": "m1", "index": 1, "profile": "p"})
+    assert (old.context_window, old.num_ctx, old.system_sections) == (None, None, None)
+    data = ModelCallStartedData(
+        message_id="m1",
+        index=1,
+        profile="p",
+        context_window=16384,
+        num_ctx=16384,
+        system_sections=[PromptSectionInfo(name="rules", chars=9)],
+    )
+    assert ModelCallStartedData.model_validate_json(data.model_dump_json()) == data
+    with pytest.raises(ValidationError):
+        PromptSectionInfo(name="rules", chars=-1)
+    with pytest.raises(ValidationError):
+        ModelCallStartedData(message_id="m1", index=1, profile="p", context_window=0)

@@ -41,12 +41,19 @@ class ModelRequested:
 
     ``system_prompt_sha`` and ``tools_sha`` are the hashes of the stored system
     prompt and tool schemas, and ``message_ids`` the history sent.
+
+    ``context_window`` is the tokens the model can take in, ``num_ctx`` the
+    Ollama option sent, and ``system_sections`` the ``(name, chars)`` of each
+    non-empty section of the system prompt. Each is None when unknown.
     """
 
     message_id: str
     system_prompt_sha: str | None = None
     tools_sha: str | None = None
     message_ids: tuple[str, ...] = ()
+    context_window: int | None = None
+    num_ctx: int | None = None
+    system_sections: tuple[tuple[str, int], ...] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -450,7 +457,36 @@ def _request(message_id: str, item: Mapping[str, object]) -> ModelRequested:
         tuple(i for i in cast(list[object], ids) if isinstance(i, str))
         if isinstance(ids, list)
         else (),
+        _positive(item.get("context_window")),
+        _positive(item.get("num_ctx")),
+        _sections(item.get("system_sections")),
     )
+
+
+def _positive(value: object) -> int | None:
+    return value if isinstance(value, int) and not isinstance(value, bool) and value > 0 else None
+
+
+def _sections(value: object) -> tuple[tuple[str, int], ...] | None:
+    if not isinstance(value, list):
+        return None
+    found: list[tuple[str, int]] = []
+    for entry in cast(list[object], value):
+        if not isinstance(entry, dict):
+            continue
+        name, chars = (
+            cast(dict[str, object], entry).get("name"),
+            cast(dict[str, object], entry).get("chars"),
+        )
+        if (
+            isinstance(name, str)
+            and name
+            and isinstance(chars, int)
+            and not isinstance(chars, bool)
+            and chars >= 0
+        ):
+            found.append((name, chars))
+    return tuple(found) or None
 
 
 def _pin(kind: object, item: Mapping[str, object]) -> PinRead | PinSkipped | None:

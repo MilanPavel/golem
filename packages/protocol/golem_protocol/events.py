@@ -258,6 +258,21 @@ class ToolOutputData(BaseModel):
     text: str = Field(min_length=1)
 
 
+class PromptSectionInfo(BaseModel):
+    """One non-empty section of the system prompt sent with a model call.
+
+    ``chars`` is the length of the section's text after strip, counted as
+    Python counts it (Unicode code points). The prompt is the sections' texts,
+    in order, joined with "\\n\\n", so the lengths split the stored prompt
+    exactly.
+    """
+
+    model_config = _CONFIG
+
+    name: str = Field(min_length=1)
+    chars: int = Field(ge=0)
+
+
 class ModelCallStartedData(BaseModel):
     """A request went to the model.
 
@@ -282,6 +297,9 @@ class ModelCallStartedData(BaseModel):
     system_prompt_sha: str | None = None
     tools_sha: str | None = None
     message_ids: list[str] = Field(default_factory=list[str])
+    context_window: int | None = Field(default=None, ge=1)
+    num_ctx: int | None = Field(default=None, ge=1)
+    system_sections: list[PromptSectionInfo] | None = None
 
 
 class TokenUsage(BaseModel):
@@ -831,6 +849,7 @@ __all__ = [
     "ModelSelectedData",
     "ModelSelectedEvent",
     "Ping",
+    "PromptSectionInfo",
     "RunCancelledData",
     "RunCancelledEvent",
     "RunCompletedEvent",

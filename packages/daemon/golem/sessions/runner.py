@@ -62,6 +62,7 @@ from golem_protocol.events import (
     MessageStartedData,
     ModelCallCompletedData,
     ModelCallStartedData,
+    PromptSectionInfo,
     RunCancelledData,
     RunFailedData,
     SkillActivatedData,
@@ -372,6 +373,11 @@ async def _apply(
                 system_prompt_sha=fact.system_prompt_sha,
                 tools_sha=fact.tools_sha,
                 message_ids=list(fact.message_ids),
+                context_window=fact.context_window,
+                num_ctx=fact.num_ctx,
+                system_sections=None
+                if fact.system_sections is None
+                else [PromptSectionInfo(name=n, chars=c) for n, c in fact.system_sections],
             ),
         )
     elif isinstance(fact, TextDelta) and progress.open is not None:
