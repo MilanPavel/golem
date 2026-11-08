@@ -32,9 +32,9 @@ import { FolderBrowserView } from "../features/shell/folder-browser.tsx";
 import { CommandPaletteView, KeysDialog } from "../features/palette/index.ts";
 import { ModelDialogView, type ModelDialogViewProps } from "../features/models/index.ts";
 import { SetupDialogView } from "../features/setup/index.ts";
-import { TraceTree } from "../features/trace/index.ts";
-import { APPROVAL_TRACE, FAILED_TRACE, LONG_TRACE, OLD_TRACE, SHORT_TRACE } from "../features/trace/sample.ts";
-import type { TraceRunSpan } from "../store/trace.ts";
+import { SpanDetail, TraceTree } from "../features/trace/index.ts";
+import { APPROVAL_DETAIL, APPROVAL_TRACE, MODEL_DETAIL, OLD_DETAIL, TOOL_DETAIL, FAILED_TRACE, LONG_TRACE, OLD_TRACE, SHORT_TRACE } from "../features/trace/sample.ts";
+import type { TraceRunSpan, TraceSpanResult } from "../store/trace.ts";
 import { FORM_CASES, SETUP_CASES } from "../features/setup/sample.ts";
 import { AddKey, SetupFormView } from "../features/setup/setup-form.tsx";
 import { panelView } from "../features/setup/setup-ui.ts";
@@ -525,6 +525,32 @@ function TraceDemo({ label, runs }: { label: string; runs: TraceRunSpan[] }) {
   );
 }
 
+/** The gallery has no daemon to read an artifact from, so "Open full output" opens a stand-in. */
+function GalleryArtifact({ artifactId, open, onOpenChange }: { sessionId: string; artifactId: string; open: boolean; onOpenChange: (open: boolean) => void }) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogTitle>Full output</DialogTitle>
+        <DialogDescription>{`Artifact ${artifactId}`}</DialogDescription>
+        <DialogClose asChild>
+          <Button size="sm" className="mt-3">Close</Button>
+        </DialogClose>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function DetailDemo({ label, result }: { label: string; result: TraceSpanResult }) {
+  return (
+    <figure className="w-full">
+      <figcaption className="mb-1 font-mono text-xs text-faint">{label}</figcaption>
+      <div className="flex h-96 flex-col overflow-hidden rounded-md border border-line bg-bg">
+        <SpanDetail result={result} sessionId="s_gallery" Artifact={GalleryArtifact} />
+      </div>
+    </figure>
+  );
+}
+
 function Panel({ theme }: { theme: "slip" | "kiln" }) {
   return (
     <section data-theme={theme} aria-label={`${theme} theme`} className="rounded-lg border border-line bg-bg p-4 text-ink">
@@ -536,6 +562,10 @@ function Panel({ theme }: { theme: "slip" | "kiln" }) {
         <TraceDemo label="A failed and a denied tool" runs={FAILED_TRACE} />
         <TraceDemo label="A tool with an approval wait" runs={APPROVAL_TRACE} />
         <TraceDemo label="A session from before traces" runs={OLD_TRACE} />
+        <DetailDemo label="A model call: context, reply, metadata" result={MODEL_DETAIL} />
+        <DetailDemo label="A tool with a big output" result={TOOL_DETAIL} />
+        <DetailDemo label="A tool with an edited approval" result={APPROVAL_DETAIL} />
+        <DetailDemo label="Not recorded" result={OLD_DETAIL} />
       </Group>
 
       <Group title="Button">

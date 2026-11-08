@@ -1,4 +1,4 @@
-import type { TraceModelSpan, TraceRunSpan, TraceToolSpan } from "../../store/trace.ts";
+import type { TraceMessage, TraceModelSpan, TraceRunSpan, TraceSpanResult, TraceToolSpan } from "../../store/trace.ts";
 
 const BASE = Date.parse("2026-11-07T10:00:00.000Z");
 const at = (ms: number): string => new Date(BASE + ms).toISOString();
@@ -100,3 +100,51 @@ export const OLD_TRACE: TraceRunSpan[] = [
     sampleModel("m_2", 2, 1100, 1900, [], { recorded: false }),
   ]),
 ];
+
+const USER: TraceMessage = { id: "u_1", role: "user", text: "What is in **notes.txt**?" };
+const ASKED: TraceMessage = {
+  id: "m_1",
+  role: "assistant",
+  text: "Let me look.",
+  tool_calls: [{ call_id: "c_1", name: "read_file", args: { path: "notes.txt" } }],
+};
+const SEEN: TraceMessage = { id: "t_1", role: "tool", text: Array.from({ length: 30 }, (_, i) => `line ${i + 1}: the answer is 42`).join("\n"), call_id: "c_1" };
+
+/** The second model call: the system prompt and two tools, three messages, and the last two are new. */
+export const MODEL_DETAIL: TraceSpanResult = {
+  span: SHORT_TRACE[0]?.children?.[1] as TraceModelSpan,
+  system_prompt: "You are golem, a coding agent. Work in the folder you are given.",
+  tools: [
+    { type: "function", function: { name: "read_file", description: "Read a file.", parameters: { type: "object", properties: { path: { type: "string" } } } } },
+    { type: "function", function: { name: "grep", description: "Search files.", parameters: { type: "object", properties: { pattern: { type: "string" } } } } },
+  ],
+  messages: [USER, ASKED, SEEN],
+  new_from: 1,
+  reply: { id: "m_2", role: "assistant", text: "It says **42**.", tool_calls: [] },
+  stop_reason: "end_turn",
+  provider: "ollama",
+};
+
+/** A tool whose output was too big for the model: the start went back, and the rest is in an artifact. */
+export const TOOL_DETAIL: TraceSpanResult = {
+  span: SHORT_TRACE[0]?.children?.[0]?.children?.[1] as TraceToolSpan,
+  args: { path: "notes.txt", offset: 0 },
+  result: "head of the output\n… the whole output is saved as artifact a_9f3c",
+  artifact_id: "a_9f3c",
+};
+
+/** A tool call the user allowed after editing its arguments. */
+export const APPROVAL_DETAIL: TraceSpanResult = {
+  span: APPROVAL_TRACE[0]?.children?.[0]?.children?.[0] as TraceToolSpan,
+  args: { path: "notes.txt", old_string: "world", new_string: "there" },
+  result: "Edited notes.txt",
+  approval: { call_id: "c_1", name: "edit_file", decision: "allow", rule: "built-in default", args: { path: "notes.txt", old_string: "world", new_string: "edited" } },
+};
+
+/** A model call from before traces: no system prompt or tools, and the messages before its reply. */
+export const OLD_DETAIL: TraceSpanResult = {
+  span: OLD_TRACE[0]?.children?.[0] as TraceModelSpan,
+  messages: [USER],
+  new_from: 0,
+  reply: { id: "m_1", role: "assistant", text: "It is an off-by-one.", tool_calls: [] },
+};

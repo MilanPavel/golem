@@ -4,7 +4,7 @@ import type { Page } from "@playwright/test";
 
 import { axeViolations } from "./axe.ts";
 import { expect, test } from "./fixtures.ts";
-import { answers, composer, startStack } from "./stack.ts";
+import { answers, composer, setTheme, startStack } from "./stack.ts";
 
 /** The gateway link carries the login, so open it first, then the session. */
 async function openSession(page: Page, url: string, sessionId: string): Promise<void> {
@@ -46,12 +46,31 @@ test("a run that used a tool shows as a run, a model call, and a tool call on th
   await page.reload();
   await expect(tree.getByRole("treeitem", { name: /read_file/ })).toHaveAttribute("aria-selected", "true");
 
+  // The tool's detail: its args and its result.
+  const detail = page.getByRole("region", { name: "Span detail" });
+  await expect(detail.getByRole("heading", { name: /read_file/ })).toBeVisible();
+  await expect(detail.getByText("notes.txt")).toBeVisible();
+  await detail.getByRole("tab", { name: "Result" }).click();
+  await expect(detail.getByText("the answer is 42")).toBeVisible();
+  await expect(detail.getByRole("tab", { name: "Approval" })).toHaveCount(0);
+
+  // The model call's detail: the user's message is in its context, and the call's reply is in Reply.
+  await tree.getByRole("treeitem", { name: /model 1/ }).click();
+  await expect(detail.getByRole("tab", { name: "Context" })).toHaveAttribute("aria-selected", "true");
+  await expect(detail.getByRole("list", { name: "Messages" }).getByText("what is in notes?")).toBeVisible();
+  await detail.getByRole("tab", { name: "Reply" }).click();
+  await expect(detail.getByText("→ read_file(path=\"notes.txt\")")).toBeVisible();
+  await tree.getByRole("treeitem", { name: /read_file/ }).click();
+
   // The keyboard moves the selection.
   await tree.getByRole("treeitem", { name: /read_file/ }).focus();
   await page.keyboard.press("ArrowUp");
   await expect(tree.getByRole("treeitem", { name: /model 1/ })).toHaveAttribute("aria-selected", "true");
 
   expect(await axeViolations(page)).toEqual([]);
+  await setTheme(page, "kiln");
+  expect(await axeViolations(page)).toEqual([]);
+  await setTheme(page, "slip");
 
   await page.getByRole("group", { name: "View" }).getByRole("button", { name: "Chat" }).click();
   await expect(page).toHaveURL(new RegExp(`/s/${sessionId}$`));

@@ -1,4 +1,4 @@
-import { keepPreviousData, QueryClientProvider, useQuery, type UseQueryResult } from "@tanstack/react-query";
+import { keepPreviousData, QueryClientProvider, useInfiniteQuery, useQuery, type UseInfiniteQueryResult, type InfiniteData, type UseQueryResult } from "@tanstack/react-query";
 import { createContext, useCallback, useContext, useSyncExternalStore, type ReactNode } from "react";
 import { useSyncExternalStoreWithSelector } from "use-sync-external-store/with-selector";
 import { ConnectionProvider } from "./connection-context.tsx";
@@ -9,7 +9,7 @@ import type { Page, PageActions } from "./page.ts";
 import type { PullsSnapshot } from "./pulls.ts";
 import type { Route } from "./router.ts";
 import type { McpListResult, SessionSummary, SetupStatusResult, SkillListResult } from "@golem/client";
-import { traceKey, type TraceGetResult } from "./trace.ts";
+import { ARTIFACT_PAGE, artifactKey, traceKey, traceSpanKey, type ArtifactReadResult, type TraceGetResult, type TraceSpanResult } from "./trace.ts";
 import { mcpCatalogKey, mcpListKey, mcpToolsKey, type McpCatalogResult, type McpToolsResult } from "./mcp.ts";
 import type { Pastes } from "@golem/view";
 import { distinctFolders, resolveFolder } from "./new-session.ts";
@@ -180,6 +180,30 @@ export function useTrace(sessionId: string): UseQueryResult<TraceGetResult> {
   const { queries } = usePage();
   // Read again on every visit: the answer is only as new as its last read.
   return useQuery({ queryKey: traceKey(sessionId), queryFn: () => queries.trace(sessionId), staleTime: 0, retry: false });
+}
+
+/** One span's input and output. Fetched only with a `spanId`, and again by the page's Refresh. */
+export function useTraceSpan(sessionId: string, spanId: string | null): UseQueryResult<TraceSpanResult> {
+  const { queries } = usePage();
+  return useQuery({
+    queryKey: traceSpanKey(sessionId, spanId ?? ""),
+    queryFn: () => queries.traceSpan(sessionId, spanId ?? ""),
+    enabled: spanId !== null,
+    retry: false,
+  });
+}
+
+/** An artifact, a page of characters at a time. Fetched only once `enabled`, and `fetchNextPage` reads the next one. */
+export function useArtifact(sessionId: string, artifactId: string, enabled = true): UseInfiniteQueryResult<InfiniteData<ArtifactReadResult, number>> {
+  const { queries } = usePage();
+  return useInfiniteQuery({
+    queryKey: artifactKey(sessionId, artifactId),
+    queryFn: ({ pageParam }) => queries.artifact(sessionId, artifactId, pageParam, ARTIFACT_PAGE),
+    initialPageParam: 0,
+    getNextPageParam: (last) => (last.offset + last.text.length < last.size ? last.offset + last.text.length : undefined),
+    enabled,
+    retry: false,
+  });
 }
 
 /** The tool rules and what the session allows. Fetched only once `enabled`; the rule edits and `approval.resolved` refresh it. */
