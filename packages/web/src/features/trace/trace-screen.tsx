@@ -1,13 +1,13 @@
 import type { UseQueryResult } from "@tanstack/react-query";
-import type { TraceGetResult, TraceSpanResult } from "../../store/trace.ts";
+import type { TraceGetResult, TraceRunSpan, TraceSpanResult } from "../../store/trace.ts";
 import { useNavigate, useTrace, useTraceSpan } from "../../store/page-context.tsx";
 import { sessionPath, tracePath } from "../../store/router.ts";
 import { Button } from "../../ui/button.tsx";
 import { RefreshIcon } from "../../ui/icons.tsx";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "../../ui/dialog.tsx";
 import { Link } from "../../ui/link.tsx";
-import { summaryLine } from "./format.ts";
 import { SpanDetail } from "./span-detail.tsx";
+import { TraceSummary } from "./trace-summary.tsx";
 import { TraceTree } from "./trace-tree.tsx";
 import { useNarrow } from "./use-narrow.ts";
 import { SessionViewBar } from "./view-switch.tsx";
@@ -15,11 +15,11 @@ import { SessionViewBar } from "./view-switch.tsx";
 export const SELECT_A_SPAN = "Select a span to see what went in and what came out.";
 export const NOTHING_TO_TRACE = "Nothing to trace yet. Send a message first.";
 
-function Header({ id, summary, refreshing, onRefresh }: { id: string; summary: string | null; refreshing: boolean; onRefresh: () => void }) {
+function Header({ id, runs, refreshing, onRefresh }: { id: string; runs: readonly TraceRunSpan[] | null; refreshing: boolean; onRefresh: () => void }) {
   return (
     <div className="flex flex-col">
       <SessionViewBar id={id} view="trace">
-        <p className="min-w-0 flex-1 truncate font-mono text-xs text-muted">{summary ?? ""}</p>
+        {runs === null ? <div className="flex-1" /> : <TraceSummary runs={runs} />}
         <Button kind="ghost" size="sm" onClick={onRefresh} disabled={refreshing} aria-label="Refresh">
           <RefreshIcon className="size-3.5" />
           <span className="max-narrow:hidden">Refresh</span>
@@ -103,10 +103,10 @@ function Panes({ id, trace, span, query }: { id: string; trace: TraceGetResult; 
 export function TraceScreen({ id, span }: { id: string; span: string | null }) {
   const trace = useTrace(id);
   const detail = useTraceSpan(id, span);
-  const line = trace.data === undefined ? null : summaryLine(trace.data.runs);
+  const runs = trace.data?.runs ?? null;
   return (
     <div data-screen="trace" className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <Header id={id} summary={line} refreshing={trace.isFetching || detail.isFetching}
+      <Header id={id} runs={runs} refreshing={trace.isFetching || detail.isFetching}
         onRefresh={() => {
           void trace.refetch();
           if (span !== null) void detail.refetch();

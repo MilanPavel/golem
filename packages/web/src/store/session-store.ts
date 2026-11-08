@@ -1,11 +1,13 @@
 import type { ChatEvent } from "@golem/client";
-import { appendDelta, emptyChat, reduceChat, type ChatState } from "@golem/view";
+import { appendDelta, emptyChat, emptyLiveContext, foldLiveContext, reduceChat, type ChatState, type LiveContextState } from "@golem/view";
 import { createStore, type StoreSource } from "./create-store.ts";
 
 export type SessionModel = { profile: string; provider: string | null; name: string | null };
 
 export type SessionView = {
   chat: ChatState;
+  /** The context of the latest model call that reported its input tokens. */
+  context: LiveContextState;
   title: string | null;
   cwd: string | null;
   model: SessionModel | null;
@@ -34,6 +36,7 @@ const browserFrame: Frame = {
 
 export const initialSessionView: SessionView = {
   chat: emptyChat,
+  context: emptyLiveContext,
   title: null,
   cwd: null,
   model: null,
@@ -63,6 +66,7 @@ function connectDevtools(name: string | undefined): DevtoolsConnection | undefin
 
 function fold(view: SessionView, event: ChatEvent): SessionView {
   const chat = reduceChat(view.chat, event);
+  const context = foldLiveContext(view.context, event);
   let { title, cwd, model } = view;
   if (event.type === "session.created") {
     cwd = event.data.cwd ?? null;
@@ -82,10 +86,10 @@ function fold(view: SessionView, event: ChatEvent): SessionView {
       cwd = event.data.cwd;
     }
   }
-  if (chat === view.chat && title === view.title && cwd === view.cwd && model === view.model) {
+  if (chat === view.chat && context === view.context && title === view.title && cwd === view.cwd && model === view.model) {
     return view;
   }
-  return { ...view, chat, title, cwd, model };
+  return { ...view, chat, context, title, cwd, model };
 }
 
 /**

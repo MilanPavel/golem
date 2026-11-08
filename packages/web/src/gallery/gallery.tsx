@@ -24,7 +24,7 @@ import { ANSWERED, PENDING_EDIT, PENDING_SHELL } from "../features/approval/samp
 import { DiffModeSwitch, DiffView } from "../features/diff/index.ts";
 import { SAMPLE_EDIT_DIFF, SAMPLE_LONG_LINE_DIFF, SAMPLE_NEW_FILE_DIFF } from "../features/diff/sample.ts";
 import { Drawer, TodoList } from "../features/drawer/index.ts";
-import { Composer, DockView, Meter } from "../features/composer/index.ts";
+import { Composer, ContextChipView, DockView, Meter } from "../features/composer/index.ts";
 import { createHistory } from "../features/composer/history.ts";
 import { CommandsDialog } from "../features/composer/help-dialog.tsx";
 import { HomeView, NewSessionModelChipView, SessionTitle } from "../features/shell/index.ts";
@@ -32,8 +32,8 @@ import { FolderBrowserView } from "../features/shell/folder-browser.tsx";
 import { CommandPaletteView, KeysDialog } from "../features/palette/index.ts";
 import { ModelDialogView, type ModelDialogViewProps } from "../features/models/index.ts";
 import { SetupDialogView } from "../features/setup/index.ts";
-import { SpanDetail, TraceTree } from "../features/trace/index.ts";
-import { APPROVAL_DETAIL, APPROVAL_TRACE, FULL_DETAIL, MODEL_DETAIL, NO_PROMPT_DETAIL, NUM_CTX_DETAIL, OLD_DETAIL, SECTIONS_DETAIL, TOOL_DETAIL, UNKNOWN_WINDOW_DETAIL, FAILED_TRACE, LONG_TRACE, OLD_TRACE, SHORT_TRACE } from "../features/trace/sample.ts";
+import { SpanDetail, TraceSummary, TraceTree } from "../features/trace/index.ts";
+import { APPROVAL_DETAIL, APPROVAL_TRACE, FULL_DETAIL, MODEL_DETAIL, NO_PROMPT_DETAIL, NUM_CTX_DETAIL, OLD_DETAIL, SECTIONS_DETAIL, TOOL_DETAIL, UNKNOWN_WINDOW_DETAIL, FAILED_TRACE, GROWING_TRACE, LONG_TRACE, OLD_TRACE, SHORT_TRACE } from "../features/trace/sample.ts";
 import type { TraceRunSpan, TraceSpanResult } from "../store/trace.ts";
 import { FORM_CASES, SETUP_CASES } from "../features/setup/sample.ts";
 import { AddKey, SetupFormView } from "../features/setup/setup-form.tsx";
@@ -525,6 +525,17 @@ function TraceDemo({ label, runs }: { label: string; runs: TraceRunSpan[] }) {
   );
 }
 
+function SummaryDemo({ label, runs }: { label: string; runs: TraceRunSpan[] }) {
+  return (
+    <figure className="w-full">
+      <figcaption className="mb-1 font-mono text-xs text-faint">{label}</figcaption>
+      <div className="flex items-center rounded-md border border-line bg-bg px-4 py-2">
+        <TraceSummary runs={runs} />
+      </div>
+    </figure>
+  );
+}
+
 /** The gallery has no daemon to read an artifact from, so "Open full output" opens a stand-in. */
 function GalleryArtifact({ artifactId, open, onOpenChange }: { sessionId: string; artifactId: string; open: boolean; onOpenChange: (open: boolean) => void }) {
   return (
@@ -557,6 +568,9 @@ function Panel({ theme }: { theme: "slip" | "kiln" }) {
       <h2 className="font-prose text-xl">{theme}</h2>
 
       <Group title="Trace">
+        <SummaryDemo label="Summary, context growing" runs={GROWING_TRACE} />
+        <SummaryDemo label="Summary, 26 model calls" runs={LONG_TRACE} />
+        <SummaryDemo label="Summary, a session from before traces" runs={OLD_TRACE} />
         <TraceDemo label="Short trace" runs={SHORT_TRACE} />
         <TraceDemo label="Long trace, 25 model calls" runs={LONG_TRACE} />
         <TraceDemo label="A failed and a denied tool" runs={FAILED_TRACE} />
@@ -672,6 +686,21 @@ function Panel({ theme }: { theme: "slip" | "kiln" }) {
         <h3 className="mb-2 font-mono text-xs text-faint">Dock</h3>
         <div className="grid gap-4 rounded-lg border border-line bg-bg p-4">
           <DockView busy={false} meter={<Meter state="idle" runStartedAt={null} />} composer={<DemoComposer />} />
+          <DockView
+            busy={false}
+            meter={<Meter state="idle" runStartedAt={null} aside={<ContextChipView used={32000} window={128000} onOpen={() => {}} />} />}
+            composer={<DemoComposer />}
+          />
+          <DockView
+            busy={false}
+            meter={<Meter state="idle" runStartedAt={null} aside={<ContextChipView used={110000} window={128000} onOpen={() => {}} />} />}
+            composer={<DemoComposer />}
+          />
+          <DockView
+            busy={false}
+            meter={<Meter state="idle" runStartedAt={null} aside={<ContextChipView used={125000} window={128000} onOpen={() => {}} />} />}
+            composer={<DemoComposer />}
+          />
           <DockView
             busy
             meter={<Meter state="thinking" runStartedAt={new Date(NOW - 12_000).toISOString()} />}
