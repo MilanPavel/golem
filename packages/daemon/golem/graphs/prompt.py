@@ -38,24 +38,46 @@ class PromptContext:
     report: Callable[[Mapping[str, object]], None] | None = None
 
 
-Section = Callable[[PromptContext], str | None]
-"""One part of the system prompt. None or blank text leaves it out."""
+SectionFn = Callable[[PromptContext], str | None]
+
+
+@dataclass(frozen=True, slots=True)
+class Section:
+    """One named part of the system prompt. None or blank text leaves it out."""
+
+    name: str
+    build: SectionFn
+
+    def __call__(self, context: PromptContext) -> str | None:
+        return self.build(context)
 
 
 @dataclass(frozen=True, slots=True)
 class SystemPrompt:
-    """The sections of the system prompt, in order. No sections means no prompt."""
+    """The sections of the system prompt, in order. No sections means no prompt.
 
-    sections: tuple[Section, ...] = ()
+    A bare function is named ``section_<n>``, where ``n`` is its 1-based place
+    in ``sections``.
+    """
+
+    sections: tuple[Section | SectionFn, ...] = ()
+
+    def parts(self, context: PromptContext) -> list[tuple[str, str]]:
+        """The non-empty ``(name, text)`` pairs in order, with each text stripped.
+
+        Calls each section exactly once.
+        """
+        found: list[tuple[str, str]] = []
+        for number, section in enumerate(self.sections, start=1):
+            name = section.name if isinstance(section, Section) else f"section_{number}"
+            part = section(context)
+            if part is not None and part.strip():
+                found.append((name, part.strip()))
+        return found
 
     def text(self, context: PromptContext) -> str:
         """The prompt for ``context``, or ``""`` when no section has anything to say."""
-        parts: list[str] = []
-        for section in self.sections:
-            part = section(context)
-            if part is not None and part.strip():
-                parts.append(part.strip())
-        return "\n\n".join(parts)
+        return "\n\n".join(text for _, text in self.parts(context))
 
     def message(self, context: PromptContext) -> SystemMessage | None:
         """The system message for one model call, or None when the prompt is empty."""
@@ -63,4 +85,4 @@ class SystemPrompt:
         return SystemMessage(content=text) if text else None
 
 
-__all__ = ["PINNED_KEY", "PromptContext", "Section", "SystemPrompt"]
+__all__ = ["PINNED_KEY", "PromptContext", "Section", "SectionFn", "SystemPrompt"]

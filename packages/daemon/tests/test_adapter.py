@@ -149,3 +149,38 @@ def test_completed_reads_openai_finish_reason_and_no_usage() -> None:
 def test_a_model_request_item_becomes_a_fact() -> None:
     part = {"type": "custom", "data": {"golem": "model.request", "message_id": "m1"}}
     assert translate(part) == ModelRequested("m1")
+
+
+def test_a_model_request_carries_the_window_and_sections() -> None:
+    item: dict[str, object] = {
+        "golem": "model.request",
+        "message_id": "m1",
+        "context_window": 8192,
+        "num_ctx": 4096,
+        "system_sections": [{"name": "rules", "chars": 9}, {"name": "", "chars": 1}],
+    }
+    fact = translate({"type": "custom", "data": item})
+    assert fact == ModelRequested(
+        "m1",
+        context_window=8192,
+        num_ctx=4096,
+        system_sections=(("rules", 9),),
+    )
+
+
+def test_a_bad_window_or_section_is_dropped() -> None:
+    item: dict[str, object] = {
+        "golem": "model.request",
+        "message_id": "m1",
+        "context_window": True,
+        "num_ctx": -3,
+        "system_sections": [
+            {"chars": 4},
+            {"name": "a", "chars": -1},
+            "x",
+            {"name": "b", "chars": "x"},
+        ],
+    }
+    assert translate({"type": "custom", "data": item}) == ModelRequested("m1")
+    item["context_window"] = "x"
+    assert translate({"type": "custom", "data": item}) == ModelRequested("m1")

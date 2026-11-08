@@ -1,7 +1,44 @@
 {
+  "$defs": {
+    "PromptSectionInfo": {
+      "additionalProperties": false,
+      "description": "One non-empty section of the system prompt sent with a model call.\n\n``chars`` is the length of the section's text after strip, counted as\nPython counts it (Unicode code points). The prompt is the sections' texts,\nin order, joined with \"\\n\\n\", so the lengths split the stored prompt\nexactly.",
+      "properties": {
+        "chars": {
+          "minimum": 0,
+          "title": "Chars",
+          "type": "integer"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "chars"
+      ],
+      "title": "PromptSectionInfo",
+      "type": "object"
+    }
+  },
   "additionalProperties": false,
   "description": "A request went to the model.\n\n``message_id`` is the assistant reply's id, which identifies the model\ncall. ``index`` counts the calls of this run from 1. ``provider`` and\n``model`` are None when the profile does not resolve.\n\n``system_prompt_sha`` and ``tools_sha`` are the sha256 of the system\nprompt and of the tool schemas (compact JSON, sorted keys) sent with the\ncall, which the daemon keeps by hash. Each is None when it was not sent.\n``message_ids`` are the history messages sent, in order, not counting the\nsystem prompt.",
   "properties": {
+    "context_window": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Context Window"
+    },
     "index": {
       "minimum": 1,
       "title": "Index",
@@ -31,6 +68,19 @@
       "default": null,
       "title": "Model"
     },
+    "num_ctx": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Num Ctx"
+    },
     "profile": {
       "minLength": 1,
       "title": "Profile",
@@ -59,6 +109,21 @@
       ],
       "default": null,
       "title": "System Prompt Sha"
+    },
+    "system_sections": {
+      "anyOf": [
+        {
+          "items": {
+            "$ref": "#/$defs/PromptSectionInfo"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "System Sections"
     },
     "tools_sha": {
       "anyOf": [

@@ -87,6 +87,13 @@ def skills(tmp_path: Path) -> Path:
     return parent
 
 
+def test_the_pinned_section_is_named(tmp_path: Path) -> None:
+    registry = SkillRegistry(
+        SkillSettings(), golem_skills=tmp_path / "g", user_home=tmp_path / "home"
+    )
+    assert pinned_section(registry).name == "pinned_skills"
+
+
 async def test_pinned_bodies_are_in_the_prompt_in_pin_order(
     database: Database, tmp_path: Path, skills: Path
 ) -> None:

@@ -17,7 +17,7 @@ from contextlib import AbstractAsyncContextManager, aclosing, nullcontext
 from typing import Literal, Protocol, cast
 
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.messages.tool import ToolCall
 from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.base import BaseCheckpointSaver
@@ -43,6 +43,7 @@ from golem.graphs.tools_node import (
 )
 from golem.models.ollama import LocalServers
 from golem.models.router import ModelRouter
+from golem.models.window import ContextWindow, WindowOf
 from golem.permissions.engine import Allowance
 from golem.permissions.policy import Policy
 from golem.sessions.ids import new_id
@@ -122,12 +123,14 @@ class ChatRuntime:
         tools: ToolRegistry | None = None,
         policy: Policy | None = None,
         prompt: SystemPrompt | None = None,
+        window_of: WindowOf | None = None,
     ) -> None:
         self._graph = graph
         self.router = router
         self.tools = default_registry() if tools is None else tools
         self.policy = Policy(None) if policy is None else policy
         self.prompt = SystemPrompt() if prompt is None else prompt
+        self.window_of = window_of
 
     async def values(self, session_id: str) -> Mapping[str, object]:
         """Checkpoint values for ``session_id``, or an empty mapping."""
@@ -340,6 +343,7 @@ def open_chat(
     local: LocalServers | None = None,
     prompt: SystemPrompt | None = None,
     blobs: Blobs | None = None,
+    window_of: WindowOf | None = None,
 ) -> ChatRuntime:
     """Compile the chat graph against ``checkpointer``.
 
@@ -350,6 +354,8 @@ def open_chat(
     ``prompt`` builds the system prompt for each model call. It defaults to
     none, so the model sees only the stored history. With ``blobs``, each model
     call stores its system prompt and tool schemas there, and reports their hashes.
+    ``window_of`` gives the context window of a profile. Each model call reports it
+    with the lengths of the system prompt's sections. Without it, the window is unknown.
     """
     registry = default_registry() if tools is None else tools
     rules = Policy(None) if policy is None else policy
@@ -366,12 +372,19 @@ def open_chat(
         tools = registry.scoped(scope)
         schemas = tools.schemas()
         context = PromptContext(state, _cwd(config), _pinned(config), get_stream_writer())
-        system = system_prompt.message(context)
+        parts = system_prompt.parts(context)
+        text = "\n\n".join(t for _, t in parts)
+        system = SystemMessage(content=text) if text else None
         # The system message is sent, never returned, so it stays out of the checkpoint.
         sent = messages if system is None else [system, *messages]
+        window = window_of(profile) if window_of is not None else ContextWindow()
         async with _held(router, local, profile):
             request: dict[str, object] = {STREAM_KEY: "model.request", "message_id": message_id}
             request["message_ids"] = [m.id for m in messages if m.id]
+            if parts:
+                request["system_sections"] = [{"name": n, "chars": len(t)} for n, t in parts]
+            request["context_window"] = window.window
+            request["num_ctx"] = window.num_ctx
             if blobs is not None:
                 if system is not None and isinstance(system.content, str):
                     request["system_prompt_sha"] = await blobs.put("system_prompt", system.content)
@@ -404,7 +417,12 @@ def open_chat(
     builder.add_conditional_edges("call_model", route, {"tools": "tools", "end": END})
     builder.add_edge("tools", "call_model")
     return ChatRuntime(
-        builder.compile(checkpointer=checkpointer), router, registry, rules, system_prompt
+        builder.compile(checkpointer=checkpointer),
+        router,
+        registry,
+        rules,
+        system_prompt,
+        window_of,
     )
 
 

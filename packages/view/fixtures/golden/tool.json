@@ -49,15 +49,18 @@
     },
     {
       "data": {
+        "context_window": null,
         "index": 1,
         "message_id": "id-4",
         "message_ids": [
           "id-3"
         ],
         "model": null,
+        "num_ctx": null,
         "profile": "remote",
         "provider": null,
         "system_prompt_sha": null,
+        "system_sections": null,
         "tools_sha": "310002311a2a5a2409ce7ef36bd1231772ad4a573e63572c677e4673b6356342"
       },
       "run_id": "id-2",
@@ -149,6 +152,7 @@
     },
     {
       "data": {
+        "context_window": null,
         "index": 2,
         "message_id": "id-5",
         "message_ids": [
@@ -157,9 +161,11 @@
           "t_call_1"
         ],
         "model": null,
+        "num_ctx": null,
         "profile": "remote",
         "provider": null,
         "system_prompt_sha": null,
+        "system_sections": null,
         "tools_sha": "310002311a2a5a2409ce7ef36bd1231772ad4a573e63572c677e4673b6356342"
       },
       "run_id": "id-2",
@@ -256,15 +262,18 @@
     },
     {
       "data": {
+        "context_window": null,
         "index": 1,
         "message_id": "id-4",
         "message_ids": [
           "id-3"
         ],
         "model": null,
+        "num_ctx": null,
         "profile": "remote",
         "provider": null,
         "system_prompt_sha": null,
+        "system_sections": null,
         "tools_sha": "310002311a2a5a2409ce7ef36bd1231772ad4a573e63572c677e4673b6356342"
       },
       "run_id": "id-2",
@@ -356,6 +365,7 @@
     },
     {
       "data": {
+        "context_window": null,
         "index": 2,
         "message_id": "id-5",
         "message_ids": [
@@ -364,9 +374,11 @@
           "t_call_1"
         ],
         "model": null,
+        "num_ctx": null,
         "profile": "remote",
         "provider": null,
         "system_prompt_sha": null,
+        "system_sections": null,
         "tools_sha": "310002311a2a5a2409ce7ef36bd1231772ad4a573e63572c677e4673b6356342"
       },
       "run_id": "id-2",

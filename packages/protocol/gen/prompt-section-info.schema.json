@@ -1,0 +1,22 @@
+{
+  "additionalProperties": false,
+  "description": "One non-empty section of the system prompt sent with a model call.\n\n``chars`` is the length of the section's text after strip, counted as\nPython counts it (Unicode code points). The prompt is the sections' texts,\nin order, joined with \"\\n\\n\", so the lengths split the stored prompt\nexactly.",
+  "properties": {
+    "chars": {
+      "minimum": 0,
+      "title": "Chars",
+      "type": "integer"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "chars"
+  ],
+  "title": "PromptSectionInfo",
+  "type": "object"
+}

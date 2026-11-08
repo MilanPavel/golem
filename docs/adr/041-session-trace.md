@@ -53,6 +53,7 @@ All of it is optional, so older events stay valid. Each step raises the protocol
    - A new table, `blobs`, keyed by the sha256 of the text, holds each system prompt and each tool-schema list (canonical JSON).
    - `model.call.started` gains `system_prompt_sha`, `tools_sha`, and `message_ids`: the checkpoint ids of the messages sent, in order.
 3. **`duration_ms` on `tool.completed` and `tool.failed`** (13.4). It is measured around the tool's run. `tool.started` is already written after approval, so the wait never counts. A denied call never ran and has none.
+4. **The context window and the prompt sections** (13.9). `model.call.started` gains `context_window` (profile `ctx`, then the listed model's `ctx`, then LiteLLM's `max_input_tokens`; `None` when unknown), `num_ctx` (the Ollama option sent, if any) and `system_sections` (`name` and `chars` per non-empty section, in order; the stored prompt is their texts joined with a blank line, so the lengths split it exactly). The window is resolved when the call is made because the profile, the listing and the price book change later. The sections cost a few bytes and save storing the prompt twice.
 
 ### Why hashes and message ids, not a copy of the context
 
@@ -128,7 +129,7 @@ Blobs hold prompts, which can hold anything a skill or a pinned file says. They 
 
 ### Negative
 
-- Two more events per model call, one more table, and four protocol minor bumps over Phase 13.
+- Two more events per model call, one more table, and six protocol minor bumps over Phase 13.
 - `trace.span` reads the checkpoint, which is slower than reading events. It is called once per click, not per row.
 
 ### Risks

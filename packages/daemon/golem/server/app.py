@@ -26,6 +26,7 @@ from golem.models.keys import ProviderKeys
 from golem.models.ollama import LocalServer, LocalServers, ServerState
 from golem.models.pulls import PullManager
 from golem.models.router import ModelRouter
+from golem.models.window import resolve_window
 from golem.paths import GolemPaths, resolve_paths
 from golem.permissions.policy import Policy
 from golem.secrets import KeychainSecrets, SecretStore
@@ -182,6 +183,10 @@ class DaemonApp:
                 load_settings=lambda: load_settings(home=home, project_dir=home).skills,
                 broadcast=self._broadcast,
             )
+            if self._discovery is None:
+                models = ModelDiscovery(router, self.paths.cache_dir)
+            else:
+                models = self._discovery(router)
             async with (
                 Database.open(self.paths.database_file) as database,
                 open_checkpoints(database, self.paths.checkpoints_file) as saver,
@@ -200,15 +205,12 @@ class DaemonApp:
                         local,
                         SystemPrompt(sections=(pinned_section(self.state.skills),)),
                         BlobStore(database),
+                        window_of=lambda profile: resolve_window(router, profile, models),
                     ),
                     self._titles,
                     self.state.skills,
                     BlobStore(database),
                 )
-                if self._discovery is None:
-                    models = ModelDiscovery(router, self.paths.cache_dir)
-                else:
-                    models = self._discovery(router)
                 if self._pulls is None:
                     pulls = PullManager(router, ram_gb=models.ram_gb)
                 else:
