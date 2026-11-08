@@ -3,9 +3,9 @@ import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
 import { expect, test } from "vitest";
 import type { TraceSpanResult } from "../../store/trace.ts";
-import { APPROVAL_DETAIL, MODEL_DETAIL, NO_PROMPT_DETAIL, OLD_DETAIL, SECTIONS_DETAIL, TOOL_DETAIL } from "./sample.ts";
+import { APPROVAL_DETAIL, FULL_DETAIL, MODEL_DETAIL, NO_PROMPT_DETAIL, NUM_CTX_DETAIL, OLD_DETAIL, SECTIONS_DETAIL, TOOL_DETAIL, UNKNOWN_WINDOW_DETAIL } from "./sample.ts";
 import { SpanDetail } from "./span-detail.tsx";
-import { copyText, jsonOf, modelLine, promptSections, sectionLabel, tabsOf } from "./span-text.ts";
+import { copyText, jsonOf, modelLine, promptSections, sectionLabel, tabsOf, toolGroups } from "./span-text.ts";
 
 function show(result: TraceSpanResult) {
   const user = userEvent.setup();
@@ -24,12 +24,12 @@ test("a model call shows its header, with the model, time, first token, and toke
 
 test("Context has the system prompt row, the tools row, the messages, and the divider at new_from", async () => {
   const { user } = show(MODEL_DETAIL);
-  const prompt = screen.getByText(`System prompt · ${MODEL_DETAIL.system_prompt?.length} characters`);
-  expect(screen.getByText(/System prompt/).closest("details")?.open).toBe(false);
+  const prompt = screen.getByText("System prompt · ≈16 tokens");
+  expect(screen.getByText(/System prompt ·/).closest("details")?.open).toBe(false);
   await user.click(prompt);
   expect(screen.getByText(/You are golem, a coding agent/)).toBeTruthy();
-  await user.click(screen.getByText("Tools · 2"));
-  await user.click(screen.getByText("read_file", { selector: "summary" }));
+  await user.click(screen.getByText("Tools · 2 · ≈92 tokens"));
+  await user.click(screen.getByText("read_file · ≈48", { selector: "summary" }));
   expect(document.body.textContent).toContain('"description": "Read a file."');
 
   const messages = within(screen.getByRole("list", { name: "Messages" }));
@@ -156,7 +156,7 @@ test("the text helpers: tabs, raw parts, copy, and the model line", () => {
   expect(modelLine(cached)).toContain("cache read 800 · cache write 200");
 });
 
-for (const [name, result] of [["a model call", MODEL_DETAIL], ["a tool with an artifact", TOOL_DETAIL], ["an old call", OLD_DETAIL]] as const) {
+for (const [name, result] of [["a model call", MODEL_DETAIL], ["a full call", FULL_DETAIL], ["an unknown window", UNKNOWN_WINDOW_DETAIL], ["a tool with an artifact", TOOL_DETAIL], ["an old call", OLD_DETAIL]] as const) {
   test(`${name} has no accessibility violations`, async () => {
     const { container } = show(result);
     const results = await axe.run(container, { rules: { "color-contrast": { enabled: false }, region: { enabled: false } } });
@@ -172,7 +172,7 @@ test("a recorded call with no system prompt says why, and not Not recorded", () 
 
 test("a prompt in two sections opens to two folds, each with Copy", async () => {
   const { user } = show(SECTIONS_DETAIL);
-  await user.click(screen.getByText(/^System prompt/));
+  await user.click(screen.getByText(/^System prompt ·/));
   expect(screen.getByText("Pinned skills · ≈1.1K", { selector: "summary" })).toBeTruthy();
   expect(screen.getByText("Section 2 · ≈50", { selector: "summary" })).toBeTruthy();
   await user.click(screen.getByText(/^Pinned skills/));
@@ -200,4 +200,66 @@ test("promptSections splits by code points and refuses a wrong total", () => {
 test("sectionLabel", () => {
   expect(sectionLabel("pinned_skills")).toBe("Pinned skills");
   expect(sectionLabel("section_2")).toBe("Section 2");
+});
+
+const legend = () => within(screen.getByRole("list", { name: "What fills the context" }));
+
+test("a model call shows the context meter above the tabs, with the legend and Free", () => {
+  show(MODEL_DETAIL);
+  const section = screen.getByRole("region", { name: "Context window" });
+  expect(section.textContent).toContain("Context · 3.4K / 32K · 10%");
+  expect(legend().getAllByRole("listitem").map((row) => row.textContent)).toEqual([
+    "System prompt16",
+    "Tool definitions · 2 tools92",
+    "Your messages8",
+    "Replies30",
+    "Tool results3.3K",
+    "Free29.4K",
+  ]);
+  expect(section.compareDocumentPosition(screen.getByRole("tablist")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
+test("a nearly full call warns in deny, and an Ollama call over num_ctx says so", () => {
+  const full = show(FULL_DETAIL);
+  expect(screen.getByText("Context is 96% full.").className).toContain("text-deny");
+  full.unmount();
+  show(NUM_CTX_DETAIL);
+  expect(screen.getByText("Input is larger than num_ctx 8K. Ollama dropped the oldest part.")).toBeTruthy();
+});
+
+test("an unknown window shows the split without Free, and the hint for the provider", () => {
+  const first = show(UNKNOWN_WINDOW_DETAIL);
+  expect(screen.getByRole("region", { name: "Context window" }).textContent).toContain("Context · 3.4K · window unknown");
+  expect(legend().getAllByRole("listitem")).toHaveLength(5);
+  expect(legend().queryByText("Free")).toBeNull();
+  expect(screen.getByText(/golem sent no num_ctx, so Ollama used its own default window/)).toBeTruthy();
+  first.unmount();
+  show({ ...UNKNOWN_WINDOW_DETAIL, provider: "openai" });
+  expect(screen.getByText("golem does not know this model's window.")).toBeTruthy();
+});
+
+test("the Tools fold shows the cost, grouped by server and largest first", async () => {
+  const { user } = show(FULL_DETAIL);
+  await user.click(screen.getByText("Tools · 7 · ≈22.8K tokens"));
+  const fold = screen.getByText("Tools · 7 · ≈22.8K tokens").closest("details");
+  const titles = [...(fold?.querySelectorAll(":scope > div > div > details > summary") ?? [])].map((summary) => summary.textContent);
+  expect(titles).toEqual(["github · 3 tools · ≈20.0K", "fs · 2 tools · ≈2.2K", "built-in · 2 tools · ≈600"]);
+  await user.click(screen.getByText("github · 3 tools · ≈20.0K"));
+  const github = screen.getByText("github · 3 tools · ≈20.0K").closest("details");
+  const inner = [...(github?.querySelectorAll("details > summary") ?? [])].slice(1).map((s) => s.textContent);
+  expect(inner[0]).toBe("create_issue · ≈9.0K");
+});
+
+test("a tool span and an old call have no meter, and the Context JSON carries the context", async () => {
+  const tool = show(TOOL_DETAIL);
+  expect(screen.queryByRole("region", { name: "Context window" })).toBeNull();
+  tool.unmount();
+  show(OLD_DETAIL);
+  expect(screen.queryByRole("region", { name: "Context window" })).toBeNull();
+  expect(jsonOf(MODEL_DETAIL, "context")).toMatchObject({ context: { used: 3400 } });
+});
+
+test("toolGroups puts a schema with no item under built-in with no tokens", () => {
+  const groups = toolGroups([{ name: "mystery" }], []);
+  expect(groups).toEqual([{ group: null, label: "built-in", tokens: null, tools: [{ name: "mystery", label: "mystery", tokens: null, schema: { name: "mystery" } }] }]);
 });

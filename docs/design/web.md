@@ -286,9 +286,15 @@ How an answer was made: each model call with its context and reply, each tool ca
 - **The detail header:**
   - **A model call:** the name, then a mono line: the model and provider, the time, the time to the first token, `input → output` tokens, and cache read and cache write when there are any.
   - **A tool:** the tool's name, `✓` or `✗`, its time, and its approval wait.
+- **Context meter:** a model call with a recorded context shows it right under the header, above the tabs, so it stays on Context, Reply and Metadata. A tool, a run, and a call from before the context was recorded have none.
+  - **Title:** `Context · 3.4K / 32K · 10%` in mono, with `≈` before the window when it comes from today's catalog, and `Context · 3.4K · window unknown` when no window is known. At the right, a faint `estimated split`, because the provider reports only the total and golem splits it by characters.
+  - **Bar:** a thin rounded bar. One segment per part, in the order System prompt, Tool definitions, Your messages, Replies, Tool results, each its share of the window. The free part is the bar's own `line` ground. With no window, the bar is the split of what was used.
+  - **Colours:** the `ctx-*` data tokens in the table above. They do not reuse `allow`, `wait` or `deny`.
+  - **Legend:** one row per part, always all five, with a swatch, the label, and the tokens at the right. The tools row adds `· 7 tools`. A last `Free` row has an empty swatch. Colour is never the only cue.
+  - **Warnings:** under the legend, `Context is 96% full.` from 80% (`wait` colour) and in `deny` from 95%. When the input is larger than the Ollama `num_ctx`, `Input is larger than num_ctx 8K. Ollama dropped the oldest part.` in `deny`. With no window, a faint hint: for Ollama, set `ctx` on the profile; otherwise, golem does not know the window.
 - **Model call tabs:**
   - **Context**, in the order it was sent:
-    1. `System prompt · ≈1.1K tokens` and `Tools · 9`, each a closed disclosure. The prompt opens into one closed disclosure per section, titled `Pinned skills · ≈1.1K`, with a `Copy` button at the right and the section in a mono block. A prompt that cannot be split exactly shows whole, with one `Copy`. Before the call has a token count, the title is `System prompt · 2,140 characters`. The tools open into mono blocks, one schema each.
+    1. `System prompt · ≈1.1K tokens` and `Tools · 9 · ≈22.8K tokens`, each a closed disclosure. The prompt opens into one closed disclosure per section, titled `Pinned skills · ≈1.1K`, with a `Copy` button at the right and the section in a mono block. A prompt that cannot be split exactly shows whole, with one `Copy`. Before the call has a token count, the title is `System prompt · 2,140 characters`. Tools open into one fold per MCP server, largest first, titled `github · 3 tools · ≈20.0K` (built-in tools are `built-in`), and each tool is a fold titled `create_issue · ≈9.0K` that opens into its schema. With only built-in tools the list is flat.
     2. The messages as a compact transcript. A label column holds `you`, `golem`, or the tool's name, and under it the message's size, `≈3.2K`. A faint bar above the message is as long as its share of the context, so a big tool result stands out. Text is in the UI font, not Literata, because this is for reading closely, not for reading through.
     3. An assistant message lists its tool calls as `→ name(args)` in mono.
     4. A tool result is in a `code-bg` block, closed after 12 lines with `Show all`.
@@ -369,6 +375,13 @@ These become `packages/web/src/styles/tokens.css` in step 10.6. The names say wh
 | `deny` / `deny-soft` | `#A8402F` / `#F4DED9` | `#E58474` / `#33201C` | Denied, removed lines, failed |
 | `wait` / `wait-soft` | `#8A600E` / `#F3E7C9` | `#E2B655` / `#30271A` | Waiting for you |
 | `code-bg` | `#EFEDE9` | `#191512` | Code blocks, tool output |
+| `ctx-system` | `#6B7A8F` | `#8E9DB3` | System prompt part of the context meter |
+| `ctx-tools` | `#AE6B34` | `#D08549` | Tool definitions part |
+| `ctx-user` | `#59855C` | `#8DB88A` | Your messages part |
+| `ctx-replies` | `#95752F` | `#D9B45E` | Replies part |
+| `ctx-results` | `#8A5A86` | `#B98BB4` | Tool results part |
+
+The five `ctx-*` tokens are data colours for the context meter; each is at least 3:1 against `line` and `surface`.
 
 ### Contrast
 

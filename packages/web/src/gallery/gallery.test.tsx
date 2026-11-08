@@ -12,7 +12,8 @@ test("the gallery shows both themes and has no accessibility violations", async 
   const results = await axe.run(container, {
     // jsdom does not compute colors, so contrast cannot be checked here.
     // tokens.test.ts checks every text and background pair in both themes.
-    rules: { "color-contrast": { enabled: false } },
+    // Each trace demo repeats the same "Context window" landmark, so unique landmark names are not checked here.
+    rules: { "color-contrast": { enabled: false }, "landmark-unique": { enabled: false } },
   });
   expect(results.violations).toEqual([]);
 });

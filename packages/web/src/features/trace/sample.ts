@@ -125,6 +125,104 @@ export const MODEL_DETAIL: TraceSpanResult = {
   reply: { id: "m_2", role: "assistant", text: "It says **42**.", tool_calls: [], tokens: 12 },
   stop_reason: "end_turn",
   provider: "ollama",
+  context: {
+    used: 3400,
+    window: 32768,
+    window_estimated: false,
+    num_ctx: 32768,
+    estimated: true,
+    parts: [
+      { key: "system", tokens: 16, chars: 64, items: [{ name: "pinned_skills", group: null, tokens: 16 }] },
+      {
+        key: "tools",
+        tokens: 92,
+        chars: 368,
+        items: [
+          { name: "read_file", group: null, tokens: 48 },
+          { name: "grep", group: null, tokens: 44 },
+        ],
+      },
+      { key: "user", tokens: 8, chars: 26, items: [] },
+      { key: "assistant", tokens: 30, chars: 120, items: [] },
+      { key: "tool_results", tokens: 3254, chars: 13016, items: [] },
+    ],
+  },
+};
+
+function tool(name: string): Record<string, unknown> {
+  return { type: "function", function: { name, description: `The ${name} tool.`, parameters: { type: "object", properties: {} } } };
+}
+
+function part(key: "system" | "tools" | "user" | "assistant" | "tool_results", tokens: number, items: { name: string; group: string | null; tokens: number }[] = []) {
+  return { key, tokens, chars: tokens * 4, items };
+}
+
+/** A call at 96% of its window, with five MCP tools that take most of it. */
+export const FULL_DETAIL: TraceSpanResult = {
+  ...MODEL_DETAIL,
+  tools: [
+    ...(MODEL_DETAIL.tools ?? []),
+    tool("mcp__github__create_issue"),
+    tool("mcp__github__list_issues"),
+    tool("mcp__github__get_file_contents"),
+    tool("mcp__fs__read_file"),
+    tool("mcp__fs__write_file"),
+  ],
+  context: {
+    used: 31500,
+    window: 32768,
+    window_estimated: false,
+    num_ctx: 32768,
+    estimated: true,
+    parts: [
+      part("system", 300, [{ name: "pinned_skills", group: null, tokens: 300 }]),
+      part("tools", 22800, [
+        { name: "mcp__github__create_issue", group: "github", tokens: 9000 },
+        { name: "mcp__github__list_issues", group: "github", tokens: 7000 },
+        { name: "mcp__github__get_file_contents", group: "github", tokens: 4000 },
+        { name: "mcp__fs__read_file", group: "fs", tokens: 1200 },
+        { name: "mcp__fs__write_file", group: "fs", tokens: 1000 },
+        { name: "read_file", group: null, tokens: 330 },
+        { name: "grep", group: null, tokens: 270 },
+      ]),
+      part("user", 300),
+      part("assistant", 2100),
+      part("tool_results", 6000),
+    ],
+  },
+};
+
+/** An Ollama call whose input was cut at num_ctx: the characters are more than it holds. */
+export const NUM_CTX_DETAIL: TraceSpanResult = {
+  ...MODEL_DETAIL,
+  context: {
+    used: 8192,
+    window: 8192,
+    window_estimated: false,
+    num_ctx: 8192,
+    estimated: true,
+    parts: [
+      { key: "system", tokens: 0, chars: 0, items: [] },
+      {
+        key: "tools",
+        tokens: 600,
+        chars: 2400,
+        items: [
+          { name: "read_file", group: null, tokens: 330 },
+          { name: "grep", group: null, tokens: 270 },
+        ],
+      },
+      { key: "user", tokens: 200, chars: 1400, items: [] },
+      { key: "assistant", tokens: 400, chars: 3000, items: [] },
+      { key: "tool_results", tokens: 6992, chars: 41250, items: [] },
+    ],
+  },
+};
+
+/** An Ollama call on a profile with no ctx: golem sent no num_ctx, so the window is not known. */
+export const UNKNOWN_WINDOW_DETAIL: TraceSpanResult = {
+  ...MODEL_DETAIL,
+  context: { ...(MODEL_DETAIL.context as NonNullable<TraceSpanResult["context"]>), window: null, num_ctx: null },
 };
 
 /** A tool whose output was too big for the model: the start went back, and the rest is in an artifact. */

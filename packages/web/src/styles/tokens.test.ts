@@ -34,6 +34,7 @@ const text: Record<string, string[]> = {
   wait: ["bg", "surface", "sunken", "wait-soft"],
 };
 const nonText: Record<string, string[]> = { clay: ["bg", "surface"] };
+for (const part of ["system", "tools", "user", "replies", "results"]) nonText[`ctx-${part}`] = ["line", "surface"];
 text["on-clay"] = ["clay"];
 text.bg = ["ink"];
 

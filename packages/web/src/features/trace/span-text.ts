@@ -1,5 +1,8 @@
+import { contextUsed, formatTokens, ownToolName, type TraceContextPart } from "@golem/view";
 import type { TraceMessage, TraceSpan, TraceSpanResult } from "../../store/trace.ts";
-import { formatDuration, formatTokens } from "./format.ts";
+import { formatDuration } from "./format.ts";
+
+type TraceContextItem = NonNullable<TraceContextPart["items"]>[number];
 
 export type ModelTab = "context" | "reply" | "metadata";
 export type ToolTab = "args" | "result" | "approval";
@@ -106,6 +109,7 @@ export function jsonOf(result: TraceSpanResult, tab: Tab): unknown {
         tools: result.tools ?? null,
         messages: result.messages ?? [],
         new_from: result.new_from ?? null,
+        context: result.context ?? null,
       };
     case "reply":
       return result.reply ?? null;
@@ -212,15 +216,49 @@ export function sectionTokens(result: TraceSpanResult, name: string): number | n
   return part?.items?.find((item) => item.name === name)?.tokens ?? null;
 }
 
-/** The tokens a call took in: the context's own count, else the sum of its parts, else the sum of the messages. */
-// `contextUsed` from `@golem/view` replaces this once it is available.
+/** The tokens a call took in: the context's own count, else the sum of the messages, else null. */
 export function usedTokens(result: TraceSpanResult): number | null {
-  const context = result.context;
-  if (context) {
-    if (context.used !== null && context.used !== undefined) return context.used;
-    return context.parts.reduce((sum, p) => sum + p.tokens, 0);
-  }
+  if (result.context) return contextUsed(result.context);
   let sum: number | null = null;
   for (const m of result.messages ?? []) if (typeof m.tokens === "number") sum = (sum ?? 0) + m.tokens;
   return sum;
+}
+
+/** The name the model saw for a tool schema: `function.name`, else `name`, else `tool 3`. */
+export function schemaName(schema: Record<string, unknown>, index: number): string {
+  const fn = schema["function"];
+  const inner = fn !== null && typeof fn === "object" ? (fn as Record<string, unknown>)["name"] : undefined;
+  const name = inner ?? schema["name"];
+  return typeof name === "string" ? name : `tool ${index + 1}`;
+}
+
+export type ToolEntry = { name: string; label: string; tokens: number | null; schema: Record<string, unknown> };
+export type ToolGroup = { group: string | null; label: string; tokens: number | null; tools: ToolEntry[] };
+
+function byTokens<T extends { tokens: number | null }>(rows: T[]): T[] {
+  // Array.sort is stable, so ties keep schema order.
+  return rows.sort((a, b) => (b.tokens ?? -1) - (a.tokens ?? -1));
+}
+
+/** The tool schemas grouped by MCP server (`built-in` for the rest), each with its token cost, largest first. */
+export function toolGroups(tools: readonly Record<string, unknown>[], items: readonly TraceContextItem[]): ToolGroup[] {
+  const known = new Map(items.map((item) => [item.name, item]));
+  const groups = new Map<string | null, ToolEntry[]>();
+  tools.forEach((schema, index) => {
+    const name = schemaName(schema, index);
+    const item = known.get(name);
+    const group = item?.group ?? null;
+    const entry: ToolEntry = { name, label: group === null ? name : ownToolName(group, name), tokens: item?.tokens ?? null, schema };
+    groups.set(group, [...(groups.get(group) ?? []), entry]);
+  });
+  const rows = [...groups.entries()].map(([group, entries]) => {
+    const known = entries.filter((entry) => entry.tokens !== null);
+    return {
+      group,
+      label: group ?? "built-in",
+      tokens: known.length === 0 ? null : known.reduce((sum, entry) => sum + (entry.tokens ?? 0), 0),
+      tools: byTokens(entries),
+    };
+  });
+  return byTokens(rows);
 }
