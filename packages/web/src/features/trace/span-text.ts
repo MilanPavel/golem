@@ -1,6 +1,6 @@
 import { contextUsed, formatTokens, ownToolName, type TraceContextPart } from "@golem/view";
 import type { TraceMessage, TraceSpan, TraceSpanResult } from "../../store/trace.ts";
-import { formatDuration } from "./format.ts";
+import { formatDuration, localTime, throughput } from "./format.ts";
 
 type TraceContextItem = NonNullable<TraceContextPart["items"]>[number];
 
@@ -73,9 +73,15 @@ function dash(value: unknown): string {
   return value === null || value === undefined ? "—" : showValue(value);
 }
 
-/** Every field of the span, plus the model's provider and why it stopped, as label and value. */
+const DURATIONS = new Set(["duration_ms", "first_token_ms", "approval_wait_ms"]);
+const TIMES = new Set(["start", "end"]);
+
+/** The fields of the span that have a value, plus the model's provider and why it stopped, as label and value. */
 export function metadataRows(result: TraceSpanResult): [string, string][] {
   const span: TraceSpan = result.span;
+  const window = "context_window" in span ? span.context_window : null;
+  const estimated = "context_window_estimated" in span && span.context_window_estimated === true;
+  const numCtx = "num_ctx" in span ? span.num_ctx : null;
   const rows: [string, unknown][] = [
     ["id", span.id],
     ["kind", span.kind],
@@ -92,11 +98,19 @@ export function metadataRows(result: TraceSpanResult): [string, string][] {
     ["tokens.output", span.tokens?.output],
     ["tokens.cache_read", span.tokens?.cache_read],
     ["tokens.cache_write", span.tokens?.cache_write],
+    ["context_window", window === null || window === undefined ? window : `${window}${estimated ? " (estimated)" : ""}`],
+    ["num_ctx", numCtx],
     ["approval_wait_ms", span.approval_wait_ms],
     ["recorded", span.recorded ?? true],
     ["preview", span.preview],
   ];
-  return rows.map(([label, value]) => [label, dash(value)]);
+  return rows
+    .filter(([, value]) => value !== null && value !== undefined && value !== "")
+    .map(([label, value]): [string, string] => {
+      if (DURATIONS.has(label) && typeof value === "number") return [label, `${value} · ${formatDuration(value)}`];
+      if (TIMES.has(label) && typeof value === "string") return [label, localTime(value)];
+      return [label, showValue(value)];
+    });
 }
 
 /** The raw part of the result that a tab shows. */
@@ -179,6 +193,8 @@ export function modelLine(result: TraceSpanResult): string {
   if (span.model) parts.push(result.provider && !span.model.startsWith(`${result.provider}/`) ? `${span.model} (${result.provider})` : span.model);
   parts.push(formatDuration(span.duration_ms));
   if (span.first_token_ms !== null && span.first_token_ms !== undefined) parts.push(`first token ${formatDuration(span.first_token_ms)}`);
+  const speed = throughput(span);
+  if (speed !== null) parts.push(`≈ ${speed} tok/s`);
   const { input, output, cache_read: read, cache_write: write } = span.tokens ?? {};
   if (input !== null && input !== undefined && output !== null && output !== undefined) parts.push(`${formatTokens(input)} → ${formatTokens(output)}`);
   if (read) parts.push(`cache read ${formatTokens(read)}`);

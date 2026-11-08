@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import { formatTokens } from "@golem/view";
 import { modelsOf, toolsOf, type TraceNode, type TraceRunSpan } from "../../store/trace.ts";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../ui/tooltip.tsx";
-import { formatDuration, spanTokens } from "./format.ts";
+import { formatDuration, tokenCell, type TokenCell } from "./format.ts";
 import { NOT_RECORDED_LINE } from "./span-text.ts";
-import { barFor } from "./waterfall.ts";
+import { barFor, runExtent, ticksFor } from "./waterfall.ts";
 import { WaterfallBar } from "./waterfall-bar.tsx";
 
 type Row = {
@@ -89,6 +88,23 @@ function Glyph({ span }: { span: TraceNode }) {
   return null;
 }
 
+const LEVEL_FILL = { ok: "bg-muted", high: "bg-wait", full: "bg-deny" } as const;
+
+/** The token column: a small fill bar for how full the context is, then the text. */
+function TokenCellView({ cell }: { cell: TokenCell | null }) {
+  if (cell === null) return null;
+  return (
+    <span title={cell.title === "" ? undefined : cell.title} className="flex items-center justify-end gap-1.5">
+      {cell.share === null || cell.level === null ? null : (
+        <span aria-hidden="true" className="relative h-1.5 w-6 shrink-0 overflow-hidden rounded-xs bg-line">
+          <span data-part="fill" className={`absolute inset-y-0 left-0 block ${LEVEL_FILL[cell.level]}`} style={{ width: `${Math.min(1, cell.share) * 100}%` }} />
+        </span>
+      )}
+      <span>{cell.text}</span>
+    </span>
+  );
+}
+
 function TreeRow({
   row,
   open,
@@ -105,7 +121,7 @@ function TreeRow({
   onToggle: () => void;
 }) {
   const { span } = row;
-  const tokens = span.kind === "model" ? spanTokens(span) : null;
+  const cell = tokenCell(span);
   const unrecorded = span.kind === "model" && span.recorded === false;
   return (
     <div
@@ -120,7 +136,7 @@ function TreeRow({
         selected ? "bg-clay-soft" : "hover:bg-sunken"
       }`}
     >
-      <span className={`flex w-2/5 min-w-0 shrink-0 items-center gap-1.5 ${INDENT[row.depth]}`}>
+      <span className={`flex w-1/3 min-w-0 shrink-0 items-center gap-1.5 ${INDENT[row.depth]}`}>
         <span
           aria-hidden="true"
           onClick={(event) => {
@@ -144,10 +160,10 @@ function TreeRow({
           </Tooltip>
         ) : null}
       </span>
-      <WaterfallBar span={span} bar={barFor(row.run, span)} />
+      <WaterfallBar span={span} bar={barFor(row.run, span)} ticks={span.kind === "run" ? ticksFor(runExtent(span)) : undefined} />
       <span className="w-20 shrink-0 text-right font-mono text-xs text-muted tabular-nums">{formatDuration(span.duration_ms)}</span>
-      <span className="w-12 shrink-0 text-right font-mono text-xs text-muted tabular-nums max-narrow:hidden">
-        {span.kind === "model" ? (tokens === null ? "—" : formatTokens(tokens)) : ""}
+      <span className="w-32 shrink-0 text-right font-mono text-xs text-muted tabular-nums max-narrow:hidden">
+        <TokenCellView cell={cell} />
       </span>
       <span className="w-16 shrink-0 text-right text-xs">
         <Mark span={span} />

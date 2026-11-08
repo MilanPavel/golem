@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { sampleModel, sampleRun, sampleTool } from "./sample.ts";
-import { barFor, MIN_WIDTH, runExtent } from "./waterfall.ts";
+import { barFor, MIN_WIDTH, runExtent, ticksFor } from "./waterfall.ts";
 
 // A run of one second, so a millisecond is a tenth of a percent.
 function within(...tools: ReturnType<typeof sampleTool>[]) {
@@ -58,4 +58,14 @@ test("a span with no measured time is as long as its start to its end", () => {
   const unmeasured = { ...sampleTool("a", "t", 200, 300), duration_ms: null };
   const run = within(unmeasured);
   expect(barFor(run, unmeasured)).toEqual({ left: 20, width: 30, wait: null });
+});
+
+test("ticks: none under 2 s, and at a round step inside the line", () => {
+  expect(ticksFor(0)).toEqual([]);
+  expect(ticksFor(1500)).toEqual([]);
+  expect(ticksFor(Number.NaN)).toEqual([]);
+  expect(ticksFor(4200).map((tick) => tick.label)).toEqual(["0m 02s"]);
+  expect(ticksFor(150_800).map((tick) => tick.label)).toEqual(["1m 00s", "2m 00s"]);
+  expect(ticksFor(3_723_000).map((tick) => tick.label)).toEqual(["30m 00s"]);
+  expect(ticksFor(150_800)[0]?.left).toBeCloseTo(39.79, 1);
 });

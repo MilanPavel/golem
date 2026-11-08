@@ -1,3 +1,4 @@
+import { formatElapsed } from "@golem/view";
 import { modelsOf, toolsOf, type TraceNode, type TraceRunSpan } from "../../store/trace.ts";
 
 /** A bar's smallest width, in percent of its run, so a 3 ms tool still shows. */
@@ -60,4 +61,20 @@ export function barFor(run: TraceRunSpan, span: TraceNode): Bar {
   const width = clamp((length / extent) * 100, MIN_WIDTH, Math.max(MIN_WIDTH, 100 - left));
   const wait = waited > 0 ? { left: (offset / extent) * 100, width: ((begin - offset) / extent) * 100 } : null;
   return { left: Math.min(left, 100 - MIN_WIDTH), width, wait };
+}
+
+export type Tick = { left: number; label: string };
+
+const TICK_STEPS = [1000, 2000, 5000, 10000, 15000, 30000, 60000, 120000, 300000, 600000, 900000, 1800000, 3600000];
+
+/** Up to three ticks inside a run's time line, at a round step. None under 2 s. */
+export function ticksFor(extentMs: number): Tick[] {
+  if (!Number.isFinite(extentMs) || extentMs < 2000) return [];
+  const step = TICK_STEPS.find((candidate) => Math.floor(extentMs / candidate) <= 3) ?? TICK_STEPS[TICK_STEPS.length - 1] ?? 3600000;
+  const ticks: Tick[] = [];
+  for (let moment = step; moment < extentMs; moment += step) {
+    const left = (moment / extentMs) * 100;
+    if (left <= 90) ticks.push({ left, label: formatElapsed(moment) });
+  }
+  return ticks;
 }
