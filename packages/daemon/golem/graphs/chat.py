@@ -351,6 +351,7 @@ def open_chat(
     prompt: SystemPrompt | None = None,
     blobs: Blobs | None = None,
     window_of: WindowOf | None = None,
+    note_loaded: Callable[[str], Awaitable[None]] | None = None,
 ) -> ChatRuntime:
     """Compile the chat graph against ``checkpointer``.
 
@@ -363,6 +364,8 @@ def open_chat(
     call stores its system prompt and tool schemas there, and reports their hashes.
     ``window_of`` gives the context window of a profile. Each model call reports it
     with the lengths of the system prompt's sections. Without it, the window is unknown.
+    ``note_loaded`` is awaited with the profile after each model call, so the server can
+    read what the model loaded. A failure there never fails the call.
     """
     registry = default_registry() if tools is None else tools
     rules = Policy(None) if policy is None else policy
@@ -409,6 +412,11 @@ def open_chat(
                 if down is None:
                     raise
                 raise down from exc
+        if note_loaded is not None:
+            try:
+                await note_loaded(profile)
+            except Exception:
+                log.debug("noting the loaded model %s failed", profile, exc_info=True)
         update: dict[str, object] = {"id": message_id}
         if response.tool_calls:
             update["tool_calls"] = _with_ids(response.tool_calls)
