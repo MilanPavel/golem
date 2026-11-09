@@ -120,6 +120,7 @@ class DaemonApp:
         self.state = DaemonState(
             paths=paths, started_at=time.monotonic(), secrets=secrets, user_home=user_home
         )
+        self.state.broadcast = self._broadcast
         methods = standard_methods()
         if extra_methods:
             methods.update(extra_methods)

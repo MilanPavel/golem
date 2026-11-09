@@ -17,6 +17,10 @@ import type { SetupRow, SetupStatusResult } from "../../protocol/gen/setup-statu
 import type { McpListResult } from "../../protocol/gen/mcp-list-result.ts";
 import type { McpServer } from "../../protocol/gen/mcp-server.ts";
 import type { ModelServerStatus } from "../../protocol/gen/model-server-status.ts";
+import type { ModelOptionsGetResult } from "../../protocol/gen/model-options-get-result.ts";
+import type { ModelOptionsSaved } from "../../protocol/gen/model-options-saved.ts";
+import type { ModelOptionsSetResult } from "../../protocol/gen/model-options-set-result.ts";
+import type { SessionSetOptionsResult } from "../../protocol/gen/session-set-options-result.ts";
 import type { ListedSkill, SkillListResult } from "../../protocol/gen/skill-list-result.ts";
 import type { McpRemoveResult } from "../../protocol/gen/mcp-remove-result.ts";
 import type { McpToggleResult } from "../../protocol/gen/mcp-toggle-result.ts";
@@ -220,6 +224,42 @@ export function isPullDone(value: unknown): value is ModelPullDone {
 
 export function isSessionSetModelResult(value: unknown): value is SessionSetModelResult {
   return isRecord(value) && typeof value["session_id"] === "string" && typeof value["model_profile"] === "string";
+}
+
+function isOptionValues(value: unknown): boolean {
+  return isRecord(value) && Object.values(value).every((item) => typeof item === "number" || typeof item === "string");
+}
+
+export function isModelOptionsGetResult(value: unknown): value is ModelOptionsGetResult {
+  return (
+    isRecord(value) &&
+    typeof value["model"] === "string" &&
+    Array.isArray(value["options"]) &&
+    value["options"].every(
+      (row) =>
+        isRecord(row) &&
+        typeof row["name"] === "string" &&
+        typeof row["kind"] === "string" &&
+        typeof row["minimum"] === "number" &&
+        typeof row["maximum"] === "number" &&
+        typeof row["step"] === "number",
+    ) &&
+    isOptionValues(value["defaults"]) &&
+    isOptionValues(value["saved"]) &&
+    (value["session"] === undefined || value["session"] === null || isOptionValues(value["session"]))
+  );
+}
+
+export function isModelOptionsSaved(value: unknown): value is ModelOptionsSaved {
+  return isRecord(value) && typeof value["model"] === "string" && isOptionValues(value["saved"]);
+}
+
+export function isModelOptionsSetResult(value: unknown): value is ModelOptionsSetResult {
+  return isModelOptionsSaved(value);
+}
+
+export function isSessionSetOptionsResult(value: unknown): value is SessionSetOptionsResult {
+  return isRecord(value) && typeof value["session_id"] === "string" && isOptionValues(value["options"]);
 }
 
 export function isModelSetDefaultResult(value: unknown): value is ModelSetDefaultResult {

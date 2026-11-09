@@ -57,6 +57,10 @@ import type { ModelPullDone } from "../../protocol/gen/model-pull-done.ts";
 import type { ModelPullProgress } from "../../protocol/gen/model-pull-progress.ts";
 import type { ModelPullResult } from "../../protocol/gen/model-pull-result.ts";
 import type { ModelSetDefaultResult } from "../../protocol/gen/model-set-default-result.ts";
+import type { ModelOptionsGetResult } from "../../protocol/gen/model-options-get-result.ts";
+import type { ModelOptionsSaved } from "../../protocol/gen/model-options-saved.ts";
+import type { ModelOptionsSetResult } from "../../protocol/gen/model-options-set-result.ts";
+import type { SessionSetOptionsResult } from "../../protocol/gen/session-set-options-result.ts";
 import type { SessionSetModelResult } from "../../protocol/gen/session-set-model-result.ts";
 import type { Params as ChatEvent } from "../../protocol/gen/rpc-notification.ts";
 import type { RunCancelResult } from "../../protocol/gen/run-cancel-result.ts";
@@ -106,7 +110,11 @@ import {
   isModelListResult,
   isModelProbeResult,
   isModelServerStatus,
+  isModelOptionsGetResult,
+  isModelOptionsSaved,
+  isModelOptionsSetResult,
   isModelSetDefaultResult,
+  isSessionSetOptionsResult,
   isPullDone,
   isPullProgress,
   isRefResult,
@@ -278,6 +286,14 @@ export interface GolemClient {
   setSessionModel(sessionId: string, model: string): Promise<SessionSetModelResult>;
   /** Write `default_model` to the user's config.toml. New sessions start on it. */
   setDefaultModel(model: string): Promise<ModelSetDefaultResult>;
+  /** The tunable options of a local model, its own defaults, what is saved for it, and `sessionId`'s overrides. */
+  getModelOptions(model: string, sessionId?: string): Promise<ModelOptionsGetResult>;
+  /** Save options for the model in config.toml. A `null` value removes one. Every connection gets `onOptionsSaved`. */
+  setModelOptions(model: string, options: Record<string, number | string | null>): Promise<ModelOptionsSetResult>;
+  /** Override options for one session from its next run. A `null` value removes one. The session stores `model.options.changed`. */
+  setSessionOptions(sessionId: string, options: Record<string, number | string | null>): Promise<SessionSetOptionsResult>;
+  /** `model.options.saved`: the options saved for a model changed, from any client. */
+  onOptionsSaved(listener: (saved: ModelOptionsSaved) => void): () => void;
   /** Size, fit, and free disk for a local model before downloading it. */
   probeModel(name: string): Promise<ModelProbeResult>;
   /** Start downloading. Progress reaches {@link GolemClient.onPull} on every connection. */
@@ -430,6 +446,7 @@ export function connectGolem(options: ConnectOptions): GolemClient {
   const logListeners = new Set<(log: McpServerLog) => void>();
   const skillListeners = new Set<(root: string | null) => void>();
   const serverListeners = new Set<(status: ModelServerStatus) => void>();
+  const optionsSavedListeners = new Set<(saved: ModelOptionsSaved) => void>();
   const installListeners = new Set<(update: OllamaInstallUpdate) => void>();
   const runtimeListeners = new Set<(update: RuntimeInstallUpdate) => void>();
   const keychainListeners = new Set<(wait: KeychainWait) => void>();
@@ -692,6 +709,20 @@ export function connectGolem(options: ConnectOptions): GolemClient {
         for (const listener of runtimeListeners) {
           try {
             listener(update);
+          } catch {
+            // A listener must not tear the socket down.
+          }
+        }
+      }
+      return;
+    }
+    if (isRecord(message) && message["method"] === "model.options.saved") {
+      const params = message["params"];
+      record({ direction: "in", kind: "model.options.saved", detail: isModelOptionsSaved(params) ? params.model : "", json: line });
+      if (isModelOptionsSaved(params)) {
+        for (const listener of optionsSavedListeners) {
+          try {
+            listener(params);
           } catch {
             // A listener must not tear the socket down.
           }
@@ -1231,6 +1262,39 @@ export function connectGolem(options: ConnectOptions): GolemClient {
         throw new Error("invalid model.set_default result");
       }
       return result;
+    },
+    async getModelOptions(model: string, sessionId?: string): Promise<ModelOptionsGetResult> {
+      await ready;
+      const result = await call("model.options.get", sessionId === undefined ? { model } : { model, session_id: sessionId });
+      if (!isModelOptionsGetResult(result)) {
+        throw new Error("invalid model.options.get result");
+      }
+      return result;
+    },
+    async setModelOptions(model: string, options: Record<string, number | string | null>): Promise<ModelOptionsSetResult> {
+      await ready;
+      const result = await call("model.options.set", { model, options });
+      if (!isModelOptionsSetResult(result)) {
+        throw new Error("invalid model.options.set result");
+      }
+      return result;
+    },
+    async setSessionOptions(
+      sessionId: string,
+      options: Record<string, number | string | null>,
+    ): Promise<SessionSetOptionsResult> {
+      await ready;
+      const result = await call("session.set_options", { session_id: sessionId, options });
+      if (!isSessionSetOptionsResult(result)) {
+        throw new Error("invalid session.set_options result");
+      }
+      return result;
+    },
+    onOptionsSaved(listener: (saved: ModelOptionsSaved) => void): () => void {
+      optionsSavedListeners.add(listener);
+      return () => {
+        optionsSavedListeners.delete(listener);
+      };
     },
     async probeModel(name: string): Promise<ModelProbeResult> {
       await ready;

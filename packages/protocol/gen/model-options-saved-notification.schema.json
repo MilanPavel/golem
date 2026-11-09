@@ -1,0 +1,59 @@
+{
+  "$defs": {
+    "ModelOptionsSaved": {
+      "additionalProperties": false,
+      "description": "The options saved for a model changed. ``saved`` is what is saved for it now.",
+      "properties": {
+        "model": {
+          "minLength": 1,
+          "title": "Model",
+          "type": "string"
+        },
+        "saved": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "title": "Saved",
+          "type": "object"
+        }
+      },
+      "required": [
+        "model",
+        "saved"
+      ],
+      "title": "ModelOptionsSaved",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Server → every connection: the saved options of a model changed. Not stored.",
+  "properties": {
+    "jsonrpc": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Jsonrpc",
+      "type": "string"
+    },
+    "method": {
+      "const": "model.options.saved",
+      "default": "model.options.saved",
+      "title": "Method",
+      "type": "string"
+    },
+    "params": {
+      "$ref": "#/$defs/ModelOptionsSaved"
+    }
+  },
+  "required": [
+    "params"
+  ],
+  "title": "ModelOptionsSavedNotification",
+  "type": "object"
+}

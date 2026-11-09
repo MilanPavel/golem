@@ -73,10 +73,25 @@ Type `/` and suggestions appear, with each command's arguments. `/help` lists ev
 | `/model` | Open the model picker |
 | `/model <name>` | Switch this chat to a model or a profile |
 | `/model pull <name>`, `/model rm <name>` | Download or remove a local model |
+| `/tune` | Tune a local model: a slider and an explanation for each option, such as temperature and context size |
 | `/login [provider]`, `/logout <provider>` | Add an API key, checked with the provider, or remove one |
 | `/setup` | See what is set up and what is broken, fix it, or walk the setup steps again |
 
 [Models and API keys](./models.md) has the details.
+
+#### Tune a local model
+
+`/tune` opens a panel with one row per option of the model this chat uses, a block slider for each, and what the focused option does under the rows. It is for local Ollama models. A hosted model says so and opens nothing.
+
+| Key | What it does |
+|---|---|
+| Up, Down | Move between options |
+| Left, Right | Change the focused value. Each change is sent at once |
+| `r` | Reset the focused option to the model's default |
+| `s` | Switch where changes go: saved for this model, or this chat only |
+| Esc | Close the panel |
+
+A saved change is kept in `config.toml` for the model, and every chat on it uses it. A change for this chat only is kept with the chat. Either one applies from your next message. When a value is not the default, the row says what the default is.
 
 ### Tools, skills, and MCP
 

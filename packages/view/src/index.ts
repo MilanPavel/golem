@@ -119,6 +119,28 @@ export {
   type TraceContextPart,
 } from "./context.ts";
 export {
+  differsFromDefault,
+  focusedRow,
+  formatTuneValue,
+  KEEP_ALIVE_STEPS,
+  moveFocus,
+  reset,
+  sliderCells,
+  step,
+  toggleTarget,
+  tuneRow,
+  tuneRows,
+  tuneState,
+  withSaved,
+  withSession,
+  written,
+  type TuneRow,
+  type TuneSource,
+  type TuneState,
+  type TuneTarget,
+  type TuneValue,
+} from "./tune.ts";
+export {
   detailChoices,
   firstLine,
   formatSeconds,

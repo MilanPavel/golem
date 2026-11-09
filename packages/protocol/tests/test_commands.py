@@ -8,6 +8,7 @@ from golem_protocol.commands import (
     InspectMessage,
     ListedProvider,
     LocalServer,
+    ModelOptionsSaved,
     ModelServerStatus,
     PingParams,
     SessionInspectResult,
@@ -16,6 +17,7 @@ from golem_protocol.commands import (
 )
 from golem_protocol.events import Ping
 from golem_protocol.rpc import (
+    ModelOptionsSavedNotification,
     ModelServerStatusNotification,
     RpcErrorBody,
     RpcFailure,
@@ -80,6 +82,16 @@ def test_daemon_status_lists_local_servers() -> None:
     assert DaemonStatus.model_validate_json(status.model_dump_json()) == status
     with pytest.raises(ValidationError):
         LocalServer.model_validate({**ours.model_dump(), "owner": "someone"})
+
+
+def test_model_options_saved_notification_round_trip() -> None:
+    saved = ModelOptionsSavedNotification(
+        params=ModelOptionsSaved(model="qwen3:8b", saved={"temperature": 0.3, "keep_alive": "5m"})
+    )
+    assert saved.method == "model.options.saved"
+    assert ModelOptionsSavedNotification.model_validate_json(saved.model_dump_json()) == saved
+    with pytest.raises(ValidationError):
+        ModelOptionsSaved.model_validate({"model": "", "saved": {}})
 
 
 def test_model_server_status_notification_round_trip() -> None:
