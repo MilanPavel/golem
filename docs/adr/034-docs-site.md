@@ -97,5 +97,5 @@ The approved design is [docs/design/web.md](../design/web.md), and [ADR-029](029
 ### Risks
 
 - **Reading `tokens.css` with a regex.** If its format changes, the docs lose their colours. The build fails on a missing token, so this shows up in CI, not on the site.
-- **Pages settings live outside the repo.** If Pages is switched off or set to a branch, the workflow fails visibly. `docs/sre.md` notes the setting.
+- **Pages settings live outside the repo.** If Pages is switched off or set to a branch, the workflow fails visibly. [`docs/ops/build.md`](../ops/build.md#the-docs-site) (The docs site) notes the setting.
 - **The site runs ahead of releases.** It is built from `main`, so it can describe a feature not yet in Homebrew. A page marks such a feature, and a versioned site can come later if it is needed.
