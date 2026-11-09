@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -24,6 +25,7 @@ from langchain_core.language_models import BaseChatModel
 
 from golem.config import (
     GolemSettings,
+    ModelOptions,
     ModelSettings,
     ProviderKind,
     ProviderSettings,
@@ -31,8 +33,10 @@ from golem.config import (
     unknown_provider_message,
 )
 from golem.models import ollama
+from golem.models import options as model_options
 from golem.models.errors import ModelUnreachable
 from golem.models.keys import KeyStore, KeyStoreError
+from golem.models.ollama_chat import OllamaChat
 from golem.paths import resolve_paths
 
 log = logging.getLogger(__name__)
@@ -136,6 +140,7 @@ class _Catalog:
     default: str | None
     providers: dict[str, Provider]
     models: dict[str, ModelSettings]
+    saved: dict[str, ModelOptions]
 
 
 class ModelRouter:
@@ -225,8 +230,13 @@ class ModelRouter:
             profile=active, provider=resolved.provider_name, name=resolved.model_id
         )
 
-    def chat_model(self, profile: str) -> BaseChatModel:
+    def chat_model(
+        self, profile: str, overrides: Mapping[str, float | str] | None = None
+    ) -> BaseChatModel:
         """Return the chat model for ``profile``.
+
+        An Ollama model gets the options saved for it in ``config.toml``, and
+        then ``overrides``, which win. Other providers ignore both.
 
         Raises :class:`ModelConfigError` when the name does not resolve or the
         provider's API key is not set.
@@ -278,15 +288,14 @@ class ModelRouter:
                 }
             )
         if provider.kind == "ollama":
-            from langchain_ollama import ChatOllama
-
             options = {
                 "model": resolved.model_id,
                 "base_url": _ollama_url(provider.base_url),
             }
             if resolved.ctx is not None:
                 options["num_ctx"] = resolved.ctx
-            return ChatOllama.model_validate(options)
+            options.update(self._ollama_options(resolved.model_id, overrides))
+            return OllamaChat.model_validate(options)
         from langchain_openai import ChatOpenAI
 
         if provider.base_url is None:
@@ -300,6 +309,16 @@ class ModelRouter:
                 "stream_usage": True,
             },
         )
+
+    def _ollama_options(
+        self, model_id: str, overrides: Mapping[str, float | str] | None
+    ) -> dict[str, object]:
+        """The saved options of ``model_id`` with ``overrides`` on top, as ChatOllama fields."""
+        catalog = self._current()
+        saved = catalog.saved.get(model_id) if catalog is not None else None
+        values: dict[str, object] = saved.model_dump(exclude_none=True) if saved is not None else {}
+        values.update(overrides or {})
+        return {name: value for name, value in values.items() if model_options.spec(name)}
 
     def ollama_server(self, profile: str) -> tuple[str, str] | None:
         """``(provider, base URL)`` when ``profile`` runs on Ollama, or None."""
@@ -451,7 +470,9 @@ def _catalog(settings: GolemSettings) -> _Catalog:
     if legacy is not None and legacy_name not in models:
         models[legacy_name] = legacy
     default = settings.default_model or (legacy_name if legacy is not None else None)
-    return _Catalog(default=default, providers=providers, models=models)
+    return _Catalog(
+        default=default, providers=providers, models=models, saved=dict(settings.ollama.models)
+    )
 
 
 def _merge(preset: Provider | None, configured: ProviderSettings) -> Provider:

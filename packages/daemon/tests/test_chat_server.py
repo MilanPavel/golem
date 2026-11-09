@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import sqlite3
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any, cast
 
@@ -217,7 +217,9 @@ async def test_status_and_session_name_the_configured_model(short_home: Path) ->
 class _KeyedRouter(ModelRouter):
     """Real name resolution, and a scripted model for every name, as if each key were set."""
 
-    def chat_model(self, profile: str) -> BaseChatModel:
+    def chat_model(
+        self, profile: str, overrides: Mapping[str, float | str] | None = None
+    ) -> BaseChatModel:
         self.resolve(profile)
         return ScriptedChatModel(replies=[])
 
