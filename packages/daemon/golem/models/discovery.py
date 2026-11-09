@@ -151,6 +151,14 @@ class ModelListing:
     disk_free_gb: float | None = None
 
 
+def _modelfile_num_ctx(parameters: object) -> int | None:
+    """The positive ``num_ctx`` in the ``parameters`` text of ``/api/show``, if there is one."""
+    if not isinstance(parameters, str):
+        return None
+    value = options.parse_parameters(parameters).get("num_ctx")
+    return value if isinstance(value, int) and not isinstance(value, bool) and value > 0 else None
+
+
 @dataclass(frozen=True, slots=True)
 class _Found:
     """One model as a provider reported it."""
@@ -163,6 +171,8 @@ class _Found:
     size_gb: float | None = None
     # What Ollama's /api/show says the model can do: completion, tools, vision, thinking.
     capabilities: tuple[str, ...] | None = None
+    # The num_ctx line of the model's Modelfile, from /api/show parameters.
+    modelfile_num_ctx: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -171,6 +181,7 @@ class _Shown:
 
     ctx: int | None
     capabilities: tuple[str, ...] | None
+    num_ctx: int | None = None
 
 
 @dataclass(slots=True)
@@ -232,6 +243,7 @@ class ModelDiscovery:
         self._price_task: asyncio.Task[None] | None = None
         self._shown: dict[str, _Shown] = {}
         self._ctx: dict[str, int] = {}
+        self._modelfile_ctx: dict[str, int] = {}
 
     def known_ctx(self, ref: str) -> int | None:
         """The tokens ``ref`` can take in, as last listed or from the price book. No I/O."""
@@ -244,6 +256,10 @@ class ModelDiscovery:
             return None
         info = self._prices.lookup(provider, model_id)
         return None if info is None else info.ctx
+
+    def modelfile_num_ctx(self, ref: str) -> int | None:
+        """The ``num_ctx`` an installed model's Modelfile sets, as last listed. No I/O."""
+        return self._modelfile_ctx.get(ref)
 
     @property
     def ram_gb(self) -> float | None:
@@ -311,6 +327,12 @@ class ModelDiscovery:
             self.pulling(),
         )
         self._ctx = {m.ref: m.ctx for m in models if m.ctx is not None}
+        self._modelfile_ctx = {
+            f"{name}/{found.model_id}": found.modelfile_num_ctx
+            for name, result in results.items()
+            for found in result.found
+            if found.modelfile_num_ctx is not None
+        }
         ollama_state = states.get("ollama")
         running = ollama_state is not None and ollama_state.status == "ready"
         setup = ModelSetup(
@@ -575,13 +597,10 @@ class ModelDiscovery:
         ctx = _positive_int(details.get("context_length"))
         capabilities = _names(item.get("capabilities"))
         tools = "tools" in capabilities if capabilities is not None else None
-        if ctx is None or capabilities is None:
-            shown = await self._ollama_show(
-                client, base, name, item.get("digest"), ctx, capabilities
-            )
-            ctx, capabilities = shown.ctx, shown.capabilities
-            if tools is None and capabilities is not None:
-                tools = "tools" in capabilities
+        shown = await self._ollama_show(client, base, name, item.get("digest"), ctx, capabilities)
+        ctx, capabilities = shown.ctx, shown.capabilities
+        if tools is None and capabilities is not None:
+            tools = "tools" in capabilities
         size = item.get("size")
         return _Found(
             model_id=name,
@@ -589,6 +608,7 @@ class ModelDiscovery:
             tools=tools,
             size_gb=round(size / 1e9, 1) if isinstance(size, int) else None,
             capabilities=capabilities,
+            modelfile_num_ctx=shown.num_ctx,
         )
 
     async def _ollama_show(
@@ -610,14 +630,14 @@ class ModelDiscovery:
             response.raise_for_status()
             shown = _dict(response.json())
         except (httpx.HTTPError, ValueError):
-            return _Shown(ctx, capabilities)
+            return _Shown(ctx, capabilities, None)
         info = _dict(shown.get("model_info"))
         for field_name, value in info.items():
             if ctx is None and field_name.endswith(".context_length"):
                 ctx = _positive_int(value)
         if capabilities is None:
             capabilities = _names(shown.get("capabilities"))
-        self._shown[key] = _Shown(ctx, capabilities)
+        self._shown[key] = _Shown(ctx, capabilities, _modelfile_num_ctx(shown.get("parameters")))
         return self._shown[key]
 
     async def _remote_models(
