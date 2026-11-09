@@ -43,7 +43,7 @@ export type ConnectionScreenProps = {
   headingLevel?: "h1" | "h2" | "h3" | "h4";
 };
 
-/** The full-screen state of docs/design/web.md: golem, a tag, a heading, a sentence, a command. */
+/** The full-screen state of docs/design/index.md: golem, a tag, a heading, a sentence, a command. */
 export function ConnectionScreen({ spec, headingLevel: Heading = "h1" }: ConnectionScreenProps) {
   return (
     <div data-screen={spec.kind} className="grid w-full place-items-center p-5">

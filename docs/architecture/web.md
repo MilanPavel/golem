@@ -153,7 +153,7 @@ The same rules are tests. `packages/gateway/src/framing.test.ts` and `auth.test.
 
 ## The details
 
-For contributors: the reference for the gateway and the page. [ADR-028](../adr/028-web-gateway.md) and [ADR-029](../adr/029-web-stack.md) hold the reasons and the shapes that lost. [The web UI's design](../design/web.md) holds the look, screen by screen.
+For contributors: the reference for the gateway and the page. [ADR-028](../adr/028-web-gateway.md) and [ADR-029](../adr/029-web-stack.md) hold the reasons and the shapes that lost. [The design system](../design/index.md) holds the look, and [the gallery](/gallery/) shows it screen by screen.
 
 ### golem web
 
@@ -290,7 +290,7 @@ In development, `vite dev` serves the page on its own port. Its proxy for `/ws` 
 - Next: [Tracing](./tracing.md): how an answer was made.
 - Before: [The terminal app](./tui.md): the fold, the batcher, and the client this page shares.
 - [The web UI](../guide/web.md): how to use it.
-- [The web UI's design](../design/web.md): the layout, the pixel golem, the shem, and the tokens.
+- [The design system](../design/index.md): the pixel golem, the shem, the type, and the tokens. [The gallery](/gallery/) shows every screen.
 - [The protocol](./protocol.md): `hello`, `seq`, and attach, which pass through the gateway unchanged.
 - [The daemon](./daemon.md): the socket the gateway stands in front of.
 - [The overview](../architecture.md): the whole system on one page.

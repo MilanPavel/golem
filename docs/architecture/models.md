@@ -193,6 +193,7 @@ Downloads go through Ollama (`golem/models/pulls.py`):
 - **What an entry carries:** its status (`ready`, `needs_key`, `not_installed`, or `server_down`), the profile names that point at it, context size, tool support, price in USD per million tokens, download size, and whether it fits in memory.
 - **Price and context precedence:** the profile, then the provider's own list (Ollama), then LiteLLM (`golem/models/prices.py`).
 - **Caching and time limit:** hosted lists are cached for a day under `cache/`. A listing waits at most 2 seconds for the network. A slower fetch keeps running, and its result is used next time, with `stale` set on what was shown meanwhile. `refresh: true` skips the cache.
+- **The window of a local model:** Ollama runs a model at its own default window unless `num_ctx` is sent, so the listing's context size is the model's maximum, not the window. golem finds the window from what it sent, then from Ollama's `/api/ps`, then from the Modelfile, and shows an estimated one with a leading `≈` ([ADR-043](../adr/043-ollama-context-window.md)).
 
 | File | What it does |
 |---|---|

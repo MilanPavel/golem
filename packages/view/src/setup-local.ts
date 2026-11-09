@@ -7,7 +7,7 @@ import { move, providerName, type Choice, type PanelKey, type SetupLine } from "
 
 /**
  * On this Mac: the Ollama panel (A5–A6′) and the Model panel (A7, A8, D2,
- * E3) of docs/design/setup-window.md. Pure, so the browser can draw the same.
+ * E3) of docs/architecture/tui.md. Pure, so the browser can draw the same.
  */
 
 export const OLLAMA_DOWNLOAD_URL = "https://ollama.com/download";

@@ -809,3 +809,44 @@ async def test_known_ctx_reads_the_listing_then_the_price_book(tmp_path: Path) -
     await discovery.list()
     assert discovery.known_ctx("ollama/qwen3:8b") == 40960
     await discovery.aclose()
+
+
+def _ps(handler: Handler) -> Network:
+    return Network({"127.0.0.1/api/ps": handler})
+
+
+async def test_note_loaded_reads_the_loaded_context_and_replaces_it(tmp_path: Path) -> None:
+    ref = "ollama/qwen3:8b"
+    body: dict[str, object] = {"models": [{"name": "qwen3:8b", "context_length": 8192}]}
+    router = ModelRouter(GolemSettings(), keys=MemoryKeyStore())
+    discovery = _discovery(router, _ps(lambda _r: httpx.Response(200, json=body)), tmp_path)
+    assert discovery.loaded_ctx(ref) is None
+    await discovery.note_loaded(ref)
+    assert discovery.loaded_ctx(ref) == 8192
+    body["models"] = [{"model": "qwen3:8b", "context_length": 16384}]
+    await discovery.note_loaded(ref)
+    assert discovery.loaded_ctx(ref) == 16384
+    await discovery.aclose()
+
+
+@pytest.mark.parametrize(
+    "answer",
+    [
+        httpx.Response(200, json={"models": [{"name": "qwen3:8b"}]}),
+        httpx.Response(200, json={"models": [{"name": "qwen3:8b", "context_length": 0}]}),
+        httpx.Response(200, json={"models": [{"name": "other:1b", "context_length": 4096}]}),
+        httpx.Response(200, json={"models": []}),
+        httpx.Response(200, text="not json"),
+        httpx.Response(404),
+        None,
+    ],
+)
+async def test_note_loaded_leaves_nothing_when_ollama_cannot_say(
+    tmp_path: Path, answer: httpx.Response | None
+) -> None:
+    router = ModelRouter(GolemSettings(), keys=MemoryKeyStore())
+    network = Network({} if answer is None else {"127.0.0.1/api/ps": lambda _r: answer})
+    discovery = _discovery(router, network, tmp_path)
+    await discovery.note_loaded("ollama/qwen3:8b")
+    assert discovery.loaded_ctx("ollama/qwen3:8b") is None
+    await discovery.aclose()

@@ -235,6 +235,7 @@ An unknown `span_id` is an error. Neither method calls the model or starts a run
 - **The shares** are whole numbers that add up to the total exactly. The tokens left after rounding down go, one each, to the largest remainders.
 - **The items** split a part further. The system part has one item for each section. The tools part has one for each tool, with `group` set to the MCP server that offers it, largest first. The messages of a role share that role's part.
 - **The window** is the one recorded, or today's, with `window_estimated` set. `estimated` is always true, because of the split.
+- **A local model's window** comes from what golem sent, then from Ollama's `/api/ps`, then from the Modelfile, and the last two are estimated ([ADR-043](../adr/043-ollama-context-window.md)).
 
 The web page draws this as the context meter: a bar with a segment for each part, in the order above, and a `Free` row. Each part has its own colour. When the input is larger than `num_ctx`, it says Ollama dropped the oldest part. The Tools disclosure groups the tools by server with each one's cost. The thin bar in the page's summary line is clay, then the `wait` colour from 80% full, then `deny` from 95%. The chat's `ctx 6%` chip is built from the live `model.call.*` events, so it comes back after a reload.
 
@@ -244,7 +245,7 @@ A session with no `model.call.*` events gets its model spans from each assistant
 
 ### The page
 
-The trace has its own route, `/s/:id/trace`, with `?span=<id>` for the selected span. It shows finished data with a Refresh button, and does not update while a run streams. The Chat and Trace tabs, the palette's Trace row, the rows, and the colours are in [the guide](../guide/web.md#trace-a-session). The layout is in [the web UI's design](../design/web.md#the-trace).
+The trace has its own route, `/s/:id/trace`, with `?span=<id>` for the selected span. It shows finished data with a Refresh button, and does not update while a run streams. The Chat and Trace tabs, the palette's Trace row, the rows, and the colours are in [the guide](../guide/web.md#trace-a-session). The layout is on [the gallery](/gallery/).
 
 ### Privacy
 
