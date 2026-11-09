@@ -5,7 +5,7 @@ import { move, providerName, type Choice, type MoveKey, type PanelKey, type Setu
 
 /**
  * With an API key: the Provider panel (B1) and the Key panel (B2–B3′) of
- * docs/design/setup-window.md. The daemon checks a key before it stores it
+ * docs/architecture/tui.md. The daemon checks a key before it stores it
  * (ADR-035), and never reads the shell: a key found in the terminal's
  * environment is passed to it.
  */

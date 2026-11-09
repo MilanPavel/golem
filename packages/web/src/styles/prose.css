@@ -251,7 +251,7 @@
   }
 }
 
-/* The trace reads closely, so it keeps the UI font and a smaller size (design/web.md, The trace). */
+/* The trace reads closely, so it keeps the UI font and a smaller size (docs/design/index.md, Type). */
 .prose.prose-trace {
   max-width: none;
   font-family: var(--font-ui);
