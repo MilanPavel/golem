@@ -89,6 +89,7 @@ Type `/` and suggestions appear, with each command's arguments. `/help` lists ev
 | Left, Right | Change the focused value. Each change is sent at once |
 | `r` | Reset the focused option to the model's default |
 | `s` | Switch where changes go: saved for this model, or this chat only |
+| `t` | Ask your last question again with these settings. The answer shows under the panel, and the try is kept as its own chat. `t` again stops it |
 | Esc | Close the panel |
 
 A saved change is kept in `config.toml` for the model, and every chat on it uses it. A change for this chat only is kept with the chat. Either one applies from your next message. When a value is not the default, the row says what the default is.
