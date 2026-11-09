@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* The one source of golem's design tokens. Values are in docs/design/web.md.
+/* The one source of golem's design tokens. Values are in docs/design/index.md.
    Each colour is light-dark(slip, kiln): the page follows the system, or data-theme. */
 @theme {
   --color-*: initial;
@@ -41,7 +41,7 @@
   --font-prose: "Literata Variable", Georgia, serif;
   --font-mono: "Geist Mono Variable", ui-monospace, monospace;
 
-  /* Layout widths from docs/design/web.md: w-sidebar is 268 px, max-w-column is 46 rem. */
+  /* Layout widths from docs/design/index.md: w-sidebar is 268 px, max-w-column is 46 rem. */
   --spacing-sidebar: 16.75rem;
   --container-column: 46rem;
 

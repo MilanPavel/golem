@@ -7,7 +7,7 @@
 
 [ADR-033](033-golem-offers-to-start-the-service.md) had `golem` ask about the service in plain lines, before the chat screen opened. Testing v0.5.0 on a bare Mac showed two problems. After Enter nothing moved while launchd started the daemon, so golem looked stuck. And the next question, how golem should think, came in a different screen with a different look.
 
-Step 1.9 ([#343](https://github.com/MilanPavel/golem/issues/343)) makes setup one window, drawn in `docs/design/setup-window.md`. Its first panel is the service question. So `golem` now opens the chat screen at once, and the screen opens the setup window on Service when nothing answers.
+Step 1.9 ([#343](https://github.com/MilanPavel/golem/issues/343)) makes setup one window, drawn in [the terminal app](../architecture/tui.md). Its first panel is the service question. So `golem` now opens the chat screen at once, and the screen opens the setup window on Service when nothing answers.
 
 ## What the code does
 

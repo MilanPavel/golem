@@ -245,7 +245,7 @@ A session with no `model.call.*` events gets its model spans from each assistant
 
 ### The page
 
-The trace has its own route, `/s/:id/trace`, with `?span=<id>` for the selected span. It shows finished data with a Refresh button, and does not update while a run streams. The Chat and Trace tabs, the palette's Trace row, the rows, and the colours are in [the guide](../guide/web.md#trace-a-session). The layout is in [the web UI's design](../design/web.md#the-trace).
+The trace has its own route, `/s/:id/trace`, with `?span=<id>` for the selected span. It shows finished data with a Refresh button, and does not update while a run streams. The Chat and Trace tabs, the palette's Trace row, the rows, and the colours are in [the guide](../guide/web.md#trace-a-session). The layout is on [the gallery](/gallery/).
 
 ### Privacy
 

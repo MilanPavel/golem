@@ -1,5 +1,5 @@
 // golem's own blocks for docs pages, styled in theme/custom.css after the web UI's
-// (docs/design/web.md). docs/_kitchen-sink.md shows one of each.
+// (docs/design/index.md). docs/_kitchen-sink.md shows one of each.
 //
 //   ::: shem Allow `edit_file` on connect.ts? | rule: edit_file → ask · built-in default
 //   ```diff … ```                    an approval: a clay seal, the question, the rule, the body

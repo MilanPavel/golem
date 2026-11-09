@@ -120,4 +120,4 @@ The page shows a full screen, with the command to run:
 | golem's daemon is not running | Run `golem daemon start`. The page reconnects by itself |
 | The daemon is older than this page | Run `golem daemon restart` after an upgrade |
 
-How the gateway works is in [ADR-028](../adr/028-web-gateway.md). How the page looks, screen by screen, is in [the web UI's design](../design/web.md).
+How the gateway works is in [ADR-028](../adr/028-web-gateway.md). How the page looks, screen by screen, is on [the gallery](/gallery/).

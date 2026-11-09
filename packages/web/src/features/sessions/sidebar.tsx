@@ -254,7 +254,7 @@ function SettingsButton({ problem, open, onNavigate }: { problem: string | null;
   );
 }
 
-/** The sidebar of docs/design/web.md: golem's state, New session, sessions by folder, the connection and Settings. */
+/** The sidebar of docs/design/index.md: golem's state, New session, sessions by folder, the connection and Settings. */
 export function SidebarView({
   sessions,
   selectedId,

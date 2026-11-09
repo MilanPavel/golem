@@ -1,6 +1,6 @@
 # The design system
 
-The look of golem's web UI: the idea, the pixel golem, the type, the tokens, the shape, and the copy. What each screen looks like is on [the gallery](/gallery/), drawn from the real components in both themes. How each feature behaves is in [the web UI](web.md), [the setup window](setup-window.md), and [MCP management](mcp.md).
+The look of golem's web UI: the idea, the pixel golem, the type, the tokens, the shape, and the copy. What each screen looks like is on [the gallery](/gallery/), drawn from the real components in both themes. How each feature works is in [How golem works](../architecture.md).
 
 ## The idea
 
@@ -38,7 +38,7 @@ It borrows the calm, centred reading column and generous input from Claude's cha
 | Headings on full screens | Literata | 26 px, 400 |
 | Code, tools, labels, times | Geist Mono | 11 to 13.5 px |
 
-The fonts are self-hosted and subset ([ADR-029](../adr/029-web-stack.md)). Silkscreen, a pixel face, is in the prototype only as a wordmark choice to compare, and is not shipped.
+The fonts are self-hosted and subset ([ADR-029](../adr/029-web-stack.md)). Silkscreen, a pixel face, was a wordmark choice to compare, and is not shipped.
 
 ## Tokens
 

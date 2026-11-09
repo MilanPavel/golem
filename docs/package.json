@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vitepress dev .",
+    "dev": "pnpm --filter @golem/web build:gallery && vitepress dev .",
     "build": "pnpm --filter @golem/web build:gallery && vitepress build .",
     "preview": "vitepress preview .",
     "typecheck": "tsc --noEmit",

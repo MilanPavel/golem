@@ -17,6 +17,46 @@ const docsDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const galleryDir = path.resolve(docsDir, "../packages/web/dist-gallery");
 const tokensFile = path.resolve(docsDir, "../packages/web/src/styles/tokens.css");
 
+const GALLERY_TYPES: Record<string, string> = {
+  ".html": "text/html; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".svg": "image/svg+xml",
+  ".png": "image/png",
+  ".woff2": "font/woff2",
+};
+
+/**
+ * Serves the built gallery at /gallery/ in `vitepress dev`, as buildEnd does for the built site.
+ * `pnpm dev` builds it first; an edit to the web UI needs `just gallery-build` to show here.
+ */
+function galleryDev(): Plugin {
+  const prefix = `${SITE_BASE}gallery/`;
+  return {
+    name: "golem-gallery-dev",
+    apply: "serve",
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const url = (req.url ?? "").split("?")[0] ?? "";
+        if (url === prefix.slice(0, -1)) {
+          res.writeHead(301, { Location: prefix }).end();
+          return;
+        }
+        if (!url.startsWith(prefix)) return next();
+        const rest = decodeURIComponent(url.slice(prefix.length)) || "gallery.html";
+        const file = path.resolve(galleryDir, rest);
+        if (!file.startsWith(galleryDir + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
+          res.statusCode = 404;
+          res.end(`The gallery is not built, or has no ${rest}. Run \`just gallery-build\`.`);
+          return;
+        }
+        res.setHeader("Content-Type", GALLERY_TYPES[path.extname(file)] ?? "application/octet-stream");
+        fs.createReadStream(file).pipe(res);
+      });
+    },
+  };
+}
+
 /**
  * Serves the web UI's palette to the theme, read from tokens.css on every build and never
  * copied: `virtual:golem-tokens.css` (the --golem-* properties) and `virtual:golem-tokens`
@@ -119,6 +159,7 @@ const sidebar: DefaultTheme.Sidebar = [
       { text: "The monorepo", link: "/monorepo" },
       {
         text: "Build, release, run",
+        collapsed: false,
         items: [
           { text: "Building and checking", link: "/ops/build" },
           { text: "Releasing", link: "/ops/release" },
@@ -131,9 +172,7 @@ const sidebar: DefaultTheme.Sidebar = [
     text: "Design",
     items: [
       { text: "The design system", link: "/design/" },
-      { text: "The web UI", link: "/design/web" },
-      { text: "The setup window", link: "/design/setup-window" },
-      { text: "MCP management", link: "/design/mcp" },
+      { text: "Gallery", link: "/gallery/", target: "_self" },
     ],
   },
   {
@@ -260,6 +299,6 @@ export default defineConfig({
   vite: {
     publicDir: path.join(docsDir, "images"),
     build: { chunkSizeWarningLimit: 3000 },
-    plugins: [golemTokens()],
+    plugins: [golemTokens(), galleryDev()],
   },
 });
