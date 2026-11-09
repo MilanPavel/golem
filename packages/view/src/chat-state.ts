@@ -217,6 +217,8 @@ function reduceChatEvent(state: ChatState, event: ChatEvent): ChatState {
       return state;
     case "model.selected":
       return { ...state, down: null, retry: null };
+    case "model.options.changed":
+      return state;
     case "message.started":
       return {
         ...state,

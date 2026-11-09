@@ -16,6 +16,7 @@ from golem_protocol.events import (
     ApprovalResolvedEvent,
     ChatEvent,
     MessageDeltaEvent,
+    ModelOptionsChangedEvent,
     ModelSelectedEvent,
     RunCancelledEvent,
     RunCompletedEvent,
@@ -75,6 +76,11 @@ async def project(tx: Transaction, event: ChatEvent) -> None:
     elif isinstance(event, SkillDeactivatedEvent):
         await _set_skills(
             tx, event.session_id, lambda names: [n for n in names if n != event.data.name]
+        )
+    elif isinstance(event, ModelOptionsChangedEvent):
+        await tx.execute(
+            "UPDATE sessions SET options = ? WHERE session_id = ?",
+            (json.dumps(event.data.options), event.session_id),
         )
     elif isinstance(event, ModelSelectedEvent):
         await tx.execute(
