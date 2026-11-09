@@ -59,7 +59,7 @@ For someone who wants to change golem.
 | Hacking: set up, run, ship | [contributing/hacking.md](contributing/hacking.md) | |
 | Contributing | [contributing/index.md](contributing/index.md), which includes [CONTRIBUTING.md](../CONTRIBUTING.md) | |
 | Building, releasing, and running | [ops/build.md](ops/build.md), [ops/release.md](ops/release.md), [ops/run.md](ops/run.md), split into pages | [#296](https://github.com/MilanPavel/golem/issues/296) |
-| The web UI's design | [design/web.md](design/web.md) | |
+| Design: the design system, the web UI, the setup window, MCP management | [design/index.md](design/index.md), [design/web.md](design/web.md), [design/setup-window.md](design/setup-window.md), [design/mcp.md](design/mcp.md). The gallery at `/gallery/` is built from `packages/web`. | |
 
 ## Project
 
