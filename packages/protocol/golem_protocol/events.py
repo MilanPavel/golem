@@ -226,6 +226,18 @@ class ModelSelectedData(BaseModel):
     reason: Literal["user"]
 
 
+class ModelOptionsChangedData(BaseModel):
+    """The session's option overrides, whole, after a change.
+
+    The last event holds what applies from the next run, so a replayed session
+    gets its options back. An empty ``options`` means no overrides.
+    """
+
+    model_config = _CONFIG
+
+    options: dict[str, float | str]
+
+
 class ToolRequestedData(BaseModel):
     """The model asked for one tool call.
 
@@ -495,6 +507,19 @@ class ModelSelectedEvent(BaseModel):
     ts: str = Field(min_length=1)
     type: Literal["model.selected"]
     data: ModelSelectedData
+
+
+class ModelOptionsChangedEvent(BaseModel):
+    """``session.set_options`` changed the session's option overrides."""
+
+    model_config = _CONFIG
+
+    seq: int = Field(ge=1)
+    session_id: str = Field(min_length=1)
+    run_id: None
+    ts: str = Field(min_length=1)
+    type: Literal["model.options.changed"]
+    data: ModelOptionsChangedData
 
 
 class MessageStartedEvent(BaseModel):
@@ -769,6 +794,7 @@ EventType = Literal[
     "session.updated",
     "session.closed",
     "model.selected",
+    "model.options.changed",
     "message.started",
     "message.delta",
     "message.completed",
@@ -798,6 +824,7 @@ ChatEvent = Annotated[
     | SessionUpdatedEvent
     | SessionClosedEvent
     | ModelSelectedEvent
+    | ModelOptionsChangedEvent
     | MessageStartedEvent
     | MessageDeltaEvent
     | MessageCompletedEvent
@@ -846,6 +873,8 @@ __all__ = [
     "ModelCallCompletedEvent",
     "ModelCallStartedData",
     "ModelCallStartedEvent",
+    "ModelOptionsChangedData",
+    "ModelOptionsChangedEvent",
     "ModelSelectedData",
     "ModelSelectedEvent",
     "Ping",
