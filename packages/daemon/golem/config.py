@@ -186,19 +186,42 @@ class SkillSettings(BaseModel):
     extra_dirs: list[str] = Field(default_factory=list[str])
 
 
+class ModelOptions(BaseModel):
+    """``[ollama.models."<name>"]``. The Ollama options saved for one model.
+
+    Each field is one row of ``golem.models.options.OPTIONS``. A field left out
+    is not set, so the model's own default applies. The daemon writes this
+    table, and checks each value against the table's range first.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    temperature: float | None = None
+    top_p: float | None = None
+    top_k: int | None = None
+    min_p: float | None = None
+    repeat_penalty: float | None = None
+    num_ctx: int | None = None
+    num_predict: int | None = None
+    seed: int | None = None
+    keep_alive: str | int | None = None
+
+
 class OllamaSettings(BaseModel):
     """``[ollama]``. Whether golem starts a local Ollama, and when it stops it.
 
     ``start`` lets golem run ``ollama serve`` when a local model is needed and
     nothing answers. ``idle_stop_minutes`` stops a server golem started after
     that long unused, and 0 keeps it running. A server golem did not start is
-    never stopped.
+    never stopped. ``models`` holds the options saved for each model, by its
+    Ollama name, such as ``qwen3:8b``.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     start: bool = True
     idle_stop_minutes: int = Field(default=30, ge=0)
+    models: dict[str, ModelOptions] = Field(default_factory=dict[str, ModelOptions])
 
 
 class WebSettings(BaseModel):
