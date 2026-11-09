@@ -118,7 +118,12 @@ import {
   formatTestStep,
   latestModelSpan,
   type ContextReport,
+  tuneState,
+  withSaved,
+  withSession,
+  type TuneState,
 } from "@golem/view";
+import { pressTune, tuneKeyOf, tuneLines, tuneOpening, type TuneAction } from "./tune-panel.ts";
 import { folderFacts } from "./folder-facts.ts";
 import {
   applyComposer,
@@ -428,6 +433,14 @@ export function App({
   const [panel, setPanel] = useState<"help" | "context" | null>(null);
   const [contextReport, setContextReport] = useState<ContextReport>({ kind: "loading" });
   const contextGen = useRef(0);
+  /** The `/tune` panel, or null while it is closed. It takes the keys while it is open. */
+  const [tune, setTune] = useState<TuneState | null>(null);
+  const tuneRef = useRef(tune);
+  tuneRef.current = tune;
+  const tuneGen = useRef(0);
+  /** Changes sent and not yet answered. Live updates wait for them, or they would undo the newest key. */
+  const tuneSending = useRef(0);
+  const tuneQueue = useRef<Promise<void>>(Promise.resolve());
   const [mcpManager, setMcpManager] = useState<McpManagerState>(closedMcpManager);
   const mcpManagerRef = useRef(mcpManager);
   mcpManagerRef.current = mcpManager;
@@ -619,7 +632,13 @@ export function App({
   overlayFrame.current = { columns, body: budget.body };
   const diffOffset = chat.approval !== null && diffScroll.callId === chat.approval.callId ? diffScroll.offset : 0;
   const panelLines =
-    panel === "help" ? helpLines(COMMANDS, columns) : panel === "context" ? contextLines(contextReport, columns) : [];
+    tune !== null
+      ? tuneLines(tune, columns)
+      : panel === "help"
+        ? helpLines(COMMANDS, columns)
+        : panel === "context"
+          ? contextLines(contextReport, columns)
+          : [];
   const helpText = !keysOpen && !switcher.open ? panelLines : [];
   const helpHeight = Math.min(helpText.length, budget.body);
   const chatHeight = budget.body - helpHeight;
@@ -661,6 +680,7 @@ export function App({
       setLiveTitle(null);
       setPanel(null);
       contextGen.current += 1;
+      showTune(null);
       setKeysOpen(false);
       historyCursorRef.current = null;
       setHistoryCursor(null);
@@ -930,6 +950,10 @@ export function App({
       if (event.type === "session.created") {
         setSessionCwd(event.data.cwd ?? null);
       }
+      if (event.type === "model.selected") {
+        // The panel tunes the model it was opened for.
+        showTune(null);
+      }
       if (event.type === "session.created" || event.type === "model.selected") {
         setSessionModel({
           profile: event.data.model_profile,
@@ -1037,6 +1061,24 @@ export function App({
       }
     });
   }, [client]);
+
+  // What another client saves for the open panel's model shows at once.
+  useEffect(() => {
+    return client.onOptionsSaved(({ model, saved }) => {
+      const open = tuneRef.current;
+      if (open !== null && tuneSending.current === 0) {
+        showTune(withSaved(open, model, saved));
+      }
+    });
+  }, [client]);
+
+  // The session's overrides, from `model.options.changed`, whoever set them.
+  useEffect(() => {
+    const open = tuneRef.current;
+    if (open !== null && tuneSending.current === 0) {
+      showTune(withSession(open, chat.options));
+    }
+  }, [chat.options]);
 
   useEffect(() => {
     return client.onPull((update) => {
@@ -1305,6 +1347,57 @@ export function App({
     })();
   }
 
+  function showTune(next: TuneState | null): void {
+    tuneRef.current = next;
+    setTune(next);
+    if (next === null) {
+      tuneGen.current += 1;
+    }
+  }
+
+  /** Read the model's options and this session's overrides, then open the `/tune` panel. */
+  function loadTune(model: string, id: string): void {
+    const gen = ++tuneGen.current;
+    client.getModelOptions(model, id).then(
+      (result) => {
+        if (gen === tuneGen.current && sessionRef.current === id) {
+          showTune(tuneState(result));
+        }
+      },
+      (error: unknown) => {
+        if (gen === tuneGen.current) {
+          setChat((current) => ({ ...current, error: messageOf(error) }));
+        }
+      },
+    );
+  }
+
+  /** Send one change at once. They go out one at a time, so the last key is the last value written. */
+  function sendTune(model: string, action: Extract<TuneAction, { kind: "change" }>): void {
+    const id = sessionRef.current;
+    const options = { [action.name]: action.value };
+    tuneSending.current += 1;
+    tuneQueue.current = tuneQueue.current.then(async () => {
+      try {
+        if (action.target === "saved") {
+          const result = await client.setModelOptions(model, options);
+          if (tuneSending.current === 1 && tuneRef.current !== null) {
+            showTune(withSaved(tuneRef.current, result.model, result.saved));
+          }
+        } else if (id !== null) {
+          const result = await client.setSessionOptions(id, options);
+          if (tuneSending.current === 1 && tuneRef.current !== null && sessionRef.current === id) {
+            showTune(withSession(tuneRef.current, result.options));
+          }
+        }
+      } catch (error) {
+        setChat((current) => ({ ...current, error: messageOf(error) }));
+      } finally {
+        tuneSending.current -= 1;
+      }
+    });
+  }
+
   /** Ask the daemon for the catalog. A pick waiting from `/mcp add <id>` goes on when it arrives. */
   function loadMcpCatalog(): void {
     client.mcpCatalog(sessionRef.current ?? undefined).then(
@@ -1360,6 +1453,26 @@ export function App({
       setKeysOpen(false);
       setSwitcher(closedSwitcher);
       setChat((current) => ({ ...current, notice: null }));
+      return;
+    }
+    if (outcome.kind === "tune") {
+      setDraft(draftAt(""));
+      setKeysOpen(false);
+      setSwitcher(closedSwitcher);
+      setPanel(null);
+      const model = sessionModelRef.current;
+      const opening = tuneOpening({
+        connected: connectionRef.current.status === "connected",
+        sessionId: sessionRef.current,
+        provider: model?.provider ?? null,
+        name: model?.name ?? null,
+      });
+      if (opening.kind === "notice") {
+        setChat((current) => ({ ...current, notice: opening.text }));
+        return;
+      }
+      setChat((current) => ({ ...current, notice: null }));
+      loadTune(opening.model, opening.sessionId);
       return;
     }
     if (outcome.kind === "context") {
@@ -2825,6 +2938,21 @@ export function App({
     setSkillsManager(pressed.state);
   }
 
+  function onTunePress(press: Press): void {
+    const state = tuneRef.current;
+    const key = tuneKeyOf(press);
+    if (state === null || key === null) {
+      return;
+    }
+    const pressed = pressTune(state, key);
+    showTune(pressed.state);
+    if (pressed.action.kind === "close") {
+      showTune(null);
+    } else if (pressed.action.kind === "change") {
+      sendTune(pressed.state.model, pressed.action);
+    }
+  }
+
   function onPickerPress(press: Press): void {
     const state = pickerRef.current;
     const key = pickerKeyOf(state, press);
@@ -3285,6 +3413,10 @@ export function App({
       onSetupPress(press);
       return;
     }
+    if (tuneRef.current !== null && !keysOpenRef.current && press.name !== "f1") {
+      onTunePress(press);
+      return;
+    }
     if (pickerRef.current.open && !keysOpenRef.current && press.name !== "f1") {
       onPickerPress(press);
       return;
@@ -3431,6 +3563,7 @@ export function App({
       permsRef.current.open ||
       mcpManagerRef.current.open ||
       skillsManagerRef.current.open ||
+      tuneRef.current !== null ||
       keysOpenRef.current
     ) {
       return;

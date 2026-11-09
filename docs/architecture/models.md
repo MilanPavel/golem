@@ -144,6 +144,8 @@ A setting that needs a secret names it as `keychain:<name>` and the daemon resol
 
 `model.set_default` writes `default_model` into the user's `config.toml` with `tomlkit`, which keeps comments and layout (`golem/config_edit.py`). The router picks the change up on its next read.
 
+`model.options.set` saves options for a model in `config.toml`, and sends `model.options.saved` with the model and everything saved for it to every welcomed connection, so an open tune panel in another client shows the change at once. It is not stored.
+
 ### Model errors
 
 A run ends in `run.failed` with a `message` and no traceback. A failure a client can act on also has a `code`. `model_unreachable`: the model's server did not answer. `not_installed`: the model needs a local Ollama, and no `ollama` binary is on `PATH` or at a known install path. Either comes with the `provider` and a `hint` that says how to fix it, such as `run ollama serve`.

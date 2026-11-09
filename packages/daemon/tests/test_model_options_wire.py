@@ -69,6 +69,35 @@ async def test_saved_options_are_stored_in_config_and_read_back(short_home: Path
         await stop_daemon(app, task)
 
 
+async def test_a_save_is_sent_to_every_connection(short_home: Path) -> None:
+    app, task = await start_daemon(short_home, router=_router())
+    client = await RpcClient.connect(app.paths.socket_path)
+    other = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        await other.call("hello", HELLO)
+        rpc_result(
+            await client.call(
+                "model.options.set", {"model": "ollama/qwen3:8b", "options": {"temperature": 0.3}}
+            )
+        )
+        for watcher in (client, other):
+            await watcher.take_events()
+            assert [(n["method"], n["params"]) for n in watcher.notices] == [
+                ("model.options.saved", {"model": "qwen3:8b", "saved": {"temperature": 0.3}})
+            ]
+        failed = await client.call(
+            "model.options.set", {"model": "qwen3:8b", "options": {"temperature": 9}}
+        )
+        assert error_code(failed) == INVALID_PARAMS
+        await other.take_events()
+        assert len(other.notices) == 1
+    finally:
+        await client.close()
+        await other.close()
+        await stop_daemon(app, task)
+
+
 async def test_a_bad_option_is_refused_and_nothing_is_written(short_home: Path) -> None:
     app, task = await start_daemon(short_home, router=_router())
     client = await RpcClient.connect(app.paths.socket_path)

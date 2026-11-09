@@ -22,6 +22,7 @@ export type ComposerOutcome =
   | { kind: "unknown"; notice: string }
   | { kind: "help" }
   | { kind: "context" }
+  | { kind: "tune" }
   | { kind: "mcp" }
   | { kind: "mcp-add"; id: string | null }
   | { kind: "mcp-toggle"; on: boolean; name: string }
@@ -261,6 +262,13 @@ export const COMMANDS: readonly Command[] = [
       }
       return { kind: "model", name: first ?? null };
     },
+  },
+  {
+    name: "/tune",
+    group: "model",
+    args: "",
+    description: "Opens the panel that tunes the local model: temperature, context size, and more.",
+    run: withoutArgs({ kind: "tune" }),
   },
   {
     name: "/new",
