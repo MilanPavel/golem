@@ -8,6 +8,7 @@ line. Where the model says nothing, Ollama's default is the value.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Literal, cast
@@ -170,6 +171,30 @@ _BY_NAME = {spec.name: spec for spec in OPTIONS}
 def spec(name: str) -> OptionSpec | None:
     """The table row for ``name``, or None when it is not a tunable option."""
     return _BY_NAME.get(name)
+
+
+_DURATION = re.compile(r"^-?\d+(\.\d+)?(ms|s|m|h)?$")
+
+
+def validate(name: str, value: object) -> float | str:
+    """Check ``value`` against the table and return it. Raises ``ValueError`` when it is no good."""
+    row = _BY_NAME.get(name)
+    if row is None:
+        raise ValueError(f"{name} is not an option golem can tune")
+    if row.kind == "duration":
+        if isinstance(value, bool) or not isinstance(value, (int, str)):
+            raise ValueError(f"{name} is a time such as 5m, or -1")
+        text = str(value)
+        if _DURATION.match(text) is None:
+            raise ValueError(f"{name} is a time such as 5m, or -1, not {text!r}")
+        return value
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{name} is a number")
+    if row.kind == "int" and value != int(value):
+        raise ValueError(f"{name} is a whole number")
+    if not row.minimum <= value <= row.maximum:
+        raise ValueError(f"{name} is between {row.minimum:g} and {row.maximum:g}")
+    return int(value) if row.kind == "int" else value
 
 
 def parse_parameters(text: str) -> dict[str, float | str]:
