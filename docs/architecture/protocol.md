@@ -232,6 +232,8 @@ The MCP methods, `mcp.list` to `mcp.server.status`, are in [MCP](./mcp.md#on-the
 
 The default model and `model.list` are in [Talking to models](./models.md#the-model-list).
 
+The `model.call.started` and `model.call.completed` events, and the `trace.get` and `trace.span` commands, are in [Tracing](./tracing.md#the-details).
+
 ### Why a protocol package
 
 Those shapes are written once, as Python classes in `golem_protocol`. `just gen` writes JSON Schema, then TypeScript, into `packages/protocol/gen/`. `@golem/client` imports the generated types, and the TUI and `golem status` both use that client. A hand-written TypeScript copy would drift, and the bug would show up as a wrong screen. Here `just check` fails if the generated files do not match the classes.
