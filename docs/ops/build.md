@@ -2,12 +2,12 @@
 
 How golem is built, tested, and checked on every pull request. [Releasing](release.md) covers tags, signing, and the tap. [Running](run.md) covers installing and keeping golem going.
 
-This guide explains how golem is built, tested, installed, and kept running, and what is still to come. It is written for someone who runs golem or ships it, not for someone changing its code.
+This guide explains how golem is built, tested, installed, and kept running. It is written for someone who runs golem or ships it, not for someone changing its code.
 
 For more detail:
 - How the code works inside: [architecture.md](../architecture.md)
 - Why it is built this way: the [ADRs](../adr/README.md)
-- The roadmap, step by step: [plan.md](../plan.md)
+- The roadmap: [roadmap.md](../roadmap.md)
 
 ---
 

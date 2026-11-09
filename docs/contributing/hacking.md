@@ -92,4 +92,4 @@ It stops at the PR link. You review and merge it on GitHub. Without an agent, [C
 
 - [Architecture](../architecture.md): how the daemon, the protocol, and the screens fit together.
 - [Decisions](../adr/README.md): why things are built the way they are. A non-obvious choice gets a new one.
-- [The plan](../plan.md): what comes next.
+- [The roadmap](../roadmap.md): what comes next.

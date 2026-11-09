@@ -23,7 +23,7 @@ Golem is an AI agent that lives on your Mac. You chat with it in your terminal o
 
 **The agent behind your application.** The same agent you shape in your terminal can be deployed behind an app, with its rules and tools, while the models stay outside it as endpoints you can swap.
 
-Some of this is built, and some is the road ahead. [The vision](../vision.md) says where golem is going, and [the plan](../plan.md) lists the steps.
+Some of this is built, and some is the road ahead. [The vision](../vision.md) says where golem is going, and [the roadmap](../roadmap.md) links the steps.
 
 ## What you need
 

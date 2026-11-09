@@ -149,7 +149,7 @@ The 14 tool schemas are 2,189 of the 2,220 tokens. That is the kind of thing a t
 
 **Estimates are marked.** The split of the context is a guess scaled to a real total, and a window filled from today's config is marked too. A trace that looks exact and isn't would mislead.
 
-What golem gave up: the page is web only (the TUI keeps `/debug`), it shows finished data and does not stream, and there is no export. Sending these spans to OpenTelemetry or Langfuse is [plan step 6.1](../plan.md), and it can be built on what is stored now.
+What golem gave up: the page is web only (the TUI keeps `/debug`), it shows finished data and does not stream, and there is no export. Sending these spans to OpenTelemetry or Langfuse is [step 6.1](https://github.com/MilanPavel/golem/issues/91), and it can be built on what is stored now.
 
 - [ADR-041: golem records a trace of each session and shows it in the browser](../adr/041-session-trace.md): the spans, what is recorded, and the fallback
 

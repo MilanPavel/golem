@@ -24,7 +24,7 @@ What is already there is enough to join a tree together:
 | The wait for approval | `approval.needed` → `approval.resolved` |
 | The full output of a large tool result | The `artifacts` table |
 
-Phase 13 of `docs/plan.md` builds the trace. This ADR fixes the choices its steps depend on.
+Phase 13 ([#532](https://github.com/MilanPavel/golem/issues/532)) builds the trace. This ADR fixes the choices its steps depend on.
 
 ## Decision
 

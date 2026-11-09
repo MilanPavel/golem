@@ -102,7 +102,7 @@ Two model calls, one tool call, one answer. Lines 4 to 8 are one trip round the 
 
 **The system prompt is built for every call, and never saved** ([ADR-031](../adr/031-system-prompt.md)). `call_model` puts it in front of the history each time and returns only the reply. A change to a pinned skill applies at the next call, and old checkpoints never hold a stale prompt.
 
-**A cap of 25 model calls** stops a loop that never ends. It is a guard, not a budget. Budgets per answer belong to model routing, in Phase 9 of [the plan](../plan.md).
+**A cap of 25 model calls** stops a loop that never ends. It is a guard, not a budget. Budgets per answer belong to model routing, in Phase 9 ([#110](https://github.com/MilanPavel/golem/issues/110)).
 
 ## Try it
 

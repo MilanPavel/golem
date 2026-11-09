@@ -388,26 +388,3 @@ Remember: under launchd, `GOLEM_...` variables from your terminal do not apply. 
 | The first start of a new build is slow | Expected: macOS checks the new files once |
 
 **Building behind a company proxy:** `just dist` and `just smoke-dist` work offline once the packages are installed. `just check` tries to update packages first, and fails if it can't download them. If everything is already installed, run `UV_NO_SYNC=1 just check`.
-
----
-
-## 15. What is planned
-
-The phases that matter for running golem, in the order of [the plan](../plan.md):
-
-```mermaid
-flowchart LR
-  p4["Phase 4<br/>Triggers"] --> p6["Phase 6<br/>Hardening"] --> p8["Phase 8<br/>Linux and<br/>Windows"] --> p9["Phase 9<br/>Costs"]
-```
-
-| Phase | What you will get |
-|---|---|
-| **4. Triggers** | The daemon does work on a schedule or when files change, with no chat screen open |
-| **6. Hardening** | Tracing (a timeline of where each answer spent its time), nightly database backups, crash tests, speed checks, and a security review |
-| **8.1 Platform layer** | Everything that differs between macOS, Linux, and Windows moves behind one interface, so the next steps are additions, not rewrites |
-| **8.2 Linux** | Linux builds, a systemd service, CI on Ubuntu. No shell sandbox at first, so shell commands always ask |
-| **8.3 Windows: running** | A Windows "named pipe" instead of the socket file, Task Scheduler instead of launchd, CI on Windows |
-| **8.4 Windows: installing** | `scoop install golem` |
-| **9. Model routing** | Token and cost display, and spending limits |
-
-**Not planned yet:** log rotation, metrics export, Intel Mac builds, and access from other computers or other users. Golem is meant to run for one person, on one computer.
