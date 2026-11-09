@@ -43,7 +43,7 @@ Run `golem web` again while one is running, and it opens the same server instead
 - **Trace a session:** read how an answer was made, model call by model call. See [Trace a session](#trace-a-session).
 - **Two themes:** slip (light) and kiln (dark). The switch at the bottom of the sidebar picks one, or follows your system.
 
-The web UI is new, and it grows step by step in [Phase 10](../plan.md#phase-10--web-ui). **Approvals, diffs, and the todo drawer** come next. Until then, answer an approval in the terminal: run `golem` in the same folder, and the waiting question is there. After that come models and a command palette, then settings, a layout for phones, and installing the page as an app.
+The web UI is new, and it grows step by step in [Phase 10](https://github.com/MilanPavel/golem/issues/150). **Approvals, diffs, and the todo drawer** come next. Until then, answer an approval in the terminal: run `golem` in the same folder, and the waiting question is there. After that come models and a command palette, then settings, a layout for phones, and installing the page as an app.
 
 ## Trace a session
 

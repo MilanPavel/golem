@@ -19,7 +19,7 @@ test("a link out of docs/ goes to the file on GitHub, with its anchor", () => {
   assert.equal(siteHref("../README.md#use-skills", "architecture.md"), `${blob}README.md#use-skills`);
   assert.equal(siteHref("../../CONTRIBUTING.md", "adr/024-commits-prs-releases.md"), `${blob}CONTRIBUTING.md`);
   assert.equal(siteHref("../../scripts/version.sh", "adr/024-commits-prs-releases.md"), `${blob}scripts/version.sh`);
-  assert.equal(siteHref("../packages/tui/src/theme.ts", "plan.md"), `${blob}packages/tui/src/theme.ts`);
+  assert.equal(siteHref("../packages/tui/src/theme.ts", "roadmap.md"), `${blob}packages/tui/src/theme.ts`);
 });
 
 test("a file in docs/ that is not a page goes to GitHub", () => {
@@ -29,7 +29,7 @@ test("a file in docs/ that is not a page goes to GitHub", () => {
 });
 
 test("a folder goes to the folder on GitHub", () => {
-  assert.equal(siteHref("../packages/web/", "plan.md"), "https://github.com/MilanPavel/golem/tree/main/packages/web");
+  assert.equal(siteHref("../packages/web/", "roadmap.md"), "https://github.com/MilanPavel/golem/tree/main/packages/web");
 });
 
 test("a link in an included file resolves from that file", () => {

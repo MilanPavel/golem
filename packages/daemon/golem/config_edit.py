@@ -15,6 +15,7 @@ from tomlkit.items import AoT, Table
 from tomlkit.toml_document import TOMLDocument
 
 from golem.config import McpEnabled, PolicyRule, RuleAction
+from golem.models import options as model_options
 
 
 class RuleIndexError(ValueError):
@@ -191,6 +192,61 @@ def set_rule_action(config_file: Path, index: int, action: RuleAction) -> None:
     assert isinstance(table, Table)
     table["action"] = action
     _write(config_file, document)
+
+
+def set_model_options(
+    config_file: Path, model: str, values: dict[str, float | str | None]
+) -> dict[str, float | str]:
+    """Save options in ``[ollama.models."<model>"]`` and return what that table now holds.
+
+    A value of None removes the option, so the model's own default applies
+    again. A table left empty is removed, and so is ``[ollama.models]`` once it
+    is empty. Raises ``ValueError`` for an unknown option or a value out of range,
+    before anything is written.
+    """
+    for name, value in values.items():
+        if value is not None:
+            model_options.validate(name, value)
+    document = _read(config_file)
+    ollama = _sub_table(document, "ollama", create=True)
+    models = _sub_table(ollama, "models", create=True)
+    table = _sub_table(models, model, create=True)
+    for name, value in values.items():
+        if value is None:
+            if name in table:
+                del table[name]
+        else:
+            table[name] = value
+    saved = {key: cast(float | str, value) for key, value in table.items()}
+    if not table:
+        del models[model]
+    if not models:
+        del ollama["models"]
+    if not ollama:
+        del document["ollama"]
+    _write(config_file, document)
+    return saved
+
+
+def read_model_options(config_file: Path, model: str) -> dict[str, float | str]:
+    """The options saved for ``model``. Empty when there are none."""
+    ollama = _sub_table(_read(config_file), "ollama", create=False)
+    models = _sub_table(ollama, "models", create=False) if ollama is not None else None
+    table = _sub_table(models, model, create=False) if models is not None else None
+    if table is None:
+        return {}
+    return {key: cast(float | str, value) for key, value in table.items()}
+
+
+def _sub_table(parent: Any, key: str, *, create: bool) -> Any:
+    child = cast(object, parent.get(key))
+    if isinstance(child, Table):
+        return child
+    if not create:
+        return None
+    added = tomlkit.table()
+    parent[key] = added
+    return added
 
 
 def _rules(document: TOMLDocument, index: int) -> AoT:

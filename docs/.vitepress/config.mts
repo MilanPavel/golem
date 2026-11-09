@@ -111,7 +111,14 @@ const sidebar: DefaultTheme.Sidebar = [
       { text: "Hacking on golem", link: "/contributing/hacking" },
       { text: "Contributing", link: "/contributing/" },
       { text: "The monorepo", link: "/monorepo" },
-      { text: "Building, releasing, and running", link: "/sre" },
+      {
+        text: "Build, release, run",
+        items: [
+          { text: "Building and checking", link: "/ops/build" },
+          { text: "Releasing", link: "/ops/release" },
+          { text: "Running", link: "/ops/run" },
+        ],
+      },
     ],
   },
   {
@@ -127,7 +134,7 @@ const sidebar: DefaultTheme.Sidebar = [
     text: "Project",
     items: [
       { text: "The vision", link: "/vision" },
-      { text: "The plan", link: "/plan" },
+      { text: "Roadmap", link: "/roadmap" },
       {
         text: "Decisions (ADRs)",
         link: "/adr/README",

@@ -76,7 +76,7 @@ just check                  # lint, typecheck, and tests
 | `just dist` | Builds a standalone golem into `dist/` |
 | `just smoke-dist` | Starts that build against a fake model and checks one chat |
 
-[Building, releasing, and running](../sre.md) has the rest: signing, releases, and CI.
+[Building](../ops/build.md), [releasing](../ops/release.md), and [running](../ops/run.md) have the rest: signing, releases, and CI.
 
 ## Ship a change
 
@@ -92,4 +92,4 @@ It stops at the PR link. You review and merge it on GitHub. Without an agent, [C
 
 - [Architecture](../architecture.md): how the daemon, the protocol, and the screens fit together.
 - [Decisions](../adr/README.md): why things are built the way they are. A non-obvious choice gets a new one.
-- [The plan](../plan.md): what comes next.
+- [The roadmap](../roadmap.md): what comes next.

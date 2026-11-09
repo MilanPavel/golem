@@ -1,6 +1,6 @@
 # Notes for coding agents
 
-golem is a Python daemon and a TypeScript terminal app in one repository. [README.md](README.md) says what it is, [docs/architecture.md](docs/architecture.md) how it is built, and [docs/sre.md](docs/sre.md) how it is set up, built, and released. [docs/plan.md](docs/plan.md) lists the next steps.
+golem is a Python daemon and a TypeScript terminal app in one repository. [README.md](README.md) says what it is, [docs/architecture.md](docs/architecture.md) how it is built, and [docs/ops/build.md](docs/ops/build.md), [docs/ops/release.md](docs/ops/release.md), and [docs/ops/run.md](docs/ops/run.md) how it is set up, built, and released. [docs/roadmap.md](docs/roadmap.md) links the board that lists the next steps.
 
 ## Skills
 

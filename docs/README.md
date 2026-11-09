@@ -1,6 +1,6 @@
 # golem's docs
 
-These files are the source of golem's docs site (Phase 11 of [plan.md](plan.md), [ADR-034](adr/034-docs-site.md)). On GitHub, this page is the map. On the site, the same map is the side menu.
+These files are the source of golem's docs site (Phase 11 of the [roadmap](roadmap.md), [ADR-034](adr/034-docs-site.md)). On GitHub, this page is the map. On the site, the same map is the side menu.
 
 A page with a ticket number is planned and not written yet.
 
@@ -58,7 +58,7 @@ For someone who wants to change golem.
 | The monorepo | [monorepo.md](monorepo.md) | |
 | Hacking: set up, run, ship | [contributing/hacking.md](contributing/hacking.md) | |
 | Contributing | [contributing/index.md](contributing/index.md), which includes [CONTRIBUTING.md](../CONTRIBUTING.md) | |
-| Building, releasing, and running | [sre.md](sre.md), split into pages | [#296](https://github.com/MilanPavel/golem/issues/296) |
+| Building, releasing, and running | [ops/build.md](ops/build.md), [ops/release.md](ops/release.md), [ops/run.md](ops/run.md), split into pages | [#296](https://github.com/MilanPavel/golem/issues/296) |
 | Design: the design system, the web UI, the setup window, MCP management | [design/index.md](design/index.md), [design/web.md](design/web.md), [design/setup-window.md](design/setup-window.md), [design/mcp.md](design/mcp.md). The gallery at `/gallery/` is built from `packages/web`. | |
 
 ## Project
@@ -66,7 +66,7 @@ For someone who wants to change golem.
 | Page | File | Ticket |
 |---|---|---|
 | The vision | [vision.md](vision.md) | |
-| The plan | [plan.md](plan.md) | |
+| The roadmap | [roadmap.md](roadmap.md) | |
 | Decisions (ADRs), by topic | [adr/README.md](adr/README.md) | [#295](https://github.com/MilanPavel/golem/issues/295) |
 
 ## Not pages

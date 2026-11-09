@@ -4,7 +4,7 @@
 
 Golem today is one daemon on your Mac, with a chat in your terminal and in your browser. This page says where golem goes from there, and why. It does not say when.
 
-**A vision, not a plan.** Nothing here is built yet. [plan.md](plan.md) holds the work, step by step. When a part of this page becomes work, it moves there, and its choices get an ADR in [adr/](adr/README.md).
+**A vision, not a plan.** Nothing here is built yet. The [roadmap](roadmap.md) links the issues that hold the work, step by step. When a part of this page becomes work, it moves there, and its choices get an ADR in [adr/](adr/README.md).
 
 ## What golem becomes
 
@@ -275,7 +275,7 @@ Everything above stands on the same core, and the core is where golem is also a 
 - **Evals and replay.** Tracing, eval suites, replaying a run, crash tests. On your Mac they make golem better; in serve mode they gate a deploy.
 - **More than macOS.** One small interface for everything that depends on the OS, then Linux (servers and containers run it) and, later, Windows.
 
-[plan.md](plan.md) lists these as steps.
+The [roadmap](roadmap.md) links the issues that list these as steps.
 
 ---
 

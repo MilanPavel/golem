@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import httpx
+import pytest
 
 from golem.models import options
 
@@ -73,3 +74,19 @@ async def test_an_ollama_that_does_not_answer_gives_no_parameters() -> None:
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
         assert await options.model_parameters(client, "http://x", "qwen3:8b") == {}
+
+
+def test_a_value_is_checked_against_the_table() -> None:
+    assert options.validate("top_k", 20) == 20
+    assert options.validate("temperature", 0.4) == 0.4
+    assert options.validate("keep_alive", "10m") == "10m"
+    assert options.validate("keep_alive", -1) == -1
+    for name, value in (
+        ("temperature", 3),
+        ("top_k", 2.5),
+        ("temperature", True),
+        ("keep_alive", "soon"),
+        ("nope", 1),
+    ):
+        with pytest.raises(ValueError):
+            options.validate(name, value)

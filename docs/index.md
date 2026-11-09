@@ -22,7 +22,7 @@ hero:
 
 <HomeWhy />
 
-Some of this is still the road ahead. [The vision](./vision.md) says where golem is going, and [the plan](./plan.md) lists the steps.
+Some of this is still the road ahead. [The vision](./vision.md) says where golem is going, and [the roadmap](./roadmap.md) links the steps.
 
 ## See it work
 
