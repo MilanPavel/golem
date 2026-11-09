@@ -287,6 +287,7 @@ In development, `vite dev` serves the page on its own port. Its proxy for `/ws` 
 
 ## Read more
 
+- Next: [Tracing](./tracing.md): how an answer was made.
 - Before: [The terminal app](./tui.md): the fold, the batcher, and the client this page shares.
 - [The web UI](../guide/web.md): how to use it.
 - [The web UI's design](../design/web.md): the layout, the pixel golem, the shem, and the tokens.
