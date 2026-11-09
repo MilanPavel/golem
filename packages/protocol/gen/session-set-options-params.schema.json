@@ -1,0 +1,34 @@
+{
+  "additionalProperties": false,
+  "description": "``session.set_options``. Override options for one session only.\n\nA value of ``null`` removes that override. Options not named stay as they are.\nThe daemon emits ``model.options.changed``, and the overrides apply from the\nsession's next run. They are kept with the session, and are not written to\n``config.toml``.",
+  "properties": {
+    "options": {
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "title": "Options",
+      "type": "object"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "session_id",
+    "options"
+  ],
+  "title": "SessionSetOptionsParams",
+  "type": "object"
+}

@@ -1,0 +1,75 @@
+{
+  "additionalProperties": false,
+  "description": "One row of the option table: what an option may be, and what it does.\n\n``kind`` ``duration`` is a time such as ``5m``, or a number of seconds, and\n``-1`` for always. ``default`` is Ollama's own, and ``None`` when it has\nnone, as for the seed.",
+  "properties": {
+    "default": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Default"
+    },
+    "kind": {
+      "enum": [
+        "float",
+        "int",
+        "duration"
+      ],
+      "title": "Kind",
+      "type": "string"
+    },
+    "label": {
+      "minLength": 1,
+      "title": "Label",
+      "type": "string"
+    },
+    "long": {
+      "minLength": 1,
+      "title": "Long",
+      "type": "string"
+    },
+    "maximum": {
+      "title": "Maximum",
+      "type": "number"
+    },
+    "minimum": {
+      "title": "Minimum",
+      "type": "number"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "short": {
+      "minLength": 1,
+      "title": "Short",
+      "type": "string"
+    },
+    "step": {
+      "exclusiveMinimum": 0,
+      "title": "Step",
+      "type": "number"
+    }
+  },
+  "required": [
+    "name",
+    "label",
+    "kind",
+    "minimum",
+    "maximum",
+    "step",
+    "short",
+    "long"
+  ],
+  "title": "ModelOption",
+  "type": "object"
+}
