@@ -4,10 +4,16 @@ import { test } from "node:test";
 import type { ModelOption, ModelOptionsGetResult } from "@golem/client";
 
 import {
+  applyPreset,
+  changedRows,
   differsFromDefault,
   focusedRow,
   formatTuneValue,
+  keepSession,
   moveFocus,
+  PRESETS,
+  presetForKey,
+  PRESETS_HINT,
   reset,
   sliderCells,
   step,
@@ -185,4 +191,112 @@ test("sliderCells draws the minimum, the maximum, and a value between", () => {
       assert.equal(sliderCells(value, temperature, width).length, width + 2);
     }
   }
+});
+
+/** The ranges of the daemon's table (`models/options.py`), for the options a preset names. */
+const RANGES: Record<string, [number, number]> = {
+  temperature: [0, 2],
+  top_p: [0, 1],
+  top_k: [0, 200],
+  min_p: [0, 1],
+  repeat_penalty: [0.5, 2],
+  num_ctx: [512, 262144],
+};
+
+const PRESET_OPTIONS: ModelOption[] = [
+  option("temperature"),
+  option("top_p", { maximum: 1, step: 0.01 }),
+  option("top_k", { kind: "int", maximum: 200, step: 1 }),
+  option("min_p", { maximum: 1, step: 0.01 }),
+  option("repeat_penalty", { minimum: 0.5, step: 0.05 }),
+  option("num_ctx", { kind: "int", minimum: 512, maximum: 262144, step: 512 }),
+];
+
+function presetState(extra: Partial<ModelOptionsGetResult> = {}) {
+  return tuneState({
+    model: "qwen3:8b",
+    options: PRESET_OPTIONS,
+    defaults: { temperature: 0.7, top_p: 0.9, top_k: 40, min_p: 0, repeat_penalty: 1, num_ctx: 4096 },
+    saved: {},
+    ...extra,
+  });
+}
+
+function preset(key: number) {
+  const found = presetForKey(key);
+  assert.notEqual(found, null);
+  return found as NonNullable<typeof found>;
+}
+
+test("the presets are on keys 1 to 4 with the values the ticket names", () => {
+  assert.deepEqual(PRESETS.map((item) => [item.key, item.id]), [
+    [1, "precise"],
+    [2, "balanced"],
+    [3, "creative"],
+    [4, "long-memory"],
+  ]);
+  assert.deepEqual(preset(1).options, { temperature: 0.2, top_p: 0.9, repeat_penalty: 1.1 });
+  assert.deepEqual(preset(3).options, { temperature: 1.0, top_p: 0.95, min_p: 0.05 });
+  assert.deepEqual(preset(4).options, { num_ctx: 16384 });
+  assert.equal(presetForKey(5), null);
+  assert.equal(PRESETS_HINT, "presets  1 precise   2 balanced   3 creative   4 long memory");
+});
+
+test("every preset value is inside the table's range", () => {
+  for (const item of PRESETS) {
+    for (const [name, value] of Object.entries(item.options)) {
+      if (value === null) continue;
+      const range = RANGES[name];
+      assert.notEqual(range, undefined, `${item.id}: ${name} has no range`);
+      const [low, high] = range as [number, number];
+      assert.equal(value >= low && value <= high, true, `${item.id}: ${name} ${value}`);
+    }
+  }
+});
+
+test("a preset goes into the session, whatever the target says", () => {
+  const saved = presetState({ saved: { temperature: 0.5 } });
+  const applied = applyPreset(saved, preset(1));
+  assert.deepEqual(applied.options, { temperature: 0.2, top_p: 0.9, repeat_penalty: 1.1 });
+  assert.deepEqual(applied.state.session, { temperature: 0.2, top_p: 0.9, repeat_penalty: 1.1 });
+  assert.deepEqual(applied.state.saved, { temperature: 0.5 });
+  assert.equal(applied.state.preset, "precise");
+  const session = applyPreset(toggleTarget(saved), preset(1));
+  assert.deepEqual(session.state.session, applied.state.session);
+});
+
+test("balanced sends null for each sampling option and clears them from the session", () => {
+  const creative = applyPreset(presetState(), preset(3)).state;
+  const withCtx = { ...creative, session: { ...creative.session, num_ctx: 8192 } };
+  const balanced = applyPreset(withCtx, preset(2));
+  assert.deepEqual(balanced.options, {
+    temperature: null,
+    top_p: null,
+    top_k: null,
+    min_p: null,
+    repeat_penalty: null,
+  });
+  assert.deepEqual(balanced.state.session, { num_ctx: 8192 });
+});
+
+test("changedRows names only the rows that moved", () => {
+  const before = presetState();
+  assert.deepEqual(changedRows(before, before), []);
+  const precise = applyPreset(before, preset(1)).state;
+  assert.deepEqual(changedRows(before, precise), ["temperature", "repeat_penalty"]);
+  assert.deepEqual(precise.lit, ["temperature", "repeat_penalty"]);
+  const again = applyPreset(precise, preset(1)).state;
+  assert.deepEqual(again.lit, []);
+  const back = applyPreset(precise, preset(2)).state;
+  assert.deepEqual(back.lit, ["temperature", "repeat_penalty"]);
+});
+
+test("keepSession moves the session's values to saved and names what to clear", () => {
+  const applied = applyPreset(presetState({ saved: { top_k: 20 } }), preset(1)).state;
+  const kept = keepSession(applied);
+  assert.deepEqual(kept.save, { temperature: 0.2, top_p: 0.9, repeat_penalty: 1.1 });
+  assert.deepEqual(kept.clear, { temperature: null, top_p: null, repeat_penalty: null });
+  assert.deepEqual(kept.state.saved, { top_k: 20, temperature: 0.2, top_p: 0.9, repeat_penalty: 1.1 });
+  assert.deepEqual(kept.state.session, {});
+  assert.equal(kept.state.preset, undefined);
 });

@@ -23,6 +23,10 @@ export type TuneState = {
   /** Index of the focused option. */
   focus: number;
   target: TuneTarget;
+  /** The id of the preset just applied to this session, until a value changes by hand. */
+  preset?: string;
+  /** Names of the rows the last preset moved, until the next key press. */
+  lit?: readonly string[];
 };
 
 /** One option with the value in use. `value` is null when there is none, such as a random seed. */
@@ -30,6 +34,34 @@ export type TuneRow = { option: ModelOption; value: TuneValue | null; source: Tu
 
 /** What `keep_alive` steps through, from unloading at once to never. */
 export const KEEP_ALIVE_STEPS: readonly TuneValue[] = [0, "30s", "5m", "30m", -1];
+
+/** A preset: a few values for this session. `null` removes an override, back to the model's own value. */
+export type TunePreset = {
+  /** The key that applies it. */
+  key: 1 | 2 | 3 | 4;
+  id: string;
+  label: string;
+  options: Readonly<Record<string, number | null>>;
+};
+
+/** The sampling options that `balanced` clears. */
+const SAMPLING = ["temperature", "top_p", "top_k", "min_p", "repeat_penalty"] as const;
+
+/** The presets, in key order. Every value is inside the option table's range. */
+export const PRESETS: readonly TunePreset[] = [
+  { key: 1, id: "precise", label: "precise", options: { temperature: 0.2, top_p: 0.9, repeat_penalty: 1.1 } },
+  {
+    key: 2,
+    id: "balanced",
+    label: "balanced",
+    options: Object.fromEntries(SAMPLING.map((name) => [name, null])),
+  },
+  { key: 3, id: "creative", label: "creative", options: { temperature: 1.0, top_p: 0.95, min_p: 0.05 } },
+  { key: 4, id: "long-memory", label: "long memory", options: { num_ctx: 16384 } },
+];
+
+/** The hint line under the explanation. */
+export const PRESETS_HINT = `presets  ${PRESETS.map((preset) => `${preset.key} ${preset.label}`).join("   ")}`;
 
 const FILLS = "▏▎▍▌▋▊▉";
 
@@ -114,6 +146,56 @@ export function withSession(state: TuneState, options: Readonly<Record<string, T
 /** What is saved for the model, as `model.options.saved` says it. Another model's is ignored. */
 export function withSaved(state: TuneState, model: string, saved: Readonly<Record<string, TuneValue>>): TuneState {
   return model === state.model ? { ...state, saved } : state;
+}
+
+/** The preset for a key, or null. */
+export function presetForKey(key: number): TunePreset | null {
+  return PRESETS.find((preset) => preset.key === key) ?? null;
+}
+
+/** Names of the rows whose value in use differs between two states, in table order. */
+export function changedRows(before: TuneState, after: TuneState): string[] {
+  return after.options
+    .filter((option) => tuneRow(before, option).value !== tuneRow(after, option).value)
+    .map((option) => option.name);
+}
+
+/**
+ * Apply a preset to this session, whatever the target says. `options` is what to send with
+ * `session.set_options`; `state` has the new overrides, the preset's name, and the rows that moved.
+ */
+export function applyPreset(
+  state: TuneState,
+  preset: TunePreset,
+): { state: TuneState; options: Record<string, number | null> } {
+  const session: Record<string, TuneValue> = { ...state.session };
+  for (const [name, value] of Object.entries(preset.options)) {
+    if (value === null) {
+      delete session[name];
+    } else {
+      session[name] = value;
+    }
+  }
+  const moved = { ...state, session };
+  const next: TuneState = { ...moved, preset: preset.label, lit: changedRows(state, moved) };
+  return { state: next, options: { ...preset.options } };
+}
+
+/**
+ * Keep the session's overrides for the model: `saved` takes them, the session is left empty.
+ * `save` is what to send to `model.options.set`, `clear` the nulls for `session.set_options`.
+ */
+export function keepSession(state: TuneState): {
+  state: TuneState;
+  save: Record<string, TuneValue>;
+  clear: Record<string, null>;
+} {
+  const save = { ...state.session };
+  const clear = Object.fromEntries(Object.keys(save).map((name) => [name, null]));
+  const next: TuneState = { ...state, saved: { ...state.saved, ...save }, session: {} };
+  delete next.preset;
+  delete next.lit;
+  return { state: next, save, clear };
 }
 
 /**
