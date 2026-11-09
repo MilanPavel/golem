@@ -18,7 +18,7 @@ What talks to what, and how:
 
 ## Where to go next
 
-- Start with [The agent loop](architecture/agent-loop.md), chapter 1, and follow the Next links.
+- Start with [The agent loop](architecture/agent-loop.md), and follow the Next links.
 - The choice behind each part is an ADR in [Decisions](adr/README.md).
 - How the Python and TypeScript trees share one repository is in [The monorepo](monorepo.md).
 - Every setting in `config.toml` is in [Settings](guide/settings.md).

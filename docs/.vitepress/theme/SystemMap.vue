@@ -62,7 +62,7 @@ const parts: Part[] = [
   {
     id: "sessions", x: 346, y: 136, w: 298, h: 44, title: "Sessions", sub: "runs, the event log, fan-out",
     about: "One chat each, with an id and a project folder. A run is one answer. Every event is numbered by `seq` and written to `golem.db` before any client sees it, so a client that reconnects reads what it missed.",
-    code: "golem/sessions/", link: "/architecture/sessions", chapter: "Sessions that survive",
+    code: "golem/sessions/", link: "/architecture/sessions", chapter: "Sessions",
   },
   {
     id: "graph", x: 346, y: 196, w: 190, h: 44, title: "Graph runtime", sub: "the agent loop",
@@ -117,12 +117,12 @@ const parts: Part[] = [
   {
     id: "golemdb", x: 32, y: 368, w: 264, h: 36, title: "golem.db", sub: "the event log, sessions, runs",
     about: "golem's own SQLite file: every event, numbered by `seq`, and the sessions and runs tables derived from them in the same transaction. Long tool output is kept here as artifacts.",
-    code: "golem/store/", link: "/architecture/sessions#the-event-log", chapter: "Sessions that survive",
+    code: "golem/store/", link: "/architecture/sessions#the-event-log", chapter: "Sessions",
   },
   {
     id: "ckpt", x: 32, y: 414, w: 264, h: 36, title: "checkpoints.db", sub: "the model's memory",
     about: "Written by LangGraph's SQLite checkpointer after each step. The thread id is the session id. It is a separate file, so it can be wiped without losing the event log.",
-    link: "/architecture/sessions#files-on-disk", chapter: "Sessions that survive",
+    link: "/architecture/sessions#files-on-disk", chapter: "Sessions",
   },
   {
     id: "config", x: 32, y: 460, w: 264, h: 36, title: "config.toml", sub: "your settings and rules",
@@ -171,7 +171,7 @@ const steps: Step[] = [
   {
     title: "A run starts, and is written down",
     text: "The session starts a run. Your `message.completed` and `run.started` are written to `golem.db` first, then sent to every client attached to the session.",
-    lit: ["server", "sessions", "golemdb"], path: ["server", "sessions", "golemdb"], link: "/architecture/sessions", chapter: "Sessions that survive",
+    lit: ["server", "sessions", "golemdb"], path: ["server", "sessions", "golemdb"], link: "/architecture/sessions", chapter: "Sessions",
   },
   {
     title: "The graph builds the context",
