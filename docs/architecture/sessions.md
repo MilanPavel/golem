@@ -1,5 +1,5 @@
 ---
-title: Sessions that survive
+title: Sessions
 description: Why an agent's work should outlive a closed window, a stopped run, and a crash, and how golem keeps it in an event log and a checkpoint, closes what a crash left open, and forks a chat at one message.
 order: 5
 adrs: [6, 8, 9, 10, 20]
