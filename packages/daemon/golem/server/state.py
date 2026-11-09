@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
+
+from pydantic import BaseModel
 
 from golem.mcp import McpSupervisor
 from golem.mcp.importer import ScanStore
@@ -43,3 +46,5 @@ class DaemonState:
     user_home: Path | None = None
     """The home folder other apps keep their config in. None means the real one."""
     mcp_imports: ScanStore = field(default_factory=ScanStore)
+    broadcast: Callable[[BaseModel], None] = field(default=lambda _notification: None)
+    """Queues a notification on every connection that said hello."""

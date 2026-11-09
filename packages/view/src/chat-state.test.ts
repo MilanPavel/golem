@@ -802,3 +802,18 @@ test("an event that changes neither the chat nor the context returns the same st
   const same = reduceChat(emptyChat, { seq: 1, session_id: "s", run_id: "r", ts: "t", type: "session.updated", data: {} } as unknown as ChatEvent);
   assert.equal(same, emptyChat);
 });
+
+test("model.options.changed keeps the session's whole set of overrides", () => {
+  const event = (options: Record<string, number | string>): ChatEvent => ({
+    seq: 2,
+    session_id: "s",
+    run_id: null,
+    ts: "t",
+    type: "model.options.changed",
+    data: { options },
+  });
+  assert.deepEqual(emptyChat.options, {});
+  const set = reduceChat(emptyChat, event({ top_k: 5, seed: 7 }));
+  assert.deepEqual(set.options, { top_k: 5, seed: 7 });
+  assert.deepEqual(reduceChat(set, event({ top_k: 5 })).options, { top_k: 5 });
+});

@@ -168,6 +168,8 @@ export function useCommands({ session, cwd, typing, send }: UseCommandsOptions):
             return "handled";
           case "artifact":
             return say(NOT_YET.artifact);
+          case "tune":
+            return say(NOT_YET.tune);
           case "setup":
             openSetup({ window: OVERVIEW, returnTo: focused() });
             return "handled";

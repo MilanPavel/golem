@@ -142,6 +142,7 @@ from golem_protocol.commands import (
     ModelOption,
     ModelOptionsGetParams,
     ModelOptionsGetResult,
+    ModelOptionsSaved,
     ModelOptionsSetParams,
     ModelOptionsSetResult,
     ModelPriceInfo,
@@ -203,6 +204,7 @@ from golem_protocol.commands import (
     TraceSpanResult,
 )
 from golem_protocol.events import Ping
+from golem_protocol.rpc import ModelOptionsSavedNotification
 from golem_protocol.version import PROTOCOL_MAJOR, PROTOCOL_MINOR
 
 log = logging.getLogger("golem.server")
@@ -707,6 +709,9 @@ async def _model_options_set(
     except OSError as exc:
         raise RpcCallError(INTERNAL_ERROR, f"could not write {config_file}: {exc}") from exc
     log.info("model options model=%s saved=%s", name, sorted(saved))
+    ctx.state.broadcast(
+        ModelOptionsSavedNotification(params=ModelOptionsSaved(model=name, saved=saved))
+    )
     return ModelOptionsSetResult(model=name, saved=saved)
 
 

@@ -96,6 +96,8 @@ export type ChatState = {
   retry: { text: string; provider: string } | null;
   /** The context of the newest model call that reported its input, from the `model.call.*` events. */
   context: LiveContextState;
+  /** The session's option overrides, from the newest `model.options.changed`: the whole set. */
+  options: Readonly<Record<string, number | string>>;
 };
 
 export const emptyChat: ChatState = {
@@ -112,6 +114,7 @@ export const emptyChat: ChatState = {
   down: null,
   retry: null,
   context: emptyLiveContext,
+  options: {},
 };
 
 /** What to do after a model server did not answer, besides fixing it. */
@@ -218,7 +221,7 @@ function reduceChatEvent(state: ChatState, event: ChatEvent): ChatState {
     case "model.selected":
       return { ...state, down: null, retry: null };
     case "model.options.changed":
-      return state;
+      return { ...state, options: event.data.options };
     case "message.started":
       return {
         ...state,

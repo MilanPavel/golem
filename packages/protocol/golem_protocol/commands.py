@@ -838,6 +838,15 @@ class ModelOptionsSetResult(BaseModel):
     saved: dict[str, float | str]
 
 
+class ModelOptionsSaved(BaseModel):
+    """The options saved for a model changed. ``saved`` is what is saved for it now."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    model: str = Field(min_length=1)
+    saved: dict[str, float | str]
+
+
 class SessionSetOptionsParams(BaseModel):
     """``session.set_options``. Override options for one session only.
 
@@ -2205,6 +2214,7 @@ __all__ = [
     "ModelOption",
     "ModelOptionsGetParams",
     "ModelOptionsGetResult",
+    "ModelOptionsSaved",
     "ModelOptionsSetParams",
     "ModelOptionsSetResult",
     "ModelPriceInfo",
