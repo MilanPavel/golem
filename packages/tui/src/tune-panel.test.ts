@@ -5,7 +5,7 @@ import type { ModelOption, ModelOptionsGetResult } from "@golem/client";
 import { tuneState, type TuneState } from "@golem/view";
 
 import type { Press, PressName } from "./keys.ts";
-import { pressTune, tuneKeyOf, tuneLines, tuneOpening } from "./tune-panel.ts";
+import { pressTune, tuneKeyOf, tuneLines, tuneLitLines, tuneOpening } from "./tune-panel.ts";
 
 function press(name: PressName | null, input = "", ctrl = false): Press {
   return { name, input, ctrl, meta: false };
@@ -124,7 +124,8 @@ test("the panel shows a row for each option, the default note, the long text, an
   assert.equal(keep.includes("5m"), true);
   assert.equal(lines.some((line) => line.startsWith("─ temperature ─")), true);
   assert.equal(lines.some((line) => line.includes("About temperature.")), true);
-  assert.equal(lines[lines.length - 1], " ↑/↓ move · ←/→ change · r reset · Esc close");
+  assert.equal(lines[lines.length - 2], " ↑/↓ move · ←/→ change · r reset · Esc close");
+  assert.equal(lines[lines.length - 1], " presets  1 precise   2 balanced   3 creative   4 long memory");
 });
 
 test("the header says where changes go", () => {
@@ -147,4 +148,49 @@ test("the long text wraps to the terminal", () => {
   const start = lines.findIndex((line) => line.startsWith("─ temperature"));
   const end = lines.length - 1;
   assert.equal(end - start > 2, true);
+});
+
+test("1 to 4 and S map to preset and save keys", () => {
+  assert.equal(tuneKeyOf(press(null, "1")), "preset-1");
+  assert.equal(tuneKeyOf(press(null, "4")), "preset-4");
+  assert.equal(tuneKeyOf(press(null, "5")), null);
+  assert.equal(tuneKeyOf(press(null, "S")), "save");
+  assert.equal(tuneKeyOf(press(null, "S", true)), null);
+});
+
+test("pressing 1 sends precise's values to the session, even when changes go to the model", () => {
+  const pressed = pressTune(open(), "preset-1");
+  assert.deepEqual(pressed.action, {
+    kind: "preset",
+    options: { temperature: 0.2, top_p: 0.9, repeat_penalty: 1.1 },
+  });
+  assert.deepEqual(pressed.state.session, { temperature: 0.2, top_p: 0.9, repeat_penalty: 1.1 });
+  assert.equal(pressed.state.target, "saved");
+  assert.deepEqual(pressed.state.saved, {});
+});
+
+test("the header names the preset, the moved rows light up, and the next key ends it", () => {
+  const pressed = pressTune(open(), "preset-1").state;
+  const lines = tuneLines(pressed, 80);
+  assert.equal(lines[0]?.endsWith("preset precise · this session"), true);
+  assert.deepEqual(tuneLitLines(pressed), [1]);
+  const moved = pressTune(pressed, "down").state;
+  assert.deepEqual(tuneLitLines(moved), []);
+  assert.equal(tuneLines(moved, 80)[0]?.endsWith("preset precise · this session"), true);
+  const edited = pressTune(moved, "right").state;
+  assert.equal(tuneLines(edited, 80)[0]?.endsWith("saved for this model · s this session only"), true);
+});
+
+test("S saves the session's values for the model and clears them, and does nothing with none", () => {
+  const applied = pressTune(open(), "preset-1").state;
+  assert.equal(tuneLines(applied, 80).some((line) => line.startsWith(" S save")), true);
+  const kept = pressTune(applied, "save");
+  assert.deepEqual(kept.action, {
+    kind: "save",
+    save: { temperature: 0.2, top_p: 0.9, repeat_penalty: 1.1 },
+    clear: { temperature: null, top_p: null, repeat_penalty: null },
+  });
+  assert.deepEqual(kept.state.session, {});
+  assert.deepEqual(kept.state.saved, { temperature: 0.2, top_p: 0.9, repeat_penalty: 1.1 });
+  assert.deepEqual(pressTune(open(), "save").action, { kind: "none" });
 });
