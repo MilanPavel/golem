@@ -14,7 +14,12 @@ from test_server import HELLO, RpcClient, rpc_result, start_daemon, stop_daemon
 
 from golem.config import GolemSettings, ModelPrice, ModelSettings, ProviderSettings
 from golem.models.catalog import CatalogEntry, HostedEntry
-from golem.models.discovery import ListedModel, ModelDiscovery, openai_chat_model
+from golem.models.discovery import (
+    ListedModel,
+    ModelDiscovery,
+    _modelfile_num_ctx,  # pyright: ignore[reportPrivateUsage]
+    openai_chat_model,
+)
 from golem.models.keys import MemoryKeyStore
 from golem.models.prices import PriceBook
 from golem.models.router import ModelRouter
@@ -809,6 +814,73 @@ async def test_known_ctx_reads_the_listing_then_the_price_book(tmp_path: Path) -
     await discovery.list()
     assert discovery.known_ctx("ollama/qwen3:8b") == 40960
     await discovery.aclose()
+
+
+@pytest.mark.parametrize(
+    ("parameters", "expected"),
+    [
+        ("num_ctx 8192", 8192),
+        ('stop "<|im_start|>"\nnum_ctx                        8192\nstop "<|im_end|>"', 8192),
+        ("num_ctx abc", None),
+        ("num_ctx 0", None),
+        ("num_ctx -5", None),
+        ("", None),
+        (None, None),
+        (8192, None),
+    ],
+)
+def test_modelfile_num_ctx_reads_the_parameters_text(
+    parameters: object, expected: int | None
+) -> None:
+    assert _modelfile_num_ctx(parameters) == expected
+
+
+def _show_with(parameters: dict[str, object]) -> Handler:
+    return _json(
+        {"model_info": {"llama.context_length": 8192}, "capabilities": ["completion"], **parameters}
+    )
+
+
+async def test_modelfile_num_ctx_reads_the_show_parameters(tmp_path: Path) -> None:
+    routes = _ollama_routes()
+    routes["127.0.0.1/api/show"] = _show_with({"parameters": "num_ctx 6144"})
+    discovery = _discovery(
+        ModelRouter(GolemSettings(), keys=MemoryKeyStore()), Network(routes), tmp_path
+    )
+    assert discovery.modelfile_num_ctx("ollama/qwen3:8b") is None
+    await discovery.list()
+    assert discovery.modelfile_num_ctx("ollama/qwen3:8b") == 6144
+    assert discovery.modelfile_num_ctx("ollama/unknown") is None
+    await discovery.aclose()
+
+
+async def test_modelfile_num_ctx_is_none_without_parameters_or_when_show_fails(
+    tmp_path: Path,
+) -> None:
+    routes = _ollama_routes()
+    discovery = _discovery(
+        ModelRouter(GolemSettings(), keys=MemoryKeyStore()), Network(routes), tmp_path
+    )
+    await discovery.list()
+    assert discovery.modelfile_num_ctx("ollama/qwen3:8b") is None
+    await discovery.aclose()
+    routes["127.0.0.1/api/show"] = lambda _request: httpx.Response(500)
+    failing = _discovery(
+        ModelRouter(GolemSettings(), keys=MemoryKeyStore()), Network(routes), tmp_path
+    )
+    listing = await failing.list()
+    assert failing.modelfile_num_ctx("ollama/qwen3:8b") is None
+    assert "ollama/qwen3:8b" in _by_ref(listing.models)
+    await failing.aclose()
+
+
+async def test_show_is_requested_once_per_digest_across_listings(tmp_path: Path) -> None:
+    network = Network(_ollama_routes())
+    discovery = _discovery(ModelRouter(GolemSettings(), keys=MemoryKeyStore()), network, tmp_path)
+    await discovery.list()
+    first = network.calls["127.0.0.1/api/show"]
+    await discovery.list(refresh=True)
+    assert network.calls["127.0.0.1/api/show"] == first
 
 
 def _ps(handler: Handler) -> Network:
