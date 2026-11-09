@@ -5,7 +5,7 @@
 
 ## Context
 
-Step 1.9 built the setup window for the terminal: one panel at a time, a stepper, and a navigation table driven by Enter, the arrows, and Esc ([design/setup-window.md](../design/setup-window.md)). Step 10.10.6 ported it to the browser as a centred dialog that draws the same panels and reads the same table. Step 10.11.1 then added a Settings page, whose Setup section is a status line and an `Open setup` button that opens the dialog.
+Step 1.9 built the setup window for the terminal: one panel at a time, a stepper, and a navigation table driven by Enter, the arrows, and Esc ([the terminal app](../architecture/tui.md)). Step 10.10.6 ported it to the browser as a centred dialog that draws the same panels and reads the same table. Step 10.11.1 then added a Settings page, whose Setup section is a status line and an `Open setup` button that opens the dialog.
 
 Using it showed that the port doesn't fit a page:
 
@@ -60,4 +60,4 @@ What the page may do does not change ([ADR-028](028-web-gateway.md)): it install
 
 ### Risks
 
-- The two can drift. They share rows, words, and the start rule through `@golem/view`, and `docs/design/setup-window.md` § *The web UI* says how they differ.
+- The two can drift. They share rows, words, and the start rule through `@golem/view`, so only the layout differs.

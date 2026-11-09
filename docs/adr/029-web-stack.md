@@ -78,7 +78,7 @@ Golem's look is a short list of named values. `src/styles/tokens.css` is the onl
   - the faint grid behind the empty screen
 - **Contrast is checked.** A script reads `tokens.css` and checks every text-on-surface pair in both themes: 4.5:1 for text, 3:1 for borders, focus rings, and status dots ([WCAG 2.2](https://www.w3.org/TR/WCAG22/)). It runs in `just check`. Every state the pixel golem shows also has a word next to it, because colour alone is not enough.
 
-The values themselves are in `docs/design/web.md`, from the prototype approved in 10.2.
+The values themselves are in [the design system](../design/index.md), from the prototype approved in 10.2.
 
 ### State
 

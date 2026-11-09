@@ -60,7 +60,7 @@ For someone who wants to change golem.
 | Hacking: set up, run, ship | [contributing/hacking.md](contributing/hacking.md) | |
 | Contributing | [contributing/index.md](contributing/index.md), which includes [CONTRIBUTING.md](../CONTRIBUTING.md) | |
 | Building, releasing, and running | [ops/build.md](ops/build.md), [ops/release.md](ops/release.md), [ops/run.md](ops/run.md), split into pages | [#296](https://github.com/MilanPavel/golem/issues/296) |
-| Design: the design system, the web UI, the setup window, MCP management | [design/index.md](design/index.md), [design/web.md](design/web.md), [design/setup-window.md](design/setup-window.md), [design/mcp.md](design/mcp.md). The gallery at `/gallery/` is built from `packages/web`. | |
+| Design: the design system, and the gallery of every screen | [design/index.md](design/index.md). The gallery at `/gallery/` is built from `packages/web`. | |
 
 ## Project
 
@@ -80,6 +80,5 @@ For someone who wants to change golem.
 
 - `architecture/_template.md`: the shape of a "How golem works" chapter.
 - `adr/template.md`: the shape of an ADR.
-- `design/prototype.html`: the web UI's prototype. Open it in a browser.
 - `images/`: the pictures the pages use.
 - `README.md`: this map. The site's home page is `index.md`, from [#274](https://github.com/MilanPavel/golem/issues/274).

@@ -266,6 +266,23 @@ MCP servers are listed with `mcp.list`: each one's name, state (`idle`, `startin
 
 `golem/mcp/probe.py` tries a server outside the supervisor, so one that is not saved yet, or one that fails, can be looked at step by step. `mcp.test` runs it with `{test_id, name}` for a saved server, `{test_id, config, secrets}` for one that is not, or `{test_id, catalog_id, inputs, secrets}` for a catalog entry, which the daemon fills the way `mcp.add` does (secrets by input id, used for this test only). The steps are `resolve` (the command is on the search path, or the host resolves), `spawn` or `connect`, `initialize` (60 s), `tools` (30 s), and `ping` (10 s). Each has its own timeout and timing, a failure skips the rest, and `mcp.test.progress` carries each change to every connection while the call is open. The result has the steps, the server's name and version, its tools (with `hidden` for a saved server's filter), the last 50 lines of stderr, and one `hint`, from a pure function (`test_hint`) over the failed step and the error: Node or uv missing (with `runtime`, so a UI can offer to install it), Docker missing, HTTP 401 or 403 (a refused token, or OAuth when the answer has `WWW-Authenticate`), a first run that is still downloading, an exit with its last stderr line, or a host that cannot be reached.
 
+The hint is one line with one cause, and says what golem can do. It is chosen from the first failed step, in this order:
+
+| What went wrong | The hint | `runtime` |
+|---|---|---|
+| A secret named in the config is not stored | A secret is missing: paste it again in the server's form | |
+| `resolve` fails for `npx`, `node`, or `npm` | Node is missing: golem can install it | `node` |
+| `resolve` fails for `uvx` or `uv` | uv is missing: golem can install it | `uv` |
+| `resolve` fails for `docker` | Install Docker Desktop or OrbStack | |
+| `resolve` fails for another command | Install `<command>`, or set command to its full path | |
+| HTTP 401 or 403, with `WWW-Authenticate` | This server signs in with OAuth | |
+| HTTP 401 or 403, without it | The token was refused: paste a new one | |
+| `initialize` gets no answer, from `npx`, `uvx`, `pnpm`, or `bunx` | The first run downloads the package: try again | |
+| The process exited | The last line of its stderr, as it was | |
+| The host does not resolve, or refuses the connection | Can't reach `<host>` | |
+
+A failure that no row names has no hint. A UI then shows the server's own last words and the log, and never a made-up cause.
+
 Secrets sent with `mcp.test` are used for that test and forgotten. A saved server may also read its stored secrets. A config that is not saved may not: otherwise a stored token could be sent to any address the page names, which is what ADR-037's second check stops for `mcp.update`. Every line that leaves the probe, the stderr tail included, has the values of the secrets replaced by `•••`.
 
 The supervisor keeps a log for each server, up to 500 lines: its stderr, and lines for what golem did (`starting`, `running (12 tools)`, `failed: …`, `retry in 4 s`). The log belongs to the server's entry, so it survives restarts and a changed table, and the values of the server's secrets are replaced by `•••` in every line. `mcp.logs {name, limit}` returns the last lines, and `mcp.server.log` sends new ones to every connection in batches of at most one every 250 ms for each server.

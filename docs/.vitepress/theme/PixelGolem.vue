@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// The 9×6 pixel golem, as in the TUI and the web UI (docs/design/web.md, "The pixel golem").
+// The 9×6 pixel golem, as in the TUI and the web UI (docs/design/index.md, "The pixel golem").
 // `cell` is the size of one pixel in px, a whole number, so the edges stay crisp.
 import { computed } from "vue";
 import { GOLEM_CELLS, GOLEM_HEIGHT, GOLEM_WIDTH } from "../golem.ts";

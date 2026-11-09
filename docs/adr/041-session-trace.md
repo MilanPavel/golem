@@ -83,7 +83,7 @@ A session from before Phase 13 still has a trace:
 
 ### The page
 
-Its own route, `/s/:id/trace`, with finished data and a refresh button. It does not update while a run streams. It is web only; the TUI keeps `/debug`. The design is in [docs/design/web.md](../design/web.md#the-trace).
+Its own route, `/s/:id/trace`, with finished data and a refresh button. It does not update while a run streams. It is web only; the TUI keeps `/debug`. The design is in [the guide](../guide/web.md#trace-a-session).
 
 ### Privacy
 

@@ -1,5 +1,5 @@
 // golem's look for the docs: the web UI's palette and type on VitePress's default theme
-// (docs/design/web.md, ADR-034). The palette comes from tokens.css through config.mts.
+// (docs/design/index.md, ADR-034). The palette comes from tokens.css through config.mts.
 
 import type { Theme } from "vitepress";
 import DefaultTheme from "vitepress/theme";

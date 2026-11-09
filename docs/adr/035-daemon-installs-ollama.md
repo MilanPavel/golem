@@ -5,7 +5,7 @@
 
 ## The idea
 
-The setup window (step 1.9, [#343](https://github.com/MilanPavel/golem/issues/343), drawn in `docs/design/setup-window.md`) takes a new user from nothing to a model that answers. Two of its steps used to happen in the wrong place:
+The setup window (step 1.9, [#343](https://github.com/MilanPavel/golem/issues/343), drawn in [the terminal app](../architecture/tui.md)) takes a new user from nothing to a model that answers. Two of its steps used to happen in the wrong place:
 
 - **Installing Ollama.** The TUI ran `brew install ollama` itself, because the daemon runs under launchd with no `PATH` of the user's and no terminal (decision 4 of [#62](https://github.com/MilanPavel/golem/issues/62)). The browser can't run brew, so the web UI had no way to install Ollama, and two TUIs could each start their own install.
 - **Checking an API key.** `auth.set` stored any key. A wrong one showed up only as a failed first message.

@@ -2,7 +2,7 @@ import type { GolemState } from "@golem/view";
 
 export type { GolemState } from "@golem/view";
 
-/** The word shown beside each state, from docs/design/web.md. Colour is never the only sign. */
+/** The word shown beside each state, from docs/design/index.md. Colour is never the only sign. */
 export const GOLEM_STATE_LABEL: Record<GolemState, string> = {
   idle: "idle",
   thinking: "working",

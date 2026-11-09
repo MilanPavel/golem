@@ -4,9 +4,9 @@ import { formatElapsed } from "./duration.ts";
 import { firstRunChoice, hostedProviders, namesModel } from "./first-run.ts";
 
 /**
- * The setup window, the same in the terminal and the browser. It is drawn in
- * docs/design/setup-window.md, and this file is its section G: the panels,
- * the navigation between them, and what each one shows.
+ * The setup window, the same in the terminal and the browser. It is described in
+ * docs/architecture/tui.md. This file holds the panels, the navigation between
+ * them, and what each one shows.
  *
  * Guided mode walks Service, Engine, Model, and Ready. Single mode opens one
  * panel and goes back where it came from. The overview lists what is set up.
