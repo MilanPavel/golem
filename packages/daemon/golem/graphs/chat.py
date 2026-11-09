@@ -52,6 +52,9 @@ from golem.tools.registry import Artifacts, ToolRegistry
 
 log = logging.getLogger("golem.graphs")
 
+OPTIONS_KEY = "golem_model_options"
+"""The ``configurable`` key with the session's Ollama option overrides, for each model call."""
+
 INTERRUPTED_KEY = "golem_interrupted"
 """``response_metadata`` flag on a reply the run did not finish."""
 
@@ -162,6 +165,7 @@ class ChatRuntime:
         skill_folder: str | None = None,
         pinned: Sequence[str] = (),
         pinned_folders: Sequence[str] = (),
+        options: Mapping[str, float | str] | None = None,
     ) -> AsyncGenerator[object]:
         """Stream one user turn. The first turn writes the state fields.
 
@@ -186,6 +190,7 @@ class ChatRuntime:
                 MCP_KEY: list(mcp_servers),
                 PINNED_KEY: list(pinned),
                 PINNED_FOLDERS_KEY: list(pinned_folders),
+                OPTIONS_KEY: dict(options or {}),
             },
             "recursion_limit": _RECURSION_LIMIT,
         }
@@ -215,6 +220,7 @@ class ChatRuntime:
         mcp_servers: Sequence[str] = (),
         pinned: Sequence[str] = (),
         pinned_folders: Sequence[str] = (),
+        options: Mapping[str, float | str] | None = None,
     ) -> AsyncGenerator[object]:
         """Go on with a run paused on a tool approval, with the user's ``answer``.
 
@@ -231,6 +237,7 @@ class ChatRuntime:
                 MCP_KEY: list(mcp_servers),
                 PINNED_KEY: list(pinned),
                 PINNED_FOLDERS_KEY: list(pinned_folders),
+                OPTIONS_KEY: dict(options or {}),
             },
             "recursion_limit": _RECURSION_LIMIT,
         }
@@ -368,6 +375,7 @@ def open_chat(
         get_stream_writer()({STREAM_KEY: "model.started", "message_id": message_id})
         profile = state["model_profile"]
         scope = scope_of(config)
+        overrides = _options(config)
         await registry.prepare(scope)
         tools = registry.scoped(scope)
         schemas = tools.schemas()
@@ -393,7 +401,9 @@ def open_chat(
                     request["tools_sha"] = await blobs.put("tools", text)
             get_stream_writer()(request)
             try:
-                response = await binder.invoke(profile, router.chat_model(profile), sent, schemas)
+                response = await binder.invoke(
+                    profile, router.chat_model(profile, overrides), sent, schemas
+                )
             except Exception as exc:
                 down = router.unreachable(profile, exc)
                 if down is None:
@@ -489,6 +499,18 @@ def _cwd(config: RunnableConfig) -> str | None:
     configurable = cast(Mapping[str, object], config.get("configurable", {}))
     raw = configurable.get(CWD_KEY)
     return raw if isinstance(raw, str) and raw != "" else None
+
+
+def _options(config: RunnableConfig) -> dict[str, float | str]:
+    configurable = cast(Mapping[str, object], config.get("configurable", {}))
+    raw = configurable.get(OPTIONS_KEY)
+    if not isinstance(raw, dict):
+        return {}
+    return {
+        key: value
+        for key, value in cast(dict[object, object], raw).items()
+        if isinstance(key, str) and isinstance(value, (int, float, str))
+    }
 
 
 def _pinned(config: RunnableConfig) -> tuple[str, ...]:

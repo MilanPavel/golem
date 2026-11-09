@@ -581,6 +581,7 @@ class SessionManager:
                 mcp_servers=tuple(sorted(session.mcp_servers)),
                 pinned=tuple(session.skills),
                 pinned_folders=self._pinned_folders(session),
+                options=dict(session.options),
                 pins=session.pins,
             )
             control = RunControl()
@@ -648,6 +649,7 @@ class SessionManager:
                 mcp_servers=tuple(sorted(session.mcp_servers)),
                 pinned=tuple(session.skills),
                 pinned_folders=self._pinned_folders(session),
+                options=dict(session.options),
                 pins=session.pins,
             )
             control = RunControl()

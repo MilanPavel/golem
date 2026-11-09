@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 from fakes import ScriptedChatModel
 from langchain_anthropic import ChatAnthropic
+from langchain_core.messages import HumanMessage
 from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
 from pydantic import SecretStr
@@ -333,3 +334,37 @@ def test_an_invalid_edit_keeps_the_last_good_models(tmp_path: Path) -> None:
     router = ModelRouter(load_settings(home=tmp_path, project_dir=tmp_path), home=tmp_path)
     _touch_later(config, '[models.qwen]\nmodel = "no-slash"\n')
     assert router.resolve("qwen").model_id == "qwen3:8b"
+
+
+def _sent(model: object) -> dict[str, object]:
+    assert isinstance(model, ChatOllama)
+    options = model._chat_params([HumanMessage(content="hi")])["options"]  # pyright: ignore[reportPrivateUsage]
+    return dict(options)
+
+
+def test_a_saved_option_reaches_ollama() -> None:
+    settings = GolemSettings.model_validate(
+        {"ollama": {"models": {"qwen3:8b": {"temperature": 0.2, "min_p": 0.05, "seed": 7}}}}
+    )
+    model = ModelRouter(settings).chat_model("ollama/qwen3:8b")
+    sent = _sent(model)
+    assert sent["temperature"] == 0.2
+    assert sent["min_p"] == 0.05
+    assert sent["seed"] == 7
+
+
+def test_a_session_override_wins_over_the_saved_option() -> None:
+    settings = GolemSettings.model_validate(
+        {"ollama": {"models": {"qwen3:8b": {"temperature": 0.2, "top_k": 10}}}}
+    )
+    model = ModelRouter(settings).chat_model("ollama/qwen3:8b", {"temperature": 1.1})
+    sent = _sent(model)
+    assert sent["temperature"] == 1.1
+    assert sent["top_k"] == 10
+
+
+def test_options_of_another_model_do_not_apply() -> None:
+    settings = GolemSettings.model_validate(
+        {"ollama": {"models": {"llama3:8b": {"temperature": 0.2}}}}
+    )
+    assert "temperature" not in _sent(ModelRouter(settings).chat_model("ollama/qwen3:8b"))
