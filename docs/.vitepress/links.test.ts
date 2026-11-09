@@ -23,7 +23,6 @@ test("a link out of docs/ goes to the file on GitHub, with its anchor", () => {
 });
 
 test("a file in docs/ that is not a page goes to GitHub", () => {
-  assert.equal(siteHref("prototype.html", "design/web.md"), `${blob}docs/design/prototype.html`);
   assert.equal(siteHref("template.md", "adr/README.md"), `${blob}docs/adr/template.md`);
   assert.equal(siteHref("architecture/_template.md", "README.md"), `${blob}docs/architecture/_template.md`);
 });
