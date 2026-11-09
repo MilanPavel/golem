@@ -53,6 +53,7 @@ const EVENT_TYPES = new Set([
   "session.updated",
   "session.closed",
   "model.selected",
+  "model.options.changed",
   "message.started",
   "message.delta",
   "message.completed",

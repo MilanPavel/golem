@@ -1,0 +1,34 @@
+{
+  "additionalProperties": false,
+  "description": "``model.options.set``. Save options for a model in the user's ``config.toml``.\n\nA value of ``null`` removes that option, so the model's default applies again.\nOptions not named stay as they are. The values are checked against the table.",
+  "properties": {
+    "model": {
+      "minLength": 1,
+      "title": "Model",
+      "type": "string"
+    },
+    "options": {
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "title": "Options",
+      "type": "object"
+    }
+  },
+  "required": [
+    "model",
+    "options"
+  ],
+  "title": "ModelOptionsSetParams",
+  "type": "object"
+}

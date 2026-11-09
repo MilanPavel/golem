@@ -790,7 +790,7 @@ The prototype in [mcp-prototype.html](mcp-prototype.html) is a working Settings 
 - **Words.** Plain, and the same as the terminal's: `Install Node`, `Save anyway`, `Disable everywhere`. A button says what happens.
 - **Errors.** One line of what is wrong and the one thing to do. A failed call keeps the form as it was.
 - **Motion.** 150 to 200 ms, and none under `prefers-reduced-motion`.
-- **Tokens.** Only the tokens of [the web UI's design](web.md#tokens): no new colour is added for MCP. Status uses `allow`, `deny`, `wait`, and `faint`, and the accent stays clay.
+- **Tokens.** Only the tokens of [the web UI's design](index.md#tokens): no new colour is added for MCP. Status uses `allow`, `deny`, `wait`, and `faint`, and the accent stays clay.
 
 ## K · What each screen calls
 

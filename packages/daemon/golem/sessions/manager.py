@@ -21,6 +21,7 @@ from typing import cast
 from golem.graphs.adapter import PlainMessage, plain_messages, trace_messages
 from golem.graphs.chat import ChatRuntime
 from golem.graphs.state import SCHEMA_VERSION
+from golem.models import options as model_options
 from golem.models.router import ModelIdentity, ModelRouter
 from golem.permissions.engine import Allowance
 from golem.permissions.policy import explain
@@ -53,6 +54,7 @@ from golem_protocol.events import (
     EmptyEventData,
     ForkedFrom,
     MessageCompletedEvent,
+    ModelOptionsChangedData,
     ModelSelectedData,
     RunCancelledData,
     SessionAllowance,
@@ -142,6 +144,8 @@ class _LiveSession:
     mcp_servers: set[str] = field(default_factory=set[str])
     skills: list[str] = field(default_factory=list[str])
     """The pinned skills, in the order they were pinned."""
+    options: dict[str, float | str] = field(default_factory=dict[str, float | str])
+    """The Ollama option overrides of this session."""
     pins: PinMemory = field(default_factory=PinMemory)
     """What the log last said about each pin, so a run logs only a change."""
     title: str | None = None
@@ -487,6 +491,44 @@ class SessionManager:
             session.model_profile = model
             return identity
 
+    async def session_options(self, session_id: str) -> dict[str, float | str]:
+        """The session's option overrides.
+
+        Raises :class:`SessionNotFoundError` or :class:`SchemaMismatchError`.
+        """
+        async with self._lock:
+            return dict((await self._resolve(session_id)).options)
+
+    async def set_options(
+        self, session_id: str, change: dict[str, float | str | None]
+    ) -> dict[str, float | str]:
+        """Override options for this session, and store ``model.options.changed``.
+
+        A value of None removes an override. The overrides apply from the next run.
+        Nothing is stored when they do not change.
+
+        Raises :class:`SessionNotFoundError`, :class:`SchemaMismatchError`, or
+        ``ValueError`` for an unknown option or a value out of range.
+        """
+        for name, value in change.items():
+            if value is not None:
+                model_options.validate(name, value)
+        async with self._lock:
+            session = await self._resolve(session_id)
+            merged = dict(session.options)
+            for name, value in change.items():
+                if value is None:
+                    merged.pop(name, None)
+                else:
+                    merged[name] = value
+            if merged == session.options:
+                return merged
+            await self._events.emit(
+                session_id, None, "model.options.changed", ModelOptionsChangedData(options=merged)
+            )
+            session.options = merged
+            return dict(merged)
+
     def configured_model(self) -> ModelIdentity:
         """The model ``daemon.status`` reports for this process."""
         return self._runtime.router.identity()
@@ -539,6 +581,7 @@ class SessionManager:
                 mcp_servers=tuple(sorted(session.mcp_servers)),
                 pinned=tuple(session.skills),
                 pinned_folders=self._pinned_folders(session),
+                options=dict(session.options),
                 pins=session.pins,
             )
             control = RunControl()
@@ -606,6 +649,7 @@ class SessionManager:
                 mcp_servers=tuple(sorted(session.mcp_servers)),
                 pinned=tuple(session.skills),
                 pinned_folders=self._pinned_folders(session),
+                options=dict(session.options),
                 pins=session.pins,
             )
             control = RunControl()
@@ -903,6 +947,7 @@ class SessionManager:
             allowed_tools=set() if record is None else set(record.allowed_tools),
             mcp_servers=set() if record is None else set(record.mcp_servers),
             skills=[] if record is None else list(record.skills),
+            options={} if record is None else dict(record.options),
         )
         if session.skills:
             session.pins = PinMemory.from_events(await self._events.stored(session_id))

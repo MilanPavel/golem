@@ -17,13 +17,16 @@ from golem.config import load_settings
 from golem.config_edit import (
     McpTableError,
     RuleIndexError,
+    read_model_options,
     set_default_model,
     set_mcp_enabled,
+    set_model_options,
 )
 from golem.doctor import MacPlatform, run_checks
 from golem.folders import FolderError, list_dirs
 from golem.mcp import McpServerError, McpSupervisor
 from golem.models import ollama
+from golem.models import options as model_options
 from golem.models.discovery import KeyRejected, KeyUnchecked
 from golem.models.errors import ModelUnreachable
 from golem.models.install import InstallError, OllamaInstaller
@@ -136,6 +139,11 @@ from golem_protocol.commands import (
     ModelDeleteResult,
     ModelListParams,
     ModelListResult,
+    ModelOption,
+    ModelOptionsGetParams,
+    ModelOptionsGetResult,
+    ModelOptionsSetParams,
+    ModelOptionsSetResult,
     ModelPriceInfo,
     ModelProbeParams,
     ModelProbeResult,
@@ -180,6 +188,8 @@ from golem_protocol.commands import (
     SessionRevokeResult,
     SessionSetModelParams,
     SessionSetModelResult,
+    SessionSetOptionsParams,
+    SessionSetOptionsResult,
     SessionSetSkillsParams,
     SessionSetSkillsResult,
     SetupRow,
@@ -642,6 +652,77 @@ async def _model_set_default(
     return ModelSetDefaultResult(default=params.model)
 
 
+def _ollama_name(model: str) -> str:
+    return model.strip().removeprefix("ollama/")
+
+
+async def _model_options_get(
+    ctx: RequestContext, params: ModelOptionsGetParams
+) -> ModelOptionsGetResult:
+    name = _ollama_name(params.model)
+    discovery = ctx.state.models
+    own = {} if discovery is None else await discovery.ollama_parameters(f"ollama/{name}")
+    config_file = ctx.state.paths.config_file
+    try:
+        saved = await asyncio.to_thread(read_model_options, config_file, name)
+    except (OSError, ValueError) as exc:
+        raise RpcCallError(INTERNAL_ERROR, f"could not read {config_file}: {exc}") from exc
+    session: dict[str, float | str] | None = None
+    if params.session_id is not None:
+        try:
+            session = await _sessions(ctx).session_options(params.session_id)
+        except (SessionNotFoundError, SchemaMismatchError) as exc:
+            raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
+    return ModelOptionsGetResult(
+        model=name,
+        options=[
+            ModelOption(
+                name=row.name,
+                label=row.label,
+                kind=row.kind,
+                minimum=row.minimum,
+                maximum=row.maximum,
+                step=row.step,
+                default=row.default,
+                short=row.short,
+                long=row.long,
+            )
+            for row in model_options.OPTIONS
+        ],
+        defaults=model_options.defaults(own),
+        saved=saved,
+        session=session,
+    )
+
+
+async def _model_options_set(
+    ctx: RequestContext, params: ModelOptionsSetParams
+) -> ModelOptionsSetResult:
+    name = _ollama_name(params.model)
+    config_file = ctx.state.paths.config_file
+    try:
+        saved = await asyncio.to_thread(set_model_options, config_file, name, params.options)
+    except ValueError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+    except OSError as exc:
+        raise RpcCallError(INTERNAL_ERROR, f"could not write {config_file}: {exc}") from exc
+    log.info("model options model=%s saved=%s", name, sorted(saved))
+    return ModelOptionsSetResult(model=name, saved=saved)
+
+
+async def _session_set_options(
+    ctx: RequestContext, params: SessionSetOptionsParams
+) -> SessionSetOptionsResult:
+    try:
+        options = await _sessions(ctx).set_options(params.session_id, params.options)
+    except (SessionNotFoundError, SchemaMismatchError) as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
+    except ValueError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+    log.info("session options session=%s options=%s", params.session_id, sorted(options))
+    return SessionSetOptionsResult(session_id=params.session_id, options=options)
+
+
 async def _config_get(ctx: RequestContext, params: ConfigGetParams) -> ConfigGetResult:
     policy, tools = ctx.state.policy, ctx.state.tools
     if policy is None or tools is None:
@@ -1045,6 +1126,15 @@ def standard_methods() -> dict[str, Method]:
         "model.delete": Method("model.delete", ModelDeleteParams, True, _model_delete),
         "model.set_default": Method(
             "model.set_default", ModelSetDefaultParams, True, _model_set_default
+        ),
+        "model.options.get": Method(
+            "model.options.get", ModelOptionsGetParams, True, _model_options_get
+        ),
+        "model.options.set": Method(
+            "model.options.set", ModelOptionsSetParams, True, _model_options_set
+        ),
+        "session.set_options": Method(
+            "session.set_options", SessionSetOptionsParams, True, _session_set_options
         ),
         "fs.list_dirs": Method("fs.list_dirs", FsListDirsParams, True, _fs_list_dirs),
         "setup.status": Method("setup.status", SetupStatusParams, True, _setup_status),

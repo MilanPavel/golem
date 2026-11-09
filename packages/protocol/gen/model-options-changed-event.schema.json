@@ -1,0 +1,70 @@
+{
+  "$defs": {
+    "ModelOptionsChangedData": {
+      "additionalProperties": false,
+      "description": "The session's option overrides, whole, after a change.\n\nThe last event holds what applies from the next run, so a replayed session\ngets its options back. An empty ``options`` means no overrides.",
+      "properties": {
+        "options": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "title": "Options",
+          "type": "object"
+        }
+      },
+      "required": [
+        "options"
+      ],
+      "title": "ModelOptionsChangedData",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "``session.set_options`` changed the session's option overrides.",
+  "properties": {
+    "data": {
+      "$ref": "#/$defs/ModelOptionsChangedData"
+    },
+    "run_id": {
+      "title": "Run Id",
+      "type": "null"
+    },
+    "seq": {
+      "minimum": 1,
+      "title": "Seq",
+      "type": "integer"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    },
+    "ts": {
+      "minLength": 1,
+      "title": "Ts",
+      "type": "string"
+    },
+    "type": {
+      "const": "model.options.changed",
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "seq",
+    "session_id",
+    "run_id",
+    "ts",
+    "type",
+    "data"
+  ],
+  "title": "ModelOptionsChangedEvent",
+  "type": "object"
+}

@@ -764,6 +764,104 @@ class SessionSetModelResult(BaseModel):
     model_name: str | None = Field(default=None, min_length=1)
 
 
+class ModelOption(BaseModel):
+    """One row of the option table: what an option may be, and what it does.
+
+    ``kind`` ``duration`` is a time such as ``5m``, or a number of seconds, and
+    ``-1`` for always. ``default`` is Ollama's own, and ``None`` when it has
+    none, as for the seed.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    label: str = Field(min_length=1)
+    kind: Literal["float", "int", "duration"]
+    minimum: float
+    maximum: float
+    step: float = Field(gt=0)
+    default: float | str | None = None
+    short: str = Field(min_length=1)
+    long: str = Field(min_length=1)
+
+
+class ModelOptionsGetParams(BaseModel):
+    """``model.options.get``. The option table and the values one model has.
+
+    ``model`` is an Ollama name such as ``qwen3:8b``, or ``ollama/qwen3:8b``.
+    With ``session_id`` the result also has that session's overrides.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    model: str = Field(min_length=1)
+    session_id: str | None = Field(default=None, min_length=1)
+
+
+class ModelOptionsGetResult(BaseModel):
+    """The table, and each option's value from the model's own default up.
+
+    ``defaults`` are the model's own values from Ollama, and Ollama's for what the
+    model leaves out. ``saved`` is what ``model.options.set`` stored for the model.
+    ``session`` is the session's overrides, or ``None`` when no session was asked for.
+    The value in use is the session's, else the saved, else the default.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    model: str = Field(min_length=1)
+    options: list[ModelOption]
+    defaults: dict[str, float | str]
+    saved: dict[str, float | str]
+    session: dict[str, float | str] | None = None
+
+
+class ModelOptionsSetParams(BaseModel):
+    """``model.options.set``. Save options for a model in the user's ``config.toml``.
+
+    A value of ``null`` removes that option, so the model's default applies again.
+    Options not named stay as they are. The values are checked against the table.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    model: str = Field(min_length=1)
+    options: dict[str, float | str | None]
+
+
+class ModelOptionsSetResult(BaseModel):
+    """What is saved for the model now."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    model: str = Field(min_length=1)
+    saved: dict[str, float | str]
+
+
+class SessionSetOptionsParams(BaseModel):
+    """``session.set_options``. Override options for one session only.
+
+    A value of ``null`` removes that override. Options not named stay as they are.
+    The daemon emits ``model.options.changed``, and the overrides apply from the
+    session's next run. They are kept with the session, and are not written to
+    ``config.toml``.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    options: dict[str, float | str | None]
+
+
+class SessionSetOptionsResult(BaseModel):
+    """The session's overrides now."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    options: dict[str, float | str]
+
+
 class ModelSetDefaultParams(BaseModel):
     """``model.set_default``. Write ``default_model`` to the user's ``config.toml``.
 
@@ -2104,6 +2202,11 @@ __all__ = [
     "ModelDeleteResult",
     "ModelListParams",
     "ModelListResult",
+    "ModelOption",
+    "ModelOptionsGetParams",
+    "ModelOptionsGetResult",
+    "ModelOptionsSetParams",
+    "ModelOptionsSetResult",
     "ModelPriceInfo",
     "ModelProbeParams",
     "ModelProbeResult",
@@ -2156,6 +2259,8 @@ __all__ = [
     "SessionRevokeResult",
     "SessionSetModelParams",
     "SessionSetModelResult",
+    "SessionSetOptionsParams",
+    "SessionSetOptionsResult",
     "SessionSetSkillsParams",
     "SessionSetSkillsResult",
     "SessionSummary",

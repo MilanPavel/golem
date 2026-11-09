@@ -104,6 +104,7 @@ class Turn:
     mcp_servers: tuple[str, ...] = ()
     pinned: tuple[str, ...] = ()
     pinned_folders: tuple[str, ...] = ()
+    options: dict[str, float | str] = field(default_factory=dict[str, float | str], compare=False)
     pins: PinMemory = field(default_factory=PinMemory, compare=False)
     skill: Invocation | None = None
     typed: str | None = None
@@ -137,6 +138,7 @@ class Resume:
     mcp_servers: tuple[str, ...] = ()
     pinned: tuple[str, ...] = ()
     pinned_folders: tuple[str, ...] = ()
+    options: dict[str, float | str] = field(default_factory=dict[str, float | str], compare=False)
     pins: PinMemory = field(default_factory=PinMemory, compare=False)
 
 
@@ -236,6 +238,7 @@ async def run_turn(
             mcp_servers=turn.mcp_servers,
             pinned=turn.pinned,
             pinned_folders=turn.pinned_folders,
+            options=turn.options,
             skill_folder=None if skill is None else str(skill.path),
         )
         return await _finish(stream, progress, emit)
@@ -293,6 +296,7 @@ async def resume_turn(
             mcp_servers=resume.mcp_servers,
             pinned=resume.pinned,
             pinned_folders=resume.pinned_folders,
+            options=resume.options,
         )
         return await _finish(stream, progress, emit)
     except asyncio.CancelledError:

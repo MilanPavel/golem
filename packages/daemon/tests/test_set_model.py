@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 import tomllib
+from collections.abc import Mapping
 from pathlib import Path
 from typing import cast
 
@@ -24,7 +25,9 @@ class _TwoModels(ModelRouter):
         super().__init__(settings)
         self.models = models
 
-    def chat_model(self, profile: str) -> BaseChatModel:
+    def chat_model(
+        self, profile: str, overrides: Mapping[str, float | str] | None = None
+    ) -> BaseChatModel:
         ref = self.resolve(profile).ref
         model = self.models.get(ref)
         if model is None:

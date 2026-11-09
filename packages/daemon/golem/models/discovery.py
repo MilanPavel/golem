@@ -34,7 +34,7 @@ from typing import Any, Literal, cast
 import httpx
 
 from golem.config import ModelPrice, ModelSettings
-from golem.models import hardware, ollama, prices
+from golem.models import hardware, ollama, options, prices
 from golem.models.catalog import (
     CATEGORIES,
     CatalogEntry,
@@ -529,6 +529,15 @@ class ModelDiscovery:
         if size_gb is None or self._ram_gb is None:
             return None
         return hardware.fit(size_gb, self._ram_gb, ctx)
+
+    async def ollama_parameters(self, ref: str) -> dict[str, float | str]:
+        """The options the model sets itself, from ``/api/show``. Empty when it cannot say."""
+        server = self._router.ollama_server(ref)
+        if server is None:
+            return {}
+        base = server[1].rstrip("/").removesuffix("/v1")
+        name = ref.removeprefix("ollama/")
+        return await options.model_parameters(self._http(), base, name)
 
     def _http(self) -> httpx.AsyncClient:
         if self._client is None:

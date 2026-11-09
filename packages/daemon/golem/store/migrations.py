@@ -96,4 +96,5 @@ MIGRATIONS: tuple[tuple[str, ...], ...] = (
         )
         """,
     ),
+    ("ALTER TABLE sessions ADD COLUMN options TEXT",),
 )

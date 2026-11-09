@@ -2,48 +2,13 @@
 
 This is how golem looks in a browser.
 
-The prototype in [prototype.html](prototype.html) shows every screen below. Open it in a browser. Its dark panel switches screens, golem's state, the wordmark, and the theme. For a screenshot, add `#kiln` or `#slip` to the address to pick a theme, `shot` to hide the panel, and `end` to scroll down to the approval, as in `prototype.html#kiln,shot,end`.
+What each screen looks like is on [the gallery](/gallery/), drawn from the real components with sample data, in both themes (slip and kiln). Each section below links to its part of it. This page keeps the why and the rules for how each screen behaves. The idea, the pixel golem, the type, the tokens, and the copy are in [the design system](index.md).
 
-The prototype was approved in step 10.2 ([#155](https://github.com/MilanPavel/golem/issues/155)). How the page is built is in [ADR-029](../adr/029-web-stack.md), and how it reaches the daemon is in [ADR-028](../adr/028-web-gateway.md).
-
-![The chat in the slip theme, with an approval waiting](../images/web-chat-slip.png)
-
-![The same chat in the kiln theme](../images/web-chat-kiln.png)
-
-## The idea
-
-The design is minimal: one accent colour, a quiet reading column, and few borders. What makes it golem's is the figure itself.
-
-- **The pixel golem is the status light.** The 9×6 figure from the TUI's logo (`packages/tui/src/logo.ts`) appears in the sidebar, on every answer, in the meter, on the empty screen, and as the favicon. Its eyes say what golem is doing.
-- **Clay is the only accent.** It marks what is golem's or what needs you: the send button, the streaming cursor, the seal on an approval, the eyes while golem works.
-- **Golem's answers read like a page,** in a book serif. Everything else (the interface, code, tools) is a quiet sans or mono.
-- **An approval reads like the shem,** the scroll that tells the golem what it may do. It is a card with a clay seal, the question, the rule that asked, and the diff.
-
-It borrows the calm, centred reading column and generous input from Claude's chat. From opencode it borrows sessions grouped by project, a diff-first approval, and a side drawer.
+The first prototype was approved in step 10.2 ([#155](https://github.com/MilanPavel/golem/issues/155)). It is still in [prototype.html](prototype.html) for the screens the gallery does not draw yet: the `/welcome` steps (Engine, Model, Tools, Tools: adding, Ready), the Settings page, and a new session with no default model. How the page is built is in [ADR-029](../adr/029-web-stack.md), and how it reaches the daemon is in [ADR-028](../adr/028-web-gateway.md).
 
 ## Layout
 
-```
-┌──────────────┬───────────────────────────────────────┬──────────────┐
-│ ▞ golem      │ Session title       model · folder  ▯ │ Todos Session│
-│ + New        ├───────────────────────────────────────┤ Wire         │
-│ Search  ⌘K   │                                       │              │
-│              │           you: a question  ▐          │ 2 of 4 ▬▬▬▭  │
-│ ~/repos/golem│  ▞ (hover: 14:02)                     │ ☑ Find …     │
-│ ■ UTF-8 …    │  › grep  toString("utf8")    ✓ 2      │ ☑ Write …    │
-│ ■ ADR-028 …  │  An answer in Literata, about 65      │ ▨ Decode …   │
-│   ⑂ gateway …│  characters wide …                    │ ☐ Run …      │
-│ □ Invoke …   │  ┌ shem ─────────────────────────┐    │              │
-│              │  │ ▣ Allow edit_file on …?       │    │              │
-│ ~/notes      │  │   diff                        │    │              │
-│ □ PR digest  │  │ [Allow once] [Session] …[Deny]│    │              │
-│              │  └───────────────────────────────┘    │              │
-│              │  ▞ waiting for your approval          │              │
-│ ● connected  │  ┌ Reply, or type / for commands ──┐  │              │
-│ v0.4.0 · ☼   │  └─────────────────────────────  ■ ┘  │              │
-└──────────────┴───────────────────────────────────────┴──────────────┘
-   268 px            column at most 46 rem                 320 px
-```
+The layout, in [the gallery](/gallery/#sidebar): a sidebar of 268 px, a column of at most 46 rem, and a drawer of 320 px. See also [the dock](/gallery/#dock), [the transcript](/gallery/#transcript), and [the drawer](/gallery/#drawer).
 
 - **Sidebar** (`sunken`): the wordmark with golem's state, New session, a Search button (`Search or run a command`, with its key, ⌘K or Ctrl K) that opens the palette, then sessions grouped by folder. Each session has a small square for its state, its title, and how long ago it was active. A fork is indented under its parent with `⑂`. At the bottom are the download row (while a model downloads, see [Downloads](#downloads)), the Settings button, the connection, and the version. The theme is chosen in Settings. The Settings button has a gear and opens `/settings`. When `setup.status` has a problem, it shows a warning dot (`wait`) and the problem under the name as a line of text, with the same text in its name for a screen reader (`Settings, <problem>`), so colour is not the only signal. While the query loads or if it fails, the button is plain.
 - **Top bar:** the session title, the model chip, the folder chip, and the drawer toggle. Below it, a row with the `Chat | Trace` tabs; see [The trace](#the-trace).
@@ -63,22 +28,9 @@ It borrows the calm, centred reading column and generous input from Claude's cha
 - Below 1100 px the drawer becomes a sheet from the right.
 - Below 760 px the sidebar becomes a sheet from the left, opened from a menu button. The folder chip and the key hints go away.
 
-## The pixel golem
-
-| State | Eyes | Word beside it | When |
-|---|---|---|---|
-| idle | dark (`golem-eye`) | `idle` | Nothing runs |
-| thinking | clay, pulsing | `working` | A run is in progress |
-| waiting | amber, a short blink | `waiting for you` | An approval waits |
-| failed | brick | `last run failed` | The last run ended in `run.failed` |
-| disconnected | grey, and the body grey | `offline` | The link is down |
-
-- **Every state has a word as well as a colour,** so colour is never the only sign.
-- **The golem on an answer shows only that answer's state.** It is plain when the answer is done, has clay eyes while it streams, and has amber eyes while a tool call in it waits for you.
-- **The favicon and the tab title** follow the sidebar's state, from the same state the TUI's `window-title.ts` uses. They update outside the animation frame, so a hidden tab still shows it.
-- **Motion** lasts 150 to 200 ms. `prefers-reduced-motion` turns off every animation: the eyes, the cursor, and the dots.
-
 ## Messages and tools
+
+See [the transcript](/gallery/#transcript).
 
 - **You:**
   - Geist 14.5 px, in a `slip` bubble with one sharp corner toward the bottom right.
@@ -94,6 +46,8 @@ It borrows the calm, centred reading column and generous input from Claude's cha
 - **Below an answer:** the duration and the number of tools, in `faint` mono.
 
 ## The approval (the shem)
+
+See [the approval](/gallery/#approval) and [the diff](/gallery/#diff).
 
 - **The head:**
   - A clay seal: a 30 px square with a shield and a tick.
@@ -113,6 +67,8 @@ It borrows the calm, centred reading column and generous input from Claude's cha
 
 ## Full-screen states
 
+See [the connection screens](/gallery/#connection-screens).
+
 The page cannot do anything while the link is down, so each case gets its own screen instead of a banner. Each screen has the golem (grey or failed eyes), a short tag, a heading in Literata, one sentence, and the command to run, with a copy button.
 
 | State | Tag | Heading | Command |
@@ -124,6 +80,8 @@ The page cannot do anything while the link is down, so each case gets its own sc
 The page keeps retrying behind "daemon down", and the screen goes away by itself when the link is back.
 
 ## The ⌘K palette
+
+See [the palette and keys](/gallery/#command-palette-and-keys).
 
 - **Opening:** ⌘K on macOS, Ctrl+K elsewhere, from anywhere on the page, also while typing in the message box. It toggles, so the same key closes it. It does not open over another dialog. The sidebar's Search button opens it too. Browsers keep ⌘N for a new window, so the page binds no key for New session.
 - A centred dialog with a search field on top, named `Commands`, and a footer line `↵ run · ↑↓ move · esc close`. It is the same combobox and grouped list as the model dialog.
@@ -147,6 +105,8 @@ The page keeps retrying behind "daemon down", and the screen goes away by itself
 
 ## Downloads
 
+See [the download row](/gallery/#download-row).
+
 - A model download shows in the sidebar footer, above the Settings button, on every screen. The model dialog shows it too, on its row. Progress reaches every connection, so a download started in the terminal shows here as well.
 - **One download:** `↓ <label>`, the same bar as the model dialog's, then `12% · 38 min` in mono. With no speed yet, the text is the percent only.
 - **Two or more:** `↓ 2 downloads`, with the combined share (completed over total, counting only the downloads whose size is known) and the longest time left.
@@ -157,6 +117,8 @@ The page keeps retrying behind "daemon down", and the screen goes away by itself
 
 ## The new-session screen
 
+See [the empty screen](/gallery/#empty-screen).
+
 - The heading `Start a new session`, the large composer, and under it a row of two chips: the folder (`📁 milan.pavel ⌄`) and the model (`◇ qwen3.5:4b · default ⌄`).
 - **Folder chip:** a menu with the folders of earlier sessions, `No folder`, and `Choose a folder…`, which opens [the folder browser](#the-folder-browser).
 - **Model chip:** the model the new session will use. It shows the default with a `default` tag, or a model you picked without the tag. With no default it says `Choose a model` in `wait`. It opens the model dialog for the new session.
@@ -165,6 +127,8 @@ The page keeps retrying behind "daemon down", and the screen goes away by itself
 - An error from starting the session (a folder that is not there, a model that is not known) shows under the chips in the red line, and the draft stays.
 
 ## The folder browser
+
+See [the folder browser](/gallery/#folder-browser).
 
 - `Choose a folder…` opens a popover under the folder chip, named `Choose a folder`.
 - From the top:
@@ -180,6 +144,8 @@ The page keeps retrying behind "daemon down", and the screen goes away by itself
 
 ## The model dialog
 
+See [the model dialog](/gallery/#model-dialog).
+
 - The model chip in the top bar is a button, `Model: <name>`. It opens a centred dialog, `Choose a model`, and focus returns to the chip when it closes.
 - A search field over the list, as one combobox: focus stays in the field, Up, Down, Home, End, PageUp, and PageDown move the active row, Enter does its main action, and Esc clears the search, then closes.
 - The groups are the TUI picker's: Profiles, Installed, Download, then each provider. A row has the label, the ref in faint mono, and the facts in mono. The session's model has a check, the default a `default` badge.
@@ -189,6 +155,8 @@ The page keeps retrying behind "daemon down", and the screen goes away by itself
 - The footer acts on the active row: the mode's main button, Make default, Download, Stop download, Remove. Download and Remove ask first, in the footer; a model too big for the machine asks twice.
 
 ## Setup in Settings
+
+See [the setup form](/gallery/#setup-form) and [the setup window](/gallery/#setup-window).
 
 The browser sets up golem on pages, not in a dialog ([ADR-039](../adr/039-web-setup-as-pages.md)). Settings → Setup is the overview, and [the welcome page](#the-welcome-page) is the first run. Both use the terminal's `setup.status`, rows, and words ([setup-window.md](setup-window.md)).
 
@@ -237,26 +205,7 @@ The browser sets up golem on pages, not in a dialog ([ADR-039](../adr/039-web-se
 
 How an answer was made: each model call with its context and reply, each tool call with its args and result, and the time and tokens of each. What is recorded, and how older sessions fall back, is in [ADR-041](../adr/041-session-trace.md). Phase 13 builds it.
 
-```
-┌ UTF-8 split in the socket client                                       ┐
-├────────────────────────────────────────────────────────────────────────┤
-│ Chat   Trace          2 runs · 24.6 s · 52.0K tokens   ↻ Refresh       │
-├──────────────────────────────────────────┬─────────────────────────────┤
-│ ▾ Run 1  A character that is two…  18.4s │ ◆ model 2                   │
-│   ▾ ◆ model 1   ███                2.1s  │ qwen3-coder:30b · 4.7s ·    │
-│        ⚙ grep      ▍               48ms  │ first token 820ms · 9.6K→612│
-│        ⚙ read_file ▍               12ms  │ [Context] [Reply] [Metadata]│
-│   ▾ ◆ model 2      ██████          4.7s ◀│ ▸ System prompt · 2,140 ch  │
-│        ⚙ edit_file      ▨▨▨▨▨▨▨▨▍  30ms  │ ▸ Tools · 9                 │
-│   ▸ ◆ model 3                 ████ 3.3s  │ you   A character that is … │
-│ ▸ Run 2  Run the client tests       6.2s │ ── new since the last call ─│
-│                                          │ golem → grep(…) read_file(…)│
-│                                          │ grep  2 matches             │
-│                                          │           [Pretty|JSON] Copy│
-└──────────────────────────────────────────┴─────────────────────────────┘
-```
-
-- **In the prototype:** the panel's *Trace* row has three screens: a model call, a tool call, and a session from before traces (`prototype.html#trace`, `#tracetool`, `#traceold`).
+- **On the gallery:** [the trace](/gallery/#trace) shows a short and a long trace, a failed and a denied tool, an approval wait, a model call's context, reply, and metadata, and a session from before traces.
 - **Route:** `/s/:id/trace`, with `?span=<id>` for the selected span, so a link opens the same span. It sits in the same frame as the chat: the top bar (title and its actions, model chip, folder chip, drawer toggle) and the drawer stay as they are when the tab changes, and only what is below the `Chat | Trace` row changes. The sidebar stays.
 - **Ways in:**
   - A `Chat | Trace` row of underline tabs under the top bar, on both views. It is a `nav` named `View`, and the current tab is `aria-current="page"`. The right side of the row belongs to the view: the trace puts its summary line and Refresh there.
@@ -290,7 +239,7 @@ How an answer was made: each model call with its context and reply, each tool ca
 - **Context meter:** a model call with a recorded context shows it right under the header, above the tabs, so it stays on Context, Reply and Metadata. A tool, a run, and a call from before the context was recorded have none.
   - **Title:** `Context · 3.4K / 32K · 10%` in mono, with `≈` before the window when it comes from today's catalog, and `Context · 3.4K · window unknown` when no window is known. At the right, a faint `estimated split`, because the provider reports only the total and golem splits it by characters.
   - **Bar:** a thin rounded bar. One segment per part, in the order System prompt, Tool definitions, Your messages, Replies, Tool results, each its share of the window. The free part is the bar's own `line` ground. With no window, the bar is the split of what was used.
-  - **Colours:** the `ctx-*` data tokens in the table above. They do not reuse `allow`, `wait` or `deny`.
+  - **Colours:** the `ctx-*` data tokens in [the design system](index.md#colour). They do not reuse `allow`, `wait` or `deny`.
   - **Legend:** one row per part, always all five, with a swatch, the label, and the tokens at the right. The tools row adds `· 7 tools`. A last `Free` row has an empty swatch. Colour is never the only cue.
   - **Warnings:** under the legend, `Context is 96% full.` from 80% (`wait` colour) and in `deny` from 95%. When the input is larger than the Ollama `num_ctx`, `Input is larger than num_ctx 8K. Ollama dropped the oldest part.` in `deny`. With no window, a faint hint: for Ollama, set `ctx` on the profile; otherwise, golem does not know the window.
 - **Model call tabs:**
@@ -327,6 +276,8 @@ How an answer was made: each model call with its context and reply, each tool ca
 
 ## Slash commands in the composer
 
+See [the slash commands](/gallery/#dock-slash-commands).
+
 - Typing `/` at the start of the message opens a list above the composer: the `/name` in clay mono, the description in muted text, at most about eight rows, then it scrolls. Up and Down move, Tab completes, Enter runs (a partial match fills in first), and Esc closes it for that text. Typing again opens it again. `//` is a message and never suggests. The list stays closed while a run is in progress or while you browse the history with Up and Down.
 - It is a listbox named `Commands`. The textarea stays a textbox and points at it with `aria-autocomplete="list"`, `aria-controls`, and `aria-activedescendant`, because a role of combobox is not allowed on a textarea. A polite live region says how many suggestions there are when the count changes.
 - After `/model ` the list offers model names, and after `/skill run ` skill names. The model and skill lists are fetched only once the text starts with `/`.
@@ -337,83 +288,3 @@ How an answer was made: each model call with its context and reply, each tool ca
 - The page has no key entry, so `/login` and `/logout` show the `golem auth` command to copy ([ADR-028](../adr/028-web-gateway.md)).
 - `/mcp add [id]` opens Settings → MCP servers with the Add dialog, on that server's form, or on the list with no id or an unknown one. The session's folder fills a path input.
 - Not on the page yet, so each says where it lives: `/skills`, `/artifact`, and `/debug` are in the terminal (run `golem`, then the command); `/sessions` points at the sidebar. The Commands dialog marks the terminal ones `In the terminal for now`.
-
-## Type
-
-| Role | Face | Size and weight |
-|---|---|---|
-| Interface | Geist | 14 px / 1.5, 500 for buttons and titles, 600 for the shem's question |
-| Wordmark | Geist | 17 px, 600, letter spacing −0.03 em, lowercase `golem` |
-| Golem's answers | Literata (optical sizes) | 16 px / 1.68 (15.5 px on a phone) |
-| Headings on full screens | Literata | 26 px, 400 |
-| Code, tools, labels, times | Geist Mono | 11 to 13.5 px |
-
-The fonts are self-hosted and subset ([ADR-029](../adr/029-web-stack.md)). Silkscreen, a pixel face, is in the prototype only as a wordmark choice to compare, and is not shipped.
-
-## Tokens
-
-These become `packages/web/src/styles/tokens.css` in step 10.6. The names say what a colour is for. **slip** is the light theme, like unfired clay, and **kiln** is the dark one.
-
-### Colour
-
-| Token | slip | kiln | Used for |
-|---|---|---|---|
-| `bg` | `#F3F2EF` | `#15120F` | The page, the diff |
-| `surface` | `#FBFAF8` | `#1D1915` | Cards, the composer, the drawer |
-| `sunken` | `#EAE8E3` | `#110E0C` | The sidebar, hunk headers |
-| `ink` | `#1D1A17` | `#EEE7DF` | Text, the primary button |
-| `muted` | `#57524C` | `#B5ACA2` | Secondary text |
-| `faint` | `#6C665F` | `#8F877E` | Times, labels, folder names. Not on `slip` |
-| `line` | `#DEDAD3` | `#2C2621` | Borders |
-| `line-strong` | `#C9C3BA` | `#3B332C` | Control borders, empty boxes |
-| `clay` | `#C4783A` | `#D08549` | The accent as a fill: send, seal, cursor, eyes |
-| `clay-ink` | `#94501E` | `#E6A06A` | The accent as text: `/commands`, the tool chip |
-| `clay-soft` | `#F1E2D4` | `#2E2118` | The current todo, the tool chip's ground |
-| `slip` | `#ECE3D8` | `#2A221B` | Your messages |
-| `golem-body` | `#9C6B3C` | `#A8733F` | The figure |
-| `golem-eye` | `#2A1408` | `#0E0704` | The figure's eyes at rest |
-| `allow` / `allow-soft` | `#3F7342` / `#DFEBDD` | `#86B57F` / `#1F2B1E` | Allowed, added lines, done |
-| `deny` / `deny-soft` | `#A8402F` / `#F4DED9` | `#E58474` / `#33201C` | Denied, removed lines, failed |
-| `wait` / `wait-soft` | `#8A600E` / `#F3E7C9` | `#E2B655` / `#30271A` | Waiting for you |
-| `code-bg` | `#EFEDE9` | `#191512` | Code blocks, tool output |
-| `ctx-system` | `#6B7A8F` | `#8E9DB3` | System prompt part of the context meter |
-| `ctx-tools` | `#AE6B34` | `#D08549` | Tool definitions part |
-| `ctx-user` | `#59855C` | `#8DB88A` | Your messages part |
-| `ctx-replies` | `#95752F` | `#D9B45E` | Replies part |
-| `ctx-results` | `#8A5A86` | `#B98BB4` | Tool results part |
-
-The five `ctx-*` tokens are data colours for the context meter; each is at least 3:1 against `line` and `surface`.
-
-### Contrast
-
-Checked with the WCAG 2.2 formula. 4.5:1 for text, 3:1 for fills and focus rings that carry meaning.
-
-| Pair | slip | kiln |
-|---|---|---|
-| `ink` on `bg` / `surface` / `sunken` / `slip` | 15.5 / 16.6 / 14.2 / 13.7 | 15.2 / 14.3 / 15.7 / 12.8 |
-| `muted` on `bg` / `sunken` / `slip` | 6.9 / 6.3 / 6.1 | 8.3 / 7.8 / 7.0 |
-| `faint` on `bg` / `sunken` / `surface` | 5.1 / 4.6 / 5.4 | 5.3 / 4.9 / 5.4 |
-| `clay-ink` on `bg` / `surface` | 5.5 / 5.9 | 8.5 / 8.0 |
-| `allow`, `deny`, `wait` on `surface` | 5.4, 5.9, 5.35 | 7.4, 6.6, 9.2 |
-| `wait` on `bg` / `sunken` | 4.99 / 4.56 | 9.8 / 10.1 |
-| `clay` on `bg` (a fill, and the focus ring) | 3.1 | 6.3 |
-
-`wait` was darkened from `#96690F` so the waiting label passes on `bg` as well.
-
-`faint` reaches only 4.47 on `slip`, so text on your messages uses `muted`. The check in 10.6.2 runs over every pair in this table.
-
-### Shape and space
-
-| Token | Value |
-|---|---|
-| Radius | 6 px (small), 10 px (controls), 16 px (cards, the shem), 18 px (the composer), round for chips |
-| Shadow | One soft shadow, for the composer, the shem, and the palette only |
-| Sidebar, drawer, column | 268 px, 320 px, 46 rem |
-| Gutter | At least 16 px, and the safe-area insets on a phone |
-| Grid | 4 px steps. The empty screen's faint grid is 20 px, one pixel of the golem |
-
-## Copy
-
-- Plain words, and the names the TUI already uses: session, fork, model, folder, rule, approval, todo.
-- A button says what happens: `Allow once`, `Deny`, `New session`.
-- An error says what is wrong and the one thing to do: `golem's daemon is not running` with `golem daemon start`.

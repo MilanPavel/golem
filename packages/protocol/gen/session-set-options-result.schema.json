@@ -1,0 +1,31 @@
+{
+  "additionalProperties": false,
+  "description": "The session's overrides now.",
+  "properties": {
+    "options": {
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "string"
+          }
+        ]
+      },
+      "title": "Options",
+      "type": "object"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "session_id",
+    "options"
+  ],
+  "title": "SessionSetOptionsResult",
+  "type": "object"
+}
