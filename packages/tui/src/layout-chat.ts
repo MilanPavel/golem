@@ -320,7 +320,7 @@ function paint(line: LayoutLine, width: number): LayoutLine {
   return padLine(line, width);
 }
 
-function markdownLines(source: string, width: number): Span[][] {
+export function markdownLines(source: string, width: number): Span[][] {
   const lines: Span[][] = [];
   for (const token of Lexer.lex(source)) {
     lines.push(...blockLines(token, width));

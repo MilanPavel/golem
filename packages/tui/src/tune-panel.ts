@@ -20,12 +20,14 @@ import type { Press } from "./keys.ts";
  * `/tune`: one row per option with a block slider, and the explanation of the focused one under
  * the rows. The state and its changes are the view package's; this is the keys and the lines.
  */
-export type TuneKey = "up" | "down" | "left" | "right" | "reset" | "target" | "close";
+export type TuneKey = "up" | "down" | "left" | "right" | "reset" | "target" | "try" | "close";
 
 /** What a key asks the app to do after the state changed. */
 export type TuneAction =
   | { kind: "none" }
   | { kind: "close" }
+  /** Ask the last question again with these values, in a fork. */
+  | { kind: "try" }
   /** Send `value` for `name`: `null` removes it. It goes to the model's saved options or to the session. */
   | { kind: "change"; name: string; value: TuneValue | null; target: TuneTarget };
 
@@ -37,7 +39,7 @@ export const NEEDS_SESSION_NOTICE = "open a session first";
 export const NO_MODEL_NOTICE = "Choose a model first: /model.";
 
 const SLIDER_CELLS = 15;
-const KEYS = "↑/↓ move · ←/→ change · r reset · Esc close";
+const KEYS = "↑/↓ move · ←/→ change · r reset · t try again · Esc close";
 
 /** Whether `/tune` can open: a session on a local Ollama model. Else the notice to show. */
 export function tuneOpening(input: {
@@ -84,6 +86,9 @@ export function tuneKeyOf(press: Press): TuneKey | null {
   if (press.input === "s") {
     return "target";
   }
+  if (press.input === "t") {
+    return "try";
+  }
   return null;
 }
 
@@ -96,6 +101,8 @@ export function pressTune(state: TuneState, key: TuneKey): { state: TuneState; a
       return { state: moveFocus(state, -1), action: none };
     case "down":
       return { state: moveFocus(state, 1), action: none };
+    case "try":
+      return { state, action: { kind: "try" } };
     case "target":
       return { state: toggleTarget(state), action: none };
     case "left":

@@ -141,6 +141,19 @@ export {
   type TuneValue,
 } from "./tune.ts";
 export {
+  foldTry,
+  NO_QUESTION_NOTICE,
+  planTry,
+  runningTry,
+  RUNNING_NOTICE,
+  startedTry,
+  tryAnswer,
+  tryHeading,
+  tryTitle,
+  type TryPlan,
+  type TryRun,
+} from "./try-again.ts";
+export {
   detailChoices,
   firstLine,
   formatSeconds,

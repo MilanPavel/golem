@@ -124,7 +124,7 @@ test("the panel shows a row for each option, the default note, the long text, an
   assert.equal(keep.includes("5m"), true);
   assert.equal(lines.some((line) => line.startsWith("─ temperature ─")), true);
   assert.equal(lines.some((line) => line.includes("About temperature.")), true);
-  assert.equal(lines[lines.length - 1], " ↑/↓ move · ←/→ change · r reset · Esc close");
+  assert.equal(lines[lines.length - 1], " ↑/↓ move · ←/→ change · r reset · t try again · Esc close");
 });
 
 test("the header says where changes go", () => {
