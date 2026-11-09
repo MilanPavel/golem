@@ -232,6 +232,34 @@ class ModelDiscovery:
         self._price_task: asyncio.Task[None] | None = None
         self._shown: dict[str, _Shown] = {}
         self._ctx: dict[str, int] = {}
+        self._loaded_ctx: dict[str, int] = {}
+
+    def loaded_ctx(self, ref: str) -> int | None:
+        """The context length Ollama last reported for ``ref`` in memory. No I/O."""
+        return self._loaded_ctx.get(ref)
+
+    async def note_loaded(self, ref: str) -> None:
+        """Read ``ref``'s loaded context length from ``/api/ps``. Never raises.
+
+        It does not start the server: when Ollama is not answering, nothing changes.
+        """
+        try:
+            server = self._router.ollama_server(ref)
+            if server is None:
+                return
+            base = server[1].rstrip("/").removesuffix("/v1")
+            name = ref.removeprefix("ollama/")
+            response = await self._http().get(f"{base}/api/ps", timeout=_OLLAMA_TIMEOUT)
+            response.raise_for_status()
+            for item in _list(_dict(response.json()).get("models")):
+                entry = _dict(item)
+                if name in (entry.get("name"), entry.get("model")):
+                    ctx = _positive_int(entry.get("context_length"))
+                    if ctx is not None:
+                        self._loaded_ctx[ref] = ctx
+                    return
+        except (httpx.HTTPError, ValueError) as exc:
+            log.debug("ollama /api/ps for %s failed: %s", ref, exc)
 
     def known_ctx(self, ref: str) -> int | None:
         """The tokens ``ref`` can take in, as last listed or from the price book. No I/O."""
