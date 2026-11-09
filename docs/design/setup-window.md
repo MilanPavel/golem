@@ -1,6 +1,6 @@
 # The setup window: design
 
-This is how golem sets itself up in the terminal, and how it shows later what is set up and what is broken. Step 1.9 of [the plan](../plan.md#phase-1--first-run-continued) builds it, and step 1.12 adds the Tools panel (H).
+This is how golem sets itself up in the terminal, and how it shows later what is set up and what is broken. Step 1.9 of [the roadmap](https://github.com/MilanPavel/golem/issues/343) builds it, and step 1.12 adds the Tools panel (H).
 
 ## The idea
 

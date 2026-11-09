@@ -1,6 +1,6 @@
 # golem's docs
 
-These files are the source of golem's docs site (Phase 11 of [plan.md](plan.md), [ADR-034](adr/034-docs-site.md)). On GitHub, this page is the map. On the site, the same map is the side menu.
+These files are the source of golem's docs site (Phase 11 of the [roadmap](roadmap.md), [ADR-034](adr/034-docs-site.md)). On GitHub, this page is the map. On the site, the same map is the side menu.
 
 A page with a ticket number is planned and not written yet.
 
@@ -66,7 +66,7 @@ For someone who wants to change golem.
 | Page | File | Ticket |
 |---|---|---|
 | The vision | [vision.md](vision.md) | |
-| The plan | [plan.md](plan.md) | |
+| The roadmap | [roadmap.md](roadmap.md) | |
 | Decisions (ADRs), by topic | [adr/README.md](adr/README.md) | [#295](https://github.com/MilanPavel/golem/issues/295) |
 
 ## Not pages

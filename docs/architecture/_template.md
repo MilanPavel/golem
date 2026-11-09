@@ -3,7 +3,7 @@
 # delete every guidance line (the ones in > quotes and in HTML comments). Each chapter is one
 # idea that most agents share, taught in general first, then how golem builds it, then golem's
 # details for contributors. Together the chapters are golem's architecture; architecture.md is
-# the overview that links them. ADR-034 and Phase 11 of docs/plan.md say why. The 11.6 tickets
+# the overview that links them. ADR-034 and Phase 11 (#264) say why. The 11.6 tickets
 # in #282 list the chapters.
 title: The idea, as a short noun phrase        # "The agent loop", "Tool calling"
 description: One sentence a search result can show. What the reader will understand.

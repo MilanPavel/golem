@@ -118,7 +118,7 @@ const sidebar: DefaultTheme.Sidebar = [
     text: "Project",
     items: [
       { text: "The vision", link: "/vision" },
-      { text: "The plan", link: "/plan" },
+      { text: "Roadmap", link: "/roadmap" },
       {
         text: "Decisions (ADRs)",
         link: "/adr/README",
