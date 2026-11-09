@@ -58,7 +58,7 @@ For someone who wants to change golem.
 | The monorepo | [monorepo.md](monorepo.md) | |
 | Hacking: set up, run, ship | [contributing/hacking.md](contributing/hacking.md) | |
 | Contributing | [contributing/index.md](contributing/index.md), which includes [CONTRIBUTING.md](../CONTRIBUTING.md) | |
-| Building, releasing, and running | [sre.md](sre.md), split into pages | [#296](https://github.com/MilanPavel/golem/issues/296) |
+| Building, releasing, and running | [ops/build.md](ops/build.md), [ops/release.md](ops/release.md), [ops/run.md](ops/run.md), split into pages | [#296](https://github.com/MilanPavel/golem/issues/296) |
 | The web UI's design | [design/web.md](design/web.md) | |
 
 ## Project

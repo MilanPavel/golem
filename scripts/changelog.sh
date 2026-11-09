@@ -1,5 +1,5 @@
 #!/bin/sh
-# CHANGELOG.md, one section per release (ADR-024, docs/sre.md section 5).
+# CHANGELOG.md, one section per release (ADR-024, docs/ops/release.md, Releases).
 #
 #   changelog.sh add <version>     write the commits since the last tag as <version>'s
 #                                  section, above the newest one
@@ -45,7 +45,7 @@ case "$command" in
   notes)
     text=$(notes)
     if [ -z "$text" ]; then
-      echo "CHANGELOG.md has no section for $version. Run just release $version first (docs/sre.md, section 5)." >&2
+      echo "CHANGELOG.md has no section for $version. Run just release $version first (docs/ops/release.md, Releases)." >&2
       exit 1
     fi
     printf '%s\n' "$text"

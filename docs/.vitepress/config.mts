@@ -108,7 +108,14 @@ const sidebar: DefaultTheme.Sidebar = [
       { text: "Hacking on golem", link: "/contributing/hacking" },
       { text: "Contributing", link: "/contributing/" },
       { text: "The monorepo", link: "/monorepo" },
-      { text: "Building, releasing, and running", link: "/sre" },
+      {
+        text: "Build, release, run",
+        items: [
+          { text: "Building and checking", link: "/ops/build" },
+          { text: "Releasing", link: "/ops/release" },
+          { text: "Running", link: "/ops/run" },
+        ],
+      },
       { text: "The web UI's design", link: "/design/web" },
       { text: "The setup window's design", link: "/design/setup-window" },
       { text: "MCP management's design", link: "/design/mcp" },
