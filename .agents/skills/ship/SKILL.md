@@ -63,7 +63,7 @@ Read new untracked files too, not only their names. Then flag:
 | A stray file: notes, scratch files, `.DS_Store`, a build output, a large binary. For example, a loose `*.md` file in the root that nothing links to | Leave it out of the commit. List it, so the user can add it if they want |
 | A change under `packages/protocol/golem_protocol/` without a matching change in `packages/protocol/gen/` | Run `just gen`. Also check that `PROTOCOL_MINOR` or `PROTOCOL_MAJOR` in `packages/protocol/golem_protocol/version.py` was bumped |
 | A non-obvious choice: a new dependency, a config key, a wire command, a stored format, a different approach to something an ADR covers | Suggest an ADR in `docs/adr/` (next number in `docs/adr/README.md`). Ask; don't block |
-| A behaviour change that the docs describe | Name the doc to update: `README.md`, `docs/sre.md`, `docs/architecture.md`, `CONTRIBUTING.md` |
+| A behaviour change that the docs describe | Name the doc to update: `README.md`, `docs/ops/*.md`, `docs/architecture.md`, `CONTRIBUTING.md` |
 | A change to packaging, signing, or the daemon's startup (`scripts/dist.sh`, `scripts/package.sh`, `scripts/sign_dist.py`, `packages/daemon/golem-daemon.spec`, `golem/server/`) | Offer `just dist` and `just smoke-dist`. They take a few minutes |
 
 If the user gave a hint (`/ship fix the mcp restart`), use it for the type, the scope, and the wording.

@@ -160,7 +160,7 @@ release version="":
     gh pr create --base main --head "$branch" --title "chore(release): $tag" --body "$(printf '%s\n' \
       "The release notes for golem $version: the new section in \`CHANGELOG.md\`. Edit them on this branch if they need it." \
       "" \
-      "After this merges, run \`just tag\` on an up-to-date \`main\`. The tag starts the release (docs/sre.md, section 5).")"
+      "After this merges, run \`just tag\` on an up-to-date \`main\`. The tag starts the release (docs/ops/release.md, Releases).")"
     git switch --quiet main
     printf 'Review and merge the PR, then: git pull && just tag\n'
 

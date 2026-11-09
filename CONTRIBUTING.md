@@ -1,6 +1,6 @@
 # Contributing to golem
 
-To set up a checkout, run `/setup` in Claude Code, or `scripts/setup.sh`. It also turns on the commit check below. Building and testing are in [docs/sre.md](docs/sre.md), section 6. This file is about how a change gets written down.
+To set up a checkout, run `/setup` in Claude Code, or `scripts/setup.sh`. It also turns on the commit check below. Building and testing are in [docs/ops/build.md](docs/ops/build.md#_4-building). This file is about how a change gets written down.
 
 ## Commit messages
 
@@ -88,7 +88,7 @@ Old messages, rewritten:
 
 ### Release notes
 
-The first lines of the commits on `main` are the first draft of the release notes. `just release` groups them into a new section of [CHANGELOG.md](CHANGELOG.md), and the release PR is where that draft gets edited ([docs/sre.md](docs/sre.md), section 5). So write the line for someone using golem: `fix(tui): the composer keeps its text after a resize`, not `fix(tui): handle SIGWINCH`.
+The first lines of the commits on `main` are the first draft of the release notes. `just release` groups them into a new section of [CHANGELOG.md](CHANGELOG.md), and the release PR is where that draft gets edited ([docs/ops/release.md](docs/ops/release.md#releases), Releases). So write the line for someone using golem: `fix(tui): the composer keeps its text after a resize`, not `fix(tui): handle SIGWINCH`.
 
 Keep the first line under 100 characters. Merge, revert, `fixup!`, and `squash!` commits are let through as git writes them.
 
@@ -96,7 +96,7 @@ Keep the first line under 100 characters. Merge, revert, `fixup!`, and `squash!`
 
 Nothing is pushed to `main` directly. Work on a branch, open a pull request, and fill in the template. The PR title is checked like a commit message (job `pr-title`), because it becomes the one commit on `main` when the pull request is squash-merged. The commits on the branch can say anything.
 
-A pull request merges when `check`, `dist`, and `pr-title` pass. How the rules are set up is in [docs/sre.md](docs/sre.md), section 5.
+A pull request merges when `check`, `dist`, and `pr-title` pass. How the rules are set up is in [docs/ops/build.md](docs/ops/build.md#pull-requests).
 
 ### With `/ship`
 

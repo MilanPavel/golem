@@ -25,7 +25,7 @@ The title is the commit on main and a line in the release notes:
 
 - [ ] Protocol changed: minor or major version bumped, and `just gen` run
 - [ ] A non-obvious choice has an ADR in `docs/adr/`
-- [ ] Docs updated (`docs/architecture.md`, `docs/sre.md`, `README.md`)
+- [ ] Docs updated (`docs/architecture.md`, `docs/ops/*.md`, `README.md`)
 - [ ] Breaking change: the title has `!`, and a `BREAKING CHANGE:` note below says what to do
 
 <!-- shipped-by: -->

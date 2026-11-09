@@ -3,17 +3,22 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
 
 import pytest
 
+from golem.config import load_settings
 from golem.config_edit import (
     McpExistsError,
     McpTableError,
     RawConflictError,
+    read_model_options,
     read_raw,
     replace_mcp_server,
+    set_model_options,
     write_raw,
 )
+from golem.paths import resolve_paths
 
 FILE = """# my servers
 log_level = "INFO"
@@ -75,3 +80,43 @@ def test_raw_write_checks_the_mtime(tmp_path: Path) -> None:
     second = write_raw(path, "log_level = 'DEBUG'\n", first)
     assert path.read_text(encoding="utf-8") == "log_level = 'DEBUG'\n"
     assert second >= first
+
+
+def test_saved_model_options_survive_a_reload_and_keep_the_comments(tmp_path: Path) -> None:
+    home = tmp_path / "home"
+    path = resolve_paths(home).config_file
+    path.parent.mkdir(parents=True)
+    path.write_text("# mine\n[ollama]\nstart = false\n", encoding="utf-8")
+    saved = set_model_options(path, "qwen3:8b", {"temperature": 0.4, "num_ctx": 16384})
+    assert saved == {"temperature": 0.4, "num_ctx": 16384}
+    assert read_model_options(path, "qwen3:8b") == saved
+    assert "# mine" in path.read_text(encoding="utf-8")
+    settings = load_settings(home=home, project_dir=tmp_path / "project")
+    assert settings.ollama.start is False
+    assert settings.ollama.models["qwen3:8b"].temperature == 0.4
+    assert settings.ollama.models["qwen3:8b"].num_ctx == 16384
+
+
+def test_an_option_set_to_none_is_removed_and_empty_tables_go(tmp_path: Path) -> None:
+    path = tmp_path / "config.toml"
+    set_model_options(path, "qwen3:8b", {"temperature": 0.4, "keep_alive": "10m"})
+    set_model_options(path, "gemma4:e4b", {"top_k": 20})
+    assert set_model_options(path, "qwen3:8b", {"temperature": None}) == {"keep_alive": "10m"}
+    set_model_options(path, "qwen3:8b", {"keep_alive": None})
+    set_model_options(path, "gemma4:e4b", {"top_k": None})
+    assert read_model_options(path, "qwen3:8b") == {}
+    assert path.read_text(encoding="utf-8") == ""
+
+
+def test_a_bad_option_is_refused_before_anything_is_written(tmp_path: Path) -> None:
+    path = tmp_path / "config.toml"
+    for values in (
+        {"temperature": 9.0},
+        {"top_k": 1.5},
+        {"colour": 1},
+        {"keep_alive": "soon"},
+        {"temperature": 0.4, "top_p": 5},
+    ):
+        with pytest.raises(ValueError):
+            set_model_options(path, "qwen3:8b", cast(dict[str, float | str | None], values))
+    assert not path.exists()
