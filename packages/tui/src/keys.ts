@@ -592,6 +592,8 @@ const EDIT_KEYS = editKeys();
 export type OverlayLine = {
   text: string;
   dim: boolean;
+  /** Draw in the accent colour. */
+  accent?: boolean;
 };
 
 /** Grouped by context. A binding is listed once for each context it names. */

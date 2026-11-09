@@ -123,7 +123,7 @@ import {
   withSession,
   type TuneState,
 } from "@golem/view";
-import { pressTune, tuneKeyOf, tuneLines, tuneOpening, type TuneAction } from "./tune-panel.ts";
+import { pressTune, tuneKeyOf, tuneLines, tuneLitLines, tuneOpening, type TuneAction } from "./tune-panel.ts";
 import { folderFacts } from "./folder-facts.ts";
 import {
   applyComposer,
@@ -1388,6 +1388,35 @@ export function App({
           const result = await client.setSessionOptions(id, options);
           if (tuneSending.current === 1 && tuneRef.current !== null && sessionRef.current === id) {
             showTune(withSession(tuneRef.current, result.options));
+          }
+        }
+      } catch (error) {
+        setChat((current) => ({ ...current, error: messageOf(error) }));
+      } finally {
+        tuneSending.current -= 1;
+      }
+    });
+  }
+
+  /** A preset goes to the session only. `save` keeps the session's values for the model, then clears them. */
+  function sendTunePreset(model: string, action: Extract<TuneAction, { kind: "preset" | "save" }>): void {
+    const id = sessionRef.current;
+    if (id === null) {
+      return;
+    }
+    tuneSending.current += 1;
+    tuneQueue.current = tuneQueue.current.then(async () => {
+      try {
+        if (action.kind === "preset") {
+          const result = await client.setSessionOptions(id, action.options);
+          if (tuneSending.current === 1 && tuneRef.current !== null && sessionRef.current === id) {
+            showTune(withSession(tuneRef.current, result.options));
+          }
+        } else {
+          const saved = await client.setModelOptions(model, action.save);
+          const cleared = await client.setSessionOptions(id, action.clear);
+          if (tuneSending.current === 1 && tuneRef.current !== null && sessionRef.current === id) {
+            showTune(withSession(withSaved(tuneRef.current, saved.model, saved.saved), cleared.options));
           }
         }
       } catch (error) {
@@ -2950,6 +2979,8 @@ export function App({
       showTune(null);
     } else if (pressed.action.kind === "change") {
       sendTune(pressed.state.model, pressed.action);
+    } else if (pressed.action.kind === "preset" || pressed.action.kind === "save") {
+      sendTunePreset(pressed.state.model, pressed.action);
     }
   }
 
@@ -3778,7 +3809,11 @@ export function App({
         </Box>
         {helpHeight > 0 ? (
           <LineList
-            lines={helpText.map((text) => ({ text, dim: false }))}
+            lines={helpText.map((text, index) => ({
+              text,
+              dim: false,
+              accent: tune !== null && tuneLitLines(tune).includes(index),
+            }))}
             columns={columns}
             height={helpHeight}
             offset={0}
@@ -4002,7 +4037,12 @@ function LineList({
   return (
     <Box flexDirection="column" width={columns} height={height} flexShrink={0} overflow="hidden">
       {shown.map((line, index) => (
-        <Text key={index} dimColor={line.dim} color={line.dim ? undefined : color} wrap="truncate-end">
+        <Text
+          key={index}
+          dimColor={line.dim}
+          color={line.dim ? undefined : line.accent === true ? CLAY : color}
+          wrap="truncate-end"
+        >
           {line.text.length === 0 ? " " : line.text}
         </Text>
       ))}
