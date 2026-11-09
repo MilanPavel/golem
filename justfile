@@ -89,7 +89,11 @@ test:
 docs:
     pnpm --filter @golem/docs dev
 
-# Build the docs site into docs/.vitepress/dist. A dead link fails the build.
+# Build the static gallery of every web component into packages/web/dist-gallery. The docs site publishes it at /gallery/.
+gallery-build:
+    pnpm --filter @golem/web build:gallery
+
+# Build the docs site, with the gallery, into docs/.vitepress/dist. A dead link fails the build.
 docs-build:
     pnpm --filter @golem/docs build
 

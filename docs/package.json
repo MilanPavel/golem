@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vitepress dev .",
-    "build": "vitepress build .",
+    "build": "pnpm --filter @golem/web build:gallery && vitepress build .",
     "preview": "vitepress preview .",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test .vitepress/*.test.ts"

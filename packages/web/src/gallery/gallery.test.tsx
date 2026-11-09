@@ -90,3 +90,21 @@ for (const theme of ["slip", "kiln"]) {
     });
   }
 }
+
+test("each gallery section has a stable anchor, the slip one plain and the kiln one prefixed, and no id repeats", () => {
+  const { container } = render(<Gallery />);
+  for (const id of ["trace", "approval", "setup-window", "setup-form", "model-dialog", "kiln-trace", "kiln-approval"]) {
+    expect(container.querySelector(`#${id}`), id).toBeTruthy();
+  }
+  const ids = [...container.querySelectorAll("[id]")].map((element) => element.id);
+  expect(new Set(ids).size).toBe(ids.length);
+});
+
+test("the gallery shows one theme when asked, and then the anchors have no prefix", async () => {
+  const user = userEvent.setup();
+  const { container } = render(<Gallery />);
+  await user.click(screen.getByRole("button", { name: "Kiln" }));
+  expect(container.querySelector('[data-theme="slip"]')).toBeNull();
+  expect(container.querySelector("#trace")).toBeTruthy();
+  expect(container.querySelector("#kiln-trace")).toBeNull();
+});
