@@ -49,6 +49,7 @@ class _Chat:
         model: ToolCallingChatModel,
         prompt: SystemPrompt | None,
         window_of: WindowOf | None = None,
+        note_loaded: Callable[[str], Awaitable[None]] | None = None,
     ) -> None:
         self.database = database
         self.runtime = open_chat(
@@ -58,6 +59,7 @@ class _Chat:
             prompt=prompt,
             blobs=BlobStore(database),
             window_of=window_of,
+            note_loaded=note_loaded,
         )
         self.events = EventLog(database)
         self.runs = RunRecords(database)
@@ -226,3 +228,29 @@ async def test_the_window_is_recorded_when_it_is_known(database: Database) -> No
     (second,) = await plain.send(other, "hello")
     await plain.manager.cancel_all()
     assert (second.data.context_window, second.data.num_ctx) == (None, None)
+
+
+async def test_a_model_call_tells_note_loaded_the_profile(database: Database) -> None:
+    seen: list[str] = []
+
+    async def note(profile: str) -> None:
+        seen.append(profile)
+
+    chat = _Chat(database, ToolCallingChatModel(replies=["hi"]), None, note_loaded=note)
+    session_id = await chat.manager.create(None)
+    await chat.send(session_id, "hello")
+    await chat.manager.cancel_all()
+    assert len(seen) == 1
+
+
+async def test_a_note_loaded_that_raises_does_not_fail_the_call(database: Database) -> None:
+    async def note(profile: str) -> None:
+        raise RuntimeError("boom")
+
+    chat = _Chat(database, ToolCallingChatModel(replies=["hi"]), None, note_loaded=note)
+    session_id = await chat.manager.create(None)
+    (first,) = await chat.send(session_id, "hello")
+    run = await chat.runs.get(str(first.run_id))
+    await chat.manager.cancel_all()
+    assert run is not None
+    assert run.status == "completed"

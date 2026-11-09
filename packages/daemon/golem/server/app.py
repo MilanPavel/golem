@@ -187,6 +187,12 @@ class DaemonApp:
                 models = ModelDiscovery(router, self.paths.cache_dir)
             else:
                 models = self._discovery(router)
+
+            async def note_loaded(profile: str) -> None:
+                resolved = router.resolve(profile)
+                if resolved.provider.kind == "ollama":
+                    await models.note_loaded(resolved.ref)
+
             async with (
                 Database.open(self.paths.database_file) as database,
                 open_checkpoints(database, self.paths.checkpoints_file) as saver,
@@ -206,6 +212,7 @@ class DaemonApp:
                         SystemPrompt(sections=(pinned_section(self.state.skills),)),
                         BlobStore(database),
                         window_of=lambda profile: resolve_window(router, profile, models),
+                        note_loaded=note_loaded,
                     ),
                     self._titles,
                     self.state.skills,
