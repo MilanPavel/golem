@@ -1,5 +1,5 @@
 import { COMMANDS, noPastes, withModelChoices, withSkillChoices, type TodoItem } from "@golem/view";
-import { useId, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useId, useState, type ReactNode } from "react";
 import { Badge } from "../ui/badge.tsx";
 import { Button } from "../ui/button.tsx";
 import { Card } from "../ui/card.tsx";
@@ -87,9 +87,30 @@ const CONNECTED: ConnectionSnapshot = { state: { status: "connected" }, daemonVe
 
 const STATES: GolemState[] = ["idle", "thinking", "waiting", "failed", "offline"];
 
+/** The id a section's heading gives it, such as `Session title, rename, and close` -> `session-title-rename-and-close`. */
+function slug(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+/**
+ * Both themes are on the page at once, so a section's id would repeat. The kiln panel puts `kiln-`
+ * in front, and `#trace` goes to the slip panel. With one theme shown there is no prefix.
+ */
+const AnchorPrefix = createContext("");
+
+/** The id for a section, so a link such as `/gallery/#trace` reaches it. */
+function useAnchor(): (title: string) => string {
+  const prefix = useContext(AnchorPrefix);
+  return (title) => prefix + slug(title);
+}
+
 function Group({ title, children }: { title: string; children: ReactNode }) {
+  const anchor = useAnchor();
   return (
-    <section className="mt-6">
+    <section className="mt-6" id={anchor(title)}>
       <h3 className="mb-2 font-mono text-xs text-faint">{title}</h3>
       <div className="flex flex-wrap items-center gap-2">{children}</div>
     </section>
@@ -143,6 +164,7 @@ function DemoComposer({
 
 /** Every diff in both layouts, and the switch on its own. */
 function DiffDemo() {
+  const anchor = useAnchor();
   const [mode, setMode] = useState<"unified" | "split">("unified");
   const samples = [
     ["An edit with two hunks", SAMPLE_EDIT_DIFF],
@@ -150,7 +172,7 @@ function DiffDemo() {
     ["A long line", SAMPLE_LONG_LINE_DIFF],
   ] as const;
   return (
-    <section className="mt-6">
+    <section className="mt-6" id={anchor("Diff")}>
       <h3 className="mb-2 font-mono text-xs text-faint">Diff</h3>
       <div className="flex flex-col gap-4">
         <div>
@@ -190,9 +212,10 @@ const LONG_TODO: TodoItem[] = [
 
 /** The todo list in its states, and the drawer frame at a fixed height. */
 function DrawerDemo({ theme }: { theme: string }) {
+  const anchor = useAnchor();
   const id = useId();
   return (
-    <section className="mt-6">
+    <section className="mt-6" id={anchor("Drawer")}>
       <h3 className="mb-2 font-mono text-xs text-faint">Drawer</h3>
       <div className="flex flex-wrap items-start gap-4">
         {(
@@ -223,8 +246,9 @@ function EditingDemo({ draft }: { draft?: string }) {
 
 /** The approval card, pending and answered. */
 function ApprovalDemo() {
+  const anchor = useAnchor();
   return (
-    <section className="mt-6">
+    <section className="mt-6" id={anchor("Approval")}>
       <h3 className="mb-2 font-mono text-xs text-faint">Approval</h3>
       <div className="flex flex-col gap-4">
         <ApprovalCard tool={PENDING_EDIT} pending onAnswer={() => {}} />
@@ -562,7 +586,8 @@ function DetailDemo({ label, result }: { label: string; result: TraceSpanResult 
   );
 }
 
-function Panel({ theme }: { theme: "slip" | "kiln" }) {
+function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }) {
+  const anchor = (title: string) => prefix + slug(title);
   return (
     <section data-theme={theme} aria-label={`${theme} theme`} className="rounded-lg border border-line bg-bg p-4 text-ink">
       <h2 className="font-prose text-xl">{theme}</h2>
@@ -613,7 +638,7 @@ function Panel({ theme }: { theme: "slip" | "kiln" }) {
         <IconButton label="Disabled" disabled><CopyIcon /></IconButton>
       </Group>
 
-      <section className="mt-6">
+      <section className="mt-6" id={anchor("Connection screens")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Connection screens</h3>
         <div className="grid gap-4">
           {SNAPSHOTS.map((snapshot) => {
@@ -627,7 +652,7 @@ function Panel({ theme }: { theme: "slip" | "kiln" }) {
         </div>
       </section>
 
-      <section className="mt-6">
+      <section className="mt-6" id={anchor("Sidebar")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Sidebar</h3>
         <div className="h-96 overflow-hidden rounded-lg border border-line">
           <SidebarView
@@ -643,27 +668,27 @@ function Panel({ theme }: { theme: "slip" | "kiln" }) {
         </div>
       </section>
 
-      <section className="mt-6">
+      <section className="mt-6" id={anchor("Folder browser")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Folder browser</h3>
         <FolderBrowserDemo theme={theme} />
       </section>
 
-      <section className="mt-6">
+      <section className="mt-6" id={anchor("Setup form")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Setup form</h3>
         <SetupFormDemo />
       </section>
 
-      <section className="mt-6">
+      <section className="mt-6" id={anchor("Download row")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Download row</h3>
         <DownloadRowDemo />
       </section>
 
-      <section className="mt-6">
+      <section className="mt-6" id={anchor("Session title, rename, and close")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Session title, rename, and close</h3>
         <SessionActionsDemo theme={theme} />
       </section>
 
-      <section className="mt-6">
+      <section className="mt-6" id={anchor("Empty screen")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Empty screen</h3>
         <div className="flex h-96 flex-col rounded-lg border border-line bg-bg">
           <HomeView
@@ -682,7 +707,7 @@ function Panel({ theme }: { theme: "slip" | "kiln" }) {
         </div>
       </section>
 
-      <section className="mt-6">
+      <section className="mt-6" id={anchor("Dock")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Dock</h3>
         <div className="grid gap-4 rounded-lg border border-line bg-bg p-4">
           <DockView busy={false} meter={<Meter state="idle" runStartedAt={null} />} composer={<DemoComposer />} />
@@ -720,7 +745,7 @@ function Panel({ theme }: { theme: "slip" | "kiln" }) {
         </div>
       </section>
 
-      <section className="mt-6">
+      <section className="mt-6" id={anchor("Dock, slash commands")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Dock, slash commands</h3>
         <div className="grid gap-4 rounded-lg border border-line bg-bg p-4">
           {[
@@ -808,7 +833,7 @@ function Panel({ theme }: { theme: "slip" | "kiln" }) {
         ))}
       </Group>
 
-      <section className="mt-6">
+      <section className="mt-6" id={anchor("Transcript")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Transcript</h3>
         <div className="flex flex-col gap-6 rounded-lg border border-line bg-bg p-4">
           <TranscriptMessages chat={SAMPLE_CHAT} />
@@ -824,17 +849,17 @@ function Panel({ theme }: { theme: "slip" | "kiln" }) {
 
       <DrawerDemo theme={theme} />
 
-      <section className="mt-6">
+      <section className="mt-6" id={anchor("Command palette and keys")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Command palette and keys</h3>
         <PaletteDemo theme={theme} />
       </section>
 
-      <section className="mt-6">
+      <section className="mt-6" id={anchor("Model dialog")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Model dialog</h3>
         <ModelDialogDemo theme={theme} />
       </section>
 
-      <section className="mt-6">
+      <section className="mt-6" id={anchor("Setup window")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Setup window</h3>
         <SetupDemo theme={theme} />
       </section>
@@ -894,16 +919,76 @@ function Panel({ theme }: { theme: "slip" | "kiln" }) {
   );
 }
 
-/** Every primitive in both themes, side by side. Development only: open /gallery. */
+function Panel({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }) {
+  return (
+    <AnchorPrefix.Provider value={prefix}>
+      <PanelBody theme={theme} prefix={prefix} />
+    </AnchorPrefix.Provider>
+  );
+}
+
+type View = "both" | "slip" | "kiln";
+
+const VIEWS: { value: View; label: string }[] = [
+  { value: "both", label: "Both" },
+  { value: "slip", label: "Slip" },
+  { value: "kiln", label: "Kiln" },
+];
+
+/** `?theme=slip` or `?theme=kiln` shows one theme; anything else shows both. */
+function initialView(): View {
+  const asked = new URLSearchParams(location.search).get("theme");
+  return asked === "slip" || asked === "kiln" ? asked : "both";
+}
+
+/** Every primitive in both themes, side by side, or one at a time. Each section has an id: `#trace`, `#approval`. */
 export function Gallery() {
+  const [view, setView] = useState<View>(initialView);
+
+  // The sections are drawn after the browser looked for the hash, so scroll to it once they are.
+  // Fonts and lazily loaded code highlighting keep growing the sections above it for a moment,
+  // so stay on the section while the page resizes, until the reader scrolls or two seconds pass.
+  useEffect(() => {
+    const id = decodeURIComponent(location.hash.slice(1));
+    const target = id ? document.getElementById(id) : null;
+    if (!target) return;
+    const pin = () => target.scrollIntoView();
+    pin();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(pin);
+    observer.observe(document.body);
+    const stop = () => {
+      observer.disconnect();
+      clearTimeout(timer);
+      for (const event of ["wheel", "touchstart", "keydown"]) window.removeEventListener(event, stop);
+    };
+    const timer = setTimeout(stop, 2000);
+    for (const event of ["wheel", "touchstart", "keydown"]) window.addEventListener(event, stop, { once: true });
+    return stop;
+  }, []);
+
   return (
     <main className="min-h-screen bg-bg p-4 text-ink sm:p-8">
       <h1 className="font-prose text-2xl">Gallery</h1>
       <p className="mt-2 text-muted">Every primitive, in slip and kiln.</p>
       <ThemeSwitch />
-      <div className="mt-6 grid gap-4 md:grid-cols-2">
-        <Panel theme="slip" />
-        <Panel theme="kiln" />
+      <div role="group" aria-label="Themes shown" className="mt-3 flex items-center gap-2">
+        <span className="text-sm text-muted">Show</span>
+        {VIEWS.map(({ value, label }) => (
+          <button
+            key={value}
+            type="button"
+            aria-pressed={view === value}
+            onClick={() => setView(value)}
+            className="rounded-md border border-line-strong bg-surface px-3 py-1 text-sm outline-offset-2 outline-clay focus-visible:outline-2 aria-pressed:bg-clay-soft aria-pressed:text-clay-ink"
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <div className={view === "both" ? "mt-6 grid gap-4 md:grid-cols-2" : "mt-6 grid gap-4"}>
+        {view !== "kiln" && <Panel theme="slip" prefix="" />}
+        {view !== "slip" && <Panel theme="kiln" prefix={view === "both" ? "kiln-" : ""} />}
       </div>
     </main>
   );

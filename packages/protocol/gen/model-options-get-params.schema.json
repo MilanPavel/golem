@@ -1,0 +1,29 @@
+{
+  "additionalProperties": false,
+  "description": "``model.options.get``. The option table and the values one model has.\n\n``model`` is an Ollama name such as ``qwen3:8b``, or ``ollama/qwen3:8b``.\nWith ``session_id`` the result also has that session's overrides.",
+  "properties": {
+    "model": {
+      "minLength": 1,
+      "title": "Model",
+      "type": "string"
+    },
+    "session_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Session Id"
+    }
+  },
+  "required": [
+    "model"
+  ],
+  "title": "ModelOptionsGetParams",
+  "type": "object"
+}

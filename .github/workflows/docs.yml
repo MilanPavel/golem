@@ -9,7 +9,9 @@ on:
     branches: ["main"]
     paths:
       - "docs/**"
-      - "packages/web/src/styles/tokens.css" # the site's palette is read from it
+      - "packages/web/**" # the gallery is built from the web UI, and the palette is read from tokens.css
+      - "packages/view/**"
+      - "packages/client/**"
       - "pnpm-lock.yaml"
       - ".github/workflows/docs.yml"
   workflow_dispatch:
@@ -41,10 +43,11 @@ jobs:
           node-version: "24"
           cache: pnpm
 
-      # The site needs only its own packages, not the whole workspace.
+      # The site needs its own packages and the web UI's, which build the gallery at /gallery/.
       - name: Install the docs packages
-        run: pnpm install --frozen-lockfile --filter @golem/docs
+        run: pnpm install --frozen-lockfile --filter @golem/docs --filter "@golem/web..."
 
+      # Builds the gallery (packages/web, mode gallery) first and copies it to /gallery/.
       - name: Build the site
         run: pnpm --filter @golem/docs build
 

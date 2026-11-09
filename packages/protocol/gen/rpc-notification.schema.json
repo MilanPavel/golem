@@ -754,6 +754,74 @@
       "title": "ModelCallStartedEvent",
       "type": "object"
     },
+    "ModelOptionsChangedData": {
+      "additionalProperties": false,
+      "description": "The session's option overrides, whole, after a change.\n\nThe last event holds what applies from the next run, so a replayed session\ngets its options back. An empty ``options`` means no overrides.",
+      "properties": {
+        "options": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "title": "Options",
+          "type": "object"
+        }
+      },
+      "required": [
+        "options"
+      ],
+      "title": "ModelOptionsChangedData",
+      "type": "object"
+    },
+    "ModelOptionsChangedEvent": {
+      "additionalProperties": false,
+      "description": "``session.set_options`` changed the session's option overrides.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/ModelOptionsChangedData"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "null"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "model.options.changed",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "run_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "ModelOptionsChangedEvent",
+      "type": "object"
+    },
     "ModelSelectedData": {
       "additionalProperties": false,
       "description": "The model the session's next run uses.\n\n``model_profile`` is the name asked for, a profile or a ``provider/model``\nref. ``model_provider`` and ``model_name`` are what it resolved to when it\nwas chosen. ``reason`` ``user`` is ``session.set_model``.",
@@ -2274,6 +2342,7 @@
           "message.started": "#/$defs/MessageStartedEvent",
           "model.call.completed": "#/$defs/ModelCallCompletedEvent",
           "model.call.started": "#/$defs/ModelCallStartedEvent",
+          "model.options.changed": "#/$defs/ModelOptionsChangedEvent",
           "model.selected": "#/$defs/ModelSelectedEvent",
           "run.cancelled": "#/$defs/RunCancelledEvent",
           "run.completed": "#/$defs/RunCompletedEvent",
@@ -2306,6 +2375,9 @@
         },
         {
           "$ref": "#/$defs/ModelSelectedEvent"
+        },
+        {
+          "$ref": "#/$defs/ModelOptionsChangedEvent"
         },
         {
           "$ref": "#/$defs/MessageStartedEvent"

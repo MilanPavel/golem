@@ -11,7 +11,10 @@ import { golemContainers } from "./containers.ts";
 import { faviconHref, markCss } from "./golem.ts";
 import { checkTokens, parseTokens, tokensCss } from "./tokens.ts";
 
+const SITE_BASE = "/golem/";
 const docsDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+// The static gallery (`pnpm --filter @golem/web build:gallery`), published at /gallery/.
+const galleryDir = path.resolve(docsDir, "../packages/web/dist-gallery");
 const tokensFile = path.resolve(docsDir, "../packages/web/src/styles/tokens.css");
 
 /**
@@ -85,21 +88,27 @@ const sidebar: DefaultTheme.Sidebar = [
   {
     text: "How golem works",
     items: [
-      { text: "Overview", link: "/architecture" },
-      { text: "1. The agent loop", link: "/architecture/agent-loop" },
-      { text: "2. Talking to models", link: "/architecture/models" },
-      { text: "3. The daemon", link: "/architecture/daemon" },
-      { text: "4. The protocol", link: "/architecture/protocol" },
-      { text: "5. Sessions", link: "/architecture/sessions" },
-      { text: "6. Tools", link: "/architecture/tools" },
-      { text: "7. Permissions", link: "/architecture/permissions" },
-      { text: "8. Sandboxes", link: "/architecture/sandboxes" },
-      { text: "9. Context", link: "/architecture/context" },
-      { text: "10. Skills", link: "/architecture/skills" },
-      { text: "11. MCP", link: "/architecture/mcp" },
-      { text: "12. The terminal app", link: "/architecture/tui" },
-      { text: "13. The web UI", link: "/architecture/web" },
-      { text: "14. Tracing", link: "/architecture/tracing" },
+      {
+        text: "Overview",
+        link: "/architecture",
+        collapsed: false,
+        items: [
+          { text: "The agent loop", link: "/architecture/agent-loop" },
+          { text: "Talking to models", link: "/architecture/models" },
+          { text: "The daemon", link: "/architecture/daemon" },
+          { text: "The protocol", link: "/architecture/protocol" },
+          { text: "Sessions", link: "/architecture/sessions" },
+          { text: "Tools", link: "/architecture/tools" },
+          { text: "Permissions", link: "/architecture/permissions" },
+          { text: "Sandboxes", link: "/architecture/sandboxes" },
+          { text: "Context", link: "/architecture/context" },
+          { text: "Skills", link: "/architecture/skills" },
+          { text: "MCP", link: "/architecture/mcp" },
+          { text: "The terminal app", link: "/architecture/tui" },
+          { text: "The web UI", link: "/architecture/web" },
+          { text: "Tracing", link: "/architecture/tracing" },
+        ],
+      },
     ],
   },
   {
@@ -116,9 +125,15 @@ const sidebar: DefaultTheme.Sidebar = [
           { text: "Running", link: "/ops/run" },
         ],
       },
-      { text: "The web UI's design", link: "/design/web" },
-      { text: "The setup window's design", link: "/design/setup-window" },
-      { text: "MCP management's design", link: "/design/mcp" },
+    ],
+  },
+  {
+    text: "Design",
+    items: [
+      { text: "The design system", link: "/design/" },
+      { text: "The web UI", link: "/design/web" },
+      { text: "The setup window", link: "/design/setup-window" },
+      { text: "MCP management", link: "/design/mcp" },
     ],
   },
   {
@@ -151,10 +166,26 @@ const sidebar: DefaultTheme.Sidebar = [
 export default defineConfig({
   title: "golem",
   description: "Your own AI agent, living on your Mac.",
-  base: "/golem/",
+  base: SITE_BASE,
   cleanUrls: true,
   lastUpdated: true,
   srcExclude: NOT_PAGES,
+
+  // /gallery/ is not a page: buildEnd copies the gallery build there. Links to it are not dead.
+  ignoreDeadLinks: [/^\/gallery\//],
+
+  // The gallery is its own static page with its own bundle, so it is copied in, not built by VitePress.
+  buildEnd(siteConfig) {
+    if (!fs.existsSync(path.join(galleryDir, "index.html")) && !fs.existsSync(path.join(galleryDir, "gallery.html"))) {
+      throw new Error(`The gallery is not built: ${galleryDir} is empty. Run \`just gallery-build\`.`);
+    }
+    const target = path.join(siteConfig.outDir, "gallery");
+    fs.rmSync(target, { recursive: true, force: true });
+    fs.cpSync(galleryDir, target, { recursive: true });
+    // Vite names the page after its entry. The site serves a folder's index.html.
+    const built = path.join(target, "gallery.html");
+    if (fs.existsSync(built)) fs.renameSync(built, path.join(target, "index.html"));
+  },
 
   // The favicon is the pixel golem, drawn from logo.ts in the theme's colours.
   head: [["link", { rel: "icon", type: "image/svg+xml", href: faviconHref(parseTokens(fs.readFileSync(tokensFile, "utf8"))) }]],
@@ -175,6 +206,12 @@ export default defineConfig({
             if (token.type === "link_open") {
               const href = token.attrGet("href");
               if (href !== null) token.attrSet("href", siteHref(href, page, from));
+              // The gallery is a separate static page, not a VitePress page: it gets the site's base,
+              // and a target makes the router leave the click to the browser.
+              if (href?.startsWith("/gallery/")) {
+                token.attrSet("href", `${SITE_BASE}${href.slice(1)}`);
+                token.attrSet("target", "_self");
+              }
             } else if (token.type === "html_inline") {
               token.content = bundleHtmlAssets(token.content);
             }

@@ -66,8 +66,8 @@ golem takes the fourth way: one daemon per user, behind a Unix socket, started b
 The start, in the order it runs:
 
 1. **The lock.** `DaemonLock` takes the `flock` and writes the pid. When another process holds it, the start exits 1, and `run/last-error` says who holds it and how to stop it.
-2. **The files.** It opens `golem.db` and `checkpoints.db`, copying each first when it must migrate ([Sessions that survive](./sessions.md#migrations-and-backups)).
-3. **What a crash left.** `recover_runs` closes the runs that were open when the last daemon died ([Sessions that survive](./sessions.md#crash-recovery)).
+2. **The files.** It opens `golem.db` and `checkpoints.db`, copying each first when it must migrate ([Sessions](./sessions.md#migrations-and-backups)).
+3. **What a crash left.** `recover_runs` closes the runs that were open when the last daemon died ([Sessions](./sessions.md#crash-recovery)).
 4. **The socket.** Only now, with the lock held, it unlinks a stale `golem.sock`, binds a new one, sets mode `0600`, and listens.
 5. **The watch.** Every 5 s it checks that the socket file is still the one it bound. If it is gone, the daemon stops, so launchd starts one that clients can reach.
 
@@ -172,7 +172,7 @@ The socket is only the door. Behind it, these jobs sit in one process:
 | MCP servers | Child processes or HTTP endpoints from `[mcp.<name>]`, started in the background, watched with `ping`, and restarted with backoff. Each session's tools come from `ToolRegistry.scoped` (`golem/mcp/`, [MCP](./mcp.md)). | Built |
 | Permissions | Rules from the project, the user, and the defaults, checked in order before every tool call (`golem/permissions/`, [Permissions](./permissions.md)). | Built |
 | Skills | The `SKILL.md` folders a session's folder sees, and which one each name means (`golem/skills/`, [Skills](./skills.md)). | Built: finding, listing, running by name, and pinning. The model picking one planned |
-| Event log | The history. Every event, numbered by `seq`, written before it is sent. A client that reconnects reads it and rebuilds the screen ([Sessions that survive](./sessions.md)). | Built |
+| Event log | The history. Every event, numbered by `seq`, written before it is sent. A client that reconnects reads it and rebuilds the screen ([Sessions](./sessions.md)). | Built |
 
 What the graph owns, and what it calls instead, is in [The agent loop](./agent-loop.md#what-the-graph-owns-and-what-it-calls).
 

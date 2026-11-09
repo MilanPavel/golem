@@ -236,7 +236,7 @@ Longer output is stored whole in the `artifacts` table, and the message keeps th
 ## Read more
 
 - Next: [Permissions](./permissions.md), the rules and approvals that decide whether a call may run.
-- Before: [Sessions that survive](./sessions.md).
+- Before: [Sessions](./sessions.md).
 - [Tools and permissions](../guide/permissions.md), the user's guide to the same thing.
 - [The overview](../architecture.md): the whole system on one page.
 - [Anthropic's guide to tool use](https://docs.anthropic.com/en/docs/build-with-claude/tool-use/overview), for native tool calling from the provider's side.

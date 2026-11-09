@@ -83,14 +83,16 @@ function loginLink(): Plugin {
   };
 }
 
-export default defineConfig(async ({ command }) => ({
+export default defineConfig(async ({ command, mode }) => ({
   plugins: [react(), tailwindcss(), loginLink()],
   server: command === "serve" ? { proxy: gatewayProxy(await gatewayPort()) } : {},
-  build: {
-    outDir: "dist",
-    assetsDir: "assets",
-    sourcemap: false,
-  },
+  // `vite build --mode gallery` builds the static gallery (gallery.html) into dist-gallery, with
+  // relative paths so it works under any prefix. The default build is the app and has no gallery.
+  base: mode === "gallery" ? "./" : "/",
+  build:
+    mode === "gallery"
+      ? { outDir: "dist-gallery", assetsDir: "assets", sourcemap: false, rollupOptions: { input: "gallery.html" } }
+      : { outDir: "dist", assetsDir: "assets", sourcemap: false },
   test: {
     environment: "jsdom",
     setupFiles: ["src/test-setup.ts"],

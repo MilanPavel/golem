@@ -30,23 +30,24 @@ For someone who wants to use golem today.
 
 golem's architecture, one idea per chapter. Each chapter explains an idea that most agents share, then how golem builds it, and ends with golem's details for contributors. Every chapter follows [architecture/_template.md](architecture/_template.md). Read them in order. [architecture.md](architecture.md) is the overview: the whole system on one page, and one message followed end to end.
 
-| # | Chapter | File | Ticket |
-|---|---|---|---|
-| | Overview, and one message end to end | [architecture.md](architecture.md) | [#292](https://github.com/MilanPavel/golem/issues/292) |
-| 1 | The agent loop | [architecture/agent-loop.md](architecture/agent-loop.md) | |
-| 2 | Talking to models | [architecture/models.md](architecture/models.md) | |
-| 3 | The daemon | [architecture/daemon.md](architecture/daemon.md) | |
-| 4 | The protocol | [architecture/protocol.md](architecture/protocol.md) | |
-| 5 | Sessions that survive | [architecture/sessions.md](architecture/sessions.md) | |
-| 6 | Tools | [architecture/tools.md](architecture/tools.md) | |
-| 7 | Permissions: rules and approvals | [architecture/permissions.md](architecture/permissions.md) | |
-| 8 | Sandboxes | [architecture/sandboxes.md](architecture/sandboxes.md) | |
-| 9 | Context: the system prompt | [architecture/context.md](architecture/context.md) | |
-| 10 | Skills | [architecture/skills.md](architecture/skills.md) | |
-| 11 | MCP: tools from outside | [architecture/mcp.md](architecture/mcp.md) | |
-| 12 | The terminal app | [architecture/tui.md](architecture/tui.md) | |
-| 13 | The web UI | [architecture/web.md](architecture/web.md) | |
-| 14 | What comes next | `architecture/whats-next.md` | [#291](https://github.com/MilanPavel/golem/issues/291) |
+| Chapter | File | Ticket |
+|---|---|---|
+| Overview, and one message end to end | [architecture.md](architecture.md) | [#292](https://github.com/MilanPavel/golem/issues/292) |
+| The agent loop | [architecture/agent-loop.md](architecture/agent-loop.md) | |
+| Talking to models | [architecture/models.md](architecture/models.md) | |
+| The daemon | [architecture/daemon.md](architecture/daemon.md) | |
+| The protocol | [architecture/protocol.md](architecture/protocol.md) | |
+| Sessions | [architecture/sessions.md](architecture/sessions.md) | |
+| Tools | [architecture/tools.md](architecture/tools.md) | |
+| Permissions | [architecture/permissions.md](architecture/permissions.md) | |
+| Sandboxes | [architecture/sandboxes.md](architecture/sandboxes.md) | |
+| Context | [architecture/context.md](architecture/context.md) | |
+| Skills | [architecture/skills.md](architecture/skills.md) | |
+| MCP | [architecture/mcp.md](architecture/mcp.md) | |
+| The terminal app | [architecture/tui.md](architecture/tui.md) | |
+| The web UI | [architecture/web.md](architecture/web.md) | |
+| Tracing | [architecture/tracing.md](architecture/tracing.md) | |
+| What comes next | `architecture/whats-next.md` | [#291](https://github.com/MilanPavel/golem/issues/291) |
 
 ## Build golem
 
@@ -59,7 +60,7 @@ For someone who wants to change golem.
 | Hacking: set up, run, ship | [contributing/hacking.md](contributing/hacking.md) | |
 | Contributing | [contributing/index.md](contributing/index.md), which includes [CONTRIBUTING.md](../CONTRIBUTING.md) | |
 | Building, releasing, and running | [ops/build.md](ops/build.md), [ops/release.md](ops/release.md), [ops/run.md](ops/run.md), split into pages | [#296](https://github.com/MilanPavel/golem/issues/296) |
-| The web UI's design | [design/web.md](design/web.md) | |
+| Design: the design system, the web UI, the setup window, MCP management | [design/index.md](design/index.md), [design/web.md](design/web.md), [design/setup-window.md](design/setup-window.md), [design/mcp.md](design/mcp.md). The gallery at `/gallery/` is built from `packages/web`. | |
 
 ## Project
 

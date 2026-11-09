@@ -113,7 +113,7 @@ The same guarantee is a test. `just golden` records five chats from a real daemo
 
 ## Why this way
 
-**A fold over the event log, not a copy of the chat** ([ADR-007](../adr/007-attach-and-fan-out.md)). The daemon already writes every event to the log before it sends it ([Sessions that survive](./sessions.md)). A window that folds those events needs nothing else: the replay after a restart, a late window, and a reconnect are one code path, and the golden test checks all three. A snapshot API would be a second way to say the same thing, and the two could drift. The cost: every new event needs a case in `reduceChat`, and an event must carry everything the screen needs.
+**A fold over the event log, not a copy of the chat** ([ADR-007](../adr/007-attach-and-fan-out.md)). The daemon already writes every event to the log before it sends it ([Sessions](./sessions.md)). A window that folds those events needs nothing else: the replay after a restart, a late window, and a reconnect are one code path, and the golden test checks all three. A snapshot API would be a second way to say the same thing, and the two could drift. The cost: every new event needs a case in `reduceChat`, and an event must carry everything the screen needs.
 
 **One reducer for the terminal and the browser** ([ADR-029](../adr/029-web-stack.md)). `@golem/view` holds `reduceChat` and imports no React, DOM, or Node API. The TUI calls it from React state, and the web UI from small stores. A bug fixed there is fixed in both windows. A second reducer would let the terminal and the browser disagree about the same chat.
 
@@ -276,5 +276,5 @@ The client does not build the transcript. It hands each `event` line to `App`. I
 - Next: [The web UI](./web.md): a browser on a local socket.
 - Before: [MCP](./mcp.md).
 - [The protocol](./protocol.md): `seq`, attach, and replay, which this screen folds.
-- [Sessions that survive](./sessions.md): the event log the replay reads.
+- [Sessions](./sessions.md): the event log the replay reads.
 - [The overview](../architecture.md): the whole system on one page.
