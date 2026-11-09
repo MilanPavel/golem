@@ -261,7 +261,7 @@ How an answer was made: each model call with its context and reply, each tool ca
 - **Ways in:**
   - A `Chat | Trace` row of underline tabs under the top bar, on both views. It is a `nav` named `View`, and the current tab is `aria-current="page"`. The right side of the row belongs to the view: the trace puts its summary line and Refresh there.
   - The palette's `Trace` row, which is shown only when a session is open.
-  - There is no slash command, because the terminal has no trace.
+  - `/context` opens the trace with the newest model call selected.
 - **Summary line:** the number of runs, the total time, the total tokens (input plus output; `—` when none are recorded), and the context of the latest model call that reported its input, such as `2 runs · 2m 30.8s · 110.7K tokens · context 32.0K / 128K · 25%`. A session from before traces has no context part. Beside the line sit a thin bar of how full the window is (clay, `wait` from 80%, `deny` from 95%; none when the window is unknown) and a sparkline of the input tokens per model call (plain SVG, hidden below 760 px), then `Refresh`, on the right of the tabs row. The page shows finished data and does not update while a run streams. A running run shows its open spans as `running`, and Refresh reads again.
 - **Two panes:**
   - The tree, about 55%, and the detail beside it.
@@ -332,7 +332,7 @@ How an answer was made: each model call with its context and reply, each tool ca
 - After `/model ` the list offers model names, and after `/skill run ` skill names. The model and skill lists are fetched only once the text starts with `/`.
 - A command answers in one muted line above the key hints, such as `Renamed.` or `Copied the last answer.`. It clears when you type or run the next command. An error stays in the red line. A notice may carry a command for a terminal, such as `golem auth set anthropic`, in mono with a `Copy` button that says `Copied` for two seconds.
 - `/help` opens a `Commands` dialog with the table grouped as Session, Model, Tools, and View.
-- `/model`, `/close`, `/fork`, `/title`, `/skill`, `/copy`, `/export` (a markdown download), `/time`, and `/todos` act on the page. `/permissions` opens Settings → Tool rules. `/config [project]` opens Settings → Config file. `/mcp` opens Settings → MCP servers, and `/mcp enable <name>` and `/mcp disable <name>` turn a server on or off for the session, saying so, or show the daemon's message. On the empty screen `/model` picks the new session's model, and the others that need a session say `Start a session first: send a message.`
+- `/model`, `/close`, `/fork`, `/title`, `/skill`, `/copy`, `/export` (a markdown download), `/time`, `/todos`, and `/context` act on the page. `/permissions` opens Settings → Tool rules. `/config [project]` opens Settings → Config file. `/mcp` opens Settings → MCP servers, and `/mcp enable <name>` and `/mcp disable <name>` turn a server on or off for the session, saying so, or show the daemon's message. On the empty screen `/model` picks the new session's model, and the others that need a session say `Start a session first: send a message.`
 - `/setup` and the palette's `/setup` row open Settings → Setup.
 - The page has no key entry, so `/login` and `/logout` show the `golem auth` command to copy ([ADR-028](../adr/028-web-gateway.md)).
 - `/mcp add [id]` opens Settings → MCP servers with the Add dialog, on that server's form, or on the list with no id or an unknown one. The session's folder fills a path input.

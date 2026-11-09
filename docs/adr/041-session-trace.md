@@ -138,3 +138,7 @@ Blobs hold prompts, which can hold anything a skill or a pinned file says. They 
 
 - A provider may change where it reports usage or the stop reason. The adapter reads both LangChain fields and the known names (`stop_reason`, `finish_reason`); a missing value shows as "not recorded", not as zero.
 - Unused blobs stay when a session is deleted. Pruning them is left for later, and they are small.
+
+## Addendum
+
+**13.9.9:** The TUI shows the context of the newest model call. `/context` prints the breakdown from `trace.get` and `trace.span`, and the status line shows `ctx N%` from the `model.call.*` events. The tree and the waterfall stay in the browser, and `/debug` stays.

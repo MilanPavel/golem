@@ -1,4 +1,4 @@
-import { connectionLabel } from "@golem/view";
+import { connectionLabel, contextLevel, contextShare, type LiveContext } from "@golem/view";
 
 import { newLinesLabel } from "./transcript.ts";
 
@@ -54,7 +54,7 @@ export function shortCwd(cwd: string, home: string): string {
   return cwd;
 }
 
-export type StatusTone = "connection" | "title" | "model" | "dim" | "fresh" | "alert";
+export type StatusTone = "connection" | "title" | "model" | "dim" | "fresh" | "warn" | "alert";
 
 export type StatusSegment = {
   id: string;
@@ -68,7 +68,7 @@ export type StatusSegment = {
 
 /**
  * Connection never drops. After that, the right-hand segments leave first:
- * uptime, message count, folder, pinned skills, new lines, then model, then
+ * uptime, message count, folder, pinned skills, context, new lines, then model, then
  * the title, then an alert.
  */
 export const STATUS_PRIORITY = {
@@ -77,6 +77,7 @@ export const STATUS_PRIORITY = {
   title: 80,
   model: 60,
   fresh: 55,
+  context: 50,
   skills: 45,
   folder: 40,
   messages: 20,
@@ -185,6 +186,31 @@ export function startedAtMs(nowMs: number, uptimeSeconds: number): number | null
   return nowMs - uptimeSeconds * 1000;
 }
 
+/** `ctx 25%`, `ctx <1%`; empty when the size or the window is unknown. */
+export function contextLabel(context: { used: number | null; window: number | null } | null): string {
+  if (context === null) {
+    return "";
+  }
+  const share = contextShare(context.used, context.window);
+  if (share === null) {
+    return "";
+  }
+  const percent = share * 100;
+  return percent > 0 && percent < 1 ? "ctx <1%" : `ctx ${Math.floor(percent)}%`;
+}
+
+/** Red from 95% or when the input reached `num_ctx`, yellow from 80%. */
+export function contextTone(context: LiveContext | null): StatusTone {
+  if (context === null) {
+    return "dim";
+  }
+  if (context.numCtx !== null && context.used >= context.numCtx) {
+    return "alert";
+  }
+  const level = contextLevel(context.used, context.window);
+  return level === "full" ? "alert" : level === "high" ? "warn" : "dim";
+}
+
 export function statusSegments(input: {
   connection: string;
   title: string;
@@ -199,12 +225,15 @@ export function statusSegments(input: {
   skills?: readonly string[];
   /** The pinned skills the newest model call left out. */
   skippedSkills?: readonly string[];
+  /** The context of the newest model call that reported its input. */
+  context?: LiveContext | null;
 }): StatusSegment[] {
   return [
     segment("connection", input.connection, STATUS_PRIORITY.connection, "connection", true),
     segment("alert", input.alert ?? "", STATUS_PRIORITY.alert, "alert"),
     segment("title", input.title, STATUS_PRIORITY.title, "title"),
     segment("model", input.model, STATUS_PRIORITY.model, "model"),
+    segment("context", contextLabel(input.context ?? null), STATUS_PRIORITY.context, contextTone(input.context ?? null)),
     segment("skills", skillsLabel(input.skills ?? [], input.skippedSkills ?? []), STATUS_PRIORITY.skills, "dim"),
     segment("folder", input.folder, STATUS_PRIORITY.folder, "dim"),
     segment(

@@ -1,4 +1,4 @@
-import type { ChatEvent, TraceContext, TraceContextPart } from "@golem/client";
+import type { ChatEvent, TraceContext, TraceContextPart, TraceModelSpan, TraceRunSpan } from "@golem/client";
 
 export type { TraceContext, TraceContextPart };
 export type ContextKey = TraceContextPart["key"];
@@ -156,4 +156,97 @@ export function foldLiveContext(state: LiveContextState, event: ChatEvent): Live
     return { last: { spanId: pending.spanId, used: input, window: pending.window, numCtx: pending.numCtx }, pending: null };
   }
   return state;
+}
+
+/** The last model call of the last run that has one, or null. */
+export function latestModelSpan(runs: readonly TraceRunSpan[]): TraceModelSpan | null {
+  for (let at = runs.length - 1; at >= 0; at -= 1) {
+    const calls = runs[at]?.children ?? [];
+    const last = calls[calls.length - 1];
+    if (last !== undefined) return last;
+  }
+  return null;
+}
+
+/** What the context panel shows: a read in progress, nothing to read, a failure, or the context. */
+export type ContextReport =
+  | { kind: "loading" }
+  | { kind: "none" }
+  | { kind: "error"; message: string }
+  | { kind: "ready"; model: string | null; context: TraceContext | null };
+
+const BUILT_IN = "built-in";
+const SERVERS_SHOWN = 5;
+
+/** A whole percent of `of`, with `<1%` for a share above 0 and below 1%. */
+function partPercent(tokens: number, of: number): string {
+  if (!(of > 0) || tokens <= 0) return "0%";
+  const percent = (tokens / of) * 100;
+  return percent < 1 ? "<1%" : `${Math.round(percent)}%`;
+}
+
+function toolServerLines(part: TraceContextPart): string[] {
+  const groups = new Map<string, { tokens: number; count: number }>();
+  for (const item of part.items ?? []) {
+    const name = item.group ?? BUILT_IN;
+    const group = groups.get(name) ?? { tokens: 0, count: 0 };
+    group.tokens += item.tokens;
+    group.count += 1;
+    groups.set(name, group);
+  }
+  const sorted = [...groups.entries()].sort((a, b) => b[1].tokens - a[1].tokens);
+  const row = (text: string, tokens: number): string => `${text.padEnd(28)}${formatTokens(tokens).padStart(6)}`;
+  const lines = sorted
+    .slice(0, SERVERS_SHOWN)
+    .map(([name, { tokens, count }]) => row(`  ${name} · ${count} ${count === 1 ? "tool" : "tools"}`, tokens));
+  const rest = sorted.slice(SERVERS_SHOWN);
+  if (rest.length > 0) {
+    const tokens = rest.reduce((sum, [, group]) => sum + group.tokens, 0);
+    lines.push(row(`  +${rest.length} more ${rest.length === 1 ? "server" : "servers"}`, tokens));
+  }
+  return lines;
+}
+
+/**
+ * The lines of the context panel. Lines are not cut to `columns`; it only sets the bar's width.
+ * The terminal cuts the lines.
+ */
+export function contextReport(report: ContextReport, columns: number): string[] {
+  switch (report.kind) {
+    case "loading":
+      return ["reading the context…"];
+    case "none":
+      return ["no model call yet — send a message first"];
+    case "error":
+      return [`could not read the context: ${report.message}`];
+    case "ready":
+      break;
+  }
+  const ctx = report.context;
+  if (ctx === null) return ["this call has no context record — it ran before golem kept traces"];
+  const used = ctx.used ?? null;
+  const window = ctx.window ?? null;
+  const summary =
+    used === null
+      ? "usage not reported"
+      : window === null
+        ? `${formatTokens(used)} · window unknown`
+        : contextSummary(used, window, ctx.window_estimated ?? false);
+  const lines = [`context · ${report.model === null ? "" : `${report.model} · `}${summary}`];
+  if (used !== null && window !== null) {
+    lines.push(contextBar(ctx.parts, window, Math.max(1, Math.min(columns, 60))));
+  }
+  const base = window ?? used;
+  const percentOf = (tokens: number): string => (used === null || base === null ? "" : partPercent(tokens, base));
+  const row = (label: string, tokens: number): string =>
+    `${label.padEnd(18)}${formatTokens(tokens).padStart(7)}${used === null ? "" : ` ${percentOf(tokens).padStart(5)}`}`;
+  for (const part of ctx.parts) {
+    lines.push(row(CONTEXT_LABELS[part.key], part.tokens));
+    if (part.key === "tools") lines.push(...toolServerLines(part));
+  }
+  if (used !== null && window !== null && used <= window) lines.push(row(CONTEXT_LABELS.free, window - used));
+  if (ctx.estimated) lines.push("Parts are estimates, scaled to the provider's count.");
+  const warning = contextWarning(ctx);
+  if (warning !== null) lines.push(`! ${warning}`);
+  return lines;
 }

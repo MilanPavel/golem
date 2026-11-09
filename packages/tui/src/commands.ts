@@ -1,4 +1,4 @@
-import { type Command } from "@golem/view";
+import { contextReport, type Command, type ContextReport } from "@golem/view";
 
 export {
   applyComposer,
@@ -26,6 +26,11 @@ export function helpLines(commands: readonly Pick<Command, "name" | "args" | "de
     command.args.length > 0 ? `${command.name} ${command.args}` : command.name;
   const width = commands.reduce((max, command) => Math.max(max, usage(command).length), 0);
   return commands.map((command) => fitLine(`${usage(command).padEnd(width)}  ${command.description}`, columns));
+}
+
+/** `/context`: the view's report, each line cut to the terminal. */
+export function contextLines(report: ContextReport, columns: number): string[] {
+  return contextReport(report, columns).map((line) => fitLine(line, columns));
 }
 
 export function fitLine(text: string, columns: number): string {

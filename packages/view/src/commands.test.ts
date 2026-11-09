@@ -330,3 +330,8 @@ test("every command has a group and the names are unique", () => {
   const names = COMMANDS.map((command) => command.name);
   assert.equal(new Set(names).size, names.length);
 });
+
+test("/context opens the context panel and takes no argument", () => {
+  assert.deepEqual(applyComposer(closedDebug, "/context"), { kind: "context" });
+  assert.equal(applyComposer(closedDebug, "/context x").kind, "unknown");
+});

@@ -783,3 +783,22 @@ test("replaying the approval events twice gives the same tool", () => {
   const twice = [...events, ...events.slice(3)].reduce(reduceChat, emptyChat);
   assert.deepEqual(twice.messages[0]?.tools?.[0]?.approval, once.messages[0]?.tools?.[0]?.approval);
 });
+
+function call(type: "model.call.started" | "model.call.completed", id: string, data: Record<string, unknown>): ChatEvent {
+  return { seq: 1, session_id: "s", run_id: "r", ts: "t", type, data: { message_id: id, ...data } } as ChatEvent;
+}
+
+test("the newest call's context comes from model.call.started and completed, and a second call replaces it", () => {
+  let state = reduceChat(emptyChat, call("model.call.started", "m1", { context_window: 8000, num_ctx: 4000 }));
+  assert.equal(state.context.last, null);
+  state = reduceChat(state, call("model.call.completed", "m1", { usage: { input: 1200, output: 5 } }));
+  assert.deepEqual(state.context.last, { spanId: "m1", used: 1200, window: 8000, numCtx: 4000 });
+  state = reduceChat(state, call("model.call.started", "m2", { context_window: 8000 }));
+  state = reduceChat(state, call("model.call.completed", "m2", { usage: { input: 2400, output: 5 } }));
+  assert.deepEqual(state.context.last, { spanId: "m2", used: 2400, window: 8000, numCtx: null });
+});
+
+test("an event that changes neither the chat nor the context returns the same state", () => {
+  const same = reduceChat(emptyChat, { seq: 1, session_id: "s", run_id: "r", ts: "t", type: "session.updated", data: {} } as unknown as ChatEvent);
+  assert.equal(same, emptyChat);
+});

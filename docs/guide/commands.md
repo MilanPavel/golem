@@ -101,6 +101,7 @@ Type `/` and suggestions appear, with each command's arguments. `/help` lists ev
 | Command | What it does |
 |---|---|
 | `/todos` | Show or hide the agent's todo list above the composer |
+| `/context` | See how full the model's context is, and what fills it. In the web UI it opens the trace |
 | `/time` | Show or hide the time beside each message |
 | `/debug` | Open or close the debug panel |
 | `/debug wire`, `/debug model` | Show the protocol messages, or exactly what the model sees |
