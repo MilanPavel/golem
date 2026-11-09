@@ -216,7 +216,7 @@ async def test_the_window_is_recorded_when_it_is_known(database: Database) -> No
         database,
         ToolCallingChatModel(replies=["hi"]),
         None,
-        window_of=lambda _: ContextWindow(8192, 8192),
+        window_of=lambda _, __: ContextWindow(8192, 8192),
     )
     session_id = await chat.manager.create(None)
     (first,) = await chat.send(session_id, "hello")

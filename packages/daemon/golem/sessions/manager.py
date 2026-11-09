@@ -346,7 +346,7 @@ class SessionManager:
             window_of = self._runtime.window_of
             if window_of is not None:
                 runs = with_windows(
-                    runs, lambda name: window_of(name).window, session.model_profile
+                    runs, lambda name: window_of(name, None).window, session.model_profile
                 )
             return session.title, runs
 
@@ -381,7 +381,7 @@ class SessionManager:
             window_of = self._runtime.window_of
             if window is None and window_of is not None:
                 window, estimated = filled_window(
-                    span, None, session.model_profile, lambda name: window_of(name).window
+                    span, None, session.model_profile, lambda name: window_of(name, None).window
                 )
             context, sized = context_breakdown(
                 used=None if span.tokens is None else span.tokens.input,
