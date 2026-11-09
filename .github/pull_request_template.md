@@ -9,7 +9,7 @@ The title is the commit on main and a line in the release notes:
 
 ## Why
 
-<!-- The problem, or the plan step (docs/plan.md), this is for. -->
+<!-- The problem, or the roadmap issue, this is for. -->
 
 ## Changes
 

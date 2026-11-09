@@ -1,6 +1,6 @@
 # MCP from anywhere: design
 
-This is how golem adds, tests, edits, and removes MCP servers, in the terminal and in the browser. Step 1.12 of [the plan](../plan.md#phase-1--first-run-continued) builds it, and [ADR-037](../adr/037-browser-manages-mcp-and-config.md) says what the browser may do. The terminal screens are drawn the way [the setup window](setup-window.md) draws its own, and the browser screens follow [the web UI's design](web.md).
+This is how golem adds, tests, edits, and removes MCP servers, in the terminal and in the browser. Step 1.12 of [the roadmap](https://github.com/MilanPavel/golem/issues/245) builds it, and [ADR-037](../adr/037-browser-manages-mcp-and-config.md) says what the browser may do. The terminal screens are drawn the way [the setup window](setup-window.md) draws its own, and the browser screens follow [the web UI's design](web.md).
 
 ## The idea
 
@@ -196,7 +196,7 @@ every chat that has them.
 
 ## C · Add a server
 
-`a` in the list, `/mcp add`, or the first row of an empty list. The catalog is the daemon's data ([1.12.6](../plan.md#phase-1--first-run-continued)), so the terminal and the browser always show the same entries.
+`a` in the list, `/mcp add`, or the first row of an empty list. The catalog is the daemon's data ([1.12.6](https://github.com/MilanPavel/golem/issues/485)), so the terminal and the browser always show the same entries.
 
 ```screen C1 · Pick from the catalog | By category. Type to search. A row that needs Node or uv says golem installs it. A row you already have is marked.
 Add a server                                  13 in the catalog
@@ -588,7 +588,7 @@ Enter picks · ↑↓ move
 
 ## H · Signing in
 
-A hosted server that signs in with OAuth ([1.12.10](../plan.md#phase-1--first-run-continued)) shows `needs sign-in` in the list. Sign in opens the browser, and the server starts when the sign-in ends.
+A hosted server that signs in with OAuth ([1.12.10](https://github.com/MilanPavel/golem/issues/489)) shows `needs sign-in` in the list. Sign in opens the browser, and the server starts when the sign-in ends.
 
 ```screen H1 · Sign in | The browser is opened with the address. The address is shown too, to copy, for a Mac with no browser open.
 linear · sign in
@@ -616,7 +616,7 @@ Sign out is a row in the server's detail once it is signed in. A token that can 
 
 ## I · The model asks, and servers talk back
 
-These screens belong to [1.12.11](../plan.md#phase-1--first-run-continued) and [1.12.12](../plan.md#phase-1--first-run-continued). They are drawn here so the rest is built to fit them.
+These screens belong to [1.12.11](https://github.com/MilanPavel/golem/issues/490) and [1.12.12](https://github.com/MilanPavel/golem/issues/491). They are drawn here so the rest is built to fit them.
 
 ```screen I1 · The model asks for a server | An approval, like a tool's. The reason is the model's own. Allow once starts it for this chat, and the tools appear in the same turn.
 golem wants to turn on playwright for this chat

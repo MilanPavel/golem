@@ -45,7 +45,7 @@ The open questions are the same in every agent:
 
 - **What earns a place in every call.** Each line is paid for on every call. Skills are the usual answer for knowledge that only some tasks need: one line each in the prompt, and the rest only when used ([Skills](./skills.md)).
 - **When an edit shows.** A rule or a skill changed mid-chat should apply from the next call, not from the next chat.
-- **What to keep when the window fills.** Planned for golem in [Phase 9](../plan.md).
+- **What to keep when the window fills.** Planned for golem in [Phase 9](https://github.com/MilanPavel/golem/issues/110).
 
 ## How golem does it
 

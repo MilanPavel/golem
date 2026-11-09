@@ -51,7 +51,7 @@ Everything else is in **[the documentation](https://milanpavel.github.io/golem/)
 - [First chat](https://milanpavel.github.io/golem/guide/first-chat): a model, a first question, and a first approval
 - [Models and API keys](https://milanpavel.github.io/golem/guide/models), [Commands](https://milanpavel.github.io/golem/guide/commands), [Tools and permissions](https://milanpavel.github.io/golem/guide/permissions), [MCP servers](https://milanpavel.github.io/golem/guide/mcp), [Skills](https://milanpavel.github.io/golem/guide/skills), and [the web UI](https://milanpavel.github.io/golem/guide/web)
 - [Architecture](https://milanpavel.github.io/golem/architecture) and [the decisions](https://milanpavel.github.io/golem/adr/README) behind it
-- [Vision](docs/vision.md): where golem is going, and [the plan](docs/plan.md): the next steps
+- [Vision](docs/vision.md): where golem is going, and [the roadmap](docs/roadmap.md): the next steps
 
 ## Contributing
 

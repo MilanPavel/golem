@@ -45,6 +45,7 @@ An Architecture Decision Record (ADR) is a short note of one choice: what was de
 | [039](039-web-setup-as-pages.md) | The browser sets up golem on pages, not in a dialog | accepted | 2026-11-06 |
 | [040](040-browser-lists-home-folders.md) | The browser may list folders under your home | accepted | 2026-11-06 |
 | [041](041-session-trace.md) | golem records a trace of each session and shows it in the browser | accepted | 2026-11-07 |
+| [042](042-roadmap-in-issues.md) | The plan lives in GitHub issues and Project 1, not in a file | accepted | 2026-11-09 |
 
 How the running code fits together is in [../architecture.md](../architecture.md).
 

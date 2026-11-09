@@ -101,7 +101,6 @@ It runs lint, typecheck, tests, and `just gen`, and it fails if the generated fi
 | `scripts/setup.sh`, `scripts/dist.sh`, `scripts/package.sh`, `scripts/render_formula.sh`, `golem/launchd.py` | `install` |
 | `cliff.toml`, `CHANGELOG.md`, `release.yml`, signing | `release` |
 | `.github/` | `ci` |
-| `docs/plan.md` | `plan` |
 | other docs | `docs` |
 | only `uv.lock`, `pnpm-lock.yaml`, or version pins | `deps` |
 

@@ -60,7 +60,6 @@ The scope is optional. Use it when a change sits in one part of golem.
 | `release` | Versioning, signing, the release workflow |
 | `ci` | CI that is not about releases |
 | `docs` | A specific document, when the type is not `docs` |
-| `plan` | `docs/plan.md` |
 | `deps` | Dependency updates |
 
 A new scope is a one-line change to `.githooks/commit-msg` and a row here.
