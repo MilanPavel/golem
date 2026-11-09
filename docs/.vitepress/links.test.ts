@@ -6,7 +6,7 @@ const blob = "https://github.com/MilanPavel/golem/blob/main/";
 
 test("a link to another page stays as it is", () => {
   assert.equal(siteHref("adr/012-permission-rules.md", "architecture.md"), "adr/012-permission-rules.md");
-  assert.equal(siteHref("../vision.md#1-web-ui", "adr/029-web-stack.md"), "../vision.md#1-web-ui");
+  assert.equal(siteHref("../vision/workflows.md", "adr/029-web-stack.md"), "../vision/workflows.md");
 });
 
 test("anchors, absolute URLs, site paths, and images stay as they are", () => {

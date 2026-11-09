@@ -66,6 +66,12 @@ For someone who wants to change golem.
 | Page | File | Ticket |
 |---|---|---|
 | The vision | [vision.md](vision.md) | |
+| One golem, wherever you are | [vision/everywhere.md](vision/everywhere.md) | |
+| Workflows | [vision/workflows.md](vision/workflows.md) | |
+| Sub-agents | [vision/sub-agents.md](vision/sub-agents.md) | |
+| Serve mode: the agent behind your app | [vision/serve-mode.md](vision/serve-mode.md) | |
+| Core features | [vision/core.md](vision/core.md) | |
+| Security | [vision/security.md](vision/security.md) | |
 | The roadmap | [roadmap.md](roadmap.md) | |
 | Decisions (ADRs), by topic | [adr/README.md](adr/README.md) | [#295](https://github.com/MilanPavel/golem/issues/295) |
 

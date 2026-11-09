@@ -124,7 +124,19 @@ const sidebar: DefaultTheme.Sidebar = [
   {
     text: "Project",
     items: [
-      { text: "The vision", link: "/vision" },
+      {
+        text: "The vision",
+        link: "/vision",
+        collapsed: false,
+        items: [
+          { text: "One golem, wherever you are", link: "/vision/everywhere" },
+          { text: "Workflows", link: "/vision/workflows" },
+          { text: "Sub-agents", link: "/vision/sub-agents" },
+          { text: "Serve mode: the agent behind your app", link: "/vision/serve-mode" },
+          { text: "Core features", link: "/vision/core" },
+          { text: "Security", link: "/vision/security" },
+        ],
+      },
       { text: "Roadmap", link: "/roadmap" },
       {
         text: "Decisions (ADRs)",
