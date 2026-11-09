@@ -46,7 +46,8 @@ An Architecture Decision Record (ADR) is a short note of one choice: what was de
 | [040](040-browser-lists-home-folders.md) | The browser may list folders under your home | accepted | 2026-11-06 |
 | [041](041-session-trace.md) | golem records a trace of each session and shows it in the browser | accepted | 2026-11-07 |
 | [042](042-roadmap-in-issues.md) | The plan lives in GitHub issues and Project 1, not in a file | accepted | 2026-11-09 |
+| [043](043-ollama-context-window.md) | golem finds the context window of a local model from what Ollama says, and never sends a `num_ctx` nobody asked for | accepted | 2026-11-09 |
 
 How the running code fits together is in [../architecture.md](../architecture.md).
 
-New records use [template.md](template.md). Number the next file `042-….md` and add a row here.
+New records use [template.md](template.md). Number the next file `044-….md` and add a row here.
