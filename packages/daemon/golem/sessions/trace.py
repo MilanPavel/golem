@@ -162,6 +162,7 @@ def _recorded_models(
                 first_token_ms=first,
                 context_window=data.context_window,
                 num_ctx=data.num_ctx,
+                context_window_estimated=data.window_estimated,
                 preview=replies.get(data.message_id, "")[:_PREVIEW_CHARS],
             )
         )
@@ -336,6 +337,7 @@ class SpanRead:
     tools_sha: str | None = None
     context_window: int | None = None
     num_ctx: int | None = None
+    window_estimated: bool = False
 
 
 def read_span(
@@ -422,6 +424,7 @@ def _model_read(
         tools_sha=None if here is None else here.tools_sha,
         context_window=None if here is None else here.context_window,
         num_ctx=None if here is None else here.num_ctx,
+        window_estimated=False if here is None else here.window_estimated,
     )
 
 

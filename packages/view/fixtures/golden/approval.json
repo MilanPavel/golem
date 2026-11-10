@@ -61,7 +61,8 @@
         "provider": null,
         "system_prompt_sha": null,
         "system_sections": null,
-        "tools_sha": "310002311a2a5a2409ce7ef36bd1231772ad4a573e63572c677e4673b6356342"
+        "tools_sha": "310002311a2a5a2409ce7ef36bd1231772ad4a573e63572c677e4673b6356342",
+        "window_estimated": false
       },
       "run_id": "id-2",
       "seq": 5,
@@ -199,7 +200,8 @@
         "provider": null,
         "system_prompt_sha": null,
         "system_sections": null,
-        "tools_sha": "310002311a2a5a2409ce7ef36bd1231772ad4a573e63572c677e4673b6356342"
+        "tools_sha": "310002311a2a5a2409ce7ef36bd1231772ad4a573e63572c677e4673b6356342",
+        "window_estimated": false
       },
       "run_id": "id-2",
       "seq": 14,
@@ -307,7 +309,8 @@
         "provider": null,
         "system_prompt_sha": null,
         "system_sections": null,
-        "tools_sha": "310002311a2a5a2409ce7ef36bd1231772ad4a573e63572c677e4673b6356342"
+        "tools_sha": "310002311a2a5a2409ce7ef36bd1231772ad4a573e63572c677e4673b6356342",
+        "window_estimated": false
       },
       "run_id": "id-2",
       "seq": 5,
@@ -445,7 +448,8 @@
         "provider": null,
         "system_prompt_sha": null,
         "system_sections": null,
-        "tools_sha": "310002311a2a5a2409ce7ef36bd1231772ad4a573e63572c677e4673b6356342"
+        "tools_sha": "310002311a2a5a2409ce7ef36bd1231772ad4a573e63572c677e4673b6356342",
+        "window_estimated": false
       },
       "run_id": "id-2",
       "seq": 14,
