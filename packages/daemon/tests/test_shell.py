@@ -12,7 +12,7 @@ import pytest
 
 from golem.config import ShellSettings
 from golem.permissions.policy import Policy
-from golem.tools import default_registry, sandbox
+from golem.tools import default_registry, sandbox, shell
 from golem.tools.registry import ToolContext, ToolError, ToolResult
 
 needs_sandbox = pytest.mark.skipif(not sandbox.available(), reason="needs macOS sandbox-exec")
@@ -185,6 +185,49 @@ async def test_the_shell_tool_ends_with_the_exit_code(root: Path) -> None:
     assert (failed.output, failed.summary, failed.failed) == ("boom\n[exit code 2]", "exit 2", True)
     slow = await _call(root, "shell", command="sleep 5", timeout_seconds=1)
     assert (slow.summary, slow.failed) == ("timed out after 1s", True)
+
+
+@pytest.mark.parametrize(
+    ("command", "expected"),
+    [
+        ("curl -s https://example.com | head", True),
+        ("/usr/bin/curl -s x", True),
+        ("cd a && wget x", True),
+        ("git clone x", True),
+        ("git   pull", True),
+        ("pip install requests", True),
+        ("uv add httpx", True),
+        ("ls", False),
+        ("curly --help", False),
+        ("echo uncle", False),
+        ("git status", False),
+        ("git clone-ish", False),
+        ("cat ssh-notes.txt", False),
+        ("make pip-install", False),
+        ("ls ~/.ssh", False),
+        ("cat ssh.txt", False),
+    ],
+)
+def test_the_matcher_finds_network_clients_as_whole_words(command: str, expected: bool) -> None:
+    assert shell.needs_network(command) is expected
+
+
+@needs_sandbox
+async def test_a_network_command_gets_a_hint_only_in_the_sandbox_with_network_off(
+    root: Path,
+) -> None:
+    hint = f"[{shell.NO_NETWORK_HINT}]"
+    # No network client in these commands' output, so only the word list can speak.
+    hinted = await _call(root, "shell", command="echo curl")
+    assert hinted.output == f"curl\n[exit code 0]\n{hint}"
+    plain = await _call(root, "shell", command="ls")
+    assert hint not in plain.output
+    with_network = await default_registry().call(
+        "shell", {"command": "echo curl"}, ToolContext(root=root, shell=ShellSettings(network=True))
+    )
+    assert hint not in with_network.output
+    unsandboxed = await _call(root, "shell_unsandboxed", command="echo curl")
+    assert unsandboxed.output == "curl\n[exit code 0]"
 
 
 def _git(root: Path, *args: str) -> None:
