@@ -90,7 +90,7 @@ The line above the tree adds up the session: runs, time, tokens, and how full th
 Click a row to read it in the panel beside it.
 
 - **A model call** has three tabs. **Context** is what was sent: the system prompt and the tools folded away, then the messages, with a line where the part new since the last call begins. **Reply** is what came back. **Metadata** is the model, the tokens, why it stopped, and the times.
-- Above the tabs, the **context meter** shows how full the window was, and what filled it: the system prompt, the tool definitions, your messages, the replies, and the tool results. The split is an estimate, so it says so. Tools that come from an MCP server are grouped by server, with the cost of each, so you can see which server's tools use the most.
+- Above the tabs, the **context meter** shows how full the window was, and what filled it: the system prompt, the tool definitions, your messages, the replies, and the tool results. The split is an estimate, so it says so. A local model's window shows with `≈` when golem did not send it and read it from Ollama instead: it is a good guess, not a number golem set. Tools that come from an MCP server are grouped by server, with the cost of each, so you can see which server's tools use the most.
 - **A tool call** has **Args** (what the model asked for) and **Result** (what it got back). A long result opens in the full viewer. An **Approval** tab shows when you were asked.
 
 **Pretty** and **JSON** switch how a tab is shown, and **Copy** copies it. In the chat, the `ctx` chip at the end of the meter row shows the same fill, and opens the trace at the latest model call.

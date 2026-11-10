@@ -8,6 +8,7 @@ import {
   contextLevel,
   contextSummary,
   contextReport,
+  windowUnknownHint,
   contextWarning,
   emptyLiveContext,
   foldLiveContext,
@@ -91,12 +92,37 @@ test("contextCells and contextBar: largest remainder, free at the end", () => {
 function event(type: string, data: Record<string, unknown>): ChatEvent {
   return { seq: 1, session_id: "s", run_id: "r", ts: "2026-11-01T10:00:00+00:00", type, data } as ChatEvent;
 }
-const started = (id: string, window: number | null = 128000) => event("model.call.started", { message_id: id, index: 1, profile: "p", context_window: window });
+const started = (id: string, window: number | null = 128000, extra: Record<string, unknown> = {}) =>
+  event("model.call.started", { message_id: id, index: 1, profile: "p", context_window: window, ...extra });
 const completed = (id: string, usage?: Record<string, unknown>) => event("model.call.completed", { message_id: id, latency_ms: 5, usage });
 
 test("foldLiveContext: started then completed gives the last context", () => {
   const state = foldLiveContext(foldLiveContext(emptyLiveContext, started("m1")), completed("m1", { input: 32000, output: 10 }));
-  assert.deepEqual(state, { last: { spanId: "m1", used: 32000, window: 128000, numCtx: null }, pending: null });
+  assert.deepEqual(state, { last: { spanId: "m1", used: 32000, window: 128000, windowEstimated: false, numCtx: null }, pending: null });
+});
+
+test("foldLiveContext: window_estimated on the start reaches last, and a missing field is false", () => {
+  const done = (extra: Record<string, unknown>) =>
+    foldLiveContext(foldLiveContext(emptyLiveContext, started("m1", 8192, extra)), completed("m1", { input: 100 }));
+  assert.equal(done({ window_estimated: true }).last?.windowEstimated, true);
+  assert.equal(done({}).last?.windowEstimated, false);
+});
+
+test("windowUnknownHint: an Ollama model learns its window after the first answer", () => {
+  assert.equal(
+    windowUnknownHint("ollama"),
+    "golem does not know this model's window yet. It learns it after the first answer, or you can set ctx on the profile.",
+  );
+  assert.equal(windowUnknownHint("openai"), "golem does not know this model's window.");
+  assert.equal(windowUnknownHint(null), "golem does not know this model's window.");
+});
+
+test("contextReport: an estimated window is marked and an unknown one gets the hint", () => {
+  const estimated = contextReport({ kind: "ready", model: "m", context: context({ used: 1000, window: 8192, window_estimated: true, parts: [part("user", 1000)] }) }, 80);
+  assert.ok(estimated[0]?.includes("≈8K"));
+  assert.ok(estimated.some((line) => line.includes("not sent")));
+  const unknown = contextReport({ kind: "ready", model: "m", provider: "ollama", context: context({ used: 1000, window: null, parts: [part("user", 1000)] }) }, 80);
+  assert.ok(unknown.some((line) => line.includes("learns it after the first answer")));
 });
 
 test("foldLiveContext: a call with no usage keeps the previous last", () => {

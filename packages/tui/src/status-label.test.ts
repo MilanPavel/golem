@@ -251,18 +251,40 @@ test("a pinned skill the model call left out is marked skipped, in its place", (
   assert.equal(skillsLabel([], []), "");
 });
 
-test("contextLabel: percent rounded down, <1% for a sliver, empty when unknown", () => {
+test("contextLabel: a bar, the percent rounded down, and the tokens against the window", () => {
   assert.equal(contextLabel(null), "");
-  assert.equal(contextLabel({ used: 1000, window: null }), "");
   assert.equal(contextLabel({ used: null, window: 8000 }), "");
-  assert.equal(contextLabel({ used: 0, window: 8000 }), "ctx 0%");
-  assert.equal(contextLabel({ used: 300, window: 100_000 }), "ctx <1%");
-  assert.equal(contextLabel({ used: 32_000, window: 128_000 }), "ctx 25%");
-  assert.equal(contextLabel({ used: 123_000, window: 128_000 }), "ctx 96%");
+  assert.equal(contextLabel({ used: 0, window: 8000 }), "░░░░░░░░ 0% 0/8.0K");
+  assert.equal(contextLabel({ used: 300, window: 100_000 }), "█░░░░░░░ <1% 300/100.0K");
+  assert.equal(contextLabel({ used: 32_000, window: 128_000 }), "██░░░░░░ 25% 32.0K/128.0K");
+  assert.equal(contextLabel({ used: 84_000, window: 1_049_400 }), "█░░░░░░░ 8% 84.0K/1049.4K");
+  assert.equal(contextLabel({ used: 123_000, window: 128_000 }), "████████ 96% 123.0K/128.0K");
+});
+
+test("contextLabel: ≈ marks an estimated window, tokens only when the window is unknown, a full bar over 100%", () => {
+  assert.equal(contextLabel({ used: 1_300, window: 16_384, windowEstimated: true }), "█░░░░░░░ ≈7% 1.3K/16.4K");
+  assert.equal(contextLabel({ used: 84_000, window: null }), "84.0K");
+  assert.equal(contextLabel({ used: 17_040, window: 16_384 }), "████████ 104% 17.0K/16.4K");
+});
+
+test("at 80 columns the context segment fits beside the model and the model outlasts it", () => {
+  const segments = statusSegments({
+    connection: "connected",
+    title: "Trip",
+    model: "qwen3:8b",
+    folder: "~/repos/golem",
+    messageCount: 4,
+    uptimeSeconds: 90,
+    context: { spanId: "m", used: 84_000, window: 1_049_400, windowEstimated: false, numCtx: null },
+  });
+  const wide = fitSegments(segments, 80).map((segment) => segment.id);
+  assert.ok(wide.includes("context") && wide.includes("model"));
+  const narrow = fitSegments(segments, 30).map((segment) => segment.id);
+  assert.ok(narrow.includes("model") && !narrow.includes("context"));
 });
 
 test("contextTone: dim below 80%, warn from 80%, alert from 95% or at num_ctx", () => {
-  const at = (used: number, numCtx: number | null = null) => contextTone({ spanId: "m", used, window: 100, numCtx });
+  const at = (used: number, numCtx: number | null = null) => contextTone({ spanId: "m", used, window: 100, windowEstimated: false, numCtx });
   assert.equal(contextTone(null), "dim");
   assert.equal(at(25), "dim");
   assert.equal(at(80), "warn");
@@ -270,7 +292,7 @@ test("contextTone: dim below 80%, warn from 80%, alert from 95% or at num_ctx", 
   assert.equal(at(95), "alert");
   assert.equal(at(10, 8), "alert");
   assert.equal(at(7, 8), "dim");
-  assert.equal(contextTone({ spanId: "m", used: 50, window: null, numCtx: null }), "dim");
+  assert.equal(contextTone({ spanId: "m", used: 50, window: null, windowEstimated: false, numCtx: null }), "dim");
 });
 
 test("context sits after the model and leaves the line after the skills and before new lines", () => {
@@ -283,14 +305,14 @@ test("context sits after the model and leaves the line after the skills and befo
     uptimeSeconds: null,
     freshLines: 3,
     skills: ["ship"],
-    context: { spanId: "m", used: 85, window: 100, numCtx: null },
+    context: { spanId: "m", used: 85, window: 100, windowEstimated: false, numCtx: null },
   });
   assert.deepEqual(
     segments.map((segment) => segment.id).slice(0, 5),
     ["connection", "alert", "title", "model", "context"],
   );
   const context = segments.find((segment) => segment.id === "context");
-  assert.equal(context?.text, "ctx 85%");
+  assert.equal(context?.text, "███████░ 85% 85/100");
   assert.equal(context?.tone, "warn");
   const ids = (columns: number) => fitSegments(segments, columns).map((segment) => segment.id);
   const order = [80, 70, 60, 50, 45, 40, 36, 30, 25, 20, 15].map(ids);
