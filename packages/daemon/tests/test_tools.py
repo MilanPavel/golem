@@ -154,6 +154,7 @@ def test_schemas_use_the_function_format() -> None:
         "git_diff",
         "git_log",
         "web_fetch",
+        "web_search",
         "read_artifact",
         "todo_write",
     ]
