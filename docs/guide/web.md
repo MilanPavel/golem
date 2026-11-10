@@ -30,7 +30,7 @@ Run `golem web` again while one is running, and it opens the same server instead
 - **Choose a folder for a new session** from the folder chip: pick one of your earlier folders, or `Choose a folder…` to browse your home folder, filter it, or type a path.
 - **Choose a model for a new session** with the chip next to the folder chip on the empty screen, or with `/model`. It shows the default until you pick another. The pick is for that session only, and a refused model shows under the chips.
 - **Sessions,** grouped by folder in the sidebar, the same list as `/sessions` in the terminal.
-- **Read a chat:** answers in a book serif, with highlighted code, and each tool line opens into its arguments and output.
+- **Read a chat:** answers in a book serif, with highlighted code, and each tool line opens into its arguments and output. A reply that thought first has a line above it, such as `thought for 12s`, that you click to read the thinking.
 - **Write:** the composer sends a message, keeps your history, takes pastes, and stops an answer.
 - **See what golem is doing:** the pixel golem's eyes, the tab's icon, and its title follow the chat's state: idle, working, waiting for you, or failed.
 - **See and fix your setup** in Settings → Setup: a card for each part, with a mark and a word (`done`, `needs attention`, `failed`), the detail, and the fix beside it.

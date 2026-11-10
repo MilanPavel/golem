@@ -60,6 +60,7 @@ const EVENT_TYPES = new Set([
   "model.options.changed",
   "message.started",
   "message.delta",
+  "message.thinking.delta",
   "message.completed",
   "model.call.started",
   "model.call.completed",

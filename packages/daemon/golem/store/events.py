@@ -1,6 +1,6 @@
 """Append-only session events.
 
-``message.delta`` rows live only while their message is open. The
+``message.delta`` and ``message.thinking.delta`` rows live only while their message is open. The
 ``message.completed`` for that message deletes them in the same transaction.
 ``tool.output`` rows live only while their tool call runs, and the call's
 ``tool.completed`` or ``tool.failed`` deletes them.
@@ -19,6 +19,7 @@ from golem_protocol.events import (
     MessageCompletedEvent,
     MessageDeltaEvent,
     MessageStartedEvent,
+    MessageThinkingDeltaEvent,
     ToolCompletedEvent,
     ToolFailedEvent,
     ToolOutputEvent,
@@ -54,7 +55,8 @@ class EventLog:
             if isinstance(event, MessageCompletedEvent):
                 await tx.execute(
                     "DELETE FROM events"
-                    " WHERE session_id = ? AND message_id = ? AND type = 'message.delta'",
+                    " WHERE session_id = ? AND message_id = ?"
+                    " AND type IN ('message.delta', 'message.thinking.delta')",
                     (event.session_id, message_id),
                 )
             elif isinstance(event, ToolCompletedEvent | ToolFailedEvent):
@@ -90,7 +92,10 @@ class EventLog:
 
 
 def _message_id(event: ChatEvent) -> str | None:
-    if isinstance(event, MessageStartedEvent | MessageDeltaEvent | MessageCompletedEvent):
+    if isinstance(
+        event,
+        MessageStartedEvent | MessageDeltaEvent | MessageThinkingDeltaEvent | MessageCompletedEvent,
+    ):
         return event.data.message_id
     if isinstance(event, ToolOutputEvent):
         return event.data.call_id

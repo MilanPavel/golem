@@ -20,7 +20,9 @@
         "message_id": "id-3",
         "role": "user",
         "skill": null,
-        "text": "hello"
+        "text": "hello",
+        "thinking": null,
+        "thinking_ms": null
       },
       "run_id": "id-2",
       "seq": 2,
@@ -132,7 +134,9 @@
         "message_id": "id-3",
         "role": "user",
         "skill": null,
-        "text": "hello"
+        "text": "hello",
+        "thinking": null,
+        "thinking_ms": null
       },
       "run_id": "id-2",
       "seq": 2,

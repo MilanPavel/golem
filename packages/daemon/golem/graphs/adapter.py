@@ -90,6 +90,13 @@ class TextDelta:
 
 
 @dataclass(frozen=True, slots=True)
+class ThinkingDelta:
+    """Incremental thinking text, kept apart from the answer."""
+
+    text: str
+
+
+@dataclass(frozen=True, slots=True)
 class RequestedCall:
     call_id: str
     name: str
@@ -105,6 +112,8 @@ class TextCompleted:
     calls: tuple[RequestedCall, ...] = field(default=())
     usage: dict[str, int] | None = None
     stop_reason: str | None = None
+    thinking: str | None = None
+    """The whole thinking text of the call, None when the model did not think."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -181,6 +190,7 @@ Fact = (
     | ModelRequested
     | ModelResponded
     | TextDelta
+    | ThinkingDelta
     | TextCompleted
     | ToolStarted
     | ToolOutput
@@ -310,7 +320,8 @@ def _pair(data: object) -> tuple[object, object] | None:
     return items[0], items[1]
 
 
-def _delta(data: object) -> TextDelta | None:
+def _chunk(data: object) -> AIMessageChunk | None:
+    """The chunk of a ``messages`` part that the model call streamed, if it is one."""
     pair = _pair(data)
     if pair is None:
         return None
@@ -319,12 +330,152 @@ def _delta(data: object) -> TextDelta | None:
         node = cast(dict[object, object], metadata).get("langgraph_node")
         if isinstance(node, str) and node != "call_model":
             return None
-    if not isinstance(chunk, AIMessageChunk):
+    return chunk if isinstance(chunk, AIMessageChunk) else None
+
+
+def _delta(data: object) -> TextDelta | None:
+    chunk = _chunk(data)
+    if chunk is None:
         return None
     text = message_text(chunk)
     if text == "":
         return None
     return TextDelta(text)
+
+
+def _reasoning(message: BaseMessage) -> str:
+    """The thinking a provider returned apart from the content, or an empty string."""
+    kept = message.additional_kwargs.get("reasoning_content")
+    return kept if isinstance(kept, str) else ""
+
+
+THINK_OPEN = "<think>"
+THINK_CLOSE = "</think>"
+
+
+def split_think(text: str) -> tuple[str, str]:
+    """``(thinking, answer)`` of a whole answer.
+
+    Content that starts with ``<think>`` holds thinking up to ``</think>``. With
+    no close tag, all of it is thinking. Otherwise the text is the answer.
+    """
+    if not text.startswith(THINK_OPEN):
+        return "", text
+    inner = text[len(THINK_OPEN) :]
+    thinking, closed, answer = inner.partition(THINK_CLOSE)
+    return (thinking, answer.lstrip()) if closed else (inner, "")
+
+
+class _ThinkSplitter:
+    """Splits streamed content into thinking and answer fragments.
+
+    Only content that *starts* with ``<think>`` holds thinking. The tag can arrive
+    split across chunks, so text that could still become the open tag, or the close
+    tag, is held back until the next chunk decides it. :meth:`finish` returns what
+    is still held.
+    """
+
+    def __init__(self) -> None:
+        self._mode: Literal["start", "thinking", "answer"] = "start"
+        self._held = ""
+        self._trim = False
+
+    def feed(self, text: str) -> list[ThinkingDelta | TextDelta]:
+        out: list[ThinkingDelta | TextDelta] = []
+        self._held += text
+        while self._held:
+            if self._mode == "start":
+                if self._held.startswith(THINK_OPEN):
+                    self._held = self._held[len(THINK_OPEN) :]
+                    self._mode = "thinking"
+                elif THINK_OPEN.startswith(self._held):
+                    break
+                else:
+                    self._mode = "answer"
+            elif self._mode == "thinking":
+                before, closed, after = self._held.partition(THINK_CLOSE)
+                if closed:
+                    _add(out, ThinkingDelta, before)
+                    self._held = after
+                    self._mode = "answer"
+                    self._trim = True
+                    continue
+                keep = _partial_suffix(self._held, THINK_CLOSE)
+                _add(out, ThinkingDelta, self._held[: len(self._held) - keep])
+                self._held = self._held[len(self._held) - keep :]
+                break
+            else:
+                held, self._held = self._held, ""
+                if self._trim:
+                    held = held.lstrip()
+                    self._trim = held == ""
+                _add(out, TextDelta, held)
+        return out
+
+    def finish(self) -> list[ThinkingDelta | TextDelta]:
+        """What was held when the call ended: an unfinished tag is part of its mode's text."""
+        out: list[ThinkingDelta | TextDelta] = []
+        held, self._held = self._held, ""
+        _add(out, ThinkingDelta if self._mode == "thinking" else TextDelta, held)
+        self._mode = "start"
+        self._trim = False
+        return out
+
+
+def _add(
+    out: list[ThinkingDelta | TextDelta],
+    kind: type[ThinkingDelta] | type[TextDelta],
+    text: str,
+) -> None:
+    if text:
+        out.append(kind(text))
+
+
+def _partial_suffix(text: str, tag: str) -> int:
+    """Length of the longest suffix of ``text`` that is a proper prefix of ``tag``."""
+    for size in range(min(len(tag) - 1, len(text)), 0, -1):
+        if text.endswith(tag[:size]):
+            return size
+    return 0
+
+
+class Translator:
+    """:func:`translate` that also separates thinking from the answer while streaming.
+
+    A chunk's ``reasoning_content`` becomes a :class:`ThinkingDelta`. Content that
+    starts with ``<think>`` is split into thinking and answer, across chunks. One
+    translator serves one run, and a new model call starts it over.
+    """
+
+    def __init__(self) -> None:
+        self._split = _ThinkSplitter()
+
+    def __call__(self, part: object) -> list[Fact]:
+        if isinstance(part, dict):
+            raw = cast(dict[object, object], part)
+            kind = raw.get("type")
+            if kind == "messages":
+                return self._streamed(raw.get("data"))
+            fact = translate(raw)
+            if isinstance(fact, TextCompleted):
+                return [*self._split.finish(), fact]
+            if isinstance(fact, ModelStarted):
+                self._split.finish()
+            return [] if fact is None else [fact]
+        return []
+
+    def _streamed(self, data: object) -> list[Fact]:
+        chunk = _chunk(data)
+        if chunk is None:
+            return []
+        facts: list[Fact] = []
+        kept = _reasoning(chunk)
+        if kept:
+            facts.append(ThinkingDelta(kept))
+        text = message_text(chunk)
+        if text:
+            facts.extend(self._split.feed(text))
+        return facts
 
 
 def _completed(data: object) -> TextCompleted | ApprovalAsked | None:
@@ -349,12 +500,15 @@ def _completed(data: object) -> TextCompleted | ApprovalAsked | None:
                 )
                 for call in message.tool_calls
             )
+            thinking, text = split_think(message_text(message))
+            kept = _reasoning(message)
             return TextCompleted(
-                message_text(message),
+                text,
                 message.id,
                 calls,
                 _usage(message),
                 _stop_reason(message),
+                (kept + thinking) or None,
             )
     return None
 
@@ -576,12 +730,15 @@ __all__ = [
     "RequestedCall",
     "TextCompleted",
     "TextDelta",
+    "ThinkingDelta",
     "TodosChanged",
     "ToolErrored",
     "ToolFinished",
     "ToolOutput",
     "ToolStarted",
+    "Translator",
     "message_text",
     "plain_messages",
+    "split_think",
     "translate",
 ]

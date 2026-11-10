@@ -209,7 +209,7 @@ Ollama cuts a prompt that does not fit its window, and says nothing. `model.call
 
 For `older_messages`, `dropped_message_ids` are the oldest messages, never the last one and never the system prompt, marked until the estimate of what is left is at most `C`. `dropped_tokens` is their estimate. Both are estimates, even for `yes`: only the fact of the cut is proven, so a screen shows their size with `≈`.
 
-golem does not send an earlier reply's reasoning back to the model: it never asks Ollama for `reasoning`, so no `reasoning_content` is stored or sent. A new user message therefore does not shrink a prompt by itself, and rule 2 holds across runs.
+golem does not send an earlier reply's thinking back to the model ([ADR-045](../adr/045-thinking.md)). It sends Ollama no `think` or `reasoning`, but a thinking model thinks anyway, and `OllamaChat` keeps what comes back as `reasoning_content` on the reply. That text is stored with the reply, in the checkpoint and in `message.completed`, and is sent to the clients. When `call_model` builds the messages of a call, it takes `reasoning_content` off every earlier reply, so the library never turns it into the request's `thinking`. The checkpoint keeps it. A new user message therefore does not shrink a prompt by itself, and rule 2 holds across runs.
 
 ### Times
 

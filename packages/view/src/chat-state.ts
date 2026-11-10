@@ -61,6 +61,10 @@ export type ChatMessage = {
   at?: string;
   /** Milliseconds from `run.started` to this finished answer. */
   durationMs?: number;
+  /** What the model thought before it answered, from `message.thinking.delta` and `message.completed`. */
+  thinking?: string;
+  /** Milliseconds the model thought, from `message.completed`. */
+  thinkingMs?: number;
   /** Tool calls this reply asked for, in order. */
   tools?: ToolBlock[];
   /** Set on a user message that ran a skill. `text` is then the filled-in body. */
@@ -251,6 +255,8 @@ function reduceChatEvent(state: ChatState, event: ChatEvent): ChatState {
       };
     case "message.delta":
       return appendDelta(state, event.data.message_id, event.data.text);
+    case "message.thinking.delta":
+      return appendThinking(state, event.data.message_id, event.data.text);
     case "message.completed":
       return { ...state, messages: upsertCompleted(state.messages, event, state.runStartedAt) };
     case "run.started":
@@ -417,6 +423,42 @@ export function appendDelta(state: ChatState, messageId: string, text: string): 
   };
 }
 
+/** Add streamed thinking text to the message `messageId`. */
+export function appendThinking(state: ChatState, messageId: string, text: string): ChatState {
+  return {
+    ...state,
+    messages: state.messages.map((message) =>
+      message.id === messageId ? { ...message, thinking: (message.thinking ?? "") + text } : message,
+    ),
+  };
+}
+
+/**
+ * The one line shown above an answer that came after thinking: `thinking…` while the thinking
+ * streams, `thought for 12s` when it is done, `thought` when its time is not known. Null when
+ * the message has no thinking. Both clients show this line.
+ */
+export function thinkingLine(
+  message: Pick<ChatMessage, "streaming" | "text" | "thinking" | "thinkingMs">,
+): string | null {
+  if (message.thinking === undefined || message.thinking === "") {
+    return null;
+  }
+  if (message.streaming && message.text === "") {
+    return "thinking…";
+  }
+  return message.thinkingMs === undefined ? "thought" : `thought for ${thoughtTime(message.thinkingMs)}`;
+}
+
+/** `<1s`, `12s`, then `1m 05s` from a minute on. */
+function thoughtTime(ms: number): string {
+  const seconds = Math.round(ms / 1000);
+  if (seconds < 1) {
+    return "<1s";
+  }
+  return seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${String(seconds % 60).padStart(2, "0")}s`;
+}
+
 export type DeltaBatcher = {
   push(messageId: string, text: string): void;
   flush(): void;
@@ -476,11 +518,24 @@ function upsertCompleted(
   };
   const index = messages.findIndex((message) => message.id === next.id);
   if (index < 0) {
-    return [...messages, next];
+    return [...messages, withThinking(next, event.data.thinking, event.data.thinking_ms)];
   }
-  return messages.map((message, position) =>
-    position === index ? (message.tools === undefined ? next : { ...next, tools: message.tools }) : message,
-  );
+  return messages.map((message, position) => {
+    if (position !== index) {
+      return message;
+    }
+    // A reply stopped by a cancel completes with no thinking, so keep what streamed.
+    const kept = event.data.thinking ?? message.thinking;
+    const done = withThinking(next, kept, event.data.thinking_ms);
+    return message.tools === undefined ? done : { ...done, tools: message.tools };
+  });
+}
+
+function withThinking(message: ChatMessage, thinking: string | null | undefined, ms: number | null | undefined): ChatMessage {
+  if (thinking == null || thinking === "") {
+    return message;
+  }
+  return { ...message, thinking, ...(ms == null ? {} : { thinkingMs: ms }) };
 }
 
 /** Absent when either timestamp is missing or the clock went backwards. */

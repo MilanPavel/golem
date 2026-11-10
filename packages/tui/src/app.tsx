@@ -705,8 +705,15 @@ export function App({
 
   const batcher = useRef<DeltaBatcher | null>(null);
   if (batcher.current === null) {
-    batcher.current = createDeltaBatcher((messageId, text) => {
-      setChat((current) => reduceChat(current, deltaEvent(messageId, text)));
+    batcher.current = createDeltaBatcher((key, text) => {
+      setChat((current) =>
+        reduceChat(
+          current,
+          key.startsWith(THINKING_KEY)
+            ? deltaEvent(key.slice(THINKING_KEY.length), text, "message.thinking.delta")
+            : deltaEvent(key, text),
+        ),
+      );
     });
   }
 
@@ -1046,6 +1053,10 @@ export function App({
       }
       if (event.type === "message.delta") {
         batcher.current?.push(event.data.message_id, event.data.text);
+        return;
+      }
+      if (event.type === "message.thinking.delta") {
+        batcher.current?.push(`${THINKING_KEY}${event.data.message_id}`, event.data.text);
         return;
       }
       if (
@@ -4195,13 +4206,16 @@ function LineList({
   );
 }
 
-function deltaEvent(messageId: string, text: string) {
+/** Batcher key prefix that keeps a reply's thinking apart from its text. */
+const THINKING_KEY = "thinking:";
+
+function deltaEvent(messageId: string, text: string, type: "message.delta" | "message.thinking.delta" = "message.delta") {
   return {
     seq: 1,
     session_id: "local",
     run_id: "local",
     ts: "",
-    type: "message.delta" as const,
+    type,
     data: { message_id: messageId, text },
   };
 }

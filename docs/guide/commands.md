@@ -150,7 +150,7 @@ The status line shows the options that differ from the model's default, such as 
 | Enter / Shift-Enter | Send / new line |
 | Up on an empty line | Recall a message you sent |
 | Ctrl-C | Stop the answer. Twice quits |
-| Ctrl-O | Show what each tool returned, and the instructions of each skill you ran |
+| Ctrl-O | Show what each tool returned, the instructions of each skill you ran, and the thinking of each reply |
 | Ctrl-G | Edit the message in `$EDITOR` |
 | Page Up / Page Down, End | Scroll, and jump back to the newest line |
 | `?` on an empty line, or F1 | All keys |

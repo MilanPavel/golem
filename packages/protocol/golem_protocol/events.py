@@ -66,6 +66,15 @@ class MessageDeltaData(BaseModel):
     text: str
 
 
+class MessageThinkingDeltaData(BaseModel):
+    """One incremental fragment of the thinking a model did before or while it answered."""
+
+    model_config = _CONFIG
+
+    message_id: str = Field(min_length=1)
+    text: str
+
+
 class SkillCall(BaseModel):
     """A skill run once by name, with what was typed after it."""
 
@@ -83,6 +92,11 @@ class MessageCompletedData(BaseModel):
     message that invoked a skill: ``text`` is then the skill body the model
     got, with the arguments filled in, and a client can show the skill's name
     and arguments instead.
+
+    ``thinking`` is the whole thinking text of an assistant message, None when
+    the model did not think. ``thinking_ms`` is the time from the first
+    thinking fragment to the first answer fragment, or to the end when no
+    answer text came.
     """
 
     model_config = _CONFIG
@@ -92,6 +106,8 @@ class MessageCompletedData(BaseModel):
     text: str
     interrupted: bool = False
     skill: SkillCall | None = None
+    thinking: str | None = None
+    thinking_ms: int | None = Field(default=None, ge=0)
 
 
 SkillSource = Literal["project", "user", "bundled"]
@@ -575,6 +591,19 @@ class MessageDeltaEvent(BaseModel):
     data: MessageDeltaData
 
 
+class MessageThinkingDeltaEvent(BaseModel):
+    """Thinking text to append to the open assistant message. It is not part of the answer."""
+
+    model_config = _CONFIG
+
+    seq: int = Field(ge=1)
+    session_id: str = Field(min_length=1)
+    run_id: str = Field(min_length=1)
+    ts: str = Field(min_length=1)
+    type: Literal["message.thinking.delta"]
+    data: MessageThinkingDeltaData
+
+
 class MessageCompletedEvent(BaseModel):
     """The full text of one message. Replaces any deltas for that id."""
 
@@ -824,6 +853,7 @@ EventType = Literal[
     "model.options.changed",
     "message.started",
     "message.delta",
+    "message.thinking.delta",
     "message.completed",
     "model.call.started",
     "model.call.completed",
@@ -854,6 +884,7 @@ ChatEvent = Annotated[
     | ModelOptionsChangedEvent
     | MessageStartedEvent
     | MessageDeltaEvent
+    | MessageThinkingDeltaEvent
     | MessageCompletedEvent
     | ModelCallStartedEvent
     | ModelCallCompletedEvent
@@ -896,6 +927,8 @@ __all__ = [
     "MessageDeltaEvent",
     "MessageStartedData",
     "MessageStartedEvent",
+    "MessageThinkingDeltaData",
+    "MessageThinkingDeltaEvent",
     "ModelCallCompletedData",
     "ModelCallCompletedEvent",
     "ModelCallStartedData",

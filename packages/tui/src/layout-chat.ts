@@ -1,7 +1,7 @@
 import type { SkillCall } from "@golem/client";
 import { Lexer, type Token, type Tokens } from "marked";
 
-import { formatDuration, visibleText, type ChatMessage, type ToolBlock } from "@golem/view";
+import { formatDuration, thinkingLine, visibleText, type ChatMessage, type ToolBlock } from "@golem/view";
 import { formatMessageTime } from "./transcript.ts";
 
 export type Span = {
@@ -52,7 +52,7 @@ export type Transcript = Viewport & {
 export type TranscriptOptions = {
   times: boolean;
   now: number;
-  /** Ctrl-O: draw each tool call's output under its line, and each skill's body under its line. */
+  /** Ctrl-O: draw each tool call's output, each skill's body, and each reply's thinking under its line. */
   toolOutput?: boolean;
 };
 
@@ -97,6 +97,9 @@ export function layoutMessages(
     if (!continues) {
       const head: LayoutLine = { role, spans: labelSpans(label, message, options) };
       lines.push(paint(role === "user" ? { ...head, asks: firstLine(message.text) } : head, width));
+    }
+    for (const spans of thinkingLines(message, width, options?.toolOutput === true)) {
+      lines.push(wrappedLine(role, spans));
     }
     for (const spans of body) {
       lines.push(paint(wrappedLine(role, spans), width));
@@ -246,6 +249,22 @@ export function toolLines(tool: ToolBlock, width: number, expanded: boolean): Sp
   }
   if (tool.artifactId !== undefined) {
     lines.push(...wrapSpans([{ text: `  │ all of it: /artifact ${tool.artifactId}`, dim: true }], width));
+  }
+  return lines;
+}
+
+/** `thought for 12s`, dim, then the thinking text under it while Ctrl-O is on. */
+export function thinkingLines(message: ChatMessage, width: number, expanded: boolean): Span[][] {
+  const line = thinkingLine(message);
+  if (line === null) {
+    return [];
+  }
+  const lines = wrapSpans([{ text: line, dim: true }], width);
+  if (!expanded || message.thinking === undefined) {
+    return lines;
+  }
+  for (const row of message.thinking.replace(/\s+$/, "").split("\n")) {
+    lines.push(...wrapSpans([{ text: `  │ ${visibleText(row)}`, dim: true }], width));
   }
   return lines;
 }

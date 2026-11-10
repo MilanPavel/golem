@@ -10,6 +10,7 @@ export type Params =
   | ModelOptionsChangedEvent
   | MessageStartedEvent
   | MessageDeltaEvent
+  | MessageThinkingDeltaEvent
   | MessageCompletedEvent
   | ModelCallStartedEvent
   | ModelCallCompletedEvent
@@ -83,22 +84,31 @@ export type Seq6 = number;
 export type SessionId7 = string;
 export type Ts6 = string;
 export type Type6 = 'message.delta';
-export type Interrupted = boolean;
 export type MessageId3 = string;
-export type Role1 = 'user' | 'assistant';
-export type Args = string;
-export type Name = string;
 export type Text1 = string;
 export type RunId7 = string;
 export type Seq7 = number;
 export type SessionId8 = string;
 export type Ts7 = string;
-export type Type7 = 'message.completed';
+export type Type7 = 'message.thinking.delta';
+export type Interrupted = boolean;
+export type MessageId4 = string;
+export type Role1 = 'user' | 'assistant';
+export type Args = string;
+export type Name = string;
+export type Text2 = string;
+export type Thinking = string | null;
+export type ThinkingMs = number | null;
+export type RunId8 = string;
+export type Seq8 = number;
+export type SessionId9 = string;
+export type Ts8 = string;
+export type Type8 = 'message.completed';
 export type ContextWindow = number | null;
 export type Index = number;
 export type MessageBytes = number[] | null;
 export type MessageChars = number[] | null;
-export type MessageId4 = string;
+export type MessageId5 = string;
 export type MessageIds = string[];
 export type Model = string | null;
 export type NumCtx = number | null;
@@ -114,73 +124,73 @@ export type ToolsBytes = number | null;
 export type ToolsChars = number | null;
 export type ToolsSha = string | null;
 export type WindowEstimated = boolean;
-export type RunId8 = string;
-export type Seq8 = number;
-export type SessionId9 = string;
-export type Ts8 = string;
-export type Type8 = 'model.call.started';
+export type RunId9 = string;
+export type Seq9 = number;
+export type SessionId10 = string;
+export type Ts9 = string;
+export type Type9 = 'model.call.started';
 export type ContextWindow1 = number | null;
 export type Failed = boolean;
 export type FirstTokenMs = number | null;
 export type LatencyMs = number;
-export type MessageId5 = string;
+export type MessageId6 = string;
 export type StopReason = string | null;
 export type TextToolCalls = ('recovered' | 'unread') | null;
 export type CacheRead = number | null;
 export type CacheWrite = number | null;
 export type Input = number | null;
 export type Output = number | null;
-export type RunId9 = string;
-export type Seq9 = number;
-export type SessionId10 = string;
-export type Ts9 = string;
-export type Type9 = 'model.call.completed';
 export type RunId10 = string;
 export type Seq10 = number;
 export type SessionId11 = string;
 export type Ts10 = string;
-export type Type10 = 'run.started';
+export type Type10 = 'model.call.completed';
 export type RunId11 = string;
 export type Seq11 = number;
 export type SessionId12 = string;
 export type Ts11 = string;
-export type Type11 = 'run.completed';
-export type Code = ('model_unreachable' | 'not_installed') | null;
-export type Hint = string | null;
-export type Message = string;
-export type Provider1 = string | null;
+export type Type11 = 'run.started';
 export type RunId12 = string;
 export type Seq12 = number;
 export type SessionId13 = string;
 export type Ts12 = string;
-export type Type12 = 'run.failed';
-export type Reason1 = 'user' | 'shutdown';
+export type Type12 = 'run.completed';
+export type Code = ('model_unreachable' | 'not_installed') | null;
+export type Hint = string | null;
+export type Message = string;
+export type Provider1 = string | null;
 export type RunId13 = string;
 export type Seq13 = number;
 export type SessionId14 = string;
 export type Ts13 = string;
-export type Type13 = 'run.cancelled';
-export type CallId = string;
-export type MessageId6 = string;
-export type Name2 = string;
+export type Type13 = 'run.failed';
+export type Reason1 = 'user' | 'shutdown';
 export type RunId14 = string;
 export type Seq14 = number;
 export type SessionId15 = string;
 export type Ts14 = string;
-export type Type14 = 'tool.requested';
-export type CallId1 = string;
+export type Type14 = 'run.cancelled';
+export type CallId = string;
+export type MessageId7 = string;
+export type Name2 = string;
 export type RunId15 = string;
 export type Seq15 = number;
 export type SessionId16 = string;
 export type Ts15 = string;
-export type Type15 = 'tool.started';
-export type CallId2 = string;
-export type Text2 = string;
+export type Type15 = 'tool.requested';
+export type CallId1 = string;
 export type RunId16 = string;
 export type Seq16 = number;
 export type SessionId17 = string;
 export type Ts16 = string;
-export type Type16 = 'tool.output';
+export type Type16 = 'tool.started';
+export type CallId2 = string;
+export type Text3 = string;
+export type RunId17 = string;
+export type Seq17 = number;
+export type SessionId18 = string;
+export type Ts17 = string;
+export type Type17 = 'tool.output';
 export type ArtifactId = string | null;
 export type CallId3 = string;
 export type DurationMs = number | null;
@@ -188,30 +198,30 @@ export type Failed1 = boolean;
 export type Preview = string;
 export type Summary = string;
 export type Truncated = boolean;
-export type RunId17 = string;
-export type Seq17 = number;
-export type SessionId18 = string;
-export type Ts17 = string;
-export type Type17 = 'tool.completed';
-export type CallId4 = string;
-export type DurationMs1 = number | null;
-export type Message1 = string;
 export type RunId18 = string;
 export type Seq18 = number;
 export type SessionId19 = string;
 export type Ts18 = string;
-export type Type18 = 'tool.failed';
-export type CallId5 = string;
-export type Diff = string | null;
-export type MessageId7 = string | null;
-export type Name3 = string;
-export type Source = string;
-export type Subject1 = string | null;
+export type Type18 = 'tool.completed';
+export type CallId4 = string;
+export type DurationMs1 = number | null;
+export type Message1 = string;
 export type RunId19 = string;
 export type Seq19 = number;
 export type SessionId20 = string;
 export type Ts19 = string;
-export type Type19 = 'approval.needed';
+export type Type19 = 'tool.failed';
+export type CallId5 = string;
+export type Diff = string | null;
+export type MessageId8 = string | null;
+export type Name3 = string;
+export type Source = string;
+export type Subject1 = string | null;
+export type RunId20 = string;
+export type Seq20 = number;
+export type SessionId21 = string;
+export type Ts20 = string;
+export type Type20 = 'approval.needed';
 export type Args3 = {
   [k: string]: unknown;
 } | null;
@@ -220,46 +230,46 @@ export type Decision = 'allow' | 'allow_session' | 'allow_always' | 'deny';
 export type Name4 = string;
 export type Rule = string | null;
 export type Subject2 = string | null;
-export type RunId20 = string;
-export type Seq20 = number;
-export type SessionId21 = string;
-export type Ts20 = string;
-export type Type20 = 'approval.resolved';
-export type CallId7 = string | null;
-export type Id = string;
-export type Status = 'pending' | 'in_progress' | 'done';
-export type Text3 = string;
-export type Todos = Todo[];
-export type RunId21 = string | null;
+export type RunId21 = string;
 export type Seq21 = number;
 export type SessionId22 = string;
 export type Ts21 = string;
-export type Type21 = 'todos.updated';
+export type Type21 = 'approval.resolved';
+export type CallId7 = string | null;
+export type Id = string;
+export type Status = 'pending' | 'in_progress' | 'done';
+export type Text4 = string;
+export type Todos = Todo[];
+export type RunId22 = string | null;
+export type Seq22 = number;
+export type SessionId23 = string;
+export type Ts22 = string;
+export type Type22 = 'todos.updated';
 export type Hash = string;
 export type How = 'invoked' | 'pinned';
 export type Name5 = string;
 export type Path = string;
 export type Source1 = 'project' | 'user' | 'bundled';
-export type RunId22 = string | null;
-export type Seq22 = number;
-export type SessionId23 = string;
-export type Ts22 = string;
-export type Type22 = 'skill.activated';
-export type Name6 = string;
-export type Reason2 = 'unpinned';
 export type RunId23 = string | null;
 export type Seq23 = number;
 export type SessionId24 = string;
 export type Ts23 = string;
-export type Type23 = 'skill.deactivated';
-export type Message2 = string;
-export type Name7 = string;
-export type Reason3 = 'missing' | 'disabled' | 'broken';
+export type Type23 = 'skill.activated';
+export type Name6 = string;
+export type Reason2 = 'unpinned';
 export type RunId24 = string | null;
 export type Seq24 = number;
 export type SessionId25 = string;
 export type Ts24 = string;
-export type Type24 = 'skill.skipped';
+export type Type24 = 'skill.deactivated';
+export type Message2 = string;
+export type Name7 = string;
+export type Reason3 = 'missing' | 'disabled' | 'broken';
+export type RunId25 = string | null;
+export type Seq25 = number;
+export type SessionId26 = string;
+export type Ts25 = string;
+export type Type25 = 'skill.skipped';
 
 /**
  * Server → client event. No ``id``; this is not a response to a request.
@@ -487,6 +497,30 @@ export interface MessageDeltaData {
   text: Text;
 }
 /**
+ * Thinking text to append to the open assistant message. It is not part of the answer.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "MessageThinkingDeltaEvent".
+ */
+export interface MessageThinkingDeltaEvent {
+  data: MessageThinkingDeltaData;
+  run_id: RunId7;
+  seq: Seq7;
+  session_id: SessionId8;
+  ts: Ts7;
+  type: Type7;
+}
+/**
+ * One incremental fragment of the thinking a model did before or while it answered.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "MessageThinkingDeltaData".
+ */
+export interface MessageThinkingDeltaData {
+  message_id: MessageId3;
+  text: Text1;
+}
+/**
  * The full text of one message. Replaces any deltas for that id.
  *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
@@ -494,11 +528,11 @@ export interface MessageDeltaData {
  */
 export interface MessageCompletedEvent {
   data: MessageCompletedData;
-  run_id: RunId7;
-  seq: Seq7;
-  session_id: SessionId8;
-  ts: Ts7;
-  type: Type7;
+  run_id: RunId8;
+  seq: Seq8;
+  session_id: SessionId9;
+  ts: Ts8;
+  type: Type8;
 }
 /**
  * Full text of a user or assistant message.
@@ -509,15 +543,22 @@ export interface MessageCompletedEvent {
  * got, with the arguments filled in, and a client can show the skill's name
  * and arguments instead.
  *
+ * ``thinking`` is the whole thinking text of an assistant message, None when
+ * the model did not think. ``thinking_ms`` is the time from the first
+ * thinking fragment to the first answer fragment, or to the end when no
+ * answer text came.
+ *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "MessageCompletedData".
  */
 export interface MessageCompletedData {
   interrupted?: Interrupted;
-  message_id: MessageId3;
+  message_id: MessageId4;
   role: Role1;
   skill?: SkillCall | null;
-  text: Text1;
+  text: Text2;
+  thinking?: Thinking;
+  thinking_ms?: ThinkingMs;
 }
 /**
  * A skill run once by name, with what was typed after it.
@@ -537,11 +578,11 @@ export interface SkillCall {
  */
 export interface ModelCallStartedEvent {
   data: ModelCallStartedData;
-  run_id: RunId8;
-  seq: Seq8;
-  session_id: SessionId9;
-  ts: Ts8;
-  type: Type8;
+  run_id: RunId9;
+  seq: Seq9;
+  session_id: SessionId10;
+  ts: Ts9;
+  type: Type9;
 }
 /**
  * A request went to the model.
@@ -574,7 +615,7 @@ export interface ModelCallStartedData {
   index: Index;
   message_bytes?: MessageBytes;
   message_chars?: MessageChars;
-  message_id: MessageId4;
+  message_id: MessageId5;
   message_ids?: MessageIds;
   model?: Model;
   num_ctx?: NumCtx;
@@ -612,11 +653,11 @@ export interface PromptSectionInfo {
  */
 export interface ModelCallCompletedEvent {
   data: ModelCallCompletedData;
-  run_id: RunId9;
-  seq: Seq9;
-  session_id: SessionId10;
-  ts: Ts9;
-  type: Type9;
+  run_id: RunId10;
+  seq: Seq10;
+  session_id: SessionId11;
+  ts: Ts10;
+  type: Type10;
 }
 /**
  * A model call ended.
@@ -641,7 +682,7 @@ export interface ModelCallCompletedData {
   failed?: Failed;
   first_token_ms?: FirstTokenMs;
   latency_ms: LatencyMs;
-  message_id: MessageId5;
+  message_id: MessageId6;
   stop_reason?: StopReason;
   text_tool_calls?: TextToolCalls;
   usage?: TokenUsage | null;
@@ -666,11 +707,11 @@ export interface TokenUsage {
  */
 export interface RunStartedEvent {
   data: EmptyEventData;
-  run_id: RunId10;
-  seq: Seq10;
-  session_id: SessionId11;
-  ts: Ts10;
-  type: Type10;
+  run_id: RunId11;
+  seq: Seq11;
+  session_id: SessionId12;
+  ts: Ts11;
+  type: Type11;
 }
 /**
  * The graph run finished and the checkpoint is current.
@@ -680,11 +721,11 @@ export interface RunStartedEvent {
  */
 export interface RunCompletedEvent {
   data: EmptyEventData;
-  run_id: RunId11;
-  seq: Seq11;
-  session_id: SessionId12;
-  ts: Ts11;
-  type: Type11;
+  run_id: RunId12;
+  seq: Seq12;
+  session_id: SessionId13;
+  ts: Ts12;
+  type: Type12;
 }
 /**
  * The graph run stopped with an error.
@@ -694,11 +735,11 @@ export interface RunCompletedEvent {
  */
 export interface RunFailedEvent {
   data: RunFailedData;
-  run_id: RunId12;
-  seq: Seq12;
-  session_id: SessionId13;
-  ts: Ts12;
-  type: Type12;
+  run_id: RunId13;
+  seq: Seq13;
+  session_id: SessionId14;
+  ts: Ts13;
+  type: Type13;
 }
 /**
  * Why a run stopped. No traceback.
@@ -726,11 +767,11 @@ export interface RunFailedData {
  */
 export interface RunCancelledEvent {
   data: RunCancelledData;
-  run_id: RunId13;
-  seq: Seq13;
-  session_id: SessionId14;
-  ts: Ts13;
-  type: Type13;
+  run_id: RunId14;
+  seq: Seq14;
+  session_id: SessionId15;
+  ts: Ts14;
+  type: Type14;
 }
 /**
  * Who stopped the run. ``user`` is ``run.cancel``, ``shutdown`` the daemon stopping.
@@ -749,11 +790,11 @@ export interface RunCancelledData {
  */
 export interface ToolRequestedEvent {
   data: ToolRequestedData;
-  run_id: RunId14;
-  seq: Seq14;
-  session_id: SessionId15;
-  ts: Ts14;
-  type: Type14;
+  run_id: RunId15;
+  seq: Seq15;
+  session_id: SessionId16;
+  ts: Ts15;
+  type: Type15;
 }
 /**
  * The model asked for one tool call.
@@ -767,7 +808,7 @@ export interface ToolRequestedEvent {
 export interface ToolRequestedData {
   args: Args1;
   call_id: CallId;
-  message_id: MessageId6;
+  message_id: MessageId7;
   name: Name2;
 }
 export interface Args1 {
@@ -781,11 +822,11 @@ export interface Args1 {
  */
 export interface ToolStartedEvent {
   data: ToolStartedData;
-  run_id: RunId15;
-  seq: Seq15;
-  session_id: SessionId16;
-  ts: Ts15;
-  type: Type15;
+  run_id: RunId16;
+  seq: Seq16;
+  session_id: SessionId17;
+  ts: Ts16;
+  type: Type16;
 }
 /**
  * A requested tool call is running.
@@ -804,11 +845,11 @@ export interface ToolStartedData {
  */
 export interface ToolOutputEvent {
   data: ToolOutputData;
-  run_id: RunId16;
-  seq: Seq16;
-  session_id: SessionId17;
-  ts: Ts16;
-  type: Type16;
+  run_id: RunId17;
+  seq: Seq17;
+  session_id: SessionId18;
+  ts: Ts17;
+  type: Type17;
 }
 /**
  * Text a running tool call printed. Stored only until the call ends.
@@ -818,7 +859,7 @@ export interface ToolOutputEvent {
  */
 export interface ToolOutputData {
   call_id: CallId2;
-  text: Text2;
+  text: Text3;
 }
 /**
  * The tool call finished, and its result went back to the model.
@@ -828,11 +869,11 @@ export interface ToolOutputData {
  */
 export interface ToolCompletedEvent {
   data: ToolCompletedData;
-  run_id: RunId17;
-  seq: Seq17;
-  session_id: SessionId18;
-  ts: Ts17;
-  type: Type17;
+  run_id: RunId18;
+  seq: Seq18;
+  session_id: SessionId19;
+  ts: Ts18;
+  type: Type18;
 }
 /**
  * A tool call finished.
@@ -869,11 +910,11 @@ export interface ToolCompletedData {
  */
 export interface ToolFailedEvent {
   data: ToolFailedData;
-  run_id: RunId18;
-  seq: Seq18;
-  session_id: SessionId19;
-  ts: Ts18;
-  type: Type18;
+  run_id: RunId19;
+  seq: Seq19;
+  session_id: SessionId20;
+  ts: Ts19;
+  type: Type19;
 }
 /**
  * A tool call did not run, or stopped with an error. The model sees the same message.
@@ -897,11 +938,11 @@ export interface ToolFailedData {
  */
 export interface ApprovalNeededEvent {
   data: ApprovalNeededData;
-  run_id: RunId19;
-  seq: Seq19;
-  session_id: SessionId20;
-  ts: Ts19;
-  type: Type19;
+  run_id: RunId20;
+  seq: Seq20;
+  session_id: SessionId21;
+  ts: Ts20;
+  type: Type20;
 }
 /**
  * A tool call waits for the user. The run is paused until ``approval.respond``.
@@ -918,7 +959,7 @@ export interface ApprovalNeededData {
   args: Args2;
   call_id: CallId5;
   diff?: Diff;
-  message_id?: MessageId7;
+  message_id?: MessageId8;
   name: Name3;
   source: Source;
   subject?: Subject1;
@@ -934,11 +975,11 @@ export interface Args2 {
  */
 export interface ApprovalResolvedEvent {
   data: ApprovalResolvedData;
-  run_id: RunId20;
-  seq: Seq20;
-  session_id: SessionId21;
-  ts: Ts20;
-  type: Type20;
+  run_id: RunId21;
+  seq: Seq21;
+  session_id: SessionId22;
+  ts: Ts21;
+  type: Type21;
 }
 /**
  * The user answered.
@@ -967,11 +1008,11 @@ export interface ApprovalResolvedData {
  */
 export interface TodosUpdatedEvent {
   data: TodosUpdatedData;
-  run_id: RunId21;
-  seq: Seq21;
-  session_id: SessionId22;
-  ts: Ts21;
-  type: Type21;
+  run_id: RunId22;
+  seq: Seq22;
+  session_id: SessionId23;
+  ts: Ts22;
+  type: Type22;
 }
 /**
  * The agent's todo list, whole, after ``todo_write`` replaced it.
@@ -995,7 +1036,7 @@ export interface TodosUpdatedData {
 export interface Todo {
   id: Id;
   status: Status;
-  text: Text3;
+  text: Text4;
 }
 /**
  * A skill became active.
@@ -1008,11 +1049,11 @@ export interface Todo {
  */
 export interface SkillActivatedEvent {
   data: SkillActivatedData;
-  run_id?: RunId22;
-  seq: Seq22;
-  session_id: SessionId23;
-  ts: Ts22;
-  type: Type22;
+  run_id?: RunId23;
+  seq: Seq23;
+  session_id: SessionId24;
+  ts: Ts23;
+  type: Type23;
 }
 /**
  * A skill is active in the session.
@@ -1043,11 +1084,11 @@ export interface SkillActivatedData {
  */
 export interface SkillDeactivatedEvent {
   data: SkillDeactivatedData;
-  run_id?: RunId23;
-  seq: Seq23;
-  session_id: SessionId24;
-  ts: Ts23;
-  type: Type23;
+  run_id?: RunId24;
+  seq: Seq24;
+  session_id: SessionId25;
+  ts: Ts24;
+  type: Type24;
 }
 /**
  * A pinned skill is off again. ``unpinned``: the user turned it off.
@@ -1069,11 +1110,11 @@ export interface SkillDeactivatedData {
  */
 export interface SkillSkippedEvent {
   data: SkillSkippedData;
-  run_id?: RunId24;
-  seq: Seq24;
-  session_id: SessionId25;
-  ts: Ts24;
-  type: Type24;
+  run_id?: RunId25;
+  seq: Seq25;
+  session_id: SessionId26;
+  ts: Ts25;
+  type: Type25;
 }
 /**
  * A pinned skill was left out of a model call. It stays pinned.

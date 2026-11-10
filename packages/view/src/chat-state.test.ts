@@ -16,6 +16,7 @@ import {
   providersUp,
   reduceChat,
   serverUp,
+  thinkingLine,
 } from "./chat-state.ts";
 
 function event(partial: ChatEvent): ChatEvent {
@@ -846,4 +847,69 @@ test("the notice for a call written as text names the slash command in the TUI a
     unreadCallNotice("web"),
     "The model wrote a tool call as text, and golem couldn't read it. Ask again, or try the Tune tab → precise (a lower temperature makes this rarer).",
   );
+});
+
+function thinkingEvent(type: "message.started" | "message.thinking.delta" | "message.delta" | "message.completed", data: object): ChatEvent {
+  return { seq: 1, session_id: "s", run_id: "r", ts: "t", type, data } as ChatEvent;
+}
+
+test("thinking deltas fold into message.thinking, apart from the text", () => {
+  let state = reduceChat(emptyChat, thinkingEvent("message.started", { message_id: "a", role: "assistant" }));
+  state = reduceChat(state, thinkingEvent("message.thinking.delta", { message_id: "a", text: "Let me " }));
+  state = reduceChat(state, thinkingEvent("message.thinking.delta", { message_id: "a", text: "see" }));
+  assert.equal(state.messages[0]?.thinking, "Let me see");
+  assert.equal(state.messages[0]?.text, "");
+  state = reduceChat(state, thinkingEvent("message.delta", { message_id: "a", text: "391" }));
+  assert.equal(state.messages[0]?.text, "391");
+  assert.equal(state.messages[0]?.thinking, "Let me see");
+});
+
+test("message.completed sets the whole thinking and its time", () => {
+  let state = reduceChat(emptyChat, thinkingEvent("message.started", { message_id: "a", role: "assistant" }));
+  state = reduceChat(state, thinkingEvent("message.thinking.delta", { message_id: "a", text: "part" }));
+  state = reduceChat(
+    state,
+    thinkingEvent("message.completed", {
+      message_id: "a",
+      role: "assistant",
+      text: "391",
+      thinking: "whole thought",
+      thinking_ms: 12_400,
+    }),
+  );
+  assert.equal(state.messages[0]?.thinking, "whole thought");
+  assert.equal(state.messages[0]?.thinkingMs, 12_400);
+  assert.equal(state.messages[0]?.streaming, false);
+});
+
+test("a completed message without thinking has none", () => {
+  const state = reduceChat(
+    emptyChat,
+    thinkingEvent("message.completed", { message_id: "a", role: "assistant", text: "hi", thinking: null, thinking_ms: null }),
+  );
+  assert.equal(state.messages[0]?.thinking, undefined);
+  assert.equal(state.messages[0]?.thinkingMs, undefined);
+});
+
+test("a cancelled reply keeps the thinking that streamed", () => {
+  let state = reduceChat(emptyChat, thinkingEvent("message.started", { message_id: "a", role: "assistant" }));
+  state = reduceChat(state, thinkingEvent("message.thinking.delta", { message_id: "a", text: "half" }));
+  state = reduceChat(
+    state,
+    thinkingEvent("message.completed", { message_id: "a", role: "assistant", text: "", interrupted: true }),
+  );
+  assert.equal(state.messages[0]?.thinking, "half");
+});
+
+test("thinkingLine covers each state", () => {
+  const base = { streaming: false, text: "391" };
+  assert.equal(thinkingLine({ ...base }), null);
+  assert.equal(thinkingLine({ ...base, thinking: "" }), null);
+  assert.equal(thinkingLine({ streaming: true, text: "", thinking: "hm" }), "thinking…");
+  assert.equal(thinkingLine({ streaming: true, text: "3", thinking: "hm" }), "thought");
+  assert.equal(thinkingLine({ ...base, thinking: "hm", thinkingMs: 12_400 }), "thought for 12s");
+  assert.equal(thinkingLine({ ...base, thinking: "hm", thinkingMs: 200 }), "thought for <1s");
+  assert.equal(thinkingLine({ ...base, thinking: "hm", thinkingMs: 65_000 }), "thought for 1m 05s");
+  assert.equal(thinkingLine({ ...base, thinking: "hm" }), "thought");
+  assert.equal(thinkingLine({ streaming: true, text: "", thinking: undefined }), null);
 });
