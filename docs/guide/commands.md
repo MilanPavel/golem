@@ -89,6 +89,8 @@ Type `/` and suggestions appear, with each command's arguments. `/help` lists ev
 | Left, Right | Change the focused value. Each change is sent at once |
 | `r` | Reset the focused option to the model's default |
 | `s` | Switch where changes go: saved for this model, or this chat only |
+| `1`–`4` | Apply a preset to this chat: precise, balanced, creative, or long memory. Balanced clears this chat's changes |
+| `S` | Save this chat's changes for the model |
 | `t` | Ask your last question again with these settings. The answer shows under the panel, and the try is kept as its own chat. `t` again stops it |
 | Esc | Close the panel |
 

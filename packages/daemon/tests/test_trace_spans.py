@@ -57,7 +57,7 @@ class _Chat:
             artifacts=ArtifactStore(database),
             prompt=SystemPrompt((lambda _: "You are golem.",)),
             blobs=BlobStore(database),
-            window_of=lambda _: window or ContextWindow(8192, None),
+            window_of=lambda _, __: window or ContextWindow(8192, None),
         )
         self.runs = RunRecords(database)
         records = SessionRecords(database)
