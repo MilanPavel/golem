@@ -77,8 +77,28 @@
     }
   },
   "additionalProperties": false,
-  "description": "What filled one model call's context, and how big the window was.\n\n``parts`` always has the five keys, in order. They add up to ``used``\nwhen it is known. The split between them is an estimate (about four\ncharacters a token, scaled to ``used``), so ``estimated`` is always true.",
+  "description": "What filled one model call's context, and how big the window was.\n\n``parts`` always has the five keys, in order. They add up to ``used``\nwhen it is known. The split between them is an estimate (about four\ncharacters a token, scaled to ``used``), so ``estimated`` is always true.\nThe ``prompt_cut`` fields are those of the model span.",
   "properties": {
+    "dropped_message_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Dropped Message Ids",
+      "type": "array"
+    },
+    "dropped_tokens": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Dropped Tokens"
+    },
     "estimated": {
       "default": true,
       "title": "Estimated",
@@ -103,6 +123,39 @@
       },
       "title": "Parts",
       "type": "array"
+    },
+    "prompt_cut": {
+      "anyOf": [
+        {
+          "enum": [
+            "no",
+            "yes",
+            "likely"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Prompt Cut"
+    },
+    "prompt_cut_kind": {
+      "anyOf": [
+        {
+          "enum": [
+            "older_messages",
+            "middle"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Prompt Cut Kind"
     },
     "used": {
       "anyOf": [

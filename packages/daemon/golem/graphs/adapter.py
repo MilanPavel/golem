@@ -47,6 +47,9 @@ class ModelRequested:
     non-empty section of the system prompt. Each is None when unknown.
     ``window_estimated`` is true when golem did not send the window and read it
     from Ollama.
+
+    The size fields are the characters and UTF-8 bytes of what was sent, or None
+    when not given.
     """
 
     message_id: str
@@ -57,6 +60,12 @@ class ModelRequested:
     num_ctx: int | None = None
     window_estimated: bool = False
     system_sections: tuple[tuple[str, int], ...] | None = None
+    system_chars: int | None = None
+    system_bytes: int | None = None
+    tools_chars: int | None = None
+    tools_bytes: int | None = None
+    message_chars: tuple[int, ...] | None = None
+    message_bytes: tuple[int, ...] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -479,7 +488,24 @@ def _request(message_id: str, item: Mapping[str, object]) -> ModelRequested:
         _positive(item.get("num_ctx")),
         item.get("window_estimated") is True,
         _sections(item.get("system_sections")),
+        _count(item.get("system_chars")),
+        _count(item.get("system_bytes")),
+        _count(item.get("tools_chars")),
+        _count(item.get("tools_bytes")),
+        _counts(item.get("message_chars")),
+        _counts(item.get("message_bytes")),
     )
+
+
+def _count(value: object) -> int | None:
+    return value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else None
+
+
+def _counts(value: object) -> tuple[int, ...] | None:
+    if not isinstance(value, list):
+        return None
+    found = [_count(v) for v in cast(list[object], value)]
+    return None if any(v is None for v in found) else tuple(v for v in found if v is not None)
 
 
 def _positive(value: object) -> int | None:

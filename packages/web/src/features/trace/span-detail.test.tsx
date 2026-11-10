@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
 import { expect, test } from "vitest";
 import type { TraceSpanResult } from "../../store/trace.ts";
-import { APPROVAL_DETAIL, FULL_DETAIL, MODEL_DETAIL, NO_PROMPT_DETAIL, NUM_CTX_DETAIL, OLD_DETAIL, SECTIONS_DETAIL, TOOL_DETAIL, UNKNOWN_WINDOW_DETAIL } from "./sample.ts";
+import { APPROVAL_DETAIL, CUT_LIKELY_DETAIL, CUT_MIDDLE_DETAIL, CUT_NO_DETAIL, CUT_YES_DETAIL, FULL_DETAIL, MODEL_DETAIL, NO_PROMPT_DETAIL, NUM_CTX_DETAIL, OLD_DETAIL, SECTIONS_DETAIL, TOOL_DETAIL, UNKNOWN_WINDOW_DETAIL } from "./sample.ts";
 import { SpanDetail } from "./span-detail.tsx";
 import { copyText, jsonOf, modelLine, promptSections, sectionLabel, tabsOf, toolGroups } from "./span-text.ts";
 
@@ -168,7 +168,7 @@ test("the text helpers: tabs, raw parts, copy, and the model line", () => {
   expect(modelLine(cached)).toContain("cache read 800 · cache write 200");
 });
 
-for (const [name, result] of [["a model call", MODEL_DETAIL], ["a full call", FULL_DETAIL], ["an unknown window", UNKNOWN_WINDOW_DETAIL], ["a tool with an artifact", TOOL_DETAIL], ["an old call", OLD_DETAIL]] as const) {
+for (const [name, result] of [["a model call", MODEL_DETAIL], ["a full call", FULL_DETAIL], ["an unknown window", UNKNOWN_WINDOW_DETAIL], ["a tool with an artifact", TOOL_DETAIL], ["an old call", OLD_DETAIL], ["a proven cut", CUT_YES_DETAIL], ["a likely cut", CUT_LIKELY_DETAIL], ["a cut in the middle", CUT_MIDDLE_DETAIL]] as const) {
   test(`${name} has no accessibility violations`, async () => {
     const { container } = show(result);
     const results = await axe.run(container, { rules: { "color-contrast": { enabled: false }, region: { enabled: false } } });
@@ -231,12 +231,13 @@ test("a model call shows the context meter above the tabs, with the legend and F
   expect(section.compareDocumentPosition(screen.getByRole("tablist")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 });
 
-test("a nearly full call warns in deny, and an Ollama call over num_ctx says so", () => {
+test("a nearly full call warns in deny, and a call over num_ctx claims no cut", () => {
   const full = show(FULL_DETAIL);
   expect(screen.getByText("Context is 96% full.").className).toContain("text-deny");
   full.unmount();
   show(NUM_CTX_DETAIL);
-  expect(screen.getByText("Input is larger than num_ctx 8K. Ollama dropped the oldest part.")).toBeTruthy();
+  expect(screen.getByText("Context is 100% full.")).toBeTruthy();
+  expect(document.body.textContent).not.toContain("dropped");
 });
 
 test("an unknown window shows the split without Free, and the hint for the provider", () => {
@@ -274,4 +275,39 @@ test("a tool span and an old call have no meter, and the Context JSON carries th
 test("toolGroups puts a schema with no item under built-in with no tokens", () => {
   const groups = toolGroups([{ name: "mystery" }], []);
   expect(groups).toEqual([{ group: null, label: "built-in", tokens: null, tools: [{ name: "mystery", label: "mystery", tokens: null, schema: { name: "mystery" } }] }]);
+});
+
+const tagged = () =>
+  within(screen.getByRole("list", { name: "Messages" }))
+    .getAllByRole("listitem")
+    .map((row) => (row.textContent?.includes("probably not seen") ? "probably" : row.textContent?.includes("not seen") ? "seen-not" : ""));
+
+test("a proven cut says so in warning colour and tags the dropped messages not seen", () => {
+  show(CUT_YES_DETAIL);
+  const note = screen.getByText("Ollama dropped older messages to fit the window. About 2 (≈1.2K) were not seen.");
+  expect(note.className).toContain("text-wait");
+  expect(tagged().filter((tag) => tag !== "")).toEqual(["seen-not", "seen-not"]);
+  expect(screen.getAllByText("not seen")).toHaveLength(2);
+  expect(screen.queryByText("probably not seen")).toBeNull();
+});
+
+test("a likely cut says probably, in the quiet colour, and tags probably not seen", () => {
+  show(CUT_LIKELY_DETAIL);
+  const note = screen.getByText("Ollama probably dropped about 2 older messages (≈1.2K) to fit the window.");
+  expect(note.className).not.toContain("text-wait");
+  expect(screen.getAllByText("probably not seen")).toHaveLength(2);
+});
+
+test("a prompt cut in the middle warns and tags no message", () => {
+  show(CUT_MIDDLE_DETAIL);
+  expect(screen.getByText(/did not fit, so Ollama probably cut the prompt in the middle/).className).toContain("text-wait");
+  expect(screen.queryByText("not seen")).toBeNull();
+  expect(screen.queryByText("probably not seen")).toBeNull();
+});
+
+test("a call proven uncut shows no cut line, no tag, and no badge", () => {
+  show(CUT_NO_DETAIL);
+  expect(screen.queryByRole("note")).toBeNull();
+  expect(document.body.textContent).not.toContain("Ollama");
+  expect(document.body.textContent).not.toContain("not seen");
 });

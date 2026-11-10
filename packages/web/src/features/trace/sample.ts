@@ -207,7 +207,7 @@ export const FULL_DETAIL: TraceSpanResult = {
   },
 };
 
-/** An Ollama call whose input was cut at num_ctx: the characters are more than it holds. */
+/** An Ollama call that filled num_ctx: it claims no cut. */
 export const NUM_CTX_DETAIL: TraceSpanResult = {
   ...MODEL_DETAIL,
   context: {
@@ -239,6 +239,22 @@ export const UNKNOWN_WINDOW_DETAIL: TraceSpanResult = {
   ...MODEL_DETAIL,
   context: { ...(MODEL_DETAIL.context as NonNullable<TraceSpanResult["context"]>), window: null, num_ctx: null },
 };
+
+function withCut(cut: Partial<NonNullable<TraceSpanResult["context"]>>): TraceSpanResult {
+  return { ...MODEL_DETAIL, context: { ...(MODEL_DETAIL.context as NonNullable<TraceSpanResult["context"]>), ...cut } };
+}
+
+/** Ollama dropped the two oldest messages: proven from an earlier call. */
+export const CUT_YES_DETAIL: TraceSpanResult = withCut({ prompt_cut: "yes", prompt_cut_kind: "older_messages", dropped_message_ids: ["u_1", "m_1"], dropped_tokens: 1200 });
+
+/** Ollama probably dropped the two oldest messages: estimated. */
+export const CUT_LIKELY_DETAIL: TraceSpanResult = withCut({ prompt_cut: "likely", prompt_cut_kind: "older_messages", dropped_message_ids: ["u_1", "m_1"], dropped_tokens: 1200 });
+
+/** The system prompt and tools alone did not fit: Ollama probably cut the prompt in the middle. */
+export const CUT_MIDDLE_DETAIL: TraceSpanResult = withCut({ prompt_cut: "likely", prompt_cut_kind: "middle", dropped_message_ids: [], dropped_tokens: null });
+
+/** The prompt is proven to fit: no line, no badge. */
+export const CUT_NO_DETAIL: TraceSpanResult = withCut({ prompt_cut: "no" });
 
 /** A tool whose output was too big for the model: the start went back, and the rest is in an artifact. */
 export const TOOL_DETAIL: TraceSpanResult = {

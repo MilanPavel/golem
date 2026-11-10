@@ -96,16 +96,22 @@ export type Ts7 = string;
 export type Type7 = 'message.completed';
 export type ContextWindow = number | null;
 export type Index = number;
+export type MessageBytes = number[] | null;
+export type MessageChars = number[] | null;
 export type MessageId4 = string;
 export type MessageIds = string[];
 export type Model = string | null;
 export type NumCtx = number | null;
 export type Profile = string;
 export type Provider = string | null;
+export type SystemBytes = number | null;
+export type SystemChars = number | null;
 export type SystemPromptSha = string | null;
 export type SystemSections = PromptSectionInfo[] | null;
 export type Chars = number;
 export type Name1 = string;
+export type ToolsBytes = number | null;
+export type ToolsChars = number | null;
 export type ToolsSha = string | null;
 export type WindowEstimated = boolean;
 export type RunId8 = string;
@@ -553,20 +559,32 @@ export interface ModelCallStartedEvent {
  * from Ollama (the loaded context or the Modelfile). An older event has no
  * field and reads as False.
  *
+ * The size fields count what was sent, in UTF-8 bytes and in characters: the
+ * system text, the tool schemas as compact JSON, and each history message in
+ * ``message_ids`` order (its text and its tool calls as JSON). ``message_chars``
+ * and ``message_bytes`` have one number per message sent. Each is None on an
+ * event recorded before they existed.
+ *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "ModelCallStartedData".
  */
 export interface ModelCallStartedData {
   context_window?: ContextWindow;
   index: Index;
+  message_bytes?: MessageBytes;
+  message_chars?: MessageChars;
   message_id: MessageId4;
   message_ids?: MessageIds;
   model?: Model;
   num_ctx?: NumCtx;
   profile: Profile;
   provider?: Provider;
+  system_bytes?: SystemBytes;
+  system_chars?: SystemChars;
   system_prompt_sha?: SystemPromptSha;
   system_sections?: SystemSections;
+  tools_bytes?: ToolsBytes;
+  tools_chars?: ToolsChars;
   tools_sha?: ToolsSha;
   window_estimated?: WindowEstimated;
 }

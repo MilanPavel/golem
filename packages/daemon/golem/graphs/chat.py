@@ -406,6 +406,7 @@ def open_chat(
                 if schemas and binder.offers(profile):
                     text = json.dumps(schemas, sort_keys=True, separators=(",", ":"))
                     request["tools_sha"] = await blobs.put("tools", text)
+            request.update(_sizes(system, messages, schemas if binder.offers(profile) else []))
             get_stream_writer()(request)
             try:
                 response = await binder.invoke(
@@ -463,6 +464,34 @@ def open_chat(
         system_prompt,
         window_of,
     )
+
+
+def _sizes(
+    system: SystemMessage | None, messages: Sequence[BaseMessage], schemas: list[dict[str, object]]
+) -> dict[str, object]:
+    """The characters and UTF-8 bytes of what a model call sends, for ``model.request``.
+
+    A message counts its text and, for a reply, its tool calls as JSON. The tool
+    schemas count as the compact JSON the call stores.
+    """
+    system_text = "" if system is None else message_text(system)
+    tools_text = json.dumps(schemas, sort_keys=True, separators=(",", ":")) if schemas else ""
+    texts = [_sent_text(m) for m in messages]
+    return {
+        "system_chars": len(system_text),
+        "system_bytes": len(system_text.encode()),
+        "tools_chars": len(tools_text),
+        "tools_bytes": len(tools_text.encode()),
+        "message_chars": [len(t) for t in texts],
+        "message_bytes": [len(t.encode()) for t in texts],
+    }
+
+
+def _sent_text(message: BaseMessage) -> str:
+    text = message_text(message)
+    if isinstance(message, AIMessage) and message.tool_calls:
+        text += json.dumps(message.tool_calls, ensure_ascii=False, default=str)
+    return text
 
 
 class Blobs(Protocol):

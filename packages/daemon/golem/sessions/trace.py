@@ -15,10 +15,11 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from typing import Literal
 
+from golem.sessions.cut import CallFacts, PromptCut, judge
 from golem_protocol.commands import (
     TraceMessage,
     TraceModelSpan,
@@ -69,7 +70,46 @@ def build_trace(events: Sequence[ChatEvent]) -> list[TraceRunSpan]:
         run = _run(run_id, by_run[run_id])
         if run is not None:
             runs.append(run)
-    return runs
+    return _with_cuts(runs, events)
+
+
+def _with_cuts(runs: list[TraceRunSpan], events: Sequence[ChatEvent]) -> list[TraceRunSpan]:
+    """``runs`` with the cut of each recorded model span, judged against the calls before it.
+
+    The calls of every run of the session count: a call in an earlier run can prove a cut.
+    Only an exact window is used. A span without one says nothing.
+    """
+    starts = {e.data.message_id: e.data for e in events if isinstance(e, ModelCallStartedEvent)}
+    seen: list[CallFacts] = []
+    cut: list[TraceRunSpan] = []
+    for run in runs:
+        models: list[TraceModelSpan] = []
+        for model in run.children:
+            data = starts.get(model.id)
+            if data is None:
+                models.append(model)
+                continue
+            exact = model.context_window_estimated is False
+            here = CallFacts(
+                data,
+                model.model,
+                model.context_window if exact else None,
+                None if model.tokens is None else model.tokens.input,
+            )
+            found = judge(here, seen)
+            seen.append(here)
+            models.append(
+                model.model_copy(
+                    update={
+                        "prompt_cut": found.cut,
+                        "prompt_cut_kind": found.kind,
+                        "dropped_message_ids": list(found.dropped_message_ids),
+                        "dropped_tokens": found.dropped_tokens,
+                    }
+                )
+            )
+        cut.append(run.model_copy(update={"children": models}))
+    return cut
 
 
 def _run(run_id: str, events: list[ChatEvent]) -> TraceRunSpan | None:
@@ -373,6 +413,7 @@ class SpanRead:
     context_window: int | None = None
     num_ctx: int | None = None
     window_estimated: bool = False
+    cut: PromptCut = field(default_factory=PromptCut)
 
 
 def read_span(
@@ -394,7 +435,17 @@ def read_span(
     if span.kind == "tool":
         return SpanRead(_tool_read(span, events, messages))
     if span.kind == "model":
-        return _model_read(span, [s for s in flat if s.kind == "model"], events, messages)
+        found = _model_read(span, [s for s in flat if s.kind == "model"], events, messages)
+        full = next((m for run in runs for m in run.children if m.id == span_id), None)
+        if full is None:
+            return found
+        cut = PromptCut(
+            full.prompt_cut,
+            full.prompt_cut_kind,
+            tuple(full.dropped_message_ids),
+            full.dropped_tokens,
+        )
+        return replace(found, cut=cut)
     return SpanRead(TraceSpanResult(span=span))
 
 

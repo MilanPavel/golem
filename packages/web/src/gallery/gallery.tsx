@@ -24,17 +24,17 @@ import { ANSWERED, PENDING_EDIT, PENDING_SHELL } from "../features/approval/samp
 import { DiffModeSwitch, DiffView } from "../features/diff/index.ts";
 import { SAMPLE_EDIT_DIFF, SAMPLE_LONG_LINE_DIFF, SAMPLE_NEW_FILE_DIFF } from "../features/diff/sample.ts";
 import { Drawer, TodoList } from "../features/drawer/index.ts";
-import { Composer, ContextChipView, DockView, Meter } from "../features/composer/index.ts";
+import { Composer, ContextChipView, DockView, Meter, TuneChipView } from "../features/composer/index.ts";
 import { createHistory } from "../features/composer/history.ts";
 import { CommandsDialog } from "../features/composer/help-dialog.tsx";
 import { HomeView, NewSessionModelChipView, SessionTitle } from "../features/shell/index.ts";
 import { FolderBrowserView } from "../features/shell/folder-browser.tsx";
 import { CommandPaletteView, KeysDialog } from "../features/palette/index.ts";
 import { ModelDialogView, type ModelDialogViewProps } from "../features/models/index.ts";
-import { sampleTuneBackend } from "../features/models/sample-tune.ts";
+import { sampleTry, sampleTuneBackend } from "../features/models/sample-tune.ts";
 import { SetupDialogView } from "../features/setup/index.ts";
 import { SpanDetail, TraceSummary, TraceTree } from "../features/trace/index.ts";
-import { APPROVAL_DETAIL, APPROVAL_TRACE, FULL_DETAIL, MODEL_DETAIL, NO_PROMPT_DETAIL, NUM_CTX_DETAIL, OLD_DETAIL, SECTIONS_DETAIL, TOOL_DETAIL, UNKNOWN_WINDOW_DETAIL, FAILED_TRACE, GROWING_TRACE, LONG_TRACE, OLD_TRACE, SHORT_TRACE } from "../features/trace/sample.ts";
+import { APPROVAL_DETAIL, APPROVAL_TRACE, CUT_LIKELY_DETAIL, CUT_MIDDLE_DETAIL, CUT_YES_DETAIL, FULL_DETAIL, MODEL_DETAIL, NO_PROMPT_DETAIL, NUM_CTX_DETAIL, OLD_DETAIL, SECTIONS_DETAIL, TOOL_DETAIL, UNKNOWN_WINDOW_DETAIL, FAILED_TRACE, GROWING_TRACE, LONG_TRACE, OLD_TRACE, SHORT_TRACE } from "../features/trace/sample.ts";
 import type { TraceRunSpan, TraceSpanResult } from "../store/trace.ts";
 import { FORM_CASES, SETUP_CASES } from "../features/setup/sample.ts";
 import { AddKey, SetupFormView } from "../features/setup/setup-form.tsx";
@@ -324,6 +324,12 @@ const MODEL_CASES: { label: string; props: Partial<ModelDialogViewProps> }[] = [
   { label: "No Ollama", props: { listing: NO_OLLAMA_LISTING } },
   { label: "Tune view", props: { initial: { tune: "ollama/qwen3:8b" } } },
   { label: "Tune view, a model that is not the session's", props: { initial: { tune: "ollama/gemma4:e4b" } } },
+  { label: "Tune view, try again", props: { initial: { tune: "ollama/qwen3:8b" }, tune: { ...sampleTuneBackend(), again: sampleTry("idle") } } },
+  { label: "Tune view, no question to try", props: { initial: { tune: "ollama/qwen3:8b" }, tune: { ...sampleTuneBackend(), again: sampleTry("no-question") } } },
+  { label: "Tune view, chat running", props: { initial: { tune: "ollama/qwen3:8b" }, tune: { ...sampleTuneBackend(), again: sampleTry("running") } } },
+  { label: "Tune view, a try streaming", props: { initial: { tune: "ollama/qwen3:8b" }, tune: { ...sampleTuneBackend(), again: sampleTry("streaming") } } },
+  { label: "Tune view, a try done", props: { initial: { tune: "ollama/qwen3:8b" }, tune: { ...sampleTuneBackend(), again: sampleTry("done") } } },
+  { label: "Tune view, a try failed", props: { initial: { tune: "ollama/qwen3:8b" }, tune: { ...sampleTuneBackend(), again: sampleTry("failed") } } },
   { label: "Loading", props: { listing: null } },
   { label: "Could not list", props: { listing: null, loadError: "daemon went away" } },
 ];
@@ -609,6 +615,9 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
         <DetailDemo label="A model call, nearly full, with MCP tools" result={FULL_DETAIL} />
         <DetailDemo label="Ollama input over num_ctx" result={NUM_CTX_DETAIL} />
         <DetailDemo label="Ollama with no ctx: window unknown" result={UNKNOWN_WINDOW_DETAIL} />
+        <DetailDemo label="Ollama dropped older messages (proven)" result={CUT_YES_DETAIL} />
+        <DetailDemo label="Ollama probably dropped older messages" result={CUT_LIKELY_DETAIL} />
+        <DetailDemo label="Ollama probably cut the prompt in the middle" result={CUT_MIDDLE_DETAIL} />
         <DetailDemo label="A tool with a big output" result={TOOL_DETAIL} />
         <DetailDemo label="A tool with an edited approval" result={APPROVAL_DETAIL} />
         <DetailDemo label="Not recorded" result={OLD_DETAIL} />
@@ -733,6 +742,22 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
           <DockView
             busy={false}
             meter={<Meter state="idle" runStartedAt={null} aside={<ContextChipView used={1300} window={16384} windowEstimated onOpen={() => {}} />} />}
+            composer={<DemoComposer />}
+          />
+          <DockView
+            busy={false}
+            meter={
+              <Meter
+                state="idle"
+                runStartedAt={null}
+                aside={
+                  <span className="flex items-center gap-2">
+                    <TuneChipView text="temp 0.2 · top_p 0.9" onOpen={() => {}} />
+                    <ContextChipView used={32000} window={128000} onOpen={() => {}} />
+                  </span>
+                }
+              />
+            }
             composer={<DemoComposer />}
           />
           <DockView
