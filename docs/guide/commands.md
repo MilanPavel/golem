@@ -130,6 +130,19 @@ The status line shows the options that differ from the model's default, such as 
 | `/debug hold`, `/debug go` | Hold your next message, to look at it in the model tab before it is sent, then send it |
 | `/help` | List every command |
 
+`/context` draws the model's window as a grid of cells, coloured by what fills them, with a legend beside it (or under it in a narrow terminal). One cell is 0.5% of the window.
+
+```text
+■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■    qwen3:8b
+■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ □ □    3.1K / 16.4K · 18%
+□ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □
+□ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □    ■ System prompt        1.2K    7%
+□ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □    ■ Tool definitions     1.4K    9%
+□ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □    ■ Your messages         300    2%
+□ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □    ■ Replies               200    1%
+□ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □    □ Free                13.3K   81%
+```
+
 ## Keys
 
 | Key | What it does |
