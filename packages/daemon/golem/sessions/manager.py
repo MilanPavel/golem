@@ -376,7 +376,7 @@ class SessionManager:
             updates["tools"] = tools
         span = found.result.span
         if span.kind == "model":
-            window, estimated = found.context_window, False
+            window, estimated = found.context_window, found.window_estimated
             num_ctx = found.num_ctx
             window_of = self._runtime.window_of
             if window is None and window_of is not None:

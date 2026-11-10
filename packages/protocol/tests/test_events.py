@@ -189,12 +189,14 @@ def test_session_updated_names_what_changed() -> None:
 def test_model_call_started_context_fields_are_optional_and_round_trip() -> None:
     old = ModelCallStartedData.model_validate({"message_id": "m1", "index": 1, "profile": "p"})
     assert (old.context_window, old.num_ctx, old.system_sections) == (None, None, None)
+    assert old.window_estimated is False
     data = ModelCallStartedData(
         message_id="m1",
         index=1,
         profile="p",
         context_window=16384,
         num_ctx=16384,
+        window_estimated=True,
         system_sections=[PromptSectionInfo(name="rules", chars=9)],
     )
     assert ModelCallStartedData.model_validate_json(data.model_dump_json()) == data

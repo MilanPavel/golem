@@ -396,6 +396,7 @@ def open_chat(
                 request["system_sections"] = [{"name": n, "chars": len(t)} for n, t in parts]
             request["context_window"] = window.window
             request["num_ctx"] = window.num_ctx
+            request["window_estimated"] = window.estimated
             if blobs is not None:
                 if system is not None and isinstance(system.content, str):
                     request["system_prompt_sha"] = await blobs.put("system_prompt", system.content)

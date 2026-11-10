@@ -45,6 +45,8 @@ class ModelRequested:
     ``context_window`` is the tokens the model can take in, ``num_ctx`` the
     Ollama option sent, and ``system_sections`` the ``(name, chars)`` of each
     non-empty section of the system prompt. Each is None when unknown.
+    ``window_estimated`` is true when golem did not send the window and read it
+    from Ollama.
     """
 
     message_id: str
@@ -53,6 +55,7 @@ class ModelRequested:
     message_ids: tuple[str, ...] = ()
     context_window: int | None = None
     num_ctx: int | None = None
+    window_estimated: bool = False
     system_sections: tuple[tuple[str, int], ...] | None = None
 
 
@@ -459,6 +462,7 @@ def _request(message_id: str, item: Mapping[str, object]) -> ModelRequested:
         else (),
         _positive(item.get("context_window")),
         _positive(item.get("num_ctx")),
+        item.get("window_estimated") is True,
         _sections(item.get("system_sections")),
     )
 
