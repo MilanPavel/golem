@@ -2,6 +2,56 @@
 
 What changed in each release of golem, newest first. `just release` writes each section from the commit messages on `main` ([CONTRIBUTING.md](CONTRIBUTING.md)), and the release pull request is the place to edit it. The GitHub release shows the same section. How a release is made is in [docs/sre.md](docs/sre.md), section 5.
 
+## [0.11.0] - 2026-11-10
+
+### Features
+
+- **tui:** show the context with /context and a ctx % in the status line ([#584](https://github.com/MilanPavel/golem/pull/584))
+- **models:** add the table of Ollama options with ranges and explanations ([#594](https://github.com/MilanPavel/golem/pull/594))
+- **models:** save Ollama options for each model in config.toml ([#599](https://github.com/MilanPavel/golem/pull/599))
+- **protocol:** add model.options.get and set, session.set_options and model.options.changed ([#603](https://github.com/MilanPavel/golem/pull/603))
+- **models:** send saved and session options to Ollama ([#606](https://github.com/MilanPavel/golem/pull/606))
+- **models:** read the loaded context of an Ollama model from /api/ps ([#612](https://github.com/MilanPavel/golem/pull/612))
+- **tui:** add /tune with sliders and explanations ([#616](https://github.com/MilanPavel/golem/pull/616))
+- **models:** read the num_ctx a Modelfile sets for an installed model ([#613](https://github.com/MilanPavel/golem/pull/613))
+- **tui:** add presets to /tune ([#617](https://github.com/MilanPavel/golem/pull/617))
+- **models:** find a local model's context window from session and saved options ([#618](https://github.com/MilanPavel/golem/pull/618))
+- **tui:** try the last question again with the /tune settings ([#619](https://github.com/MilanPavel/golem/pull/619))
+- **models:** record on model.call.started that a window is estimated ([#621](https://github.com/MilanPavel/golem/pull/621))
+- **web:** add a Tune tab to the model dialog ([#622](https://github.com/MilanPavel/golem/pull/622))
+- **tui:** show how much memory num_ctx needs in /tune ([#623](https://github.com/MilanPavel/golem/pull/623))
+- **tui:** show an estimated window with ≈ and a context bar in the status line ([#626](https://github.com/MilanPavel/golem/pull/626))
+- **web:** open Tune from the model row, with presets and the memory gauge ([#627](https://github.com/MilanPavel/golem/pull/627))
+- **tui:** show changed options in the status line and set one with /tune ([#628](https://github.com/MilanPavel/golem/pull/628))
+- **tui:** show /context as a grid of cells with a legend ([#629](https://github.com/MilanPavel/golem/pull/629))
+- **web:** try again in the Tune view and a changed-options chip ([#631](https://github.com/MilanPavel/golem/pull/631))
+- **sessions:** show when Ollama cut a prompt that did not fit ([#636](https://github.com/MilanPavel/golem/pull/636))
+- **sessions:** keep a local model's thinking and show it as one line ([#644](https://github.com/MilanPavel/golem/pull/644))
+- **protocol:** mark tool calls a model wrote as text ([#647](https://github.com/MilanPavel/golem/pull/647))
+- **tui:** /thinking shows or hides the thinking line ([#654](https://github.com/MilanPavel/golem/pull/654))
+- **models:** a think row in Tune for local models ([#656](https://github.com/MilanPavel/golem/pull/656))
+- **tools:** search the web with web_search through DuckDuckGo ([#657](https://github.com/MilanPavel/golem/pull/657))
+
+### Fixes
+
+- **models:** read the window Ollama used after each call ([#630](https://github.com/MilanPavel/golem/pull/630))
+- **daemon:** recover tool calls a model writes as text ([#637](https://github.com/MilanPavel/golem/pull/637))
+- **tools:** send a User-Agent with a contact URL from web_fetch ([#643](https://github.com/MilanPavel/golem/pull/643))
+- **tools:** give a refused page's title as the reason in web_fetch ([#648](https://github.com/MilanPavel/golem/pull/648))
+- **tools:** tell the model when the sandboxed shell had no network ([#655](https://github.com/MilanPavel/golem/pull/655))
+
+### Docs
+
+- add chapter 14 on tracing and a trace section to the web guide ([#585](https://github.com/MilanPavel/golem/pull/585))
+- split sre.md into build, release, and run pages ([#602](https://github.com/MilanPavel/golem/pull/602))
+- move the plan to GitHub issues ([#600](https://github.com/MilanPavel/golem/pull/600))
+- publish the web gallery on the docs site ([#601](https://github.com/MilanPavel/golem/pull/601))
+- nest the How golem works chapters under Overview ([#608](https://github.com/MilanPavel/golem/pull/608))
+- split the vision into chapters ([#607](https://github.com/MilanPavel/golem/pull/607))
+- put the gallery in the menu and retire the feature design pages ([#614](https://github.com/MilanPavel/golem/pull/614))
+- find a local model's context window from what Ollama says ([#615](https://github.com/MilanPavel/golem/pull/615))
+- add the preset keys to the /tune guide ([#620](https://github.com/MilanPavel/golem/pull/620))
+
 ## [0.10.0] - 2026-11-08
 
 ### Features
