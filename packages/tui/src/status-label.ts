@@ -78,6 +78,7 @@ export const STATUS_PRIORITY = {
   model: 60,
   fresh: 55,
   context: 50,
+  tune: 48,
   skills: 45,
   folder: 40,
   messages: 20,
@@ -242,6 +243,8 @@ export function statusSegments(input: {
   skippedSkills?: readonly string[];
   /** The context of the newest model call that reported its input. */
   context?: LiveContext | null;
+  /** The options changed from the model's defaults, as `tuneChip` says them. */
+  tune?: string;
 }): StatusSegment[] {
   return [
     segment("connection", input.connection, STATUS_PRIORITY.connection, "connection", true),
@@ -249,6 +252,7 @@ export function statusSegments(input: {
     segment("title", input.title, STATUS_PRIORITY.title, "title"),
     segment("model", input.model, STATUS_PRIORITY.model, "model"),
     segment("context", contextLabel(input.context ?? null), STATUS_PRIORITY.context, contextTone(input.context ?? null)),
+    segment("tune", input.tune ?? "", STATUS_PRIORITY.tune, "dim"),
     segment("skills", skillsLabel(input.skills ?? [], input.skippedSkills ?? []), STATUS_PRIORITY.skills, "dim"),
     segment("folder", input.folder, STATUS_PRIORITY.folder, "dim"),
     segment(

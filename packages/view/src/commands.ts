@@ -1,4 +1,6 @@
-import type { ListedSkill } from "@golem/client";
+import type { ListedSkill, ModelOption } from "@golem/client";
+
+import { TUNE_USAGE, tuneHints, tuneSet, type TuneValue } from "./tune.ts";
 
 
 export type DebugTab = "wire" | "model";
@@ -23,6 +25,8 @@ export type ComposerOutcome =
   | { kind: "help" }
   | { kind: "context" }
   | { kind: "tune" }
+  /** Set one option for this session, or with a null `value` remove its override. `notice` is what to print. */
+  | { kind: "tune-set"; name: string; value: TuneValue | null; notice: string }
   | { kind: "mcp" }
   | { kind: "mcp-add"; id: string | null }
   | { kind: "mcp-toggle"; on: boolean; name: string }
@@ -74,6 +78,8 @@ export type Command = {
   hint?: string;
   /** Choices for the word after one of `choices`, such as the skill names after `/skill run`. */
   subChoices?: Readonly<Record<string, readonly string[]>>;
+  /** A note for the word after one of `choices`, shown but not inserted, such as `0.7 · 0–2`. */
+  argHints?: Readonly<Record<string, string>>;
   run: (debug: DebugState, args: readonly string[]) => ComposerOutcome;
 };
 
@@ -266,9 +272,10 @@ export const COMMANDS: readonly Command[] = [
   {
     name: "/tune",
     group: "model",
-    args: "",
-    description: "Opens the panel that tunes the local model: temperature, context size, and more.",
-    run: withoutArgs({ kind: "tune" }),
+    args: "[option] [value|reset]",
+    description: "Opens the panel that tunes the local model, or sets one option for this session.",
+    // The composer reads /tune <option> <value> itself, because it needs the option table.
+    run: (_debug, args) => (args.length === 0 ? { kind: "tune" } : { kind: "unknown", notice: TUNE_USAGE }),
   },
   {
     name: "/new",
@@ -374,6 +381,22 @@ export function withSkillChoices(
   return [...withRun, ...rows];
 }
 
+/**
+ * `commands` with `/tune`'s argument choices set to the option names, and after a name the hint
+ * with its default and range. `defaults` are the model's own values, when known.
+ */
+export function withTuneChoices(
+  commands: readonly Command[],
+  options: readonly ModelOption[],
+  defaults: Readonly<Record<string, TuneValue>> = {},
+): Command[] {
+  return commands.map((command) =>
+    command.name === "/tune"
+      ? { ...command, choices: options.map((option) => option.name), argHints: tuneHints(options, defaults) }
+      : command,
+  );
+}
+
 /** `commands` with `/model`'s argument choices set to `names`, for suggestions. */
 export function withModelChoices(commands: readonly Command[], names: readonly string[]): Command[] {
   return commands.map((command) => (command.name === "/model" ? { ...command, choices: names } : command));
@@ -396,6 +419,7 @@ export function applyComposer(
   raw: string,
   skills: readonly SkillChoice[] = [],
   pins: PinChoices = noPins,
+  tuneOptions: readonly ModelOption[] = [],
 ): ComposerOutcome {
   const text = raw.trim();
   if (text.length === 0) {
@@ -405,7 +429,7 @@ export function applyComposer(
     return sendOrPreview(debug, text.slice(2).trim());
   }
   if (text.startsWith("/")) {
-    return applyCommand(debug, text, skills, pins);
+    return applyCommand(debug, text, skills, pins, tuneOptions);
   }
   return sendOrPreview(debug, text);
 }
@@ -431,10 +455,17 @@ function applyCommand(
   text: string,
   skills: readonly SkillChoice[],
   pins: PinChoices,
+  tuneOptions: readonly ModelOption[],
 ): ComposerOutcome {
   const [name = "", ...args] = text.split(/\s+/);
   if (name === "/skill") {
     return skillCommand(debug, text, skills, pins);
+  }
+  if (name === "/tune" && args.length > 0) {
+    const set = tuneSet(tuneOptions, args);
+    return set.kind === "set"
+      ? { kind: "tune-set", name: set.name, value: set.value, notice: set.notice }
+      : { kind: "unknown", notice: set.notice };
   }
   const command = COMMANDS.find((candidate) => candidate.name === name);
   if (command !== undefined) {
