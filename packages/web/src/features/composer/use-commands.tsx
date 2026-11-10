@@ -22,7 +22,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { actionErrorText, isNoModelChosen } from "../../store/errors.ts";
 import { useModelList, useNavigate, useNewSessionModel, usePageActions, useSessionReader, useSkillList } from "../../store/page-context.tsx";
-import { setTimesShown, timesShownStore } from "../chat/index.ts";
+import { setThinkingShown, setTimesShown, thinkingShownStore, timesShownStore } from "../chat/index.ts";
 import { drawerOpenStore, useDrawerOpen } from "../drawer/index.ts";
 import { openModelDialog } from "../models/index.ts";
 import { openSetup, startNoticeStore, useStartNotice } from "../setup/index.ts";
@@ -225,6 +225,11 @@ export function useCommands({ session, cwd, typing, send }: UseCommandsOptions):
             } catch (err) {
               return fail(err, `Could not turn ${found.name} ${found.on ? "on" : "off"}.`);
             }
+          case "thinking": {
+            const next = !thinkingShownStore.getSnapshot();
+            setThinkingShown(next);
+            return say(next ? "Thinking shown." : "Thinking hidden.");
+          }
           case "todos": {
             const next = !drawerOpenStore.getSnapshot();
             setDrawerOpen(next);

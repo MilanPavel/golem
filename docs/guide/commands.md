@@ -125,6 +125,7 @@ The status line shows the options that differ from the model's default, such as 
 | `/todos` | Show or hide the agent's todo list above the composer |
 | `/context` | See how full the model's context is, and what fills it. In the web UI it opens the trace |
 | `/time` | Show or hide the time beside each message |
+| `/thinking` | Show or hide the thinking line above each answer. It only changes what you see; the `think` setting in `/tune` is what the model is asked to do |
 | `/debug` | Open or close the debug panel |
 | `/debug wire`, `/debug model` | Show the protocol messages, or exactly what the model sees |
 | `/debug hold`, `/debug go` | Hold your next message, to look at it in the model tab before it is sent, then send it |
