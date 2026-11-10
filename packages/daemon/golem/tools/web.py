@@ -30,6 +30,7 @@ HTML_CHARS = 1_000_000
 TEXT_TYPES = ("text/", "application/json", "application/xml", "application/xhtml+xml")
 CONTACT_URL = "https://github.com/MilanPavel/golem"
 """Named in the user agent, which Wikimedia's policy asks every client to do."""
+USER_AGENT = f"golem/{__version__} (+{CONTACT_URL})"
 REASON_BYTES = 2_048
 """The most of a refused page's body that is read, for the reason in the error."""
 REASON_CHARS = 200
@@ -69,7 +70,7 @@ async def _follow(url: str, ctx: ToolContext) -> ToolResult:
     settings = ctx.web
     host = urlsplit(url).hostname
     headers = {
-        "User-Agent": f"golem/{__version__} (+{CONTACT_URL})",
+        "User-Agent": USER_AGENT,
         "Accept": "text/html, text/*;q=0.9, */*;q=0.1",
         "Accept-Encoding": "identity",
     }
@@ -244,4 +245,11 @@ WEB_FETCH = Tool(
     untrusted=True,
 )
 
-__all__ = ["MAX_REDIRECTS", "UNTRUSTED_NOTE", "WEB_FETCH", "WebFetchArgs", "host_subject"]
+__all__ = [
+    "MAX_REDIRECTS",
+    "UNTRUSTED_NOTE",
+    "USER_AGENT",
+    "WEB_FETCH",
+    "WebFetchArgs",
+    "host_subject",
+]

@@ -325,6 +325,7 @@ Remember: under launchd, `GOLEM_...` variables from your terminal do not apply. 
 | `[shell] network` | `false` | Commands the AI runs cannot use the internet |
 | `[shell] timeout_seconds` | `120` | The longest a command can run |
 | `[web] allow_private` | `false` | `web_fetch` cannot reach your own computer or home network |
+| `[web] search` | `"duckduckgo"` | `web_search` sends its query to DuckDuckGo. `"off"` removes the tool |
 
 ---
 

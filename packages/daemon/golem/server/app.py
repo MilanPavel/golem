@@ -200,7 +200,7 @@ class DaemonApp:
                 open_checkpoints(database, self.paths.checkpoints_file) as saver,
             ):
                 self.state.policy = policy
-                self.state.tools = default_registry(mcp)
+                self.state.tools = default_registry(mcp, policy.web())
                 self.state.artifacts = ArtifactStore(database)
                 self.state.sessions = await _open_sessions(
                     database,

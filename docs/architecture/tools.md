@@ -140,6 +140,7 @@ Every session gets these (`default_registry`), plus the tools of its MCP servers
 | `shell` | Run a command in the sandbox | Asks, per command |
 | `shell_unsandboxed` | Run a command outside the sandbox, with the user's credentials and the network | Asks, per command. Only a rule that names it allows it |
 | `web_fetch` | Read one web page as text | Asks, per host |
+| `web_search` | Search the web, get titles, URLs, and snippets | Asks, for the provider's host |
 
 A `Tool` says how the rules treat it:
 
@@ -209,6 +210,16 @@ Longer output is stored whole in the `artifacts` table, and the message keeps th
 - **The page.** HTML becomes text: scripts and styles are dropped, headings become `#`, list items `-`, and links `[text](url)`. Other text, JSON, and XML pass through, and anything else, such as an image, is refused.
 - **Data, not instructions.** The text comes inside `<web_content url=… title=…>`, after a line that says it is data and cannot approve anything. The page's own `<web_content` tags are defused, so it cannot end the wrapper early.
 
+### `web_search`
+
+`web_search` searches the web and gives numbered results, each with a title, a URL, and a snippet ([ADR-046](../adr/046-web-search.md)). The model reads a result with `web_fetch`.
+
+- **Provider.** `[web] search` names it: `"duckduckgo"` (the default) or `"off"`, which leaves the tool out when the daemon starts. A provider is one module with `async search(query, n) -> list[Result]` (`golem/tools/search_provider.py`). DuckDuckGo's is `golem/tools/search_duckduckgo.py`.
+- **Policy.** Not read-only, so it asks. The subject is the provider's host (`html.duckduckgo.com`), so one rule allows searches without allowing every query.
+- **The request.** `POST https://html.duckduckgo.com/html/` with the form field `q`, with the same user agent as `web_fetch`. Two searches start at least 5 seconds apart, and the wait counts toward `[web] timeout_seconds`. The page is read with the standard library's parser. A result's link is a redirect, and the URL inside it is the one returned.
+- **Failures.** No results is a result: `no results for '…'`. HTTP 202, 403, or 429, or a page without the results list, is an error that says DuckDuckGo refused the search, and to wait a minute or answer from what was found.
+- **Data, not instructions.** The results come inside `<web_content query=…>`, after a line that says they are data.
+
 ### The shell's output
 
 `shell` runs the user's login shell (`$SHELL -lc`) in the session folder, under the sandbox, which [Sandboxes](./sandboxes.md) describes.
@@ -226,6 +237,7 @@ Longer output is stored whole in the `artifacts` table, and the message keeps th
 | `packages/daemon/golem/tools/write.py` | `write_file` and `edit_file`: plans, previews, and writes |
 | `packages/daemon/golem/tools/shell.py` | `shell`, `shell_unsandboxed`, `git_status`, `git_diff`, and `git_log` |
 | `packages/daemon/golem/tools/web.py` | `web_fetch` |
+| `packages/daemon/golem/tools/search.py`, `search_duckduckgo.py` | `web_search` and its DuckDuckGo provider |
 | `packages/daemon/golem/tools/html_text.py` | HTML to text, for `web_fetch` |
 | `packages/daemon/golem/tools/untrusted.py` | The wrapper for outside content |
 | `packages/daemon/golem/tools/artifacts.py` | `read_artifact` |

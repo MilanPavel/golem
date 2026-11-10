@@ -225,11 +225,13 @@ class OllamaSettings(BaseModel):
 
 
 class WebSettings(BaseModel):
-    """``[web]``. What ``web_fetch`` may reach and how much it reads.
+    """``[web]``. What ``web_fetch`` may reach and how much it reads, and who searches.
 
     ``allow_private`` lets it reach loopback, private, and link-local
     addresses, such as a dev server on ``localhost``. ``max_bytes`` is the most
     of a response it reads, and ``timeout_seconds`` the longest it waits.
+    ``search`` names the provider ``web_search`` asks, or ``"off"``, which
+    leaves the tool out.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -237,6 +239,7 @@ class WebSettings(BaseModel):
     allow_private: bool = False
     max_bytes: int = Field(default=5_000_000, gt=0, le=50_000_000)
     timeout_seconds: int = Field(default=20, gt=0, le=300)
+    search: Literal["duckduckgo", "off"] = "duckduckgo"
 
 
 MCP_SECRET = re.compile(r"keychain:(mcp/[A-Za-z0-9][A-Za-z0-9._-]*)")

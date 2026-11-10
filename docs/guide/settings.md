@@ -164,9 +164,12 @@ Only your own file sets these.
 |---|---|---|
 | `allow_private` | `false` | Let `web_fetch` reach loopback, private, and link-local addresses |
 | `max_bytes` | `5000000` | The most of a page it reads, up to 50 000 000 |
-| `timeout_seconds` | `20` | The longest one fetch takes, up to 300 |
+| `timeout_seconds` | `20` | The longest one fetch or search takes, up to 300 |
+| `search` | `"duckduckgo"` | Who `web_search` asks. `"off"` leaves the tool out |
 
 A redirect to another host is not followed. The model gets the new URL and asks again.
+
+`web_search` sends the query to DuckDuckGo, a third party, and needs no key or account. Searches start at least 5 seconds apart. DuckDuckGo may still refuse a burst, and the model is then told to wait a minute. Restart the daemon after you change `search`.
 
 ### `[skills]`
 

@@ -23,6 +23,7 @@ golem does its work through **tools**: small actions it asks the daemon to run, 
 | `shell` | Runs a command, in a sandbox | Asks |
 | `shell_unsandboxed` | Runs a command outside the sandbox, with your credentials and the network, for `gh` and `git push` | Asks |
 | `web_fetch` | Reads one web page | Asks, per host |
+| `web_search` | Searches the web with DuckDuckGo | Asks, for `html.duckduckgo.com` |
 | `mcp__<server>__<tool>` | A tool from an [MCP server](./mcp.md) | Asks |
 
 The read-only tools only see the folder you opened golem in. Reads change nothing, so they never stop to ask.
@@ -137,7 +138,16 @@ match = "docs.python.org|developer.mozilla.org"
 action = "allow"
 ```
 
-It refuses addresses inside your network (such as `192.168.…` or `localhost`) unless `[web] allow_private = true`. What a page says is treated as data, never as instructions, so a page cannot approve anything.
+`web_search` sends the words it searches for to DuckDuckGo. It asks once for the host `html.duckduckgo.com`, whatever the query, so one rule allows searches:
+
+```toml
+[[rule]]
+tool = "web_search"
+match = "html.duckduckgo.com"
+action = "allow"
+```
+
+`web_fetch` refuses addresses inside your network (such as `192.168.…` or `localhost`) unless `[web] allow_private = true`. What a page says is treated as data, never as instructions, so a page cannot approve anything.
 
 ## Long output
 

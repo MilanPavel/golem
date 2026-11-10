@@ -93,7 +93,7 @@ All settings live in `~/.golem/config.toml`. `golem config show` prints the ones
 | `session_titles` | `true` | Name each chat after its first answer, with one extra model call |
 | `log_level` | `INFO` | `DEBUG`, `INFO`, `WARNING`, or `ERROR` |
 | `[shell]` | | `network = false`, `writable = []`, `timeout_seconds = 120` |
-| `[web]` | | `allow_private = false`, `max_bytes = 5000000`, `timeout_seconds = 20` |
+| `[web]` | | `allow_private = false`, `max_bytes = 5000000`, `timeout_seconds = 20`, `search = "duckduckgo"` |
 
 - **From the environment.** Every setting can also come from an environment variable: `GOLEM_` plus the name in capitals, for example `GOLEM_LOG_LEVEL`.
 - **When it applies.** Model settings apply at once. For the others, restart the daemon with `golem daemon restart`.
