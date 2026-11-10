@@ -15,6 +15,7 @@ import {
   shownSessionTitle,
   skillsLabel,
   startedAtMs,
+  STATUS_PRIORITY,
   statusLabel,
   statusSegments,
   uptimeRefreshMs,
@@ -320,4 +321,25 @@ test("context sits after the model and leaves the line after the skills and befo
   assert.ok(last("skills") < last("context"));
   assert.ok(last("context") < last("fresh"));
   assert.ok(last("fresh") < last("model"));
+});
+
+test("the tune segment sits after the context, below context and above skills", () => {
+  const segments = statusSegments({
+    connection: "connected",
+    title: "t",
+    model: "qwen",
+    folder: "",
+    messageCount: null,
+    uptimeSeconds: null,
+    skills: ["ship"],
+    tune: "temp 0.2 · top_p 0.9",
+  });
+  const ids = segments.filter((part) => part.text.length > 0).map((part) => part.id);
+  assert.deepEqual(ids, ["connection", "title", "model", "tune", "skills"]);
+  const tune = segments.find((part) => part.id === "tune");
+  assert.equal(tune?.priority, 48);
+  assert.equal(tune?.tone, "dim");
+  assert.ok(48 < STATUS_PRIORITY.context && 48 > STATUS_PRIORITY.skills);
+  const empty = statusSegments({ connection: "c", title: "t", model: "m", folder: "", messageCount: null, uptimeSeconds: null });
+  assert.equal(empty.find((part) => part.id === "tune")?.text, "");
 });
