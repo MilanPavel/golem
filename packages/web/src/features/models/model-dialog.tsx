@@ -2,15 +2,17 @@ import { namesModel, pickerGroups, pickerName, providerMissing, type Category } 
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { actionErrorText } from "../../store/errors.ts";
 import type { ListedModel, ModelListResult } from "../../store/models.ts";
-import { useModelList, useNewSessionModel, usePageActions, usePulls } from "../../store/page-context.tsx";
+import { useModelList, useNewSessionModel, usePageActions, usePulls, useSessionOptions } from "../../store/page-context.tsx";
 import type { PullsSnapshot } from "../../store/pulls.ts";
 import { Button } from "../../ui/button.tsx";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../ui/tabs.tsx";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "../../ui/dialog.tsx";
 import { IconButton } from "../../ui/icon-button.tsx";
 import { RefreshIcon } from "../../ui/icons.tsx";
 import { resolveActive, SearchList, type SearchListItem } from "../../ui/search-list.tsx";
 import { CategoryChips } from "./category-chips.tsx";
 import { ModelRow } from "./model-row.tsx";
+import { HOSTED_TEXT, TuneTab, type TuneBackend } from "./tune-tab.tsx";
 import { diskText, downloadText, removable, removeText, shortName, tooBigText, withActivePulls } from "./model-text.ts";
 
 /** What the dialog does, with the session already bound. Each call rejects with the daemon's message. */
@@ -54,8 +56,10 @@ export type ModelDialogViewProps = {
   showAll?: boolean;
   /** Turns show all on or off. Without it the dialog has no such switch. */
   onShowAll?: (on: boolean) => void;
+  /** What the Tune tab reads and writes. Without it the dialog has no tabs. */
+  tune?: TuneBackend;
   /** Where the dialog starts, for the gallery. */
-  initial?: { query?: string; category?: Category; activeId?: string; confirm?: ModelConfirm; failure?: string };
+  initial?: { tab?: "models" | "tune"; query?: string; category?: Category; activeId?: string; confirm?: ModelConfirm; failure?: string };
 };
 
 type Guard = { busy: boolean; escape: (event: Event) => void };
@@ -98,7 +102,7 @@ function Content({
   guardRef: RefObject<Guard | null>;
   close: () => void;
 }) {
-  const { session, listing, loadError, onRetry, pulls, actions, initial, showAll, onShowAll } = props;
+  const { session, listing, loadError, onRetry, pulls, actions, initial, showAll, onShowAll, tune } = props;
   const isNew = props.mode === "new";
   const isDefaultMode = props.mode === "default";
   const [query, setQuery] = useState(initial?.query ?? "");
@@ -109,6 +113,7 @@ function Content({
     initial?.failure === undefined ? null : { ref: initial.activeId ?? null, text: initial.failure },
   );
   const [busy, setBusy] = useState<string | null>(null);
+  const [tab, setTab] = useState<"models" | "tune">(initial?.tab ?? "models");
   const input = useRef<HTMLInputElement>(null);
   const confirmButton = useRef<HTMLButtonElement>(null);
 
@@ -128,6 +133,16 @@ function Content({
   const confirm = confirmFits(confirmState, model, missing) ? confirmState : null;
   const error = failure !== null && (failure.ref === null || failure.ref === model?.ref) ? failure.text : null;
   const profile = session?.profile ?? null;
+  // Tune the highlighted model when it is a ready local one, else the one the session uses.
+  const sessionModel = shown?.models.find((item) => namesModel(item, profile)) ?? null;
+  const tuned =
+    model !== null && model.provider === "ollama" && model.status === "ready"
+      ? model
+      : sessionModel !== null && sessionModel.provider === "ollama"
+        ? sessionModel
+        : null;
+  const tuneBackend =
+    tune === undefined ? undefined : { ...tune, sessionId: tuned !== null && tuned.ref === sessionModel?.ref ? tune.sessionId : null };
 
   // The question takes focus, so a keyboard user hears it and answers it; answering gives focus back.
   const confirmKey = confirm === null ? "" : `${confirm.kind}:${confirm.ref}:${confirm.kind === "pull" ? confirm.step : 0}`;
@@ -223,22 +238,8 @@ function Content({
       <p className="px-3 py-6 text-center text-sm text-muted">{query === "" && category === null ? "No models found." : "No matching models."}</p>
     );
 
-  return (
+  const modelsPanel = (
     <>
-      <div className="flex items-start gap-3">
-        <div className="min-w-0 flex-1">
-          <DialogTitle>Choose a model</DialogTitle>
-          <DialogDescription>{description(isNew || isDefaultMode ? null : session, listing)}</DialogDescription>
-        </div>
-        <IconButton
-          label="Refresh the list"
-          aria-busy={busy === "refresh"}
-          disabled={busy !== null}
-          onClick={() => void run("refresh", null, actions.refresh, "Could not refresh the list.")}
-        >
-          <RefreshIcon />
-        </IconButton>
-      </div>
       {onShowAll === undefined ? null : (
         <label className="mt-3 flex items-center gap-2 text-sm text-muted">
           <input
@@ -311,6 +312,49 @@ function Content({
           />
         )}
       </div>
+    </>
+  );
+
+  return (
+    <>
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <DialogTitle>Choose a model</DialogTitle>
+          <DialogDescription>{description(isNew || isDefaultMode ? null : session, listing)}</DialogDescription>
+        </div>
+        <IconButton
+          label="Refresh the list"
+          aria-busy={busy === "refresh"}
+          disabled={busy !== null}
+          onClick={() => void run("refresh", null, actions.refresh, "Could not refresh the list.")}
+        >
+          <RefreshIcon />
+        </IconButton>
+      </div>
+      {tuneBackend === undefined ? (
+        modelsPanel
+      ) : (
+        <Tabs value={tab} onValueChange={(next) => setTab(next === "tune" ? "tune" : "models")} className="mt-3">
+          <TabsList aria-label="Model dialog">
+            <TabsTrigger value="models">Models</TabsTrigger>
+            <TabsTrigger value="tune">Tune</TabsTrigger>
+          </TabsList>
+          <TabsContent value="models" forceMount hidden={tab !== "models"}>
+            {modelsPanel}
+          </TabsContent>
+          <TabsContent value="tune" className="mt-3">
+            {listing === null ? (
+              <p role="status" className="px-3 py-6 text-center text-sm text-muted">
+                Loading models…
+              </p>
+            ) : tuned === null ? (
+              <p className="px-3 py-6 text-center text-sm text-muted">{HOSTED_TEXT}</p>
+            ) : (
+              <TuneTab key={tuned.ref} model={tuned.ref.replace(/^ollama\//, "")} backend={tuneBackend} />
+            )}
+          </TabsContent>
+        </Tabs>
+      )}
     </>
   );
 }
@@ -506,10 +550,24 @@ export function ModelDialog({
     }),
     [page, sessionId, choosePick, showAll],
   );
+  const tuneSession = mode === "default" ? null : sessionId;
+  const sessionOptions = useSessionOptions(tuneSession);
+  const tune = useMemo<TuneBackend>(
+    () => ({
+      sessionId: tuneSession,
+      load: (name) => page.modelOptions(name, tuneSession),
+      save: (name, options) => page.saveModelOptions(name, options),
+      setSession: (options) => page.setSessionOptions(tuneSession ?? "", options),
+      watchSaved: (listener) => page.watchSavedOptions(listener),
+      sessionOptions,
+    }),
+    [page, tuneSession, sessionOptions],
+  );
   return (
     <ModelDialogView
       open={open}
       onOpenChange={onOpenChange}
+      tune={tune}
       onCloseAutoFocus={onCloseAutoFocus}
       mode={mode ?? (sessionId === null ? "new" : "session")}
       session={mode === "default" ? null : sessionId === null ? (pick === null ? null : { profile: pick, name: null }) : session}
