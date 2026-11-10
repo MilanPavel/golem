@@ -7,6 +7,8 @@ export type Args = {
   [k: string]: unknown;
 } | null;
 export type ArtifactId = string | null;
+export type DroppedMessageIds = string[];
+export type DroppedTokens = number | null;
 export type Estimated = boolean;
 export type NumCtx = number | null;
 export type Chars = number;
@@ -17,6 +19,8 @@ export type Items = TraceContextItem[];
 export type Key = 'system' | 'tools' | 'user' | 'assistant' | 'tool_results';
 export type Tokens1 = number;
 export type Parts = TraceContextPart[];
+export type PromptCut = ('no' | 'yes' | 'likely') | null;
+export type PromptCutKind = ('older_messages' | 'middle') | null;
 export type Used = number | null;
 export type Window = number | null;
 export type WindowEstimated = boolean;
@@ -92,14 +96,19 @@ export interface TraceSpanResult {
  * ``parts`` always has the five keys, in order. They add up to ``used``
  * when it is known. The split between them is an estimate (about four
  * characters a token, scaled to ``used``), so ``estimated`` is always true.
+ * The ``prompt_cut`` fields are those of the model span.
  *
  * This interface was referenced by `TraceSpanResult`'s JSON-Schema
  * via the `definition` "TraceContext".
  */
 export interface TraceContext {
+  dropped_message_ids?: DroppedMessageIds;
+  dropped_tokens?: DroppedTokens;
   estimated?: Estimated;
   num_ctx?: NumCtx;
   parts: Parts;
+  prompt_cut?: PromptCut;
+  prompt_cut_kind?: PromptCutKind;
   used?: Used;
   window?: Window;
   window_estimated?: WindowEstimated;

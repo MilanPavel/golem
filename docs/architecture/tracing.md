@@ -179,7 +179,7 @@ A model call has no id of its own. Each call makes exactly one assistant message
 
 | Event | Fields |
 |---|---|
-| `model.call.started` | `message_id`, `index` (1-based within the run), `profile`, `provider`, `model`, `system_prompt_sha`, `tools_sha`, `message_ids`, `context_window`, `num_ctx`, `window_estimated`, `system_sections` |
+| `model.call.started` | `message_id`, `index` (1-based within the run), `profile`, `provider`, `model`, `system_prompt_sha`, `tools_sha`, `message_ids`, `context_window`, `num_ctx`, `window_estimated`, `system_sections`, `system_chars`, `system_bytes`, `tools_chars`, `tools_bytes`, `message_chars`, `message_bytes` |
 | `model.call.completed` | `message_id`, `usage` (`input`, `output`, `cache_read`, `cache_write`), `stop_reason`, `first_token_ms`, `latency_ms`, `failed`, `context_window` |
 | `tool.completed`, `tool.failed` | `duration_ms`, as well as what they had before |
 
@@ -195,6 +195,19 @@ The `blobs` table is `sha256`, `kind`, `size`, `created_at`, and `text`. `BlobSt
 `message_ids` are the checkpoint ids of the history sent, in order, not counting the system prompt. `window_estimated` is true when golem did not send the window and read it from Ollama, from the loaded context or the Modelfile, so a screen shows it with `≈`. An older event has no field and reads as false. `system_sections` lists the non-empty parts of the system prompt as `name` and `chars`. The stored prompt is those parts joined with a blank line, so their lengths split it exactly, and the prompt is not stored twice.
 
 `context_window` is the profile's `ctx`, else the listed model's, else LiteLLM's `max_input_tokens`, and `null` when none is known. `num_ctx` is the Ollama option sent, if any. Both are worked out when the call is made, because the profile, the listing, and the prices change later, so on `model.call.started` the window is a forecast. `model.call.completed` has `context_window`: the window the call ran with, read from the model server (Ollama `/api/ps`) after the call. It is exact, and `null` when it could not be read or the provider is hosted. A span takes the completed value when there is one. An estimated window below the call's input tokens is dropped, so no span shows more than 100% of a guess.
+
+### A cut prompt
+
+Ollama cuts a prompt that does not fit its window, and says nothing. `model.call.started` records the characters and the UTF-8 bytes of what was sent: the system text, the tool schemas as compact JSON, and each message (its text and its tool calls as JSON), one number per message in `message_ids` order. From these and the exact window `W` (see above) the trace says whether the prompt was cut. A model span has `prompt_cut` (`no`, `yes`, `likely`, or `null`), `prompt_cut_kind` (`older_messages` or `middle`), `dropped_message_ids`, and `dropped_tokens`. `trace.span` gives the same on the context. Only an Ollama call with an exact window is judged. A hosted model, an estimated or unknown window, or an event with no size fields gives `null`. `C` is the call's input tokens and `B` the bytes sent plus 16 for each message, which is an upper bound on the prompt's tokens.
+
+1. **`no`, proven:** `B < W`.
+2. **`yes`, proven, `older_messages`:** an earlier call of this session, with the same model and window, sent a strict prefix of these `message_ids` with the same `system_prompt_sha` and `tools_sha`, and took in more than `C` tokens. The prompt grew and fewer tokens arrived. The latest such call counts, in any run.
+3. **`likely`:** not 1 or 2, and the estimate `E` is at least `W`. `E` is the characters sent times a tokens-per-character ratio: `C / chars` of the latest earlier call of this model that rule 1 proved uncut, else 1/4. `middle` when `C <= 0.6 * W` (the system prompt and tools alone did not fit, and Ollama cut to about half the window), else `older_messages`.
+4. **Otherwise `null`.** golem shows nothing.
+
+For `older_messages`, `dropped_message_ids` are the oldest messages, never the last one and never the system prompt, marked until the estimate of what is left is at most `C`. `dropped_tokens` is their estimate. Both are estimates, even for `yes`: only the fact of the cut is proven, so a screen shows their size with `≈`.
+
+golem does not send an earlier reply's reasoning back to the model: it never asks Ollama for `reasoning`, so no `reasoning_content` is stored or sent. A new user message therefore does not shrink a prompt by itself, and rule 2 holds across runs.
 
 ### Times
 
@@ -237,7 +250,7 @@ An unknown `span_id` is an error. Neither method calls the model or starts a run
 - **The window** is the one recorded, or today's, with `window_estimated` set. `estimated` is always true, because of the split.
 - **A local model's window** comes from what golem sent, then from Ollama's `/api/ps`, then from the Modelfile, and the last two are estimated ([ADR-043](../adr/043-ollama-context-window.md)).
 
-The web page draws this as the context meter: a bar with a segment for each part, in the order above, and a `Free` row. Each part has its own colour. When the input is larger than `num_ctx`, it says Ollama dropped the oldest part. The Tools disclosure groups the tools by server with each one's cost. The thin bar in the page's summary line is clay, then the `wait` colour from 80% full, then `deny` from 95%. The chat's `ctx 6%` chip is built from the live `model.call.*` events, so it comes back after a reload.
+The web page draws this as the context meter: a bar with a segment for each part, in the order above, and a `Free` row. Each part has its own colour. A line under the bar says when Ollama cut the prompt (see A cut prompt). The Tools disclosure groups the tools by server with each one's cost. The thin bar in the page's summary line is clay, then the `wait` colour from 80% full, then `deny` from 95%. The chat's `ctx 6%` chip is built from the live `model.call.*` events, so it comes back after a reload.
 
 ### Older sessions
 

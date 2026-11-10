@@ -387,6 +387,12 @@ async def _apply(
                 system_sections=None
                 if fact.system_sections is None
                 else [PromptSectionInfo(name=n, chars=c) for n, c in fact.system_sections],
+                system_chars=fact.system_chars,
+                system_bytes=fact.system_bytes,
+                tools_chars=fact.tools_chars,
+                tools_bytes=fact.tools_bytes,
+                message_chars=None if fact.message_chars is None else list(fact.message_chars),
+                message_bytes=None if fact.message_bytes is None else list(fact.message_bytes),
             ),
         )
     elif isinstance(fact, ModelResponded):

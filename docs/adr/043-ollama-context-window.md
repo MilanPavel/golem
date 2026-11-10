@@ -44,6 +44,7 @@ What follows:
 - **An estimated window is never shown below the input tokens.** Then the window is unknown and the hint says so. An exact window below them is kept and logged, as it would be a bug.
 - **No fixed `num_ctx` default.** `/tune` and the web Tune view say `set by Ollama when it loads` until the Modelfile or a call says the number, then `model default 32768 · from Ollama` or `· from the Modelfile`.
 - Whether `/api/ps` `context_length` is per request or per slot with `OLLAMA_NUM_PARALLEL` above 1 is not settled here.
+- 12.16.10 ([#625](https://github.com/MilanPavel/golem/issues/625)) uses the exact window to say when Ollama cut a prompt that did not fit, and how sure golem is. See [Tracing](../architecture/tracing.md).
 
 ## Alternatives Considered
 

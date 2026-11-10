@@ -301,6 +301,12 @@ class ModelCallStartedData(BaseModel):
     ``window_estimated`` is true when golem did not send the window and read it
     from Ollama (the loaded context or the Modelfile). An older event has no
     field and reads as False.
+
+    The size fields count what was sent, in UTF-8 bytes and in characters: the
+    system text, the tool schemas as compact JSON, and each history message in
+    ``message_ids`` order (its text and its tool calls as JSON). ``message_chars``
+    and ``message_bytes`` have one number per message sent. Each is None on an
+    event recorded before they existed.
     """
 
     model_config = _CONFIG
@@ -317,6 +323,12 @@ class ModelCallStartedData(BaseModel):
     num_ctx: int | None = Field(default=None, ge=1)
     window_estimated: bool = False
     system_sections: list[PromptSectionInfo] | None = None
+    system_chars: int | None = Field(default=None, ge=0)
+    system_bytes: int | None = Field(default=None, ge=0)
+    tools_chars: int | None = Field(default=None, ge=0)
+    tools_bytes: int | None = Field(default=None, ge=0)
+    message_chars: list[int] | None = None
+    message_bytes: list[int] | None = None
 
 
 class TokenUsage(BaseModel):

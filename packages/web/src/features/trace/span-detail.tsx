@@ -87,13 +87,17 @@ function CopySection({ text, label }: { text: string; label: string }) {
   );
 }
 
-function MessageRow({ message, names, total }: { message: TraceMessage; names: ReadonlyMap<string, string>; total: number | null }) {
+/** The tag of a message the model did not see, or probably did not see. Text, not only colour. */
+export type NotSeen = "not seen" | "probably not seen";
+
+function MessageRow({ message, names, total, notSeen = null }: { message: TraceMessage; names: ReadonlyMap<string, string>; total: number | null; notSeen?: NotSeen | null }) {
   const calls = message.tool_calls ?? [];
   const tokens = typeof message.tokens === "number" ? message.tokens : null;
   return (
-    <li className="flex gap-3">
+    <li className={`flex gap-3 ${notSeen === null ? "" : "opacity-60"}`}>
       <span className="flex w-16 shrink-0 flex-col items-end pt-0.5 font-mono text-xs text-faint">
         <span>{labelOf(message, names)}</span>
+        {notSeen === null ? null : <span className="whitespace-nowrap rounded-xs border border-line-strong px-1 text-wait">{notSeen}</span>}
         {tokens === null ? null : <span>{`≈${formatTokens(tokens)}`}</span>}
       </span>
       <div className="min-w-0 flex-1 text-sm">
@@ -121,7 +125,7 @@ function MessageRow({ message, names, total }: { message: TraceMessage; names: R
   );
 }
 
-function Messages({ messages, newFrom, names, total }: { messages: readonly TraceMessage[]; newFrom: number | null; names: ReadonlyMap<string, string>; total: number | null }) {
+function Messages({ messages, newFrom, names, total, notSeen }: { messages: readonly TraceMessage[]; newFrom: number | null; names: ReadonlyMap<string, string>; total: number | null; notSeen: ReadonlyMap<string, NotSeen> }) {
   return (
     <ul aria-label="Messages" className="flex flex-col gap-3">
       {messages.map((message, index) => (
@@ -133,7 +137,7 @@ function Messages({ messages, newFrom, names, total }: { messages: readonly Trac
               <span aria-hidden="true" className="h-px flex-1 bg-line" />
             </li>
           ) : null}
-          <MessageRow message={message} names={names} total={total} />
+          <MessageRow message={message} names={names} total={total} notSeen={message.id === null || message.id === undefined ? null : (notSeen.get(message.id) ?? null)} />
         </Fragment>
       ))}
     </ul>
@@ -216,6 +220,9 @@ function Context({ result }: { result: TraceSpanResult }) {
   const names = toolNames(messages);
   const prompt = result.system_prompt;
   const tools = result.tools;
+  const cut = result.context?.prompt_cut ?? null;
+  const tag: NotSeen = cut === "yes" ? "not seen" : "probably not seen";
+  const notSeen = new Map<string, NotSeen>(cut === "yes" || cut === "likely" ? (result.context?.dropped_message_ids ?? []).map((id) => [id, tag] as const) : []);
   return (
     <div className="flex flex-col gap-3">
       {result.span.recorded === false ? (
@@ -226,7 +233,7 @@ function Context({ result }: { result: TraceSpanResult }) {
         <SystemPrompt result={result} prompt={prompt} />
       )}
       {tools === null || tools === undefined ? null : <Tools result={result} />}
-      {messages.length === 0 ? <p className="text-sm text-faint">No messages.</p> : <Messages messages={messages} newFrom={result.new_from ?? null} names={names} total={usedTokens(result)} />}
+      {messages.length === 0 ? <p className="text-sm text-faint">No messages.</p> : <Messages messages={messages} newFrom={result.new_from ?? null} names={names} total={usedTokens(result)} notSeen={notSeen} />}
     </div>
   );
 }

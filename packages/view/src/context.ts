@@ -63,24 +63,8 @@ export function contextSummary(used: number, window: number | null, estimatedWin
   return `${formatTokens(used)} / ${estimatedWindow ? "≈" : ""}${formatWindow(window)} · ${contextPercent(share)}%`;
 }
 
-/**
- * True when the input is more than the `num_ctx` sent to Ollama. Ollama reports the input after it
- * cut it, so the raw characters of the parts are checked as well.
- */
-export function overNumCtx(ctx: TraceContext): boolean {
-  const numCtx = ctx.num_ctx ?? null;
-  if (numCtx === null) return false;
-  if (contextUsed(ctx) >= numCtx) return true;
-  const chars = ctx.parts.reduce((sum, part) => sum + part.chars, 0);
-  return Math.round(chars / CHARS_PER_TOKEN) > numCtx;
-}
-
 export function contextWarning(ctx: TraceContext): string | null {
-  const numCtx = ctx.num_ctx ?? null;
   const window = ctx.window ?? null;
-  if (numCtx !== null && overNumCtx(ctx)) {
-    return `Input is larger than num_ctx ${formatWindow(numCtx)}. Ollama dropped the oldest part.`;
-  }
   const used = contextUsed(ctx);
   const share = contextShare(used, window);
   const level = contextLevel(used, window);
@@ -93,6 +77,39 @@ export function windowUnknownHint(provider: string | null): string {
   return provider === "ollama"
     ? "golem does not know this model's window yet. It learns it after the first answer, or you can set ctx on the profile."
     : "golem does not know this model's window.";
+}
+
+/** The cut fields of a model span or of its context. */
+export type CutFields = Pick<TraceContext, "prompt_cut" | "prompt_cut_kind" | "dropped_message_ids" | "dropped_tokens">;
+
+/**
+ * The line to show when Ollama cut a prompt that did not fit, or null when there is nothing to say.
+ * `warn` is true for a proven cut and for a prompt cut in the middle. A size of a cut always has `≈`:
+ * only the fact of a proven cut is known, never how much was lost. A "no" and an unknown cut say nothing.
+ */
+export function cutNote(span: CutFields): { text: string; warn: boolean } | null {
+  const cut = span.prompt_cut ?? null;
+  const count = span.dropped_message_ids?.length ?? 0;
+  const tokens = span.dropped_tokens ?? null;
+  const size = tokens === null ? "" : ` (≈${formatTokens(tokens)})`;
+  if (cut === "yes") {
+    const head = "Ollama dropped older messages to fit the window.";
+    return { text: count === 0 ? head : `${head} About ${count}${size} ${count === 1 ? "was" : "were"} not seen.`, warn: true };
+  }
+  if (cut === "likely" && span.prompt_cut_kind === "middle") {
+    return {
+      text: "The system prompt and tools alone did not fit, so Ollama probably cut the prompt in the middle. This answer is not reliable.",
+      warn: true,
+    };
+  }
+  if (cut === "likely" && span.prompt_cut_kind === "older_messages") {
+    const text =
+      count === 0
+        ? "Ollama probably dropped older messages to fit the window."
+        : `Ollama probably dropped about ${count} older ${count === 1 ? "message" : "messages"}${size} to fit the window.`;
+    return { text, warn: false };
+  }
+  return null;
 }
 
 /** Cells of a bar `width` wide for each part, in display order, and the free rest. */
@@ -315,6 +332,8 @@ export function contextReportLines(report: ContextReport, columns: number): Cont
     lines.push(plain("The window is estimated: golem read it from Ollama. It was not sent."));
   }
   if (window === null) lines.push(plain(windowUnknownHint(report.provider ?? null)));
+  const note = cutNote(ctx);
+  if (note !== null) lines.push(plain(`${note.warn ? "! " : ""}${note.text}`));
   const warning = contextWarning(ctx);
   if (warning !== null) lines.push(plain(`! ${warning}`));
   return lines;
