@@ -142,7 +142,8 @@ def _kind(response: httpx.Response) -> str:
 async def _reason(url: str, response: httpx.Response) -> str:
     """Why a page was refused, from the start of its body, or ``""`` when there is none.
 
-    Only an uncompressed text body is read, at most :data:`REASON_BYTES` of it. A failure
+    Only an uncompressed text body is read, at most :data:`REASON_BYTES` of it. For HTML the
+    reason is the page's title, or its text when it has none. A failure
     here gives no reason and never replaces the status error.
     """
     kind = _kind(response)
@@ -159,7 +160,8 @@ async def _reason(url: str, response: httpx.Response) -> str:
                 break
         raw = bytes(body[:REASON_BYTES]).decode(response.encoding or "utf-8", errors="replace")
         if kind in ("", "text/html", "application/xhtml+xml"):
-            raw, _ = await asyncio.to_thread(html_to_text, _parseable(raw), url)
+            page, title = await asyncio.to_thread(html_to_text, _parseable(raw), url)
+            raw = title or page
     except (httpx.HTTPError, LookupError):
         return ""
     text = " ".join(raw.split())
@@ -209,10 +211,16 @@ def _unwrapped(
 
 
 def _parseable(html: str) -> str:
-    """HTML without comments, cut at :data:`HTML_CHARS`, so the parser stays linear."""
+    """HTML without comments, cut at :data:`HTML_CHARS`, so the parser stays linear.
+
+    A tag left open at the end is dropped, because the parser would give it back as text.
+    """
     text = _COMMENT.sub("", html[:HTML_CHARS])
     unclosed = text.find("<!--")
-    return text if unclosed == -1 else text[:unclosed]
+    if unclosed != -1:
+        text = text[:unclosed]
+    opened = text.rfind("<")
+    return text[:opened] if opened > text.rfind(">") else text
 
 
 async def _resolve(host: str) -> list[str]:
