@@ -1,8 +1,21 @@
-import { namesModel, pickerGroups, pickerName, providerMissing, type Category } from "@golem/view";
+import {
+  namesModel,
+  pickerGroups,
+  pickerName,
+  planTry,
+  providerMissing,
+  startedTry,
+  tryTitle,
+  tuneState,
+  type Category,
+  type TryPlan,
+} from "@golem/view";
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { actionErrorText } from "../../store/errors.ts";
 import type { ListedModel, ModelListResult } from "../../store/models.ts";
-import { useModelList, useNewSessionModel, usePageActions, usePulls, useSessionOptions } from "../../store/page-context.tsx";
+import { useModelList, useNavigate, useNewSessionModel, usePageActions, usePulls, useSessionOptions, useSessionReader, useSessionSlice } from "../../store/page-context.tsx";
+import { sessionPath } from "../../store/router.ts";
+import type { SessionView } from "../../store/session-store.ts";
 import type { PullsSnapshot } from "../../store/pulls.ts";
 import { Button } from "../../ui/button.tsx";
 import { cn } from "../../ui/cn.ts";
@@ -12,7 +25,7 @@ import { RefreshIcon, SlidersIcon } from "../../ui/icons.tsx";
 import { resolveActive, SearchList, type SearchListItem } from "../../ui/search-list.tsx";
 import { CategoryChips } from "./category-chips.tsx";
 import { ModelRow } from "./model-row.tsx";
-import { TuneView, type TuneBackend } from "./tune-view.tsx";
+import { TuneView, type TryBackend, type TuneBackend } from "./tune-view.tsx";
 import { diskText, downloadText, removable, removeText, shortName, tooBigText, withActivePulls } from "./model-text.ts";
 
 /** What the dialog does, with the session already bound. Each call rejects with the daemon's message. */
@@ -563,6 +576,16 @@ export function ModelDialogView(props: ModelDialogViewProps) {
   );
 }
 
+/** Only the plan's refusal reads this, so any table will do. */
+const NO_TUNE = tuneState({ model: "", options: [], defaults: {}, saved: {}, session: {} });
+
+const selectBlocked = (view: SessionView): TryBackend["blocked"] => {
+  const plan = planTry(view.chat, NO_TUNE);
+  return plan.kind === "refused" ? plan.reason : null;
+};
+
+type Trying = { sessionId: string; forkId: string; plan: Extract<TryPlan, { kind: "try" }>; heading: string; before: number };
+
 /** The model dialog for one session. The listing is fetched while it is open. */
 export function ModelDialog({
   sessionId,
@@ -608,6 +631,46 @@ export function ModelDialog({
   );
   const tuneSession = mode === "default" ? null : sessionId;
   const sessionOptions = useSessionOptions(tuneSession);
+  const navigate = useNavigate();
+  const blocked = useSessionSlice(tuneSession, selectBlocked);
+  const [trying, setTrying] = useState<Trying | null>(null);
+  const current = trying !== null && trying.sessionId === tuneSession ? trying : null;
+  const forkChat = useSessionSlice(current?.forkId ?? null, (view) => view.chat);
+  const run = useMemo(() => {
+    if (current === null) return null;
+    const started = forkChat.messages.filter((message) => message.role === "user").length > current.before;
+    return { ...startedTry(current.forkId, current.plan, current.heading), started, chat: forkChat };
+  }, [current, forkChat]);
+  const store = useSessionReader(tuneSession);
+  const again = useMemo<TryBackend | undefined>(() => {
+    if (tuneSession === null) return undefined;
+    const chat = () => store().view.chat;
+    return {
+      blocked,
+      plan: (tune) => planTry(chat(), tune),
+      start: async (plan, heading) => {
+        const { view, summary } = store();
+        // The fork's history ends at `forkAt`, so the question it gets is one more user message than that holds.
+        const messages = view.chat.messages;
+        const end = plan.forkAt === null ? -1 : messages.findIndex((message) => message.id === plan.forkAt);
+        const before = messages.slice(0, end + 1).filter((message) => message.role === "user").length;
+        const title = tryTitle(summary?.title ?? view.title, plan.text);
+        const forkId =
+          plan.forkAt === null
+            ? await page.createSession(view.cwd, view.model?.profile ?? null)
+            : await page.fork(tuneSession, plan.forkAt);
+        setTrying({ sessionId: tuneSession, forkId, plan, heading, before });
+        await page.rename(forkId, title);
+        await page.setSessionOptions(forkId, plan.options);
+        await page.send(forkId, plan.text);
+      },
+      run,
+      open: (id) => {
+        navigate(sessionPath(id));
+        onOpenChange(false);
+      },
+    };
+  }, [tuneSession, blocked, run, store, page, navigate, onOpenChange]);
   const tune = useMemo<TuneBackend>(
     () => ({
       sessionId: tuneSession,
@@ -616,8 +679,9 @@ export function ModelDialog({
       setSession: (options) => page.setSessionOptions(tuneSession ?? "", options),
       watchSaved: (listener) => page.watchSavedOptions(listener),
       sessionOptions,
+      again,
     }),
-    [page, tuneSession, sessionOptions],
+    [page, tuneSession, sessionOptions, again],
   );
   return (
     <ModelDialogView
