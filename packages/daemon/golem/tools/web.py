@@ -28,6 +28,11 @@ MAX_REDIRECTS = 5
 HTML_CHARS = 1_000_000
 """The most HTML handed to the parser, which slows down on hostile markup."""
 TEXT_TYPES = ("text/", "application/json", "application/xml", "application/xhtml+xml")
+CONTACT_URL = "https://github.com/MilanPavel/golem"
+"""Named in the user agent, which Wikimedia's policy asks every client to do."""
+REASON_BYTES = 2_048
+"""The most of a refused page's body that is read, for the reason in the error."""
+REASON_CHARS = 200
 _COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
 _NAT64 = ipaddress.ip_network("64:ff9b::/96")
 _V4_COMPAT = ipaddress.ip_network("::/96")
@@ -64,7 +69,7 @@ async def _follow(url: str, ctx: ToolContext) -> ToolResult:
     settings = ctx.web
     host = urlsplit(url).hostname
     headers = {
-        "User-Agent": f"golem/{__version__}",
+        "User-Agent": f"golem/{__version__} (+{CONTACT_URL})",
         "Accept": "text/html, text/*;q=0.9, */*;q=0.1",
         "Accept-Encoding": "identity",
     }
@@ -101,8 +106,10 @@ def _elsewhere(url: str, target: str) -> ToolResult:
 
 async def _page(url: str, response: httpx.Response, max_bytes: int) -> ToolResult:
     if response.status_code >= 400:
-        raise ToolError(f"{url} answered HTTP {response.status_code}")
-    kind = response.headers.get("content-type", "").split(";")[0].strip().lower()
+        reason = await _reason(url, response)
+        suffix = f": {reason}" if reason else ""
+        raise ToolError(f"{url} answered HTTP {response.status_code}{suffix}")
+    kind = _kind(response)
     if kind and not kind.startswith(TEXT_TYPES):
         raise ToolError(f"{url} is {kind}, not text")
     encoding = response.headers.get("content-encoding", "identity").strip().lower()
@@ -126,6 +133,37 @@ async def _page(url: str, response: httpx.Response, max_bytes: int) -> ToolResul
     output = wrap(f"{text}{tail}", url=url, title=title)
     summary = f"{response.status_code} {kind or 'text'}, {len(text)} chars"
     return ToolResult(output=output, summary=summary)
+
+
+def _kind(response: httpx.Response) -> str:
+    return response.headers.get("content-type", "").split(";")[0].strip().lower()
+
+
+async def _reason(url: str, response: httpx.Response) -> str:
+    """Why a page was refused, from the start of its body, or ``""`` when there is none.
+
+    Only an uncompressed text body is read, at most :data:`REASON_BYTES` of it. A failure
+    here gives no reason and never replaces the status error.
+    """
+    kind = _kind(response)
+    if kind and not kind.startswith(TEXT_TYPES):
+        return ""
+    encoding = response.headers.get("content-encoding", "identity").strip().lower()
+    if encoding not in ("", "identity"):
+        return ""
+    body = bytearray()
+    try:
+        async for chunk in response.aiter_bytes():
+            body.extend(chunk)
+            if len(body) >= REASON_BYTES:
+                break
+        raw = bytes(body[:REASON_BYTES]).decode(response.encoding or "utf-8", errors="replace")
+        if kind in ("", "text/html", "application/xhtml+xml"):
+            raw, _ = await asyncio.to_thread(html_to_text, _parseable(raw), url)
+    except (httpx.HTTPError, LookupError):
+        return ""
+    text = " ".join(raw.split())
+    return text if len(text) <= REASON_CHARS else f"{text[: REASON_CHARS - 1]}…"
 
 
 def _checked(raw: str) -> str:
