@@ -83,6 +83,7 @@ export function fakeClient() {
   const pull = listeners<PullUpdate>();
   const server = listeners<ModelServerStatus>();
   const install = listeners<OllamaInstallUpdate>();
+  const saved = listeners<{ model: string; saved: Record<string, number | string> }>();
   let current: ConnectionState = { status: "connecting" };
   const raw = {
     get state() {
@@ -147,6 +148,10 @@ export function fakeClient() {
     listModels: vi.fn<PageClient["listModels"]>(async () => EMPTY_LISTING),
     setSessionModel: vi.fn<PageClient["setSessionModel"]>(async () => ({}) as never),
     setDefaultModel: vi.fn<PageClient["setDefaultModel"]>(async () => ({}) as never),
+    getModelOptions: vi.fn<PageClient["getModelOptions"]>(async (model) => ({ model, options: [], defaults: {}, saved: {}, session: {} })),
+    setModelOptions: vi.fn<PageClient["setModelOptions"]>(async (model) => ({ model, saved: {} })),
+    setSessionOptions: vi.fn<PageClient["setSessionOptions"]>(async (id) => ({ session_id: id, options: {} })),
+    onOptionsSaved: saved.on,
     pullModel: vi.fn<PageClient["pullModel"]>(async (ref) => ({ ref, started: true }) as never),
     cancelPull: vi.fn<PageClient["cancelPull"]>(async (ref) => ({ ref, cancelled: true }) as never),
     deleteModel: vi.fn<PageClient["deleteModel"]>(async (ref) => ({ ref, deleted: true }) as never),
@@ -173,6 +178,7 @@ export function fakeClient() {
     emitPull: pull.emit,
     emitModelServer: server.emit,
     emitInstall: install.emit,
+    emitOptionsSaved: saved.emit,
     eventListeners: event.size,
   };
 }

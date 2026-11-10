@@ -77,6 +77,31 @@ export function useSession<T>(id: string, selector: (view: SessionView) => T, is
   return useSyncExternalStoreWithSelector(subscribe, getSnapshot, undefined, selector, isEqual);
 }
 
+const NO_OPTIONS: Readonly<Record<string, number | string>> = {};
+const NEVER = () => () => undefined;
+
+/** The session's option overrides, as the newest `model.options.changed` says them. Empty with no session. */
+export function useSessionOptions(id: string | null): Readonly<Record<string, number | string>> {
+  const page = usePage();
+  const subscribe = useCallback(
+    (listener: () => void) => {
+      if (id === null) return NEVER();
+      const { store, release } = page.acquire(id);
+      const off = store.subscribe(listener);
+      return () => {
+        off();
+        release();
+      };
+    },
+    [page, id],
+  );
+  const getSnapshot = useCallback(
+    () => (id === null ? NO_OPTIONS : (page.sessions.get(id)?.getSnapshot() ?? initialSessionView).chat.options),
+    [page, id],
+  );
+  return useSyncExternalStore(subscribe, getSnapshot);
+}
+
 export function usePageActions(): PageActions {
   return usePage().actions;
 }
