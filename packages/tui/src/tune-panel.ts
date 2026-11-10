@@ -1,8 +1,12 @@
 import {
+  applyPreset,
   differsFromDefault,
   focusedRow,
   formatTuneValue,
+  keepSession,
   moveFocus,
+  presetForKey,
+  PRESETS_HINT,
   reset,
   sliderCells,
   step,
@@ -20,7 +24,20 @@ import type { Press } from "./keys.ts";
  * `/tune`: one row per option with a block slider, and the explanation of the focused one under
  * the rows. The state and its changes are the view package's; this is the keys and the lines.
  */
-export type TuneKey = "up" | "down" | "left" | "right" | "reset" | "target" | "try" | "close";
+export type TuneKey =
+  | "up"
+  | "down"
+  | "left"
+  | "right"
+  | "reset"
+  | "target"
+  | "try"
+  | "close"
+  | "preset-1"
+  | "preset-2"
+  | "preset-3"
+  | "preset-4"
+  | "save";
 
 /** What a key asks the app to do after the state changed. */
 export type TuneAction =
@@ -29,7 +46,11 @@ export type TuneAction =
   /** Ask the last question again with these values, in a fork. */
   | { kind: "try" }
   /** Send `value` for `name`: `null` removes it. It goes to the model's saved options or to the session. */
-  | { kind: "change"; name: string; value: TuneValue | null; target: TuneTarget };
+  | { kind: "change"; name: string; value: TuneValue | null; target: TuneTarget }
+  /** Send a preset's values to this session: `null` removes an override. */
+  | { kind: "preset"; options: Record<string, number | null> }
+  /** Save `save` for the model, then clear the same names from the session with `clear`. */
+  | { kind: "save"; save: Record<string, TuneValue>; clear: Record<string, null> };
 
 export type TuneOpening =
   | { kind: "open"; model: string; sessionId: string }
@@ -89,12 +110,39 @@ export function tuneKeyOf(press: Press): TuneKey | null {
   if (press.input === "t") {
     return "try";
   }
+  if (press.input === "S") {
+    return "save";
+  }
+  if (press.input === "1" || press.input === "2" || press.input === "3" || press.input === "4") {
+    return `preset-${press.input}`;
+  }
   return null;
 }
 
 export function pressTune(state: TuneState, key: TuneKey): { state: TuneState; action: TuneAction } {
   const none: TuneAction = { kind: "none" };
+  if (key.startsWith("preset-")) {
+    const preset = presetForKey(Number(key.slice(7)));
+    if (preset === null) {
+      return { state, action: none };
+    }
+    const applied = applyPreset(state, preset);
+    return { state: applied.state, action: { kind: "preset", options: applied.options } };
+  }
+  state = settle(state, key);
   switch (key) {
+    case "save": {
+      const kept = keepSession(state);
+      if (Object.keys(kept.save).length === 0) {
+        return { state, action: none };
+      }
+      return { state: kept.state, action: { kind: "save", save: kept.save, clear: kept.clear } };
+    }
+    case "preset-1":
+    case "preset-2":
+    case "preset-3":
+    case "preset-4":
+      return { state, action: none };
     case "close":
       return { state, action: { kind: "close" } };
     case "up":
@@ -123,6 +171,25 @@ export function pressTune(state: TuneState, key: TuneKey): { state: TuneState; a
       return { state: next, action: change(next, name) };
     }
   }
+}
+
+/** A key press ends the lit rows. A change by hand ends the preset's name. */
+function settle(state: TuneState, key: TuneKey): TuneState {
+  if (state.lit === undefined && state.preset === undefined) {
+    return state;
+  }
+  const next: TuneState = { ...state };
+  delete next.lit;
+  if (key === "left" || key === "right" || key === "reset" || key === "target") {
+    delete next.preset;
+  }
+  return next;
+}
+
+/** The lines of {@link tuneLines} that show a row the last preset moved, to draw in the accent colour. */
+export function tuneLitLines(state: TuneState): number[] {
+  const lit = state.lit ?? [];
+  return state.options.flatMap((option, index) => (lit.includes(option.name) ? [index + 1] : []));
 }
 
 function change(state: TuneState, name: string): TuneAction {
@@ -158,13 +225,19 @@ export function tuneLines(state: TuneState, columns: number): string[] {
     lines.push(...wrap(focused.option.long, Math.max(1, width - 1)).map((line) => ` ${line}`));
   }
   lines.push(` ${KEYS}`);
+  lines.push(` ${PRESETS_HINT}`);
+  if (Object.keys(state.session).length > 0) {
+    lines.push(" S save this session's values for the model");
+  }
   return lines.map((line) => fit(line, width));
 }
 
 function header(state: TuneState, width: number): string {
   const left = ` tune · ${state.model}`;
   const right =
-    state.target === "saved"
+    state.preset !== undefined
+      ? `preset ${state.preset} · this session`
+      : state.target === "saved"
       ? "saved for this model · s this session only"
       : "this session only · s saved for this model";
   const gap = width - left.length - right.length;
