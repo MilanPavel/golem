@@ -152,11 +152,15 @@ test("the gallery shows one theme when asked, and then the anchors have no prefi
 
 test("the gallery has a Thinking section with streaming, done, none, and long cases", () => {
   render(<Gallery />);
-  for (const label of ["streaming", "done", "no thinking", "long thinking"]) {
+  for (const label of ["streaming", "done", "no thinking", "hidden", "long thinking"]) {
     expect(screen.getAllByRole("group", { name: `Thinking, ${label}` }).length).toBeGreaterThan(0);
   }
   expect(screen.getAllByRole("button", { name: /thought for 12s/ }).length).toBeGreaterThan(0);
   expect(screen.getAllByRole("button", { name: /thinking…/ }).length).toBeGreaterThan(0);
+  for (const group of screen.getAllByRole("group", { name: "Thinking, hidden" })) {
+    expect(group.querySelector("[data-thinking]")).toBeNull();
+    expect(group.textContent).toContain("17 * 23 = 391.");
+  }
 });
 
 for (const theme of ["slip", "kiln"]) {

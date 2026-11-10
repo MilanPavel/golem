@@ -50,6 +50,7 @@ export type ComposerOutcome =
   | { kind: "export"; path: string | null }
   | { kind: "time" }
   | { kind: "todos" }
+  | { kind: "thinking" }
   | { kind: "model"; name: string | null }
   | { kind: "model-pull"; name: string }
   | { kind: "model-rm"; name: string }
@@ -327,6 +328,13 @@ export const COMMANDS: readonly Command[] = [
     args: "",
     description: "Shows or hides the time beside each message.",
     run: withoutArgs({ kind: "time" }),
+  },
+  {
+    name: "/thinking",
+    group: "view",
+    args: "",
+    description: "Show or hide the thinking line above each answer",
+    run: withoutArgs({ kind: "thinking" }),
   },
   {
     name: "/title",

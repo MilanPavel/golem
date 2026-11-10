@@ -434,6 +434,7 @@ export function App({
   const [tail, setTail] = useState<TailAnchor | null>(null);
   const [showTimes, setShowTimes] = useState(false);
   const [showTodos, setShowTodos] = useState(DEFAULT_PREFS.todos);
+  const [showThinking, setShowThinking] = useState(DEFAULT_PREFS.thinking);
   const [tick, setTick] = useState(0);
   const [debug, setDebug] = useState<DebugState>(closedDebug);
   const [debugOffset, setDebugOffset] = useState(0);
@@ -550,6 +551,8 @@ export function App({
   const showTimesRef = useRef(showTimes);
   const showTodosRef = useRef(showTodos);
   showTodosRef.current = showTodos;
+  const showThinkingRef = useRef(showThinking);
+  showThinkingRef.current = showThinking;
   const prefsLoaded = useRef(false);
   draftRef.current = draft;
   historyCursorRef.current = historyCursor;
@@ -689,7 +692,7 @@ export function App({
       : [];
   startersRef.current = starters;
   const starterRows = starterLines(starters, starters.length > 0 ? starterPick : null);
-  const transcriptOptions = { times: showTimes, now, toolOutput };
+  const transcriptOptions = { times: showTimes, now, toolOutput, thinking: showThinking };
   const measured = layoutTranscript(chat.messages, columns, chatHeight, offset, transcriptOptions);
   const widthKey = measured.overflow ? Math.max(1, columns - 1) : columns;
   const followed = followTail(tail, measured.lineCount, widthKey, offset);
@@ -847,6 +850,7 @@ export function App({
         prefsLoaded.current = true;
         setShowTimes(prefs.times);
         setShowTodos(prefs.todos);
+        setShowThinking(prefs.thinking);
       },
       () => undefined,
     );
@@ -1883,6 +1887,16 @@ export function App({
       setShowTodos(next);
       showHint(next ? "todo list shown" : "todo list hidden");
       void savePref(prefsPath(), "todos", next).catch(() => undefined);
+      return;
+    }
+    if (outcome.kind === "thinking") {
+      setDraft(draftAt(""));
+      prefsLoaded.current = true;
+      const next = !showThinkingRef.current;
+      showThinkingRef.current = next;
+      setShowThinking(next);
+      showHint(next ? "thinking shown" : "thinking hidden");
+      void savePref(prefsPath(), "thinking", next).catch(() => undefined);
       return;
     }
     if (outcome.kind === "local") {

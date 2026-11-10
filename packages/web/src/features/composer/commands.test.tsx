@@ -6,7 +6,7 @@ import { App } from "../../app.tsx";
 import { createPage } from "../../store/page.ts";
 import { PageProvider } from "../../store/page-context.tsx";
 import { ev, fakeClient, fakeFrame, rpcError, summary } from "../../store/test-support.ts";
-import { timesShownStore } from "../chat/index.ts";
+import { thinkingShownStore, timesShownStore } from "../chat/index.ts";
 import { drawerOpenStore } from "../drawer/drawer-open.ts";
 import { SAMPLE_LISTING } from "../models/sample.ts";
 
@@ -82,6 +82,7 @@ beforeEach(() => {
   localStorage.clear();
   drawerOpenStore.set(true);
   timesShownStore.set(true);
+  thinkingShownStore.set(true);
 });
 afterEach(() => {
   history.replaceState(null, "", "/");
@@ -281,6 +282,16 @@ test("/time hides and shows the time beside messages and keeps the choice", asyn
   await say(user, "/time");
   expect(dockNotice()).toBe("Times shown.");
   expect(document.querySelector("article[aria-label='You'] time")).toBeTruthy();
+});
+
+test("/thinking toggles the choice and keeps it", async () => {
+  const { user } = await session();
+  await say(user, "/thinking");
+  expect(dockNotice()).toBe("Thinking hidden.");
+  expect(localStorage.getItem("golem.thinking")).toBe("hidden");
+  await say(user, "/thinking");
+  expect(dockNotice()).toBe("Thinking shown.");
+  expect(localStorage.getItem("golem.thinking")).toBe("shown");
 });
 
 test("/todos toggles the drawer", async () => {

@@ -63,6 +63,7 @@ One shell command, in the order it runs:
 4. **The command runs** as `$SHELL -lc <command>` in the project folder, under `sandbox-exec`, in its own process group.
 5. **A blocked action fails inside the command.** macOS answers `Operation not permitted`, the command prints it, and it exits with an error. The model reads that as the result, and the run goes on.
 6. **golem says it was the sandbox.** When the output shows a refusal the profile explains, golem adds one line before the exit code: what it blocked, why, and the setting or tool that allows it. The summary becomes `exit 1, blocked by the sandbox`. So the model can tell you what to do, instead of telling you to check your permissions.
+7. **golem hints at the network.** A command can fail quietly in a pipe, such as `curl -s URL | head`, and end with `[exit code 0]`. So when `[shell] network` is off and the command names a network client as a whole word (`curl`, `wget`, `git clone`, `pip install`, and the others in `NETWORK_CLIENTS`), golem adds `[the sandbox has no network: use web_fetch to read a page, or shell_unsandboxed for a command that needs the network]` after the exit code. It does so whatever the exit code is. `shell_unsandboxed` never gets it.
 
 Here is a real run, recorded against a throwaway home with `qwen3-coder:30b` on a local Ollama. A rule in `config.toml` allowed every `shell` call, so the sandbox was the only guard. The daemon was started with `DEMO_API_KEY=not-a-real-key` in its environment, and the home folder is shown as `~`.
 

@@ -322,6 +322,14 @@ test("a reply with thinking shows one dim line above the answer", () => {
   assert.equal(lines[1]?.spans.every((span) => span.dim === true), true);
 });
 
+test("a hidden thinking line leaves only the answer, and unset shows it", () => {
+  const rows = (thinking: boolean | undefined) =>
+    layoutMessages([thoughtful], 60, { times: false, now: 0, toolOutput: true, thinking }).map((line) => textOf(line.spans).trimEnd());
+  assert.deepEqual(rows(false), ["golem", "391"]);
+  assert.equal(rows(true).includes("thought for 12s"), true);
+  assert.equal(rows(undefined).includes("thought for 12s"), true);
+});
+
 test("Ctrl-O shows the thinking text, dim, under the line", () => {
   const lines = layoutMessages([thoughtful], 60, { times: false, now: 0, toolOutput: true });
   assert.deepEqual(
