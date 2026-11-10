@@ -1,0 +1,67 @@
+{
+  "$defs": {
+    "MessageThinkingDeltaData": {
+      "additionalProperties": false,
+      "description": "One incremental fragment of the thinking a model did before or while it answered.",
+      "properties": {
+        "message_id": {
+          "minLength": 1,
+          "title": "Message Id",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "message_id",
+        "text"
+      ],
+      "title": "MessageThinkingDeltaData",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Thinking text to append to the open assistant message. It is not part of the answer.",
+  "properties": {
+    "data": {
+      "$ref": "#/$defs/MessageThinkingDeltaData"
+    },
+    "run_id": {
+      "minLength": 1,
+      "title": "Run Id",
+      "type": "string"
+    },
+    "seq": {
+      "minimum": 1,
+      "title": "Seq",
+      "type": "integer"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    },
+    "ts": {
+      "minLength": 1,
+      "title": "Ts",
+      "type": "string"
+    },
+    "type": {
+      "const": "message.thinking.delta",
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "seq",
+    "session_id",
+    "run_id",
+    "ts",
+    "type",
+    "data"
+  ],
+  "title": "MessageThinkingDeltaEvent",
+  "type": "object"
+}

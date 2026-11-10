@@ -48,6 +48,35 @@ export const SAMPLE_TOOLS: ToolBlock[] = [
   },
 ];
 
+const LONG_THINKING = Array.from(
+  { length: 40 },
+  (_, step) => `Step ${step + 1}: check whether the retry delay can reuse the clamp, then compare it with the meter.`,
+).join("\n");
+
+/** Replies with thinking, for the gallery and the tests: streaming, done, none, and a long text. */
+export const THINKING_CASES: { label: string; message: ChatMessage }[] = [
+  {
+    label: "streaming",
+    message: { id: "k1", role: "assistant", text: "", streaming: true, thinking: "The user wants 17 times 23. I can split it as 17 times 20 plus 17 times 3." },
+  },
+  {
+    label: "done",
+    message: {
+      id: "k2",
+      role: "assistant",
+      text: "17 * 23 = 391.",
+      streaming: false,
+      thinking: "The user wants 17 times 23.\n17 times 20 is 340. 17 times 3 is 51.\n340 plus 51 is 391.",
+      thinkingMs: 12_400,
+    },
+  },
+  { label: "no thinking", message: { id: "k3", role: "assistant", text: "The answer is 391.", streaming: false } },
+  {
+    label: "long thinking",
+    message: { id: "k4", role: "assistant", text: "Done.", streaming: false, thinking: LONG_THINKING, thinkingMs: 95_000 },
+  },
+];
+
 /** A transcript that shows every kind of message, for the gallery and the tests. */
 export const SAMPLE_CHAT: Pick<ChatState, "messages" | "error" | "notice"> = {
   messages: [

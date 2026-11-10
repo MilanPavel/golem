@@ -16,6 +16,7 @@ from golem_protocol.events import (
     ApprovalResolvedEvent,
     ChatEvent,
     MessageDeltaEvent,
+    MessageThinkingDeltaEvent,
     ModelOptionsChangedEvent,
     ModelSelectedEvent,
     RunCancelledEvent,
@@ -115,7 +116,7 @@ async def project(tx: Transaction, event: ChatEvent) -> None:
         await _finish_run(tx, event.run_id, "failed", event.ts, event.data.message)
     elif isinstance(event, RunCancelledEvent):
         await _finish_run(tx, event.run_id, "cancelled", event.ts, None)
-    if not isinstance(event, MessageDeltaEvent | ToolOutputEvent):
+    if not isinstance(event, MessageDeltaEvent | MessageThinkingDeltaEvent | ToolOutputEvent):
         await tx.execute(
             "UPDATE sessions SET updated_at = ? WHERE session_id = ?",
             (event.ts, event.session_id),

@@ -17,6 +17,8 @@ from golem_protocol.events import (
     MessageCompletedEvent,
     MessageDeltaData,
     MessageDeltaEvent,
+    MessageThinkingDeltaData,
+    MessageThinkingDeltaEvent,
     ModelCallStartedData,
     PromptSectionInfo,
     RunFailedData,
@@ -74,6 +76,16 @@ def test_chat_event_union_round_trip() -> None:
         data=MessageDeltaData(message_id="m_abc", text="Hel"),
     )
     assert _ADAPTER.validate_python(delta.model_dump()) == delta
+
+    thought = MessageThinkingDeltaEvent(
+        seq=2,
+        session_id="s_abc",
+        run_id="r_abc",
+        ts="2026-10-07T10:00:01+00:00",
+        type="message.thinking.delta",
+        data=MessageThinkingDeltaData(message_id="m_abc", text="Let me see"),
+    )
+    assert _ADAPTER.validate_python(thought.model_dump()) == thought
 
     done = MessageCompletedEvent(
         seq=3,

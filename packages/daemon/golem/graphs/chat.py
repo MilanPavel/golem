@@ -389,7 +389,8 @@ def open_chat(
         text = "\n\n".join(t for _, t in parts)
         system = SystemMessage(content=text) if text else None
         # The system message is sent, never returned, so it stays out of the checkpoint.
-        sent = messages if system is None else [system, *messages]
+        history = _without_thinking(messages)
+        sent = history if system is None else [system, *history]
         window = window_of(profile, overrides) if window_of is not None else ContextWindow()
         async with _held(router, local, profile):
             request: dict[str, object] = {STREAM_KEY: "model.request", "message_id": message_id}
@@ -458,6 +459,22 @@ def open_chat(
         system_prompt,
         window_of,
     )
+
+
+def _without_thinking(messages: Sequence[BaseMessage]) -> list[BaseMessage]:
+    """``messages`` with the thinking of every earlier reply removed.
+
+    The library turns a stored ``reasoning_content`` into the request's ``thinking``
+    on the next call. golem never sends thinking back, so the copies sent have none.
+    The messages in the checkpoint keep theirs.
+    """
+    kept: list[BaseMessage] = []
+    for message in messages:
+        if isinstance(message, AIMessage) and "reasoning_content" in message.additional_kwargs:
+            extra = {k: v for k, v in message.additional_kwargs.items() if k != "reasoning_content"}
+            message = message.model_copy(update={"additional_kwargs": extra})
+        kept.append(message)
+    return kept
 
 
 def _sizes(

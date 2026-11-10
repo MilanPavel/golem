@@ -1,4 +1,4 @@
-import { formatDuration, LIVE_OUTPUT_CHARS, type ChatMessage, type ChatState, type ToolBlock, type ApprovalChoice } from "@golem/view";
+import { formatDuration, LIVE_OUTPUT_CHARS, thinkingLine, type ChatMessage, type ChatState, type ToolBlock, type ApprovalChoice } from "@golem/view";
 import { memo, useCallback, useId, useLayoutEffect, useRef, useState } from "react";
 import { usePageActions, useDraftReader, useSession } from "../../store/page-context.tsx";
 import { ApprovalCard } from "../approval/approval-card.tsx";
@@ -141,6 +141,35 @@ export function ToolLine({ tool, defaultOpen = false }: { tool: ToolBlock; defau
   );
 }
 
+/** The line above an answer that came after thinking. It opens into the thinking text. */
+export function ThinkingLine({ message, defaultOpen = false }: { message: ChatMessage; defaultOpen?: boolean }) {
+  const line = thinkingLine(message);
+  const [open, setOpen] = useState(defaultOpen);
+  const textId = useId();
+  if (line === null) return null;
+  return (
+    <div className="tool-line font-mono text-xs leading-snug" data-thinking>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={textId}
+        className="tool-line-head outline-offset-2 outline-clay focus-visible:outline-2"
+        onClick={() => {
+          setOpen((value) => !value);
+        }}
+      >
+        <span aria-hidden="true" className="tool-chevron text-faint">›</span>
+        <span>{line}</span>
+      </button>
+      {open ? (
+        <div id={textId} role="region" aria-label="Thinking" className="tool-tablet">
+          <pre className={cn(TABLET_TEXT, "text-muted")}>{message.thinking}</pre>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function golemState(message: ChatMessage): GolemState {
   if (message.tools?.some((tool) => tool.status === "waiting")) return "waiting";
   return message.streaming ? "thinking" : "idle";
@@ -194,6 +223,7 @@ export const GolemMessage = memo(function GolemMessage({
   return (
     <article aria-label="golem" className="flex min-w-0 flex-col gap-2.5">
       <PixelGolem state={golemState(message)} size="sm" />
+      <ThinkingLine message={message} />
       {tools.length > 0 ? (
         <ul aria-label="Tool calls" className="flex list-none flex-col gap-0.5 p-0 font-mono text-xs leading-snug">
           {tools.map((tool) => (

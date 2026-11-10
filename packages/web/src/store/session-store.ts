@@ -1,5 +1,5 @@
 import type { ChatEvent } from "@golem/client";
-import { appendDelta, emptyChat, emptyLiveContext, foldLiveContext, reduceChat, type ChatState, type LiveContextState } from "@golem/view";
+import { appendDelta, appendThinking, emptyChat, emptyLiveContext, foldLiveContext, reduceChat, type ChatState, type LiveContextState } from "@golem/view";
 import { createStore, type StoreSource } from "./create-store.ts";
 
 export type SessionModel = { profile: string; provider: string | null; name: string | null };
@@ -93,13 +93,14 @@ function fold(view: SessionView, event: ChatEvent): SessionView {
 }
 
 /**
- * One session's snapshot. `message.delta` events wait in a buffer and fold once per frame. Any
+ * One session's snapshot. `message.delta` and `message.thinking.delta` events wait in a buffer and fold once per frame. Any
  * other event folds the buffer first, then itself, at once: a hidden tab runs no frames, and the
  * approval card and the title must still be right in it.
  */
 export function createSessionStore(frame: Frame = browserFrame, devtoolsName?: string): SessionStore {
   const store = createStore<SessionView>(initialSessionView);
   const pending = new Map<string, string>();
+  const thinking = new Map<string, string>();
   let handle: number | undefined;
   const devtools = connectDevtools(devtoolsName);
 
@@ -111,20 +112,24 @@ export function createSessionStore(frame: Frame = browserFrame, devtoolsName?: s
   }
 
   function foldPending(view: SessionView): SessionView {
-    if (pending.size === 0) {
+    if (pending.size === 0 && thinking.size === 0) {
       return view;
     }
     let chat = view.chat;
+    for (const [messageId, text] of thinking) {
+      chat = appendThinking(chat, messageId, text);
+    }
     for (const [messageId, text] of pending) {
       chat = appendDelta(chat, messageId, text);
     }
+    thinking.clear();
     pending.clear();
     return { ...view, chat };
   }
 
   function flush(): void {
     cancelFrame();
-    if (pending.size === 0) {
+    if (pending.size === 0 && thinking.size === 0) {
       return;
     }
     store.set(foldPending(store.getSnapshot()));
@@ -135,8 +140,9 @@ export function createSessionStore(frame: Frame = browserFrame, devtoolsName?: s
     getSnapshot: store.getSnapshot,
     subscribe: store.subscribe,
     dispatch(event) {
-      if (event.type === "message.delta") {
-        pending.set(event.data.message_id, (pending.get(event.data.message_id) ?? "") + event.data.text);
+      if (event.type === "message.delta" || event.type === "message.thinking.delta") {
+        const waiting = event.type === "message.delta" ? pending : thinking;
+        waiting.set(event.data.message_id, (waiting.get(event.data.message_id) ?? "") + event.data.text);
         if (handle === undefined) {
           handle = frame.request(() => {
             handle = undefined;
@@ -160,6 +166,7 @@ export function createSessionStore(frame: Frame = browserFrame, devtoolsName?: s
     dispose() {
       cancelFrame();
       pending.clear();
+      thinking.clear();
     },
   };
 }
