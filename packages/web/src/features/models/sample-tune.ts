@@ -1,5 +1,5 @@
-import type { ModelOption, ModelOptionsGetResult } from "../../store/model-options.ts";
-import type { TuneBackend } from "./tune-tab.tsx";
+import type { ModelMemory, ModelOption, ModelOptionsGetResult } from "../../store/model-options.ts";
+import type { TuneBackend } from "./tune-view.tsx";
 
 function option(name: string, label: string, kind: ModelOption["kind"], minimum: number, maximum: number, step: number, fallback: number | string | null, short: string, long: string): ModelOption {
   return { name, label, kind, minimum, maximum, step, default: fallback, short, long };
@@ -18,6 +18,9 @@ export const SAMPLE_OPTIONS: ModelOption[] = [
   option("keep_alive", "Keep loaded", "duration", -1, 86400, 60, "5m", "How long the model stays in memory after its last answer.", "A loaded model answers at once but holds its memory. A short time frees memory sooner. -1 keeps it loaded until Ollama stops, and 0 unloads it right away."),
 ];
 
+/** A 16 GB Mac and a 5.2 GB model: 4K fits, 32K is tight, and 128K is too big. */
+export const SAMPLE_MEMORY: ModelMemory = { ram_gb: 16, size_gb: 5.2, kv_gb_per_1k_tokens: 0.125, overhead_gb: 1, fits_share: 0.5, tight_share: 0.75 };
+
 /** A model's answer: its own defaults (Ollama's, with a Modelfile temperature), one saved value, no session overrides. */
 export function sampleOptionsResult(model: string): ModelOptionsGetResult {
   return {
@@ -26,6 +29,7 @@ export function sampleOptionsResult(model: string): ModelOptionsGetResult {
     defaults: { temperature: 0.6, top_p: 0.9, top_k: 40, min_p: 0, repeat_penalty: 1.1, num_ctx: 4096, num_predict: -1, keep_alive: "5m" },
     saved: { temperature: 0.2 },
     session: {},
+    memory: SAMPLE_MEMORY,
   };
 }
 

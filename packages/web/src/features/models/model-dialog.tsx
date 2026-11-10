@@ -5,14 +5,14 @@ import type { ListedModel, ModelListResult } from "../../store/models.ts";
 import { useModelList, useNewSessionModel, usePageActions, usePulls, useSessionOptions } from "../../store/page-context.tsx";
 import type { PullsSnapshot } from "../../store/pulls.ts";
 import { Button } from "../../ui/button.tsx";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../ui/tabs.tsx";
+import { cn } from "../../ui/cn.ts";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "../../ui/dialog.tsx";
 import { IconButton } from "../../ui/icon-button.tsx";
-import { RefreshIcon } from "../../ui/icons.tsx";
+import { RefreshIcon, SlidersIcon } from "../../ui/icons.tsx";
 import { resolveActive, SearchList, type SearchListItem } from "../../ui/search-list.tsx";
 import { CategoryChips } from "./category-chips.tsx";
 import { ModelRow } from "./model-row.tsx";
-import { HOSTED_TEXT, TuneTab, type TuneBackend } from "./tune-tab.tsx";
+import { TuneView, type TuneBackend } from "./tune-view.tsx";
 import { diskText, downloadText, removable, removeText, shortName, tooBigText, withActivePulls } from "./model-text.ts";
 
 /** What the dialog does, with the session already bound. Each call rejects with the daemon's message. */
@@ -56,11 +56,21 @@ export type ModelDialogViewProps = {
   showAll?: boolean;
   /** Turns show all on or off. Without it the dialog has no such switch. */
   onShowAll?: (on: boolean) => void;
-  /** What the Tune tab reads and writes. Without it the dialog has no tabs. */
+  /** What the Tune view reads and writes. Without it a row has no Tune button. */
   tune?: TuneBackend;
-  /** Where the dialog starts, for the gallery. */
-  initial?: { tab?: "models" | "tune"; query?: string; category?: Category; activeId?: string; confirm?: ModelConfirm; failure?: string };
+  /** Where the dialog starts, for the gallery. `tune` is the ref of the model whose Tune view is open. */
+  initial?: { tune?: string; query?: string; category?: Category; activeId?: string; confirm?: ModelConfirm; failure?: string };
 };
+
+/** The list, or the Tune view of one model (its ref). */
+type View = "list" | { tune: string };
+
+const NO_OPTIONS: Readonly<Record<string, never>> = {};
+
+/** Only a local model that is installed has options: they are Ollama's. */
+function tunable(model: ListedModel): boolean {
+  return model.provider === "ollama" && model.status === "ready";
+}
 
 type Guard = { busy: boolean; escape: (event: Event) => void };
 
@@ -113,7 +123,8 @@ function Content({
     initial?.failure === undefined ? null : { ref: initial.activeId ?? null, text: initial.failure },
   );
   const [busy, setBusy] = useState<string | null>(null);
-  const [tab, setTab] = useState<"models" | "tune">(initial?.tab ?? "models");
+  const [view, setView] = useState<View>(initial?.tune === undefined ? "list" : { tune: initial.tune });
+  const tuneButton = useRef<HTMLButtonElement>(null);
   const input = useRef<HTMLInputElement>(null);
   const confirmButton = useRef<HTMLButtonElement>(null);
 
@@ -133,16 +144,39 @@ function Content({
   const confirm = confirmFits(confirmState, model, missing) ? confirmState : null;
   const error = failure !== null && (failure.ref === null || failure.ref === model?.ref) ? failure.text : null;
   const profile = session?.profile ?? null;
-  // Tune the highlighted model when it is a ready local one, else the one the session uses.
-  const sessionModel = shown?.models.find((item) => namesModel(item, profile)) ?? null;
-  const tuned =
-    model !== null && model.provider === "ollama" && model.status === "ready"
-      ? model
-      : sessionModel !== null && sessionModel.provider === "ollama"
-        ? sessionModel
-        : null;
+  // A Tune view tunes the model of the row it was opened from, and only the session's own model has a session.
+  const tuning = typeof view === "object" ? (shown?.models.find((item) => item.ref === view.tune) ?? null) : null;
   const tuneBackend =
-    tune === undefined ? undefined : { ...tune, sessionId: tuned !== null && tuned.ref === sessionModel?.ref ? tune.sessionId : null };
+    tune === undefined || tuning === null
+      ? undefined
+      : namesModel(tuning, profile)
+        ? tune
+        : { ...tune, sessionId: null, sessionOptions: NO_OPTIONS };
+  const inTune = tuning !== null && tuneBackend !== undefined;
+  const leaving = useRef<string | null>(null);
+
+  function openTune(target: ListedModel): void {
+    if (tune === undefined || !tunable(target) || busy !== null) return;
+    setActiveId(target.ref);
+    setView({ tune: target.ref });
+  }
+
+  function closeTune(): void {
+    if (typeof view === "object") leaving.current = view.tune;
+    setView("list");
+  }
+
+  // Back on the list: focus goes to the row's Tune button, and the row's fit is read again, since
+  // `num_ctx` changes it. The read waits a tick so a change on its way is sent first.
+  useEffect(() => {
+    const ref = leaving.current;
+    if (view !== "list" || ref === null) return;
+    leaving.current = null;
+    tuneButton.current?.focus();
+    const timer = setTimeout(() => void actions.refresh().catch(() => undefined), 0);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view]);
 
   // The question takes focus, so a keyboard user hears it and answers it; answering gives focus back.
   const confirmKey = confirm === null ? "" : `${confirm.kind}:${confirm.ref}:${confirm.kind === "pull" ? confirm.step : 0}`;
@@ -157,7 +191,10 @@ function Content({
     guardRef.current = {
       busy: busy !== null,
       escape(event) {
-        if (confirm !== null) {
+        if (typeof view === "object") {
+          event.preventDefault();
+          closeTune();
+        } else if (confirm !== null) {
           event.preventDefault();
           setConfirm(null);
         } else if (query !== "") {
@@ -239,7 +276,7 @@ function Content({
     );
 
   const modelsPanel = (
-    <>
+    <div hidden={inTune}>
       {onShowAll === undefined ? null : (
         <label className="mt-3 flex items-center gap-2 text-sm text-muted">
           <input
@@ -266,16 +303,39 @@ function Content({
         onActivate={(row) => primary(row.model)}
         empty={empty}
         after={shown === null ? null : <ProviderNotes listing={shown} />}
-        renderItem={(row) => (
-          <ModelRow
-            model={row.model}
-            providerMissing={providerMissing(shown, row.model.provider)}
-            current={namesModel(row.model, profile)}
-            isDefault={namesModel(row.model, listing?.default ?? null)}
-            category={category}
-            pull={pulls.active.get(row.model.ref)}
-            failed={pulls.failed.get(row.model.ref)}
-          />
+        renderItem={(row, { active: highlighted }) => (
+          <div className="flex items-start gap-2">
+            <div className="min-w-0 flex-1">
+              <ModelRow
+                model={row.model}
+                providerMissing={providerMissing(shown, row.model.provider)}
+                current={namesModel(row.model, profile)}
+                isDefault={namesModel(row.model, listing?.default ?? null)}
+                category={category}
+                pull={pulls.active.get(row.model.ref)}
+                failed={pulls.failed.get(row.model.ref)}
+              />
+            </div>
+            {tune === undefined || !tunable(row.model) ? null : (
+              // A button cannot sit inside an option, so this is for the mouse; the keyboard has the Tune button
+              // of the actions below, and a screen reader does not hear this one.
+              <span
+                aria-hidden="true"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  openTune(row.model);
+                }}
+                onDoubleClick={(event) => event.stopPropagation()}
+                className={cn(
+                  "inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-sm border border-line-strong px-2 py-0.5 text-xs text-ink hover:bg-line",
+                  highlighted ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+                )}
+              >
+                <SlidersIcon />
+                Tune
+              </span>
+            )}
+          </div>
         )}
       />
       <div className="mt-4 flex flex-col gap-3 border-t border-line pt-4 empty:hidden">
@@ -309,52 +369,37 @@ function Content({
             onDownload={() => ask({ kind: "pull", ref: model.ref, step: 1 })}
             onStop={() => void stop(model)}
             onRemove={() => ask({ kind: "remove", ref: model.ref })}
+            onTune={tune !== undefined && tunable(model) ? () => openTune(model) : undefined}
+            tuneRef={tuneButton}
           />
         )}
       </div>
-    </>
+    </div>
   );
 
+  // The title and the description stay in the Tune view, for the dialog's name, but only the list shows them.
   return (
     <>
-      <div className="flex items-start gap-3">
+      <div className={cn("flex items-start gap-3", inTune && "sr-only")}>
         <div className="min-w-0 flex-1">
           <DialogTitle>Choose a model</DialogTitle>
           <DialogDescription>{description(isNew || isDefaultMode ? null : session, listing)}</DialogDescription>
         </div>
-        <IconButton
-          label="Refresh the list"
-          aria-busy={busy === "refresh"}
-          disabled={busy !== null}
-          onClick={() => void run("refresh", null, actions.refresh, "Could not refresh the list.")}
-        >
-          <RefreshIcon />
-        </IconButton>
+        {inTune ? null : (
+          <IconButton
+            label="Refresh the list"
+            aria-busy={busy === "refresh"}
+            disabled={busy !== null}
+            onClick={() => void run("refresh", null, actions.refresh, "Could not refresh the list.")}
+          >
+            <RefreshIcon />
+          </IconButton>
+        )}
       </div>
-      {tuneBackend === undefined ? (
-        modelsPanel
-      ) : (
-        <Tabs value={tab} onValueChange={(next) => setTab(next === "tune" ? "tune" : "models")} className="mt-3">
-          <TabsList aria-label="Model dialog">
-            <TabsTrigger value="models">Models</TabsTrigger>
-            <TabsTrigger value="tune">Tune</TabsTrigger>
-          </TabsList>
-          <TabsContent value="models" forceMount hidden={tab !== "models"}>
-            {modelsPanel}
-          </TabsContent>
-          <TabsContent value="tune" className="mt-3">
-            {listing === null ? (
-              <p role="status" className="px-3 py-6 text-center text-sm text-muted">
-                Loading models…
-              </p>
-            ) : tuned === null ? (
-              <p className="px-3 py-6 text-center text-sm text-muted">{HOSTED_TEXT}</p>
-            ) : (
-              <TuneTab key={tuned.ref} model={tuned.ref.replace(/^ollama\//, "")} backend={tuneBackend} />
-            )}
-          </TabsContent>
-        </Tabs>
-      )}
+      {modelsPanel}
+      {inTune ? (
+        <TuneView key={tuning.ref} model={tuning.ref.replace(/^ollama\//, "")} label={tuning.label} backend={tuneBackend} onBack={closeTune} />
+      ) : null}
     </>
   );
 }
@@ -418,6 +463,8 @@ function ActionBar({
   onDownload,
   onStop,
   onRemove,
+  onTune,
+  tuneRef,
 }: {
   model: ListedModel;
   missing: boolean;
@@ -432,6 +479,9 @@ function ActionBar({
   onDownload: () => void;
   onStop: () => void;
   onRemove: () => void;
+  /** Opens the Tune view. Only a local model that is installed has one. */
+  onTune?: (() => void) | undefined;
+  tuneRef: RefObject<HTMLButtonElement | null>;
 }) {
   const idle = busy === null;
   let buttons;
@@ -443,6 +493,12 @@ function ActionBar({
             Remove
           </Button>
         ) : null}
+        {onTune === undefined ? null : (
+          <Button ref={tuneRef} kind="secondary" disabled={!idle} onClick={onTune}>
+            <SlidersIcon />
+            Tune
+          </Button>
+        )}
         <Button
           kind={defaultOnly ? "ink" : "secondary"}
           disabled={!idle || isDefault}
@@ -555,7 +611,7 @@ export function ModelDialog({
   const tune = useMemo<TuneBackend>(
     () => ({
       sessionId: tuneSession,
-      load: (name) => page.modelOptions(name, tuneSession),
+      load: (name, sessionId) => page.modelOptions(name, sessionId),
       save: (name, options) => page.saveModelOptions(name, options),
       setSession: (options) => page.setSessionOptions(tuneSession ?? "", options),
       watchSaved: (listener) => page.watchSavedOptions(listener),

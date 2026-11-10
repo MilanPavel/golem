@@ -96,3 +96,17 @@ export const RefreshIcon = (props: IconProps) => (
     <path d="M13 2.5v3h-3" />
   </Icon>
 );
+export const ChevronLeftIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M10 3.5L5.5 8l4.5 4.5" />
+  </Icon>
+);
+/** Three sliders: a line each, with a knob on it. */
+export const SlidersIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M2 4h4M10 4h4M2 8h1M7 8h7M2 12h6M12 12h2" />
+    <circle cx="8" cy="4" r="1.5" />
+    <circle cx="5" cy="8" r="1.5" />
+    <circle cx="10" cy="12" r="1.5" />
+  </Icon>
+);
