@@ -479,7 +479,7 @@
     }
   },
   "additionalProperties": false,
-  "description": "What a span took in and gave out. ``span`` has no children.\n\nFor a model span, ``messages`` is the context sent, in order, and\n``new_from`` is where the part new since the previous model call\nbegins. ``system_prompt`` and ``tools`` are null when they were not\nrecorded. For a tool span, ``result`` is the text the model got back, and\n``artifact_id`` is set when the output was too big for the model: open it\nwith ``artifact.read``. ``context`` is set for every model span, and\n``system_sections`` is null when the call recorded none.",
+  "description": "What a span took in and gave out. ``span`` has no children.\n\nFor a model span, ``messages`` is the context sent, in order, and\n``new_from`` is where the part new since the previous model call\nbegins. ``system_prompt`` and ``tools`` are null when they were not\nrecorded. For a tool span, ``result`` is the text the model got back, and\n``artifact_id`` is set when the output was too big for the model: open it\nwith ``artifact.read``. ``context`` is set for every model span, and\n``system_sections`` is null when the call recorded none. ``text_tool_calls``\nis what ``model.call.completed`` said about a tool call written as text.",
   "properties": {
     "approval": {
       "anyOf": [
@@ -627,6 +627,22 @@
       ],
       "default": null,
       "title": "System Sections"
+    },
+    "text_tool_calls": {
+      "anyOf": [
+        {
+          "enum": [
+            "recovered",
+            "unread"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Text Tool Calls"
     },
     "tools": {
       "anyOf": [

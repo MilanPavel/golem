@@ -180,6 +180,24 @@ async def test_a_call_written_as_text_runs_as_a_tool_call(
     result = model.seen[1][-1]
     assert isinstance(result, ToolMessage)
     assert "the answer is 42" in result.text
+    marks = [e.data.text_tool_calls for e in events if isinstance(e, ModelCallCompletedEvent)]
+    assert marks == ["recovered", None]
+
+
+async def test_a_call_written_as_text_that_cannot_be_read_is_marked_unread(
+    database: Database, project: Path
+) -> None:
+    leaked = "Let me look.\n\n<function=format_disk>\n</function>\n</tool_call>"
+    chat = _chat(database, ToolCallingChatModel(replies=[leaked]))
+    session_id = await chat.manager.create(None, cwd=str(project))
+    events = await chat.finished(await chat.manager.send(session_id, "what is in notes?"))
+
+    assert not [event for event in events if isinstance(event, ToolCompletedEvent)]
+    assert events[-1].type == "run.completed"
+    (done,) = [e for e in events if isinstance(e, ModelCallCompletedEvent)]
+    assert done.data.text_tool_calls == "unread"
+    stored = _messages(await chat.runtime.values(session_id))
+    assert [m.text for m in stored if isinstance(m, AIMessage)] == [leaked]
 
 
 async def test_a_path_outside_the_folder_fails_and_the_model_hears_why(

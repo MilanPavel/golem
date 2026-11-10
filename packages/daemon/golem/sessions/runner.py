@@ -168,7 +168,7 @@ class _Progress:
     model call sent and not yet ended, ``sent_at`` when it was sent
     (``time.monotonic()``), and ``first_at`` when its first text came.
     ``index`` counts the calls sent so far. ``ran_window`` is the window the call
-    ran with, read after it.
+    ran with, read after it. ``text_tool_calls`` is what became of a tool call it wrote as text.
     """
 
     run_started: bool = False
@@ -184,6 +184,7 @@ class _Progress:
     sent_at: float = 0.0
     first_at: float | None = None
     ran_window: int | None = None
+    text_tool_calls: Literal["recovered", "unread"] | None = None
     translate: Translator = field(default_factory=Translator)
     """Turns stream parts into facts. It holds text that may be half of a ``<think>`` tag."""
     thinking: list[str] = field(default_factory=list[str])
@@ -380,6 +381,7 @@ async def _apply(
         progress.sent_at = time.monotonic()
         progress.first_at = None
         progress.ran_window = None
+        progress.text_tool_calls = None
         model = progress.model
         await emit(
             "model.call.started",
@@ -408,6 +410,7 @@ async def _apply(
         )
     elif isinstance(fact, ModelResponded):
         progress.ran_window = fact.context_window
+        progress.text_tool_calls = fact.text_tool_calls
     elif isinstance(fact, ThinkingDelta) and progress.open is not None:
         if progress.think_at is None:
             progress.think_at = time.monotonic()
@@ -538,6 +541,7 @@ async def _end_call(
             latency_ms=_ms(now - progress.sent_at),
             failed=failed,
             context_window=None if failed else progress.ran_window,
+            text_tool_calls=None if failed else progress.text_tool_calls,
         ),
     )
 

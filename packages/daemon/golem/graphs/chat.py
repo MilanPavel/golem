@@ -367,8 +367,9 @@ def open_chat(
     with the lengths of the system prompt's sections. Without it, the window is unknown.
     ``note_loaded`` is awaited with the profile and the ``num_ctx`` sent (or None) after each
     model call, so the server can read the window the model loaded. It returns that window,
-    or None. The window the call ran with goes out as ``model.response``. A failure there
-    never fails the call.
+    or None. The window the call ran with goes out as ``model.response``, with
+    ``text_tool_calls`` (``recovered`` or ``unread``) when the reply held a tool call written as
+    text. A failure there never fails the call.
     """
     registry = default_registry() if tools is None else tools
     rules = Policy(None) if policy is None else policy
@@ -432,17 +433,27 @@ def open_chat(
                 )
             else:
                 ran = window.num_ctx
-        get_stream_writer()(
-            {STREAM_KEY: "model.response", "message_id": message_id, "context_window": ran}
-        )
         update: dict[str, object] = {"id": message_id}
+        text_tool_calls: str | None = None
         if response.tool_calls:
             update["tool_calls"] = _with_ids(response.tool_calls)
         elif schemas and binder.offers(profile) and "<function=" in message_text(response):
             recovered = recover(message_text(response), schemas)
             if recovered is not None:
                 update["content"], update["tool_calls"] = recovered
+                text_tool_calls = "recovered"
                 log.info("%s wrote %d tool call(s) as text; recovered", profile, len(recovered[1]))
+            else:
+                text_tool_calls = "unread"
+                log.info("%s wrote a tool call as text that could not be read", profile)
+        response_item: dict[str, object] = {
+            STREAM_KEY: "model.response",
+            "message_id": message_id,
+            "context_window": ran,
+        }
+        if text_tool_calls is not None:
+            response_item["text_tool_calls"] = text_tool_calls
+        get_stream_writer()(response_item)
         return {"messages": [response.model_copy(update=update)]}
 
     def route(state: AgentState) -> Literal["tools", "end"]:

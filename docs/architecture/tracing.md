@@ -180,7 +180,7 @@ A model call has no id of its own. Each call makes exactly one assistant message
 | Event | Fields |
 |---|---|
 | `model.call.started` | `message_id`, `index` (1-based within the run), `profile`, `provider`, `model`, `system_prompt_sha`, `tools_sha`, `message_ids`, `context_window`, `num_ctx`, `window_estimated`, `system_sections`, `system_chars`, `system_bytes`, `tools_chars`, `tools_bytes`, `message_chars`, `message_bytes` |
-| `model.call.completed` | `message_id`, `usage` (`input`, `output`, `cache_read`, `cache_write`), `stop_reason`, `first_token_ms`, `latency_ms`, `failed`, `context_window` |
+| `model.call.completed` | `message_id`, `usage` (`input`, `output`, `cache_read`, `cache_write`), `stop_reason`, `first_token_ms`, `latency_ms`, `failed`, `context_window`, `text_tool_calls` |
 | `tool.completed`, `tool.failed` | `duration_ms`, as well as what they had before |
 
 Every new field is optional, so older events stay valid. A provider that reports no usage leaves `usage` empty, and one that reports only some counts leaves the rest `null`. Neither is ever zero. `model.call.completed` comes before the call's `tool.requested` events.
@@ -195,6 +195,8 @@ The `blobs` table is `sha256`, `kind`, `size`, `created_at`, and `text`. `BlobSt
 `message_ids` are the checkpoint ids of the history sent, in order, not counting the system prompt. `window_estimated` is true when golem did not send the window and read it from Ollama, from the loaded context or the Modelfile, so a screen shows it with `≈`. An older event has no field and reads as false. `system_sections` lists the non-empty parts of the system prompt as `name` and `chars`. The stored prompt is those parts joined with a blank line, so their lengths split it exactly, and the prompt is not stored twice.
 
 `context_window` is the profile's `ctx`, else the listed model's, else LiteLLM's `max_input_tokens`, and `null` when none is known. `num_ctx` is the Ollama option sent, if any. Both are worked out when the call is made, because the profile, the listing, and the prices change later, so on `model.call.started` the window is a forecast. `model.call.completed` has `context_window`: the window the call ran with, read from the model server (Ollama `/api/ps`) after the call. It is exact, and `null` when it could not be read or the provider is hosted. A span takes the completed value when there is one. An estimated window below the call's input tokens is dropped, so no span shows more than 100% of a guess.
+
+`text_tool_calls` is set when the model wrote a tool call as text in its reply. `recovered` means golem turned the text into tool calls and ran them. `unread` means the reply held a call golem could not read (an unknown tool, a key the tool does not have, a value that is not valid, or an unclosed block), so the turn ended with the text as the answer. `null` when the reply had no such text. The trace shows both on the model span, and the chat shows a notice for `unread`.
 
 ### A cut prompt
 

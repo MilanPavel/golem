@@ -1,4 +1,4 @@
-import { formatDuration, LIVE_OUTPUT_CHARS, thinkingLine, type ChatMessage, type ChatState, type ToolBlock, type ApprovalChoice } from "@golem/view";
+import { formatDuration, LIVE_OUTPUT_CHARS, thinkingLine, unreadCallNotice, type ChatMessage, type ChatState, type ToolBlock, type ApprovalChoice } from "@golem/view";
 import { memo, useCallback, useId, useLayoutEffect, useRef, useState } from "react";
 import { usePageActions, useDraftReader, useSession } from "../../store/page-context.tsx";
 import { ApprovalCard } from "../approval/approval-card.tsx";
@@ -263,7 +263,7 @@ export const GolemMessage = memo(function GolemMessage({
 });
 
 /** What the transcript draws of the chat. `approval` names the call whose card is open. */
-export type TranscriptChat = Pick<ChatState, "messages" | "error" | "notice"> & Partial<Pick<ChatState, "approval">>;
+export type TranscriptChat = Pick<ChatState, "messages" | "error" | "notice"> & Partial<Pick<ChatState, "approval" | "unreadCall">>;
 
 type Answers = {
   onAnswer?: (callId: string, decision: ApprovalChoice, args?: Args) => void;
@@ -278,7 +278,8 @@ type Answers = {
 /** The messages and the closing error or notice. Pure: the page's stores are not read here. */
 export function TranscriptMessages({ chat, onAnswer, sendingId = null, answerError = null, editing = false, onEdit }: { chat: TranscriptChat } & Answers) {
   const pendingId = chat.approval?.callId ?? null;
-  if (chat.messages.length === 0 && !chat.error && !chat.notice) {
+  const notice = chat.notice ?? (chat.unreadCall === true ? unreadCallNotice("web") : null);
+  if (chat.messages.length === 0 && !chat.error && !notice) {
     return <p className="text-sm text-faint">No messages yet.</p>;
   }
   return (
@@ -302,7 +303,7 @@ export function TranscriptMessages({ chat, onAnswer, sendingId = null, answerErr
         ),
       )}
       {chat.error ? <p role="alert" className="text-sm text-deny">{chat.error}</p> : null}
-      {chat.notice ? <p role="status" className="text-sm text-muted">{chat.notice}</p> : null}
+      {notice ? <p role="status" className="text-sm text-muted">{notice}</p> : null}
     </>
   );
 }

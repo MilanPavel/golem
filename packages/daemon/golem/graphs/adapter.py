@@ -73,11 +73,13 @@ class ModelResponded:
     """The model call with this ``message_id`` returned.
 
     ``context_window`` is the window it ran with, read from the model server after
-    the call. None when it could not be read.
+    the call. None when it could not be read. ``text_tool_calls`` says what became of a
+    tool call the model wrote as text: ``recovered`` or ``unread``. None when there was none.
     """
 
     message_id: str
     context_window: int | None = None
+    text_tool_calls: Literal["recovered", "unread"] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -567,6 +569,12 @@ def _approval(paused: object) -> ApprovalAsked | None:
     return None
 
 
+def _text_calls(value: object) -> Literal["recovered", "unread"] | None:
+    if value == "recovered":
+        return "recovered"
+    return "unread" if value == "unread" else None
+
+
 def _custom(data: object) -> Fact | None:
     if not isinstance(data, dict):
         return None
@@ -579,7 +587,12 @@ def _custom(data: object) -> Fact | None:
     if kind == "model.request" and isinstance(message_id, str):
         return _request(message_id, item)
     if kind == "model.response" and isinstance(message_id, str):
-        return ModelResponded(message_id, _positive(item.get("context_window")))
+        text_calls = item.get("text_tool_calls")
+        return ModelResponded(
+            message_id,
+            _positive(item.get("context_window")),
+            _text_calls(text_calls),
+        )
     if kind in (PIN_READ_KIND, PIN_SKIPPED_KIND):
         return _pin(kind, item)
     if not isinstance(call_id, str):

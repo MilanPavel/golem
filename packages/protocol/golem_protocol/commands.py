@@ -547,7 +547,8 @@ class TraceSpanResult(BaseModel):
     recorded. For a tool span, ``result`` is the text the model got back, and
     ``artifact_id`` is set when the output was too big for the model: open it
     with ``artifact.read``. ``context`` is set for every model span, and
-    ``system_sections`` is null when the call recorded none.
+    ``system_sections`` is null when the call recorded none. ``text_tool_calls``
+    is what ``model.call.completed`` said about a tool call written as text.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -563,6 +564,7 @@ class TraceSpanResult(BaseModel):
     artifact_id: str | None = Field(default=None, min_length=1)
     approval: dict[str, Any] | None = None
     stop_reason: str | None = None
+    text_tool_calls: Literal["recovered", "unread"] | None = None
     provider: str | None = None
     context: TraceContext | None = None
     system_sections: list[PromptSectionInfo] | None = None

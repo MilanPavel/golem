@@ -62,7 +62,7 @@
     }
   },
   "additionalProperties": false,
-  "description": "A model call ended.\n\n``first_token_ms`` is the time from the request to the first text, and\nNone when no text came. ``latency_ms`` is the time to the end.\n``failed`` is true when the call raised or was stopped.\n\n``context_window`` is the window the call ran with, read from the model server\nafter the call. Exact. None when it could not be read.",
+  "description": "A model call ended.\n\n``first_token_ms`` is the time from the request to the first text, and\nNone when no text came. ``latency_ms`` is the time to the end.\n``failed`` is true when the call raised or was stopped.\n\n``context_window`` is the window the call ran with, read from the model server\nafter the call. Exact. None when it could not be read.\n\n``text_tool_calls`` is set when the model wrote a tool call as text in its\nreply. ``recovered`` means golem turned the text into tool calls. ``unread``\nmeans the text held a call golem could not read, so the reply stayed text.\nNone when the reply had no such text.",
   "properties": {
     "context_window": {
       "anyOf": [
@@ -116,6 +116,22 @@
       ],
       "default": null,
       "title": "Stop Reason"
+    },
+    "text_tool_calls": {
+      "anyOf": [
+        {
+          "enum": [
+            "recovered",
+            "unread"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Text Tool Calls"
     },
     "usage": {
       "anyOf": [
