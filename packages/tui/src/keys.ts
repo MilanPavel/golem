@@ -594,6 +594,8 @@ export type OverlayLine = {
   dim: boolean;
   /** Draw in the accent colour. */
   accent?: boolean;
+  /** Draw these pieces in turn, each in its own colour, in place of `text`. */
+  segments?: { text: string; color?: string }[];
   /** From column `start`, draw the rest dim (`fits`), in the warning colour (`tight`), or the alert colour (`too_big`). */
   gauge?: { start: number; fit: "fits" | "tight" | "too_big" };
 };

@@ -139,7 +139,7 @@ import {
   pinnableSkills,
   closedDebug,
   COMMANDS,
-  contextLines,
+  contextSegments,
   helpLines,
   toggleDebugTab,
   withModelChoices,
@@ -642,13 +642,14 @@ export function App({
   };
   overlayFrame.current = { columns, body: budget.body };
   const diffOffset = chat.approval !== null && diffScroll.callId === chat.approval.callId ? diffScroll.offset : 0;
+  const contextSegmentRows = panel === "context" && tune === null ? contextSegments(contextReport, columns) : [];
   const panelLines =
     tune !== null
       ? tuneLines(tune, columns)
       : panel === "help"
         ? helpLines(COMMANDS, columns)
         : panel === "context"
-          ? contextLines(contextReport, columns)
+          ? contextSegmentRows.map((line) => line.map((segment) => segment.text).join(""))
           : [];
   const tryRows = tune !== null && tryRun !== null ? tryLines(tryRun, columns) : [];
   const helpText = !keysOpen && !switcher.open ? panelLines : [];
@@ -661,6 +662,7 @@ export function App({
         text,
         dim: false,
         accent: litLines.includes(index),
+        ...(contextSegmentRows[index] === undefined ? {} : { segments: contextSegmentRows[index] }),
         ...(gauge === undefined ? {} : { gauge: { start: gauge.start, fit: gauge.fit } }),
       };
     }),
@@ -4112,7 +4114,13 @@ function LineList({
           color={line.dim ? undefined : line.accent === true ? CLAY : color}
           wrap="truncate-end"
         >
-          {line.gauge === undefined ? (
+          {line.segments !== undefined ? (
+            line.segments.map((segment, at) => (
+              <Text key={at} color={segment.color}>
+                {segment.text}
+              </Text>
+            ))
+          ) : line.gauge === undefined ? (
             line.text.length === 0 ? " " : line.text
           ) : (
             <>
