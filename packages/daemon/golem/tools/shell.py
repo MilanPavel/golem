@@ -16,6 +16,7 @@ external diff drivers, and text conversion.
 from __future__ import annotations
 
 import os
+import re
 import shutil
 from pathlib import Path
 
@@ -28,6 +29,37 @@ from golem.tools.registry import Tool, ToolContext, ToolError, ToolResult
 NO_SANDBOX = (
     "the shell needs a macOS sandbox, and none can be applied here (no sandbox-exec, or golem "
     "itself runs inside a sandbox), so commands do not run"
+)
+
+NO_NETWORK_HINT = (
+    "the sandbox has no network: use web_fetch to read a page, "
+    "or shell_unsandboxed for a command that needs the network"
+)
+
+# Commands that need the network. A multi-word entry matches its words in order,
+# with any space between them. A word is not part of a longer name, a file name,
+# or a dot folder such as ~/.ssh.
+NETWORK_CLIENTS = (
+    "curl",
+    "wget",
+    "http",
+    "https",
+    "nc",
+    "ssh",
+    "scp",
+    "rsync",
+    "git clone",
+    "git fetch",
+    "git pull",
+    "pip install",
+    "npm install",
+    "pnpm add",
+    "uv add",
+)
+_NETWORK_CLIENT = re.compile(
+    r"(?<![\w.-])(?:"
+    + "|".join(r"\s+".join(map(re.escape, name.split())) for name in NETWORK_CLIENTS)
+    + r")(?![\w.-])"
 )
 
 _ARGS = ConfigDict(extra="forbid")
@@ -101,12 +133,20 @@ async def _login_shell(
     blocked = sandbox.refusals(output, root, ctx.shell, home=Path.home()) if sandboxed else []
     if blocked:
         summary += ", blocked by the sandbox"
-    tail = "\n".join([*(f"[{line}]" for line in blocked), ending])
+    lines = [*(f"[{line}]" for line in blocked), ending]
+    if sandboxed and not ctx.shell.network and needs_network(args.command):
+        lines.append(f"[{NO_NETWORK_HINT}]")
+    tail = "\n".join(lines)
     return ToolResult(
         output=f"{output}\n{tail}" if output else tail,
         summary=summary,
         failed=done.timed_out or done.exit_code != 0,
     )
+
+
+def needs_network(command: str) -> bool:
+    """Whether ``command`` names a network client as a whole word, such as ``curl``."""
+    return _NETWORK_CLIENT.search(command) is not None
 
 
 async def _git_status(args: GitStatusArgs, ctx: ToolContext) -> ToolResult:
@@ -232,6 +272,8 @@ __all__ = [
     "GIT_DIFF",
     "GIT_LOG",
     "GIT_STATUS",
+    "NETWORK_CLIENTS",
+    "NO_NETWORK_HINT",
     "NO_SANDBOX",
     "SHELL",
     "SHELL_TOOLS",
