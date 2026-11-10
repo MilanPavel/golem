@@ -647,39 +647,185 @@ for (const theme of ["slip", "kiln"]) {
   }, 10_000);
 }
 
-async function openTune(listing: ModelListResult = SAMPLE_LISTING) {
+async function openTune(listing: ModelListResult = SAMPLE_LISTING, name = "local") {
   const opened = await openDialog(listing);
   opened.fake.raw.getModelOptions.mockImplementation(async (model) => sampleOptionsResult(model));
-  await opened.user.click(within(dialog()).getByRole("tab", { name: "Tune" }));
+  await pick(opened.user, name);
+  await opened.user.click(within(dialog()).getByRole("button", { name: "Tune" }));
   return opened;
 }
 
 const slider = (name: string) => within(dialog()).getByRole("slider", { name }) as HTMLInputElement;
 const later = (ms: number) => act(() => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+const tuneButton = () => within(dialog()).queryByRole("button", { name: "Tune" });
+const heading = () => within(dialog()).getByRole("heading", { name: "Tune Qwen3 8B" });
 
-test("the dialog has a Models tab and a Tune tab, and the arrow keys and a click switch them", async () => {
+test("the dialog has no tab strip, and only a ready local row has a Tune button", async () => {
   const { user } = await openDialog();
-  const models = within(dialog()).getByRole("tab", { name: "Models" });
-  const tune = within(dialog()).getByRole("tab", { name: "Tune" });
-  expect(within(dialog()).getByRole("tablist")).toBeTruthy();
-  expect(models.getAttribute("aria-selected")).toBe("true");
-  expect(options().length).toBeGreaterThan(0);
-  models.focus();
-  await user.keyboard("{ArrowRight}");
-  expect(tune.getAttribute("aria-selected")).toBe("true");
+  expect(within(dialog()).queryByRole("tablist")).toBeNull();
+  expect(within(dialog()).queryByRole("tab")).toBeNull();
+  for (const [name, has] of [["local", true], ["Gemma 4 E4B", true], ["Qwen3 14B", false], ["sonnet", false], ["Qwen3 235B", false], ["Qwen2.5 7B", false]] as const) {
+    await pick(user, name);
+    expect(tuneButton() !== null).toBe(has);
+  }
+});
+
+test("the Tune button opens that model's view, and Esc goes back to the button, and a second Esc closes", async () => {
+  const { fake, user } = await openTune();
+  expect(within(dialog()).queryByRole("combobox", { name: "Search models" })).toBeNull();
+  expect(heading().textContent).toBe("Qwen3 8B");
+  expect(dialog().textContent).toContain("qwen3:8b");
+  await within(dialog()).findByRole("slider", { name: "Temperature" });
+  expect(fake.raw.getModelOptions).toHaveBeenCalledWith("qwen3:8b", "a");
+  expect(document.activeElement).toBe(heading());
+  expect(within(dialog()).getByRole("button", { name: "Reset all options" })).toBeTruthy();
+  expect(within(dialog()).getByRole("button", { name: "Done" })).toBeTruthy();
+  expect(within(dialog()).queryByRole("button", { name: "Remove" })).toBeNull();
+  await user.keyboard("{Escape}");
+  expect(dialog()).toBeTruthy();
+  expect(search()).toBeTruthy();
+  expect(document.activeElement).toBe(tuneButton());
+  expect(active()).toBe(optionOf("local"));
+  await user.keyboard("{Escape}");
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+});
+
+test("left, Done, and the back button go back to the list", async () => {
+  const { user } = await openDialog();
+  await pick(user, "Gemma 4 E4B");
+  await user.click(tuneButton() as HTMLElement);
+  expect(within(dialog()).getByRole("heading", { name: "Tune Gemma 4 E4B" })).toBeTruthy();
   await user.keyboard("{ArrowLeft}");
-  expect(models.getAttribute("aria-selected")).toBe("true");
-  await user.click(tune);
-  expect(tune.getAttribute("aria-selected")).toBe("true");
-  await user.click(models);
-  expect(models.getAttribute("aria-selected")).toBe("true");
+  expect(search().value).toBe("");
+  expect(document.activeElement).toBe(tuneButton());
+  await user.click(tuneButton() as HTMLElement);
+  await user.click(within(dialog()).getByRole("button", { name: "Done" }));
+  expect(search()).toBeTruthy();
+  await user.click(within(dialog()).getByRole("button", { name: "Tune" }));
+  await user.click(within(dialog()).getByRole("button", { name: "Back to the models" }));
   expect(search()).toBeTruthy();
 });
 
-test("the Tune tab has one control per option, with the long text of the focused row", async () => {
+test("going back reads the listing again, for the row's fit", async () => {
   const { fake, user } = await openTune();
   await within(dialog()).findByRole("slider", { name: "Temperature" });
-  expect(fake.raw.getModelOptions).toHaveBeenCalledWith("qwen3:8b", "a");
+  const before = fake.raw.listModels.mock.calls.length;
+  await user.keyboard("{Escape}");
+  await waitFor(() => expect(fake.raw.listModels.mock.calls.length).toBeGreaterThan(before));
+});
+
+test("this session shows only for the session's model", async () => {
+  const mine = await openTune();
+  await within(dialog()).findByRole("slider", { name: "Temperature" });
+  expect(within(dialog()).getByRole("button", { name: "This session only" })).toBeTruthy();
+  expect(mine.fake.raw.getModelOptions).toHaveBeenCalledWith("qwen3:8b", "a");
+  mine.unmount();
+  const other = await openTune(SAMPLE_LISTING, "Gemma 4 E4B");
+  await within(dialog()).findByRole("slider", { name: "Temperature" });
+  expect(within(dialog()).queryByRole("button", { name: "This session only" })).toBeNull();
+  expect(dialog().textContent).toContain("Every change is saved for this model.");
+  expect(other.fake.raw.getModelOptions).toHaveBeenCalledWith("gemma4:e4b", undefined);
+  fireEvent.change(slider("Top K"), { target: { value: "20" } });
+  await waitFor(() => expect(other.fake.raw.setModelOptions).toHaveBeenCalledWith("gemma4:e4b", { top_k: 20 }), { timeout: 2000 });
+  expect(other.fake.raw.setSessionOptions).not.toHaveBeenCalled();
+});
+
+test("Reset removes every value of the layer the changes go to", async () => {
+  const { fake, user } = await openTune();
+  await within(dialog()).findByRole("slider", { name: "Temperature" });
+  await user.click(within(dialog()).getByRole("button", { name: "Reset all options" }));
+  await waitFor(() => expect(fake.raw.setModelOptions).toHaveBeenCalledWith("qwen3:8b", { temperature: null }), { timeout: 2000 });
+  expect(slider("Temperature").value).toBe("0.6");
+  expect((within(dialog()).getByRole("button", { name: "Reset all options" }) as HTMLButtonElement).disabled).toBe(true);
+});
+
+const PRESET_VALUES: [string, Record<string, number | null>][] = [
+  ["Precise", { temperature: 0.2, top_p: 0.9, repeat_penalty: 1.1 }],
+  ["Balanced", { temperature: null, top_p: null, top_k: null, min_p: null, repeat_penalty: null }],
+  ["Creative", { temperature: 1.0, top_p: 0.95, min_p: 0.05 }],
+  ["Long memory", { num_ctx: 14336 }],
+];
+for (const [name, values] of PRESET_VALUES) {
+  test(`the ${name} preset sends session.set_options with its values`, async () => {
+    const { fake, user } = await openTune();
+    await within(dialog()).findByRole("slider", { name: "Temperature" });
+    fake.raw.setSessionOptions.mockImplementation(async (_id, options) => ({
+      session_id: "a",
+      options: Object.fromEntries(Object.entries(options).filter(([, value]) => value !== null)) as Record<string, number>,
+    }));
+    await user.click(within(dialog()).getByRole("button", { name }));
+    await waitFor(() => expect(fake.raw.setSessionOptions).toHaveBeenCalledWith("a", values));
+    expect(fake.raw.setModelOptions).not.toHaveBeenCalled();
+  });
+}
+
+test("a preset lights only the rows it moved, and the highlight fades", async () => {
+  const { fake, user } = await openTune();
+  await within(dialog()).findByRole("slider", { name: "Temperature" });
+  fake.raw.setSessionOptions.mockImplementation(async (_id, options) => ({ session_id: "a", options: options as Record<string, number> }));
+  await user.click(within(dialog()).getByRole("button", { name: "Creative" }));
+  const lit = (name: string) => (slider(name).closest("li") as HTMLElement).className.includes("bg-clay/25");
+  expect(lit("Temperature")).toBe(true);
+  expect(lit("Top P")).toBe(true);
+  expect(lit("Min P")).toBe(true);
+  expect(lit("Top K")).toBe(false);
+  expect(lit("Context size")).toBe(false);
+  expect(slider("Temperature").value).toBe("1");
+  expect(dialog().textContent).toContain("Preset creative");
+  await waitFor(() => expect(lit("Temperature")).toBe(false), { timeout: 3000 });
+});
+
+test("Save these for the model shows while the session has overrides, and saves them", async () => {
+  const { fake, user } = await openTune();
+  await within(dialog()).findByRole("slider", { name: "Temperature" });
+  expect(within(dialog()).queryByRole("button", { name: "Save these for the model" })).toBeNull();
+  fake.raw.setSessionOptions.mockImplementation(async (_id, options) => ({
+    session_id: "a",
+    options: Object.fromEntries(Object.entries(options).filter(([, value]) => value !== null)) as Record<string, number>,
+  }));
+  await user.click(within(dialog()).getByRole("button", { name: "Creative" }));
+  await user.click(await within(dialog()).findByRole("button", { name: "Save these for the model" }));
+  await waitFor(() => expect(fake.raw.setSessionOptions).toHaveBeenCalledTimes(2));
+  expect(fake.raw.setModelOptions).toHaveBeenCalledWith("qwen3:8b", { temperature: 1, top_p: 0.95, min_p: 0.05 });
+  expect(fake.raw.setSessionOptions).toHaveBeenLastCalledWith("a", { temperature: null, top_p: null, min_p: null });
+});
+
+test("a model that is not the session's has presets that wait for a session", async () => {
+  await openTune(SAMPLE_LISTING, "Gemma 4 E4B");
+  await within(dialog()).findByRole("slider", { name: "Temperature" });
+  expect((within(dialog()).getByRole("button", { name: "Precise" }) as HTMLButtonElement).disabled).toBe(true);
+});
+
+const gauge = () => (slider("Context size").closest("li") as HTMLElement).textContent ?? "";
+
+test("the gauge says fits, tight, or too big for the context size, with the cost against the default", async () => {
+  await openTune();
+  await within(dialog()).findByRole("slider", { name: "Context size" });
+  expect(gauge()).toContain("+0.0 GB · fits");
+  fireEvent.change(slider("Context size"), { target: { value: "32768" } });
+  expect(gauge()).toContain("+3.5 GB · tight");
+  fireEvent.change(slider("Context size"), { target: { value: "131072" } });
+  expect(gauge()).toContain("+15.5 GB · too big");
+  expect(dialog().textContent).not.toContain("This may not load on this Mac.");
+  slider("Context size").focus();
+  fireEvent.focus(slider("Context size"));
+  expect(dialog().textContent).toContain("This may not load on this Mac.");
+  fireEvent.change(slider("Context size"), { target: { value: "2048" } });
+  expect(gauge()).toContain("−0.3 GB · fits");
+});
+
+test("there is no gauge when the daemon does not know the memory", async () => {
+  const { fake, user } = await openDialog();
+  fake.raw.getModelOptions.mockImplementation(async (model) => ({ ...sampleOptionsResult(model), memory: undefined }));
+  await pick(user, "local");
+  await user.click(within(dialog()).getByRole("button", { name: "Tune" }));
+  await within(dialog()).findByRole("slider", { name: "Context size" });
+  expect(gauge()).not.toContain(" GB");
+});
+
+test("the Tune view has one control per option, with the long text of the focused row", async () => {
+  const { user } = await openTune();
+  await within(dialog()).findByRole("slider", { name: "Temperature" });
   expect(within(dialog()).getAllByRole("slider")).toHaveLength(8);
   expect(within(dialog()).getByRole("combobox", { name: "Keep loaded" })).toBeTruthy();
   const row = slider("Temperature").closest("li") as HTMLElement;
@@ -745,20 +891,28 @@ test("a change saved by another client shows at once, and so does a session over
   await waitFor(() => expect(slider("Top K").value).toBe("12"));
 });
 
-test("a hosted model shows the sentence instead of the options", async () => {
+test("a hosted row has no Tune button", async () => {
   const { user, fake } = await openDialog();
   act(() => fake.emitEvent(ev("a", "model.selected", { model_profile: "sonnet", model_provider: "anthropic", model_name: "claude-sonnet-4" })));
   await pick(user, "sonnet");
-  await user.click(within(dialog()).getByRole("tab", { name: "Tune" }));
-  expect(within(dialog()).getByText("Tuning is for local Ollama models.")).toBeTruthy();
-  expect(within(dialog()).queryByRole("slider")).toBeNull();
+  expect(tuneButton()).toBeNull();
 });
 
 for (const theme of ["slip", "kiln"]) {
-  test(`no accessibility violations on the Tune tab in ${theme}`, async () => {
+  test(`no accessibility violations on the model list with Tune buttons in ${theme}`, async () => {
     document.documentElement.dataset.theme = theme;
-    await openTune();
-    await within(dialog()).findByRole("slider", { name: "Temperature" });
+    await openDialog();
     expect((await axe.run(document.body, popup)).violations).toEqual([]);
   });
+
+  for (const [label, value] of [["fits", "4096"], ["tight", "32768"], ["too big", "131072"]] as const) {
+    test(`no accessibility violations on the Tune view in ${theme}, with the gauge saying ${label}`, async () => {
+      document.documentElement.dataset.theme = theme;
+      await openTune();
+      await within(dialog()).findByRole("slider", { name: "Temperature" });
+      fireEvent.change(slider("Context size"), { target: { value } });
+      expect(gauge()).toContain(label);
+      expect((await axe.run(document.body, popup)).violations).toEqual([]);
+    });
+  }
 }

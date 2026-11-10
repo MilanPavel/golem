@@ -322,8 +322,8 @@ const MODEL_CASES: { label: string; props: Partial<ModelDialogViewProps> }[] = [
   { label: "A refused action", props: { initial: { activeId: "ollama/gemma4:e4b", failure: "model not found" } } },
   { label: "Ollama down", props: { listing: OLLAMA_DOWN_LISTING } },
   { label: "No Ollama", props: { listing: NO_OLLAMA_LISTING } },
-  { label: "Tune tab", props: { initial: { tab: "tune" } } },
-  { label: "Tune tab, hosted model", props: { session: { profile: "sonnet", name: null }, initial: { tab: "tune", activeId: "anthropic/claude-sonnet-4" } } },
+  { label: "Tune view", props: { initial: { tune: "ollama/qwen3:8b" } } },
+  { label: "Tune view, a model that is not the session's", props: { initial: { tune: "ollama/gemma4:e4b" } } },
   { label: "Loading", props: { listing: null } },
   { label: "Could not list", props: { listing: null, loadError: "daemon went away" } },
 ];

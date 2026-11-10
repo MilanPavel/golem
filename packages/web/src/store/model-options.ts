@@ -1,3 +1,3 @@
-import type { ModelOption, ModelOptionsGetResult, ModelOptionsSetResult, SessionSetOptionsResult } from "@golem/client";
+import type { ModelMemory, ModelOption, ModelOptionsGetResult, ModelOptionsSetResult, SessionSetOptionsResult } from "@golem/client";
 
-export type { ModelOption, ModelOptionsGetResult, ModelOptionsSetResult, SessionSetOptionsResult };
+export type { ModelMemory, ModelOption, ModelOptionsGetResult, ModelOptionsSetResult, SessionSetOptionsResult };
