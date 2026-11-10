@@ -1,4 +1,4 @@
-import { connectionLabel, contextLevel, contextShare, type LiveContext } from "@golem/view";
+import { connectionLabel, contextLevel, formatTokens, type LiveContext } from "@golem/view";
 
 import { newLinesLabel } from "./transcript.ts";
 
@@ -186,17 +186,32 @@ export function startedAtMs(nowMs: number, uptimeSeconds: number): number | null
   return nowMs - uptimeSeconds * 1000;
 }
 
-/** `ctx 25%`, `ctx <1%`; empty when the size or the window is unknown. */
-export function contextLabel(context: { used: number | null; window: number | null } | null): string {
-  if (context === null) {
+const CONTEXT_BAR_CELLS = 8;
+
+/**
+ * `█░░░░░░░ 8% 84.0K/1049.4K`, with `≈` before the percent when the window is estimated.
+ * Just the tokens, `84.0K`, when the window is unknown. Empty when the size is unknown.
+ */
+export function contextLabel(
+  context: { used: number | null; window: number | null; windowEstimated?: boolean } | null,
+): string {
+  if (context === null || context.used === null) {
     return "";
   }
-  const share = contextShare(context.used, context.window);
-  if (share === null) {
-    return "";
+  const { used, window } = context;
+  if (window === null || !(window > 0)) {
+    return formatTokens(used);
   }
-  const percent = share * 100;
-  return percent > 0 && percent < 1 ? "ctx <1%" : `ctx ${Math.floor(percent)}%`;
+  const ratio = used / window;
+  const filled = Math.min(
+    CONTEXT_BAR_CELLS,
+    used > 0 ? Math.max(1, Math.round(ratio * CONTEXT_BAR_CELLS)) : 0,
+  );
+  const bar = "█".repeat(filled) + "░".repeat(CONTEXT_BAR_CELLS - filled);
+  const percent = ratio * 100;
+  const share = percent > 0 && percent < 1 ? "<1%" : `${Math.floor(percent)}%`;
+  const mark = context.windowEstimated === true ? "≈" : "";
+  return `${bar} ${mark}${share} ${formatTokens(used)}/${formatTokens(window)}`;
 }
 
 /** Red from 95% or when the input reached `num_ctx`, yellow from 80%. */

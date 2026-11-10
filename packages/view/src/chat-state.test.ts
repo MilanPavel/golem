@@ -792,10 +792,10 @@ test("the newest call's context comes from model.call.started and completed, and
   let state = reduceChat(emptyChat, call("model.call.started", "m1", { context_window: 8000, num_ctx: 4000 }));
   assert.equal(state.context.last, null);
   state = reduceChat(state, call("model.call.completed", "m1", { usage: { input: 1200, output: 5 } }));
-  assert.deepEqual(state.context.last, { spanId: "m1", used: 1200, window: 8000, numCtx: 4000 });
+  assert.deepEqual(state.context.last, { spanId: "m1", used: 1200, window: 8000, windowEstimated: false, numCtx: 4000 });
   state = reduceChat(state, call("model.call.started", "m2", { context_window: 8000 }));
   state = reduceChat(state, call("model.call.completed", "m2", { usage: { input: 2400, output: 5 } }));
-  assert.deepEqual(state.context.last, { spanId: "m2", used: 2400, window: 8000, numCtx: null });
+  assert.deepEqual(state.context.last, { spanId: "m2", used: 2400, window: 8000, windowEstimated: false, numCtx: null });
 });
 
 test("an event that changes neither the chat nor the context returns the same state", () => {
