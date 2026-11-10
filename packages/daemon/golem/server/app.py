@@ -189,10 +189,11 @@ class DaemonApp:
             else:
                 models = self._discovery(router)
 
-            async def note_loaded(profile: str) -> None:
+            async def note_loaded(profile: str, sent_num_ctx: int | None) -> int | None:
                 resolved = router.resolve(profile)
-                if resolved.provider.kind == "ollama":
-                    await models.note_loaded(resolved.ref)
+                if resolved.provider.kind != "ollama":
+                    return None
+                return await models.note_loaded(resolved.ref, sent_num_ctx)
 
             async with (
                 Database.open(self.paths.database_file) as database,

@@ -94,7 +94,8 @@ function event(type: string, data: Record<string, unknown>): ChatEvent {
 }
 const started = (id: string, window: number | null = 128000, extra: Record<string, unknown> = {}) =>
   event("model.call.started", { message_id: id, index: 1, profile: "p", context_window: window, ...extra });
-const completed = (id: string, usage?: Record<string, unknown>) => event("model.call.completed", { message_id: id, latency_ms: 5, usage });
+const completed = (id: string, usage?: Record<string, unknown>, extra: Record<string, unknown> = {}) =>
+  event("model.call.completed", { message_id: id, latency_ms: 5, usage, ...extra });
 
 test("foldLiveContext: started then completed gives the last context", () => {
   const state = foldLiveContext(foldLiveContext(emptyLiveContext, started("m1")), completed("m1", { input: 32000, output: 10 }));
@@ -249,4 +250,27 @@ test("contextReport: the part rows add up to used when the parts are scaled", ()
   const ctx = full();
   const sum = ctx.parts.reduce((total, p) => total + p.tokens, 0);
   assert.equal(sum, ctx.used);
+});
+
+test("foldLiveContext: a window read after the call replaces the estimate and is exact", () => {
+  const state = foldLiveContext(
+    foldLiveContext(emptyLiveContext, started("m1", 4096, { window_estimated: true })),
+    completed("m1", { input: 23600 }, { context_window: 32768 }),
+  );
+  assert.equal(state.last?.window, 32768);
+  assert.equal(state.last?.windowEstimated, false);
+});
+
+test("foldLiveContext: input above an estimated window drops the window, never over 100%", () => {
+  const state = foldLiveContext(
+    foldLiveContext(emptyLiveContext, started("m1", 4096, { window_estimated: true })),
+    completed("m1", { input: 23600 }),
+  );
+  assert.equal(state.last?.window, null);
+  assert.equal(state.last?.windowEstimated, false);
+});
+
+test("foldLiveContext: input above an exact window keeps it", () => {
+  const state = foldLiveContext(foldLiveContext(emptyLiveContext, started("m1", 4096)), completed("m1", { input: 23600 }));
+  assert.equal(state.last?.window, 4096);
 });

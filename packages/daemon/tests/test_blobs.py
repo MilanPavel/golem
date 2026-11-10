@@ -24,7 +24,12 @@ from golem.store.database import Database
 from golem.store.events import EventLog
 from golem.store.records import RunRecords, SessionRecords
 from golem.tools import default_registry
-from golem_protocol.events import ChatEvent, ModelCallStartedEvent, PromptSectionInfo
+from golem_protocol.events import (
+    ChatEvent,
+    ModelCallCompletedEvent,
+    ModelCallStartedEvent,
+    PromptSectionInfo,
+)
 
 
 class _RefusesTools(ToolCallingChatModel):
@@ -49,7 +54,7 @@ class _Chat:
         model: ToolCallingChatModel,
         prompt: SystemPrompt | None,
         window_of: WindowOf | None = None,
-        note_loaded: Callable[[str], Awaitable[None]] | None = None,
+        note_loaded: Callable[[str, int | None], Awaitable[int | None]] | None = None,
     ) -> None:
         self.database = database
         self.runtime = open_chat(
@@ -61,6 +66,7 @@ class _Chat:
             window_of=window_of,
             note_loaded=note_loaded,
         )
+        self.completed: list[ModelCallCompletedEvent] = []
         self.events = EventLog(database)
         self.runs = RunRecords(database)
         records = SessionRecords(database)
@@ -77,6 +83,7 @@ class _Chat:
 
         await _until(done)
         events: list[ChatEvent] = await self.events.for_run(run_id)
+        self.completed = [e for e in events if isinstance(e, ModelCallCompletedEvent)]
         return [e for e in events if isinstance(e, ModelCallStartedEvent)]
 
 
@@ -248,8 +255,9 @@ async def test_an_estimated_window_is_recorded_as_estimated(database: Database) 
 async def test_a_model_call_tells_note_loaded_the_profile(database: Database) -> None:
     seen: list[str] = []
 
-    async def note(profile: str) -> None:
+    async def note(profile: str, sent: int | None) -> int | None:
         seen.append(profile)
+        return None
 
     chat = _Chat(database, ToolCallingChatModel(replies=["hi"]), None, note_loaded=note)
     session_id = await chat.manager.create(None)
@@ -259,7 +267,7 @@ async def test_a_model_call_tells_note_loaded_the_profile(database: Database) ->
 
 
 async def test_a_note_loaded_that_raises_does_not_fail_the_call(database: Database) -> None:
-    async def note(profile: str) -> None:
+    async def note(profile: str, sent: int | None) -> int | None:
         raise RuntimeError("boom")
 
     chat = _Chat(database, ToolCallingChatModel(replies=["hi"]), None, note_loaded=note)
@@ -269,3 +277,51 @@ async def test_a_note_loaded_that_raises_does_not_fail_the_call(database: Databa
     await chat.manager.cancel_all()
     assert run is not None
     assert run.status == "completed"
+
+
+async def _ran_with(
+    database: Database, sent: int | None, loaded: int | None
+) -> tuple[int | None, list[int | None]]:
+    asked: list[int | None] = []
+
+    async def note(profile: str, num_ctx: int | None) -> int | None:
+        asked.append(num_ctx)
+        return loaded
+
+    chat = _Chat(
+        database,
+        ToolCallingChatModel(replies=["hi"]),
+        None,
+        window_of=lambda _, __: ContextWindow(sent, sent),
+        note_loaded=note,
+    )
+    session_id = await chat.manager.create(None)
+    await chat.send(session_id, "hello")
+    await chat.manager.cancel_all()
+    (done,) = chat.completed
+    return done.data.context_window, asked
+
+
+async def test_the_completed_call_has_the_window_ollama_loaded_when_nothing_was_sent(
+    database: Database,
+) -> None:
+    assert await _ran_with(database, None, 32768) == (32768, [None])
+
+
+async def test_the_completed_call_has_the_sent_num_ctx_when_one_was_sent(
+    database: Database,
+) -> None:
+    assert await _ran_with(database, 8192, 8192) == (8192, [8192])
+    assert await _ran_with(database, 8192, None) == (8192, [8192])
+
+
+async def test_the_completed_call_has_no_window_when_ollama_says_nothing(
+    database: Database,
+) -> None:
+    assert await _ran_with(database, None, None) == (None, [None])
+
+
+async def test_ollamas_value_wins_over_the_sent_one_when_they_differ(
+    database: Database,
+) -> None:
+    assert await _ran_with(database, 8192, 4096) == (4096, [8192])

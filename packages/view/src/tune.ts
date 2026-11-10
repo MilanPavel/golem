@@ -18,6 +18,8 @@ export type TuneState = {
   options: readonly ModelOption[];
   /** The model's own values, else Ollama's. */
   defaults: Readonly<Record<string, TuneValue>>;
+  /** Where a default that is not Ollama's fixed one came from: the Modelfile, or Ollama's own load. */
+  defaultFrom: Readonly<Record<string, "modelfile" | "ollama">>;
   saved: Readonly<Record<string, TuneValue>>;
   session: Readonly<Record<string, TuneValue>>;
   /** What the daemon knows of this machine's memory and the model's size, or null when it does not. */
@@ -77,6 +79,7 @@ export function tuneState(result: ModelOptionsGetResult): TuneState {
     model: result.model,
     options: result.options,
     defaults: result.defaults,
+    defaultFrom: result.default_from ?? {},
     saved: result.saved,
     session: result.session ?? {},
     memory: result.memory ?? null,
@@ -113,6 +116,23 @@ export function differsFromDefault(state: TuneState, row: TuneRow): boolean {
   return String(row.value) !== String(fallback);
 }
 
+/** What `num_ctx` starts at on the first step or drag when it has no default and no value. */
+export const NUM_CTX_START = 8192;
+
+/** What a row says about its default, or null. `num_ctx` with no default says Ollama sets it when it loads. */
+export function defaultNote(state: TuneState, row: TuneRow): string | null {
+  const name = row.option.name;
+  const fallback = state.defaults[name];
+  if (fallback === undefined) {
+    return name === "num_ctx" && row.value === null ? "set by Ollama when it loads" : null;
+  }
+  const origin = state.defaultFrom[name];
+  if (origin !== undefined) {
+    return `model default ${formatTuneValue(row.option, fallback)} · from ${origin === "ollama" ? "Ollama" : "the Modelfile"}`;
+  }
+  return differsFromDefault(state, row) ? `model default ${formatTuneValue(row.option, fallback)}` : null;
+}
+
 export function moveFocus(state: TuneState, by: number): TuneState {
   if (state.options.length === 0) return state;
   const focus = Math.min(state.options.length - 1, Math.max(0, state.focus + by));
@@ -132,6 +152,9 @@ export function step(state: TuneState, name: string, direction: 1 | -1): TuneSta
   const option = state.options.find((item) => item.name === name);
   if (option === undefined) return state;
   const current = tuneRow(state, option).value;
+  if (name === "num_ctx" && current === null && option.kind !== "duration") {
+    return put(state, name, Math.min(option.maximum, Math.max(option.minimum, NUM_CTX_START)));
+  }
   const next = option.kind === "duration" ? nextDuration(current, direction) : nextNumber(option, current, direction);
   return put(state, name, next);
 }
@@ -239,11 +262,12 @@ export function kvGb(ctx: number, memory: ModelMemory): number {
 
 /**
  * What `ctx` costs against `baseCtx`, the default window: `extraGb` is the KV cache for `ctx`
- * minus the KV cache for `baseCtx`, negative below the default. `fit` is for the whole model with
+ * minus the KV cache for `baseCtx`, negative below the default. With no default (`baseCtx` null)
+ * it is the KV cache for `ctx` alone. `fit` is for the whole model with
  * `ctx`, the rule of the daemon's `hardware.fit`: `fits` within `fits_share` of RAM, `tight`
  * within `tight_share`, else `too_big`.
  */
-export function memoryFor(ctx: number, memory: ModelMemory, baseCtx: number): { extraGb: number; fit: MemoryFit } {
+export function memoryFor(ctx: number, memory: ModelMemory, baseCtx: number | null): { extraGb: number; fit: MemoryFit } {
   const need = memory.size_gb + kvGb(ctx, memory) + memory.overhead_gb;
   const fit: MemoryFit =
     need <= memory.ram_gb * memory.fits_share
@@ -251,7 +275,7 @@ export function memoryFor(ctx: number, memory: ModelMemory, baseCtx: number): { 
       : need <= memory.ram_gb * memory.tight_share
       ? "tight"
       : "too_big";
-  return { extraGb: kvGb(ctx, memory) - kvGb(baseCtx, memory), fit };
+  return { extraGb: kvGb(ctx, memory) - (baseCtx === null ? 0 : kvGb(baseCtx, memory)), fit };
 }
 
 /** A memory change as the panel shows it: `+1.1 GB`, or `−0.5 GB` below the default. */
@@ -260,18 +284,18 @@ export function formatExtraGb(extraGb: number): string {
   return `${extraGb < 0 && rounded > 0 ? "−" : "+"}${rounded.toFixed(1)} GB`;
 }
 
-/** The note after the `num_ctx` value: `+1.1 GB · fits`, and `warning` when it is too big. */
+/** The note after the `num_ctx` value: `+1.1 GB · fits`, or `2.1 GB for the window · fits` with no default, and `warning` when it is too big. */
 export type MemoryNote = { text: string; fit: MemoryFit; warning?: string };
 
 /** The memory gauge for a row, or null for any option but `num_ctx`, or when the memory is not known. */
 export function memoryNote(state: TuneState, row: TuneRow): MemoryNote | null {
   if (row.option.name !== "num_ctx" || state.memory === null || typeof row.value !== "number") return null;
   const fallback = state.defaults["num_ctx"];
-  const base = typeof fallback === "number" ? fallback : row.option.default;
-  if (typeof base !== "number") return null;
+  const base = typeof fallback === "number" ? fallback : null;
   const { extraGb, fit } = memoryFor(row.value, state.memory, base);
   const verdict = fit === "fits" ? "fits" : fit === "tight" ? "tight" : "too big";
-  const note: MemoryNote = { text: `${formatExtraGb(extraGb)} · ${verdict}`, fit };
+  const amount = base === null ? `${Number(extraGb.toFixed(1)).toFixed(1)} GB for the window` : formatExtraGb(extraGb);
+  const note: MemoryNote = { text: `${amount} · ${verdict}`, fit };
   if (fit === "too_big") note.warning = "This may not load on this Mac.";
   return note;
 }

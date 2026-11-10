@@ -351,7 +351,7 @@ def open_chat(
     prompt: SystemPrompt | None = None,
     blobs: Blobs | None = None,
     window_of: WindowOf | None = None,
-    note_loaded: Callable[[str], Awaitable[None]] | None = None,
+    note_loaded: Callable[[str, int | None], Awaitable[int | None]] | None = None,
 ) -> ChatRuntime:
     """Compile the chat graph against ``checkpointer``.
 
@@ -364,8 +364,10 @@ def open_chat(
     call stores its system prompt and tool schemas there, and reports their hashes.
     ``window_of`` gives the context window of a profile. Each model call reports it
     with the lengths of the system prompt's sections. Without it, the window is unknown.
-    ``note_loaded`` is awaited with the profile after each model call, so the server can
-    read what the model loaded. A failure there never fails the call.
+    ``note_loaded`` is awaited with the profile and the ``num_ctx`` sent (or None) after each
+    model call, so the server can read the window the model loaded. It returns that window,
+    or None. The window the call ran with goes out as ``model.response``. A failure there
+    never fails the call.
     """
     registry = default_registry() if tools is None else tools
     rules = Policy(None) if policy is None else policy
@@ -413,11 +415,23 @@ def open_chat(
                 if down is None:
                     raise
                 raise down from exc
+        loaded: int | None = None
         if note_loaded is not None:
             try:
-                await note_loaded(profile)
+                loaded = await note_loaded(profile, window.num_ctx)
             except Exception:
                 log.debug("noting the loaded model %s failed", profile, exc_info=True)
+        ran = loaded
+        if window.num_ctx is not None:
+            if loaded is not None and loaded != window.num_ctx:
+                log.warning(
+                    "%s was sent num_ctx %d but ran with %d", profile, window.num_ctx, loaded
+                )
+            else:
+                ran = window.num_ctx
+        get_stream_writer()(
+            {STREAM_KEY: "model.response", "message_id": message_id, "context_window": ran}
+        )
         update: dict[str, object] = {"id": message_id}
         if response.tool_calls:
             update["tool_calls"] = _with_ids(response.tool_calls)

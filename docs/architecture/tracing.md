@@ -52,7 +52,7 @@ golem keeps every request, but once: the history is already in the checkpoint, s
 
 Three things are recorded as a session runs:
 
-1. **Each model call is marked.** `call_model` sends a `model.request` item just before the request goes out. The runner stores `model.call.started` then, and `model.call.completed` when the stream ends, with the tokens, the stop reason, the time to the first token, and the latency. Building the prompt and starting MCP servers come before the mark, so they don't count as model time.
+1. **Each model call is marked.** `call_model` sends a `model.request` item just before the request goes out. The runner stores `model.call.started` then, and `model.call.completed` when the stream ends, with the tokens, the stop reason, the time to the first token, the latency, and, for a local model, the window it ran with (read after the call and sent by `call_model` as a `model.response` item before its reply). Building the prompt and starting MCP servers come before the mark, so they don't count as model time.
 2. **The request is kept by hash.** The system prompt and the tool schemas go in the `blobs` table, keyed by their sha256. `model.call.started` holds the two hashes, the ids of the history messages sent, the model's context window, and the name and size of each part of the system prompt.
 3. **Each tool is timed.** `tool.completed` and `tool.failed` carry `duration_ms`, measured around the tool's run. The wait for an approval is not in it.
 
@@ -180,7 +180,7 @@ A model call has no id of its own. Each call makes exactly one assistant message
 | Event | Fields |
 |---|---|
 | `model.call.started` | `message_id`, `index` (1-based within the run), `profile`, `provider`, `model`, `system_prompt_sha`, `tools_sha`, `message_ids`, `context_window`, `num_ctx`, `window_estimated`, `system_sections` |
-| `model.call.completed` | `message_id`, `usage` (`input`, `output`, `cache_read`, `cache_write`), `stop_reason`, `first_token_ms`, `latency_ms`, `failed` |
+| `model.call.completed` | `message_id`, `usage` (`input`, `output`, `cache_read`, `cache_write`), `stop_reason`, `first_token_ms`, `latency_ms`, `failed`, `context_window` |
 | `tool.completed`, `tool.failed` | `duration_ms`, as well as what they had before |
 
 Every new field is optional, so older events stay valid. A provider that reports no usage leaves `usage` empty, and one that reports only some counts leaves the rest `null`. Neither is ever zero. `model.call.completed` comes before the call's `tool.requested` events.
@@ -194,7 +194,7 @@ The `blobs` table is `sha256`, `kind`, `size`, `created_at`, and `text`. `BlobSt
 
 `message_ids` are the checkpoint ids of the history sent, in order, not counting the system prompt. `window_estimated` is true when golem did not send the window and read it from Ollama, from the loaded context or the Modelfile, so a screen shows it with `≈`. An older event has no field and reads as false. `system_sections` lists the non-empty parts of the system prompt as `name` and `chars`. The stored prompt is those parts joined with a blank line, so their lengths split it exactly, and the prompt is not stored twice.
 
-`context_window` is the profile's `ctx`, else the listed model's, else LiteLLM's `max_input_tokens`, and `null` when none is known. `num_ctx` is the Ollama option sent, if any. Both are worked out when the call is made, because the profile, the listing, and the prices change later.
+`context_window` is the profile's `ctx`, else the listed model's, else LiteLLM's `max_input_tokens`, and `null` when none is known. `num_ctx` is the Ollama option sent, if any. Both are worked out when the call is made, because the profile, the listing, and the prices change later, so on `model.call.started` the window is a forecast. `model.call.completed` has `context_window`: the window the call ran with, read from the model server (Ollama `/api/ps`) after the call. It is exact, and `null` when it could not be read or the provider is hosted. A span takes the completed value when there is one. An estimated window below the call's input tokens is dropped, so no span shows more than 100% of a guess.
 
 ### Times
 

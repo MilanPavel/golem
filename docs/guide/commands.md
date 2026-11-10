@@ -81,7 +81,7 @@ Type `/` and suggestions appear, with each command's arguments. `/help` lists ev
 
 #### Tune a local model
 
-`/tune` opens a panel with one row per option of the model this chat uses, a block slider for each, and what the focused option does under the rows. It is for local Ollama models. A hosted model says so and opens nothing.
+`/tune` opens a panel with one row per option of the model this chat uses, a block slider for each, and what the focused option does under the rows. A model with no `num_ctx` in its Modelfile and none asked for shows `set by Ollama when it loads` for the context size, and the first `←` or `→` starts it at 8192. It is for local Ollama models. A hosted model says so and opens nothing.
 
 | Key | What it does |
 |---|---|

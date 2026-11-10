@@ -158,10 +158,17 @@ export function foldLiveContext(state: LiveContextState, event: ChatEvent): Live
     if (pending === null || pending.spanId !== event.data.message_id) return state;
     const input = event.data.usage?.input;
     if (typeof input !== "number") return { ...state, pending: null };
-    return {
-      last: { spanId: pending.spanId, used: input, window: pending.window, windowEstimated: pending.windowEstimated, numCtx: pending.numCtx },
-      pending: null,
-    };
+    // The window read after the call is exact and replaces the forecast made before it.
+    const read = event.data.context_window ?? null;
+    const exact = read !== null;
+    let window = exact ? read : pending.window;
+    let windowEstimated = exact ? false : pending.windowEstimated;
+    // An estimated window below the input is a bad guess: show it as unknown, never over 100%.
+    if (window !== null && windowEstimated && input > window) {
+      window = null;
+      windowEstimated = false;
+    }
+    return { last: { spanId: pending.spanId, used: input, window, windowEstimated, numCtx: pending.numCtx }, pending: null };
   }
   return state;
 }

@@ -14,7 +14,7 @@ The listing's `context_length` (`<arch>.context_length` from `/api/show`) is tha
 golem finds the window of a local model from these sources, in this order of trust:
 
 1. **Sent by golem** (exact, always known when set): the session's `num_ctx` override, else the `num_ctx` saved for the model (step 12.6), else the profile's `ctx`. This is the order `ModelRouter.chat_model` sends them in: it sets the profile's `ctx` first, and then `ollama_options` overwrites it with the saved value and the session override.
-2. **Loaded in Ollama** (exact, once the model has run): `context_length` of the model in Ollama's `/api/ps`.
+2. **Loaded in Ollama** (see "Changed by 12.16.9": this source no longer counts as exact before the call): `context_length` of the model in Ollama's `/api/ps`.
 3. **The model's Modelfile** (estimated): the `num_ctx` line in the `parameters` of `/api/show`. It is known as soon as the model is installed.
 4. **Unknown**: as today.
 
@@ -24,6 +24,26 @@ Also:
 - The window is worked out when the call is made and recorded on `model.call.started`, as [ADR-041](041-session-trace.md) already says for `context_window`.
 - golem still never sends a `num_ctx` that nobody asked for.
 - golem does not read Ollama's server settings (`OLLAMA_CONTEXT_LENGTH`) and does not guess a default number.
+
+## Changed by 12.16.9
+
+Measured on 2026-11-10, Ollama 0.40.14, `llama3.2:3b`, a Mac with 36 GB:
+
+| # | Fact |
+|---|---|
+| F1 | A request without `num_ctx` loads the model at 32768 (`/api/ps` `context_length`). That is not 4096 and not the model's maximum (131072). Ollama picks it from the machine's memory or `OLLAMA_CONTEXT_LENGTH`, so golem cannot know it before a load. |
+| F2 | Ollama reloads the model whenever a request's `num_ctx` differs from the loaded one. The loaded value is only the window of a request made the same way. |
+| F3 | After a call with `keep_alive: 0`, `/api/ps` is empty. |
+| F4 | `prompt_eval_count` counts the prompt after any cut, so it is never above the window the call ran with. |
+| F5 | There is no `/api/tokenize`, and no field in the reply says the prompt was cut. |
+
+What follows:
+
+- **The window after the call is the truth.** `call_model` reads `/api/ps` once after each call and the window the call ran with goes out on `model.call.completed` as `context_window`: exact, `None` when it could not be read. The window on `model.call.started` is a forecast.
+- **"Loaded" only counts for a request made the same way.** golem keeps `default_ctx`, the window Ollama gave a model the last time golem sent no `num_ctx`. A load made for a session that sent `num_ctx` never sets it. The forecast order is now: the sent `num_ctx`, the profile `ctx`, the Modelfile's `num_ctx` (estimated), `default_ctx` (estimated), unknown.
+- **An estimated window is never shown below the input tokens.** Then the window is unknown and the hint says so. An exact window below them is kept and logged, as it would be a bug.
+- **No fixed `num_ctx` default.** `/tune` and the web Tune view say `set by Ollama when it loads` until the Modelfile or a call says the number, then `model default 32768 · from Ollama` or `· from the Modelfile`.
+- Whether `/api/ps` `context_length` is per request or per slot with `OLLAMA_NUM_PARALLEL` above 1 is not settled here.
 
 ## Alternatives Considered
 

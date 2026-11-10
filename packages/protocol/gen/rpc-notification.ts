@@ -113,6 +113,7 @@ export type Seq8 = number;
 export type SessionId9 = string;
 export type Ts8 = string;
 export type Type8 = 'model.call.started';
+export type ContextWindow1 = number | null;
 export type Failed = boolean;
 export type FirstTokenMs = number | null;
 export type LatencyMs = number;
@@ -605,10 +606,14 @@ export interface ModelCallCompletedEvent {
  * None when no text came. ``latency_ms`` is the time to the end.
  * ``failed`` is true when the call raised or was stopped.
  *
+ * ``context_window`` is the window the call ran with, read from the model server
+ * after the call. Exact. None when it could not be read.
+ *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "ModelCallCompletedData".
  */
 export interface ModelCallCompletedData {
+  context_window?: ContextWindow1;
   failed?: Failed;
   first_token_ms?: FirstTokenMs;
   latency_ms: LatencyMs;

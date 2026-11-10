@@ -121,6 +121,7 @@ export {
 export {
   applyPreset,
   changedRows,
+  defaultNote,
   differsFromDefault,
   focusedRow,
   formatExtraGb,
@@ -133,6 +134,7 @@ export {
   memoryFor,
   memoryNote,
   moveFocus,
+  NUM_CTX_START,
   presetForKey,
   presetOptions,
   PRESETS,

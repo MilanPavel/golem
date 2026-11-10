@@ -30,6 +30,7 @@ from pydantic import BaseModel
 from golem.graphs.adapter import (
     ApprovalAsked,
     ModelRequested,
+    ModelResponded,
     ModelStarted,
     PinRead,
     PinSkipped,
@@ -164,7 +165,8 @@ class _Progress:
     ``model`` names the model that answers. ``call`` is the message id of the
     model call sent and not yet ended, ``sent_at`` when it was sent
     (``time.monotonic()``), and ``first_at`` when its first text came.
-    ``index`` counts the calls sent so far.
+    ``index`` counts the calls sent so far. ``ran_window`` is the window the call
+    ran with, read after it.
     """
 
     run_started: bool = False
@@ -179,6 +181,7 @@ class _Progress:
     call: str | None = None
     sent_at: float = 0.0
     first_at: float | None = None
+    ran_window: int | None = None
 
 
 async def run_turn(
@@ -365,6 +368,7 @@ async def _apply(
         progress.call = fact.message_id
         progress.sent_at = time.monotonic()
         progress.first_at = None
+        progress.ran_window = None
         model = progress.model
         await emit(
             "model.call.started",
@@ -385,6 +389,8 @@ async def _apply(
                 else [PromptSectionInfo(name=n, chars=c) for n, c in fact.system_sections],
             ),
         )
+    elif isinstance(fact, ModelResponded):
+        progress.ran_window = fact.context_window
     elif isinstance(fact, TextDelta) and progress.open is not None:
         if progress.call is not None and progress.first_at is None:
             progress.first_at = time.monotonic()
@@ -490,6 +496,7 @@ async def _end_call(
             first_token_ms=None if first is None else _ms(first - progress.sent_at),
             latency_ms=_ms(now - progress.sent_at),
             failed=failed,
+            context_window=None if failed else progress.ran_window,
         ),
     )
 

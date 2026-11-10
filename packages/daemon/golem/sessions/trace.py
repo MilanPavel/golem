@@ -13,6 +13,7 @@ not record is filled from today's config, and marked estimated.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
@@ -47,6 +48,9 @@ Status = Literal["ok", "failed", "cancelled", "denied", "running"]
 
 _NAME_CHARS = 80
 _PREVIEW_CHARS = 200
+
+
+log = logging.getLogger(__name__)
 
 
 def build_trace(events: Sequence[ChatEvent]) -> list[TraceRunSpan]:
@@ -148,6 +152,13 @@ def _recorded_models(
             if done.data.usage is not None:
                 tokens = TraceTokens(**done.data.usage.model_dump())
         model = f"{data.provider}/{data.model}" if data.provider and data.model else data.profile
+        window, estimated = recorded_window(
+            data.context_window,
+            data.window_estimated,
+            None if done is None else done.data.context_window,
+            None if tokens is None else tokens.input,
+            data.message_id,
+        )
         spans.append(
             TraceModelSpan(
                 id=data.message_id,
@@ -160,9 +171,9 @@ def _recorded_models(
                 model=model,
                 tokens=tokens,
                 first_token_ms=first,
-                context_window=data.context_window,
+                context_window=window,
                 num_ctx=data.num_ctx,
-                context_window_estimated=data.window_estimated,
+                context_window_estimated=estimated,
                 preview=replies.get(data.message_id, "")[:_PREVIEW_CHARS],
             )
         )
@@ -286,6 +297,29 @@ def window_name(span: TraceSpan, profile: str) -> str | None:
     return profile or None
 
 
+def recorded_window(
+    started: int | None,
+    started_estimated: bool,
+    completed: int | None,
+    used: int | None,
+    span_id: str = "",
+) -> tuple[int | None, bool]:
+    """``(window, estimated)`` of a model call from what the events recorded.
+
+    The window read after the call is exact and wins over the forecast of the start.
+    An estimated window below the input tokens is dropped, so no call shows more than
+    100% of a guessed window. An exact one that is below them is kept and logged.
+    """
+    window, estimated = (
+        (completed, False) if completed is not None else (started, started_estimated)
+    )
+    if window is not None and used is not None and used > window:
+        if estimated:
+            return None, False
+        log.warning("model call %s took in %d tokens, over its window of %d", span_id, used, window)
+    return window, estimated
+
+
 def filled_window(
     span: TraceSpan, window: int | None, profile: str, window_of: Callable[[str], int | None]
 ) -> tuple[int | None, bool]:
@@ -319,7 +353,8 @@ def with_windows(
         for model in run.children:
             if model.context_window is None:
                 window, estimated = filled_window(model, None, profile, lookup)
-                if window is not None:
+                used = None if model.tokens is None else model.tokens.input
+                if window is not None and (used is None or used <= window):
                     model = model.model_copy(
                         update={"context_window": window, "context_window_estimated": estimated}
                     )
@@ -410,6 +445,15 @@ def _model_read(
             m.id for m in _context(before, previous.message_ids if previous else None, messages)
         }
         new_from = next((i for i, m in enumerate(context) if m.id not in seen), len(context))
+    window, estimated = (None, False)
+    if here is not None:
+        window, estimated = recorded_window(
+            here.context_window,
+            here.window_estimated,
+            None if done is None else done.context_window,
+            None if span.tokens is None else span.tokens.input,
+            span.id,
+        )
     return SpanRead(
         TraceSpanResult(
             span=span,
@@ -422,9 +466,9 @@ def _model_read(
         ),
         system_prompt_sha=None if here is None else here.system_prompt_sha,
         tools_sha=None if here is None else here.tools_sha,
-        context_window=None if here is None else here.context_window,
+        context_window=window,
         num_ctx=None if here is None else here.num_ctx,
-        window_estimated=False if here is None else here.window_estimated,
+        window_estimated=estimated,
     )
 
 

@@ -249,3 +249,41 @@ async def test_memory_is_none_without_a_size_or_without_ram(
         finally:
             await client.close()
             await stop_daemon(app, task)
+
+
+def _ps(loaded: int, shown: dict[str, object]) -> httpx.MockTransport:
+    def handle(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/ps":
+            return httpx.Response(
+                200, json={"models": [{"name": "qwen3:8b", "context_length": loaded}]}
+            )
+        if request.url.path == "/api/show":
+            return httpx.Response(200, json=shown)
+        return httpx.Response(404)
+
+    return httpx.MockTransport(handle)
+
+
+async def test_num_ctx_has_no_default_until_ollama_or_the_modelfile_gives_one(
+    short_home: Path, tmp_path: Path
+) -> None:
+    app, task = await start_daemon(
+        short_home, router=_router(), discovery=_discovery(tmp_path, _ps(32768, {}), None)
+    )
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        first = rpc_result(await client.call("model.options.get", {"model": "qwen3:8b"}))
+        assert "num_ctx" not in cast(dict[str, object], first["defaults"])
+        assert first["default_from"] == {}
+        assert app.state.models is not None
+        assert await app.state.models.note_loaded("ollama/qwen3:8b", 8192) == 32768
+        again = rpc_result(await client.call("model.options.get", {"model": "qwen3:8b"}))
+        assert "num_ctx" not in cast(dict[str, object], again["defaults"])
+        assert await app.state.models.note_loaded("ollama/qwen3:8b", None) == 32768
+        later = rpc_result(await client.call("model.options.get", {"model": "qwen3:8b"}))
+        assert cast(dict[str, object], later["defaults"])["num_ctx"] == 32768
+        assert later["default_from"] == {"num_ctx": "ollama"}
+    finally:
+        await client.close()
+        await stop_daemon(app, task)

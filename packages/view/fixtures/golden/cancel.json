@@ -105,6 +105,7 @@
     },
     {
       "data": {
+        "context_window": null,
         "failed": true,
         "first_token_ms": 0,
         "latency_ms": 0,
@@ -216,6 +217,7 @@
     },
     {
       "data": {
+        "context_window": null,
         "failed": true,
         "first_token_ms": 0,
         "latency_ms": 0,
