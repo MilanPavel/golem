@@ -31,6 +31,7 @@ export type TuneKey =
   | "right"
   | "reset"
   | "target"
+  | "try"
   | "close"
   | "preset-1"
   | "preset-2"
@@ -42,6 +43,8 @@ export type TuneKey =
 export type TuneAction =
   | { kind: "none" }
   | { kind: "close" }
+  /** Ask the last question again with these values, in a fork. */
+  | { kind: "try" }
   /** Send `value` for `name`: `null` removes it. It goes to the model's saved options or to the session. */
   | { kind: "change"; name: string; value: TuneValue | null; target: TuneTarget }
   /** Send a preset's values to this session: `null` removes an override. */
@@ -57,7 +60,7 @@ export const NEEDS_SESSION_NOTICE = "open a session first";
 export const NO_MODEL_NOTICE = "Choose a model first: /model.";
 
 const SLIDER_CELLS = 15;
-const KEYS = "↑/↓ move · ←/→ change · r reset · Esc close";
+const KEYS = "↑/↓ move · ←/→ change · r reset · t try again · Esc close";
 
 /** Whether `/tune` can open: a session on a local Ollama model. Else the notice to show. */
 export function tuneOpening(input: {
@@ -104,6 +107,9 @@ export function tuneKeyOf(press: Press): TuneKey | null {
   if (press.input === "s") {
     return "target";
   }
+  if (press.input === "t") {
+    return "try";
+  }
   if (press.input === "S") {
     return "save";
   }
@@ -143,6 +149,8 @@ export function pressTune(state: TuneState, key: TuneKey): { state: TuneState; a
       return { state: moveFocus(state, -1), action: none };
     case "down":
       return { state: moveFocus(state, 1), action: none };
+    case "try":
+      return { state, action: { kind: "try" } };
     case "target":
       return { state: toggleTarget(state), action: none };
     case "left":

@@ -124,7 +124,7 @@ test("the panel shows a row for each option, the default note, the long text, an
   assert.equal(keep.includes("5m"), true);
   assert.equal(lines.some((line) => line.startsWith("─ temperature ─")), true);
   assert.equal(lines.some((line) => line.includes("About temperature.")), true);
-  assert.equal(lines[lines.length - 2], " ↑/↓ move · ←/→ change · r reset · Esc close");
+  assert.equal(lines[lines.length - 2], " ↑/↓ move · ←/→ change · r reset · t try again · Esc close");
   assert.equal(lines[lines.length - 1], " presets  1 precise   2 balanced   3 creative   4 long memory");
 });
 

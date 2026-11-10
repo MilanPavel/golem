@@ -91,6 +91,7 @@ Type `/` and suggestions appear, with each command's arguments. `/help` lists ev
 | `s` | Switch where changes go: saved for this model, or this chat only |
 | `1`–`4` | Apply a preset to this chat: precise, balanced, creative, or long memory. Balanced clears this chat's changes |
 | `S` | Save this chat's changes for the model |
+| `t` | Ask your last question again with these settings. The answer shows under the panel, and the try is kept as its own chat. `t` again stops it |
 | Esc | Close the panel |
 
 A saved change is kept in `config.toml` for the model, and every chat on it uses it. A change for this chat only is kept with the chat. Either one applies from your next message. When a value is not the default, the row says what the default is.

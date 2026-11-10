@@ -122,7 +122,15 @@ import {
   withSaved,
   withSession,
   type TuneState,
+  foldTry,
+  planTry,
+  runningTry,
+  startedTry,
+  tryHeading,
+  tryTitle,
+  type TryRun,
 } from "@golem/view";
+import { dropTry, startTry, tryLines } from "./try-again.ts";
 import { pressTune, tuneKeyOf, tuneLines, tuneLitLines, tuneOpening, type TuneAction } from "./tune-panel.ts";
 import { folderFacts } from "./folder-facts.ts";
 import {
@@ -441,6 +449,9 @@ export function App({
   /** Changes sent and not yet answered. Live updates wait for them, or they would undo the newest key. */
   const tuneSending = useRef(0);
   const tuneQueue = useRef<Promise<void>>(Promise.resolve());
+  /** The answer asked again with the panel's values, in a fork. Shown under the panel. */
+  const [tryRun, setTryRun] = useState<TryRun | null>(null);
+  const tryRef = useRef<TryRun | null>(null);
   const [mcpManager, setMcpManager] = useState<McpManagerState>(closedMcpManager);
   const mcpManagerRef = useRef(mcpManager);
   mcpManagerRef.current = mcpManager;
@@ -639,8 +650,14 @@ export function App({
         : panel === "context"
           ? contextLines(contextReport, columns)
           : [];
+  const tryRows = tune !== null && tryRun !== null ? tryLines(tryRun, columns) : [];
   const helpText = !keysOpen && !switcher.open ? panelLines : [];
-  const helpHeight = Math.min(helpText.length, budget.body);
+  const litLines = tune !== null ? tuneLitLines(tune) : [];
+  const helpRows = [
+    ...helpText.map((text, index) => ({ text, dim: false, accent: litLines.includes(index) })),
+    ...(helpText.length > 0 ? tryRows : []),
+  ];
+  const helpHeight = Math.min(helpRows.length, budget.body);
   const chatHeight = budget.body - helpHeight;
   // Starter prompts fit the session's folder, and show until the first message.
   const starterFolder = sessionCwd ?? process.cwd();
@@ -944,6 +961,11 @@ export function App({
 
   useEffect(() => {
     return client.onEvent((event) => {
+      const tried = tryRef.current;
+      if (tried !== null && event.session_id === tried.sessionId) {
+        setTry(foldTry(tried, event));
+        return;
+      }
       if (event.session_id !== sessionRef.current) {
         return;
       }
@@ -1352,7 +1374,47 @@ export function App({
     setTune(next);
     if (next === null) {
       tuneGen.current += 1;
+      clearTry();
     }
+  }
+
+  function setTry(next: TryRun | null): void {
+    tryRef.current = next;
+    setTryRun(next);
+  }
+
+  /** Cancel a running try, stop watching its fork, and hide the block. The fork stays a session. */
+  function clearTry(): void {
+    const old = tryRef.current;
+    if (old !== null) {
+      dropTry(client, runningTry(old), old.sessionId);
+      setTry(null);
+    }
+  }
+
+  /** `t`: ask the last question again in a fork with the panel's values, and show the answer. */
+  function tryAgain(tune: TuneState): void {
+    const id = sessionRef.current;
+    const plan = planTry(chatRef.current, tune);
+    if (plan.kind === "refused") {
+      setChat((current) => ({ ...current, notice: plan.notice }));
+      return;
+    }
+    if (id === null || connectionRef.current.status !== "connected") {
+      return;
+    }
+    clearTry();
+    const heading = tryHeading(tune);
+    const known = sessionsRef.current.find((summary) => summary.session_id === id)?.title;
+    const title = tryTitle(known ?? (liveTitleRef.current?.sessionId === id ? liveTitleRef.current.title : null), plan.text);
+    const source = { sessionId: id, cwd: sessionCwdRef.current ?? undefined, profile: sessionModelRef.current?.profile ?? undefined };
+    setChat((current) => ({ ...current, notice: null }));
+    startTry(client, plan, source, title, (forkId) => setTry(startedTry(forkId, plan, heading))).catch(
+      (error: unknown) => {
+        clearTry();
+        setChat((current) => ({ ...current, error: messageOf(error) }));
+      },
+    );
   }
 
   /** Read the model's options and this session's overrides, then open the `/tune` panel. */
@@ -2977,6 +3039,8 @@ export function App({
     showTune(pressed.state);
     if (pressed.action.kind === "close") {
       showTune(null);
+    } else if (pressed.action.kind === "try") {
+      tryAgain(pressed.state);
     } else if (pressed.action.kind === "change") {
       sendTune(pressed.state.model, pressed.action);
     } else if (pressed.action.kind === "preset" || pressed.action.kind === "save") {
@@ -3809,11 +3873,7 @@ export function App({
         </Box>
         {helpHeight > 0 ? (
           <LineList
-            lines={helpText.map((text, index) => ({
-              text,
-              dim: false,
-              accent: tune !== null && tuneLitLines(tune).includes(index),
-            }))}
+            lines={helpRows}
             columns={columns}
             height={helpHeight}
             offset={0}
