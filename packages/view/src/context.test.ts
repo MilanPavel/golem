@@ -4,6 +4,7 @@ import { test } from "node:test";
 import type { ChatEvent, TraceModelSpan, TraceRunSpan } from "@golem/client";
 import {
   contextBar,
+  cutNote,
   contextCells,
   contextGrid,
   contextReportLines,
@@ -64,13 +65,9 @@ test("contextSummary: used, window and percent", () => {
   assert.equal(contextSummary(31500, 32768, false), "31.5K / 32K · 96%");
 });
 
-test("contextWarning: num_ctx first, then how full, else none", () => {
+test("contextWarning: how full, else none", () => {
   const full = context({ used: 31500, window: 32768 });
   assert.equal(contextWarning(full), "Context is 96% full.");
-  const over = context({ used: 8192, window: 8192, num_ctx: 8192, parts: [part("tools", 600), part("tool_results", 6992, 41250)] });
-  assert.equal(contextWarning(over), "Input is larger than num_ctx 8K. Ollama dropped the oldest part.");
-  const cut = context({ used: 5000, window: 8192, num_ctx: 8192, parts: [part("tool_results", 5000, 50000)] });
-  assert.equal(contextWarning(cut), "Input is larger than num_ctx 8K. Ollama dropped the oldest part.");
   assert.equal(contextWarning(context({ num_ctx: 32768 })), null);
   assert.equal(contextWarning(context({ used: 850, window: 1000 })), "Context is 85% full.");
 });
@@ -271,10 +268,10 @@ test("contextReport: unknown usage leaves out the percent, the bar and the free 
   assert.ok(!lines.some((line) => line.startsWith("Free") || line.startsWith("█")));
 });
 
-test("contextReport: input above num_ctx adds the warning line, and no estimate line when exact", () => {
+test("contextReport: input above num_ctx claims no cut, and no estimate line when exact", () => {
   const ctx = context({ used: 8192, window: 32768, num_ctx: 8192, estimated: false, parts: [part("user", 8192)] });
   const lines = contextReport({ kind: "ready", model: null, context: ctx }, 80);
-  assert.equal(lines.at(-1), "! Input is larger than num_ctx 8K. Ollama dropped the oldest part.");
+  assert.ok(!lines.some((line) => line.includes("dropped")));
   assert.ok(!lines.some((line) => line.startsWith("Parts are")));
 });
 
@@ -305,4 +302,38 @@ test("foldLiveContext: input above an estimated window drops the window, never o
 test("foldLiveContext: input above an exact window keeps it", () => {
   const state = foldLiveContext(foldLiveContext(emptyLiveContext, started("m1", 4096)), completed("m1", { input: 23600 }));
   assert.equal(state.last?.window, 4096);
+});
+
+test("cutNote: says nothing for no, an unknown cut, and an old record", () => {
+  assert.equal(cutNote({}), null);
+  assert.equal(cutNote({ prompt_cut: null }), null);
+  assert.equal(cutNote({ prompt_cut: "no" }), null);
+});
+
+test("cutNote: a proven cut is a warning with the size marked as an estimate", () => {
+  const ids = ["a", "b", "c", "d"];
+  assert.deepEqual(cutNote({ prompt_cut: "yes", prompt_cut_kind: "older_messages", dropped_message_ids: ids, dropped_tokens: 1200 }), {
+    text: "Ollama dropped older messages to fit the window. About 4 (≈1.2K) were not seen.",
+    warn: true,
+  });
+  assert.equal(cutNote({ prompt_cut: "yes", prompt_cut_kind: "older_messages", dropped_message_ids: [], dropped_tokens: null })?.text, "Ollama dropped older messages to fit the window.");
+  assert.equal(cutNote({ prompt_cut: "yes", prompt_cut_kind: "older_messages", dropped_message_ids: ["a"], dropped_tokens: 300 })?.text, "Ollama dropped older messages to fit the window. About 1 (≈300) was not seen.");
+});
+
+test("cutNote: a likely cut", () => {
+  assert.deepEqual(cutNote({ prompt_cut: "likely", prompt_cut_kind: "older_messages", dropped_message_ids: ["a", "b", "c", "d"], dropped_tokens: 1200 }), {
+    text: "Ollama probably dropped about 4 older messages (≈1.2K) to fit the window.",
+    warn: false,
+  });
+  assert.deepEqual(cutNote({ prompt_cut: "likely", prompt_cut_kind: "middle" }), {
+    text: "The system prompt and tools alone did not fit, so Ollama probably cut the prompt in the middle. This answer is not reliable.",
+    warn: true,
+  });
+});
+
+test("contextReportLines: the cut note is one line under the parts", () => {
+  const ready = { kind: "ready" as const, model: "ollama/m", provider: "ollama", context: context({ prompt_cut: "yes", prompt_cut_kind: "older_messages", dropped_message_ids: ["a"], dropped_tokens: 300 }) };
+  const lines = contextReport(ready, 80);
+  assert.ok(lines.includes("! Ollama dropped older messages to fit the window. About 1 (≈300) was not seen."));
+  assert.ok(!contextReport({ ...ready, context: context({ prompt_cut: "no" }) }, 80).some((line) => line.includes("Ollama")));
 });

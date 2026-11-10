@@ -51,6 +51,12 @@
       "data": {
         "context_window": null,
         "index": 1,
+        "message_bytes": [
+          10
+        ],
+        "message_chars": [
+          10
+        ],
         "message_id": "id-4",
         "message_ids": [
           "id-3"
@@ -59,8 +65,12 @@
         "num_ctx": null,
         "profile": "remote",
         "provider": null,
+        "system_bytes": 0,
+        "system_chars": 0,
         "system_prompt_sha": null,
         "system_sections": null,
+        "tools_bytes": 8061,
+        "tools_chars": 8061,
         "tools_sha": "310002311a2a5a2409ce7ef36bd1231772ad4a573e63572c677e4673b6356342",
         "window_estimated": false
       },
@@ -189,6 +199,16 @@
       "data": {
         "context_window": null,
         "index": 1,
+        "message_bytes": [
+          10,
+          91,
+          23
+        ],
+        "message_chars": [
+          10,
+          91,
+          23
+        ],
         "message_id": "id-5",
         "message_ids": [
           "id-3",
@@ -199,8 +219,12 @@
         "num_ctx": null,
         "profile": "remote",
         "provider": null,
+        "system_bytes": 0,
+        "system_chars": 0,
         "system_prompt_sha": null,
         "system_sections": null,
+        "tools_bytes": 8061,
+        "tools_chars": 8061,
         "tools_sha": "310002311a2a5a2409ce7ef36bd1231772ad4a573e63572c677e4673b6356342",
         "window_estimated": false
       },
@@ -301,6 +325,12 @@
       "data": {
         "context_window": null,
         "index": 1,
+        "message_bytes": [
+          10
+        ],
+        "message_chars": [
+          10
+        ],
         "message_id": "id-4",
         "message_ids": [
           "id-3"
@@ -309,8 +339,12 @@
         "num_ctx": null,
         "profile": "remote",
         "provider": null,
+        "system_bytes": 0,
+        "system_chars": 0,
         "system_prompt_sha": null,
         "system_sections": null,
+        "tools_bytes": 8061,
+        "tools_chars": 8061,
         "tools_sha": "310002311a2a5a2409ce7ef36bd1231772ad4a573e63572c677e4673b6356342",
         "window_estimated": false
       },
@@ -439,6 +473,16 @@
       "data": {
         "context_window": null,
         "index": 1,
+        "message_bytes": [
+          10,
+          91,
+          23
+        ],
+        "message_chars": [
+          10,
+          91,
+          23
+        ],
         "message_id": "id-5",
         "message_ids": [
           "id-3",
@@ -449,8 +493,12 @@
         "num_ctx": null,
         "profile": "remote",
         "provider": null,
+        "system_bytes": 0,
+        "system_chars": 0,
         "system_prompt_sha": null,
         "system_sections": null,
+        "tools_bytes": 8061,
+        "tools_chars": 8061,
         "tools_sha": "310002311a2a5a2409ce7ef36bd1231772ad4a573e63572c677e4673b6356342",
         "window_estimated": false
       },

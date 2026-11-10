@@ -432,12 +432,24 @@ class TraceToolSpan(TraceSpan):
 
 
 class TraceModelSpan(TraceSpan):
-    """A model call, with the tool calls it asked for, in request order."""
+    """A model call, with the tool calls it asked for, in request order.
+
+    ``prompt_cut`` says whether Ollama cut the prompt that did not fit: "no"
+    and "yes" are proven from exact numbers, "likely" is an estimate, and null
+    means golem cannot tell. ``prompt_cut_kind`` is set with "yes" and
+    "likely". ``dropped_message_ids`` are the messages the model probably did
+    not see (older messages only), and ``dropped_tokens`` is an estimate of
+    their size.
+    """
 
     children: list[TraceToolSpan] = Field(default_factory=list[TraceToolSpan])
     context_window: int | None = Field(default=None, ge=1)
     num_ctx: int | None = Field(default=None, ge=1)
     context_window_estimated: bool = False
+    prompt_cut: Literal["no", "yes", "likely"] | None = None
+    prompt_cut_kind: Literal["older_messages", "middle"] | None = None
+    dropped_message_ids: list[str] = Field(default_factory=list[str])
+    dropped_tokens: int | None = Field(default=None, ge=0)
 
 
 class TraceRunSpan(TraceSpan):
@@ -496,6 +508,7 @@ class TraceContext(BaseModel):
     ``parts`` always has the five keys, in order. They add up to ``used``
     when it is known. The split between them is an estimate (about four
     characters a token, scaled to ``used``), so ``estimated`` is always true.
+    The ``prompt_cut`` fields are those of the model span.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -506,6 +519,10 @@ class TraceContext(BaseModel):
     num_ctx: int | None = Field(default=None, ge=1)
     estimated: bool = True
     parts: list[TraceContextPart]
+    prompt_cut: Literal["no", "yes", "likely"] | None = None
+    prompt_cut_kind: Literal["older_messages", "middle"] | None = None
+    dropped_message_ids: list[str] = Field(default_factory=list[str])
+    dropped_tokens: int | None = Field(default=None, ge=0)
 
 
 class TraceMessage(BaseModel):

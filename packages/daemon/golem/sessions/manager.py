@@ -396,7 +396,14 @@ class SessionManager:
                 tools=tools,
                 messages=found.result.messages,
             )
-            updates["context"] = context
+            updates["context"] = context.model_copy(
+                update={
+                    "prompt_cut": found.cut.cut,
+                    "prompt_cut_kind": found.cut.kind,
+                    "dropped_message_ids": list(found.cut.dropped_message_ids),
+                    "dropped_tokens": found.cut.dropped_tokens,
+                }
+            )
             updates["messages"] = sized
         return found.result.model_copy(update=updates)
 

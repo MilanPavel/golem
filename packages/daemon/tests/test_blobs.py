@@ -325,3 +325,27 @@ async def test_ollamas_value_wins_over_the_sent_one_when_they_differ(
     database: Database,
 ) -> None:
     assert await _ran_with(database, 8192, 4096) == (4096, [8192])
+
+
+async def test_the_sizes_sent_are_recorded_in_chars_and_bytes(database: Database) -> None:
+    prompt = SystemPrompt((lambda _: "Be brief ✓",))
+    chat = _Chat(database, ToolCallingChatModel(replies=["hi"]), prompt)
+    session_id = await chat.manager.create(None)
+    (first,) = await chat.send(session_id, "naïve café")
+    await chat.manager.cancel_all()
+    tools = json.dumps(default_registry().schemas(), sort_keys=True, separators=(",", ":"))
+    data = first.data
+    assert (data.system_chars, data.system_bytes) == (10, 12)
+    assert (data.tools_chars, data.tools_bytes) == (len(tools), len(tools.encode()))
+    assert data.message_chars == [10]
+    assert data.message_bytes == [12]
+
+
+async def test_no_prompt_and_no_tools_record_zero_sizes(database: Database) -> None:
+    chat = _Chat(database, _RefusesTools(replies=["one", "two"]), None)
+    session_id = await chat.manager.create(None)
+    await chat.send(session_id, "hello")
+    (second,) = await chat.send(session_id, "again")
+    await chat.manager.cancel_all()
+    assert (second.data.system_chars, second.data.system_bytes) == (0, 0)
+    assert (second.data.tools_chars, second.data.tools_bytes) == (0, 0)

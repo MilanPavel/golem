@@ -24,7 +24,7 @@
     }
   },
   "additionalProperties": false,
-  "description": "A request went to the model.\n\n``message_id`` is the assistant reply's id, which identifies the model\ncall. ``index`` counts the calls of this run from 1. ``provider`` and\n``model`` are None when the profile does not resolve.\n\n``system_prompt_sha`` and ``tools_sha`` are the sha256 of the system\nprompt and of the tool schemas (compact JSON, sorted keys) sent with the\ncall, which the daemon keeps by hash. Each is None when it was not sent.\n``message_ids`` are the history messages sent, in order, not counting the\nsystem prompt.\n\n``window_estimated`` is true when golem did not send the window and read it\nfrom Ollama (the loaded context or the Modelfile). An older event has no\nfield and reads as False.",
+  "description": "A request went to the model.\n\n``message_id`` is the assistant reply's id, which identifies the model\ncall. ``index`` counts the calls of this run from 1. ``provider`` and\n``model`` are None when the profile does not resolve.\n\n``system_prompt_sha`` and ``tools_sha`` are the sha256 of the system\nprompt and of the tool schemas (compact JSON, sorted keys) sent with the\ncall, which the daemon keeps by hash. Each is None when it was not sent.\n``message_ids`` are the history messages sent, in order, not counting the\nsystem prompt.\n\n``window_estimated`` is true when golem did not send the window and read it\nfrom Ollama (the loaded context or the Modelfile). An older event has no\nfield and reads as False.\n\nThe size fields count what was sent, in UTF-8 bytes and in characters: the\nsystem text, the tool schemas as compact JSON, and each history message in\n``message_ids`` order (its text and its tool calls as JSON). ``message_chars``\nand ``message_bytes`` have one number per message sent. Each is None on an\nevent recorded before they existed.",
   "properties": {
     "context_window": {
       "anyOf": [
@@ -43,6 +43,36 @@
       "minimum": 1,
       "title": "Index",
       "type": "integer"
+    },
+    "message_bytes": {
+      "anyOf": [
+        {
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Message Bytes"
+    },
+    "message_chars": {
+      "anyOf": [
+        {
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Message Chars"
     },
     "message_id": {
       "minLength": 1,
@@ -98,6 +128,32 @@
       "default": null,
       "title": "Provider"
     },
+    "system_bytes": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "System Bytes"
+    },
+    "system_chars": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "System Chars"
+    },
     "system_prompt_sha": {
       "anyOf": [
         {
@@ -124,6 +180,32 @@
       ],
       "default": null,
       "title": "System Sections"
+    },
+    "tools_bytes": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Tools Bytes"
+    },
+    "tools_chars": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Tools Chars"
     },
     "tools_sha": {
       "anyOf": [

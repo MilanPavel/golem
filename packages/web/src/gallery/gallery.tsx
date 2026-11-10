@@ -34,7 +34,7 @@ import { ModelDialogView, type ModelDialogViewProps } from "../features/models/i
 import { sampleTuneBackend } from "../features/models/sample-tune.ts";
 import { SetupDialogView } from "../features/setup/index.ts";
 import { SpanDetail, TraceSummary, TraceTree } from "../features/trace/index.ts";
-import { APPROVAL_DETAIL, APPROVAL_TRACE, FULL_DETAIL, MODEL_DETAIL, NO_PROMPT_DETAIL, NUM_CTX_DETAIL, OLD_DETAIL, SECTIONS_DETAIL, TOOL_DETAIL, UNKNOWN_WINDOW_DETAIL, FAILED_TRACE, GROWING_TRACE, LONG_TRACE, OLD_TRACE, SHORT_TRACE } from "../features/trace/sample.ts";
+import { APPROVAL_DETAIL, APPROVAL_TRACE, CUT_LIKELY_DETAIL, CUT_MIDDLE_DETAIL, CUT_YES_DETAIL, FULL_DETAIL, MODEL_DETAIL, NO_PROMPT_DETAIL, NUM_CTX_DETAIL, OLD_DETAIL, SECTIONS_DETAIL, TOOL_DETAIL, UNKNOWN_WINDOW_DETAIL, FAILED_TRACE, GROWING_TRACE, LONG_TRACE, OLD_TRACE, SHORT_TRACE } from "../features/trace/sample.ts";
 import type { TraceRunSpan, TraceSpanResult } from "../store/trace.ts";
 import { FORM_CASES, SETUP_CASES } from "../features/setup/sample.ts";
 import { AddKey, SetupFormView } from "../features/setup/setup-form.tsx";
@@ -609,6 +609,9 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
         <DetailDemo label="A model call, nearly full, with MCP tools" result={FULL_DETAIL} />
         <DetailDemo label="Ollama input over num_ctx" result={NUM_CTX_DETAIL} />
         <DetailDemo label="Ollama with no ctx: window unknown" result={UNKNOWN_WINDOW_DETAIL} />
+        <DetailDemo label="Ollama dropped older messages (proven)" result={CUT_YES_DETAIL} />
+        <DetailDemo label="Ollama probably dropped older messages" result={CUT_LIKELY_DETAIL} />
+        <DetailDemo label="Ollama probably cut the prompt in the middle" result={CUT_MIDDLE_DETAIL} />
         <DetailDemo label="A tool with a big output" result={TOOL_DETAIL} />
         <DetailDemo label="A tool with an edited approval" result={APPROVAL_DETAIL} />
         <DetailDemo label="Not recorded" result={OLD_DETAIL} />

@@ -5,8 +5,8 @@ import {
   contextSummary,
   contextUsed,
   contextWarning,
+  cutNote,
   formatTokens,
-  overNumCtx,
   windowUnknownHint,
   type ContextKey,
   type TraceContext,
@@ -28,7 +28,8 @@ export function ContextMeter({ context, provider }: { context: TraceContext; pro
   const total = Math.max(size ?? 0, used);
   const parts = CONTEXT_KEYS.map((key) => context.parts.find((part) => part.key === key) ?? { key, tokens: 0, chars: 0, items: [] });
   const warning = contextWarning(context);
-  const severe = overNumCtx(context) || contextLevel(used, size) === "full";
+  const note = cutNote(context);
+  const severe = contextLevel(used, size) === "full";
   const summary = contextSummary(used, size, context.window_estimated ?? false);
   return (
     <section aria-label="Context window" className="flex flex-col gap-2 border-b border-line px-4 py-3">
@@ -49,6 +50,11 @@ export function ContextMeter({ context, provider }: { context: TraceContext; pro
             <span key={part.key} className={PART_COLOR[part.key]} style={{ width: `${(part.tokens / total) * 100}%` }} />
           ))}
       </div>
+      {note === null ? null : (
+        <p role="note" className={`text-xs ${note.warn ? "text-wait" : "text-muted"}`}>
+          {note.text}
+        </p>
+      )}
       <ul aria-label="What fills the context" className="flex max-w-sm flex-col gap-0.5 font-mono text-xs">
         {parts.map((part) => (
           <li key={part.key} className="flex items-center gap-2">

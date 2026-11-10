@@ -21,6 +21,8 @@ export type Output = number | null;
 export type Children1 = TraceToolSpan[];
 export type ContextWindow = number | null;
 export type ContextWindowEstimated = boolean;
+export type DroppedMessageIds = string[];
+export type DroppedTokens = number | null;
 export type DurationMs1 = number | null;
 export type End1 = string | null;
 export type FirstTokenMs1 = number | null;
@@ -30,6 +32,8 @@ export type Model1 = string | null;
 export type Name1 = string;
 export type NumCtx = number | null;
 export type Preview1 = string;
+export type PromptCut = ('no' | 'yes' | 'likely') | null;
+export type PromptCutKind = ('older_messages' | 'middle') | null;
 export type Recorded1 = boolean;
 export type Start1 = string;
 export type Status1 = 'ok' | 'failed' | 'cancelled' | 'denied' | 'running';
@@ -85,6 +89,13 @@ export interface TraceRunSpan {
 /**
  * A model call, with the tool calls it asked for, in request order.
  *
+ * ``prompt_cut`` says whether Ollama cut the prompt that did not fit: "no"
+ * and "yes" are proven from exact numbers, "likely" is an estimate, and null
+ * means golem cannot tell. ``prompt_cut_kind`` is set with "yes" and
+ * "likely". ``dropped_message_ids`` are the messages the model probably did
+ * not see (older messages only), and ``dropped_tokens`` is an estimate of
+ * their size.
+ *
  * This interface was referenced by `TraceGetResult`'s JSON-Schema
  * via the `definition` "TraceModelSpan".
  */
@@ -93,6 +104,8 @@ export interface TraceModelSpan {
   children?: Children1;
   context_window?: ContextWindow;
   context_window_estimated?: ContextWindowEstimated;
+  dropped_message_ids?: DroppedMessageIds;
+  dropped_tokens?: DroppedTokens;
   duration_ms?: DurationMs1;
   end?: End1;
   first_token_ms?: FirstTokenMs1;
@@ -102,6 +115,8 @@ export interface TraceModelSpan {
   name: Name1;
   num_ctx?: NumCtx;
   preview?: Preview1;
+  prompt_cut?: PromptCut;
+  prompt_cut_kind?: PromptCutKind;
   recorded?: Recorded1;
   start: Start1;
   status: Status1;
