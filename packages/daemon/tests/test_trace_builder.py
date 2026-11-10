@@ -327,3 +327,33 @@ def test_with_windows_leaves_a_span_whose_window_is_unknown() -> None:
         None,
         False,
     )
+
+
+def test_with_windows_gives_an_old_ollama_call_todays_estimated_window() -> None:
+    from golem.config import GolemSettings, ModelSettings
+    from golem.models.router import ModelRouter
+    from golem.models.window import resolve_window
+
+    class Listed:
+        def known_ctx(self, ref: str) -> int | None:
+            return 131072
+
+        def modelfile_num_ctx(self, ref: str) -> int | None:
+            return 4096
+
+        def loaded_ctx(self, ref: str) -> int | None:
+            return None
+
+    router = ModelRouter(GolemSettings(models={"local": ModelSettings(model="ollama/llama3.2:3b")}))
+    log = _Log()
+    log.user("hi")
+    log.model("m1", recorded=False)
+    (run,) = with_windows(
+        build_trace(log.events),
+        lambda name: resolve_window(router, name, Listed()).window,
+        "local",
+    )
+    assert (run.children[0].context_window, run.children[0].context_window_estimated) == (
+        4096,
+        True,
+    )

@@ -13,7 +13,7 @@ The listing's `context_length` (`<arch>.context_length` from `/api/show`) is tha
 
 golem finds the window of a local model from these sources, in this order of trust:
 
-1. **Sent by golem** (exact, always known when set): the session's `num_ctx` override, else the `num_ctx` saved for the model (step 12.6), else the profile's `ctx`. This is the order `ModelRouter.chat_model` sends them in: it sets the profile's `ctx` first, and then `_ollama_options` overwrites it with the saved value and the session override.
+1. **Sent by golem** (exact, always known when set): the session's `num_ctx` override, else the `num_ctx` saved for the model (step 12.6), else the profile's `ctx`. This is the order `ModelRouter.chat_model` sends them in: it sets the profile's `ctx` first, and then `ollama_options` overwrites it with the saved value and the session override.
 2. **Loaded in Ollama** (exact, once the model has run): `context_length` of the model in Ollama's `/api/ps`.
 3. **The model's Modelfile** (estimated): the `num_ctx` line in the `parameters` of `/api/show`. It is known as soon as the model is installed.
 4. **Unknown**: as today.
