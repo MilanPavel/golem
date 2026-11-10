@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import logging
 import os
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -170,6 +170,7 @@ class ModelRouter:
         self._model = model
         self._home = home
         self.keys = keys
+        self._think_values: dict[str, tuple[str, ...]] = {}
         self._config_file = resolve_paths(home).config_file if home is not None else None
         self._stamp = self._file_stamp()
         self._catalog = _catalog(settings) if settings is not None else None
@@ -321,7 +322,31 @@ class ModelRouter:
         saved = catalog.saved.get(model_id) if catalog is not None else None
         values: dict[str, object] = saved.model_dump(exclude_none=True) if saved is not None else {}
         values.update(overrides or {})
-        return {name: value for name, value in values.items() if model_options.spec(name)}
+        found = {name: value for name, value in values.items() if model_options.spec(name)}
+        if "think" in found:
+            reasoning = self._reasoning(model_id, found.pop("think"))
+            if reasoning is not None:
+                found["reasoning"] = reasoning
+        return found
+
+    def note_think_values(self, model_id: str, values: Sequence[str]) -> None:
+        """Remember what ``think`` takes for an installed model, as discovery found it.
+
+        A saved ``think`` the model does not take is not sent. A model not noted yet
+        gets the setting as it was saved.
+        """
+        self._think_values[model_id] = tuple(values)
+
+    def _reasoning(self, model_id: str, think: object) -> bool | str | None:
+        """The ``ChatOllama.reasoning`` for a ``think`` setting, or None to send nothing."""
+        if not isinstance(think, str):
+            return None
+        known = self._think_values.get(model_id)
+        if known is not None and think not in known:
+            return None
+        if think == "off":
+            return False
+        return True if think == "on" else think
 
     def ollama_server(self, profile: str) -> tuple[str, str] | None:
         """``(provider, base URL)`` when ``profile`` runs on Ollama, or None."""

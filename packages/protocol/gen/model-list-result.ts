@@ -20,6 +20,7 @@ export type Source = 'installed' | 'catalog' | 'remote' | 'profile';
 export type Stale = boolean;
 export type Status = 'ready' | 'needs_key' | 'not_installed' | 'server_down' | 'pulling';
 export type Tags = string[];
+export type ThinkValues = string[];
 export type Tools = boolean | null;
 export type Models = ListedModel[];
 export type Provider1 = string;
@@ -61,6 +62,8 @@ export interface ModelListResult {
  * LiteLLM's ``supports_*`` fields and context size show.
  * ``recommended_for`` lists the categories this catalog model is the pick for on
  * this Mac: the largest model of that category it has the memory for.
+ * ``think_values`` is what the ``think`` option takes for this model: ``off`` and
+ * ``on``, or ``low``, ``medium`` and ``high``. It is empty when the model cannot think.
  * ``stale`` means a cached list was shown because the provider did not
  * answer in time.
  *
@@ -84,6 +87,7 @@ export interface ListedModel {
   stale?: Stale;
   status: Status;
   tags?: Tags;
+  think_values?: ThinkValues;
   tools?: Tools;
 }
 /**

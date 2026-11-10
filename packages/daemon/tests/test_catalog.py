@@ -78,3 +78,14 @@ def test_the_protocol_and_the_catalog_agree_on_the_categories() -> None:
     from golem_protocol.commands import ModelCategory
 
     assert get_args(ModelCategory) == CATEGORIES
+
+
+def test_think_values_follow_capabilities_the_catalog_and_the_name() -> None:
+    from golem.models.catalog import think_values
+
+    assert think_values("qwen3.5:4b", ["completion", "thinking"]) == ["off", "on"]
+    assert think_values("gpt-oss:20b", ["completion", "thinking"]) == ["low", "medium", "high"]
+    assert think_values("gpt-oss:7b", ["thinking"]) == ["low", "medium", "high"]
+    assert think_values("llama3.2:3b", ["completion", "tools"]) == []
+    assert think_values("gpt-oss:20b", ["completion"]) == []
+    assert think_values("qwen3.5:4b", None) == []

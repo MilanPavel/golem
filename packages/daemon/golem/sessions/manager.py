@@ -509,8 +509,19 @@ class SessionManager:
         async with self._lock:
             return dict((await self._resolve(session_id)).options)
 
+    async def model_profile(self, session_id: str) -> str:
+        """The profile or ref the session runs on.
+
+        Raises :class:`SessionNotFoundError` or :class:`SchemaMismatchError`.
+        """
+        async with self._lock:
+            return (await self._resolve(session_id)).model_profile
+
     async def set_options(
-        self, session_id: str, change: dict[str, float | str | None]
+        self,
+        session_id: str,
+        change: dict[str, float | str | None],
+        think_values: Sequence[str] | None = None,
     ) -> dict[str, float | str]:
         """Override options for this session, and store ``model.options.changed``.
 
@@ -518,11 +529,12 @@ class SessionManager:
         Nothing is stored when they do not change.
 
         Raises :class:`SessionNotFoundError`, :class:`SchemaMismatchError`, or
-        ``ValueError`` for an unknown option or a value out of range.
+        ``ValueError`` for an unknown option or a value out of range. ``think_values`` is
+        what ``think`` takes for the session's model, or None to accept every value.
         """
         for name, value in change.items():
             if value is not None:
-                model_options.validate(name, value)
+                model_options.validate(name, value, think_values if name == "think" else None)
         async with self._lock:
             session = await self._resolve(session_id)
             merged = dict(session.options)

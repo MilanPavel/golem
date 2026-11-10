@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import json
 import tomllib
 from collections.abc import Callable
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 import httpx
 from test_server import HELLO, RpcClient, error_code, rpc_result, start_daemon, stop_daemon
@@ -284,6 +285,71 @@ async def test_num_ctx_has_no_default_until_ollama_or_the_modelfile_gives_one(
         later = rpc_result(await client.call("model.options.get", {"model": "qwen3:8b"}))
         assert cast(dict[str, object], later["defaults"])["num_ctx"] == 32768
         assert later["default_from"] == {"num_ctx": "ollama"}
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+
+
+def _thinking(models: dict[str, list[str]]) -> httpx.MockTransport:
+    def handle(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/tags":
+            return httpx.Response(
+                200, json={"models": [{"name": name, "digest": name} for name in models]}
+            )
+        if request.url.path == "/api/show":
+            name = json.loads(request.content)["model"]
+            return httpx.Response(200, json={"capabilities": models[name]})
+        return httpx.Response(404)
+
+    return httpx.MockTransport(handle)
+
+
+async def test_think_is_a_row_only_for_a_model_that_thinks_and_checks_its_values(
+    short_home: Path, tmp_path: Path
+) -> None:
+    transport = _thinking(
+        {
+            "qwen3.5:4b": ["completion", "thinking"],
+            "gpt-oss:20b": ["completion", "thinking"],
+            "llama3.2:3b": ["completion"],
+        }
+    )
+    app, task = await start_daemon(
+        short_home, router=_router(), discovery=_discovery(tmp_path, transport, None)
+    )
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+
+        async def think_row(model: str) -> dict[str, object] | None:
+            got = rpc_result(await client.call("model.options.get", {"model": model}))
+            rows = [
+                row for row in cast(list[dict[str, Any]], got["options"]) if row["name"] == "think"
+            ]
+            return rows[0] if rows else None
+
+        plain = await think_row("qwen3.5:4b")
+        assert plain is not None
+        assert plain["kind"] == "choice"
+        assert plain["values"] == ["off", "on"]
+        assert plain["minimum"] is None
+        assert plain["step"] is None
+        levels = await think_row("gpt-oss:20b")
+        assert levels is not None
+        assert levels["values"] == ["low", "medium", "high"]
+        assert await think_row("llama3.2:3b") is None
+
+        saved = rpc_result(
+            await client.call(
+                "model.options.set", {"model": "qwen3.5:4b", "options": {"think": "off"}}
+            )
+        )
+        assert saved["saved"] == {"think": "off"}
+        for model, value in (("qwen3.5:4b", "high"), ("llama3.2:3b", "on")):
+            bad = await client.call(
+                "model.options.set", {"model": model, "options": {"think": value}}
+            )
+            assert error_code(bad) == INVALID_PARAMS
     finally:
         await client.close()
         await stop_daemon(app, task)

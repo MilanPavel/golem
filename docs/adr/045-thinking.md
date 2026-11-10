@@ -30,6 +30,14 @@ So a thinking model thinks by default, and golem already pays for it: the time, 
 - **The collapsed line.** A reply that thought shows one dim line above the answer: `thinking…` while it streams, `thought for 12s` when done, `thought` when the time is not known. The terminal shows the text under it with Ctrl-O, like tool output. The web shows it when the line is clicked. Both clients draw the same text from `thinkingLine` in `packages/view`.
 - **Show or hide is a display setting, `think` is a model setting.** Whether the line is shown at all belongs to each client, like `/time`: it changes what the screen draws, not what the model does. `think` changes the request, so it lives with the model's other settings. Step 12.9.5 adds the display toggle.
 
+## The `think` setting for local models (step 12.9.2)
+
+- **One option, `think`, of a new kind `choice`.** Its row is in Tune and takes the values of the model it is for: `off` and `on` for a model whose capabilities include `thinking`, and `low`, `medium`, and `high` for a model that takes levels. A model without `thinking` has no row. The wire's `ModelOption` has `values`, and `minimum`, `maximum`, and `step` are empty for a choice. `ListedModel.think_values` gives the same list in `model.list`.
+- **The levels rule.** Capabilities do not say whether a model takes levels, and gpt-oss ignores `true` and `false`. So the catalog's `[[local]]` entries have an optional `think` list, set on both gpt-oss entries. For an installed model the catalog does not list, a name that starts with `gpt-oss` gets the levels and any other model that thinks gets `off` and `on`. `golem.models.catalog.think_values` is the one function with this rule.
+- **No default.** Nothing set means nothing sent, and the model does what it does (T1). The row says `model default · thinks`. `PRESETS` stay numeric and leave `think` alone.
+- **The request.** `off` is sent as `think: false`, `on` as `true`, and a level as that string, through `ChatOllama.reasoning`. A saved value the model does not take is dropped when the daemon has seen the model's capabilities, so a value saved for a model that was later replaced by one that cannot think is not sent.
+- **The check.** `model.options.set` and `session.set_options` check `think` against the values of the model it is for, and refuse `high` for a model that takes `on` and `off`.
+
 ## Alternatives Considered
 
 ### Alternative 1: send `think: true` to get the thinking

@@ -39,6 +39,16 @@ export const SAMPLE_LISTING: ModelListResult = {
   setup: { ollama_installed: true, ollama_running: true, keys: ["openrouter"], default_status: "ready" },
 };
 
+/** The sample listing with two installed models that think: one takes `off` and `on`, one takes levels. */
+export const THINKING_LISTING: ModelListResult = {
+  ...SAMPLE_LISTING,
+  models: [
+    ...SAMPLE_LISTING.models,
+    model("ollama/qwen3.5:4b", { label: "Qwen3.5 4B", source: "installed", categories: ["general", "reasoning"], price: FREE, size_gb: 3.4, fit: "fits", ctx: 262144, think_values: ["off", "on"] }),
+    model("ollama/gpt-oss:20b", { label: "gpt-oss 20B", source: "installed", categories: ["general", "reasoning"], price: FREE, size_gb: 13.8, fit: "fits", ctx: 131072, think_values: ["low", "medium", "high"] }),
+  ],
+};
+
 /** Ollama is installed but not answering. */
 export const OLLAMA_DOWN_LISTING: ModelListResult = {
   default: null,

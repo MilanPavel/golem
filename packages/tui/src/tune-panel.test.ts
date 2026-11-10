@@ -219,3 +219,24 @@ test("a window too big for the machine is flagged, and the explanation warns", (
   const quiet = tuneLines({ ...big, focus: 0 }, 100);
   assert.equal(quiet.join(" ").includes("This may not load"), false);
 });
+
+const THINK = option("think", { kind: "choice", values: ["off", "on"], minimum: null, maximum: null, step: null, default: null });
+
+test("a think row has no slider and steps through its values with the arrows", () => {
+  const state = open({ options: [...RESULT.options, THINK] });
+  const lines = tuneLines(state, 80);
+  const row = lines.find((line) => line.includes("think")) as string;
+  assert.equal(row.includes("▕"), false);
+  assert.equal(row.includes("model default · thinks"), true);
+  let next = state;
+  for (let i = 0; i < 4; i += 1) next = pressTune(next, "down").state;
+  const first = pressTune(next, "right");
+  assert.deepEqual(first.action, { kind: "change", name: "think", value: "off", target: "saved" });
+  const second = pressTune(first.state, "right");
+  assert.deepEqual(second.action, { kind: "change", name: "think", value: "on", target: "saved" });
+  assert.equal(tuneLines(second.state, 80).some((line) => /think\s+on/.test(line)), true);
+});
+
+test("a model that cannot think has no think row", () => {
+  assert.equal(tuneLines(open(), 80).some((line) => line.includes("think")), false);
+});

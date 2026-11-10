@@ -1,6 +1,6 @@
 {
   "additionalProperties": false,
-  "description": "One row of the option table: what an option may be, and what it does.\n\n``kind`` ``duration`` is a time such as ``5m``, or a number of seconds, and\n``-1`` for always. ``default`` is Ollama's own, and ``None`` when it has\nnone, as for the seed.",
+  "description": "One row of the option table: what an option may be, and what it does.\n\n``kind`` ``duration`` is a time such as ``5m``, or a number of seconds, and\n``-1`` for always. ``choice`` is one of ``values``, which are the values this\nmodel takes, and has no range. ``default`` is Ollama's own, and ``None`` when\nit has none, as for the seed and for ``think``.",
   "properties": {
     "default": {
       "anyOf": [
@@ -21,7 +21,8 @@
       "enum": [
         "float",
         "int",
-        "duration"
+        "duration",
+        "choice"
       ],
       "title": "Kind",
       "type": "string"
@@ -37,12 +38,28 @@
       "type": "string"
     },
     "maximum": {
-      "title": "Maximum",
-      "type": "number"
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Maximum"
     },
     "minimum": {
-      "title": "Minimum",
-      "type": "number"
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Minimum"
     },
     "name": {
       "minLength": 1,
@@ -55,18 +72,30 @@
       "type": "string"
     },
     "step": {
-      "exclusiveMinimum": 0,
-      "title": "Step",
-      "type": "number"
+      "anyOf": [
+        {
+          "exclusiveMinimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Step"
+    },
+    "values": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Values",
+      "type": "array"
     }
   },
   "required": [
     "name",
     "label",
     "kind",
-    "minimum",
-    "maximum",
-    "step",
     "short",
     "long"
   ],

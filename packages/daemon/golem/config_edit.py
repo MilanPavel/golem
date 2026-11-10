@@ -7,6 +7,7 @@ and moved into place, so a crash never leaves half a config.
 from __future__ import annotations
 
 import os
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, cast
 
@@ -195,18 +196,22 @@ def set_rule_action(config_file: Path, index: int, action: RuleAction) -> None:
 
 
 def set_model_options(
-    config_file: Path, model: str, values: dict[str, float | str | None]
+    config_file: Path,
+    model: str,
+    values: dict[str, float | str | None],
+    think_values: Sequence[str] | None = None,
 ) -> dict[str, float | str]:
     """Save options in ``[ollama.models."<model>"]`` and return what that table now holds.
 
     A value of None removes the option, so the model's own default applies
     again. A table left empty is removed, and so is ``[ollama.models]`` once it
-    is empty. Raises ``ValueError`` for an unknown option or a value out of range,
+    is empty. ``think_values`` is what ``think`` takes for this model, or None to accept
+    every value. Raises ``ValueError`` for an unknown option or a value out of range,
     before anything is written.
     """
     for name, value in values.items():
         if value is not None:
-            model_options.validate(name, value)
+            model_options.validate(name, value, think_values if name == "think" else None)
     document = _read(config_file)
     ollama = _sub_table(document, "ollama", create=True)
     models = _sub_table(ollama, "models", create=True)

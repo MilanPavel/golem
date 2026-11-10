@@ -3,6 +3,7 @@ import {
   defaultNote,
   focusedRow,
   formatTuneValue,
+  isListKind,
   keepSession,
   memoryNote,
   moveFocus,
@@ -224,7 +225,7 @@ export function tuneLines(state: TuneState, columns: number): string[] {
   const lines = [header(state, width)];
   rows.forEach((row, index) => {
     const pointer = index === state.focus ? "▸" : " ";
-    const slider = row.option.kind === "duration" ? " ".repeat(cells + 2) : sliderCells(row.value, row.option, cells);
+    const slider = isListKind(row.option) ? " ".repeat(cells + 2) : sliderCells(row.value, row.option, cells);
     const value = formatTuneValue(row.option, row.value).padEnd(valueWidth);
     const notes: string[] = [];
     const memory = memoryNote(state, row);
