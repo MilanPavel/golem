@@ -1,4 +1,4 @@
-# ADR-044: golem keeps a model's thinking, shows it as one line, and never sends it back
+# ADR-045: golem keeps a model's thinking, shows it as one line, and never sends it back
 
 **Date**: 2026-11-10
 **Status**: accepted

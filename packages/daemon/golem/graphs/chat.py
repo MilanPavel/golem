@@ -29,6 +29,7 @@ from langgraph.types import Command
 from golem.graphs.adapter import STREAM_KEY, message_text
 from golem.graphs.prompt import PINNED_KEY, PromptContext, SystemPrompt
 from golem.graphs.state import AgentState
+from golem.graphs.text_calls import recover
 from golem.graphs.tools_node import (
     ALLOWED_KEY,
     ASKED_KEY,
@@ -437,6 +438,11 @@ def open_chat(
         update: dict[str, object] = {"id": message_id}
         if response.tool_calls:
             update["tool_calls"] = _with_ids(response.tool_calls)
+        elif schemas and binder.offers(profile) and "<function=" in message_text(response):
+            recovered = recover(message_text(response), schemas)
+            if recovered is not None:
+                update["content"], update["tool_calls"] = recovered
+                log.info("%s wrote %d tool call(s) as text; recovered", profile, len(recovered[1]))
         return {"messages": [response.model_copy(update=update)]}
 
     def route(state: AgentState) -> Literal["tools", "end"]:

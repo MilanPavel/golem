@@ -155,6 +155,33 @@ async def test_the_model_reads_a_file_then_answers(database: Database, project: 
     ]
 
 
+async def test_a_call_written_as_text_runs_as_a_tool_call(
+    database: Database, project: Path
+) -> None:
+    leaked = (
+        "Let me read it.\n\n<function=read_file>\n<parameter=path>\nnotes.txt\n"
+        "</parameter>\n</function>\n</tool_call>"
+    )
+    model = ToolCallingChatModel(replies=[leaked, "It says 42."])
+    chat = _chat(database, model)
+    session_id = await chat.manager.create(None, cwd=str(project))
+    events = await chat.finished(await chat.manager.send(session_id, "what is in notes?"))
+
+    completed = [event for event in events if isinstance(event, ToolCompletedEvent)]
+    assert len(completed) == 1
+    assert events[-1].type == "run.completed"
+    stored = _messages(await chat.runtime.values(session_id))
+    assistant = [m for m in stored if isinstance(m, AIMessage)]
+    assert assistant[0].text == "Let me read it."
+    assert [(c["name"], c["args"]) for c in assistant[0].tool_calls] == [
+        ("read_file", {"path": "notes.txt"})
+    ]
+    assert all("<function=" not in m.text for m in assistant)
+    result = model.seen[1][-1]
+    assert isinstance(result, ToolMessage)
+    assert "the answer is 42" in result.text
+
+
 async def test_a_path_outside_the_folder_fails_and_the_model_hears_why(
     database: Database, project: Path
 ) -> None:
