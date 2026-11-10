@@ -6,6 +6,7 @@ import type { ModelOption, ModelOptionsGetResult } from "@golem/client";
 import {
   applyPreset,
   changedRows,
+  defaultNote,
   differsFromDefault,
   focusedRow,
   formatTuneValue,
@@ -15,6 +16,7 @@ import {
   memoryFor,
   memoryNote,
   moveFocus,
+  NUM_CTX_START,
   PRESETS,
   presetForKey,
   PRESETS_HINT,
@@ -369,6 +371,49 @@ test("long memory picks the largest num_ctx step that fits, at most 32768", () =
   assert.deepEqual(applyPreset(none, preset(4)).options, { num_ctx: 16384 });
 });
 
+const withoutNumCtx = () => Object.fromEntries(Object.entries(result().defaults).filter(([name]) => name !== "num_ctx"));
+const numCtxRow = (state: ReturnType<typeof tuneState>) =>
+  tuneRows(state).find((row) => row.option.name === "num_ctx") as ReturnType<typeof tuneRows>[number];
+
+test("num_ctx with no default and no value says Ollama sets it when it loads", () => {
+  const defaults = withoutNumCtx();
+  const state = tuneState(result({ defaults }));
+  assert.equal(numCtxRow(state).value, null);
+  assert.equal(defaultNote(state, numCtxRow(state)), "set by Ollama when it loads");
+  const seed = tuneRows(state).find((row) => row.option.name === "seed") as ReturnType<typeof tuneRows>[number];
+  assert.equal(defaultNote(state, seed), null);
+});
+
+test("a default from Ollama or the Modelfile says where it came from", () => {
+  const ollama = tuneState(result({ defaults: { num_ctx: 32768 }, default_from: { num_ctx: "ollama" } }));
+  assert.equal(defaultNote(ollama, numCtxRow(ollama)), "model default 32K · from Ollama");
+  const modelfile = tuneState(result({ defaults: { num_ctx: 8192 }, default_from: { num_ctx: "modelfile" }, saved: { num_ctx: 16384 } }));
+  assert.equal(defaultNote(modelfile, numCtxRow(modelfile)), "model default 8K · from the Modelfile");
+  const plain = tuneState(result({ saved: { top_k: 20 } }));
+  const topK = tuneRows(plain).find((row) => row.option.name === "top_k") as ReturnType<typeof tuneRows>[number];
+  assert.equal(defaultNote(plain, topK), "model default 40");
+});
+
+test("memoryFor with no base gives the KV cache of the window alone", () => {
+  const memory = { ram_gb: 36, size_gb: 5.2, ...MEMORY };
+  const got = memoryFor(16384, memory, null);
+  assert.equal(got.extraGb, 16 * 0.06);
+  assert.equal(got.fit, "fits");
+  const defaults = withoutNumCtx();
+  const state = tuneState(result({ defaults, memory, saved: { num_ctx: 16384 } }));
+  assert.deepEqual(memoryNote(state, numCtxRow(state)), { text: "1.0 GB for the window · fits", fit: "fits" });
+});
+
+test("the first step from no default starts at 8192", () => {
+  const defaults = withoutNumCtx();
+  const state = tuneState(result({ defaults }));
+  const first = step(state, "num_ctx", 1);
+  assert.equal(numCtxRow(first).value, NUM_CTX_START);
+  assert.equal(NUM_CTX_START, 8192);
+  assert.equal(numCtxRow(step(first, "num_ctx", -1)).value, 7680);
+  assert.equal(numCtxRow(step(state, "num_ctx", -1)).value, 8192);
+});
+
 test("the chip lists only changed values, in table order, with temperature as temp", () => {
   const base = tuneState(result());
   assert.equal(tuneChip(base, "ollama"), "");
@@ -415,4 +460,7 @@ test("/tune <option> <value> checks the table and says the range", () => {
 test("the hint after an option name is its default and range", () => {
   assert.equal(tuneHint(OPTIONS[0] as ModelOption, { temperature: 0.7 }), "0.7 · 0–2");
   assert.equal(tuneHint(OPTIONS[0] as ModelOption), "0.8 · 0–2");
+  const numCtx = OPTIONS.find((item) => item.name === "num_ctx") as ModelOption;
+  assert.equal(tuneHint({ ...numCtx, default: null }), "set by Ollama · 512–262144");
+  assert.equal(tuneHint(numCtx, { num_ctx: 32768 }), "32K · 512–262144");
 });

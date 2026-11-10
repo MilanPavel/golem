@@ -37,7 +37,7 @@ class ListedContext(Protocol):
 
     def modelfile_num_ctx(self, ref: str) -> int | None: ...
 
-    def loaded_ctx(self, ref: str) -> int | None: ...
+    def default_ctx(self, ref: str) -> int | None: ...
 
 
 def resolve_window(
@@ -49,10 +49,13 @@ def resolve_window(
 ) -> ContextWindow:
     """The window of ``profile``.
 
-    An Ollama model has what golem sends (``overrides``, the saved option, the profile's
-    ``ctx``), then what Ollama loaded, then the Modelfile's ``num_ctx``, which is
-    estimated. The model's maximum is never used for it. Another provider has the
-    profile's ``ctx``, then the listed model's, then the price book's.
+    This is a forecast, made before the call. An Ollama model has what golem sends
+    (``overrides``, the saved option, the profile's ``ctx``), which is exact, then the
+    Modelfile's ``num_ctx``, then the window Ollama gave the model the last time golem
+    sent no ``num_ctx``. Those two are estimated, because Ollama may have restarted with
+    another default. What a load of another request holds is never used. The model's
+    maximum is never used. Another provider has the profile's ``ctx``, then the listed
+    model's, then the price book's.
     """
     try:
         resolved = router.resolve(profile)
@@ -73,10 +76,10 @@ def resolve_window(
     # model's maximum from the listing.
     if listed is None:
         return ContextWindow()
-    loaded = listed.loaded_ctx(resolved.ref)
-    if loaded:
-        return ContextWindow(loaded, None)
     modelfile = listed.modelfile_num_ctx(resolved.ref)
     if modelfile:
         return ContextWindow(modelfile, None, estimated=True)
+    default = listed.default_ctx(resolved.ref)
+    if default:
+        return ContextWindow(default, None, estimated=True)
     return ContextWindow()

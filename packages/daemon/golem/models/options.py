@@ -114,7 +114,7 @@ OPTIONS: tuple[OptionSpec, ...] = (
         minimum=512,
         maximum=262144,
         step=512,
-        default=4096,
+        default=None,
         short="How many tokens the model can keep in mind.",
         long=(
             "The prompt, the history, and the answer all have to fit. A larger window remembers "

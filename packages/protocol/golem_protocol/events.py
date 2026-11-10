@@ -336,6 +336,9 @@ class ModelCallCompletedData(BaseModel):
     ``first_token_ms`` is the time from the request to the first text, and
     None when no text came. ``latency_ms`` is the time to the end.
     ``failed`` is true when the call raised or was stopped.
+
+    ``context_window`` is the window the call ran with, read from the model server
+    after the call. Exact. None when it could not be read.
     """
 
     model_config = _CONFIG
@@ -346,6 +349,7 @@ class ModelCallCompletedData(BaseModel):
     first_token_ms: int | None = Field(default=None, ge=0)
     latency_ms: int = Field(ge=0)
     failed: bool = False
+    context_window: int | None = Field(default=None, gt=0)
 
 
 class ToolCompletedData(BaseModel):

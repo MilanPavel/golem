@@ -887,17 +887,23 @@ def _ps(handler: Handler) -> Network:
     return Network({"127.0.0.1/api/ps": handler})
 
 
-async def test_note_loaded_reads_the_loaded_context_and_replaces_it(tmp_path: Path) -> None:
+async def test_note_loaded_returns_the_context_and_keeps_only_a_default(
+    tmp_path: Path,
+) -> None:
     ref = "ollama/qwen3:8b"
     body: dict[str, object] = {"models": [{"name": "qwen3:8b", "context_length": 8192}]}
     router = ModelRouter(GolemSettings(), keys=MemoryKeyStore())
     discovery = _discovery(router, _ps(lambda _r: httpx.Response(200, json=body)), tmp_path)
-    assert discovery.loaded_ctx(ref) is None
-    await discovery.note_loaded(ref)
-    assert discovery.loaded_ctx(ref) == 8192
-    body["models"] = [{"model": "qwen3:8b", "context_length": 16384}]
-    await discovery.note_loaded(ref)
-    assert discovery.loaded_ctx(ref) == 16384
+    assert discovery.default_ctx(ref) is None
+    assert await discovery.note_loaded(ref, 8192) == 8192
+    assert discovery.default_ctx(ref) is None
+    assert await discovery.note_loaded(ref, None) == 8192
+    assert discovery.default_ctx(ref) == 8192
+    body["models"] = [{"model": "qwen3:8b", "context_length": 32768}]
+    assert await discovery.note_loaded(ref, 4096) == 32768
+    assert discovery.default_ctx(ref) == 8192
+    assert await discovery.note_loaded(ref, None) == 32768
+    assert discovery.default_ctx(ref) == 32768
     await discovery.aclose()
 
 
@@ -919,6 +925,6 @@ async def test_note_loaded_leaves_nothing_when_ollama_cannot_say(
     router = ModelRouter(GolemSettings(), keys=MemoryKeyStore())
     network = Network({} if answer is None else {"127.0.0.1/api/ps": lambda _r: answer})
     discovery = _discovery(router, network, tmp_path)
-    await discovery.note_loaded("ollama/qwen3:8b")
-    assert discovery.loaded_ctx("ollama/qwen3:8b") is None
+    assert await discovery.note_loaded("ollama/qwen3:8b", None) is None
+    assert discovery.default_ctx("ollama/qwen3:8b") is None
     await discovery.aclose()

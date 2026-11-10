@@ -48,6 +48,8 @@ class _Log:
         text: str = "ok",
         run: str = "r1",
         window: dict[str, int | bool] | None = None,
+        done: dict[str, int | bool] | None = None,
+        used: int = 5,
     ) -> None:
         self.add("message.started", {"message_id": message_id, "role": "assistant"}, run)
         if recorded:
@@ -73,8 +75,9 @@ class _Log:
                     "message_id": message_id,
                     "latency_ms": 700,
                     "first_token_ms": 100,
-                    "usage": {"input": 5, "output": 2},
+                    "usage": {"input": used, "output": 2},
                     "stop_reason": "end_turn",
+                    **(done or {}),
                 },
                 run,
             )
@@ -349,7 +352,7 @@ def test_with_windows_gives_an_old_ollama_call_todays_estimated_window() -> None
         def modelfile_num_ctx(self, ref: str) -> int | None:
             return 4096
 
-        def loaded_ctx(self, ref: str) -> int | None:
+        def default_ctx(self, ref: str) -> int | None:
             return None
 
     router = ModelRouter(GolemSettings(models={"local": ModelSettings(model="ollama/llama3.2:3b")}))
@@ -365,3 +368,38 @@ def test_with_windows_gives_an_old_ollama_call_todays_estimated_window() -> None
         4096,
         True,
     )
+
+
+def test_a_window_read_after_the_call_wins_and_is_exact() -> None:
+    log = _Log()
+    log.user("hi")
+    log.model(
+        "m1",
+        window={"context_window": 4096, "window_estimated": True},
+        done={"context_window": 32768},
+        used=23600,
+    )
+    (run,) = build_trace(log.events)
+    span = run.children[0]
+    assert (span.context_window, span.context_window_estimated) == (32768, False)
+
+
+def test_an_estimated_window_below_the_input_is_dropped_and_not_filled_again() -> None:
+    log = _Log()
+    log.user("hi")
+    log.model("m1", window={"context_window": 4096, "window_estimated": True}, used=23600)
+    (run,) = build_trace(log.events)
+    assert (run.children[0].context_window, run.children[0].context_window_estimated) == (
+        None,
+        False,
+    )
+    (again,) = with_windows(build_trace(log.events), lambda _: 4096, "prof")
+    assert again.children[0].context_window is None
+
+
+def test_an_exact_window_below_the_input_is_kept() -> None:
+    log = _Log()
+    log.user("hi")
+    log.model("m1", window={"context_window": 4096}, used=23600)
+    (run,) = build_trace(log.events)
+    assert run.children[0].context_window == 4096

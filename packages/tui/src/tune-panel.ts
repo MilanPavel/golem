@@ -1,6 +1,6 @@
 import {
   applyPreset,
-  differsFromDefault,
+  defaultNote,
   focusedRow,
   formatTuneValue,
   keepSession,
@@ -231,9 +231,9 @@ export function tuneLines(state: TuneState, columns: number): string[] {
     if (memory !== null) {
       notes.push(memory.text);
     }
-    const fallback = state.defaults[row.option.name];
-    if (differsFromDefault(state, row) && fallback !== undefined) {
-      notes.push(`model default ${formatTuneValue(row.option, fallback)}`);
+    const fallbackNote = defaultNote(state, row);
+    if (fallbackNote !== null) {
+      notes.push(fallbackNote);
     }
     if (row.source === "session") {
       notes.push("this session");

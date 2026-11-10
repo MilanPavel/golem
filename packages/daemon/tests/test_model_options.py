@@ -55,6 +55,7 @@ def test_a_default_comes_from_the_model_first_then_ollama() -> None:
     assert values["top_k"] == 20
     assert values["top_p"] == 0.9
     assert "seed" not in values
+    assert "num_ctx" not in values
     assert options.defaults() == options.defaults(None)
 
 
@@ -90,3 +91,10 @@ def test_a_value_is_checked_against_the_table() -> None:
     ):
         with pytest.raises(ValueError):
             options.validate(name, value)
+
+
+def test_num_ctx_has_no_fixed_default_and_a_modelfile_one_is_kept() -> None:
+    assert "num_ctx" not in options.defaults()
+    assert options.defaults({"num_ctx": 8192})["num_ctx"] == 8192
+    row = next(r for r in options.OPTIONS if r.name == "num_ctx")
+    assert row.default is None

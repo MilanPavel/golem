@@ -824,6 +824,10 @@ class ModelOptionsGetResult(BaseModel):
     ``session`` is the session's overrides, or ``None`` when no session was asked for.
     The value in use is the session's, else the saved, else the default. ``memory`` is
     ``None`` when golem does not know the RAM or the installed model's size.
+    ``default_from`` says where a default came from when it is not Ollama's fixed one:
+    ``modelfile`` for the model's own, ``ollama`` for the window Ollama gave the model
+    on a call that sent no ``num_ctx``. ``num_ctx`` has no default until one of the two
+    is known.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -831,6 +835,7 @@ class ModelOptionsGetResult(BaseModel):
     model: str = Field(min_length=1)
     options: list[ModelOption]
     defaults: dict[str, float | str]
+    default_from: dict[str, Literal["modelfile", "ollama"]] = Field(default_factory=dict)
     saved: dict[str, float | str]
     session: dict[str, float | str] | None = None
     memory: ModelMemory | None = None

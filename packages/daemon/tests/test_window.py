@@ -8,8 +8,8 @@ from golem.models.window import ContextWindow, resolve_window
 
 
 class _Listed:
-    def __init__(self, loaded: int | None = None, modelfile: int | None = None) -> None:
-        self.loaded = loaded
+    def __init__(self, default: int | None = None, modelfile: int | None = None) -> None:
+        self.default = default
         self.modelfile = modelfile
 
     def known_ctx(self, ref: str) -> int | None:
@@ -18,8 +18,8 @@ class _Listed:
     def modelfile_num_ctx(self, ref: str) -> int | None:
         return self.modelfile
 
-    def loaded_ctx(self, ref: str) -> int | None:
-        return self.loaded
+    def default_ctx(self, ref: str) -> int | None:
+        return self.default
 
 
 def _router(saved: int | None = None) -> ModelRouter:
@@ -67,12 +67,12 @@ def test_an_unknown_name_and_a_test_double_router_have_no_window() -> None:
 
 
 def test_a_profile_ctx_wins_over_what_ollama_says() -> None:
-    listed = _Listed(loaded=8192, modelfile=4096)
+    listed = _Listed(default=8192, modelfile=4096)
     assert resolve_window(_router(), "qwen", listed) == ContextWindow(16384, 16384)
 
 
 def test_a_saved_num_ctx_wins_over_the_profile_ctx_and_ollama() -> None:
-    listed = _Listed(loaded=8192, modelfile=4096)
+    listed = _Listed(default=8192, modelfile=4096)
     assert resolve_window(_router(32768), "qwen", listed) == ContextWindow(32768, 32768)
     assert resolve_window(_router(32768), "ollama/qwen3:8b", listed) == ContextWindow(32768, 32768)
 
@@ -92,20 +92,57 @@ def test_the_window_matches_the_num_ctx_chat_model_sends(
     router = _router(saved)
     model = router.chat_model("qwen", overrides)
     assert isinstance(model, OllamaChat)
-    got = resolve_window(router, "qwen", _Listed(loaded=1, modelfile=2), overrides=overrides)
+    got = resolve_window(router, "qwen", _Listed(default=1, modelfile=2), overrides=overrides)
     assert got.num_ctx == model.num_ctx
     assert got.window == model.num_ctx
 
 
-def test_a_loaded_window_is_exact_and_not_sent() -> None:
-    listed = _Listed(loaded=8192, modelfile=4096)
+def test_a_modelfile_window_comes_before_the_one_ollama_gave_last_time() -> None:
+    listed = _Listed(default=8192, modelfile=4096)
     assert resolve_window(_router(), "ollama/llama3.2:3b", listed) == ContextWindow(
-        8192, None, False
+        4096, None, True
     )
 
 
+def test_the_window_ollama_gave_last_time_is_a_forecast_not_exact() -> None:
+    listed = _Listed(default=32768)
+    assert resolve_window(_router(), "ollama/llama3.2:3b", listed) == ContextWindow(
+        32768, None, True
+    )
+
+
+def test_a_session_num_ctx_is_exact_whatever_ollama_gave_last_time() -> None:
+    listed = _Listed(default=32768)
+    got = resolve_window(_router(), "ollama/llama3.2:3b", listed, overrides={"num_ctx": 8192})
+    assert got == ContextWindow(8192, 8192, False)
+
+
+def test_a_call_that_sent_a_num_ctx_does_not_change_the_forecast_of_one_that_did_not() -> None:
+    class Discovery(_Listed):
+        def __init__(self) -> None:
+            super().__init__()
+            self.kept: dict[str, int] = {}
+
+        def default_ctx(self, ref: str) -> int | None:
+            return self.kept.get(ref)
+
+        def note(self, ref: str, sent: int | None, loaded: int) -> None:
+            if sent is None:
+                self.kept[ref] = loaded
+
+    seen = Discovery()
+    ref = "ollama/llama3.2:3b"
+    a = resolve_window(_router(), ref, seen, overrides={"num_ctx": 8192})
+    seen.note(ref, a.num_ctx, 8192)
+    b = resolve_window(_router(), ref, seen)
+    assert a == ContextWindow(8192, 8192, False)
+    assert b == ContextWindow()
+    seen.note(ref, b.num_ctx, 32768)
+    assert resolve_window(_router(), ref, seen) == ContextWindow(32768, None, True)
+
+
 def test_a_modelfile_window_is_estimated() -> None:
-    listed = _Listed(loaded=None, modelfile=4096)
+    listed = _Listed(default=None, modelfile=4096)
     assert resolve_window(_router(), "ollama/llama3.2:3b", listed) == ContextWindow(
         4096, None, True
     )

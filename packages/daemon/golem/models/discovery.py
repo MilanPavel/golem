@@ -244,21 +244,27 @@ class ModelDiscovery:
         self._shown: dict[str, _Shown] = {}
         self._ctx: dict[str, int] = {}
         self._modelfile_ctx: dict[str, int] = {}
-        self._loaded_ctx: dict[str, int] = {}
+        self._default_ctx: dict[str, int] = {}
 
-    def loaded_ctx(self, ref: str) -> int | None:
-        """The context length Ollama last reported for ``ref`` in memory. No I/O."""
-        return self._loaded_ctx.get(ref)
+    def default_ctx(self, ref: str) -> int | None:
+        """The window Ollama gave ``ref`` the last time golem sent no ``num_ctx``. No I/O.
 
-    async def note_loaded(self, ref: str) -> None:
-        """Read ``ref``'s loaded context length from ``/api/ps``. Never raises.
+        Kept in memory only, so it is unknown after a restart until the next call.
+        """
+        return self._default_ctx.get(ref)
 
-        It does not start the server: when Ollama is not answering, nothing changes.
+    async def note_loaded(self, ref: str, sent_num_ctx: int | None) -> int | None:
+        """Read ``ref``'s loaded context length from ``/api/ps`` and return it. Never raises.
+
+        ``sent_num_ctx`` is the ``num_ctx`` golem sent with the call. Only a call that sent
+        none says what Ollama's own default is, so only then is the value kept. Returns
+        None when Ollama does not answer or has nothing loaded, and changes nothing.
+        It does not start the server.
         """
         try:
             server = self._router.ollama_server(ref)
             if server is None:
-                return
+                return None
             base = server[1].rstrip("/").removesuffix("/v1")
             name = ref.removeprefix("ollama/")
             response = await self._http().get(f"{base}/api/ps", timeout=_OLLAMA_TIMEOUT)
@@ -267,11 +273,12 @@ class ModelDiscovery:
                 entry = _dict(item)
                 if name in (entry.get("name"), entry.get("model")):
                     ctx = _positive_int(entry.get("context_length"))
-                    if ctx is not None:
-                        self._loaded_ctx[ref] = ctx
-                    return
+                    if ctx is not None and sent_num_ctx is None:
+                        self._default_ctx[ref] = ctx
+                    return ctx
         except (httpx.HTTPError, ValueError) as exc:
             log.debug("ollama /api/ps for %s failed: %s", ref, exc)
+        return None
 
     def known_ctx(self, ref: str) -> int | None:
         """The tokens ``ref`` can take in, as last listed or from the price book. No I/O."""

@@ -383,6 +383,9 @@ class SessionManager:
                 window, estimated = filled_window(
                     span, None, session.model_profile, lambda name: window_of(name, None).window
                 )
+                used = None if span.tokens is None else span.tokens.input
+                if window is not None and used is not None and used > window:
+                    window, estimated = None, False
             context, sized = context_breakdown(
                 used=None if span.tokens is None else span.tokens.input,
                 window=window,

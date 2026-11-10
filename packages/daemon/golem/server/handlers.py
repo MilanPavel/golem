@@ -688,6 +688,15 @@ async def _model_options_get(
                 fits_share=hardware.FITS_SHARE,
                 tight_share=hardware.TIGHT_SHARE,
             )
+    values = model_options.defaults(own)
+    default_from: dict[str, Literal["modelfile", "ollama"]] = {}
+    if "num_ctx" in values:
+        default_from["num_ctx"] = "modelfile"
+    elif discovery is not None:
+        seen = discovery.default_ctx(f"ollama/{name}")
+        if seen is not None:
+            values["num_ctx"] = seen
+            default_from["num_ctx"] = "ollama"
     return ModelOptionsGetResult(
         model=name,
         options=[
@@ -704,7 +713,8 @@ async def _model_options_get(
             )
             for row in model_options.OPTIONS
         ],
-        defaults=model_options.defaults(own),
+        defaults=values,
+        default_from=default_from,
         saved=saved,
         session=session,
         memory=memory,

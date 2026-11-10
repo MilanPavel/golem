@@ -1,8 +1,9 @@
 import type { ModelOptionsGetResult, ModelOptionsSetResult, SessionSetOptionsResult } from "../../store/model-options.ts";
 import {
   applyPreset,
-  differsFromDefault,
+  defaultNote,
   formatTuneValue,
+  NUM_CTX_START,
   keepSession,
   KEEP_ALIVE_STEPS,
   memoryNote,
@@ -102,6 +103,8 @@ function RowControl({ row, id, onChange }: { row: TuneRow; id: string; onChange:
       </select>
     );
   }
+  // `num_ctx` with no default and no value: no thumb, and the first move starts at NUM_CTX_START.
+  const unset = option.name === "num_ctx" && value === null;
   return (
     <input
       id={id}
@@ -109,9 +112,12 @@ function RowControl({ row, id, onChange }: { row: TuneRow; id: string; onChange:
       min={option.minimum}
       max={option.maximum}
       step={option.step}
-      value={typeof value === "number" ? value : option.minimum}
-      onChange={(event) => onChange(event.target.valueAsNumber)}
-      className="min-w-0 flex-1 accent-clay"
+      value={typeof value === "number" ? value : unset ? NUM_CTX_START : option.minimum}
+      onChange={(event) => onChange(unset ? NUM_CTX_START : event.target.valueAsNumber)}
+      className={cn(
+        "min-w-0 flex-1 accent-clay",
+        unset && "[&::-moz-range-thumb]:opacity-0 [&::-webkit-slider-thumb]:opacity-0",
+      )}
     />
   );
 }
@@ -407,8 +413,7 @@ export function TuneView({
           {rows.map((row) => {
             const { option } = row;
             const id = `${ids}-${option.name}`;
-            const differs = differsFromDefault(view, row);
-            const fallback = state.defaults[option.name];
+            const fallbackNote = defaultNote(view, row);
             const memory = memoryNote(view, row);
             return (
               <li
@@ -430,7 +435,7 @@ export function TuneView({
                 <span className="w-16 text-right font-mono text-sm text-ink">{formatTuneValue(option, row.value)}</span>
                 <span className="flex w-44 flex-col text-xs text-muted">
                   {memory === null ? null : <span className={FIT_CLASS[memory.fit]}>{memory.text}</span>}
-                  {differs && fallback !== undefined ? <span>model default {formatTuneValue(option, fallback)}</span> : null}
+                  {fallbackNote === null ? null : <span>{fallbackNote}</span>}
                 </span>
                 <Button
                   size="sm"

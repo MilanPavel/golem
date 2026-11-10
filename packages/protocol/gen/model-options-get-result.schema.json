@@ -123,8 +123,19 @@
     }
   },
   "additionalProperties": false,
-  "description": "The table, and each option's value from the model's own default up.\n\n``defaults`` are the model's own values from Ollama, and Ollama's for what the\nmodel leaves out. ``saved`` is what ``model.options.set`` stored for the model.\n``session`` is the session's overrides, or ``None`` when no session was asked for.\nThe value in use is the session's, else the saved, else the default. ``memory`` is\n``None`` when golem does not know the RAM or the installed model's size.",
+  "description": "The table, and each option's value from the model's own default up.\n\n``defaults`` are the model's own values from Ollama, and Ollama's for what the\nmodel leaves out. ``saved`` is what ``model.options.set`` stored for the model.\n``session`` is the session's overrides, or ``None`` when no session was asked for.\nThe value in use is the session's, else the saved, else the default. ``memory`` is\n``None`` when golem does not know the RAM or the installed model's size.\n``default_from`` says where a default came from when it is not Ollama's fixed one:\n``modelfile`` for the model's own, ``ollama`` for the window Ollama gave the model\non a call that sent no ``num_ctx``. ``num_ctx`` has no default until one of the two\nis known.",
   "properties": {
+    "default_from": {
+      "additionalProperties": {
+        "enum": [
+          "modelfile",
+          "ollama"
+        ],
+        "type": "string"
+      },
+      "title": "Default From",
+      "type": "object"
+    },
     "defaults": {
       "additionalProperties": {
         "anyOf": [

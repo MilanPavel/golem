@@ -60,6 +60,18 @@ class ModelRequested:
 
 
 @dataclass(frozen=True, slots=True)
+class ModelResponded:
+    """The model call with this ``message_id`` returned.
+
+    ``context_window`` is the window it ran with, read from the model server after
+    the call. None when it could not be read.
+    """
+
+    message_id: str
+    context_window: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class TextDelta:
     """Incremental assistant text. Empty chunks are not represented."""
 
@@ -156,6 +168,7 @@ class PinSkipped:
 Fact = (
     ModelStarted
     | ModelRequested
+    | ModelResponded
     | TextDelta
     | TextCompleted
     | ToolStarted
@@ -402,6 +415,8 @@ def _custom(data: object) -> Fact | None:
         return ModelStarted(message_id)
     if kind == "model.request" and isinstance(message_id, str):
         return _request(message_id, item)
+    if kind == "model.response" and isinstance(message_id, str):
+        return ModelResponded(message_id, _positive(item.get("context_window")))
     if kind in (PIN_READ_KIND, PIN_SKIPPED_KIND):
         return _pin(kind, item)
     if not isinstance(call_id, str):
@@ -514,6 +529,7 @@ __all__ = [
     "ApprovalAsked",
     "Fact",
     "ModelRequested",
+    "ModelResponded",
     "ModelStarted",
     "PinRead",
     "PinSkipped",
