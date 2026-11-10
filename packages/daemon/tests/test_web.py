@@ -7,6 +7,7 @@ from collections.abc import Callable
 import httpx
 import pytest
 
+from golem import __version__
 from golem.config import WebSettings
 from golem.permissions.policy import describe, rule_for
 from golem.tools import default_registry
@@ -147,6 +148,47 @@ async def test_binary_content_and_errors_are_refused_and_big_pages_cut() -> None
     big = _ctx(lambda request: httpx.Response(200, text="x" * 5000), max_bytes=1000)
     result = await _fetch(big, "https://docs.example.com/big.txt")
     assert "[the page was cut at 1000 bytes]" in result.output
+
+
+async def test_the_request_names_golem_and_where_to_reach_its_author() -> None:
+    seen: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request.headers["user-agent"])
+        return httpx.Response(200, html=PAGE)
+
+    await _fetch(_ctx(handler), "https://docs.example.com/")
+    assert seen == [f"golem/{__version__} (+https://github.com/MilanPavel/golem)"]
+
+
+async def test_a_refused_page_says_why_in_at_most_200_characters() -> None:
+    body = "<html><body><h1>Blocked</h1><p>Please respect our   robot policy. " + "x " * 400
+    ctx = _ctx(lambda request: httpx.Response(403, html=body))
+    with pytest.raises(ToolError) as caught:
+        await _fetch(ctx, "https://docs.example.com/wiki")
+    prefix = "https://docs.example.com/wiki answered HTTP 403: "
+    message = str(caught.value)
+    assert message.startswith(prefix + "# Blocked Please respect our robot policy. x x")
+    reason = message[len(prefix) :]
+    assert len(reason) == 200 and reason.endswith("…")
+
+
+async def test_a_refused_page_with_no_body_has_no_reason() -> None:
+    ctx = _ctx(lambda request: httpx.Response(404, content=b""))
+    with pytest.raises(ToolError) as caught:
+        await _fetch(ctx, "https://docs.example.com/nope")
+    assert str(caught.value) == "https://docs.example.com/nope answered HTTP 404"
+
+
+async def test_a_refused_binary_page_has_no_reason_and_no_crash() -> None:
+    ctx = _ctx(
+        lambda request: httpx.Response(
+            500, content=b"\x00\x01oops", headers={"content-type": "application/octet-stream"}
+        )
+    )
+    with pytest.raises(ToolError) as caught:
+        await _fetch(ctx, "https://docs.example.com/blob")
+    assert str(caught.value) == "https://docs.example.com/blob answered HTTP 500"
 
 
 def test_the_subject_is_the_host_and_always_allow_covers_it() -> None:
