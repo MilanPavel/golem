@@ -39,6 +39,8 @@ What does this project do? Look at the README and the main folders.
 
 The answer streams in. While golem works, you see a line for each tool it uses, such as `read_file README.md`. Press **Ctrl-O** to see what each tool returned.
 
+A model that thinks before it answers shows one dim line above the answer, such as `thought for 12s`. Press **Ctrl-O** to read the thinking under it.
+
 Reading and searching files inside the folder needs no approval, so a question like this one runs straight through.
 
 ## Answer an approval

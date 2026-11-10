@@ -36,12 +36,13 @@ from golem.graphs.adapter import (
     PinSkipped,
     TextCompleted,
     TextDelta,
+    ThinkingDelta,
     TodosChanged,
     ToolErrored,
     ToolFinished,
     ToolOutput,
     ToolStarted,
-    translate,
+    Translator,
 )
 from golem.graphs.chat import ChatRuntime
 from golem.graphs.tools_node import Answer
@@ -61,6 +62,7 @@ from golem_protocol.events import (
     MessageCompletedData,
     MessageDeltaData,
     MessageStartedData,
+    MessageThinkingDeltaData,
     ModelCallCompletedData,
     ModelCallStartedData,
     PromptSectionInfo,
@@ -182,6 +184,13 @@ class _Progress:
     sent_at: float = 0.0
     first_at: float | None = None
     ran_window: int | None = None
+    translate: Translator = field(default_factory=Translator)
+    """Turns stream parts into facts. It holds text that may be half of a ``<think>`` tag."""
+    thinking: list[str] = field(default_factory=list[str])
+    think_at: float | None = None
+    """When the first thinking fragment of the open reply came."""
+    think_ms: int | None = None
+    """Thinking time of the open reply, set when its first answer fragment comes."""
 
 
 async def run_turn(
@@ -324,7 +333,8 @@ async def _finish(
 ) -> str | None:
     async with aclosing(stream):
         async for part in stream:
-            await _apply(translate(part), progress, emit)
+            for fact in progress.translate(part):
+                await _apply(fact, progress, emit)
     if progress.waiting:
         return None
     await emit("run.completed", EmptyEventData())
@@ -360,6 +370,7 @@ async def _apply(
             return
         progress.open = fact.message_id
         progress.parts = []
+        _reset_thinking(progress)
         await emit(
             "message.started", MessageStartedData(message_id=fact.message_id, role="assistant")
         )
@@ -397,9 +408,20 @@ async def _apply(
         )
     elif isinstance(fact, ModelResponded):
         progress.ran_window = fact.context_window
+    elif isinstance(fact, ThinkingDelta) and progress.open is not None:
+        if progress.think_at is None:
+            progress.think_at = time.monotonic()
+        progress.thinking.append(fact.text)
+        await emit(
+            "message.thinking.delta",
+            MessageThinkingDeltaData(message_id=progress.open, text=fact.text),
+        )
     elif isinstance(fact, TextDelta) and progress.open is not None:
+        now = time.monotonic()
         if progress.call is not None and progress.first_at is None:
-            progress.first_at = time.monotonic()
+            progress.first_at = now
+        if progress.think_at is not None and progress.think_ms is None:
+            progress.think_ms = _ms(now - progress.think_at)
         progress.parts.append(fact.text)
         await emit("message.delta", MessageDeltaData(message_id=progress.open, text=fact.text))
     elif isinstance(fact, TextCompleted):
@@ -408,9 +430,22 @@ async def _apply(
             return
         progress.reply = fact.text
         progress.open = None
+        thinking = fact.thinking or "".join(progress.thinking) or None
+        spent = None
+        if thinking is not None and progress.think_at is not None:
+            spent = progress.think_ms
+            if spent is None:
+                spent = _ms(time.monotonic() - progress.think_at)
+        _reset_thinking(progress)
         await emit(
             "message.completed",
-            MessageCompletedData(message_id=message_id, role="assistant", text=fact.text),
+            MessageCompletedData(
+                message_id=message_id,
+                role="assistant",
+                text=fact.text,
+                thinking=thinking,
+                thinking_ms=spent,
+            ),
         )
         await _end_call(progress, emit, fact)
         for call in fact.calls:
@@ -505,6 +540,12 @@ async def _end_call(
             context_window=None if failed else progress.ran_window,
         ),
     )
+
+
+def _reset_thinking(progress: _Progress) -> None:
+    progress.thinking = []
+    progress.think_at = None
+    progress.think_ms = None
 
 
 def _ms(seconds: float) -> int:

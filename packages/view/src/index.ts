@@ -3,6 +3,7 @@ export { formatDuration, formatElapsed } from "./duration.ts";
 export { editedArgs, parseArgs, type ParsedArgs } from "./approval-args.ts";
 export {
   appendDelta,
+  appendThinking,
   CANCELLED_NOTICE,
   createDeltaBatcher,
   downloadEnded,
@@ -18,6 +19,7 @@ export {
   SHUTDOWN_NOTICE,
   skippedNotice,
   SWITCH_HINT,
+  thinkingLine,
   type ApprovalAnswer,
   type ChatMessage,
   type ChatState,

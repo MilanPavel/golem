@@ -268,3 +268,42 @@ test("a tool without a diff shows no change section", () => {
   expect(screen.queryByText("change")).toBeNull();
   expect(screen.queryByRole("table")).toBeNull();
 });
+
+test("an answer after thinking has one line that opens to the thinking text and closes again", () => {
+  const { container } = render(
+    <TranscriptMessages
+      chat={chat([answer({ text: "391", thinking: "17 times 23 is 391.", thinkingMs: 12_400 })])}
+    />,
+  );
+  const control = screen.getByRole("button", { name: /thought for 12s/ });
+  expect(control.getAttribute("aria-expanded")).toBe("false");
+  expect(screen.queryByText("17 times 23 is 391.")).toBeNull();
+  fireEvent.click(control);
+  expect(control.getAttribute("aria-expanded")).toBe("true");
+  expect(screen.getByRole("region", { name: "Thinking" }).textContent).toBe("17 times 23 is 391.");
+  fireEvent.click(control);
+  expect(screen.queryByText("17 times 23 is 391.")).toBeNull();
+  // The line comes before the answer text.
+  const line = container.querySelector("[data-thinking]");
+  const text = container.querySelector(".prose");
+  expect(line && text && line.compareDocumentPosition(text) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
+test("a streaming reply says thinking, and an answer without thinking has no line", () => {
+  render(<TranscriptMessages chat={chat([answer({ streaming: true, text: "", thinking: "hm" })])} />);
+  expect(screen.getByRole("button", { name: /thinking…/ })).toBeTruthy();
+});
+
+test("no thinking, no thinking line", () => {
+  const { container } = render(<TranscriptMessages chat={chat([answer()])} />);
+  expect(container.querySelector("[data-thinking]")).toBeNull();
+});
+
+test("the thinking control passes axe closed and open", async () => {
+  const { container } = render(
+    <TranscriptMessages chat={chat([answer({ text: "391", thinking: "step one\nstep two", thinkingMs: 3000 })])} />,
+  );
+  expect((await axe.run(container, noContrast)).violations).toEqual([]);
+  fireEvent.click(screen.getByRole("button", { name: /thought for 3s/ }));
+  expect((await axe.run(container, noContrast)).violations).toEqual([]);
+});

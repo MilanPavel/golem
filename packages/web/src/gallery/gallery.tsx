@@ -18,7 +18,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip.tsx";
 import { ConnectionScreen } from "../features/connection/connection-screen.tsx";
 import { connectionScreen } from "../features/connection/connection-screen.ts";
 import { ToolLine, TranscriptMessages } from "../features/chat/index.ts";
-import { SAMPLE_CHAT, SAMPLE_TOOLS } from "../features/chat/sample.ts";
+import { SAMPLE_CHAT, SAMPLE_TOOLS, THINKING_CASES } from "../features/chat/sample.ts";
 import { ApprovalCard } from "../features/approval/index.ts";
 import { ANSWERED, PENDING_EDIT, PENDING_SHELL } from "../features/approval/sample.ts";
 import { DiffModeSwitch, DiffView } from "../features/diff/index.ts";
@@ -876,6 +876,18 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
               <ToolLine key={tool.callId} tool={tool} defaultOpen={tool.status === "running"} />
             ))}
           </ul>
+        </div>
+      </section>
+
+      <section className="mt-6" id={anchor("Thinking")}>
+        <h3 className="mb-2 font-mono text-xs text-faint">Thinking</h3>
+        <div className="flex flex-col gap-6 rounded-lg border border-line bg-bg p-4">
+          {THINKING_CASES.map(({ label, message }) => (
+            <div key={label} aria-label={`Thinking, ${label}`} role="group" className="flex flex-col gap-1">
+              <p className="font-mono text-xs text-faint">{label}</p>
+              <TranscriptMessages chat={{ messages: [message], error: null, notice: null }} />
+            </div>
+          ))}
         </div>
       </section>
 

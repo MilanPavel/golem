@@ -6,6 +6,8 @@ export type Role = 'user' | 'assistant';
 export type Args = string;
 export type Name = string;
 export type Text = string;
+export type Thinking = string | null;
+export type ThinkingMs = number | null;
 export type RunId = string;
 export type Seq = number;
 export type SessionId = string;
@@ -32,6 +34,11 @@ export interface MessageCompletedEvent {
  * got, with the arguments filled in, and a client can show the skill's name
  * and arguments instead.
  *
+ * ``thinking`` is the whole thinking text of an assistant message, None when
+ * the model did not think. ``thinking_ms`` is the time from the first
+ * thinking fragment to the first answer fragment, or to the end when no
+ * answer text came.
+ *
  * This interface was referenced by `MessageCompletedEvent`'s JSON-Schema
  * via the `definition` "MessageCompletedData".
  */
@@ -41,6 +48,8 @@ export interface MessageCompletedData {
   role: Role;
   skill?: SkillCall | null;
   text: Text;
+  thinking?: Thinking;
+  thinking_ms?: ThinkingMs;
 }
 /**
  * A skill run once by name, with what was typed after it.
