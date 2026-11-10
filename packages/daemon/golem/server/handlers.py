@@ -25,7 +25,7 @@ from golem.config_edit import (
 from golem.doctor import MacPlatform, run_checks
 from golem.folders import FolderError, list_dirs
 from golem.mcp import McpServerError, McpSupervisor
-from golem.models import ollama
+from golem.models import hardware, ollama
 from golem.models import options as model_options
 from golem.models.discovery import KeyRejected, KeyUnchecked
 from golem.models.errors import ModelUnreachable
@@ -139,6 +139,7 @@ from golem_protocol.commands import (
     ModelDeleteResult,
     ModelListParams,
     ModelListResult,
+    ModelMemory,
     ModelOption,
     ModelOptionsGetParams,
     ModelOptionsGetResult,
@@ -675,6 +676,18 @@ async def _model_options_get(
             session = await _sessions(ctx).session_options(params.session_id)
         except (SessionNotFoundError, SchemaMismatchError) as exc:
             raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
+    memory: ModelMemory | None = None
+    if discovery is not None and discovery.ram_gb is not None:
+        size_gb = await discovery.ollama_size_gb(f"ollama/{name}")
+        if size_gb is not None:
+            memory = ModelMemory(
+                ram_gb=discovery.ram_gb,
+                size_gb=size_gb,
+                kv_gb_per_1k_tokens=hardware.KV_GB_PER_1K_TOKENS,
+                overhead_gb=hardware.OVERHEAD_GB,
+                fits_share=hardware.FITS_SHARE,
+                tight_share=hardware.TIGHT_SHARE,
+            )
     return ModelOptionsGetResult(
         model=name,
         options=[
@@ -694,6 +707,7 @@ async def _model_options_get(
         defaults=model_options.defaults(own),
         saved=saved,
         session=session,
+        memory=memory,
     )
 
 

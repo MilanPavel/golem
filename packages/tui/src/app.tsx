@@ -131,7 +131,7 @@ import {
   type TryRun,
 } from "@golem/view";
 import { dropTry, startTry, tryLines } from "./try-again.ts";
-import { pressTune, tuneKeyOf, tuneLines, tuneLitLines, tuneOpening, type TuneAction } from "./tune-panel.ts";
+import { pressTune, tuneKeyOf, tuneLines, tuneLitLines, tuneMemorySpans, tuneOpening, type TuneAction } from "./tune-panel.ts";
 import { folderFacts } from "./folder-facts.ts";
 import {
   applyComposer,
@@ -653,8 +653,17 @@ export function App({
   const tryRows = tune !== null && tryRun !== null ? tryLines(tryRun, columns) : [];
   const helpText = !keysOpen && !switcher.open ? panelLines : [];
   const litLines = tune !== null ? tuneLitLines(tune) : [];
-  const helpRows = [
-    ...helpText.map((text, index) => ({ text, dim: false, accent: litLines.includes(index) })),
+  const gauges = tune !== null ? tuneMemorySpans(tune, columns) : [];
+  const helpRows: OverlayLine[] = [
+    ...helpText.map((text, index) => {
+      const gauge = gauges.find((item) => item.line === index);
+      return {
+        text,
+        dim: false,
+        accent: litLines.includes(index),
+        ...(gauge === undefined ? {} : { gauge: { start: gauge.start, fit: gauge.fit } }),
+      };
+    }),
     ...(helpText.length > 0 ? tryRows : []),
   ];
   const helpHeight = Math.min(helpRows.length, budget.body);
@@ -4103,7 +4112,19 @@ function LineList({
           color={line.dim ? undefined : line.accent === true ? CLAY : color}
           wrap="truncate-end"
         >
-          {line.text.length === 0 ? " " : line.text}
+          {line.gauge === undefined ? (
+            line.text.length === 0 ? " " : line.text
+          ) : (
+            <>
+              {line.text.slice(0, line.gauge.start)}
+              <Text
+                dimColor={line.gauge.fit === "fits"}
+                color={line.gauge.fit === "tight" ? "yellow" : line.gauge.fit === "too_big" ? "red" : undefined}
+              >
+                {line.text.slice(line.gauge.start)}
+              </Text>
+            </>
+          )}
         </Text>
       ))}
     </Box>

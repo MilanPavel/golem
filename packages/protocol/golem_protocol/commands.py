@@ -798,13 +798,32 @@ class ModelOptionsGetParams(BaseModel):
     session_id: str | None = Field(default=None, min_length=1)
 
 
+class ModelMemory(BaseModel):
+    """What a client needs to say whether a ``num_ctx`` fits in this machine's memory.
+
+    A model needs ``size_gb``, plus ``kv_gb_per_1k_tokens`` for each 1024 tokens of
+    context, plus ``overhead_gb``. It ``fits`` when that is at most ``fits_share`` of
+    ``ram_gb``, is ``tight`` up to ``tight_share``, and is too big beyond.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    ram_gb: float = Field(gt=0)
+    size_gb: float = Field(ge=0)
+    kv_gb_per_1k_tokens: float = Field(ge=0)
+    overhead_gb: float = Field(ge=0)
+    fits_share: float = Field(gt=0)
+    tight_share: float = Field(gt=0)
+
+
 class ModelOptionsGetResult(BaseModel):
     """The table, and each option's value from the model's own default up.
 
     ``defaults`` are the model's own values from Ollama, and Ollama's for what the
     model leaves out. ``saved`` is what ``model.options.set`` stored for the model.
     ``session`` is the session's overrides, or ``None`` when no session was asked for.
-    The value in use is the session's, else the saved, else the default.
+    The value in use is the session's, else the saved, else the default. ``memory`` is
+    ``None`` when golem does not know the RAM or the installed model's size.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -814,6 +833,7 @@ class ModelOptionsGetResult(BaseModel):
     defaults: dict[str, float | str]
     saved: dict[str, float | str]
     session: dict[str, float | str] | None = None
+    memory: ModelMemory | None = None
 
 
 class ModelOptionsSetParams(BaseModel):

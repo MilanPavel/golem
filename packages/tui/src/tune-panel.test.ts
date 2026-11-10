@@ -5,7 +5,7 @@ import type { ModelOption, ModelOptionsGetResult } from "@golem/client";
 import { tuneState, type TuneState } from "@golem/view";
 
 import type { Press, PressName } from "./keys.ts";
-import { pressTune, tuneKeyOf, tuneLines, tuneLitLines, tuneOpening } from "./tune-panel.ts";
+import { pressTune, tuneKeyOf, tuneLines, tuneLitLines, tuneMemorySpans, tuneOpening } from "./tune-panel.ts";
 
 function press(name: PressName | null, input = "", ctrl = false): Press {
   return { name, input, ctrl, meta: false };
@@ -193,4 +193,29 @@ test("S saves the session's values for the model and clears them, and does nothi
   assert.deepEqual(kept.state.session, {});
   assert.deepEqual(kept.state.saved, { temperature: 0.2, top_p: 0.9, repeat_penalty: 1.1 });
   assert.deepEqual(pressTune(open(), "save").action, { kind: "none" });
+});
+
+const MEMORY = { kv_gb_per_1k_tokens: 0.06, overhead_gb: 1, fits_share: 0.5, tight_share: 0.75 };
+
+test("the num_ctx row shows the memory of the value, and nothing when it is not known", () => {
+  const known = open({ saved: { num_ctx: 16384 }, memory: { ram_gb: 36, size_gb: 5.2, ...MEMORY } });
+  const lines = tuneLines(known, 100);
+  assert.match(lines.find((line) => line.includes("num_ctx")) as string, /16K\s+\+0\.7 GB · fits/);
+  assert.deepEqual(tuneMemorySpans(known, 100).map((span) => [span.line, span.fit]), [[3, "fits"]]);
+  const below = tuneLines(open({ saved: { num_ctx: 2048 }, memory: { ram_gb: 36, size_gb: 5.2, ...MEMORY } }), 100);
+  assert.equal(below.some((line) => line.includes("−0.1 GB · fits")), true);
+  const none = open({ saved: { num_ctx: 16384 } });
+  assert.equal(tuneLines(none, 100).some((line) => line.includes("GB")), false);
+  assert.deepEqual(tuneMemorySpans(none, 100), []);
+});
+
+test("a window too big for the machine is flagged, and the explanation warns", () => {
+  const big = open({ saved: { num_ctx: 32768 }, memory: { ram_gb: 8, size_gb: 5.2, ...MEMORY } });
+  const focused = { ...big, focus: 2 };
+  const lines = tuneLines(focused, 100);
+  assert.equal(lines.some((line) => line.includes("· too big")), true);
+  assert.equal(lines.join(" ").includes("This may not load on this Mac."), true);
+  assert.equal(tuneMemorySpans(big, 100)[0]?.fit, "too_big");
+  const quiet = tuneLines({ ...big, focus: 0 }, 100);
+  assert.equal(quiet.join(" ").includes("This may not load"), false);
 });

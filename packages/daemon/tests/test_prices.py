@@ -120,6 +120,18 @@ def test_fit(size_gb: float, ram_gb: float, ctx: int | None, expected: str) -> N
     assert hardware.fit(size_gb, ram_gb, ctx) == expected
 
 
+def test_kv_gb_is_the_rate_for_each_1024_tokens() -> None:
+    assert hardware.kv_gb(1024) == hardware.KV_GB_PER_1K_TOKENS
+    assert hardware.kv_gb(8192) == pytest.approx(0.48)
+    assert hardware.kv_gb(0) == 0
+
+
+def test_fit_uses_kv_gb() -> None:
+    need = 5.2 + hardware.kv_gb(8192) + hardware.OVERHEAD_GB
+    assert need <= 36.0 * hardware.FITS_SHARE
+    assert hardware.fit(5.2, 36.0, None) == hardware.fit(5.2, 36.0, 8192) == "fits"
+
+
 def test_total_ram_is_known_here() -> None:
     ram = hardware.total_ram_gb()
     assert ram is not None and ram > 1

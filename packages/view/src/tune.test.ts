@@ -9,7 +9,11 @@ import {
   differsFromDefault,
   focusedRow,
   formatTuneValue,
+  formatExtraGb,
   keepSession,
+  largestFittingCtx,
+  memoryFor,
+  memoryNote,
   moveFocus,
   PRESETS,
   presetForKey,
@@ -237,7 +241,7 @@ test("the presets are on keys 1 to 4 with the values the ticket names", () => {
   ]);
   assert.deepEqual(preset(1).options, { temperature: 0.2, top_p: 0.9, repeat_penalty: 1.1 });
   assert.deepEqual(preset(3).options, { temperature: 1.0, top_p: 0.95, min_p: 0.05 });
-  assert.deepEqual(preset(4).options, { num_ctx: 16384 });
+  assert.deepEqual(preset(4).options, { num_ctx: 16384 }, "the fallback with no memory known");
   assert.equal(presetForKey(5), null);
   assert.equal(PRESETS_HINT, "presets  1 precise   2 balanced   3 creative   4 long memory");
 });
@@ -299,4 +303,65 @@ test("keepSession moves the session's values to saved and names what to clear", 
   assert.deepEqual(kept.state.saved, { top_k: 20, temperature: 0.2, top_p: 0.9, repeat_penalty: 1.1 });
   assert.deepEqual(kept.state.session, {});
   assert.equal(kept.state.preset, undefined);
+});
+
+const MEMORY = { kv_gb_per_1k_tokens: 0.06, overhead_gb: 1, fits_share: 0.5, tight_share: 0.75 };
+
+// The same cases as test_fit in packages/daemon/tests/test_prices.py, with the default window of 8192.
+for (const [size, ram, ctx, expected] of [
+  [5.2, 36, 8192, "fits"],
+  [5.2, 36, 32768, "fits"],
+  [18.6, 36, 8192, "tight"],
+  [40, 36, 8192, "too_big"],
+  [3.3, 8, 8192, "tight"],
+  [5.2, 8, 8192, "too_big"],
+  [13.8, 16, 8192, "too_big"],
+] as const) {
+  test(`memoryFor gives the daemon's verdict: ${size} GB in ${ram} GB with ${ctx} is ${expected}`, () => {
+    const memory = { ram_gb: ram, size_gb: size, ...MEMORY };
+    assert.equal(memoryFor(ctx, memory, 4096).fit, expected);
+  });
+}
+
+test("memoryFor's extra is the KV cache over the default's, negative below it", () => {
+  const memory = { ram_gb: 36, size_gb: 5.2, ...MEMORY };
+  assert.equal(formatExtraGb(memoryFor(16384, memory, 4096).extraGb), "+0.7 GB");
+  assert.equal(formatExtraGb(memoryFor(20480, memory, 2048).extraGb), "+1.1 GB");
+  assert.equal(formatExtraGb(memoryFor(8192, memory, 16384).extraGb), "−0.5 GB");
+  assert.equal(formatExtraGb(memoryFor(4096, memory, 4096).extraGb), "+0.0 GB");
+});
+
+test("the gauge is for num_ctx only, and only when the memory is known", () => {
+  const memory = { ram_gb: 36, size_gb: 5.2, ...MEMORY };
+  const known = tuneState(result({ memory, saved: { num_ctx: 16384 } }));
+  const ctx = tuneRows(known).find((row) => row.option.name === "num_ctx") as ReturnType<typeof tuneRows>[number];
+  assert.deepEqual(memoryNote(known, ctx), { text: "+0.7 GB · fits", fit: "fits" });
+  const other = tuneRows(known).find((row) => row.option.name === "top_p") as ReturnType<typeof tuneRows>[number];
+  assert.equal(memoryNote(known, other), null);
+  const unknown = tuneState(result({ saved: { num_ctx: 16384 } }));
+  assert.equal(memoryNote(unknown, ctx), null);
+});
+
+test("a window that does not load says so", () => {
+  const memory = { ram_gb: 16, size_gb: 13.8, ...MEMORY };
+  const state = tuneState(result({ memory }));
+  const ctx = tuneRows(state).find((row) => row.option.name === "num_ctx") as ReturnType<typeof tuneRows>[number];
+  const note = memoryNote(state, ctx);
+  assert.equal(note?.fit, "too_big");
+  assert.equal(note?.text, "+0.0 GB · too big");
+  assert.equal(note?.warning, "This may not load on this Mac.");
+});
+
+test("long memory picks the largest num_ctx step that fits, at most 32768", () => {
+  const roomy = tuneState(result({ memory: { ram_gb: 36, size_gb: 5.2, ...MEMORY } }));
+  assert.deepEqual(applyPreset(roomy, preset(4)).options, { num_ctx: 32768 });
+  const small = tuneState(result({ memory: { ram_gb: 16, size_gb: 6.2, ...MEMORY } }));
+  const picked = applyPreset(small, preset(4)).options["num_ctx"] as number;
+  assert.equal(picked, 13312);
+  assert.equal(memoryFor(picked, { ram_gb: 16, size_gb: 6.2, ...MEMORY }, 4096).fit, "fits");
+  assert.equal(memoryFor(picked + 512, { ram_gb: 16, size_gb: 6.2, ...MEMORY }, 4096).fit, "tight");
+  const option = OPTIONS.find((item) => item.name === "num_ctx") as ModelOption;
+  assert.equal(largestFittingCtx(option, { ram_gb: 8, size_gb: 3.3, ...MEMORY }), null);
+  const none = tuneState(result({ memory: { ram_gb: 8, size_gb: 3.3, ...MEMORY } }));
+  assert.deepEqual(applyPreset(none, preset(4)).options, { num_ctx: 16384 });
 });

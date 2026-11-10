@@ -118,7 +118,8 @@ OPTIONS: tuple[OptionSpec, ...] = (
         short="How many tokens the model can keep in mind.",
         long=(
             "The prompt, the history, and the answer all have to fit. A larger window remembers "
-            "more of a long chat and costs memory. Past the window the oldest text is dropped."
+            "more of a long chat and costs memory. The memory shown is about right for a mid-size "
+            "model, not exact. Past the window the oldest text is dropped."
         ),
     ),
     OptionSpec(

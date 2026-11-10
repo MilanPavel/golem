@@ -13,11 +13,11 @@ from typing import Literal
 Fit = Literal["fits", "tight", "too_big"]
 
 # KV cache for a mid-size model at 16-bit, per 1024 tokens of context.
-_KV_GB_PER_1K_TOKENS = 0.06
-_DEFAULT_CTX = 8192
-_OVERHEAD_GB = 1.0
-_FITS_SHARE = 0.5
-_TIGHT_SHARE = 0.75
+KV_GB_PER_1K_TOKENS = 0.06
+DEFAULT_CTX = 8192
+OVERHEAD_GB = 1.0
+FITS_SHARE = 0.5
+TIGHT_SHARE = 0.75
 
 
 def total_ram_gb() -> float | None:
@@ -38,12 +38,17 @@ def total_ram_gb() -> float | None:
         return None
 
 
+def kv_gb(ctx: int) -> float:
+    """The KV-cache memory in GB for ``ctx`` tokens, at one rate for every model."""
+    return ctx / 1024 * KV_GB_PER_1K_TOKENS
+
+
 def fit(size_gb: float, ram_gb: float, ctx: int | None = None) -> Fit:
     """``fits`` within half of RAM, ``tight`` within three quarters, else ``too_big``."""
-    tokens = ctx if ctx is not None and ctx > 0 else _DEFAULT_CTX
-    need = size_gb + tokens / 1024 * _KV_GB_PER_1K_TOKENS + _OVERHEAD_GB
-    if need <= ram_gb * _FITS_SHARE:
+    tokens = ctx if ctx is not None and ctx > 0 else DEFAULT_CTX
+    need = size_gb + kv_gb(tokens) + OVERHEAD_GB
+    if need <= ram_gb * FITS_SHARE:
         return "fits"
-    if need <= ram_gb * _TIGHT_SHARE:
+    if need <= ram_gb * TIGHT_SHARE:
         return "tight"
     return "too_big"

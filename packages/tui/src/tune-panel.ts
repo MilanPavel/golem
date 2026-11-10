@@ -4,6 +4,7 @@ import {
   focusedRow,
   formatTuneValue,
   keepSession,
+  memoryNote,
   moveFocus,
   presetForKey,
   PRESETS_HINT,
@@ -13,6 +14,7 @@ import {
   toggleTarget,
   tuneRows,
   written,
+  type MemoryFit,
   type TuneState,
   type TuneTarget,
   type TuneValue,
@@ -192,6 +194,22 @@ export function tuneLitLines(state: TuneState): number[] {
   return state.options.flatMap((option, index) => (lit.includes(option.name) ? [index + 1] : []));
 }
 
+/**
+ * Where the memory gauge sits in {@link tuneLines}: the line, the column it starts at, and the
+ * verdict, so the screen can colour it. Empty when the gauge is not shown.
+ */
+export function tuneMemorySpans(
+  state: TuneState,
+  columns: number,
+): { line: number; start: number; fit: MemoryFit }[] {
+  const lines = tuneLines(state, columns);
+  return tuneRows(state).flatMap((row, index) => {
+    const note = memoryNote(state, row);
+    const start = note === null ? -1 : (lines[index + 1] ?? "").indexOf(note.text);
+    return note !== null && start >= 0 ? [{ line: index + 1, start, fit: note.fit }] : [];
+  });
+}
+
 function change(state: TuneState, name: string): TuneAction {
   return { kind: "change", name, value: written(state, name), target: state.target };
 }
@@ -209,6 +227,10 @@ export function tuneLines(state: TuneState, columns: number): string[] {
     const slider = row.option.kind === "duration" ? " ".repeat(cells + 2) : sliderCells(row.value, row.option, cells);
     const value = formatTuneValue(row.option, row.value).padEnd(valueWidth);
     const notes: string[] = [];
+    const memory = memoryNote(state, row);
+    if (memory !== null) {
+      notes.push(memory.text);
+    }
     const fallback = state.defaults[row.option.name];
     if (differsFromDefault(state, row) && fallback !== undefined) {
       notes.push(`model default ${formatTuneValue(row.option, fallback)}`);
@@ -222,7 +244,9 @@ export function tuneLines(state: TuneState, columns: number): string[] {
   if (focused !== null) {
     const title = `─ ${focused.option.name} `;
     lines.push(title + "─".repeat(Math.max(0, width - title.length)));
-    lines.push(...wrap(focused.option.long, Math.max(1, width - 1)).map((line) => ` ${line}`));
+    const warning = memoryNote(state, focused)?.warning;
+    const text = warning === undefined ? focused.option.long : `${focused.option.long} ${warning}`;
+    lines.push(...wrap(text, Math.max(1, width - 1)).map((line) => ` ${line}`));
   }
   lines.push(` ${KEYS}`);
   lines.push(` ${PRESETS_HINT}`);

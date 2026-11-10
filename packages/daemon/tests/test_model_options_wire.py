@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import tomllib
+from collections.abc import Callable
 from pathlib import Path
 from typing import cast
 
+import httpx
 from test_server import HELLO, RpcClient, error_code, rpc_result, start_daemon, stop_daemon
 
 from golem.config import GolemSettings, ModelSettings
+from golem.models import hardware
+from golem.models.discovery import ModelDiscovery
 from golem.models.router import ModelRouter
 from golem.server.dispatcher import INVALID_PARAMS, SESSION_NOT_FOUND
 
@@ -173,3 +177,75 @@ async def test_a_session_override_is_that_sessions_and_survives_a_restart(
     finally:
         await client.close()
         await stop_daemon(app, task)
+
+
+def _tags(models: list[dict[str, object]]) -> httpx.MockTransport:
+    def handle(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/tags":
+            return httpx.Response(200, json={"models": models})
+        return httpx.Response(404)
+
+    return httpx.MockTransport(handle)
+
+
+def _discovery(
+    tmp_path: Path, transport: httpx.MockTransport, ram_gb: float | None
+) -> Callable[[ModelRouter], ModelDiscovery]:
+    def make(router: ModelRouter) -> ModelDiscovery:
+        return ModelDiscovery(
+            router,
+            tmp_path / "cache",
+            transport=transport,
+            ram_gb=ram_gb,
+            detect_ram=False,
+            fetch_prices=False,
+            ollama_installed=lambda: True,
+        )
+
+    return make
+
+
+async def test_memory_is_given_for_an_installed_model_with_a_size(
+    short_home: Path, tmp_path: Path
+) -> None:
+    transport = _tags([{"name": "qwen3:8b", "size": 5_200_000_000}])
+    app, task = await start_daemon(
+        short_home, router=_router(), discovery=_discovery(tmp_path, transport, 36.0)
+    )
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        got = rpc_result(await client.call("model.options.get", {"model": "qwen3:8b"}))
+        assert got["memory"] == {
+            "ram_gb": 36.0,
+            "size_gb": 5.2,
+            "kv_gb_per_1k_tokens": hardware.KV_GB_PER_1K_TOKENS,
+            "overhead_gb": hardware.OVERHEAD_GB,
+            "fits_share": hardware.FITS_SHARE,
+            "tight_share": hardware.TIGHT_SHARE,
+        }
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+
+
+async def test_memory_is_none_without_a_size_or_without_ram(
+    short_home: Path, tmp_path: Path
+) -> None:
+    cases = [
+        (_tags([{"name": "other:1b", "size": 1_000_000_000}]), 36.0),
+        (_tags([{"name": "qwen3:8b"}]), 36.0),
+        (_tags([{"name": "qwen3:8b", "size": 5_200_000_000}]), None),
+    ]
+    for transport, ram in cases:
+        app, task = await start_daemon(
+            short_home, router=_router(), discovery=_discovery(tmp_path, transport, ram)
+        )
+        client = await RpcClient.connect(app.paths.socket_path)
+        try:
+            await client.call("hello", HELLO)
+            got = rpc_result(await client.call("model.options.get", {"model": "qwen3:8b"}))
+            assert got["memory"] is None
+        finally:
+            await client.close()
+            await stop_daemon(app, task)

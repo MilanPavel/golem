@@ -230,6 +230,15 @@ function isOptionValues(value: unknown): boolean {
   return isRecord(value) && Object.values(value).every((item) => typeof item === "number" || typeof item === "string");
 }
 
+function isModelMemory(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    ["ram_gb", "size_gb", "kv_gb_per_1k_tokens", "overhead_gb", "fits_share", "tight_share"].every(
+      (key) => typeof value[key] === "number",
+    )
+  );
+}
+
 export function isModelOptionsGetResult(value: unknown): value is ModelOptionsGetResult {
   return (
     isRecord(value) &&
@@ -246,7 +255,8 @@ export function isModelOptionsGetResult(value: unknown): value is ModelOptionsGe
     ) &&
     isOptionValues(value["defaults"]) &&
     isOptionValues(value["saved"]) &&
-    (value["session"] === undefined || value["session"] === null || isOptionValues(value["session"]))
+    (value["session"] === undefined || value["session"] === null || isOptionValues(value["session"])) &&
+    (value["memory"] === undefined || value["memory"] === null || isModelMemory(value["memory"]))
   );
 }
 

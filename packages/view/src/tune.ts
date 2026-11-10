@@ -1,4 +1,4 @@
-import type { ModelOption, ModelOptionsGetResult } from "@golem/client";
+import type { ModelMemory, ModelOption, ModelOptionsGetResult } from "@golem/client";
 
 /**
  * `/tune`: the options of a local model, the value in use for each, and where it comes from.
@@ -20,6 +20,8 @@ export type TuneState = {
   defaults: Readonly<Record<string, TuneValue>>;
   saved: Readonly<Record<string, TuneValue>>;
   session: Readonly<Record<string, TuneValue>>;
+  /** What the daemon knows of this machine's memory and the model's size, or null when it does not. */
+  memory: ModelMemory | null;
   /** Index of the focused option. */
   focus: number;
   target: TuneTarget;
@@ -44,6 +46,11 @@ export type TunePreset = {
   options: Readonly<Record<string, number | null>>;
 };
 
+/** The most `long memory` asks for. */
+export const LONG_MEMORY_MAX_CTX = 32768;
+/** What `long memory` sets when the machine's memory or the model's size is not known. */
+const LONG_MEMORY_FALLBACK = 16384;
+
 /** The sampling options that `balanced` clears. */
 const SAMPLING = ["temperature", "top_p", "top_k", "min_p", "repeat_penalty"] as const;
 
@@ -57,7 +64,7 @@ export const PRESETS: readonly TunePreset[] = [
     options: Object.fromEntries(SAMPLING.map((name) => [name, null])),
   },
   { key: 3, id: "creative", label: "creative", options: { temperature: 1.0, top_p: 0.95, min_p: 0.05 } },
-  { key: 4, id: "long-memory", label: "long memory", options: { num_ctx: 16384 } },
+  { key: 4, id: "long-memory", label: "long memory", options: { num_ctx: LONG_MEMORY_FALLBACK } },
 ];
 
 /** The hint line under the explanation. */
@@ -72,6 +79,7 @@ export function tuneState(result: ModelOptionsGetResult): TuneState {
     defaults: result.defaults,
     saved: result.saved,
     session: result.session ?? {},
+    memory: result.memory ?? null,
     focus: 0,
     target: "saved",
   };
@@ -161,6 +169,28 @@ export function changedRows(before: TuneState, after: TuneState): string[] {
 }
 
 /**
+ * What a preset sets for this model. `long memory` takes the largest `num_ctx` step that fits in
+ * memory, at most {@link LONG_MEMORY_MAX_CTX}; with no memory known, or none that fits, a fixed value.
+ */
+export function presetOptions(state: TuneState, preset: TunePreset): Record<string, number | null> {
+  if (preset.id !== "long-memory") return { ...preset.options };
+  const option = state.options.find((item) => item.name === "num_ctx");
+  if (option === undefined || state.memory === null) return { ...preset.options };
+  return { num_ctx: largestFittingCtx(option, state.memory) ?? LONG_MEMORY_FALLBACK };
+}
+
+/** The largest value of `option`'s steps, up to {@link LONG_MEMORY_MAX_CTX}, that fits. Null when none does. */
+export function largestFittingCtx(option: ModelOption, memory: ModelMemory): number | null {
+  const top = Math.min(option.maximum, LONG_MEMORY_MAX_CTX);
+  const steps = Math.floor((top - option.minimum) / option.step);
+  for (let at = steps; at >= 0; at -= 1) {
+    const ctx = option.minimum + at * option.step;
+    if (memoryFor(ctx, memory, ctx).fit === "fits") return ctx;
+  }
+  return null;
+}
+
+/**
  * Apply a preset to this session, whatever the target says. `options` is what to send with
  * `session.set_options`; `state` has the new overrides, the preset's name, and the rows that moved.
  */
@@ -168,8 +198,9 @@ export function applyPreset(
   state: TuneState,
   preset: TunePreset,
 ): { state: TuneState; options: Record<string, number | null> } {
+  const values = presetOptions(state, preset);
   const session: Record<string, TuneValue> = { ...state.session };
-  for (const [name, value] of Object.entries(preset.options)) {
+  for (const [name, value] of Object.entries(values)) {
     if (value === null) {
       delete session[name];
     } else {
@@ -178,7 +209,7 @@ export function applyPreset(
   }
   const moved = { ...state, session };
   const next: TuneState = { ...moved, preset: preset.label, lit: changedRows(state, moved) };
-  return { state: next, options: { ...preset.options } };
+  return { state: next, options: { ...values } };
 }
 
 /**
@@ -196,6 +227,53 @@ export function keepSession(state: TuneState): {
   delete next.preset;
   delete next.lit;
   return { state: next, save, clear };
+}
+
+/** Whether a model with a window of `ctx` tokens loads in this machine's memory. Same rule as the daemon's `fit`. */
+export type MemoryFit = "fits" | "tight" | "too_big";
+
+/** The KV-cache memory for `ctx` tokens, in GB. The daemon's `kv_gb`. */
+export function kvGb(ctx: number, memory: ModelMemory): number {
+  return (ctx / 1024) * memory.kv_gb_per_1k_tokens;
+}
+
+/**
+ * What `ctx` costs against `baseCtx`, the default window: `extraGb` is the KV cache for `ctx`
+ * minus the KV cache for `baseCtx`, negative below the default. `fit` is for the whole model with
+ * `ctx`, the rule of the daemon's `hardware.fit`: `fits` within `fits_share` of RAM, `tight`
+ * within `tight_share`, else `too_big`.
+ */
+export function memoryFor(ctx: number, memory: ModelMemory, baseCtx: number): { extraGb: number; fit: MemoryFit } {
+  const need = memory.size_gb + kvGb(ctx, memory) + memory.overhead_gb;
+  const fit: MemoryFit =
+    need <= memory.ram_gb * memory.fits_share
+      ? "fits"
+      : need <= memory.ram_gb * memory.tight_share
+      ? "tight"
+      : "too_big";
+  return { extraGb: kvGb(ctx, memory) - kvGb(baseCtx, memory), fit };
+}
+
+/** A memory change as the panel shows it: `+1.1 GB`, or `−0.5 GB` below the default. */
+export function formatExtraGb(extraGb: number): string {
+  const rounded = Number(Math.abs(extraGb).toFixed(1));
+  return `${extraGb < 0 && rounded > 0 ? "−" : "+"}${rounded.toFixed(1)} GB`;
+}
+
+/** The note after the `num_ctx` value: `+1.1 GB · fits`, and `warning` when it is too big. */
+export type MemoryNote = { text: string; fit: MemoryFit; warning?: string };
+
+/** The memory gauge for a row, or null for any option but `num_ctx`, or when the memory is not known. */
+export function memoryNote(state: TuneState, row: TuneRow): MemoryNote | null {
+  if (row.option.name !== "num_ctx" || state.memory === null || typeof row.value !== "number") return null;
+  const fallback = state.defaults["num_ctx"];
+  const base = typeof fallback === "number" ? fallback : row.option.default;
+  if (typeof base !== "number") return null;
+  const { extraGb, fit } = memoryFor(row.value, state.memory, base);
+  const verdict = fit === "fits" ? "fits" : fit === "tight" ? "tight" : "too big";
+  const note: MemoryNote = { text: `${formatExtraGb(extraGb)} · ${verdict}`, fit };
+  if (fit === "too_big") note.warning = "This may not load on this Mac.";
+  return note;
 }
 
 /**
