@@ -50,6 +50,30 @@ for (const theme of ["slip", "kiln"]) {
   }
 }
 
+for (const theme of ["slip", "kiln"]) {
+  for (const [label, text] of [
+    ["Tune view, try again", null],
+    ["Tune view, no question to try", "Ask something first, then try again."],
+    ["Tune view, chat running", "Wait for the answer, then try again."],
+    ["Tune view, a try streaming", "A mutex lets one thread hold a resource"],
+    ["Tune view, a try done", "The others wait their turn."],
+    ["Tune view, a try failed", "The model did not answer."],
+  ] as const) {
+    test(`the gallery's "${label}" in ${theme} shows Try again and passes axe`, async () => {
+      const user = userEvent.setup();
+      render(<Gallery />);
+      await user.click(screen.getByRole("button", { name: `${label}, ${theme}` }));
+      const dialog = await screen.findByRole("dialog", { name: "Choose a model" });
+      const button = (await within(dialog).findByRole("button", { name: "Try again with these settings" })) as HTMLButtonElement;
+      expect(button.disabled).toBe(label === "Tune view, no question to try" || label === "Tune view, chat running");
+      if (text !== null) expect(dialog.textContent).toContain(text);
+      if (label.includes("a try")) expect(within(dialog).getByRole("link", { name: "Open the try session" })).toBeTruthy();
+      const results = await axe.run(document.body, { rules: { "color-contrast": { enabled: false }, region: { enabled: false } } });
+      expect(results.violations).toEqual([]);
+    });
+  }
+}
+
 test("the gallery's Commands dialog lists the groups and passes axe", async () => {
   const user = userEvent.setup();
   render(<Gallery />);

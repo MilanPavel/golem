@@ -58,9 +58,15 @@ export function useSessionList(): readonly SessionSummary[] {
  * unmount, so a render that never commits attaches nothing.
  */
 export function useSession<T>(id: string, selector: (view: SessionView) => T, isEqual?: (a: T, b: T) => boolean): T {
+  return useSessionSlice(id, selector, isEqual);
+}
+
+/** Like {@link useSession}, for a session that may not exist yet: with null it attaches nothing and reads the empty view. */
+export function useSessionSlice<T>(id: string | null, selector: (view: SessionView) => T, isEqual?: (a: T, b: T) => boolean): T {
   const page = usePage();
   const subscribe = useCallback(
     (listener: () => void) => {
+      if (id === null) return () => undefined;
       const { store, release } = page.acquire(id);
       const off = store.subscribe(listener);
       return () => {
@@ -71,7 +77,7 @@ export function useSession<T>(id: string, selector: (view: SessionView) => T, is
     [page, id],
   );
   const getSnapshot = useCallback(
-    () => page.sessions.get(id)?.getSnapshot() ?? initialSessionView,
+    () => (id === null ? initialSessionView : (page.sessions.get(id)?.getSnapshot() ?? initialSessionView)),
     [page, id],
   );
   return useSyncExternalStoreWithSelector(subscribe, getSnapshot, undefined, selector, isEqual);
