@@ -54,6 +54,8 @@ export type TranscriptOptions = {
   now: number;
   /** Ctrl-O: draw each tool call's output, each skill's body, and each reply's thinking under its line. */
   toolOutput?: boolean;
+  /** `/thinking`: false hides the thinking line. Unset shows it. */
+  thinking?: boolean;
 };
 
 /** Output rows shown per tool call while Ctrl-O is on. */
@@ -98,7 +100,7 @@ export function layoutMessages(
       const head: LayoutLine = { role, spans: labelSpans(label, message, options) };
       lines.push(paint(role === "user" ? { ...head, asks: firstLine(message.text) } : head, width));
     }
-    for (const spans of thinkingLines(message, width, options?.toolOutput === true)) {
+    for (const spans of options?.thinking === false ? [] : thinkingLines(message, width, options?.toolOutput === true)) {
       lines.push(wrappedLine(role, spans));
     }
     for (const spans of body) {

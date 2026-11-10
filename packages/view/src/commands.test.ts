@@ -168,6 +168,14 @@ test("/copy, /export, and /time stay on this machine", () => {
   assert.equal(applyComposer(closedDebug, "/time on").kind, "unknown");
 });
 
+test("/thinking is a view command with no arguments", () => {
+  assert.deepEqual(applyComposer(closedDebug, "/thinking"), { kind: "thinking" });
+  assert.equal(applyComposer(closedDebug, "/thinking off").kind, "unknown");
+  const command = COMMANDS.find((entry) => entry.name === "/thinking");
+  assert.equal(command?.group, "view");
+  assert.equal(command?.args, "");
+});
+
 test("/close takes no arguments", () => {
   assert.deepEqual(applyComposer(closedDebug, "/close"), { kind: "close-session" });
   assert.equal(applyComposer(closedDebug, "/close now").kind, "unknown");
