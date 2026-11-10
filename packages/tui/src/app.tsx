@@ -119,6 +119,7 @@ import {
   latestModelSpan,
   type ContextReport,
   tuneState,
+  tuneChip,
   withSaved,
   withSession,
   type TuneState,
@@ -139,10 +140,11 @@ import {
   pinnableSkills,
   closedDebug,
   COMMANDS,
-  contextLines,
+  contextSegments,
   helpLines,
   toggleDebugTab,
   withModelChoices,
+  withTuneChoices,
   withSkillChoices,
   type DebugState,
 } from "./commands.ts";
@@ -446,6 +448,10 @@ export function App({
   const tuneRef = useRef(tune);
   tuneRef.current = tune;
   const tuneGen = useRef(0);
+  /** The open model's option table, defaults, and saved values, for the status chip and `/tune <option>`. */
+  const [chipTune, setChipTune] = useState<TuneState | null>(null);
+  const chipTuneRef = useRef(chipTune);
+  chipTuneRef.current = chipTune;
   /** Changes sent and not yet answered. Live updates wait for them, or they would undo the newest key. */
   const tuneSending = useRef(0);
   const tuneQueue = useRef<Promise<void>>(Promise.resolve());
@@ -614,7 +620,7 @@ export function App({
       : suggest(
           draft.text,
           withSkillChoices(
-            withModelChoices(COMMANDS, modelNames(listing)),
+            withTuneChoices(withModelChoices(COMMANDS, modelNames(listing)), chipTune?.options ?? [], chipTune?.defaults ?? {}),
             invocableSkills(skillList.skills ?? []),
             { pinnable: pinnableSkills(skillList.skills ?? []), active: chat.activeSkills },
           ),
@@ -642,13 +648,14 @@ export function App({
   };
   overlayFrame.current = { columns, body: budget.body };
   const diffOffset = chat.approval !== null && diffScroll.callId === chat.approval.callId ? diffScroll.offset : 0;
+  const contextSegmentRows = panel === "context" && tune === null ? contextSegments(contextReport, columns) : [];
   const panelLines =
     tune !== null
       ? tuneLines(tune, columns)
       : panel === "help"
         ? helpLines(COMMANDS, columns)
         : panel === "context"
-          ? contextLines(contextReport, columns)
+          ? contextSegmentRows.map((line) => line.map((segment) => segment.text).join(""))
           : [];
   const tryRows = tune !== null && tryRun !== null ? tryLines(tryRun, columns) : [];
   const helpText = !keysOpen && !switcher.open ? panelLines : [];
@@ -661,6 +668,7 @@ export function App({
         text,
         dim: false,
         accent: litLines.includes(index),
+        ...(contextSegmentRows[index] === undefined ? {} : { segments: contextSegmentRows[index] }),
         ...(gauge === undefined ? {} : { gauge: { start: gauge.start, fit: gauge.fit } }),
       };
     }),
@@ -726,6 +734,38 @@ export function App({
   });
   const sessionRef = session.ref;
   const sessionId = session.id;
+
+  // One `model.options.get` when the session opens or the model changes, for the tune chip.
+  const chipModel = model.provider === "ollama" ? model.name : null;
+  useEffect(() => {
+    if (connection.status !== "connected" || sessionId === null || chipModel === null) {
+      setChipTune(null);
+      return;
+    }
+    let live = true;
+    client.getModelOptions(chipModel, sessionId).then(
+      (result) => {
+        if (live) {
+          setChipTune(tuneState(result));
+        }
+      },
+      () => {
+        if (live) {
+          setChipTune(null);
+        }
+      },
+    );
+    return () => {
+      live = false;
+    };
+  }, [client, connection.status, sessionId, chipModel]);
+
+  // What any client saves for the model keeps the chip fresh.
+  useEffect(() => {
+    return client.onOptionsSaved(({ model: saved, saved: values }) => {
+      setChipTune((current) => (current === null ? current : withSaved(current, saved, values)));
+    });
+  }, [client]);
   // One tip per session: a session seen for the first time takes the next one.
   const tipFile = useRef(tipCounterPath());
   const sessionTips = useRef(new Map<string, number>());
@@ -776,6 +816,7 @@ export function App({
       skills: sessionId === null ? [] : chat.activeSkills,
       skippedSkills: chat.skippedSkills,
       context: sessionId === null ? null : chat.context.last,
+      tune: sessionId === null || chipTune === null ? "" : tuneChip(withSession(chipTune, chat.options), model.provider),
     }),
     columns,
   );
@@ -1536,6 +1577,7 @@ export function App({
       expandPastes(draftRef.current.text, pastesRef.current),
       invocableSkills(skillListRef.current.skills ?? []),
       { pinnable: pinnableSkills(skillListRef.current.skills ?? []), active: chatRef.current.activeSkills },
+      chipTuneRef.current?.options ?? [],
     );
     if (outcome.kind === "idle") {
       return;
@@ -1553,6 +1595,20 @@ export function App({
       setKeysOpen(false);
       setSwitcher(closedSwitcher);
       setChat((current) => ({ ...current, notice: null }));
+      return;
+    }
+    if (outcome.kind === "tune-set") {
+      setDraft(draftAt(""));
+      setKeysOpen(false);
+      const id = sessionRef.current;
+      if (id === null) {
+        setChat((current) => ({ ...current, notice: "Tuning needs a session." }));
+        return;
+      }
+      client.setSessionOptions(id, { [outcome.name]: outcome.value }).then(
+        () => setChat((current) => ({ ...current, notice: outcome.notice })),
+        (error: unknown) => setChat((current) => ({ ...current, error: messageOf(error) })),
+      );
       return;
     }
     if (outcome.kind === "tune") {
@@ -4112,7 +4168,13 @@ function LineList({
           color={line.dim ? undefined : line.accent === true ? CLAY : color}
           wrap="truncate-end"
         >
-          {line.gauge === undefined ? (
+          {line.segments !== undefined ? (
+            line.segments.map((segment, at) => (
+              <Text key={at} color={segment.color}>
+                {segment.text}
+              </Text>
+            ))
+          ) : line.gauge === undefined ? (
             line.text.length === 0 ? " " : line.text
           ) : (
             <>

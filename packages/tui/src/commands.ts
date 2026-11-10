@@ -1,4 +1,6 @@
-import { contextReport, type Command, type ContextReport } from "@golem/view";
+import { contextReportLines, type Command, type ContextKey, type ContextLine, type ContextReport } from "@golem/view";
+
+import { CTX_REPLIES, CTX_RESULTS, CTX_SYSTEM, CTX_TOOLS, CTX_USER, HINT } from "./theme.ts";
 
 export {
   applyComposer,
@@ -11,6 +13,7 @@ export {
   toggleDebugTab,
   withModelChoices,
   withSkillChoices,
+  withTuneChoices,
   type Command,
   type CommandGroup,
   type ComposerOutcome,
@@ -28,9 +31,36 @@ export function helpLines(commands: readonly Pick<Command, "name" | "args" | "de
   return commands.map((command) => fitLine(`${usage(command).padEnd(width)}  ${command.description}`, columns));
 }
 
-/** `/context`: the view's report, each line cut to the terminal. */
+const PART_COLORS: Record<ContextKey | "free", string> = {
+  system: CTX_SYSTEM,
+  tools: CTX_TOOLS,
+  user: CTX_USER,
+  assistant: CTX_REPLIES,
+  tool_results: CTX_RESULTS,
+  free: HINT,
+};
+
+/** `/context`: the view's report as coloured segments, each line cut to the terminal. */
+export function contextSegments(report: ContextReport, columns: number): { text: string; color?: string }[][] {
+  return contextReportLines(report, columns).map((line) => fitSegments(line, columns));
+}
+
+/** `/context` as plain lines, each cut to the terminal. */
 export function contextLines(report: ContextReport, columns: number): string[] {
-  return contextReport(report, columns).map((line) => fitLine(line, columns));
+  return contextSegments(report, columns).map((line) => line.map((segment) => segment.text).join(""));
+}
+
+function fitSegments(line: ContextLine, columns: number): { text: string; color?: string }[] {
+  const cut = fitLine(line.map((segment) => segment.text).join(""), columns);
+  const out: { text: string; color?: string }[] = [];
+  let at = 0;
+  for (const segment of line) {
+    const text = cut.slice(at, at + segment.text.length);
+    at += segment.text.length;
+    if (text.length === 0) continue;
+    out.push(segment.part === undefined ? { text } : { text, color: PART_COLORS[segment.part] });
+  }
+  return out;
 }
 
 export function fitLine(text: string, columns: number): string {

@@ -5,6 +5,8 @@ import type { ChatEvent, TraceModelSpan, TraceRunSpan } from "@golem/client";
 import {
   contextBar,
   contextCells,
+  contextGrid,
+  contextReportLines,
   contextLevel,
   contextSummary,
   contextReport,
@@ -120,7 +122,7 @@ test("windowUnknownHint: an Ollama model learns its window after the first answe
 
 test("contextReport: an estimated window is marked and an unknown one gets the hint", () => {
   const estimated = contextReport({ kind: "ready", model: "m", context: context({ used: 1000, window: 8192, window_estimated: true, parts: [part("user", 1000)] }) }, 80);
-  assert.ok(estimated[0]?.includes("≈8K"));
+  assert.ok(estimated.some((line) => line.includes("≈8K")));
   assert.ok(estimated.some((line) => line.includes("not sent")));
   const unknown = contextReport({ kind: "ready", model: "m", provider: "ollama", context: context({ used: 1000, window: null, parts: [part("user", 1000)] }) }, 80);
   assert.ok(unknown.some((line) => line.includes("learns it after the first answer")));
@@ -181,30 +183,60 @@ function full(): TraceContext {
   });
 }
 
-test("contextReport: the block, with the tools grouped by server and a free row", () => {
-  const lines = contextReport({ kind: "ready", model: "ollama/qwen3-coder:30b", context: full() }, 80);
-  assert.deepEqual(lines, [
-    "context · ollama/qwen3-coder:30b · 32.0K / 128K · 25%",
-    contextBar(full().parts, 128000, 60),
-    "System prompt        1.2K   <1%",
-    "Tool definitions    22.8K   18%",
+test("contextReport: the grid with the legend beside it, the tools grouped by server and a free row", () => {
+  const lines = contextReport({ kind: "ready", model: "ollama/qwen3-coder:30b", context: full() }, 100);
+  const free = "\u25A1 ".repeat(15);
+  const row = (text: string): string => `${text.padEnd(18)}`;
+  assert.equal(lines.length, 10 + 3 + 1);
+  assert.ok(lines[0]?.endsWith("   ollama/qwen3-coder:30b"));
+  assert.ok(lines[1]?.endsWith("   32.0K / 128K · 25%"));
+  assert.ok(lines[2]?.length === 40);
+  assert.equal(lines[3]?.slice(40), `   ${"\u25A0 "}${row("System prompt")}${"1.2K".padStart(7)}   <1%`);
+  assert.equal(lines[4]?.slice(40), `   ${"\u25A0 "}${row("Tool definitions")}${"22.8K".padStart(7)}   18%`);
+  assert.equal(lines[8]?.slice(40), `   ${"\u25A1 "}${row("Free")}${"96.0K".padStart(7)}   75%`);
+  assert.ok(lines[9]?.startsWith(free));
+  assert.deepEqual(lines.slice(10), [
     "  github · 1 tool            12.1K",
     "  filesystem · 1 tool         6.0K",
     "  built-in · 1 tool           4.7K",
-    "Your messages         312   <1%",
-    "Replies              2.1K    2%",
-    "Tool results         5.6K    4%",
-    "Free                96.0K   75%",
     "Parts are estimates, scaled to the provider's count.",
   ]);
 });
 
-test("contextReport: the bar is at most 60 wide and at most the terminal wide", () => {
-  const wide = contextReport({ kind: "ready", model: null, context: full() }, 200);
-  const narrow = contextReport({ kind: "ready", model: null, context: full() }, 24);
-  assert.equal(wide[1]?.length, 60);
-  assert.equal(narrow[1]?.length, 24);
-  assert.equal(wide[0], "context · 32.0K / 128K · 25%");
+test("contextGrid: rows by cols cells, parts in order, then free; an overfull window fills it", () => {
+  const parts = full().parts;
+  const grid = contextGrid(parts, 128000);
+  assert.equal(grid.length, 10);
+  assert.ok(grid.every((row) => row.length === 20));
+  const flat = grid.flat();
+  for (const { key, cells } of contextCells(parts, 128000, 200)) {
+    assert.equal(flat.filter((cell) => cell === key).length, cells);
+  }
+  assert.equal(flat.lastIndexOf("tool_results") < flat.indexOf("free"), true);
+  assert.equal(flat.slice(flat.indexOf("free")).every((cell) => cell === "free"), true);
+  assert.equal(contextGrid(parts, 1000).flat().every((cell) => cell !== "free"), true);
+  assert.equal(contextGrid(parts, 128000, 2, 3).flat().length, 6);
+});
+
+test("contextReportLines: the legend sits beside the grid from 84 columns and under it below", () => {
+  const input = { kind: "ready" as const, model: "m", context: full() };
+  const wide = contextReportLines(input, 100);
+  const narrow = contextReportLines(input, 60);
+  assert.equal(wide[3]?.some((segment) => segment.part === "system"), true);
+  assert.equal(wide[3]?.some((segment) => segment.text.includes("System prompt")), true);
+  assert.equal(contextReportLines(input, 84)[3]?.some((segment) => segment.text.includes("System prompt")), true);
+  assert.equal(contextReportLines(input, 83)[3]?.some((segment) => segment.text.includes("System prompt")), false);
+  assert.equal(narrow.slice(0, 10).every((line) => line.every((segment) => !segment.text.includes("System"))), true);
+  assert.equal(narrow[10]?.[0]?.text, "m");
+  assert.equal(narrow[13]?.[0]?.part, "system");
+  assert.equal(narrow[18]?.[0]?.part, "free");
+});
+
+test("contextReport: with no window there is no grid, only the rows and the hint", () => {
+  const lines = contextReport({ kind: "ready", model: "m", provider: "ollama", context: context({ used: 1000, window: null, parts: [part("user", 1000)] }) }, 100);
+  assert.equal(lines[0], "context · m · 1.0K · window unknown");
+  assert.equal(lines.some((line) => line.includes("\u25A0")), false);
+  assert.equal(lines.at(-1)?.includes("learns it after the first answer"), true);
 });
 
 test("contextReport: seven servers show five and the rest summed; a null group is built-in", () => {

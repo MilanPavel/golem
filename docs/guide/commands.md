@@ -96,6 +96,10 @@ Type `/` and suggestions appear, with each command's arguments. `/help` lists ev
 
 A saved change is kept in `config.toml` for the model, and every chat on it uses it. A change for this chat only is kept with the chat. Either one applies from your next message. When a value is not the default, the row says what the default is. The `num_ctx` row also says how much memory the value costs compared with the default, and whether it fits: `+1.1 GB · fits`, `· tight`, or `· too big`. It is a rough estimate, one rate for every model. The row says nothing when golem does not know your memory or the model's size.
 
+To change one option without the panel, type `/tune <option> <value>`, for example `/tune temperature 0.3`. It is for this chat only. `/tune temperature reset` removes the change, and a value out of range prints the allowed range. After `/tune `, completion lists the options, then the default and range of the one you picked.
+
+The status line shows the options that differ from the model's default, such as `temp 0.2 · top_p 0.9`, at most three and then `+N`. The context size is left out, because the context bar already shows it.
+
 ### Tools, skills, and MCP
 
 | Command | What it does |
@@ -125,6 +129,19 @@ A saved change is kept in `config.toml` for the model, and every chat on it uses
 | `/debug wire`, `/debug model` | Show the protocol messages, or exactly what the model sees |
 | `/debug hold`, `/debug go` | Hold your next message, to look at it in the model tab before it is sent, then send it |
 | `/help` | List every command |
+
+`/context` draws the model's window as a grid of cells, coloured by what fills them, with a legend beside it (or under it in a narrow terminal). One cell is 0.5% of the window.
+
+```text
+■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■    qwen3:8b
+■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ □ □    3.1K / 16.4K · 18%
+□ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □
+□ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □    ■ System prompt        1.2K    7%
+□ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □    ■ Tool definitions     1.4K    9%
+□ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □    ■ Your messages         300    2%
+□ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □    ■ Replies               200    1%
+□ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □ □    □ Free                13.3K   81%
+```
 
 ## Keys
 

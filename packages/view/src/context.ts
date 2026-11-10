@@ -222,23 +222,51 @@ function toolServerLines(part: TraceContextPart): string[] {
   return lines;
 }
 
-/**
- * The lines of the context panel. Lines are not cut to `columns`; it only sets the bar's width.
- * The terminal cuts the lines.
- */
-export function contextReport(report: ContextReport, columns: number): string[] {
+/** One line of the panel: segments in order, a part's own colour on the segments that name one. */
+export type ContextLine = { text: string; part?: ContextKey | "free" }[];
+
+/** The panel's grid: rows of cells, the parts in display order, then the free ones. One cell is 0.5% of the window. */
+export function contextGrid(
+  parts: readonly TraceContextPart[],
+  window: number | null,
+  rows = 10,
+  cols = 20,
+): (ContextKey | "free")[][] {
+  const flat = contextCells(parts, window, rows * cols).flatMap(({ key, cells }) => Array.from({ length: cells }, () => key));
+  return Array.from({ length: rows }, (_, row) => flat.slice(row * cols, (row + 1) * cols));
+}
+
+const GRID_WIDTH = 40;
+const GRID_GAP = "   ";
+/** The least width that holds the grid and the legend side by side. */
+const SIDE_BY_SIDE = 84;
+
+function gridLine(cells: readonly (ContextKey | "free")[]): ContextLine {
+  const line: ContextLine = [];
+  for (const key of cells) {
+    const glyph = key === "free" ? "\u25A1 " : "\u25A0 ";
+    const last = line[line.length - 1];
+    if (last !== undefined && last.part === key) last.text += glyph;
+    else line.push({ text: glyph, part: key });
+  }
+  return line;
+}
+
+/** The lines of the context panel, as segments. Lines are not cut to `columns`; the terminal cuts them. */
+export function contextReportLines(report: ContextReport, columns: number): ContextLine[] {
+  const plain = (text: string): ContextLine => [{ text }];
   switch (report.kind) {
     case "loading":
-      return ["reading the context…"];
+      return [plain("reading the context…")];
     case "none":
-      return ["no model call yet — send a message first"];
+      return [plain("no model call yet — send a message first")];
     case "error":
-      return [`could not read the context: ${report.message}`];
+      return [plain(`could not read the context: ${report.message}`)];
     case "ready":
       break;
   }
   const ctx = report.context;
-  if (ctx === null) return ["this call has no context record — it ran before golem kept traces"];
+  if (ctx === null) return [plain("this call has no context record — it ran before golem kept traces")];
   const used = ctx.used ?? null;
   const window = ctx.window ?? null;
   const summary =
@@ -247,25 +275,55 @@ export function contextReport(report: ContextReport, columns: number): string[] 
       : window === null
         ? `${formatTokens(used)} · window unknown`
         : contextSummary(used, window, ctx.window_estimated ?? false);
-  const lines = [`context · ${report.model === null ? "" : `${report.model} · `}${summary}`];
-  if (used !== null && window !== null) {
-    lines.push(contextBar(ctx.parts, window, Math.max(1, Math.min(columns, 60))));
-  }
   const base = window ?? used;
   const percentOf = (tokens: number): string => (used === null || base === null ? "" : partPercent(tokens, base));
   const row = (label: string, tokens: number): string =>
     `${label.padEnd(18)}${formatTokens(tokens).padStart(7)}${used === null ? "" : ` ${percentOf(tokens).padStart(5)}`}`;
-  for (const part of ctx.parts) {
-    lines.push(row(CONTEXT_LABELS[part.key], part.tokens));
-    if (part.key === "tools") lines.push(...toolServerLines(part));
+  const lines: ContextLine[] = [];
+  const grid = used !== null && window !== null;
+  const servers = ctx.parts.filter((part) => part.key === "tools").flatMap(toolServerLines).map(plain);
+  if (used !== null && window !== null) {
+    const cells = contextGrid(ctx.parts, window).map(gridLine);
+    const head: ContextLine[] = [];
+    if (report.model !== null) head.push(plain(report.model));
+    head.push(plain(summary), plain(""));
+    const legend: ContextLine[] = ctx.parts
+      .filter((part) => part.tokens > 0)
+      .map((part): ContextLine => [{ text: "\u25A0 ", part: part.key }, { text: row(CONTEXT_LABELS[part.key], part.tokens) }]);
+    if (used <= window) legend.push([{ text: "\u25A1 ", part: "free" }, { text: row(CONTEXT_LABELS.free, window - used) }]);
+    const side = [...head, ...legend];
+    if (columns >= SIDE_BY_SIDE) {
+      const height = Math.max(cells.length, side.length);
+      for (let at = 0; at < height; at += 1) {
+        const left = cells[at] ?? [{ text: " ".repeat(GRID_WIDTH) }];
+        const right = side[at];
+        lines.push(right === undefined || right.every((segment) => segment.text === "") ? left : [...left, { text: GRID_GAP }, ...right]);
+      }
+    } else {
+      lines.push(...cells, ...side);
+    }
+  } else {
+    lines.push(plain(`context · ${report.model === null ? "" : `${report.model} · `}${summary}`));
+    for (const part of ctx.parts) {
+      lines.push(plain(row(CONTEXT_LABELS[part.key], part.tokens)));
+      if (part.key === "tools") lines.push(...servers);
+    }
   }
-  if (used !== null && window !== null && used <= window) lines.push(row(CONTEXT_LABELS.free, window - used));
-  if (ctx.estimated) lines.push("Parts are estimates, scaled to the provider's count.");
+  if (grid) lines.push(...servers);
+  if (ctx.estimated) lines.push(plain("Parts are estimates, scaled to the provider's count."));
   if (window !== null && ctx.window_estimated === true) {
-    lines.push("The window is estimated: golem read it from Ollama. It was not sent.");
+    lines.push(plain("The window is estimated: golem read it from Ollama. It was not sent."));
   }
-  if (window === null) lines.push(windowUnknownHint(report.provider ?? null));
+  if (window === null) lines.push(plain(windowUnknownHint(report.provider ?? null)));
   const warning = contextWarning(ctx);
-  if (warning !== null) lines.push(`! ${warning}`);
+  if (warning !== null) lines.push(plain(`! ${warning}`));
   return lines;
+}
+
+/**
+ * The lines of the context panel as plain text, the segments joined. Lines are not cut to `columns`;
+ * the terminal cuts them.
+ */
+export function contextReport(report: ContextReport, columns: number): string[] {
+  return contextReportLines(report, columns).map((line) => line.map((segment) => segment.text).join(""));
 }

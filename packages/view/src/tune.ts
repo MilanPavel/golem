@@ -372,3 +372,87 @@ function decimals(step: number): number {
 function trim(value: number, places: number): string {
   return String(Number(value.toFixed(places)));
 }
+
+/** The most options the status chip names before `+N`. */
+export const TUNE_CHIP_MAX = 3;
+
+/**
+ * The status line's tune chip: `temp 0.2 · top_p 0.9`, the options whose value in use differs from
+ * the model's default, in table order. `num_ctx` is left out, because the context meter shows the
+ * window. At most {@link TUNE_CHIP_MAX} are named, then `+N`. Empty when nothing differs, when the
+ * options are not known, and on a hosted model, which ignores them.
+ */
+export function tuneChip(state: TuneState | null, provider: string | null): string {
+  if (state === null || (provider !== null && provider !== "ollama")) return "";
+  const parts = tuneRows(state)
+    .filter((row) => row.option.name !== "num_ctx" && differsFromDefault(state, row))
+    .map((row) => `${row.option.name === "temperature" ? "temp" : row.option.name} ${formatTuneValue(row.option, row.value)}`);
+  if (parts.length <= TUNE_CHIP_MAX) return parts.join(" · ");
+  return `${parts.slice(0, TUNE_CHIP_MAX).join(" · ")} +${parts.length - TUNE_CHIP_MAX}`;
+}
+
+/** What `/tune <option> <value>` asks for: a value, or null to remove the session's override. */
+export type TuneSetResult =
+  | { kind: "set"; name: string; value: TuneValue | null; notice: string }
+  | { kind: "error"; notice: string };
+
+export const TUNE_USAGE = "/tune, /tune <option> <value>, or /tune <option> reset";
+
+/** Check one typed value against the table. The messages are the daemon's own. */
+export function parseTuneValue(option: ModelOption, text: string): { value: TuneValue } | { error: string } {
+  const { name } = option;
+  if (option.kind === "duration") {
+    if (!/^-?\d+(\.\d+)?(ms|s|m|h)?$/.test(text)) return { error: `${name} is a time such as 5m, or -1` };
+    return { value: /^-?\d+$/.test(text) ? Number(text) : text };
+  }
+  const number = Number(text);
+  if (text.length === 0 || !Number.isFinite(number)) return { error: `${name} is a number` };
+  if (option.kind === "int" && !Number.isInteger(number)) return { error: `${name} is a whole number` };
+  if (number < option.minimum || number > option.maximum) {
+    return { error: `${name} is between ${trim(option.minimum, 6)} and ${trim(option.maximum, 6)}` };
+  }
+  return { value: number };
+}
+
+/**
+ * `/tune <option> <value>` and `/tune <option> reset`, for this session only. `args` are the words
+ * after `/tune`, and `options` the table.
+ */
+export function tuneSet(options: readonly ModelOption[], args: readonly string[]): TuneSetResult {
+  const [name, text, ...extra] = args;
+  if (name === undefined || text === undefined || extra.length > 0) return { kind: "error", notice: TUNE_USAGE };
+  if (options.length === 0) {
+    return { kind: "error", notice: "Tuning is for local Ollama models, in a session with one." };
+  }
+  const option = options.find((item) => item.name === name);
+  if (option === undefined) {
+    return { kind: "error", notice: `${name} is not an option to tune: ${options.map((item) => item.name).join(", ")}` };
+  }
+  if (text === "reset") {
+    return { kind: "set", name, value: null, notice: `${name} reset for this session` };
+  }
+  const parsed = parseTuneValue(option, text);
+  if ("error" in parsed) return { kind: "error", notice: parsed.error };
+  return { kind: "set", name, value: parsed.value, notice: `${name} ${String(parsed.value)} for this session` };
+}
+
+/**
+ * The hint after an option's name: its default and range, `0.7 · 0–2`. `defaults` are the model's
+ * own values when known, else the table's.
+ */
+export function tuneHint(option: ModelOption, defaults: Readonly<Record<string, TuneValue>> = {}): string {
+  const fallback = defaults[option.name] ?? option.default;
+  const shown =
+    fallback == null && option.name === "num_ctx" ? "set by Ollama" : formatTuneValue(option, fallback ?? null);
+  const range =
+    option.kind === "duration" ? "a time such as 5m, or -1" : `${trim(option.minimum, 6)}–${trim(option.maximum, 6)}`;
+  return `${shown} · ${range}`;
+}
+
+/** The hints for every option, by name. */
+export function tuneHints(
+  options: readonly ModelOption[],
+  defaults: Readonly<Record<string, TuneValue>> = {},
+): Record<string, string> {
+  return Object.fromEntries(options.map((option) => [option.name, tuneHint(option, defaults)]));
+}
