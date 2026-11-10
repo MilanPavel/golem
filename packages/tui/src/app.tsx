@@ -1371,7 +1371,7 @@ export function App({
           return;
         }
         const result = await client.getTraceSpan(id, span.id);
-        if (current()) setContextReport({ kind: "ready", model: span.model ?? null, context: result.context ?? null });
+        if (current()) setContextReport({ kind: "ready", model: span.model ?? null, context: result.context ?? null, provider: result.provider ?? null });
       } catch (error) {
         if (current()) setContextReport({ kind: "error", message: messageOf(error) });
       }

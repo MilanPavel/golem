@@ -731,6 +731,11 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
             composer={<DemoComposer />}
           />
           <DockView
+            busy={false}
+            meter={<Meter state="idle" runStartedAt={null} aside={<ContextChipView used={1300} window={16384} windowEstimated onOpen={() => {}} />} />}
+            composer={<DemoComposer />}
+          />
+          <DockView
             busy
             meter={<Meter state="thinking" runStartedAt={new Date(NOW - 12_000).toISOString()} />}
             composer={<DemoComposer busy />}

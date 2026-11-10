@@ -244,7 +244,7 @@ test("an unknown window shows the split without Free, and the hint for the provi
   expect(screen.getByRole("region", { name: "Context window" }).textContent).toContain("Context · 3.4K · window unknown");
   expect(legend().getAllByRole("listitem")).toHaveLength(5);
   expect(legend().queryByText("Free")).toBeNull();
-  expect(screen.getByText(/golem sent no num_ctx, so Ollama used its own default window/)).toBeTruthy();
+  expect(screen.getByText(/It learns it after the first answer/)).toBeTruthy();
   first.unmount();
   show({ ...UNKNOWN_WINDOW_DETAIL, provider: "openai" });
   expect(screen.getByText("golem does not know this model's window.")).toBeTruthy();

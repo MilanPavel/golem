@@ -91,7 +91,7 @@ export function contextWarning(ctx: TraceContext): string | null {
 /** What to say when the window is not known. */
 export function windowUnknownHint(provider: string | null): string {
   return provider === "ollama"
-    ? "golem sent no num_ctx, so Ollama used its own default window. Set ctx on the profile to see how full it is."
+    ? "golem does not know this model's window yet. It learns it after the first answer, or you can set ctx on the profile."
     : "golem does not know this model's window.";
 }
 
@@ -127,12 +127,12 @@ export function contextBar(parts: readonly TraceContextPart[], window: number | 
 }
 
 /** The context of the latest model call that reported its input tokens. */
-export type LiveContext = { spanId: string; used: number; window: number | null; numCtx: number | null };
+export type LiveContext = { spanId: string; used: number; window: number | null; windowEstimated: boolean; numCtx: number | null };
 
 /** `pending` is the call that started and has not ended: its window waits for its usage. */
 export type LiveContextState = {
   last: LiveContext | null;
-  pending: { spanId: string; window: number | null; numCtx: number | null } | null;
+  pending: { spanId: string; window: number | null; windowEstimated: boolean; numCtx: number | null } | null;
 };
 
 export const emptyLiveContext: LiveContextState = { last: null, pending: null };
@@ -145,7 +145,12 @@ export function foldLiveContext(state: LiveContextState, event: ChatEvent): Live
   if (event.type === "model.call.started") {
     return {
       ...state,
-      pending: { spanId: event.data.message_id, window: event.data.context_window ?? null, numCtx: event.data.num_ctx ?? null },
+      pending: {
+        spanId: event.data.message_id,
+        window: event.data.context_window ?? null,
+        windowEstimated: event.data.window_estimated ?? false,
+        numCtx: event.data.num_ctx ?? null,
+      },
     };
   }
   if (event.type === "model.call.completed") {
@@ -153,7 +158,10 @@ export function foldLiveContext(state: LiveContextState, event: ChatEvent): Live
     if (pending === null || pending.spanId !== event.data.message_id) return state;
     const input = event.data.usage?.input;
     if (typeof input !== "number") return { ...state, pending: null };
-    return { last: { spanId: pending.spanId, used: input, window: pending.window, numCtx: pending.numCtx }, pending: null };
+    return {
+      last: { spanId: pending.spanId, used: input, window: pending.window, windowEstimated: pending.windowEstimated, numCtx: pending.numCtx },
+      pending: null,
+    };
   }
   return state;
 }
@@ -173,7 +181,7 @@ export type ContextReport =
   | { kind: "loading" }
   | { kind: "none" }
   | { kind: "error"; message: string }
-  | { kind: "ready"; model: string | null; context: TraceContext | null };
+  | { kind: "ready"; model: string | null; context: TraceContext | null; provider?: string | null };
 
 const BUILT_IN = "built-in";
 const SERVERS_SHOWN = 5;
@@ -246,6 +254,10 @@ export function contextReport(report: ContextReport, columns: number): string[] 
   }
   if (used !== null && window !== null && used <= window) lines.push(row(CONTEXT_LABELS.free, window - used));
   if (ctx.estimated) lines.push("Parts are estimates, scaled to the provider's count.");
+  if (window !== null && ctx.window_estimated === true) {
+    lines.push("The window is estimated: golem read it from Ollama. It was not sent.");
+  }
+  if (window === null) lines.push(windowUnknownHint(report.provider ?? null));
   const warning = contextWarning(ctx);
   if (warning !== null) lines.push(`! ${warning}`);
   return lines;
