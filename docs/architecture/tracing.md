@@ -179,7 +179,7 @@ A model call has no id of its own. Each call makes exactly one assistant message
 
 | Event | Fields |
 |---|---|
-| `model.call.started` | `message_id`, `index` (1-based within the run), `profile`, `provider`, `model`, `system_prompt_sha`, `tools_sha`, `message_ids`, `context_window`, `num_ctx`, `system_sections` |
+| `model.call.started` | `message_id`, `index` (1-based within the run), `profile`, `provider`, `model`, `system_prompt_sha`, `tools_sha`, `message_ids`, `context_window`, `num_ctx`, `window_estimated`, `system_sections` |
 | `model.call.completed` | `message_id`, `usage` (`input`, `output`, `cache_read`, `cache_write`), `stop_reason`, `first_token_ms`, `latency_ms`, `failed` |
 | `tool.completed`, `tool.failed` | `duration_ms`, as well as what they had before |
 
@@ -192,7 +192,7 @@ The `blobs` table is `sha256`, `kind`, `size`, `created_at`, and `text`. `BlobSt
 - **`system_prompt`:** the prompt, as sent. golem sends one only when a skill is pinned, so a call with none has `system_prompt_sha` `null`, and the page says so.
 - **`tools`:** the tool schemas as compact JSON with sorted keys. A model that is not offered tools has `tools_sha` `null`.
 
-`message_ids` are the checkpoint ids of the history sent, in order, not counting the system prompt. `system_sections` lists the non-empty parts of the system prompt as `name` and `chars`. The stored prompt is those parts joined with a blank line, so their lengths split it exactly, and the prompt is not stored twice.
+`message_ids` are the checkpoint ids of the history sent, in order, not counting the system prompt. `window_estimated` is true when golem did not send the window and read it from Ollama, from the loaded context or the Modelfile, so a screen shows it with `≈`. An older event has no field and reads as false. `system_sections` lists the non-empty parts of the system prompt as `name` and `chars`. The stored prompt is those parts joined with a blank line, so their lengths split it exactly, and the prompt is not stored twice.
 
 `context_window` is the profile's `ctx`, else the listed model's, else LiteLLM's `max_input_tokens`, and `null` when none is known. `num_ctx` is the Ollama option sent, if any. Both are worked out when the call is made, because the profile, the listing, and the prices change later.
 

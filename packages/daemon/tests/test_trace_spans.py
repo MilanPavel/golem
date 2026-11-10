@@ -206,6 +206,32 @@ async def test_an_old_session_without_model_call_events_still_reads(
     assert (detail.system_prompt, detail.tools, detail.new_from) == (None, None, 0)
 
 
+async def test_a_recorded_estimated_window_shows_in_the_span_and_its_detail(
+    database: Database, tmp_path: Path
+) -> None:
+    model = ToolCallingChatModel(replies=["hello"])
+    chat = _Chat(database, model, default_registry(), ContextWindow(4096, None, True))
+    session_id, _ = await chat.ask("hi", tmp_path)
+    _, runs = await chat.manager.trace(session_id)
+    (span,) = runs[0].children
+    assert span.recorded is True
+    assert (span.context_window, span.context_window_estimated) == (4096, True)
+    detail = await chat.manager.trace_span(session_id, span.id)
+    assert detail.context is not None
+    assert detail.context.window == 4096 and detail.context.window_estimated is True
+
+
+async def test_a_recorded_exact_window_stays_exact(database: Database, tmp_path: Path) -> None:
+    model = ToolCallingChatModel(replies=["hello"])
+    chat = _Chat(database, model, default_registry(), ContextWindow(4096, 4096))
+    session_id, _ = await chat.ask("hi", tmp_path)
+    _, runs = await chat.manager.trace(session_id)
+    (span,) = runs[0].children
+    assert span.context_window_estimated is False
+    detail = await chat.manager.trace_span(session_id, span.id)
+    assert detail.context is not None and detail.context.window_estimated is False
+
+
 async def test_an_unknown_span_or_session_is_an_error(database: Database, tmp_path: Path) -> None:
     model = ToolCallingChatModel(replies=["hello"])
     chat = _Chat(database, model, default_registry())

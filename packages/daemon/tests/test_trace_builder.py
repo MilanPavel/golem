@@ -47,7 +47,7 @@ class _Log:
         recorded: bool = True,
         text: str = "ok",
         run: str = "r1",
-        window: dict[str, int] | None = None,
+        window: dict[str, int | bool] | None = None,
     ) -> None:
         self.add("message.started", {"message_id": message_id, "role": "assistant"}, run)
         if recorded:
@@ -296,6 +296,14 @@ def test_a_recorded_span_takes_its_window_and_num_ctx_from_the_event() -> None:
     assert (first.context_window, first.num_ctx) == (8192, 4096)
     assert (second.context_window, second.num_ctx) == (None, None)
     assert first.context_window_estimated is False
+
+
+def test_a_recorded_estimated_window_is_estimated_on_the_span() -> None:
+    log = _Log()
+    log.user("hi")
+    log.model("m1", window={"context_window": 4096, "window_estimated": True})
+    (run,) = build_trace(log.events)
+    assert run.children[0].context_window_estimated is True
 
 
 def test_with_windows_fills_only_spans_without_one() -> None:
