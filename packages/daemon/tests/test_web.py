@@ -13,7 +13,7 @@ from golem.permissions.policy import describe, rule_for
 from golem.tools import default_registry
 from golem.tools.html_text import html_to_text
 from golem.tools.registry import Network, ToolContext, ToolError, ToolResult
-from golem.tools.web import UNTRUSTED_NOTE
+from golem.tools.web import UNTRUSTED_NOTE, _parseable  # pyright: ignore[reportPrivateUsage]
 
 PAGE = """<html><head><title>Docs &amp; more</title><style>.x{}</style></head>
 <body><nav><a href="/">Home</a></nav><script>alert(1)</script>
@@ -171,6 +171,45 @@ async def test_a_refused_page_says_why_in_at_most_200_characters() -> None:
     assert message.startswith(prefix + "# Blocked Please respect our robot policy. x x")
     reason = message[len(prefix) :]
     assert len(reason) == 200 and reason.endswith("…")
+
+
+async def test_a_refused_html_page_gives_its_title_even_when_the_cut_is_inside_a_tag() -> None:
+    body = (
+        '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8" />'
+        "<title>404 Error - Page Not Found</title>"
+        '<link rel="stylesheet" href="/site.css" type="text/css">'
+        + '<script src="/clientlibs/'
+        + "a" * 3000
+        + '.js"></script></head>'
+    )
+    ctx = _ctx(lambda request: httpx.Response(404, html=body))
+    with pytest.raises(ToolError) as caught:
+        await _fetch(ctx, "https://docs.example.com/gone")
+    assert str(caught.value) == (
+        "https://docs.example.com/gone answered HTTP 404: 404 Error - Page Not Found"
+    )
+
+
+async def test_a_refused_html_page_without_a_title_gives_its_text_and_no_markup() -> None:
+    body = '<html><body><p>Access denied.</p><div class="container lp__banner_cont'
+    ctx = _ctx(lambda request: httpx.Response(403, html=body))
+    with pytest.raises(ToolError) as caught:
+        await _fetch(ctx, "https://docs.example.com/denied")
+    assert str(caught.value) == "https://docs.example.com/denied answered HTTP 403: Access denied."
+
+
+async def test_a_refused_plain_text_page_gives_its_text_as_it_is() -> None:
+    ctx = _ctx(lambda request: httpx.Response(403, text="Please respect our robot policy <3"))
+    with pytest.raises(ToolError) as caught:
+        await _fetch(ctx, "https://docs.example.com/robots")
+    assert str(caught.value) == (
+        "https://docs.example.com/robots answered HTTP 403: Please respect our robot policy <3"
+    )
+
+
+def test_a_tag_left_open_at_the_end_is_dropped() -> None:
+    assert _parseable('<p>ok</p><div class="x') == "<p>ok</p>"
+    assert _parseable("<p>1 < 2</p>") == "<p>1 < 2</p>"
 
 
 async def test_a_refused_page_with_no_body_has_no_reason() -> None:
