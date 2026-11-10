@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import type { ListedSkill } from "@golem/client";
+import type { ListedSkill, ModelOption } from "@golem/client";
 
 import {
   applyComposer,
@@ -11,6 +11,7 @@ import {
   pinnableSkills,
   toggleDebugTab,
   withSkillChoices,
+  withTuneChoices,
   type DebugState,
   type SkillChoice,
 } from "./commands.ts";
@@ -340,4 +341,47 @@ test("/tune opens the tune panel, is in the model group, and takes no argument",
   assert.deepEqual(applyComposer(closedDebug, "/tune"), { kind: "tune" });
   assert.equal(applyComposer(closedDebug, "/tune x").kind, "unknown");
   assert.equal(COMMANDS.find((command) => command.name === "/tune")?.group, "model");
+});
+
+const TUNE_TABLE: ModelOption[] = ["temperature", "top_p", "top_k"].map((name) => ({
+  name,
+  label: name,
+  kind: name === "top_k" ? "int" : "float",
+  minimum: 0,
+  maximum: name === "top_k" ? 200 : name === "top_p" ? 1 : 2,
+  step: 0.05,
+  default: name === "temperature" ? 0.7 : name === "top_p" ? 0.9 : 40,
+  short: "s",
+  long: "l",
+}));
+
+test("/tune <option> <value> gives the set outcome, reset gives null, a bad value gives the error", () => {
+  const run = (line: string) => applyComposer(closedDebug, line, [], { pinnable: [], active: [] }, TUNE_TABLE);
+  assert.deepEqual(run("/tune temperature 0.3"), {
+    kind: "tune-set",
+    name: "temperature",
+    value: 0.3,
+    notice: "temperature 0.3 for this session",
+  });
+  assert.deepEqual(run("/tune temperature reset"), {
+    kind: "tune-set",
+    name: "temperature",
+    value: null,
+    notice: "temperature reset for this session",
+  });
+  assert.deepEqual(run("/tune temperature 5"), { kind: "unknown", notice: "temperature is between 0 and 2" });
+  assert.deepEqual(run("/tune"), { kind: "tune" });
+});
+
+test("/tune completes the option names, then the default and range", async () => {
+  const { suggest } = await import("./suggest.ts");
+  const registry = withTuneChoices(COMMANDS, TUNE_TABLE, { temperature: 0.7 });
+  assert.deepEqual(
+    suggest("/tune ", registry).map((item) => item.label),
+    ["temperature", "top_p", "top_k"],
+  );
+  const hint = suggest("/tune temperature ", registry);
+  assert.equal(hint.length, 1);
+  assert.equal(hint[0]?.label, "0.7 · 0–2");
+  assert.equal(hint[0]?.partial, true);
 });

@@ -11,6 +11,7 @@ export {
   toggleDebugTab,
   withModelChoices,
   withSkillChoices,
+  withTuneChoices,
   type Command,
   type CommandGroup,
   type ComposerOutcome,

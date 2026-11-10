@@ -22,8 +22,11 @@ import {
   sliderCells,
   step,
   toggleTarget,
+  tuneChip,
+  tuneHint,
   tuneRow,
   tuneRows,
+  tuneSet,
   tuneState,
   withSaved,
   withSession,
@@ -364,4 +367,52 @@ test("long memory picks the largest num_ctx step that fits, at most 32768", () =
   assert.equal(largestFittingCtx(option, { ram_gb: 8, size_gb: 3.3, ...MEMORY }), null);
   const none = tuneState(result({ memory: { ram_gb: 8, size_gb: 3.3, ...MEMORY } }));
   assert.deepEqual(applyPreset(none, preset(4)).options, { num_ctx: 16384 });
+});
+
+test("the chip lists only changed values, in table order, with temperature as temp", () => {
+  const base = tuneState(result());
+  assert.equal(tuneChip(base, "ollama"), "");
+  const changed = withSession(base, { top_p: 0.5, temperature: 0.2 });
+  assert.equal(tuneChip(changed, "ollama"), "temp 0.2 · top_p 0.5");
+  assert.equal(tuneChip(withSession(base, { temperature: 0.7 }), "ollama"), "");
+  assert.equal(tuneChip(withSaved(base, "qwen3:8b", { top_k: 10 }), "ollama"), "top_k 10");
+});
+
+test("the chip leaves out num_ctx, cuts at three with +N, and is empty on a hosted model", () => {
+  const base = tuneState(result());
+  assert.equal(tuneChip(withSession(base, { num_ctx: 8192 }), "ollama"), "");
+  const many = withSession(base, { temperature: 0.2, top_p: 0.5, top_k: 10, seed: 7, keep_alive: "30m", num_ctx: 8192 });
+  assert.equal(tuneChip(many, "ollama"), "temp 0.2 · top_p 0.5 · top_k 10 +2");
+  assert.equal(tuneChip(many, "anthropic"), "");
+  assert.equal(tuneChip(null, "ollama"), "");
+});
+
+test("/tune <option> <value> checks the table and says the range", () => {
+  assert.deepEqual(tuneSet(OPTIONS, ["temperature", "0.3"]), {
+    kind: "set",
+    name: "temperature",
+    value: 0.3,
+    notice: "temperature 0.3 for this session",
+  });
+  assert.deepEqual(tuneSet(OPTIONS, ["temperature", "reset"]), {
+    kind: "set",
+    name: "temperature",
+    value: null,
+    notice: "temperature reset for this session",
+  });
+  assert.deepEqual(tuneSet(OPTIONS, ["temperature", "3"]), {
+    kind: "error",
+    notice: "temperature is between 0 and 2",
+  });
+  assert.equal(tuneSet(OPTIONS, ["top_k", "1.5"]).kind, "error");
+  assert.equal(tuneSet(OPTIONS, ["temperature", "hot"]).kind, "error");
+  assert.equal(tuneSet(OPTIONS, ["nope", "1"]).kind, "error");
+  assert.equal(tuneSet(OPTIONS, ["keep_alive", "10m"]).kind, "set");
+  assert.equal(tuneSet(OPTIONS, ["keep_alive", "soon"]).kind, "error");
+  assert.equal(tuneSet([], ["temperature", "0.3"]).kind, "error");
+});
+
+test("the hint after an option name is its default and range", () => {
+  assert.equal(tuneHint(OPTIONS[0] as ModelOption, { temperature: 0.7 }), "0.7 · 0–2");
+  assert.equal(tuneHint(OPTIONS[0] as ModelOption), "0.8 · 0–2");
 });

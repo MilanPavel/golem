@@ -6,6 +6,8 @@ export type SuggestCommand = {
   choices?: readonly string[];
   /** Choices for the word after one of `choices`. */
   subChoices?: Readonly<Record<string, readonly string[]>>;
+  /** A note for the word after one of `choices`. It is shown, and Enter does not submit it. */
+  argHints?: Readonly<Record<string, string>>;
 };
 
 export type Suggestion = {
@@ -58,6 +60,10 @@ function subSuggestions(command: SuggestCommand | undefined, name: string, rest:
   const space = rest.search(/\s/);
   const choice = rest.slice(0, space);
   const word = rest.slice(space).trimStart();
+  const hint = command?.argHints?.[choice];
+  if (command !== undefined && hint !== undefined && word.length === 0) {
+    return [{ label: hint, description: command.description, completion: `${name} ${choice} `, partial: true }];
+  }
   const choices = command?.subChoices?.[choice];
   if (command === undefined || choices === undefined || choices.length === 0 || /\s/.test(word)) {
     return [];
