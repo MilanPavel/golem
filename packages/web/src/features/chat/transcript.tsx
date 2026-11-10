@@ -8,6 +8,7 @@ import { Button } from "../../ui/button.tsx";
 import { cn } from "../../ui/cn.ts";
 import type { GolemState } from "../../ui/golem-state.ts";
 import { PixelGolem } from "../../ui/pixel-golem.tsx";
+import { useThinkingShown } from "./thinking-shown.ts";
 import { useTimesShown } from "./times-shown.ts";
 import { formatClock, shouldStick, squeezeArgs } from "./format.ts";
 import type { DiffMode } from "../diff/diff-mode.ts";
@@ -142,11 +143,12 @@ export function ToolLine({ tool, defaultOpen = false }: { tool: ToolBlock; defau
 }
 
 /** The line above an answer that came after thinking. It opens into the thinking text. */
-export function ThinkingLine({ message, defaultOpen = false }: { message: ChatMessage; defaultOpen?: boolean }) {
+export function ThinkingLine({ message, defaultOpen = false, shown }: { message: ChatMessage; defaultOpen?: boolean; shown?: boolean }) {
   const line = thinkingLine(message);
+  const chosen = useThinkingShown();
   const [open, setOpen] = useState(defaultOpen);
   const textId = useId();
-  if (line === null) return null;
+  if (line === null || !(shown ?? chosen)) return null;
   return (
     <div className="tool-line font-mono text-xs leading-snug" data-thinking>
       <button
@@ -206,6 +208,8 @@ type Answering = {
   editing?: boolean;
   onEdit?: (open: boolean) => void;
   onAnswer?: (callId: string, decision: ApprovalChoice, args?: Args) => void;
+  /** Overrides the `/thinking` choice, for the gallery. */
+  thinkingShown?: boolean;
 };
 
 export const GolemMessage = memo(function GolemMessage({
@@ -216,6 +220,7 @@ export const GolemMessage = memo(function GolemMessage({
   editing = false,
   onEdit,
   onAnswer,
+  thinkingShown,
 }: { message: ChatMessage } & Answering) {
   const tools = message.tools ?? [];
   const duration = message.durationMs === undefined ? "" : formatDuration(message.durationMs);
@@ -223,7 +228,7 @@ export const GolemMessage = memo(function GolemMessage({
   return (
     <article aria-label="golem" className="flex min-w-0 flex-col gap-2.5">
       <PixelGolem state={golemState(message)} size="sm" />
-      <ThinkingLine message={message} />
+      <ThinkingLine message={message} shown={thinkingShown} />
       {tools.length > 0 ? (
         <ul aria-label="Tool calls" className="flex list-none flex-col gap-0.5 p-0 font-mono text-xs leading-snug">
           {tools.map((tool) => (
@@ -276,7 +281,7 @@ type Answers = {
 };
 
 /** The messages and the closing error or notice. Pure: the page's stores are not read here. */
-export function TranscriptMessages({ chat, onAnswer, sendingId = null, answerError = null, editing = false, onEdit }: { chat: TranscriptChat } & Answers) {
+export function TranscriptMessages({ chat, onAnswer, sendingId = null, answerError = null, editing = false, onEdit, thinkingShown }: { chat: TranscriptChat; thinkingShown?: boolean } & Answers) {
   const pendingId = chat.approval?.callId ?? null;
   const notice = chat.notice ?? (chat.unreadCall === true ? unreadCallNotice("web") : null);
   if (chat.messages.length === 0 && !chat.error && !notice) {
@@ -297,9 +302,10 @@ export function TranscriptMessages({ chat, onAnswer, sendingId = null, answerErr
             editing={editing}
             onEdit={onEdit}
             onAnswer={onAnswer}
+            thinkingShown={thinkingShown}
           />
         ) : (
-          <GolemMessage key={message.id} message={message} onAnswer={onAnswer} />
+          <GolemMessage key={message.id} message={message} onAnswer={onAnswer} thinkingShown={thinkingShown} />
         ),
       )}
       {chat.error ? <p role="alert" className="text-sm text-deny">{chat.error}</p> : null}

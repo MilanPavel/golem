@@ -882,10 +882,10 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
       <section className="mt-6" id={anchor("Thinking")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Thinking</h3>
         <div className="flex flex-col gap-6 rounded-lg border border-line bg-bg p-4">
-          {THINKING_CASES.map(({ label, message }) => (
+          {THINKING_CASES.map(({ label, message, shown }) => (
             <div key={label} aria-label={`Thinking, ${label}`} role="group" className="flex flex-col gap-1">
               <p className="font-mono text-xs text-faint">{label}</p>
-              <TranscriptMessages chat={{ messages: [message], error: null, notice: null }} />
+              <TranscriptMessages chat={{ messages: [message], error: null, notice: null }} thinkingShown={shown} />
             </div>
           ))}
         </div>

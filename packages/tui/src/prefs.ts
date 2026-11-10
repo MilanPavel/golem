@@ -9,9 +9,11 @@ export type TuiPrefs = {
   times: boolean;
   /** The agent's todo list above the composer. */
   todos: boolean;
+  /** The collapsed thinking line above each answer. */
+  thinking: boolean;
 };
 
-export const DEFAULT_PREFS: TuiPrefs = { times: false, todos: true };
+export const DEFAULT_PREFS: TuiPrefs = { times: false, todos: true, thinking: true };
 
 export function prefsPath(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
   return join(golemDir(env, home), "tui.json");
@@ -22,6 +24,7 @@ export function parsePrefs(text: string): TuiPrefs {
   return {
     times: value["times"] === true,
     todos: value["todos"] !== false,
+    thinking: value["thinking"] !== false,
   };
 }
 
