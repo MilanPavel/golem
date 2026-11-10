@@ -89,12 +89,12 @@ Type `/` and suggestions appear, with each command's arguments. `/help` lists ev
 | Left, Right | Change the focused value. Each change is sent at once |
 | `r` | Reset the focused option to the model's default |
 | `s` | Switch where changes go: saved for this model, or this chat only |
-| `1`–`4` | Apply a preset to this chat: precise, balanced, creative, or long memory. Balanced clears this chat's changes |
+| `1`–`4` | Apply a preset to this chat: precise, balanced, creative, or long memory. Balanced clears this chat's changes. Long memory sets the largest context size that fits in your Mac's memory, up to 32K |
 | `S` | Save this chat's changes for the model |
 | `t` | Ask your last question again with these settings. The answer shows under the panel, and the try is kept as its own chat. `t` again stops it |
 | Esc | Close the panel |
 
-A saved change is kept in `config.toml` for the model, and every chat on it uses it. A change for this chat only is kept with the chat. Either one applies from your next message. When a value is not the default, the row says what the default is.
+A saved change is kept in `config.toml` for the model, and every chat on it uses it. A change for this chat only is kept with the chat. Either one applies from your next message. When a value is not the default, the row says what the default is. The `num_ctx` row also says how much memory the value costs compared with the default, and whether it fits: `+1.1 GB · fits`, `· tight`, or `· too big`. It is a rough estimate, one rate for every model. The row says nothing when golem does not know your memory or the model's size.
 
 ### Tools, skills, and MCP
 

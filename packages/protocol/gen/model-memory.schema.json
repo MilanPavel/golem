@@ -1,0 +1,46 @@
+{
+  "additionalProperties": false,
+  "description": "What a client needs to say whether a ``num_ctx`` fits in this machine's memory.\n\nA model needs ``size_gb``, plus ``kv_gb_per_1k_tokens`` for each 1024 tokens of\ncontext, plus ``overhead_gb``. It ``fits`` when that is at most ``fits_share`` of\n``ram_gb``, is ``tight`` up to ``tight_share``, and is too big beyond.",
+  "properties": {
+    "fits_share": {
+      "exclusiveMinimum": 0,
+      "title": "Fits Share",
+      "type": "number"
+    },
+    "kv_gb_per_1k_tokens": {
+      "minimum": 0,
+      "title": "Kv Gb Per 1K Tokens",
+      "type": "number"
+    },
+    "overhead_gb": {
+      "minimum": 0,
+      "title": "Overhead Gb",
+      "type": "number"
+    },
+    "ram_gb": {
+      "exclusiveMinimum": 0,
+      "title": "Ram Gb",
+      "type": "number"
+    },
+    "size_gb": {
+      "minimum": 0,
+      "title": "Size Gb",
+      "type": "number"
+    },
+    "tight_share": {
+      "exclusiveMinimum": 0,
+      "title": "Tight Share",
+      "type": "number"
+    }
+  },
+  "required": [
+    "ram_gb",
+    "size_gb",
+    "kv_gb_per_1k_tokens",
+    "overhead_gb",
+    "fits_share",
+    "tight_share"
+  ],
+  "title": "ModelMemory",
+  "type": "object"
+}

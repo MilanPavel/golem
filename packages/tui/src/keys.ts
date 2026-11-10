@@ -594,6 +594,8 @@ export type OverlayLine = {
   dim: boolean;
   /** Draw in the accent colour. */
   accent?: boolean;
+  /** From column `start`, draw the rest dim (`fits`), in the warning colour (`tight`), or the alert colour (`too_big`). */
+  gauge?: { start: number; fit: "fits" | "tight" | "too_big" };
 };
 
 /** Grouped by context. A binding is listed once for each context it names. */

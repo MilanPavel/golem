@@ -589,6 +589,26 @@ class ModelDiscovery:
         name = ref.removeprefix("ollama/")
         return await options.model_parameters(self._http(), base, name)
 
+    async def ollama_size_gb(self, ref: str) -> float | None:
+        """The installed model's size in GB from ``/api/tags``, or None when it cannot say."""
+        server = self._router.ollama_server(ref)
+        if server is None:
+            return None
+        base = server[1].rstrip("/").removesuffix("/v1")
+        name = ref.removeprefix("ollama/")
+        try:
+            response = await self._http().get(f"{base}/api/tags", timeout=_OLLAMA_TIMEOUT)
+            response.raise_for_status()
+            items = _list(_dict(response.json()).get("models"))
+        except (httpx.HTTPError, ValueError):
+            return None
+        for item in items:
+            listed = item.get("name") or item.get("model")
+            if listed == name or listed == f"{name}:latest":
+                size = item.get("size")
+                return round(size / 1e9, 1) if isinstance(size, int) else None
+        return None
+
     def _http(self) -> httpx.AsyncClient:
         if self._client is None:
             self._client = httpx.AsyncClient(transport=self._transport, follow_redirects=True)

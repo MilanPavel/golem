@@ -58,6 +58,7 @@ export type { McpRemoveResult } from "../../protocol/gen/mcp-remove-result.ts";
 export type { McpServer } from "../../protocol/gen/mcp-server.ts";
 export type { KeychainWait } from "../../protocol/gen/keychain-wait.ts";
 export type { ModelServerStatus } from "../../protocol/gen/model-server-status.ts";
+export type { ModelMemory } from "../../protocol/gen/model-memory.ts";
 export type { ModelOption } from "../../protocol/gen/model-option.ts";
 export type { ModelOptionsGetResult } from "../../protocol/gen/model-options-get-result.ts";
 export type { ModelOptionsSaved } from "../../protocol/gen/model-options-saved.ts";
