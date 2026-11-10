@@ -1030,3 +1030,36 @@ for (const theme of ["slip", "kiln"]) {
     expect((await axe.run(document.body, popup)).violations).toEqual([]);
   });
 }
+
+test("a thinking model has a think select that sends its value, and another model has none", async () => {
+  const { fake, user } = await openTune();
+  expect(within(dialog()).queryByRole("combobox", { name: "Think" })).toBeNull();
+  fake.raw.getModelOptions.mockImplementation(async (model) => ({ ...sampleOptionsResult("qwen3.5:4b"), model }));
+  await user.click(within(dialog()).getByRole("button", { name: "Back to the models" }));
+  await user.click(within(dialog()).getByRole("button", { name: "Tune" }));
+  const select = await within(dialog()).findByRole("combobox", { name: "Think" });
+  expect(Array.from((select as HTMLSelectElement).options).map((item) => item.value)).toEqual(["", "off", "on"]);
+  await user.selectOptions(select, "off");
+  await waitFor(() => expect(fake.raw.setModelOptions).toHaveBeenCalledWith("qwen3:8b", { think: "off" }), { timeout: 2000 });
+});
+
+test("a model with thinking levels offers low, medium, and high", async () => {
+  const { fake, user } = await openTune();
+  fake.raw.getModelOptions.mockImplementation(async (model) => ({ ...sampleOptionsResult("gpt-oss:20b"), model }));
+  await user.click(within(dialog()).getByRole("button", { name: "Back to the models" }));
+  await user.click(within(dialog()).getByRole("button", { name: "Tune" }));
+  const select = await within(dialog()).findByRole("combobox", { name: "Think" });
+  expect(Array.from((select as HTMLSelectElement).options).map((item) => item.value)).toEqual(["", "low", "medium", "high"]);
+});
+
+for (const theme of ["slip", "kiln"]) {
+  test(`no accessibility violations on the Tune view of a thinking model in ${theme}`, async () => {
+    document.documentElement.dataset.theme = theme;
+    const { fake, user } = await openTune();
+    fake.raw.getModelOptions.mockImplementation(async (model) => ({ ...sampleOptionsResult("qwen3.5:4b"), model, saved: { think: "off" } }));
+    await user.click(within(dialog()).getByRole("button", { name: "Back to the models" }));
+    await user.click(within(dialog()).getByRole("button", { name: "Tune" }));
+    await within(dialog()).findByRole("combobox", { name: "Think" });
+    expect((await axe.run(document.body, popup)).violations).toEqual([]);
+  });
+}

@@ -14,6 +14,8 @@
 # min_ram_gb is the memory a Mac needs for the model to run well. Of the
 # entries tagged "starter", golem recommends the largest one this Mac has the
 # memory for, so a first download stays small and quick.
+# think lists the thinking levels a model takes, such as ["low", "medium", "high"] for gpt-oss.
+# A model that thinks and has no think takes off and on.
 
 [[local]]
 ref = "ollama/llama3.2:3b"
@@ -86,6 +88,7 @@ size_gb = 13.8
 min_ram_gb = 32
 tags = ["general", "reasoning"]
 categories = ["general", "reasoning"]
+think = ["low", "medium", "high"]
 
 [[local]]
 ref = "ollama/devstral:24b"
@@ -142,6 +145,7 @@ size_gb = 65.4
 min_ram_gb = 64
 tags = ["general", "reasoning"]
 categories = ["general", "reasoning"]
+think = ["low", "medium", "high"]
 
 [[hosted]]
 ref = "anthropic/claude-fable-5-1"

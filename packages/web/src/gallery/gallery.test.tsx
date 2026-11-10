@@ -162,3 +162,18 @@ test("the gallery has a Thinking section with streaming, done, none, and long ca
     expect(group.textContent).toContain("17 * 23 = 391.");
   }
 });
+
+for (const theme of ["slip", "kiln"]) {
+  for (const [label, values] of [["Tune view, a thinking model", ["", "off", "on"]], ["Tune view, thinking levels", ["", "low", "medium", "high"]]] as const) {
+    test(`the gallery's "${label}" in ${theme} has a think select and passes axe`, async () => {
+      const user = userEvent.setup();
+      render(<Gallery />);
+      await user.click(screen.getByRole("button", { name: `${label}, ${theme}` }));
+      const dialog = await screen.findByRole("dialog", { name: "Choose a model" });
+      const select = await within(dialog).findByRole("combobox", { name: "Think" });
+      expect(Array.from((select as HTMLSelectElement).options).map((item) => item.value)).toEqual([...values]);
+      const results = await axe.run(document.body, { rules: { "color-contrast": { enabled: false }, region: { enabled: false } } });
+      expect(results.violations).toEqual([]);
+    });
+  }
+}

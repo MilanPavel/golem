@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import tomllib
+from collections.abc import Collection
 from dataclasses import dataclass
 from importlib import resources
 from typing import Any
 
 from golem.config import HOSTED_PROVIDERS
+from golem.models.options import LEVELS, ON_OFF
 
 # The fixed set a model can be filed under.
 CATEGORIES = ("general", "coding", "reasoning", "vision", "fast", "long-context")
@@ -46,6 +48,8 @@ class CatalogEntry:
     tags: tuple[str, ...]
     min_ram_gb: float | None = None
     categories: tuple[str, ...] = ()
+    # The thinking levels the model takes, such as low, medium, high. Empty for on and off.
+    think: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,9 +81,27 @@ def load_local_catalog() -> list[CatalogEntry]:
                 tags=tuple(str(tag) for tag in item.get("tags", [])),
                 min_ram_gb=float(item["min_ram_gb"]) if "min_ram_gb" in item else None,
                 categories=tuple(str(name) for name in item.get("categories", [])),
+                think=tuple(str(name) for name in item.get("think", [])),
             )
         )
     return entries
+
+
+def think_values(name: str, capabilities: Collection[str] | None) -> list[str]:
+    """What ``think`` takes for the installed Ollama model ``name``. Empty when it cannot think.
+
+    A model without ``thinking`` in its capabilities takes none. One that thinks takes the
+    levels its catalog entry lists. Off the catalog, a name that starts with ``gpt-oss`` takes
+    the levels and every other model takes ``off`` and ``on``.
+    """
+    if capabilities is None or "thinking" not in capabilities:
+        return []
+    for entry in load_local_catalog():
+        if entry.ref.removeprefix("ollama/") == name and entry.think:
+            return list(entry.think)
+    if name.startswith("gpt-oss"):
+        return list(LEVELS)
+    return list(ON_OFF)
 
 
 def load_hosted_catalog() -> list[HostedEntry]:

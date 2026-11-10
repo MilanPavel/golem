@@ -9,15 +9,23 @@ line. Where the model says nothing, Ollama's default is the value.
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Literal, cast
 
 import httpx
 
-OptionKind = Literal["float", "int", "duration"]
+OptionKind = Literal["float", "int", "duration", "choice"]
 
 _TIMEOUT = 5.0
+
+ON_OFF = ("off", "on")
+"""What a model that thinks takes when it has no levels."""
+
+LEVELS = ("low", "medium", "high")
+"""What a model with thinking levels takes, such as gpt-oss."""
+
+THINK_VALUES = ON_OFF + LEVELS
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,6 +42,8 @@ class OptionSpec:
     default: float | str | None
     short: str
     long: str
+    # What a ``choice`` may be, for a model that takes every value. A model takes some of them.
+    values: tuple[str, ...] = ()
 
 
 OPTIONS: tuple[OptionSpec, ...] = (
@@ -164,6 +174,23 @@ OPTIONS: tuple[OptionSpec, ...] = (
             "sooner. -1 keeps it loaded until Ollama stops, and 0 unloads it right away."
         ),
     ),
+    OptionSpec(
+        name="think",
+        label="Think",
+        kind="choice",
+        minimum=0,
+        maximum=0,
+        step=1,
+        default=None,
+        short="Whether the model thinks before it answers.",
+        long=(
+            "A thinking model writes out its reasoning first. That can give a better answer on a "
+            "hard question, and it costs time and output tokens. Left unset, the model does what "
+            "it does by itself. Some models take a level, low, medium, or high, "
+            "instead of on or off."
+        ),
+        values=THINK_VALUES,
+    ),
 )
 
 _BY_NAME = {spec.name: spec for spec in OPTIONS}
@@ -177,11 +204,22 @@ def spec(name: str) -> OptionSpec | None:
 _DURATION = re.compile(r"^-?\d+(\.\d+)?(ms|s|m|h)?$")
 
 
-def validate(name: str, value: object) -> float | str:
-    """Check ``value`` against the table and return it. Raises ``ValueError`` when it is no good."""
+def validate(name: str, value: object, values: Sequence[str] | None = None) -> float | str:
+    """Check ``value`` against the table and return it. Raises ``ValueError`` when it is no good.
+
+    A ``choice`` is checked against ``values``, what one model takes, or against every value
+    in the table when ``values`` is None. An empty ``values`` means the model takes none.
+    """
     row = _BY_NAME.get(name)
     if row is None:
         raise ValueError(f"{name} is not an option golem can tune")
+    if row.kind == "choice":
+        allowed = row.values if values is None else tuple(values)
+        if not allowed:
+            raise ValueError(f"this model does not take {name}")
+        if not isinstance(value, str) or value not in allowed:
+            raise ValueError(f"{name} is one of {', '.join(allowed)}")
+        return value
     if row.kind == "duration":
         if isinstance(value, bool) or not isinstance(value, (int, str)):
             raise ValueError(f"{name} is a time such as 5m, or -1")
@@ -236,6 +274,8 @@ def defaults(model_parameters: Mapping[str, float | str] | None = None) -> dict[
 
 
 def _coerce(row: OptionSpec, raw: str) -> float | str | None:
+    if row.kind == "choice":
+        return None
     if row.kind == "duration":
         return raw or None
     try:

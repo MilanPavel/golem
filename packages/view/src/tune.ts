@@ -36,6 +36,16 @@ export type TuneState = {
 /** One option with the value in use. `value` is null when there is none, such as a random seed. */
 export type TuneRow = { option: ModelOption; value: TuneValue | null; source: TuneSource };
 
+/** True for an option that steps through a list: a duration, or a choice among `values`. */
+export function isListKind(option: ModelOption): boolean {
+  return option.kind === "duration" || option.kind === "choice";
+}
+
+/** The range of a number option. A choice has none, so these are 0, 0, and 1 for it. */
+export function rangeOf(option: ModelOption): { minimum: number; maximum: number; step: number } {
+  return { minimum: option.minimum ?? 0, maximum: option.maximum ?? 0, step: option.step ?? 1 };
+}
+
 /** What `keep_alive` steps through, from unloading at once to never. */
 export const KEEP_ALIVE_STEPS: readonly TuneValue[] = [0, "30s", "5m", "30m", -1];
 
@@ -122,6 +132,7 @@ export const NUM_CTX_START = 8192;
 /** What a row says about its default, or null. `num_ctx` with no default says Ollama sets it when it loads. */
 export function defaultNote(state: TuneState, row: TuneRow): string | null {
   const name = row.option.name;
+  if (row.option.kind === "choice") return "model default · thinks";
   const fallback = state.defaults[name];
   if (fallback === undefined) {
     return name === "num_ctx" && row.value === null ? "set by Ollama when it loads" : null;
@@ -152,10 +163,16 @@ export function step(state: TuneState, name: string, direction: 1 | -1): TuneSta
   const option = state.options.find((item) => item.name === name);
   if (option === undefined) return state;
   const current = tuneRow(state, option).value;
-  if (name === "num_ctx" && current === null && option.kind !== "duration") {
-    return put(state, name, Math.min(option.maximum, Math.max(option.minimum, NUM_CTX_START)));
+  if (name === "num_ctx" && current === null && !isListKind(option)) {
+    const { minimum, maximum } = rangeOf(option);
+    return put(state, name, Math.min(maximum, Math.max(minimum, NUM_CTX_START)));
   }
-  const next = option.kind === "duration" ? nextDuration(current, direction) : nextNumber(option, current, direction);
+  const next =
+    option.kind === "choice"
+      ? nextChoice(option.values ?? [], current, direction)
+      : option.kind === "duration"
+      ? nextDuration(current, direction)
+      : nextNumber(option, current, direction);
   return put(state, name, next);
 }
 
@@ -204,10 +221,11 @@ export function presetOptions(state: TuneState, preset: TunePreset): Record<stri
 
 /** The largest value of `option`'s steps, up to {@link LONG_MEMORY_MAX_CTX}, that fits. Null when none does. */
 export function largestFittingCtx(option: ModelOption, memory: ModelMemory): number | null {
-  const top = Math.min(option.maximum, LONG_MEMORY_MAX_CTX);
-  const steps = Math.floor((top - option.minimum) / option.step);
+  const range = rangeOf(option);
+  const top = Math.min(range.maximum, LONG_MEMORY_MAX_CTX);
+  const steps = Math.floor((top - range.minimum) / range.step);
   for (let at = steps; at >= 0; at -= 1) {
-    const ctx = option.minimum + at * option.step;
+    const ctx = range.minimum + at * range.step;
     if (memoryFor(ctx, memory, ctx).fit === "fits") return ctx;
   }
   return null;
@@ -306,9 +324,10 @@ export function memoryNote(state: TuneState, row: TuneRow): MemoryNote | null {
  */
 export function sliderCells(value: TuneValue | null, option: ModelOption, width: number): string {
   const cells = Math.max(0, Math.floor(width));
-  const span = option.maximum - option.minimum;
-  const number = typeof value === "number" ? value : option.minimum;
-  const share = span > 0 ? Math.min(1, Math.max(0, (number - option.minimum) / span)) : 0;
+  const { minimum, maximum } = rangeOf(option);
+  const span = maximum - minimum;
+  const number = typeof value === "number" ? value : minimum;
+  const share = span > 0 ? Math.min(1, Math.max(0, (number - minimum) / span)) : 0;
   const eighths = Math.round(share * cells * 8);
   const full = Math.floor(eighths / 8);
   const part = eighths % 8 === 0 ? "" : (FILLS[(eighths % 8) - 1] ?? "");
@@ -318,11 +337,11 @@ export function sliderCells(value: TuneValue | null, option: ModelOption, width:
 
 /** A value as the panel shows it: `0.7`, `16K` for a window, `5m`, `always`, or `random` with no seed. */
 export function formatTuneValue(option: ModelOption, value: TuneValue | null): string {
-  if (value === null) return option.name === "seed" ? "random" : "none";
+  if (value === null) return option.name === "seed" ? "random" : option.kind === "choice" ? "unset" : "none";
   if (option.kind === "duration") return String(value) === "-1" ? "always" : String(value);
   if (typeof value === "string") return value;
   if (option.name === "num_ctx") return `${trim(value / 1024, 1)}K`;
-  return trim(value, Math.max(2, decimals(option.step)));
+  return trim(value, Math.max(2, decimals(rangeOf(option).step)));
 }
 
 function put(state: TuneState, name: string, value: TuneValue | null): TuneState {
@@ -336,11 +355,20 @@ function put(state: TuneState, name: string, value: TuneValue | null): TuneState
 }
 
 function nextNumber(option: ModelOption, current: TuneValue | null, direction: 1 | -1): number {
-  const base = typeof current === "number" ? current : Number(current ?? option.minimum);
-  const start = Number.isFinite(base) ? base : option.minimum;
-  const moved = start + direction * option.step;
-  const rounded = Number(moved.toFixed(decimals(option.step)));
-  return Math.min(option.maximum, Math.max(option.minimum, rounded));
+  const { minimum, maximum, step } = rangeOf(option);
+  const base = typeof current === "number" ? current : Number(current ?? minimum);
+  const start = Number.isFinite(base) ? base : minimum;
+  const moved = start + direction * step;
+  const rounded = Number(moved.toFixed(decimals(step)));
+  return Math.min(maximum, Math.max(minimum, rounded));
+}
+
+/** The next value in `values`, clamped at the ends. With no value yet, the first step goes to the first or last. */
+function nextChoice(values: readonly string[], current: TuneValue | null, direction: 1 | -1): TuneValue | null {
+  if (values.length === 0) return null;
+  const at = values.indexOf(String(current));
+  if (current === null || at < 0) return (direction === 1 ? values[0] : values[values.length - 1]) ?? null;
+  return values[Math.min(values.length - 1, Math.max(0, at + direction))] ?? null;
 }
 
 function nextDuration(current: TuneValue | null, direction: 1 | -1): TuneValue {
@@ -401,6 +429,11 @@ export const TUNE_USAGE = "/tune, /tune <option> <value>, or /tune <option> rese
 /** Check one typed value against the table. The messages are the daemon's own. */
 export function parseTuneValue(option: ModelOption, text: string): { value: TuneValue } | { error: string } {
   const { name } = option;
+  if (option.kind === "choice") {
+    const values = option.values ?? [];
+    if (!values.includes(text)) return { error: `${name} is one of ${values.join(", ")}` };
+    return { value: text };
+  }
   if (option.kind === "duration") {
     if (!/^-?\d+(\.\d+)?(ms|s|m|h)?$/.test(text)) return { error: `${name} is a time such as 5m, or -1` };
     return { value: /^-?\d+$/.test(text) ? Number(text) : text };
@@ -408,8 +441,9 @@ export function parseTuneValue(option: ModelOption, text: string): { value: Tune
   const number = Number(text);
   if (text.length === 0 || !Number.isFinite(number)) return { error: `${name} is a number` };
   if (option.kind === "int" && !Number.isInteger(number)) return { error: `${name} is a whole number` };
-  if (number < option.minimum || number > option.maximum) {
-    return { error: `${name} is between ${trim(option.minimum, 6)} and ${trim(option.maximum, 6)}` };
+  const { minimum, maximum } = rangeOf(option);
+  if (number < minimum || number > maximum) {
+    return { error: `${name} is between ${trim(minimum, 6)} and ${trim(maximum, 6)}` };
   }
   return { value: number };
 }
@@ -442,10 +476,11 @@ export function tuneSet(options: readonly ModelOption[], args: readonly string[]
  */
 export function tuneHint(option: ModelOption, defaults: Readonly<Record<string, TuneValue>> = {}): string {
   const fallback = defaults[option.name] ?? option.default;
+  if (option.kind === "choice") return `model default · ${(option.values ?? []).join(", ")}`;
   const shown =
     fallback == null && option.name === "num_ctx" ? "set by Ollama" : formatTuneValue(option, fallback ?? null);
-  const range =
-    option.kind === "duration" ? "a time such as 5m, or -1" : `${trim(option.minimum, 6)}–${trim(option.maximum, 6)}`;
+  const { minimum, maximum } = rangeOf(option);
+  const range = option.kind === "duration" ? "a time such as 5m, or -1" : `${trim(minimum, 6)}–${trim(maximum, 6)}`;
   return `${shown} · ${range}`;
 }
 

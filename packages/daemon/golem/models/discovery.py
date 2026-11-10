@@ -43,6 +43,7 @@ from golem.models.catalog import (
     in_order,
     load_hosted_catalog,
     load_local_catalog,
+    think_values,
 )
 from golem.models.errors import ModelUnreachable
 from golem.models.keys import KeyStoreError
@@ -114,6 +115,7 @@ class ListedModel:
     categories: tuple[str, ...] = ()
     recommended: bool = False
     recommended_for: tuple[str, ...] = ()
+    think_values: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -544,6 +546,7 @@ class ModelDiscovery:
             fit=self._fit(found.size_gb, None),
             stale=stale,
             categories=categories_of(vision=vision, reasoning=reasoning, ctx=ctx),
+            think_values=tuple(think_values(found.model_id, found.capabilities)) if local else (),
         )
 
     def _recommended(self) -> str | None:
@@ -595,6 +598,30 @@ class ModelDiscovery:
         base = server[1].rstrip("/").removesuffix("/v1")
         name = ref.removeprefix("ollama/")
         return await options.model_parameters(self._http(), base, name)
+
+    async def ollama_think_values(self, ref: str) -> list[str]:
+        """What ``think`` takes for the installed model ``ref``, a profile or a ref.
+
+        Empty when it cannot think or does not run on Ollama.
+        """
+        server = self._router.ollama_server(ref)
+        if server is None:
+            return []
+        base = server[1].rstrip("/").removesuffix("/v1")
+        name = self._router.resolve(ref).model_id
+        try:
+            response = await self._http().post(
+                f"{base}/api/show", json={"model": name}, timeout=_OLLAMA_TIMEOUT
+            )
+            response.raise_for_status()
+            capabilities = _names(_dict(response.json()).get("capabilities"))
+        except (httpx.HTTPError, ValueError):
+            return []
+        if capabilities is None:
+            return []
+        values = think_values(name, capabilities)
+        self._router.note_think_values(name, values)
+        return values
 
     async def ollama_size_gb(self, ref: str) -> float | None:
         """The installed model's size in GB from ``/api/tags``, or None when it cannot say."""
@@ -657,6 +684,8 @@ class ModelDiscovery:
         if tools is None and capabilities is not None:
             tools = "tools" in capabilities
         size = item.get("size")
+        if capabilities is not None:
+            self._router.note_think_values(name, think_values(name, capabilities))
         return _Found(
             model_id=name,
             ctx=ctx,

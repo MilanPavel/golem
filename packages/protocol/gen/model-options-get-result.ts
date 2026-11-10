@@ -8,14 +8,15 @@ export type SizeGb = number;
 export type TightShare = number;
 export type Model = string;
 export type Default = number | string | null;
-export type Kind = 'float' | 'int' | 'duration';
+export type Kind = 'float' | 'int' | 'duration' | 'choice';
 export type Label = string;
 export type Long = string;
-export type Maximum = number;
-export type Minimum = number;
+export type Maximum = number | null;
+export type Minimum = number | null;
 export type Name = string;
 export type Short = string;
-export type Step = number;
+export type Step = number | null;
+export type Values = string[];
 export type Options = ModelOption[];
 export type Session = {
   [k: string]: number | string;
@@ -71,8 +72,9 @@ export interface ModelMemory {
  * One row of the option table: what an option may be, and what it does.
  *
  * ``kind`` ``duration`` is a time such as ``5m``, or a number of seconds, and
- * ``-1`` for always. ``default`` is Ollama's own, and ``None`` when it has
- * none, as for the seed.
+ * ``-1`` for always. ``choice`` is one of ``values``, which are the values this
+ * model takes, and has no range. ``default`` is Ollama's own, and ``None`` when
+ * it has none, as for the seed and for ``think``.
  *
  * This interface was referenced by `ModelOptionsGetResult`'s JSON-Schema
  * via the `definition` "ModelOption".
@@ -82,11 +84,12 @@ export interface ModelOption {
   kind: Kind;
   label: Label;
   long: Long;
-  maximum: Maximum;
-  minimum: Minimum;
+  maximum?: Maximum;
+  minimum?: Minimum;
   name: Name;
   short: Short;
-  step: Step;
+  step?: Step;
+  values?: Values;
 }
 export interface Saved {
   [k: string]: number | string;

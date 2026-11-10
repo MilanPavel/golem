@@ -601,6 +601,7 @@ async def _model_list(ctx: RequestContext, params: ModelListParams) -> ModelList
                 categories=cast(list[ModelCategory], list(model.categories)),
                 recommended=model.recommended,
                 recommended_for=cast(list[ModelCategory], list(model.recommended_for)),
+                think_values=list(model.think_values),
             )
             for model in listing.models
         ],
@@ -659,6 +660,14 @@ def _ollama_name(model: str) -> str:
     return model.strip().removeprefix("ollama/")
 
 
+async def _think_values(ctx: RequestContext, ref: str) -> list[str] | None:
+    """What ``think`` takes for ``ref``, or None when golem cannot find out, so any value passes."""
+    discovery = ctx.state.models
+    if discovery is None:
+        return None
+    return await discovery.ollama_think_values(ref)
+
+
 async def _model_options_get(
     ctx: RequestContext, params: ModelOptionsGetParams
 ) -> ModelOptionsGetResult:
@@ -688,6 +697,7 @@ async def _model_options_get(
                 fits_share=hardware.FITS_SHARE,
                 tight_share=hardware.TIGHT_SHARE,
             )
+    thinks = [] if discovery is None else await discovery.ollama_think_values(f"ollama/{name}")
     values = model_options.defaults(own)
     default_from: dict[str, Literal["modelfile", "ollama"]] = {}
     if "num_ctx" in values:
@@ -704,14 +714,16 @@ async def _model_options_get(
                 name=row.name,
                 label=row.label,
                 kind=row.kind,
-                minimum=row.minimum,
-                maximum=row.maximum,
-                step=row.step,
+                minimum=None if row.kind == "choice" else row.minimum,
+                maximum=None if row.kind == "choice" else row.maximum,
+                step=None if row.kind == "choice" else row.step,
                 default=row.default,
                 short=row.short,
                 long=row.long,
+                values=thinks if row.name == "think" else [],
             )
             for row in model_options.OPTIONS
+            if row.name != "think" or thinks
         ],
         defaults=values,
         default_from=default_from,
@@ -726,8 +738,11 @@ async def _model_options_set(
 ) -> ModelOptionsSetResult:
     name = _ollama_name(params.model)
     config_file = ctx.state.paths.config_file
+    thinks = await _think_values(ctx, f"ollama/{name}") if "think" in params.options else None
     try:
-        saved = await asyncio.to_thread(set_model_options, config_file, name, params.options)
+        saved = await asyncio.to_thread(
+            set_model_options, config_file, name, params.options, thinks
+        )
     except ValueError as exc:
         raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
     except OSError as exc:
@@ -742,8 +757,15 @@ async def _model_options_set(
 async def _session_set_options(
     ctx: RequestContext, params: SessionSetOptionsParams
 ) -> SessionSetOptionsResult:
+    thinks: list[str] | None = None
+    if "think" in params.options:
+        try:
+            profile = await _sessions(ctx).model_profile(params.session_id)
+        except (SessionNotFoundError, SchemaMismatchError) as exc:
+            raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
+        thinks = await _think_values(ctx, profile)
     try:
-        options = await _sessions(ctx).set_options(params.session_id, params.options)
+        options = await _sessions(ctx).set_options(params.session_id, params.options, thinks)
     except (SessionNotFoundError, SchemaMismatchError) as exc:
         raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
     except ValueError as exc:

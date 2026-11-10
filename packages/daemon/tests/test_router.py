@@ -368,3 +368,43 @@ def test_options_of_another_model_do_not_apply() -> None:
         {"ollama": {"models": {"llama3:8b": {"temperature": 0.2}}}}
     )
     assert "temperature" not in _sent(ModelRouter(settings).chat_model("ollama/qwen3:8b"))
+
+
+def _reasoning(model: object) -> object:
+    assert isinstance(model, ChatOllama)
+    return model.reasoning
+
+
+def test_think_maps_to_reasoning() -> None:
+    cases = {"off": False, "on": True, "low": "low", "medium": "medium", "high": "high"}
+    for think, expected in cases.items():
+        settings = GolemSettings.model_validate(
+            {"ollama": {"models": {"gpt-oss:20b": {"think": think}}}}
+        )
+        model = ModelRouter(settings).chat_model("ollama/gpt-oss:20b")
+        assert _reasoning(model) == expected
+
+
+def test_an_unset_think_sends_no_reasoning() -> None:
+    settings = GolemSettings.model_validate({"ollama": {"models": {"qwen3:8b": {"top_k": 10}}}})
+    model = ModelRouter(settings).chat_model("ollama/qwen3:8b")
+    assert _reasoning(model) is None
+    assert "reasoning" not in ModelRouter(settings).ollama_options("qwen3:8b", None)
+
+
+def test_a_session_think_wins_over_the_saved_one() -> None:
+    settings = GolemSettings.model_validate({"ollama": {"models": {"qwen3:8b": {"think": "on"}}}})
+    model = ModelRouter(settings).chat_model("ollama/qwen3:8b", {"think": "off"})
+    assert _reasoning(model) is False
+
+
+def test_a_saved_think_is_dropped_for_a_model_that_cannot_think() -> None:
+    settings = GolemSettings.model_validate(
+        {"ollama": {"models": {"llama3.2:3b": {"think": "off"}, "qwen3:8b": {"think": "high"}}}}
+    )
+    router = ModelRouter(settings)
+    router.note_think_values("llama3.2:3b", [])
+    router.note_think_values("qwen3:8b", ["off", "on"])
+    assert "reasoning" not in router.ollama_options("llama3.2:3b", None)
+    assert "reasoning" not in router.ollama_options("qwen3:8b", None)
+    assert router.ollama_options("qwen3:8b", {"think": "on"})["reasoning"] is True

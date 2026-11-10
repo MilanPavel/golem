@@ -135,6 +135,7 @@ export {
   focusedRow,
   formatExtraGb,
   formatTuneValue,
+  isListKind,
   KEEP_ALIVE_STEPS,
   keepSession,
   kvGb,
