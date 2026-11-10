@@ -104,6 +104,8 @@ A command you allow still runs in a sandbox (`sandbox-exec`, built into macOS). 
 
 When the sandbox refuses something, the result says so: the tool line reads `exit 1, blocked by the sandbox`, and the output names what was blocked and how to allow it. The model reads the same line, so it can tell you.
 
+With the network off, a command that names a network client such as `curl`, `wget`, or `git clone` also gets a last line after the exit code. It says the sandbox has no network, and points to `web_fetch` or `shell_unsandboxed`. The line is a hint, so it appears whatever the exit code is.
+
 `git_status`, `git_diff`, and `git_log` run git directly, in the same sandbox, with hooks and other ways for a repository to run code switched off.
 
 ```toml

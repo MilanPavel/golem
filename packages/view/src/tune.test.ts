@@ -10,6 +10,7 @@ import {
   differsFromDefault,
   focusedRow,
   formatTuneValue,
+  isListKind,
   formatExtraGb,
   keepSession,
   largestFittingCtx,
@@ -463,4 +464,67 @@ test("the hint after an option name is its default and range", () => {
   const numCtx = OPTIONS.find((item) => item.name === "num_ctx") as ModelOption;
   assert.equal(tuneHint({ ...numCtx, default: null }), "set by Ollama · 512–262144");
   assert.equal(tuneHint(numCtx, { num_ctx: 32768 }), "32K · 512–262144");
+});
+
+const THINK = option("think", { kind: "choice", values: ["off", "on"], minimum: null, maximum: null, step: null, default: null });
+const LEVELS = option("think", { kind: "choice", values: ["low", "medium", "high"], minimum: null, maximum: null, step: null, default: null });
+
+function thinking(extra: Partial<ModelOptionsGetResult> = {}, think: ModelOption = THINK): ModelOptionsGetResult {
+  return result({ options: [...OPTIONS, think], ...extra });
+}
+
+test("isListKind is true for a duration and a choice only", () => {
+  assert.equal(isListKind(THINK), true);
+  assert.equal(isListKind(OPTIONS[5] as ModelOption), true);
+  assert.equal(isListKind(OPTIONS[0] as ModelOption), false);
+});
+
+test("think steps through its values and stops at the ends", () => {
+  let state = tuneState(thinking());
+  state = step(state, "think", 1);
+  assert.equal(written(state, "think"), "off");
+  state = step(state, "think", 1);
+  assert.equal(written(state, "think"), "on");
+  state = step(state, "think", 1);
+  assert.equal(written(state, "think"), "on");
+  state = step(state, "think", -1);
+  assert.equal(written(state, "think"), "off");
+  state = step(state, "think", -1);
+  assert.equal(written(state, "think"), "off");
+  const levels = step(tuneState(thinking({}, LEVELS)), "think", -1);
+  assert.equal(written(levels, "think"), "high");
+  assert.equal(written(step(levels, "think", -1), "think"), "medium");
+});
+
+test("think shows its value, says the model default, and is the chip when set", () => {
+  const state = tuneState(thinking());
+  const row = tuneRow(state, THINK);
+  assert.equal(row.value, null);
+  assert.equal(formatTuneValue(THINK, row.value), "unset");
+  assert.equal(defaultNote(state, row), "model default · thinks");
+  assert.equal(tuneChip(state, "ollama"), "");
+  const off = tuneState(thinking({ saved: { think: "off" } }));
+  assert.equal(formatTuneValue(THINK, "off"), "off");
+  assert.equal(tuneChip(off, "ollama"), "think off");
+  const high = tuneState(thinking({ session: { think: "high" } }, LEVELS));
+  assert.equal(tuneChip(high, "ollama"), "think high");
+  const many = withSession(tuneState(thinking()), { temperature: 0.2, top_p: 0.5, top_k: 10, think: "on" });
+  assert.equal(tuneChip(many, "ollama"), "temp 0.2 · top_p 0.5 · top_k 10 +1");
+});
+
+test("/tune think accepts only the model's values and says the allowed ones", () => {
+  assert.deepEqual(tuneSet([...OPTIONS, LEVELS], ["think", "high"]), {
+    kind: "set",
+    name: "think",
+    value: "high",
+    notice: "think high for this session",
+  });
+  assert.deepEqual(tuneSet([...OPTIONS, THINK], ["think", "high"]), {
+    kind: "error",
+    notice: "think is one of off, on",
+  });
+  assert.equal(tuneSet([...OPTIONS, THINK], ["think", "reset"]).kind, "set");
+  assert.match(tuneSet(OPTIONS, ["think", "on"]).notice, /think is not an option to tune/);
+  assert.equal(tuneHint(LEVELS), "model default · low, medium, high");
+  assert.equal(tuneHint(OPTIONS[5] as ModelOption, { keep_alive: "5m" }), "5m · a time such as 5m, or -1");
 });

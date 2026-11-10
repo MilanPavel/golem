@@ -96,7 +96,7 @@ Type `/` and suggestions appear, with each command's arguments. `/help` lists ev
 
 A saved change is kept in `config.toml` for the model, and every chat on it uses it. A change for this chat only is kept with the chat. Either one applies from your next message. When a value is not the default, the row says what the default is. The `num_ctx` row also says how much memory the value costs compared with the default, and whether it fits: `+1.1 GB · fits`, `· tight`, or `· too big`. It is a rough estimate, one rate for every model. The row says nothing when golem does not know your memory or the model's size.
 
-To change one option without the panel, type `/tune <option> <value>`, for example `/tune temperature 0.3`. It is for this chat only. `/tune temperature reset` removes the change, and a value out of range prints the allowed range. After `/tune `, completion lists the options, then the default and range of the one you picked.
+To change one option without the panel, type `/tune <option> <value>`, for example `/tune temperature 0.3`. It is for this chat only. `/tune temperature reset` removes the change, and a value out of range prints the allowed range. After `/tune `, completion lists the options, then the default and range of the one you picked. A model that can think also has a `think` row, `off` and `on`, or `low`, `medium`, and `high` for gpt-oss; `/tune think off` stops its thinking for this chat, and a model that cannot think has no such row.
 
 The status line shows the options that differ from the model's default, such as `temp 0.2 · top_p 0.9`, at most three and then `+N`. The context size is left out, because the context bar already shows it.
 
@@ -125,6 +125,7 @@ The status line shows the options that differ from the model's default, such as 
 | `/todos` | Show or hide the agent's todo list above the composer |
 | `/context` | See how full the model's context is, and what fills it. In the web UI it opens the trace |
 | `/time` | Show or hide the time beside each message |
+| `/thinking` | Show or hide the thinking line above each answer. It only changes what you see; the `think` setting in `/tune` is what the model is asked to do |
 | `/debug` | Open or close the debug panel |
 | `/debug wire`, `/debug model` | Show the protocol messages, or exactly what the model sees |
 | `/debug hold`, `/debug go` | Hold your next message, to look at it in the model tab before it is sent, then send it |

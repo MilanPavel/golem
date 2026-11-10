@@ -684,6 +684,8 @@ class ListedModel(BaseModel):
     LiteLLM's ``supports_*`` fields and context size show.
     ``recommended_for`` lists the categories this catalog model is the pick for on
     this Mac: the largest model of that category it has the memory for.
+    ``think_values`` is what the ``think`` option takes for this model: ``off`` and
+    ``on``, or ``low``, ``medium`` and ``high``. It is empty when the model cannot think.
     ``stale`` means a cached list was shown because the provider did not
     answer in time.
     """
@@ -707,6 +709,7 @@ class ListedModel(BaseModel):
     categories: list[ModelCategory] = Field(default_factory=list[ModelCategory])
     recommended: bool = False
     recommended_for: list[ModelCategory] = Field(default_factory=list[ModelCategory])
+    think_values: list[str] = Field(default_factory=list[str])
 
 
 class ListedProvider(BaseModel):
@@ -787,18 +790,20 @@ class ModelOption(BaseModel):
     """One row of the option table: what an option may be, and what it does.
 
     ``kind`` ``duration`` is a time such as ``5m``, or a number of seconds, and
-    ``-1`` for always. ``default`` is Ollama's own, and ``None`` when it has
-    none, as for the seed.
+    ``-1`` for always. ``choice`` is one of ``values``, which are the values this
+    model takes, and has no range. ``default`` is Ollama's own, and ``None`` when
+    it has none, as for the seed and for ``think``.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     name: str = Field(min_length=1)
     label: str = Field(min_length=1)
-    kind: Literal["float", "int", "duration"]
-    minimum: float
-    maximum: float
-    step: float = Field(gt=0)
+    kind: Literal["float", "int", "duration", "choice"]
+    minimum: float | None = None
+    maximum: float | None = None
+    step: float | None = Field(default=None, gt=0)
+    values: list[str] = Field(default_factory=list[str])
     default: float | str | None = None
     short: str = Field(min_length=1)
     long: str = Field(min_length=1)

@@ -40,7 +40,7 @@ import { FORM_CASES, SETUP_CASES } from "../features/setup/sample.ts";
 import { AddKey, SetupFormView } from "../features/setup/setup-form.tsx";
 import { panelView } from "../features/setup/setup-ui.ts";
 import { PullStatusView, pullSummary } from "../features/models/index.ts";
-import { NO_OLLAMA_LISTING, OLLAMA_DOWN_LISTING, SAMPLE_LISTING, SAMPLE_PULLS } from "../features/models/sample.ts";
+import { NO_OLLAMA_LISTING, OLLAMA_DOWN_LISTING, SAMPLE_LISTING, SAMPLE_PULLS, THINKING_LISTING } from "../features/models/sample.ts";
 import { CloseSessionDialog, RenameField, SidebarView } from "../features/sessions/index.ts";
 import { faviconHref, tabTitle } from "../features/tab-status/index.ts";
 import type { ConnectionSnapshot } from "../store/connection.ts";
@@ -329,6 +329,8 @@ const MODEL_CASES: { label: string; props: Partial<ModelDialogViewProps> }[] = [
   { label: "Tune view, chat running", props: { initial: { tune: "ollama/qwen3:8b" }, tune: { ...sampleTuneBackend(), again: sampleTry("running") } } },
   { label: "Tune view, a try streaming", props: { initial: { tune: "ollama/qwen3:8b" }, tune: { ...sampleTuneBackend(), again: sampleTry("streaming") } } },
   { label: "Tune view, a try done", props: { initial: { tune: "ollama/qwen3:8b" }, tune: { ...sampleTuneBackend(), again: sampleTry("done") } } },
+  { label: "Tune view, a thinking model", props: { listing: THINKING_LISTING, initial: { tune: "ollama/qwen3.5:4b" }, tune: sampleTuneBackend() } },
+  { label: "Tune view, thinking levels", props: { listing: THINKING_LISTING, initial: { tune: "ollama/gpt-oss:20b" }, tune: sampleTuneBackend() } },
   { label: "Tune view, a try failed", props: { initial: { tune: "ollama/qwen3:8b" }, tune: { ...sampleTuneBackend(), again: sampleTry("failed") } } },
   { label: "Loading", props: { listing: null } },
   { label: "Could not list", props: { listing: null, loadError: "daemon went away" } },
@@ -882,10 +884,10 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
       <section className="mt-6" id={anchor("Thinking")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Thinking</h3>
         <div className="flex flex-col gap-6 rounded-lg border border-line bg-bg p-4">
-          {THINKING_CASES.map(({ label, message }) => (
+          {THINKING_CASES.map(({ label, message, shown }) => (
             <div key={label} aria-label={`Thinking, ${label}`} role="group" className="flex flex-col gap-1">
               <p className="font-mono text-xs text-faint">{label}</p>
-              <TranscriptMessages chat={{ messages: [message], error: null, notice: null }} />
+              <TranscriptMessages chat={{ messages: [message], error: null, notice: null }} thinkingShown={shown} />
             </div>
           ))}
         </div>

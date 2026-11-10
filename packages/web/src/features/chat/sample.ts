@@ -54,7 +54,7 @@ const LONG_THINKING = Array.from(
 ).join("\n");
 
 /** Replies with thinking, for the gallery and the tests: streaming, done, none, and a long text. */
-export const THINKING_CASES: { label: string; message: ChatMessage }[] = [
+export const THINKING_CASES: { label: string; message: ChatMessage; shown?: boolean }[] = [
   {
     label: "streaming",
     message: { id: "k1", role: "assistant", text: "", streaming: true, thinking: "The user wants 17 times 23. I can split it as 17 times 20 plus 17 times 3." },
@@ -71,6 +71,11 @@ export const THINKING_CASES: { label: string; message: ChatMessage }[] = [
     },
   },
   { label: "no thinking", message: { id: "k3", role: "assistant", text: "The answer is 391.", streaming: false } },
+  {
+    label: "hidden",
+    shown: false,
+    message: { id: "k5", role: "assistant", text: "17 * 23 = 391.", streaming: false, thinking: "17 times 20 is 340. 17 times 3 is 51.", thinkingMs: 12_400 },
+  },
   {
     label: "long thinking",
     message: { id: "k4", role: "assistant", text: "Done.", streaming: false, thinking: LONG_THINKING, thinkingMs: 95_000 },

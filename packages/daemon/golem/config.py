@@ -205,6 +205,7 @@ class ModelOptions(BaseModel):
     num_predict: int | None = None
     seed: int | None = None
     keep_alive: str | int | None = None
+    think: Literal["off", "on", "low", "medium", "high"] | None = None
 
 
 class OllamaSettings(BaseModel):

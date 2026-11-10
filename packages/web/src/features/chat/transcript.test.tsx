@@ -4,6 +4,7 @@ import axe from "axe-core";
 import { expect, test } from "vitest";
 import { ToolLine, TranscriptColumn, TranscriptMessages } from "./transcript.tsx";
 import { SAMPLE_CHAT } from "./sample.ts";
+import { setThinkingShown } from "./thinking-shown.ts";
 
 const noContrast = { rules: { "color-contrast": { enabled: false } } };
 const chat = (messages: ChatMessage[], extra: { error?: string | null; notice?: string | null } = {}) => ({
@@ -294,6 +295,17 @@ test("an answer after thinking has one line that opens to the thinking text and 
   const line = container.querySelector("[data-thinking]");
   const text = container.querySelector(".prose");
   expect(line && text && line.compareDocumentPosition(text) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
+test("a hidden thinking line leaves no control, and showing it brings it back", () => {
+  const messages = chat([answer({ text: "391", thinking: "hm", thinkingMs: 12_400 })]);
+  const view = render(<TranscriptMessages chat={messages} />);
+  act(() => setThinkingShown(false));
+  expect(view.container.querySelector("[data-thinking]")).toBeNull();
+  expect(screen.getByText("391")).toBeTruthy();
+  act(() => setThinkingShown(true));
+  expect(screen.getByRole("button", { name: /thought for 12s/ })).toBeTruthy();
+  localStorage.clear();
 });
 
 test("a streaming reply says thinking, and an answer without thinking has no line", () => {

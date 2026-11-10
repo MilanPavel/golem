@@ -928,3 +928,37 @@ async def test_note_loaded_leaves_nothing_when_ollama_cannot_say(
     assert await discovery.note_loaded("ollama/qwen3:8b", None) is None
     assert discovery.default_ctx("ollama/qwen3:8b") is None
     await discovery.aclose()
+
+
+async def test_a_listed_model_says_what_think_takes() -> None:
+    names = ["qwen3.5:4b", "gpt-oss:20b", "gpt-oss:7b", "llama3.2:3b"]
+    tags: dict[str, list[dict[str, object]]] = {
+        "models": [
+            {"name": name, "size": 4_000_000_000, "digest": name, "details": {}} for name in names
+        ]
+    }
+
+    def show(request: httpx.Request) -> httpx.Response:
+        name = json.loads(request.content)["model"]
+        caps = ["completion", "tools"] if name == "llama3.2:3b" else ["completion", "thinking"]
+        return httpx.Response(
+            200, json={"model_info": {"llama.context_length": 8192}, "capabilities": caps}
+        )
+
+    network = Network({"127.0.0.1/api/tags": _json(tags), "127.0.0.1/api/show": show})
+    router = ModelRouter(GolemSettings())
+    discovery = _discovery(router, network, Path("/nonexistent"))
+    try:
+        models = _by_ref((await discovery.list()).models)
+        assert await discovery.ollama_think_values("ollama/gpt-oss:7b") == [
+            "low",
+            "medium",
+            "high",
+        ]
+    finally:
+        await discovery.aclose()
+    assert models["ollama/qwen3.5:4b"].think_values == ("off", "on")
+    assert models["ollama/gpt-oss:20b"].think_values == ("low", "medium", "high")
+    assert models["ollama/gpt-oss:7b"].think_values == ("low", "medium", "high")
+    assert models["ollama/llama3.2:3b"].think_values == ()
+    assert router.ollama_options("llama3.2:3b", {"think": "off"}) == {}

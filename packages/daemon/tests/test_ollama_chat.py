@@ -110,3 +110,10 @@ def test_earlier_thinking_goes_back_as_the_library_sends_it() -> None:
     ]
     list(_model(sent).stream(history))
     assert [m.get("thinking") for m in sent[0]["messages"]] == [None, "hmm", None]
+
+
+def test_think_false_is_sent_and_a_level_is_sent_as_it_is() -> None:
+    for reasoning in (False, True, "high"):
+        sent: list[dict[str, Any]] = []
+        list(_model(sent, reasoning=reasoning).stream([HumanMessage("What is 17*23?")]))
+        assert sent[0]["think"] == reasoning

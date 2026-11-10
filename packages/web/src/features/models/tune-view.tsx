@@ -3,6 +3,7 @@ import {
   applyPreset,
   defaultNote,
   formatTuneValue,
+  isListKind,
   NUM_CTX_START,
   keepSession,
   KEEP_ALIVE_STEPS,
@@ -103,6 +104,24 @@ function viewOf(state: TuneState, canSession: boolean): TuneState {
 
 function RowControl({ row, id, onChange }: { row: TuneRow; id: string; onChange: (value: TuneValue) => void }) {
   const { option, value } = row;
+  if (option.kind === "choice") {
+    const current = value === null ? "" : String(value);
+    return (
+      <select
+        id={id}
+        value={current}
+        onChange={(event) => onChange(event.target.value)}
+        className="min-w-0 rounded-md border border-line-strong bg-surface px-2 py-1 text-sm text-ink outline-offset-2 outline-clay focus-visible:outline-2"
+      >
+        {current === "" ? <option value="">unset</option> : null}
+        {(option.values ?? []).map((choice) => (
+          <option key={choice} value={choice}>
+            {choice}
+          </option>
+        ))}
+      </select>
+    );
+  }
   if (option.kind === "duration") {
     const current = value === null ? "" : String(value);
     const known = KEEP_ALIVE_STEPS.map(String);
@@ -132,10 +151,10 @@ function RowControl({ row, id, onChange }: { row: TuneRow; id: string; onChange:
     <input
       id={id}
       type="range"
-      min={option.minimum}
-      max={option.maximum}
-      step={option.step}
-      value={typeof value === "number" ? value : unset ? NUM_CTX_START : option.minimum}
+      min={option.minimum ?? 0}
+      max={option.maximum ?? 0}
+      step={option.step ?? 1}
+      value={typeof value === "number" ? value : unset ? NUM_CTX_START : (option.minimum ?? 0)}
       onChange={(event) => onChange(unset ? NUM_CTX_START : event.target.valueAsNumber)}
       className={cn(
         "min-w-0 flex-1 accent-clay",
@@ -505,7 +524,7 @@ export function TuneView({
                   {option.label}
                 </label>
                 <div className="flex min-w-40 flex-1 items-center">
-                  <RowControl row={row} id={id} onChange={(value) => change(option.name, value, option.kind === "duration" ? 0 : TUNE_DEBOUNCE_MS)} />
+                  <RowControl row={row} id={id} onChange={(value) => change(option.name, value, isListKind(option) ? 0 : TUNE_DEBOUNCE_MS)} />
                 </div>
                 <span className="w-16 text-right font-mono text-sm text-ink">{formatTuneValue(option, row.value)}</span>
                 <span className="flex w-44 flex-col text-xs text-muted">
