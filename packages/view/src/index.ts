@@ -13,6 +13,8 @@ export {
   LIVE_OUTPUT_CHARS,
   providersUp,
   reduceChat,
+  unreadCallNotice,
+  type UnreadCallClient,
   RETRY_QUESTION,
   serverUp,
   SHUTDOWN_NOTICE,

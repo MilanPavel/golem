@@ -166,7 +166,7 @@ class _Progress:
     model call sent and not yet ended, ``sent_at`` when it was sent
     (``time.monotonic()``), and ``first_at`` when its first text came.
     ``index`` counts the calls sent so far. ``ran_window`` is the window the call
-    ran with, read after it.
+    ran with, read after it. ``text_tool_calls`` is what became of a tool call it wrote as text.
     """
 
     run_started: bool = False
@@ -182,6 +182,7 @@ class _Progress:
     sent_at: float = 0.0
     first_at: float | None = None
     ran_window: int | None = None
+    text_tool_calls: Literal["recovered", "unread"] | None = None
 
 
 async def run_turn(
@@ -369,6 +370,7 @@ async def _apply(
         progress.sent_at = time.monotonic()
         progress.first_at = None
         progress.ran_window = None
+        progress.text_tool_calls = None
         model = progress.model
         await emit(
             "model.call.started",
@@ -397,6 +399,7 @@ async def _apply(
         )
     elif isinstance(fact, ModelResponded):
         progress.ran_window = fact.context_window
+        progress.text_tool_calls = fact.text_tool_calls
     elif isinstance(fact, TextDelta) and progress.open is not None:
         if progress.call is not None and progress.first_at is None:
             progress.first_at = time.monotonic()
@@ -503,6 +506,7 @@ async def _end_call(
             latency_ms=_ms(now - progress.sent_at),
             failed=failed,
             context_window=None if failed else progress.ran_window,
+            text_tool_calls=None if failed else progress.text_tool_calls,
         ),
     )
 

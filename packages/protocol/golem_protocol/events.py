@@ -351,6 +351,11 @@ class ModelCallCompletedData(BaseModel):
 
     ``context_window`` is the window the call ran with, read from the model server
     after the call. Exact. None when it could not be read.
+
+    ``text_tool_calls`` is set when the model wrote a tool call as text in its
+    reply. ``recovered`` means golem turned the text into tool calls. ``unread``
+    means the text held a call golem could not read, so the reply stayed text.
+    None when the reply had no such text.
     """
 
     model_config = _CONFIG
@@ -362,6 +367,7 @@ class ModelCallCompletedData(BaseModel):
     latency_ms: int = Field(ge=0)
     failed: bool = False
     context_window: int | None = Field(default=None, gt=0)
+    text_tool_calls: Literal["recovered", "unread"] | None = None
 
 
 class ToolCompletedData(BaseModel):

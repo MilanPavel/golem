@@ -234,6 +234,7 @@
         "latency_ms": 0,
         "message_id": "id-4",
         "stop_reason": null,
+        "text_tool_calls": null,
         "usage": null
       },
       "run_id": "id-2",
@@ -354,6 +355,7 @@
         "latency_ms": 0,
         "message_id": "id-4",
         "stop_reason": null,
+        "text_tool_calls": null,
         "usage": null
       },
       "run_id": "id-2",

@@ -76,6 +76,12 @@ function dash(value: unknown): string {
 const DURATIONS = new Set(["duration_ms", "first_token_ms", "approval_wait_ms"]);
 const TIMES = new Set(["start", "end"]);
 
+/** The metadata line for a tool call the model wrote as text, by what became of it. */
+const TEXT_CALL_LINES: Record<string, string> = {
+  recovered: "tool call recovered from text",
+  unread: "tool call written as text, not read",
+};
+
 /** The fields of the span that have a value, plus the model's provider and why it stopped, as label and value. */
 export function metadataRows(result: TraceSpanResult): [string, string][] {
   const span: TraceSpan = result.span;
@@ -93,6 +99,7 @@ export function metadataRows(result: TraceSpanResult): [string, string][] {
     ["model", span.model],
     ["provider", result.provider],
     ["stop_reason", result.stop_reason],
+    ["text_tool_calls", TEXT_CALL_LINES[result.text_tool_calls ?? ""]],
     ["first_token_ms", span.first_token_ms],
     ["tokens.input", span.tokens?.input],
     ["tokens.output", span.tokens?.output],
@@ -128,7 +135,7 @@ export function jsonOf(result: TraceSpanResult, tab: Tab): unknown {
     case "reply":
       return result.reply ?? null;
     case "metadata":
-      return { span: result.span, provider: result.provider ?? null, stop_reason: result.stop_reason ?? null };
+      return { span: result.span, provider: result.provider ?? null, stop_reason: result.stop_reason ?? null, text_tool_calls: result.text_tool_calls ?? null };
     case "args":
       return result.args ?? null;
     case "result":

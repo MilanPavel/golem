@@ -109,6 +109,13 @@ test("the chat's error and notice close the transcript", () => {
   expect(screen.getByRole("status").textContent).toBe("Saved");
 });
 
+test("a tool call the model wrote as text shows the notice with the Tune tab", () => {
+  render(<TranscriptMessages chat={{ ...chat([answer()]), unreadCall: true }} />);
+  expect(screen.getByRole("status").textContent).toBe(
+    "The model wrote a tool call as text, and golem couldn't read it. Ask again, or try the Tune tab → precise (a lower temperature makes this rarer).",
+  );
+});
+
 function setScroll(el: HTMLElement, values: { scrollHeight: number; clientHeight: number; scrollTop?: number }) {
   Object.defineProperty(el, "scrollHeight", { configurable: true, value: values.scrollHeight });
   Object.defineProperty(el, "clientHeight", { configurable: true, value: values.clientHeight });

@@ -98,6 +98,7 @@ import {
   type SetupWindow,
   providersUp,
   reduceChat,
+  unreadCallNotice,
   RETRY_QUESTION,
   serverUp,
   todoRows,
@@ -602,9 +603,10 @@ export function App({
   if (chat.busy && answering && model.provider === "ollama") {
     warmModels.current.add(chip);
   }
+  const unreadNotice = chat.unreadCall ? unreadCallNotice("tui") : null;
   const banner = asking
     ? RETRY_QUESTION
-    : (keychainNotice(keychainWaiting) ?? chat.error ?? serviceText ?? warming ?? chat.notice ?? setupLine ?? welcomeLine);
+    : (keychainNotice(keychainWaiting) ?? chat.error ?? serviceText ?? warming ?? chat.notice ?? unreadNotice ?? setupLine ?? welcomeLine);
   const hintText = liveHint(hint, Date.now())?.text ?? null;
   const suggestMatches =
     chat.busy ||

@@ -57,6 +57,7 @@ export type SystemPrompt = string | null;
 export type SystemSections = PromptSectionInfo[] | null;
 export type Chars1 = number;
 export type Name2 = string;
+export type TextToolCalls = ('recovered' | 'unread') | null;
 export type Tools =
   | {
       [k: string]: unknown;
@@ -72,7 +73,8 @@ export type Tools =
  * recorded. For a tool span, ``result`` is the text the model got back, and
  * ``artifact_id`` is set when the output was too big for the model: open it
  * with ``artifact.read``. ``context`` is set for every model span, and
- * ``system_sections`` is null when the call recorded none.
+ * ``system_sections`` is null when the call recorded none. ``text_tool_calls``
+ * is what ``model.call.completed`` said about a tool call written as text.
  */
 export interface TraceSpanResult {
   approval?: Approval;
@@ -88,6 +90,7 @@ export interface TraceSpanResult {
   stop_reason?: StopReason;
   system_prompt?: SystemPrompt;
   system_sections?: SystemSections;
+  text_tool_calls?: TextToolCalls;
   tools?: Tools;
 }
 /**

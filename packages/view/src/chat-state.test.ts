@@ -9,6 +9,7 @@ import {
   downloadEnded,
   SHUTDOWN_NOTICE,
   skippedNotice,
+  unreadCallNotice,
   createDeltaBatcher,
   emptyChat,
   failureText,
@@ -816,4 +817,33 @@ test("model.options.changed keeps the session's whole set of overrides", () => {
   const set = reduceChat(emptyChat, event({ top_k: 5, seed: 7 }));
   assert.deepEqual(set.options, { top_k: 5, seed: 7 });
   assert.deepEqual(reduceChat(set, event({ top_k: 5 })).options, { top_k: 5 });
+});
+
+test("a call written as text that golem could not read sets the notice flag until the next run", () => {
+  const base = { session_id: "s", run_id: "r", ts: "t" };
+  const completed = (seq: number, text_tool_calls?: "recovered" | "unread") =>
+    ({
+      ...base,
+      seq,
+      type: "model.call.completed",
+      data: { message_id: "m", latency_ms: 5, failed: false, ...(text_tool_calls ? { text_tool_calls } : {}) },
+    }) satisfies ChatEvent;
+  assert.equal(reduceChat(emptyChat, completed(1)).unreadCall, false);
+  assert.equal(reduceChat(emptyChat, completed(1, "recovered")).unreadCall, false);
+  const unread = reduceChat(emptyChat, completed(1, "unread"));
+  assert.equal(unread.unreadCall, true);
+  assert.equal(reduceChat(unread, completed(2)).unreadCall, true);
+  const next = reduceChat(unread, { ...base, seq: 3, type: "run.started", data: {} });
+  assert.equal(next.unreadCall, false);
+});
+
+test("the notice for a call written as text names the slash command in the TUI and the tab in the web", () => {
+  assert.equal(
+    unreadCallNotice("tui"),
+    "The model wrote a tool call as text, and golem couldn't read it. Ask again, or try /tune → precise (a lower temperature makes this rarer).",
+  );
+  assert.equal(
+    unreadCallNotice("web"),
+    "The model wrote a tool call as text, and golem couldn't read it. Ask again, or try the Tune tab → precise (a lower temperature makes this rarer).",
+  );
 });

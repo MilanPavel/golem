@@ -94,6 +94,8 @@ export type ChatState = {
    * `not_installed`. The banner offers to install Ollama and send it again.
    */
   retry: { text: string; provider: string } | null;
+  /** True after a model call wrote a tool call as text that golem could not read, until the next run starts. */
+  unreadCall: boolean;
   /** The context of the newest model call that reported its input, from the `model.call.*` events. */
   context: LiveContextState;
   /** The session's option overrides, from the newest `model.options.changed`: the whole set. */
@@ -113,6 +115,7 @@ export const emptyChat: ChatState = {
   skippedSkills: [],
   down: null,
   retry: null,
+  unreadCall: false,
   context: emptyLiveContext,
   options: {},
 };
@@ -182,6 +185,15 @@ function withoutSkip(state: ChatState, name: string): ChatState {
   };
 }
 
+/** Where the notice for a tool call written as text points to the tuning options. */
+export type UnreadCallClient = "tui" | "web";
+
+/** What to tell the person when a model wrote a tool call as text and golem could not read it. */
+export function unreadCallNotice(client: UnreadCallClient): string {
+  const tune = client === "tui" ? "/tune" : "the Tune tab";
+  return `The model wrote a tool call as text, and golem couldn't read it. Ask again, or try ${tune} → precise (a lower temperature makes this rarer).`;
+}
+
 export const SHUTDOWN_NOTICE = "the daemon stopped, so the run was cancelled";
 
 /**
@@ -242,7 +254,17 @@ function reduceChatEvent(state: ChatState, event: ChatEvent): ChatState {
     case "message.completed":
       return { ...state, messages: upsertCompleted(state.messages, event, state.runStartedAt) };
     case "run.started":
-      return { ...state, busy: true, error: null, retry: null, runStartedAt: event.ts, runId: event.run_id };
+      return {
+        ...state,
+        busy: true,
+        error: null,
+        retry: null,
+        unreadCall: false,
+        runStartedAt: event.ts,
+        runId: event.run_id,
+      };
+    case "model.call.completed":
+      return event.data.text_tool_calls === "unread" ? { ...state, unreadCall: true } : state;
     case "run.completed":
       return { ...state, busy: false, runStartedAt: null, runId: null, approval: null, down: null, retry: null };
     case "run.failed":

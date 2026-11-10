@@ -512,6 +512,7 @@ def _model_read(
             new_from=new_from,
             reply=next((m for m in messages if m.id == span.id), None),
             stop_reason=None if done is None else done.stop_reason,
+            text_tool_calls=None if done is None else done.text_tool_calls,
             provider=None if here is None else here.provider,
             system_sections=None if here is None else here.system_sections,
         ),

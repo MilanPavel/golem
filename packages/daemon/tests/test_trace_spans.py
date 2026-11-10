@@ -139,6 +139,21 @@ async def test_a_model_span_reads_its_context_reply_prompt_and_tools(
     assert second.provider is None
 
 
+async def test_a_model_span_says_when_a_call_was_written_as_text(
+    database: Database, tmp_path: Path
+) -> None:
+    (tmp_path / "notes.txt").write_text("the answer is 42\n", encoding="utf-8")
+    recovered = "<function=read_file>\n<parameter=path>\nnotes.txt\n</parameter>\n</function>"
+    model = ToolCallingChatModel(replies=[recovered, "<function=format_disk>\n</function>"])
+    chat = _Chat(database, model, default_registry())
+    session_id, _ = await chat.ask("what is in notes?", tmp_path)
+    _, runs = await chat.manager.trace(session_id)
+    first_id, second_id = _models(runs)
+
+    assert (await chat.manager.trace_span(session_id, first_id)).text_tool_calls == "recovered"
+    assert (await chat.manager.trace_span(session_id, second_id)).text_tool_calls == "unread"
+
+
 async def test_a_second_run_starts_after_the_first(database: Database, tmp_path: Path) -> None:
     model = ToolCallingChatModel(replies=["one", "two"])
     chat = _Chat(database, model, default_registry())

@@ -5,7 +5,7 @@ import { expect, test } from "vitest";
 import type { TraceSpanResult } from "../../store/trace.ts";
 import { APPROVAL_DETAIL, CUT_LIKELY_DETAIL, CUT_MIDDLE_DETAIL, CUT_NO_DETAIL, CUT_YES_DETAIL, FULL_DETAIL, MODEL_DETAIL, NO_PROMPT_DETAIL, NUM_CTX_DETAIL, OLD_DETAIL, SECTIONS_DETAIL, TOOL_DETAIL, UNKNOWN_WINDOW_DETAIL } from "./sample.ts";
 import { SpanDetail } from "./span-detail.tsx";
-import { copyText, jsonOf, modelLine, promptSections, sectionLabel, tabsOf, toolGroups } from "./span-text.ts";
+import { copyText, jsonOf, metadataRows, modelLine, promptSections, sectionLabel, tabsOf, toolGroups } from "./span-text.ts";
 
 function show(result: TraceSpanResult) {
   const user = userEvent.setup();
@@ -73,6 +73,16 @@ test("Metadata lists the fields that have a value, with the provider and why the
   expect(text).not.toContain("tokens.cache_read");
   await user.click(screen.getByRole("button", { name: "JSON" }));
   expect(document.body.textContent).toContain("cache_read");
+});
+
+test("Metadata says when a tool call was written as text, and nothing when it was not", async () => {
+  const { user, unmount } = show({ ...MODEL_DETAIL, text_tool_calls: "unread" });
+  await user.click(tab("Metadata"));
+  expect(document.body.textContent).toContain("tool call written as text, not read");
+  unmount();
+  const lines = (result: TraceSpanResult) => metadataRows(result).map(([, value]) => value);
+  expect(lines({ ...MODEL_DETAIL, text_tool_calls: "recovered" })).toContain("tool call recovered from text");
+  expect(lines(MODEL_DETAIL).filter((value) => value.includes("as text"))).toEqual([]);
 });
 
 test("the Reply renders Markdown in the trace style, and the header has the throughput", async () => {

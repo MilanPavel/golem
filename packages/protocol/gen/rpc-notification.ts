@@ -125,6 +125,7 @@ export type FirstTokenMs = number | null;
 export type LatencyMs = number;
 export type MessageId5 = string;
 export type StopReason = string | null;
+export type TextToolCalls = ('recovered' | 'unread') | null;
 export type CacheRead = number | null;
 export type CacheWrite = number | null;
 export type Input = number | null;
@@ -627,6 +628,11 @@ export interface ModelCallCompletedEvent {
  * ``context_window`` is the window the call ran with, read from the model server
  * after the call. Exact. None when it could not be read.
  *
+ * ``text_tool_calls`` is set when the model wrote a tool call as text in its
+ * reply. ``recovered`` means golem turned the text into tool calls. ``unread``
+ * means the text held a call golem could not read, so the reply stayed text.
+ * None when the reply had no such text.
+ *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "ModelCallCompletedData".
  */
@@ -637,6 +643,7 @@ export interface ModelCallCompletedData {
   latency_ms: LatencyMs;
   message_id: MessageId5;
   stop_reason?: StopReason;
+  text_tool_calls?: TextToolCalls;
   usage?: TokenUsage | null;
 }
 /**
