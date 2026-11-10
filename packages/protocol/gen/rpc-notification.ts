@@ -107,6 +107,7 @@ export type SystemSections = PromptSectionInfo[] | null;
 export type Chars = number;
 export type Name1 = string;
 export type ToolsSha = string | null;
+export type WindowEstimated = boolean;
 export type RunId8 = string;
 export type Seq8 = number;
 export type SessionId9 = string;
@@ -547,6 +548,10 @@ export interface ModelCallStartedEvent {
  * ``message_ids`` are the history messages sent, in order, not counting the
  * system prompt.
  *
+ * ``window_estimated`` is true when golem did not send the window and read it
+ * from Ollama (the loaded context or the Modelfile). An older event has no
+ * field and reads as False.
+ *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "ModelCallStartedData".
  */
@@ -562,6 +567,7 @@ export interface ModelCallStartedData {
   system_prompt_sha?: SystemPromptSha;
   system_sections?: SystemSections;
   tools_sha?: ToolsSha;
+  window_estimated?: WindowEstimated;
 }
 /**
  * One non-empty section of the system prompt sent with a model call.

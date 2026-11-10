@@ -222,12 +222,27 @@ async def test_the_window_is_recorded_when_it_is_known(database: Database) -> No
     (first,) = await chat.send(session_id, "hello")
     await chat.manager.cancel_all()
     assert (first.data.context_window, first.data.num_ctx) == (8192, 8192)
+    assert first.data.window_estimated is False
 
     plain = _Chat(database, ToolCallingChatModel(replies=["hi"]), None)
     other = await plain.manager.create(None)
     (second,) = await plain.send(other, "hello")
     await plain.manager.cancel_all()
     assert (second.data.context_window, second.data.num_ctx) == (None, None)
+
+
+async def test_an_estimated_window_is_recorded_as_estimated(database: Database) -> None:
+    chat = _Chat(
+        database,
+        ToolCallingChatModel(replies=["hi"]),
+        None,
+        window_of=lambda _, __: ContextWindow(8192, None, True),
+    )
+    session_id = await chat.manager.create(None)
+    (first,) = await chat.send(session_id, "hello")
+    await chat.manager.cancel_all()
+    assert (first.data.context_window, first.data.num_ctx) == (8192, None)
+    assert first.data.window_estimated is True
 
 
 async def test_a_model_call_tells_note_loaded_the_profile(database: Database) -> None:

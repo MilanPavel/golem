@@ -31,6 +31,7 @@ import { HomeView, NewSessionModelChipView, SessionTitle } from "../features/she
 import { FolderBrowserView } from "../features/shell/folder-browser.tsx";
 import { CommandPaletteView, KeysDialog } from "../features/palette/index.ts";
 import { ModelDialogView, type ModelDialogViewProps } from "../features/models/index.ts";
+import { sampleTuneBackend } from "../features/models/sample-tune.ts";
 import { SetupDialogView } from "../features/setup/index.ts";
 import { SpanDetail, TraceSummary, TraceTree } from "../features/trace/index.ts";
 import { APPROVAL_DETAIL, APPROVAL_TRACE, FULL_DETAIL, MODEL_DETAIL, NO_PROMPT_DETAIL, NUM_CTX_DETAIL, OLD_DETAIL, SECTIONS_DETAIL, TOOL_DETAIL, UNKNOWN_WINDOW_DETAIL, FAILED_TRACE, GROWING_TRACE, LONG_TRACE, OLD_TRACE, SHORT_TRACE } from "../features/trace/sample.ts";
@@ -321,6 +322,8 @@ const MODEL_CASES: { label: string; props: Partial<ModelDialogViewProps> }[] = [
   { label: "A refused action", props: { initial: { activeId: "ollama/gemma4:e4b", failure: "model not found" } } },
   { label: "Ollama down", props: { listing: OLLAMA_DOWN_LISTING } },
   { label: "No Ollama", props: { listing: NO_OLLAMA_LISTING } },
+  { label: "Tune tab", props: { initial: { tab: "tune" } } },
+  { label: "Tune tab, hosted model", props: { session: { profile: "sonnet", name: null }, initial: { tab: "tune", activeId: "anthropic/claude-sonnet-4" } } },
   { label: "Loading", props: { listing: null } },
   { label: "Could not list", props: { listing: null, loadError: "daemon went away" } },
 ];
@@ -397,6 +400,7 @@ function ModelDialogDemo({ theme }: { theme: string }) {
             loadError={null}
             onRetry={() => {}}
             pulls={SAMPLE_PULLS}
+            tune={sampleTuneBackend()}
             actions={{ use: none, setDefault: none, pull: none, stop: none, remove: none, refresh: none }}
             {...props}
           />

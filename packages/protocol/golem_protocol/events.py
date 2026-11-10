@@ -297,6 +297,10 @@ class ModelCallStartedData(BaseModel):
     call, which the daemon keeps by hash. Each is None when it was not sent.
     ``message_ids`` are the history messages sent, in order, not counting the
     system prompt.
+
+    ``window_estimated`` is true when golem did not send the window and read it
+    from Ollama (the loaded context or the Modelfile). An older event has no
+    field and reads as False.
     """
 
     model_config = _CONFIG
@@ -311,6 +315,7 @@ class ModelCallStartedData(BaseModel):
     message_ids: list[str] = Field(default_factory=list[str])
     context_window: int | None = Field(default=None, ge=1)
     num_ctx: int | None = Field(default=None, ge=1)
+    window_estimated: bool = False
     system_sections: list[PromptSectionInfo] | None = None
 
 

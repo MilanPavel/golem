@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
 import { afterEach, beforeEach, expect, test } from "vitest";
@@ -8,6 +8,7 @@ import { createPage } from "../../store/page.ts";
 import { PageProvider } from "../../store/page-context.tsx";
 import { rpcError, ev, fakeClient, fakeFrame, summary } from "../../store/test-support.ts";
 import { drawerOpenStore } from "../drawer/drawer-open.ts";
+import { sampleOptionsResult } from "./sample-tune.ts";
 import { NO_OLLAMA_LISTING, OLLAMA_DOWN_LISTING, SAMPLE_LISTING } from "./sample.ts";
 
 const popup = { rules: { "color-contrast": { enabled: false }, region: { enabled: false } } };
@@ -644,4 +645,120 @@ for (const theme of ["slip", "kiln"]) {
     await within(dialog()).findByRole("alert", {}, { timeout: 4000 });
     expect((await axe.run(document.body, popup)).violations).toEqual([]);
   }, 10_000);
+}
+
+async function openTune(listing: ModelListResult = SAMPLE_LISTING) {
+  const opened = await openDialog(listing);
+  opened.fake.raw.getModelOptions.mockImplementation(async (model) => sampleOptionsResult(model));
+  await opened.user.click(within(dialog()).getByRole("tab", { name: "Tune" }));
+  return opened;
+}
+
+const slider = (name: string) => within(dialog()).getByRole("slider", { name }) as HTMLInputElement;
+const later = (ms: number) => act(() => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+
+test("the dialog has a Models tab and a Tune tab, and the arrow keys and a click switch them", async () => {
+  const { user } = await openDialog();
+  const models = within(dialog()).getByRole("tab", { name: "Models" });
+  const tune = within(dialog()).getByRole("tab", { name: "Tune" });
+  expect(within(dialog()).getByRole("tablist")).toBeTruthy();
+  expect(models.getAttribute("aria-selected")).toBe("true");
+  expect(options().length).toBeGreaterThan(0);
+  models.focus();
+  await user.keyboard("{ArrowRight}");
+  expect(tune.getAttribute("aria-selected")).toBe("true");
+  await user.keyboard("{ArrowLeft}");
+  expect(models.getAttribute("aria-selected")).toBe("true");
+  await user.click(tune);
+  expect(tune.getAttribute("aria-selected")).toBe("true");
+  await user.click(models);
+  expect(models.getAttribute("aria-selected")).toBe("true");
+  expect(search()).toBeTruthy();
+});
+
+test("the Tune tab has one control per option, with the long text of the focused row", async () => {
+  const { fake, user } = await openTune();
+  await within(dialog()).findByRole("slider", { name: "Temperature" });
+  expect(fake.raw.getModelOptions).toHaveBeenCalledWith("qwen3:8b", "a");
+  expect(within(dialog()).getAllByRole("slider")).toHaveLength(8);
+  expect(within(dialog()).getByRole("combobox", { name: "Keep loaded" })).toBeTruthy();
+  const row = slider("Temperature").closest("li") as HTMLElement;
+  expect(row.title).toBe("How adventurous each next word is.");
+  expect(slider("Temperature").value).toBe("0.2");
+  expect(row.textContent).toContain("model default 0.6");
+  expect((within(dialog()).getByRole("combobox", { name: "Keep loaded" }) as HTMLSelectElement).value).toBe("5m");
+  expect(within(dialog()).getAllByRole("option", { hidden: false }).map((option) => option.textContent)).toEqual(
+    expect.arrayContaining(["0", "30s", "5m", "30m", "always"]),
+  );
+  await user.click(slider("Top K"));
+  expect(dialog().textContent).toContain("A small number keeps the answer safe and plain.");
+});
+
+test("moving a slider sends model.options.set once after the debounce", async () => {
+  const { fake } = await openTune();
+  await within(dialog()).findByRole("slider", { name: "Temperature" });
+  fireEvent.change(slider("Temperature"), { target: { value: "0.5" } });
+  fireEvent.change(slider("Temperature"), { target: { value: "0.7" } });
+  expect(slider("Temperature").value).toBe("0.7");
+  expect(fake.raw.setModelOptions).not.toHaveBeenCalled();
+  await waitFor(() => expect(fake.raw.setModelOptions).toHaveBeenCalledTimes(1), { timeout: 2000 });
+  await later(400);
+  expect(fake.raw.setModelOptions).toHaveBeenCalledTimes(1);
+  expect(fake.raw.setModelOptions).toHaveBeenCalledWith("qwen3:8b", { temperature: 0.7 });
+  expect(fake.raw.setSessionOptions).not.toHaveBeenCalled();
+});
+
+test("with This session only, a change sends session.set_options", async () => {
+  const { fake, user } = await openTune();
+  await within(dialog()).findByRole("slider", { name: "Temperature" });
+  await user.click(within(dialog()).getByRole("button", { name: "This session only" }));
+  fireEvent.change(slider("Top K"), { target: { value: "20" } });
+  await waitFor(() => expect(fake.raw.setSessionOptions).toHaveBeenCalledTimes(1), { timeout: 2000 });
+  expect(fake.raw.setSessionOptions).toHaveBeenCalledWith("a", { top_k: 20 });
+  expect(fake.raw.setModelOptions).not.toHaveBeenCalled();
+});
+
+test("reset sends null for the row", async () => {
+  const { fake, user } = await openTune();
+  await within(dialog()).findByRole("slider", { name: "Temperature" });
+  expect((within(dialog()).getByRole("button", { name: "Reset Top K" }) as HTMLButtonElement).disabled).toBe(true);
+  await user.click(within(dialog()).getByRole("button", { name: "Reset Temperature" }));
+  await waitFor(() => expect(fake.raw.setModelOptions).toHaveBeenCalledWith("qwen3:8b", { temperature: null }), { timeout: 2000 });
+  expect(slider("Temperature").value).toBe("0.6");
+});
+
+test("the keep_alive select sends its value", async () => {
+  const { fake, user } = await openTune();
+  const select = await within(dialog()).findByRole("combobox", { name: "Keep loaded" });
+  await user.selectOptions(select, "always");
+  await waitFor(() => expect(fake.raw.setModelOptions).toHaveBeenCalledWith("qwen3:8b", { keep_alive: -1 }), { timeout: 2000 });
+});
+
+test("a change saved by another client shows at once, and so does a session override", async () => {
+  const { fake } = await openTune();
+  await within(dialog()).findByRole("slider", { name: "Temperature" });
+  act(() => fake.emitOptionsSaved({ model: "qwen3:8b", saved: { temperature: 0.9 } }));
+  expect(slider("Temperature").value).toBe("0.9");
+  act(() => fake.emitOptionsSaved({ model: "other", saved: { temperature: 1.5 } }));
+  expect(slider("Temperature").value).toBe("0.9");
+  act(() => fake.emitEvent(ev("a", "model.options.changed", { options: { top_k: 12 } })));
+  await waitFor(() => expect(slider("Top K").value).toBe("12"));
+});
+
+test("a hosted model shows the sentence instead of the options", async () => {
+  const { user, fake } = await openDialog();
+  act(() => fake.emitEvent(ev("a", "model.selected", { model_profile: "sonnet", model_provider: "anthropic", model_name: "claude-sonnet-4" })));
+  await pick(user, "sonnet");
+  await user.click(within(dialog()).getByRole("tab", { name: "Tune" }));
+  expect(within(dialog()).getByText("Tuning is for local Ollama models.")).toBeTruthy();
+  expect(within(dialog()).queryByRole("slider")).toBeNull();
+});
+
+for (const theme of ["slip", "kiln"]) {
+  test(`no accessibility violations on the Tune tab in ${theme}`, async () => {
+    document.documentElement.dataset.theme = theme;
+    await openTune();
+    await within(dialog()).findByRole("slider", { name: "Temperature" });
+    expect((await axe.run(document.body, popup)).violations).toEqual([]);
+  });
 }

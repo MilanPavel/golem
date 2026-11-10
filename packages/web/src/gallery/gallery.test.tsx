@@ -33,6 +33,19 @@ test("the gallery's model dialog shows a download with its speed and time left, 
   expect(results.violations).toEqual([]);
 });
 
+for (const theme of ["slip", "kiln"]) {
+  test(`the gallery's Tune tab in ${theme} lists every option and passes axe`, async () => {
+    const user = userEvent.setup();
+    render(<Gallery />);
+    await user.click(screen.getByRole("button", { name: `Tune tab, ${theme}` }));
+    const dialog = await screen.findByRole("dialog", { name: "Choose a model" });
+    expect(await within(dialog).findAllByRole("slider")).toHaveLength(8);
+    expect(within(dialog).getByRole("combobox", { name: "Keep loaded" })).toBeTruthy();
+    const results = await axe.run(document.body, { rules: { "color-contrast": { enabled: false }, region: { enabled: false } } });
+    expect(results.violations).toEqual([]);
+  });
+}
+
 test("the gallery's Commands dialog lists the groups and passes axe", async () => {
   const user = userEvent.setup();
   render(<Gallery />);

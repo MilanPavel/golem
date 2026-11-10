@@ -1,4 +1,4 @@
-import { OLLAMA_FAILED, RpcError, type ApprovalChoice, type ConfigGetResult, type ConfigRawGetResult, type ConfigRawResult, type FsListDirsResult, type McpAddParams, type McpCallResult, type McpImportApplyParams, type McpImportApplyResult, type McpImportScanResult, type McpCatalogResult, type McpListResult, type McpLogsResult, type McpServerConfig, type McpServerDetail, type McpServerLog, type McpTestProgress, type McpTestResult, type GolemClient, type RuntimeName, type SetupStatusResult, type SkillListResult, type TraceGetResult, type TraceSpanResult, type ArtifactReadResult } from "@golem/client";
+import { OLLAMA_FAILED, RpcError, type ApprovalChoice, type ConfigGetResult, type ConfigRawGetResult, type ConfigRawResult, type FsListDirsResult, type McpAddParams, type McpCallResult, type McpImportApplyParams, type McpImportApplyResult, type McpImportScanResult, type McpCatalogResult, type McpListResult, type McpLogsResult, type McpServerConfig, type McpServerDetail, type McpServerLog, type McpTestProgress, type McpTestResult, type GolemClient, type RuntimeName, type SetupStatusResult, type SkillListResult, type TraceGetResult, type TraceSpanResult, type ArtifactReadResult, type ModelOptionsGetResult, type ModelOptionsSetResult, type SessionSetOptionsResult } from "@golem/client";
 import { changeToolFilter, installEventOf, type InstallEvent } from "@golem/view";
 import type { QueryClient } from "@tanstack/react-query";
 import { createDrafts, type Drafts } from "./drafts.ts";
@@ -72,6 +72,10 @@ export type PageClient = Pick<
   | "revokeAllowance"
   | "setSessionModel"
   | "setDefaultModel"
+  | "getModelOptions"
+  | "setModelOptions"
+  | "setSessionOptions"
+  | "onOptionsSaved"
   | "pullModel"
   | "cancelPull"
   | "deleteModel"
@@ -103,6 +107,14 @@ export type PageActions = {
   /** Switches the session's model. The chip changes from the daemon's `model.selected` event. */
   useModel(sessionId: string, name: string): Promise<void>;
   setDefault(name: string): Promise<void>;
+  /** A local model's tunable options with its defaults, what is saved for it, and the session's overrides. */
+  modelOptions(model: string, sessionId: string | null): Promise<ModelOptionsGetResult>;
+  /** Saves options for the model in config.toml. A `null` value removes one. */
+  saveModelOptions(model: string, options: Record<string, number | string | null>): Promise<ModelOptionsSetResult>;
+  /** Overrides options for one session from its next run. A `null` value removes one. */
+  setSessionOptions(sessionId: string, options: Record<string, number | string | null>): Promise<SessionSetOptionsResult>;
+  /** What is saved for a model changed, from any client, until the returned function is called. */
+  watchSavedOptions(listener: (model: string, saved: Readonly<Record<string, number | string>>) => void): () => void;
   /**
    * Starts a download. With `after`, the page switches that session to the model when the
    * download ends well, even if the dialog that asked is closed by then.
@@ -477,6 +489,18 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
         } finally {
           await queryClient.invalidateQueries({ queryKey: CONFIG_KEY });
         }
+      },
+      async modelOptions(model, sessionId) {
+        return client.getModelOptions(model, sessionId ?? undefined);
+      },
+      async saveModelOptions(model, options) {
+        return client.setModelOptions(model, options);
+      },
+      async setSessionOptions(sessionId, options) {
+        return client.setSessionOptions(sessionId, options);
+      },
+      watchSavedOptions(listener) {
+        return client.onOptionsSaved(({ model, saved }) => listener(model, saved));
       },
       async useModel(sessionId, name) {
         await client.setSessionModel(sessionId, name);
