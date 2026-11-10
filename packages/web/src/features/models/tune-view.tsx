@@ -7,7 +7,11 @@ import {
   keepSession,
   KEEP_ALIVE_STEPS,
   memoryNote,
+  NO_QUESTION_NOTICE,
   PRESETS,
+  RUNNING_NOTICE,
+  tryAnswer,
+  tryHeading,
   toggleTarget,
   tuneRows,
   tuneState,
@@ -19,12 +23,29 @@ import {
   type TuneState,
   type TuneTarget,
   type TuneValue,
+  type TryPlan,
+  type TryRun,
 } from "@golem/view";
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { actionErrorText } from "../../store/errors.ts";
+import { sessionPath } from "../../store/router.ts";
 import { Button } from "../../ui/button.tsx";
 import { ChevronLeftIcon } from "../../ui/icons.tsx";
 import { cn } from "../../ui/cn.ts";
+
+/** What Try again needs of the session whose model is tuned. Absent for any other model. */
+export type TryBackend = {
+  /** Why a try cannot start now: the chat has no question yet, or its run goes on. */
+  blocked: "no-question" | "running" | null;
+  /** What a try would ask, from the chat as it is now and the panel's values. */
+  plan(tune: TuneState): TryPlan;
+  /** Forks the chat, names and tunes the fork, and sends the question to it. The answer comes back in `run`. */
+  start(plan: Extract<TryPlan, { kind: "try" }>, heading: string): Promise<void>;
+  /** The try in progress or done, with the fork's chat. */
+  run: TryRun | null;
+  /** Opens the fork as a session. */
+  open(sessionId: string): void;
+};
 
 /** What the Tune view needs of the page, with the session already bound. */
 export type TuneBackend = {
@@ -38,6 +59,8 @@ export type TuneBackend = {
   watchSaved(listener: (model: string, saved: Readonly<Record<string, TuneValue>>) => void): () => void;
   /** The session's overrides, live from `model.options.changed`. */
   sessionOptions: Readonly<Record<string, TuneValue>>;
+  /** Try again, for the session's own model. */
+  again?: TryBackend | undefined;
 };
 
 /** How long a drag waits before it is sent. */
@@ -122,6 +145,36 @@ function RowControl({ row, id, onChange }: { row: TuneRow; id: string; onChange:
   );
 }
 
+/** The try's heading, the first line of the original answer, then the new answer as it streams. */
+function TryBlock({ run, onOpen }: { run: TryRun; onOpen: () => void }) {
+  const answer = tryAnswer(run);
+  return (
+    <section aria-label="Try" aria-live="polite" aria-busy={answer === null || answer.streaming} className="flex flex-col gap-1 rounded-md border border-line bg-surface px-3 py-2 text-sm">
+      <p className="font-mono text-xs text-ink">{run.heading}</p>
+      {run.original === null ? null : <p className="truncate text-xs text-muted">was: {run.original}</p>}
+      {answer === null || (answer.text === "" && answer.error === null) ? (
+        <p className="text-muted">…</p>
+      ) : (
+        <p className="whitespace-pre-wrap break-words text-ink">{answer.text}</p>
+      )}
+      {answer?.error == null ? null : <p className="text-xs text-deny">{answer.error}</p>}
+      <div>
+        <a
+          href={sessionPath(run.sessionId)}
+          onClick={(event) => {
+            if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+            event.preventDefault();
+            onOpen();
+          }}
+          className="text-sm text-clay underline outline-offset-2 outline-clay focus-visible:outline-2"
+        >
+          Open the try session
+        </a>
+      </div>
+    </section>
+  );
+}
+
 /**
  * The options of one local model, one row each, with the same explanations as `/tune` in the
  * terminal. A change shows at once and is sent after the debounce: into `config.toml` for the model,
@@ -146,6 +199,7 @@ export function TuneView({
   const [error, setError] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
   const [shown, setShown] = useState<string | null>(null);
+  const [starting, setStarting] = useState(false);
   const timers = useRef(new Map<string, Pending>());
   const inflight = useRef(0);
   const queue = useRef<Promise<void>>(Promise.resolve());
@@ -310,6 +364,26 @@ export function TuneView({
     });
   }
 
+  /** Try again: ask the last question once more in a fork, with the values in use. */
+  async function tryAgain(): Promise<void> {
+    const again = backendRef.current.again;
+    if (state === null || again === undefined || starting) return;
+    const plan = again.plan(state);
+    if (plan.kind === "refused") {
+      setError(plan.notice);
+      return;
+    }
+    setStarting(true);
+    setError(null);
+    try {
+      await again.start(plan, tryHeading(state));
+    } catch (failure) {
+      setError(actionErrorText(failure, "Could not try again."));
+    } finally {
+      setStarting(false);
+    }
+  }
+
   // Leaving sends what is still waiting, so a change is never lost.
   const sendRef = useRef(send);
   useEffect(() => {
@@ -333,6 +407,7 @@ export function TuneView({
   const layer = view === null ? {} : view[target];
   const names = Object.keys(layer);
 
+  const again = canSession ? backend.again : undefined;
   let body;
   if (state === null || view === null) {
     body =
@@ -455,6 +530,22 @@ export function TuneView({
             <span className="font-medium text-ink">{explained.option.label}.</span> {explained.option.long}
             {explainedNote?.warning === undefined ? null : <> {explainedNote.warning}</>}
           </p>
+        )}
+        {again === undefined ? null : (
+          <div className="flex flex-col gap-2 border-t border-line pt-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                size="sm"
+                disabled={again.blocked !== null || starting}
+                title={again.blocked === "no-question" ? NO_QUESTION_NOTICE : again.blocked === "running" ? RUNNING_NOTICE : undefined}
+                onClick={() => void tryAgain()}
+              >
+                Try again with these settings
+              </Button>
+              {again.blocked === null ? null : <span className="text-xs text-muted">{again.blocked === "running" ? RUNNING_NOTICE : NO_QUESTION_NOTICE}</span>}
+            </div>
+            {again.run === null ? null : <TryBlock run={again.run} onOpen={() => again.open(again.run?.sessionId ?? "")} />}
+          </div>
         )}
       </>
     );

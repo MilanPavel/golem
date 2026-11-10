@@ -916,3 +916,117 @@ for (const theme of ["slip", "kiln"]) {
     });
   }
 }
+
+const tryButton = () => within(dialog()).queryByRole("button", { name: "Try again with these settings" }) as HTMLButtonElement | null;
+
+function talk(fake: Awaited<ReturnType<typeof openTune>>["fake"], turns: [string, string][]) {
+  act(() => {
+    turns.forEach(([question, answer], index) => {
+      fake.emitEvent(ev("a", "message.completed", { message_id: `q${index}`, role: "user", text: question }));
+      fake.emitEvent(ev("a", "message.completed", { message_id: `a${index}`, role: "assistant", text: answer }));
+    });
+  });
+}
+
+test("Try again forks before the question, renames, sets the options, and sends on the fork only", async () => {
+  const { fake, user } = await openTune();
+  talk(fake, [["hello", "hi there"], ["what is a mutex?", "A lock.\nIt keeps two threads apart."]]);
+  await within(dialog()).findByRole("slider", { name: "Temperature" });
+  await waitFor(() => expect(tryButton()?.disabled).toBe(false));
+  await user.click(tryButton() as HTMLElement);
+  await waitFor(() => expect(fake.raw.sendMessage).toHaveBeenCalledWith("s_fork", "what is a mutex?"));
+  expect(fake.raw.forkSession).toHaveBeenCalledWith("a", "a0");
+  expect(fake.raw.renameSession).toHaveBeenCalledWith("s_fork", "try · UTF-8 split");
+  expect(fake.raw.setSessionOptions).toHaveBeenCalledWith("s_fork", { temperature: 0.2 });
+  expect(fake.raw.sendMessage.mock.calls.every(([id]) => id !== "a")).toBe(true);
+  expect(fake.raw.createSession).not.toHaveBeenCalled();
+  expect(dialog().textContent).toContain("try · temperature 0.2");
+  expect(dialog().textContent).toContain("was: A lock.");
+});
+
+test("the answer streams under the rows and the link opens the fork", async () => {
+  const { fake, user } = await openTune();
+  talk(fake, [["hello", "hi there"], ["what is a mutex?", "A lock."]]);
+  await within(dialog()).findByRole("slider", { name: "Temperature" });
+  await waitFor(() => expect(tryButton()?.disabled).toBe(false));
+  await user.click(tryButton() as HTMLElement);
+  await waitFor(() => expect(fake.raw.sendMessage).toHaveBeenCalledWith("s_fork", "what is a mutex?"));
+  // The fork's history replays first. It is not the new answer.
+  act(() => {
+    fake.emitEvent(ev("s_fork", "message.completed", { message_id: "q0", role: "user", text: "hello" }));
+    fake.emitEvent(ev("s_fork", "message.completed", { message_id: "a0", role: "assistant", text: "hi there" }));
+  });
+  expect(within(dialog()).queryByText("hi there")).toBeNull();
+  act(() => {
+    fake.emitEvent(ev("s_fork", "run.started", {}));
+    fake.emitEvent(ev("s_fork", "message.completed", { message_id: "q1", role: "user", text: "what is a mutex?" }));
+    fake.emitEvent(ev("s_fork", "message.completed", { message_id: "a1", role: "assistant", text: "Two threads, one lock." }));
+    fake.emitEvent(ev("s_fork", "run.completed", {}));
+  });
+  expect(await within(dialog()).findByText("Two threads, one lock.")).toBeTruthy();
+  // The chat itself is unchanged.
+  await user.click(within(dialog()).getByRole("link", { name: "Open the try session" }));
+  expect(location.pathname).toBe("/s/s_fork");
+  expect(screen.queryByRole("dialog", { name: "Choose a model" })).toBeNull();
+});
+
+test("a question that is the first message starts a new session in the same folder", async () => {
+  const { fake, user } = await openTune();
+  talk(fake, [["what is a mutex?", "A lock."]]);
+  await within(dialog()).findByRole("slider", { name: "Temperature" });
+  await waitFor(() => expect(tryButton()?.disabled).toBe(false));
+  await user.click(tryButton() as HTMLElement);
+  await waitFor(() => expect(fake.raw.sendMessage).toHaveBeenCalledWith("s_new", "what is a mutex?"));
+  expect(fake.raw.createSession).toHaveBeenCalledWith({ cwd: CWD, modelProfile: "local" });
+  expect(fake.raw.forkSession).not.toHaveBeenCalled();
+});
+
+test("Try again is disabled with no question and while the chat runs", async () => {
+  const { fake } = await openTune();
+  await within(dialog()).findByRole("slider", { name: "Temperature" });
+  expect(tryButton()?.disabled).toBe(true);
+  expect(dialog().textContent).toContain("Ask something first, then try again.");
+  talk(fake, [["hello", "hi there"]]);
+  await waitFor(() => expect(tryButton()?.disabled).toBe(false));
+  act(() => fake.emitEvent(ev("a", "run.started", {})));
+  await waitFor(() => expect(tryButton()?.disabled).toBe(true));
+  expect(dialog().textContent).toContain("Wait for the answer, then try again.");
+  expect(fake.raw.forkSession).not.toHaveBeenCalled();
+});
+
+test("Try again is absent when the tuned model is not the session's", async () => {
+  const { fake } = await openTune(SAMPLE_LISTING, "Gemma 4 E4B");
+  talk(fake, [["hello", "hi there"]]);
+  await within(dialog()).findByRole("slider", { name: "Temperature" });
+  expect(tryButton()).toBeNull();
+});
+
+test("Try again works with a num_ctx that has no default", async () => {
+  const { fake, user } = await openTune();
+  fake.raw.getModelOptions.mockImplementation(async (model) => {
+    const result = sampleOptionsResult(model);
+    const defaults = Object.fromEntries(Object.entries(result.defaults).filter(([name]) => name !== "num_ctx"));
+    return { ...result, defaults, options: result.options.map((item) => (item.name === "num_ctx" ? { ...item, default: null } : item)) };
+  });
+  talk(fake, [["hello", "hi there"], ["what is a mutex?", "A lock."]]);
+  await user.click(within(dialog()).getByRole("button", { name: "Back to the models" }));
+  await user.click(within(dialog()).getByRole("button", { name: "Tune" }));
+  await within(dialog()).findByRole("slider", { name: "Temperature" });
+  await waitFor(() => expect(tryButton()?.disabled).toBe(false));
+  await user.click(tryButton() as HTMLElement);
+  await waitFor(() => expect(fake.raw.sendMessage).toHaveBeenCalledWith("s_fork", "what is a mutex?"));
+  expect(fake.raw.setSessionOptions).toHaveBeenCalledWith("s_fork", { temperature: 0.2 });
+});
+
+for (const theme of ["slip", "kiln"]) {
+  test(`no accessibility violations on the Tune view with a try in ${theme}`, async () => {
+    document.documentElement.dataset.theme = theme;
+    const { fake, user } = await openTune();
+    talk(fake, [["hello", "hi there"], ["what is a mutex?", "A lock."]]);
+    await within(dialog()).findByRole("slider", { name: "Temperature" });
+    await waitFor(() => expect(tryButton()?.disabled).toBe(false));
+    await user.click(tryButton() as HTMLElement);
+    await within(dialog()).findByRole("link", { name: "Open the try session" });
+    expect((await axe.run(document.body, popup)).violations).toEqual([]);
+  });
+}

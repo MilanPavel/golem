@@ -1,5 +1,6 @@
 import type { ModelMemory, ModelOption, ModelOptionsGetResult } from "../../store/model-options.ts";
-import type { TuneBackend } from "./tune-view.tsx";
+import { emptyChat, type TryRun } from "@golem/view";
+import type { TryBackend, TuneBackend } from "./tune-view.tsx";
 
 function option(name: string, label: string, kind: ModelOption["kind"], minimum: number, maximum: number, step: number, fallback: number | string | null, short: string, long: string): ModelOption {
   return { name, label, kind, minimum, maximum, step, default: fallback, short, long };
@@ -42,5 +43,44 @@ export function sampleTuneBackend(sessionId: string | null = "s_gallery"): TuneB
     setSession: () => Promise.resolve({ session_id: sessionId ?? "", options: {} }),
     watchSaved: () => () => undefined,
     sessionOptions: {},
+  };
+}
+
+/** A try for the gallery: nothing started, or one that streams, or one that is done. */
+export function sampleTry(state: "idle" | "no-question" | "running" | "streaming" | "done" | "failed"): TryBackend {
+  const base: TryRun = {
+    sessionId: "s_try",
+    heading: "try · temperature 0.2 · top_p 0.9",
+    original: "A lock that keeps two threads out of the same code.",
+    question: "What is a mutex?",
+    started: true,
+    chat: emptyChat,
+  };
+  const reply = (text: string, streaming: boolean, error: string | null = null): TryRun => ({
+    ...base,
+    chat: {
+      ...emptyChat,
+      busy: streaming,
+      error,
+      messages: [
+        { id: "q", role: "user", text: base.question, streaming: false },
+        { id: "a", role: "assistant", text, streaming },
+      ],
+    },
+  });
+  const run =
+    state === "streaming"
+      ? reply("A mutex lets one thread hold a resource", true)
+      : state === "done"
+        ? reply("A mutex lets one thread hold a resource at a time. The others wait their turn.", false)
+        : state === "failed"
+          ? reply("", false, "The model did not answer.")
+          : null;
+  return {
+    blocked: state === "no-question" ? "no-question" : state === "running" ? "running" : null,
+    plan: () => ({ kind: "refused", reason: "no-question", notice: "Ask something first, then try again." }),
+    start: () => Promise.resolve(),
+    run,
+    open: () => undefined,
   };
 }
