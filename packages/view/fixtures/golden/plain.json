@@ -20,7 +20,9 @@
         "message_id": "id-3",
         "role": "user",
         "skill": null,
-        "text": "say hi"
+        "text": "say hi",
+        "thinking": null,
+        "thinking_ms": null
       },
       "run_id": "id-2",
       "seq": 2,
@@ -218,7 +220,9 @@
         "message_id": "id-4",
         "role": "assistant",
         "skill": null,
-        "text": "Hello there."
+        "text": "Hello there.",
+        "thinking": null,
+        "thinking_ms": null
       },
       "run_id": "id-2",
       "seq": 18,
@@ -272,7 +276,9 @@
         "message_id": "id-3",
         "role": "user",
         "skill": null,
-        "text": "say hi"
+        "text": "say hi",
+        "thinking": null,
+        "thinking_ms": null
       },
       "run_id": "id-2",
       "seq": 2,
@@ -338,7 +344,9 @@
         "message_id": "id-4",
         "role": "assistant",
         "skill": null,
-        "text": "Hello there."
+        "text": "Hello there.",
+        "thinking": null,
+        "thinking_ms": null
       },
       "run_id": "id-2",
       "seq": 18,

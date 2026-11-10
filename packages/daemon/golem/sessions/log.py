@@ -24,6 +24,9 @@ from golem.store.events import EventLog
 from golem.store.records import SessionActivity, SessionRecords
 from golem_protocol.events import CHAT_EVENT, ChatEvent, EventType
 
+_DELTAS = ("message.delta", "message.thinking.delta", "tool.output")
+"""Events that do not change a session's summary."""
+
 
 class SessionLog:
     """Owns ``seq`` for every session. One emit or attach per session at a time."""
@@ -108,7 +111,7 @@ class SessionLog:
             await self._events.append(event)
             self._seq[session_id] = event.seq
             self._bus.publish(event)
-            if event.type not in ("message.delta", "tool.output") and self._bus.watched:
+            if event.type not in _DELTAS and self._bus.watched:
                 activity = await self._records.activity(session_id)
                 if activity is not None:
                     self._bus.publish_summary(summarize(activity))

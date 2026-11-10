@@ -306,3 +306,51 @@ test("a skill run without arguments shows only its name", () => {
   const lines = layoutMessages([sent], 60).map((line) => textOf(line.spans).trimEnd());
   assert.deepEqual(lines, ["you", `/setup  ${SKILL_MARK}`]);
 });
+
+const thoughtful: ChatMessage = {
+  ...message("a", "assistant", "391"),
+  thinking: "Let me multiply.\n17 times 23 is 391.",
+  thinkingMs: 12_400,
+};
+
+test("a reply with thinking shows one dim line above the answer", () => {
+  const lines = layoutMessages([thoughtful], 60);
+  assert.deepEqual(
+    lines.map((line) => textOf(line.spans).trimEnd()),
+    ["golem", "thought for 12s", "391"],
+  );
+  assert.equal(lines[1]?.spans.every((span) => span.dim === true), true);
+});
+
+test("Ctrl-O shows the thinking text, dim, under the line", () => {
+  const lines = layoutMessages([thoughtful], 60, { times: false, now: 0, toolOutput: true });
+  assert.deepEqual(
+    lines.map((line) => textOf(line.spans).trimEnd()),
+    ["golem", "thought for 12s", "  │ Let me multiply.", "  │ 17 times 23 is 391.", "391"],
+  );
+  assert.equal(lines.slice(1, 4).every((line) => line.spans.every((span) => span.dim === true)), true);
+});
+
+test("a streaming reply that is still thinking says so, and a reply without thinking has no line", () => {
+  const thinking: ChatMessage = { ...message("a", "assistant", "", true), thinking: "hm" };
+  assert.deepEqual(
+    layoutMessages([thinking], 60).map((line) => textOf(line.spans)),
+    ["golem", "thinking…", ""],
+  );
+  assert.deepEqual(
+    layoutMessages([message("a", "assistant", "plain")], 60, { times: false, now: 0, toolOutput: true }).map((line) =>
+      textOf(line.spans),
+    ),
+    ["golem", "plain"],
+  );
+});
+
+test("every thinking row fits the columns", () => {
+  const long: ChatMessage = { ...thoughtful, thinking: "word ".repeat(60) + "x".repeat(70) };
+  for (const columns of [10, 20, 33]) {
+    const lines = layoutMessages([long], columns, { times: false, now: 0, toolOutput: true });
+    for (const line of lines) {
+      assert.ok(textOf(line.spans).length <= columns, `${textOf(line.spans)} is wider than ${columns}`);
+    }
+  }
+});

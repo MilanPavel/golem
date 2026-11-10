@@ -20,7 +20,9 @@
         "message_id": "id-3",
         "role": "user",
         "skill": null,
-        "text": "read notes"
+        "text": "read notes",
+        "thinking": null,
+        "thinking_ms": null
       },
       "run_id": "id-2",
       "seq": 2,
@@ -86,7 +88,9 @@
         "message_id": "id-4",
         "role": "assistant",
         "skill": null,
-        "text": ""
+        "text": "",
+        "thinking": null,
+        "thinking_ms": null
       },
       "run_id": "id-2",
       "seq": 6,
@@ -207,7 +211,9 @@
         "message_id": "id-5",
         "role": "assistant",
         "skill": null,
-        "text": "It is 42."
+        "text": "It is 42.",
+        "thinking": null,
+        "thinking_ms": null
       },
       "run_id": "id-2",
       "seq": 13,
@@ -261,7 +267,9 @@
         "message_id": "id-3",
         "role": "user",
         "skill": null,
-        "text": "read notes"
+        "text": "read notes",
+        "thinking": null,
+        "thinking_ms": null
       },
       "run_id": "id-2",
       "seq": 2,
@@ -327,7 +335,9 @@
         "message_id": "id-4",
         "role": "assistant",
         "skill": null,
-        "text": ""
+        "text": "",
+        "thinking": null,
+        "thinking_ms": null
       },
       "run_id": "id-2",
       "seq": 6,
@@ -448,7 +458,9 @@
         "message_id": "id-5",
         "role": "assistant",
         "skill": null,
-        "text": "It is 42."
+        "text": "It is 42.",
+        "thinking": null,
+        "thinking_ms": null
       },
       "run_id": "id-2",
       "seq": 13,

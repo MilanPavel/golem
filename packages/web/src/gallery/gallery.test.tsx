@@ -149,3 +149,12 @@ test("the gallery shows one theme when asked, and then the anchors have no prefi
   expect(container.querySelector("#trace")).toBeTruthy();
   expect(container.querySelector("#kiln-trace")).toBeNull();
 });
+
+test("the gallery has a Thinking section with streaming, done, none, and long cases", () => {
+  render(<Gallery />);
+  for (const label of ["streaming", "done", "no thinking", "long thinking"]) {
+    expect(screen.getAllByRole("group", { name: `Thinking, ${label}` }).length).toBeGreaterThan(0);
+  }
+  expect(screen.getAllByRole("button", { name: /thought for 12s/ }).length).toBeGreaterThan(0);
+  expect(screen.getAllByRole("button", { name: /thinking…/ }).length).toBeGreaterThan(0);
+});

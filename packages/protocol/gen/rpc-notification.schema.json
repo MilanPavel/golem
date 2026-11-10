@@ -260,7 +260,7 @@
     },
     "MessageCompletedData": {
       "additionalProperties": false,
-      "description": "Full text of a user or assistant message.\n\n``interrupted`` is true when the run stopped before the model finished.\n``text`` is then what had streamed so far. ``skill`` is set on a user\nmessage that invoked a skill: ``text`` is then the skill body the model\ngot, with the arguments filled in, and a client can show the skill's name\nand arguments instead.",
+      "description": "Full text of a user or assistant message.\n\n``interrupted`` is true when the run stopped before the model finished.\n``text`` is then what had streamed so far. ``skill`` is set on a user\nmessage that invoked a skill: ``text`` is then the skill body the model\ngot, with the arguments filled in, and a client can show the skill's name\nand arguments instead.\n\n``thinking`` is the whole thinking text of an assistant message, None when\nthe model did not think. ``thinking_ms`` is the time from the first\nthinking fragment to the first answer fragment, or to the end when no\nanswer text came.",
       "properties": {
         "interrupted": {
           "default": false,
@@ -294,6 +294,31 @@
         "text": {
           "title": "Text",
           "type": "string"
+        },
+        "thinking": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Thinking"
+        },
+        "thinking_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Thinking Ms"
         }
       },
       "required": [
@@ -477,6 +502,71 @@
         "data"
       ],
       "title": "MessageStartedEvent",
+      "type": "object"
+    },
+    "MessageThinkingDeltaData": {
+      "additionalProperties": false,
+      "description": "One incremental fragment of the thinking a model did before or while it answered.",
+      "properties": {
+        "message_id": {
+          "minLength": 1,
+          "title": "Message Id",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "message_id",
+        "text"
+      ],
+      "title": "MessageThinkingDeltaData",
+      "type": "object"
+    },
+    "MessageThinkingDeltaEvent": {
+      "additionalProperties": false,
+      "description": "Thinking text to append to the open assistant message. It is not part of the answer.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/MessageThinkingDeltaData"
+        },
+        "run_id": {
+          "minLength": 1,
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "message.thinking.delta",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "run_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "MessageThinkingDeltaEvent",
       "type": "object"
     },
     "ModelCallCompletedData": {
@@ -2440,6 +2530,7 @@
           "message.completed": "#/$defs/MessageCompletedEvent",
           "message.delta": "#/$defs/MessageDeltaEvent",
           "message.started": "#/$defs/MessageStartedEvent",
+          "message.thinking.delta": "#/$defs/MessageThinkingDeltaEvent",
           "model.call.completed": "#/$defs/ModelCallCompletedEvent",
           "model.call.started": "#/$defs/ModelCallStartedEvent",
           "model.options.changed": "#/$defs/ModelOptionsChangedEvent",
@@ -2484,6 +2575,9 @@
         },
         {
           "$ref": "#/$defs/MessageDeltaEvent"
+        },
+        {
+          "$ref": "#/$defs/MessageThinkingDeltaEvent"
         },
         {
           "$ref": "#/$defs/MessageCompletedEvent"
