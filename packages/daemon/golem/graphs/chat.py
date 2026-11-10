@@ -388,7 +388,7 @@ def open_chat(
         system = SystemMessage(content=text) if text else None
         # The system message is sent, never returned, so it stays out of the checkpoint.
         sent = messages if system is None else [system, *messages]
-        window = window_of(profile) if window_of is not None else ContextWindow()
+        window = window_of(profile, overrides) if window_of is not None else ContextWindow()
         async with _held(router, local, profile):
             request: dict[str, object] = {STREAM_KEY: "model.request", "message_id": message_id}
             request["message_ids"] = [m.id for m in messages if m.id]

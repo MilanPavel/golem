@@ -294,7 +294,7 @@ class ModelRouter:
             }
             if resolved.ctx is not None:
                 options["num_ctx"] = resolved.ctx
-            options.update(self._ollama_options(resolved.model_id, overrides))
+            options.update(self.ollama_options(resolved.model_id, overrides))
             return OllamaChat.model_validate(options)
         from langchain_openai import ChatOpenAI
 
@@ -310,10 +310,13 @@ class ModelRouter:
             },
         )
 
-    def _ollama_options(
+    def ollama_options(
         self, model_id: str, overrides: Mapping[str, float | str] | None
     ) -> dict[str, object]:
-        """The saved options of ``model_id`` with ``overrides`` on top, as ChatOllama fields."""
+        """The saved options of ``model_id`` with ``overrides`` on top, as ChatOllama fields.
+
+        It is what ``chat_model`` sends, so it also says which ``num_ctx`` a call runs with.
+        """
         catalog = self._current()
         saved = catalog.saved.get(model_id) if catalog is not None else None
         values: dict[str, object] = saved.model_dump(exclude_none=True) if saved is not None else {}

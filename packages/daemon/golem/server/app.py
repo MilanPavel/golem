@@ -212,7 +212,9 @@ class DaemonApp:
                         local,
                         SystemPrompt(sections=(pinned_section(self.state.skills),)),
                         BlobStore(database),
-                        window_of=lambda profile: resolve_window(router, profile, models),
+                        window_of=lambda profile, overrides: resolve_window(
+                            router, profile, models, overrides=overrides
+                        ),
                         note_loaded=note_loaded,
                     ),
                     self._titles,
