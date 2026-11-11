@@ -1899,6 +1899,11 @@ export function App({
       void savePref(prefsPath(), "thinking", next).catch(() => undefined);
       return;
     }
+    if (outcome.kind === "detail") {
+      setDraft(draftAt(""));
+      showHint("/detail is a setting of the web page");
+      return;
+    }
     if (outcome.kind === "local") {
       showDebug(outcome.debug);
       setDraft(draftAt(outcome.restore ?? ""));

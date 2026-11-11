@@ -12,11 +12,11 @@ function barClass(span: TraceNode): string {
  * One span on its run's time line. The position is a share of the run, which only a style can
  * say; every colour is a token.
  */
-export function WaterfallBar({ span, bar, ticks }: { span: TraceNode; bar: Bar; ticks?: Tick[] }) {
+export function WaterfallBar({ span, bar, ticks, compact = false }: { span: TraceNode; bar: Bar; ticks?: Tick[]; compact?: boolean }) {
   const thin = span.kind === "run";
   const scale = thin && ticks !== undefined && ticks.length > 0 ? ticks : null;
   return (
-    <span aria-hidden="true" className="relative block h-4 min-w-0 flex-1">
+    <span aria-hidden="true" className={`relative block h-4 min-w-0 ${compact ? "w-12 shrink-0 @max-sm:hidden" : "flex-1"}`}>
       {bar.wait === null ? null : (
         <span
           data-part="wait"
@@ -39,13 +39,13 @@ export function WaterfallBar({ span, bar, ticks }: { span: TraceNode; bar: Bar; 
       {scale?.map((tick) => (
         <span key={tick.left} data-part="tick">
           <span className="absolute bottom-0 block h-1.5 w-px bg-line-strong" style={{ left: `${tick.left}%` }} />
-          <span
+          {compact ? null : <span
             data-part="tick-label"
             className="absolute top-0 -translate-x-1/2 font-mono text-xs leading-none text-faint max-wide:hidden"
             style={{ left: `${tick.left}%` }}
           >
             {tick.label}
-          </span>
+          </span>}
         </span>
       ))}
     </span>

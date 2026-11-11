@@ -1,13 +1,15 @@
 import { forkPoint, type TodoItem } from "@golem/view";
-import { SessionViewBar } from "../trace/index.ts";
+import { INSPECTOR_ID, InspectorPanel } from "../trace/index.ts";
 import { useEffect, useMemo, useRef, type ReactNode, type Ref, type RefObject } from "react";
 import { Badge, badgeVariants } from "../../ui/badge.tsx";
 import { Button } from "../../ui/button.tsx";
-import { FolderIcon, PanelIcon } from "../../ui/icons.tsx";
+import { FolderIcon, InspectIcon, PanelIcon } from "../../ui/icons.tsx";
 import { PixelGolem } from "../../ui/pixel-golem.tsx";
-import { useNavigate, useRememberOpenedFolder, useSession, useSessionList } from "../../store/page-context.tsx";
+import { useNavigate, useRememberOpenedFolder, useRoute, useSession, useSessionList } from "../../store/page-context.tsx";
+import { inspectPath, sessionPath } from "../../store/router.ts";
+import { hasMod, modShortcut } from "../../ui/platform.ts";
 import type { SessionModel, SessionView } from "../../store/session-store.ts";
-import { Transcript } from "../chat/index.ts";
+import { DetailSwitch, Transcript } from "../chat/index.ts";
 import { SessionDock } from "../composer/index.ts";
 import { Drawer, DRAWER_ID, useDrawerOpen } from "../drawer/index.ts";
 import { closeModelDialog, ModelDialog, openModelDialog, useModelDialogOpen } from "../models/index.ts";
@@ -168,6 +170,25 @@ function DrawerToggle({
   );
 }
 
+/** The top bar's switch for the trace inspector beside the chat. */
+function InspectToggle({ open, onToggle, ref }: { open: boolean; onToggle: () => void; ref?: Ref<HTMLButtonElement> }) {
+  return (
+    <Button
+      kind="ghost"
+      size="sm"
+      aria-label="Inspect"
+      aria-pressed={open}
+      aria-controls={open ? INSPECTOR_ID : undefined}
+      title={`Inspect (${modShortcut(".")})`}
+      onClick={onToggle}
+      ref={ref}
+      className="h-8 min-w-8 rounded-sm px-2"
+    >
+      <InspectIcon />
+    </Button>
+  );
+}
+
 /**
  * The chrome both views of a session share: the top bar with the title, the model chip, the
  * folder, and the drawer toggle, the model dialog, and the drawer. The view goes in the column
@@ -180,6 +201,10 @@ export function SessionFrame({ id, children }: { id: string; children: ReactNode
   const todos = useSession(id, selectTodos);
   const [drawerOpen, setDrawerOpen] = useDrawerOpen();
   const toggle = useRef<HTMLButtonElement>(null);
+  const inspectToggle = useRef<HTMLButtonElement>(null);
+  const route = useRoute();
+  const navigate = useNavigate();
+  const inspect = route.name === "session" ? route.inspect : null;
   const chip = useRef<HTMLButtonElement>(null);
   const atMessage = useSession(id, selectForkPoint);
   const session = useSessionActions();
@@ -204,6 +229,20 @@ export function SessionFrame({ id, children }: { id: string; children: ReactNode
   }, [cwd, remember]);
   useRememberSettingsContext(id, cwd);
 
+  // ⌘. (Ctrl+. elsewhere) toggles the inspector from anywhere on the chat.
+  const inspecting = inspect !== null;
+  useEffect(() => {
+    if (route.name !== "session") return;
+    function onKeyDown(event: KeyboardEvent): void {
+      if (event.defaultPrevented || event.isComposing || event.repeat) return;
+      if (event.key !== "." || !hasMod(event) || event.shiftKey || event.altKey) return;
+      event.preventDefault();
+      navigate(inspecting ? sessionPath(id) : inspectPath(id), { replace: true });
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [route.name, inspecting, id, navigate]);
+
   if (header.status === "gone") {
     return <GoneScreen />;
   }
@@ -211,6 +250,7 @@ export function SessionFrame({ id, children }: { id: string; children: ReactNode
     <div className="flex min-h-0 min-w-0 flex-1">
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <TopBar title={<SessionTitle title={title || null} canFork={atMessage !== null} actions={titleActions} />}>
+          <DetailSwitch />
           {model ? <ModelChip sessionId={id} model={model} buttonRef={chip} /> : null}
           {cwd === undefined ? null : (
             <Badge title={cwd ?? undefined}>
@@ -218,10 +258,28 @@ export function SessionFrame({ id, children }: { id: string; children: ReactNode
               {folderName(cwd)}
             </Badge>
           )}
+          {route.name === "session" ? (
+            <InspectToggle
+              ref={inspectToggle}
+              open={inspecting}
+              onToggle={() => navigate(inspecting ? sessionPath(id) : inspectPath(id), { replace: true })}
+            />
+          ) : null}
           <DrawerToggle ref={toggle} open={drawerOpen} todos={todos} onToggle={() => setDrawerOpen(!drawerOpen)} />
         </TopBar>
         {children}
       </div>
+      {inspect === null ? null : (
+        <InspectorPanel
+          id={id}
+          span={inspect.span}
+          onClose={() => {
+            // The panel goes away with its close button, so focus goes back to the toggle.
+            navigate(sessionPath(id), { replace: true });
+            inspectToggle.current?.focus();
+          }}
+        />
+      )}
       <SessionModelDialog sessionId={id} model={model} chip={chip} />
       {drawerOpen ? (
         <Drawer
@@ -237,11 +295,10 @@ export function SessionFrame({ id, children }: { id: string; children: ReactNode
   );
 }
 
-/** The chat view's part of the column: the tabs, the transcript, and the dock. */
+/** The chat view's part of the column: the transcript and the dock. */
 export function ChatView({ id }: { id: string }) {
   return (
     <>
-      <SessionViewBar id={id} view="chat" />
       <TranscriptSlot id={id} />
       <div className="mx-auto w-full max-w-column px-5 pb-4">
         <DockSlot id={id} />

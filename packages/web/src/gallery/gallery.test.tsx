@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, test } from "vitest";
 import { Gallery } from "./gallery.tsx";
@@ -68,3 +68,22 @@ test("the gallery has a Thinking section with streaming, done, none, and long ca
     expect(group.textContent).toContain("17 * 23 = 391.");
   }
 });
+
+for (const theme of ["slip", "kiln"] as const) {
+  test(`the gallery's turn with four tool steps folds into one activity line in ${theme}, and passes axe`, async () => {
+    showTheme(theme);
+    render(<Gallery />);
+    const normal = screen.getByRole("group", { name: "A turn with four tool steps, normal" });
+    expect(normal.querySelectorAll("svg[data-state]")).toHaveLength(1);
+    expect(within(normal).getAllByText("8.8s · 4 steps")).toHaveLength(1);
+    const line = within(normal).getByRole("button", { name: /github calls, 1 failed/ });
+    expect(line.getAttribute("aria-expanded")).toBe("false");
+    expect(within(normal).queryByRole("list", { name: "Tool calls" })).toBeNull();
+    const verbose = screen.getByRole("group", { name: "A turn with four tool steps, verbose" });
+    expect(within(verbose).getByRole("list", { name: "Tool calls" })).toBeTruthy();
+    expect(within(verbose).getAllByText("github · get_me").length).toBeGreaterThan(0);
+    const quiet = screen.getByRole("group", { name: "A turn with four tool steps, quiet" });
+    expect(within(quiet).getByRole("button", { name: "4 steps" })).toBeTruthy();
+    for (const group of [normal, verbose, quiet]) await expectAxeClean(group, DIALOG_RULES);
+  });
+}

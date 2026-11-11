@@ -1,7 +1,17 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { formatDuration, formatElapsed } from "./duration.ts";
+import { formatDuration, formatElapsed, formatTurnTime } from "./duration.ts";
+
+test("a turn's time is seconds under a minute, then minutes and seconds", () => {
+  assert.equal(formatTurnTime(42_100), "42.1s");
+  assert.equal(formatTurnTime(4), "0.0s");
+  assert.equal(formatTurnTime(59_949), "59.9s");
+  assert.equal(formatTurnTime(59_960), "1m 00s");
+  assert.equal(formatTurnTime(63_000), "1m 03s");
+  assert.equal(formatTurnTime(-1), "");
+  assert.equal(formatTurnTime(Number.NaN), "");
+});
 
 test("a duration reads as minutes and seconds", () => {
   const rows: [number, string][] = [
