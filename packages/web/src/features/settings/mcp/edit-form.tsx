@@ -9,7 +9,7 @@ import { fieldClass, Input } from "../../../ui/input.tsx";
 import { Textarea } from "../../../ui/textarea.tsx";
 
 /** Edits one server's `[mcp.<name>]` in the file that names it. The name stays: renaming moves secrets. */
-export function EditServer({ server, sessionId, onBack, onSaved }: { server: McpServer; sessionId: string | null; onBack: () => void; onSaved: () => void }) {
+export function EditServer({ server, sessionId, onBack, onCancel, onSaved }: { server: McpServer; sessionId: string | null; onBack?: () => void; onCancel?: () => void; onSaved: () => void }) {
   const actions = usePageActions();
   const detail = useQuery({
     queryKey: ["mcp.get", server.name, sessionId],
@@ -20,12 +20,16 @@ export function EditServer({ server, sessionId, onBack, onSaved }: { server: Mcp
   });
   return (
     <div className="flex flex-col gap-3">
-      <div>
-        <Button size="sm" onClick={onBack}>
-          Back
-        </Button>
-      </div>
-      <h3 className="font-mono text-base font-semibold wrap-anywhere">Edit {server.name}</h3>
+      {onBack === undefined ? null : (
+        <>
+          <div>
+            <Button size="sm" onClick={onBack}>
+              Back
+            </Button>
+          </div>
+          <h3 className="font-mono text-base font-semibold wrap-anywhere">Edit {server.name}</h3>
+        </>
+      )}
       {detail.isError ? (
         <div className="flex flex-col items-start gap-2">
           <p role="alert" className="text-sm text-deny">
@@ -38,7 +42,7 @@ export function EditServer({ server, sessionId, onBack, onSaved }: { server: Mcp
       ) : detail.data === undefined ? (
         <p className="font-mono text-sm text-muted">loading…</p>
       ) : (
-        <Fields name={server.name} original={detail.data.config} path={detail.data.path} sessionId={sessionId} onBack={onBack} onSaved={onSaved} />
+        <Fields name={server.name} original={detail.data.config} path={detail.data.path} sessionId={sessionId} onCancel={onCancel ?? onBack} onSaved={onSaved} />
       )}
     </div>
   );
@@ -46,7 +50,7 @@ export function EditServer({ server, sessionId, onBack, onSaved }: { server: Mcp
 
 type Original = Parameters<typeof editForm>[0];
 
-function Fields({ name, original, path, sessionId, onBack, onSaved }: { name: string; original: Original; path: string; sessionId: string | null; onBack: () => void; onSaved: () => void }) {
+function Fields({ name, original, path, sessionId, onCancel, onSaved }: { name: string; original: Original; path: string; sessionId: string | null; onCancel?: () => void; onSaved: () => void }) {
   const actions = usePageActions();
   const [form, setForm] = useState<EditForm>(() => editForm(original));
   const [error, setError] = useState<string | null>(null);
@@ -142,7 +146,7 @@ function Fields({ name, original, path, sessionId, onBack, onSaved }: { name: st
         <Button type="submit" kind="primary" disabled={saving}>
           Save
         </Button>
-        <Button onClick={onBack}>Cancel</Button>
+        {onCancel === undefined ? null : <Button onClick={onCancel}>Cancel</Button>}
       </div>
     </form>
   );

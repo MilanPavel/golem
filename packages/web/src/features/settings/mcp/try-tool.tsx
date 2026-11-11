@@ -14,7 +14,7 @@ type Tool = { name: string; description: string; input_schema?: Record<string, u
  * Runs one tool by hand. The form comes from the tool's input schema, and a schema it cannot draw,
  * or a person who prefers it, gets JSON. The call asks no approval and is part of no chat.
  */
-export function TryTool({ server, tool, sessionId, onClose }: { server: McpServer; tool: Tool; sessionId: string | null; onClose: () => void }) {
+export function TryTool({ server, tool, sessionId, onClose }: { server: McpServer; tool: Tool; sessionId: string | null; onClose?: () => void }) {
   const actions = usePageActions();
   const own = ownToolName(server.name, tool.name);
   const fields = useMemo(() => tryFields(tool.input_schema), [tool.input_schema]);
@@ -61,8 +61,14 @@ export function TryTool({ server, tool, sessionId, onClose }: { server: McpServe
 
   return (
     <>
-      <DialogTitle className="font-mono">Try {own}</DialogTitle>
-      <DialogDescription>Runs now, without asking. It is not part of any chat.</DialogDescription>
+      {onClose === undefined ? (
+        <p className="text-sm text-muted">Runs now, without asking. It is not part of any chat.</p>
+      ) : (
+        <>
+          <DialogTitle className="font-mono">Try {own}</DialogTitle>
+          <DialogDescription>Runs now, without asking. It is not part of any chat.</DialogDescription>
+        </>
+      )}
       <form
         className="mt-3 flex flex-col gap-3"
         onSubmit={(event) => {
@@ -102,7 +108,7 @@ export function TryTool({ server, tool, sessionId, onClose }: { server: McpServe
             </Button>
           )}
           <div className="flex gap-2">
-            <Button onClick={onClose}>Close</Button>
+            {onClose === undefined ? null : <Button onClick={onClose}>Close</Button>}
             <Button type="submit" kind="primary" disabled={running}>
               {running ? "Running…" : "Run"}
             </Button>
