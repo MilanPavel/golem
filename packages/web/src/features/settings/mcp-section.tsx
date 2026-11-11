@@ -40,6 +40,15 @@ function same(server: McpServer, at: Selected): boolean {
   return server.name === at.name && (server.project ?? null) === at.project;
 }
 
+function groupFile(group: { project: string | null; servers: McpServer[] }): string {
+  return group.servers[0]?.config ?? (group.project === null ? DEFAULT_FILE : group.project);
+}
+
+/** The home directory as `~`; the web page does not know it, so it is read off the path. */
+function tilde(path: string): string {
+  return path.replace(/^\/(?:Users|home)\/[^/]+/, "~");
+}
+
 function keyOf(server: McpServer): string {
   return `${server.project ?? ""}\u0000${server.name}`;
 }
@@ -212,11 +221,13 @@ function ServerList({
 }) {
   const addButton = (
     <div className="flex flex-wrap items-center gap-2">
-      <Button kind="primary" onClick={onAdd}>
+      <Button kind="primary" size={wide ? "sm" : undefined} onClick={onAdd}>
         Add a server
       </Button>
-      <Button onClick={onImport}>Import from other apps</Button>
-      <p role="status" aria-live="polite" className="font-mono text-xs text-muted">
+      <Button size={wide ? "sm" : undefined} onClick={onImport}>
+        Import from other apps
+      </Button>
+      <p role="status" aria-live="polite" className="font-mono text-xs text-muted empty:hidden">
         {added === null ? null : `added ${added}`}
       </p>
     </div>
@@ -245,12 +256,19 @@ function ServerList({
       {addButton}
       {groups.map((group) => (
         <section key={group.project ?? ""} aria-label={group.project === null ? "Yours" : "This project"} className="flex flex-col gap-2">
-          <h3 className="text-sm font-semibold">
-            {group.project === null ? "Yours" : "This project"}{" "}
-            <span className="font-mono text-xs font-normal text-muted wrap-anywhere">
-              ({shortPath(group.servers[0]?.config ?? (group.project === null ? DEFAULT_FILE : group.project), "")})
-            </span>
-          </h3>
+          {wide ? (
+            <h3 className="min-w-0 px-2 font-mono text-xs font-normal text-faint">
+              {group.project === null ? "Yours" : "This project"}
+              <span className="block truncate" title={groupFile(group)}>
+                {tilde(groupFile(group))}
+              </span>
+            </h3>
+          ) : (
+            <h3 className="text-sm font-semibold">
+              {group.project === null ? "Yours" : "This project"}{" "}
+              <span className="font-mono text-xs font-normal text-muted wrap-anywhere">({shortPath(groupFile(group), "")})</span>
+            </h3>
+          )}
           <ul className={cn("flex flex-col", wide ? "gap-0.5" : "gap-2")}>
             {group.servers.map((server) => {
               const mark = mcpStatusMark(server);
@@ -269,14 +287,14 @@ function ServerList({
                       server.state === "disabled" && "opacity-70",
                     )}
                   >
-                    <span className="flex items-baseline gap-x-2">
+                    <span className="flex min-w-0 items-baseline gap-x-2">
                       <span aria-hidden="true" className={cn("font-mono text-sm", TONE[mark.tone])}>
                         {mark.text}
                       </span>
                       <span className="sr-only">{mcpStatusWord(server)}, </span>
-                      <span className="min-w-0 font-mono text-sm wrap-anywhere">{server.name}</span>
+                      <span className={cn("min-w-0 font-mono text-sm", wide ? "truncate" : "wrap-anywhere")}>{server.name}</span>
                       {wide ? (
-                        <span aria-hidden="true" className="ml-auto font-mono text-xs text-faint">
+                        <span aria-hidden="true" className="ml-auto shrink-0 font-mono text-xs whitespace-nowrap text-faint">
                           {mcpStatusWord(server)}
                         </span>
                       ) : null}
