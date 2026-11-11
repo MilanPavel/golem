@@ -1,5 +1,6 @@
 export type { ApprovalChoice } from "@golem/client";
 export { formatDuration, formatElapsed } from "./duration.ts";
+export { groupTurns, turnFooter, type Turn } from "./turns.ts";
 export { editedArgs, parseArgs, type ParsedArgs } from "./approval-args.ts";
 export {
   appendDelta,

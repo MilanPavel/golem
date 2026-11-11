@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, test } from "vitest";
 import { Gallery } from "./gallery.tsx";
@@ -68,3 +68,15 @@ test("the gallery has a Thinking section with streaming, done, none, and long ca
     expect(group.textContent).toContain("17 * 23 = 391.");
   }
 });
+
+for (const theme of ["slip", "kiln"] as const) {
+  test(`the gallery's turn with three tool steps has one golem and one footer in ${theme}, and passes axe`, async () => {
+    showTheme(theme);
+    render(<Gallery />);
+    const group = screen.getByRole("group", { name: "A turn with three tool steps" });
+    expect(group.querySelectorAll("svg[data-state]")).toHaveLength(1);
+    expect(within(group).getAllByRole("article", { name: "golem" })).toHaveLength(1);
+    expect(within(group).getAllByText("0m 08.8s · 3 tools")).toHaveLength(1);
+    await expectAxeClean(group, DIALOG_RULES);
+  });
+}
