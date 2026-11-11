@@ -14,7 +14,7 @@ async function openSession(page: Page, url: string, sessionId: string): Promise<
   await expect(page.getByText("connected", { exact: true })).toBeVisible();
 }
 
-test("a run that used a tool shows as a run, a model call, and a tool call on the trace page", async ({ page, rig }) => {
+test("a run that used a tool shows as a run, a model call, and a tool call in the inspector, and on the trace page", async ({ page, rig }) => {
   const stack = await startStack(rig);
   const dir = realpathSync(rig.home());
   writeFileSync(path.join(dir, "notes.txt"), "the answer is 42\n");
@@ -27,10 +27,27 @@ test("a run that used a tool shows as a run, a model call, and a tool call on th
   await composer(page).press("Enter");
   await expect(answers(page).last()).toContainText("It says 42.");
 
-  // The chat's switch opens the trace.
-  const view = page.getByRole("navigation", { name: "View" });
-  await expect(view.getByRole("link", { name: "Chat" })).toHaveAttribute("aria-current", "page");
-  await view.getByRole("link", { name: "Trace" }).click();
+  // The Inspect button opens the trace beside the chat, and the address says so.
+  const inspect = page.getByRole("button", { name: "Inspect" });
+  await expect(inspect).toHaveAttribute("aria-pressed", "false");
+  await inspect.click();
+  await expect(page).toHaveURL(new RegExp(`/s/${sessionId}\\?inspect$`));
+  await expect(inspect).toHaveAttribute("aria-pressed", "true");
+  const inspector = page.getByRole("complementary", { name: "Trace inspector" });
+  await expect(inspector.getByRole("treeitem", { name: /read_file/ })).toBeVisible();
+  await expect(page.getByRole("separator", { name: "Resize the inspector" })).toBeVisible();
+  await expect(composer(page)).toBeVisible();
+  await inspector.getByRole("treeitem", { name: /read_file/ }).click();
+  await expect(page).toHaveURL(/\?inspect=/);
+  await page.reload();
+  await expect(inspector.getByRole("treeitem", { name: /read_file/ })).toHaveAttribute("aria-selected", "true");
+  await inspector.getByRole("button", { name: "Close inspector" }).click();
+  await expect(page).toHaveURL(new RegExp(`/s/${sessionId}$`));
+  await expect(inspector).toHaveCount(0);
+
+  // The full page opens from the panel.
+  await inspect.click();
+  await inspector.getByRole("link", { name: "Open full ↗" }).click();
   await expect(page).toHaveURL(new RegExp(`/s/${sessionId}/trace$`));
 
   const tree = page.getByRole("tree", { name: "Trace" });
@@ -77,7 +94,7 @@ test("a run that used a tool shows as a run, a model call, and a tool call on th
   expect(await axeViolations(page)).toEqual([]);
   await setTheme(page, "slip");
 
-  await page.getByRole("navigation", { name: "View" }).getByRole("link", { name: "Chat" }).click();
+  await page.getByRole("link", { name: "Back to chat" }).click();
   await expect(page).toHaveURL(new RegExp(`/s/${sessionId}$`));
 });
 

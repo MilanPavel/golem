@@ -54,6 +54,10 @@
   /* The list pane of the MCP servers, beside the details: 300 px. */
   --spacing-mcp-list: 18.75rem;
 
+  /* The trace inspector beside the chat: 26 rem to start with, never below 20 rem. */
+  --spacing-inspector: 26rem;
+  --spacing-inspector-min: 20rem;
+
   /* From here the details drawer sits beside the column (1100 px). */
   --breakpoint-wide: 68.75rem;
   /* Below this the trace page is a single column: 760 px. */

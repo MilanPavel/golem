@@ -11,8 +11,9 @@ export function keySections(): KeySection[] {
       title: "Page",
       rows: [
         { keys: [modShortcut("K")], label: "the palette" },
+        { keys: [modShortcut(".")], label: "the trace inspector, in a session" },
         { keys: ["?"], label: "this list" },
-        { keys: ["Esc"], label: "close a dialog" },
+        { keys: ["Esc"], label: "close a dialog or the inspector" },
       ],
     },
     {
