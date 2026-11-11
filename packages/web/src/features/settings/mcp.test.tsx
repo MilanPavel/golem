@@ -1,7 +1,7 @@
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
-import { afterEach, beforeEach, expect, test } from "vitest";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { App } from "../../app.tsx";
 import type { McpServer, McpToolsResult } from "../../store/mcp.ts";
 import { createPage } from "../../store/page.ts";
@@ -89,11 +89,18 @@ const DB_ROW = /^running,\s*db/;
 const main = () => screen.getByRole("main");
 const row = (name: string) => within(main()).getByRole("button", { name: new RegExp(`${name}`) });
 
+/** jsdom has no layout; `narrow` says which side of the breakpoint the window is on. */
+function stubWidth(narrow: boolean): void {
+  vi.stubGlobal("matchMedia", (query: string) => ({ matches: narrow, media: query, addEventListener() {}, removeEventListener() {} }));
+}
+
 beforeEach(() => {
+  stubWidth(true);
   localStorage.clear();
   settingsContextStore.set(null);
 });
 afterEach(() => {
+  vi.unstubAllGlobals();
   closeSetup();
   closePalette();
   settingsContextStore.set(null);
@@ -230,6 +237,37 @@ test("View tools lists the tools without the prefix, and says so when there are 
   fake.raw.mcpTools.mockResolvedValue({ name: "git", tools: [] });
   await user.click(screen.getByRole("button", { name: "Back" }));
   expect(within(main()).getByRole("heading", { level: 3, name: "git" })).toBeTruthy();
+});
+
+test("on a wide window the list and the selected server's details sit side by side, and the first is shown at once", async () => {
+  stubWidth(false);
+  const { user, container } = mount("/settings/mcp", [git, github]);
+  expect(await screen.findByRole("heading", { name: "git" })).toBeTruthy();
+  expect((await axe.run(container, noContrast)).violations).toEqual([]);
+  expect(screen.getByRole("button", { name: GIT_ROW }).getAttribute("aria-current")).toBe("true");
+  expect(screen.queryByRole("button", { name: "Back" })).toBeNull();
+  await user.click(row("github"));
+  expect(await screen.findByRole("heading", { name: "github" })).toBeTruthy();
+  expect(screen.queryByRole("heading", { name: "git" })).toBeNull();
+  expect(row("github").getAttribute("aria-current")).toBe("true");
+  expect(screen.getByRole("button", { name: GIT_ROW }).getAttribute("aria-current")).toBeNull();
+  expect(screen.getByText("401 Unauthorized", { selector: "dd" })).toBeTruthy();
+  expect(screen.getAllByRole("button", { name: /Add a server|Import/ }).length).toBe(2);
+});
+
+test("on a wide window the list and the selected server's details sit side by side, and the first is shown at once", async () => {
+  stubWidth(false);
+  const { user } = mount("/settings/mcp", [git, github]);
+  expect(await screen.findByRole("heading", { name: "git" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: GIT_ROW }).getAttribute("aria-current")).toBe("true");
+  expect(screen.queryByRole("button", { name: "Back" })).toBeNull();
+  await user.click(row("github"));
+  expect(await screen.findByRole("heading", { name: "github" })).toBeTruthy();
+  expect(screen.queryByRole("heading", { name: "git" })).toBeNull();
+  expect(row("github").getAttribute("aria-current")).toBe("true");
+  expect(screen.getByRole("button", { name: GIT_ROW }).getAttribute("aria-current")).toBeNull();
+  expect(screen.getByText("401 Unauthorized", { selector: "dd" })).toBeTruthy();
+  expect(screen.getAllByRole("button", { name: /Add a server|Import/ }).length).toBe(2);
 });
 
 test("Back from a detail gives focus back to its row", async () => {

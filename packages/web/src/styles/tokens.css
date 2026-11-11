@@ -46,6 +46,8 @@
   --container-column: 46rem;
   /* The tallest the model dialog grows: 44 rem. It keeps one size whatever it shows. */
   --spacing-dialog: 44rem;
+  /* The list pane of the MCP servers, beside the details: 300 px. */
+  --spacing-mcp-list: 18.75rem;
 
   /* From here the details drawer sits beside the column (1100 px). */
   --breakpoint-wide: 68.75rem;
