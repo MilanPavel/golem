@@ -216,6 +216,18 @@ test("useSettingsFolder falls back to the new session's folder when the context 
   expect(screen.getByTestId("folder").textContent).toBe("/work/one");
 });
 
+test("Close settings goes back to the session the person came from, else home", async () => {
+  const first = mount("/settings", OK_ROWS);
+  await first.user.click(await screen.findByRole("button", { name: "Close settings" }));
+  expect(location.pathname).toBe("/");
+  first.unmount();
+
+  settingsContextStore.set({ sessionId: "a", cwd: null });
+  const second = mount("/settings/appearance", OK_ROWS);
+  await second.user.click(await screen.findByRole("button", { name: "Close settings" }));
+  expect(location.pathname).toBe("/s/a");
+});
+
 // Accessibility
 
 for (const theme of ["slip", "kiln"] as const) {
