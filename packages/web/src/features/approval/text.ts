@@ -55,3 +55,18 @@ export function keyDecision(key: string): ApprovalChoice | null {
   const does = approvalKey(key);
   return does === "edit" ? null : does;
 }
+
+/** What the chip in the steps says after the tool's name: `this chat`, `always`, `once`, `denied`, or `not answered`. */
+export function chipText(answer: ApprovalAnswer | undefined): string {
+  if (answer === undefined) return "not answered";
+  switch (answer.decision) {
+    case "allow":
+      return answer.edited ? "once · edited" : "once";
+    case "allow_session":
+      return "this chat";
+    case "allow_always":
+      return "always";
+    case "deny":
+      return "denied";
+  }
+}

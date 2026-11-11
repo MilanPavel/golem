@@ -4,12 +4,15 @@ import { NoticeLine, type CommandNotice } from "./notice-line.tsx";
 /** The meter, the composer, a line for an error or a notice, and the key hints, in a column. */
 export function DockView({
   meter,
+  approval = null,
   composer,
   error,
   notice = null,
   busy,
 }: {
   meter: ReactNode;
+  /** The approval that waits, directly above the composer. */
+  approval?: ReactNode;
   composer: ReactNode;
   error?: string | null;
   /** What the last command did, in a muted status line. */
@@ -20,6 +23,7 @@ export function DockView({
   return (
     <div data-dock="" className="flex flex-col gap-2">
       {meter}
+      {approval}
       {composer}
       {error ? (
         <p role="alert" className="px-1 text-xs text-deny">

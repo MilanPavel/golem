@@ -34,6 +34,11 @@ async function startStack(rig: Rig): Promise<Stack> {
 
 const composer = (page: Page): Locator => page.getByRole("textbox", { name: "Message" });
 const card = (page: Page): Locator => page.getByRole("group", { name: "Approval" });
+/** Opens the activity line, so the chip an answered approval leaves shows. */
+async function chip(page: Page): Promise<Locator> {
+  await page.getByRole("button", { name: /1 approval/ }).click();
+  return page.locator("[data-approval-chip]");
+}
 const answers = (page: Page): Locator => page.getByRole("article", { name: "golem" });
 
 const OLD = "hello world\n";
@@ -75,18 +80,18 @@ function read(project: Project): string {
   return readFileSync(project.file, "utf8");
 }
 
-test("allowing an edit from its diff changes the file and the card shrinks", async ({ page, rig }) => {
+test("allowing an edit from its diff changes the file and the bar leaves a chip", async ({ page, rig }) => {
   const stack = await startStack(rig);
   const project = await makeSession(rig, stack);
   queueEdit(stack.model);
   await askToEdit(page, stack, project);
-  await expect(card(page).getByRole("heading", { name: /Allow edit_file on notes\.txt\?/ })).toBeVisible();
+  await expect(card(page).getByText(/Allow edit_file on notes\.txt\?/)).toBeVisible();
   await expect(card(page).getByText("there")).toBeVisible();
   expect(read(project)).toBe(OLD);
   await card(page).getByRole("button", { name: /Allow once/ }).click();
-  await expect(card(page)).toContainText("Allowed once");
-  await expect(card(page).getByRole("button")).toHaveCount(0);
+  await expect(card(page)).toHaveCount(0);
   await expect(answers(page).last()).toContainText("Done.");
+  await expect(await chip(page)).toContainText("edit_file · once");
   expect(read(project)).toBe(NEW);
 });
 
@@ -96,8 +101,9 @@ test("denying an edit leaves the file and tells the model", async ({ page, rig }
   queueEdit(stack.model);
   await askToEdit(page, stack, project);
   await card(page).getByRole("button", { name: /Deny/ }).click();
-  await expect(card(page)).toContainText("Denied");
-  await expect(page.getByRole("button", { name: /edit_file/ }).getByText("✗ denied", { exact: true })).toBeVisible();
+  await expect(card(page)).toHaveCount(0);
+  await expect(answers(page).last()).toContainText("Done.");
+  await expect(await chip(page)).toContainText("edit_file · denied");
   await expect(answers(page).last()).toContainText("Done.");
   expect(read(project)).toBe(OLD);
   expect(stack.model.requests).toHaveLength(2);
@@ -112,17 +118,18 @@ test("editing the arguments runs the edited call once", async ({ page, rig }) =>
   const project = await makeSession(rig, stack);
   queueEdit(stack.model);
   await askToEdit(page, stack, project);
-  await card(page).getByRole("button", { name: /Edit/ }).click();
+  await card(page).getByRole("button", { name: /Edit args/ }).click();
   const field = card(page).getByRole("textbox", { name: "Arguments, as JSON. Allow runs the edited call once." });
   await expect(field).toBeVisible();
   await field.fill(JSON.stringify({ path: "notes.txt", old_string: "world", new_string: "edited" }));
   await card(page).getByRole("button", { name: /Allow once/ }).click();
-  await expect(card(page)).toContainText("Allowed once, with edited arguments");
+  await expect(card(page)).toHaveCount(0);
   await expect(answers(page).last()).toContainText("Done.");
+  await expect(await chip(page)).toContainText("edit_file · once · edited");
   expect(read(project)).toBe(EDITED);
 });
 
-test("an answer from another client closes the card in the page", async ({ page, rig }) => {
+test("an answer from another client closes the bar in the page", async ({ page, rig }) => {
   const stack = await startStack(rig);
   const project = await makeSession(rig, stack);
   const needed = new Promise<string>((resolve) => {
@@ -135,8 +142,7 @@ test("an answer from another client closes the card in the page", async ({ page,
   await askToEdit(page, stack, project);
   const callId = await needed;
   await stack.second.client.respondApproval(project.sessionId, callId, "allow");
-  await expect(card(page)).toContainText("Allowed once");
-  await expect(card(page).getByRole("button")).toHaveCount(0);
+  await expect(card(page)).toHaveCount(0);
   await expect(answers(page).last()).toContainText("Done.");
   expect(read(project)).toBe(NEW);
 });
@@ -153,7 +159,7 @@ for (const [theme, label] of [
     await page.evaluate((t) => document.documentElement.setAttribute("data-theme", t), theme);
     await expect(card(page).getByRole("button", { name: /Allow once/ })).toBeVisible();
     expect(await axeViolations(page), "pending approval").toEqual([]);
-    await card(page).getByRole("button", { name: /Edit/ }).click();
+    await card(page).getByRole("button", { name: /Edit args/ }).click();
     await expect(card(page).getByRole("textbox")).toBeVisible();
     expect(await axeViolations(page), "editing arguments").toEqual([]);
   });

@@ -1,34 +1,27 @@
-import { editedArgs, parseArgs, type ToolBlock, type ApprovalChoice } from "@golem/view";
-import { Fragment, useEffect, useId, useRef, useState } from "react";
+import { displayToolName, editedArgs, parseArgs, type ToolBlock, type ApprovalChoice } from "@golem/view";
+import { useEffect, useId, useRef, useState } from "react";
 import { Button } from "../../ui/button.tsx";
-import { cn } from "../../ui/cn.ts";
+import { Menu, MenuContent, MenuItem, MenuTrigger } from "../../ui/menu.tsx";
 import { Kbd } from "../../ui/kbd.tsx";
 import { Textarea } from "../../ui/textarea.tsx";
 import { DiffModeSwitch } from "../diff/diff-mode-switch.tsx";
 import { useDiffMode } from "../diff/diff-mode.ts";
 import { DiffView } from "../diff/diff-view.tsx";
-import { approvalTarget, verdictText } from "./text.ts";
+import { approvalTarget } from "./text.ts";
 
-const CHIP = "rounded-sm bg-clay-soft px-1.5 py-0.5 font-mono text-sm font-medium text-clay-ink";
+const CHIP = "rounded-sm bg-clay-soft px-1.5 py-0.5 font-mono text-xs font-medium text-clay-ink";
 
 /** The clay seal: a shield with a tick. */
 function Seal() {
   return (
-    <span className="grid size-7.5 flex-none place-items-center rounded-sm bg-clay text-on-clay">
-      <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+    <span className="mt-0.5 grid size-5 flex-none place-items-center rounded-sm bg-clay text-on-clay">
+      <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
         <path d="M8 1.8 13.2 4v4.1c0 3-2.2 5.2-5.2 6.1-3-.9-5.2-3.1-5.2-6.1V4z" />
         <path d="m5.6 8 1.7 1.7L10.6 6.4" />
       </svg>
     </span>
   );
 }
-
-const ACTIONS: { decision: ApprovalChoice; label: string; key: string; shortcut: string; kind: "ink" | "secondary" | "danger" }[] = [
-  { decision: "allow", label: "Allow once", key: "↵", shortcut: "Enter", kind: "ink" },
-  { decision: "allow_session", label: "For this session", key: "S", shortcut: "S", kind: "secondary" },
-  { decision: "allow_always", label: "Always", key: "W", shortcut: "W", kind: "secondary" },
-  { decision: "deny", label: "Deny", key: "D", shortcut: "D", kind: "danger" },
-];
 
 const INK_KBD = "border-bg/40 bg-transparent text-bg";
 const MIN_ROWS = 8;
@@ -131,12 +124,12 @@ function ArgsEditor({
 }
 
 /**
- * The question about one tool call, drawn like the shem: the seal, what is asked, the rule that
- * asked, the change or the arguments, and the answers. Once answered it shrinks to one line.
+ * The question about the one tool call that waits, docked above the composer: the seal, what is
+ * asked, why, and the answers. The arguments or the diff sit under Details, open from the start
+ * for a change to a file, since that is what you are approving.
  */
-export function ApprovalCard({
+export function ApprovalBar({
   tool,
-  pending,
   sending = false,
   error = null,
   editing = false,
@@ -145,7 +138,6 @@ export function ApprovalCard({
   onAnswer,
 }: {
   tool: ToolBlock;
-  pending: boolean;
   sending?: boolean;
   error?: string | null;
   /** The arguments are open for editing. */
@@ -156,26 +148,28 @@ export function ApprovalCard({
   onAnswer: (decision: ApprovalChoice, args?: Args) => void;
 }) {
   const [mode, setMode] = useDiffMode();
-  const editButton = useRef<HTMLButtonElement>(null);
+  const [chosen, setChosen] = useState<boolean | null>(null);
+  const detailsId = useId();
+  const detailsButton = useRef<HTMLButtonElement>(null);
   const wasEditing = useRef(false);
-  const showEditor = editing && pending && tool.approval?.answer === undefined;
+  const showEditor = editing && tool.approval?.answer === undefined;
   useEffect(() => {
-    // Closing the editor puts focus back on the button that opened it.
-    if (wasEditing.current && !showEditor) editButton.current?.focus();
+    // Closing the editor puts focus back on the button that opens the details.
+    if (wasEditing.current && !showEditor) detailsButton.current?.focus();
     wasEditing.current = showEditor;
   }, [showEditor]);
   const approval = tool.approval;
   if (approval === undefined) return null;
-  const answer = approval.answer;
-  const open = pending && answer === undefined;
+  const details = chosen ?? Boolean(tool.diff);
+  const name = displayToolName(tool.name);
   const target = approvalTarget(tool.args, approval.subject);
   return (
-    <section role="group" aria-label="Approval" className={cn("overflow-hidden rounded-lg border border-line-strong bg-surface", open && "shadow-soft")}>
-      <div className="flex items-start gap-3 px-4 pt-3.5 pb-3">
+    <section role="group" aria-label="Approval" data-approval-bar="" className="overflow-hidden rounded-lg border border-line-strong bg-surface shadow-soft">
+      <div className="flex items-start gap-2.5 px-3 pt-3 pb-2">
         <Seal />
         <div className="min-w-0">
-          <h2 className="text-base leading-snug font-semibold wrap-anywhere">
-            Allow <code className={CHIP}>{tool.name}</code>
+          <p className="text-sm leading-snug font-semibold wrap-anywhere">
+            Allow <code className={CHIP}>{name}</code>
             {target ? (
               <>
                 {" on "}
@@ -183,19 +177,11 @@ export function ApprovalCard({
               </>
             ) : null}
             ?
-          </h2>
-          <p className="mt-1 font-mono text-xs leading-snug text-muted wrap-anywhere">
-            rule: <b className="font-medium text-ink">{tool.name} → ask</b>
-            {approval.source ? ` · ${approval.source}` : ""}
           </p>
+          <p className="mt-0.5 font-mono text-xs leading-snug text-faint wrap-anywhere">asks: {approval.source ? approval.source : "your rules"}</p>
         </div>
-        {open && !showEditor && tool.diff ? (
-          <div className="ml-auto flex-none">
-            <DiffModeSwitch mode={mode} onChange={setMode} />
-          </div>
-        ) : null}
       </div>
-      {open && showEditor ? (
+      {showEditor ? (
         <>
           <ArgsEditor
             tool={tool}
@@ -212,69 +198,71 @@ export function ApprovalCard({
             </p>
           ) : null}
         </>
-      ) : open ? (
+      ) : (
         <>
-          {tool.diff ? (
-            <div className="overflow-x-auto border-y border-line bg-bg px-4 py-2 font-mono text-xs">
-              <DiffView diff={tool.diff} mode={mode} />
+          <div className="flex flex-wrap items-center gap-2 px-3 pb-3">
+            <Button kind="ink" disabled={sending} aria-keyshortcuts="Enter" data-decision="allow" onClick={() => { onAnswer("allow"); }}>
+              Allow once
+              <Kbd className={INK_KBD}>↵</Kbd>
+            </Button>
+            <div className="inline-flex">
+              <Button className="rounded-r-none" disabled={sending} aria-keyshortcuts="S" data-decision="allow_session" onClick={() => { onAnswer("allow_session"); }}>
+                Allow in this chat
+                <Kbd>S</Kbd>
+              </Button>
+              <Menu>
+                <MenuTrigger asChild>
+                  <Button className="-ml-px rounded-l-none px-2" disabled={sending} aria-label="More ways to allow">
+                    <span aria-hidden="true">▾</span>
+                  </Button>
+                </MenuTrigger>
+                <MenuContent align="start" side="top">
+                  <MenuItem data-decision="allow_always" aria-keyshortcuts="W" onSelect={() => { onAnswer("allow_always"); }}>
+                    Always allow {name}
+                    <Kbd className="ml-auto">W</Kbd>
+                  </MenuItem>
+                  {/* Wider scopes ("every read from this server", "all of this server") go here once the daemon can grant them: ticket 686. */}
+                </MenuContent>
+              </Menu>
             </div>
-          ) : (
-            <pre className="max-h-60 overflow-auto border-y border-line bg-code-bg px-4 py-2 font-mono text-xs whitespace-pre-wrap wrap-anywhere">
-              {JSON.stringify(tool.args, null, 2)}
-            </pre>
-          )}
-          <div className="flex flex-wrap items-center gap-2 px-4 pt-3 pb-3.5">
-            {ACTIONS.map((action) => (
-              <Fragment key={action.decision}>
-                {action.decision === "deny" ? (
-                  <>
-                    <Button
-                      disabled={sending}
-                      ref={editButton}
-                      aria-keyshortcuts="E"
-                      data-action="edit"
-                      onClick={() => {
-                        onEdit(true);
-                      }}
-                    >
-                      Edit
-                      <Kbd>E</Kbd>
-                    </Button>
-                  </>
-                ) : null}
-                <Button
-                  kind={action.kind}
-                  className={action.decision === "deny" ? "ml-auto" : undefined}
-                  disabled={sending}
-                  aria-keyshortcuts={action.shortcut}
-                  data-decision={action.decision}
-                  onClick={() => {
-                    onAnswer(action.decision);
-                  }}
-                >
-                  {action.label}
-                  <Kbd className={action.kind === "ink" ? INK_KBD : undefined}>{action.key}</Kbd>
-                </Button>
-              </Fragment>
-            ))}
+            <Button ref={detailsButton} kind="ghost" aria-expanded={details} aria-controls={detailsId} onClick={() => { setChosen(!details); }}>
+              Details
+            </Button>
+            <Button kind="danger" className="ml-auto" disabled={sending} aria-keyshortcuts="D" data-decision="deny" onClick={() => { onAnswer("deny"); }}>
+              Deny
+              <Kbd>D</Kbd>
+            </Button>
           </div>
+          {details ? (
+            <div id={detailsId} className="border-t border-line">
+              {tool.diff ? (
+                <>
+                  <div className="flex justify-end px-3 pt-2">
+                    <DiffModeSwitch mode={mode} onChange={setMode} />
+                  </div>
+                  <div className="max-h-72 overflow-auto px-3 py-2 font-mono text-xs">
+                    <DiffView diff={tool.diff} mode={mode} />
+                  </div>
+                </>
+              ) : (
+                <pre className="max-h-60 overflow-auto bg-code-bg px-3 py-2 font-mono text-xs whitespace-pre-wrap wrap-anywhere">
+                  {JSON.stringify(tool.args, null, 2)}
+                </pre>
+              )}
+              <div className="px-3 pt-1 pb-3">
+                <Button size="sm" disabled={sending} aria-keyshortcuts="E" data-action="edit" onClick={() => { onEdit(true); }}>
+                  Edit args
+                  <Kbd>E</Kbd>
+                </Button>
+              </div>
+            </div>
+          ) : null}
           {error ? (
-            <p role="alert" className="px-4 pb-3.5 text-sm text-deny">
+            <p role="alert" className="px-3 pb-3 text-sm text-deny">
               {error}
             </p>
           ) : null}
         </>
-      ) : (
-        <p className={cn("pr-4 pb-3.5 pl-14.5 font-mono text-xs leading-snug", answer === undefined ? "text-muted" : answer.decision === "deny" ? "text-deny" : "text-allow")}>
-          {answer === undefined ? (
-            "Not answered"
-          ) : (
-            <>
-              <span aria-hidden="true">{answer.decision === "deny" ? "✗ " : "✓ "}</span>
-              {verdictText(answer)}
-            </>
-          )}
-        </p>
       )}
     </section>
   );

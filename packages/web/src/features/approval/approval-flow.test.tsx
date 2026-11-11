@@ -5,6 +5,7 @@ import { PageProvider } from "../../store/page-context.tsx";
 import { ev, fakeClient, fakeFrame } from "../../store/test-support.ts";
 import { Transcript } from "../chat/transcript.tsx";
 import { diffModeStore } from "../diff/diff-mode.ts";
+import { DockedApproval } from "./docked-approval.tsx";
 
 const wait = () => act(() => new Promise<void>((resolve) => setTimeout(resolve, 5)));
 
@@ -17,6 +18,9 @@ function setup() {
   render(
     <PageProvider page={page}>
       <Transcript id="s1" />
+      <div data-testid="dock">
+        <DockedApproval sessionId="s1" />
+      </div>
     </PageProvider>,
   );
   const send = (type: Parameters<typeof ev>[1], data: Record<string, unknown>) => {
@@ -49,38 +53,43 @@ afterEach(() => {
   history.replaceState(null, "", "/");
 });
 
-test("an approval shows the pending card, and Allow once answers the call", async () => {
+test("an approval docks as a bar, not in the transcript, and Allow once answers the call", async () => {
   const { fake, send } = setup();
   await wait();
   ask(send);
-  expect(screen.getByRole("group", { name: "Approval" })).toBeTruthy();
+  const bar = screen.getByRole("group", { name: "Approval" });
+  expect(screen.getByTestId("dock").contains(bar)).toBe(true);
+  expect(screen.getAllByRole("group", { name: "Approval" })).toHaveLength(1);
+  expect(document.querySelector("article")?.contains(bar)).toBe(false);
   fireEvent.click(screen.getByRole("button", { name: /^Allow once/ }));
   await wait();
   expect(fake.raw.respondApproval).toHaveBeenCalledWith("s1", "c1", "allow");
 });
 
-test("an answer from elsewhere collapses the card and clears waiting", async () => {
+test("an answer from elsewhere takes the bar away, clears waiting, and leaves a chip", async () => {
   const { send } = setup();
   await wait();
   ask(send);
   expect(document.body.textContent).toContain("waiting for you");
   send("approval.resolved", { call_id: "c1", name: "edit_file", decision: "allow_session", subject: "src/a.ts" });
-  expect(screen.getByRole("group", { name: "Approval" }).textContent).toContain("✓ Allowed for this session");
+  expect(screen.queryByRole("group", { name: "Approval" })).toBeNull();
   expect(screen.queryByRole("button", { name: /^Allow once/ })).toBeNull();
   expect(document.body.textContent).not.toContain("waiting for you");
+  fireEvent.click(screen.getByRole("button", { name: /1 approval/ }));
+  expect(document.querySelector("[data-approval-chip]")?.textContent).toBe("✓edit_file · this chat");
 });
 
-test("a denied call reads denied on the tool line", async () => {
+test("a denied call reads denied on the tool line, with a denied chip", async () => {
   const { send } = setup();
   await wait();
   ask(send);
   send("approval.resolved", { call_id: "c1", name: "edit_file", decision: "deny" });
   send("tool.failed", { call_id: "c1", message: "the user denied this tool call" });
-  expect(screen.getByRole("group", { name: "Approval" }).textContent).toContain("✗ Denied");
   fireEvent.click(screen.getByRole("button", { name: /1 failed/ }));
   const line = document.querySelector("[data-tool-status=failed]");
   expect(line?.textContent).toContain("✗ denied");
   expect(line?.textContent).not.toContain("the user denied");
+  expect(line?.querySelector("[data-approval-chip=deny]")?.textContent).toBe("✗edit_file · denied");
 });
 
 test("a key answers the call, and a failed send shows its error", async () => {
@@ -112,7 +121,7 @@ test("unchanged arguments send no args", async () => {
   const { fake, send } = setup();
   await wait();
   ask(send);
-  fireEvent.click(screen.getByRole("button", { name: /^Edit/ }));
+  fireEvent.click(screen.getByRole("button", { name: /^Edit args/ }));
   fireEvent.keyDown(screen.getByRole("textbox"), { key: "Enter", metaKey: true });
   await wait();
   expect(fake.raw.respondApproval).toHaveBeenCalledTimes(1);
@@ -140,4 +149,38 @@ test("an answer from elsewhere closes the editor", async () => {
   fireEvent.keyDown(document.body, { key: "e" });
   send("approval.resolved", { call_id: "c1", name: "edit_file", decision: "allow", subject: "src/a.ts" });
   expect(screen.queryByRole("textbox")).toBeNull();
+});
+
+test("S answers for this chat", async () => {
+  const { fake, send } = setup();
+  await wait();
+  ask(send);
+  fireEvent.keyDown(document.body, { key: "s" });
+  await wait();
+  expect(fake.raw.respondApproval).toHaveBeenCalledWith("s1", "c1", "allow_session");
+});
+
+test("W answers always, and Enter answers once", async () => {
+  const { fake, send } = setup();
+  await wait();
+  ask(send);
+  fireEvent.keyDown(document.body, { key: "w" });
+  await wait();
+  expect(fake.raw.respondApproval).toHaveBeenCalledWith("s1", "c1", "allow_always");
+});
+
+test("Enter on the page allows once", async () => {
+  const { fake, send } = setup();
+  await wait();
+  ask(send);
+  fireEvent.keyDown(document.body, { key: "Enter" });
+  await wait();
+  expect(fake.raw.respondApproval).toHaveBeenCalledWith("s1", "c1", "allow");
+});
+
+test("the diff of an edit is open in the bar from the start", async () => {
+  const { send } = setup();
+  await wait();
+  ask(send);
+  expect(screen.getByRole("table", { name: "Change to src/a.ts" })).toBeTruthy();
 });
