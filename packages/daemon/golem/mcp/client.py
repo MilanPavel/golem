@@ -32,6 +32,10 @@ class McpTool:
     name: str
     description: str
     input_schema: Mapping[str, object]
+    read_only: bool = False
+    """The server's ``annotations.readOnlyHint``. Its word, not something golem checked."""
+    destructive: bool = False
+    """The server's ``annotations.destructiveHint``."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -100,6 +104,8 @@ class McpClient:
                     continue
                 description = item.get("description") or item.get("title") or ""
                 schema = item.get("inputSchema")
+                notes = item.get("annotations")
+                hints = cast(dict[str, object], notes) if isinstance(notes, dict) else {}
                 tools.append(
                     McpTool(
                         name=name,
@@ -107,6 +113,8 @@ class McpClient:
                         input_schema=cast(dict[str, object], schema)
                         if isinstance(schema, dict)
                         else {},
+                        read_only=hints.get("readOnlyHint") is True,
+                        destructive=hints.get("destructiveHint") is True,
                     )
                 )
             next_cursor = result.get("nextCursor")

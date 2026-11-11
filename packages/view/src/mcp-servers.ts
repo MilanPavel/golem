@@ -103,7 +103,8 @@ export function mcpSummary(server: McpServer, session = true): string {
 function markNote(server: McpServer): string {
   const count = server.tools_hidden ?? 0;
   const hidden = count > 0 ? ` · ${count} hidden` : "";
-  return `${hidden}${server.approval === "allow" ? " · allow" : ""}`;
+  const approval = server.approval === "allow" ? " · allow" : server.approval === "read-only" ? " · read-only" : "";
+  return `${hidden}${approval}`;
 }
 
 function hereNote(server: McpServer, session: boolean): string {

@@ -21,6 +21,7 @@ const project: McpServer = { ...git, name: "db", project: "/work/app" };
 test("a row says tools and tokens, or the error and when it retries, or how it is turned on", () => {
   assert.equal(mcpSummary(git), "2 tools · 1.3K tokens");
   assert.equal(mcpSummary({ ...git, tools_hidden: 1, approval: "allow" }), "2 tools · 1.3K tokens · 1 hidden · allow");
+  assert.equal(mcpSummary({ ...git, approval: "read-only" }), "2 tools · 1.3K tokens · read-only");
   assert.equal(mcpSummary({ ...git, tools: ["x"], schema_tokens: 40, on_demand: true, enabled: true }), "1 tool · 40 tokens · on in this chat");
   assert.equal(mcpSummary(down), "exited · retry in 4s");
   assert.equal(mcpSummary(lazy), "on demand · off in this chat");

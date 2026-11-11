@@ -138,6 +138,8 @@ tool = "mcp__git__git_status"
 action = "allow"
 ```
 
+To let the tools a server marks read-only run without asking, set `approval = "read-only"` in its table, or choose "Trust its read-only tools" under Approval in Settings, MCP, Edit. It applies in balanced and autopilot, not in careful, and a tool that is not marked read-only still asks. The mark is the server's own word, which golem cannot check, so a server that is wrong could mark a tool that writes. That is why it is a choice per server and never the default. The Tools tab tags the tools a server marks read-only.
+
 To allow every tool of one server, set `approval = "allow"` in its table. Your own `[[rule]]`s still come first, so a `deny` rule beats it, and a server in a project's file counts only when the project is in `trusted_projects`.
 
 ## Only when you need it
@@ -197,7 +199,7 @@ A project's `.golem/config.toml` can add servers for chats in that folder, once 
 | `enabled` | `true` | `"on_demand"` for chats that run `/mcp enable`, or `false` to keep the settings without starting it |
 | `timeout_seconds` | `120` | The longest one tool call may take |
 | `tools` | all | `include` and `exclude` patterns for the tools the model gets, see above |
-| `approval` | `"ask"` | `"allow"` runs this server's calls without asking, after your own rules |
+| `approval` | `"ask"` | `"read-only"` runs the tools the server marks read-only without asking (balanced and autopilot); `"allow"` runs every call without asking. Your own rules come first |
 
 - **Secrets.** A value in `env` or `headers` can name a Keychain secret, `keychain:mcp/<name>`, alone or inside the text. A name that looks like a secret, such as `GITHUB_TOKEN`, must.
 - **Names.** A server name may use letters, digits, and `-`.

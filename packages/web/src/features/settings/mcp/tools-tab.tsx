@@ -119,7 +119,17 @@ export function ToolsTab({ server, sessionId, tools, onTry }: { server: McpServe
                   <span aria-hidden="true" className={cn("absolute top-0.5 left-0.5 size-4 rounded-full bg-surface transition-transform motion-reduce:transition-none", shown && "translate-x-4")} />
                 </button>
                 <span className="flex min-w-0 flex-1 flex-col">
-                  <span className={cn("font-mono text-sm wrap-anywhere", !shown && "text-faint line-through")}>{own}</span>
+                  <span className={cn("font-mono text-sm wrap-anywhere", !shown && "text-faint line-through")}>
+                    {own}
+                    {tool.read_only === true ? (
+                      <span
+                        title={server.approval === "ask" ? "The server says this tool only reads. It still asks, as every tool of this server does." : "The server says this tool only reads."}
+                        className="ml-2 rounded-sm border border-line px-1 font-sans text-xs text-muted no-underline"
+                      >
+                        read-only
+                      </span>
+                    ) : null}
+                  </span>
                   <span title={tool.description} className={cn("truncate text-sm", shown ? "text-muted" : "text-faint line-through")}>
                     {firstLine(tool.description)}
                   </span>

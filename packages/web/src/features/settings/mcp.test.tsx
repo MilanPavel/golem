@@ -527,6 +527,38 @@ test("Edit shows the config as a form, and Save sends the change with a stored s
   expect(await screen.findByRole("heading", { name: "git" })).toBeTruthy();
 });
 
+test("the Tools tab tags the tools the server says are read-only", async () => {
+  const { fake, user } = mount("/settings/mcp", [{ ...git, approval: "read-only" }]);
+  fake.raw.mcpTools.mockResolvedValue({
+    name: "git",
+    tools: [
+      { name: "mcp__git__git_status", description: "Shows the status.", schema_tokens: 300, read_only: true },
+      { name: "mcp__git__git_push", description: "Pushes.", schema_tokens: 100 },
+    ],
+  });
+  await user.click(await screen.findByRole("button", { name: GIT_ROW }));
+  const list = await screen.findByRole("list", { name: "git tools" });
+  const [status, push] = within(list).getAllByRole("listitem");
+  expect(within(status!).getByText("read-only")).toBeTruthy();
+  expect(within(push!).queryByText("read-only")).toBeNull();
+});
+
+test("Edit offers three approvals, and Save sends the chosen one", async () => {
+  const { fake, user } = mount("/settings/mcp", [git]);
+  fake.raw.mcpGet.mockResolvedValue(detailOf(git, { command: "mcp-server-git", approval: "ask" }));
+  await user.click(await screen.findByRole("button", { name: GIT_ROW }));
+  await user.click(screen.getByRole("tab", { name: "Edit" }));
+  const approval = (await screen.findByLabelText("Approval")) as HTMLSelectElement;
+  expect(within(approval).getAllByRole("option").map((option) => option.textContent)).toEqual([
+    "Ask before every tool",
+    "Trust its read-only tools",
+    "Allow every tool",
+  ]);
+  await user.selectOptions(approval, "Trust its read-only tools");
+  await user.click(screen.getByRole("button", { name: "Save" }));
+  expect(fake.raw.updateMcpServer.mock.calls[0]![0].config.approval).toBe("read-only");
+});
+
 test("Edit replaces a secret only when a new one is typed, and says what is wrong before sending", async () => {
   const { fake, user } = mount("/settings/mcp", [git]);
   fake.raw.mcpGet.mockResolvedValue(detailOf(git, { command: "x", env: { TOKEN: "keychain:mcp/git-token" } }));

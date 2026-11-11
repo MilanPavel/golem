@@ -262,3 +262,52 @@ def test_an_mcp_server_with_approval_allow_runs_without_asking_after_the_users_r
     assert (echo.action, echo.source) == ("allow", "mcp.fake approval = allow")
     assert policy.check(registry, "mcp__fake__fail", {}, None).action == "deny"
     assert policy.check(registry, "mcp__other__echo", {}, None).action == "ask"
+
+
+def _read_only_policy(tmp_path: Path, text: str = "") -> Policy:
+    user = tmp_path / "config.toml"
+    _write(user, text)
+    policy = Policy(user, home=tmp_path)
+    policy.mcp_read_only = lambda _root: {"fake": ["mcp__fake__echo"]}
+    return policy
+
+
+def test_a_read_only_mcp_server_runs_its_hinted_tools_in_balanced_and_autopilot(
+    tmp_path: Path,
+) -> None:
+    policy = _read_only_policy(tmp_path)
+    registry = default_registry()
+    for mode in ("balanced", "autopilot"):
+        echo = policy.check(registry, "mcp__fake__echo", {}, None, mode)
+        assert (echo.action, echo.source) == ("allow", "mcp.fake approval = read-only")
+        assert policy.check(registry, "mcp__fake__fail", {}, None, mode).action == "ask"
+        assert policy.check(registry, "mcp__other__echo", {}, None, mode).action == "ask"
+
+
+def test_a_read_only_mcp_server_still_asks_in_careful(tmp_path: Path) -> None:
+    policy = _read_only_policy(tmp_path)
+    assert policy.check(default_registry(), "mcp__fake__echo", {}, None, "careful").action == "ask"
+
+
+def test_a_user_rule_beats_a_read_only_mcp_server(tmp_path: Path) -> None:
+    registry = default_registry()
+    deny = _read_only_policy(tmp_path, '[[rule]]\ntool = "mcp__fake__echo"\naction = "deny"\n')
+    assert deny.check(registry, "mcp__fake__echo", {}, None, "balanced").action == "deny"
+    ask = _read_only_policy(tmp_path, '[[rule]]\ntool = "mcp__fake__*"\naction = "ask"\n')
+    assert ask.check(registry, "mcp__fake__echo", {}, None, "autopilot").action == "ask"
+
+
+def test_a_hint_that_goes_away_stops_the_free_run(tmp_path: Path) -> None:
+    policy = _read_only_policy(tmp_path)
+    registry = default_registry()
+    assert policy.check(registry, "mcp__fake__echo", {}, None, "balanced").action == "allow"
+    policy.mcp_read_only = lambda _root: {"fake": []}
+    assert policy.check(registry, "mcp__fake__echo", {}, None, "balanced").action == "ask"
+
+
+def test_approval_allow_runs_every_tool_in_every_mode(tmp_path: Path) -> None:
+    policy = _read_only_policy(tmp_path)
+    policy.mcp_allowed = lambda _root: ["fake"]
+    registry = default_registry()
+    for mode in ("careful", "balanced", "autopilot"):
+        assert policy.check(registry, "mcp__fake__fail", {}, None, mode).action == "allow"

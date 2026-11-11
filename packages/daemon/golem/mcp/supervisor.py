@@ -42,7 +42,7 @@ from golem.config import McpServers, McpServerSettings, load_mcp
 from golem.mcp.client import CallResult, McpClient, McpError
 from golem.mcp.launch import Secrets, find_command, transport_for
 from golem.mcp.probe import DEFAULT_TIMEOUTS, ProbeResult, Step, Timeouts, probe
-from golem.mcp.tools import mcp_tools
+from golem.mcp.tools import mcp_tools, tool_name
 from golem.tokens import CHARS_PER_TOKEN
 from golem.tools.registry import Tool, ToolScope
 from golem_protocol.commands import McpLogLine, McpServer, McpServerLog, McpServerState
@@ -89,6 +89,7 @@ class ListedTool:
     hidden: bool
     schema_tokens: int
     input_schema: dict[str, Any] | None = None
+    read_only: bool = False
 
 
 @dataclass
@@ -100,6 +101,8 @@ class _Server:
     client: McpClient | None = None
     tools: list[Tool[Any]] = field(default_factory=list[Tool[Any]])
     hidden: list[Tool[Any]] = field(default_factory=list[Tool[Any]])
+    read_only: set[str] = field(default_factory=set[str])
+    """Names of the tools, shown or hidden, that the server marks ``readOnlyHint``."""
     task: asyncio.Task[None] | None = None
     # The log outlives a restart, and a changed config table keeps it too.
     log: deque[McpLogLine] = field(default_factory=lambda: deque(maxlen=LOG_LINES))
@@ -204,6 +207,7 @@ class McpSupervisor:
                 hidden,
                 _tool_tokens(tool),
                 None if tool.parameters is None else dict(tool.parameters),
+                tool.name in server.read_only,
             )
             for hidden, tools in ((False, server.tools), (True, server.hidden))
             for tool in tools
@@ -216,6 +220,18 @@ class McpSupervisor:
         :meth:`_shown` already checks.
         """
         return [server.name for server in self._shown(root) if server.settings.approval == "allow"]
+
+    def read_only_tools(self, root: Path | None) -> dict[str, list[str]]:
+        """For each server with ``approval = "read-only"`` that ``root`` sees, its running
+        tools the server marks ``readOnlyHint``, by the name the model sees.
+
+        Only a tool that is shown can be called, so a hidden one is left out.
+        """
+        return {
+            server.name: [tool.name for tool in server.tools if tool.name in server.read_only]
+            for server in self._shown(root)
+            if server.settings.approval == "read-only"
+        }
 
     def has_command(self, program: str) -> bool:
         """Whether ``program`` is where a server would find it, on the launch search path."""
@@ -437,6 +453,7 @@ class McpSupervisor:
     def _stop_soon(self, server: _Server) -> None:
         task, client = server.task, server.client
         server.task, server.client, server.tools, server.hidden = None, None, [], []
+        server.read_only = set()
 
         async def stop() -> None:
             if task is not None:
@@ -486,6 +503,7 @@ class McpSupervisor:
             return f"{type(exc).__name__}: {exc}"
         finally:
             server.tools, server.hidden = [], []
+            server.read_only = set()
             if server.client is not None:
                 await server.client.close()
                 server.client = None
@@ -517,6 +535,7 @@ class McpSupervisor:
         server.hidden = [
             tool for tool in mcp_tools(server.name, listed, call) if tool.name not in shown
         ]
+        server.read_only = {tool_name(server.name, t.name) for t in listed if t.read_only}
         log.info("mcp server %s is running with %d tools", server.name, len(server.tools))
         self._set(server, "running")
 

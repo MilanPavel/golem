@@ -169,6 +169,7 @@ class DaemonApp:
             )
             mcp.broadcast = self._broadcast
             policy.mcp_allowed = mcp.allowed_servers
+            policy.mcp_read_only = mcp.read_only_tools
             self.state.mcp = mcp
             local = self._local or LocalServers(
                 settings.ollama, log_file=self.paths.ollama_log_file, run_dir=self.paths.run_dir

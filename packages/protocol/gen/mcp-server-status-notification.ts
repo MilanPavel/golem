@@ -2,7 +2,7 @@
 
 export type Jsonrpc = '2.0';
 export type Method = 'mcp.server.status';
-export type Approval = 'ask' | 'allow';
+export type Approval = 'ask' | 'read-only' | 'allow';
 export type Command = string;
 export type Config = string | null;
 export type Enabled = boolean | null;
@@ -37,7 +37,8 @@ export interface McpServerStatusNotification {
  * ``error`` says why it is ``failed``, and ``retry_seconds`` when golem
  * tries again. ``config`` is the file that names the server. ``tools_hidden``
  * counts the tools its ``tools`` filter keeps from the model, and
- * ``approval`` is ``"allow"`` when its calls run without asking.
+ * ``approval`` is ``"allow"`` when its calls run without asking, and
+ * ``"read-only"`` when only the tools it marks read-only do.
  *
  * This interface was referenced by `McpServerStatusNotification`'s JSON-Schema
  * via the `definition` "McpServer".

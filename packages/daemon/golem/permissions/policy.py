@@ -7,7 +7,9 @@ Order, first match wins:
    so a cloned repository cannot allow itself anything. Its ``ask`` and
    ``deny`` rules always apply.
 2. ``[[rule]]`` in the user's ``config.toml``.
-3. An MCP server with ``approval = "allow"``: its tools are allowed.
+3. An MCP server with ``approval = "allow"``: its tools are allowed. With
+   ``approval = "read-only"``, its tools that say ``readOnlyHint`` are allowed
+   in balanced and autopilot, not in careful.
 4. The built-in defaults: read-only and internal tools are allowed, the rest asks.
 
 Each file is read again when it changes. A user file that stops validating
@@ -84,6 +86,10 @@ class Policy:
         self._projects: dict[Path, tuple[_Stamp | None, list[Rule]]] = {}
         self.mcp_allowed: Callable[[Path | None], list[str]] = lambda _root: []
         """Names of the MCP servers with ``approval = "allow"`` that ``root`` sees."""
+        self.mcp_read_only: Callable[[Path | None], dict[str, list[str]]] = lambda _root: {}
+        """For each MCP server with ``approval = "read-only"`` that ``root`` sees, the names
+        of its running tools that say ``readOnlyHint``. Read at each check, so a restart
+        that changes a hint applies at once."""
 
     def rules(
         self, root: Path | None, registry: ToolRegistry, mode: PermissionMode | None = None
@@ -102,14 +108,21 @@ class Policy:
             Rule(rule, f"{label} rule {index}", file="user", index=index)
             for index, rule in enumerate(user.rule, start=1)
         )
+        mode = mode or user.permissions.mode
+        mcp_root = root.resolve() if root is not None else None
         found.extend(
             Rule(
                 PolicyRule(tool=f"mcp__{server}__*", action="allow"),
                 f"mcp.{server} approval = allow",
             )
-            for server in self.mcp_allowed(root.resolve() if root is not None else None)
+            for server in self.mcp_allowed(mcp_root)
         )
-        mode = mode or user.permissions.mode
+        if mode != "careful":
+            found.extend(
+                Rule(PolicyRule(tool=tool, action="allow"), f"mcp.{server} approval = read-only")
+                for server, tools in self.mcp_read_only(mcp_root).items()
+                for tool in tools
+            )
         allowed = registry.default_allowed(mode, network=user.shell.network)
         found.extend(default_rules(allowed, mode))
         return found

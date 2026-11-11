@@ -3,7 +3,7 @@
 export type ScanId = string;
 export type AlreadySame = boolean;
 export type Clash = boolean;
-export type Approval = 'ask' | 'allow';
+export type Approval = 'ask' | 'read-only' | 'allow';
 export type Args = string[];
 export type Command = string | null;
 export type Cwd = string | null;
