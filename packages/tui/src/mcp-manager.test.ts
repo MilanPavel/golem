@@ -99,9 +99,9 @@ test("the list groups the user's servers, then the project's", () => {
     "4 servers",
     "",
     "  Yours (~/.golem/config.toml)",
-    "❯ ✔ git     2 tools · ≈1.3K tokens",
-    "  ✘ github  HTTP 401: bad token · retrying in 4s",
-    "  ○ lazy    on demand · off here",
+    "❯ ✔ git     2 tools · 1.3K tokens",
+    "  ✘ github  HTTP 401: bad token · retry in 4s",
+    "  ○ lazy    on demand · off in this chat",
     "",
     "  This project (~/app/.golem/config.toml)",
     "  ✔ db      1 tool",
@@ -157,7 +157,7 @@ test("each kind of server offers what fits it", () => {
   const labels = (server: McpServer) => detailChoices(server).map((choice) => choice.label);
   const more = ["Test the connection", "View the log", "Remove"];
   assert.deepEqual(labels(github), ["Reconnect", "Disable everywhere", ...more]);
-  assert.deepEqual(labels(lazy), ["Turn on for this chat", "Disable everywhere", ...more]);
+  assert.deepEqual(labels(lazy), ["Turn on for this chat", "Start", "Disable everywhere", ...more]);
   assert.deepEqual(labels({ ...lazy, state: "running", tools: ["x"], enabled: true }), [
     "View tools",
     "Turn off for this chat",
@@ -590,7 +590,7 @@ test("Remove asks first, and Keep is what Enter or Esc does", () => {
 test("a list row and the details say what limits a server", () => {
   const limited: McpServer = { ...git, tools_hidden: 2, approval: "allow" };
   const row = shown(openMcpManager(), [limited]).find((line) => line.includes("git"));
-  assert.ok(row?.includes("2 tools · ≈1.3K tokens · 2 hidden · allow"));
+  assert.ok(row?.includes("2 tools · 1.3K tokens · 2 hidden · allow"));
   const detail = shown(press(openMcpManager(), "enter").state, [limited]).join("\n");
   assert.ok(detail.includes("Hidden:        2 tools kept from the model"));
   assert.ok(detail.includes("Approval:      calls run without asking"));

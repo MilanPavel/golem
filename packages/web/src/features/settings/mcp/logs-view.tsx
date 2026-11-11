@@ -8,7 +8,7 @@ import { Button } from "../../../ui/button.tsx";
 const KEPT = 500;
 
 /** The server's log, which keeps coming in while it is open. It scrolls to the newest line while Follow is on. */
-export function LogsView({ server, sessionId, onBack }: { server: McpServer; sessionId: string | null; onBack: () => void }) {
+export function LogsView({ server, sessionId, onBack }: { server: McpServer; sessionId: string | null; onBack?: () => void }) {
   const actions = usePageActions();
   const [lines, setLines] = useState<readonly string[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -43,15 +43,17 @@ export function LogsView({ server, sessionId, onBack }: { server: McpServer; ses
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-3">
-        <Button size="sm" onClick={onBack}>
-          Back
-        </Button>
+        {onBack === undefined ? null : (
+          <Button size="sm" onClick={onBack}>
+            Back
+          </Button>
+        )}
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={follow} onChange={(event) => setFollow(event.target.checked)} />
           Follow
         </label>
       </div>
-      <h3 className="font-mono text-base font-semibold wrap-anywhere">{name} log</h3>
+      {onBack === undefined ? null : <h3 className="font-mono text-base font-semibold wrap-anywhere">{name} log</h3>}
       {error === null ? null : (
         <p role="alert" className="text-sm text-deny">
           {error}

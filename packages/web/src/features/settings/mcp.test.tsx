@@ -84,10 +84,16 @@ function mount(path: string, servers: readonly McpServer[], session: string | nu
   return { fake, page, user: userEvent.setup(), ...view };
 }
 
+/** Picks an item of the "More actions" menu of the server shown. */
+async function menu(user: ReturnType<typeof userEvent.setup>, server: string, item: string): Promise<void> {
+  await user.click(screen.getByRole("button", { name: `More actions for ${server}` }));
+  await user.click(await screen.findByRole("menuitem", { name: item }));
+}
+
 const GIT_ROW = /^running,\s*git(?!hub)/;
 const DB_ROW = /^running,\s*db/;
 const main = () => screen.getByRole("main");
-const row = (name: string) => within(main()).getByRole("button", { name: new RegExp(`${name}`) });
+const row = (name: string) => within(main()).getByRole("button", { name: new RegExp(`^(?!More actions).*${name}`) });
 
 /** jsdom has no layout; `narrow` says which side of the breakpoint the window is on. */
 function stubWidth(narrow: boolean): void {
@@ -118,10 +124,10 @@ test("the list groups servers by the file that names them, with each state in wo
   expect(project.textContent).toContain("(/work/app/.golem/config.toml)");
   expect(within(project).getByRole("button", { name: /db/ })).toBeTruthy();
   expect(within(yours).getAllByRole("button").map((button) => button.textContent)).toEqual([
-    "✔running, git2 tools · ≈1.3K tokens",
-    "✘failed, github401 Unauthorized · retrying in 5s",
-    "○idle (on demand), lazyon demand · off here",
-    "–disabled, offdisabled",
+    "running, gitrunning2 tools · 1.3K tokens",
+    "failed, githubfailed401 Unauthorized · retry in 5s",
+    "on demand, lazyon demand",
+    "disabled, offdisabled",
   ]);
 });
 
@@ -154,30 +160,39 @@ test("a server's detail shows what the terminal shows, and a failed one says why
   await user.click(await screen.findByRole("button", { name: /github/ }));
   const facts = within(main());
   expect(facts.getByRole("heading", { level: 3, name: "github" })).toBeTruthy();
-  expect(facts.getByText("URL")).toBeTruthy();
   expect(facts.getByText("https://api.githubcopilot.com/mcp/")).toBeTruthy();
-  expect(facts.getByText("/Users/me/.golem/config.toml")).toBeTruthy();
-  expect(facts.getByText("401 Unauthorized")).toBeTruthy();
-  expect(facts.getByText("in 5s")).toBeTruthy();
-  expect(facts.queryByText("In this chat")).toBeNull();
+  expect(facts.getByText("Yours · ~/.golem/config.toml")).toBeTruthy();
+  expect(facts.getByText("401 Unauthorized · retry in 5s")).toBeTruthy();
+  expect(facts.getByText("failed")).toBeTruthy();
   await user.click(facts.getByRole("button", { name: "Back" }));
   await user.click(await screen.findByRole("button", { name: /^running,\s*git(?!hub)/ }));
-  expect(within(main()).getByText("2 tools · ≈1.3K tokens per prompt")).toBeTruthy();
+  expect(within(main()).getByText("running")).toBeTruthy();
+  expect(within(main()).getByText("Tools")).toBeTruthy();
 });
 
 test("with no session there is no per-chat choice, and with one there is", async () => {
   const none = mount("/settings/mcp", [lazy]);
   await none.user.click(await screen.findByRole("button", { name: /lazy/ }));
-  expect(screen.queryByRole("button", { name: "Turn on for this chat" })).toBeNull();
-  expect(within(main()).queryByText("In this chat")).toBeNull();
+  expect(screen.queryByRole("button", { name: "Turn on in this chat" })).toBeNull();
+  expect(within(main()).getAllByRole("button", { name: "Start" }).length).toBeGreaterThan(0);
+  expect(within(main()).queryByText(/in this chat/)).toBeNull();
   none.unmount();
   settingsContextStore.set(null);
   const some = mount("/settings/mcp", [lazy], "a");
   await some.user.click(await screen.findByRole("button", { name: /lazy/ }));
-  expect(within(main()).getByText("off · on demand")).toBeTruthy();
-  await some.user.click(screen.getByRole("button", { name: "Turn on for this chat" }));
+  await some.user.click(screen.getByRole("button", { name: "Turn on in this chat" }));
   expect(some.fake.raw.enableMcp).toHaveBeenCalledWith("a", "lazy");
   expect(await screen.findByText("lazy is on for this chat")).toBeTruthy();
+});
+
+test("an idle server starts from Start, with or without a chat", async () => {
+  const { fake, user } = mount("/settings/mcp", [lazy]);
+  await user.click(await screen.findByRole("button", { name: /lazy/ }));
+  expect(screen.getByText("lazy is not running.")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Reconnect" })).toBeNull();
+  await user.click(within(main()).getAllByRole("button", { name: "Start" })[0]!);
+  expect(fake.raw.restartMcp).toHaveBeenCalledWith("lazy", undefined);
+  expect(await screen.findByText("starting lazy…")).toBeTruthy();
 });
 
 test("Reconnect and Disable everywhere act at once", async () => {
@@ -185,7 +200,7 @@ test("Reconnect and Disable everywhere act at once", async () => {
   await user.click(await screen.findByRole("button", { name: /git/ }));
   await user.click(screen.getByRole("button", { name: "Reconnect" }));
   expect(fake.raw.restartMcp).toHaveBeenCalledWith("git", undefined);
-  await user.click(screen.getByRole("button", { name: "Disable everywhere" }));
+  await menu(user, "git", "Disable everywhere");
   expect(fake.raw.setMcpEnabled).toHaveBeenCalledWith("git", false, undefined);
   expect(await screen.findByText("git is disabled everywhere")).toBeTruthy();
 });
@@ -193,7 +208,7 @@ test("Reconnect and Disable everywhere act at once", async () => {
 test("enabling a disabled server asks first, showing the command, and acts only on Enable", async () => {
   const { fake, user } = mount("/settings/mcp", [off]);
   await user.click(await screen.findByRole("button", { name: /off/ }));
-  await user.click(screen.getByRole("button", { name: "Enable for every chat" }));
+  await menu(user, "off", "Enable for every chat");
   const dialog = screen.getByRole("dialog");
   expect(within(dialog).getByText("Enable off?")).toBeTruthy();
   expect(within(dialog).getByText("npx -y off-server")).toBeTruthy();
@@ -201,10 +216,10 @@ test("enabling a disabled server asks first, showing the command, and acts only 
   expect(document.activeElement).toBe(within(dialog).getByRole("button", { name: "Cancel" }));
   await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
   expect(fake.raw.setMcpEnabled).not.toHaveBeenCalled();
-  await user.click(screen.getByRole("button", { name: "Enable on demand" }));
+  await menu(user, "off", "On demand");
   await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Enable" }));
   expect(fake.raw.setMcpEnabled).toHaveBeenCalledWith("off", "on_demand", undefined);
-  await user.click(screen.getByRole("button", { name: "Enable for every chat" }));
+  await menu(user, "off", "Enable for every chat");
   await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Enable" }));
   expect(fake.raw.setMcpEnabled).toHaveBeenLastCalledWith("off", true, undefined);
 });
@@ -217,7 +232,7 @@ test("a failed action shows the daemon's message", async () => {
   expect((await screen.findByRole("alert")).textContent).toContain("no such server");
 });
 
-test("View tools lists the tools without the prefix, and says so when there are none", async () => {
+test("the Tools tab lists the tools without the prefix, and says so when there are none", async () => {
   const { fake, user } = mount("/settings/mcp", [git]);
   fake.raw.mcpTools.mockResolvedValue({
     name: "git",
@@ -227,15 +242,15 @@ test("View tools lists the tools without the prefix, and says so when there are 
     ],
   });
   await user.click(await screen.findByRole("button", { name: /git/ }));
-  await user.click(screen.getByRole("button", { name: "View tools" }));
   const list = await screen.findByRole("list", { name: "git tools" });
   expect(within(list).getAllByRole("listitem").map((item) => item.textContent)).toEqual([
-    "showngit_status≈300 tokensShows the status.Try",
-    "hiddengit_log≈100 tokensShows the log.Try",
+    "git_statusShows the status.300▸",
+    "git_logShows the log.hidden▸",
   ]);
+  expect(screen.getByText(/1 of 2 on · about 300 tokens a turn/)).toBeTruthy();
+  await user.type(screen.getByRole("searchbox", { name: "Search tools" }), "LOG");
+  expect(within(list).getAllByRole("listitem").length).toBe(1);
   expect(fake.raw.mcpTools).toHaveBeenCalledWith("git", undefined);
-  fake.raw.mcpTools.mockResolvedValue({ name: "git", tools: [] });
-  await user.click(screen.getByRole("button", { name: "Back" }));
   expect(within(main()).getByRole("heading", { level: 3, name: "git" })).toBeTruthy();
 });
 
@@ -251,7 +266,7 @@ test("on a wide window the list and the selected server's details sit side by si
   expect(screen.queryByRole("heading", { name: "git" })).toBeNull();
   expect(row("github").getAttribute("aria-current")).toBe("true");
   expect(screen.getByRole("button", { name: GIT_ROW }).getAttribute("aria-current")).toBeNull();
-  expect(screen.getByText("401 Unauthorized", { selector: "dd" })).toBeTruthy();
+  expect(screen.getByText("401 Unauthorized · retry in 5s", { selector: "p" })).toBeTruthy();
   expect(screen.getAllByRole("button", { name: /Add a server|Import/ }).length).toBe(2);
 });
 
@@ -266,7 +281,7 @@ test("on a wide window the list and the selected server's details sit side by si
   expect(screen.queryByRole("heading", { name: "git" })).toBeNull();
   expect(row("github").getAttribute("aria-current")).toBe("true");
   expect(screen.getByRole("button", { name: GIT_ROW }).getAttribute("aria-current")).toBeNull();
-  expect(screen.getByText("401 Unauthorized", { selector: "dd" })).toBeTruthy();
+  expect(screen.getByText("401 Unauthorized · retry in 5s", { selector: "p" })).toBeTruthy();
   expect(screen.getAllByRole("button", { name: /Add a server|Import/ }).length).toBe(2);
 });
 
@@ -285,7 +300,7 @@ test("axe finds nothing on the list, a detail, and the confirm, in both themes",
     expect((await axe.run(container, noContrast)).violations).toEqual([]);
     await user.click(row("off"));
     expect((await axe.run(container, noContrast)).violations).toEqual([]);
-    await user.click(screen.getByRole("button", { name: "Enable for every chat" }));
+    await menu(user, "off", "Enable for every chat");
     expect((await axe.run(document.body, noContrast)).violations).toEqual([]);
     unmount();
   }
@@ -309,7 +324,6 @@ const withTools = { name: "git", tools: [logTool, rawTool] };
 async function openTools(user: ReturnType<typeof userEvent.setup>, fake: ReturnType<typeof mount>["fake"]) {
   fake.raw.mcpTools.mockResolvedValue(withTools);
   await user.click(await screen.findByRole("button", { name: GIT_ROW }));
-  await user.click(screen.getByRole("button", { name: "View tools" }));
   await screen.findByRole("list", { name: "git tools" });
 }
 
@@ -332,7 +346,6 @@ test("a tool hidden by a pattern cannot be shown from here, and says why", async
   fake.raw.mcpGet.mockResolvedValue({ config: { tools: { include: [], exclude: ["git_*"] } } } as never);
   fake.raw.mcpTools.mockResolvedValue({ ...withTools, tools: [{ ...logTool, hidden: true }] });
   await user.click(await screen.findByRole("button", { name: GIT_ROW }));
-  await user.click(screen.getByRole("button", { name: "View tools" }));
   await user.click(await screen.findByRole("switch", { name: "Show git_log to the model" }));
   expect((await screen.findByRole("alert")).textContent).toContain("not a hidden pattern");
   expect(fake.raw.updateMcpServer).not.toHaveBeenCalled();
@@ -343,7 +356,8 @@ test("Try a tool draws a form from its schema, sends typed arguments, and shows 
   fake.raw.mcpCall.mockResolvedValue({ text: "commit 1\ncommit 2", is_error: false });
   await openTools(user, fake);
   await user.click(screen.getByRole("button", { name: "Try git_log" }));
-  const dialog = screen.getByRole("dialog");
+  const dialog = main();
+  expect(screen.getByRole("tab", { name: "Try a tool", selected: true })).toBeTruthy();
   expect(within(dialog).getByText(/Runs now, without asking/)).toBeTruthy();
   expect(within(dialog).getByText("The repo.")).toBeTruthy();
   await user.click(within(dialog).getByRole("button", { name: "Run" }));
@@ -360,7 +374,7 @@ test("a tool whose schema has no form takes JSON, and a refused call shows the d
   const { fake, user } = mount("/settings/mcp", [git]);
   await openTools(user, fake);
   await user.click(screen.getByRole("button", { name: "Try raw" }));
-  const dialog = screen.getByRole("dialog");
+  const dialog = main();
   expect(within(dialog).queryByRole("button", { name: "Use the form" })).toBeNull();
   await user.click(within(dialog).getByLabelText("Arguments (JSON)"));
   await user.paste("[1]");
@@ -378,7 +392,7 @@ test("a tool that reports an error says so", async () => {
   fake.raw.mcpCall.mockResolvedValue({ text: "no such repo", is_error: true });
   await openTools(user, fake);
   await user.click(screen.getByRole("button", { name: "Try raw" }));
-  await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Run" }));
+  await user.click(within(main()).getByRole("button", { name: "Run" }));
   expect(await screen.findByText("The tool reported an error:")).toBeTruthy();
   expect(screen.getByText("no such repo")).toBeTruthy();
 });
@@ -391,7 +405,7 @@ test("Test the connection shows each step as it ends, then what it found, and ru
     return { test_id: "t", ok: true, steps: [], tools: [{ name: "a", description: "" }], stderr_tail: [], server_info: { name: "git", version: "1.0" } } as never;
   });
   await user.click(await screen.findByRole("button", { name: GIT_ROW }));
-  await user.click(screen.getByRole("button", { name: "Test the connection" }));
+  await user.click(screen.getByRole("button", { name: "Test" }));
   const steps = await screen.findByRole("list", { name: "Test steps" });
   expect(within(steps).getAllByRole("listitem").map((item) => item.textContent)).toEqual(["✓ resolve 0m 00.003s"]);
   expect(await screen.findByText(/ok: git 1.0, 1 tools/)).toBeTruthy();
@@ -404,7 +418,7 @@ test("a failed test shows what the server said and the hint, and a refused one s
   const { fake, user } = mount("/settings/mcp", [git]);
   fake.raw.mcpTest.mockResolvedValue({ test_id: "t", ok: false, steps: [], tools: [], stderr_tail: ["boom"], hint: "Install Node." } as never);
   await user.click(await screen.findByRole("button", { name: GIT_ROW }));
-  await user.click(screen.getByRole("button", { name: "Test the connection" }));
+  await user.click(screen.getByRole("button", { name: "Test" }));
   expect(await screen.findByText("✘ failed")).toBeTruthy();
   expect(screen.getByText("boom")).toBeTruthy();
   expect(screen.getByText("Install Node.")).toBeTruthy();
@@ -417,7 +431,7 @@ test("the log shows its lines, adds new ones as they come, and follows unless tu
   const { fake, user } = mount("/settings/mcp", [git]);
   fake.raw.mcpLogs.mockResolvedValue({ name: "git", lines: [{ ts: 0, kind: "stderr", text: "starting" }] });
   await user.click(await screen.findByRole("button", { name: GIT_ROW }));
-  await user.click(screen.getByRole("button", { name: "View the log" }));
+  await user.click(screen.getByRole("tab", { name: "Logs" }));
   const log = await screen.findByRole("log", { name: "git log" });
   expect(log.textContent).toContain("starting");
   act(() => {
@@ -436,24 +450,26 @@ test("the log shows its lines, adds new ones as they come, and follows unless tu
 test("an empty log says so", async () => {
   const { user } = mount("/settings/mcp", [git]);
   await user.click(await screen.findByRole("button", { name: GIT_ROW }));
-  await user.click(screen.getByRole("button", { name: "View the log" }));
+  await user.click(screen.getByRole("tab", { name: "Logs" }));
   expect(await screen.findByText("Nothing logged yet.")).toBeTruthy();
 });
 
 test("Remove asks first, names the file, and acts only on Remove; a project's server has no Remove", async () => {
   const { fake, user } = mount("/settings/mcp", [git, mine]);
   await user.click(await screen.findByRole("button", { name: DB_ROW }));
-  expect(screen.queryByRole("button", { name: "Remove" })).toBeNull();
+  await user.click(screen.getByRole("button", { name: "More actions for db" }));
+  expect(screen.queryByRole("menuitem", { name: "Remove" })).toBeNull();
+  await user.keyboard("{Escape}");
   await user.click(screen.getByRole("button", { name: "Back" }));
   await user.click(await screen.findByRole("button", { name: GIT_ROW }));
-  await user.click(screen.getByRole("button", { name: "Remove" }));
+  await menu(user, "git", "Remove");
   const dialog = screen.getByRole("dialog");
   expect(within(dialog).getByText("Remove git?")).toBeTruthy();
   expect(within(dialog).getByText("/Users/me/.golem/config.toml")).toBeTruthy();
   expect(document.activeElement).toBe(within(dialog).getByRole("button", { name: "Cancel" }));
   await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
   expect(fake.raw.removeMcpServer).not.toHaveBeenCalled();
-  await user.click(screen.getByRole("button", { name: "Remove" }));
+  await menu(user, "git", "Remove");
   await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Remove" }));
   expect(fake.raw.removeMcpServer).toHaveBeenCalledWith("git");
 });
@@ -462,7 +478,7 @@ test("a refused remove shows the daemon's message", async () => {
   const { fake, user } = mount("/settings/mcp", [git]);
   fake.raw.removeMcpServer.mockRejectedValue(new Error("not yours to remove"));
   await user.click(await screen.findByRole("button", { name: GIT_ROW }));
-  await user.click(screen.getByRole("button", { name: "Remove" }));
+  await menu(user, "git", "Remove");
   await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Remove" }));
   expect((await screen.findByRole("alert")).textContent).toContain("not yours to remove");
 });
@@ -476,13 +492,11 @@ test("axe finds nothing on the tools, the try dialog, the test, and the log, in 
     expect((await axe.run(container, noContrast)).violations).toEqual([]);
     await user.click(screen.getByRole("button", { name: "Try git_log" }));
     expect((await axe.run(document.body, noContrast)).violations).toEqual([]);
-    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Close" }));
-    await user.click(screen.getByRole("button", { name: "Back" }));
-    await user.click(screen.getByRole("button", { name: "Test the connection" }));
-    await screen.findByRole("status");
+    await user.click(screen.getByRole("tab", { name: "Tools" }));
+    await user.click(screen.getByRole("button", { name: "Test" }));
+    await screen.findByRole("list", { name: "Test steps" });
     expect((await axe.run(container, noContrast)).violations).toEqual([]);
-    await user.click(screen.getByRole("button", { name: "Back" }));
-    await user.click(screen.getByRole("button", { name: "View the log" }));
+    await user.click(screen.getByRole("tab", { name: "Logs" }));
     await screen.findByRole("log", { name: "git log" });
     expect((await axe.run(container, noContrast)).violations).toEqual([]);
     unmount();
@@ -497,7 +511,7 @@ test("Edit shows the config as a form, and Save sends the change with a stored s
     detailOf(git, { command: "mcp-server-git", args: ["--repository", "/Users/me/repo"], env: { TOKEN: "keychain:mcp/git-token", MODE: "fast" }, timeout_seconds: 30 }),
   );
   await user.click(await screen.findByRole("button", { name: GIT_ROW }));
-  await user.click(screen.getByRole("button", { name: "Edit" }));
+  await user.click(screen.getByRole("tab", { name: "Edit" }));
   const command = await screen.findByLabelText("Command");
   expect((command as HTMLInputElement).value).toBe("mcp-server-git --repository /Users/me/repo");
   expect((screen.getByLabelText("variable 1 value") as HTMLInputElement).placeholder).toContain("stored in the Keychain");
@@ -517,7 +531,7 @@ test("Edit replaces a secret only when a new one is typed, and says what is wron
   const { fake, user } = mount("/settings/mcp", [git]);
   fake.raw.mcpGet.mockResolvedValue(detailOf(git, { command: "x", env: { TOKEN: "keychain:mcp/git-token" } }));
   await user.click(await screen.findByRole("button", { name: GIT_ROW }));
-  await user.click(screen.getByRole("button", { name: "Edit" }));
+  await user.click(screen.getByRole("tab", { name: "Edit" }));
   await user.type(await screen.findByLabelText("variable 1 value"), "s3cret");
   await user.clear(screen.getByLabelText("Command"));
   await user.click(screen.getByRole("button", { name: "Save" }));
@@ -533,7 +547,7 @@ test("a refused save shows the daemon's message and keeps the form", async () =>
   fake.raw.mcpGet.mockResolvedValue(detailOf(git, { command: "x" }));
   fake.raw.updateMcpServer.mockRejectedValue(new Error("the file changed"));
   await user.click(await screen.findByRole("button", { name: GIT_ROW }));
-  await user.click(screen.getByRole("button", { name: "Edit" }));
+  await user.click(screen.getByRole("tab", { name: "Edit" }));
   await user.click(await screen.findByRole("button", { name: "Save" }));
   expect((await screen.findByRole("alert")).textContent).toContain("the file changed");
   expect(screen.getByLabelText("Command")).toBeTruthy();
@@ -542,11 +556,11 @@ test("a refused save shows the daemon's message and keeps the form", async () =>
 test("a project's server has no Edit without a session, and has it with one", async () => {
   const first = mount("/settings/mcp", [mine]);
   await first.user.click(await screen.findByRole("button", { name: DB_ROW }));
-  expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
+  expect(screen.queryByRole("tab", { name: "Edit" })).toBeNull();
   first.unmount();
   mount("/settings/mcp", [mine], "s1");
   await userEvent.setup().click(await screen.findByRole("button", { name: DB_ROW }));
-  expect(screen.getByRole("button", { name: "Edit" })).toBeTruthy();
+  expect(screen.getByRole("tab", { name: "Edit" })).toBeTruthy();
 });
 
 const FILES = {
@@ -709,7 +723,7 @@ test("axe finds nothing on the edit form, the list of servers to add, and the ad
     fake.raw.mcpGet.mockResolvedValue(detailOf(git, { command: "x", env: { A: "keychain:mcp/git-a", B: "b" } }));
     fake.raw.mcpCatalog.mockResolvedValue({ entries: [FILES, GITHUB] as never });
     await user.click(await screen.findByRole("button", { name: GIT_ROW }));
-    await user.click(screen.getByRole("button", { name: "Edit" }));
+    await user.click(screen.getByRole("tab", { name: "Edit" }));
     await screen.findByLabelText("Command");
     expect((await axe.run(document.body, noContrast)).violations).toEqual([]);
     await user.click(screen.getByRole("button", { name: "Cancel" }));
@@ -743,7 +757,7 @@ const SCAN = {
 
 async function openImport(fake: ReturnType<typeof mount>["fake"], user: ReturnType<typeof mount>["user"], scan: unknown = SCAN) {
   fake.raw.scanMcpImport.mockResolvedValue(scan as never);
-  await user.click(await screen.findByRole("button", { name: "Import from other apps" }));
+  await user.click(await screen.findByRole("button", { name: "Import" }));
   return screen.findByRole("dialog");
 }
 
@@ -826,7 +840,7 @@ test("Import with nothing found, and a scan that fails, say so", async () => {
   first.unmount();
   const second = mount("/settings/mcp", [git]);
   second.fake.raw.scanMcpImport.mockRejectedValue(new Error("daemon is down"));
-  await second.user.click(await screen.findByRole("button", { name: "Import from other apps" }));
+  await second.user.click(await screen.findByRole("button", { name: "Import" }));
   expect((await screen.findByRole("alert")).textContent).toContain("daemon is down");
   second.fake.raw.scanMcpImport.mockResolvedValue({ scan_id: "s", sources: [] });
   await second.user.click(screen.getByRole("button", { name: "Try again" }));

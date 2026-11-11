@@ -19,11 +19,12 @@ const lazy: McpServer = { ...git, name: "lazy", state: "idle", tools: [], schema
 const project: McpServer = { ...git, name: "db", project: "/work/app" };
 
 test("a row says tools and tokens, or the error and when it retries, or how it is turned on", () => {
-  assert.equal(mcpSummary(git), "2 tools · ≈1.3K tokens");
-  assert.equal(mcpSummary({ ...git, tools_hidden: 1, approval: "allow" }), "2 tools · ≈1.3K tokens · 1 hidden · allow");
-  assert.equal(mcpSummary({ ...git, tools: ["x"], schema_tokens: 40, on_demand: true, enabled: true }), "1 tool · ≈40 tokens · on here");
-  assert.equal(mcpSummary(down), "exited · retrying in 4s");
-  assert.equal(mcpSummary(lazy), "on demand · off here");
+  assert.equal(mcpSummary(git), "2 tools · 1.3K tokens");
+  assert.equal(mcpSummary({ ...git, tools_hidden: 1, approval: "allow" }), "2 tools · 1.3K tokens · 1 hidden · allow");
+  assert.equal(mcpSummary({ ...git, tools: ["x"], schema_tokens: 40, on_demand: true, enabled: true }), "1 tool · 40 tokens · on in this chat");
+  assert.equal(mcpSummary(down), "exited · retry in 4s");
+  assert.equal(mcpSummary(lazy), "on demand · off in this chat");
+  assert.equal(mcpSummary(lazy, false), "on demand");
   assert.equal(mcpSummary({ ...git, state: "disabled" }), "disabled");
   assert.equal(mcpSummary({ ...git, state: "starting" }), "starting…");
 });
@@ -34,7 +35,7 @@ test("each state has a glyph, a tone, and a word", () => {
   assert.deepEqual(mcpStatusMark({ ...git, state: "starting" }), { text: "◌", tone: "wait" });
   assert.deepEqual(mcpStatusMark(lazy), { text: "○", tone: "off" });
   assert.deepEqual(mcpStatusMark({ ...git, state: "disabled" }), { text: "–", tone: "off" });
-  assert.equal(mcpStatusWord(lazy), "idle (on demand)");
+  assert.equal(mcpStatusWord(lazy), "on demand");
   assert.equal(mcpStatusWord(git), "running");
 });
 
@@ -44,9 +45,11 @@ test("the user's servers come before the project's", () => {
 
 test("the choices fit the state, and a project's server is not removed from here", () => {
   const labels = (server: McpServer) => detailChoices(server).map((choice) => choice.label);
-  assert.deepEqual(labels(lazy), ["Turn on for this chat", "Disable everywhere", "Test the connection", "View the log", "Remove"]);
+  assert.deepEqual(labels(lazy), ["Turn on for this chat", "Start", "Disable everywhere", "Test the connection", "View the log", "Remove"]);
   assert.deepEqual(labels({ ...git, state: "disabled" }).slice(0, 2), ["Enable for every chat", "Enable on demand"]);
   assert.ok(labels(git).includes("View tools"));
+  assert.ok(labels(git).includes("Reconnect"));
+  assert.ok(!labels({ ...git, state: "disabled" }).some((label) => label === "Reconnect" || label === "Start"));
   assert.ok(!labels(project).includes("Remove"));
 });
 

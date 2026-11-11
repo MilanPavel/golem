@@ -70,26 +70,28 @@ export function detailChoices(server: McpServer): DetailChoice[] {
       action: { kind: "session", name, on: !on },
     });
   }
-  if (server.state !== "idle") {
-    choices.push({ label: "Reconnect", action: { kind: "restart", name } });
-  }
+  // `mcp.restart` starts a server that has not started yet, so an idle one gets Start.
+  choices.push({ label: server.state === "idle" ? "Start" : "Reconnect", action: { kind: "restart", name } });
   choices.push({ label: "Disable everywhere", action: { kind: "set-enabled", name, enabled: false } });
   return [...choices, ...inspect, ...remove];
 }
 
-/** One row of the list: tools and tokens, or the error and when it retries, or how it is turned on. */
-export function mcpSummary(server: McpServer): string {
+/**
+ * One row of the list: tools and tokens, or the error and when it retries, or how it is turned on.
+ * Without a chat (`session` false) there is nothing to be on or off in, so that is not said.
+ */
+export function mcpSummary(server: McpServer, session = true): string {
   if (server.state === "running") {
     const count = server.tools?.length ?? 0;
-    const tokens = server.schema_tokens == null ? "" : ` · ≈${formatTokens(server.schema_tokens)} tokens`;
-    return `${count} ${count === 1 ? "tool" : "tools"}${tokens}${markNote(server)}${hereNote(server)}`;
+    const tokens = server.schema_tokens == null ? "" : ` · ${formatTokens(server.schema_tokens)} tokens`;
+    return `${count} ${count === 1 ? "tool" : "tools"}${tokens}${markNote(server)}${hereNote(server, session)}`;
   }
   if (server.state === "failed") {
-    const retry = server.retry_seconds == null ? "" : ` · retrying in ${formatSeconds(server.retry_seconds)}`;
+    const retry = server.retry_seconds == null ? "" : ` · retry in ${formatSeconds(server.retry_seconds)}`;
     return `${server.error ?? "failed"}${retry}`;
   }
   if (server.state === "idle") {
-    return `on demand${hereNote(server)}`;
+    return `on demand${hereNote(server, session)}`;
   }
   if (server.state === "disabled") {
     return "disabled";
@@ -104,11 +106,11 @@ function markNote(server: McpServer): string {
   return `${hidden}${server.approval === "allow" ? " · allow" : ""}`;
 }
 
-function hereNote(server: McpServer): string {
-  if (!server.on_demand) {
+function hereNote(server: McpServer, session: boolean): string {
+  if (!server.on_demand || !session) {
     return "";
   }
-  return server.enabled === true ? " · on here" : " · off here";
+  return server.enabled === true ? " · on in this chat" : " · off in this chat";
 }
 
 /** The glyph and tone of a server's state. The word goes with it, so colour is never alone. */
@@ -127,7 +129,7 @@ export function mcpStatusMark(server: McpServer): { text: string; tone: McpTone 
 
 export function mcpStatusWord(server: McpServer): string {
   if (server.state === "idle") {
-    return "idle (on demand)";
+    return "on demand";
   }
   return server.state;
 }
