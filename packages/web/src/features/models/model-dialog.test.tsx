@@ -185,11 +185,22 @@ test("the current model carries a check and the word current, the default a badg
   expect(within(current).getByText(QWEN)).toBeTruthy();
 });
 
-test("a row shows its facts", async () => {
+const factsOf = (name: string) => Array.from(optionOf(name).querySelectorAll("span.items-end > span"), (fact) => fact.textContent);
+
+test("a row shows its facts, one line per kind", async () => {
   await openDialog();
-  expect(optionOf("local").textContent).toContain("41k  free  5.2 GB fits");
-  expect(optionOf("Qwen3 14B").textContent).toContain("41k  free  9.3 GB fits  download");
-  expect(optionOf("Qwen3 235B").textContent).toContain("131k  $0.2/0.6");
+  expect(factsOf("local")).toEqual(["41k · free", "5.2 GB fits"]);
+  expect(factsOf("Qwen3 14B")).toEqual(["41k · free", "9.3 GB fits", "download"]);
+  expect(factsOf("Qwen3 235B")[0]).toContain("131k · $0.2/0.6");
+});
+
+test("the action bar is there before a model is picked, with its buttons disabled", async () => {
+  const { user } = await openDialog();
+  await user.type(screen.getByRole("combobox", { name: "Search models" }), "zzzz-no-such-model");
+  const bar = screen.getByRole("group", { name: "Actions" });
+  const buttons = within(bar).getAllByRole("button");
+  expect(buttons.length).toBeGreaterThan(0);
+  for (const button of buttons) expect((button as HTMLButtonElement).disabled).toBe(true);
 });
 
 test("a model that is not ready says why", async () => {

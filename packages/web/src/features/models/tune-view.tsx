@@ -580,8 +580,8 @@ export function TuneView({
   }
 
   return (
-    <div className="flex flex-col gap-3" onKeyDown={onKeyDown}>
-      <div className="flex items-start gap-2">
+    <div className="flex min-h-0 flex-1 flex-col gap-3" onKeyDown={onKeyDown}>
+      <div className="flex shrink-0 items-start gap-2">
         <button
           type="button"
           aria-label="Back to the models"
@@ -597,8 +597,8 @@ export function TuneView({
           <p className="font-mono text-xs text-faint">{model}</p>
         </div>
       </div>
-      {body}
-      <div className="mt-1 flex items-center justify-between gap-2 border-t border-line pt-4">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">{body}</div>
+      <div className="mt-1 flex shrink-0 items-center justify-between gap-2 border-t border-line pt-4">
         <Button
           kind="secondary"
           aria-label="Reset all options"

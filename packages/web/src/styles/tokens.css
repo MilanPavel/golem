@@ -44,6 +44,8 @@
   /* Layout widths from docs/design/index.md: w-sidebar is 268 px, max-w-column is 46 rem. */
   --spacing-sidebar: 16.75rem;
   --container-column: 46rem;
+  /* The tallest the model dialog grows: 44 rem. It keeps one size whatever it shows. */
+  --spacing-dialog: 44rem;
 
   /* From here the details drawer sits beside the column (1100 px). */
   --breakpoint-wide: 68.75rem;
