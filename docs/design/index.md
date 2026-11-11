@@ -106,7 +106,7 @@ Checked with the WCAG 2.2 formula. 4.5:1 for text, 3:1 for fills and focus rings
 
 These rules came from the 10.16 polish of Settings, the model dialog, Tune, and the trace header.
 
-**Pages.** A page such as Settings uses the full width of the main area, with 28 px gutters. It has no centered column. Its header holds the title in `font-prose` and a close button that goes back to the last session. Below the header is a row of underline tabs, the same `TAB_LOOK` as Chat and Trace, and each tab is a link with its own URL. A short form, such as Appearance, keeps to `max-w-column`.
+**Pages.** A page such as Settings uses the full width of the main area, with 28 px gutters. It has no centered column. Its header holds the title in `font-prose` and a close button that goes back to the last session. Below the header is a row of underline tabs, the same `TAB_LOOK` as the trace page, and each tab is a link with its own URL. A short form, such as Appearance, keeps to `max-w-column`.
 
 - Status cards sit in a grid: 1 column on a phone, 2 from `md`, and 3 from `wide`. A table, such as API keys, spans the full width.
 - A list with a detail, such as MCP servers, shows both side by side: a fixed list pane (`w-mcp-list`, 300 px) and a detail that scrolls on its own. Below `narrow`, the detail replaces the list and gets a Back button.
@@ -122,6 +122,52 @@ These rules came from the 10.16 polish of Settings, the model dialog, Tune, and 
 - A special value is a choice, not a magic number: Answer length is Until done, Fill context, or Limit, and Seed is Random or Fixed. A short list of values is a segmented control, not a select.
 
 **A summary line** goes on its own full-width row under the tabs, not beside them. The tab row holds only the tabs and the page's actions, such as Refresh.
+
+## The chat
+
+These rules came from the 10.17 redesign. A turn should read like an answer, not a log. Tracing detail stays one click away.
+
+**One turn, one golem.** The model steps of one run render as one turn. A turn has one pixel golem at the top and one footer at the end. The footer gives the time of the whole turn and the number of its steps (`42.1s · 5 steps`). It also has `Inspect ↗`, which opens the trace at that turn.
+
+**Steps fold into an activity line.**
+- Under the answer, one quiet line in `muted` sans: a dot per step, then a summary such as `searched the web · 3 GitHub calls, 1 failed · 1 approval`.
+- The dots are `allow` when done, `deny` when failed, and a `wait` diamond for an approval. A failure is never hidden behind the fold.
+- Clicking the line opens the steps in place. The steps form a list with a thin `line` rule at the left: one mono row per step, with a mark, the tool, and a one-line result.
+- An MCP tool reads `github · get_me`, not `mcp__github__get_me`.
+
+**Detail: Quiet, Normal, Verbose.** A switch in the session header and `/detail` set how much shows. The choice is remembered per browser.
+
+| Detail | Shows |
+|---|---|
+| Quiet | The activity line, with the count of steps only |
+| Normal | The activity line with its summary. The steps stay closed |
+| Verbose | The steps open, with their arguments and results, like Ctrl-O in the TUI |
+
+**Approvals.**
+- **While one waits,** it docks above the composer as a compact bar: the seal, `Allow github · get_me?`, a one-line reason in `faint` mono, and the buttons `Allow once ↵`, `Allow in this chat S ▾`, `Details`, `Deny D`.
+- **The ▾ opens wider scopes:** always for this tool, every read from this server, or all of this server.
+- **Once answered,** it becomes a chip in the steps (`✓ get_me · this chat`). An approval has no target when the call has no arguments.
+
+**Permission modes.** A session runs in one of three modes. A chip beside the model in the composer shows it, `/mode` changes it, and Settings sets the default.
+
+| Mode | Runs without asking |
+|---|---|
+| Careful | Reads, search in files, git status, diff and log, todos |
+| Balanced (default) | Careful's tools, plus web search, web fetch, the sandboxed shell without network, and the read-only tools of an MCP server you trust |
+| Autopilot | Balanced's tools, plus edits inside the project and every tool of a server you trust |
+
+- The unsandboxed shell and any path outside the project always ask.
+- A rule you write still wins, and a deny always wins.
+
+**Type of the answer.** Golem's answers use Literata at 16.5 px / 1.6 and weight 380, in a 38 rem column, in `ink-soft`. Code is Geist Mono at 13 px. Your message is 15 px, so it is never smaller than the reply.
+
+**The trace is an inspector.**
+- Chat has no Chat/Trace tabs. The trace opens in a resizable panel on the right, from:
+  - the Inspect icon in the session header,
+  - ⌘.,
+  - `Inspect ↗` on a turn, which scrolls the panel to that turn's span.
+- The panel has its own summary line and `Open full ↗`, which goes to the full trace page.
+- On a phone, the panel opens full screen.
 
 ## Copy
 
