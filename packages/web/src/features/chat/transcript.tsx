@@ -182,7 +182,7 @@ export const UserMessage = memo(function UserMessage({ message }: { message: Cha
   const time = shown ? formatClock(message.at) : "";
   return (
     <article aria-label="You" className="flex max-w-xl flex-col items-end self-end">
-      <div className="min-w-0 rounded-lg rounded-br-xs bg-slip px-3.5 py-2.5 text-sm leading-normal wrap-anywhere whitespace-pre-wrap">
+      <div className="min-w-0 rounded-lg rounded-br-xs bg-slip px-3.5 py-2.5 text-chat wrap-anywhere whitespace-pre-wrap">
         {message.skill ? (
           <span className="mb-1 block">
             <span className="inline-block rounded-full bg-clay-soft px-2 py-0.5 font-mono text-xs text-clay-ink">
@@ -365,7 +365,7 @@ export function TranscriptColumn({
   return (
     <div className={cn("relative flex min-h-0 flex-1 flex-col", className)}>
       <div ref={scroller} onScroll={onScroll} className="min-h-0 flex-1 overflow-y-auto" data-transcript-scroller>
-        <div ref={content} className="mx-auto flex max-w-column flex-col gap-6 px-5 py-7">
+        <div ref={content} className="mx-auto flex max-w-column flex-col gap-8 px-5 py-7">
           <TranscriptMessages chat={chat} onAnswer={onAnswer} sendingId={sendingId} answerError={answerError} editing={editing} onEdit={onEdit} />
         </div>
       </div>

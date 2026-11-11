@@ -26,6 +26,7 @@ function ratio(a: string, b: string): number {
 
 const text: Record<string, string[]> = {
   ink: ["bg", "surface", "sunken", "slip", "code-bg"],
+  "ink-soft": ["bg", "surface", "sunken", "slip", "code-bg"],
   muted: ["bg", "surface", "sunken", "slip"],
   faint: ["bg", "surface", "sunken"],
   "clay-ink": ["bg", "surface", "clay-soft"],

@@ -15,18 +15,19 @@
   --shiki-token-punctuation: var(--color-muted);
   --shiki-token-link: var(--color-clay-ink);
 
-  max-width: 40rem;
+  max-width: 38rem;
   font-family: var(--font-prose);
-  font-size: 1rem;
-  line-height: 1.68;
+  font-size: 1.03125rem;
+  line-height: 1.6;
+  font-weight: 380;
   font-optical-sizing: auto;
-  color: var(--color-ink);
+  color: var(--color-ink-soft);
   overflow-wrap: anywhere;
 }
 
 @media (max-width: 40rem) {
   .prose {
-    font-size: 0.96875rem;
+    font-size: 1rem;
   }
 }
 
@@ -39,7 +40,7 @@
 }
 
 .prose p {
-  margin: 0 0 0.7em;
+  margin: 0 0 0.75em;
 }
 
 .prose h1,
@@ -63,7 +64,7 @@
 }
 
 .prose h3 {
-  font-size: 1.0625rem;
+  font-size: 1.1875rem;
 }
 
 .prose h4,
@@ -136,8 +137,8 @@
   border-radius: var(--radius-md);
   background: var(--color-code-bg);
   font-family: var(--font-mono);
-  font-size: 0.78rem;
-  line-height: 1.6;
+  font-size: 0.8125rem;
+  line-height: 1.55;
   overflow-wrap: normal;
 }
 
