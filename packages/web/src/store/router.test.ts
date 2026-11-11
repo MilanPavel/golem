@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { createRouter, parseRoute, sessionPath, settingsPath, tracePath } from "./router.ts";
+import { createRouter, inspectPath, parseRoute, sessionPath, settingsPath, tracePath } from "./router.ts";
 
 afterEach(() => {
   history.replaceState(null, "", "/");
@@ -7,11 +7,44 @@ afterEach(() => {
 
 test("parseRoute", () => {
   expect(parseRoute("/")).toEqual({ name: "home" });
-  expect(parseRoute("/s/abc")).toEqual({ name: "session", id: "abc" });
-  expect(parseRoute("/s/a%20b")).toEqual({ name: "session", id: "a b" });
+  expect(parseRoute("/s/abc")).toEqual({ name: "session", id: "abc", inspect: null });
+  expect(parseRoute("/s/a%20b")).toEqual({ name: "session", id: "a b", inspect: null });
   for (const bad of ["/s/", "/s", "/s/a/b", "/s/a%2Fb", "/other", "/gallery", "/s/%E0%A4%A"]) {
     expect(parseRoute(bad)).toEqual({ name: "not-found" });
   }
+});
+
+test("parseRoute reads ?inspect as the open inspector, and its value as the span", () => {
+  expect(parseRoute("/s/abc", "?inspect")).toEqual({ name: "session", id: "abc", inspect: { span: null } });
+  expect(parseRoute("/s/abc", "?inspect=")).toEqual({ name: "session", id: "abc", inspect: { span: null } });
+  expect(parseRoute("/s/abc", "?inspect=m_2")).toEqual({ name: "session", id: "abc", inspect: { span: "m_2" } });
+  expect(parseRoute("/s/abc", "?other=1")).toEqual({ name: "session", id: "abc", inspect: null });
+  // The trace page ignores it.
+  expect(parseRoute("/s/abc/trace", "?inspect")).toEqual({ name: "trace", id: "abc", span: null });
+});
+
+test("inspectPath round-trips through parseRoute", () => {
+  expect(inspectPath("s_1")).toBe("/s/s_1?inspect");
+  expect(inspectPath("s_1", null)).toBe("/s/s_1?inspect");
+  const path = inspectPath("s_1 x", "m_2&3");
+  const [pathname, search] = path.split("?");
+  expect(parseRoute(pathname ?? "", `?${search ?? ""}`)).toEqual({ name: "session", id: "s_1 x", inspect: { span: "m_2&3" } });
+});
+
+test("opening, moving and closing the inspector are route changes of the same session", () => {
+  history.replaceState(null, "", "/s/one");
+  const router = createRouter();
+  const closed = router.getSnapshot();
+  router.navigate(inspectPath("one"), { replace: true });
+  const open = router.getSnapshot();
+  expect(open).toEqual({ name: "session", id: "one", inspect: { span: null } });
+  router.navigate(inspectPath("one"), { replace: true });
+  expect(router.getSnapshot()).toBe(open);
+  router.navigate(inspectPath("one", "m_1"), { replace: true });
+  expect(router.getSnapshot()).toEqual({ name: "session", id: "one", inspect: { span: "m_1" } });
+  router.navigate(sessionPath("one"), { replace: true });
+  expect(router.getSnapshot()).toEqual(closed);
+  router.stop();
 });
 
 test("parseRoute reads the settings page and its sections", () => {
@@ -40,7 +73,7 @@ test("moving between sections is a new route, and back reaches the section, then
   expect(router.getSnapshot()).toBe(first);
   router.navigate("/settings/appearance");
   expect(router.getSnapshot()).toEqual({ name: "settings", section: "appearance" });
-  for (const expected of [{ name: "settings", section: "setup" }, { name: "session", id: "one" }]) {
+  for (const expected of [{ name: "settings", section: "setup" }, { name: "session", id: "one", inspect: null }]) {
     const popped = new Promise<void>((resolve) => window.addEventListener("popstate", () => resolve(), { once: true }));
     history.back();
     await popped;
@@ -54,13 +87,13 @@ test("moving between sections is a new route, and back reaches the section, then
 });
 
 test("sessionPath round-trips through parseRoute", () => {
-  expect(parseRoute(sessionPath("s_1 x"))).toEqual({ name: "session", id: "s_1 x" });
+  expect(parseRoute(sessionPath("s_1 x"))).toEqual({ name: "session", id: "s_1 x", inspect: null });
 });
 
 test("the router starts from the location", () => {
   history.replaceState(null, "", "/s/abc");
   const router = createRouter();
-  expect(router.getSnapshot()).toEqual({ name: "session", id: "abc" });
+  expect(router.getSnapshot()).toEqual({ name: "session", id: "abc", inspect: null });
   router.stop();
 });
 
@@ -72,10 +105,10 @@ test("navigate pushes or replaces, and notifies", () => {
   router.navigate("/s/one");
   expect(location.pathname).toBe("/s/one");
   expect(history.length).toBe(length + 1);
-  expect(router.getSnapshot()).toEqual({ name: "session", id: "one" });
+  expect(router.getSnapshot()).toEqual({ name: "session", id: "one", inspect: null });
   router.navigate("/s/two", { replace: true });
   expect(history.length).toBe(length + 1);
-  expect(router.getSnapshot()).toEqual({ name: "session", id: "two" });
+  expect(router.getSnapshot()).toEqual({ name: "session", id: "two", inspect: null });
   router.navigate("/nope");
   expect(router.getSnapshot()).toEqual({ name: "not-found" });
   expect(listener).toHaveBeenCalledTimes(3);

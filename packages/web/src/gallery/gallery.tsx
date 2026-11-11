@@ -598,6 +598,32 @@ function DetailDemo({ label, result }: { label: string; result: TraceSpanResult 
   );
 }
 
+/** The inspector's column as the chat shows it: the header, the summary, the tree, and the span's detail under it. */
+function InspectorDemo({ label, runs, result, minimum = false }: { label: string; runs: TraceRunSpan[]; result: TraceSpanResult; minimum?: boolean }) {
+  const [selected, setSelected] = useState<string | null>("c_2");
+  return (
+    <figure className="w-full">
+      <figcaption className="mb-1 font-mono text-xs text-faint">{label}</figcaption>
+      <aside aria-label="Trace inspector" className={`flex h-160 ${minimum ? "w-inspector-min" : "w-inspector"} max-w-full flex-col overflow-hidden rounded-md border border-line bg-surface`}>
+        <div className="flex items-center gap-2 border-b border-line px-3 py-2">
+          <h3 className="text-sm font-medium">Trace</h3>
+          <div className="flex-1" />
+          <span className="px-1.5 text-xs text-clay-ink underline underline-offset-2">Open full ↗</span>
+        </div>
+        <div className="flex items-center border-b border-line px-3 py-1.5">
+          <TraceSummary runs={runs} stacked />
+        </div>
+        <div className="flex min-h-0 flex-1 basis-1/2 flex-col">
+          <TraceTree runs={runs} selected={selected} onSelect={setSelected} compact />
+        </div>
+        <div className="flex min-h-0 flex-1 basis-1/2 flex-col border-t border-line">
+          <SpanDetail result={result} sessionId="s_gallery" Artifact={GalleryArtifact} />
+        </div>
+      </aside>
+    </figure>
+  );
+}
+
 function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }) {
   const anchor = (title: string) => prefix + slug(title);
   return (
@@ -608,6 +634,8 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
         <SummaryDemo label="Summary, context growing" runs={GROWING_TRACE} />
         <SummaryDemo label="Summary, 26 model calls" runs={LONG_TRACE} />
         <SummaryDemo label="Summary, a session from before traces" runs={OLD_TRACE} />
+        <InspectorDemo label="The inspector beside the chat" runs={SHORT_TRACE} result={TOOL_DETAIL} />
+        <InspectorDemo label="The inspector at its least width" runs={SHORT_TRACE} result={TOOL_DETAIL} minimum />
         <TraceDemo label="Short trace" runs={SHORT_TRACE} />
         <TraceDemo label="Long trace, 25 model calls" runs={LONG_TRACE} />
         <TraceDemo label="A failed and a denied tool" runs={FAILED_TRACE} />

@@ -138,13 +138,11 @@ for (const theme of ["slip", "kiln"] as const) {
   });
 }
 
-test("the chat shows the View tabs at every width, with Chat current", async () => {
+test("the chat has no Chat and Trace tabs, and its top bar has an Inspect button", async () => {
   await open();
-  const nav = screen.getByRole("navigation", { name: "View" });
-  expect(within(nav).getByRole("link", { name: "Chat" }).getAttribute("aria-current")).toBe("page");
-  expect(within(nav).getByRole("link", { name: "Trace" }).hasAttribute("aria-current")).toBe(false);
-  expect(nav.className).not.toContain("max-narrow:hidden");
-  expect((nav.parentElement as HTMLElement).className).not.toContain("max-narrow:hidden");
+  expect(screen.queryByRole("navigation", { name: "View" })).toBeNull();
+  const inspect = within(screen.getByRole("banner")).getByRole("button", { name: "Inspect" });
+  expect(inspect.getAttribute("aria-pressed")).toBe("false");
 });
 
 test("the chat has no accessibility violations", async () => {
