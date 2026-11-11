@@ -34,7 +34,7 @@ It borrows the calm, centred reading column and generous input from Claude's cha
 |---|---|---|
 | Interface | Geist | 14 px / 1.5, 500 for buttons and titles, 600 for the shem's question |
 | Wordmark | Geist | 17 px, 600, letter spacing −0.03 em, lowercase `golem` |
-| Golem's answers | Literata (optical sizes) | 16 px / 1.68 (15.5 px on a phone) |
+| Golem's answers | Literata (optical sizes) | 16.5 px / 1.6, 380 (16 px on a phone), in `ink-soft`; headings 500 at 19 px; code in answers 13 px / 1.55 |
 | Headings on full screens | Literata | 26 px, 400 |
 | Code, tools, labels, times | Geist Mono | 11 to 13.5 px |
 
@@ -52,6 +52,7 @@ These become `packages/web/src/styles/tokens.css` in step 10.6. The names say wh
 | `surface` | `#FBFAF8` | `#1D1915` | Cards, the composer, the drawer |
 | `sunken` | `#EAE8E3` | `#110E0C` | The sidebar, hunk headers |
 | `ink` | `#1D1A17` | `#EEE7DF` | Text, the primary button |
+| `ink-soft` | `#2B2724` | `#E2DAD1` | Golem's answers, a little softer than `ink` |
 | `muted` | `#57524C` | `#B5ACA2` | Secondary text |
 | `faint` | `#6C665F` | `#8F877E` | Times, labels, folder names. Not on `slip` |
 | `line` | `#DEDAD3` | `#2C2621` | Borders |
@@ -81,6 +82,7 @@ Checked with the WCAG 2.2 formula. 4.5:1 for text, 3:1 for fills and focus rings
 | Pair | slip | kiln |
 |---|---|---|
 | `ink` on `bg` / `surface` / `sunken` / `slip` | 15.5 / 16.6 / 14.2 / 13.7 | 15.2 / 14.3 / 15.7 / 12.8 |
+| `ink-soft` on `bg` / `surface` / `sunken` / `slip` | 13.2 / 14.2 / 12.1 / 11.7 | 13.5 / 12.6 / 13.9 / 11.3 |
 | `muted` on `bg` / `sunken` / `slip` | 6.9 / 6.3 / 6.1 | 8.3 / 7.8 / 7.0 |
 | `faint` on `bg` / `sunken` / `surface` | 5.1 / 4.6 / 5.4 | 5.3 / 4.9 / 5.4 |
 | `clay-ink` on `bg` / `surface` | 5.5 / 5.9 | 8.5 / 8.0 |
