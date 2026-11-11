@@ -2,7 +2,9 @@
 
 export type ConfigFile = string;
 export type DefaultModel = string | null;
+export type DefaultPermissionMode = 'careful' | 'balanced' | 'autopilot';
 export type LogLevel = string;
+export type PermissionMode = 'careful' | 'balanced' | 'autopilot';
 export type ProjectPolicy = string | null;
 export type ProjectTrusted = boolean | null;
 export type Action = 'allow' | 'ask' | 'deny';
@@ -25,12 +27,16 @@ export type TrustedProjects = string[];
  *
  * ``project_policy`` is the project's ``.golem/policy.toml`` when it exists,
  * and ``project_trusted`` whether its allow rules count. Both are null
- * without a ``cwd``.
+ * without a ``cwd``. ``default_permission_mode`` is ``[permissions] mode``,
+ * and ``permission_mode`` the mode the ``rules`` were built for: the session's
+ * when ``session_id`` is given, else the default. An older daemon leaves both out.
  */
 export interface ConfigGetResult {
   config_file: ConfigFile;
   default_model: DefaultModel;
+  default_permission_mode?: DefaultPermissionMode;
   log_level: LogLevel;
+  permission_mode?: PermissionMode;
   project_policy?: ProjectPolicy;
   project_trusted?: ProjectTrusted;
   rules: Rules;

@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import cast
 
+from golem.config import PermissionMode
 from golem.graphs.adapter import PlainMessage, plain_messages, trace_messages
 from golem.graphs.chat import ChatRuntime
 from golem.graphs.state import SCHEMA_VERSION
@@ -59,6 +60,7 @@ from golem_protocol.events import (
     RunCancelledData,
     SessionAllowance,
     SessionCreatedData,
+    SessionModeChangedData,
     SessionUpdatedData,
     SkillActivatedData,
     SkillActivatedEvent,
@@ -146,6 +148,8 @@ class _LiveSession:
     """The pinned skills, in the order they were pinned."""
     options: dict[str, float | str] = field(default_factory=dict[str, float | str])
     """The Ollama option overrides of this session."""
+    permission_mode: PermissionMode | None = None
+    """The session's permission mode override, None to follow ``config.toml``."""
     pins: PinMemory = field(default_factory=PinMemory)
     """What the log last said about each pin, so a run logs only a change."""
     title: str | None = None
@@ -551,6 +555,37 @@ class SessionManager:
             session.options = merged
             return dict(merged)
 
+    async def set_mode(
+        self, session_id: str, mode: PermissionMode | None
+    ) -> tuple[PermissionMode, bool]:
+        """Set the session's permission mode, or with None remove its override.
+
+        Stores ``session.mode.changed`` and returns the effective mode and whether the
+        session set it. Nothing is stored when the override does not change. The mode
+        applies from the next tool call.
+
+        Raises :class:`SessionNotFoundError` or :class:`SchemaMismatchError`.
+        """
+        async with self._lock:
+            session = await self._resolve(session_id)
+            if mode != session.permission_mode:
+                await self._events.emit(
+                    session_id, None, "session.mode.changed", SessionModeChangedData(mode=mode)
+                )
+                session.permission_mode = mode
+            return self._effective_mode(session), session.permission_mode is not None
+
+    async def permission_mode(self, session_id: str) -> PermissionMode:
+        """The mode the session runs in: its override, else the one in ``config.toml``.
+
+        Raises :class:`SessionNotFoundError` or :class:`SchemaMismatchError`.
+        """
+        async with self._lock:
+            return self._effective_mode(await self._resolve(session_id))
+
+    def _effective_mode(self, session: _LiveSession) -> PermissionMode:
+        return session.permission_mode or self._runtime.policy.default_mode()
+
     def configured_model(self) -> ModelIdentity:
         """The model ``daemon.status`` reports for this process."""
         return self._runtime.router.identity()
@@ -604,6 +639,7 @@ class SessionManager:
                 pinned=tuple(session.skills),
                 pinned_folders=self._pinned_folders(session),
                 options=dict(session.options),
+                permission_mode=session.permission_mode,
                 pins=session.pins,
             )
             control = RunControl()
@@ -672,6 +708,7 @@ class SessionManager:
                 pinned=tuple(session.skills),
                 pinned_folders=self._pinned_folders(session),
                 options=dict(session.options),
+                permission_mode=session.permission_mode,
                 pins=session.pins,
             )
             control = RunControl()
@@ -808,7 +845,7 @@ class SessionManager:
             checked = tools.validate(name, args)
         except ToolError as exc:
             raise InvalidToolArgsError(str(exc)) from exc
-        verdict = policy.check(tools, name, checked, root)
+        verdict = policy.check(tools, name, checked, root, session.permission_mode)
         if verdict.action == "deny":
             raise InvalidToolArgsError(explain(verdict, name))
         return checked
@@ -970,6 +1007,7 @@ class SessionManager:
             mcp_servers=set() if record is None else set(record.mcp_servers),
             skills=[] if record is None else list(record.skills),
             options={} if record is None else dict(record.options),
+            permission_mode=None if record is None else record.permission_mode,
         )
         if session.skills:
             session.pins = PinMemory.from_events(await self._events.stored(session_id))

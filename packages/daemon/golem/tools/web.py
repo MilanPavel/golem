@@ -243,6 +243,7 @@ WEB_FETCH = Tool(
     run=_web_fetch,
     subject=host_subject,
     untrusted=True,
+    allow_from="balanced",
 )
 
 __all__ = [

@@ -1,0 +1,27 @@
+{
+  "additionalProperties": false,
+  "description": "The session's permission mode override, after a change.\n\n``mode`` null means the session has no override and follows ``[permissions]\nmode`` in ``config.toml``. The last event holds what applies from the next\ntool call, so a replayed session gets its mode back.",
+  "properties": {
+    "mode": {
+      "anyOf": [
+        {
+          "enum": [
+            "careful",
+            "balanced",
+            "autopilot"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Mode"
+    }
+  },
+  "required": [
+    "mode"
+  ],
+  "title": "SessionModeChangedData",
+  "type": "object"
+}

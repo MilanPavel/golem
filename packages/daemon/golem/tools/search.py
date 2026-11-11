@@ -78,6 +78,7 @@ WEB_SEARCH = Tool(
     run=_web_search,
     subject=search_subject,
     untrusted=True,
+    allow_from="balanced",
 )
 
 __all__ = ["WEB_SEARCH", "Result", "SearchProvider", "WebSearchArgs", "search_subject"]

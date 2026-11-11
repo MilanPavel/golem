@@ -79,7 +79,7 @@ async def test_a_tool_from_the_server_runs_from_chat_after_an_approval(short_hom
         assert (needed["name"], needed["args"], needed["source"]) == (
             "mcp__fake__echo",
             {"text": "hi"},
-            "built-in default",
+            "built-in default (balanced)",
         )
         assert needed["subject"] == '{"text":"hi"}'
         completed = _data(await client.wait_for_event("tool.completed", timeout=5))

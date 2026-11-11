@@ -820,6 +820,21 @@ test("model.options.changed keeps the session's whole set of overrides", () => {
   assert.deepEqual(reduceChat(set, event({ top_k: 5 })).options, { top_k: 5 });
 });
 
+test("session.mode.changed keeps the session's permission mode override, null when removed", () => {
+  const event = (mode: "careful" | "balanced" | "autopilot" | null): ChatEvent => ({
+    seq: 2,
+    session_id: "s",
+    run_id: null,
+    ts: "t",
+    type: "session.mode.changed",
+    data: { mode },
+  });
+  assert.equal(emptyChat.permissionMode, null);
+  const set = reduceChat(emptyChat, event("autopilot"));
+  assert.equal(set.permissionMode, "autopilot");
+  assert.equal(reduceChat(set, event(null)).permissionMode, null);
+});
+
 test("a call written as text that golem could not read sets the notice flag until the next run", () => {
   const base = { session_id: "s", run_id: "r", ts: "t" };
   const completed = (seq: number, text_tool_calls?: "recovered" | "unread") =>

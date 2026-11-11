@@ -1,0 +1,31 @@
+{
+  "additionalProperties": false,
+  "description": "The mode the session runs in now.\n\n``mode`` is the effective mode, and ``override`` is true when the session\nset it, false when it is the default from ``config.toml``.",
+  "properties": {
+    "mode": {
+      "enum": [
+        "careful",
+        "balanced",
+        "autopilot"
+      ],
+      "title": "Mode",
+      "type": "string"
+    },
+    "override": {
+      "title": "Override",
+      "type": "boolean"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "session_id",
+    "mode",
+    "override"
+  ],
+  "title": "SessionSetModeResult",
+  "type": "object"
+}

@@ -9,24 +9,41 @@ golem does its work through **tools**: small actions it asks the daemon to run, 
 
 ## The built-in tools
 
-| Tool | What it does | By default |
-|---|---|---|
-| `read_file` | Reads a file in the project, in pages of lines | Allowed |
-| `list_dir` | Lists a folder in the project | Allowed |
-| `glob` | Finds files by pattern, such as `**/*.py` | Allowed |
-| `grep` | Searches file contents with a regular expression | Allowed |
-| `git_status`, `git_diff`, `git_log` | The branch, the changes, and recent commits | Allowed |
-| `read_artifact` | Reads more of a long tool output that was cut | Allowed |
-| `todo_write` | Keeps the agent's todo list, shown with `/todos` | Allowed |
-| `write_file` | Creates a file, or replaces all of it | Asks, with the diff |
-| `edit_file` | Replaces exact text in a file | Asks, with the diff |
-| `shell` | Runs a command, in a sandbox | Asks |
-| `shell_unsandboxed` | Runs a command outside the sandbox, with your credentials and the network, for `gh` and `git push` | Asks |
-| `web_fetch` | Reads one web page | Asks, per host |
-| `web_search` | Searches the web with DuckDuckGo | Asks, for `html.duckduckgo.com` |
-| `mcp__<server>__<tool>` | A tool from an [MCP server](./mcp.md) | Asks |
+| Tool | What it does | Careful | Balanced | Autopilot |
+|---|---|---|---|---|
+| `read_file` | Reads a file in the project, in pages of lines | Allowed | Allowed | Allowed |
+| `list_dir` | Lists a folder in the project | Allowed | Allowed | Allowed |
+| `glob` | Finds files by pattern, such as `**/*.py` | Allowed | Allowed | Allowed |
+| `grep` | Searches file contents with a regular expression | Allowed | Allowed | Allowed |
+| `git_status`, `git_diff`, `git_log` | The branch, the changes, and recent commits | Allowed | Allowed | Allowed |
+| `read_artifact` | Reads more of a long tool output that was cut | Allowed | Allowed | Allowed |
+| `todo_write` | Keeps the agent's todo list, shown with `/todos` | Allowed | Allowed | Allowed |
+| `web_search` | Searches the web with DuckDuckGo | Asks | Allowed | Allowed |
+| `web_fetch` | Reads one web page | Asks | Allowed | Allowed |
+| `shell` | Runs a command, in a sandbox | Asks | Asks | Allowed, unless `[shell] network = true` |
+| `write_file` | Creates a file, or replaces all of it | Asks, with the diff | Asks, with the diff | Allowed |
+| `edit_file` | Replaces exact text in a file | Asks, with the diff | Asks, with the diff | Allowed |
+| `shell_unsandboxed` | Runs a command outside the sandbox, with your credentials and the network, for `gh` and `git push` | Asks | Asks | Asks |
+| `mcp__<server>__<tool>` | A tool from an [MCP server](./mcp.md) | Asks | Asks | Asks |
 
-The read-only tools only see the folder you opened golem in. Reads change nothing, so they never stop to ask.
+### Permission modes
+
+The mode says how much the built-in defaults allow without asking. **Balanced** is the default.
+
+- **Careful** allows only the tools that read.
+- **Balanced** also allows web search and fetch. Anything that changes a file or runs a command still asks.
+- **Autopilot** also allows file writes and edits, and shell commands, which the sandbox keeps inside the project with the network off. With `[shell] network = true` a command can reach the network, so `shell` still asks. File tools cannot leave the project folder anyway.
+
+`shell_unsandboxed` and MCP tools ask in every mode.
+
+```toml
+[permissions]
+mode = "balanced"   # careful | balanced | autopilot
+```
+
+A chat can use another mode than the default: `session.set_mode` sets it for that chat only, and it is kept with the chat. A mode changes only the built-in defaults. Your rules and the project's rules are checked first, so an `ask` or `deny` rule you wrote still applies in autopilot, and what you allowed for the session still counts.
+
+The read-only tools only see the folder you opened golem in. Reads change nothing, so they never stop to ask. The file tools cannot leave the project folder in any mode.
 
 ## Answering a question
 
@@ -83,7 +100,7 @@ action = "ask"
 
 1. The project's `.golem/policy.toml`, for everyone who works in that folder.
 2. Your `~/.golem/config.toml`.
-3. The built-in defaults in the table above.
+3. The built-in defaults in the table above, for the chat's [mode](#permission-modes).
 
 A project file can make golem stricter: its `deny` and `ask` rules always count. Its `allow` rules count only when you list the folder in `trusted_projects` in your own config, so a cloned repository cannot give itself a shell.
 

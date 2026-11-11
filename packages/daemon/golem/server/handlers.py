@@ -190,6 +190,8 @@ from golem_protocol.commands import (
     SessionRevokeResult,
     SessionSetModelParams,
     SessionSetModelResult,
+    SessionSetModeParams,
+    SessionSetModeResult,
     SessionSetOptionsParams,
     SessionSetOptionsResult,
     SessionSetSkillsParams,
@@ -774,6 +776,17 @@ async def _session_set_options(
     return SessionSetOptionsResult(session_id=params.session_id, options=options)
 
 
+async def _session_set_mode(
+    ctx: RequestContext, params: SessionSetModeParams
+) -> SessionSetModeResult:
+    try:
+        mode, override = await _sessions(ctx).set_mode(params.session_id, params.mode)
+    except (SessionNotFoundError, SchemaMismatchError) as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
+    log.info("session mode session=%s mode=%s override=%s", params.session_id, mode, override)
+    return SessionSetModeResult(session_id=params.session_id, mode=mode, override=override)
+
+
 async def _config_get(ctx: RequestContext, params: ConfigGetParams) -> ConfigGetResult:
     policy, tools = ctx.state.policy, ctx.state.tools
     if policy is None or tools is None:
@@ -785,7 +798,14 @@ async def _config_get(ctx: RequestContext, params: ConfigGetParams) -> ConfigGet
     except ValueError as exc:
         raise RpcCallError(INTERNAL_ERROR, f"{paths.config_file} does not validate: {exc}") from exc
     root = None if params.cwd is None else Path(params.cwd)
-    rules = await asyncio.to_thread(policy.rules, root, tools)
+    default_mode = policy.default_mode()
+    mode = default_mode
+    if params.session_id is not None:
+        try:
+            mode = await _sessions(ctx).permission_mode(params.session_id)
+        except (SessionNotFoundError, SchemaMismatchError) as exc:
+            raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
+    rules = await asyncio.to_thread(policy.rules, root, tools, mode)
     project = None if root is None else root / PROJECT_POLICY
     allowed: list[ConfigAllowance] = []
     if params.session_id is not None:
@@ -802,6 +822,8 @@ async def _config_get(ctx: RequestContext, params: ConfigGetParams) -> ConfigGet
         trusted_projects=settings.trusted_projects,
         project_policy=str(project) if project is not None and project.is_file() else None,
         project_trusted=None if root is None else policy.trusted(root),
+        default_permission_mode=default_mode,
+        permission_mode=mode,
         rules=[
             ConfigRule(
                 tool=rule.rule.tool,
@@ -1186,6 +1208,9 @@ def standard_methods() -> dict[str, Method]:
         ),
         "session.set_options": Method(
             "session.set_options", SessionSetOptionsParams, True, _session_set_options
+        ),
+        "session.set_mode": Method(
+            "session.set_mode", SessionSetModeParams, True, _session_set_mode
         ),
         "fs.list_dirs": Method("fs.list_dirs", FsListDirsParams, True, _fs_list_dirs),
         "setup.status": Method("setup.status", SetupStatusParams, True, _setup_status),

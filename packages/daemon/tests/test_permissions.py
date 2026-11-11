@@ -99,7 +99,7 @@ def test_defaults_allow_read_only_tools_and_ask_for_the_rest() -> None:
     rules = default_rules(["read_file", "grep"])
     assert check(_call("grep"), rules, home=HOME).action == "allow"
     shell = check(_call("shell"), rules, home=HOME)
-    assert (shell.action, shell.source) == ("ask", DEFAULT_SOURCE)
+    assert (shell.action, shell.source) == ("ask", f"{DEFAULT_SOURCE} (careful)")
     assert check(_call("shell"), [], home=HOME).action == "ask"
 
 
@@ -182,7 +182,7 @@ def test_project_rules_come_before_user_rules(tmp_path: Path, project: Path) -> 
     registry = default_registry()
     sources = [rule.source for rule in policy.rules(project, registry)]
     assert sources[:2] == ["~/project/.golem/policy.toml rule 1", "~/config.toml rule 1"]
-    assert sources[-1] == DEFAULT_SOURCE
+    assert sources[-1] == f"{DEFAULT_SOURCE} (balanced)"
     docs = policy.check(registry, "read_file", {"path": "docs/a.md"}, project)
     other = policy.check(registry, "read_file", {"path": "a.md"}, project)
     assert (docs.action, other.action) == ("ask", "deny")

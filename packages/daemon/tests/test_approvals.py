@@ -146,7 +146,7 @@ async def test_mixed_decisions_in_one_turn_run_each_call_once(
     ]
     assert counter.runs == {}
     asked = _needed(first)[0].data
-    assert (asked.name, asked.source) == ("risky_a", "built-in default")
+    assert (asked.name, asked.source) == ("risky_a", "built-in default (balanced)")
     run = await daemon.runs.get(run_id)
     assert run is not None and run.status == "waiting"
     activity = await daemon.records.activity(session_id)

@@ -230,6 +230,8 @@ SHELL = Tool(
     args=ShellArgs,
     run=_shell,
     match_arg="command",
+    allow_from="autopilot",
+    offline_only=True,
 )
 SHELL_UNSANDBOXED = Tool(
     name="shell_unsandboxed",
