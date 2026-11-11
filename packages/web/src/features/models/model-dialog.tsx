@@ -289,7 +289,7 @@ function Content({
     );
 
   const modelsPanel = (
-    <div hidden={inTune}>
+    <div hidden={inTune} className="flex min-h-0 flex-1 flex-col">
       {onShowAll === undefined ? null : (
         <label className="mt-3 flex items-center gap-2 text-sm text-muted">
           <input
@@ -303,8 +303,8 @@ function Content({
       )}
       <CategoryChips className="mt-3" value={category} onChange={setCategory} disabled={busy !== null} />
       <SearchList
-        className="mt-3"
-        listClassName="max-h-64 sm:max-h-96"
+        className="mt-3 min-h-0 flex-1"
+        listClassName="flex-1"
         label="Search models"
         placeholder="Search models"
         inputRef={input}
@@ -351,13 +351,15 @@ function Content({
           </div>
         )}
       />
-      <div className="mt-4 flex flex-col gap-3 border-t border-line pt-4 empty:hidden">
+      <div className="mt-4 flex shrink-0 flex-col gap-3 border-t border-line pt-4">
         {error === null ? null : (
           <p role="alert" className="text-sm text-deny">
             {error}
           </p>
         )}
-        {model === null || shown === null ? null : confirm !== null ? (
+        {model === null || shown === null ? (
+          <IdleBar defaultOnly={isDefaultMode} useLabel={isNew ? "Use for the new session" : "Use for this session"} />
+        ) : confirm !== null ? (
           <ConfirmBar
             confirm={confirm}
             model={model}
@@ -393,7 +395,7 @@ function Content({
   // The title and the description stay in the Tune view, for the dialog's name, but only the list shows them.
   return (
     <>
-      <div className={cn("flex items-start gap-3", inTune && "sr-only")}>
+      <div className={cn("flex shrink-0 items-start gap-3", inTune && "sr-only")}>
         <div className="min-w-0 flex-1">
           <DialogTitle>Choose a model</DialogTitle>
           <DialogDescription>{description(isNew || isDefaultMode ? null : session, listing)}</DialogDescription>
@@ -459,6 +461,22 @@ function ConfirmBar({
           {label}
         </Button>
       </div>
+    </div>
+  );
+}
+
+/** The bar before anything is picked: the same place as the real one, so the dialog does not move. */
+function IdleBar({ defaultOnly, useLabel }: { defaultOnly: boolean; useLabel: string }) {
+  return (
+    <div role="group" aria-label="Actions" className="flex flex-wrap items-center justify-end gap-2">
+      <Button kind={defaultOnly ? "ink" : "secondary"} disabled>
+        Make default
+      </Button>
+      {defaultOnly ? null : (
+        <Button kind="ink" disabled>
+          {useLabel}
+        </Button>
+      )}
     </div>
   );
 }
@@ -566,7 +584,7 @@ export function ModelDialogView(props: ModelDialogViewProps) {
       }}
     >
       <DialogContent
-        className="max-h-screen max-w-2xl overflow-y-auto"
+        className="flex h-full max-h-dialog max-w-2xl flex-col overflow-hidden"
         onCloseAutoFocus={onCloseAutoFocus}
         onEscapeKeyDown={(event) => guardRef.current?.escape(event)}
       >

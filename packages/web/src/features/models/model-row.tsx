@@ -68,9 +68,14 @@ export function ModelRow({ model, providerMissing, current, isDefault, category,
   const profiles = model.profiles ?? [];
   const label = profiles.length > 0 ? profiles.join(", ") : model.label;
   const detail = profiles.length > 0 || model.label !== model.ref ? model.ref : "";
-  const facts = [contextLabel(model.ctx), priceLabel(model), sizeLabel(model), statusLabel(model, providerMissing)]
-    .filter((part) => part.length > 0)
-    .join("  ");
+  const usage = [contextLabel(model.ctx), priceLabel(model)].filter((part) => part.length > 0).join(" · ");
+  const size = sizeLabel(model);
+  const status = statusLabel(model, providerMissing);
+  const facts = [
+    { text: usage, tone: "text-muted" },
+    { text: size, tone: model.fit === "too_big" ? "text-deny" : "text-muted" },
+    { text: status, tone: "text-clay-ink" },
+  ].filter((fact) => fact.text.length > 0);
   // General is what every model is without another mark, so it is left to the filter.
   const categories = (model.categories ?? []).filter((category) => category !== "general");
   const recommended = recommendedLabel(model, category);
@@ -102,7 +107,13 @@ export function ModelRow({ model, providerMissing, current, isDefault, category,
         {model.status === "pulling" ? <Progress model={model} entry={pull} /> : null}
         {failed === undefined ? null : <p className="mt-0.5 text-xs text-deny">Download failed: {failed}</p>}
       </div>
-      <span className="max-w-48 text-right font-mono text-xs text-muted">{facts}</span>
+      <span className="flex shrink-0 flex-col items-end font-mono text-xs">
+        {facts.map((fact) => (
+          <span key={fact.text} className={cn("whitespace-nowrap", fact.tone)}>
+            {fact.text}
+          </span>
+        ))}
+      </span>
     </div>
   );
 }
