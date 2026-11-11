@@ -26,6 +26,7 @@ from langgraph.errors import GraphRecursionError
 from langgraph.graph import END, START, StateGraph  # pyright: ignore[reportMissingTypeStubs]
 from langgraph.types import Command
 
+from golem.config import PermissionMode
 from golem.graphs.adapter import STREAM_KEY, message_text
 from golem.graphs.prompt import PINNED_KEY, PromptContext, SystemPrompt
 from golem.graphs.state import AgentState
@@ -35,6 +36,7 @@ from golem.graphs.tools_node import (
     ASKED_KEY,
     CWD_KEY,
     MCP_KEY,
+    MODE_KEY,
     PINNED_FOLDERS_KEY,
     Answer,
     cancelled_results,
@@ -167,6 +169,7 @@ class ChatRuntime:
         pinned: Sequence[str] = (),
         pinned_folders: Sequence[str] = (),
         options: Mapping[str, float | str] | None = None,
+        permission_mode: PermissionMode | None = None,
     ) -> AsyncGenerator[object]:
         """Stream one user turn. The first turn writes the state fields.
 
@@ -192,6 +195,7 @@ class ChatRuntime:
                 PINNED_KEY: list(pinned),
                 PINNED_FOLDERS_KEY: list(pinned_folders),
                 OPTIONS_KEY: dict(options or {}),
+                MODE_KEY: permission_mode,
             },
             "recursion_limit": _RECURSION_LIMIT,
         }
@@ -222,6 +226,7 @@ class ChatRuntime:
         pinned: Sequence[str] = (),
         pinned_folders: Sequence[str] = (),
         options: Mapping[str, float | str] | None = None,
+        permission_mode: PermissionMode | None = None,
     ) -> AsyncGenerator[object]:
         """Go on with a run paused on a tool approval, with the user's ``answer``.
 
@@ -239,6 +244,7 @@ class ChatRuntime:
                 PINNED_KEY: list(pinned),
                 PINNED_FOLDERS_KEY: list(pinned_folders),
                 OPTIONS_KEY: dict(options or {}),
+                MODE_KEY: permission_mode,
             },
             "recursion_limit": _RECURSION_LIMIT,
         }

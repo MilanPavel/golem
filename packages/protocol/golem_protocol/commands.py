@@ -7,7 +7,7 @@ from typing import Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
 
-from golem_protocol.events import PromptSectionInfo, SkillCall, SkillSource
+from golem_protocol.events import PermissionMode, PromptSectionInfo, SkillCall, SkillSource
 
 
 class HelloParams(BaseModel):
@@ -918,6 +918,35 @@ class SessionSetOptionsResult(BaseModel):
 
     session_id: str = Field(min_length=1)
     options: dict[str, float | str]
+
+
+class SessionSetModeParams(BaseModel):
+    """``session.set_mode``. Set the permission mode of one session.
+
+    ``mode`` ``null`` removes the session's override, so it follows
+    ``[permissions] mode`` in ``config.toml`` again. The daemon emits
+    ``session.mode.changed``, and the mode applies from the session's next tool
+    call. It is kept with the session and is not written to ``config.toml``.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    mode: PermissionMode | None
+
+
+class SessionSetModeResult(BaseModel):
+    """The mode the session runs in now.
+
+    ``mode`` is the effective mode, and ``override`` is true when the session
+    set it, false when it is the default from ``config.toml``.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    mode: PermissionMode
+    override: bool
 
 
 class ModelSetDefaultParams(BaseModel):
@@ -1905,7 +1934,9 @@ class ConfigGetResult(BaseModel):
 
     ``project_policy`` is the project's ``.golem/policy.toml`` when it exists,
     and ``project_trusted`` whether its allow rules count. Both are null
-    without a ``cwd``.
+    without a ``cwd``. ``default_permission_mode`` is ``[permissions] mode``,
+    and ``permission_mode`` the mode the ``rules`` were built for: the session's
+    when ``session_id`` is given, else the default. An older daemon leaves both out.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -1917,6 +1948,8 @@ class ConfigGetResult(BaseModel):
     trusted_projects: list[str]
     project_policy: str | None = None
     project_trusted: bool | None = None
+    default_permission_mode: PermissionMode = "balanced"
+    permission_mode: PermissionMode = "balanced"
     rules: list[ConfigRule]
     session_allowed: list[ConfigAllowance] = Field(default_factory=list[ConfigAllowance])
 
@@ -2316,6 +2349,8 @@ __all__ = [
     "SessionRenameResult",
     "SessionRevokeParams",
     "SessionRevokeResult",
+    "SessionSetModeParams",
+    "SessionSetModeResult",
     "SessionSetModelParams",
     "SessionSetModelResult",
     "SessionSetOptionsParams",

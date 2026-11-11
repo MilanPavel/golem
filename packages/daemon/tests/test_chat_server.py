@@ -823,6 +823,10 @@ async def test_config_get_lists_the_rules_for_a_folder(short_home: Path) -> None
         result = rpc_result(await client.call("config.get", {"cwd": str(project)}))
         assert isinstance(result, dict)
         assert result["project_trusted"] is False
+        assert (result["default_permission_mode"], result["permission_mode"]) == (
+            "balanced",
+            "balanced",
+        )
         assert result["project_policy"] == str(project / ".golem" / "policy.toml")
         rules = cast(list[dict[str, object]], result["rules"])
         first, second = rules[0], rules[1]
@@ -836,7 +840,7 @@ async def test_config_get_lists_the_rules_for_a_folder(short_home: Path) -> None
             "match": None,
             "path": None,
             "action": "ask",
-            "source": "built-in default",
+            "source": "built-in default (balanced)",
             "ignored": None,
             "file": "default",
             "index": None,

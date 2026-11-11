@@ -16,7 +16,7 @@ from typing import Any, Protocol
 import httpx
 from pydantic import BaseModel, ValidationError
 
-from golem.config import ShellSettings, WebSettings
+from golem.config import PERMISSION_MODES, PermissionMode, ShellSettings, WebSettings
 
 MAX_OUTPUT_CHARS = 5_000_000
 """What one call may return, at most. Output this big goes to an artifact, not the model."""
@@ -131,6 +131,10 @@ class Tool[A: BaseModel]:
     ``parameters`` is the JSON Schema of the arguments when it does not come
     from ``args``, as for an MCP server's tool. ``args`` then only checks
     that the arguments are an object, and the server checks the rest.
+
+    ``allow_from`` is the most careful permission mode whose built-in rules
+    allow the tool without asking, null for a tool no mode allows. With
+    ``offline_only`` the mode allows it only while ``[shell] network`` is off.
     """
 
     name: str
@@ -145,6 +149,8 @@ class Tool[A: BaseModel]:
     subject: Callable[[Mapping[str, object], Path | None], str | None] | None = None
     preview: Callable[[A, ToolContext], Awaitable[Preview]] | None = None
     parameters: Mapping[str, object] | None = None
+    allow_from: PermissionMode | None = None
+    offline_only: bool = False
 
     def schema(self) -> dict[str, object]:
         """The OpenAI function format, which every chat model's ``bind_tools`` accepts."""
@@ -238,10 +244,28 @@ class ToolRegistry:
     def get(self, name: str) -> Tool[Any] | None:
         return self._tools.get(name) or self._extra.get(name)
 
-    def default_allowed(self) -> list[str]:
-        """Tools the built-in rules allow without asking: read-only or internal ones."""
+    def default_allowed(
+        self, mode: PermissionMode = "careful", *, network: bool = False
+    ) -> list[str]:
+        """Tools the built-in rules allow without asking in ``mode``.
+
+        Read-only and internal tools in every mode. A tool with ``allow_from`` joins
+        them from that mode on, and one that is ``offline_only`` only when ``network``
+        (``[shell] network``) is false.
+        """
+        rank = PERMISSION_MODES.index(mode)
         tools = [*self._tools.values(), *self._extra.values()]
-        return [tool.name for tool in tools if tool.read_only or tool.internal]
+        return [
+            tool.name
+            for tool in tools
+            if tool.read_only
+            or tool.internal
+            or (
+                tool.allow_from is not None
+                and PERMISSION_MODES.index(tool.allow_from) <= rank
+                and not (tool.offline_only and network)
+            )
+        ]
 
     def schemas(self) -> list[dict[str, object]]:
         return [*self._schemas, *(tool.schema() for tool in self._extra.values())]

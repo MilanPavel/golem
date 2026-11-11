@@ -71,6 +71,7 @@ METHOD_ACCESS: Final[Mapping[str, Access]] = {
     "model.set_default": "browser",
     "session.set_model": "browser",
     "session.set_options": "browser",
+    "session.set_mode": "browser",
     "model.options.get": "browser",
     "model.options.set": "browser",
     "setup.status": "browser",

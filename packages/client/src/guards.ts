@@ -20,6 +20,7 @@ import type { ModelServerStatus } from "../../protocol/gen/model-server-status.t
 import type { ModelOptionsGetResult } from "../../protocol/gen/model-options-get-result.ts";
 import type { ModelOptionsSaved } from "../../protocol/gen/model-options-saved.ts";
 import type { ModelOptionsSetResult } from "../../protocol/gen/model-options-set-result.ts";
+import type { SessionSetModeResult } from "../../protocol/gen/session-set-mode-result.ts";
 import type { SessionSetOptionsResult } from "../../protocol/gen/session-set-options-result.ts";
 import type { ListedSkill, SkillListResult } from "../../protocol/gen/skill-list-result.ts";
 import type { McpRemoveResult } from "../../protocol/gen/mcp-remove-result.ts";
@@ -58,6 +59,7 @@ const EVENT_TYPES = new Set([
   "session.closed",
   "model.selected",
   "model.options.changed",
+  "session.mode.changed",
   "message.started",
   "message.delta",
   "message.thinking.delta",
@@ -271,6 +273,15 @@ export function isModelOptionsSetResult(value: unknown): value is ModelOptionsSe
 
 export function isSessionSetOptionsResult(value: unknown): value is SessionSetOptionsResult {
   return isRecord(value) && typeof value["session_id"] === "string" && isOptionValues(value["options"]);
+}
+
+export function isSessionSetModeResult(value: unknown): value is SessionSetModeResult {
+  return (
+    isRecord(value) &&
+    typeof value["session_id"] === "string" &&
+    (value["mode"] === "careful" || value["mode"] === "balanced" || value["mode"] === "autopilot") &&
+    typeof value["override"] === "boolean"
+  );
 }
 
 export function isModelSetDefaultResult(value: unknown): value is ModelSetDefaultResult {

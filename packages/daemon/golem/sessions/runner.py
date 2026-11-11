@@ -27,6 +27,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
+from golem.config import PermissionMode
 from golem.graphs.adapter import (
     ApprovalAsked,
     ModelRequested,
@@ -108,6 +109,7 @@ class Turn:
     pinned: tuple[str, ...] = ()
     pinned_folders: tuple[str, ...] = ()
     options: dict[str, float | str] = field(default_factory=dict[str, float | str], compare=False)
+    permission_mode: PermissionMode | None = None
     pins: PinMemory = field(default_factory=PinMemory, compare=False)
     skill: Invocation | None = None
     typed: str | None = None
@@ -142,6 +144,7 @@ class Resume:
     pinned: tuple[str, ...] = ()
     pinned_folders: tuple[str, ...] = ()
     options: dict[str, float | str] = field(default_factory=dict[str, float | str], compare=False)
+    permission_mode: PermissionMode | None = None
     pins: PinMemory = field(default_factory=PinMemory, compare=False)
 
 
@@ -252,6 +255,7 @@ async def run_turn(
             pinned=turn.pinned,
             pinned_folders=turn.pinned_folders,
             options=turn.options,
+            permission_mode=turn.permission_mode,
             skill_folder=None if skill is None else str(skill.path),
         )
         return await _finish(stream, progress, emit)
@@ -310,6 +314,7 @@ async def resume_turn(
             pinned=resume.pinned,
             pinned_folders=resume.pinned_folders,
             options=resume.options,
+            permission_mode=resume.permission_mode,
         )
         return await _finish(stream, progress, emit)
     except asyncio.CancelledError:

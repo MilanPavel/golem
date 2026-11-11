@@ -1574,6 +1574,76 @@
       "title": "SessionCreatedEvent",
       "type": "object"
     },
+    "SessionModeChangedData": {
+      "additionalProperties": false,
+      "description": "The session's permission mode override, after a change.\n\n``mode`` null means the session has no override and follows ``[permissions]\nmode`` in ``config.toml``. The last event holds what applies from the next\ntool call, so a replayed session gets its mode back.",
+      "properties": {
+        "mode": {
+          "anyOf": [
+            {
+              "enum": [
+                "careful",
+                "balanced",
+                "autopilot"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Mode"
+        }
+      },
+      "required": [
+        "mode"
+      ],
+      "title": "SessionModeChangedData",
+      "type": "object"
+    },
+    "SessionModeChangedEvent": {
+      "additionalProperties": false,
+      "description": "``session.set_mode`` changed the session's permission mode.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/SessionModeChangedData"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "null"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "session.mode.changed",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "run_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "SessionModeChangedEvent",
+      "type": "object"
+    },
     "SessionUpdatedData": {
       "additionalProperties": false,
       "description": "A session attribute changed: its title, folder, allowed tools, or MCP servers.\n\nA field left null did not change. ``cwd`` is set once, on a session made\nbefore sessions had a folder, by the first ``message.send`` that names one.\n``allowed_tools`` is the whole list after ``session.revoke``, and\n``mcp_servers`` the on-demand MCP servers the session turned on, after\n``mcp.enable`` or ``mcp.disable``.",
@@ -2557,6 +2627,7 @@
           "run.started": "#/$defs/RunStartedEvent",
           "session.closed": "#/$defs/SessionClosedEvent",
           "session.created": "#/$defs/SessionCreatedEvent",
+          "session.mode.changed": "#/$defs/SessionModeChangedEvent",
           "session.updated": "#/$defs/SessionUpdatedEvent",
           "skill.activated": "#/$defs/SkillActivatedEvent",
           "skill.deactivated": "#/$defs/SkillDeactivatedEvent",
@@ -2585,6 +2656,9 @@
         },
         {
           "$ref": "#/$defs/ModelOptionsChangedEvent"
+        },
+        {
+          "$ref": "#/$defs/SessionModeChangedEvent"
         },
         {
           "$ref": "#/$defs/MessageStartedEvent"

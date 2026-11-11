@@ -26,7 +26,14 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from golem.config import PolicyRule, RuleAction, ShellSettings, WebSettings
+from golem.config import (
+    PermissionMode,
+    PermissionSettings,
+    PolicyRule,
+    RuleAction,
+    ShellSettings,
+    WebSettings,
+)
 from golem.config_edit import add_rule, remove_rule, set_rule_action
 from golem.permissions.engine import (
     Call,
@@ -51,6 +58,7 @@ class _UserFile(BaseModel):
     trusted_projects: list[str] = Field(default_factory=list[str])
     shell: ShellSettings = Field(default_factory=ShellSettings)
     web: WebSettings = Field(default_factory=WebSettings)
+    permissions: PermissionSettings = Field(default_factory=PermissionSettings)
 
 
 class _ProjectFile(BaseModel):
@@ -77,8 +85,14 @@ class Policy:
         self.mcp_allowed: Callable[[Path | None], list[str]] = lambda _root: []
         """Names of the MCP servers with ``approval = "allow"`` that ``root`` sees."""
 
-    def rules(self, root: Path | None, registry: ToolRegistry) -> list[Rule]:
-        """Every rule for a call in ``root``, in the order they are checked."""
+    def rules(
+        self, root: Path | None, registry: ToolRegistry, mode: PermissionMode | None = None
+    ) -> list[Rule]:
+        """Every rule for a call in ``root``, in the order they are checked.
+
+        ``mode`` is the session's permission mode, or None for the one in ``config.toml``.
+        It only picks the built-in rules at the end.
+        """
         user = self._load_user()
         found: list[Rule] = []
         if root is not None:
@@ -95,7 +109,9 @@ class Policy:
             )
             for server in self.mcp_allowed(root.resolve() if root is not None else None)
         )
-        found.extend(default_rules(registry.default_allowed()))
+        mode = mode or user.permissions.mode
+        allowed = registry.default_allowed(mode, network=user.shell.network)
+        found.extend(default_rules(allowed, mode))
         return found
 
     def check(
@@ -104,10 +120,15 @@ class Policy:
         name: str,
         args: Mapping[str, object],
         root: Path | None,
+        mode: PermissionMode | None = None,
     ) -> Decision:
-        """The decision for tool ``name`` called with ``args`` in ``root``."""
+        """The decision for tool ``name`` called with ``args`` in ``root``, in ``mode``."""
         call = describe(registry, name, args, root)
-        return check(call, self.rules(root, registry), home=self.home)
+        return check(call, self.rules(root, registry, mode), home=self.home)
+
+    def default_mode(self) -> PermissionMode:
+        """The user's ``[permissions] mode``. A project file cannot change it."""
+        return self._load_user().permissions.mode
 
     def shell(self) -> ShellSettings:
         """The user's ``[shell]`` settings. A project file cannot change them."""

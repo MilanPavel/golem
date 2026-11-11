@@ -39,7 +39,7 @@ It prints the file it read, the default model, the log level, whether chats get 
 | Settings | Takes effect |
 |---|---|
 | `default_model`, `[models.*]`, `[providers.*]` | When the file changes, at the next model call |
-| `[[rule]]`, `trusted_projects`, `[shell]`, `[web]` | When the file changes, at the next tool call |
+| `[[rule]]`, `trusted_projects`, `[shell]`, `[web]`, `[permissions]` | When the file changes, at the next tool call |
 | `[skills]` | When the file changes |
 | `[mcp.*]` | When the file changes. golem starts, stops, or restarts the servers that changed |
 | `log_level`, `session_titles`, `[ollama]` | When the daemon starts. Run `golem daemon restart` |
@@ -145,6 +145,14 @@ One tool rule. The first rule that matches a call decides it ([Tools and permiss
 | `match` | none | A glob on the call's subject, such as a shell command or a search pattern, with `\|` between alternatives |
 | `path` | none | A glob on the path the call touches. `*` stays in one folder, `**` crosses folders, `~` is your home, and a relative glob starts at the chat's folder |
 | `action` | required | `allow`, `ask`, or `deny` |
+
+### `[permissions]`
+
+Only your own file sets this. A chat can use another mode for itself.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `mode` | `"balanced"` | How much the built-in defaults allow without asking: `careful`, `balanced`, or `autopilot`. See [permission modes](./permissions.md#permission-modes) |
 
 ### `[shell]`
 

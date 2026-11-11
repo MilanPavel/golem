@@ -121,7 +121,7 @@
     }
   },
   "additionalProperties": false,
-  "description": "Resolved settings. Keys are never included.\n\n``project_policy`` is the project's ``.golem/policy.toml`` when it exists,\nand ``project_trusted`` whether its allow rules count. Both are null\nwithout a ``cwd``.",
+  "description": "Resolved settings. Keys are never included.\n\n``project_policy`` is the project's ``.golem/policy.toml`` when it exists,\nand ``project_trusted`` whether its allow rules count. Both are null\nwithout a ``cwd``. ``default_permission_mode`` is ``[permissions] mode``,\nand ``permission_mode`` the mode the ``rules`` were built for: the session's\nwhen ``session_id`` is given, else the default. An older daemon leaves both out.",
   "properties": {
     "config_file": {
       "minLength": 1,
@@ -140,9 +140,29 @@
       ],
       "title": "Default Model"
     },
+    "default_permission_mode": {
+      "default": "balanced",
+      "enum": [
+        "careful",
+        "balanced",
+        "autopilot"
+      ],
+      "title": "Default Permission Mode",
+      "type": "string"
+    },
     "log_level": {
       "minLength": 1,
       "title": "Log Level",
+      "type": "string"
+    },
+    "permission_mode": {
+      "default": "balanced",
+      "enum": [
+        "careful",
+        "balanced",
+        "autopilot"
+      ],
+      "title": "Permission Mode",
       "type": "string"
     },
     "project_policy": {

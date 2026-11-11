@@ -20,6 +20,10 @@ class Ping(BaseModel):
     nonce: str
 
 
+PermissionMode = Literal["careful", "balanced", "autopilot"]
+"""How much the built-in permission rules allow without asking. See ADR-047."""
+
+
 class ForkedFrom(BaseModel):
     """The session and message a fork was copied from."""
 
@@ -224,6 +228,19 @@ class SessionUpdatedData(BaseModel):
         if all(field is None for field in fields):
             raise ValueError("session.updated needs a title, a cwd, allowed_tools, or mcp_servers")
         return self
+
+
+class SessionModeChangedData(BaseModel):
+    """The session's permission mode override, after a change.
+
+    ``mode`` null means the session has no override and follows ``[permissions]
+    mode`` in ``config.toml``. The last event holds what applies from the next
+    tool call, so a replayed session gets its mode back.
+    """
+
+    model_config = _CONFIG
+
+    mode: PermissionMode | None
 
 
 class ModelSelectedData(BaseModel):
@@ -565,6 +582,19 @@ class ModelOptionsChangedEvent(BaseModel):
     data: ModelOptionsChangedData
 
 
+class SessionModeChangedEvent(BaseModel):
+    """``session.set_mode`` changed the session's permission mode."""
+
+    model_config = _CONFIG
+
+    seq: int = Field(ge=1)
+    session_id: str = Field(min_length=1)
+    run_id: None
+    ts: str = Field(min_length=1)
+    type: Literal["session.mode.changed"]
+    data: SessionModeChangedData
+
+
 class MessageStartedEvent(BaseModel):
     """The assistant bubble is open."""
 
@@ -851,6 +881,7 @@ EventType = Literal[
     "session.closed",
     "model.selected",
     "model.options.changed",
+    "session.mode.changed",
     "message.started",
     "message.delta",
     "message.thinking.delta",
@@ -882,6 +913,7 @@ ChatEvent = Annotated[
     | SessionClosedEvent
     | ModelSelectedEvent
     | ModelOptionsChangedEvent
+    | SessionModeChangedEvent
     | MessageStartedEvent
     | MessageDeltaEvent
     | MessageThinkingDeltaEvent
@@ -937,6 +969,7 @@ __all__ = [
     "ModelOptionsChangedEvent",
     "ModelSelectedData",
     "ModelSelectedEvent",
+    "PermissionMode",
     "Ping",
     "PromptSectionInfo",
     "RunCancelledData",
@@ -949,6 +982,8 @@ __all__ = [
     "SessionClosedEvent",
     "SessionCreatedData",
     "SessionCreatedEvent",
+    "SessionModeChangedData",
+    "SessionModeChangedEvent",
     "SessionUpdatedData",
     "SessionUpdatedEvent",
     "SkillActivatedData",

@@ -60,6 +60,8 @@ import type { ModelSetDefaultResult } from "../../protocol/gen/model-set-default
 import type { ModelOptionsGetResult } from "../../protocol/gen/model-options-get-result.ts";
 import type { ModelOptionsSaved } from "../../protocol/gen/model-options-saved.ts";
 import type { ModelOptionsSetResult } from "../../protocol/gen/model-options-set-result.ts";
+import type { SessionSetModeParams } from "../../protocol/gen/session-set-mode-params.ts";
+import type { SessionSetModeResult } from "../../protocol/gen/session-set-mode-result.ts";
 import type { SessionSetOptionsResult } from "../../protocol/gen/session-set-options-result.ts";
 import type { SessionSetModelResult } from "../../protocol/gen/session-set-model-result.ts";
 import type { Params as ChatEvent } from "../../protocol/gen/rpc-notification.ts";
@@ -114,6 +116,7 @@ import {
   isModelOptionsSaved,
   isModelOptionsSetResult,
   isModelSetDefaultResult,
+  isSessionSetModeResult,
   isSessionSetOptionsResult,
   isPullDone,
   isPullProgress,
@@ -292,6 +295,8 @@ export interface GolemClient {
   setModelOptions(model: string, options: Record<string, number | string | null>): Promise<ModelOptionsSetResult>;
   /** Override options for one session from its next run. A `null` value removes one. The session stores `model.options.changed`. */
   setSessionOptions(sessionId: string, options: Record<string, number | string | null>): Promise<SessionSetOptionsResult>;
+  /** Set the permission mode of one session, or `null` to follow config.toml again. The session stores `session.mode.changed`. */
+  setSessionMode(sessionId: string, mode: SessionSetModeParams["mode"]): Promise<SessionSetModeResult>;
   /** `model.options.saved`: the options saved for a model changed, from any client. */
   onOptionsSaved(listener: (saved: ModelOptionsSaved) => void): () => void;
   /** Size, fit, and free disk for a local model before downloading it. */
@@ -1287,6 +1292,14 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("session.set_options", { session_id: sessionId, options });
       if (!isSessionSetOptionsResult(result)) {
         throw new Error("invalid session.set_options result");
+      }
+      return result;
+    },
+    async setSessionMode(sessionId: string, mode: SessionSetModeParams["mode"]): Promise<SessionSetModeResult> {
+      await ready;
+      const result = await call("session.set_mode", { session_id: sessionId, mode });
+      if (!isSessionSetModeResult(result)) {
+        throw new Error("invalid session.set_mode result");
       }
       return result;
     },

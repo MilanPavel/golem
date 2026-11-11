@@ -63,6 +63,8 @@ export type { ModelOption } from "../../protocol/gen/model-option.ts";
 export type { ModelOptionsGetResult } from "../../protocol/gen/model-options-get-result.ts";
 export type { ModelOptionsSaved } from "../../protocol/gen/model-options-saved.ts";
 export type { ModelOptionsSetResult } from "../../protocol/gen/model-options-set-result.ts";
+export type { SessionSetModeParams } from "../../protocol/gen/session-set-mode-params.ts";
+export type { SessionSetModeResult } from "../../protocol/gen/session-set-mode-result.ts";
 export type { SessionSetOptionsResult } from "../../protocol/gen/session-set-options-result.ts";
 export type { McpToggleResult } from "../../protocol/gen/mcp-toggle-result.ts";
 export type { SessionSetSkillsResult } from "../../protocol/gen/session-set-skills-result.ts";

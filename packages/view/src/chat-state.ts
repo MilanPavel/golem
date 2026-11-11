@@ -104,6 +104,8 @@ export type ChatState = {
   context: LiveContextState;
   /** The session's option overrides, from the newest `model.options.changed`: the whole set. */
   options: Readonly<Record<string, number | string>>;
+  /** The session's permission mode override, from the newest `session.mode.changed`. Null follows config.toml. */
+  permissionMode: "careful" | "balanced" | "autopilot" | null;
 };
 
 export const emptyChat: ChatState = {
@@ -122,6 +124,7 @@ export const emptyChat: ChatState = {
   unreadCall: false,
   context: emptyLiveContext,
   options: {},
+  permissionMode: null,
 };
 
 /** What to do after a model server did not answer, besides fixing it. */
@@ -238,6 +241,8 @@ function reduceChatEvent(state: ChatState, event: ChatEvent): ChatState {
       return { ...state, down: null, retry: null };
     case "model.options.changed":
       return { ...state, options: event.data.options };
+    case "session.mode.changed":
+      return { ...state, permissionMode: event.data.mode };
     case "message.started":
       return {
         ...state,

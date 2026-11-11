@@ -275,7 +275,8 @@ def test_shell_asks_by_default_and_rules_match_the_command(tmp_path: Path, root:
     registry = default_registry()
     config = tmp_path / "config.toml"
     config.write_text(
-        '[[rule]]\ntool = "shell"\nmatch = "git status|pnpm test*"\naction = "allow"\n',
+        '[[rule]]\ntool = "shell"\nmatch = "git status|pnpm test*"\naction = "allow"\n'
+        '[permissions]\nmode = "careful"\n',
         encoding="utf-8",
     )
     policy = Policy(config, home=tmp_path)

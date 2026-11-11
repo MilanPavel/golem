@@ -50,7 +50,8 @@ An Architecture Decision Record (ADR) is a short note of one choice: what was de
 | [044](044-recover-text-tool-calls.md) | golem recovers tool calls a model writes as text | accepted | 2026-11-10 |
 | [045](045-thinking.md) | golem keeps a model's thinking, shows it as one line, and never sends it back | accepted | 2026-11-10 |
 | [046](046-web-search.md) | `web_search` asks DuckDuckGo's HTML page first, behind a provider setting | accepted | 2026-11-10 |
+| [047](047-permission-modes.md) | Permission modes change only the built-in defaults: careful, balanced, and autopilot | accepted | 2026-11-11 |
 
 How the running code fits together is in [../architecture.md](../architecture.md).
 
-New records use [template.md](template.md). Number the next file `047-….md` and add a row here.
+New records use [template.md](template.md). Number the next file `048-….md` and add a row here.

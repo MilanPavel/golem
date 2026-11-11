@@ -35,6 +35,7 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.config import get_stream_writer
 from langgraph.types import interrupt
 
+from golem.config import PERMISSION_MODES, PermissionMode
 from golem.graphs.adapter import APPROVAL_KIND, STREAM_KEY
 from golem.graphs.state import AgentState
 from golem.permissions.engine import Allowance, session_allows
@@ -56,6 +57,7 @@ PINNED_FOLDERS_KEY = "golem_pinned_folders"
 """``configurable`` key for the session folder. It is not checkpointed."""
 
 ALLOWED_KEY = "golem_allowed_tools"
+MODE_KEY = "golem_permission_mode"
 """``configurable`` key for the ``[tool, subject]`` pairs allowed for the rest of the session."""
 
 ASKED_KEY = "golem_asked_calls"
@@ -142,6 +144,7 @@ def tools_node(
             read_roots=_read_roots(state, config),
         )
         allowed = _allowed(config)
+        mode = _mode(config)
         asked = _asked(config)
         ids = [call_id_of(call) for call in last.tool_calls]
         last_asked = max(
@@ -162,6 +165,7 @@ def tools_node(
                 allowed,
                 last.id,
                 preview,
+                mode,
                 asked=ids[index] in asked,
                 before_last_asked=index < last_asked,
             )
@@ -242,6 +246,7 @@ def _decide(
     allowed: set[Allowance],
     message_id: str | None,
     preview: Preview | str | None,
+    mode: PermissionMode | None,
     *,
     asked: bool,
     before_last_asked: bool,
@@ -249,7 +254,7 @@ def _decide(
     """``preview`` is what the call would change, or why it cannot, or None."""
     name = call["name"]
     subject = describe(registry, name, call["args"], ctx.root).subject
-    decision = policy.check(registry, name, call["args"], ctx.root)
+    decision = policy.check(registry, name, call["args"], ctx.root, mode)
     if not asked:
         if decision.allowed:
             return _Verdict(run=True)
@@ -403,6 +408,13 @@ def _allowed(config: RunnableConfig) -> set[Allowance]:
     return found
 
 
+def _mode(config: RunnableConfig) -> PermissionMode | None:
+    """The session's permission mode override, or None to follow ``config.toml``."""
+    configurable = cast(Mapping[str, object], config.get("configurable", {}))
+    raw = configurable.get(MODE_KEY)
+    return next((mode for mode in PERMISSION_MODES if mode == raw), None)
+
+
 def _asked(config: RunnableConfig) -> set[str]:
     configurable = cast(Mapping[str, object], config.get("configurable", {}))
     raw = configurable.get(ASKED_KEY)
@@ -458,6 +470,7 @@ __all__ = [
     "CWD_KEY",
     "DENIED_RESULT",
     "MCP_KEY",
+    "MODE_KEY",
     "PINNED_FOLDERS_KEY",
     "PREVIEW_CHARS",
     "STATE_KEYS",

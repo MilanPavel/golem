@@ -14,7 +14,7 @@ from fnmatch import fnmatchcase
 from pathlib import Path
 from typing import Literal
 
-from golem.config import PolicyRule, RuleAction
+from golem.config import PermissionMode, PolicyRule, RuleAction
 
 DEFAULT_SOURCE = "built-in default"
 
@@ -75,10 +75,16 @@ class Decision:
         return self.action == "allow"
 
 
-def default_rules(allowed: Iterable[str]) -> list[Rule]:
-    """``allowed`` tools, read-only or internal, run without asking. Anything else asks."""
-    rules = [Rule(PolicyRule(tool=name, action="allow"), DEFAULT_SOURCE) for name in allowed]
-    rules.append(Rule(PolicyRule(tool="*", action="ask"), DEFAULT_SOURCE))
+def default_source(mode: PermissionMode) -> str:
+    """The source of the built-in rules in ``mode``, as the approval card shows it."""
+    return f"{DEFAULT_SOURCE} ({mode})"
+
+
+def default_rules(allowed: Iterable[str], mode: PermissionMode = "careful") -> list[Rule]:
+    """``allowed`` tools, which ``mode`` lets run without asking. Anything else asks."""
+    source = default_source(mode)
+    rules = [Rule(PolicyRule(tool=name, action="allow"), source) for name in allowed]
+    rules.append(Rule(PolicyRule(tool="*", action="ask"), source))
     return rules
 
 
@@ -179,6 +185,7 @@ __all__ = [
     "alternatives",
     "check",
     "default_rules",
+    "default_source",
     "exact_match",
     "matches",
     "path_pattern",

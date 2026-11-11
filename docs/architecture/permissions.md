@@ -57,7 +57,7 @@ One call, in the order it is checked:
 
 1. **The project's rules,** in `.golem/policy.toml`. They come first, so a repository can say "never read `secrets/`" for everyone who works in it. Their `allow` rules count only when you list the folder in `trusted_projects`.
 2. **Your rules,** in `~/.golem/config.toml`.
-3. **The defaults.** Read-only tools and internal ones, such as `todo_write`, are allowed. Everything else asks.
+3. **The defaults.** Read-only tools and internal ones, such as `todo_write`, are allowed. The session's permission mode may allow more ([ADR-047](../adr/047-permission-modes.md)). Everything else asks.
 4. **The first match decides.** `allow` runs the call. `deny` fails it with the rule's name, and the model reads why.
 5. **An ask** runs at once if you already allowed the same call for this session. Otherwise the run pauses with `approval.needed`, and the TUI shows the question.
 6. **Your answer** is one key: allow once, for the session, always (which writes a rule), edit the arguments, or deny.
@@ -130,7 +130,7 @@ Tool rules are checked in this order, and the first one that matches decides ([A
 
 1. `<session folder>/.golem/policy.toml`, which holds only `[[rule]]` entries. Its `allow` rules count only when the folder is in `trusted_projects`. Its `ask` and `deny` rules always apply. A file that does not validate makes every call in that folder ask.
 2. `[[rule]]` in `~/.golem/config.toml`. A file that stops validating keeps its last good rules.
-3. The defaults: read-only tools and internal ones (`todo_write`) are allowed, and everything else asks.
+3. The defaults: read-only tools and internal ones (`todo_write`) are allowed, and everything else asks. The permission mode (`careful`, `balanced`, `autopilot`) adds tools to the allowed ones ([ADR-047](../adr/047-permission-modes.md)). Each `Tool` names the first mode that allows it in `allow_from`, with `offline_only` for `shell`, which `autopilot` allows only while `[shell] network` is off, and `Policy.rules(root, registry, mode)` builds the defaults for the mode, with the source `built-in default (<mode>)`. The mode is `[permissions] mode` in `config.toml` unless the session set its own with `session.set_mode`, which stores `session.mode.changed` and keeps the value in `sessions.permission_mode`. `config.get` reports `default_permission_mode`, and `permission_mode` for the session it was asked about.
 
 Both files are read again when they change. A `deny` ends the call in `tool.failed`, without `tool.started`, and the model reads why. An `ask` waits for you (below). `golem config show` prints the settings and the rules for the folder it runs in, in that order, through `config.get`.
 

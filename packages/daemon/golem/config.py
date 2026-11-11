@@ -154,6 +154,24 @@ class PolicyRule(BaseModel):
     action: RuleAction
 
 
+PermissionMode = Literal["careful", "balanced", "autopilot"]
+"""How much the built-in default rules allow without asking (ADR-047)."""
+
+PERMISSION_MODES: tuple[PermissionMode, ...] = ("careful", "balanced", "autopilot")
+
+
+class PermissionSettings(BaseModel):
+    """``[permissions]``. The mode new sessions start in, unless the session sets its own.
+
+    The mode changes only the built-in default rules. Rules you write, in
+    ``config.toml`` or a project's ``policy.toml``, are checked first.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    mode: PermissionMode = "balanced"
+
+
 class ShellSettings(BaseModel):
     """``[shell]``. What a ``shell`` command may reach besides the session folder.
 
@@ -380,6 +398,7 @@ PROTECTED_SETTINGS = frozenset(
         "trusted_projects",
         "shell",
         "web",
+        "permissions",
     }
 )
 """Top-level settings the browser's ``config.raw.set`` may not change (ADR-037).
@@ -433,6 +452,7 @@ class GolemSettings(BaseSettings):
     # Project folders whose .golem/policy.toml may allow tools. Ask and deny rules apply anywhere.
     trusted_projects: list[str] = Field(default_factory=list[str])
     shell: ShellSettings = Field(default_factory=ShellSettings)
+    permissions: PermissionSettings = Field(default_factory=PermissionSettings)
     web: WebSettings = Field(default_factory=WebSettings)
     mcp: McpServers = Field(default_factory=dict)
     skills: SkillSettings = Field(default_factory=SkillSettings)

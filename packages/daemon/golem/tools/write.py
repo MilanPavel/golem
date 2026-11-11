@@ -280,6 +280,7 @@ WRITE_FILE = Tool(
     path_arg="path",
     subject=path_subject,
     preview=_preview_write,
+    allow_from="autopilot",
 )
 EDIT_FILE = Tool(
     name="edit_file",
@@ -293,6 +294,7 @@ EDIT_FILE = Tool(
     path_arg="path",
     subject=path_subject,
     preview=_preview_edit,
+    allow_from="autopilot",
 )
 
 WRITE_TOOLS = (WRITE_FILE, EDIT_FILE)

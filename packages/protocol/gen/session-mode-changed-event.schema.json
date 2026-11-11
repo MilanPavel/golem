@@ -1,0 +1,72 @@
+{
+  "$defs": {
+    "SessionModeChangedData": {
+      "additionalProperties": false,
+      "description": "The session's permission mode override, after a change.\n\n``mode`` null means the session has no override and follows ``[permissions]\nmode`` in ``config.toml``. The last event holds what applies from the next\ntool call, so a replayed session gets its mode back.",
+      "properties": {
+        "mode": {
+          "anyOf": [
+            {
+              "enum": [
+                "careful",
+                "balanced",
+                "autopilot"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Mode"
+        }
+      },
+      "required": [
+        "mode"
+      ],
+      "title": "SessionModeChangedData",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "``session.set_mode`` changed the session's permission mode.",
+  "properties": {
+    "data": {
+      "$ref": "#/$defs/SessionModeChangedData"
+    },
+    "run_id": {
+      "title": "Run Id",
+      "type": "null"
+    },
+    "seq": {
+      "minimum": 1,
+      "title": "Seq",
+      "type": "integer"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    },
+    "ts": {
+      "minLength": 1,
+      "title": "Ts",
+      "type": "string"
+    },
+    "type": {
+      "const": "session.mode.changed",
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "seq",
+    "session_id",
+    "run_id",
+    "ts",
+    "type",
+    "data"
+  ],
+  "title": "SessionModeChangedEvent",
+  "type": "object"
+}

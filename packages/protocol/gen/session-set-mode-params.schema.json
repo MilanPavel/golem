@@ -1,0 +1,33 @@
+{
+  "additionalProperties": false,
+  "description": "``session.set_mode``. Set the permission mode of one session.\n\n``mode`` ``null`` removes the session's override, so it follows\n``[permissions] mode`` in ``config.toml`` again. The daemon emits\n``session.mode.changed``, and the mode applies from the session's next tool\ncall. It is kept with the session and is not written to ``config.toml``.",
+  "properties": {
+    "mode": {
+      "anyOf": [
+        {
+          "enum": [
+            "careful",
+            "balanced",
+            "autopilot"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Mode"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "session_id",
+    "mode"
+  ],
+  "title": "SessionSetModeParams",
+  "type": "object"
+}
