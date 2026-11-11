@@ -4,12 +4,14 @@ import { test } from "node:test";
 import type { ModelOption, ModelOptionsGetResult } from "@golem/client";
 
 import {
+  activePreset,
   applyPreset,
   changedRows,
   defaultNote,
   differsFromDefault,
   focusedRow,
   formatTuneValue,
+  groupRows,
   isListKind,
   formatExtraGb,
   keepSession,
@@ -527,4 +529,27 @@ test("/tune think accepts only the model's values and says the allowed ones", ()
   assert.match(tuneSet(OPTIONS, ["think", "on"]).notice, /think is not an option to tune/);
   assert.equal(tuneHint(LEVELS), "model default · low, medium, high");
   assert.equal(tuneHint(OPTIONS[5] as ModelOption, { keep_alive: "5m" }), "5m · a time such as 5m, or -1");
+});
+
+test("rows fall into Sampling, Memory, and Output, and an unknown option into Other at the end", () => {
+  const extra = [...OPTIONS, option("mystery")];
+  const groups = groupRows(tuneRows(tuneState(result({ options: extra }))));
+  assert.deepEqual(
+    groups.map((group) => [group.label, group.rows.map((row) => row.option.name)]),
+    [
+      ["Sampling", ["temperature", "top_p", "top_k"]],
+      ["Memory", ["num_ctx", "keep_alive"]],
+      ["Output", ["seed"]],
+      ["Other", ["mystery"]],
+    ],
+  );
+  assert.deepEqual(groupRows(tuneRows(tuneState(result()))).map((group) => group.id), ["sampling", "memory", "output"]);
+});
+
+test("a preset is active only while the values in use match it", () => {
+  const plain = tuneState(result());
+  assert.equal(activePreset(plain)?.id, "balanced");
+  const precise = applyPreset(plain, PRESETS[0] as (typeof PRESETS)[number]).state;
+  assert.equal(activePreset(precise)?.id, "precise");
+  assert.equal(activePreset(withSession(precise, { ...precise.session, temperature: 0.5 })), null);
 });

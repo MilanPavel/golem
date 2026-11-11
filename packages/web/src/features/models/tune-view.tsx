@@ -2,7 +2,10 @@ import type { ModelOptionsGetResult, ModelOptionsSetResult, SessionSetOptionsRes
 import {
   applyPreset,
   defaultNote,
+  differsFromDefault,
   formatTuneValue,
+  groupRows,
+  activePreset,
   isListKind,
   NUM_CTX_START,
   keepSession,
@@ -31,7 +34,9 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { actionErrorText } from "../../store/errors.ts";
 import { sessionPath } from "../../store/router.ts";
 import { Button } from "../../ui/button.tsx";
-import { ChevronLeftIcon } from "../../ui/icons.tsx";
+import { ChevronLeftIcon, RefreshIcon } from "../../ui/icons.tsx";
+import { IconButton } from "../../ui/icon-button.tsx";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../../ui/tooltip.tsx";
 import { cn } from "../../ui/cn.ts";
 
 /** What Try again needs of the session whose model is tuned. Absent for any other model. */
@@ -102,65 +107,159 @@ function viewOf(state: TuneState, canSession: boolean): TuneState {
   return canSession || state.target === "saved" ? state : toggleTarget(state);
 }
 
-function RowControl({ row, id, onChange }: { row: TuneRow; id: string; onChange: (value: TuneValue) => void }) {
+type Choice = { value: TuneValue | null; label: string };
+
+const SEG_CLASS = "inline-flex w-fit max-w-full gap-0.5 rounded-md border border-line-strong bg-bg p-0.5";
+const SEG_BUTTON_CLASS =
+  "rounded-sm border border-transparent px-3 py-1 text-xs text-muted outline-offset-2 outline-clay hover:text-ink focus-visible:outline-2 aria-checked:border-line-strong aria-checked:bg-surface aria-checked:text-ink disabled:pointer-events-none disabled:opacity-50";
+const NUMBER_CLASS =
+  "w-24 rounded-md border border-line-strong bg-surface px-2 py-1 font-mono text-sm text-ink outline-offset-2 outline-clay focus-visible:outline-2 disabled:bg-sunken disabled:text-faint";
+
+/** A row of radios in one box. Arrow keys move and pick; with nothing checked, the first can take focus. */
+function Segmented({
+  label,
+  choices,
+  checked,
+  onPick,
+  disabled = false,
+  title,
+  wrap = false,
+}: {
+  label: string;
+  choices: readonly { label: string }[];
+  /** Index of the checked radio, or -1 for none. */
+  checked: number;
+  onPick: (index: number) => void;
+  disabled?: boolean;
+  title?: string | undefined;
+  /** Lets the radios wrap on a narrow screen. */
+  wrap?: boolean;
+}) {
+  const buttons = useRef<(HTMLButtonElement | null)[]>([]);
+  const stop = checked >= 0 ? checked : 0;
+  function onKeyDown(event: KeyboardEvent<HTMLDivElement>): void {
+    const by = event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 0;
+    if (by === 0 || disabled || event.altKey || event.ctrlKey || event.metaKey) return;
+    // Left would also leave the view, so the group takes it.
+    event.preventDefault();
+    const next = (stop + by + choices.length) % choices.length;
+    onPick(next);
+    buttons.current[next]?.focus();
+  }
+  return (
+    <div role="radiogroup" aria-label={label} title={title} className={cn(SEG_CLASS, wrap && "flex-wrap")} onKeyDown={onKeyDown}>
+      {choices.map((choice, index) => (
+        <button
+          key={choice.label}
+          ref={(node) => {
+            buttons.current[index] = node;
+          }}
+          type="button"
+          role="radio"
+          aria-checked={index === checked}
+          tabIndex={index === stop ? 0 : -1}
+          disabled={disabled}
+          onClick={() => onPick(index)}
+          className={SEG_BUTTON_CLASS}
+        >
+          {choice.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** A mode radio plus a number: the answer length (until done, fill context, limit) and the seed (random, fixed). */
+function ModeNumber({ row, onChange }: { row: TuneRow; onChange: (value: TuneValue | null) => void }) {
+  const { option, value } = row;
+  const length = option.name === "num_predict";
+  const modes: Choice[] = length
+    ? [
+        { value: -1, label: "Until done" },
+        { value: -2, label: "Fill context" },
+        { value: null, label: "Limit" },
+      ]
+    : [
+        { value: null, label: "Random" },
+        { value: null, label: "Fixed" },
+      ];
+  const low = length ? 1 : (option.minimum ?? 0);
+  const high = option.maximum ?? Number.MAX_SAFE_INTEGER;
+  const clamp = (n: number) => Math.min(high, Math.max(low, n));
+  const fixed = typeof value === "number" && (length ? value >= 0 : true);
+  const checked = length ? (value === -2 ? 1 : fixed ? 2 : 0) : fixed ? 1 : 0;
+  const numeric = fixed && typeof value === "number" ? value : null;
+  const [draft, setDraft] = useState(numeric === null ? (length ? "4096" : "42") : String(numeric));
+  const [synced, setSynced] = useState(numeric);
+  if (synced !== numeric) {
+    setSynced(numeric);
+    if (numeric !== null && Number(draft) !== numeric && draft !== "") setDraft(String(numeric));
+  }
+  const remembered = clamp(Number.isFinite(Number(draft)) && draft !== "" ? Math.trunc(Number(draft)) : length ? 4096 : 42);
+  function pick(index: number): void {
+    if (length) onChange(index === 0 ? -1 : index === 1 ? -2 : remembered);
+    else onChange(index === 0 ? null : remembered);
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <Segmented label={option.label} choices={modes} checked={checked} onPick={pick} />
+      <input
+        type="number"
+        inputMode="numeric"
+        aria-label={length ? "Answer length limit" : "Seed value"}
+        min={low}
+        max={high}
+        step={1}
+        disabled={!fixed}
+        value={draft}
+        onChange={(event) => {
+          setDraft(event.target.value);
+          if (/^\d+$/.test(event.target.value)) onChange(clamp(Number(event.target.value)));
+        }}
+        className={NUMBER_CLASS}
+      />
+    </div>
+  );
+}
+
+function RowControl({ row, id, onChange }: { row: TuneRow; id: string; onChange: (value: TuneValue | null) => void }) {
   const { option, value } = row;
   if (option.kind === "choice") {
-    const current = value === null ? "" : String(value);
-    return (
-      <select
-        id={id}
-        value={current}
-        onChange={(event) => onChange(event.target.value)}
-        className="min-w-0 rounded-md border border-line-strong bg-surface px-2 py-1 text-sm text-ink outline-offset-2 outline-clay focus-visible:outline-2"
-      >
-        {current === "" ? <option value="">unset</option> : null}
-        {(option.values ?? []).map((choice) => (
-          <option key={choice} value={choice}>
-            {choice}
-          </option>
-        ))}
-      </select>
-    );
+    const choices: Choice[] = [{ value: null, label: "Model default" }, ...(option.values ?? []).map((choice) => ({ value: choice, label: choice }))];
+    const at = value === null ? 0 : choices.findIndex((choice) => choice.value === String(value));
+    return <Segmented label={option.label} choices={choices} checked={at} onPick={(index) => onChange(choices[index]?.value ?? null)} />;
   }
   if (option.kind === "duration") {
-    const current = value === null ? "" : String(value);
-    const known = KEEP_ALIVE_STEPS.map(String);
-    return (
-      <select
-        id={id}
-        value={current}
-        onChange={(event) => {
-          const picked = KEEP_ALIVE_STEPS.find((step) => String(step) === event.target.value);
-          onChange(picked ?? event.target.value);
-        }}
-        className="min-w-0 rounded-md border border-line-strong bg-surface px-2 py-1 text-sm text-ink outline-offset-2 outline-clay focus-visible:outline-2"
-      >
-        {current === "" ? <option value="">default</option> : null}
-        {known.includes(current) || current === "" ? null : <option value={current}>{current}</option>}
-        {known.map((step) => (
-          <option key={step} value={step}>
-            {KEEP_ALIVE_LABELS.get(step) ?? step}
-          </option>
-        ))}
-      </select>
-    );
+    const current = value === null ? null : String(value);
+    const choices: Choice[] = KEEP_ALIVE_STEPS.map((step) => ({ value: step, label: KEEP_ALIVE_LABELS.get(String(step)) ?? String(step) }));
+    if (current !== null && !choices.some((choice) => String(choice.value) === current)) choices.push({ value: current, label: current });
+    const at = current === null ? -1 : choices.findIndex((choice) => String(choice.value) === current);
+    return <Segmented label={option.label} choices={choices} checked={at} onPick={(index) => onChange(choices[index]?.value ?? null)} />;
   }
+  if (option.name === "num_predict" || option.name === "seed") return <ModeNumber row={row} onChange={onChange} />;
   // `num_ctx` with no default and no value: no thumb, and the first move starts at NUM_CTX_START.
   const unset = option.name === "num_ctx" && value === null;
+  const minimum = option.minimum ?? 0;
+  const maximum = option.maximum ?? 0;
+  const fallback = typeof option.default === "number" ? option.default : null;
+  const tick = fallback !== null && maximum > minimum ? Math.min(100, Math.max(0, ((fallback - minimum) / (maximum - minimum)) * 100)) : null;
   return (
-    <input
-      id={id}
-      type="range"
-      min={option.minimum ?? 0}
-      max={option.maximum ?? 0}
-      step={option.step ?? 1}
-      value={typeof value === "number" ? value : unset ? NUM_CTX_START : (option.minimum ?? 0)}
-      onChange={(event) => onChange(unset ? NUM_CTX_START : event.target.valueAsNumber)}
-      className={cn(
-        "min-w-0 flex-1 accent-clay",
-        unset && "[&::-moz-range-thumb]:opacity-0 [&::-webkit-slider-thumb]:opacity-0",
-      )}
-    />
+    <div className="relative flex items-center">
+      {tick === null ? null : <span aria-hidden="true" className="pointer-events-none absolute h-2.5 w-0.5 bg-faint/60" style={{ left: `${tick}%` }} />}
+      <input
+        id={id}
+        type="range"
+        min={minimum}
+        max={maximum}
+        step={option.step ?? 1}
+        value={typeof value === "number" ? value : unset ? NUM_CTX_START : minimum}
+        onChange={(event) => onChange(unset ? NUM_CTX_START : event.target.valueAsNumber)}
+        className={cn(
+          "relative min-w-0 flex-1 accent-clay",
+          unset && "[&::-moz-range-thumb]:opacity-0 [&::-webkit-slider-thumb]:opacity-0",
+        )}
+      />
+    </div>
   );
 }
 
@@ -217,7 +316,7 @@ export function TuneView({
   const [state, setState] = useState<TuneState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
-  const [shown, setShown] = useState<string | null>(null);
+  const [didSave, setDidSave] = useState(false);
   const [starting, setStarting] = useState(false);
   const timers = useRef(new Map<string, Pending>());
   const inflight = useRef(0);
@@ -286,16 +385,20 @@ export function TuneView({
   /** Runs one write after the ones before it. A failure shows, and the options are read again. */
   function enqueue(job: () => Promise<void>): void {
     inflight.current += 1;
+    setDidSave(false);
     mirror();
     queue.current = queue.current.then(async () => {
+      let failed = false;
       try {
         await job();
       } catch (failure) {
+        failed = true;
         setError(actionErrorText(failure, "Could not change the option."));
         setReload((count) => count + 1);
       } finally {
         inflight.current -= 1;
         mirror();
+        if (!failed && settled()) setDidSave(true);
       }
     });
   }
@@ -324,6 +427,7 @@ export function TuneView({
     };
     entry.timer = setTimeout(fire, delay);
     timers.current.set(name, entry);
+    setDidSave(false);
     mirror();
   }
 
@@ -422,7 +526,8 @@ export function TuneView({
   const view = state === null ? null : viewOf(state, canSession);
   const target = view?.target ?? "saved";
   const rows = view === null ? [] : tuneRows(view);
-  const explained = rows.find((row) => row.option.name === shown) ?? rows[0];
+  const groups = groupRows(rows);
+  const current = view === null ? null : activePreset(view);
   const layer = view === null ? {} : view[target];
   const names = Object.keys(layer);
 
@@ -449,32 +554,23 @@ export function TuneView({
         </div>
       );
   } else {
-    const explainedNote = explained === undefined ? null : memoryNote(view, explained);
     body = (
       <>
-        <div role="group" aria-label="Presets" className="flex flex-wrap items-center gap-2">
-          {PRESETS.map((preset) => (
-            <Button
-              key={preset.id}
-              size="sm"
-              disabled={!canSession}
-              title={canSession ? undefined : "A preset is for the session that uses this model."}
-              onClick={() => choose(preset)}
-            >
-              {preset.label.charAt(0).toUpperCase() + preset.label.slice(1)}
-            </Button>
-          ))}
-          {canSession && Object.keys(state.session).length > 0 ? (
-            <Button size="sm" kind="ghost" onClick={keep}>
-              Save these for the model
-            </Button>
-          ) : null}
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+          <Segmented
+            label="Preset"
+            wrap
+            choices={PRESETS.map((preset) => ({ label: preset.label.charAt(0).toUpperCase() + preset.label.slice(1) }))}
+            checked={current === null ? -1 : PRESETS.findIndex((preset) => preset.id === current.id)}
+            disabled={!canSession}
+            title={canSession ? undefined : "A preset is for the session that uses this model."}
+            onPick={(index) => {
+              const preset = PRESETS[index];
+              if (preset !== undefined) choose(preset);
+            }}
+          />
+          <span className="text-xs text-muted">{target === "session" ? "Changes apply to this session" : "Saved for this model"}</span>
         </div>
-        {state.preset === undefined ? null : (
-          <p role="status" className="text-xs text-muted">
-            Preset {state.preset} · this session
-          </p>
-        )}
         {canSession ? (
           <div role="group" aria-label="Applies to" className="flex flex-wrap items-center gap-2">
             <span className="text-sm text-muted">Applies to</span>
@@ -495,61 +591,89 @@ export function TuneView({
               This session only
             </Button>
           </div>
-        ) : (
-          <p className="text-sm text-muted">Every change is saved for this model.</p>
-        )}
+        ) : null}
         {error === null ? null : (
           <p role="alert" className="text-sm text-deny">
             {error}
           </p>
         )}
-        <ul className="flex flex-col gap-2" aria-label={`Options of ${state.model}`}>
-          {rows.map((row) => {
-            const { option } = row;
-            const id = `${ids}-${option.name}`;
-            const fallbackNote = defaultNote(view, row);
-            const memory = memoryNote(view, row);
-            return (
-              <li
-                key={option.name}
-                title={option.short}
-                onFocusCapture={() => setShown(option.name)}
-                onMouseEnter={() => setShown(option.name)}
-                className={cn(
-                  "flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md px-2 py-1 transition-colors duration-700 motion-reduce:transition-none",
-                  state.lit?.includes(option.name) ? "bg-clay/25" : explained?.option.name === option.name && "bg-line/40",
-                )}
+        <div className="flex flex-col" aria-label={`Options of ${state.model}`} role="group">
+          {groups.map((group) => (
+            <section key={group.id} aria-labelledby={`${ids}-group-${group.id}`}>
+              <h3
+                id={`${ids}-group-${group.id}`}
+                className="mb-1 mt-4 border-b border-line pb-1 font-mono text-xs uppercase tracking-wider text-faint"
               >
-                <label htmlFor={id} className="w-28 shrink-0 text-sm text-ink">
-                  {option.label}
-                </label>
-                <div className="flex min-w-40 flex-1 items-center">
-                  <RowControl row={row} id={id} onChange={(value) => change(option.name, value, isListKind(option) ? 0 : TUNE_DEBOUNCE_MS)} />
-                </div>
-                <span className="w-16 text-right font-mono text-sm text-ink">{formatTuneValue(option, row.value)}</span>
-                <span className="flex w-44 flex-col text-xs text-muted">
-                  {memory === null ? null : <span className={FIT_CLASS[memory.fit]}>{memory.text}</span>}
-                  {fallbackNote === null ? null : <span>{fallbackNote}</span>}
-                </span>
-                <Button
-                  size="sm"
-                  kind="ghost"
-                  aria-label={`Reset ${option.label}`}
-                  disabled={view[target][option.name] === undefined}
-                  onClick={() => change(option.name, null, 0)}
-                >
-                  Reset
-                </Button>
-              </li>
-            );
-          })}
-        </ul>
-        {explained === undefined ? null : (
-          <p className="min-h-12 text-sm text-muted">
-            <span className="font-medium text-ink">{explained.option.label}.</span> {explained.option.long}
-            {explainedNote?.warning === undefined ? null : <> {explainedNote.warning}</>}
-          </p>
-        )}
+                {group.label}
+              </h3>
+              <ul className="flex flex-col">
+                {group.rows.map((row) => {
+                  const { option } = row;
+                  const id = `${ids}-${option.name}`;
+                  const fallbackNote = defaultNote(view, row);
+                  const memory = memoryNote(view, row);
+                  const changed = view[target][option.name] !== undefined;
+                  const slider = !isListKind(option) && option.name !== "num_predict" && option.name !== "seed";
+                  return (
+                    <li
+                      key={option.name}
+                      title={option.short}
+                      className={cn(
+                        "flex flex-col gap-1 border-t border-dashed border-line py-2 first:border-t-0 transition-colors duration-700 motion-reduce:transition-none",
+                        state.lit?.includes(option.name) && "bg-clay/25",
+                      )}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        {slider ? (
+                          <label htmlFor={id} className="text-sm font-medium text-ink">
+                            {option.label}
+                          </label>
+                        ) : (
+                          <span className="text-sm font-medium text-ink">{option.label}</span>
+                        )}
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              aria-label={`About ${option.label}`}
+                              className="inline-grid size-4 place-items-center rounded-full border border-line-strong font-sans text-xs leading-none text-faint outline-offset-2 outline-clay hover:text-ink focus-visible:outline-2"
+                            >
+                              i
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-72">
+                            {option.long}
+                            {memory?.warning === undefined ? null : <> {memory.warning}</>}
+                          </TooltipContent>
+                        </Tooltip>
+                        {slider ? (
+                          <span className={cn("ml-auto font-mono text-sm font-medium", differsFromDefault(view, row) ? "text-clay-ink" : "text-ink", row.value === null && "text-faint")}>
+                            {formatTuneValue(option, row.value)}
+                          </span>
+                        ) : (
+                          <span className="ml-auto" />
+                        )}
+                        {changed ? (
+                          <IconButton label={`Reset ${option.label}`} className="size-6" onClick={() => change(option.name, null, 0)}>
+                            <RefreshIcon width={14} height={14} />
+                          </IconButton>
+                        ) : (
+                          <span aria-hidden="true" className="size-6 shrink-0" />
+                        )}
+                      </div>
+                      <RowControl row={row} id={id} onChange={(value) => change(option.name, value, isListKind(option) ? 0 : TUNE_DEBOUNCE_MS)} />
+                      <p className="text-xs text-muted">
+                        {option.short}
+                        {fallbackNote === null ? null : <span className="text-faint"> · {fallbackNote}</span>}
+                        {memory === null ? null : <span className={FIT_CLASS[memory.fit]}> · {memory.text}</span>}
+                      </p>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          ))}
+        </div>
         {again === undefined ? null : (
           <div className="flex flex-col gap-2 border-t border-line pt-3">
             <div className="flex flex-wrap items-center gap-2">
@@ -591,23 +715,32 @@ export function TuneView({
           <ChevronLeftIcon />
         </button>
         <div className="min-w-0 flex-1">
-          <h2 ref={heading} tabIndex={-1} aria-label={`Tune ${label}`} className="text-base font-semibold outline-offset-2 outline-clay focus-visible:outline-2">
+          <h2 ref={heading} tabIndex={-1} aria-label={`Tune ${label}`} className="text-base font-semibold outline-none">
             {label}
           </h2>
           <p className="font-mono text-xs text-faint">{model}</p>
         </div>
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">{body}</div>
-      <div className="mt-1 flex shrink-0 items-center justify-between gap-2 border-t border-line pt-4">
+      <div className="mt-1 flex shrink-0 flex-wrap items-center gap-2 border-t border-line pt-4">
         <Button
-          kind="secondary"
+          kind="ghost"
           aria-label="Reset all options"
           disabled={state === null || names.length === 0}
           title={target === "session" ? "Remove every override of this session." : "Remove every value saved for this model."}
           onClick={resetAll}
         >
-          Reset
+          Reset all
         </Button>
+        <span className="flex-1" />
+        <span role="status" aria-live="polite" className="text-xs text-faint">
+          {didSave ? "Saved ✓" : ""}
+        </span>
+        {canSession && state !== null && Object.keys(state.session).length > 0 ? (
+          <Button kind="secondary" onClick={keep}>
+            Save these for the model
+          </Button>
+        ) : null}
         <Button kind="ink" onClick={onBack}>
           Done
         </Button>
