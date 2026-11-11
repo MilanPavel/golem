@@ -9,7 +9,7 @@ const TAB = cn(TAB_LOOK, "aria-[current=page]:border-clay aria-[current=page]:te
 
 /**
  * The second row of a session, on both views: the `Chat | Trace` tabs on the left, the view's own
- * summary on the right. Each tab is a link to its route, so the current one is `aria-current="page"`
+ * actions on the right. Each tab is a link to its route, so the current one is `aria-current="page"`
  * and a modified click opens a new browser tab.
  */
 export function SessionViewBar({ id, view, children }: { id: string; view: "chat" | "trace"; children?: ReactNode }) {

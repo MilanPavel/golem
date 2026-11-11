@@ -150,7 +150,7 @@ function Card(props: SetupFormViewProps & { row: FormRow }) {
           ? actions.error.text
           : null;
   return (
-    <li className="flex flex-col gap-2 rounded-lg border border-line bg-surface p-4 md:flex-row md:items-start md:gap-4">
+    <li className="flex flex-col gap-2 rounded-lg border border-line bg-surface p-4">
       <div className="flex min-w-0 flex-1 items-start gap-3">
         <span className="mt-0.5">
           <MarkGlyph mark={MARKS[row.mark]} />
@@ -170,7 +170,7 @@ function Card(props: SetupFormViewProps & { row: FormRow }) {
         </div>
       </div>
       {row.fix === null ? null : (
-        <div className="flex flex-wrap items-center gap-2 pl-7 md:justify-end md:pl-0">
+        <div className="flex flex-wrap items-center gap-2 pl-7">
           <Fix {...props} fix={row.fix} />
         </div>
       )}
@@ -181,7 +181,7 @@ function Card(props: SetupFormViewProps & { row: FormRow }) {
 /** The cards of Settings → Setup. Every part of setup is a card with the fix beside it. */
 export function SetupFormView(props: SetupFormViewProps) {
   return (
-    <ul aria-label="Setup" className="flex flex-col gap-2">
+    <ul aria-label="Setup" className="grid grid-cols-1 gap-3 md:grid-cols-2 wide:grid-cols-3">
       {props.rows.map((row) => (
         <Card key={cardKey(row)} {...props} row={row} />
       ))}

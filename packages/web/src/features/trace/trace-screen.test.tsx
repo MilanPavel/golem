@@ -119,14 +119,17 @@ test("the Chat and Trace tabs move between the views, and the current one is ari
   await waitFor(() => expect(location.pathname).toBe("/s/a/trace"));
 });
 
-test("the title row holds only the title; the summary and Refresh sit with the tabs", async () => {
+test("the title row holds only the title; Refresh sits with the tabs and the summary on its own line below", async () => {
   await open("/s/a/trace");
   const nav = await screen.findByRole("navigation", { name: "View" });
   const titleRow = screen.getByRole("heading", { level: 1 }).parentElement as HTMLElement;
   expect(within(titleRow).queryByRole("link", { name: "Chat" })).toBeNull();
   const row = nav.parentElement as HTMLElement;
   expect(within(row).getByRole("button", { name: "Refresh" })).toBeTruthy();
-  expect(within(row).getByText(/runs?/)).toBeTruthy();
+  expect(within(row).queryByText(/runs?/)).toBeNull();
+  const summary = screen.getByText(/^1 run · /).parentElement as HTMLElement;
+  expect(row.nextElementSibling).toBe(summary.parentElement);
+  expect(within(summary).getByRole("meter")).toBeTruthy();
 });
 
 test("the page has no accessibility violations", async () => {

@@ -19,12 +19,16 @@ function Header({ id, runs, refreshing, onRefresh }: { id: string; runs: readonl
   return (
     <div className="flex flex-col">
       <SessionViewBar id={id} view="trace">
-        {runs === null ? <div className="flex-1" /> : <TraceSummary runs={runs} />}
         <Button kind="ghost" size="sm" onClick={onRefresh} disabled={refreshing} aria-label="Refresh">
           <RefreshIcon className="size-3.5" />
           <span className="max-narrow:hidden">Refresh</span>
         </Button>
       </SessionViewBar>
+      {runs === null || runs.length === 0 ? null : (
+        <div className="flex items-center border-b border-line px-4 py-1.5">
+          <TraceSummary runs={runs} />
+        </div>
+      )}
     </div>
   );
 }
