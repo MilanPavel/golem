@@ -176,6 +176,17 @@ test("/thinking is a view command with no arguments", () => {
   assert.equal(command?.args, "");
 });
 
+test("/detail shows the level alone, sets one word, and refuses others", () => {
+  assert.deepEqual(applyComposer(closedDebug, "/detail"), { kind: "detail", level: null });
+  assert.deepEqual(applyComposer(closedDebug, "/detail quiet"), { kind: "detail", level: "quiet" });
+  assert.deepEqual(applyComposer(closedDebug, "/detail verbose"), { kind: "detail", level: "verbose" });
+  assert.equal(applyComposer(closedDebug, "/detail loud").kind, "unknown");
+  assert.equal(applyComposer(closedDebug, "/detail quiet now").kind, "unknown");
+  const command = COMMANDS.find((entry) => entry.name === "/detail");
+  assert.equal(command?.group, "view");
+  assert.deepEqual(command?.choices, ["quiet", "normal", "verbose"]);
+});
+
 test("/close takes no arguments", () => {
   assert.deepEqual(applyComposer(closedDebug, "/close"), { kind: "close-session" });
   assert.equal(applyComposer(closedDebug, "/close now").kind, "unknown");

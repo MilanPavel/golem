@@ -104,13 +104,14 @@ export const SAMPLE_CHAT: Pick<ChatState, "messages" | "error" | "notice"> = {
   notice: null,
 };
 
-/** One run with three tool steps and a final answer: the transcript draws it as one golem with one footer. */
+/** One run with four tool steps and a final answer: the transcript draws it as one golem with one footer. */
 export const TURN_CHAT: Pick<ChatState, "messages" | "error" | "notice"> = {
   messages: [
     { id: "tu", role: "user", text: "Find where the retry delay is set.", streaming: false, at: "2026-11-01T15:00:00" },
     { id: "ts1", role: "assistant", text: "Let me search for it.", streaming: false, durationMs: 2100, tools: [{ callId: "c1", name: "grep", args: { pattern: "retryDelay" }, status: "done", summary: "3 matches" }] },
     { id: "ts2", role: "assistant", text: "", streaming: false, durationMs: 4300, tools: [{ callId: "c2", name: "read_file", args: { path: "src/socket.ts" }, status: "done", summary: "41 lines" }] },
-    { id: "ts3", role: "assistant", text: "", streaming: false, durationMs: 6900, tools: [{ callId: "c3", name: "read_file", args: { path: "src/meter.ts" }, status: "done", summary: "28 lines" }] },
+    { id: "ts3", role: "assistant", text: "", streaming: false, durationMs: 6900, tools: [{ callId: "c3", name: "mcp__github__get_me", args: {}, status: "done", summary: "1 user", approval: { source: "built-in default", subject: null, answer: { decision: "allow_session", rule: null, edited: false } } }] },
+    { id: "ts3b", role: "assistant", text: "", streaming: false, durationMs: 7600, tools: [{ callId: "c4", name: "mcp__github__list_issues", args: { repo: "golem" }, status: "failed", error: "rate limited" }] },
     { id: "ts4", role: "assistant", text: "It is set in `socket.ts`, and `meter.ts` only reads it.", streaming: false, durationMs: 8800 },
   ] satisfies ChatMessage[],
   error: null,

@@ -77,6 +77,7 @@ test("a denied call reads denied on the tool line", async () => {
   send("approval.resolved", { call_id: "c1", name: "edit_file", decision: "deny" });
   send("tool.failed", { call_id: "c1", message: "the user denied this tool call" });
   expect(screen.getByRole("group", { name: "Approval" }).textContent).toContain("✗ Denied");
+  fireEvent.click(screen.getByRole("button", { name: /1 failed/ }));
   const line = document.querySelector("[data-tool-status=failed]");
   expect(line?.textContent).toContain("✗ denied");
   expect(line?.textContent).not.toContain("the user denied");

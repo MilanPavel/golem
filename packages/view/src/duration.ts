@@ -23,6 +23,22 @@ export function formatDuration(ms: number): string {
 }
 
 /**
+ * The time of a whole turn, for its footer: seconds with one decimal under a minute (`42.1s`),
+ * then minutes and whole seconds (`1m 03s`). Empty when the number is not a duration.
+ */
+export function formatTurnTime(ms: number): string {
+  if (!Number.isFinite(ms) || ms < 0) {
+    return "";
+  }
+  const tenths = Math.round(ms / 100);
+  if (tenths < 600) {
+    return `${Math.floor(tenths / 10)}.${tenths % 10}s`;
+  }
+  const seconds = Math.round(ms / 1000);
+  return `${Math.floor(seconds / 60)}m ${String(seconds % 60).padStart(2, "0")}s`;
+}
+
+/**
  * A live counter that ticks once a second: whole seconds, rounded down, such as `0m 03s`,
  * `1m 04s` and `12m 00s`. `0m 00s` when the number is negative, `NaN` or `Infinity`.
  */

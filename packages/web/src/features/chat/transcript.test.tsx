@@ -1,9 +1,10 @@
 import { LIVE_OUTPUT_CHARS, type ChatMessage, type ToolBlock } from "@golem/view";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import axe from "axe-core";
-import { expect, test } from "vitest";
+import { afterEach, expect, test } from "vitest";
 import { ToolLine, TranscriptColumn, TranscriptMessages } from "./transcript.tsx";
 import { SAMPLE_CHAT } from "./sample.ts";
+import { detailStore } from "./detail.ts";
 import { setThinkingShown } from "./thinking-shown.ts";
 
 const noContrast = { rules: { "color-contrast": { enabled: false } } };
@@ -27,7 +28,7 @@ test("a run with tool steps is one golem and one footer: the last time and every
   );
   expect(screen.getAllByRole("article", { name: "golem" })).toHaveLength(1);
   expect(container.querySelectorAll("svg[data-state]")).toHaveLength(1);
-  expect(screen.getAllByText("0m 03.0s · 2 tools")).toHaveLength(1);
+  expect(screen.getAllByText("3.0s · 2 steps")).toHaveLength(1);
   expect(screen.queryByText(/0m 01\.0s/)).toBeNull();
 });
 
@@ -40,7 +41,7 @@ test("a streaming last step shows no footer", () => {
       ])}
     />,
   );
-  expect(screen.queryByText(/ tools?$/, { selector: "p" })).toBeNull();
+  expect(screen.queryByText(/ steps?$/, { selector: "p" })).toBeNull();
 });
 
 test("two user turns make two golems", () => {
@@ -82,12 +83,12 @@ test("a finished answer: idle golem, markdown, duration and tool count, no curso
   expect(container.querySelector(".prose strong")?.textContent).toBe("bold");
   expect(golemState(container)).toBe("idle");
   expect(container.querySelector("[data-cursor]")).toBeNull();
-  expect(screen.getByText("0m 04.2s · 1 tool")).toBeTruthy();
+  expect(screen.getByText("4.2s · 1 step")).toBeTruthy();
 });
 
-test("the duration line has no tool count when there are no tools, and says 1m 03.0s", () => {
+test("the duration line has no step count when there are no tools, and says 1m 03s", () => {
   render(<TranscriptMessages chat={chat([answer({ durationMs: 63_000 })])} />);
-  expect(screen.getByText("1m 03.0s")).toBeTruthy();
+  expect(screen.getByText("1m 03s")).toBeTruthy();
 });
 
 test("a streaming answer has the cursor, a thinking golem, and no footer", () => {
@@ -128,6 +129,7 @@ test("each tool status reads its own way, and long arguments keep their full tex
       ])}
     />,
   );
+  // A tool waits, so the steps are open.
   const items = screen.getAllByRole("listitem");
   expect(items.map((i) => i.getAttribute("data-tool-status"))).toEqual(["done", "waiting", "running", "requested", "failed"]);
   expect(items[0]?.textContent).toContain("✓ 41 lines");
@@ -135,7 +137,7 @@ test("each tool status reads its own way, and long arguments keep their full tex
   expect(items[1]?.textContent).toContain("waiting for you");
   expect(items[2]?.textContent).toContain("running…");
   expect(items[4]?.textContent).toContain("✗ denied");
-  expect(screen.getAllByRole("button")).toHaveLength(5);
+  expect(screen.getAllByRole("button")).toHaveLength(6);
 });
 
 test("the chat's error and notice close the transcript", () => {
@@ -358,5 +360,95 @@ test("the thinking control passes axe closed and open", async () => {
   );
   expect((await axe.run(container, noContrast)).violations).toEqual([]);
   fireEvent.click(screen.getByRole("button", { name: /thought for 3s/ }));
+  expect((await axe.run(container, noContrast)).violations).toEqual([]);
+});
+
+const fourTools: ToolBlock[] = [
+  { callId: "1", name: "web_search", args: {}, status: "done", summary: "5 results" },
+  { callId: "2", name: "mcp__github__get_me", args: {}, status: "done", summary: "1 user" },
+  { callId: "3", name: "mcp__github__list_prs", args: {}, status: "failed", error: "rate limited" },
+  { callId: "4", name: "read_file", args: { path: "a.ts" }, status: "done", summary: "3 lines", preview: "line" },
+];
+const turn = (tools: ToolBlock[], over: Partial<ChatMessage> = {}) => render(<TranscriptMessages chat={chat([answer({ tools, durationMs: 42_100, ...over })])} />);
+
+afterEach(() => {
+  detailStore.set("normal");
+});
+
+test("the tools fold into one activity line that is closed, with dots and the summary", () => {
+  const { container } = turn(fourTools);
+  const line = screen.getByRole("button", { name: "searched the web · 2 github calls, 1 failed · read 1 file" });
+  expect(line.getAttribute("aria-expanded")).toBe("false");
+  expect(screen.queryByRole("list", { name: "Tool calls" })).toBeNull();
+  expect(Array.from(container.querySelectorAll("[data-mark]")).map((dot) => dot.getAttribute("data-mark"))).toEqual(["allow", "allow", "deny", "allow"]);
+  expect(screen.getByText("42.1s · 4 steps")).toBeTruthy();
+});
+
+test("a click opens the steps in a list named Tool calls, with MCP names shown as server · tool", () => {
+  turn(fourTools);
+  fireEvent.click(screen.getByRole("button", { name: /searched the web/ }));
+  const list = screen.getByRole("list", { name: "Tool calls" });
+  expect(within(list).getAllByRole("listitem")).toHaveLength(4);
+  expect(within(list).getByText("github · get_me")).toBeTruthy();
+  expect(list.textContent).not.toContain("mcp__");
+  expect(list.className).toContain("border-line");
+  fireEvent.click(screen.getByRole("button", { name: /searched the web/ }));
+  expect(screen.queryByRole("list", { name: "Tool calls" })).toBeNull();
+});
+
+test("the activity line comes after the prose and before the footer", () => {
+  turn(fourTools, { text: "The answer" });
+  const answerEl = screen.getByText("The answer");
+  const line = screen.getByRole("button", { name: /searched the web/ });
+  const foot = screen.getByText("42.1s · 4 steps");
+  expect(answerEl.compareDocumentPosition(line) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(line.compareDocumentPosition(foot) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
+test("a tool that waits for approval keeps the steps open, and a click does not close them", () => {
+  turn([...fourTools, { callId: "5", name: "shell", args: { command: "ls" }, status: "waiting" }]);
+  const line = screen.getByRole("button", { name: /ran 1 command/ });
+  expect(line.getAttribute("aria-expanded")).toBe("true");
+  expect(screen.getByRole("list", { name: "Tool calls" })).toBeTruthy();
+  fireEvent.click(line);
+  expect(screen.getByRole("list", { name: "Tool calls" })).toBeTruthy();
+  expect(document.querySelector("[data-mark=wait]")).toBeTruthy();
+});
+
+test("a failed tool shows a red dot and says so in the summary", () => {
+  const { container } = turn([{ callId: "1", name: "shell", args: {}, status: "done", unsuccessful: true, summary: "exit 1" }]);
+  expect(screen.getByRole("button", { name: "ran 1 command, 1 failed" })).toBeTruthy();
+  expect(container.querySelector("[data-mark=deny]")?.className).toContain("bg-deny");
+});
+
+test("while streaming the line names the running tool", () => {
+  turn([...fourTools, { callId: "5", name: "mcp__github__search", args: {}, status: "running" }], { streaming: true });
+  expect(screen.getByRole("button", { name: "github · search running…" })).toBeTruthy();
+  expect(document.querySelector("[data-mark=run]")?.className).toContain("bg-muted");
+});
+
+test("Verbose opens the steps with every row expanded", () => {
+  detailStore.set("verbose");
+  turn(fourTools);
+  expect(screen.getByRole("list", { name: "Tool calls" })).toBeTruthy();
+  const rows = screen.getAllByRole("listitem");
+  expect(rows).toHaveLength(4);
+  expect(document.querySelectorAll(".tool-tablet")).toHaveLength(4);
+  expect(screen.getAllByText("arguments")).toHaveLength(4);
+});
+
+test("Quiet says only the step count, and still opens", () => {
+  detailStore.set("quiet");
+  const { container } = turn(fourTools);
+  const line = screen.getByRole("button", { name: "4 steps" });
+  expect(container.querySelectorAll("[data-mark]")).toHaveLength(4);
+  fireEvent.click(line);
+  expect(screen.getByRole("list", { name: "Tool calls" })).toBeTruthy();
+});
+
+test("the turn with its line closed and open passes axe", async () => {
+  const { container } = turn(fourTools);
+  expect((await axe.run(container, noContrast)).violations).toEqual([]);
+  fireEvent.click(screen.getByRole("button", { name: /searched the web/ }));
   expect((await axe.run(container, noContrast)).violations).toEqual([]);
 });

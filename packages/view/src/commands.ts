@@ -1,5 +1,6 @@
 import type { ListedSkill, ModelOption } from "@golem/client";
 
+import { DETAILS, isDetail, type Detail } from "./activity.ts";
 import { TUNE_USAGE, tuneHints, tuneSet, type TuneValue } from "./tune.ts";
 
 
@@ -51,6 +52,7 @@ export type ComposerOutcome =
   | { kind: "time" }
   | { kind: "todos" }
   | { kind: "thinking" }
+  | { kind: "detail"; level: Detail | null }
   | { kind: "model"; name: string | null }
   | { kind: "model-pull"; name: string }
   | { kind: "model-rm"; name: string }
@@ -303,7 +305,7 @@ export const COMMANDS: readonly Command[] = [
     name: "/setup",
     group: "model",
     args: "",
-    description: "Shows what is set up and what is broken, and fixes it: the service, the engine, the model.",
+    description: "Shows what is set up and what is broken, and fixes it: service, engine, model.",
     run: withoutArgs({ kind: "setup" }),
   },
   {
@@ -328,6 +330,18 @@ export const COMMANDS: readonly Command[] = [
     args: "",
     description: "Shows or hides the time beside each message.",
     run: withoutArgs({ kind: "time" }),
+  },
+  {
+    name: "/detail",
+    group: "view",
+    args: "[quiet|normal|verbose]",
+    description: "Shows or sets how much of each turn's tool steps shows.",
+    choices: DETAILS,
+    run: (_debug, args) => {
+      if (args.length === 0) return { kind: "detail", level: null };
+      const level = args[0];
+      return args.length === 1 && isDetail(level) ? { kind: "detail", level } : unknown();
+    },
   },
   {
     name: "/thinking",

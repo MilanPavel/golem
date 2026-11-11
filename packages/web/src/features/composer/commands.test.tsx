@@ -6,7 +6,7 @@ import { App } from "../../app.tsx";
 import { createPage } from "../../store/page.ts";
 import { PageProvider } from "../../store/page-context.tsx";
 import { ev, fakeClient, fakeFrame, rpcError, summary } from "../../store/test-support.ts";
-import { thinkingShownStore, timesShownStore } from "../chat/index.ts";
+import { detailStore, thinkingShownStore, timesShownStore } from "../chat/index.ts";
 import { drawerOpenStore } from "../drawer/drawer-open.ts";
 import { SAMPLE_LISTING } from "../models/sample.ts";
 
@@ -83,6 +83,7 @@ beforeEach(() => {
   drawerOpenStore.set(true);
   timesShownStore.set(true);
   thinkingShownStore.set(true);
+  detailStore.set("normal");
 });
 afterEach(() => {
   history.replaceState(null, "", "/");
@@ -282,6 +283,18 @@ test("/time hides and shows the time beside messages and keeps the choice", asyn
   await say(user, "/time");
   expect(dockNotice()).toBe("Times shown.");
   expect(document.querySelector("article[aria-label='You'] time")).toBeTruthy();
+});
+
+test("/detail shows the level, sets it, keeps it, and refuses other words", async () => {
+  const { user } = await session();
+  await say(user, "/detail");
+  expect(dockNotice()).toBe("Detail is normal. /detail quiet, normal or verbose sets it.");
+  await say(user, "/detail verbose");
+  expect(dockNotice()).toBe("Detail is verbose.");
+  expect(localStorage.getItem("golem.detail")).toBe("verbose");
+  await say(user, "/detail loud");
+  expect(dockNotice()).toBe("unknown command — /help lists them");
+  expect(localStorage.getItem("golem.detail")).toBe("verbose");
 });
 
 test("/thinking toggles the choice and keeps it", async () => {
