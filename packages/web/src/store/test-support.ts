@@ -115,6 +115,7 @@ export function fakeClient() {
     respondApproval: vi.fn<PageClient["respondApproval"]>(async () => ({}) as never),
     listSkills: vi.fn<PageClient["listSkills"]>(async () => ({ skills: [] })),
     setSkills: vi.fn<PageClient["setSkills"]>(async () => ({}) as never),
+    setSessionMode: vi.fn<PageClient["setSessionMode"]>(async () => ({}) as never),
     getConfig: vi.fn<PageClient["getConfig"]>(async () => ({ rules: [] }) as never),
     listDirs: vi.fn<PageClient["listDirs"]>(async () => ({ path: "/home/me", home: "/home/me", parent: null, entries: [], truncated: false })),
     getTraceSpan: vi.fn<PageClient["getTraceSpan"]>(async (_id, spanId) => ({ span: { id: spanId, kind: "tool", name: "t", start: "t", status: "ok" }, messages: [] }) as never),

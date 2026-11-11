@@ -296,6 +296,17 @@ test("contextTone: dim below 80%, warn from 80%, alert from 95% or at num_ctx", 
   assert.equal(contextTone({ spanId: "m", used: 50, window: null, windowEstimated: false, numCtx: null }), "dim");
 });
 
+test("the mode segment follows the model, and goes before it", () => {
+  const input = { connection: "connected", title: "Trip", model: "qwen", folder: "~/repos/golem", messageCount: null, uptimeSeconds: null };
+  const mode = statusSegments({ ...input, mode: "balanced" }).find((part) => part.id === "mode");
+  assert.equal(mode?.text, "balanced");
+  assert.equal(mode?.tone, "dim");
+  assert.ok(STATUS_PRIORITY.mode < STATUS_PRIORITY.model && STATUS_PRIORITY.mode > STATUS_PRIORITY.fresh);
+  assert.equal(statusSegments(input).find((part) => part.id === "mode")?.text, "");
+  const kept = fitSegments(statusSegments({ ...input, mode: "balanced" }), 80).map((part) => part.id);
+  assert.deepEqual(kept.slice(0, 4), ["connection", "title", "model", "mode"]);
+});
+
 test("context sits after the model and leaves the line after the skills and before new lines", () => {
   const segments = statusSegments({
     connection: "connected",
@@ -309,8 +320,8 @@ test("context sits after the model and leaves the line after the skills and befo
     context: { spanId: "m", used: 85, window: 100, windowEstimated: false, numCtx: null },
   });
   assert.deepEqual(
-    segments.map((segment) => segment.id).slice(0, 5),
-    ["connection", "alert", "title", "model", "context"],
+    segments.map((segment) => segment.id).slice(0, 6),
+    ["connection", "alert", "title", "model", "mode", "context"],
   );
   const context = segments.find((segment) => segment.id === "context");
   assert.equal(context?.text, "███████░ 85% 85/100");

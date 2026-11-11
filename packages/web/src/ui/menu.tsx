@@ -34,6 +34,26 @@ export function MenuItem({ className, ...props }: ComponentProps<typeof M.Item>)
   );
 }
 
+export const MenuRadioGroup = M.RadioGroup;
+
+/** A choice in a radio group: the dot marks the one that holds, and Radix sets `role="menuitemradio"`. */
+export function MenuRadioItem({ className, children, ...props }: ComponentProps<typeof M.RadioItem>) {
+  return (
+    <M.RadioItem
+      className={cn(
+        "flex cursor-default items-start gap-2 rounded-sm px-2 py-1.5 outline-none data-disabled:opacity-50 data-highlighted:bg-line",
+        className,
+      )}
+      {...props}
+    >
+      <span aria-hidden="true" className="mt-1.5 flex size-2 shrink-0 items-center justify-center">
+        <M.ItemIndicator className="size-2 rounded-full bg-ink" />
+      </span>
+      <span className="flex min-w-0 flex-col">{children}</span>
+    </M.RadioItem>
+  );
+}
+
 export function MenuLabel({ className, ...props }: ComponentProps<typeof M.Label>) {
   return <M.Label className={cn("px-2 py-1.5 font-mono text-xs text-faint", className)} {...props} />;
 }

@@ -1,5 +1,5 @@
 import { OLLAMA_FAILED, RpcError, type ApprovalChoice, type ConfigGetResult, type ConfigRawGetResult, type ConfigRawResult, type FsListDirsResult, type McpAddParams, type McpCallResult, type McpImportApplyParams, type McpImportApplyResult, type McpImportScanResult, type McpCatalogResult, type McpListResult, type McpLogsResult, type McpServerConfig, type McpServerDetail, type McpServerLog, type McpTestProgress, type McpTestResult, type GolemClient, type RuntimeName, type SetupStatusResult, type SkillListResult, type TraceGetResult, type TraceSpanResult, type ArtifactReadResult, type ModelOptionsGetResult, type ModelOptionsSetResult, type SessionSetOptionsResult } from "@golem/client";
-import { changeToolFilter, installEventOf, type InstallEvent } from "@golem/view";
+import { changeToolFilter, installEventOf, type InstallEvent, type PermissionMode } from "@golem/view";
 import type { QueryClient } from "@tanstack/react-query";
 import { createDrafts, type Drafts } from "./drafts.ts";
 import { createConnectionStore, type ConnectionStore } from "./connection.ts";
@@ -40,6 +40,7 @@ export type PageClient = Pick<
   | "listModels"
   | "listSkills"
   | "setSkills"
+  | "setSessionMode"
   | "getConfig"
   | "listMcp"
   | "mcpTools"
@@ -97,6 +98,8 @@ export type PageActions = {
   send(sessionId: string, text: string, skill?: { name: string; args: string }): Promise<void>;
   /** Pins a skill for the session, or unpins it. The pinned list arrives as `chat.activeSkills`. */
   pinSkill(sessionId: string, name: string, pin: boolean): Promise<void>;
+  /** Sets the session's permission mode, or with null follows config.toml. The chip changes from `session.mode.changed`. */
+  setMode(sessionId: string, mode: PermissionMode | null): Promise<void>;
   cancel(runId: string): Promise<void>;
   /** Sets the title. What the page shows afterwards comes from the daemon's summary. */
   rename(sessionId: string, title: string): Promise<void>;
@@ -314,6 +317,14 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       },
       async pinSkill(sessionId, name, pin) {
         await client.setSkills(sessionId, pin ? { pin: [name] } : { unpin: [name] });
+      },
+      async setMode(sessionId, mode) {
+        try {
+          await client.setSessionMode(sessionId, mode);
+        } finally {
+          // The rules were built for a mode, so Settings reads them again.
+          await queryClient.invalidateQueries({ queryKey: CONFIG_KEY });
+        }
       },
       async cancel(runId) {
         await client.cancelRun(runId);
