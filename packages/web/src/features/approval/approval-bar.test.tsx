@@ -1,31 +1,52 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { useState } from "react";
 import { beforeEach, expect, test, vi } from "vitest";
 import { diffModeStore } from "../diff/diff-mode.ts";
-import { ApprovalCard } from "./approval-card.tsx";
-import { ANSWERED, PENDING_EDIT, PENDING_SHELL } from "./sample.ts";
+import { ApprovalBar } from "./approval-bar.tsx";
+import { PENDING_EDIT, PENDING_SHELL } from "./sample.ts";
 
 beforeEach(() => {
   diffModeStore.set("unified");
 });
 
-test("a pending edit asks the question, names the rule, and shows the diff and the switch", () => {
-  render(<ApprovalCard tool={PENDING_EDIT} pending onAnswer={() => {}} />);
-  const card = screen.getByRole("group", { name: "Approval" });
-  expect(card.querySelector("h2")?.textContent).toBe("Allow edit_file on socket.ts?");
-  expect(card.querySelector("[title='src/socket.ts']")?.textContent).toBe("socket.ts");
-  expect(card.textContent).toContain("rule: edit_file → ask · built-in default");
+/** Opens Details when it is closed, then Edit args. */
+function openEditor(): void {
+  const details = screen.getByRole("button", { name: "Details" });
+  if (details.getAttribute("aria-expanded") === "false") fireEvent.click(details);
+  fireEvent.click(screen.getByRole("button", { name: /^Edit args/ }));
+}
+
+test("a pending edit asks the question, says who asked, and shows the diff open", () => {
+  render(<ApprovalBar tool={PENDING_EDIT} onAnswer={() => {}} />);
+  const bar = screen.getByRole("group", { name: "Approval" });
+  expect(bar.querySelector("p")?.textContent).toBe("Allow edit_file on socket.ts?");
+  expect(bar.querySelector("[title='src/socket.ts']")?.textContent).toBe("socket.ts");
+  expect(bar.textContent).toContain("asks: built-in default");
   expect(screen.getByRole("table", { name: "Change to src/socket.ts" })).toBeTruthy();
   expect(screen.getByRole("group", { name: "Diff layout" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Details" }).getAttribute("aria-expanded")).toBe("true");
 });
 
-test("each button answers with its decision", () => {
+test("an MCP tool reads server and tool, and a call without arguments has no target", () => {
+  const tool = { ...PENDING_SHELL, name: "mcp__github__get_me", args: {}, approval: { source: "built-in default (balanced)", subject: null } };
+  render(<ApprovalBar tool={tool} onAnswer={() => {}} />);
+  const bar = screen.getByRole("group", { name: "Approval" });
+  expect(bar.querySelector("p")?.textContent).toBe("Allow github · get_me?");
+  expect(bar.textContent).toContain("asks: built-in default (balanced)");
+});
+
+test("the buttons are Allow once, Allow in this chat with its menu, Details, and Deny", () => {
+  render(<ApprovalBar tool={PENDING_SHELL} onAnswer={() => {}} />);
+  expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual(["Allow once↵", "Allow in this chatS", "▾", "Details", "DenyD"]);
+  expect(screen.getByRole("button", { name: "Details" }).getAttribute("aria-expanded")).toBe("false");
+});
+
+test("each button answers with its decision, and the menu offers always", async () => {
   const onAnswer = vi.fn();
-  render(<ApprovalCard tool={PENDING_EDIT} pending onAnswer={onAnswer} />);
+  render(<ApprovalBar tool={PENDING_EDIT} onAnswer={onAnswer} />);
   const buttons: [string, string, string][] = [
     ["Allow once", "allow", "Enter"],
-    ["For this session", "allow_session", "S"],
-    ["Always", "allow_always", "W"],
+    ["Allow in this chat", "allow_session", "S"],
     ["Deny", "deny", "D"],
   ];
   for (const [name, decision, shortcut] of buttons) {
@@ -35,65 +56,51 @@ test("each button answers with its decision", () => {
     fireEvent.click(button);
     expect(onAnswer).toHaveBeenLastCalledWith(decision);
   }
+  const more = screen.getByRole("button", { name: "More ways to allow" });
+  fireEvent.keyDown(more, { key: "Enter" });
+  const menu = await screen.findByRole("menu");
+  const items = within(menu).getAllByRole("menuitem");
+  expect(items.map((item) => item.textContent)).toEqual(["Always allow edit_fileW"]);
+  expect(items[0]?.getAttribute("data-decision")).toBe("allow_always");
+  expect(items[0]?.getAttribute("aria-keyshortcuts")).toBe("W");
+  fireEvent.keyDown(items[0] as HTMLElement, { key: "Enter" });
+  expect(onAnswer).toHaveBeenLastCalledWith("allow_always");
   expect(onAnswer).toHaveBeenCalledTimes(4);
 });
 
 test("the buttons are disabled while an answer is sending", () => {
-  render(<ApprovalCard tool={PENDING_EDIT} pending sending onAnswer={() => {}} />);
-  for (const decision of ["allow", "allow_session", "allow_always", "deny"]) {
+  render(<ApprovalBar tool={PENDING_EDIT} sending onAnswer={() => {}} />);
+  for (const decision of ["allow", "allow_session", "deny"]) {
     expect((document.querySelector(`[data-decision=${decision}]`) as HTMLButtonElement).disabled).toBe(true);
   }
+  expect((screen.getByRole("button", { name: "More ways to allow" }) as HTMLButtonElement).disabled).toBe(true);
 });
 
 test("an error shows as an alert under the actions", () => {
-  render(<ApprovalCard tool={PENDING_EDIT} pending error="The daemon refused." onAnswer={() => {}} />);
+  render(<ApprovalBar tool={PENDING_EDIT} error="The daemon refused." onAnswer={() => {}} />);
   expect(screen.getByRole("alert").textContent).toBe("The daemon refused.");
 });
 
-test("a shell call has no diff and shows its arguments", () => {
-  render(<ApprovalCard tool={PENDING_SHELL} pending onAnswer={() => {}} />);
+test("a shell call has no diff; Details opens its arguments and Edit args", () => {
+  render(<ApprovalBar tool={PENDING_SHELL} onAnswer={() => {}} />);
   expect(screen.queryByRole("table")).toBeNull();
-  expect(screen.queryByRole("group", { name: "Diff layout" })).toBeNull();
+  expect(document.querySelector("pre")).toBeNull();
+  expect(screen.queryByRole("button", { name: /^Edit args/ })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Details" }));
   expect(document.querySelector("pre")?.textContent).toContain("pnpm --filter @golem/web test && just check");
-});
-
-test("an answered card is one line, with no diff, actions, or switch", () => {
-  const lines: Record<string, string> = {
-    "Allowed once": "✓ Allowed once",
-    "Allowed for this session": "✓ Allowed for this session",
-    "Always allowed, with a rule": "✓ Always allowed, rule edit_file(src/**) → allow",
-    Denied: "✗ Denied",
-  };
-  for (const [label, line] of Object.entries(lines)) {
-    const tool = ANSWERED.find((item) => item.label === label)!.tool;
-    const { container, unmount } = render(<ApprovalCard tool={tool} pending={false} onAnswer={() => {}} />);
-    expect(container.textContent).toContain(line);
-    expect(screen.queryByRole("button")).toBeNull();
-    expect(screen.queryByRole("table")).toBeNull();
-    expect(container.querySelector(".shadow-soft")).toBeNull();
-    unmount();
-  }
-});
-
-test("an edited allow says so", () => {
-  const tool = { ...PENDING_EDIT, approval: { source: "x", subject: null, answer: { decision: "allow" as const, rule: null, edited: true } } };
-  const { container } = render(<ApprovalCard tool={tool} pending={false} onAnswer={() => {}} />);
-  expect(container.textContent).toContain("✓ Allowed once, with edited arguments");
-});
-
-test("a card nobody answered says so", () => {
-  const tool = ANSWERED.find((item) => item.label === "Not answered")!.tool;
-  const { container } = render(<ApprovalCard tool={tool} pending={false} onAnswer={() => {}} />);
-  expect(container.textContent).toContain("Not answered");
-  expect(screen.queryByRole("button")).toBeNull();
+  expect(screen.queryByRole("group", { name: "Diff layout" })).toBeNull();
+  const edit = screen.getByRole("button", { name: /^Edit args/ });
+  expect(edit.getAttribute("data-action")).toBe("edit");
+  expect(edit.getAttribute("aria-keyshortcuts")).toBe("E");
+  fireEvent.click(screen.getByRole("button", { name: "Details" }));
+  expect(document.querySelector("pre")).toBeNull();
 });
 
 function Editing({ onAnswer, onCancelled }: { onAnswer: (d: string, a?: unknown) => void; onCancelled?: () => void }) {
   const [editing, setEditing] = useState(false);
   return (
-    <ApprovalCard
+    <ApprovalBar
       tool={PENDING_SHELL}
-      pending
       editing={editing}
       onEdit={(open) => {
         setEditing(open);
@@ -108,19 +115,10 @@ const editor = () => screen.getByRole("textbox") as HTMLTextAreaElement;
 const allowButton = () => screen.getByRole("button", { name: /^Allow once/ }) as HTMLButtonElement;
 const edit = (text: string) => fireEvent.change(editor(), { target: { value: text } });
 
-test("the Edit button sits after Always and before Deny", () => {
-  render(<ApprovalCard tool={PENDING_SHELL} pending onAnswer={() => {}} />);
-  const names = screen.getAllByRole("button").map((b) => b.textContent);
-  expect(names).toEqual(["Allow once↵", "For this sessionS", "AlwaysW", "EditE", "DenyD"]);
-  const button = screen.getByRole("button", { name: /^Edit/ });
-  expect(button.getAttribute("data-action")).toBe("edit");
-  expect(button.getAttribute("aria-keyshortcuts")).toBe("E");
-});
-
 test("Edit opens the arguments as JSON, labelled, focused, with the caret at the end", () => {
   const onAnswer = vi.fn();
   render(<Editing onAnswer={onAnswer} />);
-  fireEvent.click(screen.getByRole("button", { name: /^Edit/ }));
+  openEditor();
   const field = screen.getByLabelText("Arguments, as JSON. Allow runs the edited call once.") as HTMLTextAreaElement;
   expect(field).toBe(editor());
   expect(field.value).toBe(JSON.stringify(PENDING_SHELL.args, null, 2));
@@ -129,33 +127,32 @@ test("Edit opens the arguments as JSON, labelled, focused, with the caret at the
   expect(field.getAttribute("spellcheck")).toBe("false");
   expect(field.getAttribute("autocapitalize")).toBe("off");
   expect(document.querySelector("pre")).toBeNull();
-  expect(screen.queryByRole("button", { name: /^(For this session|Always|Edit)/ })).toBeNull();
+  expect(screen.queryByRole("button", { name: /^(Allow in this chat|Details|Edit)/ })).toBeNull();
   expect(screen.getByRole("button", { name: /^Cancel/ }).getAttribute("aria-keyshortcuts")).toBe("Escape");
   expect(allowButton().getAttribute("aria-keyshortcuts")).toBe("Meta+Enter Control+Enter");
 });
 
 test("the diff and its switch are hidden while editing", () => {
-  render(<ApprovalCard tool={PENDING_EDIT} pending editing onAnswer={() => {}} />);
+  render(<ApprovalBar tool={PENDING_EDIT} editing onAnswer={() => {}} />);
   expect(screen.queryByRole("table")).toBeNull();
   expect(screen.queryByRole("group", { name: "Diff layout" })).toBeNull();
   expect(editor().value).toBe(JSON.stringify(PENDING_EDIT.args, null, 2));
 });
 
-test("Cancel and Escape return to the card, send nothing, and focus Edit", () => {
+test("Cancel and Escape return to the bar, send nothing, and focus Details", () => {
   const onAnswer = vi.fn();
   render(<Editing onAnswer={onAnswer} />);
   for (const close of [
     () => fireEvent.click(screen.getByRole("button", { name: /^Cancel/ })),
     () => fireEvent.keyDown(editor(), { key: "Escape" }),
   ]) {
-    fireEvent.click(screen.getByRole("button", { name: /^Edit/ }));
+    openEditor();
     edit('{"command": "changed"}');
     close();
     expect(screen.queryByRole("textbox")).toBeNull();
-    expect(document.querySelector("pre")?.textContent).toContain("pnpm --filter");
-    expect(document.activeElement).toBe(screen.getByRole("button", { name: /^Edit/ }));
+        expect(document.activeElement).toBe(screen.getByRole("button", { name: "Details" }));
   }
-  fireEvent.click(screen.getByRole("button", { name: /^Edit/ }));
+  openEditor();
   expect(editor().value).toBe(JSON.stringify(PENDING_SHELL.args, null, 2));
   expect(onAnswer).not.toHaveBeenCalled();
 });
@@ -164,7 +161,7 @@ test("Escape in the editor does not reach the page", () => {
   const onPage = vi.fn();
   document.addEventListener("keydown", onPage);
   render(<Editing onAnswer={() => {}} />);
-  fireEvent.click(screen.getByRole("button", { name: /^Edit/ }));
+  openEditor();
   fireEvent.keyDown(editor(), { key: "Escape" });
   document.removeEventListener("keydown", onPage);
   expect(onPage).not.toHaveBeenCalled();
@@ -173,7 +170,7 @@ test("Escape in the editor does not reach the page", () => {
 test("Allow once sends the edited arguments; unchanged arguments send a plain allow", () => {
   const onAnswer = vi.fn();
   render(<Editing onAnswer={onAnswer} />);
-  fireEvent.click(screen.getByRole("button", { name: /^Edit/ }));
+  openEditor();
   fireEvent.click(allowButton());
   expect(onAnswer).toHaveBeenLastCalledWith("allow");
   expect(onAnswer.mock.calls[0]).toHaveLength(1);
@@ -185,14 +182,14 @@ test("Allow once sends the edited arguments; unchanged arguments send a plain al
 test("Deny works from the editor", () => {
   const onAnswer = vi.fn();
   render(<Editing onAnswer={onAnswer} />);
-  fireEvent.click(screen.getByRole("button", { name: /^Edit/ }));
+  openEditor();
   fireEvent.click(screen.getByRole("button", { name: /^Deny/ }));
   expect(onAnswer).toHaveBeenCalledWith("deny");
 });
 
 test("invalid JSON or a non-object disables Allow and says why; fixing it enables Allow", () => {
   render(<Editing onAnswer={() => {}} />);
-  fireEvent.click(screen.getByRole("button", { name: /^Edit/ }));
+  openEditor();
   expect(screen.queryByRole("status")).toBeNull();
   expect(editor().getAttribute("aria-invalid")).toBeNull();
   const cases: [string, string][] = [
@@ -217,7 +214,7 @@ test("invalid JSON or a non-object disables Allow and says why; fixing it enable
 test("Cmd+Enter and Ctrl+Enter allow when valid; plain Enter does not; invalid never does", () => {
   const onAnswer = vi.fn();
   render(<Editing onAnswer={onAnswer} />);
-  fireEvent.click(screen.getByRole("button", { name: /^Edit/ }));
+  openEditor();
   edit('{"command": "ls"}');
   fireEvent.keyDown(editor(), { key: "Enter" });
   expect(onAnswer).not.toHaveBeenCalled();
@@ -231,7 +228,7 @@ test("Cmd+Enter and Ctrl+Enter allow when valid; plain Enter does not; invalid n
 });
 
 test("while sending, the editor is read-only and every button is disabled", () => {
-  render(<ApprovalCard tool={PENDING_SHELL} pending editing sending onAnswer={() => {}} />);
+  render(<ApprovalBar tool={PENDING_SHELL} editing sending onAnswer={() => {}} />);
   expect(editor().readOnly).toBe(true);
   for (const button of screen.getAllByRole("button")) expect((button as HTMLButtonElement).disabled).toBe(true);
 });

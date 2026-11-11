@@ -76,6 +76,7 @@ export const STATUS_PRIORITY = {
   alert: 90,
   title: 80,
   model: 60,
+  mode: 58,
   fresh: 55,
   context: 50,
   tune: 48,
@@ -245,12 +246,15 @@ export function statusSegments(input: {
   context?: LiveContext | null;
   /** The options changed from the model's defaults, as `tuneChip` says them. */
   tune?: string;
+  /** The permission mode the session runs in: `balanced`. */
+  mode?: string;
 }): StatusSegment[] {
   return [
     segment("connection", input.connection, STATUS_PRIORITY.connection, "connection", true),
     segment("alert", input.alert ?? "", STATUS_PRIORITY.alert, "alert"),
     segment("title", input.title, STATUS_PRIORITY.title, "title"),
     segment("model", input.model, STATUS_PRIORITY.model, "model"),
+    segment("mode", input.mode ?? "", STATUS_PRIORITY.mode, "dim"),
     segment("context", contextLabel(input.context ?? null), STATUS_PRIORITY.context, contextTone(input.context ?? null)),
     segment("tune", input.tune ?? "", STATUS_PRIORITY.tune, "dim"),
     segment("skills", skillsLabel(input.skills ?? [], input.skippedSkills ?? []), STATUS_PRIORITY.skills, "dim"),

@@ -111,6 +111,7 @@ export type KeyEffect =
   | { kind: "move-row"; direction: -1 | 1 }
   | { kind: "edit-external" }
   | { kind: "toggle-tools" }
+  | { kind: "cycle-mode" }
   | { kind: "restart-service" }
   | { kind: "approve"; decision: "allow" | "allow_session" | "allow_always" | "deny" }
   | { kind: "scroll-diff"; toward: ScrollToward; line: boolean }
@@ -121,6 +122,8 @@ export type KeyEffect =
 
 type KeyWhen = {
   name?: PressName;
+  /** Shift was held on a Tab. */
+  shift?: boolean;
   input?: string;
   overlay?: boolean;
   help?: boolean;
@@ -224,6 +227,14 @@ export const KEYS: readonly KeyBinding[] = [
     description: "Closes command suggestions and keeps the draft.",
     when: { name: "escape", overlay: false, suggestions: true },
     run: () => ({ kind: "suggest", key: "close" }),
+  },
+  {
+    id: "cycle-mode",
+    label: "Shift-Tab",
+    contexts: ["composer"],
+    description: "Changes the permission mode of this session: careful, balanced, autopilot.",
+    when: { name: "tab", shift: true, overlay: false, switcher: false, debug: false, approval: false, connected: true },
+    run: () => ({ kind: "cycle-mode" }),
   },
   {
     id: "suggest-tab",
@@ -784,6 +795,9 @@ export function moveOverlayOffset(
 
 function whenMatches(when: KeyWhen, place: KeyPlace, press: Press): boolean {
   if (when.name !== undefined && when.name !== press.name) {
+    return false;
+  }
+  if (when.shift !== undefined && when.shift !== (press.shift === true)) {
     return false;
   }
   if (when.input !== undefined && when.input !== press.input) {

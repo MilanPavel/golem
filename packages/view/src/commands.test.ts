@@ -187,6 +187,16 @@ test("/detail shows the level alone, sets one word, and refuses others", () => {
   assert.deepEqual(command?.choices, ["quiet", "normal", "verbose"]);
 });
 
+test("/mode shows, sets, or returns to the default", () => {
+  assert.deepEqual(applyComposer(closedDebug, "/mode"), { kind: "mode", mode: "show" });
+  assert.deepEqual(applyComposer(closedDebug, "/mode careful"), { kind: "mode", mode: "careful" });
+  assert.deepEqual(applyComposer(closedDebug, "/mode autopilot"), { kind: "mode", mode: "autopilot" });
+  assert.deepEqual(applyComposer(closedDebug, "/mode default"), { kind: "mode", mode: null });
+  assert.equal(applyComposer(closedDebug, "/mode reckless").kind, "unknown");
+  assert.equal(applyComposer(closedDebug, "/mode careful now").kind, "unknown");
+  assert.deepEqual(COMMANDS.find((entry) => entry.name === "/mode")?.choices, ["careful", "balanced", "autopilot", "default"]);
+});
+
 test("/close takes no arguments", () => {
   assert.deepEqual(applyComposer(closedDebug, "/close"), { kind: "close-session" });
   assert.equal(applyComposer(closedDebug, "/close now").kind, "unknown");

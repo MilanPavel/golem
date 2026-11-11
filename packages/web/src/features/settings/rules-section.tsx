@@ -1,9 +1,24 @@
-import { isLoosening, itemText, permissionItems, ruleChange, DEFAULT_LOCKED, type PermissionItem, type RuleKey } from "@golem/view";
+import {
+  DEFAULT_LOCKED,
+  effectiveMode,
+  isLoosening,
+  itemText,
+  MODE_ALWAYS_ASKS,
+  MODE_HINT,
+  MODE_LABEL,
+  PERMISSION_MODES,
+  permissionItems,
+  ruleChange,
+  type PermissionItem,
+  type PermissionMode,
+  type RuleKey,
+} from "@golem/view";
 import { useMemo, useState } from "react";
 import { actionErrorText } from "../../store/errors.ts";
 import { usePageActions, useConfig } from "../../store/page-context.tsx";
 import { Button } from "../../ui/button.tsx";
 import { cn } from "../../ui/cn.ts";
+import { CopyCommand } from "../../ui/copy-command.tsx";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "../../ui/dialog.tsx";
 import { useSettingsContext, useSettingsFolder } from "./context.ts";
 
@@ -103,6 +118,9 @@ export function RulesSection() {
           {error}
         </p>
       )}
+      {config.data === undefined ? null : (
+        <DefaultMode mode={effectiveMode(null, config.data.default_permission_mode)} file={config.data.config_file} />
+      )}
       {config.isError ? (
         <div className="flex flex-col items-start gap-2">
           <p role="alert" className="text-sm text-deny">
@@ -136,6 +154,39 @@ export function RulesSection() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+/**
+ * The mode a new chat starts in, as `[permissions] mode` in config.toml. It is shown, not edited:
+ * the daemon keeps the `permissions` table out of `config.raw.set`, so the page cannot write it.
+ */
+function DefaultMode({ mode, file }: { mode: PermissionMode; file: string }) {
+  return (
+    <section aria-labelledby="default-mode" className="flex flex-col gap-2 rounded-lg border border-line bg-surface px-3 py-3">
+      <h3 id="default-mode" className="font-mono text-xs text-faint">
+        Default mode
+      </h3>
+      <div role="radiogroup" aria-labelledby="default-mode" aria-readonly="true" className="flex flex-wrap gap-1">
+        {PERMISSION_MODES.map((item) => (
+          <span
+            key={item}
+            role="radio"
+            aria-checked={item === mode}
+            aria-disabled="true"
+            className={cn("rounded-md border px-3 py-1 text-sm", item === mode ? "border-clay bg-clay-soft text-clay-ink" : "border-line text-muted")}
+          >
+            {MODE_LABEL[item]}
+          </span>
+        ))}
+      </div>
+      <p className="text-sm">{MODE_HINT[mode]}</p>
+      <p className="text-xs text-muted">{MODE_ALWAYS_ASKS} A chat can use another mode: pick it in the composer or with /mode.</p>
+      <p className="text-xs text-muted wrap-anywhere">
+        To change the default, set <code className="font-mono">[permissions] mode</code> in {file}:
+      </p>
+      <CopyCommand command={`mode = "${mode}"`} />
+    </section>
   );
 }
 

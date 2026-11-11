@@ -19,12 +19,12 @@ import { ConnectionScreen } from "../features/connection/connection-screen.tsx";
 import { connectionScreen } from "../features/connection/connection-screen.ts";
 import { ToolLine, TranscriptMessages } from "../features/chat/index.ts";
 import { SAMPLE_CHAT, SAMPLE_TOOLS, THINKING_CASES, TURN_CHAT } from "../features/chat/sample.ts";
-import { ApprovalCard } from "../features/approval/index.ts";
+import { ApprovalBar } from "../features/approval/index.ts";
 import { ANSWERED, PENDING_EDIT, PENDING_SHELL } from "../features/approval/sample.ts";
 import { DiffModeSwitch, DiffView } from "../features/diff/index.ts";
 import { SAMPLE_EDIT_DIFF, SAMPLE_LONG_LINE_DIFF, SAMPLE_NEW_FILE_DIFF } from "../features/diff/sample.ts";
 import { Drawer, TodoList } from "../features/drawer/index.ts";
-import { Composer, ContextChipView, DockView, Meter, TuneChipView } from "../features/composer/index.ts";
+import { Composer, ContextChipView, DockView, Meter, ModeChipView, TuneChipView } from "../features/composer/index.ts";
 import { createHistory } from "../features/composer/history.ts";
 import { CommandsDialog } from "../features/composer/help-dialog.tsx";
 import { HomeView, NewSessionModelChipView, SessionTitle } from "../features/shell/index.ts";
@@ -239,21 +239,41 @@ function DrawerDemo({ theme }: { theme: string }) {
   );
 }
 
-/** A pending card whose editor is open, and closes on Cancel. */
+/** A pending bar whose editor is open, and closes on Cancel. */
 function EditingDemo({ draft }: { draft?: string }) {
   const [editing, setEditing] = useState(true);
-  return <ApprovalCard tool={PENDING_SHELL} pending editing={editing} draft={draft} onEdit={setEditing} onAnswer={() => {}} />;
+  return <ApprovalBar tool={PENDING_SHELL} editing={editing} draft={draft} onEdit={setEditing} onAnswer={() => {}} />;
 }
 
-/** The approval card, pending and answered. */
+/** The approval docked above the composer, as a session shows it. */
+function DockedApprovalDemo({ tool, label }: { tool: typeof PENDING_EDIT; label: string }) {
+  return (
+    <div>
+      <p className="mb-1 text-xs text-muted">{label}</p>
+      <div className="rounded-lg border border-line bg-bg p-4">
+        <DockView
+          busy
+          meter={<Meter state="waiting" runStartedAt={null} />}
+          approval={<ApprovalBar tool={tool} onAnswer={() => {}} />}
+          composer={<DemoComposer busy />}
+        />
+      </div>
+    </div>
+  );
+}
+
+/** The approval bar, waiting in the dock, and the chips it leaves in the steps. */
 function ApprovalDemo() {
   const anchor = useAnchor();
   return (
     <section className="mt-6" id={anchor("Approval")}>
       <h3 className="mb-2 font-mono text-xs text-faint">Approval</h3>
       <div className="flex flex-col gap-4">
-        <ApprovalCard tool={PENDING_EDIT} pending onAnswer={() => {}} />
-        <ApprovalCard tool={PENDING_SHELL} pending onAnswer={() => {}} />
+        <DockedApprovalDemo label="Docked above the composer, an edit: the diff is open" tool={PENDING_EDIT} />
+        <DockedApprovalDemo label="Docked above the composer, a command: Details is closed" tool={PENDING_SHELL} />
+        <div className="max-w-sm">
+          <DockedApprovalDemo label="Docked at phone width: the buttons wrap" tool={PENDING_SHELL} />
+        </div>
         <div>
           <p className="mb-1 text-xs text-muted">Editing the arguments</p>
           <EditingDemo />
@@ -262,12 +282,14 @@ function ApprovalDemo() {
           <p className="mb-1 text-xs text-muted">Editing the arguments, not valid JSON</p>
           <EditingDemo draft={'{\n  "command": "pnpm test",\n'} />
         </div>
-        {ANSWERED.map(({ label, tool }) => (
-          <div key={label}>
-            <p className="mb-1 text-xs text-muted">{label}</p>
-            <ApprovalCard tool={tool} pending={false} onAnswer={() => {}} />
-          </div>
-        ))}
+        <div>
+          <p className="mb-1 text-xs text-muted">Chips in the steps, one for each way a question ends</p>
+          <ul aria-label="Answered approvals" className="flex list-none flex-col gap-0.5 border-l border-line py-0.5 pl-3 font-mono text-xs leading-snug">
+            {ANSWERED.map(({ label, tool }) => (
+              <ToolLine key={label} tool={tool} />
+            ))}
+          </ul>
+        </div>
       </div>
     </section>
   );
@@ -790,6 +812,26 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
             }
             composer={<DemoComposer />}
           />
+          <DockView
+            busy={false}
+            meter={
+              <Meter
+                state="idle"
+                runStartedAt={null}
+                aside={
+                  <span className="flex items-center gap-2">
+                    <ModeChipView own="autopilot" fallback="balanced" onSelect={() => {}} />
+                    <ContextChipView used={32000} window={128000} onOpen={() => {}} />
+                  </span>
+                }
+              />
+            }
+            composer={<DemoComposer />}
+          />
+          <div aria-label="Mode chips" role="group" className="flex flex-wrap gap-2">
+            <ModeChipView own="careful" fallback="balanced" onSelect={() => {}} />
+            <ModeChipView own={null} fallback="balanced" onSelect={() => {}} />
+          </div>
           <DockView
             busy
             meter={<Meter state="thinking" runStartedAt={new Date(NOW - 12_000).toISOString()} />}

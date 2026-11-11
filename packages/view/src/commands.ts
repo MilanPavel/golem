@@ -1,6 +1,7 @@
 import type { ListedSkill, ModelOption } from "@golem/client";
 
 import { DETAILS, isDetail, type Detail } from "./activity.ts";
+import { isPermissionMode, type PermissionMode } from "./permission-mode.ts";
 import { TUNE_USAGE, tuneHints, tuneSet, type TuneValue } from "./tune.ts";
 
 
@@ -53,6 +54,8 @@ export type ComposerOutcome =
   | { kind: "todos" }
   | { kind: "thinking" }
   | { kind: "detail"; level: Detail | null }
+  /** Show the permission mode ("show"), or set it for this chat. A null `mode` returns to the default. */
+  | { kind: "mode"; mode: PermissionMode | null | "show" }
   | { kind: "model"; name: string | null }
   | { kind: "model-pull"; name: string }
   | { kind: "model-rm"; name: string }
@@ -254,6 +257,20 @@ export const COMMANDS: readonly Command[] = [
         return { kind: "config", project: true };
       }
       return { kind: "unknown", notice: "/config or /config project" };
+    },
+  },
+  {
+    name: "/mode",
+    group: "tools",
+    args: "[mode|default]",
+    description: "Shows the permission mode, or sets it for this chat.",
+    choices: ["careful", "balanced", "autopilot", "default"],
+    run: (_debug, args) => {
+      const [word] = args;
+      if (word === undefined) return { kind: "mode", mode: "show" };
+      if (args.length === 1 && word === "default") return { kind: "mode", mode: null };
+      if (args.length === 1 && isPermissionMode(word)) return { kind: "mode", mode: word };
+      return { kind: "unknown", notice: "/mode, or /mode careful, balanced, autopilot or default" };
     },
   },
   {

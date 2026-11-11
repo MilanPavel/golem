@@ -26,6 +26,13 @@ test("/help lists nothing of its own, and every command has a description", () =
   assert.deepEqual(debug?.choices, ["wire", "model", "hold", "go"]);
 });
 
+test("/mode shows, sets, or follows the default", () => {
+  assert.deepEqual(applyComposer(closedDebug, "/mode"), { kind: "mode", mode: "show" });
+  assert.deepEqual(applyComposer(closedDebug, "/mode careful"), { kind: "mode", mode: "careful" });
+  assert.deepEqual(applyComposer(closedDebug, "/mode default"), { kind: "mode", mode: null });
+  assert.equal(applyComposer(closedDebug, "/mode wild").kind, "unknown");
+});
+
 const CONTEXT_REPORT = {
   kind: "ready" as const,
   model: "ollama/qwen3-coder:30b",
