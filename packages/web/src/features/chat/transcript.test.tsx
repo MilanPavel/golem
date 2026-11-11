@@ -15,6 +15,40 @@ const chat = (messages: ChatMessage[], extra: { error?: string | null; notice?: 
 const answer = (over: Partial<ChatMessage> = {}): ChatMessage => ({ id: "a", role: "assistant", text: "Hi", streaming: false, ...over });
 const golemState = (container: HTMLElement) => container.querySelector("svg[data-state]")?.getAttribute("data-state");
 
+test("a run with tool steps is one golem and one footer: the last time and every tool", () => {
+  const { container } = render(
+    <TranscriptMessages
+      chat={chat([
+        answer({ id: "s1", text: "", durationMs: 1000, tools: [{ callId: "1", name: "grep", args: {}, status: "done" }] }),
+        answer({ id: "s2", text: "", durationMs: 2000, tools: [{ callId: "2", name: "grep", args: {}, status: "done" }] }),
+        answer({ id: "s3", text: "Done", durationMs: 3000 }),
+      ])}
+    />,
+  );
+  expect(screen.getAllByRole("article", { name: "golem" })).toHaveLength(1);
+  expect(container.querySelectorAll("svg[data-state]")).toHaveLength(1);
+  expect(screen.getAllByText("0m 03.0s · 2 tools")).toHaveLength(1);
+  expect(screen.queryByText(/0m 01\.0s/)).toBeNull();
+});
+
+test("a streaming last step shows no footer", () => {
+  render(
+    <TranscriptMessages
+      chat={chat([
+        answer({ id: "s1", text: "", durationMs: 1000, tools: [{ callId: "1", name: "grep", args: {}, status: "done" }] }),
+        answer({ id: "s2", text: "Wri", streaming: true }),
+      ])}
+    />,
+  );
+  expect(screen.queryByText(/ tools?$/, { selector: "p" })).toBeNull();
+});
+
+test("two user turns make two golems", () => {
+  const u = (id: string): ChatMessage => ({ id, role: "user", text: "q", streaming: false });
+  render(<TranscriptMessages chat={chat([u("u1"), answer({ id: "a1" }), u("u2"), answer({ id: "a2" })])} />);
+  expect(screen.getAllByRole("article", { name: "golem" })).toHaveLength(2);
+});
+
 test("an empty session says so", () => {
   render(<TranscriptMessages chat={chat([])} />);
   expect(screen.getByText("No messages yet.")).toBeTruthy();

@@ -1,4 +1,4 @@
-import { formatDuration, LIVE_OUTPUT_CHARS, thinkingLine, unreadCallNotice, type ChatMessage, type ChatState, type ToolBlock, type ApprovalChoice } from "@golem/view";
+import { formatDuration, groupTurns, turnFooter, LIVE_OUTPUT_CHARS, thinkingLine, unreadCallNotice, type ChatMessage, type ChatState, type ToolBlock, type ApprovalChoice } from "@golem/view";
 import { memo, useCallback, useId, useLayoutEffect, useRef, useState } from "react";
 import { usePageActions, useDraftReader, useSession } from "../../store/page-context.tsx";
 import { ApprovalCard } from "../approval/approval-card.tsx";
@@ -172,9 +172,9 @@ export function ThinkingLine({ message, defaultOpen = false, shown }: { message:
   );
 }
 
-function golemState(message: ChatMessage): GolemState {
-  if (message.tools?.some((tool) => tool.status === "waiting")) return "waiting";
-  return message.streaming ? "thinking" : "idle";
+function golemState(steps: readonly ChatMessage[]): GolemState {
+  if (steps.some((step) => step.tools?.some((tool) => tool.status === "waiting"))) return "waiting";
+  return steps.some((step) => step.streaming) ? "thinking" : "idle";
 }
 
 export const UserMessage = memo(function UserMessage({ message }: { message: ChatMessage }) {
@@ -212,7 +212,7 @@ type Answering = {
   thinkingShown?: boolean;
 };
 
-export const GolemMessage = memo(function GolemMessage({
+const GolemStep = memo(function GolemStep({
   message,
   approvalCallId = null,
   sending = false,
@@ -223,11 +223,8 @@ export const GolemMessage = memo(function GolemMessage({
   thinkingShown,
 }: { message: ChatMessage } & Answering) {
   const tools = message.tools ?? [];
-  const duration = message.durationMs === undefined ? "" : formatDuration(message.durationMs);
-  const foot = [duration, tools.length > 0 ? `${tools.length} ${tools.length === 1 ? "tool" : "tools"}` : ""].filter(Boolean);
   return (
-    <article aria-label="golem" className="flex min-w-0 flex-col gap-2.5">
-      <PixelGolem state={golemState(message)} size="sm" />
+    <div className="flex min-w-0 flex-col gap-2.5">
       <ThinkingLine message={message} shown={thinkingShown} />
       {tools.length > 0 ? (
         <ul aria-label="Tool calls" className="flex list-none flex-col gap-0.5 p-0 font-mono text-xs leading-snug">
@@ -260,12 +257,52 @@ export const GolemMessage = memo(function GolemMessage({
       )}
       {message.streaming ? <span aria-hidden="true" data-cursor className="transcript-cursor" /> : null}
       {message.interrupted ? <p className="font-mono text-xs text-muted">stopped</p> : null}
-      {!message.streaming && foot.length > 0 ? (
-        <p className="font-mono text-xs text-faint">{foot.join(" · ")}</p>
-      ) : null}
-    </article>
+    </div>
   );
 });
+
+/** One run: one golem, each model step in order, and one footer once the run is done. */
+export function GolemTurn({
+  steps,
+  pendingId = null,
+  sendingId = null,
+  answerError = null,
+  editing = false,
+  onEdit,
+  onAnswer,
+  thinkingShown,
+}: { steps: readonly ChatMessage[]; pendingId?: string | null; sendingId?: string | null; answerError?: string | null; thinkingShown?: boolean } & Pick<Answering, "editing" | "onEdit" | "onAnswer">) {
+  const footer = turnFooter(steps);
+  const foot = footer
+    ? [
+        footer.durationMs === undefined ? "" : formatDuration(footer.durationMs),
+        footer.tools > 0 ? `${footer.tools} ${footer.tools === 1 ? "tool" : "tools"}` : "",
+      ].filter(Boolean)
+    : [];
+  return (
+    <article aria-label="golem" className="flex min-w-0 flex-col gap-2.5">
+      <PixelGolem state={golemState(steps)} size="sm" />
+      {steps.map((message) =>
+        pendingId !== null && message.tools?.some((tool) => tool.callId === pendingId) === true ? (
+          <GolemStep
+            key={message.id}
+            message={message}
+            approvalCallId={pendingId}
+            sending={sendingId === pendingId}
+            error={answerError}
+            editing={editing}
+            onEdit={onEdit}
+            onAnswer={onAnswer}
+            thinkingShown={thinkingShown}
+          />
+        ) : (
+          <GolemStep key={message.id} message={message} onAnswer={onAnswer} thinkingShown={thinkingShown} />
+        ),
+      )}
+      {foot.length > 0 ? <p className="font-mono text-xs text-faint">{foot.join(" · ")}</p> : null}
+    </article>
+  );
+}
 
 /** What the transcript draws of the chat. `approval` names the call whose card is open. */
 export type TranscriptChat = Pick<ChatState, "messages" | "error" | "notice"> & Partial<Pick<ChatState, "approval" | "unreadCall">>;
@@ -289,23 +326,21 @@ export function TranscriptMessages({ chat, onAnswer, sendingId = null, answerErr
   }
   return (
     <>
-      {chat.messages.map((message) =>
-        message.role === "user" ? (
-          <UserMessage key={message.id} message={message} />
-        ) : pendingId !== null && message.tools?.some((tool) => tool.callId === pendingId) === true ? (
-          <GolemMessage
-            key={message.id}
-            message={message}
-            approvalCallId={pendingId}
-            sending={sendingId === pendingId}
-            error={answerError}
+      {groupTurns(chat.messages).map((turn) =>
+        turn.kind === "user" ? (
+          <UserMessage key={turn.id} message={turn.message} />
+        ) : (
+          <GolemTurn
+            key={turn.id}
+            steps={turn.steps}
+            pendingId={pendingId}
+            sendingId={sendingId}
+            answerError={answerError}
             editing={editing}
             onEdit={onEdit}
             onAnswer={onAnswer}
             thinkingShown={thinkingShown}
           />
-        ) : (
-          <GolemMessage key={message.id} message={message} onAnswer={onAnswer} thinkingShown={thinkingShown} />
         ),
       )}
       {chat.error ? <p role="alert" className="text-sm text-deny">{chat.error}</p> : null}
