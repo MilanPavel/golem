@@ -26,6 +26,7 @@ import { TryTool } from "./mcp/try-tool.tsx";
 import { Button } from "../../ui/button.tsx";
 import { cn } from "../../ui/cn.ts";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "../../ui/dialog.tsx";
+import { useNarrow } from "../trace/use-narrow.ts";
 import { useSettingsContext, useSettingsFolder } from "./context.ts";
 import { mcpAddRequestStore, useMcpAddRequest } from "./mcp-add-request.ts";
 
@@ -39,6 +40,15 @@ function same(server: McpServer, at: Selected): boolean {
   return server.name === at.name && (server.project ?? null) === at.project;
 }
 
+function groupFile(group: { project: string | null; servers: McpServer[] }): string {
+  return group.servers[0]?.config ?? (group.project === null ? DEFAULT_FILE : group.project);
+}
+
+/** The home directory as `~`; the web page does not know it, so it is read off the path. */
+function tilde(path: string): string {
+  return path.replace(/^\/(?:Users|home)\/[^/]+/, "~");
+}
+
 function keyOf(server: McpServer): string {
   return `${server.project ?? ""}\u0000${server.name}`;
 }
@@ -49,6 +59,7 @@ export function McpSection() {
   const sessionId = context?.sessionId ?? null;
   const list = useMcpList(sessionId);
   const folder = useSettingsFolder();
+  const narrow = useNarrow();
   const [view, setView] = useState<View>({ kind: "list" });
   const [adding, setAdding] = useState<{ id: string | null } | null>(null);
   const [added, setAdded] = useState<string | null>(null);
@@ -111,21 +122,38 @@ export function McpSection() {
     return <p className="font-mono text-sm text-muted">asking the daemon…</p>;
   }
   const servers = orderedServers(list.data.servers);
-  const at = view.kind === "list" ? null : view.at;
-  const server = at === null ? undefined : servers.find((item) => same(item, at));
-  if (view.kind === "list" || server === undefined) {
+  const wide = !narrow;
+  // On a wide window the details sit beside the list, so a server is always shown: the first, until one is picked.
+  const first = servers[0];
+  const picked = view.kind === "list" ? null : view.at;
+  const pickedServer = picked === null ? undefined : servers.find((item) => same(item, picked));
+  const server = pickedServer ?? (wide ? first : undefined);
+  const at: Selected | null = server === undefined ? null : { name: server.name, project: server.project ?? null };
+  const kind = pickedServer === undefined || view.kind === "list" ? "detail" : view.kind;
+  const open = (item: McpServer): void => setView({ kind: "detail", at: { name: item.name, project: item.project ?? null } });
+  const listPane = (
+    <ServerList
+      servers={servers}
+      register={register}
+      added={added}
+      wide={wide}
+      selected={wide ? at : null}
+      onAdd={() => setAdding({ id: null })}
+      onImport={() => setImporting(true)}
+      onOpen={open}
+    />
+  );
+  const dialogs = (
+    <>
+      {dialog}
+      {importDialog}
+    </>
+  );
+  if (server === undefined || at === null) {
     return (
       <>
-        <ServerList
-          servers={servers}
-          register={register}
-          added={added}
-          onAdd={() => setAdding({ id: null })}
-          onImport={() => setImporting(true)}
-          onOpen={(item) => setView({ kind: "detail", at: { name: item.name, project: item.project ?? null } })}
-        />
-        {dialog}
-        {importDialog}
+        {listPane}
+        {dialogs}
       </>
     );
   }
@@ -133,26 +161,42 @@ export function McpSection() {
     back.current = keyOf(server);
     setView({ kind: "list" });
   };
-  const toDetail = (): void => setView({ kind: "detail", at: view.at });
-  if (view.kind === "edit") {
-    return <EditServer server={server} sessionId={sessionId} onBack={toDetail} onSaved={toDetail} />;
+  const toDetail = (): void => setView({ kind: "detail", at });
+  let content: React.ReactNode;
+  if (kind === "edit") {
+    content = <EditServer server={server} sessionId={sessionId} onBack={toDetail} onSaved={toDetail} />;
+  } else if (kind === "tools") {
+    content = <ToolsView server={server} sessionId={sessionId} onBack={toDetail} />;
+  } else if (kind === "test") {
+    content = <TestView server={server} sessionId={sessionId} onBack={toDetail} />;
+  } else if (kind === "logs") {
+    content = <LogsView server={server} sessionId={sessionId} onBack={toDetail} />;
+  } else {
+    content = (
+      <Detail
+        key={keyOf(server)}
+        server={server}
+        sessionId={sessionId}
+        onBack={wide ? null : leave}
+        onOpen={(next) => setView({ kind: next, at })}
+      />
+    );
   }
-  if (view.kind === "tools") {
-    return <ToolsView server={server} sessionId={sessionId} onBack={toDetail} />;
-  }
-  if (view.kind === "test") {
-    return <TestView server={server} sessionId={sessionId} onBack={toDetail} />;
-  }
-  if (view.kind === "logs") {
-    return <LogsView server={server} sessionId={sessionId} onBack={toDetail} />;
+  if (!wide) {
+    // A narrow window shows the list, or the details in its place.
+    return (
+      <>
+        {view.kind === "list" || pickedServer === undefined ? listPane : content}
+        {dialogs}
+      </>
+    );
   }
   return (
-    <Detail
-      server={server}
-      sessionId={sessionId}
-      onBack={leave}
-      onOpen={(next) => setView({ kind: next, at: view.at })}
-    />
+    <div className="flex min-h-0 flex-1 overflow-hidden rounded-xl border border-line bg-surface">
+      <div className="w-mcp-list shrink-0 overflow-y-auto border-r border-line bg-bg p-3">{listPane}</div>
+      <div className="min-w-0 flex-1 overflow-y-auto px-6 py-5">{content}</div>
+      {dialogs}
+    </div>
   );
 }
 
@@ -160,6 +204,8 @@ function ServerList({
   servers,
   register,
   added,
+  wide,
+  selected,
   onAdd,
   onImport,
   onOpen,
@@ -167,17 +213,21 @@ function ServerList({
   servers: readonly McpServer[];
   register: (key: string, node: HTMLButtonElement | null) => void;
   added: string | null;
+  wide: boolean;
+  selected: Selected | null;
   onAdd: () => void;
   onImport: () => void;
   onOpen: (server: McpServer) => void;
 }) {
   const addButton = (
-    <div className="flex flex-wrap items-center gap-3">
-      <Button kind="primary" onClick={onAdd}>
+    <div className="flex flex-wrap items-center gap-2">
+      <Button kind="primary" size={wide ? "sm" : undefined} onClick={onAdd}>
         Add a server
       </Button>
-      <Button onClick={onImport}>Import from other apps</Button>
-      <p role="status" aria-live="polite" className="font-mono text-xs text-muted">
+      <Button size={wide ? "sm" : undefined} onClick={onImport}>
+        Import from other apps
+      </Button>
+      <p role="status" aria-live="polite" className="font-mono text-xs text-muted empty:hidden">
         {added === null ? null : `added ${added}`}
       </p>
     </div>
@@ -199,39 +249,57 @@ function ServerList({
     else groups.push({ project, servers: [server] });
   }
   return (
-    <div className="flex flex-col gap-4">
+    <div className={cn("flex flex-col", wide ? "gap-3" : "gap-4")}>
       <p className="text-sm text-muted">
         {servers.length} {servers.length === 1 ? "server" : "servers"}
       </p>
       {addButton}
       {groups.map((group) => (
         <section key={group.project ?? ""} aria-label={group.project === null ? "Yours" : "This project"} className="flex flex-col gap-2">
-          <h3 className="text-sm font-semibold">
-            {group.project === null ? "Yours" : "This project"}{" "}
-            <span className="font-mono text-xs font-normal text-muted wrap-anywhere">
-              ({shortPath(group.servers[0]?.config ?? (group.project === null ? DEFAULT_FILE : group.project), "")})
-            </span>
-          </h3>
-          <ul className="flex flex-col gap-2">
+          {wide ? (
+            <h3 className="min-w-0 px-2 font-mono text-xs font-normal text-faint">
+              {group.project === null ? "Yours" : "This project"}
+              <span className="block truncate" title={groupFile(group)}>
+                {tilde(groupFile(group))}
+              </span>
+            </h3>
+          ) : (
+            <h3 className="text-sm font-semibold">
+              {group.project === null ? "Yours" : "This project"}{" "}
+              <span className="font-mono text-xs font-normal text-muted wrap-anywhere">({shortPath(groupFile(group), "")})</span>
+            </h3>
+          )}
+          <ul className={cn("flex flex-col", wide ? "gap-0.5" : "gap-2")}>
             {group.servers.map((server) => {
               const mark = mcpStatusMark(server);
+              const current = selected !== null && same(server, selected);
               return (
                 <li key={keyOf(server)}>
                   <button
                     type="button"
                     ref={(node) => register(keyOf(server), node)}
                     onClick={() => onOpen(server)}
+                    aria-current={current ? "true" : undefined}
                     className={cn(
-                      "flex w-full flex-wrap items-baseline gap-x-3 gap-y-1 rounded-lg border border-line bg-surface px-3 py-2 text-left outline-offset-2 outline-clay hover:border-line-strong focus-visible:outline-2",
+                      "flex w-full gap-x-3 gap-y-1 rounded-lg border px-3 py-2 text-left outline-offset-2 outline-clay focus-visible:outline-2",
+                      wide ? "flex-col gap-y-0.5" : "flex-wrap items-baseline bg-surface",
+                      current ? "border-line-strong bg-surface" : wide ? "border-transparent hover:border-line" : "border-line hover:border-line-strong",
                       server.state === "disabled" && "opacity-70",
                     )}
                   >
-                    <span aria-hidden="true" className={cn("font-mono text-sm", TONE[mark.tone])}>
-                      {mark.text}
+                    <span className="flex min-w-0 items-baseline gap-x-2">
+                      <span aria-hidden="true" className={cn("font-mono text-sm", TONE[mark.tone])}>
+                        {mark.text}
+                      </span>
+                      <span className="sr-only">{mcpStatusWord(server)}, </span>
+                      <span className={cn("min-w-0 font-mono text-sm", wide ? "truncate" : "wrap-anywhere")}>{server.name}</span>
+                      {wide ? (
+                        <span aria-hidden="true" className="ml-auto shrink-0 font-mono text-xs whitespace-nowrap text-faint">
+                          {mcpStatusWord(server)}
+                        </span>
+                      ) : null}
                     </span>
-                    <span className="sr-only">{mcpStatusWord(server)}, </span>
-                    <span className="font-mono text-sm">{server.name}</span>
-                    <span className="min-w-0 flex-1 font-mono text-xs text-muted wrap-anywhere">{mcpSummary(server)}</span>
+                    <span className={cn("min-w-0 font-mono text-xs text-muted wrap-anywhere", wide ? "pl-5" : "flex-1")}>{mcpSummary(server)}</span>
                   </button>
                 </li>
               );
@@ -252,7 +320,7 @@ function Fact({ label, children }: { label: string; children: React.ReactNode })
   );
 }
 
-function Detail({ server, sessionId, onBack, onOpen }: { server: McpServer; sessionId: string | null; onBack: () => void; onOpen: (screen: "tools" | "test" | "logs" | "edit") => void }) {
+function Detail({ server, sessionId, onBack, onOpen }: { server: McpServer; sessionId: string | null; onBack: (() => void) | null; onOpen: (screen: "tools" | "test" | "logs" | "edit") => void }) {
   const actions = usePageActions();
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -315,11 +383,13 @@ function Detail({ server, sessionId, onBack, onOpen }: { server: McpServer; sess
 
   return (
     <div className="flex flex-col gap-3">
-      <div>
-        <Button size="sm" onClick={onBack}>
-          Back
-        </Button>
-      </div>
+      {onBack === null ? null : (
+        <div>
+          <Button size="sm" onClick={onBack}>
+            Back
+          </Button>
+        </div>
+      )}
       <h3 className="font-mono text-base font-semibold wrap-anywhere">{server.name}</h3>
       <dl className="flex flex-col gap-1 text-sm">
         <Fact label="Status">
