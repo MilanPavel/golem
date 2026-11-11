@@ -17,7 +17,7 @@ export type EditForm = {
   url: string;
   cwd: string;
   timeout: string;
-  approval: "ask" | "allow";
+  approval: "ask" | "read-only" | "allow";
   /** One `fnmatch` pattern per line. */
   include: string;
   exclude: string;

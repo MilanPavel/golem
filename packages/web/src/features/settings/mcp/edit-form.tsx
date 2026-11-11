@@ -117,10 +117,11 @@ function Fields({ name, original, path, sessionId, onCancel, onSaved }: { name: 
           <Input value={form.timeout} onChange={(event) => set("timeout", event.target.value)} inputMode="numeric" className="w-32" />
         </label>
         <label className="flex flex-col gap-1 text-sm">
-          Tool calls
-          <select value={form.approval} onChange={(event) => set("approval", event.target.value === "allow" ? "allow" : "ask")} className={fieldClass}>
-            <option value="ask">ask first</option>
-            <option value="allow">run without asking</option>
+          Approval
+          <select value={form.approval} onChange={(event) => set("approval", event.target.value === "allow" ? "allow" : event.target.value === "read-only" ? "read-only" : "ask")} className={fieldClass}>
+            <option value="ask">Ask before every tool</option>
+            <option value="read-only">Trust its read-only tools</option>
+            <option value="allow">Allow every tool</option>
           </select>
         </label>
       </div>

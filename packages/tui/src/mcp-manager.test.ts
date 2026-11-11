@@ -594,4 +594,6 @@ test("a list row and the details say what limits a server", () => {
   const detail = shown(press(openMcpManager(), "enter").state, [limited]).join("\n");
   assert.ok(detail.includes("Hidden:        2 tools kept from the model"));
   assert.ok(detail.includes("Approval:      calls run without asking"));
+  const trusting = shown(press(openMcpManager(), "enter").state, [{ ...git, approval: "read-only" }]).join("\n");
+  assert.ok(trusting.includes("Approval:      tools the server marks read-only run without asking"));
 });

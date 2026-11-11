@@ -4,8 +4,10 @@ Each one is named ``mcp__<server>__<tool>``. Providers allow only letters,
 digits, ``_``, and ``-`` in a tool name, at most 64 of them, so the server's
 own name is cleaned to fit, and the call goes out under its original name.
 
-A server's tool is never ``read_only``: what it does is the server's word,
-so the default rules ask before every call. Its output is outside content,
+A server's tool is never ``read_only`` in the registry: what it does is the
+server's word, so the default rules ask before every call. A server the user
+set to ``approval = "read-only"`` is the exception, and the policy, not the
+tool, reads its ``readOnlyHint`` (see :meth:`Policy.rules`). Its output is outside content,
 so the model reads it marked as data.
 """
 

@@ -288,6 +288,9 @@ class McpToolFilter(BaseModel):
         return not self.include or any(fnmatchcase(name, pattern) for pattern in self.include)
 
 
+McpApproval = Literal["ask", "read-only", "allow"]
+
+
 class McpServerSettings(BaseModel):
     """``[mcp.<name>]``. An MCP server golem starts over stdio, or reaches over HTTP.
 
@@ -303,8 +306,10 @@ class McpServerSettings(BaseModel):
     the longest one tool call may take.
 
     ``tools`` hides some of the server's tools from the model. ``approval`` is
-    ``"ask"`` (every call asks, the default) or ``"allow"`` (the server's calls
-    run without asking, after the user's own ``[[rule]]``s). ``env_passthrough``
+    ``"ask"`` (every call asks, the default), ``"read-only"`` (a tool the server
+    marks ``readOnlyHint`` runs without asking in balanced and autopilot), or
+    ``"allow"`` (every call runs without asking), all after the user's own
+    ``[[rule]]``s. ``env_passthrough``
     names variables of the daemon's own environment to hand to a stdio server;
     a secret goes through the Keychain instead.
     """
@@ -322,7 +327,7 @@ class McpServerSettings(BaseModel):
     enabled: McpEnabled = True
     timeout_seconds: int = Field(default=120, gt=0, le=3600)
     tools: McpToolFilter = Field(default_factory=McpToolFilter)
-    approval: Literal["ask", "allow"] = "ask"
+    approval: McpApproval = "ask"
     env_passthrough: list[str] = Field(default_factory=list[str])
 
     @model_validator(mode="after")

@@ -24,7 +24,7 @@ golem does its work through **tools**: small actions it asks the daemon to run, 
 | `write_file` | Creates a file, or replaces all of it | Asks, with the diff | Asks, with the diff | Allowed |
 | `edit_file` | Replaces exact text in a file | Asks, with the diff | Asks, with the diff | Allowed |
 | `shell_unsandboxed` | Runs a command outside the sandbox, with your credentials and the network, for `gh` and `git push` | Asks | Asks | Asks |
-| `mcp__<server>__<tool>` | A tool from an [MCP server](./mcp.md) | Asks | Asks | Asks |
+| `mcp__<server>__<tool>` | A tool from an [MCP server](./mcp.md) | Asks | Asks, or allowed for a server you trust (below) | Asks, or allowed for a server you trust (below) |
 
 ### Permission modes
 
@@ -34,7 +34,7 @@ The mode says how much the built-in defaults allow without asking. **Balanced** 
 - **Balanced** also allows web search and fetch. Anything that changes a file or runs a command still asks.
 - **Autopilot** also allows file writes and edits, and shell commands, which the sandbox keeps inside the project with the network off. With `[shell] network = true` a command can reach the network, so `shell` still asks. File tools cannot leave the project folder anyway.
 
-`shell_unsandboxed` and MCP tools ask in every mode.
+`shell_unsandboxed` asks in every mode. MCP tools ask too, unless you trust the server: with `approval = "read-only"` in its `[mcp.<name>]` table, a tool the server marks read-only runs without asking in balanced and autopilot, and with `approval = "allow"` every tool runs in every mode. The server's word is all that marks a tool read-only, so trust it only for a server you trust. See [MCP servers](./mcp.md).
 
 ```toml
 [permissions]

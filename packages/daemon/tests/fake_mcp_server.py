@@ -22,6 +22,7 @@ TOOLS: list[dict[str, Any]] = [
     {
         "name": "echo",
         "description": "Says the text back.",
+        "annotations": {"readOnlyHint": True},
         "inputSchema": {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
@@ -29,7 +30,12 @@ TOOLS: list[dict[str, Any]] = [
             "required": ["text"],
         },
     },
-    {"name": "fail", "description": "Always fails.", "inputSchema": {"type": "object"}},
+    {
+        "name": "fail",
+        "description": "Always fails.",
+        "inputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": False, "destructiveHint": True},
+    },
     {"name": "weird.name", "inputSchema": {"type": "object"}},
     {"name": "slow", "description": "Takes too long.", "inputSchema": {"type": "object"}},
     {"name": "crash", "description": "Exits.", "inputSchema": {"type": "object"}},

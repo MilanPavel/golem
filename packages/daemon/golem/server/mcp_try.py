@@ -152,4 +152,5 @@ def _info(tool: McpTool, hidden: bool) -> McpToolInfo:
         hidden=hidden,
         schema_tokens=len(schema) // CHARS_PER_TOKEN,
         input_schema=dict(tool.input_schema),
+        read_only=tool.read_only,
     )

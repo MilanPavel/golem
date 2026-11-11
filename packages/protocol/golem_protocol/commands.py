@@ -1155,7 +1155,8 @@ class McpServer(BaseModel):
     ``error`` says why it is ``failed``, and ``retry_seconds`` when golem
     tries again. ``config`` is the file that names the server. ``tools_hidden``
     counts the tools its ``tools`` filter keeps from the model, and
-    ``approval`` is ``"allow"`` when its calls run without asking.
+    ``approval`` is ``"allow"`` when its calls run without asking, and
+    ``"read-only"`` when only the tools it marks read-only do.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -1172,7 +1173,7 @@ class McpServer(BaseModel):
     retry_seconds: float | None = Field(default=None, ge=0)
     config: str | None = None
     tools_hidden: int = Field(default=0, ge=0)
-    approval: Literal["ask", "allow"] = "ask"
+    approval: Literal["ask", "read-only", "allow"] = "ask"
 
 
 class McpServerParams(BaseModel):
@@ -1190,6 +1191,7 @@ class McpToolInfo(BaseModel):
     A ``hidden`` tool is one the server's ``tools`` filter keeps from the model.
     ``schema_tokens`` roughly what its schema costs in each prompt.
     ``input_schema`` is the JSON Schema of its arguments, for a form that tries it.
+    ``read_only`` is the server's own ``readOnlyHint``: its word, not golem's check.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -1199,6 +1201,7 @@ class McpToolInfo(BaseModel):
     hidden: bool = False
     schema_tokens: int = Field(default=0, ge=0)
     input_schema: dict[str, Any] | None = None
+    read_only: bool = False
 
 
 class McpToolsResult(BaseModel):
@@ -1241,7 +1244,7 @@ class McpServerConfig(BaseModel):
     enabled: bool | Literal["on_demand"] = True
     timeout_seconds: int = Field(default=120, gt=0, le=3600)
     tools: McpToolFilterConfig = Field(default_factory=McpToolFilterConfig)
-    approval: Literal["ask", "allow"] = "ask"
+    approval: Literal["ask", "read-only", "allow"] = "ask"
     env_passthrough: list[str] = Field(default_factory=list[str])
 
 

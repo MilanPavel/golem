@@ -17,7 +17,7 @@ from typing import Any, Literal, cast
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from golem.config import McpEnabled, McpServerSettings, McpToolFilter
+from golem.config import McpApproval, McpEnabled, McpServerSettings, McpToolFilter
 
 Category = Literal["files", "code", "web", "data", "productivity", "other"]
 Runtime = Literal["npx", "uvx", "docker", "url"]
@@ -54,7 +54,7 @@ class CatalogDefaults(BaseModel):
 
     enabled: McpEnabled = "on_demand"
     tools: McpToolFilter = Field(default_factory=McpToolFilter)
-    approval: Literal["ask", "allow"] = "ask"
+    approval: McpApproval = "ask"
 
 
 class CatalogEntry(BaseModel):

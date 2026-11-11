@@ -52,6 +52,13 @@ async def test_the_handshake_lists_every_page_of_tools(client: McpClient) -> Non
     assert tools[0].input_schema["required"] == ["text"]
 
 
+async def test_the_annotations_are_kept_and_default_to_false(client: McpClient) -> None:
+    tools = {tool.name: tool for tool in await client.list_tools(5)}
+    assert (tools["echo"].read_only, tools["echo"].destructive) == (True, False)
+    assert (tools["fail"].read_only, tools["fail"].destructive) == (False, True)
+    assert (tools["slow"].read_only, tools["slow"].destructive) == (False, False)
+
+
 async def test_a_call_returns_the_content_and_ping_answers(client: McpClient) -> None:
     result = await client.call_tool("echo", {"text": "hi"}, 5)
     assert result == CallResult(content=[{"type": "text", "text": "echo: hi"}], is_error=False)

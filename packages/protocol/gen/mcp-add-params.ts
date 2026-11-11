@@ -3,7 +3,7 @@
 export type Args = string[];
 export type CatalogId = string | null;
 export type Command = string | null;
-export type Approval = 'ask' | 'allow';
+export type Approval = 'ask' | 'read-only' | 'allow';
 export type Args1 = string[];
 export type Command1 = string | null;
 export type Cwd = string | null;

@@ -13,7 +13,7 @@ Asking before every command and every file write is safe and tiring. Asking for 
 | `balanced` (default) | `web_search` and `web_fetch` |
 | `autopilot` | also `write_file`, `edit_file`, and `shell` while `[shell] network` is off |
 
-`shell_unsandboxed` and MCP tools ask in every mode. MCP trust is its own decision.
+`shell_unsandboxed` and MCP tools ask in every mode. MCP trust is its own decision, see [ADR-048](048-mcp-read-only-tools.md).
 
 The mode touches one layer. The rules are still checked in the order of [ADR-012](012-permission-rules.md): the project's file, your `config.toml`, MCP servers with `approval = "allow"`, and last the built-in defaults, which the mode picks. So a `deny` or an `ask` you wrote beats any mode, and so does what you allowed for the session.
 

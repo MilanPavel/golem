@@ -412,3 +412,30 @@ async def test_approval_allow_names_the_servers_that_run_without_asking(
     assert supervisor.allowed_servers(project) == ["fake"]
     assert _state(supervisor, "fake").approval == "allow"
     assert _state(supervisor, "careful").approval == "ask"
+
+
+async def test_approval_read_only_names_the_tools_the_server_marks_read_only(
+    running: list[McpSupervisor],
+) -> None:
+    supervisor = McpSupervisor(
+        {
+            "fake": _settings(approval="read-only"),
+            "asks": _settings(),
+            "free": _settings(approval="allow"),
+        },
+        timing=FAST,
+    )
+    running.append(supervisor)
+    supervisor.start()
+    await _until(lambda: all(status.state == "running" for status in supervisor.statuses()))
+    assert supervisor.read_only_tools(None) == {"fake": ["mcp__fake__echo"]}
+    assert _state(supervisor, "fake").approval == "read-only"
+    listed = {tool.name: tool.read_only for tool in supervisor.tool_list(EVERYONE, "fake")}
+    assert listed["mcp__fake__echo"] is True
+    assert listed["mcp__fake__fail"] is False
+
+
+def test_approval_accepts_read_only_and_nothing_else() -> None:
+    assert _settings(approval="read-only").approval == "read-only"
+    with pytest.raises(ValueError, match="approval"):
+        _settings(approval="sometimes")

@@ -30,6 +30,7 @@
       "default": "ask",
       "enum": [
         "ask",
+        "read-only",
         "allow"
       ],
       "title": "Approval",

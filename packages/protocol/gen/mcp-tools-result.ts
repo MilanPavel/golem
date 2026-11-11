@@ -7,6 +7,7 @@ export type InputSchema = {
   [k: string]: unknown;
 } | null;
 export type Name1 = string;
+export type ReadOnly = boolean;
 export type SchemaTokens = number;
 export type Tools = McpToolInfo[];
 
@@ -23,6 +24,7 @@ export interface McpToolsResult {
  * A ``hidden`` tool is one the server's ``tools`` filter keeps from the model.
  * ``schema_tokens`` roughly what its schema costs in each prompt.
  * ``input_schema`` is the JSON Schema of its arguments, for a form that tries it.
+ * ``read_only`` is the server's own ``readOnlyHint``: its word, not golem's check.
  *
  * This interface was referenced by `McpToolsResult`'s JSON-Schema
  * via the `definition` "McpToolInfo".
@@ -32,5 +34,6 @@ export interface McpToolInfo {
   hidden?: Hidden;
   input_schema?: InputSchema;
   name: Name1;
+  read_only?: ReadOnly;
   schema_tokens?: SchemaTokens;
 }

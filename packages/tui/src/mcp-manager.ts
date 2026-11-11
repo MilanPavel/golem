@@ -865,6 +865,9 @@ function detailLines(server: McpServer, selected: number, home: string): McpMana
   if (server.approval === "allow") {
     lines.push({ text: `${label("Approval")}calls run without asking` });
   }
+  if (server.approval === "read-only") {
+    lines.push({ text: `${label("Approval")}tools the server marks read-only run without asking` });
+  }
   if (server.state === "failed") {
     lines.push({ text: `${label("Error")}${server.error ?? "failed"}` });
     if (server.retry_seconds != null) {

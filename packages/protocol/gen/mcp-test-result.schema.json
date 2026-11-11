@@ -81,7 +81,7 @@
     },
     "McpToolInfo": {
       "additionalProperties": false,
-      "description": "One of a server's tools: the name the model sees, and what it says it does.\n\nA ``hidden`` tool is one the server's ``tools`` filter keeps from the model.\n``schema_tokens`` roughly what its schema costs in each prompt.\n``input_schema`` is the JSON Schema of its arguments, for a form that tries it.",
+      "description": "One of a server's tools: the name the model sees, and what it says it does.\n\nA ``hidden`` tool is one the server's ``tools`` filter keeps from the model.\n``schema_tokens`` roughly what its schema costs in each prompt.\n``input_schema`` is the JSON Schema of its arguments, for a form that tries it.\n``read_only`` is the server's own ``readOnlyHint``: its word, not golem's check.",
       "properties": {
         "description": {
           "title": "Description",
@@ -109,6 +109,11 @@
           "minLength": 1,
           "title": "Name",
           "type": "string"
+        },
+        "read_only": {
+          "default": false,
+          "title": "Read Only",
+          "type": "boolean"
         },
         "schema_tokens": {
           "default": 0,
