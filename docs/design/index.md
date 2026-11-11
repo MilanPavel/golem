@@ -102,6 +102,27 @@ Checked with the WCAG 2.2 formula. 4.5:1 for text, 3:1 for fills and focus rings
 | Gutter | At least 16 px, and the safe-area insets on a phone |
 | Grid | 4 px steps. The empty screen's faint grid is 20 px, one pixel of the golem |
 
+## Pages and dialogs
+
+These rules came from the 10.16 polish of Settings, the model dialog, Tune, and the trace header.
+
+**Pages.** A page such as Settings uses the full width of the main area, with 28 px gutters. It has no centered column. Its header holds the title in `font-prose` and a close button that goes back to the last session. Below the header is a row of underline tabs, the same `TAB_LOOK` as Chat and Trace, and each tab is a link with its own URL. A short form, such as Appearance, keeps to `max-w-column`.
+
+- Status cards sit in a grid: 1 column on a phone, 2 from `md`, and 3 from `wide`. A table, such as API keys, spans the full width.
+- A list with a detail, such as MCP servers, shows both side by side: a fixed list pane (`w-mcp-list`, 300 px) and a detail that scrolls on its own. Below `narrow`, the detail replaces the list and gets a Back button.
+
+**Dialogs keep one size.** A dialog that filters, selects, or swaps views has a fixed height, up to `max-h-dialog` (44 rem). Its header and footer stay put, and only the body scrolls. The footer is always there: its buttons are disabled until they can act, so nothing moves when you pick something.
+
+**Facts on a row** are a right-hand stack of short lines that never wrap: usage (`131k · free`), then size and fit (`4.6 GB fits`), then the action (`download`). Only an error turns a line `deny`.
+
+**Settings with values (Tune).**
+- Group the values under small uppercase headings: Sampling, Memory, Output.
+- A row is the label with an ⓘ tooltip for the long help, the value on the right (in `clay-ink` when changed), a full-width slider below, and a one-line hint under that.
+- Reset is a ↺ icon, shown only on a changed row.
+- A special value is a choice, not a magic number: Answer length is Until done, Fill context, or Limit, and Seed is Random or Fixed. A short list of values is a segmented control, not a select.
+
+**A summary line** goes on its own full-width row under the tabs, not beside them. The tab row holds only the tabs and the page's actions, such as Refresh.
+
 ## Copy
 
 - Plain words, and the names the TUI already uses: session, fork, model, folder, rule, approval, todo.
