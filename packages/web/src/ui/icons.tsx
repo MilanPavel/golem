@@ -78,6 +78,12 @@ export const PanelIcon = (props: IconProps) => (
     <path d="M10 3v10" />
   </Icon>
 );
+/** Three bars of different reach, as a trace's waterfall. */
+export const InspectIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M2.5 4h6M5 8h7M7.5 12h6" />
+  </Icon>
+);
 export const MoreIcon = (props: IconProps) => (
   <Icon {...props}>
     <circle cx="3.5" cy="8" r="1" fill="currentColor" stroke="none" />

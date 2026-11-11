@@ -8,6 +8,13 @@ test("the target is the file name, the subject, or the arguments", () => {
   expect(approvalTarget({}, null)).toBeNull();
 });
 
+test("a subject that says nothing is no target", () => {
+  for (const empty of ["{}", "[]", "  ", " { } "]) {
+    expect(approvalTarget({}, empty)).toBeNull();
+  }
+  expect(approvalTarget({ q: "x" }, "{}")).toEqual({ short: "x", full: "x" });
+});
+
 test("verdicts and keys", () => {
   expect(verdictText({ decision: "allow_always", rule: null, edited: false })).toBe("Always allowed");
   expect(verdictText({ decision: "deny", rule: null, edited: false })).toBe("Denied");

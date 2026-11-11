@@ -130,7 +130,7 @@ test("routes, actions, and the visibility check", async () => {
   });
   expect(probe.result.current.route).toEqual({ name: "home" });
   act(() => page.router.navigate("/s/x"));
-  expect(probe.result.current.route).toEqual({ name: "session", id: "x" });
+  expect(probe.result.current.route).toEqual({ name: "session", id: "x", inspect: null });
   const { actions } = probe.result.current;
 
   await expect(actions.createSession("/repo", null)).resolves.toBe("s_new");

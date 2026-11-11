@@ -12,6 +12,7 @@
   --color-surface: light-dark(#FBFAF8, #1D1915);
   --color-sunken: light-dark(#EAE8E3, #110E0C);
   --color-ink: light-dark(#1D1A17, #EEE7DF);
+  --color-ink-soft: light-dark(#2B2724, #E2DAD1);
   --color-muted: light-dark(#57524C, #B5ACA2);
   --color-faint: light-dark(#6C665F, #8F877E);
   --color-line: light-dark(#DEDAD3, #2C2621);
@@ -37,6 +38,10 @@
   --color-ctx-replies: light-dark(#95752F, #D9B45E);
   --color-ctx-results: light-dark(#8A5A86, #B98BB4);
 
+  /* A user message in the chat: 15 px. */
+  --text-chat: 0.9375rem;
+  --text-chat--line-height: 1.5;
+
   --font-ui: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
   --font-prose: "Literata Variable", Georgia, serif;
   --font-mono: "Geist Mono Variable", ui-monospace, monospace;
@@ -48,6 +53,10 @@
   --spacing-dialog: 44rem;
   /* The list pane of the MCP servers, beside the details: 300 px. */
   --spacing-mcp-list: 18.75rem;
+
+  /* The trace inspector beside the chat: 26 rem to start with, never below 20 rem. */
+  --spacing-inspector: 26rem;
+  --spacing-inspector-min: 20rem;
 
   /* From here the details drawer sits beside the column (1100 px). */
   --breakpoint-wide: 68.75rem;

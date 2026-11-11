@@ -59,7 +59,7 @@ test("the top bar of the chat stays on the trace: title actions, model, folder, 
   expect(bar.getByText("golem")).toBeTruthy();
   expect(bar.getByRole("button", { name: /^(Show|Hide) details$/ })).toBeTruthy();
   expect(bar.getByRole("button", { name: /^Session actions/ })).toBeTruthy();
-  await user.click(screen.getByRole("link", { name: "Chat" }));
+  await user.click(screen.getByRole("link", { name: "Back to chat" }));
   expect(within(screen.getByRole("banner")).getByRole("button", { name: "Model: m" })).toBeTruthy();
   expect(location.pathname).toBe("/s/a");
 });
@@ -105,26 +105,22 @@ test("a link with a span opens with that span selected", async () => {
   expect(await screen.findByRole("treeitem", { name: /model 2/, selected: true })).toBeTruthy();
 });
 
-test("the Chat and Trace tabs move between the views, and the current one is aria-current", async () => {
+test("the page has a Back to chat link and no Chat and Trace tabs", async () => {
   const { user } = await open("/s/a/trace");
-  const nav = await screen.findByRole("navigation", { name: "View" });
-  expect(within(nav).getByRole("link", { name: "Trace" }).getAttribute("aria-current")).toBe("page");
-  expect(within(nav).getByRole("link", { name: "Chat" }).hasAttribute("aria-current")).toBe(false);
-  await user.click(within(nav).getByRole("link", { name: "Chat" }));
+  await screen.findByRole("tree");
+  expect(screen.queryByRole("navigation", { name: "View" })).toBeNull();
+  const back = screen.getByRole("link", { name: "Back to chat" });
+  expect(back.getAttribute("href")).toBe("/s/a");
+  await user.click(back);
   await waitFor(() => expect(location.pathname).toBe("/s/a"));
-  const chat = await screen.findByRole("navigation", { name: "View" });
-  expect(within(chat).getByRole("link", { name: "Chat" }).getAttribute("aria-current")).toBe("page");
-  expect(within(chat).getByRole("link", { name: "Trace" }).hasAttribute("aria-current")).toBe(false);
-  await user.click(within(chat).getByRole("link", { name: "Trace" }));
-  await waitFor(() => expect(location.pathname).toBe("/s/a/trace"));
+  expect(location.search).toBe("");
+  expect(screen.queryByRole("tree")).toBeNull();
 });
 
-test("the title row holds only the title; Refresh sits with the tabs and the summary on its own line below", async () => {
+test("the header holds the way back and Refresh, and the summary sits on its own line below", async () => {
   await open("/s/a/trace");
-  const nav = await screen.findByRole("navigation", { name: "View" });
-  const titleRow = screen.getByRole("heading", { level: 1 }).parentElement as HTMLElement;
-  expect(within(titleRow).queryByRole("link", { name: "Chat" })).toBeNull();
-  const row = nav.parentElement as HTMLElement;
+  const back = await screen.findByRole("link", { name: "Back to chat" });
+  const row = back.parentElement as HTMLElement;
   expect(within(row).getByRole("button", { name: "Refresh" })).toBeTruthy();
   expect(within(row).queryByText(/runs?/)).toBeNull();
   const summary = screen.getByText(/^1 run · /).parentElement as HTMLElement;

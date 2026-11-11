@@ -2,10 +2,13 @@ import { createStore, type StoreSource } from "./create-store.ts";
 
 export type Route =
   | { name: "home" }
-  | { name: "session"; id: string }
+  | { name: "session"; id: string; inspect: Inspect | null }
   | { name: "trace"; id: string; span: string | null }
   | { name: "settings"; section: string }
   | { name: "not-found" };
+
+/** The inspector beside a chat: open, with `span` selected when not null. */
+export type Inspect = { span: string | null };
 
 /** The section `/settings` opens. */
 export const DEFAULT_SETTINGS_SECTION = "setup";
@@ -21,6 +24,7 @@ export type Router = StoreSource<Route> & {
  * `/settings/:section` (lowercase letters and dashes) the settings page, anything else is not found.
  * The router does not know which sections exist; the page says so for a name it does not list.
  * `/s/:id/trace` is a session's trace, and `?span=` in `search` names the selected span.
+ * On `/s/:id`, `?inspect` opens the inspector panel and `?inspect=<span>` opens it at that span.
  */
 export function parseRoute(pathname: string, search = ""): Route {
   if (pathname === "/") {
@@ -38,8 +42,12 @@ export function parseRoute(pathname: string, search = ""): Route {
     try {
       const id = decodeURIComponent(match[1]);
       if (id !== "" && !id.includes("/")) {
-        if (match[2] === undefined) return { name: "session", id };
-        const span = new URLSearchParams(search).get("span");
+        const params = new URLSearchParams(search);
+        if (match[2] === undefined) {
+          const inspect = params.get("inspect");
+          return { name: "session", id, inspect: inspect === null ? null : { span: inspect === "" ? null : inspect } };
+        }
+        const span = params.get("span");
         return { name: "trace", id, span: span === null || span === "" ? null : span };
       }
     } catch {
@@ -54,6 +62,12 @@ export function sessionPath(id: string): string {
   return `/s/${encodeURIComponent(id)}`;
 }
 
+/** The path of a session with the inspector open, at `span` when given. */
+export function inspectPath(id: string, span?: string | null): string {
+  const base = sessionPath(id);
+  return span === undefined || span === null ? `${base}?inspect` : `${base}?inspect=${encodeURIComponent(span)}`;
+}
+
 /** The path of a session's trace, with `span` selected when given. */
 export function tracePath(id: string, span?: string | null): string {
   const base = `${sessionPath(id)}/trace`;
@@ -66,7 +80,9 @@ export function settingsPath(section: string = DEFAULT_SETTINGS_SECTION): string
 }
 
 function sameRoute(a: Route, b: Route): boolean {
-  if (a.name === "session") return b.name === "session" && a.id === b.id;
+  if (a.name === "session") {
+    return b.name === "session" && a.id === b.id && a.inspect?.span === b.inspect?.span && (a.inspect === null) === (b.inspect === null);
+  }
   if (a.name === "trace") return b.name === "trace" && a.id === b.id && a.span === b.span;
   if (a.name === "settings") return b.name === "settings" && a.section === b.section;
   return a.name === b.name;

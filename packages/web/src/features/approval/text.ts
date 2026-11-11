@@ -9,8 +9,16 @@ export function approvalTarget(args: ToolBlock["args"], subject: string | null):
     const name = trimmed.slice(trimmed.lastIndexOf("/") + 1);
     return { short: name === "" ? path : name, full: path };
   }
-  const text = subject !== null && subject !== "" ? subject : squeezeArgs(args);
+  const own = subject === null ? "" : squeezeSubject(subject);
+  const text = own !== "" ? own : squeezeArgs(args);
   return text === "" ? null : { short: text, full: text };
+}
+
+/** The subject as one line; "{}" and "[]" are the arguments of a call without any, so they name nothing. */
+function squeezeSubject(subject: string): string {
+  const line = subject.replace(/\s+/g, " ").trim();
+  const bare = line.replace(/\s/g, "");
+  return bare === "{}" || bare === "[]" ? "" : line;
 }
 
 /** The line under an answered approval, without its mark. */

@@ -1,5 +1,5 @@
 export { TraceScreen } from "./trace-screen.tsx";
-export { SessionViewBar } from "./view-switch.tsx";
+export { InspectorPanel, INSPECTOR_ID } from "./inspector.tsx";
 export { TraceTree } from "./trace-tree.tsx";
 export { SpanDetail } from "./span-detail.tsx";
 export { TraceSummary } from "./trace-summary.tsx";

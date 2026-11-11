@@ -110,10 +110,12 @@ function TreeRow({
   open,
   selected,
   tabStop,
+  compact,
   onSelect,
   onToggle,
 }: {
   row: Row;
+  compact: boolean;
   open: boolean;
   selected: boolean;
   tabStop: boolean;
@@ -136,7 +138,7 @@ function TreeRow({
         selected ? "bg-clay-soft" : "hover:bg-sunken"
       }`}
     >
-      <span className={`flex w-1/3 min-w-0 shrink-0 items-center gap-1.5 ${INDENT[row.depth]}`}>
+      <span className={`flex min-w-0 items-center gap-1.5 ${compact ? "flex-1" : "w-1/3 shrink-0"} ${INDENT[row.depth]}`}>
         <span
           aria-hidden="true"
           onClick={(event) => {
@@ -160,12 +162,21 @@ function TreeRow({
           </Tooltip>
         ) : null}
       </span>
-      <WaterfallBar span={span} bar={barFor(row.run, span)} ticks={span.kind === "run" ? ticksFor(runExtent(span)) : undefined} />
-      <span className="w-20 shrink-0 text-right font-mono text-xs text-muted tabular-nums">{formatDuration(span.duration_ms)}</span>
-      <span className="w-32 shrink-0 text-right font-mono text-xs text-muted tabular-nums max-narrow:hidden">
-        <TokenCellView cell={cell} />
+      <WaterfallBar
+        span={span}
+        bar={barFor(row.run, span)}
+        ticks={span.kind === "run" ? ticksFor(runExtent(span)) : undefined}
+        compact={compact}
+      />
+      <span className={`shrink-0 text-right font-mono text-xs text-muted tabular-nums ${compact ? "w-18 whitespace-nowrap" : "w-20"}`}>
+        {formatDuration(span.duration_ms)}
       </span>
-      <span className="w-16 shrink-0 text-right text-xs">
+      {compact ? null : (
+        <span className="w-32 shrink-0 text-right font-mono text-xs text-muted tabular-nums max-narrow:hidden">
+          <TokenCellView cell={cell} />
+        </span>
+      )}
+      <span className={`shrink-0 text-right text-xs ${compact ? "w-12" : "w-16"}`}>
         <Mark span={span} />
       </span>
     </div>
@@ -180,10 +191,13 @@ export function TraceTree({
   runs,
   selected,
   onSelect,
+  compact = false,
 }: {
   runs: readonly TraceRunSpan[];
   selected: string | null;
   onSelect: (id: string) => void;
+  /** For a narrow column: names first, then a short bar and the duration; no token column and no axis labels. */
+  compact?: boolean;
 }) {
   const [open, setOpen] = useState(() => initialOpen(runs, selected));
   const rows = useMemo(() => visibleRows(runs, open), [runs, open]);
@@ -257,7 +271,7 @@ export function TraceTree({
   }
 
   return (
-    <div ref={tree} role="tree" aria-label="Trace" onKeyDown={onKeyDown} className="min-h-0 flex-1 overflow-y-auto">
+    <div ref={tree} role="tree" aria-label="Trace" onKeyDown={onKeyDown} className="@container min-h-0 flex-1 overflow-y-auto">
       {rows.map((row) => (
         <TreeRow
           key={row.span.id}
@@ -265,6 +279,7 @@ export function TraceTree({
           open={open.has(row.span.id)}
           selected={row.span.id === selected}
           tabStop={row.span.id === tabId}
+          compact={compact}
           onSelect={() => onSelect(row.span.id)}
           onToggle={() => toggle(row.span.id)}
         />
