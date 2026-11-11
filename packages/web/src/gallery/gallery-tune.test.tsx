@@ -14,9 +14,9 @@ for (const theme of ["slip", "kiln"] as const) {
       render(<Gallery />);
       await user.click(screen.getByRole("button", { name: `${label}, ${theme}` }));
       const dialog = await screen.findByRole("dialog", { name: "Choose a model" });
-      expect(await within(dialog).findAllByRole("slider")).toHaveLength(8);
-      expect(within(dialog).getByRole("combobox", { name: "Keep loaded" })).toBeTruthy();
-      expect(within(dialog).getByRole("button", { name: "Creative" })).toBeTruthy();
+      expect(await within(dialog).findAllByRole("slider")).toHaveLength(6);
+      expect(within(dialog).getByRole("radiogroup", { name: "Keep loaded" })).toBeTruthy();
+      expect(within(dialog).getByRole("radio", { name: "Creative" })).toBeTruthy();
       expect(dialog.textContent).toContain("+0.0 GB · fits");
       await expectAxeClean(dialog, DIALOG_RULES);
     });
@@ -48,15 +48,15 @@ for (const theme of ["slip", "kiln"] as const) {
 }
 
 for (const theme of ["slip", "kiln"] as const) {
-  for (const [label, values] of [["Tune view, a thinking model", ["", "off", "on"]], ["Tune view, thinking levels", ["", "low", "medium", "high"]]] as const) {
-    test(`the gallery's "${label}" in ${theme} has a think select and passes axe`, async () => {
+  for (const [label, values] of [["Tune view, a thinking model", ["Model default", "off", "on"]], ["Tune view, thinking levels", ["Model default", "low", "medium", "high"]]] as const) {
+    test(`the gallery's "${label}" in ${theme} has a think radio group and passes axe`, async () => {
       showTheme(theme);
       const user = userEvent.setup();
       render(<Gallery />);
       await user.click(screen.getByRole("button", { name: `${label}, ${theme}` }));
       const dialog = await screen.findByRole("dialog", { name: "Choose a model" });
-      const select = await within(dialog).findByRole("combobox", { name: "Think" });
-      expect(Array.from((select as HTMLSelectElement).options).map((item) => item.value)).toEqual([...values]);
+      const group = await within(dialog).findByRole("radiogroup", { name: "Think" });
+      expect(within(group).getAllByRole("radio").map((item) => item.textContent)).toEqual([...values]);
       await expectAxeClean(dialog, DIALOG_RULES);
     });
   }
