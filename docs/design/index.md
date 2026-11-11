@@ -153,8 +153,8 @@ These rules came from the 10.17 redesign. A turn should read like an answer, not
 | Mode | Runs without asking |
 |---|---|
 | Careful | Reads, search in files, git status, diff and log, todos |
-| Balanced (default) | Careful's tools, plus web search, web fetch, the sandboxed shell without network, and the read-only tools of an MCP server you trust |
-| Autopilot | Balanced's tools, plus edits inside the project and every tool of a server you trust |
+| Balanced (default) | Careful's tools, plus web search, web fetch, and the read-only tools of an MCP server you trust |
+| Autopilot | Balanced's tools, plus edits inside the project, the sandboxed shell without network, and every tool of a server you trust |
 
 - The unsandboxed shell and any path outside the project always ask.
 - A rule you write still wins, and a deny always wins.
