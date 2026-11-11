@@ -19,7 +19,7 @@ test("typing filters on name, args, and description, ignoring case", () => {
   expect(names("TIME")).toContain("/time");
   expect(names("pager")).toEqual(["/artifact"]);
   expect(names("provider")).toEqual(expect.arrayContaining(["/login", "/logout"]));
-  expect(names("/mo")).toEqual(["/model"]);
+  expect(names("/mo")).toEqual(["/model", "/mode"]);
 });
 
 test("names that start with the query come first, with or without the slash", () => {

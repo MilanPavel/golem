@@ -68,7 +68,7 @@ test("/ opens the list, typing filters it, and the textarea names the list and t
   expect(box().getAttribute("aria-activedescendant")).toBe(selected()?.id);
   expect(box().getAttribute("aria-autocomplete")).toBe("list");
   expect(box().hasAttribute("aria-expanded")).toBe(false);
-  await user.type(box(), "mo");
+  await user.type(box(), "model");
   expect(options().map((option) => option.textContent)).toEqual([expect.stringContaining("/model")]);
   expect(options()[0]?.textContent).toContain("Opens the model picker");
 });
@@ -76,9 +76,9 @@ test("/ opens the list, typing filters it, and the textarea names the list and t
 test("the live region counts the suggestions when the count changes, and not otherwise", async () => {
   const { user } = setup();
   expect(live()?.textContent).toBe("");
-  await user.type(box(), "/mod");
+  await user.type(box(), "/model");
   expect(live()?.textContent).toBe("1 suggestion");
-  await user.type(box(), "{Backspace}{Backspace}{Backspace}");
+  await user.type(box(), "{Backspace}{Backspace}{Backspace}{Backspace}{Backspace}");
   expect(live()?.textContent).toMatch(/^\d+ suggestions$/);
   await user.type(box(), "{Backspace}");
   expect(live()?.textContent).toBe("");
@@ -107,6 +107,8 @@ test("Shift+Tab and modified arrows are left alone", async () => {
   await user.type(box(), "/");
   await user.keyboard("{Shift>}{Tab}{/Shift}");
   expect(box().value).toBe("/");
+  // Shift+Tab leaves the box for the chip before it, as the browser does.
+  await user.click(box());
   await user.keyboard("{Alt>}{ArrowDown}{/Alt}");
   expect(selected()).toBe(options()[0]);
 });

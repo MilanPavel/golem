@@ -24,7 +24,7 @@ import { ANSWERED, PENDING_EDIT, PENDING_SHELL } from "../features/approval/samp
 import { DiffModeSwitch, DiffView } from "../features/diff/index.ts";
 import { SAMPLE_EDIT_DIFF, SAMPLE_LONG_LINE_DIFF, SAMPLE_NEW_FILE_DIFF } from "../features/diff/sample.ts";
 import { Drawer, TodoList } from "../features/drawer/index.ts";
-import { Composer, ContextChipView, DockView, Meter, TuneChipView } from "../features/composer/index.ts";
+import { Composer, ContextChipView, DockView, Meter, ModeChipView, TuneChipView } from "../features/composer/index.ts";
 import { createHistory } from "../features/composer/history.ts";
 import { CommandsDialog } from "../features/composer/help-dialog.tsx";
 import { HomeView, NewSessionModelChipView, SessionTitle } from "../features/shell/index.ts";
@@ -812,6 +812,26 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
             }
             composer={<DemoComposer />}
           />
+          <DockView
+            busy={false}
+            meter={
+              <Meter
+                state="idle"
+                runStartedAt={null}
+                aside={
+                  <span className="flex items-center gap-2">
+                    <ModeChipView own="autopilot" fallback="balanced" onSelect={() => {}} />
+                    <ContextChipView used={32000} window={128000} onOpen={() => {}} />
+                  </span>
+                }
+              />
+            }
+            composer={<DemoComposer />}
+          />
+          <div aria-label="Mode chips" role="group" className="flex flex-wrap gap-2">
+            <ModeChipView own="careful" fallback="balanced" onSelect={() => {}} />
+            <ModeChipView own={null} fallback="balanced" onSelect={() => {}} />
+          </div>
           <DockView
             busy
             meter={<Meter state="thinking" runStartedAt={new Date(NOW - 12_000).toISOString()} />}
