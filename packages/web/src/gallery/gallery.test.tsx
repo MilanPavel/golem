@@ -7,7 +7,8 @@ import { DIALOG_RULES, expectAxeClean, resetThemeAfterEach, showTheme } from "./
 // The dialog tests are in gallery-tune, gallery-setup and gallery-palette, so vitest runs them in parallel.
 resetThemeAfterEach();
 
-test("the gallery shows both themes and has no accessibility violations", async () => {
+// The one test that walks the whole gallery in both themes: about 6 s locally, over 20 s on a shared CI runner.
+test("the gallery shows both themes and has no accessibility violations", { timeout: 60_000 }, async () => {
   const { container } = render(<Gallery />);
   expect(container.querySelector('[data-theme="slip"]')).toBeTruthy();
   expect(container.querySelector('[data-theme="kiln"]')).toBeTruthy();
