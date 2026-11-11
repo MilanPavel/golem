@@ -5,10 +5,13 @@ import {
   closedDebug,
   COMMANDS,
   copyAnswer,
+  effectiveMode,
   copyCode,
   exportFileName,
   forkPoint,
   invocableSkills,
+  modeChanged,
+  modeReport,
   modelNames,
   namesModel,
   pickerName,
@@ -21,7 +24,7 @@ import {
 } from "@golem/view";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { actionErrorText, isNoModelChosen } from "../../store/errors.ts";
-import { useModelList, useNavigate, useNewSessionModel, usePageActions, useSessionReader, useSkillList } from "../../store/page-context.tsx";
+import { useConfig, useModelList, useNavigate, useNewSessionModel, usePageActions, useSessionReader, useSkillList } from "../../store/page-context.tsx";
 import { detailStore, setDetail, setThinkingShown, setTimesShown, thinkingShownStore, timesShownStore } from "../chat/index.ts";
 import { drawerOpenStore, useDrawerOpen } from "../drawer/index.ts";
 import { openModelDialog } from "../models/index.ts";
@@ -83,6 +86,7 @@ export function useCommands({ session, cwd, typing, send }: UseCommandsOptions):
   const read = useSessionReader(sessionId);
   const models = useModelList(typing);
   const skills = useSkillList(cwd, typing);
+  const config = useConfig(cwd, sessionId, sessionId !== null);
   const [, setDrawerOpen] = useDrawerOpen();
   const [ownNotice, setNotice] = useState<CommandNotice | null>(null);
   const startNotice = useStartNotice();
@@ -107,9 +111,9 @@ export function useCommands({ session, cwd, typing, send }: UseCommandsOptions):
     });
   }, [skills.data, models.data, active]);
 
-  const latest = useRef({ send, skills, models, cwd });
+  const latest = useRef({ send, skills, models, cwd, config });
   useEffect(() => {
-    latest.current = { send, skills, models, cwd };
+    latest.current = { send, skills, models, cwd, config };
   });
 
   const clear = useCallback(() => {
@@ -120,7 +124,7 @@ export function useCommands({ session, cwd, typing, send }: UseCommandsOptions):
 
   const run = useCallback(
     async (raw: string): Promise<RunResult> => {
-      const { send: sendMessage, skills: skillQuery, models: modelQuery } = latest.current;
+      const { send: sendMessage, skills: skillQuery, models: modelQuery, config: configQuery } = latest.current;
       clear();
       const line = raw.trim();
       let listed = skillQuery.data?.skills;
@@ -234,6 +238,18 @@ export function useCommands({ session, cwd, typing, send }: UseCommandsOptions):
             const next = !thinkingShownStore.getSnapshot();
             setThinkingShown(next);
             return say(next ? "Thinking shown." : "Thinking hidden.");
+          }
+          case "mode": {
+            const loaded = configQuery.data ?? (await configQuery.refetch()).data;
+            const fallback = effectiveMode(null, loaded?.default_permission_mode);
+            const own = view.chat.permissionMode;
+            if (found.mode === "show") return say(modeReport(own ?? fallback, own !== null, fallback));
+            try {
+              await actions.setMode(sessionId, found.mode);
+              return say(modeChanged(found.mode, fallback));
+            } catch (err) {
+              return fail(err, "Could not change the mode.");
+            }
           }
           case "todos": {
             const next = !drawerOpenStore.getSnapshot();

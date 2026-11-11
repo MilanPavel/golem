@@ -70,6 +70,37 @@ afterEach(() => {
   delete document.documentElement.dataset.theme;
 });
 
+test("the default mode is shown read-only with the line to set and a copy button, and the built-in rules keep their source", async () => {
+  mount("/settings/rules", {
+    ...CONFIG,
+    default_permission_mode: "autopilot",
+    permission_mode: "autopilot",
+    rules: [{ tool: "write_file", action: "allow", source: "built-in default (autopilot)" }],
+  });
+  const modes = await screen.findByRole("radiogroup", { name: "Default mode" });
+  const radios = within(modes).getAllByRole("radio");
+  expect(radios.map((radio) => [radio.textContent, radio.getAttribute("aria-checked")])).toEqual([
+    ["Careful", "false"],
+    ["Balanced", "false"],
+    ["Autopilot", "true"],
+  ]);
+  expect(radios.every((radio) => radio.getAttribute("aria-disabled") === "true")).toBe(true);
+  const section = modes.closest("section") as HTMLElement;
+  expect(section.textContent).toContain("Also edits inside the project");
+  expect(section.textContent).toContain("[permissions] mode in /Users/you/.golem/config.toml");
+  expect(within(section).getByText('mode = "autopilot"')).toBeTruthy();
+  expect(within(section).getByRole("button", { name: "Copy" })).toBeTruthy();
+  expect(rows()[0]?.textContent).toContain("built-in default (autopilot)");
+  const results = await axe.run(section, noContrast);
+  expect(results.violations).toEqual([]);
+});
+
+test("without a default from the daemon the section reads balanced", async () => {
+  mount("/settings/rules");
+  const modes = await screen.findByRole("radiogroup", { name: "Default mode" });
+  expect(within(modes).getByRole("radio", { name: "Balanced" }).getAttribute("aria-checked")).toBe("true");
+});
+
 test("the section lists the rules in order, then the allowance, with the terminal's words", async () => {
   const { fake } = mount("/settings/rules");
   await screen.findByRole("list", { name: "Tool rules" });

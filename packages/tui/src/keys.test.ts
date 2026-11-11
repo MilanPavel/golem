@@ -196,6 +196,20 @@ test("keys dispatch through the table", () => {
   assert.deepEqual(pressed("b", { ctrl: true }), { kind: "ignore" });
 });
 
+test("Shift-Tab cycles the permission mode in the composer, and plain Tab does not", () => {
+  const pressed = (key: Partial<KeyFlags>, where: Partial<KeyPlace> = {}) => pressKey(place(where), classifyPress("", flags(key)));
+  assert.deepEqual(pressed({ tab: true, shift: true }), { kind: "cycle-mode" });
+  // The suggestions' Tab keeps its own key: Shift-Tab is the mode, even with the list open.
+  assert.deepEqual(pressed({ tab: true, shift: true }, { suggestions: true }), { kind: "cycle-mode" });
+  assert.deepEqual(pressed({ tab: true }, { suggestions: true }), { kind: "suggest", key: "tab" });
+  assert.notDeepEqual(pressed({ tab: true }), { kind: "cycle-mode" });
+  // Not behind the key table, the switcher, the debug panel, or a question about a tool call.
+  for (const where of [{ overlay: true }, { switcher: true }, { debug: true }, { approval: true }, { connected: false }]) {
+    assert.notDeepEqual(pressed({ tab: true, shift: true }, where), { kind: "cycle-mode" }, JSON.stringify(where));
+  }
+  assert.equal(KEYS.find((key) => key.id === "cycle-mode")?.label, "Shift-Tab");
+});
+
 test("F1 is the sequence Ink drops before the input handler", () => {
   assert.equal(isF1("\u001bOP"), true);
   assert.equal(isF1("\u001b[11~"), true);

@@ -421,6 +421,18 @@ export {
   type StarterPick,
   type StarterPress,
 } from "./starter-prompts.ts";
+export {
+  effectiveMode,
+  isPermissionMode,
+  modeChanged,
+  modeReport,
+  MODE_ALWAYS_ASKS,
+  MODE_HINT,
+  MODE_LABEL,
+  nextMode,
+  PERMISSION_MODES,
+  type PermissionMode,
+} from "./permission-mode.ts";
 export { parseTipCount, tipAt, TIPS } from "./tips.ts";
 export {
   DEFAULT_LOCKED,

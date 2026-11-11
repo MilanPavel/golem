@@ -482,7 +482,7 @@ test("the empty screen: suggestions work, /new does nothing, /help and /login wo
   expect(box().value).toBe("");
   await say(user, "/login anthropic");
   expect(screen.getByText("golem auth set anthropic")).toBeTruthy();
-  for (const line of ["/fork", "/title x", "/close", "/copy", "/export", "/model pull x", "/todos", "/mcp enable x"]) {
+  for (const line of ["/fork", "/title x", "/close", "/copy", "/export", "/model pull x", "/todos", "/mcp enable x", "/mode careful"]) {
     await say(user, line);
     expect(dockNotice()).toBe("Start a session first: send a message.");
     expect(box().value).toBe("");

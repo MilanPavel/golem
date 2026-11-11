@@ -121,6 +121,11 @@ import {
   type ContextReport,
   tuneState,
   tuneChip,
+  effectiveMode,
+  modeChanged,
+  modeReport,
+  nextMode,
+  type PermissionMode,
   withSaved,
   withSession,
   type TuneState,
@@ -452,6 +457,8 @@ export function App({
   const tuneGen = useRef(0);
   /** The open model's option table, defaults, and saved values, for the status chip and `/tune <option>`. */
   const [chipTune, setChipTune] = useState<TuneState | null>(null);
+  /** `[permissions] mode` from config.toml, which a session without a mode of its own follows. */
+  const [defaultMode, setDefaultMode] = useState<PermissionMode>("balanced");
   const chipTuneRef = useRef(chipTune);
   chipTuneRef.current = chipTune;
   /** Changes sent and not yet answered. Live updates wait for them, or they would undo the newest key. */
@@ -772,6 +779,25 @@ export function App({
     };
   }, [client, connection.status, sessionId, chipModel]);
 
+  // One `config.get` when the session opens, for the default mode behind the status segment.
+  useEffect(() => {
+    if (connection.status !== "connected" || sessionId === null) {
+      return;
+    }
+    let live = true;
+    client.getConfig(sessionCwd ?? process.cwd(), sessionId).then(
+      (config: ConfigGetResult) => {
+        if (live) {
+          setDefaultMode(effectiveMode(null, config.default_permission_mode));
+        }
+      },
+      () => undefined,
+    );
+    return () => {
+      live = false;
+    };
+  }, [client, connection.status, sessionId, sessionCwd]);
+
   // What any client saves for the model keeps the chip fresh.
   useEffect(() => {
     return client.onOptionsSaved(({ model: saved, saved: values }) => {
@@ -828,6 +854,7 @@ export function App({
       skills: sessionId === null ? [] : chat.activeSkills,
       skippedSkills: chat.skippedSkills,
       context: sessionId === null ? null : chat.context.last,
+      mode: sessionId === null ? "" : effectiveMode(chat.permissionMode, defaultMode),
       tune: sessionId === null || chipTune === null ? "" : tuneChip(withSession(chipTune, chat.options), model.provider),
     }),
     columns,
@@ -1717,6 +1744,22 @@ export function App({
           setChat((state) => ({ ...state, notice }));
         },
       );
+      return;
+    }
+    if (outcome.kind === "mode") {
+      setDraft(draftAt(""));
+      const current = sessionRef.current;
+      if (current === null) {
+        setChat((state) => ({ ...state, notice: "open a session first" }));
+        return;
+      }
+      const own = chatRef.current.permissionMode;
+      if (outcome.mode === "show") {
+        const shown = effectiveMode(own, defaultMode);
+        setChat((state) => ({ ...state, notice: modeReport(shown, own !== null, defaultMode) }));
+        return;
+      }
+      changeMode(current, outcome.mode);
       return;
     }
     if (outcome.kind === "skill-pin") {
@@ -2965,6 +3008,19 @@ export function App({
     );
   }
 
+  /** Sets the session's permission mode. The status segment changes from `session.mode.changed`. */
+  function changeMode(id: string, mode: PermissionMode | null): void {
+    client.setSessionMode(id, mode).then(
+      () => {
+        const notice = modeChanged(mode, defaultMode);
+        setChat((state) => ({ ...state, notice }));
+      },
+      (error: unknown) => {
+        setChat((state) => ({ ...state, notice: messageOf(error) }));
+      },
+    );
+  }
+
   function loadPermissions(): void {
     const current = sessionRef.current;
     client.getConfig(sessionCwdRef.current ?? process.cwd(), current ?? undefined).then(
@@ -3459,6 +3515,13 @@ export function App({
           restartService();
         }
         return;
+      case "cycle-mode": {
+        const current = sessionRef.current;
+        if (current !== null) {
+          changeMode(current, nextMode(effectiveMode(chatRef.current.permissionMode, defaultMode)));
+        }
+        return;
+      }
       case "toggle-tools":
         setToolOutput((shown) => {
           const next = !shown;
