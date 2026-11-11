@@ -2,6 +2,34 @@
 
 What changed in each release of golem, newest first. `just release` writes each section from the commit messages on `main` ([CONTRIBUTING.md](CONTRIBUTING.md)), and the release pull request is the place to edit it. The GitHub release shows the same section. How a release is made is in [docs/sre.md](docs/sre.md), section 5.
 
+## [0.12.0] - 2026-11-11
+
+### Features
+
+- **web:** the trace summary on its own line ([#666](https://github.com/MilanPavel/golem/pull/666))
+- **web:** settings as a full-width page with tabs ([#667](https://github.com/MilanPavel/golem/pull/667))
+- **web:** the model dialog keeps one size ([#669](https://github.com/MilanPavel/golem/pull/669))
+- **web:** MCP servers as a list and a detail side by side ([#671](https://github.com/MilanPavel/golem/pull/671))
+- **web:** Tune as grouped, compact rows ([#674](https://github.com/MilanPavel/golem/pull/674))
+- **web:** MCP details with status, Start, and the tools in place ([#676](https://github.com/MilanPavel/golem/pull/676))
+- **web:** answers in a lighter serif ([#689](https://github.com/MilanPavel/golem/pull/689))
+- **web:** the trace as an inspector beside the chat ([#692](https://github.com/MilanPavel/golem/pull/692))
+- **web:** one golem and one footer per turn ([#690](https://github.com/MilanPavel/golem/pull/690))
+- **web:** tool steps as one activity line, with Quiet, Normal and Verbose ([#693](https://github.com/MilanPavel/golem/pull/693))
+- **daemon:** permission modes Careful, Balanced and Autopilot ([#694](https://github.com/MilanPavel/golem/pull/694))
+- **web:** pick the permission mode in the composer, the TUI and Settings ([#696](https://github.com/MilanPavel/golem/pull/696))
+- **web:** approvals dock above the composer and shrink to a chip ([#695](https://github.com/MilanPavel/golem/pull/695))
+- **mcp:** trust a server's read-only tools ([#697](https://github.com/MilanPavel/golem/pull/697))
+
+### Fixes
+
+- **web:** no "on {}" for a call without arguments ([#688](https://github.com/MilanPavel/golem/pull/688))
+
+### Docs
+
+- rules for pages, dialogs, and Tune ([#670](https://github.com/MilanPavel/golem/pull/670))
+- the chat — steps, approvals, modes, type and the trace ([#691](https://github.com/MilanPavel/golem/pull/691))
+
 ## [0.11.0] - 2026-11-10
 
 ### Features
