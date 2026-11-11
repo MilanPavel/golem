@@ -196,6 +196,43 @@ export function withSaved(state: TuneState, model: string, saved: Readonly<Recor
   return model === state.model ? { ...state, saved } : state;
 }
 
+/** One group of rows in the Tune panel. */
+export type TuneGroup = { id: string; label: string; rows: TuneRow[] };
+
+/** The panel's groups, in order, and the options each holds. */
+const GROUPS: readonly { id: string; label: string; names: readonly string[] }[] = [
+  { id: "sampling", label: "Sampling", names: ["temperature", "top_p", "top_k", "min_p", "repeat_penalty"] },
+  { id: "memory", label: "Memory", names: ["num_ctx", "keep_alive"] },
+  { id: "output", label: "Output", names: ["num_predict", "seed", "think"] },
+];
+
+/** The rows in groups. An option no group names goes into Other, at the end. Empty groups are left out. */
+export function groupRows(rows: readonly TuneRow[]): TuneGroup[] {
+  const known = new Set(GROUPS.flatMap((group) => group.names));
+  const groups: TuneGroup[] = GROUPS.map((group) => ({
+    id: group.id,
+    label: group.label,
+    rows: group.names.flatMap((name) => rows.filter((row) => row.option.name === name)),
+  }));
+  groups.push({ id: "other", label: "Other", rows: rows.filter((row) => !known.has(row.option.name)) });
+  return groups.filter((group) => group.rows.length > 0);
+}
+
+/** The preset whose values are the ones in use, or null when none matches. */
+export function activePreset(state: TuneState): TunePreset | null {
+  const rows = tuneRows(state);
+  return (
+    PRESETS.find((preset) =>
+      Object.entries(presetOptions(state, preset)).every(([name, want]) => {
+        const row = rows.find((item) => item.option.name === name);
+        if (row === undefined) return true;
+        if (want === null) return state.session[name] === undefined && state.saved[name] === undefined;
+        return row.value !== null && Number(row.value) === want;
+      }),
+    ) ?? null
+  );
+}
+
 /** The preset for a key, or null. */
 export function presetForKey(key: number): TunePreset | null {
   return PRESETS.find((preset) => preset.key === key) ?? null;
