@@ -911,8 +911,13 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
 
       <section className="mt-6" id={anchor("Turn")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Turn</h3>
-        <div aria-label="A turn with three tool steps" role="group" className="flex flex-col gap-6 rounded-lg border border-line bg-bg p-4">
-          <TranscriptMessages chat={TURN_CHAT} />
+        <div className="flex flex-col gap-3">
+          {(["normal", "verbose", "quiet"] as const).map((detail) => (
+            <div key={detail} aria-label={`A turn with four tool steps, ${detail}`} role="group" className="flex flex-col gap-6 rounded-lg border border-line bg-bg p-4">
+              <p className="font-mono text-xs text-faint">{detail}</p>
+              <TranscriptMessages chat={TURN_CHAT} detail={detail} />
+            </div>
+          ))}
         </div>
       </section>
 

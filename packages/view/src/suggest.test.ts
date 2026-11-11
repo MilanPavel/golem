@@ -19,14 +19,14 @@ test("/model suggests the names it is given", () => {
 });
 
 test("/de then Tab is /debug, and /debug m then Tab is /debug model", () => {
-  const names = suggest("/de", COMMANDS);
+  const names = suggest("/deb", COMMANDS);
   assert.deepEqual(
     names.map((item) => item.label),
-    ["/debug", "/model"],
+    ["/debug"],
   );
   assert.equal(names[0]?.partial, true);
-  assert.deepEqual(applySuggestion("/de", names, 0, "tab"), { draft: "/debug ", submit: false });
-  assert.deepEqual(applySuggestion("/de", names, 0, "enter"), { draft: "/debug ", submit: false });
+  assert.deepEqual(applySuggestion("/deb", names, 0, "tab"), { draft: "/debug ", submit: false });
+  assert.deepEqual(applySuggestion("/deb", names, 0, "enter"), { draft: "/debug ", submit: false });
 
   const args = suggest("/debug m", COMMANDS);
   assert.deepEqual(

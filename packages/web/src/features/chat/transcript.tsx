@@ -1,4 +1,4 @@
-import { formatDuration, groupTurns, turnFooter, LIVE_OUTPUT_CHARS, thinkingLine, unreadCallNotice, type ChatMessage, type ChatState, type ToolBlock, type ApprovalChoice } from "@golem/view";
+import { displayToolName, formatTurnTime, groupTurns, stepCount, stepMark, summarizeSteps, turnFooter, LIVE_OUTPUT_CHARS, thinkingLine, unreadCallNotice, type ChatMessage, type ChatState, type Detail, type StepMark, type ToolBlock, type ApprovalChoice } from "@golem/view";
 import { memo, useCallback, useId, useLayoutEffect, useRef, useState } from "react";
 import { usePageActions, useDraftReader, useSession } from "../../store/page-context.tsx";
 import { ApprovalCard } from "../approval/approval-card.tsx";
@@ -8,6 +8,7 @@ import { Button } from "../../ui/button.tsx";
 import { cn } from "../../ui/cn.ts";
 import type { GolemState } from "../../ui/golem-state.ts";
 import { PixelGolem } from "../../ui/pixel-golem.tsx";
+import { useDetail } from "./detail.ts";
 import { useThinkingShown } from "./thinking-shown.ts";
 import { useTimesShown } from "./times-shown.ts";
 import { formatClock, shouldStick, squeezeArgs } from "./format.ts";
@@ -116,7 +117,7 @@ export function ToolLine({ tool, defaultOpen = false }: { tool: ToolBlock; defau
         }}
       >
         <span aria-hidden="true" className="tool-chevron text-faint">›</span>
-        <span className="font-medium text-ink">{tool.name}</span>
+        <span className="font-medium text-ink">{displayToolName(tool.name)}</span>
         <span className="truncate" title={args}>{args}</span>
         <ToolResult tool={tool} />
       </button>
@@ -226,13 +227,6 @@ const GolemStep = memo(function GolemStep({
   return (
     <div className="flex min-w-0 flex-col gap-2.5">
       <ThinkingLine message={message} shown={thinkingShown} />
-      {tools.length > 0 ? (
-        <ul aria-label="Tool calls" className="flex list-none flex-col gap-0.5 p-0 font-mono text-xs leading-snug">
-          {tools.map((tool) => (
-            <ToolLine key={tool.callId} tool={tool} />
-          ))}
-        </ul>
-      ) : null}
       {message.text ? (
         <div className="prose">
           <Markdown text={message.text} streaming={message.streaming} />
@@ -261,7 +255,62 @@ const GolemStep = memo(function GolemStep({
   );
 });
 
-/** One run: one golem, each model step in order, and one footer once the run is done. */
+const MARK_CLASS: Record<StepMark, string> = {
+  allow: "bg-allow",
+  deny: "bg-deny",
+  wait: "rotate-45 rounded-xs bg-wait",
+  run: "bg-muted",
+};
+
+/**
+ * The tools of a whole turn as one line under the answer: a dot each and a summary. It opens into
+ * the steps. A tool that waits for you keeps it open, and Verbose opens it with every row expanded.
+ */
+export function ActivityLine({ tools, detail, streaming = false }: { tools: readonly ToolBlock[]; detail: Detail; streaming?: boolean }) {
+  const [chosen, setChosen] = useState<boolean | null>(null);
+  const listId = useId();
+  if (tools.length === 0) return null;
+  const verbose = detail === "verbose";
+  const waiting = tools.some((tool) => tool.status === "waiting");
+  const open = waiting || (chosen ?? verbose);
+  const running = streaming ? tools.filter((tool) => tool.status === "running").at(-1) : undefined;
+  const text =
+    detail === "quiet"
+      ? stepCount(tools.length)
+      : running !== undefined
+        ? `${displayToolName(running.name)} running…`
+        : summarizeSteps(tools);
+  return (
+    <div className="flex min-w-0 flex-col gap-1" data-activity>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={listId}
+        className="group -ml-1.5 inline-flex cursor-pointer items-center gap-2 self-start rounded-md px-1.5 py-0.5 text-xs text-muted outline-offset-2 outline-clay hover:bg-sunken hover:text-ink focus-visible:outline-2"
+        onClick={() => {
+          setChosen(!open);
+        }}
+      >
+        <span aria-hidden="true" className="text-faint transition-transform group-aria-expanded:rotate-90 motion-reduce:transition-none">›</span>
+        <span aria-hidden="true" className="inline-flex items-center gap-1">
+          {tools.map((tool) => (
+            <span key={tool.callId} data-mark={stepMark(tool)} className={cn("block size-1.5 rounded-full", MARK_CLASS[stepMark(tool)])} />
+          ))}
+        </span>
+        <span>{text}</span>
+      </button>
+      {open ? (
+        <ul id={listId} aria-label="Tool calls" className="flex list-none flex-col gap-0.5 border-l border-line py-0.5 pl-3 font-mono text-xs leading-snug">
+          {tools.map((tool) => (
+            <ToolLine key={`${tool.callId}:${verbose}`} tool={tool} defaultOpen={verbose} />
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
+/** One run: one golem, each model step in order, one activity line for all their tools, and one footer once the run is done. */
 export function GolemTurn({
   steps,
   pendingId = null,
@@ -271,13 +320,14 @@ export function GolemTurn({
   onEdit,
   onAnswer,
   thinkingShown,
-}: { steps: readonly ChatMessage[]; pendingId?: string | null; sendingId?: string | null; answerError?: string | null; thinkingShown?: boolean } & Pick<Answering, "editing" | "onEdit" | "onAnswer">) {
+  detail: detailOverride,
+}: { steps: readonly ChatMessage[]; pendingId?: string | null; sendingId?: string | null; answerError?: string | null; thinkingShown?: boolean; detail?: Detail } & Pick<Answering, "editing" | "onEdit" | "onAnswer">) {
+  const chosenDetail = useDetail();
+  const detail = detailOverride ?? chosenDetail;
   const footer = turnFooter(steps);
+  const tools = steps.flatMap((step) => step.tools ?? []);
   const foot = footer
-    ? [
-        footer.durationMs === undefined ? "" : formatDuration(footer.durationMs),
-        footer.tools > 0 ? `${footer.tools} ${footer.tools === 1 ? "tool" : "tools"}` : "",
-      ].filter(Boolean)
+    ? [footer.durationMs === undefined ? "" : formatTurnTime(footer.durationMs), footer.tools > 0 ? stepCount(footer.tools) : ""].filter(Boolean)
     : [];
   return (
     <article aria-label="golem" className="flex min-w-0 flex-col gap-2.5">
@@ -299,6 +349,7 @@ export function GolemTurn({
           <GolemStep key={message.id} message={message} onAnswer={onAnswer} thinkingShown={thinkingShown} />
         ),
       )}
+      <ActivityLine tools={tools} detail={detail} streaming={steps.some((step) => step.streaming)} />
       {foot.length > 0 ? <p className="font-mono text-xs text-faint">{foot.join(" · ")}</p> : null}
     </article>
   );
@@ -318,7 +369,7 @@ type Answers = {
 };
 
 /** The messages and the closing error or notice. Pure: the page's stores are not read here. */
-export function TranscriptMessages({ chat, onAnswer, sendingId = null, answerError = null, editing = false, onEdit, thinkingShown }: { chat: TranscriptChat; thinkingShown?: boolean } & Answers) {
+export function TranscriptMessages({ chat, onAnswer, sendingId = null, answerError = null, editing = false, onEdit, thinkingShown, detail }: { chat: TranscriptChat; thinkingShown?: boolean; detail?: Detail } & Answers) {
   const pendingId = chat.approval?.callId ?? null;
   const notice = chat.notice ?? (chat.unreadCall === true ? unreadCallNotice("web") : null);
   if (chat.messages.length === 0 && !chat.error && !notice) {
@@ -340,6 +391,7 @@ export function TranscriptMessages({ chat, onAnswer, sendingId = null, answerErr
             onEdit={onEdit}
             onAnswer={onAnswer}
             thinkingShown={thinkingShown}
+            detail={detail}
           />
         ),
       )}

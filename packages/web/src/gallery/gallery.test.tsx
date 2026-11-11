@@ -70,13 +70,20 @@ test("the gallery has a Thinking section with streaming, done, none, and long ca
 });
 
 for (const theme of ["slip", "kiln"] as const) {
-  test(`the gallery's turn with three tool steps has one golem and one footer in ${theme}, and passes axe`, async () => {
+  test(`the gallery's turn with four tool steps folds into one activity line in ${theme}, and passes axe`, async () => {
     showTheme(theme);
     render(<Gallery />);
-    const group = screen.getByRole("group", { name: "A turn with three tool steps" });
-    expect(group.querySelectorAll("svg[data-state]")).toHaveLength(1);
-    expect(within(group).getAllByRole("article", { name: "golem" })).toHaveLength(1);
-    expect(within(group).getAllByText("0m 08.8s · 3 tools")).toHaveLength(1);
-    await expectAxeClean(group, DIALOG_RULES);
+    const normal = screen.getByRole("group", { name: "A turn with four tool steps, normal" });
+    expect(normal.querySelectorAll("svg[data-state]")).toHaveLength(1);
+    expect(within(normal).getAllByText("8.8s · 4 steps")).toHaveLength(1);
+    const line = within(normal).getByRole("button", { name: /github calls, 1 failed/ });
+    expect(line.getAttribute("aria-expanded")).toBe("false");
+    expect(within(normal).queryByRole("list", { name: "Tool calls" })).toBeNull();
+    const verbose = screen.getByRole("group", { name: "A turn with four tool steps, verbose" });
+    expect(within(verbose).getByRole("list", { name: "Tool calls" })).toBeTruthy();
+    expect(within(verbose).getAllByText("github · get_me").length).toBeGreaterThan(0);
+    const quiet = screen.getByRole("group", { name: "A turn with four tool steps, quiet" });
+    expect(within(quiet).getByRole("button", { name: "4 steps" })).toBeTruthy();
+    for (const group of [normal, verbose, quiet]) await expectAxeClean(group, DIALOG_RULES);
   });
 }
