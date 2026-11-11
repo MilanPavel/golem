@@ -4,6 +4,7 @@ import { useConnection } from "../../store/connection-context.tsx";
 import { actionErrorText, sendErrorText } from "../../store/errors.ts";
 import { useDraft, useDraftPastes, usePageActions, useSession } from "../../store/page-context.tsx";
 import type { SessionView } from "../../store/session-store.ts";
+import { DockedApproval } from "../approval/docked-approval.tsx";
 import { Composer } from "./composer.tsx";
 import { ModeChip } from "./mode-chip.tsx";
 import { ContextChip } from "./context-chip.tsx";
@@ -89,6 +90,7 @@ export function SessionDock({ sessionId }: { sessionId: string }) {
                 <ContextChip sessionId={sessionId} />
               </span>
             } />}
+        approval={<DockedApproval sessionId={sessionId} />}
         composer={
           <Composer
             forPalette

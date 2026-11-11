@@ -452,3 +452,44 @@ test("the turn with its line closed and open passes axe", async () => {
   fireEvent.click(screen.getByRole("button", { name: /searched the web/ }));
   expect((await axe.run(container, noContrast)).violations).toEqual([]);
 });
+
+const asked = (callId: string, name: string, verdict?: NonNullable<ToolBlock["approval"]>["answer"], over: Partial<ToolBlock> = {}): ToolBlock => ({
+  callId,
+  name,
+  args: {},
+  status: "done",
+  approval: verdict === undefined ? { source: "built-in default", subject: null } : { source: "built-in default", subject: null, answer: verdict },
+  ...over,
+});
+
+test("a tool that had an approval shows a chip after its row, one for each verdict", () => {
+  turn([
+    asked("1", "mcp__github__get_me", { decision: "allow_session", rule: null, edited: false }),
+    asked("2", "mcp__github__list_prs", { decision: "allow_always", rule: null, edited: false }),
+    asked("3", "read_file", { decision: "allow", rule: null, edited: false }),
+    asked("4", "write_file", { decision: "allow", rule: null, edited: true }),
+    asked("5", "shell", { decision: "deny", rule: null, edited: false }, { status: "failed" }),
+    asked("6", "run_shell", undefined, { status: "requested" }),
+  ]);
+  fireEvent.click(screen.getByRole("button", { name: /6 approvals/ }));
+  const chips = Array.from(document.querySelectorAll("[data-approval-chip]"));
+  expect(chips.map((chip) => chip.textContent)).toEqual([
+    "✓github · get_me · this chat",
+    "✓github · list_prs · always",
+    "✓read_file · once",
+    "✓write_file · once · edited",
+    "✗shell · denied",
+    "–run_shell · not answered",
+  ]);
+  expect(chips[4]?.className).toContain("bg-deny-soft");
+  expect(chips[0]?.className).toContain("bg-allow-soft");
+});
+
+test("the transcript draws no approval card, and no chip for the call that waits", () => {
+  const waiting = asked("1", "shell", undefined, { status: "waiting" });
+  render(<TranscriptMessages chat={{ ...chat([answer({ tools: [waiting] })]), approval: { callId: "1", name: "shell", args: {}, source: "built-in default", diff: null } }} />);
+  expect(screen.queryByRole("group", { name: "Approval" })).toBeNull();
+  expect(screen.queryByRole("button", { name: /^Allow/ })).toBeNull();
+  expect(document.querySelector("[data-approval-chip]")).toBeNull();
+  expect(document.querySelector("[data-mark=wait]")).toBeTruthy();
+});
