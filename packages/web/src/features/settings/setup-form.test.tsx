@@ -358,6 +358,8 @@ test("with no server yet, Add tools opens the offer in place; the servers added 
   expect(fetch.disabled).toBe(true);
   expect(panel.getByRole("heading", { name: "Tools · 1 server" })).toBeTruthy();
   expect(panel.getByRole("button", { name: "Add 2" })).toBeTruthy();
+  // Settings keeps the row at the start; only /welcome centers it.
+  expect(panel.getByRole("button", { name: "Add 2" }).parentElement?.className).not.toContain("justify-center");
   expect(document.querySelector("input[type=password]")).toBeNull();
   fake.raw.setupStatus.mockResolvedValue({ rows: OK_ROWS });
   await user.click(panel.getByRole("checkbox", { name: /^Playwright/ }));

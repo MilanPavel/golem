@@ -253,7 +253,7 @@ export function ToolsOfferView({ state, draft, logs, onDraft, onTick, onStart, o
             <RunCard key={row.id} row={row} log={logs[row.id]} onRetry={onRetry} onSkipRow={onSkipRow} onLog={onLog} />
           ))}
         </ul>
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className={cn("flex flex-wrap items-center gap-2.5", guided && "justify-center")}>
           <Button kind="ink" onClick={onContinue}>
             {guided ? "Continue" : "Done"}
           </Button>
@@ -287,7 +287,7 @@ export function ToolsOfferView({ state, draft, logs, onDraft, onTick, onStart, o
           <OfferRow key={row.id} row={row} state={state} draft={draft} onDraft={onDraft} onTick={onTick} />
         ))}
       </ul>
-      <div className="flex flex-wrap items-center gap-2.5">
+      <div className={cn("flex flex-wrap items-center gap-2.5", guided && "justify-center")}>
         <Button type="submit" kind="ink" disabled={count === 0}>
           {count === 0 ? "Add" : `Add ${count}`}
         </Button>
