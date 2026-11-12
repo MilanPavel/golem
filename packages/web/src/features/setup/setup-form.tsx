@@ -4,7 +4,7 @@ import { Button } from "../../ui/button.tsx";
 import { CopyCommand } from "../../ui/copy-command.tsx";
 import { fieldClass } from "../../ui/input.tsx";
 import { Link } from "../../ui/link.tsx";
-import { MarkGlyph } from "./panel-body.tsx";
+import { MarkGlyph } from "./mark-glyph.tsx";
 import { installLog, type SetupActionsState } from "./use-setup-actions.ts";
 
 const MARKS: Record<FormMark, Mark> = { ok: "ok", warn: "attn", fail: "fail" };

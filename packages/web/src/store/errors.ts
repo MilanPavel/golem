@@ -15,7 +15,7 @@ export function isModelRefused(error: unknown): error is RpcError {
   return error instanceof RpcError && error.code === MODEL_NOT_CONFIGURED;
 }
 
-/** The daemon refused a message because no model was ever chosen: the setup window picks one. */
+/** The daemon refused a message because no model was ever chosen: the welcome page picks one. */
 export function isNoModelChosen(error: unknown): boolean {
   return error instanceof RpcError && noModelChosen(error.code, error.message, MODEL_NOT_CONFIGURED);
 }

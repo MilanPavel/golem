@@ -1,7 +1,5 @@
 import {
   applyComposer,
-  guided,
-  OVERVIEW,
   closedDebug,
   COMMANDS,
   copyAnswer,
@@ -28,13 +26,13 @@ import { useConfig, useModelList, useNavigate, useNewSessionModel, usePageAction
 import { detailStore, setDetail, setThinkingShown, setTimesShown, thinkingShownStore, timesShownStore } from "../chat/index.ts";
 import { drawerOpenStore, useDrawerOpen } from "../drawer/index.ts";
 import { openModelDialog } from "../models/index.ts";
-import { openSetup, startNoticeStore, useStartNotice } from "../setup/index.ts";
+import { startNoticeStore, useStartNotice } from "../setup/index.ts";
 import { CloseSessionDialog, useSessionActions } from "../sessions/index.ts";
 import { writeClipboard } from "../../ui/clipboard.ts";
 import { downloadText } from "./copy-text.ts";
 import { CommandsDialog } from "./help-dialog.tsx";
 import type { CommandNotice } from "./notice-line.tsx";
-import { settingsPath, tracePath } from "../../store/router.ts";
+import { settingsPath, tracePath, welcomePath } from "../../store/router.ts";
 import { requestConfig } from "../settings/config-request.ts";
 import { requestMcpAdd } from "../settings/mcp-add-request.ts";
 import { NEEDS_SESSION, NOT_YET } from "./terminal-only.ts";
@@ -175,7 +173,7 @@ export function useCommands({ session, cwd, typing, send }: UseCommandsOptions):
           case "tune":
             return say(NOT_YET.tune);
           case "setup":
-            openSetup({ window: OVERVIEW, returnTo: focused() });
+            navigate(settingsPath("setup"));
             return "handled";
           case "sessions":
             return say(NOT_YET.sessions);
@@ -355,8 +353,8 @@ export function useCommands({ session, cwd, typing, send }: UseCommandsOptions):
         try {
           await sendMessage(outcome.text, outcome.kind === "skill" ? { name: outcome.name, args: outcome.args } : undefined);
         } catch (err) {
-          // No model chosen yet: setup picks one. The draft stays, and goes when Enter is pressed again.
-          if (isNoModelChosen(err)) openSetup({ window: guided("engine", "send"), returnTo: focused() });
+          // No model chosen yet: the welcome page picks one. The draft stays, and goes when Enter is pressed again.
+          if (isNoModelChosen(err)) navigate(welcomePath("engine", "send"));
           throw err;
         }
         return "sent";

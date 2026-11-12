@@ -253,7 +253,7 @@ In development, `vite dev` serves the page on its own port. Its proxy for `/ws` 
 
 - **Commands are thin calls.** `PageActions` in `page.ts` wraps `message.send`, `approval.respond`, `run.cancel`, `session.set_model`, and the rest. Their results arrive as events, so there is nothing to merge.
 - **The draft** is kept per session id, or `"new"`, in memory only, so switching away and back keeps what you typed.
-- **Routes** are `/`, `/s/:id`, `/settings`, and `/welcome`, from a small history router in `router.ts`. `/welcome` is first run, with no sidebar: `?step=engine|model|tools|ready` names the step and `?from=send` says a send with no model sent the person there. At the start, a fresh home goes to `/welcome` and a default that is gone goes to `/welcome?step=model` ([ADR-039](../adr/039-web-setup-as-pages.md)). `Later` leaves a `Finish setup` strip on home until a default model is ready.
+- **Routes** are `/`, `/s/:id`, `/settings`, and `/welcome`, from a small history router in `router.ts`. `/welcome` is first run, with no sidebar: `?step=engine|model|tools|ready` names the step and `?from=send` says a send with no model sent the person there. At the start, a fresh home goes to `/welcome` and a default that is gone goes to `/welcome?step=model` ([ADR-039](../adr/039-web-setup-as-pages.md)). `Later` leaves a `Finish setup` strip on home until a default model is ready. A send that fails with no model navigates to `/welcome?from=send` and the draft stays under its key, and `/setup` and the palette's Setup row navigate to `/settings/setup`, whose `Run setup again` goes to `/welcome`. The web has no setup dialog: setup is these two pages.
 
 ### The look, and what may render
 

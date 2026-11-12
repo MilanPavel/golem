@@ -21,6 +21,8 @@ export interface FakeOllama {
 export interface FakeOllamaOptions {
   /** Names `/api/tags` lists from the start. */
   installed?: string[];
+  /** What `/api/chat` answers. Default `The stub answers.` */
+  answer?: string;
 }
 
 type Line = Record<string, unknown>;
@@ -97,6 +99,10 @@ export async function startFakeOllama(options: FakeOllamaOptions = {}): Promise<
       const name = modelName(raw);
       pulls.push(name);
       await pull(res, name);
+    } else if (url.pathname === "/api/chat") {
+      res.writeHead(200, { "content-type": "application/x-ndjson" });
+      res.write(`${JSON.stringify({ model: modelName(raw), message: { role: "assistant", content: options.answer ?? "The stub answers." }, done: false })}\n`);
+      res.end(`${JSON.stringify({ model: modelName(raw), message: { role: "assistant", content: "" }, done: true, done_reason: "stop", prompt_eval_count: 3, eval_count: 4 })}\n`);
     } else if (url.pathname === "/api/delete") {
       const name = modelName(raw);
       const at = installed.indexOf(name);
