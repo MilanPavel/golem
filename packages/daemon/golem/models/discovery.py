@@ -670,7 +670,8 @@ class ModelDiscovery:
             log.debug("ollama at %s is not answering: %s", base, exc)
             missing = ollama.is_local(base) and not self._ollama_installed()
             return _ProviderResult(up=False, missing=missing)
-        if ollama.is_local(base) and not await asyncio.to_thread(self._ollama_installed):
+        installed = server.installed if server is not None else self._ollama_installed
+        if ollama.is_local(base) and not await asyncio.to_thread(installed):
             # It lists models it cannot load: there is nothing to run them with.
             log.info("ollama at %s answers, but no ollama binary is installed", base)
             return _ProviderResult(up=False, missing=True, stray=True)

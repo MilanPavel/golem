@@ -182,6 +182,10 @@ class LocalServer:
             return None
         return LocalServerStatus(self.provider, self.base_url, self._owner, self._pid)
 
+    def installed(self) -> bool:
+        """True when there is an ``ollama`` binary this server could start."""
+        return self._find_binary() is not None
+
     async def ensure_running(self) -> bool:
         """True when the server answers, after starting it if golem may.
 
