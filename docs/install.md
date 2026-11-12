@@ -91,15 +91,7 @@ Your chats and settings carry over. If a new version changes the database, golem
 
 ## Remove
 
-Run these in this order. If you run `brew uninstall` first, the old service can keep running. The next `golem` you install sees the leftover launch agent and installs it again.
-
-```bash
-golem daemon uninstall
-brew uninstall golem
-brew untap milanpavel/golem
-```
-
-Your chats and settings stay in `~/.golem`. To delete them too, run `rm -rf ~/.golem`. API keys stay in the Keychain until you remove them: run `golem auth remove <provider>` before you uninstall.
+See [Uninstall](./guide/uninstall.md). It covers the background jobs, your keys, `~/.golem`, and Ollama, in the order that works.
 
 ## When something is wrong
 
@@ -127,7 +119,7 @@ Next: golem, then /setup installs it, or brew install ollama
 | The chat says `reconnecting` | The daemon isn't running. Run `golem status`, then `golem daemon start` |
 | `needs key` in red | Run `golem auth set <provider>`, or `/login <provider>` in the chat |
 | A local model doesn't answer | Run `golem doctor`. golem starts Ollama itself. If it doesn't start, look in `~/.golem/logs/ollama.log` |
-| macOS asks whether golem may use a Keychain item | Choose Always Allow. It asks once per key after each upgrade, and golem names the key while the dialog is open |
+| macOS asks whether golem may use a Keychain item | Choose Always Allow. It asks once per key, the first time golem reads a key that an older version saved, and golem names the key while the dialog is open. It does not ask again after upgrades |
 | Anything else | Run `golem daemon logs` |
 
 Settings are in `~/.golem/config.toml`. [Models and API keys](guide/models.md#settings) lists them all.

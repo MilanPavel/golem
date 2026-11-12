@@ -117,12 +117,12 @@ Users never see or install the certificate. There are no extra steps for signing
 | Situation | What the user sees | What to do |
 |---|---|---|
 | New user installs a release and saves a key with `golem auth set` | Nothing. The daemon saved the key, so it owns it. | Nothing |
-| Upgrade to a newer release | One Keychain dialog per key, on the first read after the upgrade. golem says so in the setup window or the chat band while the dialog is open. | **Always Allow**. The rule matches every release, but without an Apple Team ID macOS also ties each item to the build's hash (its partition, `cdhash:…`), and that changes every release |
-| First start of a release, with keys saved earlier by a source-code run or a local ad-hoc build | One Keychain dialog per key: "golem-daemon wants to use your confidential information" | Enter the Mac password and click **Always Allow**, once. The daemon then saves the key again as its own ([API keys and the Keychain](run.md#_9-api-keys-and-the-keychain)), so it never asks again. |
+| Upgrade to a newer release | Nothing. The daemon reads keys through `/usr/bin/security`, which does not change between releases ([ADR-021](../adr/021-release-signing.md)). | Nothing |
+| First start of a release that keeps keys saved by an older build | One Keychain dialog per key: "golem-daemon wants to use your confidential information" | Enter the Mac password and click **Always Allow**, once. The daemon then stores the key again through `security` ([API keys and the Keychain](run.md#_9-api-keys-and-the-keychain)), so it never asks again. |
 | Archive downloaded in a browser instead of `curl` | macOS refuses to open `golem`, because a self-signed program is not notarized | Download with `curl` ([Installing today](run.md#_6-installing-today)), or run `xattr -dr com.apple.quarantine <the unpacked folder>` |
-| We ever have to replace the certificate | One Keychain dialog per key after that upgrade | **Always Allow** once, as above |
+| We ever have to replace the certificate | Nothing for keys, which `security` guards. The certificate still names the daemon | Nothing |
 
-Homebrew downloads with `curl`, so a `brew install` user ([Homebrew](run.md#_10-homebrew)) sees none of the dialogs above, except after a certificate change.
+Homebrew downloads with `curl`, so a `brew install` user ([Homebrew](run.md#_10-homebrew)) sees none of the dialogs above, except once, if they kept keys from an older build.
 
 ### How the seal decides
 
@@ -157,7 +157,7 @@ A local build is ad-hoc unless you set them. Even then it is re-signed, because 
 **What is left out, on purpose.**
 - No *hardened runtime*. Apple needs it only for notarization, and with a certificate that has no Apple team it makes macOS refuse to load PyInstaller's libraries. This is also why golem does not use PyInstaller's own signing option: it turns the hardened runtime on.
 - No timestamp (`--timestamp=none`). A timestamp needs Apple's server and only matters for notarization.
-- No notarization. Gatekeeper ignores a self-signed certificate. `curl` and Homebrew downloads are not checked by Gatekeeper, but an archive downloaded in a browser is blocked until the user allows it ([Installing today](run.md#_6-installing-today)). Developer ID and notarization come later. Switching changes the rule once, so users approve the daemon once more.
+- No notarization. Gatekeeper ignores a self-signed certificate. `curl` and Homebrew downloads are not checked by Gatekeeper, but an archive downloaded in a browser is blocked until the user allows it ([Installing today](run.md#_6-installing-today)). Developer ID and notarization come later. Switching changes the signing rule once. Keys do not depend on it, because `security` guards them.
 
 **Checking a tree.** `just check-signature [tree] [--identity-hash <sha1>]` fails if any of these is false:
 - every Mach-O file passes `codesign --verify --strict`;
@@ -208,7 +208,7 @@ just check-signature "" --identity-hash <sha1>
 
 ### Losing or replacing the certificate
 
-**Never replace the certificate unless you have to.** A new certificate, a lost `.p12`, or an expired certificate all change the rule. Every user then gets a Keychain prompt for each key after their next upgrade, and must choose Always Allow again. Data is not lost, only the trust. If you must rotate it, run the one-time setup again and say so in the release notes.
+**Never replace the certificate unless you have to.** A new certificate, a lost `.p12`, or an expired certificate all change the rule. Keys and data are not affected, because the daemon stores keys through `/usr/bin/security`. If you must rotate it, run the one-time setup again and say so in the release notes.
 
 
 ## Setting up the tap (once)
