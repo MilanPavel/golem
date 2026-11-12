@@ -3,7 +3,7 @@ import { test } from "node:test";
 
 import type { SetupRow } from "@golem/client";
 
-import { setupFormRows, TOOLS_PATH } from "./setup-form.ts";
+import { setupFormRows } from "./setup-form.ts";
 import { pageServiceRow } from "./setup-window.ts";
 
 function row(part: SetupRow["part"], name: string, state: SetupRow["state"], detail: string, extra: Partial<SetupRow> = {}): SetupRow {
@@ -150,11 +150,11 @@ test("a disk row has no fix", () => {
   assert.equal(byPart(setupFormRows(rows, KEPT), "disk")[0]?.fix, null);
 });
 
-test("no tool servers: one card that says so, and links to add tools", () => {
+test("no tool servers: one card that says so, with a button to add tools in place", () => {
   const [tools] = byPart(setupFormRows([], KEPT), "tools");
   assert.equal(tools?.detail, "no MCP servers yet");
   assert.equal(tools?.mark, "ok");
-  assert.deepEqual(tools?.fix, { kind: "link", to: TOOLS_PATH, label: "Add tools" });
+  assert.deepEqual(tools?.fix, { kind: "button", id: "add_tools", label: "Add tools" });
 });
 
 test("healthy tool servers fold into a count with Manage", () => {

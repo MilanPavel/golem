@@ -11,6 +11,7 @@ import { fakeClient, fakeFrame, OLLAMA_FAILED_CODE, rpcError } from "../../store
 import { closeModelDialog } from "../models/index.ts";
 import { closeSetup } from "../setup/index.ts";
 import { OK_ROWS, STATUS_ROWS, WORKING_LISTING } from "../setup/sample.ts";
+import { TOOLS_CATALOG } from "../setup/tools-sample.ts";
 
 const noContrast = { rules: { "color-contrast": { enabled: false } } };
 
@@ -347,12 +348,39 @@ test("Run setup again opens the guided window, and closing it gives focus back",
   await waitFor(() => expect(document.activeElement).toBe(again));
 });
 
-test("Tools links to the MCP servers section", async () => {
-  mount([...OK_ROWS.filter((row) => row.part !== "tools")]);
+test("with no server yet, Add tools opens the offer in place; the servers added show as done, and then Manage links to the MCP section", async () => {
+  const { fake, user } = mount([...OK_ROWS.filter((row) => row.part !== "tools")]);
+  fake.raw.mcpCatalog.mockResolvedValue({ entries: TOOLS_CATALOG.map((each) => (each.id === "fetch" ? { ...each, added: true } : each)) });
   const tools = await waitFor(() => card("Tools"));
   expect(tools.getByText("no MCP servers yet")).toBeTruthy();
-  expect(tools.getByRole("link").getAttribute("href")).toBe("/settings/mcp");
-  expect(tools.queryByRole("button")).toBeNull();
+  expect(tools.queryByRole("link")).toBeNull();
+  await user.click(tools.getByRole("button", { name: "Add tools" }));
+  const panel = within(await screen.findByRole("group", { name: "Add tools" }));
+  // A server that is there already is shown as done and cannot be ticked.
+  const fetch = panel.getByRole("checkbox", { name: /^Fetch/ }) as HTMLInputElement;
+  expect(fetch.checked).toBe(true);
+  expect(fetch.disabled).toBe(true);
+  expect(panel.getByRole("heading", { name: "Tools · 1 server" })).toBeTruthy();
+  expect(panel.getByRole("button", { name: "Add 2" })).toBeTruthy();
+  expect(document.querySelector("input[type=password]")).toBeNull();
+  fake.raw.setupStatus.mockResolvedValue({ rows: OK_ROWS });
+  await user.click(panel.getByRole("checkbox", { name: /^Playwright/ }));
+  await user.click(panel.getByRole("button", { name: "Add 1" }));
+  await waitFor(() => expect(fake.raw.addMcpServer).toHaveBeenCalledWith(expect.objectContaining({ catalog_id: "context7" })));
+  await waitFor(() => expect(panel.getAllByText(/^added · /).length).toBe(1));
+  await waitFor(() => expect(card("Tools").getByRole("link", { name: "Manage" }).getAttribute("href")).toBe("/settings/mcp"));
+  await user.click(panel.getByRole("button", { name: "Done" }));
+  expect(screen.queryByRole("group", { name: "Add tools" })).toBeNull();
+});
+
+test("Cancel closes the offer in place and adds nothing", async () => {
+  const { fake, user } = mount([...OK_ROWS.filter((row) => row.part !== "tools")]);
+  fake.raw.mcpCatalog.mockResolvedValue({ entries: TOOLS_CATALOG });
+  await user.click((await waitFor(() => card("Tools"))).getByRole("button", { name: "Add tools" }));
+  const panel = within(await screen.findByRole("group", { name: "Add tools" }));
+  await user.click(panel.getByRole("button", { name: "Cancel" }));
+  expect(screen.queryByRole("group", { name: "Add tools" })).toBeNull();
+  expect(fake.raw.addMcpServer).not.toHaveBeenCalled();
 });
 
 test("a failed setup.status says so, with a way to try again", async () => {

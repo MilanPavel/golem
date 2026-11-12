@@ -323,11 +323,17 @@ test("Ready from a send says where it goes, and that nothing was sent", async ()
   expect(onStart).toHaveBeenCalledTimes(1);
 });
 
-test("Tools, a placeholder, shows and goes on", async () => {
+test("Tools while the starter list is read: the heading and a status, no panel yet", () => {
+  render(<WelcomeView {...welcomeProps("tools", { tools: { offer: null, failed: false, onContinue: vi.fn() } })} />);
+  expect(screen.getByRole("heading", { level: 2, name: "Give golem some tools?" })).toBeTruthy();
+  expect(screen.getByRole("status").textContent).toContain("Checking…");
+});
+
+test("Tools when the starter list cannot be read: says so, and Continue goes on", async () => {
   const user = userEvent.setup();
   const onContinue = vi.fn();
-  render(<WelcomeView {...welcomeProps("tools", { tools: { onContinue } })} />);
-  expect(screen.getByRole("heading", { level: 2, name: "Give golem some tools?" })).toBeTruthy();
+  render(<WelcomeView {...welcomeProps("tools", { tools: { offer: null, failed: true, onContinue } })} />);
+  expect(screen.getByRole("alert").textContent).toContain("Could not read the starter tools.");
   await user.click(screen.getByRole("button", { name: "Continue" }));
   expect(onContinue).toHaveBeenCalledTimes(1);
 });

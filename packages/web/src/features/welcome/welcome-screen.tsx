@@ -13,14 +13,15 @@ import {
 } from "@golem/view";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useConnection } from "../../store/connection-context.tsx";
-import { useModelList, useNavigate, usePageActions, usePageHost, usePulls, useSetupStatus } from "../../store/page-context.tsx";
+import { useMcpList, useModelList, useNavigate, usePageActions, usePageHost, usePulls, useSetupStatus } from "../../store/page-context.tsx";
 import { welcomePath } from "../../store/router.ts";
 import { pullShare, pullText, shortName } from "../models/index.ts";
 import type { KeyProvider } from "../setup/setup-form.tsx";
+import { toolsSummary } from "../setup/tools-summary.ts";
 import { useSetupActions } from "../setup/use-setup-actions.ts";
+import { useTools } from "../setup/use-tools.ts";
 import type { EngineChoice, OllamaPhase } from "./engine-step.tsx";
 import type { ReadyModel } from "./ready-step.tsx";
-import { TOOLS_OFFERED } from "./tools-step.tsx";
 import { finishWelcome, leaveWelcome, setPendingModel, setPullSpeed, useWelcomeProgress } from "./welcome-store.ts";
 import { nextStep, stepStates, type WelcomeStep } from "./welcome-steps.ts";
 import { WelcomeView } from "./welcome-view.tsx";
@@ -133,12 +134,18 @@ export function WelcomeScreen({ step, from }: { step: WelcomeStep; from: "send" 
     if (measured !== null) setPullSpeed(Math.max(1, Math.round(measured / 1e6)) * 1e6);
   }, [measured]);
 
-  const states = stepStates(step, TOOLS_OFFERED);
+  // Tools is offered while the user's config has no `[mcp]` table, and stays once the page has started adding.
+  const mcp = useMcpList(null, true);
+  const tools = useTools({ mode: "guided", enabled: step === "tools" });
+  const toolsOffered = tools.state?.phase === "run" || (mcp.data !== undefined && mcp.data.servers.length === 0);
+  const toolsLine = toolsSummary(tools.state);
+
+  const states = stepStates(step, toolsOffered);
   const goTo = (to: WelcomeStep): void => {
     navigate(welcomePath(to, from), { replace: true });
   };
   const advanceFrom = (at: WelcomeStep): void => {
-    const to = nextStep(at, TOOLS_OFFERED);
+    const to = nextStep(at, toolsOffered);
     if (to !== null) goTo(to);
   };
 
@@ -249,6 +256,29 @@ export function WelcomeScreen({ step, from }: { step: WelcomeStep; from: "send" 
         onContinue: continueFromModel,
       }}
       tools={{
+        offer:
+          tools.state === null
+            ? null
+            : {
+                state: tools.state,
+                draft: tools.draft,
+                logs: tools.logs,
+                onDraft: tools.setDraft,
+                onTick: tools.tick,
+                onStart: () => {
+                  if (!tools.start()) advanceFrom("tools");
+                },
+                onSkip: () => {
+                  advanceFrom("tools");
+                },
+                onContinue: () => {
+                  advanceFrom("tools");
+                },
+                onRetry: tools.retry,
+                onSkipRow: tools.skipRow,
+                onLog: tools.showLog,
+              },
+        failed: tools.failed,
         onContinue: () => {
           advanceFrom("tools");
         },
@@ -256,8 +286,8 @@ export function WelcomeScreen({ step, from }: { step: WelcomeStep; from: "send" 
       ready={{
         engine: engineLine,
         model: readyModel,
-        tools: "skipped",
-        toolsSkipped: !TOOLS_OFFERED,
+        tools: toolsLine.text,
+        toolsSkipped: toolsLine.skipped,
         keepNote: keepAt === null ? null : serviceKept ? { command: keepAt, page: "only" } : { command: keepAt },
         fromSend: from === "send",
         onStart: start,

@@ -1,18 +1,55 @@
-import { daemonServiceRow, guided, HOSTED_PROVIDERS, pageServiceRow, setupFormRows, setupProblem, type FormButtonId } from "@golem/view";
-import { useEffect, useMemo } from "react";
+import { daemonServiceRow, guided, HOSTED_PROVIDERS, pageServiceRow, setupFormRows, setupProblem, toolsSettled, type FormButtonId } from "@golem/view";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useConnection } from "../../store/connection-context.tsx";
 import { useModelList, useNavigate, usePageHost, useSetupStatus } from "../../store/page-context.tsx";
 import { Button } from "../../ui/button.tsx";
 import { openModelDialog } from "../models/index.ts";
 import { openSetup } from "../setup/index.ts";
 import { AddKey, SetupFormView } from "../setup/setup-form.tsx";
+import { ToolsOfferView } from "../setup/tools-offer.tsx";
 import { useSetupActions } from "../setup/use-setup-actions.ts";
+import { useTools } from "../setup/use-tools.ts";
 import { SECTIONS } from "./sections.ts";
 
 /** A link of the form points at `/settings/<section>`: it is shown once the page has that section. */
 function hasPage(path: string): boolean {
   const section = path.replace(/^\/settings\//, "");
   return path.startsWith("/settings/") && SECTIONS.some((item) => item.id === section);
+}
+
+/** The Tools offer of Settings → Setup, in place under the cards. The status is read again once the servers are added. */
+function AddTools({ onClose, onAdded }: { onClose: () => void; onAdded: () => void }) {
+  const tools = useTools({ mode: "single", enabled: true });
+  const settled = tools.state !== null && toolsSettled(tools.state);
+  useEffect(() => {
+    if (settled) onAdded();
+  }, [settled, onAdded]);
+  if (tools.state === null) {
+    return (
+      <p role={tools.failed ? "alert" : "status"} className={tools.failed ? "text-sm text-deny" : "text-sm text-muted"}>
+        {tools.failed ? "Could not read the starter tools." : "Checking…"}
+      </p>
+    );
+  }
+  return (
+    <div role="group" aria-label="Add tools" className="rounded-lg border border-line bg-surface p-4">
+      <ToolsOfferView
+        state={tools.state}
+        draft={tools.draft}
+        logs={tools.logs}
+        onDraft={tools.setDraft}
+        onTick={tools.tick}
+        onStart={() => {
+          if (!tools.start()) onClose();
+        }}
+        onSkip={onClose}
+        onContinue={onClose}
+        onRetry={tools.retry}
+        onSkipRow={tools.skipRow}
+        onLog={tools.showLog}
+      />
+    </div>
+  );
 }
 
 /**
@@ -28,6 +65,10 @@ export function SetupSection() {
   const navigate = useNavigate();
   const { refetch } = status;
   const actions = useSetupActions(refetch);
+  const [adding, setAdding] = useState(false);
+  const reread = useCallback((): void => {
+    void refetch();
+  }, [refetch]);
   useEffect(() => {
     void refetch();
   }, [refetch]);
@@ -57,6 +98,9 @@ export function SetupSection() {
         return;
       case "change_model":
         openModelDialog({ sessionId: null, mode: "default", returnTo: from });
+        return;
+      case "add_tools":
+        setAdding(true);
         return;
     }
   }
@@ -94,6 +138,14 @@ export function SetupSection() {
             onNavigate={navigate}
             hasPage={hasPage}
           />
+          {adding ? (
+            <AddTools
+              onClose={() => {
+                setAdding(false);
+              }}
+              onAdded={reread}
+            />
+          ) : null}
           <AddKey
             providers={listing.data === undefined ? [] : keyProviders}
             actions={actions.state}

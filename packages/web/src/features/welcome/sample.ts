@@ -1,10 +1,14 @@
 import type { ListedModel, ModelListResult } from "../../store/models.ts";
 import type { PullsSnapshot } from "../../store/pulls.ts";
 import type { KeyProvider } from "../setup/setup-form.tsx";
+import type { ToolsOfferViewProps } from "../setup/tools-offer.tsx";
+import { toolsAdding, toolsGithubTicked, toolsOffered } from "../setup/tools-sample.ts";
 import type { SetupActionsState } from "../setup/use-setup-actions.ts";
+import type { ToolsState } from "@golem/view";
 import type { EngineStepProps } from "./engine-step.tsx";
 import type { ModelStepProps } from "./model-step.tsx";
 import type { ReadyStepProps } from "./ready-step.tsx";
+import type { ToolsStepProps } from "./tools-step.tsx";
 import { stepStates, type WelcomeStep } from "./welcome-steps.ts";
 import type { WelcomeViewProps } from "./welcome-view.tsx";
 
@@ -91,6 +95,24 @@ export function modelProps(change: Partial<ModelStepProps> = {}): ModelStepProps
   };
 }
 
+/** The Tools step with its panel in `state`, every handler doing nothing. */
+export function toolsProps(state: ToolsState): ToolsStepProps {
+  const offer: ToolsOfferViewProps = {
+    state,
+    draft: "",
+    logs: {},
+    onDraft: noop,
+    onTick: noop,
+    onStart: noop,
+    onSkip: noop,
+    onContinue: noop,
+    onRetry: noop,
+    onSkipRow: noop,
+    onLog: noop,
+  };
+  return { offer, failed: false, onContinue: noop };
+}
+
 export function readyProps(change: Partial<ReadyStepProps> = {}): ReadyStepProps {
   return {
     engine: "Ollama on this Mac",
@@ -115,7 +137,7 @@ export function welcomeProps(step: WelcomeStep, change: Partial<WelcomeViewProps
     onLater: noop,
     engine: engineProps(),
     model: modelProps(),
-    tools: { onContinue: noop },
+    tools: { offer: null, failed: false, onContinue: noop },
     ready: readyProps(),
     ...change,
   };
@@ -158,7 +180,9 @@ export const WELCOME_CASES: WelcomeCase[] = [
     }),
   },
   { label: "Model, default gone", props: welcomeProps("model", { states: ["done", "current", "skipped", "todo"], banner: DEFAULT_GONE }) },
-  { label: "Tools", props: welcomeProps("tools") },
+  { label: "Tools, the offer", props: welcomeProps("tools", { states: stepStates("tools", true), tools: toolsProps(toolsOffered()) }) },
+  { label: "Tools, GitHub ticked", props: welcomeProps("tools", { states: stepStates("tools", true), tools: toolsProps(toolsGithubTicked()) }) },
+  { label: "Tools, adding", props: welcomeProps("tools", { states: stepStates("tools", true), working: true, tools: toolsProps(toolsAdding()) }) },
   { label: "Ready", props: welcomeProps("ready") },
   {
     label: "Ready, model downloading",
