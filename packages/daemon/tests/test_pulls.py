@@ -181,6 +181,37 @@ async def test_cancel_stops_the_pull_and_says_so(tmp_path: Path) -> None:
     await manager.aclose()
 
 
+async def test_wait_returns_when_the_pull_lands_or_none_runs(tmp_path: Path) -> None:
+    gate = asyncio.Event()
+    manager = _manager(FakeOllama(_lines(PULL_OK, gate=gate, after=2)), [], tmp_path)
+    await manager.wait("ollama/qwen3:30b-a3b")
+    ref, _ = await manager.start("qwen3:30b-a3b")
+    waiter = asyncio.create_task(manager.wait(ref))
+    await asyncio.sleep(0.05)
+    assert not waiter.done()
+    gate.set()
+    await asyncio.wait_for(waiter, 2)
+    await manager.aclose()
+
+
+async def test_wait_raises_the_error_of_a_failed_or_stopped_pull(tmp_path: Path) -> None:
+    failing = FakeOllama(_lines([{"status": "pulling manifest"}, {"error": "file does not exist"}]))
+    manager = _manager(failing, [], tmp_path)
+    ref, _ = await manager.start("qwen3:30b-a3b")
+    with pytest.raises(PullError, match="failed: file does not exist"):
+        await manager.wait(ref)
+    await manager.aclose()
+    gate = asyncio.Event()
+    stopped = _manager(FakeOllama(_lines(PULL_OK, gate=gate, after=2)), [], tmp_path)
+    ref, _ = await stopped.start("qwen3:30b-a3b")
+    waiter = asyncio.create_task(stopped.wait(ref))
+    await asyncio.sleep(0.05)
+    await stopped.cancel(ref)
+    with pytest.raises(PullError, match="was stopped"):
+        await waiter
+    await stopped.aclose()
+
+
 async def test_a_pull_that_cannot_start_says_why(tmp_path: Path) -> None:
     fake = FakeOllama()
     manager = _manager(fake, [], tmp_path)

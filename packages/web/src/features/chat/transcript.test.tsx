@@ -2,7 +2,8 @@ import { LIVE_OUTPUT_CHARS, type ChatMessage, type ToolBlock } from "@golem/view
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import axe from "axe-core";
 import { afterEach, expect, test } from "vitest";
-import { ToolLine, TranscriptColumn, TranscriptMessages } from "./transcript.tsx";
+import { ToolLine, TranscriptColumn, TranscriptMessages, waitingLine } from "./transcript.tsx";
+import type { PullsSnapshot } from "../../store/pulls.ts";
 import { SAMPLE_CHAT } from "./sample.ts";
 import { detailStore } from "./detail.ts";
 import { setThinkingShown } from "./thinking-shown.ts";
@@ -492,4 +493,19 @@ test("the transcript draws no approval card, and no chip for the call that waits
   expect(screen.queryByRole("button", { name: /^Allow/ })).toBeNull();
   expect(document.querySelector("[data-approval-chip]")).toBeNull();
   expect(document.querySelector("[data-mark=wait]")).toBeTruthy();
+});
+
+const PULLING: PullsSnapshot = {
+  active: new Map([["ollama/gemma4:e4b", { track: { completed: 12, total: 100, samples: [] }, status: "pulling", progress: null }]]),
+  failed: new Map(),
+};
+const MODEL = { profile: "ollama/gemma4:e4b", provider: "ollama", name: "gemma4:e4b" };
+
+test("a message waits with the download's name and share, and only while it downloads", () => {
+  expect(waitingLine(true, MODEL, PULLING)).toBe("waiting for gemma4:e4b · 12%");
+  expect(waitingLine(false, MODEL, PULLING)).toBeNull();
+  expect(waitingLine(true, { ...MODEL, name: "other:1b" }, PULLING)).toBeNull();
+  expect(waitingLine(true, null, PULLING)).toBeNull();
+  render(<TranscriptMessages chat={chat([answer()])} waiting="waiting for gemma4:e4b · 12%" />);
+  expect(screen.getByRole("status").textContent).toBe("waiting for gemma4:e4b · 12%");
 });

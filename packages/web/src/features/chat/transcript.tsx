@@ -1,6 +1,9 @@
 import { displayToolName, formatTurnTime, groupTurns, stepCount, stepMark, summarizeSteps, turnFooter, LIVE_OUTPUT_CHARS, thinkingLine, unreadCallNotice, type ChatMessage, type ChatState, type Detail, type StepMark, type ToolBlock } from "@golem/view";
 import { memo, useCallback, useId, useLayoutEffect, useRef, useState } from "react";
-import { useSession } from "../../store/page-context.tsx";
+import { usePulls, useSession } from "../../store/page-context.tsx";
+import type { PullsSnapshot } from "../../store/pulls.ts";
+import type { SessionModel } from "../../store/session-store.ts";
+import { pullShare, shortName } from "../models/index.ts";
 import { ApprovalChip } from "../approval/approval-chip.tsx";
 import { Button } from "../../ui/button.tsx";
 import { cn } from "../../ui/cn.ts";
@@ -303,7 +306,7 @@ export function GolemTurn({
 export type TranscriptChat = Pick<ChatState, "messages" | "error" | "notice"> & Partial<Pick<ChatState, "approval" | "unreadCall">>;
 
 /** The messages and the closing error or notice. Pure: the page's stores are not read here. */
-export function TranscriptMessages({ chat, thinkingShown, detail }: { chat: TranscriptChat; thinkingShown?: boolean; detail?: Detail }) {
+export function TranscriptMessages({ chat, thinkingShown, detail, waiting = null }: { chat: TranscriptChat; thinkingShown?: boolean; detail?: Detail; waiting?: string | null }) {
   const pendingId = chat.approval?.callId ?? null;
   const notice = chat.notice ?? (chat.unreadCall === true ? unreadCallNotice("web") : null);
   if (chat.messages.length === 0 && !chat.error && !notice) {
@@ -324,6 +327,7 @@ export function TranscriptMessages({ chat, thinkingShown, detail }: { chat: Tran
           />
         ),
       )}
+      {waiting === null ? null : <p role="status" className="font-mono text-xs text-muted">{waiting}</p>}
       {chat.error ? <p role="alert" className="text-sm text-deny">{chat.error}</p> : null}
       {notice ? <p role="status" className="text-sm text-muted">{notice}</p> : null}
     </>
@@ -334,7 +338,7 @@ export function TranscriptMessages({ chat, thinkingShown, detail }: { chat: Tran
  * The scrolling column. While you are at the bottom it follows the text; once you scroll up it
  * stays where you are and offers a way back down.
  */
-export function TranscriptColumn({ chat, className }: { chat: TranscriptChat; className?: string }) {
+export function TranscriptColumn({ chat, className, waiting = null }: { chat: TranscriptChat; className?: string; waiting?: string | null }) {
   const scroller = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
   const stuck = useRef(true);
@@ -374,7 +378,7 @@ export function TranscriptColumn({ chat, className }: { chat: TranscriptChat; cl
     <div className={cn("relative flex min-h-0 flex-1 flex-col", className)}>
       <div ref={scroller} onScroll={onScroll} className="min-h-0 flex-1 overflow-y-auto" data-transcript-scroller>
         <div ref={content} className="mx-auto flex max-w-column flex-col gap-8 px-5 py-7">
-          <TranscriptMessages chat={chat} />
+          <TranscriptMessages chat={chat} waiting={waiting} />
         </div>
       </div>
       {atBottom ? null : (
@@ -396,8 +400,20 @@ export function TranscriptColumn({ chat, className }: { chat: TranscriptChat; cl
   );
 }
 
+/** `waiting for qwen3:8b · 12%` while a message waits on the download of the session's model, else null. */
+export function waitingLine(busy: boolean, model: SessionModel | null, pulls: PullsSnapshot): string | null {
+  if (!busy || model === null || model.provider === null || model.name === null) return null;
+  const ref = `${model.provider}/${model.name}`;
+  const entry = pulls.active.get(ref);
+  if (entry === undefined) return null;
+  const share = pullShare(entry, null);
+  return `waiting for ${shortName(ref)}${share === null ? "" : ` · ${Math.round(share * 100)}%`}`;
+}
+
 /** A session's transcript, read from the page's session store. The approval that waits is in the dock. */
 export function Transcript({ id }: { id: string }) {
   const chat = useSession(id, (view) => view.chat);
-  return <TranscriptColumn chat={chat} />;
+  const model = useSession(id, (view) => view.model);
+  const pulls = usePulls();
+  return <TranscriptColumn chat={chat} waiting={waitingLine(chat.busy, model, pulls)} />;
 }

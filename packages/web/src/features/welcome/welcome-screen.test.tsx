@@ -332,7 +332,8 @@ test("Ready while the default downloads says Almost ready, and turns into golem 
   await heading("Almost ready.");
   const model = within(screen.getByRole("list", { name: "What was set up" })).getAllByRole("listitem")[1] as HTMLElement;
   expect(within(model).getByRole("progressbar").getAttribute("aria-valuenow")).toBe("31");
-  expect((button("Start chatting") as HTMLButtonElement).disabled).toBe(true);
+  expect(screen.getByText("gemma4:e4b is still downloading. Start a chat now and golem answers once it's there, or wait here.")).toBeTruthy();
+  expect((button("Start chatting") as HTMLButtonElement).disabled).toBe(false);
   expect(screen.queryByRole("button", { name: "Later" })).toBeNull();
   // The download ends: the model becomes the default, and the page says so by itself.
   fake.raw.setDefaultModel.mockImplementation(async () => {
@@ -344,6 +345,18 @@ test("Ready while the default downloads says Almost ready, and turns into golem 
   await waitFor(() => expect(fake.raw.setDefaultModel).toHaveBeenCalledWith("ollama/gemma4:e4b"));
   await heading("golem is ready.");
   await waitFor(() => expect((button("Start chatting") as HTMLButtonElement).disabled).toBe(false));
+});
+
+test("Start chatting while the default downloads sets it as the default first, and goes home", async () => {
+  const { fake, user } = mount(RUNNING_LISTING, { path: "/welcome?step=model" });
+  await heading("Pick a model");
+  act(() => fake.emitPull({ kind: "progress", progress: PULL }));
+  await screen.findByRole("progressbar", { name: "Downloading gemma4:e4b" });
+  await user.click(continueButton());
+  await heading("Almost ready.");
+  await user.click(button("Start chatting"));
+  expect(fake.raw.setDefaultModel).toHaveBeenCalledWith("ollama/gemma4:e4b");
+  await waitFor(() => expect(here()).toBe("/"));
 });
 
 test("Ready names how to keep golem running when the service is not kept at login, and never blocks", async () => {

@@ -203,22 +203,23 @@ class DaemonApp:
                 self.state.policy = policy
                 self.state.tools = default_registry(mcp, policy.web())
                 self.state.artifacts = ArtifactStore(database)
+                chat = open_chat(
+                    router,
+                    saver,
+                    self.state.tools,
+                    self.state.policy,
+                    self.state.artifacts,
+                    local,
+                    SystemPrompt(sections=(pinned_section(self.state.skills),)),
+                    BlobStore(database),
+                    window_of=lambda profile, overrides: resolve_window(
+                        router, profile, models, overrides=overrides
+                    ),
+                    note_loaded=note_loaded,
+                )
                 self.state.sessions = await _open_sessions(
                     database,
-                    open_chat(
-                        router,
-                        saver,
-                        self.state.tools,
-                        self.state.policy,
-                        self.state.artifacts,
-                        local,
-                        SystemPrompt(sections=(pinned_section(self.state.skills),)),
-                        BlobStore(database),
-                        window_of=lambda profile, overrides: resolve_window(
-                            router, profile, models, overrides=overrides
-                        ),
-                        note_loaded=note_loaded,
-                    ),
+                    chat,
                     self._titles,
                     self.state.skills,
                     BlobStore(database),
@@ -228,6 +229,7 @@ class DaemonApp:
                 else:
                     pulls = self._pulls(router, models.ram_gb)
                 pulls.broadcast = self._broadcast
+                chat.until_pulled = pulls.wait
                 pulls.local = local
                 models.pulling = pulls.pulling
                 models.local = local

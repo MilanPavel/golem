@@ -137,6 +137,8 @@ class ChatRuntime:
         self.policy = Policy(None) if policy is None else policy
         self.prompt = SystemPrompt() if prompt is None else prompt
         self.window_of = window_of
+        self.until_pulled: Callable[[str], Awaitable[None]] | None = None
+        """Waits until a model's download ends, given its ref. Raises with the download's error."""
 
     async def values(self, session_id: str) -> Mapping[str, object]:
         """Checkpoint values for ``session_id``, or an empty mapping."""
