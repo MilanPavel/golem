@@ -2,8 +2,10 @@ import { focusManager } from "@tanstack/react-query";
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
-import { afterEach, beforeEach, expect, test } from "vitest";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { App } from "../../app.tsx";
+import { createAppInstall } from "../../store/app-install.ts";
+import { createPageHost } from "../../store/page-host.ts";
 import { createPage } from "../../store/page.ts";
 import { PageProvider } from "../../store/page-context.tsx";
 import { fakeClient, fakeFrame, summary } from "../../store/test-support.ts";
@@ -14,7 +16,7 @@ import { settingsContextStore, useSettingsFolder } from "./index.ts";
 const noContrast = { rules: { "color-contrast": { enabled: false } } };
 const PROBLEM = "Ollama: Ollama is not installed";
 
-function mount(path: string, rows: typeof OK_ROWS | "fail" = OK_ROWS) {
+function mount(path: string, rows: typeof OK_ROWS | "fail" = OK_ROWS, extra: { kept?: boolean; appInstall?: ReturnType<typeof createAppInstall> } = {}) {
   history.replaceState(null, "", path);
   const fake = fakeClient();
   fake.raw.listModels.mockResolvedValue(WORKING_LISTING);
@@ -23,7 +25,12 @@ function mount(path: string, rows: typeof OK_ROWS | "fail" = OK_ROWS) {
   fake.raw.status.mockResolvedValue({ version: "0.5.0" });
   const doc = new EventTarget() as unknown as Document;
   (doc as { visibilityState: string }).visibilityState = "visible";
-  const page = createPage(fake.client, { frame: fakeFrame(), doc });
+  const page = createPage(fake.client, {
+    frame: fakeFrame(),
+    doc,
+    ...(extra.kept === undefined ? {} : { pageHost: createPageHost(async () => ({ kept: extra.kept })) }),
+    ...(extra.appInstall === undefined ? {} : { appInstall: extra.appInstall }),
+  });
   page.start();
   fake.setState({ status: "connected" });
   const view = render(
@@ -133,6 +140,31 @@ test("Appearance offers Match system, Light and Dark, and the sidebar has no the
   expect(document.documentElement.dataset.theme).toBe("slip");
   await user.click(within(main).getByRole("button", { name: "Match system" }));
   expect(document.documentElement.dataset.theme).toBeUndefined();
+});
+
+test("Appearance has an App block with the install action when the web job keeps the page", async () => {
+  const listeners = new Map<string, (event: Event) => void>();
+  const appInstall = createAppInstall({
+    addEventListener: (type, listener) => listeners.set(type, listener),
+    navigator: { userAgent: "Mozilla/5.0 (Macintosh) Chrome/126.0 Safari/537.36" },
+  });
+  const prompt = vi.fn(async () => undefined);
+  const { user } = mount("/settings/appearance", OK_ROWS, { kept: true, appInstall });
+  const main = screen.getByRole("main");
+  expect(await within(main).findByRole("heading", { level: 3, name: "App" })).toBeTruthy();
+  expect(within(main).queryByRole("button", { name: "Install golem as an app" })).toBeNull();
+  act(() => {
+    listeners.get("beforeinstallprompt")?.(Object.assign(new Event("beforeinstallprompt", { cancelable: true }), { prompt }));
+  });
+  await user.click(await within(main).findByRole("button", { name: "Install golem as an app" }));
+  expect(prompt).toHaveBeenCalledTimes(1);
+});
+
+test("Appearance has no App block while the web job is not installed", async () => {
+  mount("/settings/appearance", OK_ROWS, { kept: false });
+  await screen.findByRole("button", { name: "Dark" });
+  await act(() => new Promise<void>((resolve) => setTimeout(resolve, 5)));
+  expect(screen.queryByRole("heading", { level: 3, name: "App" })).toBeNull();
 });
 
 // Looking again

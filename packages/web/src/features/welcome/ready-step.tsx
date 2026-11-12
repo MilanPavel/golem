@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Button } from "../../ui/button.tsx";
 import { CopyCommand } from "../../ui/copy-command.tsx";
 import { PullBar } from "../models/index.ts";
+import { AppCard, type AppCardProps } from "../setup/index.ts";
 import { StepMark, type CardMark } from "./step-card.tsx";
 
 /** What the Model line of the summary says. */
@@ -24,6 +25,8 @@ export type ReadyStepProps = {
    * blocks. `page: "only"` is the page's host alone, the service being kept already.
    */
   keepNote: { command: string; page?: "only" } | null;
+  /** The offer to install the page as an app, under the button. */
+  app: Omit<AppCardProps, "where">;
   /** The person came from a send that had no model: the button goes back to their message. */
   fromSend: boolean;
   onStart: () => void;
@@ -42,7 +45,7 @@ function Line({ mark, name, waitWord, children }: { mark: CardMark; name: string
 const MODEL_MARK: Record<ReadyModel["kind"], CardMark> = { ready: "ok", downloading: "spin", failed: "fail", none: "attn" };
 
 /** Ready: what was set up, and the way into the chat. While the default model downloads it says `Almost ready.` and waits. */
-export function ReadyStep({ engine, model, tools, toolsSkipped, keepNote, fromSend, onStart }: ReadyStepProps) {
+export function ReadyStep({ engine, model, tools, toolsSkipped, keepNote, app, fromSend, onStart }: ReadyStepProps) {
   const waiting = model.kind === "downloading";
   const lede = [
     waiting ? `${model.id} is still downloading. Start chatting turns on when it's there.` : null,
@@ -76,6 +79,7 @@ export function ReadyStep({ engine, model, tools, toolsSkipped, keepNote, fromSe
           {fromSend ? "Back to your message" : "Start chatting"}
         </Button>
       </div>
+      <AppCard {...app} where="ready" />
       {keepNote === null ? null : (
         <div className="flex w-full flex-col items-center gap-2 rounded-md border border-dashed border-line-strong px-3.5 py-3 text-sm text-muted">
           <p>

@@ -3,6 +3,7 @@ import { changeToolFilter, installEventOf, type InstallEvent, type PermissionMod
 import type { QueryClient } from "@tanstack/react-query";
 import { createDrafts, type Drafts } from "./drafts.ts";
 import { createConnectionStore, type ConnectionStore } from "./connection.ts";
+import { createAppInstall, type AppInstallStore } from "./app-install.ts";
 import { createPageHost, type PageHostStore } from "./page-host.ts";
 import { createNewSession, type NewSessionStore } from "./new-session.ts";
 import { CONFIG_KEY } from "./config.ts";
@@ -236,6 +237,8 @@ export type Page = {
   connection: ConnectionStore;
   /** Whether a job keeps the gateway running, read from `/healthz` at start and when the link comes back. */
   pageHost: PageHostStore;
+  /** Whether the page can become an app, and the saved install prompt. */
+  appInstall: AppInstallStore;
   sessions: Sessions;
   sessionList: SessionList;
   newSession: NewSessionStore;
@@ -256,12 +259,13 @@ export type Page = {
   stop(): void;
 };
 
-export type PageOptions = { pageHost?: PageHostStore; frame?: Frame; doc?: Pick<Document, "addEventListener" | "removeEventListener" | "visibilityState"> };
+export type PageOptions = { pageHost?: PageHostStore; appInstall?: AppInstallStore; frame?: Frame; doc?: Pick<Document, "addEventListener" | "removeEventListener" | "visibilityState"> };
 
 /** Everything the page holds, built on one client. */
 export function createPage(client: PageClient, options: PageOptions = {}): Page {
   const connection = createConnectionStore(() => client);
   const pageHost = options.pageHost ?? createPageHost();
+  const appInstall = options.appInstall ?? createAppInstall();
   const sessions = createSessions(client, options.frame);
   const sessionList = createSessionList(client);
   const newSession = createNewSession();
@@ -288,6 +292,7 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
   return {
     connection,
     pageHost,
+    appInstall,
     sessions,
     sessionList,
     newSession,
