@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { createRouter, inspectPath, parseRoute, sessionPath, settingsPath, tracePath } from "./router.ts";
+import { createRouter, inspectPath, parseRoute, sessionPath, settingsPath, tracePath, welcomePath } from "./router.ts";
 
 afterEach(() => {
   history.replaceState(null, "", "/");
@@ -162,5 +162,38 @@ test("selecting a span is a new route, and the same span is the same route", () 
   expect(router.getSnapshot()).toBe(first);
   router.navigate(tracePath("one", "m_1"), { replace: true });
   expect(router.getSnapshot()).toEqual({ name: "trace", id: "one", span: "m_1" });
+  router.stop();
+});
+
+test("parseRoute reads /welcome with its step and origin", () => {
+  expect(parseRoute("/welcome")).toEqual({ name: "welcome", step: "engine", from: null });
+  expect(parseRoute("/welcome", "?step=model")).toEqual({ name: "welcome", step: "model", from: null });
+  expect(parseRoute("/welcome", "?step=tools&from=send")).toEqual({ name: "welcome", step: "tools", from: "send" });
+  expect(parseRoute("/welcome", "?step=ready")).toEqual({ name: "welcome", step: "ready", from: null });
+  // What is not a step is the first one, and what is not an origin is none.
+  expect(parseRoute("/welcome", "?step=service&from=elsewhere")).toEqual({ name: "welcome", step: "engine", from: null });
+  expect(parseRoute("/welcome/")).toEqual({ name: "not-found" });
+});
+
+test("welcomePath round-trips through parseRoute", () => {
+  expect(welcomePath()).toBe("/welcome");
+  expect(welcomePath("engine")).toBe("/welcome");
+  expect(welcomePath("model")).toBe("/welcome?step=model");
+  expect(welcomePath("ready", "send")).toBe("/welcome?step=ready&from=send");
+  expect(welcomePath("engine", "send")).toBe("/welcome?from=send");
+  for (const [step, from] of [["engine", null], ["model", null], ["tools", "send"], ["ready", "send"]] as const) {
+    const [pathname, search] = welcomePath(step, from).split("?");
+    expect(parseRoute(pathname ?? "", `?${search ?? ""}`)).toEqual({ name: "welcome", step, from });
+  }
+});
+
+test("a step change is a route change, the same step is not", () => {
+  history.replaceState(null, "", "/welcome");
+  const router = createRouter();
+  const first = router.getSnapshot();
+  router.navigate(welcomePath("engine"), { replace: true });
+  expect(router.getSnapshot()).toBe(first);
+  router.navigate(welcomePath("model"), { replace: true });
+  expect(router.getSnapshot()).toEqual({ name: "welcome", step: "model", from: null });
   router.stop();
 });

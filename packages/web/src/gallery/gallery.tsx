@@ -33,6 +33,8 @@ import { CommandPaletteView, KeysDialog } from "../features/palette/index.ts";
 import { ModelDialogView, type ModelDialogViewProps } from "../features/models/index.ts";
 import { sampleTry, sampleTuneBackend } from "../features/models/sample-tune.ts";
 import { SetupDialogView } from "../features/setup/index.ts";
+import { FinishSetupStripView, WelcomeView } from "../features/welcome/index.ts";
+import { WELCOME_CASES } from "../features/welcome/sample.ts";
 import { SpanDetail, TraceSummary, TraceTree } from "../features/trace/index.ts";
 import { APPROVAL_DETAIL, APPROVAL_TRACE, CUT_LIKELY_DETAIL, CUT_MIDDLE_DETAIL, CUT_YES_DETAIL, FULL_DETAIL, MODEL_DETAIL, NO_PROMPT_DETAIL, NUM_CTX_DETAIL, OLD_DETAIL, SECTIONS_DETAIL, TOOL_DETAIL, UNKNOWN_WINDOW_DETAIL, FAILED_TRACE, GROWING_TRACE, LONG_TRACE, OLD_TRACE, SHORT_TRACE } from "../features/trace/sample.ts";
 import type { TraceRunSpan, TraceSpanResult } from "../store/trace.ts";
@@ -571,6 +573,22 @@ function SetupFormDemo() {
   );
 }
 
+/** The welcome page in each step and state, in a box of its own: it is a page, so it fills its frame. */
+function WelcomeDemo() {
+  return (
+    <div className="flex flex-col gap-4">
+      {WELCOME_CASES.map(({ label, props }) => (
+        <section key={label} aria-label={`Welcome, ${label}`} className="flex flex-col gap-1">
+          <span className="font-mono text-xs text-faint">{label}</span>
+          <div className="relative flex h-160 flex-col overflow-hidden rounded-lg border border-line bg-bg">
+            <WelcomeView {...props} />
+          </div>
+        </section>
+      ))}
+    </div>
+  );
+}
+
 function TraceDemo({ label, runs }: { label: string; runs: TraceRunSpan[] }) {
   const [selected, setSelected] = useState<string | null>(null);
   return (
@@ -743,6 +761,11 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
         <SetupFormDemo />
       </section>
 
+      <section className="mt-6" id={anchor("Welcome page")}>
+        <h3 className="mb-2 font-mono text-xs text-faint">Welcome page</h3>
+        <WelcomeDemo />
+      </section>
+
       <section className="mt-6" id={anchor("Download row")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Download row</h3>
         <DownloadRowDemo />
@@ -763,6 +786,17 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
             onChange={() => {}}
             composer={<DemoComposer size="large" />}
             modelChip={<NewSessionModelChipView label={{ kind: "default", text: "Gemma 4 E4B" }} onOpen={() => {}} />}
+          />
+        </div>
+        <div aria-label="Empty screen, setup left" role="group" className="mt-2 flex h-96 flex-col rounded-lg border border-line bg-bg">
+          <HomeView
+            headingLevel="h4"
+            folder="/Users/you/repos/golem"
+            folders={["/Users/you/repos/golem"]}
+            onChange={() => {}}
+            notice={<FinishSetupStripView onFinish={() => {}} />}
+            composer={<DemoComposer size="large" />}
+            modelChip={<NewSessionModelChipView label={{ kind: "none" }} onOpen={() => {}} />}
           />
         </div>
         <div className="mt-2 flex flex-wrap gap-2 rounded-lg border border-line bg-bg p-4">
