@@ -25,6 +25,17 @@ On the first start, golem's setup window asks where golem should think: on this 
 - A local model that is not downloaded yet asks once, then downloads with a progress bar. If Ollama is missing, golem offers to install it with Homebrew first.
 - A hosted model needs its API key. Type `/login`, pick the provider, and paste the key, or Enter on Use it when your shell already has it. golem checks it with the provider before it saves it in the Keychain, and nothing is echoed.
 
+## Tools offered during setup
+
+After the model, and only when your `config.toml` has no `[mcp]` table, the terminal's setup window offers some tools: Fetch, Context7, and Playwright ticked, GitHub not.
+
+- **Space** ticks or unticks a server, and **Enter** adds the ticked ones. **`s`** skips the offer, and **Esc** goes back to the model.
+- A server that needs Node or uv installs it first with Homebrew, and each row says what it is doing, then `added · N tools · on demand`. **Esc** stops what has not started.
+- Ticking GitHub asks for a token. It is not echoed, it is kept in the Keychain and not in a file, and an empty token skips GitHub.
+- A server that fails says why, and the others stay added. Pick **Paste a new token**, **Skip**, or **Show the log**.
+
+Every server is added on demand, so none costs a token until a chat turns it on. The Ready step lists the tools when some were added. `/mcp` manages them any time, and [MCP servers](mcp.md) has the rest.
+
 ## Ask a first question
 
 Type a message and press **Enter**. **Shift-Enter** starts a new line.

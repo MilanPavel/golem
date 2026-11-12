@@ -118,12 +118,14 @@ The page is only for you, on your Mac.
 
 The page can run in its own window with the pixel golem as its Dock icon.
 
-- **Chrome and Edge:** open the page, then use the install button in the address bar, or the menu's `Install golem…`.
+- **Chrome and Edge:** open the page, then use the install button in the address bar, or the menu `Cast, save, and share → Install page as app`.
 - **Safari (macOS 14 and later):** open the page, then choose `File → Add to Dock…`. Safari shows no install prompt, so this menu item is the only way.
 
 The app is tied to the address it was installed from, port included. `golem web --port N` is a different app, and it has no login. If the app opens to `This page needs a fresh link`, run `golem web` again.
 
-There is no service worker, so after an upgrade the app shows the new page on its next load, never an old copy.
+There is no service worker, so the page is never cached by one. After `brew upgrade golem`, run `golem web`: the app shows the new page on its next load, never an old copy.
+
+The Dock icon does not show state. It opens the page, and the page shows whether it is connected.
 
 ## When the page cannot connect
 
