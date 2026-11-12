@@ -61,15 +61,21 @@ export type ModelRowProps = {
   pull: PullEntry | undefined;
   /** Why the last download failed. */
   failed: string | undefined;
+  /** A tag after the name, such as `recommended`, beside the one the category filter names. */
+  tag?: string | undefined;
+  /** One line under the name: why the model is listed. */
+  note?: string | undefined;
+  /** How long the download takes, shown next to the size. */
+  estimate?: string | undefined;
 };
 
 /** One line of the list: the name, the facts, and under them what stops it or how far it is. */
-export function ModelRow({ model, providerMissing, current, isDefault, category, pull, failed }: ModelRowProps) {
+export function ModelRow({ model, providerMissing, current, isDefault, category, pull, failed, tag, note, estimate }: ModelRowProps) {
   const profiles = model.profiles ?? [];
   const label = profiles.length > 0 ? profiles.join(", ") : model.label;
   const detail = profiles.length > 0 || model.label !== model.ref ? model.ref : "";
   const usage = [contextLabel(model.ctx), priceLabel(model)].filter((part) => part.length > 0).join(" · ");
-  const size = sizeLabel(model);
+  const size = [sizeLabel(model), estimate ?? ""].filter((part) => part.length > 0).join(" · ");
   const status = statusLabel(model, providerMissing);
   const facts = [
     { text: usage, tone: "text-muted" },
@@ -96,6 +102,7 @@ export function ModelRow({ model, providerMissing, current, isDefault, category,
           <span className={cn("text-sm font-medium", ready ? "text-ink" : "text-muted")}>{label}</span>
           {detail === "" ? null : <span className="font-mono text-xs text-faint">{detail}</span>}
           {isDefault ? <Badge className="px-1.5 py-0">default</Badge> : null}
+          {tag === undefined || tag === "" ? null : <Badge className="px-1.5 py-0 text-allow">{tag}</Badge>}
           {recommended === "" ? null : <Badge className="px-1.5 py-0 text-allow">{recommended}</Badge>}
           {categories.map((category) => (
             <Badge key={category} className="px-1.5 py-0 text-faint">
@@ -103,6 +110,7 @@ export function ModelRow({ model, providerMissing, current, isDefault, category,
             </Badge>
           ))}
         </div>
+        {note === undefined || note === "" ? null : <p className="mt-0.5 text-xs text-muted">{note}</p>}
         {why === null ? null : <p className="mt-0.5 text-xs text-muted">{why}</p>}
         {model.status === "pulling" ? <Progress model={model} entry={pull} /> : null}
         {failed === undefined ? null : <p className="mt-0.5 text-xs text-deny">Download failed: {failed}</p>}

@@ -1,4 +1,4 @@
-import { COMMANDS, noPastes, withModelChoices, withSkillChoices, type TodoItem } from "@golem/view";
+import { COMMANDS, noPastes, pickerGroups, withModelChoices, withSkillChoices, type TodoItem } from "@golem/view";
 import { createContext, useContext, useEffect, useId, useState, type ReactNode } from "react";
 import { Badge } from "../ui/badge.tsx";
 import { Button } from "../ui/button.tsx";
@@ -30,7 +30,7 @@ import { CommandsDialog } from "../features/composer/help-dialog.tsx";
 import { HomeView, NewSessionModelChipView, SessionTitle } from "../features/shell/index.ts";
 import { FolderBrowserView } from "../features/shell/folder-browser.tsx";
 import { CommandPaletteView, KeysDialog } from "../features/palette/index.ts";
-import { ModelDialogView, type ModelDialogViewProps } from "../features/models/index.ts";
+import { ModelDialogView, ModelList, withActivePulls, type ModelDialogViewProps, type ModelListNote } from "../features/models/index.ts";
 import { sampleTry, sampleTuneBackend } from "../features/models/sample-tune.ts";
 import { SetupDialogView } from "../features/setup/index.ts";
 import { FinishSetupStripView, WelcomeView } from "../features/welcome/index.ts";
@@ -438,6 +438,43 @@ function ModelDialogDemo({ theme }: { theme: string }) {
           />
         </div>
       ))}
+    </div>
+  );
+}
+
+const LIST_NOTES = new Map<string, ModelListNote>([
+  ["ollama/qwen3:14b", { tag: "recommended", reason: "Strong at code, and it fits in 16 GB of memory.", estimate: "about 12 min" }],
+  ["ollama/gemma3:12b", { estimate: "about 8 min" }],
+]);
+
+/** The list alone, as `/welcome` shows it: a leading group, a tag and a reason, a download, and a collapsed tail. */
+function ModelListDemo() {
+  const [query, setQuery] = useState("");
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const listing = withActivePulls(SAMPLE_LISTING, SAMPLE_PULLS) ?? SAMPLE_LISTING;
+  const fits = listing.models.filter((model) => model.source === "catalog" && model.fit === "fits");
+  const groups = pickerGroups(listing, query, null);
+  return (
+    <div className="flex h-96 max-w-2xl flex-col rounded-lg border border-line bg-bg p-4">
+      <ModelList
+        className="min-h-0 flex-1"
+        listClassName="flex-1"
+        listing={listing}
+        groups={groups}
+        leading={{ title: "Fits this Mac · 16 GB memory", models: fits }}
+        notes={LIST_NOTES}
+        collapse={{ keep: 4 }}
+        profile="local"
+        category={null}
+        pulls={SAMPLE_PULLS}
+        query={query}
+        onQueryChange={setQuery}
+        activeId={activeId}
+        onActiveChange={setActiveId}
+        onActivate={() => {}}
+        onStop={() => {}}
+        empty={<p className="px-3 py-6 text-center text-sm text-muted">No matching models.</p>}
+      />
     </div>
   );
 }
@@ -1021,6 +1058,11 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
       <section className="mt-6" id={anchor("Model dialog")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Model dialog</h3>
         <ModelDialogDemo theme={theme} />
+      </section>
+
+      <section className="mt-6" id={anchor("Model list")}>
+        <h3 className="mb-2 font-mono text-xs text-faint">Model list</h3>
+        <ModelListDemo />
       </section>
 
       <section className="mt-6" id={anchor("Setup window")}>
