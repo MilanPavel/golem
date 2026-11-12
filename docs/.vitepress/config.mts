@@ -109,6 +109,7 @@ const sidebar: DefaultTheme.Sidebar = [
       { text: "Introduction", link: "/guide/introduction" },
       { text: "Install", link: "/install" },
       { text: "First chat", link: "/guide/first-chat" },
+      { text: "Uninstall", link: "/guide/uninstall" },
     ],
   },
   {

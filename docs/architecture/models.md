@@ -129,7 +129,7 @@ A setting that needs a secret names it as `keychain:<name>` and the daemon resol
 2. Then the provider's key from that store.
 3. A provider with `api_key_env` fails without a key, and the error names `/login <provider>`. Other providers, except `ollama`, use a stored key when there is one.
 
-**Only the daemon writes them.** Only the daemon writes those items, through `auth.set`, so the Keychain lets it read them without a prompt. A frozen daemon from `just dist` is a different executable from a checkout's Python. After its first successful read of each item, it deletes the item and writes it again so it owns it, and lists the name in `run/keychain-migrated` so this happens once.
+**Only the daemon writes them.** Only the daemon writes those items, through `auth.set`. On macOS it does so through `/usr/bin/security`, with the command on stdin, so the Keychain trusts a program that is the same in every release ([ADR-021](../adr/021-release-signing.md)). A frozen daemon from `just dist` reads an item an older build saved through `keyring` once, then deletes it and stores it again through `security`, and lists the name in `run/keychain-security` so this happens once. Other systems use `keyring`.
 
 **Model edits need no restart.** The model router re-reads `config.toml` when its modification time changes. A file that no longer validates keeps the last good models and logs a warning.
 

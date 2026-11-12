@@ -17,7 +17,7 @@ golem has commands in two places: `golem …` in your shell, and `/…` inside t
 | `golem --version` | Prints the version |
 | `golem status` | Is the daemon up? Prints its pid, version, and uptime |
 | `golem doctor` | Checks the whole install, and says how to fix each problem |
-| `golem install` / `uninstall` | Sets up or removes both background jobs: the service and the web page. `~/.golem` stays |
+| `golem install` / `uninstall` | Sets up or removes both background jobs: the service and the web page. `~/.golem` stays. [Uninstall](./uninstall.md) has the whole removal |
 | `golem daemon install` / `uninstall` | Sets up or removes the background service. `~/.golem` stays |
 | `golem daemon start` / `stop` / `restart` | Controls the daemon. `restart` after an upgrade |
 | `golem daemon logs` | Follows the daemon's log |

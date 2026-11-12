@@ -105,7 +105,7 @@ stateDiagram-v2
 | Command | What it does |
 |---|---|
 | `golem install` | Installs both jobs: the service (`golem daemon install`) and the web page ([below](#the-web-page-job)) |
-| `golem uninstall` | Removes both jobs. Your data in `~/.golem` stays |
+| `golem uninstall` | Removes both jobs. Your data in `~/.golem` stays. The whole removal is in [Uninstall](../guide/uninstall.md) |
 | `golem daemon install` | Writes the launchd file and starts the daemon. Run it again after moving or upgrading golem |
 | `golem daemon start` | Starts the daemon, or restarts it if it is running |
 | `golem daemon stop` | Stops it and keeps it stopped until `start` |
@@ -192,23 +192,20 @@ API keys are kept in the **macOS Keychain**, never in a file.
 
 ### Which program is allowed to read the key?
 
-The Keychain remembers which **program** created each item, and lets only that program read it without asking.
+On macOS the daemon reads, writes and deletes its keys through `/usr/bin/security`, Apple's own command, and sends each command on its standard input, so a key never appears in the process list. The Keychain remembers which program created each item and lets that program read it without asking. Apple signs `security` and it is the same in every release, so an upgrade or a rebuild of golem does not ask.
 
 ```mermaid
 flowchart TB
-  subgraph before [Running from source code]
-    py["uv's shared Python"] -->|created the key| k1[("Keychain item")]
-    other["Any other Python script<br/>on the same Python"] -.->|can also read it| k1
-  end
-  subgraph after [Running a build]
-    gd["golem-daemon<br/>(golem's own program)"] -->|"asks you once,<br/>then re-saves the key"| k2[("Keychain item")]
-    other2["Other programs"] -.->|macOS asks you first| k2
-  end
+  gd["golem-daemon"] -->|"runs, key on stdin"| sec["/usr/bin/security<br/>(Apple's, the same every release)"]
+  sec -->|"created the key,<br/>so it may read it"| k[("Keychain item")]
+  other["Other programs"] -.->|"macOS asks you first,<br/>unless they use security"| k
 ```
 
-When a built daemon first reads a key saved by the source-code version, macOS asks once. Choose **Always Allow**. The daemon then deletes the key and saves it again, so from then on only the daemon is trusted. It writes the key's name to `~/.golem/run/keychain-migrated`, so this happens only once per key.
+**The cost.** Any program running as you can run `security find-generic-password -s golem -a <name> -w` and read a key without a dialog. The keys stay encrypted in the login Keychain and are locked with it. It is the same exposure as `~/.aws/credentials` or an environment variable, and weaker than a dialog on every read. golem accepts that to end the dialog after every upgrade ([ADR-021](../adr/021-release-signing.md)).
 
-**Releases keep the rule, not the partition.** Releases are signed with one certificate, so every release matches the item's rule. macOS also gives each item a partition list, and a program with no Apple Team ID gets `cdhash:<its hash>` there. Each release has a new hash, so the first read after an upgrade asks again. While a read waits longer than half a second, the daemon sends `keychain.wait`, and the TUI names the key and says to choose Always Allow. Only a Developer ID signature, with a Team ID, ends the prompt. A local build is signed ad-hoc unless you give it the certificate, so macOS treats each rebuild as a new program and asks again.
+**The one-time move.** A key an earlier build saved belongs to that build. The first time a release reads it, macOS may ask once. Choose **Always Allow**. The daemon then deletes the key and stores it again through `security`, and writes the key's name to `~/.golem/run/keychain-security`, so this happens only once per key. While a read waits longer than half a second, the daemon sends `keychain.wait`, and the TUI names the key and says to choose Always Allow. Keys saved by a release or by `golem auth set` never ask.
+
+Only printable ASCII keys can be stored this way. A key with a newline or another character is refused, because a newline would start a second `security` command. On other systems golem uses the system's credential store through `keyring`.
 
 ---
 
@@ -392,7 +389,7 @@ Remember: under launchd, `GOLEM_...` variables from your terminal do not apply. 
 | An MCP server's tools are missing | Run `/mcp`. `idle` means it is on demand: `/mcp enable <name>`. A project's server needs its folder in `trusted_projects`. Changes to `[mcp.*]` apply within a few seconds; a file that does not validate keeps the last good servers, and the log says why |
 | `/mcp` shows `no secret mcp/<name> in the Keychain` | Run `golem auth set mcp/<name>`. The server starts again with it |
 | An HTTP MCP server shows `HTTP 401` | The token is wrong or expired. Store a new one with `golem auth set mcp/<name>` |
-| macOS asks about the Keychain on every start | A local build is signed ad-hoc, so every rebuild asks. Choose Always Allow, or sign local builds with the release certificate ([Signing](release.md#signing)). A release asks once, after the first upgrade from a local or ad-hoc build |
+| macOS asks about the Keychain on every start | It asks once per key, the first time this golem reads a key an older build saved. Choose Always Allow. It does not ask again, after upgrades or rebuilds ([API keys and the Keychain](#_9-api-keys-and-the-keychain)). If it asks after every upgrade, the daemon is an older version: run `golem daemon restart` |
 | A release workflow fails at "Import the signing certificate" | The secrets or the `MACOS_SIGN_IDENTITY` variable are missing. See [Signing](release.md#signing) |
 | The release's `tap` job fails | The `HOMEBREW_TAP_TOKEN` secret is missing or expired, or `homebrew-golem` does not exist. The release itself is published. Fix the token ([Setting up the tap](release.md#setting-up-the-tap-once)), then re-run the job |
 | The tap's `test` workflow fails at "Homebrew installed the archive unchanged" | Homebrew edited a file after install. A new library in the daemon may have a non-`@rpath` install name (`otool -D`), or a newer Homebrew may edit kegs in a new way. Do not merge |
