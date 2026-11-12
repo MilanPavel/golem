@@ -2,6 +2,7 @@
 
 **Date**: 2026-10-31
 **Status**: accepted
+**Amended**: 2026-11-12 (sign-ins are kept on disk, as digests. See [Sign-ins on disk](#sign-ins-on-disk))
 
 ## The idea
 
@@ -62,7 +63,7 @@ sequenceDiagram
 - **The page trades the token for a cookie.**
   - `POST /auth/exchange` takes the token in its body and compares it in constant time.
   - It sets a cookie with a fresh random secret, not the token. A cookie can leak more ways than a file can: another local server on another port receives it too, because cookies on `127.0.0.1` are shared by every port. So the cookie is worth nothing outside this gateway's memory, and its name carries the port (`golem_7480`), so two gateways never overwrite each other's.
-  - Flags: `HttpOnly`, `SameSite=Strict`, `Path=/`, and `Max-Age` of 30 days. Secrets live only in the gateway's memory, so a gateway that restarts forgets them all, and the page asks for a fresh link.
+  - Flags: `HttpOnly`, `SameSite=Strict`, `Path=/`, and `Max-Age` of 30 days. The secrets themselves live only in the cookie. The gateway keeps a SHA-256 of each one on disk, so a restarted gateway still knows them (see [Sign-ins on disk](#sign-ins-on-disk)).
 - **Every request and every upgrade is checked:**
   - **`Host`** must be exactly `127.0.0.1:<port>`. This stops DNS rebinding, where an outside name later resolves to `127.0.0.1`.
   - **`Origin`** must be exactly `http://127.0.0.1:<port>`. `localhost` is a different origin and is refused, so the CLI always opens `127.0.0.1`. On an upgrade or a `POST`, a missing `Origin` is refused too. Browsers always send it there, so only a program that is not a browser leaves it out, and such a program can use the socket.
@@ -172,8 +173,9 @@ interface Link {
 |---|---|
 | A website you visit opens a WebSocket to `127.0.0.1:7480` | `Origin` is checked exactly, and it has no cookie |
 | DNS rebinding: an outside name resolves to `127.0.0.1` | `Host` is checked exactly |
-| Another local server, on another port, reads the cookie | The cookie is a secret held only in the gateway's memory, and is useless without a matching `Origin`. The token itself never leaves the file and the address |
+| Another local server, on another port, reads the cookie | The cookie is a secret the gateway keeps only as a SHA-256, and is useless without a matching `Origin`. The token itself never leaves the file and the address |
 | A program run as you reads `web.token` | Out of scope. It can already use the socket. The file mode is the login, as it always was |
+| A program run as you reads `web-sessions` | It holds only hashes, which cannot be sent back as a cookie. The program could read `web.token` and use the socket anyway |
 | Another user on the Mac | The token file is `0600`, `run/` is checked, and the gateway listens only on loopback |
 | One message smuggles a second command | One object per message, no `\n` or `\r` |
 | A new privileged command reaches the browser by default | A generated allowlist, and a test that fails for any method nobody declared |
@@ -181,6 +183,21 @@ interface Link {
 | Clickjacking the approval card | `frame-ancestors 'none'` |
 | A slow or stuck tab fills memory | The 4 MiB pause, then the daemon's drop and a re-attach |
 | An old page after an upgrade | `index.html` is `no-cache`, there is no service worker, and `hello` refuses a different protocol major |
+
+## Sign-ins on disk
+
+Amended 2026-11-12. A gateway that restarts (a reboot, `brew upgrade`, a crash that launchd restarts) used to forget every cookie, and the page said "This page needs a fresh link". Cookie secrets are now kept on disk, as digests, so they survive a restart.
+
+- **The file is `~/.golem/run/web-sessions`.** It holds JSON: `{"version":1,"sessions":[{"sha256":"<64 hex>","expires":<ms since the epoch>}]}`. It never holds a secret, only the SHA-256 of each live one and when it ends.
+- **Mode `0600`, written atomically.** A new file is made next to it with `O_EXCL` and `O_NOFOLLOW` (as `web.token` is), written, synced, and renamed over the old one, so a reader sees the old file or the new one. `run/` is checked as for `web.token`.
+- **The gateway reads it on each check,** drops the entries that have ended, and writes it on each new sign-in and each time something was dropped. Reading on each check is what makes `golem web logout`, which runs in another process, take effect on the next request. The file is a few lines, and a check happens only on a WebSocket upgrade.
+- **A file that is damaged, has the wrong mode or owner, or is a link,** is not trusted. It is replaced with an empty one, and everyone signs in again. A `run/` that fails the check means nothing is read or written, so nobody is signed in.
+- **Comparison.** The gateway hashes the presented cookie and compares the digest with every entry in constant time, with no early exit. The cap of 64 live sign-ins stays.
+- **If the file cannot be read or written,** the gateway fails closed: a sign-in that is not on disk is not valid, so the browser needs a fresh link. A `run/` that fails its checks refuses every sign-in.
+- **Unchanged:** the cookie's name (`golem_<port>`), its flags, its 30-day `Max-Age`, and `POST /auth/exchange`.
+- **`golem web logout`** writes an empty list, and the next request of every browser is `unauthorized`. A WebSocket that is already open stays open until it closes or the page reloads, because the cookie is checked on the upgrade.
+- **Why the threat model holds.** A program running as you can already read `web.token` and use the daemon's socket, so the file gives it nothing new. A digest cannot be sent back as a cookie, because the gateway hashes what it receives. Another user cannot read the file, or `run/`.
+- **One file,** because only one gateway runs at a time (`run/web.json`). `golem web` started by hand and the launchd job share it.
 
 ## Tests this record asks for
 
@@ -248,7 +265,7 @@ The gateway's core is plain functions over the standard `Request` and strings (`
 ## What it costs
 
 - One more process when you use the web UI, and one more hop, which costs microseconds.
-- The first open after a gateway restart needs a fresh link from `golem web`, because the secrets lived in memory. Step 10.14's launchd job makes restarts rare.
+- A browser stays signed in for 30 days, across gateway restarts, because the digests are on disk. `golem web logout` ends every sign-in.
 - Port 7480 can be taken by something else. `--port` is the way out, and the new origin starts with no cookie.
 - Each new command needs a browser declaration before `just check` passes.
 - `'unsafe-inline'` for styles is a small hole: injected CSS cannot run script, but it can restyle the page. The sanitizer forbids `style` in model output, which is the main way CSS could get in.

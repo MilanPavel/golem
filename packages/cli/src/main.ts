@@ -45,7 +45,7 @@ import { readChoice } from "./read-choice.ts";
 import { readSecret } from "./read-secret.ts";
 import { type Gate, gateService, type SessionDaemon } from "./service-gate.ts";
 import { parseWebArgs, type WebArgs } from "./web.ts";
-import { runWeb } from "./web-command.ts";
+import { runWeb, runWebLogout } from "./web-command.ts";
 import { findWorkspaceRoot } from "./workspace.ts";
 
 // The first start of a fresh build takes a few seconds while macOS checks its libraries.
@@ -63,7 +63,8 @@ const USAGE =
   "       golem mcp add <name> -- <command…> [--token-env VAR] | golem mcp add <name> --url <url> [--token] [--env K=V] [--header K=V] [--cwd D] [--on-demand] [--project] [--timeout S] [--approval allow] | golem mcp add --catalog <id> [--input <id>=<value>] | golem mcp remove <name> | golem mcp export [--format claude|vscode] [--scope user|project]\n" +
   "       golem mcp list [--json] | show <name> [--json] | test <name> | test --catalog <id> | edit <name> [--project] | import [--from <app>|<file>] [--all] | logs <name> [-f] | enable <name> [--on-demand] | disable <name> | restart <name> | tools <name> [--hide <glob>] [--show <glob>]\n" +
   "       golem config show [--resolved] | golem config edit [--project] | golem skills [list] | golem skills check <path>\n" +
-  "       golem web [--port N] [--no-open] [--json]";
+  "       golem web [--port N] [--no-open] [--json]\n" +
+  "       golem web logout";
 
 // exitCode, not exit(): exit() drops output a pipe has not read yet.
 process.exitCode = await run(process.argv.slice(2));
@@ -103,6 +104,9 @@ async function run(args: string[]): Promise<number> {
   }
   if (command === "skills" && rest[0] === "check" && rest.length === 2 && rest[1] !== undefined) {
     return runSkillsCheck(rest[1]);
+  }
+  if (command === "web" && rest.length === 1 && rest[0] === "logout") {
+    return runWebLogout();
   }
   if (command === "web") {
     const parsed = parseWebArgs(rest);

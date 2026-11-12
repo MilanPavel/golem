@@ -6,7 +6,7 @@ export { MAX_EXCHANGE_BYTES, checkRequest, checkUpgrade, cookieName, exchangeTok
 export type { Check } from "./auth.ts";
 export { isSecretShape, randomSecret, timingSafeEqual } from "./secret.ts";
 export { createSessionStore } from "./sessions.ts";
-export type { SessionOptions, SessionStore } from "./sessions.ts";
+export type { SessionOptions, SessionPersistence, SessionStore, StoredSession } from "./sessions.ts";
 export { CONTENT_SECURITY_POLICY, withSecurityHeaders } from "./headers.ts";
 export {
   CLOSE_DAEMON_DOWN,
