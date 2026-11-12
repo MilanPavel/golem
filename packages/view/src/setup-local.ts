@@ -16,6 +16,7 @@ export const OLLAMA_DOWNLOAD_URL = "https://ollama.com/download";
 
 export type OllamaState =
   | { phase: "missing"; selected: number; note: string | null }
+  | { phase: "stray"; selected: number }
   | { phase: "installing"; since: number; last: string }
   | { phase: "starting"; since: number; installed: boolean }
   | { phase: "waiting"; since: number }
@@ -28,6 +29,9 @@ export function ollamaAtOpen(listing: ModelListResult | null, now: number): Olla
   }
   if (listing?.setup.ollama_installed === true) {
     return { phase: "starting", since: now, installed: false };
+  }
+  if (listing?.setup.ollama_stray === true) {
+    return { phase: "stray", selected: 0 };
   }
   return { phase: "missing", selected: 0, note: null };
 }
@@ -53,6 +57,14 @@ export function ollamaLines(state: OllamaState, now: number): SetupLine[] {
         ...(state.note === null ? [] : [{ kind: "text", text: state.note, dim: true } as const]),
         { kind: "status", mark: "fail", text: "Ollama isn't installed" },
         { kind: "text", text: "Ollama runs the model on your Mac. About 200 MB.", dim: true },
+        { kind: "blank" },
+        ...options(state.selected),
+      ];
+    case "stray":
+      return [
+        ...head,
+        { kind: "status", mark: "fail", text: "Ollama is still running from an install that was removed" },
+        { kind: "text", text: "Quit it, then install Ollama again. The models you downloaded are kept.", dim: true },
         { kind: "blank" },
         ...options(state.selected),
       ];
@@ -102,7 +114,7 @@ export function pressOllama(state: OllamaState, key: PanelKey, now: number): { s
   if (key === "back") {
     return { state, effect: { kind: "back" } };
   }
-  if (state.phase !== "missing" && state.phase !== "failed") {
+  if (state.phase !== "missing" && state.phase !== "failed" && state.phase !== "stray") {
     return { state, effect: none };
   }
   const choices = ollamaChoices(state);
@@ -130,7 +142,7 @@ export function ollamaInstallEnded(
     case "no_brew":
       return { phase: "waiting", since: now };
     case "failed":
-      return state.phase === "installing" || state.phase === "missing" || state.phase === "failed"
+      return state.phase === "installing" || state.phase === "missing" || state.phase === "stray" || state.phase === "failed"
         ? { phase: "failed", reason, selected: 0 }
         : state;
   }

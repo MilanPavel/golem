@@ -617,6 +617,7 @@ async def _model_list(ctx: RequestContext, params: ModelListParams) -> ModelList
             ollama_running=listing.setup.ollama_running,
             keys=list(listing.setup.keys),
             default_status=listing.setup.default_status,
+            ollama_stray=listing.setup.ollama_stray,
         ),
     )
 

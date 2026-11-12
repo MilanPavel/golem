@@ -441,7 +441,9 @@ def _engines(router: ModelRouter, platform: Platform, keys: KeyStore, start: boo
     if local is not None and local.kind == "ollama":
         base = (local.base_url or OLLAMA_BASE_URL).strip().rstrip("/").removesuffix("/v1")
         pulled = platform.ollama_models(base)
-        if pulled is not None:
+        if pulled is not None and ollama.is_local(base) and not platform.ollama_installed():
+            checks.append(_ollama_stray("ollama"))
+        elif pulled is not None:
             count = f"{len(pulled)} model" + ("" if len(pulled) == 1 else "s")
             checks.append(Check("ollama", "ok", f"running, {count} downloaded", part="engine"))
         elif not platform.ollama_installed():
@@ -481,6 +483,8 @@ def _ollama_checks(
     pulled = platform.ollama_models(base)
     if pulled is None:
         return [_ollama_down(name, base, platform, start)]
+    if ollama.is_local(base) and not platform.ollama_installed():
+        return [_ollama_stray(name)]
     have = {_with_tag(model) for model in pulled}
     missing = sorted({model.model_id for model in models if _with_tag(model.model_id) not in have})
     count = f"{len(pulled)} model" + ("" if len(pulled) == 1 else "s")
@@ -498,6 +502,18 @@ def _ollama_checks(
         for model in missing
     )
     return checks
+
+
+def _ollama_stray(name: str) -> Check:
+    """A local server that answers from an install that was removed: it cannot run a model."""
+    return Check(
+        name,
+        "fail",
+        ollama.STRAY_MESSAGE,
+        ollama.STRAY_HINT + ", your downloaded models are kept",
+        "engine",
+        "install_ollama",
+    )
 
 
 def _ollama_down(name: str, base: str, platform: Platform, start: bool) -> Check:

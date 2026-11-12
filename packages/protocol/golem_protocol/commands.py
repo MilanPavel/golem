@@ -732,13 +732,17 @@ class ModelSetup(BaseModel):
     ``keys`` are the providers with a key, from the environment or the
     Keychain. ``default_status`` is the default model's status, ``unknown``
     when it names a model golem does not list, and null when no default is
-    chosen.
+    chosen. ``ollama_stray`` is true when a local Ollama answers but no
+    ``ollama`` binary is installed: a server left from a removed install, which
+    lists its models and cannot load them. It is then neither installed nor
+    running here.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     ollama_installed: bool
     ollama_running: bool
+    ollama_stray: bool = False
     keys: list[str] = Field(default_factory=list)
     default_status: (
         Literal["ready", "needs_key", "not_installed", "server_down", "pulling", "unknown"] | None

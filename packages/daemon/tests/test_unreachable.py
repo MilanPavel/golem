@@ -268,3 +268,55 @@ def test_a_remote_ollama_is_unreachable_not_missing(installed: Callable[[bool], 
     assert far is not None and far.code == "model_unreachable"
     assert far.message == "Ollama at http://gpu-box:11434 is not answering"
     assert far.hint == "check that it is running"
+
+
+def _refused(model: str = "qwen3:8b") -> Exception:
+    from ollama import ResponseError
+
+    return ResponseError(f'model "{model}" not found, try pulling it first', 404)
+
+
+def _lists(monkeypatch: pytest.MonkeyPatch, listed: bool) -> None:
+    from golem.models import router as router_module
+
+    async def lists(url: str, model: str) -> bool:
+        return listed
+
+    monkeypatch.setattr(router_module, "_lists", lists)
+
+
+async def test_a_404_for_a_listed_model_says_ollama_cannot_load_it(
+    monkeypatch: pytest.MonkeyPatch, installed: Callable[[bool], None]
+) -> None:
+    del installed
+    _lists(monkeypatch, True)
+    down = await ModelRouter(_settings()).refused("ollama/qwen3:8b", _refused())
+    assert down is not None
+    assert (down.message, down.hint, down.code) == (
+        "Ollama can't load qwen3:8b",
+        "restart Ollama",
+        "model_unreachable",
+    )
+
+
+async def test_a_404_with_no_install_names_the_removed_install(
+    monkeypatch: pytest.MonkeyPatch, installed: Callable[[bool], None]
+) -> None:
+    installed(False)
+    _lists(monkeypatch, True)
+    down = await ModelRouter(_settings()).refused("ollama/qwen3:8b", _refused())
+    assert down is not None
+    assert down.message == "Ollama is still running from an install that was removed"
+    assert (down.hint, down.code) == ("quit it, then install Ollama again", "not_installed")
+
+
+async def test_a_404_for_a_model_that_is_not_listed_is_left_alone(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _lists(monkeypatch, False)
+    assert await ModelRouter(_settings()).refused("ollama/qwen3:8b", _refused()) is None
+
+
+async def test_another_error_is_not_a_refused_model(monkeypatch: pytest.MonkeyPatch) -> None:
+    _lists(monkeypatch, True)
+    assert await ModelRouter(_settings()).refused("ollama/qwen3:8b", RuntimeError("x")) is None

@@ -53,6 +53,14 @@ test("the Ollama panel opens on missing, starts a stopped one, and skips a runni
   const none = { ...LISTING, setup: { ...LISTING.setup, ollama_installed: false, ollama_running: false } };
   assert.deepEqual(ollamaAtOpen(none, 0), { phase: "missing", selected: 0, note: null });
   assert.deepEqual(ollamaAtOpen(null, 0), { phase: "missing", selected: 0, note: null });
+  const stray = { ...none, setup: { ...none.setup, ollama_stray: true } };
+  assert.deepEqual(ollamaAtOpen(stray, 0), { phase: "stray", selected: 0 });
+});
+
+test("a server left from a removed install says so, and Enter installs Ollama again", () => {
+  const lines = ollamaLines({ phase: "stray", selected: 0 }, 0);
+  assert.deepEqual(lines[2], { kind: "status", mark: "fail", text: "Ollama is still running from an install that was removed" });
+  assert.deepEqual(pressOllama({ phase: "stray", selected: 0 }, "enter", 3).effect, { kind: "install" });
 });
 
 test("install shows brew's last line, Esc stops it, and the end moves the panel on", () => {

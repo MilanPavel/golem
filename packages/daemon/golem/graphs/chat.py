@@ -423,7 +423,7 @@ def open_chat(
                     profile, router.chat_model(profile, overrides), sent, schemas
                 )
             except Exception as exc:
-                down = router.unreachable(profile, exc)
+                down = router.unreachable(profile, exc) or await router.refused(profile, exc)
                 if down is None:
                     raise
                 raise down from exc

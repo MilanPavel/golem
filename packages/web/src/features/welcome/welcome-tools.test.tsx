@@ -79,6 +79,8 @@ test("a fresh home offers the starters: the three that need no secret ticked, an
   expect(screen.getByText("needs a token")).toBeTruthy();
   expect(button("Add 3")).toBeTruthy();
   expect(tokenField()).toBeNull();
+  // The action row is centered like every other step's.
+  expect(button("Add 3").parentElement?.className).toContain("justify-center");
 });
 
 test("ticking changes the count, and GitHub opens a password field that is empty and goes when it is unticked", async () => {
@@ -163,6 +165,7 @@ test("Continue is there while Node still installs; the row finishes in the backg
   await user.click(button("Add 3"));
   await waitFor(() => expect(fake.raw.installRuntime).toHaveBeenCalledWith("node"));
   expect(screen.getByText("Node keeps installing if you go on.")).toBeTruthy();
+  expect(button("Continue").parentElement?.className).toContain("justify-center");
   await user.click(button("Continue"));
   await screen.findByRole("heading", { level: 2, name: "golem is ready." });
   const line = screen.getByRole("list", { name: "What was set up" }).textContent ?? "";
