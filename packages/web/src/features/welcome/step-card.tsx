@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { cn } from "../../ui/cn.ts";
-import { MarkGlyph } from "../setup/panel-body.tsx";
+import { MarkGlyph } from "../setup/mark-glyph.tsx";
 
 /** `wait` is a step that has not started or was left out: a dash, with its word for a screen reader. */
 export type CardMark = "ok" | "attn" | "fail" | "spin" | "wait";

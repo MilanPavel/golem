@@ -77,3 +77,21 @@ test("any other error is shown under the composer, the text is kept, and a retry
   expect(fake.raw.sendMessage).toHaveBeenCalledTimes(2);
   expect(location.pathname).toBe("/s/s_new");
 });
+
+test("a send with no model goes to /welcome?from=send and nothing opens as a dialog", async () => {
+  const { fake, user } = setup();
+  fake.raw.sendMessage.mockRejectedValueOnce(rpcError(-32005, "no model chosen yet"));
+  await user.type(box(), "hello{Enter}");
+  await wait();
+  expect(location.pathname + location.search).toBe("/welcome?from=send");
+  expect(fake.raw.sendMessage).toHaveBeenCalledTimes(1);
+  expect(screen.queryByRole("dialog", { name: "Setup" })).toBeNull();
+});
+
+test("/setup opens Settings → Setup", async () => {
+  const { user } = setup();
+  await user.type(box(), "/setup{Enter}");
+  await wait();
+  expect(location.pathname).toBe("/settings");
+  expect(screen.queryByRole("dialog", { name: "Setup" })).toBeNull();
+});

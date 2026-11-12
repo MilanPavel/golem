@@ -6,8 +6,8 @@ import type { PageActions } from "../../store/page.ts";
 import { usePageActions } from "../../store/page-context.tsx";
 
 /**
- * What setup does to the machine, apart from how a screen shows it. The setup window keeps its
- * own reducer and the Settings form keeps a card's state, and both go through these.
+ * What setup does to the machine, apart from how a screen shows it. /welcome keeps its
+ * own state and the Settings form keeps a card's state, and both go through these.
  */
 
 /** How an Ollama install ended. `no_brew` means there is no Homebrew, so the person downloads it. */

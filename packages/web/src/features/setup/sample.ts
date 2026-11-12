@@ -1,7 +1,5 @@
-import { ASK_PAGE_KEY, guided, OVERVIEW, pageServiceRow, setupFormRows, single, type FormRow, type SetupWindow } from "@golem/view";
+import { pageServiceRow, setupFormRows, type FormRow } from "@golem/view";
 import type { ListedModel, ModelListResult, SetupRow } from "../../store/models.ts";
-import type { PullsSnapshot } from "../../store/pulls.ts";
-import { newSetupUi, type PanelContext, type SetupUi } from "./setup-ui.ts";
 import type { KeyProvider } from "./setup-form.tsx";
 import type { SetupActionsState } from "./use-setup-actions.ts";
 
@@ -101,81 +99,8 @@ export const OK_ROWS: SetupRow[] = [
   { part: "disk", name: "disk", state: "ok", detail: "97 GB free" },
 ];
 
-const NOW = Date.parse("2026-11-01T12:00:00Z");
-const EMPTY_PULLS: PullsSnapshot = { active: new Map(), failed: new Map() };
-
-/** A third of Gemma 4 E4B, at 12 MB/s. */
-export const DOWNLOAD_PULLS: PullsSnapshot = {
-  active: new Map([
-    [
-      "ollama/gemma4:e4b",
-      {
-        status: "pulling",
-        progress: 2.1 / 6.6,
-        track: {
-          completed: 2_100_000_000,
-          total: 6_600_000_000,
-          samples: [
-            { at: NOW - 8_000, bytes: 2_004_000_000 },
-            { at: NOW, bytes: 2_100_000_000 },
-          ],
-        },
-      },
-    ],
-  ]),
-  failed: new Map(),
-};
-
-export type SetupCase = { label: string; ui: SetupUi; ctx: PanelContext };
-
-function at(window: SetupWindow, listing: ModelListResult, change: Partial<SetupUi> = {}): SetupUi {
-  return { ...newSetupUi(window, listing), ...change };
-}
-
 const KEPT = pageServiceRow(STATUS_ROWS[0] ?? null, "0.5.0");
 
-function ctx(listing: ModelListResult, extra: Partial<PanelContext> = {}): PanelContext {
-  return { listing, rows: STATUS_ROWS, service: KEPT, pulls: EMPTY_PULLS, now: NOW, ...extra };
-}
-
-const ENGINE = guided("engine", "start");
-const OLLAMA = guided("ollama", "start");
-const MODEL = guided("model", "start");
-
-/** The window in each state the page draws, for the gallery and its test. */
-export const SETUP_CASES: SetupCase[] = [
-  { label: "Overview", ui: at(OVERVIEW, FRESH_LISTING), ctx: ctx(FRESH_LISTING, { service: pageServiceRow(null, "0.5.0") }) },
-  { label: "Engine, guided", ui: at(ENGINE, FRESH_LISTING), ctx: ctx(FRESH_LISTING) },
-  {
-    label: "Ollama installing",
-    ui: at(OLLAMA, FRESH_LISTING, { ollama: { phase: "installing", since: NOW - 41_000, last: "==> Pouring ollama--0.12.0.arm64_sequoia.bottle.tar.gz" } }),
-    ctx: ctx(FRESH_LISTING),
-  },
-  { label: "Ollama, no Homebrew", ui: at(OLLAMA, FRESH_LISTING, { ollama: { phase: "waiting", since: NOW - 64_000 } }), ctx: ctx(FRESH_LISTING) },
-  { label: "Provider", ui: at(guided("provider", "start"), FRESH_LISTING, { path: "key" }), ctx: ctx(FRESH_LISTING) },
-  { label: "Key", ui: at(guided("key", "start"), FRESH_LISTING, { path: "key", hosted: "anthropic", key: ASK_PAGE_KEY }), ctx: ctx(FRESH_LISTING) },
-  { label: "Model, picking", ui: at(MODEL, RUNNING_LISTING), ctx: ctx(RUNNING_LISTING) },
-  {
-    label: "Model, downloading",
-    ui: at(MODEL, RUNNING_LISTING, {
-      model: { phase: "downloading", ref: "ollama/gemma4:e4b", label: "Gemma 4 E4B", pull: { completed: 0, total: null, samples: [] } },
-    }),
-    ctx: ctx(RUNNING_LISTING, { pulls: DOWNLOAD_PULLS }),
-  },
-  {
-    label: "Model, download failed",
-    ui: at(MODEL, RUNNING_LISTING, {
-      model: { phase: "failed", ref: "ollama/gemma4:e4b", reason: "no space left on device", selected: 0, all: false },
-    }),
-    ctx: ctx(RUNNING_LISTING),
-  },
-  {
-    label: "Ready",
-    ui: at(guided("ready", "start"), WORKING_LISTING, { ready: { engine: "Ollama on this Mac", model: "Gemma 4 E4B · saved as default" } }),
-    ctx: ctx(WORKING_LISTING),
-  },
-  { label: "Service, not kept", ui: at(single("service", "overview"), WORKING_LISTING), ctx: ctx(WORKING_LISTING, { service: pageServiceRow(null, "0.5.0") }) },
-];
 
 export type FormCase = { label: string; rows: FormRow[]; actions: SetupActionsState; providers: KeyProvider[] };
 

@@ -3,7 +3,6 @@ import { useNavigate, useRoute } from "../../store/page-context.tsx";
 import { openPalette, PaletteHost } from "../palette/index.ts";
 import { Sidebar } from "../sessions/index.ts";
 import { SettingsScreen } from "../settings/index.ts";
-import { SetupHost } from "../setup/index.ts";
 import { TraceScreen } from "../trace/index.ts";
 import { SetupAtStart, WelcomeScreen } from "../welcome/index.ts";
 import { HomeScreen } from "./home-screen.tsx";
@@ -59,7 +58,6 @@ export function Shell() {
         <Content />
       </main>
       <PaletteHost />
-      <SetupHost />
       <SetupAtStart />
     </div>
   );

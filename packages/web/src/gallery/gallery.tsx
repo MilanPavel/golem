@@ -32,17 +32,15 @@ import { FolderBrowserView } from "../features/shell/folder-browser.tsx";
 import { CommandPaletteView, KeysDialog } from "../features/palette/index.ts";
 import { ModelDialogView, ModelList, withActivePulls, type ModelDialogViewProps, type ModelListNote } from "../features/models/index.ts";
 import { sampleTry, sampleTuneBackend } from "../features/models/sample-tune.ts";
-import { SetupDialogView } from "../features/setup/index.ts";
 import { FinishSetupStripView, WelcomeView } from "../features/welcome/index.ts";
 import { WELCOME_CASES } from "../features/welcome/sample.ts";
 import { SpanDetail, TraceSummary, TraceTree } from "../features/trace/index.ts";
 import { APPROVAL_DETAIL, APPROVAL_TRACE, CUT_LIKELY_DETAIL, CUT_MIDDLE_DETAIL, CUT_YES_DETAIL, FULL_DETAIL, MODEL_DETAIL, NO_PROMPT_DETAIL, NUM_CTX_DETAIL, OLD_DETAIL, SECTIONS_DETAIL, TOOL_DETAIL, UNKNOWN_WINDOW_DETAIL, FAILED_TRACE, GROWING_TRACE, LONG_TRACE, OLD_TRACE, SHORT_TRACE } from "../features/trace/sample.ts";
 import type { TraceRunSpan, TraceSpanResult } from "../store/trace.ts";
-import { FORM_CASES, SETUP_CASES } from "../features/setup/sample.ts";
+import { FORM_CASES } from "../features/setup/sample.ts";
 import { AddKey, SetupFormView } from "../features/setup/setup-form.tsx";
 import { ToolsOfferView } from "../features/setup/tools-offer.tsx";
 import { TOOLS_CASES } from "../features/setup/tools-sample.ts";
-import { panelView } from "../features/setup/setup-ui.ts";
 import { PullStatusView, pullSummary } from "../features/models/index.ts";
 import { NO_OLLAMA_LISTING, OLLAMA_DOWN_LISTING, SAMPLE_LISTING, SAMPLE_PULLS, THINKING_LISTING } from "../features/models/sample.ts";
 import { CloseSessionDialog, RenameField, SidebarView } from "../features/sessions/index.ts";
@@ -574,32 +572,6 @@ function DownloadRowDemo() {
   );
 }
 
-/** The setup window in each state the page draws it. */
-function SetupDemo({ theme }: { theme: string }) {
-  const [shown, setShown] = useState<string | null>(null);
-  return (
-    <div className="flex flex-wrap gap-2 rounded-lg border border-line bg-bg p-4">
-      {SETUP_CASES.map(({ label, ui, ctx }) => (
-        <div key={label}>
-          <Button onClick={() => setShown(label)}>
-            {`Setup, ${label}`}
-            <span className="sr-only">, {theme}</span>
-          </Button>
-          <SetupDialogView
-            open={shown === label}
-            onClose={() => setShown(null)}
-            window={ui.window}
-            view={panelView(ui, ctx)}
-            pull={ui.model.phase === "downloading" ? ctx.pulls.active.get(ui.model.ref) : undefined}
-            onKey={() => {}}
-            onChoose={() => {}}
-          />
-        </div>
-      ))}
-    </div>
-  );
-}
-
 /** The Tools panel that `/welcome` and Settings → Setup share, in the states it draws. */
 function ToolsOfferDemo() {
   return (
@@ -1108,11 +1080,6 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
       <section className="mt-6" id={anchor("Model list")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Model list</h3>
         <ModelListDemo />
-      </section>
-
-      <section className="mt-6" id={anchor("Setup window")}>
-        <h3 className="mb-2 font-mono text-xs text-faint">Setup window</h3>
-        <SetupDemo theme={theme} />
       </section>
 
       <Group title="Dialog, popover, menu, tooltip">

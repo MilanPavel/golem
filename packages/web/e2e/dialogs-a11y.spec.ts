@@ -74,28 +74,19 @@ for (const [theme, label] of THEMES) {
     stack.ollama?.releasePulls();
   });
 
-  test(`no serious accessibility violations on the setup window in the ${label} theme`, async ({ page, rig }) => {
+  test(`no serious accessibility violations on /welcome in the ${label} theme`, async ({ page, rig }) => {
     const { gateway, ollama } = await startStack(rig, { ollama: {}, chat: false });
     await page.goto(gateway.url);
-    const setup = page.getByRole("dialog", { name: "Setup" });
-    await expect(setup).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Welcome to golem" })).toBeVisible();
     await setTheme(page, theme);
-    await axe(page, setup, "setup window on Engine");
+    await themeIs(page, theme);
+    expect(await axeViolations(page), "welcome on Engine").toEqual([]);
 
     ollama?.holdPulls();
-    await setup.getByRole("group", { name: "Choices" }).getByRole("button", { name: /On this Mac/ }).click();
-    await expect(setup.getByText(/Pick a model/)).toBeVisible();
-    await axe(page, setup, "setup window on Model");
-    await setup.getByRole("group", { name: "Choices" }).getByRole("button", { name: /Llama 3\.2 3B/ }).click();
-    await expect(setup.getByRole("progressbar", { name: /^Downloading / })).toBeVisible();
-    await themeIs(page, theme);
-    await axe(page, setup, "setup window with a progress bar");
+    await page.getByRole("button", { name: /On this Mac/ }).click();
+    await page.getByRole("button", { name: "Continue" }).click();
+    await expect(page.getByRole("heading", { level: 2, name: "Pick a model" })).toBeVisible();
+    expect(await axeViolations(page), "welcome on Model").toEqual([]);
     ollama?.releasePulls();
-
-    await setup.getByRole("button", { name: "Close setup" }).click();
-    await expect(setup).toBeHidden();
-    await send(page, "/setup");
-    await expect(setup.getByText("What is set up, and what is not.")).toBeVisible();
-    await axe(page, setup, "setup overview");
   });
 }
