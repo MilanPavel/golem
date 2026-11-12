@@ -104,16 +104,28 @@ stateDiagram-v2
 
 | Command | What it does |
 |---|---|
+| `golem install` | Installs both jobs: the service (`golem daemon install`) and the web page ([below](#the-web-page-job)) |
+| `golem uninstall` | Removes both jobs. Your data in `~/.golem` stays |
 | `golem daemon install` | Writes the launchd file and starts the daemon. Run it again after moving or upgrading golem |
 | `golem daemon start` | Starts the daemon, or restarts it if it is running |
 | `golem daemon stop` | Stops it and keeps it stopped until `start` |
-| `golem daemon restart` | Swaps the running daemon for the one the launchd file names, after an upgrade. Waits until the new one answers and prints its version. Warns when the launchd file names a different golem than the one you ran: then run `install` |
+| `golem daemon restart` | Swaps the running daemon for the one the launchd file names, after an upgrade. Waits until the new one answers and prints its version. Restarts the web job too when it is installed. Warns when the launchd file names a different golem than the one you ran: then run `install` |
 | `golem daemon uninstall` | Stops it and deletes the launchd file. Your data in `~/.golem` stays |
 | `golem daemon logs` | Shows the log and follows new lines |
 | `golem status` | Shows pid, version, and uptime. Exits with code 1 if the daemon is not running, and prints why it could not start or the one command that starts it. `models`, `config`, `skills list`, and `auth` do the same |
 | `golem doctor` | Checks the install and prints a fix under each problem ([section 12](#_12-logs-and-health-checks)). Exits with code 1 if anything failed. `golem doctor --mcp` also starts each MCP server and says what stopped it |
 
 `kill` is not a way to stop it: launchd starts it again within seconds. Use `golem daemon stop`.
+
+#### The web page job
+
+`golem web install` (or `golem install`, which also installs the service) writes `~/Library/LaunchAgents/dev.golem.web.plist`. launchd then runs `golem web serve` at login and starts it again whenever it stops, waiting 10 seconds between tries. So a bookmark to `http://127.0.0.1:7480` opens the page after a reboot, signed in, and `golem web` opens it at once.
+
+- **Label:** `dev.golem.web`. `--port N` at install is written into the job; without it the job serves on 7480.
+- **Logs:** `~/.golem/logs/web.stdout.log` and `web.stderr.log`, next to the daemon's `launchd.*.log`. They hold one line from `serve` and any error, never a token.
+- **A foreground `golem web` already runs:** the job starts, exits, and tries again every 10 seconds until that one stops.
+- **After `brew upgrade`:** the job names the `opt` path, so a restart runs the new build. `golem daemon restart` (or Ctrl-R in golem) and `golem web` restart the job; `golem doctor` shows a `web` line when the page is served by an older golem.
+- **Remove it:** `golem web uninstall` (or `golem uninstall` for both jobs). `~/.golem` and the logs stay. By hand: `launchctl bootout gui/$(id -u)/dev.golem.web`, then delete the plist.
 
 **A trap:** launchd does not see the environment variables from your terminal. An API key you `export` in your shell does not reach the daemon. Save keys with `golem auth set`, which puts them in the Keychain.
 
@@ -272,7 +284,7 @@ golem daemon restart        # switch the running daemon to it
 The running daemon keeps using the old version's files until you restart it. `brew upgrade` may delete the old folder straight away. The daemon then fails on the next thing it loads from disk, and launchd starts the new version. So restart right after the upgrade. The chat screen also shows a yellow notice when the daemon's version differs from its own.
 
 ```bash
-golem daemon uninstall      # first: remove the launchd service
+golem uninstall             # first: remove the launchd jobs (the service and the web page)
 brew uninstall golem        # then: remove the program
 ```
 
@@ -339,6 +351,7 @@ Remember: under launchd, `GOLEM_...` variables from your terminal do not apply. 
 |---|---|---|
 | `daemon` | `golem` cannot find the daemon program ([section 6](#_6-installing-today)) | `brew reinstall golem`, or set `GOLEM_DAEMON` |
 | `service` | launchd has no golem job, runs another copy of golem, or the job is stopped | `golem daemon install`, or `golem daemon start` |
+| `web` | Never fails. Warns when the web job is installed but stopped, its program is gone, its page does not answer, or an older golem serves it | `golem web install`, or `golem web` |
 | `running` | The daemon does not answer, or runs another version than `golem` | `golem daemon start`, or `golem daemon restart` |
 | `socket` | Someone other than you could open the socket | `golem daemon restart` |
 | `config` | `config.toml` does not load. The line names the setting | Edit the file |

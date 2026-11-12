@@ -7,6 +7,8 @@ import {
   gateService,
   LATER,
   NO_ANSWER,
+  NO_PAGE,
+  PAGE_STARTED,
   QUESTION,
   SESSION_NO_ANSWER,
   SESSION_STARTED,
@@ -25,6 +27,7 @@ function fake(options: {
   installs?: boolean;
   serves?: boolean;
   comesUp?: boolean;
+  pageComesUp?: boolean;
 }): Fake {
   const calls: string[] = [];
   const output: string[] = [];
@@ -42,6 +45,10 @@ function fake(options: {
     install: async () => {
       calls.push("install");
       return options.installs ?? true;
+    },
+    waitForPage: async () => {
+      calls.push("wait for page");
+      return options.pageComesUp ?? true;
     },
     serve: () => {
       calls.push("serve");
@@ -78,8 +85,21 @@ test("with no terminal nothing is asked and nothing is installed", async () => {
 test("yes installs the launch agent, waits for it, and opens the chat", async () => {
   const gate = fake({ choice: "install" });
   assert.deepEqual(await gateService(gate), { kind: "open", session: null });
-  assert.deepEqual(gate.calls, ["ask", "install", "wait"]);
-  assert.deepEqual(gate.output, [STARTED]);
+  assert.deepEqual(gate.calls, ["ask", "install", "wait", "wait for page"]);
+  assert.deepEqual(gate.output, [STARTED, PAGE_STARTED]);
+});
+
+test("the question tells what Enter keeps running, and its answers name both jobs", () => {
+  assert.match(QUESTION, /Keep golem running, now and at every login\?/);
+  assert.match(QUESTION, /http:\/\/127\.0\.0\.1:7480/);
+  assert.equal(STARTED, "✓ golem's service runs, now and at every login\n");
+  assert.equal(PAGE_STARTED, "✓ the web page runs, now and at every login\n");
+});
+
+test("a web page that never answers points at its log", async () => {
+  const gate = fake({ choice: "install", pageComesUp: false });
+  assert.deepEqual(await gateService(gate), { kind: "exit", code: 1 });
+  assert.deepEqual(gate.output, [STARTED, NO_PAGE]);
 });
 
 test("a failed install exits non-zero, and its own error is all that is printed", async () => {
@@ -100,6 +120,7 @@ test("n starts a daemon for this window and hands it back to be stopped", async 
   const result = await gateService(gate);
   assert.equal(result.kind, "open");
   assert.ok(result.kind === "open" && result.session !== null);
+  // The web page is served by this window's `golem web`, so no job is installed or awaited.
   assert.deepEqual(gate.calls, ["ask", "serve", "wait until it exits"]);
   assert.deepEqual(gate.output, [SESSION_STARTED]);
   result.session.stop();
