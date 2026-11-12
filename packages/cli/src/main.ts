@@ -63,7 +63,7 @@ const USAGE =
   "       golem mcp add <name> -- <command…> [--token-env VAR] | golem mcp add <name> --url <url> [--token] [--env K=V] [--header K=V] [--cwd D] [--on-demand] [--project] [--timeout S] [--approval allow] | golem mcp add --catalog <id> [--input <id>=<value>] | golem mcp remove <name> | golem mcp export [--format claude|vscode] [--scope user|project]\n" +
   "       golem mcp list [--json] | show <name> [--json] | test <name> | test --catalog <id> | edit <name> [--project] | import [--from <app>|<file>] [--all] | logs <name> [-f] | enable <name> [--on-demand] | disable <name> | restart <name> | tools <name> [--hide <glob>] [--show <glob>]\n" +
   "       golem config show [--resolved] | golem config edit [--project] | golem skills [list] | golem skills check <path>\n" +
-  "       golem web [--port N] [--no-open] [--json]\n" +
+  "       golem web [--port N] [--no-open] [--json] | golem web serve [--port N]\n" +
   "       golem web logout";
 
 // exitCode, not exit(): exit() drops output a pipe has not read yet.
@@ -110,7 +110,9 @@ async function run(args: string[]): Promise<number> {
   }
   if (command === "web") {
     const parsed = parseWebArgs(rest);
-    if (parsed !== null) return openWeb(parsed);
+    // `serve` is what the web job runs: no service gate and no daemon check, because the gateway
+    // answers "daemon down" itself and the daemon's own job may not be up yet at boot.
+    if (parsed !== null) return parsed.serve ? runWeb(parsed) : openWeb(parsed);
   }
   if (command === "config" && rest[0] === "show" && (rest.length === 1 || (rest.length === 2 && rest[1] === "--resolved"))) {
     return runConfigShow();

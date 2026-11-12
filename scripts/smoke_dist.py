@@ -101,7 +101,7 @@ def main() -> int:
             return 1
         # `golem web --json` exits 1 with no daemon, so the page is checked with one running.
         def web() -> bool:
-            return check_web(tree, env, home)
+            return check_web(tree, env, home) and check_web_serve(tree, env, home)
 
         if run_daemon(daemon, env, home, "web", FIRST_START_LIMIT_S, web) is None:
             return 1
@@ -188,6 +188,51 @@ def check_manifest(base: str) -> list[str]:
         if i_status != 200 or i_headers.get("content-type") != "image/png":
             problems.append(f"{src} was {i_status} {i_headers.get('content-type')!r}")
     return problems
+
+
+def check_web_serve(tree: Path, env: dict[str, str], home: Path) -> bool:
+    """``golem web serve`` runs a kept gateway, prints no link, and drops run files on SIGTERM."""
+    golem = tree / "bin" / "golem"
+    proc = subprocess.Popen(
+        [str(golem), "web", "serve", "--port", "0"],
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    run = home / "run"
+    problems: list[str] = []
+    try:
+        line = read_first_line(proc, WEB_START_LIMIT_S)
+        if not line:
+            problems.append(f"golem web serve printed nothing within {WEB_START_LIMIT_S:g}s")
+        elif b"#t=" in line:
+            problems.append("golem web serve printed a link with a token")
+        else:
+            record = json.loads((run / "web.json").read_text())
+            _, _, body = http_get(f"http://127.0.0.1:{record['port']}/healthz")
+            health = json.loads(body)
+            if health.get("kept") is not True:
+                problems.append(f"/healthz kept was {health.get('kept')!r}, not true")
+            if not isinstance(health.get("version"), str):
+                problems.append(f"/healthz version was {health.get('version')!r}")
+    except (OSError, ValueError, KeyError) as exc:
+        problems.append(f"golem web serve check failed: {exc}")
+    finally:
+        if proc.poll() is None:
+            proc.send_signal(signal.SIGTERM)
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait(timeout=5)
+    for name in ("web.json", "web.token"):
+        if (run / name).exists():
+            problems.append(f"golem web serve left run/{name} behind")
+    for problem in problems:
+        print(f"web serve: {problem}", file=sys.stderr)
+    if not problems:
+        print("web serve ok")
+    return not problems
 
 
 def check_web_page(info: object) -> bool:
