@@ -117,12 +117,22 @@ function write(socket: Socket, body: unknown): void {
   socket.write(`${JSON.stringify(body)}\n`);
 }
 
+// sockaddr_un is 104 bytes on macOS, including the NUL. The longest path built under the
+// directory is "/c-XXXXXX/s.sock"; keep margin. A long repo path (a git worktree) falls
+// back to a short temp dir.
+function makeSocketDir(repoRoot: string): string {
+  const root = path.join(repoRoot, ".test-socks");
+  if (Buffer.byteLength(root) + 40 <= 103) {
+    mkdirSync(root, { recursive: true });
+    return mkdtempSync(path.join(root, "c-"));
+  }
+  return mkdtempSync("/var/tmp/gt");
+}
+
 async function listen(
   handler: (socket: Socket) => void,
 ): Promise<{ socketPath: string; close: () => Promise<void> }> {
-  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../.test-socks");
-  mkdirSync(root, { recursive: true });
-  const dir = mkdtempSync(path.join(root, "c-"));
+  const dir = makeSocketDir(path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../.."));
   const socketPath = path.join(dir, "s.sock");
   const server = createServer(handler);
   await new Promise<void>((resolve) => {

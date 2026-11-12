@@ -1,4 +1,6 @@
+import os
 import shutil
+import tempfile
 import uuid
 from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
@@ -26,11 +28,30 @@ async def database(tmp_path: Path) -> AsyncIterator[Database]:
         yield opened
 
 
+# Longest path a test builds under a home: "/<8 hex>" + "/run/golem.sock", plus margin.
+_SOCKET_SUFFIX_BYTES = 40
+_MAX_SOCKET_BYTES = 103  # sockaddr_un is 104 bytes on macOS, including the NUL.
+
+
+def make_short_home(repo_root: Path) -> Path:
+    """A new directory for a test home, under ``<repo_root>/.test-socks`` when sockets fit.
+
+    Falls back to a short ``/var/tmp`` directory when the repo (for example a git worktree
+    with a long path) would make the socket path too long.
+    """
+    base = repo_root / ".test-socks"
+    if len(os.fsencode(base)) + _SOCKET_SUFFIX_BYTES <= _MAX_SOCKET_BYTES:
+        root = base / uuid.uuid4().hex[:8]
+        root.mkdir(parents=True)
+        return root
+    # Not /tmp: the sandbox tests treat /tmp as a place commands may write to.
+    return Path(tempfile.mkdtemp(prefix="gt", dir="/var/tmp")).resolve()
+
+
 @pytest.fixture
 def short_home() -> Iterator[Path]:
     """A home whose socket path fits in sockaddr_un (104 bytes on macOS)."""
-    root = Path(__file__).resolve().parents[3] / ".test-socks" / uuid.uuid4().hex[:8]
-    root.mkdir(parents=True)
+    root = make_short_home(Path(__file__).resolve().parents[3])
     try:
         yield root
     finally:
