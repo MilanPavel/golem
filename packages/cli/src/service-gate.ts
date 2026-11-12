@@ -19,8 +19,10 @@ export type Gate = {
   /** stdin and stdout are a terminal, so a question can be asked. */
   interactive: boolean;
   ask: (question: string) => Promise<ServiceChoice>;
-  /** `golem daemon install`. True when it worked; it printed its own error otherwise. */
+  /** `golem install`: the service and the web job. True when it worked; it printed its own error otherwise. */
   install: () => Promise<boolean>;
+  /** Waits until the web job's gateway answers. False after the timeout. */
+  waitForPage: () => Promise<boolean>;
   /** `golem-daemon serve` as a child of this process, or null when it could not start. */
   serve: () => SessionDaemon | null;
   /** Waits until a daemon answers. False after the timeout, or as soon as `giveUp` says so. */
@@ -32,16 +34,19 @@ export type GateResult = { kind: "open"; session: SessionDaemon | null } | { kin
 
 export const QUESTION =
   "\n" +
-  "golem runs a small background service, so a chat keeps\n" +
-  "going when you close the terminal.\n" +
+  "golem runs in the background, so chats keep going and\n" +
+  "the page at http://127.0.0.1:7480 is there whenever\n" +
+  "you open it, even after a restart.\n" +
   "\n" +
-  "Start it now and at every login?\n" +
+  "Keep golem running, now and at every login?\n" +
   "  Enter  yes\n" +
   "  n      only while this window is open\n" +
   "  q      quit\n";
 
-export const LATER = "golem's service is not running. Run golem daemon install when you want it.\n";
-export const STARTED = "✓ background service started, now and at every login\n";
+export const LATER = "golem's service is not running. Run golem install when you want it.\n";
+export const STARTED = "✓ golem's service runs, now and at every login\n";
+export const PAGE_STARTED = "✓ the web page runs, now and at every login\n";
+export const NO_PAGE = "the web page did not answer. See logs/web.stderr.log in ~/.golem.\n";
 export const SESSION_STARTED = "✓ golem's service runs until you close this window\n";
 export const NO_ANSWER =
   "golem's service did not answer. See golem daemon logs, or logs/launchd.stderr.log in ~/.golem.\n";
@@ -54,7 +59,7 @@ export function sessionFailure(output: string): string {
 }
 
 /**
- * Asks once whether golem may start its service, and starts it.
+ * Asks once whether golem may keep itself running (its service and the web page), and does.
  *
  * Nothing is asked when a daemon answers, when the launch agent already
  * exists (launchd owns it, and a daemon that does not answer is a different
@@ -81,6 +86,11 @@ export async function gateService(gate: Gate): Promise<GateResult> {
       return { kind: "exit", code: 1 };
     }
     gate.write(STARTED);
+    if (!(await gate.waitForPage())) {
+      gate.write(NO_PAGE);
+      return { kind: "exit", code: 1 };
+    }
+    gate.write(PAGE_STARTED);
     return { kind: "open", session: null };
   }
   const session = gate.serve();

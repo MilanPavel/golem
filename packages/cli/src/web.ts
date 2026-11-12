@@ -32,6 +32,18 @@ export function parseWebArgs(args: string[]): WebArgs | null {
   return { port: port ?? DEFAULT_WEB_PORT, portGiven: port !== null, open: !serve && !noOpen && !json, json, serve };
 }
 
+/** `golem web install [--port N]` or `golem web uninstall`: the launchd job. Null for anything else. */
+export function parseWebJobArgs(args: string[]): { kind: "install" | "uninstall"; port: number | null } | null {
+  const [kind, ...rest] = args;
+  if (kind === "uninstall") return rest.length === 0 ? { kind, port: null } : null;
+  if (kind !== "install") return null;
+  if (rest.length === 0) return { kind, port: null };
+  const value = rest[1];
+  if (rest.length !== 2 || rest[0] !== "--port" || value === undefined) return null;
+  if (!/^\d{1,5}$/.test(value) || Number(value) < 1 || Number(value) > 65535) return null;
+  return { kind, port: Number(value) };
+}
+
 /** The address that logs the browser in. The token sits in the fragment, which is never sent to a server. */
 export function webLink(port: number, token: string): string {
   return `http://127.0.0.1:${port}/#t=${token}`;
@@ -60,7 +72,11 @@ export interface WebOutput {
   started: boolean;
   /** `golem web serve`: one line, no link. */
   serve?: boolean;
+  /** No default model yet, and the job keeps the page: this window can close. */
+  firstRun?: boolean;
 }
+
+export const FIRST_RUN_LINE = "Setup continues in your browser. You can close this window.";
 
 /** The lines `golem web` prints on stdout. Only `--no-open` and a failed open show the token. */
 export function formatWebOutput(o: WebOutput): string[] {
@@ -72,5 +88,6 @@ export function formatWebOutput(o: WebOutput): string[] {
       : `golem web: ${o.link}`,
   ];
   if (o.started) lines.push("Press Ctrl-C to stop.");
+  else if (o.firstRun === true) lines.push(FIRST_RUN_LINE);
   return lines;
 }

@@ -27,14 +27,17 @@ export interface DoctorInput {
   /** What `golem-daemon doctor` printed. Not called when no daemon was found. */
   daemonChecks: (daemon: DaemonCommand) => Promise<Check[]>;
   readStatus: () => Promise<DaemonStatus | null>;
+  /** The web job's line, which only the CLI can see. */
+  web?: () => Promise<Check>;
 }
 
 export async function runDoctor(input: DoctorInput): Promise<Check[]> {
   const running = runningCheck(input.cliVersion, await input.readStatus());
+  const web = input.web === undefined ? [] : [await input.web()];
   const { located } = input;
   if ("error" in located) {
     const fix = "brew reinstall golem, or set GOLEM_DAEMON to the daemon's path";
-    return [{ name: "daemon", status: "fail", detail: located.error, fix }, running];
+    return [{ name: "daemon", status: "fail", detail: located.error, fix }, running, ...web];
   }
   const found: Check = { name: "daemon", status: "ok", detail: [located.command, ...located.args].join(" ") };
   let checks: Check[];
@@ -42,11 +45,11 @@ export async function runDoctor(input: DoctorInput): Promise<Check[]> {
     checks = await input.daemonChecks(located);
   } catch (error) {
     const detail = `its checks did not run: ${error instanceof Error ? error.message : String(error)}`;
-    return [found, running, { name: "checks", status: "fail", detail, fix: "golem daemon logs" }];
+    return [found, running, ...web, { name: "checks", status: "fail", detail, fix: "golem daemon logs" }];
   }
-  // The running daemon reads best right after the service that starts it.
+  // The running daemon reads best right after the service that starts it, and the page after it.
   const service = checks.findIndex((check) => check.name === "service");
-  checks.splice(service + 1, 0, running);
+  checks.splice(service + 1, 0, running, ...web);
   return [found, ...checks];
 }
 
@@ -63,6 +66,57 @@ export function runningCheck(cliVersion: string, status: DaemonStatus | null): C
     };
   }
   return { name: "running", status: "ok", detail: `version ${status.version}, pid ${status.pid}` };
+}
+
+/** What `golem doctor` finds out about the web job. */
+export interface WebJobFacts {
+  cliVersion: string;
+  /** The plist exists. */
+  plist: boolean;
+  /** The program the plist names, or null when it could not be read. */
+  program: string | null;
+  programExists: boolean;
+  loaded: boolean;
+  /** The gateway `run/web.json` names, when its `/healthz` answers. */
+  live: { port: number; version: string | undefined } | null;
+}
+
+/**
+ * The `web` line. The job is optional, so it never fails: `golem doctor` must not exit 1 for a
+ * page that is not kept running.
+ */
+export function webCheck(facts: WebJobFacts): Check {
+  if (!facts.plist) {
+    return { name: "web", status: "ok", detail: "not kept running · golem web opens it when you ask" };
+  }
+  if (facts.program !== null && !facts.programExists) {
+    return { name: "web", status: "warn", detail: `the job runs ${facts.program}, which is gone`, fix: "golem web install" };
+  }
+  if (!facts.loaded) {
+    return { name: "web", status: "warn", detail: "installed, but stopped", fix: "golem web install" };
+  }
+  if (facts.live === null) {
+    return {
+      name: "web",
+      status: "warn",
+      detail: "the job is loaded but the page does not answer",
+      fix: "tail ~/.golem/logs/web.stderr.log",
+    };
+  }
+  if (facts.live.version !== facts.cliVersion) {
+    const served = facts.live.version === undefined ? "an older golem" : `golem ${facts.live.version}`;
+    return {
+      name: "web",
+      status: "warn",
+      detail: `the page is served by ${served}, this golem is ${facts.cliVersion}`,
+      fix: "golem web",
+    };
+  }
+  return {
+    name: "web",
+    status: "ok",
+    detail: `launchd keeps the page at http://127.0.0.1:${facts.live.port} · version ${facts.live.version}`,
+  };
 }
 
 /** The JSON `golem-daemon doctor` prints. Throws when it is not a list of checks. */

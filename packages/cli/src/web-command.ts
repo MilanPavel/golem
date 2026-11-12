@@ -1,3 +1,5 @@
+import { dirname } from "node:path";
+
 import { GOLEM_VERSION, resolveSocketPath } from "@golem/client/node";
 import { createSessionStore, randomSecret } from "@golem/gateway";
 import {
@@ -15,12 +17,21 @@ import { loadAssets } from "@golem/gateway/assets";
 import { startGateway, type Gateway } from "@golem/gateway/server";
 
 import type { WebArgs } from "./web.ts";
-import { busy, findLive, show, useLive, type WebDeps } from "./web-live.ts";
+import { kickstart, realLaunchDeps, type LaunchDeps } from "./web-launchd.ts";
+import { busy, findLive, findLiveQuietly, show, useLive, type WebDeps } from "./web-live.ts";
 
-/** Until the web job's launchd helper lands, there is no job to restart. */
-const DEFAULT_DEPS: WebDeps = {
+/** The web job's launchd calls, against the real `launchctl`. */
+export function launchDeps(): LaunchDeps {
+  const runDir = resolveRunDir();
+  return realLaunchDeps(dirname(runDir), async () => {
+    const live = await findLiveQuietly(runDir);
+    return live === null ? null : { port: live.port, pid: live.health.pid };
+  });
+}
+
+export const DEFAULT_WEB_DEPS: WebDeps = {
   version: GOLEM_VERSION,
-  restartWebJob: () => Promise.resolve(false),
+  restartWebJob: () => Promise.resolve(kickstart(launchDeps())),
   pollMs: 200,
   timeoutMs: 10_000,
 };
@@ -53,7 +64,7 @@ function stayUntilStopped(gateway: Gateway, runDir: string): Promise<number> {
 }
 
 /** `golem web`: shows the link of the gateway that runs, or runs one until Ctrl-C. */
-export async function runWeb(args: WebArgs, deps: WebDeps = DEFAULT_DEPS): Promise<number> {
+export async function runWeb(args: WebArgs, deps: WebDeps = DEFAULT_WEB_DEPS): Promise<number> {
   try {
     return await runGateway(args, deps);
   } catch (error) {

@@ -35,11 +35,13 @@ golem status                # prints pid, version, and uptime
 golem doctor                # checks the whole install
 ```
 
-Without the chat, for example to use only `golem web` or a script, start the service with no question:
+`golem web` asks the same question once: Enter keeps golem's service and the web page running, now and at every login, and the page then opens from a bookmark with no terminal. Without the chat, for example for a script, install both with no question:
 
 ```bash
-golem daemon install
+golem install
 ```
+
+That writes two launchd jobs: `dev.golem.daemon` (the service) and `dev.golem.web` (the page, logs in `~/.golem/logs/web.stdout.log` and `web.stderr.log`). `golem daemon install` and `golem web install` install one of them. `golem uninstall` removes both, and `~/.golem` stays.
 
 ## 3. Choose a model
 

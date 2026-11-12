@@ -3,7 +3,30 @@ import { test } from "node:test";
 
 import { isSecretShape, randomSecret } from "@golem/gateway";
 
-import { formatWebOutput, isLiveHealth, isSafeLink, parseWebArgs, webLink } from "./web.ts";
+import { FIRST_RUN_LINE, formatWebOutput, isLiveHealth, isSafeLink, parseWebArgs, parseWebJobArgs, webLink } from "./web.ts";
+
+test("parseWebJobArgs: install, uninstall, and nothing else", () => {
+  assert.deepEqual(parseWebJobArgs(["install"]), { kind: "install", port: null });
+  assert.deepEqual(parseWebJobArgs(["install", "--port", "7500"]), { kind: "install", port: 7500 });
+  assert.deepEqual(parseWebJobArgs(["uninstall"]), { kind: "uninstall", port: null });
+  for (const bad of [[], ["serve"], ["install", "--port"], ["install", "--port", "0"], ["install", "--port", "70000"], ["install", "--json"], ["uninstall", "--port", "1"]]) {
+    assert.equal(parseWebJobArgs(bad), null, bad.join(" "));
+  }
+});
+
+test("formatWebOutput: the first-run line only after a reuse, never with Ctrl-C", () => {
+  const base = { json: false, opened: true, link: "", port: 7480, pid: 9 };
+  assert.equal(FIRST_RUN_LINE, "Setup continues in your browser. You can close this window.");
+  assert.deepEqual(formatWebOutput({ ...base, started: false, firstRun: true }), [
+    "golem web: http://127.0.0.1:7480 (opened in your browser)",
+    FIRST_RUN_LINE,
+  ]);
+  assert.deepEqual(formatWebOutput({ ...base, started: false }), ["golem web: http://127.0.0.1:7480 (opened in your browser)"]);
+  assert.deepEqual(formatWebOutput({ ...base, started: true, firstRun: true }), [
+    "golem web: http://127.0.0.1:7480 (opened in your browser)",
+    "Press Ctrl-C to stop.",
+  ]);
+});
 
 test("parseWebArgs: serve", () => {
   assert.deepEqual(parseWebArgs(["serve"]), { port: 7480, portGiven: false, open: false, json: false, serve: true });

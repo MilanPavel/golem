@@ -17,6 +17,7 @@ golem has commands in two places: `golem …` in your shell, and `/…` inside t
 | `golem --version` | Prints the version |
 | `golem status` | Is the daemon up? Prints its pid, version, and uptime |
 | `golem doctor` | Checks the whole install, and says how to fix each problem |
+| `golem install` / `uninstall` | Sets up or removes both background jobs: the service and the web page. `~/.golem` stays |
 | `golem daemon install` / `uninstall` | Sets up or removes the background service. `~/.golem` stays |
 | `golem daemon start` / `stop` / `restart` | Controls the daemon. `restart` after an upgrade |
 | `golem daemon logs` | Follows the daemon's log |
@@ -41,6 +42,7 @@ golem has commands in two places: `golem …` in your shell, and `/…` inside t
 | `golem skills` | The skills this folder sees, and why one is not used. `golem skills list` is the same |
 | `golem skills check <path>` | Checks a skill, its `SKILL.md`, or a folder of skills. Needs no daemon |
 | `golem web` | Serves the chat in your browser on 127.0.0.1, until Ctrl-C |
+| `golem web install` / `uninstall` | Keeps the web page running at login (a launchd job), or removes that job |
 | `golem web logout` | Signs every browser out of the web UI |
 
 `golem web` takes three options:
@@ -51,7 +53,7 @@ golem has commands in two places: `golem …` in your shell, and `/…` inside t
 
 `golem web serve [--port N]` runs the same server with no browser, no token in its output, and no service question. It is meant for a background job.
 
-If `golem web` is already running, a second one reuses it. With no daemon, `golem` and `golem web` first ask to start golem's service.
+If `golem web` is already running, a second one reuses it. With the web job installed, `golem web` opens the page and returns the prompt. With no daemon, `golem` and `golem web` first ask to start golem's service.
 
 ## In the chat
 
