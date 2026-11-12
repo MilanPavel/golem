@@ -158,6 +158,8 @@ async def test_a_trusted_projects_servers_join_its_sessions_only(
         ("fake", str(trusted)),
     ]
     assert await _call(supervisor, here, "mcp__fake__env", name="FROM") == "project"
+    # The user's own server is not in `here`, so `prepare(here)` did not wait for it.
+    await supervisor.prepare(EVERYONE)
     assert await _call(supervisor, EVERYONE, "mcp__fake__env", name="FROM") == "user"
 
     elsewhere = ToolScope(root=untrusted)
