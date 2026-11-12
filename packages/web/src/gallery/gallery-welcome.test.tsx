@@ -20,6 +20,10 @@ for (const theme of ["slip", "kiln"] as const) {
       if (label === "Engine, installing Ollama") expect(group.textContent).toContain("==> Fetching ollama");
       if (label === "Model, default gone") expect(group.textContent).toContain("is no longer installed");
       if (label === "Ready, model downloading") expect(within(group).getByRole("heading", { name: "Almost ready." })).toBeTruthy();
+      if (label === "Ready, install in Chrome") expect(within(group).getByRole("button", { name: "Install golem as an app" })).toBeTruthy();
+      if (label === "Ready, install in Safari") expect(group.textContent).toContain("File → Add to Dock…");
+      if (label === "Ready, install in another browser") expect(group.textContent).toContain("Bookmark 127.0.0.1:7480");
+      if (label === "Ready, app installed") expect(group.textContent).toContain("Installed. Open golem from the Dock.");
       await expectAxeClean(group, DIALOG_RULES);
     });
   }

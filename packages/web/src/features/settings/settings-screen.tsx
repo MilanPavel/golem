@@ -1,6 +1,7 @@
 import { ThemeSwitch } from "../../theme-switch.tsx";
 import { sessionPath, settingsPath } from "../../store/router.ts";
-import { useNavigate } from "../../store/page-context.tsx";
+import { installOffer } from "../../store/app-install.ts";
+import { useAppInstall, useNavigate, usePageHost } from "../../store/page-context.tsx";
 import { cn } from "../../ui/cn.ts";
 import { IconButton } from "../../ui/icon-button.tsx";
 import { CloseIcon } from "../../ui/icons.tsx";
@@ -11,9 +12,24 @@ import { useSettingsContext } from "./context.ts";
 import { McpSection } from "./mcp-section.tsx";
 import { RulesSection } from "./rules-section.tsx";
 import { SECTIONS } from "./sections.ts";
+import { AppCard } from "../setup/index.ts";
 import { SetupSection } from "./setup-section.tsx";
 
 const TAB = cn(TAB_LOOK, "shrink-0 whitespace-nowrap aria-[current=page]:border-clay aria-[current=page]:text-ink");
+
+/** The `App` block: the same install action as Ready, for later. */
+function AppearanceApp() {
+  const pageHost = usePageHost();
+  const appInstall = useAppInstall();
+  return (
+    <AppCard
+      offer={installOffer(appInstall.snapshot, pageHost.kept)}
+      host={location.host}
+      where="settings"
+      onInstall={() => void appInstall.install()}
+    />
+  );
+}
 
 function Body({ section }: { section: string }) {
   switch (section) {
@@ -27,8 +43,9 @@ function Body({ section }: { section: string }) {
       return <ConfigSection />;
     case "appearance":
       return (
-        <div className="max-w-column">
+        <div className="flex max-w-column flex-col gap-6">
           <ThemeSwitch />
+          <AppearanceApp />
         </div>
       );
     default:

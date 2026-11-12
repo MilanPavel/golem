@@ -13,7 +13,8 @@ import {
 } from "@golem/view";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useConnection } from "../../store/connection-context.tsx";
-import { useMcpList, useModelList, useNavigate, usePageActions, usePageHost, usePulls, useSetupStatus } from "../../store/page-context.tsx";
+import { installOffer } from "../../store/app-install.ts";
+import { useAppInstall, useMcpList, useModelList, useNavigate, usePageActions, usePageHost, usePulls, useSetupStatus } from "../../store/page-context.tsx";
 import { welcomePath } from "../../store/router.ts";
 import { pullShare, pullText, shortName } from "../models/index.ts";
 import type { KeyProvider } from "../setup/setup-form.tsx";
@@ -46,6 +47,7 @@ export function WelcomeScreen({ step, from }: { step: WelcomeStep; from: "send" 
   const page = usePageActions();
   const connection = useConnection();
   const pageHost = usePageHost();
+  const appInstall = useAppInstall();
   const pulls = usePulls();
   const progress = useWelcomeProgress();
   const status = useSetupStatus(true);
@@ -289,6 +291,7 @@ export function WelcomeScreen({ step, from }: { step: WelcomeStep; from: "send" 
         tools: toolsLine.text,
         toolsSkipped: toolsLine.skipped,
         keepNote: keepAt === null ? null : serviceKept ? { command: keepAt, page: "only" } : { command: keepAt },
+        app: { offer: installOffer(appInstall.snapshot, pageHost.kept), host: location.host, onInstall: () => void appInstall.install() },
         fromSend: from === "send",
         onStart: start,
       }}

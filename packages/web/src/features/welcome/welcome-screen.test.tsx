@@ -1,9 +1,10 @@
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { App } from "../../app.tsx";
 import type { McpServer } from "../../store/mcp.ts";
 import type { ModelListResult, SetupRow } from "../../store/models.ts";
+import { createAppInstall, type InstallEnv } from "../../store/app-install.ts";
 import { createPageHost } from "../../store/page-host.ts";
 import { PageProvider } from "../../store/page-context.tsx";
 import { createPage } from "../../store/page.ts";
@@ -19,9 +20,9 @@ const here = () => location.pathname + location.search;
 /** A user config that already has a server, so the Tools step is not offered. */
 const A_SERVER: McpServer = { name: "git", state: "running", command: "mcp-server-git", tools: [], schema_tokens: 0, config: "/h/config.toml", on_demand: true, enabled: null };
 
-type Options = { path?: string; rows?: SetupRow[]; pageKept?: boolean; servers?: McpServer[] };
+type Options = { path?: string; rows?: SetupRow[]; pageKept?: boolean; servers?: McpServer[]; appInstall?: ReturnType<typeof createAppInstall> };
 
-function mount(listing: ModelListResult, { path = "/", rows = OK_ROWS, pageKept = true, servers = [A_SERVER] }: Options = {}) {
+function mount(listing: ModelListResult, { path = "/", rows = OK_ROWS, pageKept = true, servers = [A_SERVER], appInstall }: Options = {}) {
   history.replaceState(null, "", path);
   const fake = fakeClient();
   const state = { listing };
@@ -31,7 +32,7 @@ function mount(listing: ModelListResult, { path = "/", rows = OK_ROWS, pageKept 
   fake.raw.listMcp.mockResolvedValue({ servers });
   const doc = new EventTarget() as unknown as Document;
   (doc as { visibilityState: string }).visibilityState = "visible";
-  const page = createPage(fake.client, { frame: fakeFrame(), doc, pageHost: createPageHost(async () => ({ kept: pageKept })) });
+  const page = createPage(fake.client, { frame: fakeFrame(), doc, pageHost: createPageHost(async () => ({ kept: pageKept })), ...(appInstall === undefined ? {} : { appInstall }) });
   page.start();
   fake.setState({ status: "connected" });
   const view = render(
@@ -126,6 +127,48 @@ test("a page opened on /welcome stays at the step its address names", async () =
   await wait();
   expect(here()).toBe("/welcome?step=ready");
   await heading("golem is ready.");
+});
+
+/** A window that holds the install events, to fire them by hand. */
+function installWindow(standalone = false) {
+  const listeners = new Map<string, (event: Event) => void>();
+  const env: InstallEnv = {
+    addEventListener: (type, listener) => listeners.set(type, listener),
+    matchMedia: () => ({ matches: standalone }),
+    navigator: { userAgent: "Mozilla/5.0 (Macintosh) Chrome/126.0 Safari/537.36" },
+  };
+  return { env, fire: (event: Event) => listeners.get(event.type)?.(event) };
+}
+
+test("Ready offers the app when the web job keeps the page, and Install fires the saved prompt", async () => {
+  const win = installWindow();
+  const appInstall = createAppInstall(win.env);
+  const prompt = vi.fn(async () => undefined);
+  const { user } = mount(FRESH_LISTING, { path: "/welcome?step=ready", appInstall });
+  await heading("golem is ready.");
+  await screen.findByText("Keep golem one click away");
+  expect(screen.queryByRole("button", { name: "Install golem as an app" })).toBeNull();
+  act(() => {
+    win.fire(Object.assign(new Event("beforeinstallprompt", { cancelable: true }), { prompt }));
+  });
+  await user.click(await screen.findByRole("button", { name: "Install golem as an app" }));
+  expect(prompt).toHaveBeenCalledTimes(1);
+  act(() => {
+    win.fire(new Event("appinstalled"));
+  });
+  expect(await screen.findByText("Installed. Open golem from the Dock.")).toBeTruthy();
+});
+
+test("Ready does not offer the app with no web job, or inside the app's own window", async () => {
+  mount(FRESH_LISTING, { path: "/welcome?step=ready", pageKept: false, appInstall: createAppInstall(installWindow().env) });
+  await heading("golem is ready.");
+  await wait();
+  expect(screen.queryByText("Keep golem one click away")).toBeNull();
+  cleanup();
+  mount(FRESH_LISTING, { path: "/welcome?step=ready", appInstall: createAppInstall(installWindow(true).env) });
+  await heading("golem is ready.");
+  await wait();
+  expect(screen.queryByText("Keep golem one click away")).toBeNull();
 });
 
 // Engine

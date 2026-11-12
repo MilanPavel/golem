@@ -120,6 +120,7 @@ export function readyProps(change: Partial<ReadyStepProps> = {}): ReadyStepProps
     tools: "skipped",
     toolsSkipped: true,
     keepNote: null,
+    app: { offer: null, host: "127.0.0.1:7480", onInstall: noop },
     fromSend: false,
     onStart: noop,
     ...change,
@@ -192,5 +193,9 @@ export const WELCOME_CASES: WelcomeCase[] = [
     }),
   },
   { label: "Ready, page not kept", props: welcomeProps("ready", { ready: readyProps({ keepNote: { command: "golem web install", page: "only" } }) }) },
+  { label: "Ready, install in Chrome", props: welcomeProps("ready", { ready: readyProps({ app: { offer: "prompt", host: "127.0.0.1:7480", onInstall: noop } }) }) },
+  { label: "Ready, install in Safari", props: welcomeProps("ready", { ready: readyProps({ app: { offer: "safari", host: "127.0.0.1:7480", onInstall: noop } }) }) },
+  { label: "Ready, install in another browser", props: welcomeProps("ready", { ready: readyProps({ app: { offer: "other", host: "127.0.0.1:7480", onInstall: noop } }) }) },
+  { label: "Ready, app installed", props: welcomeProps("ready", { ready: readyProps({ app: { offer: "installed", host: "127.0.0.1:7480", onInstall: noop } }) }) },
   { label: "Ready, from a send", props: welcomeProps("ready", { ready: readyProps({ fromSend: true }) }) },
 ];

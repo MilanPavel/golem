@@ -6,6 +6,7 @@ import { configKey, type ConfigGetResult } from "./config.ts";
 import type { FsListDirsResult } from "./dirs.ts";
 import { MODEL_LIST_ALL_KEY, MODEL_LIST_KEY, SETUP_STATUS_KEY, type ModelListResult } from "./models.ts";
 import type { Page, PageActions } from "./page.ts";
+import type { AppInstallSnapshot } from "./app-install.ts";
 import type { PageHostSnapshot } from "./page-host.ts";
 import type { PullsSnapshot } from "./pulls.ts";
 import type { Route } from "./router.ts";
@@ -51,6 +52,13 @@ export function useNavigate(): (path: string, options?: { replace?: boolean }) =
 export function usePageHost(): PageHostSnapshot {
   const { pageHost } = usePage();
   return useSyncExternalStore(pageHost.subscribe, pageHost.getSnapshot);
+}
+
+/** Whether the page can become an app, and the action that fires the browser's install prompt. */
+export function useAppInstall(): { snapshot: AppInstallSnapshot; install: () => Promise<void> } {
+  const { appInstall } = usePage();
+  const snapshot = useSyncExternalStore(appInstall.subscribe, appInstall.getSnapshot);
+  return { snapshot, install: appInstall.install };
 }
 
 /** The live session list, newest activity first. */
