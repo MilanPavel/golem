@@ -236,6 +236,12 @@ test("Ready when the service is not kept: the note with the command and Copy, ne
   expect((screen.getByRole("button", { name: "Start chatting" }) as HTMLButtonElement).disabled).toBe(false);
 });
 
+test("Ready when only the page's gateway is not kept: the note names the page and the web command", () => {
+  render(<WelcomeView {...welcomeProps("ready", { ready: readyProps({ keepNote: { command: "golem web install", page: "only" } }) })} />);
+  expect(screen.getByText("This page stops when you close the terminal window. To keep it running, even after a restart:")).toBeTruthy();
+  expect(screen.getByText("golem web install")).toBeTruthy();
+});
+
 test("Ready from a send says where it goes, and that nothing was sent", async () => {
   const user = userEvent.setup();
   const onStart = vi.fn();

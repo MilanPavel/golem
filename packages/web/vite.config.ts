@@ -29,7 +29,7 @@ function fromDevPage(req: { headers: Record<string, string | string[] | undefine
 }
 
 /**
- * Sends `/ws` and `/auth` to the gateway. The gateway checks Host and Origin, and checks stay as
+ * Sends `/ws`, `/auth`, and `/healthz` to the gateway. The gateway checks Host and Origin, and checks stay as
  * they are: the proxy sends the headers the gateway expects instead of loosening it. Cookie and
  * Sec-Fetch-Site pass as the browser sent them.
  */
@@ -59,7 +59,7 @@ function gatewayProxy(port: number): Record<string, ProxyOptions> {
       });
     },
   });
-  return { "/ws": make(true), "/auth": make(false) };
+  return { "/ws": make(true), "/auth": make(false), "/healthz": make(false) };
 }
 
 /** Dev server only: prints the login link of the running gateway, or says to start one. */

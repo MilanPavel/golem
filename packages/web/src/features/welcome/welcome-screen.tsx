@@ -3,7 +3,7 @@ import {
   defaultGone,
   engineSelected,
   HOSTED_PROVIDERS,
-  KEEP_SERVICE_COMMAND,
+  keepCommand,
   keyMissing,
   namesModel,
   pageServiceRow,
@@ -12,7 +12,7 @@ import {
 } from "@golem/view";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useConnection } from "../../store/connection-context.tsx";
-import { useModelList, useNavigate, usePageActions, usePulls, useSetupStatus } from "../../store/page-context.tsx";
+import { useModelList, useNavigate, usePageActions, usePageHost, usePulls, useSetupStatus } from "../../store/page-context.tsx";
 import { welcomePath } from "../../store/router.ts";
 import { NewSessionModelDialog, openModelDialog, pullShare, pullText, shortName } from "../models/index.ts";
 import type { KeyProvider } from "../setup/setup-form.tsx";
@@ -43,6 +43,7 @@ export function WelcomeScreen({ step, from }: { step: WelcomeStep; from: "send" 
   const navigate = useNavigate();
   const page = usePageActions();
   const connection = useConnection();
+  const pageHost = usePageHost();
   const pulls = usePulls();
   const progress = useWelcomeProgress();
   const status = useSetupStatus(true);
@@ -174,7 +175,8 @@ export function WelcomeScreen({ step, from }: { step: WelcomeStep; from: "send" 
           : { kind: "none" };
 
   const rows = status.isError ? null : (status.data?.rows ?? null);
-  const kept = rows === null ? true : pageServiceRow(daemonServiceRow(rows), connection.daemonVersion ?? "").state === "ok";
+  const serviceKept = rows === null ? true : pageServiceRow(daemonServiceRow(rows), connection.daemonVersion ?? "").state === "ok";
+  const keepAt = keepCommand(serviceKept, pageHost.kept);
 
   const banner =
     step === "model" && listing !== null && defaultGone(listing)
@@ -237,7 +239,7 @@ export function WelcomeScreen({ step, from }: { step: WelcomeStep; from: "send" 
           model: readyModel,
           tools: "skipped",
           toolsSkipped: !TOOLS_OFFERED,
-          keepNote: kept ? null : { command: KEEP_SERVICE_COMMAND },
+          keepNote: keepAt === null ? null : serviceKept ? { command: keepAt, page: "only" } : { command: keepAt },
           fromSend: from === "send",
           onStart: start,
         }}

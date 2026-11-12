@@ -1,7 +1,7 @@
 import { daemonServiceRow, guided, HOSTED_PROVIDERS, pageServiceRow, setupFormRows, setupProblem, type FormButtonId } from "@golem/view";
 import { useEffect, useMemo } from "react";
 import { useConnection } from "../../store/connection-context.tsx";
-import { useModelList, useNavigate, useSetupStatus } from "../../store/page-context.tsx";
+import { useModelList, useNavigate, usePageHost, useSetupStatus } from "../../store/page-context.tsx";
 import { Button } from "../../ui/button.tsx";
 import { openModelDialog } from "../models/index.ts";
 import { openSetup } from "../setup/index.ts";
@@ -24,6 +24,7 @@ export function SetupSection() {
   const status = useSetupStatus();
   const listing = useModelList(true);
   const connection = useConnection();
+  const pageHost = usePageHost();
   const navigate = useNavigate();
   const { refetch } = status;
   const actions = useSetupActions(refetch);
@@ -36,8 +37,8 @@ export function SetupSection() {
     () =>
       sourceRows === null
         ? null
-        : setupFormRows(sourceRows, pageServiceRow(daemonServiceRow(sourceRows), connection.daemonVersion ?? "")),
-    [sourceRows, connection.daemonVersion],
+        : setupFormRows(sourceRows, pageServiceRow(daemonServiceRow(sourceRows), connection.daemonVersion ?? ""), pageHost.kept),
+    [sourceRows, connection.daemonVersion, pageHost.kept],
   );
   const line = sourceRows === null ? null : (setupProblem(sourceRows) ?? "all set");
   const saved = new Set(listing.data?.setup.keys ?? []);

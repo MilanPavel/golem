@@ -3,6 +3,7 @@ import { changeToolFilter, installEventOf, type InstallEvent, type PermissionMod
 import type { QueryClient } from "@tanstack/react-query";
 import { createDrafts, type Drafts } from "./drafts.ts";
 import { createConnectionStore, type ConnectionStore } from "./connection.ts";
+import { createPageHost, type PageHostStore } from "./page-host.ts";
 import { createNewSession, type NewSessionStore } from "./new-session.ts";
 import { CONFIG_KEY } from "./config.ts";
 import { MCP_CATALOG_KEY, MCP_LIST_KEY, MCP_TOOLS_KEY, type McpToolsResult } from "./mcp.ts";
@@ -233,6 +234,8 @@ export type PageQueries = {
 
 export type Page = {
   connection: ConnectionStore;
+  /** Whether a job keeps the gateway running, read from `/healthz` at start and when the link comes back. */
+  pageHost: PageHostStore;
   sessions: Sessions;
   sessionList: SessionList;
   newSession: NewSessionStore;
@@ -253,11 +256,12 @@ export type Page = {
   stop(): void;
 };
 
-export type PageOptions = { frame?: Frame; doc?: Pick<Document, "addEventListener" | "removeEventListener" | "visibilityState"> };
+export type PageOptions = { pageHost?: PageHostStore; frame?: Frame; doc?: Pick<Document, "addEventListener" | "removeEventListener" | "visibilityState"> };
 
 /** Everything the page holds, built on one client. */
 export function createPage(client: PageClient, options: PageOptions = {}): Page {
   const connection = createConnectionStore(() => client);
+  const pageHost = options.pageHost ?? createPageHost();
   const sessions = createSessions(client, options.frame);
   const sessionList = createSessionList(client);
   const newSession = createNewSession();
@@ -272,6 +276,7 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
   const doc = options.doc ?? document;
   const uses = new Map<string, { count: number; timer: ReturnType<typeof setTimeout> | undefined }>();
   let stopQueries: (() => void) | undefined;
+  let stopHost: (() => void) | undefined;
   let started = false;
 
   function onVisibility(): void {
@@ -282,6 +287,7 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
 
   return {
     connection,
+    pageHost,
     sessions,
     sessionList,
     newSession,
@@ -611,6 +617,15 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       }
       started = true;
       connection.start();
+      void pageHost.refresh();
+      let linked = false;
+      stopHost = connection.subscribe(() => {
+        const up = connection.getSnapshot().state.status === "connected";
+        if (up && !linked) {
+          void pageHost.refresh();
+        }
+        linked = up;
+      });
       sessionList.start();
       pulls.start();
       stopQueries = keepQueriesHonest(client, queryClient);
@@ -621,6 +636,8 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       doc.removeEventListener("visibilitychange", onVisibility);
       stopQueries?.();
       stopQueries = undefined;
+      stopHost?.();
+      stopHost = undefined;
       sessionList.stop();
       pulls.stop();
       sessions.stop();

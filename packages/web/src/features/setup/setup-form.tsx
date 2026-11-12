@@ -54,6 +54,7 @@ function Fix({ row, fix, actions, onButton, onCancelInstall, onNavigate, hasPage
     </Button>
   );
   if (fix.kind === "command") {
+    if (fix.recheck === false) return <CopyCommand command={fix.text} />;
     return (
       <>
         <CopyCommand command={fix.text} />

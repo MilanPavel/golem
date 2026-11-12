@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { App } from "../../app.tsx";
 import type { ModelListResult, SetupRow } from "../../store/models.ts";
+import { createPageHost } from "../../store/page-host.ts";
 import { PageProvider } from "../../store/page-context.tsx";
 import { createPage } from "../../store/page.ts";
 import { fakeClient, fakeFrame } from "../../store/test-support.ts";
@@ -14,9 +15,9 @@ import { resetWelcome } from "./welcome-store.ts";
 const wait = () => act(() => new Promise<void>((resolve) => setTimeout(resolve, 5)));
 const here = () => location.pathname + location.search;
 
-type Options = { path?: string; rows?: SetupRow[] };
+type Options = { path?: string; rows?: SetupRow[]; pageKept?: boolean };
 
-function mount(listing: ModelListResult, { path = "/", rows = OK_ROWS }: Options = {}) {
+function mount(listing: ModelListResult, { path = "/", rows = OK_ROWS, pageKept = true }: Options = {}) {
   history.replaceState(null, "", path);
   const fake = fakeClient();
   const state = { listing };
@@ -25,7 +26,7 @@ function mount(listing: ModelListResult, { path = "/", rows = OK_ROWS }: Options
   fake.raw.status.mockResolvedValue({ version: "0.5.0" });
   const doc = new EventTarget() as unknown as Document;
   (doc as { visibilityState: string }).visibilityState = "visible";
-  const page = createPage(fake.client, { frame: fakeFrame(), doc });
+  const page = createPage(fake.client, { frame: fakeFrame(), doc, pageHost: createPageHost(async () => ({ kept: pageKept })) });
   page.start();
   fake.setState({ status: "connected" });
   const view = render(
@@ -279,7 +280,7 @@ test("Ready names how to keep golem running when the service is not kept at logi
   const kept = STATUS_ROWS.map((row) => (row.part === "service" ? { ...row, state: "warn" as const } : row));
   const { user } = mount(WORKING_LISTING, { path: "/welcome?step=ready", rows: kept });
   await screen.findByText("golem and this page stop when you close the terminal window. To keep them running, even after a restart:");
-  expect(screen.getByText("golem daemon install")).toBeTruthy();
+  expect(screen.getByText("golem install")).toBeTruthy();
   expect((button("Start chatting") as HTMLButtonElement).disabled).toBe(false);
   await user.click(button("Start chatting"));
   expect(here()).toBe("/");
@@ -290,6 +291,20 @@ test("Ready has no note when the service is kept", async () => {
   await heading("golem is ready.");
   await wait();
   expect(screen.queryByText(/stop when you close the terminal window/)).toBeNull();
+});
+
+test("Ready names `golem web install` when only the page's gateway is not kept", async () => {
+  mount(WORKING_LISTING, { path: "/welcome?step=ready", rows: OK_ROWS, pageKept: false });
+  await screen.findByText("This page stops when you close the terminal window. To keep it running, even after a restart:");
+  expect(screen.getByText("golem web install")).toBeTruthy();
+  expect((button("Start chatting") as HTMLButtonElement).disabled).toBe(false);
+});
+
+test("Ready names `golem install` for both when neither is kept", async () => {
+  const unkept = STATUS_ROWS.map((row) => (row.part === "service" ? { ...row, state: "warn" as const } : row));
+  mount(WORKING_LISTING, { path: "/welcome?step=ready", rows: unkept, pageKept: false });
+  await screen.findByText("golem and this page stop when you close the terminal window. To keep them running, even after a restart:");
+  expect(screen.getByText("golem install")).toBeTruthy();
 });
 
 test("from a send: the lede says nothing was sent, and the button goes back where the person came from", async () => {

@@ -1,7 +1,7 @@
 import type { SetupRow } from "@golem/client";
 
 import { pageKeyCommand } from "./setup-key.ts";
-import { KEEP_SERVICE_COMMAND, providerName, type SetupAction } from "./setup-window.ts";
+import { KEEP_ALL_COMMAND, KEEP_SERVICE_COMMAND, keepCommand, pageHostLines, providerName, type SetupAction } from "./setup-window.ts";
 
 /**
  * Settings → Setup as a form: one card for each row of `setup.status`, with the way to fix it
@@ -16,7 +16,7 @@ export type FormButtonId = "install_ollama" | "start_ollama" | "change_model" | 
 
 export type FormFix =
   /** Something to run in a terminal, shown to copy. The page never installs a service or takes a key. */
-  | { kind: "command"; text: string }
+  | { kind: "command"; text: string; recheck?: false }
   | { kind: "button"; id: FormButtonId; label: string }
   /** A page of the app, by its path, with the words for its link. */
   | { kind: "link"; to: string; label: string };
@@ -124,20 +124,45 @@ function toolRows(rows: readonly SetupRow[]): FormRow[] {
 }
 
 /** The Service card, from the page's own row: it runs, and the command that keeps it so when it is not kept. */
-function serviceRow(service: SetupRow): FormRow {
-  return row(service, { fix: service.state === "ok" ? null : { kind: "command", text: KEEP_SERVICE_COMMAND } });
+function serviceRow(service: SetupRow, pageKept: boolean | null): FormRow {
+  // With the page's job missing too, one command installs both. Unknown asks for nothing more.
+  const text = pageKept === false ? KEEP_ALL_COMMAND : KEEP_SERVICE_COMMAND;
+  return row(service, { fix: service.state === "ok" ? null : { kind: "command", text } });
+}
+
+/**
+ * The Web page card: whether a job keeps the gateway running, from `/healthz`. It has no part of
+ * its own in `setup.status`, so it borrows the service's. Unknown shows no card. The command is
+ * the one for both jobs when the service is not kept either; nothing to check again after it.
+ */
+function webPageRow(kept: boolean | null, serviceKept: boolean): FormRow | null {
+  const [status] = pageHostLines(kept);
+  if (status?.kind !== "status") return null;
+  const command = keepCommand(serviceKept, kept);
+  const mark: FormMark = kept === true ? "ok" : "warn";
+  return {
+    part: "service",
+    mark,
+    markWord: MARK_WORDS[mark],
+    name: "Web page",
+    detail: status.text,
+    fix: kept === true || command === null ? null : { kind: "command", text: command, recheck: false },
+  };
 }
 
 /**
  * The cards of the form, in the design's order, whatever order the checks ran in. `service` is
  * the page's own Service row (`pageServiceRow`), which takes the place of the daemon's launchd
  * one; without it the daemon's row is shown. The socket and the config show only when something
- * is wrong with them, and healthy tool servers fold into one card.
+ * is wrong with them, and healthy tool servers fold into one card. `pageKept` is what the
+ * gateway reports of itself: a Web page card follows the Service card, and unknown has none.
  */
-export function setupFormRows(rows: readonly SetupRow[], service?: SetupRow): FormRow[] {
+export function setupFormRows(rows: readonly SetupRow[], service?: SetupRow, pageKept: boolean | null = null): FormRow[] {
   const daemonService = rows.find((each) => each.part === "service" && each.name === "service");
   const own = service ?? daemonService;
-  const cards: FormRow[] = own === undefined ? [] : [serviceRow(own)];
+  const cards: FormRow[] = own === undefined ? [] : [serviceRow(own, pageKept)];
+  const web = webPageRow(pageKept, own?.state === "ok");
+  if (web !== null) cards.push(web);
   const ordered = [...rows].sort((a, b) => PART_ORDER.indexOf(a.part) - PART_ORDER.indexOf(b.part));
   const tools = ordered.filter((each) => each.part === "tools");
   for (const source of ordered) {
