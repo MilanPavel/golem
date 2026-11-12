@@ -57,7 +57,7 @@ test("the stepper shows each step's state, and only in guided mode", () => {
   const spans = stepperSpans(guided("engine", "start"));
   assert.deepEqual(
     spans?.map((span) => `${span.tone}:${span.text}`),
-    ["ok:✓ Service", "dim: ── ", "clay:● Engine", "dim: ── ", "dim:○ Model", "dim: ── ", "dim:○ Ready"],
+    ["ok:✓ Service", "dim: ── ", "clay:● Engine", "dim: ── ", "dim:○ Model", "dim: ── ", "dim:– Tools", "dim: ── ", "dim:○ Ready"],
   );
   assert.equal(stepperSpans(single("model", "overview")), null);
 });
