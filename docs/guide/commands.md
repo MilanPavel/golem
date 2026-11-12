@@ -49,6 +49,8 @@ golem has commands in two places: `golem …` in your shell, and `/…` inside t
 - `--no-open` prints the link instead of opening the browser. With no daemon running, it says what to run and exits 1.
 - `--json` prints the link, the port, and the pid as JSON, for scripts, and opens no browser.
 
+`golem web serve [--port N]` runs the same server with no browser, no token in its output, and no service question. It is meant for a background job.
+
 If `golem web` is already running, a second one reuses it. With no daemon, `golem` and `golem web` first ask to start golem's service.
 
 ## In the chat

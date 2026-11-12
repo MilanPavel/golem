@@ -23,7 +23,9 @@ golem starts a small server on `127.0.0.1:7480`, opens the page in your browser,
 | `--no-open` | Print the link instead of opening the browser |
 | `--json` | Print the link, the port, and the pid as JSON, for scripts |
 
-Run `golem web` again while one is running, and it opens the same server instead of starting a second one.
+Run `golem web` again while one is running, and it opens the same server instead of starting a second one. If that server runs an older golem than the one you typed, `golem web` says so on stderr; stop it with Ctrl-C and run `golem web` again.
+
+`golem web serve [--port N]` runs the server in the foreground with no browser, no token in its output, and no question about the service. It is for a background job to run, not for typing. It exits with code 75 when a `golem web` already serves the port.
 
 ## What you can do today
 
