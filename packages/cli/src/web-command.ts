@@ -1,13 +1,9 @@
-import { spawn } from "node:child_process";
-
-import { resolveSocketPath } from "@golem/client/node";
+import { GOLEM_VERSION, resolveSocketPath } from "@golem/client/node";
 import { createSessionStore, randomSecret } from "@golem/gateway";
 import {
   checkRunDirSync,
   clearSessionFile,
   ensureRunDir,
-  readRunFile,
-  readTokenFile,
   removeRunFile,
   removeTokenFile,
   resolveRunDir,
@@ -18,64 +14,16 @@ import {
 import { loadAssets } from "@golem/gateway/assets";
 import { startGateway, type Gateway } from "@golem/gateway/server";
 
-import { formatWebOutput, isLiveHealth, isSafeLink, webLink, type WebArgs } from "./web.ts";
+import type { WebArgs } from "./web.ts";
+import { busy, findLive, show, useLive, type WebDeps } from "./web-live.ts";
 
-const HEALTH_TIMEOUT_MS = 1_000;
-
-interface Health {
-  golem: string;
-  pid: number;
-}
-
-/** What `/healthz` on the port says, or null when nothing answers like a gateway. */
-async function askHealth(port: number): Promise<Health | null> {
-  try {
-    const res = await fetch(`http://127.0.0.1:${port}/healthz`, { signal: AbortSignal.timeout(HEALTH_TIMEOUT_MS) });
-    if (res.status !== 200) return null;
-    const body: unknown = await res.json();
-    const pid = (body as { pid?: unknown } | null)?.pid;
-    if (typeof pid !== "number" || !isLiveHealth(body, pid)) return null;
-    return { golem: "web", pid };
-  } catch {
-    return null;
-  }
-}
-
-/** Opens the link. The link goes in on stdin, because process arguments are visible to other users. */
-function openBrowser(link: string): Promise<boolean> {
-  if (!isSafeLink(link)) return Promise.resolve(false);
-  return new Promise((done) => {
-    const child = spawn("osascript", [], { stdio: ["pipe", "ignore", "ignore"] });
-    child.on("error", () => done(false));
-    child.on("close", (code) => done(code === 0));
-    child.stdin.on("error", () => done(false));
-    child.stdin.end(`open location "${link}"\n`);
-  });
-}
-
-async function show(args: WebArgs, port: number, pid: number, token: string, started: boolean): Promise<void> {
-  const link = webLink(port, token);
-  const opened = args.open && (await openBrowser(link));
-  const lines = formatWebOutput({ json: args.json, opened, link, port, pid, started });
-  process.stdout.write(`${lines.join("\n")}\n`);
-}
-
-/** Uses the gateway that already runs: its token is in `web.token`. */
-async function reuse(args: WebArgs, runDir: string, health: Health, port: number): Promise<number> {
-  if (args.portGiven && args.port !== 0 && args.port !== port) {
-    process.stderr.write(`golem web already runs on port ${port}\n`);
-  }
-  await show(args, port, health.pid, await readTokenFile(runDir), false);
-  return 0;
-}
-
-/** The record's gateway, when `/healthz` on its port answers with its pid. */
-async function findLive(runDir: string): Promise<{ health: Health; port: number } | null> {
-  const record = await readRunFile(runDir);
-  if (record === null) return null;
-  const health = await askHealth(record.port);
-  return health !== null && health.pid === record.pid ? { health, port: record.port } : null;
-}
+/** Until the web job's launchd helper lands, there is no job to restart. */
+const DEFAULT_DEPS: WebDeps = {
+  version: GOLEM_VERSION,
+  restartWebJob: () => Promise.resolve(false),
+  pollMs: 200,
+  timeoutMs: 10_000,
+};
 
 function isAddressInUse(error: unknown): boolean {
   const e = error as { code?: unknown; message?: unknown };
@@ -105,20 +53,20 @@ function stayUntilStopped(gateway: Gateway, runDir: string): Promise<number> {
 }
 
 /** `golem web`: shows the link of the gateway that runs, or runs one until Ctrl-C. */
-export async function runWeb(args: WebArgs): Promise<number> {
+export async function runWeb(args: WebArgs, deps: WebDeps = DEFAULT_DEPS): Promise<number> {
   try {
-    return await runGateway(args);
+    return await runGateway(args, deps);
   } catch (error) {
     process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
     return 1;
   }
 }
 
-async function runGateway(args: WebArgs): Promise<number> {
+async function runGateway(args: WebArgs, deps: WebDeps): Promise<number> {
   const runDir = resolveRunDir();
   await ensureRunDir(runDir);
   const live = await findLive(runDir);
-  if (live !== null) return reuse(args, runDir, live.health, live.port);
+  if (live !== null) return args.serve ? busy(live) : useLive(args, runDir, live, deps);
   await removeRunFile(runDir);
 
   // Start before writing the token, so a taken port leaves a running gateway's token alone.
@@ -131,6 +79,8 @@ async function runGateway(args: WebArgs): Promise<number> {
       token,
       assets: loadAssets(),
       sessions: createSessionStore({ persistence: sessionFilePersistence(runDir) }),
+      version: deps.version,
+      kept: args.serve,
     });
   } catch (error) {
     if (!isAddressInUse(error)) throw error;
@@ -138,7 +88,7 @@ async function runGateway(args: WebArgs): Promise<number> {
     // web.json names it: anything else on the port could be another user's server, and must never
     // see the token.
     const winner = await findLive(runDir);
-    if (winner !== null) return reuse(args, runDir, winner.health, winner.port);
+    if (winner !== null) return args.serve ? busy(winner) : useLive(args, runDir, winner, deps);
     process.stderr.write(`port ${args.port} is in use. Try golem web --port <other>\n`);
     return 1;
   }

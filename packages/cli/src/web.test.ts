@@ -1,15 +1,46 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
+import { isSecretShape, randomSecret } from "@golem/gateway";
+
 import { formatWebOutput, isLiveHealth, isSafeLink, parseWebArgs, webLink } from "./web.ts";
 
+test("parseWebArgs: serve", () => {
+  assert.deepEqual(parseWebArgs(["serve"]), { port: 7480, portGiven: false, open: false, json: false, serve: true });
+  assert.deepEqual(parseWebArgs(["serve", "--port", "8000"]), { port: 8000, portGiven: true, open: false, json: false, serve: true });
+  for (const bad of [["serve", "--json"], ["serve", "--no-open"], ["serve", "serve"], ["serve", "--port"], ["--port", "1", "serve"]]) {
+    assert.equal(parseWebArgs(bad), null, bad.join(" "));
+  }
+});
+
+test("isLiveHealth accepts an answer with no version", () => {
+  assert.equal(isLiveHealth({ golem: "web", pid: 5 }, 5), true);
+  assert.equal(isLiveHealth({ golem: "web", pid: 5, version: "1.2.3", kept: true }, 5), true);
+});
+
+test("formatWebOutput: serve is one line with no link and no token", () => {
+  const token = randomSecret();
+  const lines = formatWebOutput({
+    json: false,
+    opened: false,
+    link: `http://127.0.0.1:7480/#t=${token}`,
+    port: 7480,
+    pid: 9,
+    started: true,
+    serve: true,
+  });
+  assert.deepEqual(lines, ["golem web: serving http://127.0.0.1:7480"]);
+  assert.equal(lines.join("\n").includes(token), false);
+  assert.equal(lines.some((l) => l.split(/[\s/#=]+/).some(isSecretShape)), false);
+});
+
 test("parseWebArgs: defaults", () => {
-  assert.deepEqual(parseWebArgs([]), { port: 7480, portGiven: false, open: true, json: false });
+  assert.deepEqual(parseWebArgs([]), { port: 7480, portGiven: false, open: true, json: false, serve: false });
 });
 
 test("parseWebArgs: options", () => {
-  assert.deepEqual(parseWebArgs(["--port", "0", "--no-open"]), { port: 0, portGiven: true, open: false, json: false });
-  assert.deepEqual(parseWebArgs(["--json", "--port", "65535"]), { port: 65535, portGiven: true, open: false, json: true });
+  assert.deepEqual(parseWebArgs(["--port", "0", "--no-open"]), { port: 0, portGiven: true, open: false, json: false, serve: false });
+  assert.deepEqual(parseWebArgs(["--json", "--port", "65535"]), { port: 65535, portGiven: true, open: false, json: true, serve: false });
 });
 
 test("parseWebArgs: refuses anything else", () => {

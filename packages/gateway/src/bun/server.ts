@@ -27,6 +27,10 @@ export interface GatewayOptions {
   maxSockets?: number;
   /** URL keys of the page's files, to the file on disk (or in the binary). Default none. */
   assets?: ReadonlyMap<string, string>;
+  /** The golem version this gateway runs, reported by `/healthz`. Default "unknown". */
+  version?: string;
+  /** True when a job keeps this gateway running, reported by `/healthz`. Default false. */
+  kept?: boolean;
 }
 
 export interface Gateway {
@@ -62,7 +66,7 @@ export function startGateway(opts: GatewayOptions): Gateway {
     if (req.method !== "GET") return text(405, "method not allowed");
     const checked = checkRequest(req, port, { requireOrigin: false });
     if (!checked.ok) return text(checked.status, checked.reason);
-    return Response.json({ golem: "web", pid: process.pid }, { headers: { "Cache-Control": "no-store" } });
+    return Response.json({ golem: "web", pid: process.pid, version: opts.version ?? "unknown", kept: opts.kept ?? false }, { headers: { "Cache-Control": "no-store" } });
   }
 
   const assets = opts.assets ?? new Map<string, string>();
