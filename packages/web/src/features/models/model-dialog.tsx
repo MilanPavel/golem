@@ -22,9 +22,9 @@ import { cn } from "../../ui/cn.ts";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "../../ui/dialog.tsx";
 import { IconButton } from "../../ui/icon-button.tsx";
 import { RefreshIcon, SlidersIcon } from "../../ui/icons.tsx";
-import { resolveActive, SearchList, type SearchListItem } from "../../ui/search-list.tsx";
+import { resolveActive } from "../../ui/search-list.tsx";
 import { CategoryChips } from "./category-chips.tsx";
-import { ModelRow } from "./model-row.tsx";
+import { listRows, ModelList } from "./model-list.tsx";
 import { TuneView, type TryBackend, type TuneBackend } from "./tune-view.tsx";
 import { diskText, downloadText, removable, removeText, shortName, tooBigText, withActivePulls } from "./model-text.ts";
 
@@ -44,7 +44,6 @@ export type ModelDialogActions = {
 export type ModelConfirm = { kind: "pull"; ref: string; step: 1 | 2 } | { kind: "remove"; ref: string };
 
 type Failure = { ref: string | null; text: string };
-type Row = SearchListItem & { model: ListedModel };
 
 export type ModelDialogViewProps = {
   open: boolean;
@@ -142,15 +141,8 @@ function Content({
   const confirmButton = useRef<HTMLButtonElement>(null);
 
   const shown = useMemo(() => withActivePulls(listing, pulls), [listing, pulls]);
-  const rows = useMemo<Row[]>(
-    () =>
-      shown === null
-        ? []
-        : pickerGroups(shown, query, category).flatMap((group) =>
-            group.models.map((model) => ({ id: model.ref, group: group.title, model })),
-          ),
-    [shown, query, category],
-  );
+  const groups = useMemo(() => (shown === null ? [] : pickerGroups(shown, query, category)), [shown, query, category]);
+  const rows = useMemo(() => listRows(groups), [groups]);
   const active = resolveActive(rows, activeId);
   const model = active?.model ?? null;
   const missing = model !== null && providerMissing(shown, model.provider);
@@ -302,93 +294,65 @@ function Content({
         </label>
       )}
       <CategoryChips className="mt-3" value={category} onChange={setCategory} disabled={busy !== null} />
-      <SearchList
+      <ModelList
         className="mt-3 min-h-0 flex-1"
         listClassName="flex-1"
-        label="Search models"
-        placeholder="Search models"
+        listing={shown}
+        groups={groups}
+        profile={profile}
+        category={category}
+        pulls={pulls}
         inputRef={input}
-        items={rows}
         query={query}
         onQueryChange={setQuery}
         activeId={active?.id ?? null}
         onActiveChange={setActiveId}
-        onActivate={(row) => primary(row.model)}
+        onActivate={primary}
         empty={empty}
         after={shown === null ? null : <ProviderNotes listing={shown} />}
-        renderItem={(row, { active: highlighted }) => (
-          <div className="flex items-start gap-2">
-            <div className="min-w-0 flex-1">
-              <ModelRow
-                model={row.model}
-                providerMissing={providerMissing(shown, row.model.provider)}
-                current={namesModel(row.model, profile)}
-                isDefault={namesModel(row.model, listing?.default ?? null)}
-                category={category}
-                pull={pulls.active.get(row.model.ref)}
-                failed={pulls.failed.get(row.model.ref)}
+        onTune={tune === undefined ? undefined : openTune}
+        tunable={tunable}
+        footer={
+          <div className="mt-4 flex shrink-0 flex-col gap-3 border-t border-line pt-4">
+            {error === null ? null : (
+              <p role="alert" className="text-sm text-deny">
+                {error}
+              </p>
+            )}
+            {model === null || shown === null ? (
+              <IdleBar defaultOnly={isDefaultMode} useLabel={isNew ? "Use for the new session" : "Use for this session"} />
+            ) : confirm !== null ? (
+              <ConfirmBar
+                confirm={confirm}
+                model={model}
+                listing={shown}
+                use={!isNew && !isDefaultMode}
+                busy={busy}
+                buttonRef={confirmButton}
+                onAccept={accept}
+                onCancel={() => setConfirm(null)}
               />
-            </div>
-            {tune === undefined || !tunable(row.model) ? null : (
-              // A button cannot sit inside an option, so this is for the mouse; the keyboard has the Tune button
-              // of the actions below, and a screen reader does not hear this one.
-              <span
-                aria-hidden="true"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  openTune(row.model);
-                }}
-                onDoubleClick={(event) => event.stopPropagation()}
-                className={cn(
-                  "inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-sm border border-line-strong px-2 py-0.5 text-xs text-ink hover:bg-line",
-                  highlighted ? "opacity-100" : "opacity-0 group-hover:opacity-100",
-                )}
-              >
-                <SlidersIcon />
-                Tune
-              </span>
+            ) : (
+              <ActionBar
+                model={model}
+                missing={missing}
+                useLabel={isNew ? "Use for the new session" : "Use for this session"}
+                defaultOnly={isDefaultMode}
+                isCurrent={namesModel(model, profile)}
+                isDefault={namesModel(model, listing?.default ?? null)}
+                busy={busy}
+                onUse={() => void switchTo(model)}
+                onDefault={() => void makeDefault(model)}
+                onDownload={() => ask({ kind: "pull", ref: model.ref, step: 1 })}
+                onStop={() => void stop(model)}
+                onRemove={() => ask({ kind: "remove", ref: model.ref })}
+                onTune={tune !== undefined && tunable(model) ? () => openTune(model) : undefined}
+                tuneRef={tuneButton}
+              />
             )}
           </div>
-        )}
+        }
       />
-      <div className="mt-4 flex shrink-0 flex-col gap-3 border-t border-line pt-4">
-        {error === null ? null : (
-          <p role="alert" className="text-sm text-deny">
-            {error}
-          </p>
-        )}
-        {model === null || shown === null ? (
-          <IdleBar defaultOnly={isDefaultMode} useLabel={isNew ? "Use for the new session" : "Use for this session"} />
-        ) : confirm !== null ? (
-          <ConfirmBar
-            confirm={confirm}
-            model={model}
-            listing={shown}
-            use={!isNew && !isDefaultMode}
-            busy={busy}
-            buttonRef={confirmButton}
-            onAccept={accept}
-            onCancel={() => setConfirm(null)}
-          />
-        ) : (
-          <ActionBar
-            model={model}
-            missing={missing}
-            useLabel={isNew ? "Use for the new session" : "Use for this session"}
-            defaultOnly={isDefaultMode}
-            isCurrent={namesModel(model, profile)}
-            isDefault={namesModel(model, listing?.default ?? null)}
-            busy={busy}
-            onUse={() => void switchTo(model)}
-            onDefault={() => void makeDefault(model)}
-            onDownload={() => ask({ kind: "pull", ref: model.ref, step: 1 })}
-            onStop={() => void stop(model)}
-            onRemove={() => ask({ kind: "remove", ref: model.ref })}
-            onTune={tune !== undefined && tunable(model) ? () => openTune(model) : undefined}
-            tuneRef={tuneButton}
-          />
-        )}
-      </div>
     </div>
   );
 

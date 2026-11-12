@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { assetCacheControl, assetKey, fallbackKey } from "./core.ts";
+import { assetCacheControl, assetContentType, assetKey, fallbackKey } from "./core.ts";
 
 test("assetKey maps the root to the page and leaves other paths alone", () => {
   assert.equal(assetKey("/"), "/index.html");
@@ -24,4 +24,10 @@ test("assetCacheControl is immutable only under /assets/", () => {
   assert.equal(assetCacheControl("/index.html"), "no-cache");
   assert.equal(assetCacheControl("/favicon.svg"), "no-cache");
   assert.equal(assetCacheControl("/other/assets/x.js"), "no-cache");
+});
+
+test("assetContentType names the manifest and leaves other files to the runtime", () => {
+  assert.equal(assetContentType("/manifest.webmanifest"), "application/manifest+json");
+  assert.equal(assetContentType("/icon-192.png"), null);
+  assert.equal(assetContentType("/index.html"), null);
 });

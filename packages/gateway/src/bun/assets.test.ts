@@ -19,6 +19,8 @@ beforeEach(() => {
   fs.writeFileSync(path.join(site, "index.html"), "<h1>page</h1>");
   fs.writeFileSync(path.join(site, "assets", "app-abc123.js"), "console.log(1)");
   fs.writeFileSync(path.join(site, "favicon.svg"), "<svg xmlns='http://www.w3.org/2000/svg'/>");
+  fs.writeFileSync(path.join(site, "manifest.webmanifest"), '{"name":"golem"}');
+  fs.writeFileSync(path.join(site, "icon-192.png"), Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
   fs.writeFileSync(path.join(site, ".hidden"), "no");
   fs.symlinkSync(path.join(dir, "secret.txt"), path.join(site, "link.txt"));
   fs.writeFileSync(path.join(dir, "secret.txt"), "outside-secret");
@@ -37,7 +39,13 @@ afterEach(async () => {
 });
 
 test("folderAssets lists regular files only", () => {
-  expect([...folderAssets(path.join(dir, "site")).keys()]).toEqual(["/assets/app-abc123.js", "/favicon.svg", "/index.html"]);
+  expect([...folderAssets(path.join(dir, "site")).keys()]).toEqual([
+    "/assets/app-abc123.js",
+    "/favicon.svg",
+    "/icon-192.png",
+    "/index.html",
+    "/manifest.webmanifest",
+  ]);
 });
 
 test("/ is the page, checked on every load, with the CSP", async () => {
@@ -60,6 +68,19 @@ test("a file outside /assets/ is no-cache", async () => {
   const res = await fetch(`${base}/favicon.svg`);
   expect(res.status).toBe(200);
   expect(res.headers.get("cache-control")).toBe("no-cache");
+});
+
+test("the manifest and an icon need no cookie, with their types and the CSP", async () => {
+  const manifest = await fetch(`${base}/manifest.webmanifest`);
+  expect(manifest.status).toBe(200);
+  expect(manifest.headers.get("content-type")).toBe("application/manifest+json");
+  expect(manifest.headers.get("cache-control")).toBe("no-cache");
+  expect(manifest.headers.get("content-security-policy")).toContain("default-src 'self'");
+  expect(await manifest.json()).toEqual({ name: "golem" });
+  const icon = await fetch(`${base}/icon-192.png`);
+  expect(icon.status).toBe(200);
+  expect(icon.headers.get("content-type")).toBe("image/png");
+  expect(icon.headers.get("cache-control")).toBe("no-cache");
 });
 
 test("a page route serves the page, a missing file is 404", async () => {

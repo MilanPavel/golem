@@ -8,7 +8,8 @@ import { createPage } from "../../store/page.ts";
 import { PageProvider } from "../../store/page-context.tsx";
 import { fakeClient, fakeFrame, rpcError } from "../../store/test-support.ts";
 import { closePalette } from "../palette/index.ts";
-import { closeSetup } from "./setup-open.ts";
+import { setupAtStart } from "@golem/view";
+import { closeSetup, openSetup } from "./setup-open.ts";
 import { startNoticeStore } from "./start-notice.ts";
 import {
   FRESH_LISTING,
@@ -53,6 +54,13 @@ function mount(listing: ModelListResult, { rows = STATUS_ROWS, path = "/", hold 
   const page = createPage(fake.client, { frame: fakeFrame(), doc });
   page.start();
   fake.setState({ status: "connected" });
+  // The page's start opens /welcome, not this window: these tests are about the window, so open it
+  // the way the start used to, and leave the start rule to the welcome tests.
+  const start = setupAtStart(true, listing);
+  if (start?.kind === "window") {
+    page.setupStart.decide();
+    openSetup({ window: start.window });
+  }
   const view = render(
     <PageProvider page={page}>
       <App />
@@ -84,7 +92,7 @@ afterEach(() => {
   delete document.documentElement.dataset.theme;
 });
 
-// What opens at the start
+// The window at its start states
 
 test("a fresh home opens guided setup on Engine, with the stepper", async () => {
   mount(FRESH_LISTING);
@@ -94,13 +102,13 @@ test("a fresh home opens guided setup on Engine, with the stepper", async () => 
   expect(list?.textContent).toContain("Service (done)");
   expect(list?.textContent).toContain("Engine (current step)");
   expect(list?.textContent).toContain("Model (to do)");
-  expect(within(open).getByText(/Step 2\/4 Engine/)).toBeTruthy();
+  expect(within(open).getByText(/Step 2\/5 Engine/)).toBeTruthy();
 });
 
 test("a default that is gone opens the Model panel alone, naming it, with no stepper", async () => {
   mount(GONE_LISTING);
   const open = await found();
-  expect(within(open).getByText(/ollama\/qwen3:8b is no longer installed in Ollama\./)).toBeTruthy();
+  expect(await within(open).findByText(/ollama\/qwen3:8b is no longer installed in Ollama\./)).toBeTruthy();
   expect(steps()).toBeNull();
 });
 
@@ -122,19 +130,6 @@ test("the only model ready, with no default, becomes the default and no window o
   closed();
 });
 
-test("a reconnect does not open setup again", async () => {
-  const { fake, user } = mount(FRESH_LISTING);
-  await found();
-  await user.click(within(dialog()).getByRole("button", { name: "Close setup" }));
-  await waitFor(closed);
-  act(() => fake.setState({ status: "reconnecting", attempt: 1, delayMs: 1000 }));
-  await wait();
-  act(() => fake.setState({ status: "connected" }));
-  await wait();
-  await wait();
-  closed();
-});
-
 test("a window opened at the start is still there after the link drops and comes back", async () => {
   // The first load trades the token and then reconnects: the shell unmounts and mounts again.
   const { fake } = mount(FRESH_LISTING);
@@ -145,23 +140,6 @@ test("a window opened at the start is still there after the link drops and comes
   act(() => fake.setState({ status: "connected" }));
   await within(await found()).findByText("Where should golem think?");
 });
-
-test("a start-time opening waits until the dialog that is open closes", async () => {
-  const { state, user } = mount(FRESH_LISTING, { hold: true });
-  await wait();
-  await user.keyboard("{Control>}k{/Control}");
-  await screen.findByRole("dialog", { name: "Commands" });
-  // The listing comes while the palette is open: setup waits.
-  await act(async () => {
-    state.release();
-  });
-  await wait();
-  closed();
-  await user.keyboard("{Escape}");
-  await found();
-});
-
-// What opens it on request
 
 test("/setup opens the overview from the composer, and focus goes back to it", async () => {
   const { user } = mount(WORKING_LISTING);
@@ -547,7 +525,7 @@ test("using an installed model makes it the default", async () => {
 
 test("the Model panel alone, after a gone default, goes back to where it came from", async () => {
   const { fake, user } = mount(GONE_LISTING);
-  await found();
+  await within(await found()).findByText(/no longer installed/);
   await user.click(choice(/Gemma 4 E4B/));
   expect(fake.raw.setDefaultModel).toHaveBeenCalledWith("ollama/gemma4:e4b");
   await waitFor(closed);

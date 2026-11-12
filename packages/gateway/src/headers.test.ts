@@ -29,3 +29,8 @@ test("a response with immutable headers is handled", () => {
   assert.equal(out.status, 302);
   assert.equal(out.headers.get("x-content-type-options"), "nosniff");
 });
+
+test("there is no manifest-src, so the manifest falls back to default-src self", () => {
+  assert.equal(CONTENT_SECURITY_POLICY.includes("manifest-src"), false);
+  assert.match(CONTENT_SECURITY_POLICY, /default-src 'self'/);
+});

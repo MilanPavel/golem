@@ -12,11 +12,11 @@ import { firstRunChoice, hostedProviders, namesModel } from "./first-run.ts";
  * panel and goes back where it came from. The overview lists what is set up.
  * Nothing here draws: each panel gives lines, and each UI draws them its own way.
  */
-export type SetupPanel = "service" | "engine" | "ollama" | "provider" | "key" | "model" | "ready";
+export type SetupPanel = "service" | "engine" | "ollama" | "provider" | "key" | "model" | "tools" | "ready";
 
-export type SetupStep = "Service" | "Engine" | "Model" | "Ready";
+export type SetupStep = "Service" | "Engine" | "Model" | "Tools" | "Ready";
 
-export const SETUP_STEPS: readonly SetupStep[] = ["Service", "Engine", "Model", "Ready"];
+export const SETUP_STEPS: readonly SetupStep[] = ["Service", "Engine", "Model", "Tools", "Ready"];
 
 const STEP_OF: Record<SetupPanel, SetupStep> = {
   service: "Service",
@@ -25,6 +25,7 @@ const STEP_OF: Record<SetupPanel, SetupStep> = {
   provider: "Engine",
   key: "Engine",
   model: "Model",
+  tools: "Tools",
   ready: "Ready",
 };
 
@@ -50,10 +51,24 @@ export type SetupResult =
   | { kind: "key" }
   | { kind: "later" }
   | { kind: "provider"; provider: string }
-  | { kind: "background" };
+  | { kind: "background" }
+  /** Tools only: the user passed on the offer. */
+  | { kind: "skip" };
 
 /** What the navigation needs to know about golem as it is now. */
-export type SetupFacts = { ollamaRunning: boolean };
+export type SetupFacts = {
+  ollamaRunning: boolean;
+  /**
+   * True when the user config has no `[mcp]` table, so there is something to offer. Left out,
+   * it is false and Model goes straight to Ready.
+   */
+  mcpEmpty?: boolean;
+};
+
+/** Whether guided setup offers Tools: the user config has no `[mcp]` table. */
+export function offersTools(facts: SetupFacts): boolean {
+  return facts.mcpEmpty === true;
+}
 
 export type SetupNext =
   | { kind: "window"; window: SetupWindow }
@@ -128,7 +143,12 @@ function guidedNext(panel: SetupPanel, result: SetupResult, facts: SetupFacts): 
     case "provider":
       return "key";
     case "model":
-      return result.kind === "background" ? "background" : "ready";
+      if (result.kind === "background") {
+        return "background";
+      }
+      return offersTools(facts) ? "tools" : "ready";
+    case "tools":
+      return "ready";
     case "ready":
       return "chat";
   }
@@ -138,15 +158,20 @@ export type StepState = "done" | "now" | "todo" | "skip";
 
 export const STEP_MARKS: Record<StepState, string> = { done: "✓", now: "●", todo: "○", skip: "–" };
 
-/** The stepper, in guided mode only. A send with no model skips Service. */
-export function stepper(window: SetupWindow): { name: SetupStep; state: StepState }[] | null {
+/** The stepper, in guided mode only. A send with no model skips Service, and `facts` that offer no Tools skip it. */
+export function stepper(window: SetupWindow, facts?: SetupFacts): { name: SetupStep; state: StepState }[] | null {
   if (window.view !== "panel" || window.mode !== "guided") {
     return null;
   }
   const at = SETUP_STEPS.indexOf(STEP_OF[window.panel]);
+  const noTools = facts === undefined || !offersTools(facts);
   return SETUP_STEPS.map((name, index) => {
     if (index === at) {
       return { name, state: "now" };
+    }
+    // Tools is passed over when the user config already has an [mcp] table.
+    if (name === "Tools" && noTools) {
+      return { name, state: "skip" };
     }
     if (index > at) {
       return { name, state: "todo" };

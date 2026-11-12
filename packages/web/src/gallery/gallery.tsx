@@ -1,4 +1,4 @@
-import { COMMANDS, noPastes, withModelChoices, withSkillChoices, type TodoItem } from "@golem/view";
+import { COMMANDS, noPastes, pickerGroups, withModelChoices, withSkillChoices, type TodoItem } from "@golem/view";
 import { createContext, useContext, useEffect, useId, useState, type ReactNode } from "react";
 import { Badge } from "../ui/badge.tsx";
 import { Button } from "../ui/button.tsx";
@@ -30,9 +30,11 @@ import { CommandsDialog } from "../features/composer/help-dialog.tsx";
 import { HomeView, NewSessionModelChipView, SessionTitle } from "../features/shell/index.ts";
 import { FolderBrowserView } from "../features/shell/folder-browser.tsx";
 import { CommandPaletteView, KeysDialog } from "../features/palette/index.ts";
-import { ModelDialogView, type ModelDialogViewProps } from "../features/models/index.ts";
+import { ModelDialogView, ModelList, withActivePulls, type ModelDialogViewProps, type ModelListNote } from "../features/models/index.ts";
 import { sampleTry, sampleTuneBackend } from "../features/models/sample-tune.ts";
 import { SetupDialogView } from "../features/setup/index.ts";
+import { FinishSetupStripView, WelcomeView } from "../features/welcome/index.ts";
+import { WELCOME_CASES } from "../features/welcome/sample.ts";
 import { SpanDetail, TraceSummary, TraceTree } from "../features/trace/index.ts";
 import { APPROVAL_DETAIL, APPROVAL_TRACE, CUT_LIKELY_DETAIL, CUT_MIDDLE_DETAIL, CUT_YES_DETAIL, FULL_DETAIL, MODEL_DETAIL, NO_PROMPT_DETAIL, NUM_CTX_DETAIL, OLD_DETAIL, SECTIONS_DETAIL, TOOL_DETAIL, UNKNOWN_WINDOW_DETAIL, FAILED_TRACE, GROWING_TRACE, LONG_TRACE, OLD_TRACE, SHORT_TRACE } from "../features/trace/sample.ts";
 import type { TraceRunSpan, TraceSpanResult } from "../store/trace.ts";
@@ -440,6 +442,43 @@ function ModelDialogDemo({ theme }: { theme: string }) {
   );
 }
 
+const LIST_NOTES = new Map<string, ModelListNote>([
+  ["ollama/qwen3:14b", { tag: "recommended", reason: "Strong at code, and it fits in 16 GB of memory.", estimate: "about 12 min" }],
+  ["ollama/gemma3:12b", { estimate: "about 8 min" }],
+]);
+
+/** The list alone, as `/welcome` shows it: a leading group, a tag and a reason, a download, and a collapsed tail. */
+function ModelListDemo() {
+  const [query, setQuery] = useState("");
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const listing = withActivePulls(SAMPLE_LISTING, SAMPLE_PULLS) ?? SAMPLE_LISTING;
+  const fits = listing.models.filter((model) => model.source === "catalog" && model.fit === "fits");
+  const groups = pickerGroups(listing, query, null);
+  return (
+    <div className="flex h-96 max-w-2xl flex-col rounded-lg border border-line bg-bg p-4">
+      <ModelList
+        className="min-h-0 flex-1"
+        listClassName="flex-1"
+        listing={listing}
+        groups={groups}
+        leading={{ title: "Fits this Mac · 16 GB memory", models: fits }}
+        notes={LIST_NOTES}
+        collapse={{ keep: 4 }}
+        profile="local"
+        category={null}
+        pulls={SAMPLE_PULLS}
+        query={query}
+        onQueryChange={setQuery}
+        activeId={activeId}
+        onActiveChange={setActiveId}
+        onActivate={() => {}}
+        onStop={() => {}}
+        empty={<p className="px-3 py-6 text-center text-sm text-muted">No matching models.</p>}
+      />
+    </div>
+  );
+}
+
 const SAMPLE_ENTRY = [...SAMPLE_PULLS.active.values()][0]!;
 const SAMPLE_LABELS = new Map([
   ["ollama/gemma3:12b", "Gemma 3 12B"],
@@ -566,6 +605,22 @@ function SetupFormDemo() {
           />
           <AddKey providers={providers} actions={actions} onCheck={() => {}} />
         </div>
+      ))}
+    </div>
+  );
+}
+
+/** The welcome page in each step and state, in a box of its own: it is a page, so it fills its frame. */
+function WelcomeDemo() {
+  return (
+    <div className="flex flex-col gap-4">
+      {WELCOME_CASES.map(({ label, props }) => (
+        <section key={label} aria-label={`Welcome, ${label}`} className="flex flex-col gap-1">
+          <span className="font-mono text-xs text-faint">{label}</span>
+          <div className="relative flex h-160 flex-col overflow-hidden rounded-lg border border-line bg-bg">
+            <WelcomeView {...props} />
+          </div>
+        </section>
       ))}
     </div>
   );
@@ -743,6 +798,11 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
         <SetupFormDemo />
       </section>
 
+      <section className="mt-6" id={anchor("Welcome page")}>
+        <h3 className="mb-2 font-mono text-xs text-faint">Welcome page</h3>
+        <WelcomeDemo />
+      </section>
+
       <section className="mt-6" id={anchor("Download row")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Download row</h3>
         <DownloadRowDemo />
@@ -763,6 +823,17 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
             onChange={() => {}}
             composer={<DemoComposer size="large" />}
             modelChip={<NewSessionModelChipView label={{ kind: "default", text: "Gemma 4 E4B" }} onOpen={() => {}} />}
+          />
+        </div>
+        <div aria-label="Empty screen, setup left" role="group" className="mt-2 flex h-96 flex-col rounded-lg border border-line bg-bg">
+          <HomeView
+            headingLevel="h4"
+            folder="/Users/you/repos/golem"
+            folders={["/Users/you/repos/golem"]}
+            onChange={() => {}}
+            notice={<FinishSetupStripView onFinish={() => {}} />}
+            composer={<DemoComposer size="large" />}
+            modelChip={<NewSessionModelChipView label={{ kind: "none" }} onOpen={() => {}} />}
           />
         </div>
         <div className="mt-2 flex flex-wrap gap-2 rounded-lg border border-line bg-bg p-4">
@@ -987,6 +1058,11 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
       <section className="mt-6" id={anchor("Model dialog")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Model dialog</h3>
         <ModelDialogDemo theme={theme} />
+      </section>
+
+      <section className="mt-6" id={anchor("Model list")}>
+        <h3 className="mb-2 font-mono text-xs text-faint">Model list</h3>
+        <ModelListDemo />
       </section>
 
       <section className="mt-6" id={anchor("Setup window")}>
