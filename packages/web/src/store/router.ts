@@ -5,7 +5,12 @@ export type Route =
   | { name: "session"; id: string; inspect: Inspect | null }
   | { name: "trace"; id: string; span: string | null }
   | { name: "settings"; section: string }
+  | { name: "welcome"; step: WelcomeStep; from: "send" | null }
   | { name: "not-found" };
+
+/** The steps of `/welcome`, in order. */
+export const WELCOME_STEPS = ["engine", "model", "tools", "ready"] as const;
+export type WelcomeStep = (typeof WELCOME_STEPS)[number];
 
 /** The inspector beside a chat: open, with `span` selected when not null. */
 export type Inspect = { span: string | null };
@@ -24,11 +29,18 @@ export type Router = StoreSource<Route> & {
  * `/settings/:section` (lowercase letters and dashes) the settings page, anything else is not found.
  * The router does not know which sections exist; the page says so for a name it does not list.
  * `/s/:id/trace` is a session's trace, and `?span=` in `search` names the selected span.
+ * `/welcome` is first run: `?step=engine|model|tools|ready` (engine when missing or unknown) and `?from=send`.
  * On `/s/:id`, `?inspect` opens the inspector panel and `?inspect=<span>` opens it at that span.
  */
 export function parseRoute(pathname: string, search = ""): Route {
   if (pathname === "/") {
     return { name: "home" };
+  }
+  if (pathname === "/welcome") {
+    const params = new URLSearchParams(search);
+    const asked = params.get("step");
+    const step = WELCOME_STEPS.find((each) => each === asked) ?? "engine";
+    return { name: "welcome", step, from: params.get("from") === "send" ? "send" : null };
   }
   if (pathname === "/settings") {
     return { name: "settings", section: DEFAULT_SETTINGS_SECTION };
@@ -79,11 +91,21 @@ export function settingsPath(section: string = DEFAULT_SETTINGS_SECTION): string
   return section === DEFAULT_SETTINGS_SECTION ? "/settings" : `/settings/${section}`;
 }
 
+/** The path of `/welcome` at a step. The first step and no origin are the bare path. */
+export function welcomePath(step: WelcomeStep = "engine", from: "send" | null = null): string {
+  const params = new URLSearchParams();
+  if (step !== "engine") params.set("step", step);
+  if (from !== null) params.set("from", from);
+  const query = params.toString();
+  return query === "" ? "/welcome" : `/welcome?${query}`;
+}
+
 function sameRoute(a: Route, b: Route): boolean {
   if (a.name === "session") {
     return b.name === "session" && a.id === b.id && a.inspect?.span === b.inspect?.span && (a.inspect === null) === (b.inspect === null);
   }
   if (a.name === "trace") return b.name === "trace" && a.id === b.id && a.span === b.span;
+  if (a.name === "welcome") return b.name === "welcome" && a.step === b.step && a.from === b.from;
   if (a.name === "settings") return b.name === "settings" && a.section === b.section;
   return a.name === b.name;
 }

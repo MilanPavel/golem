@@ -119,7 +119,7 @@ function Fix({ row, fix, actions, onButton, onCancelInstall, onNavigate, hasPage
 }
 
 /** What the install printed, under the row: open while it runs, folded once it ends. */
-function Output({ output, running }: { output: string; running: boolean }) {
+export function Output({ output, running }: { output: string; running: boolean }) {
   const text = installLog(output);
   if (text === "") return null;
   return (

@@ -15,3 +15,8 @@ export function fallbackKey(pathname: string): string | null {
 export function assetCacheControl(key: string): string {
   return key.startsWith(HASHED_PREFIX) ? "public, max-age=31536000, immutable" : "no-cache";
 }
+
+/** A `Content-Type` for a file the runtime does not know. `null` leaves the choice to the runtime. */
+export function assetContentType(key: string): string | null {
+  return key.endsWith(".webmanifest") ? "application/manifest+json" : null;
+}

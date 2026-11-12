@@ -31,6 +31,7 @@ import {
   INSTALL_TIMEOUT_MS,
   SLOW_START_MS,
   START_TIMEOUT_MS,
+  offersTools,
   stepper,
   welcomeBack,
   withLog,
@@ -106,13 +107,13 @@ test("a single panel goes back where it opened from", () => {
 test("the stepper marks done, now and to do, and a send skips Service", () => {
   assert.deepEqual(
     stepper(guided("engine", "start"))?.map((step) => step.state),
-    ["done", "now", "todo", "todo"],
+    ["done", "now", "todo", "skip", "todo"],
   );
   assert.equal(stepper(guided("engine", "send"))?.[0]?.state, "skip");
   assert.equal(stepper(single("model", "overview")), null);
   assert.equal(stepper(OVERVIEW), null);
-  assert.equal(shortStepper(guided("engine", "start")), "2/4 Engine");
-  assert.equal(shortStepper({ ...guided("engine", "start"), panel: "key" }), "2/4 Engine");
+  assert.equal(shortStepper(guided("engine", "start")), "2/5 Engine");
+  assert.equal(shortStepper({ ...guided("engine", "start"), panel: "key" }), "2/5 Engine");
 });
 
 test("the start opens Service, Engine, the Model alone, the one ready model, or nothing", () => {
@@ -329,4 +330,39 @@ test("the page's Service panel says it runs, and names the command only when it 
   assert.match(text(pageServiceLines(pageServiceRow(null, "0.5.0"))), /run this in a terminal/);
   assert.doesNotMatch(text(pageServiceLines(pageServiceRow(LAUNCHD_OK, "0.5.0"))), /run this in a terminal/);
   assert.match(text(pageServiceLines(pageServiceRow(LAUNCHD_OK, "0.5.0"))), /starts at login/);
+});
+
+const EMPTY_MCP = { ollamaRunning: true, mcpEmpty: true };
+
+test("guided setup offers Tools after Model when no [mcp] table exists", () => {
+  const model = guided("model", "start");
+  const tools = advance(model, { kind: "done" }, EMPTY_MCP);
+  assert.equal(panelOf(tools), "tools");
+  assert.equal(tools.kind === "window" && tools.window.view === "panel" ? tools.window.trail.at(-1) : null, "model");
+  assert.equal(panelOf(advance(model, { kind: "done" }, UP)), "ready");
+  assert.equal(panelOf(advance(model, { kind: "done" }, { ...EMPTY_MCP, mcpEmpty: false })), "ready");
+  assert.equal(offersTools(EMPTY_MCP), true);
+  assert.equal(offersTools({ ollamaRunning: true }), false);
+  const at = tools.kind === "window" ? tools.window : OVERVIEW;
+  assert.equal(panelOf(advance(at, { kind: "done" }, EMPTY_MCP)), "ready");
+  assert.equal(panelOf(advance(at, { kind: "skip" }, EMPTY_MCP)), "ready");
+  assert.equal(panelOf(advance(at, { kind: "cancelled" }, EMPTY_MCP)), "model");
+  assert.equal(panelOf(advance(guided("model", "start"), { kind: "background" }, EMPTY_MCP)), "chat+download");
+});
+
+test("Tools alone, from /setup, goes back to the overview", () => {
+  assert.equal(panelOf(advance(single("tools", "overview"), { kind: "done" }, UP)), "overview");
+  assert.equal(panelOf(advance(single("tools", "overview"), { kind: "skip" }, UP)), "overview");
+  assert.equal(panelOf(advance(single("tools", "overview"), { kind: "cancelled" }, UP)), "overview");
+});
+
+test("the stepper shows Tools as now, to do, or skipped", () => {
+  const states = (window: SetupWindow, facts?: { ollamaRunning: boolean; mcpEmpty?: boolean}) =>
+    stepper(window, facts)?.map((step) => step.state);
+  assert.deepEqual(states(guided("model", "start"), EMPTY_MCP), ["done", "done", "now", "todo", "todo"]);
+  assert.deepEqual(states(guided("model", "start"), UP), ["done", "done", "now", "skip", "todo"]);
+  assert.deepEqual(states({ ...guided("model", "start"), panel: "tools" }, EMPTY_MCP), ["done", "done", "done", "now", "todo"]);
+  assert.deepEqual(states({ ...guided("model", "start"), panel: "ready" }, UP), ["done", "done", "done", "skip", "now"]);
+  assert.deepEqual(states({ ...guided("model", "start"), panel: "ready" }, EMPTY_MCP), ["done", "done", "done", "done", "now"]);
+  assert.equal(shortStepper({ ...guided("model", "start"), panel: "tools" }), "4/5 Tools");
 });
