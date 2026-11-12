@@ -7,6 +7,7 @@ import { lazy, StrictMode, Suspense, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./app.tsx";
 import { watchTabStatus } from "./features/tab-status/index.ts";
+import { createAppInstall } from "./store/app-install.ts";
 import { bootPage } from "./store/boot.ts";
 import { PageProvider } from "./store/page-context.tsx";
 import { applyTheme, readTheme } from "./styles/theme.ts";
@@ -35,7 +36,9 @@ if (showGallery && Gallery) {
     </Suspense>,
   );
 } else {
-  void bootPage().then((page) => {
+  // Made before the page boots: the browser fires the install prompt once, early.
+  const appInstall = createAppInstall();
+  void bootPage(location, appInstall).then((page) => {
     page.start();
     watchTabStatus(page);
     render(
