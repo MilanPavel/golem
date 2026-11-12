@@ -12,6 +12,7 @@ import {
   guided,
   OVERVIEW,
   overviewChoices,
+  overviewLines,
   overviewRows,
   pressEngine,
   pressService,
@@ -257,6 +258,20 @@ test("the overview offers the fix first, then Change model, Add an API key, and 
     overviewChoices(missing).map((choice) => choice.label),
     ["Pick a model", "Add the OpenAI key", "Add an API key", "Run setup again"],
   );
+});
+
+test("the overview offers Add tools only when the user config has no MCP servers", () => {
+  const withTools = overviewChoices(ROWS, undefined, { ollamaRunning: true, mcpEmpty: true });
+  assert.deepEqual(
+    withTools.map((choice) => choice.label),
+    ["Install Ollama", "Change model", "Add an API key", "Add tools", "Run setup again"],
+  );
+  assert.deepEqual(withTools[3], { kind: "fix", action: "add_tools", target: null, label: "Add tools" });
+  for (const facts of [{ ollamaRunning: true, mcpEmpty: false }, { ollamaRunning: true }, undefined]) {
+    assert.ok(!overviewChoices(ROWS, undefined, facts).some((choice) => choice.label === "Add tools"));
+  }
+  const lines = overviewLines(ROWS, serviceRow("launchd", "0.5.0"), 0, null, { ollamaRunning: true, mcpEmpty: true });
+  assert.ok(lines.some((line) => line.kind === "option" && line.label === "Add tools"));
 });
 
 test("the band names the first thing wrong, and says nothing when all is well", () => {
