@@ -9,7 +9,6 @@ import { PageProvider } from "../../store/page-context.tsx";
 import { fakeClient, fakeFrame, summary } from "../../store/test-support.ts";
 import { closePalette } from "../palette/index.ts";
 import { OK_ROWS, STATUS_ROWS, WORKING_LISTING } from "../setup/sample.ts";
-import { closeSetup } from "../setup/index.ts";
 import { settingsContextStore, useSettingsFolder } from "./index.ts";
 
 const noContrast = { rules: { "color-contrast": { enabled: false } } };
@@ -43,7 +42,6 @@ beforeEach(() => {
   settingsContextStore.set(null);
 });
 afterEach(() => {
-  closeSetup();
   closePalette();
   settingsContextStore.set(null);
   history.replaceState(null, "", "/");

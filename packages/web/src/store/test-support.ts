@@ -37,7 +37,7 @@ export function summary(id: string, updatedAt: string, cwd: string | null = null
 
 /**
  * A listing for a setup that works: the default names a model that is ready, so the page opens
- * no setup window at its start. A test about setup passes its own listing.
+ * no welcome page at its start. A test about setup passes its own listing.
  */
 const EMPTY_LISTING: ModelListResult = {
   default: "ollama/qwen3:8b",

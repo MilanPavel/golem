@@ -9,7 +9,6 @@ import { createPageHost } from "../../store/page-host.ts";
 import { PageProvider } from "../../store/page-context.tsx";
 import { fakeClient, fakeFrame, OLLAMA_FAILED_CODE, rpcError } from "../../store/test-support.ts";
 import { closeModelDialog } from "../models/index.ts";
-import { closeSetup } from "../setup/index.ts";
 import { OK_ROWS, STATUS_ROWS, WORKING_LISTING } from "../setup/sample.ts";
 import { TOOLS_CATALOG } from "../setup/tools-sample.ts";
 
@@ -60,7 +59,6 @@ beforeEach(() => {
   writeText = vi.fn(async () => undefined);
 });
 afterEach(() => {
-  closeSetup();
   closeModelDialog();
   vi.restoreAllMocks();
   history.replaceState(null, "", "/");
@@ -338,14 +336,12 @@ test("API keys never asks for a key itself", async () => {
   expect(document.querySelector("input[type=password]")).toBeNull();
 });
 
-test("Run setup again opens the guided window, and closing it gives focus back", async () => {
+test("Run setup again goes to /welcome, and there is no setup dialog", async () => {
   const { user } = mount(OK_ROWS);
-  const again = await screen.findByRole("button", { name: "Run setup again" });
-  await user.click(again);
-  const dialog = await screen.findByRole("dialog", { name: "Setup" });
-  await user.click(within(dialog).getByRole("button", { name: "Close setup" }));
-  await waitFor(() => expect(screen.queryByRole("dialog", { name: "Setup" })).toBeNull());
-  await waitFor(() => expect(document.activeElement).toBe(again));
+  await user.click(await screen.findByRole("button", { name: "Run setup again" }));
+  await screen.findByRole("heading", { level: 1, name: "Welcome to golem" });
+  expect(location.pathname).toBe("/welcome");
+  expect(screen.queryByRole("dialog", { name: "Setup" })).toBeNull();
 });
 
 test("with no server yet, Add tools opens the offer in place; the servers added show as done, and then Manage links to the MCP section", async () => {

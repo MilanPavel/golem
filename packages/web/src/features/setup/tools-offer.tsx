@@ -4,7 +4,7 @@ import { Button } from "../../ui/button.tsx";
 import { cn } from "../../ui/cn.ts";
 import { Input } from "../../ui/input.tsx";
 import { PullBar } from "../models/index.ts";
-import { MarkGlyph } from "./panel-body.tsx";
+import { MarkGlyph } from "./mark-glyph.tsx";
 import type { ToolsLog } from "./use-tools.ts";
 
 export type ToolsOfferViewProps = {

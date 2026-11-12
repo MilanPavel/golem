@@ -1,14 +1,14 @@
-import { daemonServiceRow, guided, HOSTED_PROVIDERS, pageServiceRow, setupFormRows, setupProblem, toolsSettled, type FormButtonId } from "@golem/view";
+import { daemonServiceRow, HOSTED_PROVIDERS, pageServiceRow, setupFormRows, setupProblem, toolsSettled, type FormButtonId } from "@golem/view";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useConnection } from "../../store/connection-context.tsx";
 import { useModelList, useNavigate, usePageHost, useSetupStatus } from "../../store/page-context.tsx";
 import { Button } from "../../ui/button.tsx";
 import { openModelDialog } from "../models/index.ts";
-import { openSetup } from "../setup/index.ts";
 import { AddKey, SetupFormView } from "../setup/setup-form.tsx";
 import { ToolsOfferView } from "../setup/tools-offer.tsx";
 import { useSetupActions } from "../setup/use-setup-actions.ts";
 import { useTools } from "../setup/use-tools.ts";
+import { welcomePath } from "../../store/router.ts";
 import { SECTIONS } from "./sections.ts";
 
 /** A link of the form points at `/settings/<section>`: it is shown once the page has that section. */
@@ -155,8 +155,8 @@ export function SetupSection() {
           />
           <div className="flex flex-col items-start gap-1">
             <Button
-              onClick={(event) => {
-                openSetup({ window: guided("service", "overview"), returnTo: event.currentTarget });
+              onClick={() => {
+                navigate(welcomePath());
               }}
             >
               Run setup again

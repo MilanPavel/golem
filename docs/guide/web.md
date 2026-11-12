@@ -15,7 +15,7 @@ description: Open golem's chat in your browser with golem web, and what the page
 golem web
 ```
 
-golem starts a small server on `127.0.0.1:7480`, opens the page in your browser, and keeps running until you press **Ctrl-C**. With no daemon running, it first asks to start golem's service.
+golem starts a small server on `127.0.0.1:7480`, opens the page in your browser, and keeps running until you press **Ctrl-C**. With no daemon running, it first asks to start golem's service. On a first run, that one question in the terminal (keep golem running?) is the only setup there; the page then opens on `/welcome`, where you pick how golem thinks, a model, and some tools. A send with no model sends you back to `/welcome` and keeps your message, and `/setup` opens Settings → Setup. The web has no setup dialog.
 
 | Option | What it does |
 |---|---|
