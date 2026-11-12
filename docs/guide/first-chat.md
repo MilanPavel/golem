@@ -18,7 +18,7 @@ golem
 
 ## Pick a model
 
-On the first start, golem's setup window asks where golem should think: on this Mac, with an API key, or later. If you have exactly one ready model, golem uses it without asking. Type `/model` to open the model picker at any time, and `/setup` to see the whole setup.
+`brew install` does nothing by itself. The first `golem` sets up in the terminal: its setup window asks where golem should think: on this Mac, with an API key, or later. The first `golem web` asks one question in the terminal (keep golem running?), then the page opens on `/welcome`, which asks the same thing in steps. If you have exactly one ready model, golem uses it without asking. Type `/model` to open the model picker at any time, and `/setup` to see the whole setup.
 
 - **Up** and **Down** choose a model, and **Enter** picks it for this chat.
 - **`d`** also makes it the default for new chats.

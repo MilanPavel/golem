@@ -26,7 +26,7 @@ golem --version             # golem 0.1.0, or newer
 golem
 ```
 
-The first time, golem opens its setup window. It starts with the background service: the part of golem that talks to the model and keeps your chats, so a chat keeps going when you close the terminal. Enter starts it now and at every login, and it restarts by itself if it ever crashes. **Only while this terminal is open** runs it until you quit golem. The window shows each step while the service starts, then asks how golem should think. Type `/setup` later to see what is set up, fix what is broken, or walk the steps again.
+`brew install` only puts the program on your Mac; nothing is set up until you run golem. The first `golem` sets up in the terminal: it opens its setup window. (The first `golem web` asks one question in the terminal, keep golem running?, and then the page opens on `/welcome` and sets up there.) It starts with the background service: the part of golem that talks to the model and keeps your chats, so a chat keeps going when you close the terminal. Enter starts it now and at every login, and it restarts by itself if it ever crashes. **Only while this terminal is open** runs it until you quit golem. The window shows each step while the service starts, then asks how golem should think. Type `/setup` later to see what is set up, fix what is broken, or walk the steps again.
 
 Check it any time:
 

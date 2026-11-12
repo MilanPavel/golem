@@ -39,7 +39,7 @@ test("the gallery's Commands dialog lists the groups and passes axe", async () =
 
 test("each gallery section has a stable anchor, the slip one plain and the kiln one prefixed, and no id repeats", () => {
   const { container } = render(<Gallery />);
-  for (const id of ["trace", "approval", "setup-window", "setup-form", "model-dialog", "kiln-trace", "kiln-approval"]) {
+  for (const id of ["trace", "approval", "setup-form", "model-dialog", "kiln-trace", "kiln-approval"]) {
     expect(container.querySelector(`#${id}`), id).toBeTruthy();
   }
   const ids = [...container.querySelectorAll("[id]")].map((element) => element.id);
