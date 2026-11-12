@@ -5,6 +5,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { App } from "../../app.tsx";
 import type { ModelListResult, SetupRow } from "../../store/models.ts";
 import { createPage } from "../../store/page.ts";
+import { createPageHost } from "../../store/page-host.ts";
 import { PageProvider } from "../../store/page-context.tsx";
 import { fakeClient, fakeFrame, OLLAMA_FAILED_CODE, rpcError } from "../../store/test-support.ts";
 import { closeModelDialog } from "../models/index.ts";
@@ -20,7 +21,7 @@ const TWO_READY: ModelListResult = {
   ),
 };
 
-function mount(rows: SetupRow[] = OK_ROWS, listing: ModelListResult = WORKING_LISTING, path = "/settings") {
+function mount(rows: SetupRow[] = OK_ROWS, listing: ModelListResult = WORKING_LISTING, path = "/settings", pageKept?: boolean) {
   history.replaceState(null, "", path);
   const fake = fakeClient();
   fake.raw.listModels.mockResolvedValue(listing);
@@ -28,7 +29,8 @@ function mount(rows: SetupRow[] = OK_ROWS, listing: ModelListResult = WORKING_LI
   fake.raw.status.mockResolvedValue({ version: "0.5.0" });
   const doc = new EventTarget() as unknown as Document;
   (doc as { visibilityState: string }).visibilityState = "visible";
-  const page = createPage(fake.client, { frame: fakeFrame(), doc });
+  const pageHost = createPageHost(async () => (pageKept === undefined ? {} : { kept: pageKept }));
+  const page = createPage(fake.client, { frame: fakeFrame(), doc, pageHost });
   page.start();
   fake.setState({ status: "connected" });
   const view = render(
@@ -78,6 +80,60 @@ test("a setup that works: a card for each part with its word, and nothing to fix
   expect(card("Disk").queryByRole("button")).toBeNull();
   // The service is kept, and the daemon's own row is the page's: only the version is added.
   expect(card("Service").getByText(/running · v0\.5\.0 · starts at login/)).toBeTruthy();
+});
+
+const cardNames = () =>
+  within(screen.getByRole("list", { name: "Setup" }))
+    .getAllByRole("listitem")
+    .map((item) => item.querySelector("p")?.textContent);
+
+test("a page kept running by a job: a Web page card after Service, no command", async () => {
+  mount(OK_ROWS, WORKING_LISTING, "/settings", true);
+  const web = await waitFor(() => card("Web page"));
+  expect(web.getByText("kept running · starts at login")).toBeTruthy();
+  expect(web.getByText("done:")).toBeTruthy();
+  expect(web.queryByRole("button")).toBeNull();
+  expect(cardNames().slice(0, 2)).toEqual(["Service", "Web page"]);
+});
+
+test("a page run by hand: the card says so and copies golem web install when the service is kept", async () => {
+  const { user } = mount(OK_ROWS, WORKING_LISTING, "/settings", false);
+  const web = await waitFor(() => card("Web page"));
+  expect(web.getByText("runs only while a terminal runs golem web")).toBeTruthy();
+  expect(web.getByText("needs attention:")).toBeTruthy();
+  expect(web.getByText("golem web install")).toBeTruthy();
+  // Nothing about the setup rows can change by looking again.
+  expect(web.queryByRole("button", { name: "Check again" })).toBeNull();
+  await user.click(web.getByRole("button", { name: "Copy" }));
+  expect(writeText).toHaveBeenCalledWith("golem web install");
+});
+
+test("when neither job is kept both the Service and Web page cards name golem install", async () => {
+  const rows = OK_ROWS.map((row) => (row.part === "service" ? { ...row, state: "warn" as const } : row));
+  mount(rows, WORKING_LISTING, "/settings", false);
+  const web = await waitFor(() => card("Web page"));
+  expect(web.getByText("golem install")).toBeTruthy();
+  expect(card("Service").getByText("golem install")).toBeTruthy();
+});
+
+test("a service not kept while the page is kept keeps its own command", async () => {
+  const rows = OK_ROWS.map((row) => (row.part === "service" ? { ...row, state: "warn" as const } : row));
+  mount(rows, WORKING_LISTING, "/settings", true);
+  await waitFor(() => card("Web page"));
+  expect(card("Service").getByText("golem daemon install")).toBeTruthy();
+});
+
+test("an unknown page host has no Web page card", async () => {
+  mount(OK_ROWS);
+  await screen.findByText("all set", { selector: "p" });
+  expect(cardNames()).not.toContain("Web page");
+});
+
+test.each(["slip", "kiln"])("the Web page card has no axe violations in %s", async (theme) => {
+  document.documentElement.dataset.theme = theme;
+  mount(OK_ROWS, WORKING_LISTING, "/settings", false);
+  await waitFor(() => card("Web page"));
+  expect((await axe.run(document.body, noContrast)).violations).toEqual([]);
 });
 
 test("Open setup is gone from Settings", async () => {

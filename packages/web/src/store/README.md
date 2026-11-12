@@ -13,9 +13,10 @@ Session stores, the live store, the query client, and the router.
 - `query.ts`: the TanStack query client, and the pushed events that mark answers stale.
 - `router.ts`: the current route from `location` and the history.
 - `connection.ts`: the link state and the daemon's version.
+- `page-host.ts`: whether a job keeps the gateway running, read from `/healthz` at start and when the link comes back; unknown when it cannot be read.
 - `login.ts`: takes the login token from the address and trades it for the cookie.
 - `page.ts`: everything the page holds, built on one client, with the session reference counts and the visibility check.
 - `boot.ts`: exchanges the token, makes the client, builds the page.
-- `page-context.tsx`: `PageProvider` and the hooks features use: `useRoute`, `useNavigate`, `useSessionList`, `useSession`, `usePageActions`, `useNewSessionFolder`, `useKnownFolders`, `useRememberOpenedFolder`, `useDraft`, `useDraftPastes`, `useModelList`, `useSetupStatus`, `useSetupStart`, `useSkillList`, `useSessionReader`, `usePulls`.
+- `page-context.tsx`: `PageProvider` and the hooks features use: `useRoute`, `useNavigate`, `useSessionList`, `useSession`, `usePageActions`, `useNewSessionFolder`, `useKnownFolders`, `useRememberOpenedFolder`, `useDraft`, `useDraftPastes`, `useModelList`, `useSetupStatus`, `usePageHost`, `useSetupStart`, `useSkillList`, `useSessionReader`, `usePulls`.
 - `connection-context.tsx`: `ConnectionProvider` and `useConnection`.
 - `test-support.ts`: a fake client and an event builder for tests.

@@ -16,7 +16,7 @@ import { StatusDot } from "../ui/status-dot.tsx";
 import { Textarea } from "../ui/textarea.tsx";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip.tsx";
 import { ConnectionScreen } from "../features/connection/connection-screen.tsx";
-import { connectionScreen } from "../features/connection/connection-screen.ts";
+import { connectionScreen, type ConnectionHost } from "../features/connection/connection-screen.ts";
 import { ToolLine, TranscriptMessages } from "../features/chat/index.ts";
 import { SAMPLE_CHAT, SAMPLE_TOOLS, THINKING_CASES, TURN_CHAT } from "../features/chat/sample.ts";
 import { ApprovalBar } from "../features/approval/index.ts";
@@ -56,6 +56,16 @@ const SNAPSHOTS: ConnectionSnapshot[] = [
   { state: { status: "reconnecting", attempt: 4, delayMs: 2000, closeCode: 1013 }, daemonVersion: null },
   { state: { status: "reconnecting", attempt: 2, delayMs: 1000 }, daemonVersion: null },
   { state: { status: "closed", reason: "closed" }, daemonVersion: null },
+];
+
+const GATEWAY_DOWN: ConnectionSnapshot = { state: { status: "reconnecting", attempt: 2, delayMs: 1000 }, daemonVersion: null };
+
+/** The screens with what the page knows of its gateway's job: unknown, then restarting, overdue, and no job. */
+const SCREENS: [ConnectionSnapshot, ConnectionHost][] = [
+  ...SNAPSHOTS.map((snapshot): [ConnectionSnapshot, ConnectionHost] => [snapshot, { kept: null, overdue: false }]),
+  [GATEWAY_DOWN, { kept: true, overdue: false }],
+  [GATEWAY_DOWN, { kept: true, overdue: true }],
+  [GATEWAY_DOWN, { kept: false, overdue: false }],
 ];
 
 const NOW = Date.parse("2026-11-01T12:00:00Z");
@@ -761,10 +771,10 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
       <section className="mt-6" id={anchor("Connection screens")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Connection screens</h3>
         <div className="grid gap-4">
-          {SNAPSHOTS.map((snapshot) => {
-            const spec = connectionScreen(snapshot);
+          {SCREENS.map(([snapshot, host], index) => {
+            const spec = connectionScreen(snapshot, host);
             return spec ? (
-              <div key={`${spec.kind}-${spec.tag}`} className="rounded-lg border border-line bg-bg">
+              <div key={index} className="rounded-lg border border-line bg-bg">
                 <ConnectionScreen spec={spec} headingLevel="h4" />
               </div>
             ) : null;

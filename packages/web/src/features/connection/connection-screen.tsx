@@ -57,6 +57,12 @@ export function ConnectionScreen({ spec, headingLevel: Heading = "h1" }: Connect
         </div>
         <p className="max-w-lg text-pretty text-muted">{spec.sentence}</p>
         {spec.command === null ? null : <CommandRow command={spec.command} />}
+        {spec.extras.map((extra) => (
+          <div key={extra.command} className="flex max-w-full flex-col items-center gap-3">
+            {extra.sentence === null ? null : <p className="max-w-lg text-pretty text-muted">{extra.sentence}</p>}
+            <CommandRow command={extra.command} />
+          </div>
+        ))}
       </Card>
     </div>
   );

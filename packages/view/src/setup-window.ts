@@ -649,6 +649,35 @@ export function pageServiceLines(service: SetupRow): SetupLine[] {
   ];
 }
 
+/** The command that installs both jobs, the service and the web gateway. */
+export const KEEP_ALL_COMMAND = "golem install";
+
+/** The command that keeps the page's own gateway running at login, when the service is kept already. */
+export const KEEP_WEB_COMMAND = "golem web install";
+
+/**
+ * The command to show for keeping golem running, or null when there is nothing to keep. One
+ * `golem install` covers both jobs, so it is the answer whenever the service is not kept; the
+ * web job alone is `golem web install`. A page host that is unknown asks for nothing.
+ */
+export function keepCommand(serviceKept: boolean, pageKept: boolean | null): string | null {
+  if (!serviceKept) return KEEP_ALL_COMMAND;
+  return pageKept === false ? KEEP_WEB_COMMAND : null;
+}
+
+/**
+ * The web page's own line: whether a job keeps its gateway running. `kept` comes from the
+ * gateway's `/healthz`; null means unknown, which says nothing.
+ */
+export function pageHostLines(kept: boolean | null): SetupLine[] {
+  if (kept === null) return [];
+  if (kept) return [{ kind: "status", mark: "ok", text: "kept running · starts at login" }];
+  return [
+    { kind: "status", mark: "attn", text: "runs only while a terminal runs golem web" },
+    { kind: "text", text: "To keep it running at login, run this in a terminal:" },
+  ];
+}
+
 const PART_LABELS: Record<SetupRow["part"], string> = {
   service: "Service",
   socket: "Socket",

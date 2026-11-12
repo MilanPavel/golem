@@ -6,6 +6,7 @@ import { configKey, type ConfigGetResult } from "./config.ts";
 import type { FsListDirsResult } from "./dirs.ts";
 import { MODEL_LIST_ALL_KEY, MODEL_LIST_KEY, SETUP_STATUS_KEY, type ModelListResult } from "./models.ts";
 import type { Page, PageActions } from "./page.ts";
+import type { PageHostSnapshot } from "./page-host.ts";
 import type { PullsSnapshot } from "./pulls.ts";
 import type { Route } from "./router.ts";
 import type { McpListResult, SessionSummary, SetupStatusResult, SkillListResult } from "@golem/client";
@@ -44,6 +45,12 @@ export function useRoute(): Route {
 
 export function useNavigate(): (path: string, options?: { replace?: boolean }) => void {
   return usePage().router.navigate;
+}
+
+/** Whether a job keeps the gateway running. Unknown until `/healthz` answers. */
+export function usePageHost(): PageHostSnapshot {
+  const { pageHost } = usePage();
+  return useSyncExternalStore(pageHost.subscribe, pageHost.getSnapshot);
 }
 
 /** The live session list, newest activity first. */

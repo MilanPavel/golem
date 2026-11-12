@@ -11,6 +11,7 @@ test("connecting", () => {
     heading: "Connecting to golem",
     sentence: "The page is reaching golem's daemon.",
     command: null,
+    extras: [],
     golem: "offline",
   });
 });
@@ -76,4 +77,41 @@ test("closed means the gateway is down", () => {
 
 test("connected has no screen", () => {
   expect(screen({ status: "connected" })).toBeNull();
+});
+
+const down = { status: "reconnecting", attempt: 3, delayMs: 1000, closeCode: 1006 } as const;
+const withHost = (kept: boolean | null, overdue = false) => connectionScreen({ state: down, daemonVersion: null }, { kept, overdue });
+
+test("a kept gateway that is reconnecting is restarting by itself: no command", () => {
+  expect(withHost(true)).toEqual({
+    kind: "gateway-down",
+    tag: "reconnecting",
+    heading: "golem's page server is restarting",
+    sentence: "It comes back by itself, usually within a few seconds. This page reconnects when it does.",
+    command: null,
+    extras: [],
+    golem: "offline",
+  });
+});
+
+test("a kept gateway that stays down past the grace shows today's screen with the logs", () => {
+  expect(withHost(true, true)).toMatchObject({
+    heading: "golem web is not running",
+    command: "golem web",
+    extras: [{ sentence: null, command: "golem web logs" }],
+  });
+});
+
+test("a gateway with no job shows today's screen and golem install to keep it", () => {
+  expect(withHost(false)).toMatchObject({
+    heading: "golem web is not running",
+    command: "golem web",
+    extras: [{ sentence: "Keeps golem and this page running, even after a restart.", command: "golem install" }],
+  });
+});
+
+test("an unknown job shows today's screen alone, and the daemon's screen ignores the job", () => {
+  expect(withHost(null)).toMatchObject({ heading: "golem web is not running", extras: [] });
+  const daemon = connectionScreen({ state: { ...down, closeCode: 1013 }, daemonVersion: null }, { kept: true, overdue: false });
+  expect(daemon).toMatchObject({ kind: "daemon-down", command: "golem daemon start", extras: [] });
 });

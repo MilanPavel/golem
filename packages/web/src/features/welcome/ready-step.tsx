@@ -19,8 +19,11 @@ export type ReadyStepProps = {
   tools: string;
   /** Whether the tools line is a step that was left out. */
   toolsSkipped: boolean;
-  /** The service is not kept at login, or the page's host is not: say how to keep them. Never blocks. */
-  keepNote: { command: string } | null;
+  /**
+   * The service is not kept at login, or the page's host is not: say how to keep them. Never
+   * blocks. `page: "only"` is the page's host alone, the service being kept already.
+   */
+  keepNote: { command: string; page?: "only" } | null;
   /** The person came from a send that had no model: the button goes back to their message. */
   fromSend: boolean;
   onStart: () => void;
@@ -75,7 +78,11 @@ export function ReadyStep({ engine, model, tools, toolsSkipped, keepNote, fromSe
       </div>
       {keepNote === null ? null : (
         <div className="flex w-full flex-col items-center gap-2 rounded-md border border-dashed border-line-strong px-3.5 py-3 text-sm text-muted">
-          <p>golem and this page stop when you close the terminal window. To keep them running, even after a restart:</p>
+          <p>
+            {keepNote.page === "only"
+              ? "This page stops when you close the terminal window. To keep it running, even after a restart:"
+              : "golem and this page stop when you close the terminal window. To keep them running, even after a restart:"}
+          </p>
           <CopyCommand command={keepNote.command} />
         </div>
       )}

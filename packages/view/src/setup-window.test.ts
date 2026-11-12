@@ -17,6 +17,8 @@ import {
   pressService,
   serviceAnswered,
   daemonServiceRow,
+  keepCommand,
+  pageHostLines,
   pageServiceLines,
   pageServiceRow,
   serviceFailed,
@@ -332,7 +334,25 @@ test("the page's Service panel says it runs, and names the command only when it 
   assert.match(text(pageServiceLines(pageServiceRow(LAUNCHD_OK, "0.5.0"))), /starts at login/);
 });
 
-const EMPTY_MCP = { ollamaRunning: true, mcpEmpty: true };
+test("pageHostLines: kept, not kept, and unknown", () => {
+  assert.deepEqual(pageHostLines(true), [{ kind: "status", mark: "ok", text: "kept running · starts at login" }]);
+  assert.deepEqual(pageHostLines(false), [
+    { kind: "status", mark: "attn", text: "runs only while a terminal runs golem web" },
+    { kind: "text", text: "To keep it running at login, run this in a terminal:" },
+  ]);
+  assert.deepEqual(pageHostLines(null), []);
+});
+
+test("keepCommand: golem install when the service is not kept, else golem web install, else nothing", () => {
+  assert.equal(keepCommand(false, false), "golem install");
+  assert.equal(keepCommand(false, true), "golem install");
+  assert.equal(keepCommand(false, null), "golem install");
+  assert.equal(keepCommand(true, false), "golem web install");
+  assert.equal(keepCommand(true, true), null);
+  assert.equal(keepCommand(true, null), null);
+});
+
+const EMPTY_MCP ={ ollamaRunning: true, mcpEmpty: true };
 
 test("guided setup offers Tools after Model when no [mcp] table exists", () => {
   const model = guided("model", "start");

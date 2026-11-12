@@ -194,6 +194,8 @@ const PROBLEM_ROWS: SetupRow[] = [
 /** Settings → Setup in the states the form draws, for the gallery. */
 export const FORM_CASES: FormCase[] = [
   { label: "All set", rows: setupFormRows(OK_ROWS, KEPT), actions: NO_ACTION, providers: OPENAI_SAVED },
+  { label: "All set, page kept by a job", rows: setupFormRows(OK_ROWS, KEPT, true), actions: NO_ACTION, providers: OPENAI_SAVED },
+  { label: "All set, page run by hand", rows: setupFormRows(OK_ROWS, KEPT, false), actions: NO_ACTION, providers: OPENAI_SAVED },
   {
     label: "Ollama missing, service not kept, a key missing",
     rows: setupFormRows(PROBLEM_ROWS, pageServiceRow(null, "0.5.0")),

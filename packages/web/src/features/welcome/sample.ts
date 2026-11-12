@@ -112,8 +112,9 @@ export const WELCOME_CASES: WelcomeCase[] = [
     label: "Ready, model downloading",
     props: welcomeProps("ready", {
       working: true,
-      ready: readyProps({ model: { kind: "downloading", id: "qwen3.5:4b", share: 0.72, text: "72% · 40 s" }, keepNote: { command: "golem daemon install" } }),
+      ready: readyProps({ model: { kind: "downloading", id: "qwen3.5:4b", share: 0.72, text: "72% · 40 s" }, keepNote: { command: "golem install" } }),
     }),
   },
+  { label: "Ready, page not kept", props: welcomeProps("ready", { ready: readyProps({ keepNote: { command: "golem web install", page: "only" } }) }) },
   { label: "Ready, from a send", props: welcomeProps("ready", { ready: readyProps({ fromSend: true }) }) },
 ];
