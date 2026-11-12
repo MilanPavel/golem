@@ -832,7 +832,13 @@ async function openTui(): Promise<number> {
             throw new Error(web.err.join("\n"));
           }
         },
-        uninstall: () => daemon("uninstall"),
+        uninstall: async () => {
+          await daemon("uninstall");
+          const web = uninstallWebJob(launchDeps());
+          if (!web.ok) {
+            throw new Error(web.err.join("\n"));
+          }
+        },
         serve: () => {
           owned.session?.stop();
           owned.session = serveForThisWindow(locate());

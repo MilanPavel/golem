@@ -2647,7 +2647,7 @@ export function App({
   function installService(): void {
     const install = service?.install ?? null;
     if (install === null) {
-      failService("this golem can't install its service", "golem daemon install");
+      failService("this golem can't install its service", "golem install");
       return;
     }
     // Retry while the first install still runs waits for that one.

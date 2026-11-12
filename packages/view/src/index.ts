@@ -244,7 +244,6 @@ export {
   OVERVIEW,
   daemonServiceRow,
   KEEP_ALL_COMMAND,
-  KEEP_SERVICE_COMMAND,
   KEEP_WEB_COMMAND,
   keepCommand,
   pageHostLines,

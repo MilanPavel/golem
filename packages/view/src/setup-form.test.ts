@@ -57,7 +57,7 @@ test("the service runs and is kept: no fix. Not kept: the command to run, never 
   assert.equal(setupFormRows([], KEPT)[0]?.fix, null);
   const [card] = setupFormRows([SERVICE], NOT_KEPT);
   assert.equal(card?.mark, "warn");
-  assert.deepEqual(card?.fix, { kind: "command", text: "golem daemon install" });
+  assert.deepEqual(card?.fix, { kind: "command", text: "golem install" });
   assert.match(card?.detail ?? "", /not kept at login/);
 });
 
@@ -87,7 +87,7 @@ test("when neither job is kept both cards name golem install", () => {
 test("each card keeps its own command when the other job is kept or unknown", () => {
   for (const pageKept of [true, null]) {
     const [service] = setupFormRows([], NOT_KEPT, pageKept);
-    assert.deepEqual(service?.fix, { kind: "command", text: "golem daemon install" });
+    assert.deepEqual(service?.fix, { kind: "command", text: "golem install" });
   }
   const [, bare] = setupFormRows([], KEPT, false);
   assert.deepEqual(bare?.fix, { kind: "command", text: "golem web install", recheck: false });

@@ -311,7 +311,7 @@ export function serviceChoices(state: ServiceState): Choice<ServiceChoice>[] {
     case "ask":
       if (state.runner === null) {
         return [
-          { id: "install", label: "Start it now and at every login", detail: "" },
+          { id: "install", label: "Keep golem and the page running, now and at every login", detail: "" },
           { id: "session", label: "Only while this terminal is open", detail: "" },
         ];
       }
@@ -356,8 +356,9 @@ export function serviceLines(state: ServiceState, now: number): SetupLine[] {
         return [
           { kind: "title", text: "Welcome to golem." },
           { kind: "blank" },
-          { kind: "text", text: "golem runs a small background service, so your chats" },
-          { kind: "text", text: "keep going after you close this terminal." },
+          { kind: "text", text: "golem runs in the background, so your chats keep going" },
+          { kind: "text", text: "and the page at http://127.0.0.1:7480 is there whenever" },
+          { kind: "text", text: "you open it, even after you close this terminal." },
           { kind: "blank" },
           ...options(serviceChoices(state), state.selected),
         ];
@@ -369,8 +370,8 @@ export function serviceLines(state: ServiceState, now: number): SetupLine[] {
       ];
     case "confirm":
       return [
-        { kind: "title", text: "Stop and remove golem's service?" },
-        { kind: "text", text: "golem can't answer without it. golem daemon install brings it back.", dim: true },
+        { kind: "title", text: "Stop and remove golem's service and the web page?" },
+        { kind: "text", text: "golem can't answer without it. golem install brings both back.", dim: true },
         { kind: "blank" },
         ...options(serviceChoices(state), state.selected),
       ];
@@ -611,9 +612,6 @@ export function serviceRow(runner: ServiceRunner | null, version: string): Setup
   return { part: "service", name: "service", state: "ok", detail: `running · ${how}${shown}` };
 }
 
-/** The command that keeps the service running at login. The page shows it to copy, since it never installs anything. */
-export const KEEP_SERVICE_COMMAND = "golem daemon install";
-
 /**
  * The Service row for a page that is connected, so the service runs. The page cannot tell who
  * started it, so the row keeps the daemon's launchd check: kept at login when that is ok, else
@@ -644,12 +642,12 @@ export function pageServiceLines(service: SetupRow): SetupLine[] {
           { kind: "text", text: "golem's service starts at login, so your chats keep going after you close this page." } as const,
           { kind: "blank" } as const,
         ]
-      : [{ kind: "text", text: "To keep it running at login, run this in a terminal:" } as const]),
+      : [{ kind: "text", text: "To keep golem and this page running at login, run this in a terminal:" } as const]),
     { kind: "option", label: "Continue", detail: "", selected: true },
   ];
 }
 
-/** The command that installs both jobs, the service and the web gateway. */
+/** The command that installs both jobs, the service and the web gateway. The page shows it to copy, since it never installs anything. */
 export const KEEP_ALL_COMMAND = "golem install";
 
 /** The command that keeps the page's own gateway running at login, when the service is kept already. */

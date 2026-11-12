@@ -119,7 +119,7 @@ test("a service not kept while the page is kept keeps its own command", async ()
   const rows = OK_ROWS.map((row) => (row.part === "service" ? { ...row, state: "warn" as const } : row));
   mount(rows, WORKING_LISTING, "/settings", true);
   await waitFor(() => card("Web page"));
-  expect(card("Service").getByText("golem daemon install")).toBeTruthy();
+  expect(card("Service").getByText("golem install")).toBeTruthy();
 });
 
 test("an unknown page host has no Web page card", async () => {
@@ -154,9 +154,9 @@ test("a service that is not kept shows the command with Copy, and Copy writes it
   const rows = OK_ROWS.map((row) => (row.part === "service" ? { ...row, state: "warn" as const } : row));
   const { user } = mount(rows);
   const service = await waitFor(() => card("Service"));
-  await waitFor(() => expect(service.getByText("golem daemon install")).toBeTruthy());
+  await waitFor(() => expect(service.getByText("golem install")).toBeTruthy());
   await user.click(service.getByRole("button", { name: "Copy" }));
-  expect(writeText).toHaveBeenCalledWith("golem daemon install");
+  expect(writeText).toHaveBeenCalledWith("golem install");
   await service.findByRole("button", { name: "Copied" });
 });
 
