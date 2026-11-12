@@ -218,16 +218,38 @@ test("With an API key: the command to copy, no field for a key, and the page che
 
 // Model, Ready, and the start of chat
 
-test("Model waits for a default, then Ready says what was set up, and Start chatting goes home", async () => {
-  const { relist, user } = mount(RUNNING_LISTING, { path: "/welcome?step=model" });
+test("on a fresh home one click downloads the recommended model, sets it to become the default, and moves on", async () => {
+  const { fake, page, user } = mount(RUNNING_LISTING, { path: "/welcome?step=model" });
   await heading("Pick a model");
-  expect(continueButton().disabled).toBe(true);
-  await user.click(button("Choose a model…"));
-  await screen.findByRole("dialog");
-  await user.keyboard("{Escape}");
-  await relist(WORKING_LISTING);
-  await screen.findByText("gemma4:e4b · default");
-  await user.click(continueButton());
+  await screen.findByText("Fits this Mac · 36 GB memory");
+  expect(screen.getAllByRole("option")[0]?.getAttribute("aria-selected")).toBe("true");
+  await user.click(button("Download and continue"));
+  await waitFor(() => expect(fake.raw.pullModel).toHaveBeenCalledWith("ollama/gemma4:e4b"));
+  await heading("Almost ready.");
+  expect(here()).toBe("/welcome?step=ready");
+  expect(page.pulls.getSnapshot().active.has("ollama/gemma4:e4b")).toBe(true);
+  // Back to Model: the running download, not a fresh pick.
+  await user.click(screen.getByRole("button", { name: "Model, done. Go back to it" }));
+  await heading("Pick a model");
+  const row = screen.getAllByRole("option")[0] as HTMLElement;
+  expect(row.getAttribute("aria-selected")).toBe("true");
+  expect(within(row).getByRole("progressbar")).toBeTruthy();
+  expect(continueButton()).toBeTruthy();
+});
+
+test("an installed model is Continue, sets the default, and Ready says what was set up and Start chatting goes home", async () => {
+  const ready: ModelListResult = {
+    ...RUNNING_LISTING,
+    models: RUNNING_LISTING.models.map((each, index) => (index === 0 ? { ...each, status: "ready" as const, source: "installed" as const } : each)),
+  };
+  const { fake, state, user } = mount(ready, { path: "/welcome?step=model" });
+  fake.raw.setDefaultModel.mockImplementation(async () => {
+    state.listing = { ...ready, default: "ollama/gemma4:e4b", setup: { ...ready.setup, default_status: "ready" } };
+    return {} as never;
+  });
+  await heading("Pick a model");
+  await user.click(await screen.findByRole("button", { name: "Continue" }));
+  await waitFor(() => expect(fake.raw.setDefaultModel).toHaveBeenCalledWith("ollama/gemma4:e4b"));
   await heading("golem is ready.");
   expect(here()).toBe("/welcome?step=ready");
   const list = screen.getByRole("list", { name: "What was set up" });

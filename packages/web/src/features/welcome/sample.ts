@@ -1,3 +1,5 @@
+import type { ListedModel, ModelListResult } from "../../store/models.ts";
+import type { PullsSnapshot } from "../../store/pulls.ts";
 import type { KeyProvider } from "../setup/setup-form.tsx";
 import type { SetupActionsState } from "../setup/use-setup-actions.ts";
 import type { EngineStepProps } from "./engine-step.tsx";
@@ -35,8 +37,58 @@ export function engineProps(change: Partial<EngineStepProps> = {}): EngineStepPr
   };
 }
 
+const local = (name: string, label: string, sizeGb: number, extra: Partial<ListedModel> = {}): ListedModel => ({
+  ref: `ollama/${name}`,
+  label,
+  provider: "ollama",
+  source: "catalog",
+  status: "not_installed",
+  size_gb: sizeGb,
+  fit: "fits",
+  ...extra,
+});
+
+/** A fresh 16 GB Mac: four models fit and one is recommended, so three lead; the fourth and three too big sit behind Show all. */
+export const MODEL_LISTING: ModelListResult = {
+  default: null,
+  ram_gb: 16,
+  models: [
+    local("gemma4:12b", "Gemma 4 12B", 8.1, { categories: ["general", "vision"] }),
+    local("qwen3.5:4b", "Qwen3.5 4B", 2.6, { recommended: true, categories: ["general", "fast"] }),
+    local("gemma3:12b", "Gemma 3 12B", 6.6),
+    local("qwen3:8b", "Qwen3 8B", 5.2),
+    local("qwen3-coder:30b", "Qwen3 Coder 30B", 18, { fit: "too_big", categories: ["coding"] }),
+    local("qwen3:32b", "Qwen3 32B", 20, { fit: "too_big" }),
+    local("llama3.3:70b", "Llama 3.3 70B", 43, { fit: "too_big" }),
+  ],
+  providers: [{ provider: "ollama", status: "ready" }],
+  setup: { ollama_installed: true, ollama_running: true },
+};
+
+/** `qwen3.5:4b` a third downloaded. */
+export const MODEL_PULLS: PullsSnapshot = {
+  active: new Map([
+    [
+      "ollama/qwen3.5:4b",
+      { track: { completed: 884_000_000, total: 2_600_000_000, samples: [] }, status: "pulling", progress: 0.34 },
+    ],
+  ]),
+  failed: new Map(),
+};
+
+const NO_PULLS: PullsSnapshot = { active: new Map(), failed: new Map() };
+
 export function modelProps(change: Partial<ModelStepProps> = {}): ModelStepProps {
-  return { current: null, download: null, failed: null, onChoose: noop, onContinue: noop, ...change };
+  return {
+    listing: MODEL_LISTING,
+    pulls: NO_PULLS,
+    speed: 25_000_000,
+    onDownload: async () => undefined,
+    onUse: async () => undefined,
+    onStop: async () => undefined,
+    onContinue: noop,
+    ...change,
+  };
 }
 
 export function readyProps(change: Partial<ReadyStepProps> = {}): ReadyStepProps {
@@ -97,12 +149,12 @@ export const WELCOME_CASES: WelcomeCase[] = [
     label: "Engine, key saved",
     props: welcomeProps("engine", { engine: engineProps({ choice: "key", providers: ANTHROPIC_SAVED, ready: true }) }),
   },
-  { label: "Model, none yet", props: welcomeProps("model") },
+  { label: "Model, pick one", props: welcomeProps("model") },
   {
     label: "Model, downloading",
     props: welcomeProps("model", {
       working: true,
-      model: modelProps({ download: { id: "qwen3.5:4b", share: 0.34, text: "34% · 2 min" } }),
+      model: modelProps({ pulls: MODEL_PULLS }),
     }),
   },
   { label: "Model, default gone", props: welcomeProps("model", { states: ["done", "current", "skipped", "todo"], banner: DEFAULT_GONE }) },

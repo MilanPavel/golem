@@ -9,18 +9,19 @@ import {
   pageServiceRow,
   pickerName,
   providerName,
+  pullSpeed,
 } from "@golem/view";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useConnection } from "../../store/connection-context.tsx";
 import { useModelList, useNavigate, usePageActions, usePageHost, usePulls, useSetupStatus } from "../../store/page-context.tsx";
 import { welcomePath } from "../../store/router.ts";
-import { NewSessionModelDialog, openModelDialog, pullShare, pullText, shortName } from "../models/index.ts";
+import { pullShare, pullText, shortName } from "../models/index.ts";
 import type { KeyProvider } from "../setup/setup-form.tsx";
 import { useSetupActions } from "../setup/use-setup-actions.ts";
 import type { EngineChoice, OllamaPhase } from "./engine-step.tsx";
 import type { ReadyModel } from "./ready-step.tsx";
 import { TOOLS_OFFERED } from "./tools-step.tsx";
-import { finishWelcome, leaveWelcome, setPendingModel, useWelcomeProgress } from "./welcome-store.ts";
+import { finishWelcome, leaveWelcome, setPendingModel, setPullSpeed, useWelcomeProgress } from "./welcome-store.ts";
 import { nextStep, stepStates, type WelcomeStep } from "./welcome-steps.ts";
 import { WelcomeView } from "./welcome-view.tsx";
 
@@ -126,6 +127,12 @@ export function WelcomeScreen({ step, from }: { step: WelcomeStep; from: "send" 
     if (pending !== null && defaultReady) setPendingModel(null);
   }, [pending, defaultReady]);
 
+  // The speed of the last download that was measured, to say how long the others take. Whole MB/s, so it does not stir on every tick.
+  const measured = [...pulls.active.values()].map((each) => pullSpeed(each.track)).find((each) => each !== null) ?? null;
+  useEffect(() => {
+    if (measured !== null) setPullSpeed(Math.max(1, Math.round(measured / 1e6)) * 1e6);
+  }, [measured]);
+
   const states = stepStates(step, TOOLS_OFFERED);
   const goTo = (to: WelcomeStep): void => {
     navigate(welcomePath(to, from), { replace: true });
@@ -190,61 +197,71 @@ export function WelcomeScreen({ step, from }: { step: WelcomeStep; from: "send" 
   };
 
   return (
-    <>
-      <WelcomeView
-        rootRef={root}
-        step={step}
-        states={states}
-        working={phase === "installing" || phase === "starting" || downloading}
-        banner={banner}
-        onStep={goTo}
-        onLater={() => {
-          leaveWelcome(step);
-          navigate("/");
-        }}
-        engine={{
-          choice,
-          onChoice: setPicked,
-          ollama: phase,
-          downloaded: listing?.models.filter((model) => model.provider === "ollama" && model.status === "ready").length ?? 0,
-          actions: setupActions.state,
-          onInstall: setupActions.install,
-          onCancelInstall: setupActions.cancelInstall,
-          onStart: setupActions.start,
-          onCheck: setupActions.checkAgain,
-          providers,
-          provider,
-          onProvider: setPickedProvider,
-          ready: engineReady,
-          onContinue: () => {
-            advanceFrom("engine");
-          },
-        }}
-        model={{
-          current: defaultReady && defaultModel !== null ? shortName(defaultModel.ref) : null,
-          download,
-          failed: failure === undefined ? null : failure,
-          onChoose: (trigger) => {
-            openModelDialog({ sessionId: null, mode: "default", returnTo: trigger });
-          },
-          onContinue: continueFromModel,
-        }}
-        tools={{
-          onContinue: () => {
-            advanceFrom("tools");
-          },
-        }}
-        ready={{
-          engine: engineLine,
-          model: readyModel,
-          tools: "skipped",
-          toolsSkipped: !TOOLS_OFFERED,
-          keepNote: keepAt === null ? null : serviceKept ? { command: keepAt, page: "only" } : { command: keepAt },
-          fromSend: from === "send",
-          onStart: start,
-        }}
-      />
-      <NewSessionModelDialog />
-    </>
+    <WelcomeView
+      rootRef={root}
+      step={step}
+      states={states}
+      working={phase === "installing" || phase === "starting" || downloading}
+      banner={banner}
+      onStep={goTo}
+      onLater={() => {
+        leaveWelcome(step);
+        navigate("/");
+      }}
+      engine={{
+        choice,
+        onChoice: setPicked,
+        ollama: phase,
+        downloaded: listing?.models.filter((model) => model.provider === "ollama" && model.status === "ready").length ?? 0,
+        actions: setupActions.state,
+        onInstall: setupActions.install,
+        onCancelInstall: setupActions.cancelInstall,
+        onStart: setupActions.start,
+        onCheck: setupActions.checkAgain,
+        providers,
+        provider,
+        onProvider: setPickedProvider,
+        ready: engineReady,
+        onContinue: () => {
+          advanceFrom("engine");
+        },
+      }}
+      model={{
+        listing,
+        pulls,
+        speed: progress.speed,
+        // The model becomes the default when the download ends, with this page closed.
+        onDownload: async (model) => {
+          const name = pickerName(model);
+          await page.pull(model.ref);
+          page.defaultWhenPulled(model.ref, name);
+          setPendingModel({ ref: model.ref, name });
+          advanceFrom("model");
+        },
+        onUse: async (model) => {
+          if (!namesModel(model, listing?.default ?? null)) await page.setDefault(pickerName(model));
+          advanceFrom("model");
+        },
+        onStop: async (model) => {
+          await page.cancelPull(model.ref);
+          if (progress.pending?.ref === model.ref) setPendingModel(null);
+        },
+        onContinue: continueFromModel,
+      }}
+      tools={{
+        onContinue: () => {
+          advanceFrom("tools");
+        },
+      }}
+      ready={{
+        engine: engineLine,
+        model: readyModel,
+        tools: "skipped",
+        toolsSkipped: !TOOLS_OFFERED,
+        keepNote: keepAt === null ? null : serviceKept ? { command: keepAt, page: "only" } : { command: keepAt },
+        fromSend: from === "send",
+        onStart: start,
+      }}
+    />
   );
 }

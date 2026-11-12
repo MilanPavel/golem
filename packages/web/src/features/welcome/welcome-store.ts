@@ -11,9 +11,11 @@ export type WelcomeProgress = {
   leftAt: WelcomeStep | null;
   /** A model's download, and its name as `setDefault` takes it, that the page was told to wait for. */
   pending: { ref: string; name: string } | null;
+  /** Bytes a second of the last download that was measured, for the time estimates of the Model step. */
+  speed: number | null;
 };
 
-const IDLE: WelcomeProgress = { leftAt: null, pending: null };
+const IDLE: WelcomeProgress = { leftAt: null, pending: null, speed: null };
 
 export const welcomeStore = createStore<WelcomeProgress>(IDLE);
 
@@ -33,6 +35,11 @@ export function finishWelcome(): void {
 
 export function setPendingModel(pending: WelcomeProgress["pending"]): void {
   welcomeStore.set({ ...welcomeStore.getSnapshot(), pending });
+}
+
+export function setPullSpeed(speed: number): void {
+  const snapshot = welcomeStore.getSnapshot();
+  if (snapshot.speed !== speed) welcomeStore.set({ ...snapshot, speed });
 }
 
 /** Back to a page load's start. For tests. */
