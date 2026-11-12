@@ -62,6 +62,7 @@ class _Pull:
     status: str = "starting"
     layers: dict[str, tuple[int, int]] = field(default_factory=lambda: {})
     sent_at: float = 0.0
+    error: str | None = None
 
     @property
     def completed(self) -> int | None:
@@ -181,6 +182,21 @@ class PullManager:
         log.info("pull started ref=%s", target.ref)
         return target.ref, True
 
+    async def wait(self, ref: str) -> None:
+        """Return once the download of ``ref`` has ended, at once when none runs.
+
+        Raises :class:`PullError` with the download's own error when it failed
+        or was stopped.
+        """
+        pull = self._pulls.get(ref)
+        if pull is None or pull.task is None:
+            return
+        await asyncio.wait([pull.task])
+        if pull.error is not None:
+            if pull.error == "cancelled":
+                raise PullError(f"the download of {ref} was stopped")
+            raise PullError(f"the download of {ref} failed: {pull.error}")
+
     async def cancel(self, name: str) -> tuple[str, bool]:
         target = self._target(name)
         pull = self._pulls.get(target.ref)
@@ -289,6 +305,7 @@ class PullManager:
         except ModelUnreachable as exc:
             error = f"{exc.message}: {exc.hint}"
         finally:
+            pull.error = error
             self._pulls.pop(target.ref, None)
             done = ModelPullDone(ref=target.ref, ok=error is None, error=error)
             self._send(ModelPullDoneNotification(params=done))

@@ -201,7 +201,14 @@ export function WelcomeScreen({ step, from }: { step: WelcomeStep; from: "send" 
       ? `Your default model ${listing.default ?? ""} is no longer installed. Pick another to keep chatting.`
       : null;
 
-  const start = (): void => {
+  const start = async (): Promise<void> => {
+    // The daemon has to know the default before a send, which waits for the download instead of
+    // being sent back here. If this fails, the download's end still sets it.
+    if (downloading && activeRef !== null) {
+      const named = listing?.models.find((model) => model.ref === activeRef);
+      const name = pending?.name ?? (named === undefined ? activeRef : pickerName(named));
+      await page.setDefault(name).catch(() => undefined);
+    }
     finishWelcome();
     if (from === "send") leave(navigate);
     else navigate("/");
@@ -295,7 +302,7 @@ export function WelcomeScreen({ step, from }: { step: WelcomeStep; from: "send" 
         keepNote: keepAt === null ? null : serviceKept ? { command: keepAt, page: "only" } : { command: keepAt },
         app: { offer: installOffer(appInstall.snapshot, pageHost.kept), host: location.host, onInstall: () => void appInstall.install() },
         fromSend: from === "send",
-        onStart: start,
+        onStart: () => void start(),
       }}
     />
   );

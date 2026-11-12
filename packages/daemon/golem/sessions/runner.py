@@ -48,7 +48,7 @@ from golem.graphs.adapter import (
 from golem.graphs.chat import ChatRuntime
 from golem.graphs.tools_node import Answer
 from golem.models.errors import ModelUnreachable
-from golem.models.router import ModelIdentity
+from golem.models.router import ModelConfigError, ModelIdentity
 from golem.permissions.engine import Allowance
 from golem.sessions.interrupted import close_reply
 from golem.sessions.log import SessionLog
@@ -242,6 +242,7 @@ async def run_turn(
             "message.started",
             MessageStartedData(message_id=turn.assistant_message_id, role="assistant"),
         )
+        await _until_pulled(runtime, turn.model_profile)
         stream = runtime.stream(
             session_id=turn.session_id,
             text=turn.text,
@@ -272,6 +273,17 @@ async def run_turn(
         raise
     except Exception as exc:
         return await _failed(turn.run_id, exc, progress, emit)
+
+
+async def _until_pulled(runtime: ChatRuntime, profile: str) -> None:
+    """Hold the turn while its model downloads. A failed download raises and fails the run."""
+    if runtime.until_pulled is None:
+        return
+    try:
+        ref = runtime.router.resolve(profile).ref
+    except ModelConfigError:
+        return
+    await runtime.until_pulled(ref)
 
 
 async def resume_turn(

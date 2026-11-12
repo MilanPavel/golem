@@ -44,11 +44,11 @@ function Line({ mark, name, waitWord, children }: { mark: CardMark; name: string
 
 const MODEL_MARK: Record<ReadyModel["kind"], CardMark> = { ready: "ok", downloading: "spin", failed: "fail", none: "attn" };
 
-/** Ready: what was set up, and the way into the chat. While the default model downloads it says `Almost ready.` and waits. */
+/** Ready: what was set up, and the way into the chat. While the default model downloads it says `Almost ready.` and still lets the person start. */
 export function ReadyStep({ engine, model, tools, toolsSkipped, keepNote, app, fromSend, onStart }: ReadyStepProps) {
   const waiting = model.kind === "downloading";
   const lede = [
-    waiting ? `${model.id} is still downloading. Start chatting turns on when it's there.` : null,
+    waiting ? `${model.id} is still downloading. Start a chat now and golem answers once it's there, or wait here.` : null,
     fromSend ? "Your message is waiting where you left it. Nothing has been sent." : null,
   ].filter((part) => part !== null);
   return (
@@ -75,7 +75,7 @@ export function ReadyStep({ engine, model, tools, toolsSkipped, keepNote, app, f
         </Line>
       </ul>
       <div className="flex items-center justify-center gap-2.5">
-        <Button kind="ink" disabled={waiting} onClick={onStart}>
+        <Button kind="ink" onClick={onStart}>
           {fromSend ? "Back to your message" : "Start chatting"}
         </Button>
       </div>

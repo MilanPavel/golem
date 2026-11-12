@@ -292,13 +292,14 @@ test("Ready: a line for each step, what was set up, and Start chatting", async (
   expect(onStart).toHaveBeenCalledTimes(1);
 });
 
-test("Ready while the default model downloads: Almost ready, the bar in the Model line, Start chatting disabled", () => {
+test("Ready while the default model downloads: Almost ready, the bar in the Model line, Start chatting enabled", () => {
   const props = WELCOME_CASES.find((each) => each.label === "Ready, model downloading")?.props ?? welcomeProps("ready");
   render(<WelcomeView {...props} />);
   expect(screen.getByRole("heading", { level: 2, name: "Almost ready." })).toBeTruthy();
   const model = within(screen.getByRole("list", { name: "What was set up" })).getAllByRole("listitem")[1] as HTMLElement;
   expect(within(model).getByRole("progressbar").getAttribute("aria-valuenow")).toBe("72");
-  expect((screen.getByRole("button", { name: "Start chatting" }) as HTMLButtonElement).disabled).toBe(true);
+  expect(screen.getByText("qwen3.5:4b is still downloading. Start a chat now and golem answers once it's there, or wait here.")).toBeTruthy();
+  expect((screen.getByRole("button", { name: "Start chatting" }) as HTMLButtonElement).disabled).toBe(false);
   expect(screen.queryByRole("button", { name: "Later" })).toBeNull();
 });
 

@@ -38,6 +38,31 @@ test("a fresh home opens /welcome with no dialog, and a first send works after R
   expect(model.requests).toHaveLength(0);
 });
 
+test("Start chatting while the model downloads: a send waits for it and is answered once it lands", async ({ page, rig }) => {
+  const { gateway, model, ollama } = await startStack(rig, FRESH);
+  ollama?.holdPulls();
+  await page.goto(gateway.url);
+  await page.getByRole("button", { name: /On this Mac/ }).click();
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByRole("option", { name: /Llama 3\.2 3B/ }).click();
+  await page.getByRole("button", { name: "Download and continue" }).click();
+  await page.getByRole("button", { name: "Skip", exact: true }).click();
+  await expect(page.getByRole("heading", { level: 2, name: "Almost ready." })).toBeVisible();
+  await expect(page.getByText("llama3.2:3b is still downloading. Start a chat now and golem answers once it's there, or wait here.")).toBeVisible();
+  await page.getByRole("button", { name: "Start chatting" }).click();
+  await expect(page).toHaveURL(/\/$/);
+
+  await send(page, "hello");
+  await expect(page.getByRole("status").filter({ hasText: "waiting for llama3.2:3b" })).toBeVisible();
+  expect(here(page)).not.toContain("/welcome");
+  expect(ollama?.requests).not.toContain("POST /api/chat");
+
+  ollama?.releasePulls();
+  await expect(answers(page)).toContainText("The stub answers.");
+  expect(ollama?.requests).toContain("POST /api/chat");
+  expect(model.requests).toHaveLength(0);
+});
+
 test("a send with no model goes to /welcome?from=send, and Ready comes back to the draft with nothing sent", async ({ page, rig }) => {
   const { gateway, model, ollama } = await startStack(rig, FRESH);
   await page.goto(gateway.url);
