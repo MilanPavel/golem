@@ -2720,6 +2720,7 @@ export function App({
 
   /** Read `setup.status` again for the overview and the band. */
   function recheck(): void {
+    readMcpFacts();
     const ui = setupRef.current;
     if (ui !== null && ui.window.view === "overview") {
       showSetup({ ...ui, overview: { ...ui.overview, rows: null } });
@@ -2729,7 +2730,7 @@ export function App({
         setBandRows(result.rows);
         const now = setupRef.current;
         if (now !== null && now.window.view === "overview") {
-          const count = overviewChoices(result.rows).length;
+          const count = overviewChoices(result.rows, undefined, setupFacts()).length;
           showSetup({
             ...now,
             overview: { ...now.overview, rows: result.rows, selected: Math.min(now.overview.selected, count - 1) },
@@ -2897,7 +2898,7 @@ export function App({
     if (rows === null || key === "quit" || key === "interrupt") {
       return;
     }
-    const choices = overviewChoices(rows);
+    const choices = overviewChoices(rows, undefined, setupFacts());
     if (key === "up" || key === "down") {
       showSetup({ ...ui, overview: { ...ui.overview, selected: move(ui.overview.selected, choices.length, key) } });
       return;
@@ -2942,6 +2943,9 @@ export function App({
       case "set_key":
         openKeyPanel(choice.target, "overview", ui);
         return;
+      case "add_tools":
+        goSetup({ kind: "window", window: single("tools", "overview") }, ui);
+        return;
       case "edit_config":
         return;
     }
@@ -2954,7 +2958,7 @@ export function App({
     }
     if (ui.window.view === "overview") {
       const row = serviceRow(serviceRunner(), daemonVersion);
-      return { lines: overviewLines(ui.overview.rows, row, ui.overview.selected, ui.overview.notice), screen: "overview" };
+      return { lines: overviewLines(ui.overview.rows, row, ui.overview.selected, ui.overview.notice, setupFacts()), screen: "overview" };
     }
     switch (ui.window.panel) {
       case "service": {
