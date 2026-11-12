@@ -2,6 +2,20 @@
 
 What changed in each release of golem, newest first. `just release` writes each section from the commit messages on `main` ([CONTRIBUTING.md](CONTRIBUTING.md)), and the release pull request is the place to edit it. The GitHub release shows the same section. How a release is made is in [docs/sre.md](docs/sre.md), section 5.
 
+## [0.13.1] - 2026-11-12
+
+### Fixes
+
+- **cli:** say what golem is doing while its service starts (B.10) ([#797](https://github.com/MilanPavel/golem/pull/797))
+- **web:** center the Tools step's Continue on /welcome (B.12) ([#801](https://github.com/MilanPavel/golem/pull/801))
+- **daemon:** an Ollama left from a removed install is not ready (B.13) ([#803](https://github.com/MilanPavel/golem/pull/803))
+- **web:** Start chatting while the model downloads; a send waits for it (B.11) ([#802](https://github.com/MilanPavel/golem/pull/802))
+- **daemon:** store secrets through /usr/bin/security so upgrades don't ask (B.14) ([#805](https://github.com/MilanPavel/golem/pull/805))
+
+### Docs
+
+- a separate Uninstall page, and the Keychain text after #805 ([#807](https://github.com/MilanPavel/golem/pull/807))
+
 ## [0.13.0] - 2026-11-12
 
 ### Features
