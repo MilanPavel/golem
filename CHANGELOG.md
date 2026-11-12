@@ -2,6 +2,31 @@
 
 What changed in each release of golem, newest first. `just release` writes each section from the commit messages on `main` ([CONTRIBUTING.md](CONTRIBUTING.md)), and the release pull request is the place to edit it. The GitHub release shows the same section. How a release is made is in [docs/sre.md](docs/sre.md), section 5.
 
+## [0.13.0] - 2026-11-12
+
+### Features
+
+- **web:** web app manifest and icons (10.13.1) ([#710](https://github.com/MilanPavel/golem/pull/710))
+- **mcp:** Tools panel navigation and model (1.12.13) ([#711](https://github.com/MilanPavel/golem/pull/711))
+- **web:** /welcome page with Engine and Ready, opened at start (10.15.6) ([#713](https://github.com/MilanPavel/golem/pull/713))
+- **web:** sign-ins survive a gateway restart (10.14.4) ([#714](https://github.com/MilanPavel/golem/pull/714))
+- **web:** golem web serve, a gateway for a job, never old (10.14.1) ([#709](https://github.com/MilanPavel/golem/pull/709))
+- **tui:** the Tools panel in the setup window (1.12.14) ([#719](https://github.com/MilanPavel/golem/pull/719))
+- **cli:** golem install keeps the service and the web page running (10.14.2) ([#721](https://github.com/MilanPavel/golem/pull/721))
+- **web:** the page shows whether its gateway is kept running (10.14.3) ([#720](https://github.com/MilanPavel/golem/pull/720))
+- **web:** the Model step on /welcome (10.15.8) ([#723](https://github.com/MilanPavel/golem/pull/723))
+- **web:** the Tools step on /welcome and in Settings (10.15.9) ([#722](https://github.com/MilanPavel/golem/pull/722))
+- **web:** no setup dialog; a send with no model and /setup go to pages (10.15.10) ([#727](https://github.com/MilanPavel/golem/pull/727))
+- **tui:** /setup offers Tools when no MCP server exists (1.12.15) ([#730](https://github.com/MilanPavel/golem/pull/730))
+- **web:** offer to install the app on Ready and in Settings (10.13.3) ([#726](https://github.com/MilanPavel/golem/pull/726))
+- **tui:** the Service panel names both jobs, golem install keeps both (10.14.5) ([#729](https://github.com/MilanPavel/golem/pull/729))
+
+### Fixes
+
+- **daemon:** test sockets fall back to a short dir in a long checkout (B.7) ([#716](https://github.com/MilanPavel/golem/pull/716))
+- **web:** one gallery welcome test per state, so axe fits the timeout (B.9) ([#732](https://github.com/MilanPavel/golem/pull/732))
+- **daemon:** the trusted-project MCP test waits for the user's server (B.8) ([#728](https://github.com/MilanPavel/golem/pull/728))
+
 ## [0.12.0] - 2026-11-11
 
 ### Features
