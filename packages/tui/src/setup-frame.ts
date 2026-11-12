@@ -1,6 +1,7 @@
-import { STEP_MARKS, stepper, type Mark, type SetupLine, type SetupWindow } from "@golem/view";
+import { STEP_MARKS, stepper, type Mark, type SetupFacts, type SetupLine, type SetupWindow } from "@golem/view";
 
 import type { Press } from "./keys.ts";
+import { toolsHint, type ToolsScreen } from "./setup-frame-tools.ts";
 
 /**
  * The setup window's frame in the terminal: a box about 60 columns wide,
@@ -62,9 +63,11 @@ export type SetupScreen =
   | "key-typing"
   | "ready"
   | "overview"
-  | "quit";
+  | "quit"
+  | ToolsScreen;
 
-export function setupHint(screen: SetupScreen, window: SetupWindow): string {
+/** `adds` is how many servers Enter would add on the Tools offer. */
+export function setupHint(screen: SetupScreen, window: SetupWindow, adds = 0): string {
   const fromStart = window.view === "panel" && window.origin === "start";
   switch (screen) {
     case "service-ask":
@@ -100,6 +103,8 @@ export function setupHint(screen: SetupScreen, window: SetupWindow): string {
       return "Enter starts chatting";
     case "overview":
       return "Enter picks · ↑↓ move · r recheck · Esc back to chat";
+    default:
+      return toolsHint(screen, adds, window.view === "panel" && window.mode === "guided");
   }
 }
 
@@ -133,8 +138,13 @@ export function labelWidth(lines: readonly SetupLine[]): number {
   return labels.length === 0 ? 0 : Math.max(...labels) + 2;
 }
 
+/** How wide a row's label is, so the texts line up: 10 columns, or the longest label and one more. */
+export function rowWidth(lines: readonly SetupLine[]): number {
+  return Math.max(10, ...lines.flatMap((line) => (line.kind === "row" ? [line.label.length + 1] : [])));
+}
+
 /** One line of a panel as coloured runs, `width` columns wide. */
-export function lineSpans(line: SetupLine, width: number, frame: number, labels: number): Span[] {
+export function lineSpans(line: SetupLine, width: number, frame: number, labels: number, rows = 10): Span[] {
   switch (line.kind) {
     case "blank":
       return [{ text: " ", tone: "plain" }];
@@ -159,7 +169,7 @@ export function lineSpans(line: SetupLine, width: number, frame: number, labels:
         ...(line.detail.length > 0 ? [{ text: line.detail, tone: "dim" as const }] : []),
       ];
     case "row":
-      return [glyph(line.mark, frame), { text: ` ${line.label.padEnd(10)}`, tone: "bold" }, { text: line.text, tone: "plain" }];
+      return [glyph(line.mark, frame), { text: ` ${line.label.padEnd(rows)}`, tone: "bold" }, { text: line.text, tone: "plain" }];
     case "field":
       return [
         { text: "❯ ", tone: "clay" },
@@ -169,9 +179,9 @@ export function lineSpans(line: SetupLine, width: number, frame: number, labels:
   }
 }
 
-/** The stepper as runs: `✓ Service ── ● Engine ── ○ Model ── ○ Ready`. */
-export function stepperSpans(window: SetupWindow): Span[] | null {
-  const steps = stepper(window);
+/** The stepper as runs: `✓ Service ── ● Engine ── ○ Model ── ○ Ready`. `facts` say whether Tools is offered. */
+export function stepperSpans(window: SetupWindow, facts?: SetupFacts): Span[] | null {
+  const steps = stepper(window, facts);
   if (steps === null) {
     return null;
   }

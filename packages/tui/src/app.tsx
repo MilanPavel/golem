@@ -13,6 +13,7 @@ import {
   type ConnectionState,
   type GolemClient,
   type ListedModel,
+  type McpAddParams,
   type ModelListResult,
   type SetupRow,
   type SkillCall,
@@ -54,6 +55,15 @@ import {
   setupAtStart,
   setupBand,
   single,
+  toolsAdded,
+  toolsFailed,
+  toolsOffer,
+  toolsRuntimeDone,
+  toolsRuntimeOutput,
+  toolsStep,
+  TOOLS_SKIP,
+  type ToolsRuntime,
+  type ToolsState,
   welcomeBack,
   withLog,
   hostedProvider,
@@ -92,6 +102,7 @@ import {
   type ServiceRunner,
   type ServiceState,
   type InstallTail,
+  type SetupFacts,
   type SetupLine,
   type SetupNext,
   type SetupStart,
@@ -172,6 +183,17 @@ import {
 } from "./model-picker.ts";
 import { ModelPickerView } from "./model-picker.tsx";
 import { setupHint, setupKeyOf, type SetupKey, type SetupScreen } from "./setup-frame.ts";
+import {
+  newToolsUi,
+  pressTools,
+  toolsKeyOf,
+  toolsRan,
+  toolsReadyText,
+  toolsTyping,
+  toolsView,
+  type ToolsAct,
+  type ToolsUi,
+} from "./setup-frame-tools.ts";
 import { SetupFrame } from "./setup-frame.tsx";
 import { draftAt, edit, editDraft, insertText, type Draft } from "./edit.ts";
 import { collapsePaste, deleteToken, expandPastes, noPastes, type Pastes } from "./paste.ts";
@@ -354,6 +376,10 @@ type SetupUi = {
   /** Which models the Model panel offers: this Mac's, every engine's, or with the gone default first. */
   scope: ModelScope;
   ready: { engine: string; model: string } | null;
+  /** The Tools panel: the offer, the token being typed, and the run. */
+  tools: ToolsUi;
+  /** The titles of the servers Tools added, for the Ready panel. */
+  toolsRan: string[];
 };
 
 
@@ -496,6 +522,8 @@ export function App({
   // The setup window. It covers the whole screen, except on the panels the picker stands in for.
   const [setup, setSetupState] = useState<SetupUi | null>(null);
   const setupRef = useRef(setup);
+  /** Whether the user config has no MCP servers, and the names of those it has. */
+  const mcpFactsRef = useRef<{ empty: boolean; names: string[] }>({ empty: false, names: [] });
   setupRef.current = setup;
   const startDecided = useRef(false);
   /** This screen's session, for the banner, which is worked out before the session hook runs. */
@@ -1317,6 +1345,7 @@ export function App({
       (setup.window.view === "panel" && setup.window.panel === "ollama" && ["installing", "starting", "waiting"].includes(setup.ollama.phase)) ||
       (setup.window.view === "panel" && setup.window.panel === "model" && setup.model.phase === "downloading") ||
       (setup.window.view === "panel" && setup.window.panel === "key" && (setup.key.phase === "checking" || setup.key.phase === "works")) ||
+      (setup.window.view === "panel" && setup.window.panel === "tools" && setup.tools.state?.phase === "run") ||
       (setup.window.view === "overview" && setup.overview.rows === null));
   useEffect(() => {
     if (!setupTicking) {
@@ -2005,6 +2034,9 @@ export function App({
   }
 
   function showSetup(next: SetupUi | null): void {
+    if (next !== null && next.window.view === "panel" && next.window.panel !== "tools" && next.window.panel !== "ready") {
+      readMcpFacts();
+    }
     setupRef.current = next;
     setSetupState(next);
   }
@@ -2018,6 +2050,8 @@ export function App({
       overview: { selected: 0, rows: null, notice: null },
       quit: null,
       ready: null,
+      tools: newToolsUi(),
+      toolsRan: [],
       ollama: { phase: "missing", selected: 0, note: null },
       model: START_MODEL_PANEL,
       scope: { kind: "local" },
@@ -2057,8 +2091,24 @@ export function App({
     return { state: { phase: "starting", how: "install", agent: loaded, since: Date.now() }, reinstall: !loaded };
   }
 
-  function ollamaFacts(): { ollamaRunning: boolean } {
-    return { ollamaRunning: listingRef.current?.setup.ollama_running === true };
+  function setupFacts(): SetupFacts {
+    return { ollamaRunning: listingRef.current?.setup.ollama_running === true, mcpEmpty: mcpFactsRef.current.empty };
+  }
+
+  /**
+   * Read the user's own MCP servers for the navigation: Tools is offered when the config has
+   * none. It is read as the early panels open and not again, so Ready still counts Tools as a
+   * step after Tools added some.
+   */
+  function readMcpFacts(): void {
+    void client.listMcp().then(
+      (listed) => {
+        const own = listed.servers.filter((server) => server.project == null).map((server) => server.name);
+        mcpFactsRef.current = { empty: own.length === 0, names: own };
+        setSetupNow(Date.now());
+      },
+      () => undefined,
+    );
   }
 
   /** Open the window. The overview reads `setup.status` as it opens. */
@@ -2093,6 +2143,11 @@ export function App({
     }
     const window = next.window;
     const moved: SetupUi = { ...ui, window, quit: null };
+    if (ui.window.view === "panel" && ui.window.panel === "tools") {
+      // Leaving Tools: Ready names what was added, and no token outlives the panel.
+      moved.toolsRan = [...ui.toolsRan, ...toolsRan(ui.tools.state)];
+      moved.tools = newToolsUi();
+    }
     if (window.view === "overview") {
       showSetup({ ...moved, overview: { ...ui.overview, selected: 0 } });
       recheck();
@@ -2107,7 +2162,7 @@ export function App({
     if (window.panel === "ollama") {
       const opened = ollamaAtOpen(listingRef.current, Date.now());
       if (opened === "running") {
-        goSetup(advance(window, { kind: "done" }, ollamaFacts()), moved);
+        goSetup(advance(window, { kind: "done" }, setupFacts()), moved);
         return;
       }
       moved.ollama = opened;
@@ -2127,6 +2182,12 @@ export function App({
     }
     if (window.panel === "provider") {
       moved.provider = providerSelected(listingRef.current);
+    }
+    if (window.panel === "tools") {
+      moved.tools = newToolsUi();
+      showSetup(moved);
+      loadTools(window.mode);
+      return;
     }
     if (window.panel === "key") {
       const hosted = moved.hosted ?? "anthropic";
@@ -2151,9 +2212,153 @@ export function App({
     goSetup({ kind: "window", window }, { ...ui, hosted: provider, path: "key" });
   }
 
+  /** Read the catalog for the Tools offer. A guided window with nothing to offer moves on. */
+  function loadTools(mode: "guided" | "single"): void {
+    client.mcpCatalog().then(
+      (listed) => {
+        const ui = setupRef.current;
+        if (ui === null || ui.window.view !== "panel" || ui.window.panel !== "tools" || ui.tools.state !== null) {
+          return;
+        }
+        const state = toolsOffer(listed.entries, mode);
+        if (state.rows.length === 0 && mode === "guided") {
+          goSetup(advance(ui.window, TOOLS_SKIP, setupFacts()), ui);
+          return;
+        }
+        showSetup({ ...ui, tools: { ...ui.tools, state } });
+      },
+      (error: unknown) => updateTools((tools) => ({ ...tools, error: messageOf(error) })),
+    );
+  }
+
+  function updateTools(change: (tools: ToolsUi) => ToolsUi): void {
+    updateSetup((ui) => (ui.window.view === "panel" && ui.window.panel === "tools" ? { ...ui, tools: change(ui.tools) } : ui));
+  }
+
+  /** The Tools model changes only when the panel still has a model to change. */
+  function changeToolsState(change: (state: ToolsState) => ToolsState): void {
+    updateTools((tools) => (tools.state === null ? tools : { ...tools, state: change(tools.state) }));
+  }
+
+  /** Take the model's next effect, one at a time, until the run has nothing left to do. */
+  function driveTools(): void {
+    const ui = setupRef.current;
+    const state = ui?.tools.state;
+    if (ui === null || state == null || ui.window.view !== "panel" || ui.window.panel !== "tools") {
+      return;
+    }
+    const stepped = toolsStep(state);
+    const effect = stepped.effect;
+    if (effect.kind === "none") {
+      return;
+    }
+    showSetup({ ...ui, tools: { ...ui.tools, state: stepped.state } });
+    if (effect.kind === "install") {
+      installToolsRuntime(effect.runtime);
+    } else {
+      addToolsServer(effect.id, effect.params);
+    }
+  }
+
+  /** Node or uv through the daemon, as Ollama is; its output reaches the row that waits for it. */
+  function installToolsRuntime(runtime: ToolsRuntime): void {
+    const stop = client.onRuntimeInstall((update) => {
+      if (update.kind === "output") {
+        if (update.name === runtime) {
+          changeToolsState((state) => toolsRuntimeOutput(state, runtime, update.text));
+        }
+        return;
+      }
+      if (update.done.name !== runtime) {
+        return;
+      }
+      stop();
+      const done = update.done;
+      changeToolsState((state) => toolsRuntimeDone(state, runtime, done.ok, done.error ?? null));
+      driveTools();
+    });
+    client.installRuntime(runtime).catch((error: unknown) => {
+      stop();
+      changeToolsState((state) => toolsRuntimeDone(state, runtime, false, messageOf(error)));
+      driveTools();
+    });
+  }
+
+  /**
+   * Add a server and try it. The token goes only to the daemon, which keeps it in the Keychain,
+   * and the row drops it when the add ends. A server this panel saved before is taken out first.
+   */
+  function addToolsServer(id: string, params: McpAddParams): void {
+    void (async () => {
+      if (setupRef.current?.tools.created.includes(params.name) === true) {
+        await client.removeMcpServer(params.name).catch(() => undefined);
+        updateTools((tools) => ({ ...tools, created: tools.created.filter((name) => name !== params.name) }));
+      }
+      const server = await client.addMcpServer(params);
+      updateTools((tools) => ({ ...tools, created: [...tools.created, server.name] }));
+      const result = await client.mcpTest({ name: server.name });
+      if (result.ok) {
+        changeToolsState((state) => toolsAdded(state, id, result.tools?.length ?? 0));
+      } else {
+        const step = result.steps.find((each) => each.state === "failed");
+        changeToolsState((state) => toolsFailed(state, id, result.hint ?? step?.detail ?? "the server didn't start"));
+      }
+    })()
+      .catch((error: unknown) => changeToolsState((state) => toolsFailed(state, id, messageOf(error))))
+      .finally(driveTools);
+  }
+
+  function onToolsPress(ui: SetupUi, press: Press): void {
+    const key = toolsKeyOf(press, toolsTyping(ui.tools));
+    if (key === null) {
+      return;
+    }
+    if (key.kind === "interrupt" || key.kind === "quit") {
+      showSetup({ ...ui, quit: 0 });
+      return;
+    }
+    const pressed = pressTools(ui.tools, key);
+    showSetup({ ...ui, tools: pressed.ui });
+    runToolsAct(pressed.act, pressed.ui);
+  }
+
+  function runToolsAct(act: ToolsAct, tools: ToolsUi): void {
+    const ui = setupRef.current;
+    if (ui === null || ui.window.view !== "panel") {
+      return;
+    }
+    switch (act.kind) {
+      case "none":
+        return;
+      case "step":
+        driveTools();
+        return;
+      case "leave":
+        goSetup(advance(ui.window, act.result, setupFacts()), ui);
+        return;
+      case "stop":
+        if (act.runtime !== null) {
+          void client.cancelRuntimeInstall(act.runtime).catch(() => undefined);
+        }
+        return;
+      case "remove":
+        void client.removeMcpServer(act.name).catch(() => undefined);
+        return;
+      case "logs": {
+        const row = tools.state?.rows.find((each) => each.id === act.id);
+        if (row === undefined) {
+          return;
+        }
+        const show = (lines: string[]) => updateTools((now) => ({ ...now, log: { title: `${row.title} · log`, lines } }));
+        client.mcpLogs(row.name).then((logs) => show(logs.lines.map(formatLogLine)), (error: unknown) => show([messageOf(error)]));
+        return;
+      }
+    }
+  }
+
   function onProviderKey(ui: SetupUi, window: SetupWindow & { view: "panel" }, key: SetupKey): void {
     if (key === "back") {
-      goSetup(advance(window, { kind: "cancelled" }, ollamaFacts()), ui);
+      goSetup(advance(window, { kind: "cancelled" }, setupFacts()), ui);
       return;
     }
     if (key !== "up" && key !== "down" && key !== "enter") {
@@ -2164,7 +2369,7 @@ export function App({
       showSetup({ ...ui, provider: pressed.selected });
       return;
     }
-    goSetup(advance(window, { kind: "provider", provider: pressed.provider }, ollamaFacts()), {
+    goSetup(advance(window, { kind: "provider", provider: pressed.provider }, setupFacts()), {
       ...ui,
       provider: pressed.selected,
       hosted: pressed.provider,
@@ -2203,7 +2408,7 @@ export function App({
     showSetup({ ...ui, key: pressed.state });
     const effect = pressed.effect;
     if (effect.kind === "back") {
-      goSetup(advance(window, { kind: "cancelled" }, ollamaFacts()), ui);
+      goSetup(advance(window, { kind: "cancelled" }, setupFacts()), ui);
       return;
     }
     if (effect.kind !== "check") {
@@ -2224,7 +2429,7 @@ export function App({
               return;
             }
             const name = hostedProvider(effect.provider)?.name ?? effect.provider;
-            goSetup(advance(now.window, { kind: "done" }, ollamaFacts()), {
+            goSetup(advance(now.window, { kind: "done" }, setupFacts()), {
               ...now,
               overview: { ...now.overview, notice: `${name} key saved` },
             });
@@ -2344,7 +2549,7 @@ export function App({
         void client.cancelOllamaInstall().catch(() => undefined);
         break;
       case "back":
-        goSetup(advance(window, { kind: "cancelled" }, ollamaFacts()), ui);
+        goSetup(advance(window, { kind: "cancelled" }, setupFacts()), ui);
         break;
       case "none":
         break;
@@ -2372,10 +2577,10 @@ export function App({
           // The download goes on in the band, and the model is used once it is in.
           useAfterPull.current.set(ui.model.ref, { setDefault: true });
         }
-        goSetup(advance({ ...window, panel: "model" }, { kind: "background" }, ollamaFacts()), ui);
+        goSetup(advance({ ...window, panel: "model" }, { kind: "background" }, setupFacts()), ui);
         break;
       case "back":
-        goSetup(advance(window, { kind: "cancelled" }, ollamaFacts()), ui);
+        goSetup(advance(window, { kind: "cancelled" }, setupFacts()), ui);
         break;
       case "none":
         break;
@@ -2424,7 +2629,7 @@ export function App({
         return;
       }
     }
-    goSetup(advance(ui.window, { kind: "done" }, ollamaFacts()), settled);
+    goSetup(advance(ui.window, { kind: "done" }, setupFacts()), settled);
   }
 
   function updateService(change: (state: ServiceState) => ServiceState): void {
@@ -2510,7 +2715,7 @@ export function App({
     const asModel: SetupWindow = { ...ui.window, panel: "model" };
     // Back on the overview, it says what changed.
     const overview = { ...ui.overview, notice: `default is now ${label}` };
-    goSetup(advance(asModel, { kind: "done" }, ollamaFacts()), { ...ui, ready, overview });
+    goSetup(advance(asModel, { kind: "done" }, setupFacts()), { ...ui, ready, overview });
   }
 
   /** Read `setup.status` again for the overview and the band. */
@@ -2559,6 +2764,10 @@ export function App({
       } else if (input !== null) {
         onKeyInput(ui, ui.window, input);
       }
+      return;
+    }
+    if (ui !== null && ui.quit === null && ui.window.view === "panel" && ui.window.panel === "tools") {
+      onToolsPress(ui, press);
       return;
     }
     const key = setupKeyOf(press);
@@ -2623,7 +2832,7 @@ export function App({
     const now = Date.now();
     if (key === "back" && ui.service.phase !== "confirm") {
       if (ui.service.phase !== "starting" && ui.service.phase !== "running") {
-        goSetup(advance(ui.window, { kind: "cancelled" }, ollamaFacts()), ui);
+        goSetup(advance(ui.window, { kind: "cancelled" }, setupFacts()), ui);
       }
       return;
     }
@@ -2658,7 +2867,7 @@ export function App({
 
   function onEngineKey(ui: SetupUi, window: SetupWindow & { view: "panel" }, key: SetupKey): void {
     if (key === "back") {
-      goSetup(advance(window, { kind: "cancelled" }, ollamaFacts()), ui);
+      goSetup(advance(window, { kind: "cancelled" }, setupFacts()), ui);
       return;
     }
     if (key !== "up" && key !== "down" && key !== "enter") {
@@ -2671,7 +2880,7 @@ export function App({
       return;
     }
     const path = result.kind === "key" ? "key" : "local";
-    goSetup(advance(window, result, ollamaFacts()), { ...ui, engine: pressed.selected, path });
+    goSetup(advance(window, result, setupFacts()), { ...ui, engine: pressed.selected, path });
   }
 
   function onOverviewKey(ui: SetupUi, key: SetupKey): void {
@@ -2739,7 +2948,7 @@ export function App({
   }
 
   /** What the window shows now, and which hints go with it. */
-  function setupView(ui: SetupUi, now: number): { lines: SetupLine[]; screen: SetupScreen } {
+  function setupView(ui: SetupUi, now: number): { lines: SetupLine[]; screen: SetupScreen; adds?: number } {
     if (ui.quit !== null) {
       return { lines: quitLines(ui.quit), screen: "quit" };
     }
@@ -2787,10 +2996,16 @@ export function App({
           lines: keyLines(ui.key, now),
           screen: ui.key.phase === "typing" ? "key-typing" : ui.key.phase === "found" ? "provider" : "service-wait",
         };
+      case "tools":
+        return toolsView(ui.tools);
       case "ready": {
         const runner = serviceRunner();
         const service = runner === "launchd" ? "running, starts at login" : runner === "window" ? "running while this terminal is open" : "running";
-        return { lines: readyLines({ service, ...(ui.ready ?? { engine: "", model: "" }) }), screen: "ready" };
+        return { lines: readyLines({
+            service,
+            ...(ui.ready ?? { engine: "", model: "" }),
+            tools: toolsReadyText(ui.toolsRan, mcpFactsRef.current.names),
+          }), screen: "ready" };
       }
       default:
         return { lines: [], screen: "ready" };
@@ -3808,6 +4023,8 @@ export function App({
       // Only the Key panel takes a paste: the key.
       if (ui.window.view === "panel" && ui.window.panel === "key") {
         onKeyInput(ui, ui.window, { kind: "text", text });
+      } else if (ui.window.view === "panel" && ui.window.panel === "tools" && ui.quit === null && toolsTyping(ui.tools)) {
+        showSetup({ ...ui, tools: pressTools(ui.tools, { kind: "text", text }).ui });
       }
       return;
     }
@@ -3902,8 +4119,9 @@ export function App({
     return (
       <SetupFrame
         window={setup.window}
+        facts={setupFacts()}
         lines={shown.lines}
-        hint={setupHint(shown.screen, setup.window)}
+        hint={setupHint(shown.screen, setup.window, shown.adds ?? 0)}
         version={`golem ${GOLEM_VERSION}`}
         columns={size.columns || 80}
         rows={rows}

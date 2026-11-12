@@ -1,11 +1,12 @@
 import { Box, Text } from "ink";
 
-import { shortStepper, type SetupLine, type SetupWindow } from "@golem/view";
+import { shortStepper, type SetupFacts, type SetupLine, type SetupWindow } from "@golem/view";
 
 import {
   compactSetup,
   labelWidth,
   lineSpans,
+  rowWidth,
   setupInner,
   SETUP_WIDTH,
   shortHint,
@@ -72,6 +73,7 @@ function Hint({ text }: { text: string }) {
 /** The setup window on an empty screen: no logo, composer, or status bar behind it. */
 export function SetupFrame({
   window,
+  facts,
   lines,
   hint,
   version,
@@ -80,6 +82,7 @@ export function SetupFrame({
   frame,
 }: {
   window: SetupWindow;
+  facts?: SetupFacts;
   lines: readonly SetupLine[];
   hint: string;
   version: string;
@@ -90,9 +93,9 @@ export function SetupFrame({
   const compact = compactSetup(columns, rows);
   const inner = setupInner(columns, rows);
   const labels = labelWidth(lines);
-  const steps = stepperSpans(window);
+  const steps = stepperSpans(window, facts);
   const short = shortStepper(window);
-  const body = lines.map((line, index) => <Line key={index} spans={lineSpans(line, inner, frame, labels)} />);
+  const body = lines.map((line, index) => <Line key={index} spans={lineSpans(line, inner, frame, labels, rowWidth(lines))} />);
   if (compact) {
     return (
       <Box flexDirection="column" width={columns} height={rows} overflow="hidden">
