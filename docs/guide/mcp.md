@@ -22,6 +22,12 @@ A server you already added says so, and one that can't be added says why. Server
 
 `/mcp add github` goes straight to that server. With no servers yet, `/mcp` shows the same list. In the web UI, **Add a server** in Settings → MCP servers does the same, and `/mcp add [id]` opens it.
 
+### In the setup window
+
+The first time you set golem up, and only when your `config.toml` has no `[mcp]` table, the setup window offers some tools after the model step: Fetch, Context7, and Playwright ticked, and GitHub unticked. Space ticks one, and Enter adds the ticked ones. A server that needs Node or uv installs it first, and each row says what it is doing, then `added · N tools · on demand`. Ticking GitHub asks for a token, hidden, and an empty token skips it. A server that fails says why, and the others stay added: paste a new token, or skip it. You can skip the whole offer.
+
+Every server is added **on demand**, so none costs a token until a chat turns it on. `/setup`, then Tools, opens the same list later, with the servers you have shown as added. `/mcp` manages them any time.
+
 ### From a terminal
 
 Run `golem mcp add`. Put the server's command after `--`:

@@ -102,7 +102,7 @@ test("a fresh home opens guided setup on Engine, with the stepper", async () => 
   expect(list?.textContent).toContain("Service (done)");
   expect(list?.textContent).toContain("Engine (current step)");
   expect(list?.textContent).toContain("Model (to do)");
-  expect(within(open).getByText(/Step 2\/4 Engine/)).toBeTruthy();
+  expect(within(open).getByText(/Step 2\/5 Engine/)).toBeTruthy();
 });
 
 test("a default that is gone opens the Model panel alone, naming it, with no stepper", async () => {

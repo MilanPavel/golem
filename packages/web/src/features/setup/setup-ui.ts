@@ -209,6 +209,9 @@ export function panelView(ui: SetupUi, ctx: PanelContext): PanelView {
         offset: shown === null ? 0 : firstShown(state.selected, count),
       });
     }
+    case "tools":
+      // Not drawn yet: the window never reaches Tools until the page passes the facts that offer it.
+      return view("tools", [], "Esc back");
     case "ready": {
       const summary = ui.ready ?? { engine: "", model: "" };
       const keptText = service.state === "ok" ? "running, starts at login" : "running";
