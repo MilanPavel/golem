@@ -44,6 +44,8 @@ export const QUESTION =
   "  q      quit\n";
 
 export const LATER = "golem's service is not running. Run golem install when you want it.\n";
+export const STARTING = "Starting golem's service… (the first start can take a few seconds)\n";
+export const STARTING_PAGE = "Starting the web page…\n";
 export const STARTED = "✓ golem's service runs, now and at every login\n";
 export const PAGE_STARTED = "✓ the web page runs, now and at every login\n";
 export const NO_PAGE = "the web page did not answer. See logs/web.stderr.log in ~/.golem.\n";
@@ -77,6 +79,7 @@ export async function gateService(gate: Gate): Promise<GateResult> {
     gate.write(LATER);
     return { kind: "exit", code: 0 };
   }
+  gate.write(STARTING);
   if (choice === "install") {
     if (!(await gate.install())) {
       return { kind: "exit", code: 1 };
@@ -86,6 +89,7 @@ export async function gateService(gate: Gate): Promise<GateResult> {
       return { kind: "exit", code: 1 };
     }
     gate.write(STARTED);
+    gate.write(STARTING_PAGE);
     if (!(await gate.waitForPage())) {
       gate.write(NO_PAGE);
       return { kind: "exit", code: 1 };
