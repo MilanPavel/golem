@@ -3,5 +3,5 @@ export { closeModelDialog, openModelDialog, useModelDialogOpen, type ModelDialog
 export { listRows, ModelList, type ModelListNote, type ModelListProps, type ModelListRow } from "./model-list.tsx";
 export { NewSessionModelDialog } from "./new-session-dialog.tsx";
 export { PullBar } from "./pull-bar.tsx";
-export { pullShare, pullSummary, pullText, shortName, withActivePulls, type PullSummary } from "./model-text.ts";
+export { pullShare, pullSummary, pullText, shortName, tooBigText, withActivePulls, type PullSummary } from "./model-text.ts";
 export { PullStatus, PullStatusView, type PullStatusViewProps } from "./pull-status.tsx";

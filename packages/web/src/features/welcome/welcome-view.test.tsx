@@ -2,7 +2,7 @@ import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
 import { expect, test, vi } from "vitest";
-import { DEFAULT_GONE, engineProps, INSTALL_OUTPUT, modelProps, readyProps, WELCOME_CASES, welcomeProps } from "./sample.ts";
+import { DEFAULT_GONE, engineProps, INSTALL_OUTPUT, MODEL_LISTING, modelProps, readyProps, WELCOME_CASES, welcomeProps } from "./sample.ts";
 import { nextStep, stepStates } from "./welcome-steps.ts";
 import { WelcomeView } from "./welcome-view.tsx";
 
@@ -167,20 +167,91 @@ test("a saved key is done: no command, and Continue is enabled", () => {
   expect((screen.getByRole("button", { name: "Continue" }) as HTMLButtonElement).disabled).toBe(false);
 });
 
-test("Model, a placeholder: choose opens the list, and Continue waits for a model or a download", async () => {
+test("Model: the recommended row is selected, the models that fit lead with a time and a reason, and the rest sit behind Show all", async () => {
   const user = userEvent.setup();
-  const onChoose = vi.fn();
-  const view = render(<WelcomeView {...welcomeProps("model", { model: modelProps({ onChoose }) })} />);
+  render(<WelcomeView {...welcomeProps("model")} />);
   expect(screen.getByRole("heading", { level: 2, name: "Pick a model" })).toBeTruthy();
-  expect((screen.getByRole("button", { name: "Continue" }) as HTMLButtonElement).disabled).toBe(true);
-  await user.click(screen.getByRole("button", { name: "Choose a model…" }));
-  expect(onChoose).toHaveBeenCalledTimes(1);
-  view.rerender(<WelcomeView {...welcomeProps("model", { model: modelProps({ download: { id: "qwen3.5:4b", share: 0.34, text: "34% · 2 min" } }) })} />);
-  expect(screen.getByRole("progressbar", { name: "Downloading qwen3.5:4b" }).getAttribute("aria-valuenow")).toBe("34");
-  expect((screen.getByRole("button", { name: "Continue" }) as HTMLButtonElement).disabled).toBe(false);
-  view.rerender(<WelcomeView {...welcomeProps("model", { model: modelProps({ current: "qwen3.5:4b" }) })} />);
-  expect(screen.getByText("qwen3.5:4b · default")).toBeTruthy();
-  expect((screen.getByRole("button", { name: "Continue" }) as HTMLButtonElement).disabled).toBe(false);
+  expect(screen.getByText("It downloads in the background. You can keep going while it does.")).toBeTruthy();
+  expect(screen.getByText("Fits this Mac · 16 GB memory")).toBeTruthy();
+  const options = screen.getAllByRole("option");
+  // Four models fit; the group shows the recommended one and the next two.
+  expect(options).toHaveLength(3);
+  expect(screen.queryByText("Qwen3 8B")).toBeNull();
+  expect(options[0]?.textContent).toContain("Qwen3.5 4B");
+  expect(options[0]?.textContent).toContain("recommended");
+  expect(options[0]?.textContent).toContain("≈ 2 min");
+  expect(options[0]?.textContent).toContain("The one golem suggests for this Mac.");
+  expect(options[0]?.getAttribute("aria-selected")).toBe("true");
+  expect(screen.getByRole("button", { name: "Download and continue" })).toBeTruthy();
+  await user.click(screen.getByRole("button", { name: "Show all 7 models" }));
+  expect(screen.getAllByRole("option")).toHaveLength(7);
+});
+
+test("Model: a download or default outside the top three joins the leading group after the recommended one", () => {
+  // Qwen3 8B is the fourth that fits, so it is not in the three; it is downloading.
+  const entry = { track: { completed: 1, total: 5_200_000_000, samples: [] }, status: "pulling", progress: 0.1 };
+  render(<WelcomeView {...welcomeProps("model", { model: modelProps({ pulls: { active: new Map([["ollama/qwen3:8b", entry]]), failed: new Map() } }) })} />);
+  const options = screen.getAllByRole("option");
+  expect(options).toHaveLength(4);
+  expect(options[0]?.textContent).toContain("Qwen3.5 4B");
+  expect(options[1]?.textContent).toContain("Qwen3 8B");
+  expect(options[1]?.getAttribute("aria-selected")).toBe("true");
+  expect(screen.getByRole("button", { name: "Show all 7 models" })).toBeTruthy();
+});
+
+test("Model: no time estimate until a download has been measured", () => {
+  render(<WelcomeView {...welcomeProps("model", { model: modelProps({ speed: null }) })} />);
+  expect(screen.getAllByRole("option")[0]?.textContent).not.toContain("≈");
+});
+
+test("Model: Download and continue starts the pull of the selected row, and a refusal stays on the step", async () => {
+  const user = userEvent.setup();
+  const onDownload = vi.fn().mockRejectedValueOnce(new Error("no space")).mockResolvedValue(undefined);
+  render(<WelcomeView {...welcomeProps("model", { model: modelProps({ onDownload }) })} />);
+  await user.click(screen.getByRole("button", { name: "Download and continue" }));
+  expect(onDownload).toHaveBeenCalledWith(expect.objectContaining({ ref: "ollama/qwen3.5:4b" }));
+  expect((await screen.findByRole("alert")).textContent).toContain("no space");
+  await user.click(screen.getByRole("option", { name: /Gemma 4 12B/ }));
+  expect(screen.queryByRole("alert")).toBeNull();
+  await user.click(screen.getByRole("button", { name: "Download and continue" }));
+  expect(onDownload).toHaveBeenLastCalledWith(expect.objectContaining({ ref: "ollama/gemma4:12b" }));
+});
+
+test("Model: a model too big cannot be downloaded from here", async () => {
+  const user = userEvent.setup();
+  render(<WelcomeView {...welcomeProps("model")} />);
+  await user.click(screen.getByRole("button", { name: "Show all 7 models" }));
+  await user.click(screen.getByRole("option", { name: /Qwen3 32B/ }));
+  expect(screen.getByText("qwen3:32b (20 GB) is too big for 16 GB of memory.")).toBeTruthy();
+  expect((screen.getByRole("button", { name: "Download and continue" }) as HTMLButtonElement).disabled).toBe(true);
+});
+
+test("Model: an installed model is Continue, and sets the default", async () => {
+  const user = userEvent.setup();
+  const onUse = vi.fn().mockResolvedValue(undefined);
+  const listing = {
+    ...MODEL_LISTING,
+    models: MODEL_LISTING.models.map((each) => (each.ref === "ollama/qwen3.5:4b" ? { ...each, status: "ready" as const, source: "installed" as const } : each)),
+  };
+  render(<WelcomeView {...welcomeProps("model", { model: modelProps({ listing, onUse }) })} />);
+  await user.click(screen.getByRole("button", { name: "Continue" }));
+  expect(onUse).toHaveBeenCalledWith(expect.objectContaining({ ref: "ollama/qwen3.5:4b" }));
+});
+
+test("Model: a running download shows its bar and Stop in the row, is selected, and Continue goes on", async () => {
+  const user = userEvent.setup();
+  const onContinue = vi.fn();
+  const onStop = vi.fn().mockResolvedValue(undefined);
+  const props = WELCOME_CASES.find((each) => each.label === "Model, downloading")?.props ?? welcomeProps("model");
+  render(<WelcomeView {...props} model={{ ...props.model, onContinue, onStop }} />);
+  const row = screen.getAllByRole("option")[0] as HTMLElement;
+  expect(row.getAttribute("aria-selected")).toBe("true");
+  expect(within(row).getByRole("progressbar", { name: "Downloading qwen3.5:4b" }).getAttribute("aria-valuenow")).toBe("34");
+  // Stop is a shortcut for the mouse, so it is hidden from the accessibility tree.
+  await user.click(within(row).getByText("Stop"));
+  expect(onStop).toHaveBeenCalledWith(expect.objectContaining({ ref: "ollama/qwen3.5:4b" }));
+  await user.click(screen.getByRole("button", { name: "Continue" }));
+  expect(onContinue).toHaveBeenCalledTimes(1);
 });
 
 test("?step=model with a default that is gone: Engine done, Tools skipped, and the banner names the model", () => {
