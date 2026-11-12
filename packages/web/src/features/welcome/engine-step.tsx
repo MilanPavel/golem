@@ -10,8 +10,8 @@ import { StepCard, Working } from "./step-card.tsx";
 
 export type EngineChoice = "local" | "key";
 
-/** Where Ollama is, as the card draws it. `no_brew` has no Homebrew to install it with. */
-export type OllamaPhase = "missing" | "installing" | "starting" | "no_brew" | "stopped" | "running";
+/** Where Ollama is, as the card draws it. `no_brew` has no Homebrew to install it with. `stray` is a server left from an install that was removed. */
+export type OllamaPhase = "missing" | "installing" | "starting" | "no_brew" | "stopped" | "stray" | "running";
 
 export type EngineStepProps = {
   choice: EngineChoice;
@@ -111,6 +111,22 @@ function OllamaCard({ props }: { props: EngineStepProps }) {
             </Button>
           }
         >
+          {alert}
+        </StepCard>
+      );
+    case "stray":
+      return (
+        <StepCard
+          mark="attn"
+          name="Ollama"
+          detail="Ollama is still running from an install that was removed. Quit it, then install Ollama again."
+          fix={
+            <Button size="sm" kind="ink" disabled={actions.running !== null} onClick={onInstall}>
+              Install Ollama
+            </Button>
+          }
+        >
+          <p className="text-sm text-muted">The models you downloaded are kept.</p>
           {alert}
         </StepCard>
       );

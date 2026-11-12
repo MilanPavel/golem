@@ -124,6 +124,17 @@ test("a stopped Ollama has a Start button", async () => {
   expect(onStart).toHaveBeenCalledTimes(1);
 });
 
+test("an Ollama left from a removed install is not ready, and Install Ollama is the fix", async () => {
+  const user = userEvent.setup();
+  const onInstall = vi.fn();
+  render(<WelcomeView {...welcomeProps("engine", { engine: engineProps({ ollama: "stray", onInstall }) })} />);
+  expect(screen.getByText("Ollama is still running from an install that was removed. Quit it, then install Ollama again.")).toBeTruthy();
+  expect(screen.queryByText(/Running/)).toBeNull();
+  await user.click(screen.getByRole("button", { name: "Install Ollama" }));
+  expect(onInstall).toHaveBeenCalledTimes(1);
+  expect((screen.getByRole("button", { name: "Continue" }) as HTMLButtonElement).disabled).toBe(true);
+});
+
 test("Ollama running says so, with no models yet, and Continue is enabled and has focus", async () => {
   const user = userEvent.setup();
   const onContinue = vi.fn();

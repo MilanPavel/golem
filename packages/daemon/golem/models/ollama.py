@@ -86,6 +86,11 @@ def down_text(is_installed: bool) -> str:
     return f"{message}: {hint}"
 
 
+STRAY_MESSAGE = "Ollama is still running from an install that was removed"
+STRAY_HINT = "quit it, then install Ollama again"
+STRAY_TEXT = f"{STRAY_MESSAGE}. {STRAY_HINT[0].upper()}{STRAY_HINT[1:]}."
+
+
 class Process(Protocol):
     """What :class:`LocalServer` needs of the process it started."""
 
@@ -176,6 +181,10 @@ class LocalServer:
         if self._process is not None and self._process.returncode is not None:
             return None
         return LocalServerStatus(self.provider, self.base_url, self._owner, self._pid)
+
+    def installed(self) -> bool:
+        """True when there is an ``ollama`` binary this server could start."""
+        return self._find_binary() is not None
 
     async def ensure_running(self) -> bool:
         """True when the server answers, after starting it if golem may.

@@ -19,8 +19,9 @@ import os
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Literal, cast
 
+import httpx
 from langchain_core.language_models import BaseChatModel
 
 from golem.config import (
@@ -394,6 +395,34 @@ class ModelRouter:
             f"{name} is not answering", provider=name, hint="check your network connection"
         )
 
+    async def refused(self, profile: str, exc: BaseException) -> ModelUnreachable | None:
+        """``exc`` as :class:`ModelUnreachable` when Ollama says "not found" for a model it lists.
+
+        A server left from a removed install lists the models in ``~/.ollama``
+        and answers 404 when asked to run one, because it cannot start a runner.
+        A 404 for a model the server does not list is a model not downloaded,
+        which is not mapped here.
+        """
+        if getattr(exc, "status_code", None) != 404 or type(exc).__name__ != "ResponseError":
+            return None
+        try:
+            resolved = self.resolve(profile)
+        except ModelConfigError:
+            return None
+        if resolved.provider.kind != "ollama":
+            return None
+        url = _ollama_url(resolved.provider.base_url)
+        if not await _lists(url, resolved.model_id):
+            return None
+        name = resolved.provider_name
+        if ollama.is_local(url) and not ollama.installed():
+            return ModelUnreachable(
+                ollama.STRAY_MESSAGE, provider=name, hint=ollama.STRAY_HINT, code="not_installed"
+            )
+        return ModelUnreachable(
+            f"Ollama can't load {resolved.model_id}", provider=name, hint="restart Ollama"
+        )
+
     def provider(self, name: str) -> Provider | None:
         """The provider called ``name`` after presets and config, or None."""
         return self.providers().get(name)
@@ -515,6 +544,29 @@ def _merge(preset: Provider | None, configured: ProviderSettings) -> Provider:
         base_url=configured.base_url or preset.base_url,
         api_key_env=configured.api_key_env or preset.api_key_env,
     )
+
+
+async def _lists(url: str, model: str) -> bool:
+    """True when the Ollama at ``url`` lists ``model`` in ``/api/tags``."""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f"{url}/api/tags", timeout=2.0)
+            response.raise_for_status()
+            body: object = response.json()
+    except (httpx.HTTPError, ValueError):
+        return False
+    if not isinstance(body, dict):
+        return False
+    models = cast("dict[str, object]", body).get("models")
+    if not isinstance(models, list):
+        return False
+    wanted = model if ":" in model else f"{model}:latest"
+    for item in cast("list[object]", models):
+        if isinstance(item, dict):
+            name = cast("dict[str, object]", item).get("name")
+            if isinstance(name, str) and name in (model, wanted):
+                return True
+    return False
 
 
 _CONNECT_ERRORS = frozenset({"ConnectError", "ConnectTimeout"})

@@ -141,6 +141,7 @@ class ModelSetup:
     ollama_running: bool
     keys: tuple[str, ...]
     default_status: DefaultStatus | None
+    ollama_stray: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -199,6 +200,8 @@ class _ProviderResult:
     stale: bool = False
     # A local server whose program is not on this machine.
     missing: bool = False
+    # ...and that still answers, from an install that was removed.
+    stray: bool = False
 
 
 class ModelDiscovery:
@@ -377,6 +380,7 @@ class ModelDiscovery:
             ollama_running=running,
             keys=tuple(sorted(name for name, key in keys.items() if key is not None)),
             default_status=_default_status(models, default),
+            ollama_stray=any(result.stray for result in results.values()),
         )
         return ModelListing(
             default=default,
@@ -666,6 +670,11 @@ class ModelDiscovery:
             log.debug("ollama at %s is not answering: %s", base, exc)
             missing = ollama.is_local(base) and not self._ollama_installed()
             return _ProviderResult(up=False, missing=missing)
+        installed = server.installed if server is not None else self._ollama_installed
+        if ollama.is_local(base) and not await asyncio.to_thread(installed):
+            # It lists models it cannot load: there is nothing to run them with.
+            log.info("ollama at %s answers, but no ollama binary is installed", base)
+            return _ProviderResult(up=False, missing=True, stray=True)
         found = await asyncio.gather(*(self._ollama_model(client, base, item) for item in items))
         return _ProviderResult(found=[model for model in found if model is not None])
 

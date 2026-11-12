@@ -263,6 +263,22 @@ def test_without_ollama_installed_the_fix_installs_it(
     assert checks[-1] == Check("ollama", "fail", "Ollama is not installed", fix)
 
 
+def test_an_ollama_answering_with_no_install_is_not_ready(tmp_path: Path) -> None:
+    checks = _models(
+        tmp_path,
+        "default_model = 'ollama/qwen3:8b'\n",
+        FakePlatform(ollama=["qwen3:8b"], commands=set()),
+    )
+    last = checks[-1]
+    assert (last.name, last.status, last.detail) == (
+        "ollama",
+        "fail",
+        "Ollama is still running from an install that was removed",
+    )
+    assert last.action == "install_ollama"
+    assert "quit it, then install Ollama again" in (last.fix or "")
+
+
 def test_an_ollama_on_another_machine_is_not_started(tmp_path: Path) -> None:
     config = (
         "default_model = 'ollama/qwen3:8b'\n"
