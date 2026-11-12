@@ -19,6 +19,7 @@ import sys
 import tempfile
 import threading
 import time
+import urllib.error
 import urllib.request
 from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -160,6 +161,35 @@ def check_web(tree: Path, env: dict[str, str], home: Path) -> bool:
     return ok
 
 
+def check_manifest(base: str) -> list[str]:
+    """Problems with the web app manifest and the icons it lists."""
+    try:
+        status, headers, body = http_get(f"{base}/manifest.webmanifest")
+    except OSError as exc:
+        return [f"GET /manifest.webmanifest failed: {exc}"]
+    problems: list[str] = []
+    if status != 200:
+        problems.append(f"GET /manifest.webmanifest was {status}")
+    if headers.get("content-type") != "application/manifest+json":
+        problems.append(f"manifest content-type was {headers.get('content-type')!r}")
+    if headers.get("cache-control") != "no-cache":
+        problems.append(f"manifest cache-control was {headers.get('cache-control')!r}")
+    try:
+        icons = json.loads(body)["icons"]
+        sources = [icon["src"] for icon in icons]
+    except (ValueError, KeyError, TypeError):
+        return [*problems, "the manifest is not JSON with icons[].src"]
+    for src in sources:
+        try:
+            i_status, i_headers, _ = http_get(f"{base}{src}")
+        except OSError as exc:
+            problems.append(f"GET {src} failed: {exc}")
+            continue
+        if i_status != 200 or i_headers.get("content-type") != "image/png":
+            problems.append(f"{src} was {i_status} {i_headers.get('content-type')!r}")
+    return problems
+
+
 def check_web_page(info: object) -> bool:
     if not isinstance(info, dict):
         print(f"golem web --json printed {info!r}", file=sys.stderr)
@@ -200,6 +230,14 @@ def check_web_page(info: object) -> bool:
                 problems.append(f"{script} content-type was {kind!r}")
             if "immutable" not in s_headers.get("cache-control", ""):
                 problems.append(f"{script} cache-control was {s_headers.get('cache-control')!r}")
+    problems.extend(check_manifest(base))
+    try:
+        http_get(f"{base}/sw.js")
+    except urllib.error.HTTPError as exc:
+        if exc.code != 404:
+            problems.append(f"GET /sw.js was {exc.code}, not 404")
+    else:
+        problems.append("GET /sw.js was served, there must be no service worker")
     _, _, health = http_get(f"{base}/healthz")
     reported = json.loads(health).get("pid")
     if reported != pid:

@@ -3,7 +3,7 @@
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "lib": ["ES2022"],
+    "lib": ["ES2022", "DOM"],
     "strict": true,
     "noEmit": true,
     "skipLibCheck": true,
@@ -11,7 +11,8 @@
     "noUncheckedIndexedAccess": true,
     "isolatedModules": true,
     "allowImportingTsExtensions": true,
-    "types": ["node"]
+    "jsx": "react-jsx",
+    "types": ["node", "vite/client"]
   },
-  "include": ["vite.config.ts", "src/lint-rules.test.ts", "src/styles/no-arbitrary.test.ts", "src/styles/tokens.test.ts", "src/features/tab-status/favicon-tokens.test.ts"]
+  "include": ["vite.config.ts", "src/lint-rules.test.ts", "src/styles/no-arbitrary.test.ts", "src/styles/tokens.test.ts", "src/features/tab-status/favicon-tokens.test.ts", "src/pwa/*.test.ts", "scripts/gen-icons.ts"]
 }
