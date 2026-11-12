@@ -1,4 +1,4 @@
-import { constants } from "node:fs";
+import { constants, lstatSync } from "node:fs";
 import { lstat, open, unlink } from "node:fs/promises";
 import type { Stats } from "node:fs";
 import os from "node:os";
@@ -23,14 +23,18 @@ function ownedByMe(st: Stats): boolean {
 }
 
 /** `run/` must be a real directory owned by the user that nobody else can write to. */
-export async function checkRunDir(dir: string): Promise<void> {
+export function checkRunDirSync(dir: string): void {
   const fix = `Fix: chmod 700 ${dir}`;
-  const st = await lstat(dir);
+  const st = lstatSync(dir);
   if (st.isSymbolicLink() || !st.isDirectory()) {
     throw new Error(`${dir} must be a real directory, not a link or a file. ${fix}`);
   }
   if (!ownedByMe(st)) throw new Error(`${dir} is not owned by this user. ${fix}`);
   if ((st.mode & 0o022) !== 0) throw new Error(`${dir} can be written by others. ${fix}`);
+}
+
+export async function checkRunDir(dir: string): Promise<void> {
+  checkRunDirSync(dir);
 }
 
 /** Writes a token, a new one unless given. An old file is from a gateway that stopped. */

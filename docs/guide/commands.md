@@ -41,6 +41,7 @@ golem has commands in two places: `golem …` in your shell, and `/…` inside t
 | `golem skills` | The skills this folder sees, and why one is not used. `golem skills list` is the same |
 | `golem skills check <path>` | Checks a skill, its `SKILL.md`, or a folder of skills. Needs no daemon |
 | `golem web` | Serves the chat in your browser on 127.0.0.1, until Ctrl-C |
+| `golem web logout` | Signs every browser out of the web UI |
 
 `golem web` takes three options:
 

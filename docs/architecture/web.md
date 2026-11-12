@@ -133,7 +133,7 @@ The same rules are tests. `packages/gateway/src/framing.test.ts` and `auth.test.
 
 **An allowlist, generated from the protocol.** Each command declares whether a browser may call it, and `just gen` writes the list. A test fails when the daemon answers a method nobody declared, so a new command such as `daemon.shutdown` can't reach the browser by accident. A denylist would be shorter today, and every new privileged command would be open on the day it lands.
 
-**A token in the fragment, then a cookie of the gateway's own.** The token travels only in the address after `#` and in one `POST` body. The cookie holds a secret that lives only in the gateway's memory, named after the port (`golem_7480`), `HttpOnly` and `SameSite=Strict`. A local dev server on another port that receives it can't use it without the right `Origin`. The cost: a restarted gateway forgets every secret, and the page asks for a fresh link.
+**A token in the fragment, then a cookie of the gateway's own.** The token travels only in the address after `#` and in one `POST` body. The cookie holds a secret that the gateway keeps only as a hash on disk, named after the port (`golem_7480`), `HttpOnly` and `SameSite=Strict`. A local dev server on another port that receives it can't use it without the right `Origin`. The cost: a file of hashes in `run/`, which gives a program running as you nothing it cannot already get.
 
 **A 4401 close, not an HTTP 401.** A browser reports a refused upgrade only as a generic failure, the same as a network error, and the client would retry forever. A socket that opens and closes with 4401 lets the page stop and say what to run.
 
@@ -148,7 +148,7 @@ The same rules are tests. `packages/gateway/src/framing.test.ts` and `auth.test.
 1. Run `golem web`. The page opens on `127.0.0.1:7480`, and the address bar no longer shows `#t=` once the page has loaded.
 2. Run `golem` in a terminal in the same folder, and ask something there. The browser's sidebar shows the session working, and opening it shows the same answer streaming.
 3. Open `http://localhost:7480` instead. The gateway answers `bad host`, because only `127.0.0.1` is let in.
-4. Stop `golem web` with Ctrl-C and start it again. The open tab shows "This page needs a fresh link", because the new gateway doesn't know the old cookie.
+4. Stop `golem web` with Ctrl-C and start it again, then reload the tab. It connects without a new link, because the gateway kept a hash of the cookie. Run `golem web logout` and the next request shows "This page needs a fresh link".
 5. In the page's devtools, open the Network tab and the `/ws` socket. Every frame is one protocol line, the same lines `/debug wire` shows in the TUI.
 
 ## The details
@@ -165,13 +165,13 @@ For contributors: the reference for the gateway and the page. [ADR-028](../adr/0
 | `--no-open` | Print the link, with its token, instead of opening the browser |
 | `--json` | Print `{url, port, pid}` and open nothing, for scripts |
 
-The browser is opened through `osascript` reading the link on stdin, because process arguments are visible to other users, and the link holds the token. Without `--no-open` the terminal shows the address without the token. `golem web` runs the gateway in the foreground until Ctrl-C. The gateway does not read `config.toml`.
+The browser is opened through `osascript` reading the link on stdin, because process arguments are visible to other users, and the link holds the token. Without `--no-open` the terminal shows the address without the token. `golem web` runs the gateway in the foreground until Ctrl-C. `golem web logout` signs every browser out. The gateway does not read `config.toml`.
 
 ### The token and the cookie
 
 - **The token file is the root of trust.** `web.token` holds a random 32-byte value, mode `0600`, opened with `O_EXCL` so no other file can be in its place. The gateway refuses to start when `run/` can be written by anyone but you. A new token is written each time a gateway starts, and the gateway deletes it when it stops.
 - **`POST /auth/exchange`** takes `{"token": "…"}` as `application/json`, at most 4096 bytes, and compares it in constant time. A good token gets 204 and a cookie with a fresh secret: `golem_<port>=<secret>; HttpOnly; SameSite=Strict; Path=/; Max-Age=2592000` (30 days). It has no `Secure` flag, because the page is plain `http` on `127.0.0.1`, and browsers drop a `Secure` cookie there.
-- **Secrets live only in the gateway's memory.** A gateway that restarts forgets them all.
+- **Sign-ins survive a restart.** The gateway keeps `~/.golem/run/web-sessions`: a SHA-256 of each live secret and its expiry, mode `0600`, written to a temp file and renamed (`O_EXCL`, as `web.token` is). The secret itself is never written. The gateway reads the file on each check, so a corrupt file is replaced and everyone signs in again, and `golem web logout`, which empties it, takes effect on the next request. A cookie is compared by its hash, in constant time. The code is `sessions.ts` (the store, free of Node) and `session-file.ts` (the file).
 - **The page** reads `#t=` in `takeLoginToken`, removes it with `history.replaceState` so it doesn't stay in the history, and posts it. The result of the exchange is ignored: a stale token ends in close code 4401, which shows the right screen.
 
 ### What every request is checked for

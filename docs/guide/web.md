@@ -109,7 +109,7 @@ A trace holds your prompts and files exactly as they were sent. They stay in `~/
 The page is only for you, on your Mac.
 
 - **The server listens on `127.0.0.1` only,** never on your network.
-- **The link logs you in.** It carries a one-time token after the `#`, which the page trades for a cookie and then removes from the address. Other websites you have open cannot connect: the server checks every request's origin and refuses the rest.
+- **The link logs you in.** It carries a one-time token after the `#`, which the page trades for a cookie and then removes from the address. You stay signed in for 30 days, even after the server restarts. To sign every browser out, run `golem web logout`. Other websites you have open cannot connect: the server checks every request's origin and refuses the rest.
 - **The daemon does not change.** It still listens only on its private socket. The server in `golem web` stands in front of it, and passes on only what a browser may ask for.
 
 ## Install as an app
@@ -129,7 +129,7 @@ The page shows a full screen, with the command to run:
 
 | What you see | What to do |
 |---|---|
-| This page needs a fresh link | The server restarted, or the link is old. Run `golem web` again |
+| This page needs a fresh link | The link is old, the sign-in is over 30 days old, or you ran `golem web logout`. Run `golem web` again |
 | golem's daemon is not running | Run `golem daemon start`. The page reconnects by itself |
 | The daemon is older than this page | Run `golem daemon restart` after an upgrade |
 

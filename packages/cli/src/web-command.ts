@@ -1,14 +1,17 @@
 import { spawn } from "node:child_process";
 
 import { resolveSocketPath } from "@golem/client/node";
-import { randomSecret } from "@golem/gateway";
+import { createSessionStore, randomSecret } from "@golem/gateway";
 import {
+  checkRunDirSync,
+  clearSessionFile,
   ensureRunDir,
   readRunFile,
   readTokenFile,
   removeRunFile,
   removeTokenFile,
   resolveRunDir,
+  sessionFilePersistence,
   writeRunFile,
   writeTokenFile,
 } from "@golem/gateway/node";
@@ -122,7 +125,13 @@ async function runGateway(args: WebArgs): Promise<number> {
   const token = randomSecret();
   let gateway: Gateway;
   try {
-    gateway = startGateway({ port: args.port, socketPath: resolveSocketPath(), token, assets: loadAssets() });
+    gateway = startGateway({
+      port: args.port,
+      socketPath: resolveSocketPath(),
+      token,
+      assets: loadAssets(),
+      sessions: createSessionStore({ persistence: sessionFilePersistence(runDir) }),
+    });
   } catch (error) {
     if (!isAddressInUse(error)) throw error;
     // A `golem web` that started at the same moment may have won the port. Reuse it only when
@@ -144,4 +153,26 @@ async function runGateway(args: WebArgs): Promise<number> {
   const stopped = stayUntilStopped(gateway, runDir);
   await show(args, gateway.port, process.pid, token, true);
   return stopped;
+}
+
+/** `golem web logout`: forgets every sign-in. A gateway that runs refuses their cookies from the next request. */
+export function runWebLogout(): number {
+  try {
+    const runDir = resolveRunDir();
+    try {
+      checkRunDirSync(runDir);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        process.stdout.write("golem web: no one is signed in\n");
+        return 0;
+      }
+      throw error;
+    }
+    clearSessionFile(runDir);
+    process.stdout.write("golem web: signed out every browser. Run golem web for a new link\n");
+    return 0;
+  } catch (error) {
+    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+    return 1;
+  }
 }
