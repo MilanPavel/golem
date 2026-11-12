@@ -5,6 +5,7 @@ import { Sidebar } from "../sessions/index.ts";
 import { SettingsScreen } from "../settings/index.ts";
 import { SetupHost } from "../setup/index.ts";
 import { TraceScreen } from "../trace/index.ts";
+import { SetupAtStart, WelcomeScreen } from "../welcome/index.ts";
 import { HomeScreen } from "./home-screen.tsx";
 import { ChatView, SessionFrame } from "./session-screen.tsx";
 
@@ -40,21 +41,26 @@ function Content() {
       );
     case "settings":
       return <SettingsScreen section={route.section} />;
+    case "welcome":
+      return <WelcomeScreen step={route.step} from={route.from} />;
     case "not-found":
       return <NotFoundScreen />;
   }
 }
 
-/** The connected page: the sidebar, and the main area for the route. */
+/** The connected page: the sidebar (not on the welcome page), and the main area for the route. */
 export function Shell() {
+  // The welcome page has no sidebar: it is laid out like home, on its own.
+  const welcome = useRoute().name === "welcome";
   return (
     <div className="flex h-dvh bg-bg text-ink">
-      <Sidebar onSearch={openPalette} />
+      {welcome ? null : <Sidebar onSearch={openPalette} />}
       <main className="flex min-w-0 flex-1 flex-col">
         <Content />
       </main>
       <PaletteHost />
       <SetupHost />
+      <SetupAtStart />
     </div>
   );
 }
