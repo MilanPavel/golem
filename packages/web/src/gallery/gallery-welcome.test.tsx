@@ -7,25 +7,27 @@ import { DIALOG_RULES, expectAxeClean, resetThemeAfterEach, showTheme } from "./
 
 resetThemeAfterEach();
 
-// One theme per test, and every state in it: the page is drawn the same in both, only the tokens change.
+// Every state in both themes: the page is drawn the same in both, only the tokens change.
 for (const theme of ["slip", "kiln"] as const) {
-  test(`the gallery's welcome page shows every step and state in ${theme}, and passes axe`, async () => {
-    showTheme(theme);
-    render(<Gallery />);
-    for (const { label } of WELCOME_CASES) {
+  // One test per case: axe is slow in jsdom, and a loop of every case in one test outgrew the timeout on CI.
+  // A timed-out test leaves axe running, so the tests after it failed with "Axe is already running".
+  for (const { label } of WELCOME_CASES) {
+    test(`the gallery's welcome page shows "${label}" in ${theme}, and passes axe`, async () => {
+      showTheme(theme);
+      render(<Gallery />);
       const group = screen.getByRole("region", { name: `Welcome, ${label}` });
       expect(within(group).getByRole("list", { name: "Setup steps" })).toBeTruthy();
       if (label === "Engine, installing Ollama") expect(group.textContent).toContain("==> Fetching ollama");
       if (label === "Model, default gone") expect(group.textContent).toContain("is no longer installed");
       if (label === "Ready, model downloading") expect(within(group).getByRole("heading", { name: "Almost ready." })).toBeTruthy();
       await expectAxeClean(group, DIALOG_RULES);
-    }
-  });
+    });
+  }
 
-  test(`the gallery's Tools panel shows the offer, GitHub ticked, adding and the Settings card in ${theme}, and passes axe`, async () => {
-    showTheme(theme);
-    render(<Gallery />);
-    for (const { label } of TOOLS_CASES) {
+  for (const { label } of TOOLS_CASES) {
+    test(`the gallery's Tools panel shows "${label}" in ${theme}, and passes axe`, async () => {
+      showTheme(theme);
+      render(<Gallery />);
       const group = screen.getByRole("region", { name: label });
       if (label === "Tools, the offer") expect(within(group).getByRole("button", { name: "Add 3" })).toBeTruthy();
       if (label === "Tools, GitHub ticked") expect((within(group).getByLabelText("GitHub token") as HTMLInputElement).type).toBe("password");
@@ -36,8 +38,8 @@ for (const theme of ["slip", "kiln"] as const) {
       }
       if (label === "Tools, Settings card") expect(group.textContent).toContain("Tools · 1 server");
       await expectAxeClean(group, DIALOG_RULES);
-    }
-  });
+    });
+  }
 
   test(`the gallery's empty screen with the setup strip in ${theme} passes axe`, async () => {
     showTheme(theme);
