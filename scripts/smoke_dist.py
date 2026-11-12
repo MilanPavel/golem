@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+import plistlib
 import queue
 import re
 import signal
@@ -105,6 +106,8 @@ def main() -> int:
 
         if run_daemon(daemon, env, home, "web", FIRST_START_LIMIT_S, web) is None:
             return 1
+        if sys.platform == "darwin" and not check_web_job(tree, env):
+            return 1
     finally:
         server.shutdown()
     return 0
@@ -188,6 +191,64 @@ def check_manifest(base: str) -> list[str]:
         if i_status != 200 or i_headers.get("content-type") != "image/png":
             problems.append(f"{src} was {i_status} {i_headers.get('content-type')!r}")
     return problems
+
+
+def check_web_job(tree: Path, env: dict[str, str]) -> bool:
+    """``golem web install`` writes the job and ``uninstall`` removes it, with a fake ``launchctl``.
+
+    ``HOME`` and ``GOLEM_HOME`` are temp dirs and ``PATH`` starts with a ``launchctl`` that only
+    records its arguments, so no real job is loaded.
+    """
+    golem = tree / "bin" / "golem"
+    root = Path(tempfile.mkdtemp(prefix="gj", dir="/tmp"))
+    fake_bin = root / "bin"
+    fake_bin.mkdir()
+    record = root / "launchctl.log"
+    fake = fake_bin / "launchctl"
+    # `print` fails, so the job counts as not loaded.
+    fake.write_text(
+        f'#!/bin/sh\necho "$@" >> "{record}"\n[ "$1" = print ] && exit 1\nexit 0\n',
+        encoding="utf-8",
+    )
+    fake.chmod(0o755)
+    job_env = env.copy()
+    job_env["HOME"] = str(root / "home")
+    job_env["GOLEM_HOME"] = str(root / "golem")
+    job_env["PATH"] = f"{fake_bin}{os.pathsep}{env.get('PATH', '')}"
+    (root / "home").mkdir()
+    plist = root / "home" / "Library" / "LaunchAgents" / "dev.golem.web.plist"
+    problems: list[str] = []
+    try:
+        install = subprocess.run(
+            [str(golem), "web", "install"], env=job_env, capture_output=True, text=True, timeout=30
+        )
+        if install.returncode != 0:
+            problems.append(f"golem web install exited {install.returncode}: {install.stderr.strip()}")
+        elif not plist.is_file():
+            problems.append("golem web install wrote no plist")
+        else:
+            program = plistlib.loads(plist.read_bytes()).get("ProgramArguments", [])
+            if len(program) != 3 or program[1:] != ["web", "serve"]:
+                problems.append(f"ProgramArguments was {program!r}")
+            elif Path(program[0]).resolve() != golem.resolve():
+                problems.append(f"the job runs {program[0]}, not {golem}")
+            calls = record.read_text(encoding="utf-8") if record.exists() else ""
+            if f"bootstrap gui/{os.getuid()} {plist}" not in calls:
+                problems.append(f"launchctl bootstrap was not called: {calls!r}")
+        uninstall = subprocess.run(
+            [str(golem), "web", "uninstall"], env=job_env, capture_output=True, text=True, timeout=30
+        )
+        if uninstall.returncode != 0:
+            problems.append(f"golem web uninstall exited {uninstall.returncode}: {uninstall.stderr.strip()}")
+        if plist.exists():
+            problems.append("golem web uninstall left the plist behind")
+    except (OSError, ValueError, subprocess.TimeoutExpired) as exc:
+        problems.append(f"golem web install check failed: {exc}")
+    for problem in problems:
+        print(f"web install: {problem}", file=sys.stderr)
+    if not problems:
+        print("web install ok")
+    return not problems
 
 
 def check_web_serve(tree: Path, env: dict[str, str], home: Path) -> bool:

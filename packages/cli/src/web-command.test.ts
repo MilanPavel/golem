@@ -284,8 +284,8 @@ interface Captured {
 }
 
 /** Runs `golem web --json` against a fake gateway, with the run files in the temp home. */
-async function webWith(deps: Partial<WebDeps>): Promise<Captured> {
-  const args = parseWebArgs(["--json"]);
+async function webWith(deps: Partial<WebDeps>, argv: string[] = ["--json"]): Promise<Captured> {
+  const args = parseWebArgs(argv);
   assert.ok(args !== null);
   let out = "";
   let err = "";
@@ -380,5 +380,34 @@ test("golem web reuses a foreground gateway of another version, says so, and nev
     } finally {
       forget(other);
     }
+  }
+});
+
+test("golem web with a kept job adds the first-run line only on a first run", async () => {
+  const job = await fakeGateway(4010, OURS, true);
+  await announce(job);
+  try {
+    const first = await webWith({ firstRun: () => Promise.resolve(true) }, ["--no-open"]);
+    assert.equal(first.code, 0, first.err);
+    assert.match(first.out, /Setup continues in your browser\. You can close this window\.\n$/);
+    assert.ok(!first.out.includes("Press Ctrl-C"));
+    const later = await webWith({ firstRun: () => Promise.resolve(false) }, ["--no-open"]);
+    assert.ok(!later.out.includes("Setup continues"));
+    const failing = await webWith({ firstRun: () => Promise.reject(new Error("no daemon")) }, ["--no-open"]);
+    assert.equal(failing.code, 0);
+    assert.ok(!failing.out.includes("Setup continues"));
+  } finally {
+    forget(job);
+  }
+});
+
+test("a foreground gateway never gets the first-run line, since closing the window would stop it", async () => {
+  const fg = await fakeGateway(4011, OURS, false);
+  await announce(fg);
+  try {
+    const got = await webWith({ firstRun: () => Promise.resolve(true) }, ["--no-open"]);
+    assert.ok(!got.out.includes("Setup continues"));
+  } finally {
+    forget(fg);
   }
 });

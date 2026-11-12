@@ -20,7 +20,7 @@ import { entryAvailable, entryInputs, entryParams, findEntry, inputDefault, inpu
 import { awaitRestart, formatRestarted } from "./await-restart.ts";
 import { type DaemonCommand, locateDaemon } from "./daemon-locator.ts";
 import { explainDaemonDown, isDaemonDown } from "./daemon-down.ts";
-import { doctorExitCode, formatDoctor, parseChecks, runDoctor } from "./doctor.ts";
+import { type Check, doctorExitCode, formatDoctor, parseChecks, runDoctor, webCheck } from "./doctor.ts";
 
 import { formatConfig } from "./format-config.ts";
 import { formatKeys } from "./format-keys.ts";
@@ -44,19 +44,33 @@ import { projectSession, runConfigEdit, runMcpEdit, runMcpImport, testAfterAdd }
 import { readChoice } from "./read-choice.ts";
 import { readSecret } from "./read-secret.ts";
 import { type Gate, gateService, type SessionDaemon } from "./service-gate.ts";
-import { parseWebArgs, type WebArgs } from "./web.ts";
-import { runWeb, runWebLogout } from "./web-command.ts";
+import { parseWebArgs, parseWebJobArgs, type WebArgs } from "./web.ts";
+import { DEFAULT_WEB_DEPS, launchDeps, runWeb, runWebLogout } from "./web-command.ts";
+import { findLiveQuietly, type WebDeps } from "./web-live.ts";
+import {
+  installWebJob,
+  jobLoaded,
+  kickstart,
+  plistProgram,
+  restartWebWithDaemon,
+  uninstallWebJob,
+  webPlistPath,
+} from "./web-launchd.ts";
 import { findWorkspaceRoot } from "./workspace.ts";
+import { resolveRunDir } from "@golem/gateway/node";
 
 // The first start of a fresh build takes a few seconds while macOS checks its libraries.
 const RESTART_TIMEOUT_MS = 15_000;
 // The very first start after `brew install` also checks every library once.
 const FIRST_START_TIMEOUT_MS = 30_000;
+// The web job's gateway, after `golem install`, needs the same first start.
+const WEB_START_TIMEOUT_MS = 30_000;
 // launchd's job, as golem/launchd.py names it.
 const LAUNCH_AGENT = join(homedir(), "Library", "LaunchAgents", "dev.golem.daemon.plist");
 
 const USAGE =
   "usage: golem\n" +
+  "       golem install | golem uninstall\n" +
   "       golem --version | golem --help | golem status | golem doctor [--mcp]\n" +
   "       golem daemon install|start|stop|restart|uninstall|logs\n" +
   "       golem auth set <provider> [--no-check] | golem auth remove <provider> | golem auth list | golem models [--refresh]\n" +
@@ -64,7 +78,7 @@ const USAGE =
   "       golem mcp list [--json] | show <name> [--json] | test <name> | test --catalog <id> | edit <name> [--project] | import [--from <app>|<file>] [--all] | logs <name> [-f] | enable <name> [--on-demand] | disable <name> | restart <name> | tools <name> [--hide <glob>] [--show <glob>]\n" +
   "       golem config show [--resolved] | golem config edit [--project] | golem skills [list] | golem skills check <path>\n" +
   "       golem web [--port N] [--no-open] [--json] | golem web serve [--port N]\n" +
-  "       golem web logout";
+  "       golem web install [--port N] | golem web uninstall | golem web logout";
 
 // exitCode, not exit(): exit() drops output a pipe has not read yet.
 process.exitCode = await run(process.argv.slice(2));
@@ -87,6 +101,12 @@ async function run(args: string[]): Promise<number> {
   if (command === "doctor" && (rest.length === 0 || (rest.length === 1 && rest[0] === "--mcp"))) {
     return runDoctorCommand(rest.length === 1);
   }
+  if (command === "install" && rest.length === 0) {
+    return runInstall(false);
+  }
+  if (command === "uninstall" && rest.length === 0) {
+    return runUninstall();
+  }
   if (command === "daemon") {
     return runDaemon(rest);
   }
@@ -107,6 +127,10 @@ async function run(args: string[]): Promise<number> {
   }
   if (command === "web" && rest.length === 1 && rest[0] === "logout") {
     return runWebLogout();
+  }
+  const job = command === "web" ? parseWebJobArgs(rest) : null;
+  if (job !== null) {
+    return runWebJob(job.kind, job.port, false);
   }
   if (command === "web") {
     const parsed = parseWebArgs(rest);
@@ -142,6 +166,21 @@ const RUN_DEPS = {
     await runDaemon(["restart"]);
   },
 };
+
+/** What `golem web` needs beyond the defaults: a first run is a daemon with no default model yet. */
+function webDeps(): WebDeps {
+  return {
+    ...DEFAULT_WEB_DEPS,
+    firstRun: async () => {
+      const client = connectOnce();
+      try {
+        return (await client.getConfig(process.cwd())).default_model === null;
+      } finally {
+        client.close();
+      }
+    },
+  };
+}
 
 async function runConfigShow(): Promise<number> {
   const client = connectOnce();
@@ -590,6 +629,7 @@ async function runDoctorCommand(mcp: boolean): Promise<number> {
         await captureLocated(daemon.command, [...daemon.args, "doctor", ...(mcp ? ["--mcp"] : [])]),
       ),
     readStatus: readDaemonStatus,
+    web: webJobCheck,
   });
   process.stdout.write(`${formatDoctor(checks)}\n`);
   return doctorExitCode(checks);
@@ -639,7 +679,81 @@ async function runDaemon(args: string[]): Promise<number> {
     return 1;
   }
   process.stdout.write(`${report}\n`);
+  await restartWebJobIfInstalled();
   return 0;
+}
+
+/** After the daemon restarted, an installed web job restarts too, so the page is never an old one. */
+function restartWebJobIfInstalled(): Promise<void> {
+  const deps = launchDeps();
+  return restartWebWithDaemon(
+    () => Promise.resolve(kickstart(deps)),
+    () => existsSync(webPlistPath(deps)),
+    (line) => process.stderr.write(`${line}\n`),
+  );
+}
+
+/** `golem install`: the service, then the web page's job. `quiet` leaves the web job's own line out. */
+async function runInstall(quiet: boolean): Promise<number> {
+  const exitCode = await runDaemon(["install"]);
+  return exitCode === 0 ? runWebJob("install", null, quiet) : exitCode;
+}
+
+/** `golem uninstall`: the web page's job, then the service. `~/.golem` stays. */
+async function runUninstall(): Promise<number> {
+  const web = await runWebJob("uninstall", null, false);
+  const daemon = await runDaemon(["uninstall"]);
+  return web === 0 && daemon === 0 ? 0 : 1;
+}
+
+/** `golem web install [--port N]` and `golem web uninstall`. */
+async function runWebJob(kind: "install" | "uninstall", port: number | null, quiet: boolean): Promise<number> {
+  const deps = launchDeps();
+  const result = kind === "install" ? await installWebJob(deps, port) : uninstallWebJob(deps);
+  if (!quiet && result.out.length > 0) {
+    process.stdout.write(`${result.out.join("\n")}\n`);
+  }
+  if (result.err.length > 0) {
+    process.stderr.write(`${result.err.join("\n")}\n`);
+  }
+  return result.ok ? 0 : 1;
+}
+
+/** The `web` line of `golem doctor`. */
+async function webJobCheck(): Promise<Check> {
+  const deps = launchDeps();
+  const path = webPlistPath(deps);
+  const plist = existsSync(path);
+  let program: string[] | null = null;
+  try {
+    program = plist ? plistProgram(readFileSync(path, "utf8")) : null;
+  } catch {
+    program = null;
+  }
+  const found = plist ? await findLiveQuietly(resolveRunDir()) : null;
+  return webCheck({
+    cliVersion: GOLEM_VERSION,
+    plist,
+    program: program?.[0] ?? null,
+    programExists: program !== null && existsSync(program[0] ?? ""),
+    loaded: plist && jobLoaded(deps),
+    live: found === null ? null : { port: found.port, version: found.health.version },
+  });
+}
+
+/** Waits until the web job's gateway answers, for the question's Enter. */
+async function waitForWebJob(): Promise<boolean> {
+  const runDir = resolveRunDir();
+  const deadline = Date.now() + WEB_START_TIMEOUT_MS;
+  for (;;) {
+    if ((await findLiveQuietly(runDir))?.health.kept === true) {
+      return true;
+    }
+    if (Date.now() >= deadline) {
+      return false;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
 }
 
 /** `golem daemon restart` for the chat screen: no output, and an error when it does not come back. */
@@ -657,6 +771,7 @@ async function restartQuietly(): Promise<void> {
   if (restarted === null) {
     throw new Error(formatRestarted(null, RESTART_TIMEOUT_MS));
   }
+  await restartWebJobIfInstalled();
 }
 
 async function runLocated(command: string, args: string[]): Promise<number> {
@@ -710,7 +825,13 @@ async function openTui(): Promise<number> {
         installed: () => existsSync(LAUNCH_AGENT),
         agentLoaded: launchAgentLoaded,
         restart: restartQuietly,
-        install: () => daemon("install"),
+        install: async () => {
+          await daemon("install");
+          const web = await installWebJob(launchDeps(), null);
+          if (!web.ok) {
+            throw new Error(web.err.join("\n"));
+          }
+        },
         uninstall: () => daemon("uninstall"),
         serve: () => {
           owned.session?.stop();
@@ -763,14 +884,14 @@ async function openWeb(args: WebArgs): Promise<number> {
       process.stderr.write(`${down}\n`);
       return 1;
     }
-    return runWeb(args);
+    return runWeb(args, webDeps());
   }
   const gate = await gateService(serviceGate());
   if (gate.kind === "exit") {
     return gate.code;
   }
   try {
-    return await runWeb(args);
+    return await runWeb(args, webDeps());
   } finally {
     gate.session?.stop();
   }
@@ -795,10 +916,8 @@ function serviceGate(): Gate {
     installed: () => existsSync(LAUNCH_AGENT),
     interactive: process.stdin.isTTY === true && process.stdout.isTTY === true,
     ask: readChoice,
-    install: async () => {
-      const located = locateOrSay();
-      return located !== null && (await runLocated(located.command, [...located.args, "daemon", "install"])) === 0;
-    },
+    install: async () => (await runInstall(true)) === 0,
+    waitForPage: waitForWebJob,
     serve: () => {
       const located = locateOrSay();
       return located === null ? null : serveForThisWindow(located);
