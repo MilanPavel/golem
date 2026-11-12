@@ -11,6 +11,7 @@ import {
   exchangeToken,
   isSecretShape,
   assetCacheControl,
+  assetContentType,
   assetKey,
   fallbackKey,
   withSecurityHeaders,
@@ -80,7 +81,7 @@ export function startGateway(opts: GatewayOptions): Gateway {
     }
     const blob = Bun.file(file);
     return new Response(req.method === "HEAD" ? null : blob, {
-      headers: { "Content-Type": blob.type, "Cache-Control": assetCacheControl(key) },
+      headers: { "Content-Type": assetContentType(key) ?? blob.type, "Cache-Control": assetCacheControl(key) },
     });
   }
 

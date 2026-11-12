@@ -89,6 +89,10 @@ test:
 docs:
     pnpm --filter @golem/docs dev
 
+# Redraw the web app's icons (packages/web/public/*.png) from the pixel golem. Commit the result.
+icons:
+    bun packages/web/scripts/gen-icons.ts
+
 # Build the static gallery of every web component into packages/web/dist-gallery. The docs site publishes it at /gallery/.
 gallery-build:
     pnpm --filter @golem/web build:gallery

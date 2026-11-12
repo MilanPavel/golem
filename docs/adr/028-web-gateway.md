@@ -141,7 +141,7 @@ The daemon reads JSON lines and splits on `\n` ([ADR-003](003-protocol.md)). A b
 
 - The page's files are embedded in `bin/golem` at `just dist` (`import … with { type: "file" }`). The source is `packages/web/dist`, which `just dist` builds. A checkout serves that folder when it is built, and the placeholder otherwise. A page path without a file extension serves `index.html`, so the page's routes reload.
 
-There is no service worker that caches the page. One would show an old page, speaking an old protocol, after an upgrade.
+There is no service worker that caches the page. The web app manifest and the icons are plain files served like the rest, so the page can be installed without one. A service worker would show an old page, speaking an old protocol, after an upgrade.
 
 ### Development
 
