@@ -596,7 +596,7 @@ export const QUIT_CHOICES: readonly Choice<"quit" | "keep">[] = [
 export type SetupAction = NonNullable<SetupRow["action"]>;
 
 export type OverviewChoice =
-  | { kind: "fix"; action: SetupAction; target: string | null; label: string }
+  | { kind: "fix"; action: SetupAction | "add_tools"; target: string | null; label: string }
   /** The service runs but is not kept at login: the Service panel alone says how. */
   | { kind: "service"; label: string }
   | { kind: "guided"; label: string };
@@ -745,7 +745,7 @@ function actionLabel(action: SetupAction, target: string | null): string | null 
  * The fixes for what is wrong first, then what can always be done. A `service` row that
  * needs attention (only the page makes one) leads with the Service panel.
  */
-export function overviewChoices(rows: readonly SetupRow[], service?: SetupRow): OverviewChoice[] {
+export function overviewChoices(rows: readonly SetupRow[], service?: SetupRow, facts?: SetupFacts): OverviewChoice[] {
   const choices: OverviewChoice[] = service?.state === "warn" ? [{ kind: "service", label: "Keep it running at login" }] : [];
   const seen = new Set<string>();
   const add = (action: SetupAction, target: string | null, label: string): void => {
@@ -764,6 +764,9 @@ export function overviewChoices(rows: readonly SetupRow[], service?: SetupRow): 
   }
   add("pick_model", null, "Change model");
   add("set_key", null, "Add an API key");
+  if (facts !== undefined && offersTools(facts)) {
+    choices.push({ kind: "fix", action: "add_tools", target: null, label: "Add tools" });
+  }
   return [...choices, { kind: "guided", label: "Run setup again" }];
 }
 
@@ -772,6 +775,7 @@ export function overviewLines(
   service: SetupRow,
   selected: number,
   notice: string | null,
+  facts?: SetupFacts,
 ): SetupLine[] {
   if (rows === null) {
     return [
@@ -785,7 +789,7 @@ export function overviewLines(
   }
   return [
     ...lines,
-    ...overviewChoices(rows, service).map(
+    ...overviewChoices(rows, service, facts).map(
       (choice, index): SetupLine => ({ kind: "option", label: choice.label, detail: "", selected: index === selected }),
     ),
   ];
