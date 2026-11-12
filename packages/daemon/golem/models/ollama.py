@@ -86,6 +86,11 @@ def down_text(is_installed: bool) -> str:
     return f"{message}: {hint}"
 
 
+STRAY_MESSAGE = "Ollama is still running from an install that was removed"
+STRAY_HINT = "quit it, then install Ollama again"
+STRAY_TEXT = f"{STRAY_MESSAGE}. {STRAY_HINT[0].upper()}{STRAY_HINT[1:]}."
+
+
 class Process(Protocol):
     """What :class:`LocalServer` needs of the process it started."""
 

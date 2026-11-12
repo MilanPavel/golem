@@ -259,6 +259,29 @@ async def test_an_ollama_that_is_not_installed_says_so(tmp_path: Path) -> None:
     await discovery.aclose()
 
 
+async def test_an_ollama_answering_from_a_removed_install_is_not_ready(tmp_path: Path) -> None:
+    discovery = _discovery(
+        ModelRouter(GolemSettings()),
+        Network(_ollama_routes()),
+        tmp_path,
+        ollama_installed=False,
+    )
+    listing = await discovery.list()
+    assert {p.provider: p.status for p in listing.providers}["ollama"] == "not_installed"
+    assert not any(model.status == "ready" for model in listing.models)
+    setup = listing.setup
+    flags = (setup.ollama_installed, setup.ollama_running, setup.ollama_stray)
+    assert flags == (False, False, True)
+    await discovery.aclose()
+
+
+async def test_a_running_ollama_with_its_binary_is_not_stray(tmp_path: Path) -> None:
+    discovery = _discovery(ModelRouter(GolemSettings()), Network(_ollama_routes()), tmp_path)
+    listing = await discovery.list()
+    assert (listing.setup.ollama_running, listing.setup.ollama_stray) == (True, False)
+    await discovery.aclose()
+
+
 async def test_a_fresh_home_has_no_default_and_says_what_setup_needs(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

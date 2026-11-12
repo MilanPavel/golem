@@ -32,6 +32,7 @@ export type DefaultStatus = ('ready' | 'needs_key' | 'not_installed' | 'server_d
 export type Keys = string[];
 export type OllamaInstalled = boolean;
 export type OllamaRunning = boolean;
+export type OllamaStray = boolean;
 
 /**
  * ``default`` is the model a new session gets, null before one is chosen.
@@ -121,7 +122,10 @@ export interface ListedProvider {
  * ``keys`` are the providers with a key, from the environment or the
  * Keychain. ``default_status`` is the default model's status, ``unknown``
  * when it names a model golem does not list, and null when no default is
- * chosen.
+ * chosen. ``ollama_stray`` is true when a local Ollama answers but no
+ * ``ollama`` binary is installed: a server left from a removed install, which
+ * lists its models and cannot load them. It is then neither installed nor
+ * running here.
  *
  * This interface was referenced by `ModelListResult`'s JSON-Schema
  * via the `definition` "ModelSetup".
@@ -131,4 +135,5 @@ export interface ModelSetup {
   keys?: Keys;
   ollama_installed: OllamaInstalled;
   ollama_running: OllamaRunning;
+  ollama_stray?: OllamaStray;
 }

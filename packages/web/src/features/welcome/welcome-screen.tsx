@@ -75,9 +75,11 @@ export function WelcomeScreen({ step, from }: { step: WelcomeStep; from: "send" 
           ? "running"
           : setup?.ollama_installed === true
             ? "stopped"
-            : setupActions.state.noBrew
-              ? "no_brew"
-              : "missing";
+            : setup?.ollama_stray === true
+              ? "stray"
+              : setupActions.state.noBrew
+                ? "no_brew"
+                : "missing";
 
   // With no Homebrew the person installs Ollama themselves: look again every few seconds while the tab is seen.
   const watching = step === "engine" && choice === "local" && phase === "no_brew";

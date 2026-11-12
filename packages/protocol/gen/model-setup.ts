@@ -4,6 +4,7 @@ export type DefaultStatus = ('ready' | 'needs_key' | 'not_installed' | 'server_d
 export type Keys = string[];
 export type OllamaInstalled = boolean;
 export type OllamaRunning = boolean;
+export type OllamaStray = boolean;
 
 /**
  * Where the user is in setting up a model, for a first-run screen.
@@ -11,11 +12,15 @@ export type OllamaRunning = boolean;
  * ``keys`` are the providers with a key, from the environment or the
  * Keychain. ``default_status`` is the default model's status, ``unknown``
  * when it names a model golem does not list, and null when no default is
- * chosen.
+ * chosen. ``ollama_stray`` is true when a local Ollama answers but no
+ * ``ollama`` binary is installed: a server left from a removed install, which
+ * lists its models and cannot load them. It is then neither installed nor
+ * running here.
  */
 export interface ModelSetup {
   default_status?: DefaultStatus;
   keys?: Keys;
   ollama_installed: OllamaInstalled;
   ollama_running: OllamaRunning;
+  ollama_stray?: OllamaStray;
 }
