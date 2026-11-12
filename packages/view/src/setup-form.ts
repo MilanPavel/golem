@@ -12,7 +12,7 @@ import { KEEP_ALL_COMMAND, KEEP_SERVICE_COMMAND, keepCommand, pageHostLines, pro
 export type FormMark = "ok" | "warn" | "fail";
 
 /** A button the page handles itself. */
-export type FormButtonId = "install_ollama" | "start_ollama" | "change_model" | "check_again";
+export type FormButtonId = "install_ollama" | "start_ollama" | "change_model" | "check_again" | "add_tools";
 
 export type FormFix =
   /** Something to run in a terminal, shown to copy. The page never installs a service or takes a key. */
@@ -100,7 +100,7 @@ function toolRows(rows: readonly SetupRow[]): FormRow[] {
         markWord: MARK_WORDS.ok,
         name: PART_NAMES.tools,
         detail: "no MCP servers yet",
-        fix: manage("Add tools"),
+        fix: { kind: "button", id: "add_tools", label: "Add tools" },
       },
     ];
   }

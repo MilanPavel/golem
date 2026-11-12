@@ -40,6 +40,8 @@ import { APPROVAL_DETAIL, APPROVAL_TRACE, CUT_LIKELY_DETAIL, CUT_MIDDLE_DETAIL, 
 import type { TraceRunSpan, TraceSpanResult } from "../store/trace.ts";
 import { FORM_CASES, SETUP_CASES } from "../features/setup/sample.ts";
 import { AddKey, SetupFormView } from "../features/setup/setup-form.tsx";
+import { ToolsOfferView } from "../features/setup/tools-offer.tsx";
+import { TOOLS_CASES } from "../features/setup/tools-sample.ts";
 import { panelView } from "../features/setup/setup-ui.ts";
 import { PullStatusView, pullSummary } from "../features/models/index.ts";
 import { NO_OLLAMA_LISTING, OLLAMA_DOWN_LISTING, SAMPLE_LISTING, SAMPLE_PULLS, THINKING_LISTING } from "../features/models/sample.ts";
@@ -598,6 +600,34 @@ function SetupDemo({ theme }: { theme: string }) {
   );
 }
 
+/** The Tools panel that `/welcome` and Settings → Setup share, in the states it draws. */
+function ToolsOfferDemo() {
+  return (
+    <div className="flex flex-col gap-4">
+      {TOOLS_CASES.map(({ label, state }) => (
+        <section key={label} aria-label={label} className="flex flex-col gap-2 rounded-lg border border-line bg-bg p-4">
+          <span className="font-mono text-xs text-faint">{label}</span>
+          <div className="max-w-xl">
+            <ToolsOfferView
+              state={state}
+              draft=""
+              logs={{}}
+              onDraft={() => {}}
+              onTick={() => {}}
+              onStart={() => {}}
+              onSkip={() => {}}
+              onContinue={() => {}}
+              onRetry={() => {}}
+              onSkipRow={() => {}}
+              onLog={() => {}}
+            />
+          </div>
+        </section>
+      ))}
+    </div>
+  );
+}
+
 /** Settings → Setup: the cards with their fixes, and the key command under them. */
 function SetupFormDemo() {
   return (
@@ -806,6 +836,11 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
       <section className="mt-6" id={anchor("Setup form")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Setup form</h3>
         <SetupFormDemo />
+      </section>
+
+      <section className="mt-6" id={anchor("Tools panel")}>
+        <h3 className="mb-2 font-mono text-xs text-faint">Tools panel</h3>
+        <ToolsOfferDemo />
       </section>
 
       <section className="mt-6" id={anchor("Welcome page")}>
