@@ -561,13 +561,15 @@ export function pressEngine(
 
 // Ready
 
-export function readyLines(summary: { service: string; engine: string; model: string }): SetupLine[] {
+/** `tools` is the Tools row: left out unless Tools ran or servers exist. */
+export function readyLines(summary: { service: string; engine: string; model: string; tools?: string | null }): SetupLine[] {
   return [
     { kind: "status", mark: "ok", text: "golem is ready" },
     { kind: "blank" },
     { kind: "row", mark: "ok", label: "Service", text: summary.service },
     { kind: "row", mark: "ok", label: "Engine", text: summary.engine },
     { kind: "row", mark: "ok", label: "Model", text: summary.model },
+    ...(summary.tools == null ? [] : [{ kind: "row", mark: "ok", label: "Tools", text: summary.tools } as const]),
     { kind: "blank" },
     { kind: "text", text: "/setup brings this back any time.", dim: true },
   ];
