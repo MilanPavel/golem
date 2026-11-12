@@ -5,7 +5,7 @@ import type { Press } from "./keys.ts";
 /**
  * The setup window's frame in the terminal: a box about 60 columns wide,
  * centred on an empty screen. Under 60×20 it loses its border and goes full
- * width, with `2/4 Engine` in place of the stepper.
+ * width, with `2/5 Engine` in place of the stepper.
  */
 export const SETUP_WIDTH = 60;
 
