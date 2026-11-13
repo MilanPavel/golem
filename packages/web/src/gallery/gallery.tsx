@@ -17,7 +17,7 @@ import { Textarea } from "../ui/textarea.tsx";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip.tsx";
 import { ConnectionScreen } from "../features/connection/connection-screen.tsx";
 import { connectionScreen, type ConnectionHost } from "../features/connection/connection-screen.ts";
-import { ToolLine, TranscriptMessages } from "../features/chat/index.ts";
+import { DetailSwitch, ToolLine, TranscriptMessages } from "../features/chat/index.ts";
 import { SAMPLE_CHAT, SAMPLE_TOOLS, THINKING_CASES, TURN_CHAT } from "../features/chat/sample.ts";
 import { ApprovalBar } from "../features/approval/index.ts";
 import { ANSWERED, PENDING_EDIT, PENDING_SHELL } from "../features/approval/sample.ts";
@@ -1041,6 +1041,9 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
 
       <section className="mt-6" id={anchor("Turn")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Turn</h3>
+        <div className="mb-3">
+          <DetailSwitch />
+        </div>
         <div className="flex flex-col gap-3">
           {(["normal", "verbose", "quiet"] as const).map((detail) => (
             <div key={detail} aria-label={`A turn with four tool steps, ${detail}`} role="group" className="flex flex-col gap-6 rounded-lg border border-line bg-bg p-4">

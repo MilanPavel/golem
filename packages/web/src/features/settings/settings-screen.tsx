@@ -12,6 +12,7 @@ import { useSettingsContext } from "./context.ts";
 import { McpSection } from "./mcp-section.tsx";
 import { RulesSection } from "./rules-section.tsx";
 import { SECTIONS } from "./sections.ts";
+import { DetailSwitch } from "../chat/index.ts";
 import { AppCard } from "../setup/index.ts";
 import { SetupSection } from "./setup-section.tsx";
 
@@ -45,6 +46,7 @@ function Body({ section }: { section: string }) {
       return (
         <div className="flex max-w-column flex-col gap-6">
           <ThemeSwitch />
+          <DetailSwitch />
           <AppearanceApp />
         </div>
       );
