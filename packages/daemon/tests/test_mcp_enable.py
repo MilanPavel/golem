@@ -19,6 +19,7 @@ from golem.graphs.prompt import SystemPrompt
 from golem.mcp import McpSupervisor, Timing
 from golem.mcp.prompt import mcp_section
 from golem.models.router import ModelRouter
+from golem.permissions.engine import server_grant, session_allows
 from golem.permissions.policy import Policy
 from golem.server.mcp_model import turn_on_for_model
 from golem.sessions.bus import EventBus
@@ -42,13 +43,19 @@ def _fake(**extra: object) -> McpServerSettings:
 
 
 class _Rig:
-    def __init__(self, database: Database, model: ToolCallingChatModel, mcp: McpSupervisor) -> None:
+    def __init__(
+        self,
+        database: Database,
+        model: ToolCallingChatModel,
+        mcp: McpSupervisor,
+        policy: Policy | None = None,
+    ) -> None:
         registry = default_registry(mcp)
         self.runtime = open_chat(
             ModelRouter(model=model),
             InMemorySaver(),
             registry,
-            Policy(None, home=Path("/nonexistent")),
+            policy or Policy(None, home=Path("/nonexistent")),
             prompt=SystemPrompt(sections=(mcp_section(mcp),)),
         )
         self.events = EventLog(database)
@@ -115,11 +122,9 @@ async def test_the_model_turns_a_server_on_and_uses_it_in_the_same_turn(
     assert "mcp_enable" in model.bound and "mcp__fake__echo" not in model.bound
 
     await rig.manager.respond(session_id, asked[0].data.call_id, "allow")
-    # The new tool asks for its own approval, in the same turn.
-    again = _needed(await rig.settled(run_id))
-    assert again[-1].data.name == "mcp__fake__echo"
-    await rig.manager.respond(session_id, again[-1].data.call_id, "allow")
-    await rig.settled(run_id)
+    # Allowing mcp_enable also covers the server's tools: the echo does not ask.
+    events = await rig.settled(run_id)
+    assert [a.data.name for a in _needed(events)] == ["mcp_enable"]
 
     assert "mcp__fake__echo" in model.bound
     enabled = model.seen[1][-1]
@@ -177,3 +182,58 @@ async def test_a_server_the_session_already_has_on_is_not_offered(
     supervisor = mcp()
     assert [name for name, _ in supervisor.offers(ToolScope())] == ["fake"]
     assert supervisor.offers(ToolScope(enabled=frozenset({"fake"}))) == []
+
+
+async def test_approving_mcp_enable_covers_that_servers_tools_only(
+    database: Database, mcp: Callable[..., McpSupervisor]
+) -> None:
+    model = ToolCallingChatModel(replies=[_ENABLE, _ECHO, "done"])
+    rig = _Rig(database, model, mcp())
+    session_id = await rig.manager.create(None)
+    run_id = await rig.manager.send(session_id, "echo hi")
+    asked = _needed(await rig.settled(run_id))
+    await rig.manager.respond(session_id, asked[0].data.call_id, "allow")
+    events = await rig.settled(run_id)
+
+    assert [a.data.name for a in _needed(events)] == ["mcp_enable"]
+    granted = await rig.manager.allowances(session_id)
+    assert ("mcp__fake__*", None) in granted
+    assert not session_allows(granted, "mcp__other__echo", None)
+
+
+async def test_a_deny_rule_on_the_tool_beats_the_grant(
+    database: Database, mcp: Callable[..., McpSupervisor], tmp_path: Path
+) -> None:
+    config = tmp_path / "config.toml"
+    config.write_text('[[rule]]\ntool = "mcp__fake__echo"\naction = "deny"\n', encoding="utf-8")
+    model = ToolCallingChatModel(replies=[_ENABLE, _ECHO, "done"])
+    rig = _Rig(database, model, mcp(), Policy(config, home=tmp_path))
+    session_id = await rig.manager.create(None)
+    run_id = await rig.manager.send(session_id, "echo hi")
+    asked = _needed(await rig.settled(run_id))
+    await rig.manager.respond(session_id, asked[0].data.call_id, "allow")
+    events = await rig.settled(run_id)
+
+    assert [a.data.name for a in _needed(events)] == ["mcp_enable"]
+    denied = model.seen[2][-1]
+    assert isinstance(denied, ToolMessage) and "denied" in denied.text
+
+
+async def test_a_denied_mcp_enable_grants_nothing(
+    database: Database, mcp: Callable[..., McpSupervisor]
+) -> None:
+    model = ToolCallingChatModel(replies=[_ENABLE, "ok"])
+    rig = _Rig(database, model, mcp())
+    session_id = await rig.manager.create(None)
+    run_id = await rig.manager.send(session_id, "echo hi")
+    asked = _needed(await rig.settled(run_id))
+    await rig.manager.respond(session_id, asked[0].data.call_id, "deny")
+    await rig.settled(run_id)
+    assert await rig.manager.allowances(session_id) == []
+
+
+def test_a_server_grant_is_a_prefix_not_a_tool_name() -> None:
+    grant = [server_grant("fake")]
+    assert session_allows(grant, "mcp__fake__echo", None)
+    assert not session_allows(grant, "mcp__fakery__echo", None)
+    assert not session_allows(grant, "shell", None)

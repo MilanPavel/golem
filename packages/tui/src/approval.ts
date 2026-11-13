@@ -1,4 +1,4 @@
-import type { PendingApproval } from "@golem/view";
+import { approvalQuestion, type PendingApproval } from "@golem/view";
 import { type DiffTone, diffWindow, parseDiff } from "./diff-view.ts";
 import { toolLabel } from "./layout-chat.ts";
 
@@ -42,7 +42,7 @@ export function approvalLines(
   const scrolls = diff.length > diffRows && diffRows > 0;
   const keys = "a once · s this session · w always (saves a rule) · e edit · d deny";
   return [
-    { text: fit(`Allow ${call}?`, width), bold: true, tone: "question" },
+    { text: fit(approvalQuestion(approval.name, approval.args) ?? `Allow ${call}?`, width), bold: true, tone: "question" },
     ...shown.map((line) => ({ text: line.text, tone: line.tone })),
     { text: fit(`asked by ${approval.source}${scrolls ? ` · diff ${diff.length} lines` : ""}`, width), dim: true },
     { text: fit(scrolls ? `${keys} · ↑↓ scroll` : keys, width) },

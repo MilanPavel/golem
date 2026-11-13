@@ -1,6 +1,6 @@
 export type { ApprovalChoice } from "@golem/client";
 export { formatDuration, formatElapsed, formatTurnTime } from "./duration.ts";
-export { DETAILS, displayToolName, isDetail, stepCount, stepFailed, stepMark, summarizeSteps, type Detail, type StepMark } from "./activity.ts";
+export { approvalQuestion, DETAILS, displayToolName, isDetail, stepCount, stepFailed, stepMark, summarizeSteps, type Detail, type StepMark } from "./activity.ts";
 export { groupTurns, turnFooter, type Turn } from "./turns.ts";
 export { editedArgs, parseArgs, type ParsedArgs } from "./approval-args.ts";
 export {
