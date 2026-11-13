@@ -3,6 +3,7 @@
 **Date**: 2026-10-31
 **Status**: accepted
 **Amended**: 2026-11-12 (sign-ins are kept on disk, as digests. See [Sign-ins on disk](#sign-ins-on-disk))
+**Amended**: 2026-11-13 (a phone also reaches the gateway, through a relay, and the gateway then names the device on its daemon connection. See [ADR-051](051-relay-and-pairing.md))
 
 ## The idea
 
