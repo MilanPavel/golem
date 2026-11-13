@@ -2,6 +2,7 @@ import { contextLevel, contextPercent, contextShare, contextSummary, formatToken
 import { useNavigate, useSession } from "../../store/page-context.tsx";
 import { tracePath } from "../../store/router.ts";
 import { badgeVariants } from "../../ui/badge.tsx";
+import { cn } from "../../ui/cn.ts";
 
 const TONE: Record<ContextLevel, "neutral" | "wait" | "deny"> = { ok: "neutral", high: "wait", full: "deny" };
 
@@ -27,7 +28,7 @@ export function ContextChipView({
       title={`Context ${summary}.${why}`}
       aria-label={`Context ${summary}. Open the trace.`}
       onClick={onOpen}
-      className={`${badgeVariants({ tone: TONE[contextLevel(used, window)] })} cursor-pointer py-0 outline-offset-2 outline-clay focus-visible:outline-2`}
+      className={cn(badgeVariants({ tone: TONE[contextLevel(used, window)] }), "cursor-pointer outline-offset-2 outline-clay focus-visible:outline-2")}
     >
       {text}
     </button>

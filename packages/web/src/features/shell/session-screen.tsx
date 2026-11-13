@@ -2,6 +2,7 @@ import { forkPoint, type TodoItem } from "@golem/view";
 import { INSPECTOR_ID, InspectorPanel } from "../trace/index.ts";
 import { useEffect, useMemo, useRef, type ReactNode, type Ref, type RefObject } from "react";
 import { Badge, badgeVariants } from "../../ui/badge.tsx";
+import { cn } from "../../ui/cn.ts";
 import { Button } from "../../ui/button.tsx";
 import { FolderIcon, InspectIcon, PanelIcon } from "../../ui/icons.tsx";
 import { PixelGolem } from "../../ui/pixel-golem.tsx";
@@ -64,7 +65,7 @@ function ModelChip({
       aria-label={`Model: ${name}`}
       aria-haspopup="dialog"
       onClick={() => openModelDialog({ sessionId, returnTo: "chip" })}
-      className={`${badgeVariants()} cursor-pointer outline-offset-2 outline-clay hover:border-ink hover:text-ink focus-visible:outline-2`}
+      className={cn(badgeVariants(), "cursor-pointer outline-offset-2 outline-clay hover:border-ink hover:text-ink focus-visible:outline-2")}
     >
       <span aria-hidden="true" className="size-1.5 rounded-full bg-allow" />
       {name}
