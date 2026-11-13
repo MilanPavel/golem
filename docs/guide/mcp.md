@@ -18,15 +18,15 @@ Type `/mcp add`. golem lists the servers it knows, each with one line on what it
 - **GitHub** and **Brave Search** ask for a token. The prompt hides what you type, and the token goes to the Keychain. GitHub's prompt says how to make one: at github.com/settings/personal-access-tokens/new, pick the repos under Repository access, then add Contents, Issues, and Pull requests.
 - **Other** asks for a name, then a command or a URL.
 
-A server you already added says so, and one that can't be added says why. Servers added this way are **on demand**: they cost no tokens until a chat turns them on.
+A server you already added says so, and one that can't be added says why. Servers added this way are **on in every chat** right away. To keep one out of chats that do not need it, choose "Only when a chat asks (saves tokens)" in its menu.
 
 `/mcp add github` goes straight to that server. With no servers yet, `/mcp` shows the same list. In the web UI, **Add a server** in Settings → MCP servers does the same, and `/mcp add [id]` opens it.
 
 ### In the setup window
 
-The first time you set golem up, and only when your `config.toml` has no `[mcp]` table, the setup window offers some tools after the model step: Fetch, Context7, and Playwright ticked, and GitHub unticked. Space ticks one, and Enter adds the ticked ones. A server that needs Node or uv installs it first, and each row says what it is doing, then `added · N tools · on demand`. Ticking GitHub asks for a token, hidden, and an empty token skips it. A server that fails says why, and the others stay added: paste a new token, or skip it. You can skip the whole offer.
+The first time you set golem up, and only when your `config.toml` has no `[mcp]` table, the setup window offers some tools after the model step: Fetch, Context7, and Playwright ticked, and GitHub unticked. Space ticks one, and Enter adds the ticked ones. A server that needs Node or uv installs it first, and each row says what it is doing, then `added · N tools · on in every chat`. Ticking GitHub asks for a token, hidden, and an empty token skips it. A server that fails says why, and the others stay added: paste a new token, or skip it. You can skip the whole offer.
 
-Every server is added **on demand**, so none costs a token until a chat turns it on. `/setup`, then Tools, opens the same list later, with the servers you have shown as added. `/mcp` manages them any time.
+Every server is added **on in every chat**. `/setup`, then Tools, opens the same list later, with the servers you have shown as added. `/mcp` manages them any time.
 
 ### From a terminal
 
@@ -150,7 +150,7 @@ To allow every tool of one server, set `approval = "allow"` in its table. Your o
 
 ## Only when you need it
 
-Every server's tools go into every prompt. That costs tokens, and many tools confuse small local models. With `enabled = "on_demand"`, a server stays out until a chat asks for it:
+By default every server's tools go into every prompt. That costs tokens, and many tools confuse small local models. With `enabled = "on_demand"`, a server stays out until a chat asks for it (loading a server's tools into context only when needed is later work, #490):
 
 ```toml
 [mcp.browser]
@@ -160,6 +160,12 @@ enabled = "on_demand"
 ```
 
 Type `/mcp enable browser` in a chat. Only that chat gets the server, and it stays on after a restart. `/mcp disable browser` turns it off again.
+
+### Let the model ask for it
+
+A chat with on-demand servers that are off tells the model about them in one short line, such as `MCP servers you can turn on: playwright (browse web pages), context7 (library docs)`. Each costs about 30 tokens. When a task needs one, the model calls `mcp_enable`, and you get an approval that shows its reason. Allow it and the server starts for that chat, and the model uses its tools in the same turn, as if you had typed `/mcp enable`. Deny it and the server stays off. The description is the catalog's, or the first line of the server's own `instructions` from the last time it ran.
+
+To keep a server out of that line, and so out of the model's reach, set `auto_enable = false` in its table. Only you can turn it on then.
 
 ## Servers on the web, with a token
 
@@ -203,6 +209,7 @@ A project's `.golem/config.toml` can add servers for chats in that folder, once 
 | `cwd` | your home, or the project | Where the server runs |
 | `url` | | An HTTP server's address, instead of `command` |
 | `headers` | `{}` | Headers sent with every request to `url` |
+| `auto_enable` | `true` | `false` keeps an on-demand server out of the line that tells the model what it can turn on |
 | `enabled` | `true` | `"on_demand"` for chats that run `/mcp enable`, or `false` to keep the settings without starting it |
 | `timeout_seconds` | `120` | The longest one tool call may take |
 | `tools` | all | `include` and `exclude` patterns for the tools the model gets, see above |

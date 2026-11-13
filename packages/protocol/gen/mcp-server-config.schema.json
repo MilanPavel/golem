@@ -71,6 +71,11 @@
       "title": "Args",
       "type": "array"
     },
+    "auto_enable": {
+      "default": true,
+      "title": "Auto Enable",
+      "type": "boolean"
+    },
     "command": {
       "anyOf": [
         {

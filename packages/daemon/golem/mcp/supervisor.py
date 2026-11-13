@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import functools
 import json
 import logging
 import os
@@ -45,6 +46,7 @@ from pydantic import BaseModel
 
 from golem.config import McpServers, McpServerSettings, load_mcp
 from golem.mcp import oauth
+from golem.mcp.catalog import load_catalog
 from golem.mcp.client import CallResult, McpClient, McpError
 from golem.mcp.launch import Secrets, find_command, transport_for
 from golem.mcp.probe import DEFAULT_TIMEOUTS, ProbeResult, Step, Timeouts, probe
@@ -52,6 +54,7 @@ from golem.mcp.tools import mcp_tools, tool_name
 from golem.mcp.transport import HttpTransport
 from golem.secrets import SecretStore, SecretStoreError
 from golem.tokens import CHARS_PER_TOKEN
+from golem.tools.mcp_enable import MCP_ENABLE
 from golem.tools.registry import Tool, ToolScope
 from golem_protocol.commands import (
     McpLoginDone,
@@ -73,6 +76,8 @@ START_SECONDS = 60.0
 LIST_SECONDS = 30.0
 STABLE_SECONDS = 60.0
 LOG_LINES = 500
+OFFER_CHARS = 110
+"""The most of a description the model's list of servers it can turn on shows."""
 REDACTED = "•••"
 
 Broadcast = Callable[[BaseModel], None]
@@ -133,6 +138,8 @@ class _Server:
     authenticate: str | None = None
     """The ``WWW-Authenticate`` header of its last 401, which helps find where to sign in."""
     login_task: asyncio.Task[None] | None = None
+    instructions: str | None = None
+    """The server's own ``instructions`` from the last ``initialize``. Kept across restarts."""
 
     @property
     def on_demand(self) -> bool:
@@ -189,7 +196,28 @@ class McpSupervisor:
         self._spawn(self._watch(), "mcp-watch")
 
     def tools(self, scope: ToolScope) -> list[Tool[Any]]:
-        return [tool for server in self._visible(scope) for tool in server.tools]
+        found = [tool for server in self._visible(scope) for tool in server.tools]
+        # The model can ask for a server only while there is one to ask for.
+        return [*found, MCP_ENABLE] if self.offers(scope) else found
+
+    def offers(self, scope: ToolScope) -> list[tuple[str, str]]:
+        """``(name, description)`` of each on-demand server the model may turn on in ``scope``.
+
+        The description is the catalog's, or the first line of the server's own
+        ``instructions`` from the last time it ran, cut short. It may be empty.
+        """
+        return [
+            (server.name, _describe(server))
+            for server in self._shown(scope.root)
+            if server.on_demand and server.settings.auto_enable and server.name not in scope.enabled
+        ]
+
+    def tool_names(self, scope: ToolScope, name: str) -> list[str]:
+        """The names of the tools of server ``name`` that the model gets in ``scope``."""
+        return [tool.name for tool in self._find(scope, name).tools]
+
+    def state_of(self, scope: ToolScope, name: str) -> McpServer:
+        return self._find(scope, name).status
 
     async def prepare(self, scope: ToolScope) -> None:
         servers = self._visible(scope)
@@ -645,6 +673,7 @@ class McpSupervisor:
             client = McpClient(transport, on_tools_changed=lambda: self._relist_soon(server))
             server.client = client
             await client.start(START_SECONDS)
+            server.instructions = client.instructions
             await self._list(server, client)
             return await self._watch_health(client)
         except McpError as exc:
@@ -796,6 +825,23 @@ class McpSupervisor:
         tasks = self._stopping if stopping else self._background
         tasks.add(task)
         task.add_done_callback(tasks.discard)
+
+
+def _describe(server: _Server) -> str:
+    """What the model is told a server is for, in at most :data:`OFFER_CHARS` characters."""
+    text = next((e.description for e in _catalog() if e.name == server.name), "")
+    if not text and server.instructions:
+        text = next((line.strip() for line in server.instructions.splitlines() if line.strip()), "")
+    text = " ".join(text.split())
+    return text if len(text) <= OFFER_CHARS else text[: OFFER_CHARS - 1].rstrip() + "…"
+
+
+@functools.cache
+def _catalog() -> tuple[Any, ...]:
+    try:
+        return tuple(load_catalog())
+    except ValueError:
+        return ()
 
 
 def _idle_state(settings: McpServerSettings) -> McpServerState:

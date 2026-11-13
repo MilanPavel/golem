@@ -65,6 +65,8 @@ class McpClient:
         self.server_info: Mapping[str, object] = {}
         """The server's ``serverInfo`` (name and version), once it has answered ``initialize``."""
         self.protocol_version: str | None = None
+        self.instructions: str | None = None
+        """The server's own ``instructions`` from ``initialize``, if it sent any."""
 
     async def start(self, timeout: float) -> None:
         """Open the transport and finish MCP's handshake. Raises :class:`McpError`."""
@@ -89,6 +91,8 @@ class McpClient:
         self._transport.protocol_version = self.protocol_version
         info = result.get("serverInfo")
         self.server_info = cast(dict[str, object], info) if isinstance(info, dict) else {}
+        text = result.get("instructions")
+        self.instructions = text if isinstance(text, str) and text.strip() else None
         await self._send({"jsonrpc": "2.0", "method": "notifications/initialized"})
 
     async def list_tools(self, timeout: float) -> list[McpTool]:

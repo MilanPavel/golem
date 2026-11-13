@@ -36,6 +36,8 @@ class PromptContext:
     cwd: str | None = None
     pinned: tuple[str, ...] = ()
     report: Callable[[Mapping[str, object]], None] | None = None
+    mcp_servers: tuple[str, ...] = ()
+    """The on-demand MCP servers the session has turned on."""
 
 
 SectionFn = Callable[[PromptContext], str | None]

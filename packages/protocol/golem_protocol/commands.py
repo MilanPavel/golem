@@ -1280,6 +1280,7 @@ class McpServerConfig(BaseModel):
     approval: Literal["ask", "read-only", "allow"] = "ask"
     env_passthrough: list[str] = Field(default_factory=list[str])
     oauth: McpOAuthConfig | None = None
+    auto_enable: bool = True
 
 
 class McpSecretInfo(BaseModel):
@@ -1516,7 +1517,7 @@ class McpCatalogEntry(BaseModel):
     auth: Literal["none", "token", "oauth"]
     inputs: list[McpCatalogInput] = Field(default_factory=list[McpCatalogInput])
     starter: bool = False
-    on_demand: bool = True
+    on_demand: bool = False
     available: bool = True
     reason: str | None = None
     missing: Literal["node", "uv", "docker"] | None = None

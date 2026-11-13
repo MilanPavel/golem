@@ -8,8 +8,8 @@ import { move, type Choice, type Mark, type MoveKey, type SetupLine, type SetupR
  * The Tools panel of the setup window: the starter MCP servers offered, with what each
  * needs, the ticks, the token a server asks for, and each row's progress while it is added.
  * The model is pure and has no layout: the terminal and the browser draw `toolsLines` or the
- * state itself, and do the work an effect names. Every server is added `on_demand` (the
- * daemon's catalog add does that), so none costs a token until a chat turns it on.
+ * state itself, and do the work an effect names. Every server is added on in every chat (the
+ * daemon's catalog add does that); loading tools only when needed is later work (#490).
  */
 
 export type ToolsRuntime = "node" | "uv";
@@ -313,7 +313,7 @@ export function toolsFailureChoices(row: ToolsRow): Choice<"token" | "retry" | "
   ];
 }
 
-/** The row's progress as one line: `waiting`, `installing Node`, `adding`, `added · 2 tools · on demand`, `failed · <hint>`. */
+/** The row's progress as one line: `waiting`, `installing Node`, `adding`, `added · 2 tools · on in every chat`, `failed · <hint>`. */
 export function toolsStatusText(row: ToolsRow): string {
   const status = row.status;
   switch (status.kind) {
@@ -332,7 +332,7 @@ export function toolsStatusText(row: ToolsRow): string {
         return "added";
       }
       const count = `${status.tools} tool${status.tools === 1 ? "" : "s"}`;
-      return `added · ${count} · on demand`;
+      return `added · ${count} · on in every chat`;
     }
     case "failed":
       return `failed · ${status.hint}`;

@@ -6,7 +6,6 @@ import asyncio
 import logging
 import os
 import time
-from dataclasses import replace
 from pathlib import Path
 from typing import Literal, cast
 
@@ -69,6 +68,7 @@ from golem.server.mcp_edit import (
 )
 from golem.server.mcp_import import mcp_import_apply, mcp_import_scan
 from golem.server.mcp_login import mcp_login, mcp_logout
+from golem.server.mcp_model import turn_on
 from golem.server.mcp_try import mcp_call, mcp_logs, mcp_test
 from golem.sessions.manager import (
     ApprovalNotFoundError,
@@ -940,9 +940,10 @@ async def _mcp_toggle(ctx: RequestContext, params: McpToggleParams, on: bool) ->
         mcp.check_toggle(scope, params.name)
     except McpServerError as exc:
         raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
-    names = await _sessions(ctx).set_mcp(params.session_id, params.name, on)
     if on:
-        mcp.start_for(replace(scope, enabled=frozenset(names)))
+        names = await turn_on(_sessions(ctx), mcp, params.session_id, scope, params.name)
+    else:
+        names = await _sessions(ctx).set_mcp(params.session_id, params.name, False)
     return McpToggleResult(session_id=params.session_id, mcp_servers=names)
 
 
