@@ -85,6 +85,8 @@ class ToolContext:
     artifacts: Artifacts | None = None
     network: Network = field(default_factory=Network)
     read_roots: tuple[Path, ...] = ()
+    enable_mcp: Callable[[str], Awaitable[list[str]]] | None = None
+    """Turns on an on-demand MCP server for the session. Returns its tool names."""
 
 
 @dataclass(frozen=True, slots=True)

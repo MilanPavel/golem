@@ -66,6 +66,14 @@ ASKED_KEY = "golem_asked_calls"
 MCP_KEY = "golem_mcp_servers"
 """``configurable`` key for the on-demand MCP servers the session turned on."""
 
+MCP_NOW_KEY = "golem_mcp_now"
+"""``configurable`` key for a set the model's ``mcp_enable`` adds to during one run, so the
+servers it turned on are in scope for the next model call before the session list is read again."""
+
+EnableMcp = Callable[[str, ToolScope, str], Awaitable[list[str]]]
+"""``(session_id, scope, name)``: turns the on-demand server on for the session, waits until it
+runs, and returns its tool names. Raises :class:`ToolError` when it cannot."""
+
 PREVIEW_CHARS = 4_000
 
 ARTIFACT_CHARS = 20_000
@@ -128,6 +136,7 @@ def tools_node(
     registry: ToolRegistry,
     policy: Policy,
     artifacts: Artifacts | None = None,
+    enable_mcp: Callable[[], EnableMcp | None] = lambda: None,
 ) -> Callable[[AgentState, RunnableConfig], Awaitable[dict[str, object]]]:
     async def tools(state: AgentState, config: RunnableConfig) -> dict[str, object]:
         last = state["messages"][-1]
@@ -135,6 +144,16 @@ def tools_node(
             return {"messages": []}
         session_tools = registry.scoped(scope_of(config))
         session_id = state.get("session_id")
+        enabler = enable_mcp()
+
+        async def enable_here(name: str) -> list[str]:
+            assert enabler is not None and session_id is not None
+            names = await enabler(session_id, scope_of(config), name)
+            now = cast(Mapping[str, object], config.get("configurable", {})).get(MCP_NOW_KEY)
+            if isinstance(now, set):
+                cast(set[str], now).add(name)
+            return names
+
         base = ToolContext(
             root=_root(config),
             shell=policy.shell(),
@@ -142,6 +161,7 @@ def tools_node(
             session_id=session_id,
             artifacts=artifacts,
             read_roots=_read_roots(state, config),
+            enable_mcp=enable_here if enabler is not None and session_id else None,
         )
         allowed = _allowed(config)
         mode = _mode(config)
@@ -438,7 +458,10 @@ def scope_of(config: RunnableConfig) -> ToolScope:
     """The outside tools this run's session sees: its folder and its enabled servers."""
     configurable = cast(Mapping[str, object], config.get("configurable", {}))
     raw = configurable.get(MCP_KEY)
-    names = cast(Sequence[object], raw) if isinstance(raw, list | tuple) else ()
+    names = list(cast(Sequence[object], raw)) if isinstance(raw, list | tuple) else []
+    now = configurable.get(MCP_NOW_KEY)
+    if isinstance(now, set):
+        names.extend(cast(set[object], now))
     return ToolScope(
         root=_root(config), enabled=frozenset(name for name in names if isinstance(name, str))
     )
@@ -470,11 +493,13 @@ __all__ = [
     "CWD_KEY",
     "DENIED_RESULT",
     "MCP_KEY",
+    "MCP_NOW_KEY",
     "MODE_KEY",
     "PINNED_FOLDERS_KEY",
     "PREVIEW_CHARS",
     "STATE_KEYS",
     "Answer",
+    "EnableMcp",
     "call_id_of",
     "cancelled_results",
     "scope_of",

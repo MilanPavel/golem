@@ -24,7 +24,7 @@ from golem.graphs.chat import ChatRuntime
 from golem.graphs.state import SCHEMA_VERSION
 from golem.models import options as model_options
 from golem.models.router import ModelIdentity, ModelRouter
-from golem.permissions.engine import Allowance
+from golem.permissions.engine import MCP_ENABLE, Allowance, server_grant
 from golem.permissions.policy import explain
 from golem.sessions.approvals import pending_approval
 from golem.sessions.bus import EventTarget, SummaryTarget
@@ -325,7 +325,9 @@ class SessionManager:
             session = await self._resolve(session_id)
             values = await self._runtime.values(session_id)
             identity = self._runtime.router.identity(session.model_profile)
-            system = await self._runtime.system_prompt(session_id, session.cwd, session.skills)
+            system = await self._runtime.system_prompt(
+                session_id, session.cwd, session.skills, sorted(session.mcp_servers)
+            )
             messages = plain_messages(values)
             return SessionView(
                 session_id=session.session_id,
@@ -689,6 +691,11 @@ class SessionManager:
                 rule = await self._remember(session, pending.name, pending.args)
             if decision == "allow_session":
                 session.allowed_tools.add((pending.name, pending.subject))
+            if pending.name == MCP_ENABLE and decision != "deny":
+                # Approving "turn on X" also approves X's tools for the rest of the session.
+                server = (args if args is not None else pending.args).get("name")
+                if isinstance(server, str) and server != "":
+                    session.allowed_tools.add(server_grant(server))
             resume = Resume(
                 session_id=session_id,
                 run_id=run.run_id,

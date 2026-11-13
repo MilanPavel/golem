@@ -6,13 +6,12 @@ import asyncio
 import logging
 import os
 import time
-from dataclasses import replace
 from pathlib import Path
 from typing import Literal, cast
 
 from pydantic import BaseModel, ConfigDict
 
-from golem import __version__
+from golem import __version__, install_info
 from golem.config import load_settings
 from golem.config_edit import (
     McpTableError,
@@ -69,6 +68,7 @@ from golem.server.mcp_edit import (
 )
 from golem.server.mcp_import import mcp_import_apply, mcp_import_scan
 from golem.server.mcp_login import mcp_login, mcp_logout
+from golem.server.mcp_model import turn_on
 from golem.server.mcp_try import mcp_call, mcp_logs, mcp_test
 from golem.sessions.manager import (
     ApprovalNotFoundError,
@@ -197,6 +197,9 @@ from golem_protocol.commands import (
     SessionSetOptionsResult,
     SessionSetSkillsParams,
     SessionSetSkillsResult,
+    SetupInstall,
+    SetupJob,
+    SetupPaths,
     SetupRow,
     SetupStatusParams,
     SetupStatusResult,
@@ -937,9 +940,10 @@ async def _mcp_toggle(ctx: RequestContext, params: McpToggleParams, on: bool) ->
         mcp.check_toggle(scope, params.name)
     except McpServerError as exc:
         raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
-    names = await _sessions(ctx).set_mcp(params.session_id, params.name, on)
     if on:
-        mcp.start_for(replace(scope, enabled=frozenset(names)))
+        names = await turn_on(_sessions(ctx), mcp, params.session_id, scope, params.name)
+    else:
+        names = await _sessions(ctx).set_mcp(params.session_id, params.name, False)
     return McpToggleResult(session_id=params.session_id, mcp_servers=names)
 
 
@@ -1063,7 +1067,19 @@ async def _setup_status(ctx: RequestContext, _params: SetupStatusParams) -> Setu
         (lambda _name: None) if secrets is None else secrets.get,
         live_mcp=None if ctx.state.mcp is None else ctx.state.mcp.statuses(),
     )
+    facts = await asyncio.to_thread(install_info.install_facts)
     return SetupStatusResult(
+        install=SetupInstall(
+            method=facts.method,
+            version=facts.version,
+            binary=facts.binary,
+            daemon_binary=facts.daemon_binary,
+        ),
+        paths=SetupPaths(**install_info.path_facts(ctx.state.paths)),
+        jobs=[
+            SetupJob(label=job.label, plist=job.plist, loaded=job.loaded, pid=job.pid)
+            for job in await asyncio.to_thread(install_info.jobs)
+        ],
         rows=[
             SetupRow(
                 part=check.part,
@@ -1075,7 +1091,7 @@ async def _setup_status(ctx: RequestContext, _params: SetupStatusParams) -> Setu
                 target=check.target,
             )
             for check in checks
-        ]
+        ],
     )
 
 

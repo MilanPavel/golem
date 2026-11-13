@@ -122,7 +122,7 @@ async def test_an_on_demand_server_starts_for_the_sessions_that_turn_it_on(
     assert _state(supervisor, "fake", mine).state == "running"
     assert _state(supervisor, "fake", mine).enabled is True
     assert await _call(supervisor, mine, "mcp__fake__echo", text="hi") == "echo: hi"
-    assert supervisor.tools(EVERYONE) == []
+    assert [tool.name for tool in supervisor.tools(EVERYONE)] == ["mcp_enable"]
 
     supervisor.check_toggle(mine, "fake")
     with pytest.raises(McpServerError, match="no MCP server named nope"):

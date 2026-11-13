@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { displayToolName, isDetail, stepCount, stepMark, summarizeSteps } from "./activity.ts";
+import { approvalQuestion, displayToolName, isDetail, stepCount, stepMark, summarizeSteps } from "./activity.ts";
 import type { ToolBlock } from "./chat-state.ts";
 
 const tool = (name: string, over: Partial<ToolBlock> = {}): ToolBlock => ({ callId: name, name, args: {}, status: "done", ...over });
@@ -56,4 +56,10 @@ test("steps count and detail names", () => {
   assert.equal(isDetail("quiet"), true);
   assert.equal(isDetail("loud"), false);
   assert.equal(isDetail(null), false);
+});
+
+test("approvalQuestion says an mcp_enable approval also covers the server's tools", () => {
+  assert.equal(approvalQuestion("mcp_enable", { name: "playwright", reason: "r" }), "Turn on playwright and let it use its tools in this chat?");
+  assert.equal(approvalQuestion("mcp_enable", {}), null);
+  assert.equal(approvalQuestion("shell", { name: "x" }), null);
 });
