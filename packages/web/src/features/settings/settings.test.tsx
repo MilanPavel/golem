@@ -120,12 +120,12 @@ test("the Setup section says the problem in a status line, and all set once it i
     focusManager.setFocused(false);
     focusManager.setFocused(true);
   });
-  expect(await screen.findByText("all set", { selector: "p" })).toBeTruthy();
+  expect(await screen.findByText("All set", { selector: "p" })).toBeTruthy();
 });
 
 test("the Setup section reads all set when nothing is wrong", async () => {
   mount("/settings", OK_ROWS);
-  expect(await screen.findByText("all set", { selector: "p" })).toBeTruthy();
+  expect(await screen.findByText("All set", { selector: "p" })).toBeTruthy();
 });
 
 test("Appearance offers Match system, Light and Dark, and the sidebar has no theme switch", async () => {

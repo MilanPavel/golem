@@ -1,5 +1,123 @@
 {
   "$defs": {
+    "SetupInstall": {
+      "additionalProperties": false,
+      "description": "Where golem is installed. ``binary`` is the ``golem`` program, null if not on the PATH.",
+      "properties": {
+        "binary": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Binary"
+        },
+        "daemon_binary": {
+          "minLength": 1,
+          "title": "Daemon Binary",
+          "type": "string"
+        },
+        "method": {
+          "enum": [
+            "homebrew",
+            "script",
+            "dev"
+          ],
+          "title": "Method",
+          "type": "string"
+        },
+        "version": {
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "method",
+        "version",
+        "daemon_binary"
+      ],
+      "title": "SetupInstall",
+      "type": "object"
+    },
+    "SetupJob": {
+      "additionalProperties": false,
+      "description": "A launchd job. ``pid`` is set only while it runs. ``plist`` is its file, present or not.",
+      "properties": {
+        "label": {
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "loaded": {
+          "title": "Loaded",
+          "type": "boolean"
+        },
+        "pid": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pid"
+        },
+        "plist": {
+          "minLength": 1,
+          "title": "Plist",
+          "type": "string"
+        }
+      },
+      "required": [
+        "label",
+        "plist",
+        "loaded"
+      ],
+      "title": "SetupJob",
+      "type": "object"
+    },
+    "SetupPaths": {
+      "additionalProperties": false,
+      "description": "The files golem keeps, absolute.",
+      "properties": {
+        "config": {
+          "minLength": 1,
+          "title": "Config",
+          "type": "string"
+        },
+        "home": {
+          "minLength": 1,
+          "title": "Home",
+          "type": "string"
+        },
+        "logs": {
+          "minLength": 1,
+          "title": "Logs",
+          "type": "string"
+        },
+        "socket": {
+          "minLength": 1,
+          "title": "Socket",
+          "type": "string"
+        }
+      },
+      "required": [
+        "home",
+        "config",
+        "logs",
+        "socket"
+      ],
+      "title": "SetupPaths",
+      "type": "object"
+    },
     "SetupRow": {
       "additionalProperties": false,
       "description": "One check. ``fix`` is a command to type; ``action`` is what a setup screen offers instead.\n\n``target`` is what the action is about: a provider for ``set_key``, a\nmodel ref for ``pick_model``.",
@@ -91,8 +209,37 @@
     }
   },
   "additionalProperties": false,
-  "description": "The rows in the order ``golem doctor`` prints them.",
+  "description": "The rows in the order ``golem doctor`` prints them.\n\n``install``, ``paths``, and ``jobs`` say where golem is installed and what\nruns it. A daemon that does not know them leaves them out.",
   "properties": {
+    "install": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SetupInstall"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "jobs": {
+      "items": {
+        "$ref": "#/$defs/SetupJob"
+      },
+      "title": "Jobs",
+      "type": "array"
+    },
+    "paths": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SetupPaths"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
     "rows": {
       "items": {
         "$ref": "#/$defs/SetupRow"

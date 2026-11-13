@@ -4,10 +4,12 @@ import { writeClipboard } from "./clipboard.ts";
 
 const COPIED_MS = 2000;
 
-/** A command in mono with a button that copies it. If the clipboard fails, the text is selected for a manual copy. */
-export function CopyCommand({ command }: { command: string }) {
+/**
+ * A small Copy button for `text`. It says Copied for a moment. If the clipboard fails, `onFail`
+ * runs, for the caller to select the text for a manual copy. `label` is the accessible name while it says Copy.
+ */
+export function CopyButton({ text, label, onFail }: { text: string; label?: string; onFail?: () => void }) {
   const [copied, setCopied] = useState(false);
-  const code = useRef<HTMLElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(
@@ -18,7 +20,7 @@ export function CopyCommand({ command }: { command: string }) {
   );
 
   function copy(): void {
-    writeClipboard(command).then(
+    writeClipboard(text).then(
       () => {
         setCopied(true);
         clearTimeout(timer.current);
@@ -27,26 +29,39 @@ export function CopyCommand({ command }: { command: string }) {
         }, COPIED_MS);
       },
       () => {
-        const node = code.current;
-        if (node !== null) {
-          try {
-            window.getSelection()?.selectAllChildren(node);
-          } catch {
-            // Nothing more to do: the text is on screen.
-          }
-        }
+        onFail?.();
       },
     );
   }
 
   return (
+    <Button size="sm" onClick={copy} className="px-2 py-0.5" aria-label={copied || label === undefined ? undefined : label}>
+      {copied ? "Copied" : "Copy"}
+    </Button>
+  );
+}
+
+/** A command in mono with a button that copies it. If the clipboard fails, the text is selected for a manual copy. */
+export function CopyCommand({ command }: { command: string }) {
+  const code = useRef<HTMLElement>(null);
+  return (
     <span className="inline-flex items-center gap-2">
       <code ref={code} className="rounded-sm bg-code-bg px-1.5 py-0.5 font-mono text-ink">
         {command}
       </code>
-      <Button size="sm" onClick={copy} className="px-2 py-0.5">
-        {copied ? "Copied" : "Copy"}
-      </Button>
+      <CopyButton
+        text={command}
+        onFail={() => {
+          const node = code.current;
+          if (node !== null) {
+            try {
+              window.getSelection()?.selectAllChildren(node);
+            } catch {
+              // Nothing more to do: the text is on screen.
+            }
+          }
+        }}
+      />
     </span>
   );
 }

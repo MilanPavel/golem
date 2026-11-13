@@ -820,6 +820,11 @@ export function setupProblem(rows: readonly SetupRow[]): string | null {
   return isNoModel(wrong) ? "no model yet" : problemText(wrong);
 }
 
+/** How bad the first problem is, for the mark beside `setupProblem`. Ok when all is well. */
+export function setupProblemState(rows: readonly SetupRow[]): SetupRow["state"] {
+  return wrongRow(rows)?.state ?? "ok";
+}
+
 function wrongRow(rows: readonly SetupRow[]): SetupRow | undefined {
   return rows.find((row) => row.state !== "ok" && row.part !== "service" && row.part !== "socket");
 }

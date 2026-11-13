@@ -1,10 +1,11 @@
-import { daemonServiceRow, HOSTED_PROVIDERS, pageServiceRow, setupFormRows, setupProblem, toolsSettled, type FormButtonId } from "@golem/view";
+import { daemonServiceRow, golemBlock, HOSTED_PROVIDERS, pageServiceRow, setupFormRows, setupProblem, setupProblemState, toolsSettled, type FormButtonId, type Mark } from "@golem/view";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useConnection } from "../../store/connection-context.tsx";
 import { useModelList, useNavigate, usePageHost, useSetupStatus } from "../../store/page-context.tsx";
 import { Button } from "../../ui/button.tsx";
 import { openModelDialog } from "../models/index.ts";
-import { AddKey, SetupFormView } from "../setup/setup-form.tsx";
+import { GolemBlockView } from "../setup/golem-block.tsx";
+import { AddKey, SetupFormView, SetupHeader } from "../setup/setup-form.tsx";
 import { ToolsOfferView } from "../setup/tools-offer.tsx";
 import { useSetupActions } from "../setup/use-setup-actions.ts";
 import { useTools } from "../setup/use-tools.ts";
@@ -16,6 +17,8 @@ function hasPage(path: string): boolean {
   const section = path.replace(/^\/settings\//, "");
   return path.startsWith("/settings/") && SECTIONS.some((item) => item.id === section);
 }
+
+const HEAD_MARKS: Record<"ok" | "warn" | "fail", Mark> = { ok: "ok", warn: "attn", fail: "fail" };
 
 /** The Tools offer of Settings → Setup, in place under the cards. The status is read again once the servers are added. */
 function AddTools({ onClose, onAdded }: { onClose: () => void; onAdded: () => void }) {
@@ -53,7 +56,7 @@ function AddTools({ onClose, onAdded }: { onClose: () => void; onAdded: () => vo
 }
 
 /**
- * Settings → Setup: each part of setup as a card with its fix beside it. It reads `setup.status`
+ * Settings → Setup: the golem block, then each part of setup as a row with its fix on the right. It reads `setup.status`
  * again when it opens and whenever the tab is seen again, because a key set in a terminal pushes
  * no event.
  */
@@ -82,6 +85,8 @@ export function SetupSection() {
     [sourceRows, connection.daemonVersion, pageHost.kept],
   );
   const line = sourceRows === null ? null : (setupProblem(sourceRows) ?? "all set");
+  const headMark: Mark = sourceRows === null ? "spin" : HEAD_MARKS[setupProblemState(sourceRows)];
+  const block = useMemo(() => (status.data === undefined || status.isError ? null : golemBlock(status.data)), [status.data, status.isError]);
   const saved = new Set(listing.data?.setup.keys ?? []);
   const keyProviders = HOSTED_PROVIDERS.map((item) => ({ id: item.id, name: item.name, blurb: item.blurb, saved: saved.has(item.id) }));
 
@@ -124,10 +129,15 @@ export function SetupSection() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <p role="status" className="font-mono text-sm text-muted">
-        {line ?? "checking…"}
-      </p>
+    <div className="flex flex-col gap-3">
+      <SetupHeader
+        mark={headMark}
+        text={line === null ? "Checking…" : line.charAt(0).toUpperCase() + line.slice(1)}
+        onRunAgain={() => {
+          navigate(welcomePath());
+        }}
+      />
+      {block === null ? null : <GolemBlockView block={block} />}
       {form === null ? null : (
         <>
           <SetupFormView
@@ -153,16 +163,6 @@ export function SetupSection() {
               actions.checkAgain("key");
             }}
           />
-          <div className="flex flex-col items-start gap-1">
-            <Button
-              onClick={() => {
-                navigate(welcomePath());
-              }}
-            >
-              Run setup again
-            </Button>
-            <p className="text-sm text-muted">Walk through the service, the engine, and the model from the start.</p>
-          </div>
         </>
       )}
     </div>
