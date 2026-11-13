@@ -1,5 +1,33 @@
 {
   "$defs": {
+    "McpOAuthConfig": {
+      "additionalProperties": false,
+      "description": "``oauth`` in an HTTP server's table: a client id for a server with no registration.",
+      "properties": {
+        "client_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Client Id"
+        },
+        "scopes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Scopes",
+          "type": "array"
+        }
+      },
+      "title": "McpOAuthConfig",
+      "type": "object"
+    },
     "McpToolFilterConfig": {
       "additionalProperties": false,
       "description": "``tools`` of ``[mcp.<name>]``: ``fnmatch`` patterns on the server's own tool names.\n\nAn empty ``include`` means every tool, and ``exclude`` wins.",
@@ -102,6 +130,17 @@
       },
       "title": "Headers",
       "type": "object"
+    },
+    "oauth": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/McpOAuthConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "timeout_seconds": {
       "default": 120,
