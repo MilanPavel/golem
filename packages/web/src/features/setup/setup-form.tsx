@@ -2,7 +2,7 @@ import { OLLAMA_DOWNLOAD_URL, providerName, type FormButtonId, type FormFix, typ
 import { useId, useState, type ReactNode } from "react";
 import { Button } from "../../ui/button.tsx";
 import { CopyCommand } from "../../ui/copy-command.tsx";
-import { fieldClass } from "../../ui/input.tsx";
+import { cn } from "../../ui/cn.ts";
 import { Link } from "../../ui/link.tsx";
 import { MarkGlyph } from "./mark-glyph.tsx";
 import { installLog, type SetupActionsState } from "./use-setup-actions.ts";
@@ -136,6 +136,26 @@ export function Output({ output, running }: { output: string; running: boolean }
   );
 }
 
+export type SetupHeaderProps = { mark: Mark; text: string; onRunAgain: () => void };
+
+/** `All set`, or the first problem, with its mark, and the way to walk through setup again. */
+export function SetupHeader({ mark, text, onRunAgain }: SetupHeaderProps) {
+  return (
+    <div className="flex items-center gap-2.5">
+      <MarkGlyph mark={mark} />
+      <p role="status" className="font-semibold">
+        {text}
+      </p>
+      <Button kind="ghost" size="sm" className="ml-auto" onClick={onRunAgain}>
+        Run setup again
+      </Button>
+    </div>
+  );
+}
+
+const TINT: Record<FormMark, string> = { ok: "", warn: "bg-wait-soft", fail: "bg-deny-soft" };
+const DETAIL_TONE: Record<FormMark, string> = { ok: "text-muted", warn: "text-wait", fail: "text-deny" };
+
 function Card(props: SetupFormViewProps & { row: FormRow }) {
   const { row, actions } = props;
   const card = cardKey(row);
@@ -150,39 +170,38 @@ function Card(props: SetupFormViewProps & { row: FormRow }) {
         : ollama
           ? actions.error.text
           : null;
+  const extra = (actions.noBrew && ollama) || error !== null || ollama;
   return (
-    <li className="flex flex-col gap-2 rounded-lg border border-line bg-surface p-4">
-      <div className="flex min-w-0 flex-1 items-start gap-3">
-        <span className="mt-0.5">
-          <MarkGlyph mark={MARKS[row.mark]} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="font-medium">{row.name}</p>
-          <p className="text-sm break-words text-muted">{row.detail}</p>
-          {actions.noBrew && ollama ? (
-            <p className="mt-1 text-sm text-muted">Homebrew isn't installed. Download Ollama, then check again.</p>
-          ) : null}
+    <li className={`flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-1.5 ${TINT[row.mark]}`}>
+      <MarkGlyph mark={MARKS[row.mark]} />
+      <p className="w-24 shrink-0 font-semibold">{row.name}</p>
+      <p title={row.detail} className={`min-w-0 flex-1 truncate text-sm ${DETAIL_TONE[row.mark]}`}>
+        {row.detail}
+      </p>
+      {row.fix === null ? null : (
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+          <Fix {...props} fix={row.fix} />
+        </div>
+      )}
+      {extra ? (
+        <div className="w-full pl-7">
+          {actions.noBrew && ollama ? <p className="text-sm text-muted">Homebrew isn't installed. Download Ollama, then check again.</p> : null}
           {error === null ? null : (
-            <p role="alert" className="mt-1 text-sm text-deny">
+            <p role="alert" className="text-sm text-deny">
               {error}
             </p>
           )}
           {ollama ? <Output output={actions.output} running={actions.running === "install"} /> : null}
         </div>
-      </div>
-      {row.fix === null ? null : (
-        <div className="flex flex-wrap items-center gap-2 pl-7">
-          <Fix {...props} fix={row.fix} />
-        </div>
-      )}
+      ) : null}
     </li>
   );
 }
 
-/** The cards of Settings → Setup. Every part of setup is a card with the fix beside it. */
+/** Settings → Setup: one bordered panel with a row for each part of setup, the fix on the right. */
 export function SetupFormView(props: SetupFormViewProps) {
   return (
-    <ul aria-label="Setup" className="grid grid-cols-1 gap-3 md:grid-cols-2 wide:grid-cols-3">
+    <ul aria-label="Setup" className="divide-y divide-line overflow-hidden rounded-md border border-line bg-surface">
       {props.rows.map((row) => (
         <Card key={cardKey(row)} {...props} row={row} />
       ))}
@@ -198,85 +217,78 @@ export type AddKeyProps = {
   providers: readonly KeyProvider[];
   actions: SetupActionsState;
   onCheck: (from: HTMLElement) => void;
+  /** The provider whose line starts open. The gallery uses it. */
+  initialOpen?: string | null;
 };
 
+const CHIP = "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium outline-offset-2 outline-clay focus-visible:outline-2";
+
 /**
- * Under the cards: which providers have a key saved, then the command that stores one. The page
- * only knows whether a key is saved, never its value, and never takes one.
+ * Under the status rows: a chip for each provider, saved ones in the allow tone. A chip opens one
+ * line with the command that stores a key. The page only knows whether a key is saved, never its
+ * value, and never takes one.
  */
-export function AddKey({ providers, actions, onCheck }: AddKeyProps) {
+export function AddKey({ providers, actions, onCheck, initialOpen = null }: AddKeyProps) {
   const id = useId();
-  const [picked, setPicked] = useState<string | null>(null);
-  // Offer the first provider with no key, else the first.
-  const chosen =
-    providers.find((item) => item.id === picked) ?? providers.find((item) => !item.saved) ?? providers[0] ?? null;
+  const [open, setOpen] = useState<string | null>(initialOpen);
+  const chosen = providers.find((item) => item.id === open) ?? null;
   const checking = actions.running === "check" && actions.from === "key";
   if (providers.length === 0) return null;
   return (
-    <div role="group" aria-labelledby={`${id}-title`} className="flex flex-col gap-3 rounded-lg border border-line bg-surface p-4">
-      <h3 id={`${id}-title`} className="font-medium">
-        API keys
+    <div role="group" aria-labelledby={`${id}-title`} className="flex flex-col gap-2">
+      <h3 className="text-sm font-semibold">
+        <span id={`${id}-title`}>API keys</span> <span className="font-normal text-muted">· optional, for cloud models</span>
       </h3>
-      <ul aria-label="Saved keys" className="flex flex-col divide-y divide-line text-sm">
+      <div className="flex flex-wrap gap-2">
         {providers.map((item) => (
-          <li key={item.id} className="flex items-center gap-3 py-1.5">
-            <span className="w-24 font-medium">{item.name}</span>
-            <span className="min-w-0 flex-1 truncate text-muted">{item.blurb}</span>
-            {item.saved ? (
-              <span className="inline-flex items-center gap-1.5 text-ink">
-                <MarkGlyph mark="ok" />
-                key saved
-              </span>
-            ) : (
-              <span className="text-muted">no key</span>
+          <button
+            key={item.id}
+            type="button"
+            aria-expanded={open === item.id}
+            onClick={() => {
+              setOpen(open === item.id ? null : item.id);
+            }}
+            className={cn(
+              CHIP,
+              item.saved ? "border-transparent bg-allow-soft text-allow" : "border-line-strong bg-surface text-muted hover:border-ink hover:text-ink",
+              open === item.id && "border-clay text-ink ring-1 ring-clay",
             )}
-          </li>
+          >
+            <span aria-hidden="true">{item.saved ? "✓" : "+"}</span>
+            {item.name}
+            <small className="font-mono text-xs">{item.saved ? "saved" : item.blurb}</small>
+          </button>
         ))}
-      </ul>
+      </div>
       {chosen === null ? null : (
-        <>
-          <p className="text-sm text-muted">
-            The page never takes a key. In a terminal, run this and paste the key there{chosen.saved ? ", to replace the saved one" : ""}:
-          </p>
-          <div className="flex flex-wrap items-center gap-2">
-            <label htmlFor={`${id}-provider`} className="sr-only">
-              Provider
-            </label>
-            <select
-              id={`${id}-provider`}
-              value={chosen.id}
-              onChange={(event) => {
-                setPicked(event.target.value);
+        <div
+          role="group"
+          aria-label={`${chosen.name} key`}
+          className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border border-dashed border-line-strong px-3 py-2"
+        >
+          {chosen.saved ? <span className="text-sm">Key saved. To replace it:</span> : null}
+          <CopyCommand command={`golem auth set ${chosen.id}`} />
+          {checking ? (
+            <Working>Checking…</Working>
+          ) : (
+            <Button
+              size="sm"
+              kind="ghost"
+              disabled={actions.running !== null}
+              onClick={(event) => {
+                onCheck(event.currentTarget);
               }}
-              className={`${fieldClass} w-auto`}
             >
-              {providers.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.saved ? `${item.name} · key saved` : item.name}
-                </option>
-              ))}
-            </select>
-            <CopyCommand command={`golem auth set ${chosen.id}`} />
-            {checking ? (
-              <Working>Checking…</Working>
-            ) : (
-              <Button
-                size="sm"
-                disabled={actions.running !== null}
-                onClick={(event) => {
-                  onCheck(event.currentTarget);
-                }}
-              >
-                Check again
-              </Button>
-            )}
-          </div>
+              Check again
+            </Button>
+          )}
+          <p className="w-full text-sm text-muted">The page never takes a key. Paste it in a terminal.</p>
           {actions.error?.action === "check" && actions.from === "key" ? (
-            <p role="alert" className="text-sm text-deny">
+            <p role="alert" className="w-full text-sm text-deny">
               {actions.error.text}
             </p>
           ) : null}
-        </>
+        </div>
       )}
     </div>
   );

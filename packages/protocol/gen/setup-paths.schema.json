@@ -1,0 +1,34 @@
+{
+  "additionalProperties": false,
+  "description": "The files golem keeps, absolute.",
+  "properties": {
+    "config": {
+      "minLength": 1,
+      "title": "Config",
+      "type": "string"
+    },
+    "home": {
+      "minLength": 1,
+      "title": "Home",
+      "type": "string"
+    },
+    "logs": {
+      "minLength": 1,
+      "title": "Logs",
+      "type": "string"
+    },
+    "socket": {
+      "minLength": 1,
+      "title": "Socket",
+      "type": "string"
+    }
+  },
+  "required": [
+    "home",
+    "config",
+    "logs",
+    "socket"
+  ],
+  "title": "SetupPaths",
+  "type": "object"
+}

@@ -1,0 +1,39 @@
+{
+  "additionalProperties": false,
+  "description": "A launchd job. ``pid`` is set only while it runs. ``plist`` is its file, present or not.",
+  "properties": {
+    "label": {
+      "minLength": 1,
+      "title": "Label",
+      "type": "string"
+    },
+    "loaded": {
+      "title": "Loaded",
+      "type": "boolean"
+    },
+    "pid": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Pid"
+    },
+    "plist": {
+      "minLength": 1,
+      "title": "Plist",
+      "type": "string"
+    }
+  },
+  "required": [
+    "label",
+    "plist",
+    "loaded"
+  ],
+  "title": "SetupJob",
+  "type": "object"
+}

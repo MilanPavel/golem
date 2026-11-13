@@ -1,0 +1,45 @@
+{
+  "additionalProperties": false,
+  "description": "Where golem is installed. ``binary`` is the ``golem`` program, null if not on the PATH.",
+  "properties": {
+    "binary": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Binary"
+    },
+    "daemon_binary": {
+      "minLength": 1,
+      "title": "Daemon Binary",
+      "type": "string"
+    },
+    "method": {
+      "enum": [
+        "homebrew",
+        "script",
+        "dev"
+      ],
+      "title": "Method",
+      "type": "string"
+    },
+    "version": {
+      "minLength": 1,
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "method",
+    "version",
+    "daemon_binary"
+  ],
+  "title": "SetupInstall",
+  "type": "object"
+}
