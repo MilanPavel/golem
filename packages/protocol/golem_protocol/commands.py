@@ -1280,6 +1280,7 @@ class McpServerConfig(BaseModel):
     approval: Literal["ask", "read-only", "allow"] = "ask"
     env_passthrough: list[str] = Field(default_factory=list[str])
     oauth: McpOAuthConfig | None = None
+    auto_enable: bool = True
 
 
 class McpSecretInfo(BaseModel):

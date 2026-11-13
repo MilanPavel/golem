@@ -36,9 +36,11 @@ from golem.graphs.tools_node import (
     ASKED_KEY,
     CWD_KEY,
     MCP_KEY,
+    MCP_NOW_KEY,
     MODE_KEY,
     PINNED_FOLDERS_KEY,
     Answer,
+    EnableMcp,
     cancelled_results,
     scope_of,
     tools_node,
@@ -137,6 +139,8 @@ class ChatRuntime:
         self.policy = Policy(None) if policy is None else policy
         self.prompt = SystemPrompt() if prompt is None else prompt
         self.window_of = window_of
+        self.enable_mcp: EnableMcp | None = None
+        """Turns on an on-demand MCP server for a session, for the model's ``mcp_enable``."""
         self.until_pulled: Callable[[str], Awaitable[None]] | None = None
         """Waits until a model's download ends, given its ref. Raises with the download's error."""
 
@@ -149,11 +153,16 @@ class ChatRuntime:
         return cast(Mapping[str, object], raw)
 
     async def system_prompt(
-        self, session_id: str, cwd: str | None, pinned: Sequence[str] = ()
+        self,
+        session_id: str,
+        cwd: str | None,
+        pinned: Sequence[str] = (),
+        mcp_servers: Sequence[str] = (),
     ) -> str:
         """The system prompt the next model call of ``session_id`` would get, or ``""``."""
         values = await self.values(session_id)
-        return self.prompt.text(PromptContext(values, cwd, tuple(pinned)))
+        context = PromptContext(values, cwd, tuple(pinned), mcp_servers=tuple(mcp_servers))
+        return self.prompt.text(context)
 
     async def stream(
         self,
@@ -194,6 +203,7 @@ class ChatRuntime:
                 CWD_KEY: cwd or "",
                 ALLOWED_KEY: [list(pair) for pair in allowed_tools],
                 MCP_KEY: list(mcp_servers),
+                MCP_NOW_KEY: set[str](),
                 PINNED_KEY: list(pinned),
                 PINNED_FOLDERS_KEY: list(pinned_folders),
                 OPTIONS_KEY: dict(options or {}),
@@ -243,6 +253,7 @@ class ChatRuntime:
                 ALLOWED_KEY: [list(pair) for pair in allowed_tools],
                 ASKED_KEY: list(asked),
                 MCP_KEY: list(mcp_servers),
+                MCP_NOW_KEY: set[str](),
                 PINNED_KEY: list(pinned),
                 PINNED_FOLDERS_KEY: list(pinned_folders),
                 OPTIONS_KEY: dict(options or {}),
@@ -394,7 +405,13 @@ def open_chat(
         await registry.prepare(scope)
         tools = registry.scoped(scope)
         schemas = tools.schemas()
-        context = PromptContext(state, _cwd(config), _pinned(config), get_stream_writer())
+        context = PromptContext(
+            state,
+            _cwd(config),
+            _pinned(config),
+            get_stream_writer(),
+            tuple(sorted(scope.enabled)),
+        )
         parts = system_prompt.parts(context)
         text = "\n\n".join(t for _, t in parts)
         system = SystemMessage(content=text) if text else None
@@ -472,18 +489,25 @@ def open_chat(
 
     builder = cast(_GraphBuilder, StateGraph(AgentState))
     builder.add_node("call_model", call_model)
-    builder.add_node("tools", tools_node(registry, rules, artifacts))
+    runtime: list[ChatRuntime] = []
+    builder.add_node(
+        "tools",
+        tools_node(registry, rules, artifacts, lambda: runtime[0].enable_mcp if runtime else None),
+    )
     builder.add_edge(START, "call_model")
     builder.add_conditional_edges("call_model", route, {"tools": "tools", "end": END})
     builder.add_edge("tools", "call_model")
-    return ChatRuntime(
-        builder.compile(checkpointer=checkpointer),
-        router,
-        registry,
-        rules,
-        system_prompt,
-        window_of,
+    runtime.append(
+        ChatRuntime(
+            builder.compile(checkpointer=checkpointer),
+            router,
+            registry,
+            rules,
+            system_prompt,
+            window_of,
+        )
     )
+    return runtime[0]
 
 
 def _without_thinking(messages: Sequence[BaseMessage]) -> list[BaseMessage]:
