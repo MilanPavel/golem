@@ -150,7 +150,7 @@ test("the chat has no accessibility violations", async () => {
   expect((await axe.run(container, noContrast)).violations).toEqual([]);
 });
 
-test("the chat shows ctx after a model call, and the chip opens the trace on that call", async () => {
+test("the chat shows ctx after a model call, and the chip opens the trace panel on that call", async () => {
   const { fake, container } = await open();
   act(() => {
     fake.emitEvent(ev("a", "model.call.started", { message_id: "m_1", index: 1, profile: "default", context_window: 128000 }));
@@ -160,6 +160,25 @@ test("the chat shows ctx after a model call, and the chip opens the trace on tha
   expect(chip.textContent).toBe("ctx 25%");
   expect((await axe.run(container, noContrast)).violations).toEqual([]);
   await userEvent.setup().click(chip);
-  expect(location.pathname).toBe("/s/a/trace");
-  expect(location.search).toBe("?span=m_1");
+  expect(location.pathname).toBe("/s/a");
+  expect(location.search).toBe("?inspect=m_1");
+  expect(screen.getByRole("complementary", { name: "Trace inspector" })).toBeTruthy();
+  expect(screen.getByRole("link", { name: /Open full/ }).getAttribute("href")).toBe("/s/a/trace?span=m_1");
+});
+
+test("with the panel already open on another span, the chip switches it to the latest call", async () => {
+  const { fake } = await open();
+  act(() => {
+    fake.emitEvent(ev("a", "model.call.started", { message_id: "m_1", index: 1, profile: "default", context_window: 128000 }));
+    fake.emitEvent(ev("a", "model.call.completed", { message_id: "m_1", latency_ms: 900, usage: { input: 32000, output: 10 } }));
+  });
+  act(() => {
+    history.replaceState(null, "", "/s/a?inspect=other");
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  });
+  expect(location.search).toBe("?inspect=other");
+  await userEvent.setup().click(screen.getByRole("button", { name: /^Context 32\.0K/ }));
+  expect(location.pathname).toBe("/s/a");
+  expect(location.search).toBe("?inspect=m_1");
+  expect(screen.getAllByRole("complementary", { name: "Trace inspector" })).toHaveLength(1);
 });
