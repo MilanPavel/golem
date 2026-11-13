@@ -3,6 +3,7 @@ import {
   formatSeconds,
   mcpStatusWord,
   mcpSummary,
+  ONLY_WHEN_ASKED,
   MCP_HINT,
   orderedServers,
   shortPath,
@@ -344,7 +345,7 @@ function Detail({ server, sessionId, onBack }: { server: McpServer; sessionId: s
   const place = (label: string, enabled: boolean | "on_demand"): Choice => ({ label, action: { kind: "set-enabled", name: server.name, enabled } });
   const more: Choice[] = [
     ...(mode === "every" ? [] : [place("Enable for every chat", true)]),
-    ...(mode === "on_demand" ? [] : [place("On demand", "on_demand")]),
+    ...(mode === "on_demand" ? [] : [place(ONLY_WHEN_ASKED, "on_demand")]),
     ...(mode === "off" ? [] : [place("Disable everywhere", false)]),
   ];
   const removable = detailChoices(shown).some((choice) => choice.action === "ask-remove");

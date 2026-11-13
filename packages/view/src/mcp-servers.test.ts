@@ -19,9 +19,9 @@ const lazy: McpServer = { ...git, name: "lazy", state: "idle", tools: [], schema
 const project: McpServer = { ...git, name: "db", project: "/work/app" };
 
 test("a row says tools and tokens, or the error and when it retries, or how it is turned on", () => {
-  assert.equal(mcpSummary(git), "2 tools · 1.3K tokens");
-  assert.equal(mcpSummary({ ...git, tools_hidden: 1, approval: "allow" }), "2 tools · 1.3K tokens · 1 hidden · allow");
-  assert.equal(mcpSummary({ ...git, approval: "read-only" }), "2 tools · 1.3K tokens · read-only");
+  assert.equal(mcpSummary(git), "2 tools · 1.3K tokens · on in every chat");
+  assert.equal(mcpSummary({ ...git, tools_hidden: 1, approval: "allow" }), "2 tools · 1.3K tokens · 1 hidden · allow · on in every chat");
+  assert.equal(mcpSummary({ ...git, approval: "read-only" }), "2 tools · 1.3K tokens · read-only · on in every chat");
   assert.equal(mcpSummary({ ...git, tools: ["x"], schema_tokens: 40, on_demand: true, enabled: true }), "1 tool · 40 tokens · on in this chat");
   assert.equal(mcpSummary(down), "exited · retry in 4s");
   assert.equal(mcpSummary(lazy), "on demand · off in this chat");
@@ -46,10 +46,15 @@ test("the user's servers come before the project's", () => {
 
 test("the choices fit the state, and a project's server is not removed from here", () => {
   const labels = (server: McpServer) => detailChoices(server).map((choice) => choice.label);
-  assert.deepEqual(labels(lazy), ["Turn on for this chat", "Start", "Disable everywhere", "Test the connection", "View the log", "Remove"]);
-  assert.deepEqual(labels({ ...git, state: "disabled" }).slice(0, 2), ["Enable for every chat", "Enable on demand"]);
+  assert.deepEqual(labels(lazy), ["Turn on for this chat", "Start", "Enable for every chat", "Disable everywhere", "Test the connection", "View the log", "Remove"]);
+  assert.deepEqual(labels({ ...git, state: "disabled" }).slice(0, 2), ["Enable for every chat", "Only when a chat asks (saves tokens)"]);
   assert.ok(labels(git).includes("View tools"));
   assert.ok(labels(git).includes("Reconnect"));
+  // Every chat offers on demand, on demand offers every chat, disabled offers both.
+  assert.deepEqual(labels(git).slice(0, 4), ["View tools", "Reconnect", "Only when a chat asks (saves tokens)", "Disable everywhere"]);
+  assert.ok(!labels(git).includes("Enable for every chat"));
+  assert.ok(labels(lazy).includes("Enable for every chat"));
+  assert.ok(!labels(lazy).includes("Only when a chat asks (saves tokens)"));
   assert.ok(!labels({ ...git, state: "disabled" }).some((label) => label === "Reconnect" || label === "Start"));
   assert.ok(!labels(project).includes("Remove"));
 });

@@ -18,7 +18,7 @@ flowchart LR
 
 The client is golem's own. MCP is JSON-RPC 2.0, and golem needs five messages of it: `initialize`, `notifications/initialized`, `tools/list`, `tools/call`, and `ping`. A transport carries them: a child process's stdin and stdout, one message per line, or Streamable HTTP.
 
-Which tools a session sees depends on the session. A server is on for every session, on demand for the sessions that turn it on, or off. A trusted project can add servers for the sessions in its folder.
+Which tools a session sees depends on the session. A server is on for every session (what the catalog adds), on demand for the sessions that turn it on, or off. A trusted project can add servers for the sessions in its folder.
 
 ## What the code does today
 

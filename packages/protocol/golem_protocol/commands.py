@@ -1517,7 +1517,7 @@ class McpCatalogEntry(BaseModel):
     auth: Literal["none", "token", "oauth"]
     inputs: list[McpCatalogInput] = Field(default_factory=list[McpCatalogInput])
     starter: bool = False
-    on_demand: bool = True
+    on_demand: bool = False
     available: bool = True
     reason: str | None = None
     missing: Literal["node", "uv", "docker"] | None = None

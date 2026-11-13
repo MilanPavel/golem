@@ -122,7 +122,7 @@ test("the list groups servers by the file that names them, with each state in wo
   expect(project.textContent).toContain("(/work/app/.golem/config.toml)");
   expect(within(project).getByRole("button", { name: /db/ })).toBeTruthy();
   expect(within(yours).getAllByRole("button").map((button) => button.textContent)).toEqual([
-    "running, gitrunning2 tools · 1.3K tokens",
+    "running, gitrunning2 tools · 1.3K tokens · on in every chat",
     "failed, githubfailed401 Unauthorized · retry in 5s",
     "on demand, lazyon demand",
     "disabled, offdisabled",
@@ -214,7 +214,7 @@ test("enabling a disabled server asks first, showing the command, and acts only 
   expect(document.activeElement).toBe(within(dialog).getByRole("button", { name: "Cancel" }));
   await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
   expect(fake.raw.setMcpEnabled).not.toHaveBeenCalled();
-  await menu(user, "off", "On demand");
+  await menu(user, "off", "Only when a chat asks (saves tokens)");
   await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Enable" }));
   expect(fake.raw.setMcpEnabled).toHaveBeenCalledWith("off", "on_demand", undefined);
   await menu(user, "off", "Enable for every chat");

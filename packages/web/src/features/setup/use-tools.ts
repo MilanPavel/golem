@@ -46,7 +46,7 @@ const noop = (): void => undefined;
  * The Tools panel's state and its work, shared by `/welcome` and Settings → Setup. The model is
  * `@golem/view`'s; this hook does what its effects name: install Node or uv, add the server,
  * and try it for its tool count and its one hint. A token is held only until the call that uses
- * it, and every server is added `on_demand` by the daemon's catalog add.
+ * it, and every server is added on in every chat by the daemon's catalog add.
  */
 export function useTools({ mode, enabled }: { mode: ToolsState["mode"]; enabled: boolean }): ToolsController {
   const actions = usePageActions();
