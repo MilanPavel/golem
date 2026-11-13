@@ -137,7 +137,7 @@ These rules came from the 10.17 redesign. A turn should read like an answer, not
 - Clicking the line opens the steps in place. The steps form a list with a thin `line` rule at the left: one mono row per step, with a mark, the tool, and a one-line result.
 - An MCP tool reads `github · get_me`, not `mcp__github__get_me`.
 
-**Detail: Quiet, Normal, Verbose.** A switch in the session header and `/detail` set how much shows. The choice is remembered per browser.
+**Detail: Quiet, Normal, Verbose.** The Chat detail setting in Settings, under Appearance, and `/detail` set how much shows, for every chat. The choice is remembered per browser.
 
 | Detail | Shows |
 |---|---|

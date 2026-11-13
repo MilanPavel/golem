@@ -10,7 +10,7 @@ import { useNavigate, useRememberOpenedFolder, useRoute, useSession, useSessionL
 import { inspectPath, sessionPath } from "../../store/router.ts";
 import { hasMod, modShortcut } from "../../ui/platform.ts";
 import type { SessionModel, SessionView } from "../../store/session-store.ts";
-import { DetailSwitch, Transcript } from "../chat/index.ts";
+import { Transcript } from "../chat/index.ts";
 import { SessionDock } from "../composer/index.ts";
 import { Drawer, DRAWER_ID, useDrawerOpen } from "../drawer/index.ts";
 import { closeModelDialog, ModelDialog, openModelDialog, useModelDialogOpen } from "../models/index.ts";
@@ -251,7 +251,6 @@ export function SessionFrame({ id, children }: { id: string; children: ReactNode
     <div className="flex min-h-0 min-w-0 flex-1">
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <TopBar title={<SessionTitle title={title || null} canFork={atMessage !== null} actions={titleActions} />}>
-          <DetailSwitch />
           {model ? <ModelChip sessionId={id} model={model} buttonRef={chip} /> : null}
           {cwd === undefined ? null : (
             <Badge title={cwd ?? undefined}>
