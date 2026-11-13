@@ -48,11 +48,11 @@ class CatalogInput(BaseModel):
 
 
 class CatalogDefaults(BaseModel):
-    """What an added server starts with. Most are ``on_demand``, so they cost no tokens."""
+    """What an added server starts with: on in every chat unless an entry says ``on_demand``."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    enabled: McpEnabled = "on_demand"
+    enabled: McpEnabled = True
     tools: McpToolFilter = Field(default_factory=McpToolFilter)
     approval: McpApproval = "ask"
 

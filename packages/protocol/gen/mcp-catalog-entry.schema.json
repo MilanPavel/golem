@@ -147,7 +147,7 @@
       "type": "string"
     },
     "on_demand": {
-      "default": true,
+      "default": false,
       "title": "On Demand",
       "type": "boolean"
     },

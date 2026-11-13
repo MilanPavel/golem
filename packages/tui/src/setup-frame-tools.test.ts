@@ -165,7 +165,7 @@ test("H3: adding names each row, Node first, and Esc stops what waits", () => {
   assert.equal(stopped.ui.state?.rows.find((row) => row.id === "playwright")?.status.kind, "skipped");
 });
 
-test("H4: when all are added, Enter continues and the footer says on demand", () => {
+test("H4: when all are added, Enter continues and the footer says every chat", () => {
   let state = pressTools(open(), K("enter")).ui.state as ToolsState;
   for (const [id, count] of [["fetch", 1], ["context7", 2], ["playwright", 21]] as const) {
     state = toolsStep(state).state;
@@ -179,11 +179,11 @@ test("H4: when all are added, Enter continues and the footer says on demand", ()
   const view = sees(ui);
   assert.equal(view.screen, "tools-added");
   assert.deepEqual(view.text.slice(0, 3), [
-    "✓ Fetch      added · 1 tool · on demand",
-    "✓ Context7   added · 2 tools · on demand",
-    "✓ Playwright added · 21 tools · on demand",
+    "✓ Fetch      added · 1 tool · on in every chat",
+    "✓ Context7   added · 2 tools · on in every chat",
+    "✓ Playwright added · 21 tools · on in every chat",
   ]);
-  assert.ok(view.text.includes("On demand: a chat turns one on with /mcp, or golem asks"));
+  assert.ok(view.text.includes("On in every chat. Turn one off, or make it"));
   assert.equal(toolsHint(view.screen as "tools-added", 0, true), "Enter continues");
   assert.deepEqual(pressTools(ui, K("enter")).act, { kind: "leave", result: { kind: "done" } });
   assert.deepEqual(pressTools(ui, K("back")).act, { kind: "none" });
@@ -285,7 +285,7 @@ test("a small terminal draws the same lines with no border", () => {
   assert.equal(setupHint("tools-offer", guided("tools", "start"), 3).split(" · ").length, 4);
 });
 
-test("guided setup on a fresh home reaches Tools, and Enter adds the three starters on demand", () => {
+test("guided setup on a fresh home reaches Tools, and Enter adds the three starters", () => {
   // Model's done goes to Tools when the config has no [mcp] table.
   const from = guided("model", "start");
   const next = advance(from, { kind: "done" }, { ollamaRunning: true, mcpEmpty: true });
@@ -331,10 +331,10 @@ test("Ready shows the Tools row only when Tools ran or servers exist", () => {
   const base = { service: "running", engine: "Ollama on this Mac", model: "Gemma 4 E4B · saved as default" };
   assert.equal(readyLines(base).some((line) => line.kind === "row" && line.label === "Tools"), false);
   assert.equal(toolsReadyText([], []), null);
-  assert.equal(toolsReadyText(["Fetch", "Context7"], []), "Fetch, Context7 · on demand");
+  assert.equal(toolsReadyText(["Fetch", "Context7"], []), "Fetch, Context7 · on in every chat");
   assert.equal(toolsReadyText([], ["github"]), "github");
   const row = readyLines({ ...base, tools: toolsReadyText(["Fetch", "Context7", "Playwright"], []) }).find(
     (line) => line.kind === "row" && line.label === "Tools",
   );
-  assert.deepEqual(row && row.kind === "row" && row.text, "Fetch, Context7, Playwright · on demand");
+  assert.deepEqual(row && row.kind === "row" && row.text, "Fetch, Context7, Playwright · on in every chat");
 });

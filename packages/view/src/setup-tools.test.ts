@@ -125,7 +125,7 @@ test("Enter with nothing ticked starts nothing", () => {
   assert.equal(toolsStart(state), null);
 });
 
-test("a missing Node is installed once, then the servers are added on demand, one by one", () => {
+test("a missing Node is installed once, then the servers are added, one by one", () => {
   let state = toolsStart(toolsOffer(CATALOG, "guided")) as ToolsState;
   assert.deepEqual(state.rows.map((row) => toolsStatusText(row)), ["waiting · needs uv", "waiting · needs Node", "waiting · needs Node", ""]);
   let step = toolsStep(state);
@@ -140,13 +140,13 @@ test("a missing Node is installed once, then the servers are added on demand, on
   assert.equal(toolsStatusText(step.state.rows[0] as never), "adding");
   assert.equal(toolsStep(step.state).effect.kind, "none");
   state = toolsAdded(step.state, "fetch", 1);
-  assert.equal(toolsStatusText(state.rows[0] as never), "added · 1 tool · on demand");
+  assert.equal(toolsStatusText(state.rows[0] as never), "added · 1 tool · on in every chat");
   step = toolsStep(state);
   assert.deepEqual(step.effect, { kind: "install", runtime: "node" });
   state = toolsRuntimeDone(step.state, "node", true, null);
   assert.deepEqual(state.rows.slice(1, 3).map((row) => row.missing), [null, null]);
   const done = run(state);
-  assert.deepEqual(done.rows.slice(0, 3).map((row) => toolsStatusText(row)), ["added · 1 tool · on demand", "added · 2 tools · on demand", "added · 2 tools · on demand"]);
+  assert.deepEqual(done.rows.slice(0, 3).map((row) => toolsStatusText(row)), ["added · 1 tool · on in every chat", "added · 2 tools · on in every chat", "added · 2 tools · on in every chat"]);
   assert.equal(toolsSettled(done), true);
   assert.deepEqual(toolsResult(done), { kind: "done" });
 });
@@ -222,6 +222,6 @@ test("an entry that can't be added, or asks for a folder, is not offered", () =>
 
 test("the running lines show each row's progress", () => {
   const state = run(toolsStart(toolsOffer(CATALOG, "guided")) as ToolsState);
-  assert.deepEqual(toolsLines(state)[0], { kind: "row", mark: "ok", label: "Fetch", text: "added · 2 tools · on demand" });
+  assert.deepEqual(toolsLines(state)[0], { kind: "row", mark: "ok", label: "Fetch", text: "added · 2 tools · on in every chat" });
   assert.equal(toolsLines(state).length, 3);
 });

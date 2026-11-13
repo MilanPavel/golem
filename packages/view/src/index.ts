@@ -199,6 +199,7 @@ export {
   firstLine,
   formatSeconds,
   mcpAlert,
+  ONLY_WHEN_ASKED,
   MCP_HINT,
   mcpStatusMark,
   mcpStatusWord,

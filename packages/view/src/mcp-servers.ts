@@ -45,6 +45,9 @@ export function orderedServers(servers: readonly McpServer[]): McpServer[] {
   return [...mine, ...project];
 }
 
+/** The menu word for the opt-in mode: the server loads only in the chats that ask for it. */
+export const ONLY_WHEN_ASKED = "Only when a chat asks (saves tokens)";
+
 /** What can be done with `server`, in the order the screen numbers it. */
 export function detailChoices(server: McpServer): DetailChoice[] {
   const name = server.name;
@@ -60,7 +63,7 @@ export function detailChoices(server: McpServer): DetailChoice[] {
   const remove: DetailChoice[] = server.project ? [] : [{ label: "Remove", action: "ask-remove" }];
   if (server.state === "disabled") {
     choices.push({ label: "Enable for every chat", action: { kind: "set-enabled", name, enabled: true } });
-    choices.push({ label: "Enable on demand", action: { kind: "set-enabled", name, enabled: "on_demand" } });
+    choices.push({ label: ONLY_WHEN_ASKED, action: { kind: "set-enabled", name, enabled: "on_demand" } });
     return [...choices, ...inspect, ...remove];
   }
   if (server.on_demand) {
@@ -72,6 +75,12 @@ export function detailChoices(server: McpServer): DetailChoice[] {
   }
   // `mcp.restart` starts a server that has not started yet, so an idle one gets Start.
   choices.push({ label: server.state === "idle" ? "Start" : "Reconnect", action: { kind: "restart", name } });
+  // The mode it is not in already.
+  choices.push(
+    server.on_demand
+      ? { label: "Enable for every chat", action: { kind: "set-enabled", name, enabled: true } }
+      : { label: ONLY_WHEN_ASKED, action: { kind: "set-enabled", name, enabled: "on_demand" } },
+  );
   choices.push({ label: "Disable everywhere", action: { kind: "set-enabled", name, enabled: false } });
   return [...choices, ...inspect, ...remove];
 }
@@ -108,7 +117,10 @@ function markNote(server: McpServer): string {
 }
 
 function hereNote(server: McpServer, session: boolean): string {
-  if (!server.on_demand || !session) {
+  if (!server.on_demand) {
+    return " · on in every chat";
+  }
+  if (!session) {
     return "";
   }
   return server.enabled === true ? " · on in this chat" : " · off in this chat";

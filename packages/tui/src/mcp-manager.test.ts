@@ -99,12 +99,12 @@ test("the list groups the user's servers, then the project's", () => {
     "4 servers",
     "",
     "  Yours (~/.golem/config.toml)",
-    "❯ ✔ git     2 tools · 1.3K tokens",
+    "❯ ✔ git     2 tools · 1.3K tokens · on in every chat",
     "  ✘ github  HTTP 401: bad token · retry in 4s",
     "  ○ lazy    on demand · off in this chat",
     "",
     "  This project (~/app/.golem/config.toml)",
-    "  ✔ db      1 tool",
+    "  ✔ db      1 tool · on in every chat",
     "",
     "  + Add a server",
     "",
@@ -144,10 +144,11 @@ test("Enter opens a server, its details, and what can be done with it", () => {
     "",
     "❯ 1. View tools",
     "  2. Reconnect",
-    "  3. Disable everywhere",
-    "  4. Test the connection",
-    "  5. View the log",
-    "  6. Remove",
+    "  3. Only when a chat asks (saves tokens)",
+    "  4. Disable everywhere",
+    "  5. Test the connection",
+    "  6. View the log",
+    "  7. Remove",
     "",
     "↑/↓ to navigate · Enter to select · Esc to go back",
   ]);
@@ -156,18 +157,19 @@ test("Enter opens a server, its details, and what can be done with it", () => {
 test("each kind of server offers what fits it", () => {
   const labels = (server: McpServer) => detailChoices(server).map((choice) => choice.label);
   const more = ["Test the connection", "View the log", "Remove"];
-  assert.deepEqual(labels(github), ["Reconnect", "Disable everywhere", ...more]);
-  assert.deepEqual(labels(lazy), ["Turn on for this chat", "Start", "Disable everywhere", ...more]);
+  assert.deepEqual(labels(github), ["Reconnect", "Only when a chat asks (saves tokens)", "Disable everywhere", ...more]);
+  assert.deepEqual(labels(lazy), ["Turn on for this chat", "Start", "Enable for every chat", "Disable everywhere", ...more]);
   assert.deepEqual(labels({ ...lazy, state: "running", tools: ["x"], enabled: true }), [
     "View tools",
     "Turn off for this chat",
     "Reconnect",
+    "Enable for every chat",
     "Disable everywhere",
     ...more,
   ]);
   assert.deepEqual(labels({ ...git, state: "disabled", tools: [], enabled: false }), [
     "Enable for every chat",
-    "Enable on demand",
+    "Only when a chat asks (saves tokens)",
     ...more,
   ]);
   // A project's server is changed in that project's file, so it is not removed from here.
@@ -177,7 +179,7 @@ test("each kind of server offers what fits it", () => {
 test("choosing an action asks the app to do it, by Enter or by number", () => {
   const detail = press(openMcpManager(), "enter").state;
   assert.deepEqual(press(detail, "down", "enter").action, { kind: "restart", name: "git" });
-  assert.deepEqual(press(detail, 3).action, { kind: "set-enabled", name: "git", enabled: false });
+  assert.deepEqual(press(detail, 4).action, { kind: "set-enabled", name: "git", enabled: false });
   assert.deepEqual(press(detail, 9).action, { kind: "none" });
   const onLazy = press(openMcpManager(), "down", "down", "enter", 1).action;
   assert.deepEqual(onLazy, { kind: "session", name: "lazy", on: true });
@@ -549,7 +551,7 @@ test("Enter on a tool asks for its arguments, runs them as JSON, and shows the r
 });
 
 test("Test the connection shows each step as it ends, then what it found", () => {
-  const opened = press(openMcpManager(), "enter", 4);
+  const opened = press(openMcpManager(), "enter", 5);
   assert.deepEqual(opened.action, { kind: "test", name: "git" });
   assert.ok(shown(opened.state).includes("testing…"));
   const stepped = mcpTestStep(opened.state, "git", "✓ resolve 3 ms");
@@ -560,7 +562,7 @@ test("Test the connection shows each step as it ends, then what it found", () =>
 });
 
 test("the log shows the newest lines, scrolls up, and keeps its place as lines come in", () => {
-  const opened = press(openMcpManager(), "enter", 5);
+  const opened = press(openMcpManager(), "enter", 6);
   assert.deepEqual(opened.action, { kind: "load-logs", name: "git" });
   const lines = ["a", "b", "c", "d"];
   const loaded = mcpLogsLoaded(opened.state, "git", lines);
@@ -575,7 +577,7 @@ test("the log shows the newest lines, scrolls up, and keeps its place as lines c
 });
 
 test("Remove asks first, and Keep is what Enter or Esc does", () => {
-  const asked = press(openMcpManager(), "enter", 6);
+  const asked = press(openMcpManager(), "enter", 7);
   assert.equal(asked.state.view.kind, "remove");
   assert.deepEqual(asked.action, { kind: "none" });
   assert.ok(shown(asked.state).includes("❯ 2. Keep it"));

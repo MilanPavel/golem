@@ -10,7 +10,7 @@ export function toolsSummary(state: ToolsState | null): { text: string; skipped:
   const busy = titles((kind) => BUSY.has(kind));
   const failed = titles((kind) => kind === "failed");
   const parts = [
-    added.length === 0 ? null : `${added.join(", ")} · on demand`,
+    added.length === 0 ? null : `${added.join(", ")} · on in every chat`,
     busy.length === 0 ? null : `${busy.join(", ")} still adding`,
     failed.length === 0 ? null : `${failed.join(", ")} failed`,
   ].filter((part) => part !== null);
