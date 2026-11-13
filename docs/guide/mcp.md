@@ -199,7 +199,7 @@ A project's `.golem/config.toml` can add servers for chats in that folder, once 
 | `args` | `[]` | Its arguments |
 | `env` | `{}` | Extra environment variables. A server sees only these, plus `HOME`, `PATH`, and a few basics |
 | `env_passthrough` | `[]` | Names of variables from golem's own environment to hand to the server. Not for secrets: a name such as `GITHUB_TOKEN` is refused, so use `env` with a Keychain secret. Under launchd golem has no shell environment, so a variable from your shell may not be there |
-| `oauth` | none | For an HTTP server that signs in with OAuth and does not register clients by itself: `oauth = { client_id = "...", scopes = ["read"] }`. Leave it out otherwise. The tokens are kept in the Keychain as `mcp/<name>-oauth`, never in the file |
+| `oauth` | none | For an HTTP server that signs in with OAuth and does not register clients by itself: `oauth = { client_id = "...", scopes = ["read"] }`. An empty `oauth = {}` marks a server as signing in; the catalog's Linear, Sentry, and Notion have it. Leave it out otherwise. The tokens are kept in the Keychain as `mcp/<name>-oauth`, never in the file |
 | `cwd` | your home, or the project | Where the server runs |
 | `url` | | An HTTP server's address, instead of `command` |
 | `headers` | `{}` | Headers sent with every request to `url` |
@@ -211,6 +211,10 @@ A project's `.golem/config.toml` can add servers for chats in that folder, once 
 - **Secrets.** A value in `env` or `headers` can name a Keychain secret, `keychain:mcp/<name>`, alone or inside the text. A name that looks like a secret, such as `GITHUB_TOKEN`, must.
 - **Names.** A server name may use letters, digits, and `-`.
 - **Checks.** `golem doctor` checks that each server's command is found and its secrets are stored. When the daemon is running, it also says whether each server is running or why it failed.
+
+## Servers that sign in
+
+Linear, Sentry, and Notion do not take a pasted token: you approve golem in your browser. Add one from the catalog (`golem mcp add --catalog linear`) and it shows `needs_auth` until you sign in, with no tools in the model's list. The sign-in runs in the daemon on this Mac: it gives the client an address to open, waits up to 5 minutes for the browser to come back, keeps the token in the Keychain as `mcp/<name>-oauth`, and starts the server. golem renews the token by itself, a minute before it runs out and once when the server refuses it. When renewing fails, or after you sign out, the server goes back to `needs_auth` and nothing tries again until you sign in.
 
 ## When a server doesn't work
 

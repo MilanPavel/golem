@@ -106,7 +106,8 @@
         "starting",
         "running",
         "failed",
-        "disabled"
+        "disabled",
+        "needs_auth"
       ],
       "title": "State",
       "type": "string"

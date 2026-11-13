@@ -68,6 +68,7 @@ from golem.server.mcp_edit import (
     mcp_update,
 )
 from golem.server.mcp_import import mcp_import_apply, mcp_import_scan
+from golem.server.mcp_login import mcp_login, mcp_logout
 from golem.server.mcp_try import mcp_call, mcp_logs, mcp_test
 from golem.sessions.manager import (
     ApprovalNotFoundError,
@@ -1167,6 +1168,8 @@ def standard_methods() -> dict[str, Method]:
         "mcp.disable": Method("mcp.disable", McpToggleParams, True, _mcp_disable),
         "mcp.tools": Method("mcp.tools", McpServerParams, True, _mcp_tools),
         "mcp.restart": Method("mcp.restart", McpServerParams, True, _mcp_restart),
+        "mcp.login": Method("mcp.login", McpServerParams, True, mcp_login),
+        "mcp.logout": Method("mcp.logout", McpServerParams, True, mcp_logout),
         "mcp.set_enabled": Method("mcp.set_enabled", McpSetEnabledParams, True, _mcp_set_enabled),
         "mcp.add": Method("mcp.add", McpAddParams, True, mcp_add),
         "mcp.remove": Method("mcp.remove", McpRemoveParams, True, mcp_remove),

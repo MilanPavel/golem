@@ -4,7 +4,7 @@ export type Name = string;
 export type SessionId = string | null;
 
 /**
- * ``mcp.tools`` and ``mcp.restart``: one server, as ``session_id``'s project sees it.
+ * ``mcp.tools``, ``mcp.restart``, ``mcp.login``, ``mcp.logout``: one server of a session.
  */
 export interface McpServerParams {
   name: Name;

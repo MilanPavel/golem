@@ -1143,7 +1143,7 @@ class McpListParams(BaseModel):
     session_id: str | None = Field(default=None, min_length=1)
 
 
-McpServerState = Literal["idle", "starting", "running", "failed", "disabled"]
+McpServerState = Literal["idle", "starting", "running", "failed", "disabled", "needs_auth"]
 
 
 class McpServer(BaseModel):
@@ -1181,12 +1181,32 @@ class McpServer(BaseModel):
 
 
 class McpServerParams(BaseModel):
-    """``mcp.tools`` and ``mcp.restart``: one server, as ``session_id``'s project sees it."""
+    """``mcp.tools``, ``mcp.restart``, ``mcp.login``, ``mcp.logout``: one server of a session."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     name: str = Field(min_length=1)
     session_id: str | None = Field(default=None, min_length=1)
+
+
+class McpLoginResult(BaseModel):
+    """``mcp.login``: the address to open in a browser. The sign-in ends with ``mcp.login.done``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    authorize_url: str = Field(min_length=1)
+
+
+class McpLoginDone(BaseModel):
+    """``mcp.login.done``: a sign-in ended. On ``ok`` the server is starting again. Not stored."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    project: str | None = None
+    ok: bool
+    error: str | None = None
 
 
 class McpToolInfo(BaseModel):
@@ -2280,6 +2300,8 @@ __all__ = [
     "McpListParams",
     "McpListResult",
     "McpLogLine",
+    "McpLoginDone",
+    "McpLoginResult",
     "McpLogsParams",
     "McpLogsResult",
     "McpOAuthConfig",
