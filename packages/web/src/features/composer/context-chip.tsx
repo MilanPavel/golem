@@ -1,12 +1,12 @@
 import { contextLevel, contextPercent, contextShare, contextSummary, formatTokens, type ContextLevel } from "@golem/view";
 import { useNavigate, useSession } from "../../store/page-context.tsx";
-import { tracePath } from "../../store/router.ts";
+import { inspectPath } from "../../store/router.ts";
 import { badgeVariants } from "../../ui/badge.tsx";
 import { cn } from "../../ui/cn.ts";
 
 const TONE: Record<ContextLevel, "neutral" | "wait" | "deny"> = { ok: "neutral", high: "wait", full: "deny" };
 
-/** How full the context is after the latest model call. A button that opens the trace on that call. */
+/** How full the context is after the latest model call. A button that opens the trace panel beside the chat on that call. */
 export function ContextChipView({
   used,
   window,
@@ -26,7 +26,7 @@ export function ContextChipView({
     <button
       type="button"
       title={`Context ${summary}.${why}`}
-      aria-label={`Context ${summary}. Open the trace.`}
+      aria-label={`Context ${summary}. Open the trace panel.`}
       onClick={onOpen}
       className={cn(badgeVariants({ tone: TONE[contextLevel(used, window)] }), "cursor-pointer outline-offset-2 outline-clay focus-visible:outline-2")}
     >
@@ -40,5 +40,5 @@ export function ContextChip({ sessionId }: { sessionId: string }) {
   const last = useSession(sessionId, (view) => view.context.last);
   const navigate = useNavigate();
   if (last === null) return null;
-  return <ContextChipView used={last.used} window={last.window} windowEstimated={last.windowEstimated} onOpen={() => navigate(tracePath(sessionId, last.spanId))} />;
+  return <ContextChipView used={last.used} window={last.window} windowEstimated={last.windowEstimated} onOpen={() => navigate(inspectPath(sessionId, last.spanId), { replace: true })} />;
 }
