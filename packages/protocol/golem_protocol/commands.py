@@ -1229,6 +1229,15 @@ class McpToolFilterConfig(BaseModel):
     exclude: list[str] = Field(default_factory=list[str])
 
 
+class McpOAuthConfig(BaseModel):
+    """``oauth`` in an HTTP server's table: a client id for a server with no registration."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    client_id: str | None = Field(default=None, min_length=1)
+    scopes: list[str] = Field(default_factory=list[str])
+
+
 class McpServerConfig(BaseModel):
     """Every field of ``[mcp.<name>]``, as it goes over the wire.
 
@@ -1250,6 +1259,7 @@ class McpServerConfig(BaseModel):
     tools: McpToolFilterConfig = Field(default_factory=McpToolFilterConfig)
     approval: Literal["ask", "read-only", "allow"] = "ask"
     env_passthrough: list[str] = Field(default_factory=list[str])
+    oauth: McpOAuthConfig | None = None
 
 
 class McpSecretInfo(BaseModel):
@@ -2272,6 +2282,7 @@ __all__ = [
     "McpLogLine",
     "McpLogsParams",
     "McpLogsResult",
+    "McpOAuthConfig",
     "McpRemoveParams",
     "McpRemoveResult",
     "McpSecretInfo",

@@ -6,6 +6,8 @@ export type Command = string | null;
 export type Cwd = string | null;
 export type Enabled = boolean | 'on_demand';
 export type EnvPassthrough = string[];
+export type ClientId = string | null;
+export type Scopes = string[];
 export type TimeoutSeconds = number;
 export type Exclude = string[];
 export type Include = string[];
@@ -27,6 +29,7 @@ export interface McpServerConfig {
   env?: Env;
   env_passthrough?: EnvPassthrough;
   headers?: Headers;
+  oauth?: McpOAuthConfig | null;
   timeout_seconds?: TimeoutSeconds;
   tools?: McpToolFilterConfig;
   url?: Url;
@@ -36,6 +39,16 @@ export interface Env {
 }
 export interface Headers {
   [k: string]: string;
+}
+/**
+ * ``oauth`` in an HTTP server's table: a client id for a server with no registration.
+ *
+ * This interface was referenced by `McpServerConfig`'s JSON-Schema
+ * via the `definition` "McpOAuthConfig".
+ */
+export interface McpOAuthConfig {
+  client_id?: ClientId;
+  scopes?: Scopes;
 }
 /**
  * ``tools`` of ``[mcp.<name>]``: ``fnmatch`` patterns on the server's own tool names.
