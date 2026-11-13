@@ -157,3 +157,42 @@ id = "token"
 kind = "secret"
 label = "Brave API key"
 hint = "Make a key at brave.com/search/api."
+
+[[entry]]
+id = "linear"
+name = "linear"
+title = "Linear"
+description = "Issues, projects, and cycles in Linear. You sign in with your browser."
+category = "productivity"
+homepage = "https://linear.app/docs/mcp"
+runtime = "url"
+auth = "oauth"
+[entry.template]
+url = "https://mcp.linear.app/mcp"
+oauth = {}
+
+[[entry]]
+id = "sentry"
+name = "sentry"
+title = "Sentry"
+description = "Errors, issues, and releases in Sentry. You sign in with your browser."
+category = "code"
+homepage = "https://docs.sentry.io/product/sentry-mcp/"
+runtime = "url"
+auth = "oauth"
+[entry.template]
+url = "https://mcp.sentry.dev/mcp"
+oauth = {}
+
+[[entry]]
+id = "notion"
+name = "notion"
+title = "Notion"
+description = "Search and edit pages and databases in Notion. You sign in with your browser."
+category = "productivity"
+homepage = "https://developers.notion.com/docs/mcp"
+runtime = "url"
+auth = "oauth"
+[entry.template]
+url = "https://mcp.notion.com/mcp"
+oauth = {}

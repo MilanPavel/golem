@@ -29,7 +29,7 @@ from golem.config_edit import (
 )
 from golem.config_raw import ADDRESS_FIELDS, check_text, owns
 from golem.mcp import McpServerError, McpSupervisor
-from golem.mcp.catalog import CatalogError, build, find_entry, unavailable
+from golem.mcp.catalog import CatalogError, build, find_entry
 from golem.secrets import SecretStore, SecretStoreError, check_name
 from golem.server.dispatcher import (
     INTERNAL_ERROR,
@@ -303,8 +303,6 @@ def catalog_table(
     entry = find_entry(catalog_id)
     if entry is None:
         raise RpcCallError(INVALID_PARAMS, f"there is no catalog entry {catalog_id}")
-    if (why := unavailable(entry)) is not None:
-        raise RpcCallError(INVALID_PARAMS, f"{entry.title} is not available yet: {why}")
     folder = None if scope.root is None else str(scope.root)
     try:
         return build(entry, inputs, secrets, name=name, folder=folder)

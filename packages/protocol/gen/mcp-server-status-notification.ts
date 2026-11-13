@@ -12,7 +12,7 @@ export type OnDemand = boolean;
 export type Project = string | null;
 export type RetrySeconds = number | null;
 export type SchemaTokens = number | null;
-export type State = 'idle' | 'starting' | 'running' | 'failed' | 'disabled';
+export type State = 'idle' | 'starting' | 'running' | 'failed' | 'disabled' | 'needs_auth';
 export type Tools = string[];
 export type ToolsHidden = number;
 

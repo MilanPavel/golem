@@ -14,7 +14,7 @@ export type AppCardProps = {
 
 const BODY = "Install this page as an app. It opens in its own window from the Dock, and stays signed in.";
 
-/** Install the page as an app: a button where the browser has a prompt, a menu hint in Safari, only the bookmark elsewhere. */
+/** Install the page as an app: a button where the browser has a prompt, a menu hint in Safari and Chrome, only the bookmark elsewhere. */
 export function AppCard({ offer, host, where, onInstall }: AppCardProps) {
   if (offer === null) return null;
   const settings = where === "settings";
@@ -27,7 +27,7 @@ export function AppCard({ offer, host, where, onInstall }: AppCardProps) {
     >
       {settings ? <h3 className="text-sm font-semibold">{title}</h3> : <span className="font-semibold">{title}</span>}
       {offer === "installed" ? (
-        <p className="text-sm text-muted">Installed. Open golem from the Dock.</p>
+        <p className="text-sm text-muted">golem is installed as an app. Open it from the Dock, or with Open in app in Chrome's address bar.</p>
       ) : (
         <>
           <p className="text-sm text-muted">{BODY}</p>
@@ -39,6 +39,10 @@ export function AppCard({ offer, host, where, onInstall }: AppCardProps) {
             ) : offer === "safari" ? (
               <span>
                 In Safari, choose <code className="font-mono text-ink">File → Add to Dock…</code>
+              </span>
+            ) : offer === "chromium" ? (
+              <span>
+                In Chrome, choose <code className="font-mono text-ink">⋮ → Cast, save and share → Install page as app</code>
               </span>
             ) : null}
             <span>

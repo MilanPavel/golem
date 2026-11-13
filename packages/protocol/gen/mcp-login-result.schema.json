@@ -1,0 +1,22 @@
+{
+  "additionalProperties": false,
+  "description": "``mcp.login``: the address to open in a browser. The sign-in ends with ``mcp.login.done``.",
+  "properties": {
+    "authorize_url": {
+      "minLength": 1,
+      "title": "Authorize Url",
+      "type": "string"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "authorize_url"
+  ],
+  "title": "McpLoginResult",
+  "type": "object"
+}

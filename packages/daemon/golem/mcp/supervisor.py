@@ -17,6 +17,10 @@ and starts again after a wait that doubles from ``backoff_first`` up to
 ``backoff_max``, and goes back to the first after a minute of running.
 A changed ``[mcp.*]`` table restarts that server, without a daemon restart.
 
+A hosted server that signs in with OAuth (``oauth`` in its table, or a stored
+``mcp/<name>-oauth`` item) is ``needs_auth`` when it has no usable token. It does
+not start again by itself: :meth:`login` signs in, and then it starts.
+
 Servers start in the background, so the daemon answers at once. A model
 call waits up to ``prepare_seconds`` for a server its session needs that is
 still starting, so the first message after ``/mcp enable`` can use it.
@@ -36,17 +40,31 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
+import httpx
 from pydantic import BaseModel
 
 from golem.config import McpServers, McpServerSettings, load_mcp
+from golem.mcp import oauth
 from golem.mcp.client import CallResult, McpClient, McpError
 from golem.mcp.launch import Secrets, find_command, transport_for
 from golem.mcp.probe import DEFAULT_TIMEOUTS, ProbeResult, Step, Timeouts, probe
 from golem.mcp.tools import mcp_tools, tool_name
+from golem.mcp.transport import HttpTransport
+from golem.secrets import SecretStore, SecretStoreError
 from golem.tokens import CHARS_PER_TOKEN
 from golem.tools.registry import Tool, ToolScope
-from golem_protocol.commands import McpLogLine, McpServer, McpServerLog, McpServerState
-from golem_protocol.rpc import McpServerLogNotification, McpServerStatusNotification
+from golem_protocol.commands import (
+    McpLoginDone,
+    McpLogLine,
+    McpServer,
+    McpServerLog,
+    McpServerState,
+)
+from golem_protocol.rpc import (
+    McpLoginDoneNotification,
+    McpServerLogNotification,
+    McpServerStatusNotification,
+)
 
 log = logging.getLogger(__name__)
 
@@ -75,6 +93,7 @@ class Timing:
     prepare_seconds: float = 10.0
     ping_seconds: float = 10.0
     log_batch_seconds: float = 0.25
+    login_seconds: float = oauth.LOGIN_SECONDS
 
 
 DEFAULT_TIMING = Timing()
@@ -109,6 +128,11 @@ class _Server:
     unsent: list[McpLogLine] = field(default_factory=list[McpLogLine])
     flushing: bool = False
     redact: list[str] = field(default_factory=list[str])
+    needs_auth: bool = False
+    """Set when the last run ended because the sign-in is missing or cannot be renewed."""
+    authenticate: str | None = None
+    """The ``WWW-Authenticate`` header of its last 401, which helps find where to sign in."""
+    login_task: asyncio.Task[None] | None = None
 
     @property
     def on_demand(self) -> bool:
@@ -133,6 +157,8 @@ class McpSupervisor:
         broadcast: Broadcast | None = None,
         environ: Mapping[str, str] | None = None,
         timing: Timing = DEFAULT_TIMING,
+        store: SecretStore | None = None,
+        http: httpx.AsyncBaseTransport | None = None,
     ) -> None:
         self.broadcast: Broadcast = broadcast or (lambda _notification: None)
         self._user_config = user_config
@@ -140,6 +166,9 @@ class McpSupervisor:
         self._secrets = secrets
         self._environ = dict(os.environ if environ is None else environ)
         self._timing = timing
+        self._store = store
+        self._http = http
+        self._oauth_client: httpx.AsyncClient | None = None
         self._servers: dict[tuple[str, Path | None], _Server] = {}
         self._projects: set[Path] = set()
         self._stamps: dict[Path, tuple[int, int] | None] = {}
@@ -343,6 +372,110 @@ class McpSupervisor:
             if name in server.settings.secrets and server.task is not None:
                 self._restart(server)
 
+    async def login(self, scope: ToolScope, name: str) -> str:
+        """Start signing in to server ``name``. Returns the address for the browser.
+
+        The listener waits in the background. When the browser comes back the tokens
+        are stored, ``mcp.login.done`` is sent, and the server starts again. Raises
+        :class:`McpServerError` when the server does not sign in with OAuth or the
+        sign-in cannot start.
+        """
+        server = self._find(scope, name)
+        url = self._oauth_url(server)
+        if server.settings.enabled is False:
+            raise McpServerError(f"{name} is turned off; enable it first")
+        await self._cancel_login(server)
+        settings = server.settings.oauth
+        try:
+            attempt = await oauth.begin(
+                url,
+                server.authenticate,
+                self._oauth_http(),
+                client_id=None if settings is None else settings.client_id,
+                scopes=None if settings is None or not settings.scopes else list(settings.scopes),
+                timeout=self._timing.login_seconds,
+            )
+        except oauth.OAuthError as exc:
+            raise McpServerError(str(exc)) from exc
+        self._log(server, "event", "signing in")
+        task = asyncio.create_task(self._finish_login(server, attempt), name=f"mcp-{name}-login")
+        server.login_task = task
+        self._background.add(task)
+        task.add_done_callback(self._background.discard)
+        return attempt.url
+
+    async def logout(self, scope: ToolScope, name: str) -> McpServer:
+        """Delete server ``name``'s sign-in and stop it. It is ``needs_auth`` until the next one."""
+        server = self._find(scope, name)
+        self._oauth_url(server)
+        store = self._store
+        assert store is not None
+        await self._cancel_login(server)
+        try:
+            await asyncio.to_thread(oauth.forget, store, name)
+        except (SecretStoreError, OSError) as exc:
+            raise McpServerError(f"cannot delete the sign-in from the Keychain: {exc}") from exc
+        self._stop_soon(server)
+        server.needs_auth = True
+        self._set(server, "needs_auth", error="signed out")
+        return server.status
+
+    def _oauth_url(self, server: _Server) -> str:
+        if server.settings.url is None:
+            raise McpServerError(f"{server.name} is not a hosted server, so it has no sign-in")
+        if self._store is None:
+            raise McpServerError("this daemon has no key store, so it cannot keep a sign-in")
+        return server.settings.url
+
+    def _oauth_http(self) -> httpx.AsyncClient:
+        if self._oauth_client is None:
+            self._oauth_client = oauth.new_client(self._http)
+        return self._oauth_client
+
+    def _signs_in(self, server: _Server) -> bool:
+        """Whether ``server`` is a hosted server that signs in with OAuth. Reads the Keychain."""
+        if server.settings.url is None or self._store is None:
+            return False
+        if server.settings.oauth is not None:
+            return True
+        return self._store.get(oauth.secret_name(server.name)) is not None
+
+    async def _cancel_login(self, server: _Server) -> None:
+        task, server.login_task = server.login_task, None
+        if task is not None and not task.done():
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+
+    async def _finish_login(self, server: _Server, attempt: oauth.Login) -> None:
+        store = self._store
+        assert store is not None
+        try:
+            tokens = await attempt.finish()
+            await asyncio.to_thread(oauth.save, store, server.name, tokens)
+        except asyncio.CancelledError:
+            await attempt.cancel()
+            raise
+        except (oauth.OAuthError, SecretStoreError, OSError) as exc:
+            self._log(server, "event", f"sign-in failed: {exc}")
+            self._login_done(server, ok=False, error=str(exc))
+            return
+        self._log(server, "event", "signed in")
+        if self._servers.get((server.name, server.project)) is server:
+            self._restart(server)
+        self._login_done(server, ok=True)
+
+    def _login_done(self, server: _Server, *, ok: bool, error: str | None = None) -> None:
+        done = McpLoginDone(
+            name=server.name,
+            project=None if server.project is None else str(server.project),
+            ok=ok,
+            error=error,
+        )
+        try:
+            self.broadcast(McpLoginDoneNotification(params=done))
+        except Exception:
+            log.debug("broadcast failed", exc_info=True)
+
     async def aclose(self) -> None:
         tasks = [*self._background, *(s.task for s in self._servers.values() if s.task)]
         for task in tasks:
@@ -352,6 +485,8 @@ class McpSupervisor:
         await asyncio.gather(*self._stopping, return_exceptions=True)
         clients = [server.client for server in self._servers.values() if server.client]
         await asyncio.gather(*(client.close() for client in clients), return_exceptions=True)
+        if self._oauth_client is not None:
+            await self._oauth_client.aclose()
 
     def _find(self, scope: ToolScope, name: str) -> _Server:
         server = {server.name: server for server in self._shown(scope.root)}.get(name)
@@ -470,6 +605,11 @@ class McpSupervisor:
         while True:
             began = time.monotonic()
             reason = await self._serve(server)
+            if server.needs_auth:
+                # Nothing retries until the person signs in again.
+                log.info("mcp server %s needs a sign-in: %s", server.name, reason)
+                self._set(server, "needs_auth", error=reason)
+                return
             if time.monotonic() - began >= STABLE_SECONDS:
                 delay = self._timing.backoff_first
             log.warning("mcp server %s failed: %s; trying again in %gs", server.name, reason, delay)
@@ -481,8 +621,17 @@ class McpSupervisor:
 
     async def _serve(self, server: _Server) -> str:
         """Run the server once, until it exits or stops answering. Returns why it went down."""
+        transport = None
+        server.needs_auth = False
         try:
             server.redact = await asyncio.to_thread(self._secret_values, server)
+            signs_in = await asyncio.to_thread(self._signs_in, server)
+            assert not signs_in or self._store is not None
+            tokens = (
+                oauth.TokenSource(server.name, self._store, self._oauth_http())
+                if signs_in and self._store is not None
+                else None
+            )
             transport = await asyncio.to_thread(
                 transport_for,
                 server.settings,
@@ -490,6 +639,8 @@ class McpSupervisor:
                 self._secrets,
                 project=server.project,
                 on_stderr=lambda text: self._log(server, "stderr", text),
+                tokens=tokens,
+                http=self._http,
             )
             client = McpClient(transport, on_tools_changed=lambda: self._relist_soon(server))
             server.client = client
@@ -502,6 +653,9 @@ class McpSupervisor:
             log.exception("mcp server %s broke", server.name)
             return f"{type(exc).__name__}: {exc}"
         finally:
+            if isinstance(transport, HttpTransport):
+                server.needs_auth = transport.needs_auth
+                server.authenticate = transport.authenticate or server.authenticate
             server.tools, server.hidden = [], []
             server.read_only = set()
             if server.client is not None:
@@ -630,6 +784,8 @@ class McpSupervisor:
     ) -> None:
         if state == "running":
             self._log(server, "event", f"running ({tools} tool{'' if tools == 1 else 's'})")
+        elif state == "needs_auth":
+            self._log(server, "event", f"needs sign-in: {error}")
         elif state == "failed":
             self._log(server, "event", f"failed: {error}")
             if retry is not None:

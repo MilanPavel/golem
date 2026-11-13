@@ -6,6 +6,7 @@ from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
 from golem_protocol.commands import (
     KeychainWait,
+    McpLoginDone,
     McpServer,
     McpServerLog,
     McpTestProgress,
@@ -157,6 +158,16 @@ class McpTestProgressNotification(BaseModel):
     params: McpTestProgress
 
 
+class McpLoginDoneNotification(BaseModel):
+    """Server → every connection: a sign-in to an MCP server ended. Not stored."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    jsonrpc: Literal["2.0"] = "2.0"
+    method: Literal["mcp.login.done"] = "mcp.login.done"
+    params: McpLoginDone
+
+
 class ModelServerStatusNotification(BaseModel):
     """Server → every connection: a local model server started, failed, or stopped. Not stored."""
 
@@ -199,6 +210,7 @@ class SkillRegistryChangedNotification(BaseModel):
 
 __all__ = [
     "KeychainWaitNotification",
+    "McpLoginDoneNotification",
     "McpServerLogNotification",
     "McpServerStatusNotification",
     "McpTestProgressNotification",

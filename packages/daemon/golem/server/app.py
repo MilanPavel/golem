@@ -166,6 +166,7 @@ class DaemonApp:
                 user_config=self.paths.config_file,
                 trusted=policy.trusted,
                 secrets=self._secret,
+                store=self.state.secrets,
             )
             mcp.broadcast = self._broadcast
             policy.mcp_allowed = mcp.allowed_servers

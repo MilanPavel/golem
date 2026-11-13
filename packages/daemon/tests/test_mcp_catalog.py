@@ -10,6 +10,7 @@ import pytest
 from fakes import ToolCallingChatModel
 from test_server import HELLO, RpcClient, error_code, rpc_result, start_daemon, stop_daemon
 
+from golem.config import McpServerSettings
 from golem.mcp.catalog import (
     CatalogEntry,
     CatalogError,
@@ -17,7 +18,6 @@ from golem.mcp.catalog import (
     find_entry,
     load_catalog,
     secret_ref,
-    unavailable,
 )
 from golem.mcp.catalog_check import package_of, validate
 from golem.models.router import ModelRouter
@@ -48,7 +48,6 @@ def test_every_entry_validates_with_sample_inputs() -> None:
     starters = [entry.id for entry in entries if entry.starter]
     assert starters == ["fetch", "playwright", "context7"]
     assert all(entry.defaults.enabled == "on_demand" for entry in entries)
-    assert not [entry.id for entry in entries if entry.auth == "oauth"]
 
 
 def test_the_check_fails_on_a_bad_template() -> None:
@@ -247,9 +246,12 @@ async def test_add_from_the_catalog_refuses_what_does_not_fit(short_home: Path) 
         await stop_daemon(app, task)
 
 
-def test_an_entry_that_signs_in_is_not_offered_yet() -> None:
-    signs_in = _entry(
-        auth="oauth", runtime="url", template={"url": "https://x.test/mcp"}, inputs=[]
-    )
-    assert unavailable(signs_in) == "needs sign-in (coming in 1.12.10)"
-    assert unavailable(_entry()) is None
+def test_the_entries_that_sign_in_are_offered_and_need_no_secret() -> None:
+    signs_in = [entry for entry in load_catalog() if entry.auth == "oauth"]
+    assert {entry.id for entry in signs_in} >= {"linear", "sentry", "notion"}
+    for entry in signs_in:
+        table, stored = build(entry, {}, {})
+        assert table["oauth"] == {} and str(table["url"]).startswith("https://")
+        assert stored == {}
+        settings = McpServerSettings.model_validate(table)
+        assert settings.oauth is not None and settings.oauth.client_id is None

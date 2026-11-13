@@ -22,6 +22,9 @@ from typing import Any, Protocol, cast
 
 import httpx
 
+from golem.mcp.oauth import NeedsAuth, TokenSource
+from golem.secrets import SecretStoreError
+
 log = logging.getLogger(__name__)
 
 MAX_LINE_BYTES = 16 * 1024 * 1024
@@ -211,8 +214,11 @@ class HttpTransport:
     ``Mcp-Session-Id``, which goes with every later message, and a 404 then
     means the session ended: the transport closes, and the supervisor starts
     over with a new ``initialize``. A server that cannot be reached closes it
-    too. golem does not open the optional GET stream, so a server's own
-    notifications reach it only inside an answer.
+    too. With ``tokens`` the transport sends the server's OAuth access token,
+    renews it once when the server answers 401, and closes with ``needs_auth``
+    set when there is no token or it cannot be renewed. golem does not open the
+    optional GET stream, so a server's own notifications reach it only inside an
+    answer.
     """
 
     def __init__(
@@ -221,8 +227,13 @@ class HttpTransport:
         headers: Mapping[str, str] | None = None,
         *,
         transport: httpx.AsyncBaseTransport | None = None,
+        tokens: TokenSource | None = None,
     ) -> None:
         self.protocol_version: str | None = None
+        self._tokens = tokens
+        self._bearer: str | None = None
+        self.needs_auth = False
+        """True when the server wants a sign-in that is missing, ended, or cannot be renewed."""
         self._url = url
         self._headers = dict(headers or {})
         self._transport = transport
@@ -273,35 +284,71 @@ class HttpTransport:
         assert client is not None
         request_id = message.get("id") if "method" in message else None
         try:
-            async with client.stream(
-                "POST", self._url, json=dict(message), headers=self._request_headers()
-            ) as response:
-                if session := response.headers.get("mcp-session-id"):
-                    self._session_id = session
-                if response.status_code == 404 and self._session_id is not None:
-                    self._state.fail("the server ended the session")
-                    await self._answer_error(request_id, "the server ended the session")
-                    return
-                if response.status_code >= 400:
-                    self.status = response.status_code
-                    self.authenticate = response.headers.get("www-authenticate")
-                    body = (await response.aread()).decode(errors="replace").strip()
-                    reason = f"HTTP {response.status_code}" + (f": {body[:200]}" if body else "")
-                    if request_id is None:
-                        raise McpError(reason)
-                    await self._answer_error(request_id, reason)
-                    return
-                kind = response.headers.get("content-type", "")
-                if "text/event-stream" in kind:
-                    await self._read_events(response)
-                elif "application/json" in kind:
-                    await self._deliver_body(await response.aread())
+            if self._tokens is not None:
+                self._bearer = await self._tokens.token()
+            if await self._post_once(client, message, request_id, renew=self._tokens is not None):
+                assert self._tokens is not None and self._bearer is not None
+                self._bearer = await self._tokens.rejected(self._bearer)
+                await self._post_once(client, message, request_id, renew=False)
+        except NeedsAuth as exc:
+            self.needs_auth = True
+            reason = f"sign-in needed: {exc}"
+            self._state.fail(reason)
+            if request_id is None:
+                raise McpError(reason) from exc
+            await self._answer_error(request_id, reason)
+        except SecretStoreError as exc:
+            reason = f"cannot read the sign-in from the Keychain: {exc}"
+            self._state.fail(reason)
+            if request_id is None:
+                raise McpError(reason) from exc
+            await self._answer_error(request_id, reason)
         except httpx.HTTPError as exc:
             reason = f"cannot reach {self._url}: {exc or type(exc).__name__}"
             self._state.fail(reason)
             if request_id is None:
                 raise McpError(reason) from exc
             await self._answer_error(request_id, reason)
+
+    async def _post_once(
+        self,
+        client: httpx.AsyncClient,
+        message: Mapping[str, object],
+        request_id: object,
+        *,
+        renew: bool,
+    ) -> bool:
+        """Post once. True when the server answered 401 and ``renew`` asks for a new token."""
+        async with client.stream(
+            "POST", self._url, json=dict(message), headers=self._request_headers()
+        ) as response:
+            if session := response.headers.get("mcp-session-id"):
+                self._session_id = session
+            if response.status_code == 401 and self._tokens is not None:
+                self.status = 401
+                self.authenticate = response.headers.get("www-authenticate")
+                if renew:
+                    return True
+                raise NeedsAuth("the server still refuses the renewed sign-in")
+            if response.status_code == 404 and self._session_id is not None:
+                self._state.fail("the server ended the session")
+                await self._answer_error(request_id, "the server ended the session")
+                return False
+            if response.status_code >= 400:
+                self.status = response.status_code
+                self.authenticate = response.headers.get("www-authenticate")
+                body = (await response.aread()).decode(errors="replace").strip()
+                reason = f"HTTP {response.status_code}" + (f": {body[:200]}" if body else "")
+                if request_id is None:
+                    raise McpError(reason)
+                await self._answer_error(request_id, reason)
+                return False
+            kind = response.headers.get("content-type", "")
+            if "text/event-stream" in kind:
+                await self._read_events(response)
+            elif "application/json" in kind:
+                await self._deliver_body(await response.aread())
+        return False
 
     async def _read_events(self, response: httpx.Response) -> None:
         data: list[str] = []
@@ -338,6 +385,8 @@ class HttpTransport:
             **self._headers,
             "Accept": "application/json, text/event-stream",
         }
+        if self._bearer is not None:
+            headers["Authorization"] = f"Bearer {self._bearer}"
         if self._session_id is not None:
             headers["Mcp-Session-Id"] = self._session_id
         if self.protocol_version is not None:

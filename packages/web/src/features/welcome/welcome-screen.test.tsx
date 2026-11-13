@@ -140,7 +140,7 @@ function installWindow(standalone = false) {
   return { env, fire: (event: Event) => listeners.get(event.type)?.(event) };
 }
 
-test("Ready offers the app when the web job keeps the page, and Install fires the saved prompt", async () => {
+test("Ready offers the app, and Install fires the saved prompt", async () => {
   const win = installWindow();
   const appInstall = createAppInstall(win.env);
   const prompt = vi.fn(async () => undefined);
@@ -156,14 +156,14 @@ test("Ready offers the app when the web job keeps the page, and Install fires th
   act(() => {
     win.fire(new Event("appinstalled"));
   });
-  expect(await screen.findByText("Installed. Open golem from the Dock.")).toBeTruthy();
+  expect(await screen.findByText(/golem is installed as an app/)).toBeTruthy();
 });
 
-test("Ready does not offer the app with no web job, or inside the app's own window", async () => {
+test("Ready offers the app alongside the keep note with no web job, but not inside the app's own window", async () => {
   mount(FRESH_LISTING, { path: "/welcome?step=ready", pageKept: false, appInstall: createAppInstall(installWindow().env) });
   await heading("golem is ready.");
-  await wait();
-  expect(screen.queryByText("Keep golem one click away")).toBeNull();
+  expect(await screen.findByText("Keep golem one click away")).toBeTruthy();
+  expect(screen.getByText(/To keep (it|them) running/)).toBeTruthy();
   cleanup();
   mount(FRESH_LISTING, { path: "/welcome?step=ready", appInstall: createAppInstall(installWindow(true).env) });
   await heading("golem is ready.");
