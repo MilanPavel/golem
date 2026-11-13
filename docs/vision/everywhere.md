@@ -47,7 +47,9 @@ The phone is not a small terminal. It is where you **watch and decide** while yo
 
 ### How the phone reaches the Mac
 
-A phone on 5G cannot call a Mac behind a home router, and iOS freezes apps in the background. So the phone reaches golem in one of three ways: the same Wi-Fi (the gateway announces itself with Bonjour), a private network such as Tailscale, or a small **relay** that both sides connect out to, which also sends the push notifications. Pairing once with a QR code gives the phone and the Mac each other's keys, so the relay only ever forwards encrypted bytes, and keeps nothing. If it is down, nothing is lost: the event log replays when the phone gets through.
+A phone on 5G cannot call a Mac behind a home router, and iOS freezes apps in the background. So the phone reaches golem through a small **relay** that both sides connect out to ([ADR-051](../adr/051-relay-and-pairing.md)). It is the default path: nothing to open on the router, no VPN, and no Tailscale. The relay also sends the push notifications, because Apple only accepts them from a server that holds the app's key.
+
+Pairing once with a QR code gives the phone and the Mac each other's keys. The phone's key lives in the Secure Enclave, and both screens show the same three words before the Mac accepts the phone. From then on every message is encrypted end to end, with a new key for each connection. The relay sees who talks to whom, when, and how much, never what, and it keeps nothing on disk. golem runs a default relay, and anyone can run their own as one container. If it is down, nothing is lost: the event log replays when the phone gets through. Later, on the same Wi-Fi, the phone may talk straight to the gateway, found with Bonjour.
 
 While a run is active or waiting for you, the Mac can stay awake until it finishes. For a golem that never sleeps, use a Mac mini, or let a [sub-agent run elsewhere](./sub-agents.md#somewhere-else).
 
