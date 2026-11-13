@@ -145,8 +145,8 @@ test("Add 3 adds the three starters one at a time, Node first for the one that n
   await waitFor(() => expect(fake.raw.installRuntime).toHaveBeenCalledWith("node"));
   expect(added(fake)).toEqual(["fetch", "context7"]);
   const cards = within(screen.getByRole("list", { name: "Tools being added" }));
-  expect(cards.getByText("added · 1 tool · on demand")).toBeTruthy();
-  expect(cards.getByText("added · 2 tools · on demand")).toBeTruthy();
+  expect(cards.getByText("added · 1 tool · on in every chat")).toBeTruthy();
+  expect(cards.getByText("added · 2 tools · on in every chat")).toBeTruthy();
   expect(cards.getByText("installing Node")).toBeTruthy();
   act(() => fake.emitRuntime({ kind: "output", name: "node", text: "######## 41.0%\n" }));
   expect((await cards.findByRole("progressbar", { name: "Installing Node" })).getAttribute("aria-valuenow")).toBe("41");
@@ -156,7 +156,7 @@ test("Add 3 adds the three starters one at a time, Node first for the one that n
   for (const [params] of fake.raw.addMcpServer.mock.calls) expect(params.name).toBe(params.catalog_id);
   await userEvent.setup().click(button("Continue"));
   await screen.findByRole("heading", { level: 2, name: "golem is ready." });
-  expect(screen.getByRole("list", { name: "What was set up" }).textContent).toContain("Fetch, Context7, Playwright · on demand");
+  expect(screen.getByRole("list", { name: "What was set up" }).textContent).toContain("Fetch, Context7, Playwright · on in every chat");
 });
 
 test("Continue is there while Node still installs; the row finishes in the background and Ready says so", async () => {
@@ -169,7 +169,7 @@ test("Continue is there while Node still installs; the row finishes in the backg
   await user.click(button("Continue"));
   await screen.findByRole("heading", { level: 2, name: "golem is ready." });
   const line = screen.getByRole("list", { name: "What was set up" }).textContent ?? "";
-  expect(line).toContain("Fetch, Context7 · on demand");
+  expect(line).toContain("Fetch, Context7 · on in every chat");
   expect(line).toContain("Playwright still adding");
 });
 
@@ -227,7 +227,7 @@ test("Paste a new token replaces the failed server and tries again, and the fiel
   expect(field.value).toBe("");
   await user.type(field, "new-token");
   await user.click(button("Try again"));
-  expect(await screen.findByText("added · 26 tools · on demand")).toBeTruthy();
+  expect(await screen.findByText("added · 26 tools · on in every chat")).toBeTruthy();
   // The old server went before the new add, so the name was free.
   expect(fake.raw.removeMcpServer).toHaveBeenCalledWith("github");
   const second = fake.raw.addMcpServer.mock.calls.filter(([params]) => params.catalog_id === "github").at(-1)?.[0];

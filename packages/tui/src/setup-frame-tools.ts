@@ -296,8 +296,8 @@ export function toolsView(ui: ToolsUi): { lines: SetupLine[]; screen: ToolsScree
   }
   const footer: SetupLine[] = [
     { kind: "blank" },
-    { kind: "text", text: "On demand: a chat turns one on with /mcp, or golem asks", dim: true },
-    { kind: "text", text: "you first. /mcp manages them any time.", dim: true },
+    { kind: "text", text: "On in every chat. Turn one off, or make it", dim: true },
+    { kind: "text", text: "on demand, with /mcp any time.", dim: true },
   ];
   return { lines: [...rows, ...footer], screen: "tools-added", adds };
 }
@@ -332,7 +332,7 @@ export function toolsHint(screen: ToolsScreen, adds: number, guided: boolean): s
 /** What Ready says about tools, or null when none ran and none exist (A9). */
 export function toolsReadyText(ran: readonly string[], existing: readonly string[]): string | null {
   if (ran.length > 0) {
-    return `${ran.join(", ")} · on demand`;
+    return `${ran.join(", ")} · on in every chat`;
   }
   return existing.length > 0 ? existing.join(", ") : null;
 }

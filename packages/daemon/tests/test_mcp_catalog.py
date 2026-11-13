@@ -41,13 +41,23 @@ def _entry(**changes: object) -> CatalogEntry:
     return CatalogEntry.model_validate({**base, **changes})
 
 
+@pytest.fixture
+def no_start(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An add starts a catalog server now, so never spawn a real npx or reach the network."""
+
+    def skip(_self: object, _server: object) -> None:
+        return None
+
+    monkeypatch.setattr("golem.mcp.supervisor.McpSupervisor._start", skip)
+
+
 def test_every_entry_validates_with_sample_inputs() -> None:
     entries = load_catalog()
     assert validate(entries) == []
     assert len({entry.id for entry in entries}) == len(entries) >= 10
     starters = [entry.id for entry in entries if entry.starter]
     assert starters == ["fetch", "playwright", "context7"]
-    assert all(entry.defaults.enabled == "on_demand" for entry in entries)
+    assert all(entry.defaults.enabled is True for entry in entries)
 
 
 def test_the_check_fails_on_a_bad_template() -> None:
@@ -91,7 +101,6 @@ def test_substitution_fills_folder_name_inputs_and_secrets() -> None:
         "command": "npx",
         "args": ["-y", "pkg", "/work", "--as", "x"],
         "env": {"API_KEY": "keychain:mcp/x"},
-        "enabled": "on_demand",
     }
     assert store == {"mcp/x": "abc"}
     table, _ = build(entry, {"folder": "/typed"}, {"token": "abc"}, name="second", folder="/work")
@@ -179,7 +188,7 @@ async def test_the_catalog_says_what_is_missing_and_what_is_added(
 
 
 async def test_add_from_the_catalog_fills_the_template_and_stores_the_secret(
-    short_home: Path, tmp_path: Path
+    short_home: Path, tmp_path: Path, no_start: None
 ) -> None:
     secrets = MemorySecrets()
     folder = tmp_path / "proj"
@@ -194,11 +203,15 @@ async def test_add_from_the_catalog_fills_the_template_and_stores_the_secret(
                 {"name": "filesystem", "catalog_id": "filesystem", "session_id": session_id},
             )
         )
-        assert (added["name"], added["state"]) == ("filesystem", "idle")
-        assert added["on_demand"] is True
+        assert added["name"] == "filesystem"
+        assert added["state"] != "idle" and added["on_demand"] is False
         text = (short_home / "config.toml").read_text(encoding="utf-8")
         assert f'"{folder.resolve()}"' in text or f'"{folder}"' in text
-        assert 'enabled = "on_demand"' in text
+        assert "enabled" not in text
+        # In the asking chat's scope with no toggle.
+        listed = rpc_result(await client.call("mcp.list", {"session_id": session_id}))
+        names = {str(item["name"]): item for item in listed["servers"]}  # type: ignore[index]
+        assert names["filesystem"]["state"] != "idle"
 
         github = {
             "name": "github",
@@ -220,7 +233,9 @@ async def test_add_from_the_catalog_fills_the_template_and_stores_the_secret(
         await stop_daemon(app, task)
 
 
-async def test_add_from_the_catalog_refuses_what_does_not_fit(short_home: Path) -> None:
+async def test_add_from_the_catalog_refuses_what_does_not_fit(
+    short_home: Path, no_start: None
+) -> None:
     secrets = MemorySecrets()
     app, task, client = await _daemon(short_home, secrets)
     try:

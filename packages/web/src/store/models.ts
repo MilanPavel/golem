@@ -1,6 +1,6 @@
-import type { ListedModel, ModelListResult, SetupRow } from "@golem/client";
+import type { ListedModel, ModelListResult, SetupRow, SetupStatusResult } from "@golem/client";
 
-export type { ListedModel, ModelListResult, SetupRow };
+export type { ListedModel, ModelListResult, SetupRow, SetupStatusResult };
 
 /** The query key of the model listing. The pushed events that change it invalidate this key. */
 export const MODEL_LIST_KEY = ["model.list"] as const;

@@ -38,7 +38,8 @@ import { SpanDetail, TraceSummary, TraceTree } from "../features/trace/index.ts"
 import { APPROVAL_DETAIL, APPROVAL_TRACE, CUT_LIKELY_DETAIL, CUT_MIDDLE_DETAIL, CUT_YES_DETAIL, FULL_DETAIL, MODEL_DETAIL, NO_PROMPT_DETAIL, NUM_CTX_DETAIL, OLD_DETAIL, SECTIONS_DETAIL, TOOL_DETAIL, UNKNOWN_WINDOW_DETAIL, FAILED_TRACE, GROWING_TRACE, LONG_TRACE, OLD_TRACE, SHORT_TRACE } from "../features/trace/sample.ts";
 import type { TraceRunSpan, TraceSpanResult } from "../store/trace.ts";
 import { FORM_CASES } from "../features/setup/sample.ts";
-import { AddKey, SetupFormView } from "../features/setup/setup-form.tsx";
+import { GolemBlockView } from "../features/setup/golem-block.tsx";
+import { AddKey, SetupFormView, SetupHeader } from "../features/setup/setup-form.tsx";
 import { ToolsOfferView } from "../features/setup/tools-offer.tsx";
 import { TOOLS_CASES } from "../features/setup/tools-sample.ts";
 import { PullStatusView, pullSummary } from "../features/models/index.ts";
@@ -600,13 +601,15 @@ function ToolsOfferDemo() {
   );
 }
 
-/** Settings → Setup: the cards with their fixes, and the key command under them. */
+/** Settings → Setup: the golem block, the status rows, and the key chips, in each state. */
 function SetupFormDemo() {
   return (
     <div className="flex flex-col gap-4">
-      {FORM_CASES.map(({ label, rows, actions, providers }) => (
-        <div key={label} className="flex flex-col gap-2 rounded-lg border border-line bg-bg p-4">
+      {FORM_CASES.map(({ label, rows, actions, providers, header, block, openKey }) => (
+        <section key={label} aria-label={`Setup, ${label}`} className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
           <span className="font-mono text-xs text-faint">{label}</span>
+          <SetupHeader mark={header.mark} text={header.text} onRunAgain={() => {}} />
+          {block === null ? null : <GolemBlockView block={block} />}
           <SetupFormView
             rows={rows}
             actions={actions}
@@ -615,8 +618,8 @@ function SetupFormDemo() {
             onNavigate={() => {}}
             hasPage={() => false}
           />
-          <AddKey providers={providers} actions={actions} onCheck={() => {}} />
-        </div>
+          <AddKey providers={providers} actions={actions} onCheck={() => {}} initialOpen={openKey ?? null} />
+        </section>
       ))}
     </div>
   );

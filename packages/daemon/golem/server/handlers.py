@@ -11,7 +11,7 @@ from typing import Literal, cast
 
 from pydantic import BaseModel, ConfigDict
 
-from golem import __version__
+from golem import __version__, install_info
 from golem.config import load_settings
 from golem.config_edit import (
     McpTableError,
@@ -197,6 +197,9 @@ from golem_protocol.commands import (
     SessionSetOptionsResult,
     SessionSetSkillsParams,
     SessionSetSkillsResult,
+    SetupInstall,
+    SetupJob,
+    SetupPaths,
     SetupRow,
     SetupStatusParams,
     SetupStatusResult,
@@ -1064,7 +1067,19 @@ async def _setup_status(ctx: RequestContext, _params: SetupStatusParams) -> Setu
         (lambda _name: None) if secrets is None else secrets.get,
         live_mcp=None if ctx.state.mcp is None else ctx.state.mcp.statuses(),
     )
+    facts = await asyncio.to_thread(install_info.install_facts)
     return SetupStatusResult(
+        install=SetupInstall(
+            method=facts.method,
+            version=facts.version,
+            binary=facts.binary,
+            daemon_binary=facts.daemon_binary,
+        ),
+        paths=SetupPaths(**install_info.path_facts(ctx.state.paths)),
+        jobs=[
+            SetupJob(label=job.label, plist=job.plist, loaded=job.loaded, pid=job.pid)
+            for job in await asyncio.to_thread(install_info.jobs)
+        ],
         rows=[
             SetupRow(
                 part=check.part,
@@ -1076,7 +1091,7 @@ async def _setup_status(ctx: RequestContext, _params: SetupStatusParams) -> Setu
                 target=check.target,
             )
             for check in checks
-        ]
+        ],
     )
 
 

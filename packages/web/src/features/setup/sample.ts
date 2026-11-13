@@ -1,5 +1,5 @@
-import { pageServiceRow, setupFormRows, type FormRow } from "@golem/view";
-import type { ListedModel, ModelListResult, SetupRow } from "../../store/models.ts";
+import { golemBlock, pageServiceRow, setupFormRows, setupProblem, setupProblemState, type FormRow, type GolemBlock, type Mark } from "@golem/view";
+import type { ListedModel, ModelListResult, SetupRow, SetupStatusResult } from "../../store/models.ts";
 import type { KeyProvider } from "./setup-form.tsx";
 import type { SetupActionsState } from "./use-setup-actions.ts";
 
@@ -102,7 +102,36 @@ export const OK_ROWS: SetupRow[] = [
 const KEPT = pageServiceRow(STATUS_ROWS[0] ?? null, "0.5.0");
 
 
-export type FormCase = { label: string; rows: FormRow[]; actions: SetupActionsState; providers: KeyProvider[] };
+/** What the daemon sends of where golem is installed: a Homebrew install of a Mac user. */
+export const INSTALL_FACTS: Pick<SetupStatusResult, "install" | "paths" | "jobs"> = {
+  install: {
+    method: "homebrew",
+    version: "0.13.1",
+    binary: "/opt/homebrew/bin/golem",
+    daemon_binary: "/opt/homebrew/opt/golem/libexec/golem-daemon/golem-daemon",
+  },
+  paths: {
+    home: "/Users/ann/.golem",
+    config: "/Users/ann/.golem/config.toml",
+    logs: "/Users/ann/.golem/logs/golem.jsonl",
+    socket: "/Users/ann/.golem/run/golem.sock",
+  },
+  jobs: [
+    { label: "dev.golem.daemon", plist: "/Users/ann/Library/LaunchAgents/dev.golem.daemon.plist", loaded: true, pid: 4821 },
+    { label: "dev.golem.web", plist: "/Users/ann/Library/LaunchAgents/dev.golem.web.plist", loaded: true, pid: 4833 },
+  ],
+};
+
+export type FormCase = {
+  label: string;
+  rows: FormRow[];
+  actions: SetupActionsState;
+  providers: KeyProvider[];
+  header: { mark: Mark; text: string };
+  block: GolemBlock | null;
+  /** The provider whose key line starts open. */
+  openKey?: string;
+};
 
 const key = (id: string, name: string, blurb: string, saved: boolean): KeyProvider => ({ id, name, blurb, saved });
 const NO_KEYS = [key("anthropic", "Anthropic", "Claude", false), key("openai", "OpenAI", "GPT", false), key("google", "Google", "Gemini", false)];
@@ -116,16 +145,67 @@ const PROBLEM_ROWS: SetupRow[] = [
   ...STATUS_ROWS.slice(4),
 ];
 
-/** Settings → Setup in the states the form draws, for the gallery. */
+const HEAD_MARKS = { ok: "ok", warn: "attn", fail: "fail" } as const;
+const BLOCK = golemBlock(INSTALL_FACTS);
+
+function head(rows: SetupRow[]): FormCase["header"] {
+  const line = setupProblem(rows) ?? "all set";
+  return { mark: HEAD_MARKS[setupProblemState(rows)], text: line.charAt(0).toUpperCase() + line.slice(1) };
+}
+
+const OLLAMA_STOPPED: SetupRow[] = OK_ROWS.map((row) =>
+  row.part === "engine"
+    ? { ...row, state: "warn" as const, detail: "not running · models can't load", action: "start_ollama" as const }
+    : row,
+);
+
+const ONE_FAILING: SetupRow[] = OK_ROWS.map((row) =>
+  row.part === "engine" ? { ...row, state: "fail" as const, detail: "Ollama is not installed", action: "install_ollama" as const } : row,
+);
+
+/** Settings → Setup in the states the page draws, for the gallery. */
 export const FORM_CASES: FormCase[] = [
-  { label: "All set", rows: setupFormRows(OK_ROWS, KEPT), actions: NO_ACTION, providers: OPENAI_SAVED },
-  { label: "All set, page kept by a job", rows: setupFormRows(OK_ROWS, KEPT, true), actions: NO_ACTION, providers: OPENAI_SAVED },
-  { label: "All set, page run by hand", rows: setupFormRows(OK_ROWS, KEPT, false), actions: NO_ACTION, providers: OPENAI_SAVED },
+  { label: "All set", rows: setupFormRows(OK_ROWS, KEPT, true), actions: NO_ACTION, providers: OPENAI_SAVED, header: head(OK_ROWS), block: BLOCK },
+  {
+    label: "Ollama stopped",
+    rows: setupFormRows(OLLAMA_STOPPED, KEPT, true),
+    actions: NO_ACTION,
+    providers: OPENAI_SAVED,
+    header: head(OLLAMA_STOPPED),
+    block: BLOCK,
+  },
+  {
+    label: "One failing row",
+    rows: setupFormRows(ONE_FAILING, KEPT, true),
+    actions: NO_ACTION,
+    providers: OPENAI_SAVED,
+    header: head(ONE_FAILING),
+    block: BLOCK,
+  },
+  {
+    label: "A key line open",
+    rows: setupFormRows(OK_ROWS, KEPT, true),
+    actions: NO_ACTION,
+    providers: OPENAI_SAVED,
+    header: head(OK_ROWS),
+    block: BLOCK,
+    openKey: "anthropic",
+  },
+  {
+    label: "All set, page run by hand, an older daemon",
+    rows: setupFormRows(OK_ROWS, KEPT, false),
+    actions: NO_ACTION,
+    providers: OPENAI_SAVED,
+    header: head(OK_ROWS),
+    block: null,
+  },
   {
     label: "Ollama missing, service not kept, a key missing",
     rows: setupFormRows(PROBLEM_ROWS, pageServiceRow(null, "0.5.0")),
     actions: NO_ACTION,
     providers: NO_KEYS,
+    header: head(PROBLEM_ROWS),
+    block: BLOCK,
   },
   {
     label: "Installing Ollama",
@@ -136,11 +216,15 @@ export const FORM_CASES: FormCase[] = [
       output: "==> Fetching ollama\n==> Downloading https://ghcr.io/v2/homebrew/core/ollama\n==> Pouring ollama--0.12.0.arm64_sequoia.bottle.tar.gz\n",
     },
     providers: NO_KEYS,
+    header: head(PROBLEM_ROWS),
+    block: BLOCK,
   },
   {
     label: "Install failed",
     rows: setupFormRows(PROBLEM_ROWS, KEPT),
     actions: { ...NO_ACTION, error: { action: "install", text: "Error: no space left on device" } },
     providers: OPENAI_SAVED,
+    header: head(PROBLEM_ROWS),
+    block: BLOCK,
   },
 ];

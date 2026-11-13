@@ -199,6 +199,7 @@ export {
   firstLine,
   formatSeconds,
   mcpAlert,
+  ONLY_WHEN_ASKED,
   MCP_HINT,
   mcpStatusMark,
   mcpStatusWord,
@@ -269,6 +270,7 @@ export {
   setupAtStart,
   setupBand,
   setupProblem,
+  setupProblemState,
   SETUP_STEPS,
   shortStepper,
   single,
@@ -332,6 +334,7 @@ export {
   type OllamaState,
   type PullTrack,
 } from "./setup-local.ts";
+export { golemBlock, tildePath, type GolemBlock, type GolemFact } from "./setup-golem.ts";
 export {
   setupFormRows,
   TOOLS_PATH,

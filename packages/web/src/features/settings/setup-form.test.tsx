@@ -3,13 +3,13 @@ import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { App } from "../../app.tsx";
-import type { ModelListResult, SetupRow } from "../../store/models.ts";
+import type { ModelListResult, SetupRow, SetupStatusResult } from "../../store/models.ts";
 import { createPage } from "../../store/page.ts";
 import { createPageHost } from "../../store/page-host.ts";
 import { PageProvider } from "../../store/page-context.tsx";
 import { fakeClient, fakeFrame, OLLAMA_FAILED_CODE, rpcError } from "../../store/test-support.ts";
 import { closeModelDialog } from "../models/index.ts";
-import { OK_ROWS, STATUS_ROWS, WORKING_LISTING } from "../setup/sample.ts";
+import { INSTALL_FACTS, OK_ROWS, STATUS_ROWS, WORKING_LISTING } from "../setup/sample.ts";
 import { TOOLS_CATALOG } from "../setup/tools-sample.ts";
 
 const noContrast = { rules: { "color-contrast": { enabled: false } } };
@@ -21,11 +21,17 @@ const TWO_READY: ModelListResult = {
   ),
 };
 
-function mount(rows: SetupRow[] = OK_ROWS, listing: ModelListResult = WORKING_LISTING, path = "/settings", pageKept?: boolean) {
+function mount(
+  rows: SetupRow[] = OK_ROWS,
+  listing: ModelListResult = WORKING_LISTING,
+  path = "/settings",
+  pageKept?: boolean,
+  facts: Partial<SetupStatusResult> = {},
+) {
   history.replaceState(null, "", path);
   const fake = fakeClient();
   fake.raw.listModels.mockResolvedValue(listing);
-  fake.raw.setupStatus.mockResolvedValue({ rows });
+  fake.raw.setupStatus.mockResolvedValue({ rows, ...facts });
   fake.raw.status.mockResolvedValue({ version: "0.5.0" });
   const doc = new EventTarget() as unknown as Document;
   (doc as { visibilityState: string }).visibilityState = "visible";
@@ -66,9 +72,9 @@ afterEach(() => {
   delete document.documentElement.dataset.theme;
 });
 
-test("a setup that works: a card for each part with its word, and nothing to fix", async () => {
+test("a setup that works: a row for each part with its word, and nothing to fix", async () => {
   mount(OK_ROWS);
-  await screen.findByText("all set", { selector: "p" });
+  await screen.findByText("All set", { selector: "p" });
   const names = within(screen.getByRole("list", { name: "Setup" }))
     .getAllByRole("listitem")
     .map((item) => item.querySelector("p")?.textContent);
@@ -79,6 +85,45 @@ test("a setup that works: a card for each part with its word, and nothing to fix
   expect(card("Disk").queryByRole("button")).toBeNull();
   // The service is kept, and the daemon's own row is the page's: only the version is added.
   expect(card("Service").getByText(/running · v0\.5\.0 · starts at login/)).toBeTruthy();
+  // The page has no update check, no Reveal and no Restart.
+  expect(screen.queryByRole("button", { name: /Update|Reveal|Restart/ })).toBeNull();
+  expect(screen.queryByText(/available/)).toBeNull();
+});
+
+test("a row that needs attention is tinted, and the header carries the problem and its mark", async () => {
+  mount(STATUS_ROWS);
+  const header = await screen.findByText("Ollama: Ollama is not installed", { selector: "p" });
+  expect(header.parentElement?.textContent).toContain("failed:");
+  expect(within(header.parentElement as HTMLElement).getByRole("button", { name: "Run setup again" })).toBeTruthy();
+  const ollama = screen.getByText("Ollama", { selector: "p" }).closest("li");
+  expect(ollama?.className).toContain("bg-deny-soft");
+  expect(screen.getByText("Model", { selector: "p" }).closest("li")?.className).toContain("bg-wait-soft");
+  expect(screen.getByText("Disk", { selector: "p" }).closest("li")?.className).not.toContain("soft");
+});
+
+test("the golem block says where golem is installed, and Copy is on each path only", async () => {
+  const { user } = mount(OK_ROWS, WORKING_LISTING, "/settings", undefined, INSTALL_FACTS);
+  const block = within(await screen.findByRole("group", { name: "golem" }));
+  expect(block.getByText("v0.13.1")).toBeTruthy();
+  expect(block.getByText("Homebrew · /opt/homebrew/bin/golem")).toBeTruthy();
+  expect(block.getByText("~/.golem")).toBeTruthy();
+  expect(block.getByText("~/.golem/config.toml")).toBeTruthy();
+  expect(block.getByText("~/.golem/logs/golem.jsonl")).toBeTruthy();
+  expect(block.getByText("~/.golem/run/golem.sock")).toBeTruthy();
+  expect(block.getByText("dev.golem.daemon · pid 4821")).toBeTruthy();
+  expect(block.getByText("dev.golem.web · pid 4833")).toBeTruthy();
+  // Six paths (golem, daemon, data, config, logs, socket), and no button on a job.
+  expect(block.getAllByRole("button")).toHaveLength(6);
+  await user.click(block.getByRole("button", { name: "Copy config path" }));
+  expect(writeText).toHaveBeenCalledWith("/Users/ann/.golem/config.toml");
+  await user.click(block.getByRole("button", { name: "Copy data path" }));
+  expect(writeText).toHaveBeenLastCalledWith("/Users/ann/.golem");
+});
+
+test("a daemon that sends no install facts has no golem block", async () => {
+  mount(OK_ROWS);
+  await screen.findByText("All set", { selector: "p" });
+  expect(screen.queryByRole("group", { name: "golem" })).toBeNull();
 });
 
 const cardNames = () =>
@@ -124,7 +169,7 @@ test("a service not kept while the page is kept keeps its own command", async ()
 
 test("an unknown page host has no Web page card", async () => {
   mount(OK_ROWS);
-  await screen.findByText("all set", { selector: "p" });
+  await screen.findByText("All set", { selector: "p" });
   expect(cardNames()).not.toContain("Web page");
 });
 
@@ -297,41 +342,61 @@ test("a provider that needs a key: the command to copy for it, and Check again",
 
 const KEYED_LISTING: ModelListResult = { ...WORKING_LISTING, setup: { ...WORKING_LISTING.setup, keys: ["openai"] } };
 
-test("API keys lists every provider, says which has a key saved, and offers the first without one", async () => {
-  const { user } = mount(OK_ROWS, KEYED_LISTING);
+test("API keys are chips, the saved one in the allow tone, and none is open at first", async () => {
+  mount(OK_ROWS, KEYED_LISTING);
   const section = await screen.findByRole("group", { name: "API keys" });
-  const rows = within(within(section).getByRole("list", { name: "Saved keys" })).getAllByRole("listitem");
-  expect(rows.map((row) => row.textContent)).toEqual([
-    "AnthropicClaudeno key",
-    "OpenAIGPTdone: key saved",
-    "GoogleGeminino key",
-    "DeepSeekDeepSeek V3 and R1no key",
-    "xAIGrokno key",
-    "MoonshotKimino key",
+  const chips = within(section).getAllByRole("button", { expanded: false });
+  expect(chips.map((chip) => chip.textContent)).toEqual([
+    "+AnthropicClaude",
+    "✓OpenAIsaved",
+    "+GoogleGemini",
+    "+DeepSeekDeepSeek V3 and R1",
+    "+xAIGrok",
+    "+MoonshotKimi",
   ]);
-  const select = within(section).getByRole("combobox", { name: "Provider" });
-  expect((select as HTMLSelectElement).value).toBe("anthropic");
-  expect(within(select).getByRole("option", { name: "OpenAI · key saved" })).toBeTruthy();
-  expect(within(section).getByText("golem auth set anthropic")).toBeTruthy();
-  await user.selectOptions(select, "openai");
-  expect(within(section).getByText("golem auth set openai")).toBeTruthy();
-  expect(within(section).getByText(/to replace the saved one/)).toBeTruthy();
-  await user.click(within(section).getByRole("button", { name: "Copy" }));
-  expect(writeText).toHaveBeenCalledWith("golem auth set openai");
+  expect(chips[1]?.className).toContain("bg-allow-soft");
+  expect(chips[0]?.className).not.toContain("bg-allow-soft");
+  // No full-width select, and no command until a chip is pressed.
+  expect(within(section).queryByRole("combobox")).toBeNull();
+  expect(within(section).queryByText("golem auth set anthropic")).toBeNull();
+});
+
+test("a chip opens one line with the command, Copy, Check again and the note; the same chip closes it", async () => {
+  const { user } = mount(OK_ROWS, KEYED_LISTING);
+  const section = within(await screen.findByRole("group", { name: "API keys" }));
+  const anthropic = section.getByRole("button", { name: /^Anthropic/ });
+  await user.click(anthropic);
+  expect(anthropic.getAttribute("aria-expanded")).toBe("true");
+  const line = within(section.getByRole("group", { name: "Anthropic key" }));
+  expect(line.getByText("golem auth set anthropic")).toBeTruthy();
+  expect(line.getByText("The page never takes a key. Paste it in a terminal.")).toBeTruthy();
+  expect(line.getByRole("button", { name: "Check again" })).toBeTruthy();
+  await user.click(line.getByRole("button", { name: "Copy" }));
+  expect(writeText).toHaveBeenCalledWith("golem auth set anthropic");
+  // Another chip moves the line, and a saved one says to replace.
+  await user.click(section.getByRole("button", { name: /^OpenAI/ }));
+  expect(section.queryByText("golem auth set anthropic")).toBeNull();
+  const saved = within(section.getByRole("group", { name: "OpenAI key" }));
+  expect(saved.getByText("golem auth set openai")).toBeTruthy();
+  expect(saved.getByText(/Key saved/)).toBeTruthy();
+  await user.click(section.getByRole("button", { name: /^OpenAI/ }));
+  expect(section.queryByRole("group", { name: "OpenAI key" })).toBeNull();
 });
 
 test("a key saved from the terminal shows after Check again", async () => {
   const { fake, user } = mount(OK_ROWS, WORKING_LISTING);
   const section = await screen.findByRole("group", { name: "API keys" });
-  expect(within(section).queryByText("key saved")).toBeNull();
+  await user.click(within(section).getByRole("button", { name: /^OpenAI/ }));
+  expect(within(section).queryByText("saved")).toBeNull();
   fake.raw.listModels.mockResolvedValue(KEYED_LISTING);
   await user.click(within(section).getByRole("button", { name: "Check again" }));
-  await waitFor(() => expect(within(section).getByText("key saved")).toBeTruthy());
+  await waitFor(() => expect(within(section).getByText("saved")).toBeTruthy());
 });
 
 test("API keys never asks for a key itself", async () => {
-  mount(OK_ROWS);
+  const { user } = mount(OK_ROWS);
   const section = await screen.findByRole("group", { name: "API keys" });
+  await user.click(within(section).getByRole("button", { name: /^Anthropic/ }));
   expect(section.querySelector("input")).toBeNull();
   expect(document.querySelector("input[type=password]")).toBeNull();
 });

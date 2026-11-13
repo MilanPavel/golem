@@ -1517,7 +1517,7 @@ class McpCatalogEntry(BaseModel):
     auth: Literal["none", "token", "oauth"]
     inputs: list[McpCatalogInput] = Field(default_factory=list[McpCatalogInput])
     starter: bool = False
-    on_demand: bool = True
+    on_demand: bool = False
     available: bool = True
     reason: str | None = None
     missing: Literal["node", "uv", "docker"] | None = None
@@ -2126,12 +2126,55 @@ class SetupRow(BaseModel):
     target: str | None = Field(default=None, min_length=1)
 
 
+InstallMethod = Literal["homebrew", "script", "dev"]
+
+
+class SetupInstall(BaseModel):
+    """Where golem is installed. ``binary`` is the ``golem`` program, null if not on the PATH."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    method: InstallMethod
+    version: str = Field(min_length=1)
+    binary: str | None = Field(default=None, min_length=1)
+    daemon_binary: str = Field(min_length=1)
+
+
+class SetupPaths(BaseModel):
+    """The files golem keeps, absolute."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    home: str = Field(min_length=1)
+    config: str = Field(min_length=1)
+    logs: str = Field(min_length=1)
+    socket: str = Field(min_length=1)
+
+
+class SetupJob(BaseModel):
+    """A launchd job. ``pid`` is set only while it runs. ``plist`` is its file, present or not."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    label: str = Field(min_length=1)
+    plist: str = Field(min_length=1)
+    loaded: bool
+    pid: int | None = None
+
+
 class SetupStatusResult(BaseModel):
-    """The rows in the order ``golem doctor`` prints them."""
+    """The rows in the order ``golem doctor`` prints them.
+
+    ``install``, ``paths``, and ``jobs`` say where golem is installed and what
+    runs it. A daemon that does not know them leaves them out.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     rows: list[SetupRow]
+    install: SetupInstall | None = None
+    paths: SetupPaths | None = None
+    jobs: list[SetupJob] = Field(default_factory=list[SetupJob])
 
 
 class OllamaInstallParams(BaseModel):
@@ -2277,6 +2320,7 @@ __all__ = [
     "HelloParams",
     "HelloResult",
     "InspectMessage",
+    "InstallMethod",
     "KeychainWait",
     "ListedModel",
     "ListedProvider",
@@ -2400,7 +2444,10 @@ __all__ = [
     "SessionSetSkillsResult",
     "SessionSummary",
     "SetupAction",
+    "SetupInstall",
+    "SetupJob",
     "SetupPart",
+    "SetupPaths",
     "SetupRow",
     "SetupState",
     "SetupStatusParams",
