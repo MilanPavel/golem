@@ -11,8 +11,9 @@ For someone who wants to use golem today.
 | Page | File | Ticket |
 |---|---|---|
 | Introduction: why golem, how it works | [guide/introduction.md](guide/introduction.md) | |
-| Install, upgrade, remove | [install.md](install.md) | |
+| Install, upgrade | [install.md](install.md) | |
 | First chat | [guide/first-chat.md](guide/first-chat.md) | |
+| Uninstall | [guide/uninstall.md](guide/uninstall.md) | |
 
 ## Use golem
 

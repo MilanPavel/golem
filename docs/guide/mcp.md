@@ -199,6 +199,7 @@ A project's `.golem/config.toml` can add servers for chats in that folder, once 
 | `args` | `[]` | Its arguments |
 | `env` | `{}` | Extra environment variables. A server sees only these, plus `HOME`, `PATH`, and a few basics |
 | `env_passthrough` | `[]` | Names of variables from golem's own environment to hand to the server. Not for secrets: a name such as `GITHUB_TOKEN` is refused, so use `env` with a Keychain secret. Under launchd golem has no shell environment, so a variable from your shell may not be there |
+| `oauth` | none | For an HTTP server that signs in with OAuth and does not register clients by itself: `oauth = { client_id = "...", scopes = ["read"] }`. Leave it out otherwise. The tokens are kept in the Keychain as `mcp/<name>-oauth`, never in the file |
 | `cwd` | your home, or the project | Where the server runs |
 | `url` | | An HTTP server's address, instead of `command` |
 | `headers` | `{}` | Headers sent with every request to `url` |
