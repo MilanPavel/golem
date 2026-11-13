@@ -325,7 +325,9 @@ class SessionManager:
             session = await self._resolve(session_id)
             values = await self._runtime.values(session_id)
             identity = self._runtime.router.identity(session.model_profile)
-            system = await self._runtime.system_prompt(session_id, session.cwd, session.skills)
+            system = await self._runtime.system_prompt(
+                session_id, session.cwd, session.skills, sorted(session.mcp_servers)
+            )
             messages = plain_messages(values)
             return SessionView(
                 session_id=session.session_id,

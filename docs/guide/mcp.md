@@ -161,6 +161,12 @@ enabled = "on_demand"
 
 Type `/mcp enable browser` in a chat. Only that chat gets the server, and it stays on after a restart. `/mcp disable browser` turns it off again.
 
+### Let the model ask for it
+
+A chat with on-demand servers that are off tells the model about them in one short line, such as `MCP servers you can turn on: playwright (browse web pages), context7 (library docs)`. Each costs about 30 tokens. When a task needs one, the model calls `mcp_enable`, and you get an approval that shows its reason. Allow it and the server starts for that chat, and the model uses its tools in the same turn, as if you had typed `/mcp enable`. Deny it and the server stays off. The description is the catalog's, or the first line of the server's own `instructions` from the last time it ran.
+
+To keep a server out of that line, and so out of the model's reach, set `auto_enable = false` in its table. Only you can turn it on then.
+
 ## Servers on the web, with a token
 
 golem never keeps a token in the file. `golem mcp add <name> --url <url> --token` stores the token and writes the header for you. To do it by hand, name a Keychain secret, then store it:
@@ -203,6 +209,7 @@ A project's `.golem/config.toml` can add servers for chats in that folder, once 
 | `cwd` | your home, or the project | Where the server runs |
 | `url` | | An HTTP server's address, instead of `command` |
 | `headers` | `{}` | Headers sent with every request to `url` |
+| `auto_enable` | `true` | `false` keeps an on-demand server out of the line that tells the model what it can turn on |
 | `enabled` | `true` | `"on_demand"` for chats that run `/mcp enable`, or `false` to keep the settings without starting it |
 | `timeout_seconds` | `120` | The longest one tool call may take |
 | `tools` | all | `include` and `exclude` patterns for the tools the model gets, see above |

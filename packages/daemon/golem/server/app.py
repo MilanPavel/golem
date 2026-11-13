@@ -20,6 +20,7 @@ from golem.graphs.prompt import SystemPrompt
 from golem.lock import DaemonAlreadyRunning, DaemonLock
 from golem.logging import configure_logging
 from golem.mcp import McpSupervisor
+from golem.mcp.prompt import mcp_section
 from golem.models.discovery import ModelDiscovery
 from golem.models.install import RUNTIMES, OllamaInstaller, runtime_installer
 from golem.models.keys import ProviderKeys
@@ -39,6 +40,7 @@ from golem.server.dispatcher import (
 )
 from golem.server.framing import MAX_LINE_BYTES, FrameTooLong, read_frame
 from golem.server.handlers import standard_methods
+from golem.server.mcp_model import turn_on_for_model
 from golem.server.start_error import (
     clear_start_error,
     describe_database_too_new,
@@ -61,6 +63,7 @@ from golem.store.database import Database, DatabaseTooNewError
 from golem.store.events import EventLog
 from golem.store.records import RunRecords, SessionRecords
 from golem.tools import default_registry
+from golem.tools.registry import ToolScope
 from golem_protocol.commands import KeychainWait, ModelServerStatus
 from golem_protocol.rpc import KeychainWaitNotification, ModelServerStatusNotification
 
@@ -211,7 +214,7 @@ class DaemonApp:
                     self.state.policy,
                     self.state.artifacts,
                     local,
-                    SystemPrompt(sections=(pinned_section(self.state.skills),)),
+                    SystemPrompt(sections=(pinned_section(self.state.skills), mcp_section(mcp))),
                     BlobStore(database),
                     window_of=lambda profile, overrides: resolve_window(
                         router, profile, models, overrides=overrides
@@ -225,6 +228,12 @@ class DaemonApp:
                     self.state.skills,
                     BlobStore(database),
                 )
+                sessions = self.state.sessions
+
+                async def enable_mcp(session_id: str, scope: ToolScope, name: str) -> list[str]:
+                    return await turn_on_for_model(sessions, mcp, session_id, scope, name)
+
+                chat.enable_mcp = enable_mcp
                 if self._pulls is None:
                     pulls = PullManager(router, ram_gb=models.ram_gb)
                 else:

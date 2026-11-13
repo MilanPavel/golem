@@ -2,6 +2,7 @@
 
 export type Approval = 'ask' | 'read-only' | 'allow';
 export type Args = string[];
+export type AutoEnable = boolean;
 export type Command = string | null;
 export type Cwd = string | null;
 export type Enabled = boolean | 'on_demand';
@@ -57,6 +58,7 @@ export interface McpServerDetail {
 export interface McpServerConfig {
   approval?: Approval;
   args?: Args;
+  auto_enable?: AutoEnable;
   command?: Command;
   cwd?: Cwd;
   enabled?: Enabled;

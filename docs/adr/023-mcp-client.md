@@ -67,3 +67,9 @@ A model call can wait up to 10 seconds for a server its session needs. A server 
 A project server keeps running after the last session in that folder ends, until the daemon restarts or the file changes.
 
 Golem's client follows one protocol version. A server that answers with another is used anyway, and a later MCP change that breaks the five messages above needs a change here.
+
+## Addendum: the model can change a session's scope, with approval
+
+A session's `enabled` list used to change only when the user ran `/mcp enable`. The model can now ask: the built-in `mcp_enable(name, reason)` is offered while the session has an on-demand server that is off, and its description lists those servers. It goes through the same permission policy as any tool, so the user approves each turn-on and sees the reason. On allow, it takes the same path as `mcp.enable`, so the list is stored in `session.updated` and survives a restart, and the tools are in scope for the next model call of the same turn.
+
+Only a server the model was told about can be turned on. `auto_enable = false` in `[mcp.<name>]` removes a server from that list and from `mcp_enable`, which leaves it to the user. Scope is still per session: no server turns on for another session, and a server that is `enabled = true` or `false` is never the model's to change.

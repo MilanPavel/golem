@@ -318,7 +318,9 @@ class McpServerSettings(BaseModel):
 
     ``enabled`` is ``true`` for every session, ``"on_demand"`` for the sessions
     that turn it on with ``/mcp enable``, or ``false``. ``timeout_seconds`` is
-    the longest one tool call may take.
+    the longest one tool call may take. ``auto_enable`` (default true) lets the
+    model see an on-demand server in the system prompt and ask to turn it on;
+    ``false`` keeps it out, so only you turn it on.
 
     ``tools`` hides some of the server's tools from the model. ``approval`` is
     ``"ask"`` (every call asks, the default), ``"read-only"`` (a tool the server
@@ -345,6 +347,7 @@ class McpServerSettings(BaseModel):
     approval: McpApproval = "ask"
     env_passthrough: list[str] = Field(default_factory=list[str])
     oauth: McpOAuthSettings | None = None
+    auto_enable: bool = True
 
     @model_validator(mode="after")
     def _one_transport(self) -> McpServerSettings:
