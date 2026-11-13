@@ -1,5 +1,33 @@
 {
   "$defs": {
+    "McpOAuthConfig": {
+      "additionalProperties": false,
+      "description": "``oauth`` in an HTTP server's table: a client id for a server with no registration.",
+      "properties": {
+        "client_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Client Id"
+        },
+        "scopes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Scopes",
+          "type": "array"
+        }
+      },
+      "title": "McpOAuthConfig",
+      "type": "object"
+    },
     "McpSecretInfo": {
       "additionalProperties": false,
       "description": "A secret a server names, ``ref`` as ``mcp/<name>``, and whether the store has it.\n\nThe value is never sent.",
@@ -236,6 +264,17 @@
           },
           "title": "Headers",
           "type": "object"
+        },
+        "oauth": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/McpOAuthConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "timeout_seconds": {
           "default": 120,

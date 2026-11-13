@@ -52,7 +52,8 @@ An Architecture Decision Record (ADR) is a short note of one choice: what was de
 | [046](046-web-search.md) | `web_search` asks DuckDuckGo's HTML page first, behind a provider setting | accepted | 2026-11-10 |
 | [047](047-permission-modes.md) | Permission modes change only the built-in defaults: careful, balanced, and autopilot | accepted | 2026-11-11 |
 | [048](048-mcp-read-only-tools.md) | An MCP server's read-only tools can run without asking, if you trust that server | accepted | 2026-11-11 |
+| [049](049-mcp-oauth.md) | A hosted MCP server signs in with OAuth, through a loopback listener in the daemon | accepted | 2026-11-08 |
 
 How the running code fits together is in [../architecture.md](../architecture.md).
 
-New records use [template.md](template.md). Number the next file `049-….md` and add a row here.
+New records use [template.md](template.md). Number the next file `050-….md` and add a row here.
