@@ -300,7 +300,7 @@ export function WelcomeScreen({ step, from }: { step: WelcomeStep; from: "send" 
         tools: toolsLine.text,
         toolsSkipped: toolsLine.skipped,
         keepNote: keepAt === null ? null : serviceKept ? { command: keepAt, page: "only" } : { command: keepAt },
-        app: { offer: installOffer(appInstall.snapshot, pageHost.kept), host: location.host, onInstall: () => void appInstall.install() },
+        app: { offer: installOffer(appInstall.snapshot), host: location.host, onInstall: () => void appInstall.install() },
         fromSend: from === "send",
         onStart: () => void start(),
       }}

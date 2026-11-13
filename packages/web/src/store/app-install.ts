@@ -1,7 +1,7 @@
 import { createStore, type StoreSource } from "./create-store.ts";
 
 /** Which way this browser installs the page as an app. */
-export type InstallWay = "prompt" | "safari" | "other";
+export type InstallWay = "prompt" | "safari" | "chromium" | "other";
 
 /** What the page knows about being installed. */
 export type AppInstallSnapshot = {
@@ -9,9 +9,11 @@ export type AppInstallSnapshot = {
   prompt: boolean;
   /** Safari on a Mac: no prompt, the Dock menu is the way. */
   safari: boolean;
+  /** Chrome or Edge: no prompt saved means it is installed, or the browser holds it back; the menu still installs. */
+  chromium: boolean;
   /** The page already runs in its own window. */
   standalone: boolean;
-  /** The browser said `appinstalled` while this page was open. */
+  /** golem is installed as an app: `appinstalled` was seen (and kept), the browser lists it, or this is its window. */
   installed: boolean;
 };
 
@@ -30,8 +32,33 @@ type InstallPromptEvent = Event & { prompt(): Promise<unknown> };
 export type InstallEnv = {
   addEventListener(type: string, listener: (event: Event) => void): void;
   matchMedia?: (query: string) => { matches: boolean };
-  navigator?: { userAgent?: string; standalone?: boolean };
+  navigator?: { userAgent?: string; standalone?: boolean; getInstalledRelatedApps?: () => Promise<{ url?: string }[]> };
+  localStorage?: Pick<Storage, "getItem" | "setItem">;
 };
+
+/** Chrome stops firing `beforeinstallprompt` once installed, and `appinstalled` only reaches the page that installed: this remembers it. */
+const INSTALLED_KEY = "golem.app-installed";
+
+function readInstalled(env: InstallEnv): boolean {
+  try {
+    return env.localStorage?.getItem(INSTALLED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function rememberInstalled(env: InstallEnv): void {
+  try {
+    env.localStorage?.setItem(INSTALLED_KEY, "1");
+  } catch {
+    // No storage (private window): the flag lasts as long as this page.
+  }
+}
+
+/** Chrome, Edge and the browsers built on Chromium, but not Safari or Firefox. */
+export function isChromium(userAgent: string): boolean {
+  return /Chrome|Chromium|Edg\//.test(userAgent) && !/CriOS|FxiOS|Android/.test(userAgent);
+}
 
 /** Safari on a Mac says `Safari/` and none of the browsers built on its name. */
 export function isMacSafari(userAgent: string): boolean {
@@ -50,8 +77,9 @@ export function createAppInstall(env: InstallEnv = window): AppInstallStore {
   const store = createStore<AppInstallSnapshot>({
     prompt: false,
     safari: isMacSafari(env.navigator?.userAgent ?? ""),
+    chromium: isChromium(env.navigator?.userAgent ?? ""),
     standalone: isStandalone(env),
-    installed: false,
+    installed: readInstalled(env),
   });
   let saved: InstallPromptEvent | null = null;
   const change = (part: Partial<AppInstallSnapshot>): void => {
@@ -62,8 +90,23 @@ export function createAppInstall(env: InstallEnv = window): AppInstallStore {
     saved = event as InstallPromptEvent;
     change({ prompt: true });
   });
+  if (store.getSnapshot().standalone) {
+    rememberInstalled(env);
+  } else if (!store.getSnapshot().installed) {
+    // Where the browser can say which apps of this site are installed, ask once.
+    env.navigator?.getInstalledRelatedApps?.().then(
+      (apps) => {
+        if (apps.length > 0) {
+          rememberInstalled(env);
+          change({ installed: true });
+        }
+      },
+      () => undefined,
+    );
+  }
   env.addEventListener("appinstalled", () => {
     saved = null;
+    rememberInstalled(env);
     change({ prompt: false, installed: true });
   });
   return {
@@ -86,15 +129,16 @@ export function createAppInstall(env: InstallEnv = window): AppInstallStore {
 }
 
 /**
- * What to show. Only when the web job keeps the page running: a Dock icon on a page that stops
- * with the terminal opens a dead page. Never inside the app's own window.
+ * What to show: anywhere but the app's own window. Without the web job the page stops with the
+ * terminal, but the Ready step says how to keep it right under this card, and hiding the card
+ * would also hide that golem is already installed.
  */
-export function installOffer(app: AppInstallSnapshot, pageKept: boolean | null): InstallOffer {
-  if (pageKept !== true || app.standalone) {
+export function installOffer(app: AppInstallSnapshot): InstallOffer {
+  if (app.standalone) {
     return null;
   }
   if (app.installed) {
     return "installed";
   }
-  return app.prompt ? "prompt" : app.safari ? "safari" : "other";
+  return app.prompt ? "prompt" : app.safari ? "safari" : app.chromium ? "chromium" : "other";
 }

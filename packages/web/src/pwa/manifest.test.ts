@@ -10,6 +10,7 @@ const manifest = JSON.parse(read("public/manifest.webmanifest")) as {
   start_url: string;
   scope: string;
   display: string;
+  related_applications: { platform: string; url: string }[];
   theme_color: string;
   background_color: string;
   icons: { src: string; sizes: string; type: string; purpose: string }[];
@@ -29,6 +30,10 @@ test("the manifest says what the ticket says", () => {
     scope: "/",
     display: "standalone",
   });
+});
+
+test("the manifest lists itself as a web app, so Chrome can say it is installed", () => {
+  expect(manifest.related_applications).toEqual([{ platform: "webapp", url: "/manifest.webmanifest" }]);
 });
 
 test("every icon exists, with a 192 and a 512 any icon and a maskable one", () => {

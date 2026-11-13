@@ -1,7 +1,7 @@
 import { ThemeSwitch } from "../../theme-switch.tsx";
 import { sessionPath, settingsPath } from "../../store/router.ts";
 import { installOffer } from "../../store/app-install.ts";
-import { useAppInstall, useNavigate, usePageHost } from "../../store/page-context.tsx";
+import { useAppInstall, useNavigate } from "../../store/page-context.tsx";
 import { cn } from "../../ui/cn.ts";
 import { IconButton } from "../../ui/icon-button.tsx";
 import { CloseIcon } from "../../ui/icons.tsx";
@@ -19,11 +19,10 @@ const TAB = cn(TAB_LOOK, "shrink-0 whitespace-nowrap aria-[current=page]:border-
 
 /** The `App` block: the same install action as Ready, for later. */
 function AppearanceApp() {
-  const pageHost = usePageHost();
   const appInstall = useAppInstall();
   return (
     <AppCard
-      offer={installOffer(appInstall.snapshot, pageHost.kept)}
+      offer={installOffer(appInstall.snapshot)}
       host={location.host}
       where="settings"
       onInstall={() => void appInstall.install()}
