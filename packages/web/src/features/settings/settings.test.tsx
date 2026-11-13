@@ -160,11 +160,10 @@ test("Appearance has an App block with the install action when the web job keeps
   expect(prompt).toHaveBeenCalledTimes(1);
 });
 
-test("Appearance has no App block while the web job is not installed", async () => {
+test("Appearance shows the App block even while the web job is not installed", async () => {
   mount("/settings/appearance", OK_ROWS, { kept: false });
   await screen.findByRole("button", { name: "Dark" });
-  await act(() => new Promise<void>((resolve) => setTimeout(resolve, 5)));
-  expect(screen.queryByRole("heading", { level: 3, name: "App" })).toBeNull();
+  expect(await screen.findByRole("heading", { level: 3, name: "App" })).toBeTruthy();
 });
 
 // Looking again

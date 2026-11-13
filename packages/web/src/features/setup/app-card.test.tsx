@@ -32,9 +32,16 @@ test("another browser: only the bookmark line", () => {
   expect(screen.getByText(HOST)).toBeTruthy();
 });
 
+test("Chrome without a prompt: the menu path, and the bookmark", () => {
+  render(<AppCard offer="chromium" host={HOST} where="ready" onInstall={() => undefined} />);
+  expect(screen.queryByRole("button")).toBeNull();
+  expect(screen.getByText("⋮ → Cast, save and share → Install page as app")).toBeTruthy();
+  expect(screen.getByText(/or bookmark/)).toBeTruthy();
+});
+
 test("installed: says so and offers nothing more", () => {
   render(<AppCard offer="installed" host={HOST} where="ready" onInstall={() => undefined} />);
-  expect(screen.getByText("Installed. Open golem from the Dock.")).toBeTruthy();
+  expect(screen.getByText("golem is installed as an app. Open it from the Dock, or with Open in app in Chrome's address bar.")).toBeTruthy();
   expect(screen.queryByRole("button")).toBeNull();
 });
 
