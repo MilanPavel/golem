@@ -7,6 +7,7 @@ import os
 import subprocess
 import time
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -185,6 +186,35 @@ async def test_the_shell_tool_ends_with_the_exit_code(root: Path) -> None:
     assert (failed.output, failed.summary, failed.failed) == ("boom\n[exit code 2]", "exit 2", True)
     slow = await _call(root, "shell", command="sleep 5", timeout_seconds=1)
     assert (slow.summary, slow.failed) == ("timed out after 1s", True)
+
+
+async def test_a_killed_command_leaves_no_open_transport(
+    root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    started: list[asyncio.subprocess.Process] = []
+    create = asyncio.create_subprocess_exec
+
+    async def spy(*args: object, **kwargs: object) -> asyncio.subprocess.Process:
+        process = await create(*args, **kwargs)  # pyright: ignore[reportArgumentType]
+        started.append(process)
+        return process
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", spy)
+    done = await sandbox.run(
+        ["/bin/sh", "-c", "sleep 5"],
+        root=root,
+        settings=ShellSettings(),
+        timeout=0.3,
+        sandboxed=False,
+    )
+    assert done.timed_out is True
+    (process,) = started
+    loose: Any = process
+    transport: Any = loose._transport  # pyright: ignore[reportPrivateUsage]
+    # A pipe still open when the loop closes warns when it is collected. The test cannot make the
+    # loop close early, so it checks that nothing is left open when `run` returns.
+    assert transport.is_closing()
+    assert transport.get_pipe_transport(1)._pipe is None
 
 
 @pytest.mark.parametrize(
