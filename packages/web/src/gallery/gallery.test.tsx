@@ -2,18 +2,22 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, test } from "vitest";
 import { Gallery } from "./gallery.tsx";
+import { GALLERY_SECTIONS } from "./gallery-axe-sections.tsx";
 import { DIALOG_RULES, expectAxeClean, resetThemeAfterEach, showTheme } from "./gallery-test-utils.ts";
 
 // The dialog tests are in gallery-tune, gallery-setup and gallery-palette, so vitest runs them in parallel.
 resetThemeAfterEach();
 
-// The one test that walks the whole gallery in both themes: about 6 s locally, over 20 s on a shared CI runner.
-test("the gallery shows both themes and has no accessibility violations", { timeout: 60_000 }, async () => {
+// Axe runs on one section at a time, in gallery-axe-slip and gallery-axe-kiln. This only checks that the
+// gallery shows both themes and that every section is in their list.
+test("the gallery shows both themes, and every section has an axe test", () => {
   const { container } = render(<Gallery />);
-  expect(container.querySelector('[data-theme="slip"]')).toBeTruthy();
-  expect(container.querySelector('[data-theme="kiln"]')).toBeTruthy();
-  // Each trace demo repeats the same "Context window" landmark, so unique landmark names are not checked here.
-  await expectAxeClean(container, { "landmark-unique": { enabled: false } });
+  for (const [theme, prefix] of [["slip", ""], ["kiln", "kiln-"]] as const) {
+    const panel = container.querySelector(`[data-theme="${theme}"]`);
+    expect(panel, theme).toBeTruthy();
+    const ids = [...(panel?.querySelectorAll(":scope > section") ?? [])].map((section) => section.id.replace(prefix, ""));
+    expect(ids.slice().sort(), theme).toEqual([...GALLERY_SECTIONS].sort());
+  }
 });
 
 test("the gallery's model dialog shows a download with its speed and time left, and passes axe", async () => {
