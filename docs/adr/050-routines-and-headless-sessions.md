@@ -1,7 +1,7 @@
 # ADR-050: A routine fires a headless session; `runs` stay agent turns, `routine_runs` are firings
 
 **Date**: 2026-11-13
-**Status**: accepted
+**Status**: accepted, amended 2026-11-13 (keep-awake matches ADR-051)
 **Deciders**: Milan Pavel
 
 ## Context
@@ -86,14 +86,14 @@ A project's `[[routine]]` runs only when its folder is in `trusted_projects`, th
 
 ### Sleep
 
-**golem holds a power assertion while a routine or a detached session is running, and does not try to wake the Mac.**
+**golem holds a power assertion while a routine or a detached session is running or waiting for an answer, and does not try to wake the Mac.** This is the same rule as [ADR-051](051-relay-and-pairing.md), which this paragraph was amended to match on 2026-11-13.
 
-- While at least one headless run has a task (running, not waiting), the daemon holds an idle-sleep assertion: it runs `caffeinate -i -w <daemon pid>`, and stops it when the last task ends. A **waiting** run holds nothing, since it has no task and costs nothing. `[routines] keep_awake = true` (default) turns it off. Chats you are sitting at are not covered: you are there.
+- While at least one headless run is running, or is waiting for an approval, the daemon holds an idle-sleep assertion: it runs `caffeinate -i -w <daemon pid>`, and stops it when nothing runs or waits. A run that has **waited for an answer for 4 hours** no longer counts, so a forgotten approval does not keep a laptop awake all night. A waiting run stays awake so that an answer from the phone, or a notification you act on, can continue it at once. `[power] keep_awake = false` turns it off (it is on by default). Chats you are sitting at are not covered: you are there.
 - The assertion stops **idle** sleep. Closing the lid still sleeps the Mac (unless it is on power with a display attached). golem does not claim otherwise, and does not fight it.
 - **Waking the Mac for a 08:30 routine is out.** It needs `pmset schedule` and root. A routine due while the Mac sleeps is a missed run, under the rule above.
 - **When the Mac sleeps mid-run,** the process is suspended and resumes on wake. A model call whose connection died fails the run in the usual way: `session.completed` with `failed`, and one failure notification. The run is not resumed on its own. Durable resume is what workflows are for (Phase 3). The next firing follows `missed` and fires if it is due.
 
-Not holding the assertion (alternative: let the OS sleep) makes a one-hour local-model run fail whenever you step away. Holding it forever would keep a laptop awake on a battery for a routine that is waiting for you.
+Not holding the assertion (alternative: let the OS sleep) makes a one-hour local-model run fail whenever you step away. Holding it forever would keep a laptop awake on a battery for a routine that is waiting for you; the 4-hour cap on waiting bounds that.
 
 ### The notifier (4.1)
 
