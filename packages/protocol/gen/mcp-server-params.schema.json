@@ -1,6 +1,6 @@
 {
   "additionalProperties": false,
-  "description": "``mcp.tools`` and ``mcp.restart``: one server, as ``session_id``'s project sees it.",
+  "description": "``mcp.tools``, ``mcp.restart``, ``mcp.login``, ``mcp.logout``: one server of a session.",
   "properties": {
     "name": {
       "minLength": 1,

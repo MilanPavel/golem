@@ -3,7 +3,9 @@
 An entry has a ``template``, a partial ``[mcp.<name>]`` table whose strings may
 hold ``{folder}`` (the session's folder), ``{name}``, ``{input.<id>}`` for a
 value the person typed, and ``{secret.<id>}`` for a secret, which becomes
-``keychain:mcp/<name>`` so the value never reaches the file. :func:`build`
+``keychain:mcp/<name>`` so the value never reaches the file. An ``oauth`` entry has
+no secret: its template carries an empty ``oauth`` table, and the person signs in
+with ``mcp.login`` after adding it. :func:`build`
 fills it and validates the result with the same model the daemon loads.
 """
 
@@ -25,8 +27,6 @@ Auth = Literal["none", "token", "oauth"]
 InputKind = Literal["path", "text", "secret", "choice"]
 
 PLACEHOLDER = re.compile(r"\{(folder|name|input\.[a-z0-9_-]+|secret\.[a-z0-9_-]+)\}")
-SIGN_IN_NOTE = "needs sign-in (coming in 1.12.10)"
-"""Why an ``oauth`` entry is not offered yet."""
 
 
 class CatalogError(ValueError):
@@ -94,11 +94,6 @@ def find_entry(catalog_id: str) -> CatalogEntry | None:
 def secret_ref(name: str, input_id: str) -> str:
     """The Keychain item for a server's secret input: ``mcp/<name>``, or ``mcp/<name>-<id>``."""
     return f"mcp/{name}" if input_id == "token" else f"mcp/{name}-{input_id}"
-
-
-def unavailable(entry: CatalogEntry) -> str | None:
-    """Why the entry cannot be added yet, or None."""
-    return SIGN_IN_NOTE if entry.auth == "oauth" else None
 
 
 def build(
@@ -221,5 +216,4 @@ __all__ = [
     "find_entry",
     "load_catalog",
     "secret_ref",
-    "unavailable",
 ]

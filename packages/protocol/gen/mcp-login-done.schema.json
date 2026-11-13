@@ -1,0 +1,45 @@
+{
+  "additionalProperties": false,
+  "description": "``mcp.login.done``: a sign-in ended. On ``ok`` the server is starting again. Not stored.",
+  "properties": {
+    "error": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Error"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "ok": {
+      "title": "Ok",
+      "type": "boolean"
+    },
+    "project": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Project"
+    }
+  },
+  "required": [
+    "name",
+    "ok"
+  ],
+  "title": "McpLoginDone",
+  "type": "object"
+}

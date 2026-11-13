@@ -58,6 +58,8 @@ from golem_protocol.commands import (
     McpImportSource,
     McpListParams,
     McpListResult,
+    McpLoginDone,
+    McpLoginResult,
     McpLogLine,
     McpLogsParams,
     McpLogsResult,
@@ -237,6 +239,7 @@ from golem_protocol.events import (
 from golem_protocol.methods import METHOD_ACCESS
 from golem_protocol.rpc import (
     KeychainWaitNotification,
+    McpLoginDoneNotification,
     McpServerLogNotification,
     McpServerStatusNotification,
     McpTestProgressNotification,
@@ -425,6 +428,9 @@ MODELS: tuple[type[BaseModel], ...] = (
     McpListParams,
     McpServer,
     McpListResult,
+    McpLoginDoneNotification,
+    McpLoginDone,
+    McpLoginResult,
     McpServerLogNotification,
     McpServerStatusNotification,
     McpTestProgressNotification,

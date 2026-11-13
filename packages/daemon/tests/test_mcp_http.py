@@ -2,14 +2,25 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
+import time
+from collections.abc import AsyncIterator, Callable
 from typing import Any
+from urllib.parse import parse_qs, urlsplit
 
 import httpx
 import pytest
+from pydantic import BaseModel
 
+from golem.config import McpServerSettings
+from golem.mcp import McpServerError, McpSupervisor, Timing, oauth
 from golem.mcp.client import McpClient, McpError
+from golem.mcp.oauth import Tokens
 from golem.mcp.transport import HttpTransport
+from golem.tools.registry import ToolContext, ToolScope
+from golem_protocol.commands import McpServer
+from golem_protocol.rpc import McpLoginDoneNotification, McpServerStatusNotification
 
 URL = "https://mcp.example.com/mcp"
 
@@ -131,3 +142,239 @@ async def test_a_server_that_cannot_be_reached_closes_the_transport() -> None:
         await client.start(5)
     assert "connection refused" in await client.wait_closed()
     await client.close()
+
+
+AUTH = "https://auth.example.com"
+
+
+class _Store:
+    def __init__(self) -> None:
+        self.items: dict[str, str] = {}
+
+    def get(self, name: str) -> str | None:
+        return self.items.get(name)
+
+    def set(self, name: str, value: str) -> None:
+        self.items[name] = value
+
+    def delete(self, name: str) -> bool:
+        return self.items.pop(name, None) is not None
+
+
+class _Hosted(_Server):
+    """The MCP server of ``URL``, which wants ``Bearer <valid>``, and its authorization server."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.valid: str | None = None
+        self.reject_refresh = False
+        self.refreshes = 0
+        self.bearers: list[str | None] = []
+
+    def __call__(self, request: httpx.Request) -> httpx.Response:
+        url = urlsplit(str(request.url))
+        if url.netloc == "auth.example.com":
+            return self._auth(request, url.path)
+        if url.path.startswith("/.well-known/"):
+            return httpx.Response(200, json={"authorization_servers": [AUTH]})
+        bearer = request.headers.get("authorization")
+        self.bearers.append(bearer)
+        if bearer is None or bearer != f"Bearer {self.valid}":
+            challenge = 'Bearer resource_metadata="https://mcp.example.com/.well-known/x"'
+            return httpx.Response(401, headers={"www-authenticate": challenge})
+        return super().__call__(request)
+
+    def _auth(self, request: httpx.Request, path: str) -> httpx.Response:
+        if path == "/.well-known/oauth-authorization-server":
+            return httpx.Response(
+                200,
+                json={
+                    "issuer": AUTH,
+                    "authorization_endpoint": f"{AUTH}/authorize",
+                    "token_endpoint": f"{AUTH}/token",
+                    "registration_endpoint": f"{AUTH}/register",
+                    "code_challenge_methods_supported": ["S256"],
+                },
+            )
+        if path == "/register":
+            return httpx.Response(201, json={"client_id": "client-1"})
+        form = {k: v[0] for k, v in parse_qs(request.content.decode()).items()}
+        if form["grant_type"] == "refresh_token":
+            if self.reject_refresh:
+                return httpx.Response(400, json={"error": "invalid_grant"})
+            self.refreshes += 1
+            self.valid = f"access-r{self.refreshes}"
+            return httpx.Response(200, json={"access_token": self.valid, "expires_in": 3600})
+        self.valid = "access-1"
+        body = {"access_token": "access-1", "refresh_token": "refresh-1", "expires_in": 3600}
+        return httpx.Response(200, json=body)
+
+
+FAST = Timing(backoff_first=0.05, backoff_max=0.2, health_seconds=60, reload_seconds=60)
+HOSTED = McpServerSettings.model_validate({"url": URL, "oauth": {}})
+EVERYONE = ToolScope()
+
+
+@pytest.fixture
+async def made() -> AsyncIterator[list[McpSupervisor]]:
+    supervisors: list[McpSupervisor] = []
+    yield supervisors
+    for supervisor in supervisors:
+        await supervisor.aclose()
+
+
+def _supervisor(
+    made: list[McpSupervisor], fake: _Hosted, store: _Store, sent: list[BaseModel]
+) -> McpSupervisor:
+    supervisor = McpSupervisor(
+        {"hosted": HOSTED},
+        timing=FAST,
+        store=store,
+        http=httpx.MockTransport(fake),
+        broadcast=sent.append,
+    )
+    made.append(supervisor)
+    return supervisor
+
+
+def _state(supervisor: McpSupervisor) -> McpServer:
+    return next(status for status in supervisor.statuses() if status.name == "hosted")
+
+
+async def _until(check: Callable[[], bool]) -> None:
+    async with asyncio.timeout(10):
+        while not check():
+            await asyncio.sleep(0.02)
+
+
+def _query(link: str) -> dict[str, str]:
+    return {k: v[0] for k, v in parse_qs(urlsplit(link).query).items()}
+
+
+async def _browser(link: str, **extra: str) -> None:
+    """Play the browser: come back to the loopback with the state, and a code unless told."""
+    query = _query(link)
+    params = {"state": query["state"], **(extra or {"code": "code-1"})}
+    async with httpx.AsyncClient() as client:
+        await client.get(query["redirect_uri"], params=params)
+
+
+def _saved(store: _Store, **over: Any) -> None:
+    base: dict[str, Any] = {
+        "access_token": "old",
+        "client_id": "client-1",
+        "token_endpoint": f"{AUTH}/token",
+        "refresh_token": "refresh-1",
+        "expires_at": time.time() - 10,
+    }
+    store.set("mcp/hosted-oauth", Tokens(**{**base, **over}).dump())
+
+
+async def _call(supervisor: McpSupervisor) -> str:
+    tool = next(tool for tool in supervisor.tools(EVERYONE) if tool.name == "mcp__hosted__search")
+    return (await tool.call({"q": "x"}, ToolContext(root=None))).summary
+
+
+async def test_a_server_that_wants_a_sign_in_says_so_then_runs_after_one(
+    made: list[McpSupervisor],
+) -> None:
+    fake, store, sent = _Hosted(), _Store(), list[BaseModel]()
+    supervisor = _supervisor(made, fake, store, sent)
+    supervisor.start()
+    await _until(lambda: _state(supervisor).state == "needs_auth")
+    assert supervisor.tools(EVERYONE) == [] and _state(supervisor).tools == []
+    assert fake.bearers == []  # no token, so nothing was sent
+
+    link = await supervisor.login(EVERYONE, "hosted")
+    assert link.startswith(f"{AUTH}/authorize?")
+    await _browser(link)
+    await _until(lambda: _state(supervisor).state == "running")
+    done = [n for n in sent if isinstance(n, McpLoginDoneNotification)]
+    assert [(n.params.name, n.params.ok, n.params.error) for n in done] == [("hosted", True, None)]
+    assert _state(supervisor).tools == ["mcp__hosted__search"]
+    assert "Bearer access-1" in fake.bearers
+    assert await _call(supervisor) == "found x"
+    assert "access-1" not in repr(sent)
+
+
+async def test_a_token_that_ran_out_is_renewed_before_and_after_a_server_drops_it(
+    made: list[McpSupervisor],
+) -> None:
+    fake, store, sent = _Hosted(), _Store(), list[BaseModel]()
+    _saved(store)
+    supervisor = _supervisor(made, fake, store, sent)
+    supervisor.start()
+    await _until(lambda: _state(supervisor).state == "running")
+    assert fake.refreshes == 1  # renewed at start, because it was past its expiry
+
+    # The server stops accepting the token early: a 401 renews once and the call goes through.
+    fake.valid = "dropped"
+    stored = oauth.load(store, "hosted")
+    assert stored is not None and stored.access_token == "access-r1"
+    fake.reject_refresh = False
+    assert await _call(supervisor) == "found x"
+    assert fake.refreshes == 2
+
+
+async def test_a_renewal_that_fails_puts_the_server_back_to_needs_auth(
+    made: list[McpSupervisor],
+) -> None:
+    fake, store, sent = _Hosted(), _Store(), list[BaseModel]()
+    _saved(store, expires_at=time.time() + 3600, access_token="good")
+    fake.valid = "good"
+    supervisor = _supervisor(made, fake, store, sent)
+    supervisor.start()
+    await _until(lambda: _state(supervisor).state == "running")
+
+    fake.valid, fake.reject_refresh = "changed", True
+    with pytest.raises(Exception, match="sign-in needed"):
+        await _call(supervisor)
+    await _until(lambda: _state(supervisor).state == "needs_auth")
+    assert supervisor.tools(EVERYONE) == []
+    assert "renewed" in (_state(supervisor).error or "")
+    await asyncio.sleep(0.3)  # nothing retries by itself
+    assert _state(supervisor).state == "needs_auth"
+
+
+async def test_signing_out_deletes_the_item_and_needs_auth_follows(
+    made: list[McpSupervisor],
+) -> None:
+    fake, store, sent = _Hosted(), _Store(), list[BaseModel]()
+    _saved(store, expires_at=time.time() + 3600, access_token="good")
+    fake.valid = "good"
+    supervisor = _supervisor(made, fake, store, sent)
+    supervisor.start()
+    await _until(lambda: _state(supervisor).state == "running")
+
+    status = await supervisor.logout(EVERYONE, "hosted")
+    assert status.state == "needs_auth" and status.tools == []
+    assert "mcp/hosted-oauth" not in store.items
+    assert supervisor.tools(EVERYONE) == []
+    assert any(
+        isinstance(n, McpServerStatusNotification) and n.params.state == "needs_auth" for n in sent
+    )
+
+
+async def test_a_sign_in_the_server_refuses_ends_with_the_reason(
+    made: list[McpSupervisor],
+) -> None:
+    fake, store, sent = _Hosted(), _Store(), list[BaseModel]()
+    supervisor = _supervisor(made, fake, store, sent)
+    supervisor.start()
+    await _until(lambda: _state(supervisor).state == "needs_auth")
+    await _browser(await supervisor.login(EVERYONE, "hosted"), error="access_denied")
+    await _until(lambda: any(isinstance(n, McpLoginDoneNotification) for n in sent))
+    done = next(n for n in sent if isinstance(n, McpLoginDoneNotification))
+    assert not done.params.ok and "access_denied" in (done.params.error or "")
+    assert _state(supervisor).state == "needs_auth"
+
+
+async def test_only_a_hosted_server_signs_in(made: list[McpSupervisor]) -> None:
+    supervisor = McpSupervisor(
+        {"local": McpServerSettings(command="x", enabled=False)}, store=_Store()
+    )
+    made.append(supervisor)
+    with pytest.raises(McpServerError, match="not a hosted server"):
+        await supervisor.login(EVERYONE, "local")
+    with pytest.raises(McpServerError, match="not a hosted server"):
+        await supervisor.logout(EVERYONE, "local")

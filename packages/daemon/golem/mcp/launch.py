@@ -15,7 +15,10 @@ import shutil
 from collections.abc import Callable, Mapping
 from pathlib import Path
 
+import httpx
+
 from golem.config import MCP_SECRET, McpServerSettings
+from golem.mcp.oauth import TokenSource
 from golem.mcp.transport import HttpTransport, Launch, McpError, StdioTransport, Transport
 
 EXTRA_PATH = ("/opt/homebrew/bin", "/usr/local/bin", "~/.local/bin")
@@ -48,15 +51,18 @@ def transport_for(
     *,
     project: Path | None = None,
     on_stderr: Callable[[str], None] | None = None,
+    tokens: TokenSource | None = None,
+    http: httpx.AsyncBaseTransport | None = None,
 ) -> Transport:
     """The transport for ``settings``. Raises :class:`McpError` when it cannot be built.
 
     A project server's relative ``cwd`` is relative to the project folder.
-    ``on_stderr`` gets each line a stdio server writes to stderr.
+    ``on_stderr`` gets each line a stdio server writes to stderr. ``tokens`` is
+    an HTTP server's OAuth sign-in, and ``http`` replaces the network, for tests.
     """
     if settings.url is not None:
         headers = {key: _with_secrets(value, secrets) for key, value in settings.headers.items()}
-        return HttpTransport(settings.url, headers)
+        return HttpTransport(settings.url, headers, transport=http, tokens=tokens)
     return StdioTransport(launch(settings, environ, secrets, project=project), on_stderr=on_stderr)
 
 

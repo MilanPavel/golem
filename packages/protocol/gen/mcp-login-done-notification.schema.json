@@ -1,0 +1,73 @@
+{
+  "$defs": {
+    "McpLoginDone": {
+      "additionalProperties": false,
+      "description": "``mcp.login.done``: a sign-in ended. On ``ok`` the server is starting again. Not stored.",
+      "properties": {
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "ok": {
+          "title": "Ok",
+          "type": "boolean"
+        },
+        "project": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Project"
+        }
+      },
+      "required": [
+        "name",
+        "ok"
+      ],
+      "title": "McpLoginDone",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Server → every connection: a sign-in to an MCP server ended. Not stored.",
+  "properties": {
+    "jsonrpc": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Jsonrpc",
+      "type": "string"
+    },
+    "method": {
+      "const": "mcp.login.done",
+      "default": "mcp.login.done",
+      "title": "Method",
+      "type": "string"
+    },
+    "params": {
+      "$ref": "#/$defs/McpLoginDone"
+    }
+  },
+  "required": [
+    "params"
+  ],
+  "title": "McpLoginDoneNotification",
+  "type": "object"
+}
