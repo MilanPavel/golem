@@ -1,4 +1,4 @@
-import { displayToolName, editedArgs, parseArgs, type ToolBlock, type ApprovalChoice } from "@golem/view";
+import { approvalQuestion, displayToolName, editedArgs, parseArgs, type ToolBlock, type ApprovalChoice } from "@golem/view";
 import { useEffect, useId, useRef, useState } from "react";
 import { Button } from "../../ui/button.tsx";
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "../../ui/menu.tsx";
@@ -163,20 +163,25 @@ export function ApprovalBar({
   const details = chosen ?? Boolean(tool.diff);
   const name = displayToolName(tool.name);
   const target = approvalTarget(tool.args, approval.subject);
+  const question = approvalQuestion(tool.name, tool.args);
   return (
     <section role="group" aria-label="Approval" data-approval-bar="" className="overflow-hidden rounded-lg border border-line-strong bg-surface shadow-soft">
       <div className="flex items-start gap-2.5 px-3 pt-3 pb-2">
         <Seal />
         <div className="min-w-0">
           <p className="text-sm leading-snug font-semibold wrap-anywhere">
-            Allow <code className={CHIP}>{name}</code>
-            {target ? (
+            {question ?? (
               <>
-                {" on "}
-                <span title={target.full}>{target.short}</span>
+                Allow <code className={CHIP}>{name}</code>
+                {target ? (
+                  <>
+                    {" on "}
+                    <span title={target.full}>{target.short}</span>
+                  </>
+                ) : null}
+                ?
               </>
-            ) : null}
-            ?
+            )}
           </p>
           <p className="mt-0.5 font-mono text-xs leading-snug text-faint wrap-anywhere">asks: {approval.source ? approval.source : "your rules"}</p>
         </div>

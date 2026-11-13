@@ -28,12 +28,26 @@ Allowance = tuple[str, str | None]
 """A tool allowed for the rest of a session, and the subject it is allowed with.
 
 A null subject allows every call of the tool, as for tools that have no subject.
+A tool name that ends in ``__*``, such as ``mcp__playwright__*``, covers every tool that
+starts with it: the grant the user's approval of ``mcp_enable`` gives that server's tools.
 """
+
+MCP_ENABLE = "mcp_enable"
+
+
+def server_grant(server: str) -> Allowance:
+    """The allowance that lets the session call every tool of the MCP server ``server``."""
+    return (f"mcp__{server}__*", None)
 
 
 def session_allows(allowed: Iterable[Allowance], tool: str, subject: str | None) -> bool:
     keys = set(allowed)
-    return (tool, None) in keys or (subject is not None and (tool, subject) in keys)
+    if (tool, None) in keys or (subject is not None and (tool, subject) in keys):
+        return True
+    return tool.startswith("mcp__") and any(
+        scope is None and name.endswith("__*") and tool.startswith(name[:-1])
+        for name, scope in keys
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -176,6 +190,7 @@ def _glob(text: str) -> str:
 
 __all__ = [
     "DEFAULT_SOURCE",
+    "MCP_ENABLE",
     "NAMED_ONLY",
     "Allowance",
     "Call",
@@ -189,5 +204,6 @@ __all__ = [
     "exact_match",
     "matches",
     "path_pattern",
+    "server_grant",
     "session_allows",
 ]
