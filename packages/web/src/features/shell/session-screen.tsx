@@ -2,6 +2,7 @@ import { forkPoint, type TodoItem } from "@golem/view";
 import { INSPECTOR_ID, InspectorPanel } from "../trace/index.ts";
 import { useEffect, useMemo, useRef, type ReactNode, type Ref, type RefObject } from "react";
 import { Badge, badgeVariants } from "../../ui/badge.tsx";
+import { cn } from "../../ui/cn.ts";
 import { Button } from "../../ui/button.tsx";
 import { FolderIcon, InspectIcon, PanelIcon } from "../../ui/icons.tsx";
 import { PixelGolem } from "../../ui/pixel-golem.tsx";
@@ -9,7 +10,7 @@ import { useNavigate, useRememberOpenedFolder, useRoute, useSession, useSessionL
 import { inspectPath, sessionPath } from "../../store/router.ts";
 import { hasMod, modShortcut } from "../../ui/platform.ts";
 import type { SessionModel, SessionView } from "../../store/session-store.ts";
-import { DetailSwitch, Transcript } from "../chat/index.ts";
+import { Transcript } from "../chat/index.ts";
 import { SessionDock } from "../composer/index.ts";
 import { Drawer, DRAWER_ID, useDrawerOpen } from "../drawer/index.ts";
 import { closeModelDialog, ModelDialog, openModelDialog, useModelDialogOpen } from "../models/index.ts";
@@ -64,7 +65,7 @@ function ModelChip({
       aria-label={`Model: ${name}`}
       aria-haspopup="dialog"
       onClick={() => openModelDialog({ sessionId, returnTo: "chip" })}
-      className={`${badgeVariants()} cursor-pointer outline-offset-2 outline-clay hover:border-ink hover:text-ink focus-visible:outline-2`}
+      className={cn(badgeVariants(), "cursor-pointer outline-offset-2 outline-clay hover:border-ink hover:text-ink focus-visible:outline-2")}
     >
       <span aria-hidden="true" className="size-1.5 rounded-full bg-allow" />
       {name}
@@ -250,7 +251,6 @@ export function SessionFrame({ id, children }: { id: string; children: ReactNode
     <div className="flex min-h-0 min-w-0 flex-1">
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <TopBar title={<SessionTitle title={title || null} canFork={atMessage !== null} actions={titleActions} />}>
-          <DetailSwitch />
           {model ? <ModelChip sessionId={id} model={model} buttonRef={chip} /> : null}
           {cwd === undefined ? null : (
             <Badge title={cwd ?? undefined}>

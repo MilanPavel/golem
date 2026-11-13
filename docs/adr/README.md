@@ -53,7 +53,10 @@ An Architecture Decision Record (ADR) is a short note of one choice: what was de
 | [047](047-permission-modes.md) | Permission modes change only the built-in defaults: careful, balanced, and autopilot | accepted | 2026-11-11 |
 | [048](048-mcp-read-only-tools.md) | An MCP server's read-only tools can run without asking, if you trust that server | accepted | 2026-11-11 |
 | [049](049-mcp-oauth.md) | A hosted MCP server signs in with OAuth, through a loopback listener in the daemon | accepted | 2026-11-08 |
+| [050](050-routines-and-headless-sessions.md) | A routine fires a headless session; `runs` stay agent turns, `routine_runs` are firings | accepted | 2026-11-13 |
+| [051](051-relay-and-pairing.md) | A phone reaches the Mac through a relay that sees only ciphertext | accepted | 2026-11-13 |
+| [052](052-iphone-app.md) | The iPhone app is SwiftUI on iOS 17 over a shared GolemKit package, and may save "Always allow" with Face ID | accepted | 2026-11-13 |
 
 How the running code fits together is in [../architecture.md](../architecture.md).
 
-New records use [template.md](template.md). Number the next file `050-….md` and add a row here.
+New records use [template.md](template.md). Number the next file `053-….md` and add a row here.

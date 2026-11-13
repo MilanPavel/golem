@@ -1,5 +1,6 @@
 import os
 import sqlite3
+import time
 from pathlib import Path
 
 from support import ServeProcess
@@ -107,6 +108,10 @@ async def test_a_newer_database_is_written_down_and_a_clean_start_removes_it(
     started = ServeProcess(short_home)
     try:
         started.wait_listening(paths.socket_path)
+        # The daemon binds the socket, then removes the file: a slow runner can look in between.
+        deadline = time.monotonic() + 10
+        while start_error_file(paths).exists() and time.monotonic() < deadline:
+            time.sleep(0.02)
         assert not start_error_file(paths).exists()
     finally:
         started.stop()

@@ -297,10 +297,12 @@ async def run(
             capture.add(chunk.decode("utf-8", errors="replace"))
         if timed_out:
             await _kill(process)
+            await _release(process)
         else:
             await process.wait()
     except asyncio.CancelledError:
         await asyncio.shield(_kill(process))
+        await asyncio.shield(_release(process))
         raise
     capture.flush()
     return Finished(
@@ -371,6 +373,24 @@ async def _kill(process: asyncio.subprocess.Process) -> None:
             os.killpg(process.pid, sig)
         with contextlib.suppress(TimeoutError):
             await asyncio.wait_for(process.wait(), wait)
+
+
+async def _release(process: asyncio.subprocess.Process) -> None:
+    """Read what is left of the output, then close the process's transport.
+
+    Nobody reads the output to its end once the process is killed, so its
+    pipe stays open until the garbage collector finds it, which can be after
+    the event loop is closed. A process that left a child holding the pipe
+    never ends the output, so the read gives up and the transport is closed.
+    """
+    if process.stdout is not None:
+        with contextlib.suppress(TimeoutError):
+            await asyncio.wait_for(process.stdout.read(), 1.0)
+    transport = getattr(process, "_transport", None)
+    if transport is not None:
+        transport.close()
+    # Closing finishes on the loop's next turn.
+    await asyncio.sleep(0)
 
 
 def _expand(raw: str, home: Path) -> Path:

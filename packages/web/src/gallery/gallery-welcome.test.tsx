@@ -22,8 +22,9 @@ for (const theme of ["slip", "kiln"] as const) {
       if (label === "Ready, model downloading") expect(within(group).getByRole("heading", { name: "Almost ready." })).toBeTruthy();
       if (label === "Ready, install in Chrome") expect(within(group).getByRole("button", { name: "Install golem as an app" })).toBeTruthy();
       if (label === "Ready, install in Safari") expect(group.textContent).toContain("File → Add to Dock…");
+      if (label === "Ready, install from the Chrome menu") expect(group.textContent).toContain("⋮ → Cast, save and share → Install page as app");
       if (label === "Ready, install in another browser") expect(group.textContent).toContain("Bookmark 127.0.0.1:7480");
-      if (label === "Ready, app installed") expect(group.textContent).toContain("Installed. Open golem from the Dock.");
+      if (label === "Ready, app installed") expect(group.textContent).toContain("golem is installed as an app.");
       await expectAxeClean(group, DIALOG_RULES);
     });
   }

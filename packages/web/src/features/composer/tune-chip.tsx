@@ -2,6 +2,7 @@ import { tuneChip, tuneState, withSaved, withSession, type TuneState } from "@go
 import { useEffect, useMemo, useState } from "react";
 import { usePageActions, useSession } from "../../store/page-context.tsx";
 import { badgeVariants } from "../../ui/badge.tsx";
+import { cn } from "../../ui/cn.ts";
 import { openModelDialog } from "../models/index.ts";
 
 /** The options a session changed from the model's own: `temp 0.2 · top_p 0.9`. A button that opens the Tune view. */
@@ -13,7 +14,7 @@ export function TuneChipView({ text, onOpen }: { text: string; onOpen: (trigger:
       aria-label={`Changed options: ${text}. Open Tune.`}
       aria-haspopup="dialog"
       onClick={(event) => onOpen(event.currentTarget)}
-      className={`${badgeVariants()} cursor-pointer py-0 outline-offset-2 outline-clay hover:border-ink hover:text-ink focus-visible:outline-2`}
+      className={cn(badgeVariants(), "cursor-pointer outline-offset-2 outline-clay hover:border-ink hover:text-ink focus-visible:outline-2")}
     >
       {text}
     </button>

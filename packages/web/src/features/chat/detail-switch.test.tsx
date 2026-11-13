@@ -9,9 +9,9 @@ afterEach(() => {
   detailStore.set("normal");
 });
 
-test("the switch is a radio group named Detail with Normal checked, and a click sets and keeps the level", () => {
+test("the switch is a radio group named Chat detail with Normal checked, and a click sets and keeps the level", () => {
   render(<DetailSwitch />);
-  const group = screen.getByRole("radiogroup", { name: "Detail" });
+  const group = screen.getByRole("radiogroup", { name: "Chat detail" });
   expect(group).toBeTruthy();
   expect(screen.getAllByRole("radio").map((radio) => [radio.textContent, radio.getAttribute("aria-checked")])).toEqual([
     ["Quiet", "false"],

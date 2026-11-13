@@ -34,7 +34,7 @@ export function ModeChipView({
         aria-label={label}
         className={cn(
           badgeVariants(),
-          "cursor-pointer py-0 outline-offset-2 outline-clay hover:border-ink hover:text-ink focus-visible:outline-2 disabled:cursor-default disabled:opacity-60",
+          "cursor-pointer outline-offset-2 outline-clay hover:border-ink hover:text-ink focus-visible:outline-2 disabled:cursor-default disabled:opacity-60",
         )}
       >
         <span aria-hidden="true" className={cn("size-2 rounded-full", DOT[mode])} />
