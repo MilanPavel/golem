@@ -6,7 +6,8 @@
         "forked_from": null,
         "model_name": null,
         "model_profile": "remote",
-        "model_provider": null
+        "model_provider": null,
+        "origin": null
       },
       "run_id": null,
       "seq": 1,
@@ -263,7 +264,8 @@
         "forked_from": null,
         "model_name": null,
         "model_profile": "remote",
-        "model_provider": null
+        "model_provider": null,
+        "origin": null
       },
       "run_id": null,
       "seq": 1,

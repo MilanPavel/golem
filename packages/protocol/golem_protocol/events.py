@@ -40,7 +40,9 @@ class SessionCreatedData(BaseModel):
     ``model_provider`` and ``model_name`` are set when the daemon can resolve
     it, and null otherwise. ``forked_from`` is set on a session made by
     ``session.fork``. ``cwd`` is the project folder the file tools work in,
-    or null for a session without one.
+    or null for a session without one. ``origin`` is who started the session:
+    ``cli``, ``routine:<name>``, and so on. Null means ``user``, and an older
+    daemon leaves it out.
     """
 
     model_config = _CONFIG
@@ -50,6 +52,7 @@ class SessionCreatedData(BaseModel):
     model_name: str | None = Field(default=None, min_length=1)
     forked_from: ForkedFrom | None = None
     cwd: str | None = Field(default=None, min_length=1)
+    origin: str | None = Field(default=None, min_length=1)
 
 
 class MessageStartedData(BaseModel):
@@ -472,6 +475,22 @@ class TodosUpdatedData(BaseModel):
     todos: list[Todo]
 
 
+class SessionCompletedData(BaseModel):
+    """A run in a session that no user typed into has ended.
+
+    ``status`` is how the run ended. ``summary`` is the last assistant message
+    cut to a few lines, null when the run left no reply (a failed or cancelled
+    run). A run that stops on an approval does not emit this: it is
+    ``approval.needed``.
+    """
+
+    model_config = _CONFIG
+
+    run_id: str = Field(min_length=1)
+    status: Literal["completed", "failed", "cancelled"]
+    summary: str | None = None
+
+
 class ApprovalNeededData(BaseModel):
     """A tool call waits for the user. The run is paused until ``approval.respond``.
 
@@ -535,6 +554,19 @@ class SessionUpdatedEvent(BaseModel):
     ts: str = Field(min_length=1)
     type: Literal["session.updated"]
     data: SessionUpdatedData
+
+
+class SessionCompletedEvent(BaseModel):
+    """A run of a session whose origin is not ``user`` ended. It is also in the log."""
+
+    model_config = _CONFIG
+
+    seq: int = Field(ge=1)
+    session_id: str = Field(min_length=1)
+    run_id: str = Field(min_length=1)
+    ts: str = Field(min_length=1)
+    type: Literal["session.completed"]
+    data: SessionCompletedData
 
 
 class SessionClosedEvent(BaseModel):
@@ -879,6 +911,7 @@ EventType = Literal[
     "session.created",
     "session.updated",
     "session.closed",
+    "session.completed",
     "model.selected",
     "model.options.changed",
     "session.mode.changed",
@@ -911,6 +944,7 @@ ChatEvent = Annotated[
     SessionCreatedEvent
     | SessionUpdatedEvent
     | SessionClosedEvent
+    | SessionCompletedEvent
     | ModelSelectedEvent
     | ModelOptionsChangedEvent
     | SessionModeChangedEvent
@@ -980,6 +1014,8 @@ __all__ = [
     "RunStartedEvent",
     "SessionAllowance",
     "SessionClosedEvent",
+    "SessionCompletedData",
+    "SessionCompletedEvent",
     "SessionCreatedData",
     "SessionCreatedEvent",
     "SessionModeChangedData",

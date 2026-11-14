@@ -5,6 +5,7 @@ export type Cwd = string | null;
 export type ForkedFrom = string | null;
 export type LastSeq = number;
 export type ModelProfile = string;
+export type Origin = string;
 export type SessionId = string;
 export type Status = 'idle' | 'running' | 'waiting' | 'closed';
 export type Title = string | null;
@@ -26,7 +27,8 @@ export interface SessionListResult {
  * two summaries of one session is newer. ``cwd`` is the session's project
  * folder, null for a session that has not been given one. ``forked_from`` is
  * the id of the session this one was forked from, null for a session that is
- * not a fork. An older daemon leaves it out.
+ * not a fork. An older daemon leaves it out. ``origin`` is who started the
+ * session: ``user``, ``cli``, ``routine:<name>``. A session never changes it.
  *
  * This interface was referenced by `SessionListResult`'s JSON-Schema
  * via the `definition` "SessionSummary".
@@ -37,6 +39,7 @@ export interface SessionSummary {
   forked_from?: ForkedFrom;
   last_seq: LastSeq;
   model_profile: ModelProfile;
+  origin?: Origin;
   session_id: SessionId;
   status: Status;
   title?: Title;

@@ -456,6 +456,25 @@ async def test_detach_stops_events(short_home: Path) -> None:
         await stop_daemon(app, task)
 
 
+async def test_session_create_takes_an_origin_and_refuses_routine(short_home: Path) -> None:
+    app, task = await start_daemon(
+        short_home, router=ModelRouter(model=ScriptedChatModel(replies=["ok"]))
+    )
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        plain = rpc_result(await client.call("session.create", {}))
+        detached = rpc_result(await client.call("session.create", {"origin": "cli"}))
+        refused = await client.call("session.create", {"origin": "routine:daily"})
+        assert error_code(refused) == INVALID_PARAMS
+        listed = rpc_result(await client.call("session.list", {}))
+        origins = {s["session_id"]: s["origin"] for s in listed["sessions"]}  # type: ignore[index]
+        assert origins == {plain["session_id"]: "user", detached["session_id"]: "cli"}
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+
+
 async def test_attach_to_a_missing_session_is_not_found(short_home: Path) -> None:
     app, task = await start_daemon(
         short_home, router=ModelRouter(model=ScriptedChatModel(replies=[]))

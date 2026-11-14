@@ -308,7 +308,9 @@ async def _session_create(ctx: RequestContext, params: SessionCreateParams) -> S
     sessions = _sessions(ctx)
     _check_cwd(params.cwd)
     try:
-        session_id = await sessions.create(params.model_profile, cwd=params.cwd)
+        session_id = await sessions.create(
+            params.model_profile, cwd=params.cwd, origin=params.origin
+        )
     except ModelConfigError as exc:
         raise RpcCallError(MODEL_NOT_CONFIGURED, str(exc)) from exc
     return SessionCreateResult(session_id=session_id)

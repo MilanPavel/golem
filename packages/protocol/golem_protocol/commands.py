@@ -101,6 +101,10 @@ class SessionCreateParams(BaseModel):
     model that does not resolve, or whose provider has no key, fails here with
     the same error code and message.
 
+    ``origin`` says who started the session: ``user`` (the default) or ``cli``
+    for ``golem ask --detach``. Only the daemon itself starts a ``routine:*``
+    session, and any other value is refused.
+
     The caller is not attached. ``session.attach`` replays ``session.created``.
     """
 
@@ -108,6 +112,7 @@ class SessionCreateParams(BaseModel):
 
     model_profile: str | None = Field(default=None, min_length=1)
     cwd: str | None = Field(default=None, min_length=1)
+    origin: Literal["user", "cli"] | None = None
 
 
 class SessionCreateResult(BaseModel):
@@ -187,7 +192,8 @@ class SessionSummary(BaseModel):
     two summaries of one session is newer. ``cwd`` is the session's project
     folder, null for a session that has not been given one. ``forked_from`` is
     the id of the session this one was forked from, null for a session that is
-    not a fork. An older daemon leaves it out.
+    not a fork. An older daemon leaves it out. ``origin`` is who started the
+    session: ``user``, ``cli``, ``routine:<name>``. A session never changes it.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -201,6 +207,7 @@ class SessionSummary(BaseModel):
     last_seq: int = Field(ge=0)
     cwd: str | None = Field(default=None, min_length=1)
     forked_from: str | None = Field(default=None, min_length=1)
+    origin: str = Field(default="user", min_length=1)
 
 
 class SessionListResult(BaseModel):

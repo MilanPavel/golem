@@ -24,7 +24,7 @@
     },
     "SessionCreatedData": {
       "additionalProperties": false,
-      "description": "Profile stored for a new session.\n\n``model_profile`` is a profile name or a ``provider/model`` ref.\n``model_provider`` and ``model_name`` are set when the daemon can resolve\nit, and null otherwise. ``forked_from`` is set on a session made by\n``session.fork``. ``cwd`` is the project folder the file tools work in,\nor null for a session without one.",
+      "description": "Profile stored for a new session.\n\n``model_profile`` is a profile name or a ``provider/model`` ref.\n``model_provider`` and ``model_name`` are set when the daemon can resolve\nit, and null otherwise. ``forked_from`` is set on a session made by\n``session.fork``. ``cwd`` is the project folder the file tools work in,\nor null for a session without one. ``origin`` is who started the session:\n``cli``, ``routine:<name>``, and so on. Null means ``user``, and an older\ndaemon leaves it out.",
       "properties": {
         "cwd": {
           "anyOf": [
@@ -80,6 +80,19 @@
           ],
           "default": null,
           "title": "Model Provider"
+        },
+        "origin": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Origin"
         }
       },
       "required": [

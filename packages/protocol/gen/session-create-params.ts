@@ -2,6 +2,7 @@
 
 export type Cwd = string | null;
 export type ModelProfile = string | null;
+export type Origin = ('user' | 'cli') | null;
 
 /**
  * ``session.create``. An empty profile uses the daemon's configured one.
@@ -14,9 +15,14 @@ export type ModelProfile = string | null;
  * model that does not resolve, or whose provider has no key, fails here with
  * the same error code and message.
  *
+ * ``origin`` says who started the session: ``user`` (the default) or ``cli``
+ * for ``golem ask --detach``. Only the daemon itself starts a ``routine:*``
+ * session, and any other value is refused.
+ *
  * The caller is not attached. ``session.attach`` replays ``session.created``.
  */
 export interface SessionCreateParams {
   cwd?: Cwd;
   model_profile?: ModelProfile;
+  origin?: Origin;
 }

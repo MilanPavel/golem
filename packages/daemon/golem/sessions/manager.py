@@ -40,6 +40,7 @@ from golem.sessions.runner import (
     resume_turn,
     run_turn,
 )
+from golem.sessions.summaries import cut_summary
 from golem.sessions.titles import TitleGenerator, choose_title, clean_title, fork_title
 from golem.sessions.trace import build_trace, filled_window, read_span, with_windows
 from golem.skills.invoke import Invocation, SkillInvokeError, invoke
@@ -59,6 +60,7 @@ from golem_protocol.events import (
     ModelSelectedData,
     RunCancelledData,
     SessionAllowance,
+    SessionCompletedData,
     SessionCreatedData,
     SessionModeChangedData,
     SessionUpdatedData,
@@ -142,6 +144,8 @@ class _LiveSession:
     model_profile: str
     schema_version: int
     cwd: str | None = None
+    origin: str = "user"
+    """Who started the session. It never changes."""
     allowed_tools: set[Allowance] = field(default_factory=set[Allowance])
     mcp_servers: set[str] = field(default_factory=set[str])
     skills: list[str] = field(default_factory=list[str])
@@ -206,10 +210,15 @@ class SessionManager:
         self._naming: set[asyncio.Task[None]] = set()
         self._lock = asyncio.Lock()
 
-    async def create(self, model_profile: str | None, *, cwd: str | None = None) -> str:
+    async def create(
+        self, model_profile: str | None, *, cwd: str | None = None, origin: str | None = None
+    ) -> str:
         """Store a new session and its ``session.created``. Nobody is attached yet.
 
         ``cwd`` is the folder its file tools work in. None gives it no file tools.
+        ``origin`` is ``cli``, ``routine:<name>`` and so on, None for ``user``. Only
+        daemon code calls this with ``routine:*``: the ``session.create`` command
+        accepts ``user`` and ``cli`` only.
         ``model_profile`` is a profile name or a ``provider/model`` ref, or None
         for the default.
 
@@ -228,6 +237,7 @@ class SessionManager:
                 model_profile=profile,
                 schema_version=SCHEMA_VERSION,
                 cwd=cwd,
+                origin="user" if origin is None else origin,
             )
             await self._announce(session)
             self._sessions[session.session_id] = session
@@ -907,6 +917,7 @@ class SessionManager:
         await self._events.emit(
             session_id, run_id, "run.cancelled", RunCancelledData(reason="user")
         )
+        await self._ended(session_id, run_id, None)
         return True
 
     async def cancel_all(self) -> None:
@@ -937,15 +948,54 @@ class SessionManager:
         return invoke(view, call, session_id=session_id)
 
     async def _turn(self, session: _LiveSession, turn: Turn, control: RunControl) -> None:
-        reply = await run_turn(self._runtime, self._events, turn, control)
+        try:
+            reply = await run_turn(self._runtime, self._events, turn, control)
+        except asyncio.CancelledError:
+            await self._ended(session.session_id, turn.run_id, None)
+            raise
+        await self._ended(session.session_id, turn.run_id, reply)
         self._title_after(session, turn.typed or turn.text, reply)
 
     async def _resumed(
         self, session: _LiveSession, resume: Resume, control: RunControl, prompt: str | None
     ) -> None:
-        reply = await resume_turn(self._runtime, self._events, resume, control)
+        try:
+            reply = await resume_turn(self._runtime, self._events, resume, control)
+        except asyncio.CancelledError:
+            await self._ended(resume.session_id, resume.run_id, None)
+            raise
+        await self._ended(resume.session_id, resume.run_id, reply)
         if prompt is not None:
             self._title_after(session, prompt, reply)
+
+    async def _ended(self, session_id: str, run_id: str, reply: str | None) -> None:
+        """Store ``session.completed`` when a run of a headless session ended.
+
+        A run that stopped on an approval, or that is still open, says nothing:
+        ``approval.needed`` is its event. ``reply`` is the model's answer of a
+        run that completed.
+        """
+        live = self._sessions.get(session_id)
+        if live is not None:
+            origin = live.origin
+        else:
+            record = await self._records.get(session_id)
+            origin = "user" if record is None else record.origin
+        if origin == "user":
+            return
+        run = await self._run_records.get(run_id)
+        if run is None or run.status in ("running", "waiting"):
+            return
+        await self._events.emit(
+            session_id,
+            run_id,
+            "session.completed",
+            SessionCompletedData(
+                run_id=run_id,
+                status=run.status,
+                summary=None if run.status != "completed" else cut_summary(reply),
+            ),
+        )
 
     def _title_after(self, session: _LiveSession, prompt: str, reply: str | None) -> None:
         if reply is None or self._titles is None or session.title is not None or session.titling:
@@ -1010,6 +1060,7 @@ class SessionManager:
             schema_version=SCHEMA_VERSION,
             title=None if record is None else record.title,
             cwd=None if record is None else record.cwd,
+            origin="user" if record is None else record.origin,
             allowed_tools=set() if record is None else set(record.allowed_tools),
             mcp_servers=set() if record is None else set(record.mcp_servers),
             skills=[] if record is None else list(record.skills),
@@ -1035,6 +1086,7 @@ class SessionManager:
                 model_name=chosen.name,
                 forked_from=forked_from,
                 cwd=session.cwd,
+                origin=None if session.origin == "user" else session.origin,
             ),
         )
 
