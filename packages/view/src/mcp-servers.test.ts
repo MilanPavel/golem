@@ -3,7 +3,7 @@ import { test } from "node:test";
 
 import type { McpServer } from "@golem/client";
 
-import { detailChoices, mcpAlert, mcpStatusMark, mcpStatusWord, mcpSummary, mergeMcp, orderedServers, shortPath } from "./mcp-servers.ts";
+import { detailChoices, loginDoneText, mcpAlert, mcpStatusMark, mcpStatusWord, mcpSummary, mergeMcp, orderedServers, shortPath } from "./mcp-servers.ts";
 
 const git: McpServer = {
   name: "git",
@@ -71,4 +71,29 @@ test("a pushed status keeps whether this session has the server on, and the aler
 test("a path under home shows with ~, and one outside is as sent", () => {
   assert.equal(shortPath("/Users/me/.golem/config.toml", "/Users/me"), "~/.golem/config.toml");
   assert.equal(shortPath("/Users/me/.golem/config.toml", ""), "/Users/me/.golem/config.toml");
+});
+
+const linear: McpServer = { ...git, name: "linear", state: "needs_auth", tools: [], schema_tokens: null, enabled: true };
+
+test("a server that needs a sign-in says so, with a mark, a line, and an alert", () => {
+  assert.deepEqual(mcpStatusMark(linear), { text: "!", tone: "wait" });
+  assert.equal(mcpStatusWord(linear), "needs sign-in");
+  assert.equal(mcpSummary(linear), "Sign in needed");
+  assert.equal(mcpAlert([linear, git]), "mcp ! sign in: linear");
+  assert.equal(mcpAlert([{ ...down, enabled: true }, linear]), "mcp ✗ down · mcp ! sign in: linear");
+  assert.equal(mcpAlert([{ ...linear, enabled: false }]), "");
+});
+
+test("Sign in leads the choices of a server that needs it, and Sign out is for one that signs in", () => {
+  assert.deepEqual(detailChoices(linear)[0], { label: "Sign in", action: { kind: "login", name: "linear" } });
+  assert.ok(!detailChoices(git).some((choice) => choice.label.startsWith("Sign")));
+  const out = detailChoices({ ...git, name: "linear" }, true).find((choice) => choice.label === "Sign out");
+  assert.deepEqual(out?.action, { kind: "logout", name: "linear" });
+});
+
+test("the end of a sign-in says the server and its tools, or why not", () => {
+  assert.equal(loginDoneText({ name: "Linear", ok: true }, 12), "Signed in to Linear · 12 tools");
+  assert.equal(loginDoneText({ name: "Linear", ok: true }, 1), "Signed in to Linear · 1 tool");
+  assert.equal(loginDoneText({ name: "Linear", ok: true }, null), "Signed in to Linear");
+  assert.equal(loginDoneText({ name: "Linear", ok: false, error: "the browser said no" }, null), "the browser said no");
 });

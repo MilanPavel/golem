@@ -32,14 +32,17 @@ export type McpArgs =
   | { kind: "enable"; name: string; onDemand: boolean }
   | { kind: "disable"; name: string }
   | { kind: "restart"; name: string }
+  /** Sign in to a hosted server in the browser, or delete that sign-in. */
+  | { kind: "login"; name: string }
+  | { kind: "logout"; name: string }
   /** The tools of a server, and patterns to hide or show (`tools.exclude`) when any are given. */
   | { kind: "tools"; name: string; hide: string[]; show: string[] }
   | { kind: "error"; message: string };
 
 export const MCP_USAGE =
-  "usage: golem mcp list|show|test|logs|enable|disable|restart|tools|add|remove|export (golem --help lists the options)";
+  "usage: golem mcp list|show|test|logs|enable|disable|restart|login|logout|tools|add|remove|export (golem --help lists the options)";
 
-const SERVER_ACTIONS = new Set(["show", "test", "logs", "enable", "disable", "restart", "tools", "edit"]);
+const SERVER_ACTIONS = new Set(["show", "test", "logs", "enable", "disable", "restart", "login", "logout", "tools", "edit"]);
 
 const ENV_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
@@ -222,6 +225,8 @@ function parseServerArgs(action: string, words: string[]): McpArgs {
     enable: "golem mcp enable <name> [--on-demand]",
     disable: "golem mcp disable <name>",
     restart: "golem mcp restart <name>",
+    login: "golem mcp login <name>",
+    logout: "golem mcp logout <name>",
     tools: "golem mcp tools <name> [--hide <glob>]… [--show <glob>]…",
     edit: "golem mcp edit <name> [--project]",
   };
@@ -233,6 +238,8 @@ function parseServerArgs(action: string, words: string[]): McpArgs {
     enable: ["--on-demand"],
     disable: [],
     restart: [],
+    login: [],
+    logout: [],
     tools: ["--hide", "--show"],
     edit: ["--project"],
   };
@@ -273,6 +280,10 @@ function parseServerArgs(action: string, words: string[]): McpArgs {
       return { kind: "disable", name };
     case "restart":
       return { kind: "restart", name };
+    case "login":
+      return { kind: "login", name };
+    case "logout":
+      return { kind: "logout", name };
     case "edit":
       return { kind: "edit", name, project: flags.has("--project") };
     default:

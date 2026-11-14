@@ -134,8 +134,18 @@ export type FormCase = {
 };
 
 const key = (id: string, name: string, blurb: string, saved: boolean): KeyProvider => ({ id, name, blurb, saved });
-const NO_KEYS = [key("anthropic", "Anthropic", "Claude", false), key("openai", "OpenAI", "GPT", false), key("google", "Google", "Gemini", false)];
-const OPENAI_SAVED = [key("anthropic", "Anthropic", "Claude", false), key("openai", "OpenAI", "GPT", true), key("google", "Google", "Gemini", false)];
+const keys = (saved: (id: string) => boolean): KeyProvider[] =>
+  [
+    ["anthropic", "Anthropic", "Claude"],
+    ["openai", "OpenAI", "GPT"],
+    ["google", "Google", "Gemini"],
+    ["deepseek", "DeepSeek", "DeepSeek V3 and R1"],
+    ["xai", "xAI", "Grok"],
+    ["moonshot", "Moonshot", "Kimi"],
+  ].map(([id = "", name = "", blurb = ""]) => key(id, name, blurb, saved(id)));
+const NO_KEYS = keys(() => false);
+const OPENAI_SAVED = keys((id) => id === "openai" || id === "xai");
+const ALL_SAVED = keys(() => true);
 
 const NO_ACTION: SetupActionsState = { running: null, output: "", noBrew: false, error: null, from: null };
 
@@ -165,7 +175,7 @@ const ONE_FAILING: SetupRow[] = OK_ROWS.map((row) =>
 
 /** Settings → Setup in the states the page draws, for the gallery. */
 export const FORM_CASES: FormCase[] = [
-  { label: "All set", rows: setupFormRows(OK_ROWS, KEPT, true), actions: NO_ACTION, providers: OPENAI_SAVED, header: head(OK_ROWS), block: BLOCK },
+  { label: "All set", rows: setupFormRows(OK_ROWS, KEPT, true), actions: NO_ACTION, providers: ALL_SAVED, header: head(OK_ROWS), block: BLOCK },
   {
     label: "Ollama stopped",
     rows: setupFormRows(OLLAMA_STOPPED, KEPT, true),

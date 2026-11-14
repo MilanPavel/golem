@@ -15,7 +15,9 @@ import { actionErrorText } from "../../store/errors.ts";
 import type { McpServer } from "../../store/mcp.ts";
 import { useMcpList, useMcpTools, usePageActions } from "../../store/page-context.tsx";
 import { AddDialog } from "./mcp/add-dialog.tsx";
-import { ImportDialog } from "./mcp/import-dialog.tsx";
+import { BrandIcon } from "./mcp/brand-icon.tsx";
+import { CatalogPanel } from "./mcp/catalog-panel.tsx";
+import { ImportPanel } from "./mcp/import-panel.tsx";
 import { EditServer } from "./mcp/edit-form.tsx";
 import { LogsView } from "./mcp/logs-view.tsx";
 import { TestView } from "./mcp/test-view.tsx";
@@ -72,18 +74,75 @@ function keyOf(server: McpServer): string {
   return `${server.project ?? ""}\u0000${server.name}`;
 }
 
-/** The MCP servers, as `/mcp` lists them: by the file that names each, then one server's details and its tools. */
+type Page = "installed" | "catalog" | "import";
+
+/**
+ * The MCP servers in three tabs: the ones you have (by the file that names each, then one server's
+ * details and its tools), the catalog golem offers, and the ones other apps have.
+ */
 export function McpSection() {
   const context = useSettingsContext();
   const sessionId = context?.sessionId ?? null;
-  const list = useMcpList(sessionId);
   const folder = useSettingsFolder();
+  const [page, setPage] = useState<Page>("installed");
+  const [adding, setAdding] = useState<{ id: string } | null>(null);
+  const [added, setAdded] = useState<string | null>(null);
+  const request = useMcpAddRequest();
+
+  // `/mcp add [id]` in a chat asks for the Catalog, and for a form when it names a server; closing the form takes the request.
+  const [seen, setSeen] = useState<typeof request>(null);
+  if (request !== seen) {
+    setSeen(request);
+    if (request !== null) setPage("catalog");
+  }
+  useEffect(() => {
+    if (request?.id === null) mcpAddRequestStore.set(null);
+  }, [request]);
+  const wanted = adding ?? (request?.id != null ? { id: request.id } : null);
+  const closeAdd = (): void => {
+    setAdding(null);
+    mcpAddRequestStore.set(null);
+  };
+  return (
+    <Tabs value={page} onValueChange={(next) => setPage(next as Page)} className="flex min-h-0 flex-1 flex-col gap-4">
+      <TabsList aria-label="MCP servers">
+        <TabsTrigger value="installed">Installed</TabsTrigger>
+        <TabsTrigger value="catalog">Catalog</TabsTrigger>
+        <TabsTrigger value="import">Import</TabsTrigger>
+      </TabsList>
+      <TabsContent value="installed" className="flex min-h-0 flex-1 flex-col">
+        <Installed sessionId={sessionId} added={added} onCatalog={() => setPage("catalog")} />
+      </TabsContent>
+      <TabsContent value="catalog">
+        <CatalogPanel sessionId={sessionId} onAdd={(id) => setAdding({ id })} />
+      </TabsContent>
+      <TabsContent value="import">
+        <ImportPanel
+          sessionId={sessionId}
+          onImported={(names) => setAdded(names.join(", "))}
+          onDone={() => setPage("installed")}
+        />
+      </TabsContent>
+      <AddDialog
+        open={wanted !== null}
+        onOpenChange={(open) => (open ? undefined : closeAdd())}
+        sessionId={sessionId}
+        folder={folder}
+        initial={wanted?.id ?? null}
+        onAdded={(name) => {
+          closeAdd();
+          setAdded(name);
+          setPage("installed");
+        }}
+      />
+    </Tabs>
+  );
+}
+
+function Installed({ sessionId, added, onCatalog }: { sessionId: string | null; added: string | null; onCatalog: () => void }) {
+  const list = useMcpList(sessionId);
   const narrow = useNarrow();
   const [view, setView] = useState<View>({ kind: "list" });
-  const [adding, setAdding] = useState<{ id: string | null } | null>(null);
-  const [added, setAdded] = useState<string | null>(null);
-  const [importing, setImporting] = useState(false);
-  const request = useMcpAddRequest();
   const rows = useRef(new Map<string, HTMLButtonElement>());
   /** The row to give focus back to when the list shows again. */
   const back = useRef<string | null>(null);
@@ -98,33 +157,6 @@ export function McpSection() {
     back.current = null;
   }, [view]);
 
-  // `/mcp add` in a chat asks for the dialog through the request store; closing it takes the request.
-  const wanted = adding ?? request;
-  const closeAdd = (): void => {
-    setAdding(null);
-    mcpAddRequestStore.set(null);
-  };
-  const dialog = (
-    <AddDialog
-      open={wanted !== null}
-      onOpenChange={(open) => (open ? undefined : closeAdd())}
-      sessionId={sessionId}
-      folder={folder}
-      initial={wanted?.id ?? null}
-      onAdded={(name) => {
-        closeAdd();
-        setAdded(name);
-      }}
-    />
-  );
-  const importDialog = (
-    <ImportDialog
-      open={importing}
-      onOpenChange={setImporting}
-      sessionId={sessionId}
-      onImported={(names) => setAdded(names.join(", "))}
-    />
-  );
   if (list.isError) {
     return (
       <div className="flex flex-col items-start gap-2">
@@ -157,24 +189,12 @@ export function McpSection() {
       wide={wide}
       selected={wide ? at : null}
       session={sessionId !== null}
-      onAdd={() => setAdding({ id: null })}
-      onImport={() => setImporting(true)}
+      onCatalog={onCatalog}
       onOpen={open}
     />
   );
-  const dialogs = (
-    <>
-      {dialog}
-      {importDialog}
-    </>
-  );
   if (server === undefined || at === null) {
-    return (
-      <>
-        {listPane}
-        {dialogs}
-      </>
-    );
+    return listPane;
   }
   const leave = (): void => {
     back.current = keyOf(server);
@@ -183,18 +203,12 @@ export function McpSection() {
   const content = <Detail key={keyOf(server)} server={server} sessionId={sessionId} onBack={wide ? null : leave} />;
   if (!wide) {
     // A narrow window shows the list, or the details in its place.
-    return (
-      <>
-        {view.kind === "list" || pickedServer === undefined ? listPane : content}
-        {dialogs}
-      </>
-    );
+    return view.kind === "list" || pickedServer === undefined ? listPane : content;
   }
   return (
     <div className="flex min-h-0 flex-1 overflow-hidden rounded-xl border border-line bg-surface">
       <div className="w-mcp-list shrink-0 overflow-y-auto border-r border-line bg-bg p-3">{listPane}</div>
       <div className="min-w-0 flex-1 overflow-y-auto px-6 py-5">{content}</div>
-      {dialogs}
     </div>
   );
 }
@@ -206,8 +220,7 @@ function ServerList({
   wide,
   selected,
   session,
-  onAdd,
-  onImport,
+  onCatalog,
   onOpen,
 }: {
   servers: readonly McpServer[];
@@ -216,29 +229,25 @@ function ServerList({
   wide: boolean;
   selected: Selected | null;
   session: boolean;
-  onAdd: () => void;
-  onImport: () => void;
+  onCatalog: () => void;
   onOpen: (server: McpServer) => void;
 }) {
-  const addButton = (
-    <div className="flex flex-wrap items-center gap-2">
-      <Button kind="primary" size={wide ? "sm" : undefined} onClick={onAdd}>
-        <span aria-hidden="true">+</span> Add a server
-      </Button>
-      <Button size={wide ? "sm" : undefined} onClick={onImport} title="Import from other apps">
-        Import
-      </Button>
-      <p role="status" aria-live="polite" className="font-mono text-xs text-muted empty:hidden">
-        {added === null ? null : `added ${added}`}
-      </p>
-    </div>
+  const status = (
+    <p role="status" aria-live="polite" className="font-mono text-xs text-muted empty:hidden">
+      {added === null ? null : `added ${added}`}
+    </p>
   );
   if (servers.length === 0) {
     return (
       <div className="flex flex-col gap-2">
         <p className="text-sm text-muted">0 servers</p>
         <p className="text-sm text-muted">{MCP_HINT}</p>
-        {addButton}
+        <div className="flex flex-wrap items-center gap-2">
+          <Button kind="primary" size={wide ? "sm" : undefined} onClick={onCatalog}>
+            Browse the catalog
+          </Button>
+          {status}
+        </div>
       </div>
     );
   }
@@ -254,7 +263,7 @@ function ServerList({
       <p className="text-sm text-muted">
         {servers.length} {servers.length === 1 ? "server" : "servers"}
       </p>
-      {addButton}
+      {status}
       {groups.map((group) => (
         <section key={group.project ?? ""} aria-label={group.project === null ? "Yours" : "This project"} className="flex flex-col gap-2">
           {wide ? (
@@ -292,6 +301,7 @@ function ServerList({
                   >
                     <span className="flex min-w-0 items-center gap-x-2">
                       <Dot server={server} />
+                      <BrandIcon id={server.name} size="sm" />
                       <span className="sr-only">{mcpStatusWord(server)}, </span>
                       <span className={cn("min-w-0 font-sans text-sm font-medium", wide ? "truncate" : "wrap-anywhere")}>{server.name}</span>
                       <span aria-hidden="true" className="shrink-0 font-mono text-xs whitespace-nowrap text-faint">
@@ -412,7 +422,10 @@ function Detail({ server, sessionId, onBack }: { server: McpServer; sessionId: s
       )}
       <header className="flex flex-wrap-reverse items-start justify-between gap-x-3 gap-y-1">
         <div className="flex min-w-0 flex-1 basis-48 flex-col gap-0.5">
-          <h3 className="font-sans text-lg font-semibold wrap-anywhere">{server.name}</h3>
+          <h3 className="flex items-center gap-2 font-sans text-lg font-semibold wrap-anywhere">
+            <BrandIcon id={server.name} />
+            {server.name}
+          </h3>
           <p className="font-mono text-xs text-muted wrap-anywhere">
             <span className="sr-only">{isUrl ? "URL: " : "Command: "}</span>
             {server.command}

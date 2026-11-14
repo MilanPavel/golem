@@ -953,6 +953,28 @@ class SessionSetModeResult(BaseModel):
     override: bool
 
 
+class PermissionsSetModeParams(BaseModel):
+    """``permissions.set_mode``. Write ``[permissions] mode`` to the user's ``config.toml``.
+
+    New sessions start in it, and a session that set no mode of its own follows it.
+    Comments and the rest of the file stay as they are. A file that changed on disk
+    while it was being written is refused.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    mode: PermissionMode
+
+
+class PermissionsSetModeResult(BaseModel):
+    """The default mode as stored, and the file it was written to."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    mode: PermissionMode
+    path: str
+
+
 class ModelSetDefaultParams(BaseModel):
     """``model.set_default``. Write ``default_model`` to the user's ``config.toml``.
 
@@ -2403,6 +2425,8 @@ __all__ = [
     "OllamaInstallResult",
     "OllamaStartParams",
     "OllamaStartResult",
+    "PermissionsSetModeParams",
+    "PermissionsSetModeResult",
     "PingParams",
     "PolicyEditResult",
     "PolicyRemoveParams",

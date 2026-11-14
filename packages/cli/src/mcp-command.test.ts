@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
+import type { GolemClient, McpLoginDone } from "@golem/client";
+
 import { parseMcpArgs } from "./mcp-command.ts";
+import { formatMcpList } from "./mcp-format.ts";
+import { runMcpLogin, type LoginDeps } from "./mcp-run.ts";
 
 test("a command after -- is kept verbatim, flags and all", () => {
   assert.deepEqual(parseMcpArgs(["add", "git", "--", "uvx", "mcp-server-git", "--repository", "."]), {
@@ -214,4 +218,69 @@ test("import refuses what it does not know", () => {
   assert.match(message(["import", "--wat"]), /unknown option --wat/);
   assert.match(message(["edit"]), /usage: golem mcp edit <name>/);
   assert.match(message(["edit", "git", "--all"]), /unknown option --all/);
+});
+
+test("login and logout take one name", () => {
+  assert.deepEqual(parseMcpArgs(["login", "linear"]), { kind: "login", name: "linear" });
+  assert.deepEqual(parseMcpArgs(["logout", "linear"]), { kind: "logout", name: "linear" });
+  assert.equal(parseMcpArgs(["login"]).kind, "error");
+  assert.equal(parseMcpArgs(["logout", "a", "b"]).kind, "error");
+});
+
+test("the list says needs sign-in", () => {
+  const text = formatMcpList([{ name: "linear", state: "needs_auth", command: "https://mcp.linear.app/mcp" }]);
+  assert.match(text, /linear\s+needs sign-in/);
+});
+
+type Login = { client: GolemClient; send(done: McpLoginDone): void; out: string[]; errors: string[]; opened: string[]; deps: LoginDeps };
+
+function loginFixture(timeoutMs = 1000, toolCount = 12): Login {
+  const listeners = new Set<(done: McpLoginDone) => void>();
+  const out: string[] = [];
+  const errors: string[] = [];
+  const opened: string[] = [];
+  const client = {
+    onMcpLoginDone: (listener: (done: McpLoginDone) => void) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    mcpLogin: async (name: string) => ({ name, authorize_url: "https://auth.example/authorize" }),
+    mcpTools: async (name: string) => ({ name, tools: Array.from({ length: toolCount }, (_, index) => ({ name: `t${index}`, description: "" })) }),
+  } as unknown as GolemClient;
+  return {
+    client,
+    send: (done) => listeners.forEach((listener) => listener(done)),
+    out,
+    errors,
+    opened,
+    deps: { open: (url) => opened.push(url), write: (line) => out.push(line), error: (line) => errors.push(line), timeoutMs },
+  };
+}
+
+test("login prints and opens the address, waits, and exits 0 when signed in", async () => {
+  const fixture = loginFixture();
+  const running = runMcpLogin(fixture.client, "linear", fixture.deps);
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  fixture.send({ name: "other", ok: false, error: "not this one" });
+  fixture.send({ name: "linear", ok: true });
+  assert.equal(await running, 0);
+  assert.deepEqual(fixture.opened, ["https://auth.example/authorize"]);
+  assert.ok(fixture.out.includes("https://auth.example/authorize"));
+  assert.equal(fixture.out.at(-1), "Signed in to linear · 12 tools");
+  assert.deepEqual(fixture.errors, []);
+});
+
+test("login exits 1 with the reason when the sign-in fails", async () => {
+  const fixture = loginFixture();
+  const running = runMcpLogin(fixture.client, "linear", fixture.deps);
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  fixture.send({ name: "linear", ok: false, error: "the browser refused" });
+  assert.equal(await running, 1);
+  assert.deepEqual(fixture.errors, ["the browser refused"]);
+});
+
+test("login exits 1 when nobody answers in time", async () => {
+  const fixture = loginFixture(20);
+  assert.equal(await runMcpLogin(fixture.client, "linear", fixture.deps), 1);
+  assert.match(fixture.errors[0] ?? "", /no sign-in to linear/);
 });
