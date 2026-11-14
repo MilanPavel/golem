@@ -61,5 +61,8 @@ An Architecture Decision Record (ADR) is a short note of one choice: what was de
 | [055](055-model-routing.md) | golem picks a model by fixed rules: three tiers, a route mode per session, and caps on spending | accepted | 2026-11-14 |
 
 How the running code fits together is in [../architecture.md](../architecture.md).
+| [056](056-planned-window-and-context-view.md) | golem plans the window of a local model, and sends a view of the history, never a shorter history | accepted | 2026-11-14 |
 
-New records use [template.md](template.md). Number the next file `056-….md` and add a row here.
+How the running code fits together is in [../architecture.md](../architecture.md).
+
+New records use [template.md](template.md). Number the next file `057-….md` and add a row here.
