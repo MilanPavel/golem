@@ -28,6 +28,7 @@ from langgraph.types import Command
 
 from golem.config import ModelPrice, PermissionMode
 from golem.graphs.adapter import STREAM_KEY, message_text
+from golem.graphs.context_view import view
 from golem.graphs.prompt import PINNED_KEY, PromptContext, SystemPrompt
 from golem.graphs.state import AgentState
 from golem.graphs.text_calls import recover
@@ -423,13 +424,13 @@ def open_chat(
         text = "\n\n".join(t for _, t in parts)
         system = SystemMessage(content=text) if text else None
         # The system message is sent, never returned, so it stays out of the checkpoint.
-        history = _without_thinking(messages)
+        history = view(_without_thinking(messages), state.get("context_view"))
         sent = history if system is None else [system, *history]
         window = window_of(profile, overrides) if window_of is not None else ContextWindow()
         async with _held(router, local, profile):
             request: dict[str, object] = {STREAM_KEY: "model.request", "message_id": message_id}
             request["profile"] = profile
-            request["message_ids"] = [m.id for m in messages if m.id]
+            request["message_ids"] = [m.id for m in history if m.id]
             if parts:
                 request["system_sections"] = [{"name": n, "chars": len(t)} for n, t in parts]
             request["context_window"] = window.window
@@ -441,7 +442,7 @@ def open_chat(
                 if schemas and binder.offers(profile):
                     text = json.dumps(schemas, sort_keys=True, separators=(",", ":"))
                     request["tools_sha"] = await blobs.put("tools", text)
-            request.update(_sizes(system, messages, schemas if binder.offers(profile) else []))
+            request.update(_sizes(system, history, schemas if binder.offers(profile) else []))
             get_stream_writer()(request)
             try:
                 response = await binder.invoke(

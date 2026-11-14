@@ -13,14 +13,17 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from collections.abc import Coroutine, Sequence
+from collections.abc import Coroutine, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import cast
 
+from langchain_core.messages import BaseMessage
+
 from golem.config import PermissionMode
 from golem.graphs.adapter import PlainMessage, plain_messages, trace_messages
 from golem.graphs.chat import ChatRuntime
+from golem.graphs.context_view import ContextView, view
 from golem.graphs.state import SCHEMA_VERSION
 from golem.models import options as model_options
 from golem.models.router import ModelIdentity, ModelRouter
@@ -338,7 +341,7 @@ class SessionManager:
             system = await self._runtime.system_prompt(
                 session_id, session.cwd, session.skills, sorted(session.mcp_servers)
             )
-            messages = plain_messages(values)
+            messages = plain_messages(_as_sent(values))
             return SessionView(
                 session_id=session.session_id,
                 model_profile=session.model_profile,
@@ -1164,3 +1167,13 @@ __all__ = [
     "SessionNotFoundError",
     "SessionView",
 ]
+
+
+def _as_sent(values: Mapping[str, object]) -> dict[str, object]:
+    """``values`` with its messages as the next model call would send them."""
+    raw = values.get("messages")
+    if not isinstance(raw, list):
+        return dict(values)
+    stored = [m for m in cast(list[object], raw) if isinstance(m, BaseMessage)]
+    ctx = cast(ContextView | None, values.get("context_view"))
+    return {**values, "messages": view(stored, ctx)}
