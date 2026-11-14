@@ -2,7 +2,7 @@ import type { Locator, Page } from "@playwright/test";
 
 import { expect } from "./fixtures.ts";
 import { startFakeModel, type FakeModel } from "./fake-model.ts";
-import { startFakeOllama, type FakeOllama } from "./fake-ollama.ts";
+import { startFakeOllama, type FakeOllama, type FakeOllamaOptions } from "./fake-ollama.ts";
 import {
   startDaemon,
   startGateway,
@@ -24,8 +24,8 @@ export interface Stack {
 }
 
 export interface StackOptions {
-  /** Start a stub of Ollama, with these models installed. The daemon reaches it and not the real registry. */
-  ollama?: { installed?: string[] };
+  /** Start a stub of Ollama (see `FakeOllamaOptions`; `chatModel` makes an installed model the default chat model, in place of the fake one). The daemon reaches it and not the real registry. */
+  ollama?: FakeOllamaOptions & { chatModel?: string };
   /** False leaves the fake model out of the config, as on a fresh install with no model chosen. Default true. */
   chat?: boolean;
 }
@@ -36,10 +36,13 @@ const NO_NETWORK = { HTTPS_PROXY: "http://127.0.0.1:9", NO_PROXY: "127.0.0.1,loc
 /** A fake model, a daemon on a temp home, a gateway, and a second client on the daemon socket. */
 export async function startStack(rig: Rig, options: StackOptions = {}): Promise<Stack> {
   const model = rig.own(await startFakeModel());
-  const ollama = options.ollama === undefined ? undefined : rig.own(await startFakeOllama(options.ollama));
+  const { chatModel, ...ollamaOptions } = options.ollama ?? {};
+  const ollama = options.ollama === undefined ? undefined : rig.own(await startFakeOllama(ollamaOptions));
   const home = rig.home();
   const lines = ["session_titles = false"];
-  if (options.chat !== false) {
+  if (chatModel !== undefined) {
+    lines.push(`default_model = "ollama/${chatModel}"`);
+  } else if (options.chat !== false) {
     lines.push(
       'model_provider = "openai_compat"',
       'model_name = "fake"',

@@ -128,6 +128,11 @@ class SkillRegistry:
         self._fingerprints: dict[Path | None, Fingerprint] = {None: self._fingerprint(None)}
         self._watcher: asyncio.Task[None] | None = None
 
+    @property
+    def index_budget(self) -> int:
+        """``[skills] index_budget``, as last read."""
+        return self._settings.index_budget
+
     def start(self) -> None:
         """Watch the skill folders and ``config.toml`` until :meth:`aclose`."""
         self._watcher = asyncio.get_running_loop().create_task(self._watch(), name="skills-watch")
@@ -267,8 +272,8 @@ class SkillRegistry:
             log.debug("broadcast failed", exc_info=True)
 
 
-def listed_skill(entry: Listed) -> ListedSkill:
-    """One entry of a view, as ``skill.list`` sends it."""
+def listed_skill(entry: Listed, *, indexed: bool = False) -> ListedSkill:
+    """One entry of a view, as ``skill.list`` sends it. ``indexed``: it is in the prompt's index."""
     skill = entry.skill
     return ListedSkill(
         name=skill.name,
@@ -282,6 +287,7 @@ def listed_skill(entry: Listed) -> ListedSkill:
         warnings=list(skill.warnings),
         user_invocable=skill.user_invocable,
         model_invocable=skill.model_invocable,
+        indexed=indexed,
         argument_hint=skill.argument_hint,
         allowed_tools=list(skill.allowed_tools),
         model=skill.model,

@@ -2,7 +2,7 @@
   "$defs": {
     "ListedSkill": {
       "additionalProperties": false,
-      "description": "One skill folder, valid or not.\n\n``usable`` is false when the skill has ``errors``, is in ``[skills]\ndisabled``, or lost its name to another skill, whose folder\n``shadowed_by`` names. ``model_invocable`` is false for\n``disable-model-invocation: true``. ``allowed_tools`` and ``model`` are\nthe frontmatter as written.",
+      "description": "One skill folder, valid or not.\n\n``usable`` is false when the skill has ``errors``, is in ``[skills]\ndisabled``, or lost its name to another skill, whose folder\n``shadowed_by`` names. ``model_invocable`` is false for\n``disable-model-invocation: true``. ``allowed_tools`` and ``model`` are\nthe frontmatter as written. ``indexed`` is true when the skill is in the\nskill index of the system prompt: false for a skill the model may not\nload, and for one dropped because the index is over ``[skills]\nindex_budget``.",
       "properties": {
         "allowed_tools": {
           "items": {
@@ -38,6 +38,11 @@
           },
           "title": "Errors",
           "type": "array"
+        },
+        "indexed": {
+          "default": false,
+          "title": "Indexed",
+          "type": "boolean"
         },
         "model": {
           "anyOf": [
