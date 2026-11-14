@@ -35,6 +35,7 @@ from golem.graphs.adapter import (
     ModelStarted,
     PinRead,
     PinSkipped,
+    SkillLoaded,
     TextCompleted,
     TextDelta,
     ThinkingDelta,
@@ -512,6 +513,10 @@ async def _apply(
             data = {"name": fact.name, "source": fact.source, "how": "pinned"}
             data |= {"path": fact.path, "hash": fact.hash}
             await emit("skill.activated", SkillActivatedData.model_validate(data))
+    elif isinstance(fact, SkillLoaded):
+        data = {"name": fact.name, "source": fact.source, "how": "model"}
+        data |= {"path": fact.path, "hash": fact.hash}
+        await emit("skill.activated", SkillActivatedData.model_validate(data))
     elif isinstance(fact, PinSkipped):
         data = {"name": fact.name, "reason": fact.reason, "message": fact.message}
         skipped = SkillSkippedData.model_validate(data)
