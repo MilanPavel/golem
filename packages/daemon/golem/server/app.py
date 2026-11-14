@@ -55,6 +55,7 @@ from golem.sessions.manager import SessionManager
 from golem.sessions.recovery import recover_runs
 from golem.sessions.titles import ModelTitles, TitleGenerator
 from golem.skills.bundled import bundled_skills_dir
+from golem.skills.index import index_section
 from golem.skills.pinned import pinned_section
 from golem.skills.registry import SkillRegistry
 from golem.store.artifacts import ArtifactStore
@@ -218,7 +219,13 @@ class DaemonApp:
                     self.state.policy,
                     self.state.artifacts,
                     local,
-                    SystemPrompt(sections=(pinned_section(self.state.skills), mcp_section(mcp))),
+                    SystemPrompt(
+                        sections=(
+                            pinned_section(self.state.skills),
+                            index_section(self.state.skills),
+                            mcp_section(mcp),
+                        )
+                    ),
                     BlobStore(database),
                     window_of=lambda profile, overrides: resolve_window(
                         router, profile, models, overrides=overrides
@@ -238,6 +245,7 @@ class DaemonApp:
                     return await turn_on_for_model(sessions, mcp, session_id, scope, name)
 
                 chat.enable_mcp = enable_mcp
+                chat.skills = self.state.skills
                 if self._pulls is None:
                     pulls = PullManager(router, ram_gb=models.ram_gb)
                 else:

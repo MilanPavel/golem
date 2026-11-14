@@ -5,6 +5,7 @@ export type ArgumentHint = string | null;
 export type Description = string;
 export type Disabled = boolean;
 export type Errors = string[];
+export type Indexed = boolean;
 export type Model = string | null;
 export type ModelInvocable = boolean;
 export type Name = string;
@@ -22,7 +23,10 @@ export type Warnings = string[];
  * disabled``, or lost its name to another skill, whose folder
  * ``shadowed_by`` names. ``model_invocable`` is false for
  * ``disable-model-invocation: true``. ``allowed_tools`` and ``model`` are
- * the frontmatter as written.
+ * the frontmatter as written. ``indexed`` is true when the skill is in the
+ * skill index of the system prompt: false for a skill the model may not
+ * load, and for one dropped because the index is over ``[skills]
+ * index_budget``.
  */
 export interface ListedSkill {
   allowed_tools?: AllowedTools;
@@ -30,6 +34,7 @@ export interface ListedSkill {
   description: Description;
   disabled?: Disabled;
   errors?: Errors;
+  indexed?: Indexed;
   model?: Model;
   model_invocable?: ModelInvocable;
   name: Name;
