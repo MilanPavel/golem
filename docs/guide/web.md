@@ -106,7 +106,7 @@ Click a row to read it in the panel beside it.
 
 golem keeps a trace only for a session it recorded. A session from before tracing still opens: its steps come from the messages, so you see the tree and the times. The tokens, the stop reason, the system prompt, and the tools were never kept, so those rows say `not recorded`, and the panel says `Not recorded. This session ran before golem kept traces.`
 
-Two cases look alike and are not. A call that sent no system prompt says so: golem sends one only when a skill is pinned. A provider that does not report tokens leaves them blank, never zero.
+Two cases look alike and are not. A call that sent no system prompt says so: golem sends one only when something needs it, such as a pinned skill or an MCP server you can turn on. A provider that does not report tokens leaves them blank, never zero.
 
 A trace holds your prompts and files exactly as they were sent. They stay in `~/.golem/golem.db` on your Mac and are never sent anywhere.
 

@@ -52,7 +52,7 @@ class ModelRequested:
     from Ollama.
 
     The size fields are the characters and UTF-8 bytes of what was sent, or None
-    when not given.
+    when not given. ``profile`` is the profile this call uses, or None when not given.
     """
 
     message_id: str
@@ -69,6 +69,7 @@ class ModelRequested:
     tools_bytes: int | None = None
     message_chars: tuple[int, ...] | None = None
     message_bytes: tuple[int, ...] | None = None
+    profile: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -548,8 +549,12 @@ def _usage(message: AIMessage) -> dict[str, int] | None:
 
 
 def _stop_reason(message: AIMessage) -> str | None:
-    """Why the model stopped: Anthropic's ``stop_reason`` or OpenAI's ``finish_reason``."""
-    for key in ("stop_reason", "finish_reason"):
+    """Why the model stopped.
+
+    Anthropic's ``stop_reason``, OpenAI's ``finish_reason``, or Ollama's ``done_reason``,
+    in that order.
+    """
+    for key in ("stop_reason", "finish_reason", "done_reason"):
         reason = message.response_metadata.get(key)
         if isinstance(reason, str) and reason:
             return reason
@@ -680,6 +685,7 @@ def _request(message_id: str, item: Mapping[str, object]) -> ModelRequested:
         _count(item.get("tools_bytes")),
         _counts(item.get("message_chars")),
         _counts(item.get("message_bytes")),
+        profile if isinstance(profile := item.get("profile"), str) and profile else None,
     )
 
 

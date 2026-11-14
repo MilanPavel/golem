@@ -85,6 +85,12 @@ test("Metadata says when a tool call was written as text, and nothing when it wa
   expect(lines(MODEL_DETAIL).filter((value) => value.includes("as text"))).toEqual([]);
 });
 
+test("Metadata says when the reply was cut at the length limit", () => {
+  const lines = (result: TraceSpanResult) => metadataRows(result).map(([, value]) => value);
+  expect(lines({ ...MODEL_DETAIL, stop_reason: "length" })).toContain("length (the reply was cut)");
+  expect(lines({ ...MODEL_DETAIL, stop_reason: "stop" })).toContain("stop");
+});
+
 test("the Reply renders Markdown in the trace style, and the header has the throughput", async () => {
   const { user } = show(MODEL_DETAIL);
   expect(document.body.textContent).toContain("tok/s");
@@ -188,7 +194,7 @@ for (const [name, result] of [["a model call", MODEL_DETAIL], ["a full call", FU
 
 test("a recorded call with no system prompt says why, and not Not recorded", () => {
   show(NO_PROMPT_DETAIL);
-  expect(screen.getByText("No system prompt was sent on this call. golem sends one only when a skill is pinned.")).toBeTruthy();
+  expect(screen.getByText("No system prompt was sent on this call. golem sends one only when something needs it, such as a pinned skill or an MCP server you can turn on.")).toBeTruthy();
   expect(document.body.textContent).not.toContain("Not recorded");
 });
 

@@ -928,3 +928,30 @@ test("thinkingLine covers each state", () => {
   assert.equal(thinkingLine({ ...base, thinking: "hm" }), "thought");
   assert.equal(thinkingLine({ streaming: true, text: "", thinking: undefined }), null);
 });
+
+test("a reply that hit the length limit is marked cut unless it asked for a tool", () => {
+  const base = { session_id: "s", run_id: "r", ts: "t" } as const;
+  const call = (id: string, reason: string): ChatEvent => ({
+    ...base,
+    seq: 2,
+    type: "model.call.completed",
+    data: { message_id: id, stop_reason: reason, latency_ms: 5 },
+  });
+  const done = (id: string): ChatEvent => ({
+    ...base,
+    seq: 1,
+    type: "message.completed",
+    data: { message_id: id, role: "assistant", text: "partial" },
+  });
+  const tool = (id: string): ChatEvent => ({
+    ...base,
+    seq: 3,
+    type: "tool.requested",
+    data: { call_id: "c1", message_id: id, name: "read_file", args: {} },
+  });
+  const run = (events: ChatEvent[]) => events.reduce(reduceChat, emptyChat).messages[0];
+  assert.equal(run([done("a"), call("a", "length")])?.cut, true);
+  assert.equal(run([done("a"), call("a", "max_tokens")])?.cut, true);
+  assert.equal(run([done("a"), call("a", "stop")])?.cut, undefined);
+  assert.equal(run([done("a"), call("a", "length"), tool("a")])?.cut, undefined);
+});

@@ -1,4 +1,4 @@
-import { displayToolName, formatTurnTime, groupTurns, stepCount, stepMark, summarizeSteps, turnFooter, LIVE_OUTPUT_CHARS, thinkingLine, unreadCallNotice, type ChatMessage, type ChatState, type Detail, type StepMark, type ToolBlock } from "@golem/view";
+import { displayToolName, formatTurnTime, groupTurns, stepCount, stepMark, summarizeSteps, turnFooter, LIVE_OUTPUT_CHARS, thinkingLine, unreadCallNotice, REPLY_CUT_NOTE, type ChatMessage, type ChatState, type Detail, type StepMark, type ToolBlock } from "@golem/view";
 import { memo, useCallback, useId, useLayoutEffect, useRef, useState } from "react";
 import { usePulls, useSession } from "../../store/page-context.tsx";
 import type { PullsSnapshot } from "../../store/pulls.ts";
@@ -216,6 +216,7 @@ const GolemStep = memo(function GolemStep({ message, thinkingShown }: { message:
       ) : null}
       {message.streaming ? <span aria-hidden="true" data-cursor className="transcript-cursor" /> : null}
       {message.interrupted ? <p className="font-mono text-xs text-muted">stopped</p> : null}
+      {message.cut === true ? <p className="text-sm text-muted">{REPLY_CUT_NOTE}</p> : null}
     </div>
   );
 });

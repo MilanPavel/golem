@@ -1,6 +1,7 @@
 import type { ApprovalChoice, ChatEvent, SkillCall } from "@golem/client";
 
 import { emptyLiveContext, foldLiveContext, type LiveContextState } from "./context.ts";
+import { replyWasCut } from "./stop.ts";
 import type { TodoItem } from "./todos.ts";
 
 export type ToolStatus = "requested" | "waiting" | "running" | "done" | "failed";
@@ -65,6 +66,8 @@ export type ChatMessage = {
   thinking?: string;
   /** Milliseconds the model thought, from `message.completed`. */
   thinkingMs?: number;
+  /** The model stopped at the length limit and the reply asked for no tool, from `model.call.completed`. */
+  cut?: boolean;
   /** Tool calls this reply asked for, in order. */
   tools?: ToolBlock[];
   /** Set on a user message that ran a skill. `text` is then the filled-in body. */
@@ -274,8 +277,19 @@ function reduceChatEvent(state: ChatState, event: ChatEvent): ChatState {
         runStartedAt: event.ts,
         runId: event.run_id,
       };
-    case "model.call.completed":
-      return event.data.text_tool_calls === "unread" ? { ...state, unreadCall: true } : state;
+    case "model.call.completed": {
+      const next = event.data.text_tool_calls === "unread" ? { ...state, unreadCall: true } : state;
+      if (!replyWasCut(event.data.stop_reason)) {
+        return next;
+      }
+      // The tool requests of a reply come after its `model.call.completed`; `tool.requested` clears this.
+      return {
+        ...next,
+        messages: next.messages.map((message) =>
+          message.id === event.data.message_id && message.tools === undefined ? { ...message, cut: true } : message,
+        ),
+      };
+    }
     case "run.completed":
       return { ...state, busy: false, runStartedAt: null, runId: null, approval: null, down: null, retry: null };
     case "run.failed":
@@ -310,7 +324,10 @@ function reduceChatEvent(state: ChatState, event: ChatEvent): ChatState {
         ...state,
         messages: state.messages.map((message) =>
           message.id === event.data.message_id
-            ? { ...message, tools: [...(message.tools ?? []).filter((tool) => tool.callId !== block.callId), block] }
+            ? {
+                ...withoutCut(message),
+                tools: [...(message.tools ?? []).filter((tool) => tool.callId !== block.callId), block],
+              }
             : message,
         ),
       };
@@ -532,8 +549,15 @@ function upsertCompleted(
     // A reply stopped by a cancel completes with no thinking, so keep what streamed.
     const kept = event.data.thinking ?? message.thinking;
     const done = withThinking(next, kept, event.data.thinking_ms);
-    return message.tools === undefined ? done : { ...done, tools: message.tools };
+    const final = message.cut === true ? { ...done, cut: true } : done;
+    return message.tools === undefined ? final : { ...final, tools: message.tools };
   });
+}
+
+function withoutCut(message: ChatMessage): ChatMessage {
+  const rest = { ...message };
+  delete rest.cut;
+  return rest;
 }
 
 function withThinking(message: ChatMessage, thinking: string | null | undefined, ms: number | null | undefined): ChatMessage {
