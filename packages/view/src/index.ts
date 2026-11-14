@@ -199,7 +199,10 @@ export {
   detailChoices,
   firstLine,
   formatSeconds,
+  loginDoneText,
   mcpAlert,
+  SIGN_IN_NEEDED,
+  signsIn,
   ONLY_WHEN_ASKED,
   MCP_HINT,
   mcpStatusMark,
@@ -455,6 +458,8 @@ export {
 } from "./permissions.ts";
 export {
   toolsAdded,
+  toolsSignInUrl,
+  toolsSigningIn,
   toolsFailed,
   toolsFailureChoices,
   toolsFailures,

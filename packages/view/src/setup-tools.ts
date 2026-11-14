@@ -21,6 +21,8 @@ export type ToolsRowStatus =
   /** `tail` is the newest line of `runtime.install`'s output. */
   | { kind: "installing"; runtime: ToolsRuntime; tail: string }
   | { kind: "adding" }
+  /** Added, and waiting for the sign-in in the browser. `url` is null until the daemon gives it. */
+  | { kind: "signin"; url: string | null }
   /** `tools` is null for a server that was there before, whose tools are not counted. */
   | { kind: "added"; tools: number | null }
   | { kind: "failed"; hint: string }
@@ -35,6 +37,8 @@ export type ToolsRow = {
   missing: ToolsRuntime | null;
   /** Whether the server asks for a secret (a token). */
   needsToken: boolean;
+  /** Whether the server signs in with the browser (OAuth) once it is added. */
+  oauth: boolean;
   /** How to make the token, when the catalog says. */
   tokenHint: string | null;
   ticked: boolean;
@@ -93,6 +97,7 @@ export function toolsOffer(catalog: readonly McpCatalogEntry[], mode: ToolsState
         description: entry.description,
         missing: missingRuntime(entry),
         needsToken: needsSecret(entry),
+        oauth: entry.auth === "oauth",
         tokenHint: secret?.hint ?? null,
         ticked: already || (entry.id !== UNTICKED_ID && !needsSecret(entry)),
         token: null,
@@ -193,7 +198,7 @@ export type ToolsEffect =
 /** The next effect, one at a time: a waiting row whose runtime is missing installs it first. */
 export function toolsStep(state: ToolsState): { state: ToolsState; effect: ToolsEffect } {
   const none = { state, effect: { kind: "none" } } as const;
-  if (state.phase !== "run" || state.rows.some((row) => row.status.kind === "installing" || row.status.kind === "adding")) {
+  if (state.phase !== "run" || state.rows.some((row) => row.status.kind === "installing" || row.status.kind === "adding" || row.status.kind === "signin")) {
     return none;
   }
   const row = state.rows.find((each) => each.status.kind === "waiting");
@@ -252,6 +257,16 @@ export function toolsAdded(state: ToolsState, id: string, tools: number): ToolsS
   return setRow(state, id, (row) => ({ ...row, token: null, status: { kind: "added", tools } }));
 }
 
+/** The row's server is added and waits for the browser: Sign in. */
+export function toolsSigningIn(state: ToolsState, id: string): ToolsState {
+  return setRow(state, id, (row) => ({ ...row, token: null, status: { kind: "signin", url: null } }));
+}
+
+/** The daemon gave the address to open for the row's sign-in. */
+export function toolsSignInUrl(state: ToolsState, id: string, url: string): ToolsState {
+  return setRow(state, id, (row) => (row.status.kind === "signin" ? { ...row, status: { kind: "signin", url } } : row));
+}
+
 /** `hint` is the one line `mcp.test` gives, or the daemon's reason. */
 export function toolsFailed(state: ToolsState, id: string, hint: string): ToolsState {
   return setRow(state, id, (row) => ({ ...row, token: null, status: { kind: "failed", hint } }));
@@ -281,7 +296,7 @@ export function toolsSkipRow(state: ToolsState, id: string): ToolsState {
 }
 
 function busy(row: ToolsRow): boolean {
-  return row.status.kind === "waiting" || row.status.kind === "installing" || row.status.kind === "adding";
+  return row.status.kind === "waiting" || row.status.kind === "installing" || row.status.kind === "adding" || row.status.kind === "signin";
 }
 
 /** Whether every row of a run has ended, with a result or a failure. */
@@ -327,6 +342,8 @@ export function toolsStatusText(row: ToolsRow): string {
         : `installing ${status.runtime === "node" ? "Node" : "uv"}`;
     case "adding":
       return "adding";
+    case "signin":
+      return status.url === null ? "sign in · asking the daemon" : `sign in in your browser · ${status.url}`;
     case "added": {
       if (status.tools === null) {
         return "added";
@@ -346,6 +363,7 @@ const STATUS_MARKS: Record<ToolsRowStatus["kind"], Mark | null> = {
   waiting: "attn",
   installing: "spin",
   adding: "spin",
+  signin: "attn",
   added: "ok",
   failed: "fail",
   skipped: "attn",

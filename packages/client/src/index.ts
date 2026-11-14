@@ -56,6 +56,8 @@ export type { RuntimeInstallDone } from "../../protocol/gen/runtime-install-done
 export type { McpAddParams } from "../../protocol/gen/mcp-add-params.ts";
 export type { McpRemoveResult } from "../../protocol/gen/mcp-remove-result.ts";
 export type { McpServer } from "../../protocol/gen/mcp-server.ts";
+export type { McpLoginDone } from "../../protocol/gen/mcp-login-done.ts";
+export type { McpLoginResult } from "../../protocol/gen/mcp-login-result.ts";
 export type { KeychainWait } from "../../protocol/gen/keychain-wait.ts";
 export type { ModelServerStatus } from "../../protocol/gen/model-server-status.ts";
 export type { ModelMemory } from "../../protocol/gen/model-memory.ts";

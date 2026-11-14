@@ -15,6 +15,8 @@ import type { OllamaInstallDone } from "../../protocol/gen/ollama-install-done.t
 import type { DirEntry, FsListDirsResult } from "../../protocol/gen/fs-list-dirs-result.ts";
 import type { SetupRow, SetupStatusResult } from "../../protocol/gen/setup-status-result.ts";
 import type { McpListResult } from "../../protocol/gen/mcp-list-result.ts";
+import type { McpLoginDone } from "../../protocol/gen/mcp-login-done.ts";
+import type { McpLoginResult } from "../../protocol/gen/mcp-login-result.ts";
 import type { McpServer } from "../../protocol/gen/mcp-server.ts";
 import type { ModelServerStatus } from "../../protocol/gen/model-server-status.ts";
 import type { ModelOptionsGetResult } from "../../protocol/gen/model-options-get-result.ts";
@@ -147,6 +149,14 @@ export function isMcpServer(value: unknown): value is McpServer {
     typeof value["state"] === "string" &&
     typeof value["command"] === "string"
   );
+}
+
+export function isMcpLoginResult(value: unknown): value is McpLoginResult {
+  return isRecord(value) && typeof value["name"] === "string" && typeof value["authorize_url"] === "string";
+}
+
+export function isMcpLoginDone(value: unknown): value is McpLoginDone {
+  return isRecord(value) && typeof value["name"] === "string" && typeof value["ok"] === "boolean";
 }
 
 const SERVER_STATES = new Set(["starting", "ready", "failed", "stopped"]);

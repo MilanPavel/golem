@@ -1,4 +1,4 @@
-import type { McpServer } from "@golem/client";
+import type { McpLoginDone, McpServer } from "@golem/client";
 
 import { formatTokens } from "./context.ts";
 
@@ -23,16 +23,48 @@ export function mergeMcp(servers: readonly McpServer[], changed: McpServer): Mcp
   );
 }
 
-/** For the status line: the servers this session uses that are down, or "". */
+/** For the status line: the servers this session uses that are down or need a sign-in, or "". */
 export function mcpAlert(servers: readonly McpServer[] | null): string {
-  const down = (servers ?? []).filter((server) => server.enabled === true && server.state === "failed");
-  return down.length === 0 ? "" : `mcp ✗ ${down.map((server) => server.name).join(", ")}`;
+  const used = (servers ?? []).filter((server) => server.enabled === true);
+  const down = used.filter((server) => server.state === "failed");
+  const signIn = used.filter((server) => server.state === "needs_auth");
+  const parts = [
+    ...(down.length === 0 ? [] : [`mcp ✗ ${down.map((server) => server.name).join(", ")}`]),
+    ...(signIn.length === 0 ? [] : [`mcp ! sign in: ${signIn.map((server) => server.name).join(", ")}`]),
+  ];
+  return parts.join(" · ");
+}
+
+/** What the row and the detail say about a server that waits for a sign-in. */
+export const SIGN_IN_NEEDED = "Sign in needed";
+
+/** The sign-in of a server ended: `Signed in to Linear · 12 tools`, or why it did not work. */
+export function loginDoneText(done: McpLoginDone, tools: number | null): string {
+  if (!done.ok) {
+    return done.error ?? `Could not sign in to ${done.name}`;
+  }
+  const count = tools === null ? "" : ` · ${tools} ${tools === 1 ? "tool" : "tools"}`;
+  return `Signed in to ${done.name}${count}`;
+}
+
+/**
+ * Whether `server` signs in with OAuth as far as the list can tell: it waits for a sign-in, or it is the
+ * catalog entry of that name that was added. (`mcp.logout` works on any hosted server, so Sign out is
+ * offered only where it means something.)
+ */
+export function signsIn(server: McpServer, catalog: readonly { name: string; auth: string; added?: boolean | null }[] | null): boolean {
+  if (server.state === "needs_auth") {
+    return true;
+  }
+  return (catalog ?? []).some((entry) => entry.auth === "oauth" && entry.added === true && entry.name === server.name && !server.project);
 }
 
 /** What a person can do with a server that needs no screen of its own. */
 export type McpDetailAction =
   | { kind: "session"; name: string; on: boolean }
   | { kind: "restart"; name: string }
+  | { kind: "login"; name: string }
+  | { kind: "logout"; name: string }
   | { kind: "set-enabled"; name: string; enabled: boolean | "on_demand" };
 
 /** A choice on a server's detail: the action to run, or the screen to open. */
@@ -49,9 +81,12 @@ export function orderedServers(servers: readonly McpServer[]): McpServer[] {
 export const ONLY_WHEN_ASKED = "Only when a chat asks (saves tokens)";
 
 /** What can be done with `server`, in the order the screen numbers it. */
-export function detailChoices(server: McpServer): DetailChoice[] {
+export function detailChoices(server: McpServer, oauth = server.state === "needs_auth"): DetailChoice[] {
   const name = server.name;
   const choices: DetailChoice[] = [];
+  if (server.state === "needs_auth") {
+    choices.push({ label: "Sign in", action: { kind: "login", name } });
+  }
   if (server.state === "running" && (server.tools?.length ?? 0) > 0) {
     choices.push({ label: "View tools", action: "view-tools" });
   }
@@ -76,6 +111,9 @@ export function detailChoices(server: McpServer): DetailChoice[] {
   // `mcp.restart` starts a server that has not started yet, so an idle one gets Start.
   choices.push({ label: server.state === "idle" ? "Start" : "Reconnect", action: { kind: "restart", name } });
   // The mode it is not in already.
+  if (oauth && server.state !== "needs_auth") {
+    choices.push({ label: "Sign out", action: { kind: "logout", name } });
+  }
   choices.push(
     server.on_demand
       ? { label: "Enable for every chat", action: { kind: "set-enabled", name, enabled: true } }
@@ -104,6 +142,9 @@ export function mcpSummary(server: McpServer, session = true): string {
   }
   if (server.state === "disabled") {
     return "disabled";
+  }
+  if (server.state === "needs_auth") {
+    return SIGN_IN_NEEDED;
   }
   return "starting…";
 }
@@ -137,12 +178,18 @@ export function mcpStatusMark(server: McpServer): { text: string; tone: McpTone 
   if (server.state === "starting") {
     return { text: "◌", tone: "wait" };
   }
+  if (server.state === "needs_auth") {
+    return { text: "!", tone: "wait" };
+  }
   return { text: server.state === "idle" ? "○" : "–", tone: "off" };
 }
 
 export function mcpStatusWord(server: McpServer): string {
   if (server.state === "idle") {
     return "on demand";
+  }
+  if (server.state === "needs_auth") {
+    return "needs sign-in";
   }
   return server.state;
 }

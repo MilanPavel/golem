@@ -11,6 +11,8 @@ import type { RuntimeInstallCancelResult } from "../../protocol/gen/runtime-inst
 import type { RuntimeInstallDone } from "../../protocol/gen/runtime-install-done.ts";
 import type { RuntimeInstallResult } from "../../protocol/gen/runtime-install-result.ts";
 import type { RuntimeName } from "./runtime.ts";
+import type { McpLoginDone } from "../../protocol/gen/mcp-login-done.ts";
+import type { McpLoginResult } from "../../protocol/gen/mcp-login-result.ts";
 import type { McpRemoveResult } from "../../protocol/gen/mcp-remove-result.ts";
 import type { OllamaInstallCancelResult } from "../../protocol/gen/ollama-install-cancel-result.ts";
 import type { KeychainWait } from "../../protocol/gen/keychain-wait.ts";
@@ -96,6 +98,8 @@ import {
   isDaemonStatus,
   isHelloResult,
   isMcpListResult,
+  isMcpLoginDone,
+  isMcpLoginResult,
   isMcpRemoveResult,
   isMcpServer,
   isMcpToggleResult,
@@ -326,6 +330,10 @@ export interface GolemClient {
   mcpTools(name: string, sessionId?: string): Promise<McpToolsResult>;
   /** Start a server again now. Resolves with its state, usually `starting`. */
   restartMcp(name: string, sessionId?: string): Promise<McpServer>;
+  /** Start the sign-in of a hosted server: the address to open. It ends with `mcp.login.done` ({@link GolemClient.onMcpLoginDone}). */
+  mcpLogin(name: string, sessionId?: string): Promise<McpLoginResult>;
+  /** Delete a server's sign-in and stop it. Resolves with it as `needs_auth`. */
+  mcpLogout(name: string, sessionId?: string): Promise<McpServer>;
   /** Write `enabled` into the file that names the server. It applies at once. */
   setMcpEnabled(name: string, enabled: boolean | "on_demand", sessionId?: string): Promise<McpServer>;
   /** Add `[mcp.<name>]` to the user's config and start the server. The wire view shows `token` redacted. */
@@ -376,6 +384,8 @@ export interface GolemClient {
   onRuntimeInstall(listener: (update: RuntimeInstallUpdate) => void): () => void;
   /** `mcp.server.status`: a server started, failed, or changed its tools. */
   onMcpStatus(listener: (server: McpServer) => void): () => void;
+  /** `mcp.login.done`: a sign-in ended, from any client's `mcp.login`. */
+  onMcpLoginDone(listener: (done: McpLoginDone) => void): () => void;
   /** `model.server.status`: a local model server such as Ollama started, failed, or stopped. */
   onModelServer(listener: (status: ModelServerStatus) => void): () => void;
   /**
@@ -452,6 +462,7 @@ export function connectGolem(options: ConnectOptions): GolemClient {
   const wireListeners = new Set<(lines: readonly WireLine[]) => void>();
   const pullListeners = new Set<(update: PullUpdate) => void>();
   const mcpListeners = new Set<(server: McpServer) => void>();
+  const loginListeners = new Set<(done: McpLoginDone) => void>();
   const testListeners = new Set<(progress: McpTestProgress) => void>();
   const logListeners = new Set<(log: McpServerLog) => void>();
   const skillListeners = new Set<(root: string | null) => void>();
@@ -652,6 +663,21 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       record({ direction: "in", kind: "mcp.server.status", detail: name, json: line });
       if (isMcpServer(params)) {
         for (const listener of mcpListeners) {
+          try {
+            listener(params);
+          } catch {
+            // A listener must not tear the socket down.
+          }
+        }
+      }
+      return;
+    }
+    if (isRecord(message) && message["method"] === "mcp.login.done") {
+      const params = message["params"];
+      const name = isRecord(params) && typeof params["name"] === "string" ? params["name"] : "";
+      record({ direction: "in", kind: "mcp.login.done", detail: name, json: line });
+      if (isMcpLoginDone(params)) {
+        for (const listener of loginListeners) {
           try {
             listener(params);
           } catch {
@@ -1396,6 +1422,17 @@ export function connectGolem(options: ConnectOptions): GolemClient {
     async restartMcp(name: string, sessionId?: string): Promise<McpServer> {
       return mcpServerCall("mcp.restart", withSession({ name }, sessionId));
     },
+    async mcpLogin(name: string, sessionId?: string): Promise<McpLoginResult> {
+      await ready;
+      const result = await call("mcp.login", withSession({ name }, sessionId));
+      if (!isMcpLoginResult(result)) {
+        throw new Error("invalid mcp.login result");
+      }
+      return result;
+    },
+    async mcpLogout(name: string, sessionId?: string): Promise<McpServer> {
+      return mcpServerCall("mcp.logout", withSession({ name }, sessionId));
+    },
     async setMcpEnabled(name: string, enabled: boolean | "on_demand", sessionId?: string): Promise<McpServer> {
       return mcpServerCall("mcp.set_enabled", withSession({ name, enabled }, sessionId));
     },
@@ -1551,6 +1588,12 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       mcpListeners.add(listener);
       return () => {
         mcpListeners.delete(listener);
+      };
+    },
+    onMcpLoginDone(listener: (done: McpLoginDone) => void): () => void {
+      loginListeners.add(listener);
+      return () => {
+        loginListeners.delete(listener);
       };
     },
     onModelServer(listener: (status: ModelServerStatus) => void): () => void {
