@@ -99,7 +99,7 @@ run.completed      seq 12
 
 > **A few steps a reader can do on today's golem**, each with what they will see. Use a feature only after it has shipped. If it is only planned, put it in "Why this way" and not here.
 
-1. Open the chat with `golem`, and type `/debug wire`.
+1. Open the chat with `golem tui`, and type `/debug wire`.
 2. Ask: `…`
 3. Watch for `…` in the wire panel. It is the step from the diagram above.
 

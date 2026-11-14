@@ -106,7 +106,7 @@ CHANGES.txt in the project folder, and write the notes in your answer.
 ## Try it
 
 1. Make `.golem/skills/release-notes/SKILL.md` in your project, as in the run above.
-2. Open the chat with `golem` in that folder and type `/skills`. The skill is listed under the project. Open it for its details.
+2. Open the chat with `golem tui` in that folder and type `/skills`. The skill is listed under the project. Open it for its details.
 3. Type `/rel` and see it in the suggestions, with `<version>`. Run `/release-notes 0.4.0`. Ctrl-O shows the filled-in body under your line.
 4. Break the header, for example `name: Release_Notes`, and run `golem skills check .golem/skills/release-notes` in a shell. It prints the error and exits with 1.
 

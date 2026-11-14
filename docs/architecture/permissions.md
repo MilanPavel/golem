@@ -106,7 +106,7 @@ The model then tried to read the file another way, with `cat` in the shell. That
 
 ## Try it
 
-1. Open the chat with `golem` in a project folder, and type `/debug wire`.
+1. Open the chat with `golem tui` in a project folder, and type `/debug wire`.
 2. Ask: `Run ls in the shell.` The approval band shows `Allow shell ls?`, the rule that asked, and the keys. Press `s`, then ask for `ls` again: it runs without asking.
 3. Add a rule to the project, in `.golem/policy.toml`:
 
