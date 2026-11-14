@@ -14,6 +14,8 @@ from typing import Annotated, NotRequired
 
 from langgraph.graph import MessagesState  # pyright: ignore[reportMissingTypeStubs]
 
+from golem.graphs.context_view import ContextView
+
 SCHEMA_VERSION = 1
 
 
@@ -36,3 +38,5 @@ class AgentState(MessagesState):
     """The agent's plan, from ``todo_write``. Missing in checkpoints from before it."""
     skill_folders: NotRequired[Annotated[list[str], add_folders]]
     """Folders of the skills this session ran, oldest first. Empty in older checkpoints."""
+    context_view: NotRequired[ContextView]
+    """What a model call sends of ``messages``. Replaced whole on update. Empty or missing: all."""
