@@ -189,7 +189,7 @@ Every new field is optional, so older events stay valid. A provider that reports
 
 The `blobs` table is `sha256`, `kind`, `size`, `created_at`, and `text`. `BlobStore.put` inserts a row unless the hash is there, so two calls with the same prompt share one. There are two kinds:
 
-- **`system_prompt`:** the prompt, as sent. golem sends one only when a skill is pinned, so a call with none has `system_prompt_sha` `null`, and the page says so.
+- **`system_prompt`:** the prompt, as sent. golem sends one only when something needs it, so a call with none has `system_prompt_sha` `null`, and the page says so.
 - **`tools`:** the tool schemas as compact JSON with sorted keys. A model that is not offered tools has `tools_sha` `null`.
 
 `message_ids` are the checkpoint ids of the history sent, in order, not counting the system prompt. `window_estimated` is true when golem did not send the window and read it from Ollama, from the loaded context or the Modelfile, so a screen shows it with `≈`. An older event has no field and reads as false. `system_sections` lists the non-empty parts of the system prompt as `name` and `chars`. The stored prompt is those parts joined with a blank line, so their lengths split it exactly, and the prompt is not stored twice.
