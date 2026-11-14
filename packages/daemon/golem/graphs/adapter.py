@@ -533,8 +533,12 @@ def _usage(message: AIMessage) -> dict[str, int] | None:
 
 
 def _stop_reason(message: AIMessage) -> str | None:
-    """Why the model stopped: Anthropic's ``stop_reason`` or OpenAI's ``finish_reason``."""
-    for key in ("stop_reason", "finish_reason"):
+    """Why the model stopped.
+
+    Anthropic's ``stop_reason``, OpenAI's ``finish_reason``, or Ollama's ``done_reason``,
+    in that order.
+    """
+    for key in ("stop_reason", "finish_reason", "done_reason"):
         reason = message.response_metadata.get(key)
         if isinstance(reason, str) and reason:
             return reason

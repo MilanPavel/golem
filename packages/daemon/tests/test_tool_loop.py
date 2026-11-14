@@ -560,6 +560,18 @@ async def test_each_model_call_records_its_usage_and_stop_reason(
     assert first.latency_ms >= 0
 
 
+async def test_a_reply_cut_by_the_length_limit_records_it(
+    database: Database, project: Path
+) -> None:
+    model = ToolCallingChatModel(replies=["partial"], response_metadata={"done_reason": "length"})
+    chat = _chat(database, model)
+    session_id = await chat.manager.create(None, cwd=str(project))
+    events = await chat.finished(await chat.manager.send(session_id, "write a lot"))
+
+    (done,) = [e for e in events if isinstance(e, ModelCallCompletedEvent)]
+    assert done.data.stop_reason == "length"
+
+
 async def test_a_model_without_usage_records_none_not_zeros(
     database: Database, project: Path
 ) -> None:

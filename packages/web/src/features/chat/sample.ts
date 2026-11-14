@@ -53,6 +53,15 @@ const LONG_THINKING = Array.from(
   (_, step) => `Step ${step + 1}: check whether the retry delay can reuse the clamp, then compare it with the meter.`,
 ).join("\n");
 
+/** A local model's reply that stopped at the length limit, for the gallery. */
+export const CUT_REPLY: ChatMessage = {
+  id: "cut1",
+  role: "assistant",
+  text: "The three steps are: first, read the config; second, check the model name; third, restart the",
+  streaming: false,
+  cut: true,
+};
+
 /** Replies with thinking, for the gallery and the tests: streaming, done, none, and a long text. */
 export const THINKING_CASES: { label: string; message: ChatMessage; shown?: boolean }[] = [
   {

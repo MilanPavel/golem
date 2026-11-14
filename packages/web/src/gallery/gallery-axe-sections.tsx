@@ -36,6 +36,7 @@ export const GALLERY_SECTIONS = [
   "transcript",
   "turn",
   "thinking",
+  "cut-reply",
   "diff",
   "drawer",
   "command-palette-and-keys",
