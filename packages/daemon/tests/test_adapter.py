@@ -98,6 +98,9 @@ def test_custom_stream_items_become_tool_facts() -> None:
     assert translate(
         custom(kind="tool.completed", call_id="c_1", summary="exit 1", preview="", failed=True)
     ) == ToolFinished("c_1", "exit 1", "", False, failed=True)
+    assert translate(
+        custom(kind="tool.completed", call_id="c_1", summary="s", preview="", diff="--- a\n")
+    ) == ToolFinished("c_1", "s", "", False, diff="--- a\n")
     assert translate(custom(kind="tool.failed", call_id="c_1", message="no")) == ToolErrored(
         "c_1", "no"
     )

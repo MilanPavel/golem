@@ -140,6 +140,7 @@ class ToolFinished:
     artifact_id: str | None = None
     failed: bool = False
     duration_ms: int | None = None
+    diff: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -630,6 +631,7 @@ def _custom(data: object) -> Fact | None:
         summary = item.get("summary")
         preview = item.get("preview")
         artifact_id = item.get("artifact_id")
+        diff = item.get("diff")
         return ToolFinished(
             call_id,
             summary if isinstance(summary, str) else "",
@@ -638,6 +640,7 @@ def _custom(data: object) -> Fact | None:
             artifact_id if isinstance(artifact_id, str) else None,
             item.get("failed") is True,
             _duration(item),
+            diff if isinstance(diff, str) and diff else None,
         )
     if kind == "todos.updated":
         todos = item.get("todos")

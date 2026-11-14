@@ -209,9 +209,14 @@ def commit(change: Change, approved_diff: str | None = None) -> ToolResult:
     diff = unified_diff(change)
     apply(change)
     added, removed = diff_counts(diff)
-    created = "new file " if change.before is None else ""
-    summary = f"{created}+{added} -{removed} {change.shown}"
-    return ToolResult(output=diff or f"created {change.shown}, empty", summary=summary)
+    created = change.before is None
+    summary = f"{'new file ' if created else ''}+{added} -{removed} {change.shown}"
+    verb = "created" if created else "edited"
+    return ToolResult(
+        output=f"{verb} {change.shown} (+{added} -{removed})",
+        summary=summary,
+        diff=shown_diff(change),
+    )
 
 
 async def _write_file(args: WriteFileArgs, ctx: ToolContext) -> ToolResult:

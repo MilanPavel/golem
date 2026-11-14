@@ -437,6 +437,8 @@ class ToolCompletedData(BaseModel):
 
     ``duration_ms`` is how long the tool ran, from ``tool.started`` to its
     result, without the wait for an approval. None means it was not measured.
+
+    ``diff`` is the change a file tool made, as a unified diff.
     """
 
     model_config = _CONFIG
@@ -448,6 +450,7 @@ class ToolCompletedData(BaseModel):
     artifact_id: str | None = Field(default=None, min_length=1)
     failed: bool = False
     duration_ms: int | None = Field(default=None, ge=0)
+    diff: str | None = None
 
 
 class ToolFailedData(BaseModel):

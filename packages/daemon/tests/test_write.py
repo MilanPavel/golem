@@ -37,9 +37,11 @@ async def test_edit_file_replaces_a_unique_match_and_reports_the_diff(project: P
     )
     assert (project / "src" / "a.py").read_text(encoding="utf-8") == "x = 1\ny = 3\nx = 1\n"
     assert result.summary == "+1 -1 src/a.py"
-    assert result.output.splitlines()[:2] == ["--- a/src/a.py", "+++ b/src/a.py"]
-    assert "-y = 2" in result.output.splitlines()
-    assert "+y = 3" in result.output.splitlines()
+    assert result.output == "edited src/a.py (+1 -1)"
+    assert result.diff is not None
+    assert result.diff.splitlines()[:2] == ["--- a/src/a.py", "+++ b/src/a.py"]
+    assert "-y = 2" in result.diff.splitlines()
+    assert "+y = 3" in result.diff.splitlines()
 
 
 @pytest.mark.parametrize(
@@ -77,7 +79,9 @@ async def test_write_file_creates_folders_inside_the_project(project: Path) -> N
     result = await _call(project, "write_file", path="docs/new/notes.md", content="hi\n")
     assert (project / "docs" / "new" / "notes.md").read_text(encoding="utf-8") == "hi\n"
     assert result.summary == "new file +1 -0 docs/new/notes.md"
-    assert result.output.startswith("--- /dev/null\n+++ b/docs/new/notes.md\n")
+    assert result.output == "created docs/new/notes.md (+1 -0)"
+    assert result.diff is not None
+    assert result.diff.startswith("--- /dev/null\n+++ b/docs/new/notes.md\n")
 
 
 def test_planning_writes_nothing(project: Path) -> None:

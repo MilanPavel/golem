@@ -100,12 +100,16 @@ class ToolResult:
     node applies only the keys it knows, so a tool never reaches the rest.
     ``failed`` says the call ran but did not succeed, such as a command that
     exited non-zero. The screen marks it, and the model gets the output as usual.
+
+    ``diff`` is what the call changed, as a unified diff, for the screen. Not
+    sent to the model.
     """
 
     output: str
     summary: str
     update: Mapping[str, object] | None = None
     failed: bool = False
+    diff: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

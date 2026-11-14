@@ -249,6 +249,7 @@ def tools_node(
                     "artifact_id": artifact_id,
                     "failed": result.failed,
                     "duration_ms": duration_ms,
+                    "diff": result.diff,
                 }
             )
             if verdict.args is not None:

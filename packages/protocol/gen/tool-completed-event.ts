@@ -2,6 +2,7 @@
 
 export type ArtifactId = string | null;
 export type CallId = string;
+export type Diff = string | null;
 export type DurationMs = number | null;
 export type Failed = boolean;
 export type Preview = string;
@@ -39,12 +40,15 @@ export interface ToolCompletedEvent {
  * ``duration_ms`` is how long the tool ran, from ``tool.started`` to its
  * result, without the wait for an approval. None means it was not measured.
  *
+ * ``diff`` is the change a file tool made, as a unified diff.
+ *
  * This interface was referenced by `ToolCompletedEvent`'s JSON-Schema
  * via the `definition` "ToolCompletedData".
  */
 export interface ToolCompletedData {
   artifact_id?: ArtifactId;
   call_id: CallId;
+  diff?: Diff;
   duration_ms?: DurationMs;
   failed?: Failed;
   preview: Preview;
