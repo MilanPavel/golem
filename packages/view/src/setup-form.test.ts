@@ -74,7 +74,7 @@ test("the Web page card follows Service: kept has no fix, not kept names the web
   assert.equal(kept?.fix, null);
   const [, bare] = setupFormRows([], KEPT, false);
   assert.equal(bare?.mark, "warn");
-  assert.equal(bare?.detail, "runs only while a terminal runs golem web");
+  assert.equal(bare?.detail, "runs only while a terminal runs golem");
   assert.deepEqual(bare?.fix, { kind: "command", text: "golem web install", recheck: false });
 });
 

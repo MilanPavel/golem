@@ -173,7 +173,7 @@ def test_an_invalid_config_skips_the_model_checks(tmp_path: Path) -> None:
 def test_no_model_chosen_yet_is_a_warning(tmp_path: Path) -> None:
     checks = _models(tmp_path, "", FakePlatform())
     assert checks == [
-        Check("model", "warn", "no model chosen yet", "golem, then pick one"),
+        Check("model", "warn", "no model chosen yet", "golem tui, then pick one"),
         Check("ollama", "ok", "running, 1 model downloaded"),
     ]
     assert [(check.part, check.action) for check in checks] == [
@@ -188,7 +188,7 @@ def test_with_no_model_the_engines_say_what_could_think(tmp_path: Path) -> None:
     platform = FakePlatform(ollama=None, commands=set())
     checks = _models(tmp_path, "", platform, keys)
     assert checks[1:] == [
-        Check("ollama", "warn", "Ollama is not installed", "golem, then pick On this Mac"),
+        Check("ollama", "warn", "Ollama is not installed", "golem tui, then pick On this Mac"),
         Check("anthropic", "ok", "API key in the Keychain"),
     ]
     assert checks[1].action == "install_ollama"
@@ -204,7 +204,7 @@ def test_a_default_that_does_not_resolve_fails(tmp_path: Path) -> None:
             "model",
             "fail",
             unknown_provider_message("nowhere"),
-            "golem, then pick another with /setup",
+            "golem tui, then pick another with /setup",
         ),
         Check("ollama", "ok", "running, 1 model downloaded"),
     ]
@@ -248,7 +248,7 @@ def test_a_stopped_ollama_golem_may_not_start_fails_with_a_fix(tmp_path: Path) -
 @pytest.mark.parametrize(
     ("config", "fix"),
     [
-        ("", "golem, then /setup installs it, or brew install ollama"),
+        ("", "golem tui, then /setup installs it, or brew install ollama"),
         ("[ollama]\nstart = false\n", "brew install ollama && brew services start ollama"),
     ],
 )

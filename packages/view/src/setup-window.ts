@@ -671,7 +671,7 @@ export function pageHostLines(kept: boolean | null): SetupLine[] {
   if (kept === null) return [];
   if (kept) return [{ kind: "status", mark: "ok", text: "kept running · starts at login" }];
   return [
-    { kind: "status", mark: "attn", text: "runs only while a terminal runs golem web" },
+    { kind: "status", mark: "attn", text: "runs only while a terminal runs golem" },
     { kind: "text", text: "To keep it running at login, run this in a terminal:" },
   ];
 }

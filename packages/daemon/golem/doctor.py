@@ -417,14 +417,19 @@ def disk_check(paths: GolemPaths, platform: Platform) -> Check:
 def _unresolved(name: str, default: bool, settings: GolemSettings, exc: ModelConfigError) -> Check:
     if default and settings.default_model is None:
         return Check(
-            "model", "warn", "no model chosen yet", "golem, then pick one", "model", "pick_model"
+            "model",
+            "warn",
+            "no model chosen yet",
+            "golem tui, then pick one",
+            "model",
+            "pick_model",
         )
     label = "model" if default else f"model {name}"
     return Check(
         label,
         "fail",
         str(exc),
-        "golem, then pick another with /setup",
+        "golem tui, then pick another with /setup",
         "model",
         "pick_model",
         name,
@@ -452,7 +457,7 @@ def _engines(router: ModelRouter, platform: Platform, keys: KeyStore, start: boo
                     "ollama",
                     "warn",
                     "Ollama is not installed",
-                    "golem, then pick On this Mac",
+                    "golem tui, then pick On this Mac",
                     "engine",
                     "install_ollama",
                 )
@@ -523,7 +528,7 @@ def _ollama_down(name: str, base: str, platform: Platform, start: bool) -> Check
     if not platform.ollama_installed():
         # golem installs Ollama from /setup, and only starts it when it may.
         fix = (
-            "golem, then /setup installs it, or brew install ollama"
+            "golem tui, then /setup installs it, or brew install ollama"
             if start
             else "brew install ollama && brew services start ollama"
         )

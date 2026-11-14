@@ -32,7 +32,7 @@ test("an expired cookie asks for a fresh link", async ({ page, rig, tolerate }) 
 test("an older daemon is named", async ({ page, rig, tolerate }) => {
   tolerate.push(...STOPPED);
   const home = rig.home();
-  // `golem web` refuses to start on an older daemon, so start it on a current one and swap.
+  // `golem` refuses to start on an older daemon, so start it on a current one and swap.
   const daemon = await startDaemon(home);
   const gateway = rig.own(await startGateway(home));
   await page.goto(gateway.url);
@@ -66,7 +66,7 @@ test("the gateway goes down", async ({ page, rig, tolerate }) => {
   await page.goto(gateway.url);
   await expect(page.getByText("connected", { exact: true })).toBeVisible();
   await gateway.stop();
-  await expect(page.getByRole("heading", { name: "golem web is not running" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "The golem page is not running" })).toBeVisible();
 });
 
 test("the dev server proxies to the gateway", async ({ page, rig }) => {

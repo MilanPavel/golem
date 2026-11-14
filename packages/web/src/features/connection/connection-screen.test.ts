@@ -21,7 +21,7 @@ test("unauthorized", () => {
     kind: "unauthorized",
     tag: "unauthorized",
     heading: "This page needs a fresh link",
-    command: "golem web",
+    command: "golem",
     golem: "offline",
   });
 });
@@ -56,8 +56,8 @@ test("reconnecting with another code means the gateway is down", () => {
   expect(screen({ status: "reconnecting", attempt: 2, delayMs: 1000, closeCode: 1006 })).toMatchObject({
     kind: "gateway-down",
     tag: "reconnecting · attempt 2",
-    heading: "golem web is not running",
-    command: "golem web",
+    heading: "The golem page is not running",
+    command: "golem",
     golem: "offline",
   });
 });
@@ -70,8 +70,8 @@ test("closed means the gateway is down", () => {
   expect(screen({ status: "closed", reason: "closed" })).toMatchObject({
     kind: "gateway-down",
     tag: "closed",
-    heading: "golem web is not running",
-    command: "golem web",
+    heading: "The golem page is not running",
+    command: "golem",
   });
 });
 
@@ -96,22 +96,22 @@ test("a kept gateway that is reconnecting is restarting by itself: no command", 
 
 test("a kept gateway that stays down past the grace shows today's screen with the logs", () => {
   expect(withHost(true, true)).toMatchObject({
-    heading: "golem web is not running",
-    command: "golem web",
-    extras: [{ sentence: null, command: "golem web logs" }],
+    heading: "The golem page is not running",
+    command: "golem",
+    extras: [{ sentence: null, command: "tail ~/.golem/logs/web.stderr.log" }],
   });
 });
 
 test("a gateway with no job shows today's screen and golem install to keep it", () => {
   expect(withHost(false)).toMatchObject({
-    heading: "golem web is not running",
-    command: "golem web",
+    heading: "The golem page is not running",
+    command: "golem",
     extras: [{ sentence: "Keeps golem and this page running, even after a restart.", command: "golem install" }],
   });
 });
 
 test("an unknown job shows today's screen alone, and the daemon's screen ignores the job", () => {
-  expect(withHost(null)).toMatchObject({ heading: "golem web is not running", extras: [] });
+  expect(withHost(null)).toMatchObject({ heading: "The golem page is not running", extras: [] });
   const daemon = connectionScreen({ state: { ...down, closeCode: 1013 }, daemonVersion: null }, { kept: true, overdue: false });
   expect(daemon).toMatchObject({ kind: "daemon-down", command: "golem daemon start", extras: [] });
 });
