@@ -8,6 +8,9 @@ page, with the daemon refusing edits that move a secret or widen trust
 (ADR-037). The gateway's allowlist is generated from this table (``just gen``
 writes ``gen/browser-methods.ts``), and a daemon test fails for any method that
 is missing here. ADR-028 and ADR-037 are the reference.
+
+A browser may edit user skills, and project skills only in a trusted project. The
+``_protected`` skill methods are ``"local"`` and skip that check (ADR-054).
 """
 
 from collections.abc import Mapping
@@ -65,6 +68,12 @@ METHOD_ACCESS: Final[Mapping[str, Access]] = {
     "config.raw.set": "browser",
     "config.raw.set_protected": "local",
     "skill.list": "browser",
+    "skill.read": "browser",
+    "skill.write": "browser",
+    "skill.write_protected": "local",
+    "skill.create": "browser",
+    "skill.create_protected": "local",
+    "skill.set_disabled": "browser",
     "session.set_skills": "browser",
     "model.probe": "browser",
     "model.pull": "browser",

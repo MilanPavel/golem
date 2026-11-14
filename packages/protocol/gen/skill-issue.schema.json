@@ -1,0 +1,28 @@
+{
+  "additionalProperties": false,
+  "description": "One problem in a ``SKILL.md``. ``line`` counts from 1, when known.",
+  "properties": {
+    "line": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Line"
+    },
+    "message": {
+      "title": "Message",
+      "type": "string"
+    }
+  },
+  "required": [
+    "message"
+  ],
+  "title": "SkillIssue",
+  "type": "object"
+}

@@ -168,6 +168,34 @@ def set_permission_mode(config_file: Path, mode: PermissionMode) -> int:
     return write_raw(config_file, tomlkit.dumps(document), mtime)
 
 
+def set_skill_disabled(config_file: Path, name: str, disabled: bool) -> None:
+    """Add ``name`` to ``[skills] disabled``, or take it out. Creates the file when it is missing.
+
+    A list left empty is removed, and so is ``[skills]`` once it is empty.
+    """
+    document = _read(config_file)
+    skills = _sub_table(document, "skills", create=disabled)
+    current = cast(object, skills.get("disabled")) if skills is not None else None  # pyright: ignore[reportUnknownMemberType]
+    names = [str(item) for item in cast(list[object], current)] if isinstance(current, list) else []
+    if disabled == (name in names):
+        return
+    if disabled:
+        assert skills is not None
+        if isinstance(current, list):
+            current.append(name)  # pyright: ignore[reportUnknownMemberType]
+        else:
+            skills["disabled"] = [name]
+    else:
+        assert skills is not None
+        assert isinstance(current, list)
+        current.remove(name)  # pyright: ignore[reportUnknownMemberType]
+        if not current:
+            del skills["disabled"]
+        if not skills:
+            del document["skills"]
+    _write(config_file, document)
+
+
 def add_rule(config_file: Path, rule: PolicyRule) -> None:
     """Put ``rule`` first in the file's ``[[rule]]`` list, so it wins over the others."""
     document = _read(config_file)

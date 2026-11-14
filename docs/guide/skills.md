@@ -64,6 +64,17 @@ Type `/release-notes v0.5`. The model gets that skill's instructions, with `v0.5
 - If you delete or break it, golem says so once, shows `terse (skipped)`, and goes on without it. It stays pinned, so fixing the file brings it back.
 - A pinned skill's own files, such as `references/`, are readable while it is pinned.
 
+## Edit, create, or turn one off
+
+A client (the web app, and later the terminal) edits a skill through the daemon, which checks the text the way `golem skills check` does before it writes.
+
+- **Edit.** `skill.read` returns the file's text and its `mtime_ns`. `skill.write` takes the new text with that `mtime_ns`. If the file changed since you read it, the write is refused and nothing changes. `dry_run` only checks. A mistake comes back with its line number. Without `dry_run` the text is saved even with a mistake, and the skill lists as broken until it is fixed.
+- **Create.** `skill.create` makes `~/.golem/skills/<name>/SKILL.md` for you, or `<project>/.agents/skills/<name>/SKILL.md` for a project, with a `name` and a `description`. A name that is taken, or that is not lowercase letters, digits and single hyphens, is refused.
+- **Turn off.** `skill.set_disabled` adds the name to `[skills] disabled` in `config.toml`, or takes it out, and keeps your comments there. The skill stays in the list, marked off.
+- Only a `SKILL.md` in a folder golem reads can be written. A bundled skill, a path outside those folders, and a symlink are refused.
+- Every change shows in the skill list at once, with no restart.
+- The browser edits your own skills. It edits a project's skills only in a project listed in `trusted_projects`. In any other project the browser can read a skill, and the terminal can still write it. Writing a skill never trusts it. See [ADR-054](../adr/054-browser-edits-skills.md).
+
 ## What works today, and what is next
 
 golem finds, checks, lists, runs, and pins skills, and lets a skill read its own files. Letting the model pick a skill by itself when the task fits is the next step of [Phase 2](https://github.com/MilanPavel/golem/issues/10). How it works inside is in [Skills](../architecture/skills.md) and [Context](../architecture/context.md).

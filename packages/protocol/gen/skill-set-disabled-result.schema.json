@@ -1,0 +1,19 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "disabled": {
+      "title": "Disabled",
+      "type": "boolean"
+    },
+    "name": {
+      "title": "Name",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "disabled"
+  ],
+  "title": "SkillSetDisabledResult",
+  "type": "object"
+}
