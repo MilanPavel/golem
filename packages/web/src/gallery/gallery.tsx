@@ -3,10 +3,11 @@ import { createContext, useContext, useEffect, useId, useState, type ReactNode }
 import { Badge } from "../ui/badge.tsx";
 import { Button } from "../ui/button.tsx";
 import { Card } from "../ui/card.tsx";
+import { CopyButton, CopyCommand } from "../ui/copy-command.tsx";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "../ui/dialog.tsx";
 import { GOLEM_STATE_LABEL, type GolemState } from "../ui/golem-state.ts";
 import { IconButton } from "../ui/icon-button.tsx";
-import { ChevronDownIcon, CloseIcon, CopyIcon, PlusIcon, SearchIcon, SendIcon, StopIcon } from "../ui/icons.tsx";
+import { CheckIcon, ChevronDownIcon, CloseIcon, CopyIcon, PlusIcon, SearchIcon, SendIcon, StopIcon } from "../ui/icons.tsx";
 import { Input } from "../ui/input.tsx";
 import { Kbd } from "../ui/kbd.tsx";
 import { Menu, MenuContent, MenuItem, MenuLabel, MenuSeparator, MenuTrigger } from "../ui/menu.tsx";
@@ -768,9 +769,14 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
         <IconButton label="More"><ChevronDownIcon /></IconButton>
         <IconButton label="Send"><SendIcon /></IconButton>
         <IconButton label="Stop"><StopIcon /></IconButton>
-        <IconButton label="Copy"><CopyIcon /></IconButton>
         <IconButton label="Search"><SearchIcon /></IconButton>
         <IconButton label="Disabled" disabled><CopyIcon /></IconButton>
+      </Group>
+
+      <Group title="Copy">
+        <CopyButton text="golem install" label="command" />
+        <IconButton label="Copied"><CheckIcon className="text-allow" /></IconButton>
+        <CopyCommand command="golem install" />
       </Group>
 
       <section className="mt-6" id={anchor("Connection screens")}>

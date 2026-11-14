@@ -1,38 +1,13 @@
-import { useEffect, useRef, useState } from "react";
-import { Button } from "../../ui/button.tsx";
 import { Card } from "../../ui/card.tsx";
-import { CopyIcon } from "../../ui/icons.tsx";
+import { CopyButton } from "../../ui/copy-command.tsx";
 import { PixelGolem } from "../../ui/pixel-golem.tsx";
 import type { ScreenSpec } from "./connection-screen.ts";
 
-const COPIED_MS = 2000;
-
 function CommandRow({ command }: { command: string }) {
-  const [copied, setCopied] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  useEffect(() => () => clearTimeout(timer.current), []);
-
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(command);
-    } catch {
-      return;
-    }
-    setCopied(true);
-    clearTimeout(timer.current);
-    timer.current = setTimeout(() => setCopied(false), COPIED_MS);
-  }
-
   return (
-    <div className="flex max-w-full items-center gap-3 rounded-md border border-line-strong bg-code-bg py-2 pr-2 pl-3.5 font-mono text-sm">
+    <div className="flex max-w-full items-center gap-2 rounded-md border border-line-strong bg-code-bg py-1.5 pr-1.5 pl-3.5 font-mono text-sm">
       <code className="overflow-x-auto whitespace-nowrap">{command}</code>
-      <Button size="sm" aria-label={copied ? "Copied" : "Copy command"} onClick={() => void copy()}>
-        <CopyIcon />
-        {copied ? "Copied" : "Copy"}
-      </Button>
-      <span role="status" className="sr-only">
-        {copied ? "Copied to clipboard" : ""}
-      </span>
+      <CopyButton text={command} label="command" />
     </div>
   );
 }
