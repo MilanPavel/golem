@@ -237,6 +237,8 @@ golem mcp login linear
 
 In the chat, a server that needs a sign-in shows `!` and `Sign in needed` in `/mcp`, and the status line shows `mcp ! sign in: <name>`. Open the server and choose **Sign in**: golem opens your browser, shows the address (and copies it) in case it does not open, and tells you when you are signed in. Adding an OAuth server from `/mcp add` or the setup window's Tools panel goes straight on to the sign-in. A server you are signed in to has **Sign out** on its page.
 
+In the browser, open Settings → MCP servers. A server that needs a sign-in has an amber square and "needs sign-in". Open it and press **Sign in**: golem opens the sign-in page in a new tab, and the row says "Waiting for the sign-in…" until you finish there. Then it says "Signed in to linear" and the server's tools appear in its Tools tab. If the sign-in fails or times out the row says why, and **Try again** starts over. **Sign out** is in the ⋯ menu of a server that signs in.
+
 ## When a server doesn't work
 
 `golem doctor --mcp` tries each server that is not turned off, the way golem starts it, and prints one line for each with what stopped it and what to do:

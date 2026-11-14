@@ -1072,3 +1072,99 @@ test("axe finds nothing on the config editor, with a problem and the diff, in bo
     unmount();
   }
 });
+
+const linear: McpServer = {
+  name: "linear",
+  state: "needs_auth",
+  command: "https://mcp.linear.app/mcp",
+  error: "signed out",
+  config: "/Users/me/.golem/config.toml",
+  on_demand: false,
+  enabled: null,
+};
+
+test("a server that needs a sign-in says so in its row and detail, with a Sign in button", async () => {
+  const { user } = mount("/settings/mcp", [linear]);
+  const open = await screen.findByRole("button", { name: /linear/ });
+  expect(open.textContent).toContain("Sign in needed");
+  await user.click(open);
+  expect(screen.getByText("linear needs a sign-in.")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Sign in" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Start" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Reconnect" })).toBeNull();
+});
+
+test("Sign in calls mcp.login, opens the address in a new tab, and waits until it is done", async () => {
+  const opened = vi.fn();
+  vi.stubGlobal("open", opened);
+  const { fake, user } = mount("/settings/mcp", [linear]);
+  await user.click(await screen.findByRole("button", { name: /linear/ }));
+  await user.click(screen.getByRole("button", { name: "Sign in" }));
+  expect(fake.raw.mcpLogin).toHaveBeenCalledWith("linear", undefined);
+  await waitFor(() => expect(opened).toHaveBeenCalledWith("https://auth.example/authorize?state=x", "_blank", "noopener,noreferrer"));
+  expect((await screen.findAllByText(/Waiting for the sign-in…/)).length).toBeGreaterThan(0);
+  expect(screen.getByRole("link", { name: "Open the sign-in page" }).getAttribute("href")).toBe("https://auth.example/authorize?state=x");
+  expect(screen.queryByRole("button", { name: "Sign in" })).toBeNull();
+});
+
+test("a finished sign-in says Signed in once the server runs, and its tools show", async () => {
+  vi.stubGlobal("open", vi.fn());
+  const { fake, user } = mount("/settings/mcp", [linear], null, false, (made) => {
+    made.raw.mcpTools.mockResolvedValue({ name: "linear", tools: [{ name: "mcp__linear__list_issues", description: "Lists issues." }] });
+  });
+  await user.click(await screen.findByRole("button", { name: /linear/ }));
+  await user.click(screen.getByRole("button", { name: "Sign in" }));
+  await screen.findAllByText(/Waiting for the sign-in…/);
+  fake.raw.listMcp.mockResolvedValue({ servers: [{ ...linear, state: "running", error: null, tools: ["mcp__linear__list_issues"] }] });
+  act(() => {
+    fake.emitMcpLoginDone({ name: "linear", ok: true });
+    fake.emitMcp();
+  });
+  expect(await screen.findByText("Signed in to linear")).toBeTruthy();
+  expect(await screen.findByText("list_issues")).toBeTruthy();
+});
+
+test("a sign-in that fails says why and offers Try again", async () => {
+  vi.stubGlobal("open", vi.fn());
+  const { fake, user } = mount("/settings/mcp", [linear]);
+  await user.click(await screen.findByRole("button", { name: /linear/ }));
+  await user.click(screen.getByRole("button", { name: "Sign in" }));
+  await screen.findAllByText(/Waiting for the sign-in…/);
+  act(() => {
+    fake.emitMcpLoginDone({ name: "linear", ok: false, error: "the sign-in timed out" });
+  });
+  expect((await screen.findAllByText("the sign-in timed out")).length).toBeGreaterThan(0);
+  expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
+});
+
+test("a sign-in the daemon refuses to start shows its message", async () => {
+  vi.stubGlobal("open", vi.fn());
+  const { fake, user } = mount("/settings/mcp", [linear]);
+  fake.raw.mcpLogin.mockRejectedValue(new Error("no such server"));
+  await user.click(await screen.findByRole("button", { name: /linear/ }));
+  await user.click(screen.getByRole("button", { name: "Sign in" }));
+  expect((await screen.findAllByText(/no such server/)).length).toBeGreaterThan(0);
+});
+
+test("Sign out is in the menu of a server that signs in, and calls mcp.logout", async () => {
+  const signedIn: McpServer = { ...linear, state: "running", error: null, tools: ["mcp__linear__list_issues"] };
+  const { fake, user } = mount("/settings/mcp", [signedIn], null, false, (made) => {
+    made.raw.mcpCatalog.mockResolvedValue({
+      entries: [{ id: "linear", name: "linear", title: "Linear", description: "Issues.", category: "productivity", homepage: "https://linear.app", runtime: "url", auth: "oauth", added: true }],
+    });
+  });
+  await user.click(await screen.findByRole("button", { name: /linear/ }));
+  await waitFor(() => expect(fake.raw.mcpCatalog).toHaveBeenCalled());
+  await user.click(screen.getByRole("button", { name: "More actions for linear" }));
+  await user.click(await screen.findByRole("menuitem", { name: "Sign out" }));
+  expect(fake.raw.mcpLogout).toHaveBeenCalledWith("linear", undefined);
+  expect(await screen.findByText("signed out of linear")).toBeTruthy();
+});
+
+test("a server that does not sign in has no Sign out", async () => {
+  const { user } = mount("/settings/mcp", [github]);
+  await user.click(await screen.findByRole("button", { name: /github/ }));
+  await user.click(screen.getByRole("button", { name: "More actions for github" }));
+  await screen.findByRole("menuitem", { name: "Remove" });
+  expect(screen.queryByRole("menuitem", { name: "Sign out" })).toBeNull();
+});

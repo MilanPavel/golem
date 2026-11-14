@@ -1,6 +1,6 @@
-import type { McpImportApplyResult, McpImportScanResult, McpCatalogEntry, McpCatalogResult, McpCallResult, McpLogsResult, McpServer, McpServerLog, McpTestProgress, McpTestResult, McpToolsResult } from "@golem/client";
+import type { McpLoginDone, McpImportApplyResult, McpImportScanResult, McpCatalogEntry, McpCatalogResult, McpCallResult, McpLogsResult, McpServer, McpServerLog, McpTestProgress, McpTestResult, McpToolsResult } from "@golem/client";
 
-export type { McpImportApplyResult, McpImportScanResult, McpCatalogEntry, McpCatalogResult, McpCallResult, McpLogsResult, McpServer, McpServerLog, McpTestProgress, McpTestResult, McpToolsResult };
+export type { McpLoginDone, McpImportApplyResult, McpImportScanResult, McpCatalogEntry, McpCatalogResult, McpCallResult, McpLogsResult, McpServer, McpServerLog, McpTestProgress, McpTestResult, McpToolsResult };
 
 /** The query key of `mcp.tools`. Hiding a tool, and `mcp.server.status`, mark it stale. */
 export const MCP_TOOLS_KEY = ["mcp.tools"] as const;

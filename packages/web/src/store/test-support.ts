@@ -1,4 +1,4 @@
-import { OLLAMA_FAILED, RpcError, SESSION_BUSY, type ChatEvent, type ConnectionState, type OllamaInstallUpdate, type RuntimeInstallUpdate, type McpServerLog, type ModelServerStatus, type PullUpdate, type SessionSummary } from "@golem/client";
+import { OLLAMA_FAILED, RpcError, SESSION_BUSY, type ChatEvent, type ConnectionState, type OllamaInstallUpdate, type RuntimeInstallUpdate, type McpServerLog, type McpLoginDone, type ModelServerStatus, type PullUpdate, type SessionSummary } from "@golem/client";
 import { vi } from "vitest";
 import type { ModelListResult } from "./models.ts";
 import type { PageClient } from "./page.ts";
@@ -79,6 +79,7 @@ export function fakeClient() {
   const skills = listeners<string | null>();
   const mcp = listeners<unknown>();
   const mcpLog = listeners<McpServerLog>();
+  const mcpLogin = listeners<McpLoginDone>();
   const runtime = listeners<RuntimeInstallUpdate>();
   const pull = listeners<PullUpdate>();
   const server = listeners<ModelServerStatus>();
@@ -130,8 +131,11 @@ export function fakeClient() {
     mcpTest: vi.fn<PageClient["mcpTest"]>(async () => ({ test_id: "t", ok: true, steps: [], tools: [], stderr_tail: [] })),
     mcpLogs: vi.fn<PageClient["mcpLogs"]>(async (name) => ({ name, lines: [] })),
     onMcpLog: mcpLog.on,
+    mcpLogin: vi.fn<PageClient["mcpLogin"]>(async (name) => ({ name, authorize_url: "https://auth.example/authorize?state=x" })),
+    mcpLogout: vi.fn<PageClient["mcpLogout"]>(async () => ({}) as never),
+    onMcpLoginDone: mcpLogin.on,
     mcpCall: vi.fn<PageClient["mcpCall"]>(async () => ({ text: "", is_error: false })),
-    mcpGet: vi.fn<PageClient["mcpGet"]>(async () => ({}) as never),
+    mcpGet: vi.fn<PageClient["mcpGet"]>(async () => ({ config: {} }) as never),
     addMcpServer: vi.fn<PageClient["addMcpServer"]>(async () => ({}) as never),
     configRawGet: vi.fn<PageClient["configRawGet"]>(async () => ({ exists: true, mtime_ns: 1, path: "/Users/me/.golem/config.toml", text: "" })),
     configRawSet: vi.fn<PageClient["configRawSet"]>(async () => ({ ok: true, mtime_ns: 2 })),
@@ -173,6 +177,7 @@ export function fakeClient() {
       skills.emit(root);
     },
     emitMcpLog: mcpLog.emit,
+    emitMcpLoginDone: mcpLogin.emit,
     emitRuntime: runtime.emit,
     emitMcp: () => {
       mcp.emit({});

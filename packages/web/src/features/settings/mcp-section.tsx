@@ -2,7 +2,7 @@ import {
   detailChoices,
   formatSeconds,
   mcpStatusWord,
-  mcpSummary,
+  signsIn,
   ONLY_WHEN_ASKED,
   MCP_HINT,
   orderedServers,
@@ -13,7 +13,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { actionErrorText } from "../../store/errors.ts";
 import type { McpServer } from "../../store/mcp.ts";
-import { useMcpList, useMcpTools, usePageActions } from "../../store/page-context.tsx";
+import { useMcpCatalog, useMcpList, useMcpTools, usePageActions } from "../../store/page-context.tsx";
 import { AddDialog } from "./mcp/add-dialog.tsx";
 import { BrandIcon } from "./mcp/brand-icon.tsx";
 import { CatalogPanel } from "./mcp/catalog-panel.tsx";
@@ -21,6 +21,7 @@ import { ImportPanel } from "./mcp/import-panel.tsx";
 import { EditServer } from "./mcp/edit-form.tsx";
 import { LogsView } from "./mcp/logs-view.tsx";
 import { TestView } from "./mcp/test-view.tsx";
+import { Dot, needsAuth, serverKey, serverSummary, SignInPanel, useSignIns, type Login, type SignIns } from "./mcp/sign-in.tsx";
 import { NotRunning, ToolsTab, TryTab } from "./mcp/tools-tab.tsx";
 import { Button } from "../../ui/button.tsx";
 import { cn } from "../../ui/cn.ts";
@@ -34,26 +35,6 @@ import { mcpAddRequestStore, useMcpAddRequest } from "./mcp-add-request.ts";
 
 type Selected = { name: string; project: string | null };
 type View = { kind: "list" } | { kind: "detail"; at: Selected };
-
-/** The square mark of a server's state; its word is always written beside it. */
-function dotLook(server: McpServer): string {
-  switch (server.state) {
-    case "running":
-      return "bg-allow";
-    case "failed":
-      return "bg-deny";
-    case "starting":
-      return "bg-wait";
-    case "disabled":
-      return "bg-line-strong";
-    default:
-      return "border border-faint";
-  }
-}
-
-function Dot({ server }: { server: McpServer }) {
-  return <span aria-hidden="true" className={cn("size-2 shrink-0 rounded-xs", dotLook(server))} />;
-}
 
 const DEFAULT_FILE = "~/.golem/config.toml";
 
@@ -71,7 +52,7 @@ function tilde(path: string): string {
 }
 
 function keyOf(server: McpServer): string {
-  return `${server.project ?? ""}\u0000${server.name}`;
+  return serverKey(server.name, server.project);
 }
 
 type Page = "installed" | "catalog" | "import";
@@ -141,6 +122,7 @@ export function McpSection() {
 
 function Installed({ sessionId, added, onCatalog }: { sessionId: string | null; added: string | null; onCatalog: () => void }) {
   const list = useMcpList(sessionId);
+  const signIns = useSignIns();
   const narrow = useNarrow();
   const [view, setView] = useState<View>({ kind: "list" });
   const rows = useRef(new Map<string, HTMLButtonElement>());
@@ -189,6 +171,7 @@ function Installed({ sessionId, added, onCatalog }: { sessionId: string | null; 
       wide={wide}
       selected={wide ? at : null}
       session={sessionId !== null}
+      logins={signIns.logins}
       onCatalog={onCatalog}
       onOpen={open}
     />
@@ -200,7 +183,7 @@ function Installed({ sessionId, added, onCatalog }: { sessionId: string | null; 
     back.current = keyOf(server);
     setView({ kind: "list" });
   };
-  const content = <Detail key={keyOf(server)} server={server} sessionId={sessionId} onBack={wide ? null : leave} />;
+  const content = <Detail key={keyOf(server)} server={server} sessionId={sessionId} signIns={signIns} onBack={wide ? null : leave} />;
   if (!wide) {
     // A narrow window shows the list, or the details in its place.
     return view.kind === "list" || pickedServer === undefined ? listPane : content;
@@ -220,6 +203,7 @@ function ServerList({
   wide,
   selected,
   session,
+  logins,
   onCatalog,
   onOpen,
 }: {
@@ -229,6 +213,7 @@ function ServerList({
   wide: boolean;
   selected: Selected | null;
   session: boolean;
+  logins: ReadonlyMap<string, Login>;
   onCatalog: () => void;
   onOpen: (server: McpServer) => void;
 }) {
@@ -282,7 +267,7 @@ function ServerList({
           <ul className={cn("flex flex-col", wide ? "gap-0.5" : "gap-2")}>
             {group.servers.map((server) => {
               const current = selected !== null && same(server, selected);
-              const summary = mcpSummary(server, session);
+              const summary = serverSummary(server, session, logins.get(keyOf(server)));
               // "on demand" or "disabled" with nothing more to say is already the word beside the name.
               const second = summary === mcpStatusWord(server) ? null : summary;
               return (
@@ -309,7 +294,7 @@ function ServerList({
                       </span>
                     </span>
                     {second === null ? null : (
-                      <span className={cn("min-w-0 font-mono text-xs wrap-anywhere", server.state === "failed" ? "text-deny" : "text-muted", wide ? "pl-4" : "flex-1")}>
+                      <span className={cn("min-w-0 font-mono text-xs wrap-anywhere", server.state === "failed" || logins.get(keyOf(server))?.kind === "failed" ? "text-deny" : "text-muted", wide ? "pl-4" : "flex-1")}>
                         {second}
                       </span>
                     )}
@@ -331,7 +316,7 @@ function isAction(choice: DetailChoice): choice is Choice {
   return typeof choice.action === "object";
 }
 
-function Detail({ server, sessionId, onBack }: { server: McpServer; sessionId: string | null; onBack: (() => void) | null }) {
+function Detail({ server, sessionId, signIns, onBack }: { server: McpServer; sessionId: string | null; signIns: SignIns; onBack: (() => void) | null }) {
   const actions = usePageActions();
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -347,8 +332,15 @@ function Detail({ server, sessionId, onBack }: { server: McpServer; sessionId: s
   const file = server.config ?? DEFAULT_FILE;
   // Without a session there is no chat to turn a server on for, so those choices are not offered.
   const shown = sessionId === null ? { ...server, on_demand: false } : server;
-  const choices = detailChoices(shown).filter(isAction);
-  const restart = choices.find((choice) => choice.action.kind === "restart");
+  // Sign out is offered where the list can tell the server signs in: it waits for one, or it is an added OAuth catalog entry.
+  const catalog = useMcpCatalog(sessionId);
+  const choices = detailChoices(shown, signsIn(server, catalog.data?.entries ?? null)).filter(isAction);
+  const signedOut = needsAuth(server);
+  // A server that needs a sign-in starts by signing in, not by Reconnect.
+  const restart = signedOut ? undefined : choices.find((choice) => choice.action.kind === "restart");
+  const signOutChoice = choices.find((choice) => choice.action.kind === "logout");
+  const login = signIns.logins.get(keyOf(server));
+  const signIn = (): void => signIns.start(server, sessionId);
   const session = choices.find((choice) => choice.action.kind === "session");
   // Where the server runs: only the other places are offered.
   const mode: "off" | "on_demand" | "every" = server.state === "disabled" ? "off" : server.on_demand ? "on_demand" : "every";
@@ -373,6 +365,14 @@ function Detail({ server, sessionId, onBack }: { server: McpServer; sessionId: s
           setNotice(
             `${action.name} is ${action.enabled === false ? "disabled everywhere" : action.enabled === true ? "on for every chat" : "on demand"}`,
           );
+          break;
+        case "login":
+          signIn();
+          break;
+        case "logout":
+          await actions.logoutMcp(action.name, sessionId);
+          signIns.forget(server);
+          setNotice(`signed out of ${action.name}`);
           break;
         case "session":
           if (sessionId === null) return;
@@ -471,6 +471,7 @@ function Detail({ server, sessionId, onBack }: { server: McpServer; sessionId: s
                 {choice.label}
               </MenuItem>
             ))}
+            {signOutChoice === undefined ? null : <MenuItem onSelect={() => press(signOutChoice)}>{signOutChoice.label}</MenuItem>}
             {more.length > 0 && removable ? <MenuSeparator /> : null}
             {removable ? (
               <MenuItem className="text-deny" onSelect={() => setRemoving(true)}>
@@ -481,7 +482,7 @@ function Detail({ server, sessionId, onBack }: { server: McpServer; sessionId: s
         </Menu>
       </div>
       <p role="status" aria-live="polite" className="font-mono text-xs text-muted empty:hidden">
-        {shownNotice}
+        {login?.kind === "done" && !signedOut ? login.text : shownNotice}
       </p>
       {error === null ? null : (
         <p role="alert" className="text-sm text-deny">
@@ -496,7 +497,9 @@ function Detail({ server, sessionId, onBack }: { server: McpServer; sessionId: s
           {editable ? <TabsTrigger value="edit">Edit</TabsTrigger> : null}
         </TabsList>
         <TabsContent value="tools">
-          {running ? (
+          {signedOut ? (
+            <SignInPanel name={server.name} login={login} onSignIn={signIn} />
+          ) : running ? (
             <ToolsTab
               server={server}
               sessionId={sessionId}
@@ -511,7 +514,9 @@ function Detail({ server, sessionId, onBack }: { server: McpServer; sessionId: s
           )}
         </TabsContent>
         <TabsContent value="try">
-          {running ? (
+          {signedOut ? (
+            <SignInPanel name={server.name} login={login} onSignIn={signIn} />
+          ) : running ? (
             <TryTab server={server} sessionId={sessionId} tools={tools} chosen={trying} onChoose={setTrying} />
           ) : (
             <NotRunning server={server} sessionId={sessionId} onStart={start} />
