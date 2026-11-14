@@ -223,7 +223,7 @@ async def test_pins_survive_a_restart_and_show_in_inspect(short_home: Path) -> N
         await client.call("session.attach", {"session_id": session_id, "after_seq": 0})
         await client.call("message.send", {"session_id": session_id, "text": "hello"})
         await client.wait_for_event("run.completed")
-        assert model.seen[0][0].endswith('<skill name="terse">\nAnswer in one line.\n</skill>')
+        assert '<skill name="terse">\nAnswer in one line.\n</skill>' in model.seen[0][0]
     finally:
         await client.close()
         await stop_daemon(app, task)

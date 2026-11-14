@@ -1,0 +1,3 @@
+[
+  {"prompt": "Look at the CLAUDE.md in this folder and tell me how good it is, then improve it.", "expect": "claude-md-improver"}
+]
