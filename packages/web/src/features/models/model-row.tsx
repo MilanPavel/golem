@@ -27,7 +27,7 @@ function reason(model: ListedModel, providerMissing: boolean): ReactNode {
     case "not_installed":
       return providerMissing ? (
         <>
-          Ollama is not installed. Run <Command>golem</Command>, then <Command>/setup</Command>.
+          Ollama is not installed. Run <Command>golem tui</Command>, then <Command>/setup</Command>.
         </>
       ) : (
         "Not downloaded yet"

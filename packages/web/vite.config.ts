@@ -75,7 +75,7 @@ function loginLink(): Plugin {
             const token = await readTokenFile(resolveRunDir());
             server.config.logger.info(`golem web dev: ${url}/#t=${token}`);
           } catch {
-            server.config.logger.info("golem web dev: start golem web first, then restart this dev server");
+            server.config.logger.info("golem web dev: start golem first, then restart this dev server");
           }
         })();
       });

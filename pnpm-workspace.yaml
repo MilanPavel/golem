@@ -1,6 +1,7 @@
 packages:
   - "packages/client"
   - "packages/gateway"
+  - "packages/relay"
   - "packages/cli"
   - "packages/tui"
   - "packages/view"

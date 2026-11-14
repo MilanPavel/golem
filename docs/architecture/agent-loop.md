@@ -106,7 +106,7 @@ Two model calls, one tool call, one answer. Lines 4 to 8 are one trip round the 
 
 ## Try it
 
-1. Open the chat in a project folder with `golem`, and type `/debug wire`. A panel opens with every event as it arrives.
+1. Open the chat in a project folder with `golem tui`, and type `/debug wire`. A panel opens with every event as it arrives.
 2. Ask: `What is in the README? Read it first.`
 3. Watch the panel: `run.started`, a `message.completed` with empty text, then `tool.requested read_file`, `tool.started`, and `tool.completed`. That is one trip round the loop. Then a second `message.started`, the `message.delta` lines of the answer, and `run.completed`.
 4. Press **Ctrl-O** to see what the tool returned, which is what the model read.

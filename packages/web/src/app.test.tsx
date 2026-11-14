@@ -29,7 +29,7 @@ const noContrast = {
 
 const CASES: [string, ConnectionSnapshot, string, string | null][] = [
   ["connecting", { state: { status: "connecting" }, daemonVersion: null }, "Connecting to golem", null],
-  ["unauthorized", { state: { status: "unauthorized" }, daemonVersion: null }, "This page needs a fresh link", "golem web"],
+  ["unauthorized", { state: { status: "unauthorized" }, daemonVersion: null }, "This page needs a fresh link", "golem"],
   [
     "rejected",
     { state: { status: "rejected", reason: "protocol major mismatch: client 2, daemon 1" }, daemonVersion: null },
@@ -45,10 +45,10 @@ const CASES: [string, ConnectionSnapshot, string, string | null][] = [
   [
     "gateway down",
     { state: { status: "reconnecting", attempt: 1, delayMs: 1000 }, daemonVersion: null },
-    "golem web is not running",
-    "golem web",
+    "The golem page is not running",
+    "golem",
   ],
-  ["closed", { state: { status: "closed", reason: "closed" }, daemonVersion: null }, "golem web is not running", "golem web"],
+  ["closed", { state: { status: "closed", reason: "closed" }, daemonVersion: null }, "The golem page is not running", "golem"],
 ];
 
 afterEach(() => vi.restoreAllMocks());
@@ -69,7 +69,7 @@ test("the copy button writes the command and shows Copied", async () => {
   const writeText = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
   renderApp(CASES[1]![1]);
   await user.click(screen.getByRole("button", { name: "Copy command" }));
-  expect(writeText).toHaveBeenCalledWith("golem web");
+  expect(writeText).toHaveBeenCalledWith("golem");
   expect(await screen.findByRole("button", { name: "Copied" })).toBeTruthy();
 });
 

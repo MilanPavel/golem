@@ -87,7 +87,7 @@ export interface WebJobFacts {
  */
 export function webCheck(facts: WebJobFacts): Check {
   if (!facts.plist) {
-    return { name: "web", status: "ok", detail: "not kept running · golem web opens it when you ask" };
+    return { name: "web", status: "ok", detail: "not kept running · golem opens it when you ask" };
   }
   if (facts.program !== null && !facts.programExists) {
     return { name: "web", status: "warn", detail: `the job runs ${facts.program}, which is gone`, fix: "golem web install" };
@@ -109,7 +109,7 @@ export function webCheck(facts: WebJobFacts): Check {
       name: "web",
       status: "warn",
       detail: `the page is served by ${served}, this golem is ${facts.cliVersion}`,
-      fix: "golem web",
+      fix: "golem",
     };
   }
   return {

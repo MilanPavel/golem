@@ -7,7 +7,7 @@ description: What golem is, and why it exists.
 
 Golem is an AI agent that lives on your Mac. You chat with it in your terminal or your browser, and it works in the folder you open it in: it reads and searches your files, edits them, runs commands, and looks things up on the web. It asks you first before it does anything that matters.
 
-![Golem, wake up! On parchment under a crescent moon, the golem sleeps with its head bowed, and the shem, a small scroll, slides into the slot in its forehead. On a dark screen the shem glows in the same golem's forehead, its eyes light up, and a prompt types: $ golem, then hello](../images/intro-wake.svg)
+![Golem, wake up! On parchment under a crescent moon, the golem sleeps with its head bowed, and the shem, a small scroll, slides into the slot in its forehead. On a dark screen the shem glows in the same golem's forehead, its eyes light up, and a prompt types: $ golem tui, then hello](../images/intro-wake.svg)
 
 ## What golem is for
 

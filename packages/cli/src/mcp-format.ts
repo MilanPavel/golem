@@ -21,6 +21,7 @@ export function serverMarks(server: Server): string[] {
   if (server.on_demand) marks.push("on demand");
   if ((server.tools_hidden ?? 0) > 0) marks.push(`hidden ${server.tools_hidden} tools`);
   if (server.approval === "allow") marks.push("allow");
+  if (server.state === "needs_auth") marks.push(`run: golem mcp login ${server.name}`);
   if (server.error !== undefined && server.error !== null) marks.push(server.error);
   return marks;
 }
@@ -32,7 +33,7 @@ export function formatMcpList(servers: readonly Server[]): string {
   for (const server of servers) {
     rows.push([
       server.name,
-      server.state,
+      server.state === "needs_auth" ? "needs sign-in" : server.state,
       String(server.tools?.length ?? 0),
       server.schema_tokens === undefined || server.schema_tokens === null ? "-" : String(server.schema_tokens),
       serverMarks(server).join(", "),
@@ -48,7 +49,7 @@ function entries(values: Record<string, string> | undefined): string[] {
 /** One server's whole setup. A secret is named and marked stored or not, never shown. */
 export function formatMcpDetail(detail: McpServerDetail): string {
   const { server, config } = detail;
-  const lines = [`${server.name}  ${server.state}${server.error ? `  ${server.error}` : ""}`];
+  const lines = [`${server.name}  ${server.state === "needs_auth" ? "needs sign-in" : server.state}${server.error ? `  ${server.error}` : ""}`];
   lines.push(`  in ${detail.path} (${detail.scope})`);
   if (config.url !== undefined && config.url !== null) {
     lines.push(`  url ${config.url}`);

@@ -75,6 +75,7 @@ export type PageClient = Pick<
   | "revokeAllowance"
   | "setSessionModel"
   | "setDefaultModel"
+  | "setDefaultPermissionMode"
   | "getModelOptions"
   | "setModelOptions"
   | "setSessionOptions"
@@ -102,6 +103,11 @@ export type PageActions = {
   pinSkill(sessionId: string, name: string, pin: boolean): Promise<void>;
   /** Sets the session's permission mode, or with null follows config.toml. The chip changes from `session.mode.changed`. */
   setMode(sessionId: string, mode: PermissionMode | null): Promise<void>;
+  /**
+   * Saves `[permissions] mode` in config.toml and shows it at once. A refused save puts the old
+   * mode back and throws. Resolves with the file written.
+   */
+  setDefaultMode(mode: PermissionMode): Promise<string>;
   cancel(runId: string): Promise<void>;
   /** Sets the title. What the page shows afterwards comes from the daemon's summary. */
   rename(sessionId: string, title: string): Promise<void>;
@@ -334,6 +340,20 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
           await client.setSessionMode(sessionId, mode);
         } finally {
           // The rules were built for a mode, so Settings reads them again.
+          await queryClient.invalidateQueries({ queryKey: CONFIG_KEY });
+        }
+      },
+      async setDefaultMode(mode) {
+        const before = queryClient.getQueriesData<ConfigGetResult>({ queryKey: CONFIG_KEY });
+        queryClient.setQueriesData<ConfigGetResult>({ queryKey: CONFIG_KEY }, (old) =>
+          old === undefined ? old : { ...old, default_permission_mode: mode },
+        );
+        try {
+          return (await client.setDefaultPermissionMode(mode)).path;
+        } catch (failure) {
+          for (const [key, data] of before) queryClient.setQueryData(key, data);
+          throw failure;
+        } finally {
           await queryClient.invalidateQueries({ queryKey: CONFIG_KEY });
         }
       },

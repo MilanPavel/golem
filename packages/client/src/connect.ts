@@ -11,6 +11,8 @@ import type { RuntimeInstallCancelResult } from "../../protocol/gen/runtime-inst
 import type { RuntimeInstallDone } from "../../protocol/gen/runtime-install-done.ts";
 import type { RuntimeInstallResult } from "../../protocol/gen/runtime-install-result.ts";
 import type { RuntimeName } from "./runtime.ts";
+import type { McpLoginDone } from "../../protocol/gen/mcp-login-done.ts";
+import type { McpLoginResult } from "../../protocol/gen/mcp-login-result.ts";
 import type { McpRemoveResult } from "../../protocol/gen/mcp-remove-result.ts";
 import type { OllamaInstallCancelResult } from "../../protocol/gen/ollama-install-cancel-result.ts";
 import type { KeychainWait } from "../../protocol/gen/keychain-wait.ts";
@@ -60,6 +62,8 @@ import type { ModelSetDefaultResult } from "../../protocol/gen/model-set-default
 import type { ModelOptionsGetResult } from "../../protocol/gen/model-options-get-result.ts";
 import type { ModelOptionsSaved } from "../../protocol/gen/model-options-saved.ts";
 import type { ModelOptionsSetResult } from "../../protocol/gen/model-options-set-result.ts";
+import type { PermissionsSetModeParams } from "../../protocol/gen/permissions-set-mode-params.ts";
+import type { PermissionsSetModeResult } from "../../protocol/gen/permissions-set-mode-result.ts";
 import type { SessionSetModeParams } from "../../protocol/gen/session-set-mode-params.ts";
 import type { SessionSetModeResult } from "../../protocol/gen/session-set-mode-result.ts";
 import type { SessionSetOptionsResult } from "../../protocol/gen/session-set-options-result.ts";
@@ -94,6 +98,8 @@ import {
   isDaemonStatus,
   isHelloResult,
   isMcpListResult,
+  isMcpLoginDone,
+  isMcpLoginResult,
   isMcpRemoveResult,
   isMcpServer,
   isMcpToggleResult,
@@ -116,6 +122,7 @@ import {
   isModelOptionsSaved,
   isModelOptionsSetResult,
   isModelSetDefaultResult,
+  isPermissionsSetModeResult,
   isSessionSetModeResult,
   isSessionSetOptionsResult,
   isPullDone,
@@ -289,6 +296,8 @@ export interface GolemClient {
   setSessionModel(sessionId: string, model: string): Promise<SessionSetModelResult>;
   /** Write `default_model` to the user's config.toml. New sessions start on it. */
   setDefaultModel(model: string): Promise<ModelSetDefaultResult>;
+  /** Write `[permissions] mode` to the user's config.toml, keeping its comments. New chats start in it. */
+  setDefaultPermissionMode(mode: PermissionsSetModeParams["mode"]): Promise<PermissionsSetModeResult>;
   /** The tunable options of a local model, its own defaults, what is saved for it, and `sessionId`'s overrides. */
   getModelOptions(model: string, sessionId?: string): Promise<ModelOptionsGetResult>;
   /** Save options for the model in config.toml. A `null` value removes one. Every connection gets `onOptionsSaved`. */
@@ -321,6 +330,10 @@ export interface GolemClient {
   mcpTools(name: string, sessionId?: string): Promise<McpToolsResult>;
   /** Start a server again now. Resolves with its state, usually `starting`. */
   restartMcp(name: string, sessionId?: string): Promise<McpServer>;
+  /** Start the sign-in of a hosted server: the address to open. It ends with `mcp.login.done` ({@link GolemClient.onMcpLoginDone}). */
+  mcpLogin(name: string, sessionId?: string): Promise<McpLoginResult>;
+  /** Delete a server's sign-in and stop it. Resolves with it as `needs_auth`. */
+  mcpLogout(name: string, sessionId?: string): Promise<McpServer>;
   /** Write `enabled` into the file that names the server. It applies at once. */
   setMcpEnabled(name: string, enabled: boolean | "on_demand", sessionId?: string): Promise<McpServer>;
   /** Add `[mcp.<name>]` to the user's config and start the server. The wire view shows `token` redacted. */
@@ -371,6 +384,8 @@ export interface GolemClient {
   onRuntimeInstall(listener: (update: RuntimeInstallUpdate) => void): () => void;
   /** `mcp.server.status`: a server started, failed, or changed its tools. */
   onMcpStatus(listener: (server: McpServer) => void): () => void;
+  /** `mcp.login.done`: a sign-in ended, from any client's `mcp.login`. */
+  onMcpLoginDone(listener: (done: McpLoginDone) => void): () => void;
   /** `model.server.status`: a local model server such as Ollama started, failed, or stopped. */
   onModelServer(listener: (status: ModelServerStatus) => void): () => void;
   /**
@@ -447,6 +462,7 @@ export function connectGolem(options: ConnectOptions): GolemClient {
   const wireListeners = new Set<(lines: readonly WireLine[]) => void>();
   const pullListeners = new Set<(update: PullUpdate) => void>();
   const mcpListeners = new Set<(server: McpServer) => void>();
+  const loginListeners = new Set<(done: McpLoginDone) => void>();
   const testListeners = new Set<(progress: McpTestProgress) => void>();
   const logListeners = new Set<(log: McpServerLog) => void>();
   const skillListeners = new Set<(root: string | null) => void>();
@@ -647,6 +663,21 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       record({ direction: "in", kind: "mcp.server.status", detail: name, json: line });
       if (isMcpServer(params)) {
         for (const listener of mcpListeners) {
+          try {
+            listener(params);
+          } catch {
+            // A listener must not tear the socket down.
+          }
+        }
+      }
+      return;
+    }
+    if (isRecord(message) && message["method"] === "mcp.login.done") {
+      const params = message["params"];
+      const name = isRecord(params) && typeof params["name"] === "string" ? params["name"] : "";
+      record({ direction: "in", kind: "mcp.login.done", detail: name, json: line });
+      if (isMcpLoginDone(params)) {
+        for (const listener of loginListeners) {
           try {
             listener(params);
           } catch {
@@ -1268,6 +1299,14 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       }
       return result;
     },
+    async setDefaultPermissionMode(mode: PermissionsSetModeParams["mode"]): Promise<PermissionsSetModeResult> {
+      await ready;
+      const result = await call("permissions.set_mode", { mode });
+      if (!isPermissionsSetModeResult(result)) {
+        throw new Error("invalid permissions.set_mode result");
+      }
+      return result;
+    },
     async getModelOptions(model: string, sessionId?: string): Promise<ModelOptionsGetResult> {
       await ready;
       const result = await call("model.options.get", sessionId === undefined ? { model } : { model, session_id: sessionId });
@@ -1382,6 +1421,17 @@ export function connectGolem(options: ConnectOptions): GolemClient {
     },
     async restartMcp(name: string, sessionId?: string): Promise<McpServer> {
       return mcpServerCall("mcp.restart", withSession({ name }, sessionId));
+    },
+    async mcpLogin(name: string, sessionId?: string): Promise<McpLoginResult> {
+      await ready;
+      const result = await call("mcp.login", withSession({ name }, sessionId));
+      if (!isMcpLoginResult(result)) {
+        throw new Error("invalid mcp.login result");
+      }
+      return result;
+    },
+    async mcpLogout(name: string, sessionId?: string): Promise<McpServer> {
+      return mcpServerCall("mcp.logout", withSession({ name }, sessionId));
     },
     async setMcpEnabled(name: string, enabled: boolean | "on_demand", sessionId?: string): Promise<McpServer> {
       return mcpServerCall("mcp.set_enabled", withSession({ name, enabled }, sessionId));
@@ -1538,6 +1588,12 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       mcpListeners.add(listener);
       return () => {
         mcpListeners.delete(listener);
+      };
+    },
+    onMcpLoginDone(listener: (done: McpLoginDone) => void): () => void {
+      loginListeners.add(listener);
+      return () => {
+        loginListeners.delete(listener);
       };
     },
     onModelServer(listener: (status: ModelServerStatus) => void): () => void {

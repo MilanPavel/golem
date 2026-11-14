@@ -1,19 +1,21 @@
 ---
 title: The web UI
-description: Open golem's chat in your browser with golem web, and what the page can do today.
+description: Open golem's chat in your browser with golem, and what the page can do today.
 ---
 
 # The web UI
 
-`golem web` opens golem's chat in your browser. It talks to the same daemon as the terminal, so every chat is in both: start in the terminal, carry on in the browser, or watch one answer stream in both at once.
+`golem` opens golem's chat in your browser. It talks to the same daemon as the terminal, so every chat is in both: start in the terminal, carry on in the browser, or watch one answer stream in both at once.
 
 ![The web UI in the slip theme](../images/web-chat-slip.png)
 
 ## Open it
 
 ```bash
-golem web
+golem
 ```
+
+`golem web` does the same. It is kept as an alias, so older notes and habits still work.
 
 golem starts a small server on `127.0.0.1:7480`, opens the page in your browser, and keeps running until you press **Ctrl-C**. With no daemon running, it first asks to start golem's service. On a first run, that one question in the terminal (keep golem running?) is the only setup there; the page then opens on `/welcome`, where you pick how golem thinks, a model, and some tools. A send with no model sends you back to `/welcome` and keeps your message, and `/setup` opens Settings → Setup. The web has no setup dialog.
 
@@ -23,9 +25,11 @@ golem starts a small server on `127.0.0.1:7480`, opens the page in your browser,
 | `--no-open` | Print the link instead of opening the browser |
 | `--json` | Print the link, the port, and the pid as JSON, for scripts |
 
-Run `golem web` again while one is running, and it opens the same server instead of starting a second one. If that server runs an older golem than the one you typed, `golem web` says so on stderr; stop it with Ctrl-C and run `golem web` again.
+When it opens the browser, golem prints `Chat in the terminal: golem tui`. Over SSH, with `SSH_CONNECTION` set, it opens no browser and prints the link.
 
-`golem web serve [--port N]` runs the server in the foreground with no browser, no token in its output, and no question about the service. It is for a background job to run, not for typing. It exits with code 75 when a `golem web` already serves the port.
+Run `golem` again while one is running, and it opens the same server instead of starting a second one. If that server runs an older golem than the one you typed, `golem` says so on stderr; stop it with Ctrl-C and run `golem` again.
+
+`golem web serve [--port N]` runs the server in the foreground with no browser, no token in its output, and no question about the service. It is for a background job to run, not for typing. It exits with code 75 when a `golem` already serves the port.
 
 ## What you can do today
 
@@ -46,7 +50,7 @@ Run `golem web` again while one is running, and it opens the same server instead
 - **Trace a session:** read how an answer was made, model call by model call. See [Trace a session](#trace-a-session).
 - **Two themes:** slip (light) and kiln (dark). The switch at the bottom of the sidebar picks one, or follows your system.
 
-The web UI is new, and it grows step by step in [Phase 10](https://github.com/MilanPavel/golem/issues/150). **Approvals, diffs, and the todo drawer** come next. Until then, answer an approval in the terminal: run `golem` in the same folder, and the waiting question is there. After that come models and a command palette, then settings, a layout for phones, and installing the page as an app.
+The web UI is new, and it grows step by step in [Phase 10](https://github.com/MilanPavel/golem/issues/150). **Approvals, diffs, and the todo drawer** come next. Until then, answer an approval in the terminal: run `golem tui` in the same folder, and the waiting question is there. After that come models and a command palette, then settings, a layout for phones, and installing the page as an app.
 
 ## Trace a session
 
@@ -112,7 +116,7 @@ The page is only for you, on your Mac.
 
 - **The server listens on `127.0.0.1` only,** never on your network.
 - **The link logs you in.** It carries a one-time token after the `#`, which the page trades for a cookie and then removes from the address. You stay signed in for 30 days, even after the server restarts. To sign every browser out, run `golem web logout`. Other websites you have open cannot connect: the server checks every request's origin and refuses the rest.
-- **The daemon does not change.** It still listens only on its private socket. The server in `golem web` stands in front of it, and passes on only what a browser may ask for.
+- **The daemon does not change.** It still listens only on its private socket. The server behind `golem` stands in front of it, and passes on only what a browser may ask for.
 
 ## Install as an app
 
@@ -123,9 +127,9 @@ The page can run in its own window with the pixel golem as its Dock icon.
 
 When the web job keeps the page running, the last step of `/welcome` and Settings → Appearance offer this too: a button in Chrome and Edge, the menu hint in Safari. Nothing is offered inside the app's own window.
 
-The app is tied to the address it was installed from, port included. `golem web --port N` is a different app, and it has no login. If the app opens to `This page needs a fresh link`, run `golem web` again.
+The app is tied to the address it was installed from, port included. `golem --port N` is a different app, and it has no login. If the app opens to `This page needs a fresh link`, run `golem` again.
 
-There is no service worker, so the page is never cached by one. After `brew upgrade golem`, run `golem web`: the app shows the new page on its next load, never an old copy.
+There is no service worker, so the page is never cached by one. After `brew upgrade golem`, run `golem`: the app shows the new page on its next load, never an old copy.
 
 The Dock icon does not show state. It opens the page, and the page shows whether it is connected.
 
@@ -135,7 +139,7 @@ The page shows a full screen, with the command to run:
 
 | What you see | What to do |
 |---|---|
-| This page needs a fresh link | The link is old, the sign-in is over 30 days old, or you ran `golem web logout`. Run `golem web` again |
+| This page needs a fresh link | The link is old, the sign-in is over 30 days old, or you ran `golem web logout`. Run `golem` again |
 | golem's daemon is not running | Run `golem daemon start`. The page reconnects by itself |
 | The daemon is older than this page | Run `golem daemon restart` after an upgrade |
 

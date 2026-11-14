@@ -184,7 +184,7 @@ test("a port that is taken by something else fails and leaves no token", async (
   try {
     const run = golemWeb("--json", "--port", String(port));
     assert.equal(await run.exit, 1);
-    assert.match(run.stderr(), new RegExp(`port ${port} is in use\\. Try golem web --port <other>`));
+    assert.match(run.stderr(), new RegExp(`port ${port} is in use\\. Try golem --port <other>`));
     assert.equal(exists("web.token"), false);
     assert.equal(exists("web.json"), false);
   } finally {
@@ -377,7 +377,7 @@ test("golem web reuses a foreground gateway of another version, says so, and nev
       assert.equal(got.code, 0, got.err);
       assert.equal(JSON.parse(got.out).pid, 4005);
       assert.equal(restarts, 0);
-      assert.equal(got.err, `the page is served by golem 1.0.0; Ctrl-C it and run golem web again for ${OURS}\n`);
+      assert.equal(got.err, `the page is served by golem 1.0.0; Ctrl-C it and run golem again for ${OURS}\n`);
     } finally {
       forget(other);
     }

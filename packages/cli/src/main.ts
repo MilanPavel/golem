@@ -40,7 +40,7 @@ import {
   formatTestResult,
   formatTestStep,
 } from "./mcp-format.ts";
-import { projectSession, runConfigEdit, runMcpEdit, runMcpImport, testAfterAdd } from "./mcp-run.ts";
+import { LOGIN_TIMEOUT_MS, projectSession, runConfigEdit, runMcpEdit, runMcpImport, runMcpLogin, testAfterAdd } from "./mcp-run.ts";
 import { readChoice } from "./read-choice.ts";
 import { readSecret } from "./read-secret.ts";
 import { type Gate, gateService, type SessionDaemon } from "./service-gate.ts";
@@ -76,7 +76,7 @@ const USAGE =
   "       golem daemon install|start|stop|restart|uninstall|logs\n" +
   "       golem auth set <provider> [--no-check] | golem auth remove <provider> | golem auth list | golem models [--refresh]\n" +
   "       golem mcp add <name> -- <command…> [--token-env VAR] | golem mcp add <name> --url <url> [--token] [--env K=V] [--header K=V] [--cwd D] [--on-demand] [--project] [--timeout S] [--approval allow] | golem mcp add --catalog <id> [--input <id>=<value>] | golem mcp remove <name> | golem mcp export [--format claude|vscode] [--scope user|project]\n" +
-  "       golem mcp list [--json] | show <name> [--json] | test <name> | test --catalog <id> | edit <name> [--project] | import [--from <app>|<file>] [--all] | logs <name> [-f] | enable <name> [--on-demand] | disable <name> | restart <name> | tools <name> [--hide <glob>] [--show <glob>]\n" +
+  "       golem mcp list [--json] | show <name> [--json] | test <name> | test --catalog <id> | edit <name> [--project] | import [--from <app>|<file>] [--all] | logs <name> [-f] | enable <name> [--on-demand] | disable <name> | restart <name> | login <name> | logout <name> | tools <name> [--hide <glob>] [--show <glob>]\n" +
   "       golem config show [--resolved] | golem config edit [--project] | golem skills [list] | golem skills check <path>\n" +
   "       golem web [--port N] [--no-open] [--json] (the same as golem) | golem web serve [--port N]\n" +
   "       golem web install [--port N] | golem web uninstall | golem web logout";
@@ -293,6 +293,20 @@ async function runAuth(given: string[]): Promise<number> {
   }
 }
 
+/** Open an address in the default browser. The address is printed too, so a failure here costs nothing. */
+function openInBrowser(url: string): void {
+  if (!/^https?:\/\//.test(url)) return;
+  const command = process.platform === "darwin" ? "open" : process.platform === "win32" ? null : "xdg-open";
+  if (command === null) return;
+  try {
+    const child = spawn(command, [url], { stdio: "ignore", detached: true });
+    child.on("error", () => undefined);
+    child.unref();
+  } catch {
+    // The address is on screen.
+  }
+}
+
 async function runMcp(given: string[]): Promise<number> {
   const parsed = parseMcpArgs(given);
   if (parsed.kind === "error") {
@@ -400,6 +414,18 @@ async function runMcpServer(parsed: ServerCommand): Promise<number> {
       case "restart": {
         const server = await client.restartMcp(parsed.name);
         process.stdout.write(`${parsed.name} · ${server.state}\n`);
+        return 0;
+      }
+      case "login":
+        return await runMcpLogin(client, parsed.name, {
+          open: openInBrowser,
+          write: (line) => process.stdout.write(`${line}\n`),
+          error: (line) => process.stderr.write(`${line}\n`),
+          timeoutMs: LOGIN_TIMEOUT_MS,
+        });
+      case "logout": {
+        const server = await client.mcpLogout(parsed.name);
+        process.stdout.write(`signed out of ${parsed.name} · ${server.state === "needs_auth" ? "needs sign-in" : server.state}\n`);
         return 0;
       }
       case "tools": {

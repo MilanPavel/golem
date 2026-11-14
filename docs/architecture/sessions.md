@@ -127,10 +127,10 @@ The source session kept its six messages, and `session.list` listed both, the fo
 
 ## Try it
 
-1. Open the chat with `golem`, and ask for something long, such as a story of 600 words.
+1. Open the chat with `golem tui`, and ask for something long, such as a story of 600 words.
 2. Press Ctrl-C while it streams. The answer ends with `· interrupted`. Type `go on`: the next answer continues the story.
 3. Type `/fork`. golem switches to a copy of the chat up to the newest finished message. `/sessions` lists both.
-4. Ask for another long answer, and quit the TUI with Ctrl-C twice while it streams. Open `golem` again: the answer has finished, drawn from the log.
+4. Ask for another long answer, and quit the TUI with Ctrl-C twice while it streams. Open `golem tui` again: the answer has finished, drawn from the log.
 5. To see recovery, ask for one more long answer and run `kill -9 $(cat ~/.golem/run/golem.pid)` in another terminal. launchd starts the daemon again. The answer ends with `· interrupted`, and the run with `the daemon stopped during this run`.
 
 ## The details

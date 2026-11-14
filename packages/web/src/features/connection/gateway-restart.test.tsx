@@ -45,28 +45,28 @@ test("a kept gateway that goes away: restarting, reconnects by itself, no comman
   expect(screen.queryByRole("button", { name: "Copy command" })).toBeNull();
 });
 
-test("after 30 seconds without it: today's screen, with golem web and golem web logs", async () => {
+test("after 30 seconds without it: today's screen, with golem and the web log command", async () => {
   await mountDown(true);
   await act(async () => {
     await vi.advanceTimersByTimeAsync(RESTART_GRACE_MS + 10);
   });
-  expect(screen.getByRole("heading", { name: "golem web is not running" })).toBeTruthy();
-  expect(screen.getByText("golem web")).toBeTruthy();
-  expect(screen.getByText("golem web logs")).toBeTruthy();
+  expect(screen.getByRole("heading", { name: "The golem page is not running" })).toBeTruthy();
+  expect(screen.getByText("golem")).toBeTruthy();
+  expect(screen.getByText("tail ~/.golem/logs/web.stderr.log")).toBeTruthy();
 });
 
 test("without a job: today's screen, with golem install and why", async () => {
   await mountDown(false);
-  expect(screen.getByRole("heading", { name: "golem web is not running" })).toBeTruthy();
+  expect(screen.getByRole("heading", { name: "The golem page is not running" })).toBeTruthy();
   expect(screen.getByText("Keeps golem and this page running, even after a restart.")).toBeTruthy();
   expect(screen.getByText("golem install")).toBeTruthy();
 });
 
 test("with the job unknown: today's screen alone", async () => {
   await mountDown(undefined);
-  expect(screen.getByRole("heading", { name: "golem web is not running" })).toBeTruthy();
+  expect(screen.getByRole("heading", { name: "The golem page is not running" })).toBeTruthy();
   expect(screen.queryByText("golem install")).toBeNull();
-  expect(screen.queryByText("golem web logs")).toBeNull();
+  expect(screen.queryByText("tail ~/.golem/logs/web.stderr.log")).toBeNull();
 });
 
 test("a gateway that comes back clears the screen", async () => {

@@ -229,9 +229,9 @@ test("with Ollama down, its models say to run ollama serve", async () => {
   expect(within(dialog()).getByText("ollama: not answering")).toBeTruthy();
 });
 
-test("with Ollama missing, a download says to run golem, then /setup", async () => {
+test("with Ollama missing, a download says to run golem tui, then /setup", async () => {
   const { user } = await openDialog(NO_OLLAMA_LISTING);
-  expect(optionOf("Qwen3 8B").textContent).toContain("Ollama is not installed. Run golem, then /setup.");
+  expect(optionOf("Qwen3 8B").textContent).toContain("Ollama is not installed. Run golem tui, then /setup.");
   expect(optionOf("Qwen3 8B").textContent).toContain("install");
   expect(within(dialog()).getByText("ollama: not installed")).toBeTruthy();
   await pick(user, "Qwen3 8B");

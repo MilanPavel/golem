@@ -24,10 +24,10 @@ class Golem < Formula
   # for every install. Two owners would start two daemons.
   def caveats
     <<~EOS
-      Run golem to chat in the terminal,
-      or golem web to set up in your browser.
-      After `brew upgrade golem`, press Ctrl-R in golem or run `golem daemon restart`
-      to restart its service and the web page. `golem web` restarts the page too.
+      Run golem to set up in your browser,
+      or golem tui to chat in the terminal.
+      After `brew upgrade golem`, press Ctrl-R in golem tui or run `golem daemon restart`
+      to restart its service and the web page. `golem` restarts the page too.
       Before `brew uninstall golem`, remove them:
         golem uninstall
       Chats and settings stay in ~/.golem.

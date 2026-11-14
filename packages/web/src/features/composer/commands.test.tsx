@@ -438,10 +438,10 @@ test("/mcp add opens the Add dialog in Settings, on the server named, or on the 
 });
 
 const NOT_YET: [string, string][] = [
-  ["/skills", "The skills list is in the terminal for now: run golem, then /skills."],
-  ["/artifact", "Tool output opens in the terminal for now: run golem, then /artifact."],
+  ["/skills", "The skills list is in the terminal for now: run golem tui, then /skills."],
+  ["/artifact", "Tool output opens in the terminal for now: run golem tui, then /artifact."],
   ["/sessions", "The sidebar lists your sessions."],
-  ["/debug", "The debug panel is in the terminal for now: run golem, then /debug."],
+  ["/debug", "The debug panel is in the terminal for now: run golem tui, then /debug."],
 ];
 
 for (const [line, text] of NOT_YET) {

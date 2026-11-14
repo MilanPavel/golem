@@ -10,6 +10,7 @@ import {
   orderedServers,
   ownToolName,
   shortPath,
+  signsIn,
   type McpTone,
   entryAvailable,
   entryInputs,
@@ -45,6 +46,8 @@ export type McpManagerView =
   | { kind: "test"; name: string; project: string | null; steps: readonly string[]; result: readonly string[] | null; ok: boolean | null }
   /** The server's log. `lines` is null while it loads, and `offset` is how many lines up from the newest it is scrolled. */
   | { kind: "logs"; name: string; project: string | null; lines: readonly string[] | null; offset: number }
+  /** A sign-in. `url` is the address to open, null until the daemon answers; `result` is set when it ends. */
+  | { kind: "login"; name: string; project: string | null; url: string | null; result: string | null; ok: boolean | null }
   /** Asks before the server's config and secrets go. `selected` 0 is Remove, 1 is Keep. */
   | { kind: "remove"; name: string; project: string | null; selected: number }
   /** One tool, run by hand. `args` is JSON text. A run is not asked about and not recorded in a chat. */
@@ -115,6 +118,9 @@ export type McpManagerAction =
   | { kind: "load-tools"; name: string }
   | { kind: "session"; name: string; on: boolean }
   | { kind: "restart"; name: string }
+  /** Ask the daemon for the sign-in address, open it, and wait for `mcp.login.done`. */
+  | { kind: "login"; name: string }
+  | { kind: "logout"; name: string }
   | { kind: "test"; name: string }
   | { kind: "load-logs"; name: string }
   | { kind: "remove"; name: string }
@@ -144,6 +150,7 @@ const DETAIL_HINT = "↑/↓ to navigate · Enter to select · Esc to go back";
 const TOOLS_HINT = "↑/↓ to navigate · Space to hide or show · Enter to try · Esc to go back";
 const TEST_HINT = "Esc to go back";
 const LOGS_HINT = "↑/↓ to scroll · Esc to go back";
+const LOGIN_HINT = "Esc to go back (the sign-in goes on)";
 const REMOVE_HINT = "↑/↓ to navigate · Enter to select · Esc to keep it";
 const TRY_HINT = "Enter to run · Esc to go back";
 const TRY_DONE_HINT = "Enter to run again · Esc to go back";
@@ -227,6 +234,10 @@ export function mcpManagerKeyOf(press: Press, typing = false): McpManagerKey | n
 /** The server was added: the list, with the new server selected. */
 export function mcpAdded(state: McpManagerState, servers: readonly McpServer[], name: string): McpManagerState {
   const index = orderedServers(servers).findIndex((server) => server.name === name && !server.project);
+  // A server that waits for a sign-in opens on its detail, where Sign in is the first choice.
+  if (servers.some((server) => server.name === name && !server.project && server.state === "needs_auth")) {
+    return { ...state, view: { kind: "detail", name, project: null, selected: 0 }, tools: null };
+  }
   return { ...state, view: { kind: "list", selected: Math.max(0, index) }, tools: null };
 }
 
@@ -454,10 +465,10 @@ export function pressMcpManager(
   if (view.kind === "try") {
     return pressTry(state, view, key);
   }
-  if (view.kind === "test" || view.kind === "logs" || view.kind === "remove") {
+  if (view.kind === "test" || view.kind === "logs" || view.kind === "remove" || view.kind === "login") {
     return pressInfo(state, view, key);
   }
-  const choices = detailChoices(server);
+  const choices = detailChoices(server, signsIn(server, state.catalog));
   if (key === "back") {
     return { state: backToList, action: none };
   }
@@ -471,6 +482,9 @@ export function pressMcpManager(
     return { state, action: none };
   }
   const open = (next: McpManagerView, action: McpManagerAction = none) => ({ state: { ...state, view: next }, action });
+  if (typeof picked.action === "object" && picked.action.kind === "login") {
+    return open({ kind: "login", name: view.name, project: view.project, url: null, result: null, ok: null }, picked.action);
+  }
   if (picked.action === "run-test") {
     return open({ kind: "test", name: view.name, project: view.project, steps: [], result: null, ok: null }, { kind: "test", name: view.name });
   }
@@ -590,7 +604,7 @@ function pressTry(
 
 function pressInfo(
   state: McpManagerState,
-  view: Extract<McpManagerView, { kind: "test" | "logs" | "remove" }>,
+  view: Extract<McpManagerView, { kind: "test" | "logs" | "remove" | "login" }>,
   key: McpManagerKey,
 ): { state: McpManagerState; action: McpManagerAction } {
   const none = { kind: "none" } as const;
@@ -615,6 +629,18 @@ function pressInfo(
     return picked === 1 ? { state: { ...state, view: toDetail(view) }, action: none } : { state, action: none };
   }
   return { state, action: none };
+}
+
+/** The daemon gave the address to open for a sign-in. Ignored if the person has left it. */
+export function mcpLoginUrl(state: McpManagerState, name: string, url: string): McpManagerState {
+  const view = state.view;
+  return view.kind === "login" && view.name === name ? { ...state, view: { ...view, url } } : state;
+}
+
+/** The sign-in ended, or the call for it failed: `text` is what to say. */
+export function mcpLoginDone(state: McpManagerState, name: string, ok: boolean, text: string): McpManagerState {
+  const view = state.view;
+  return view.kind === "login" && view.name === name ? { ...state, view: { ...view, ok, result: text } } : state;
 }
 
 /** A step of a running test ended. Ignored if the person has left the test. */
@@ -699,7 +725,7 @@ export function layoutMcpManager(input: {
     if (server === undefined) {
       body = listLines(servers, 0, home, state.catalog);
     } else if (view.kind === "detail") {
-      body = detailLines(server, view.selected, home);
+      body = detailLines(server, view.selected, home, signsIn(server, state.catalog));
       hint = DETAIL_HINT;
     } else if (view.kind === "tools") {
       body = toolLines(server, state.tools, view.selected);
@@ -710,6 +736,9 @@ export function layoutMcpManager(input: {
     } else if (view.kind === "logs") {
       body = logLines(server, view, room);
       hint = LOGS_HINT;
+    } else if (view.kind === "login") {
+      body = loginLines(server, view, width);
+      hint = LOGIN_HINT;
     } else if (view.kind === "remove") {
       body = removeLines(server, view);
       hint = REMOVE_HINT;
@@ -841,7 +870,7 @@ function listLines(servers: readonly McpServer[], selected: number, home: string
   return lines;
 }
 
-function detailLines(server: McpServer, selected: number, home: string): McpManagerLine[] {
+function detailLines(server: McpServer, selected: number, home: string, oauth: boolean): McpManagerLine[] {
   const label = (key: string) => `${key}:`.padEnd(15);
   const isUrl = /^https?:\/\//.test(server.command);
   const count = server.tools?.length ?? 0;
@@ -878,7 +907,7 @@ function detailLines(server: McpServer, selected: number, home: string): McpMana
     const here = server.enabled === true ? "on" : "off";
     lines.push({ text: `${label("In this chat")}${here} · ${server.on_demand ? "on demand" : "every chat"}` });
   }
-  const choices = detailChoices(server);
+  const choices = detailChoices(server, oauth);
   const chosen = clamp(selected, choices.length);
   lines.push({ text: "" });
   choices.forEach((choice, index) => {
@@ -926,6 +955,24 @@ function testLines(server: McpServer, view: Extract<McpManagerView, { kind: "tes
       index === 0 ? { text, mark: { text: view.ok === true ? "✔" : "✘", tone: view.ok === true ? "ok" : "bad" } } : { text },
     ),
   ];
+}
+
+function loginLines(server: McpServer, view: Extract<McpManagerView, { kind: "login" }>, width: number): McpManagerLine[] {
+  const lines: McpManagerLine[] = [{ text: `Sign in to ${server.name}`, bold: true }, { text: "" }];
+  if (view.url === null && view.result === null) {
+    return [...lines, { text: "asking the daemon…", dim: true }];
+  }
+  if (view.url !== null) {
+    lines.push(
+      { text: "Your browser should open. If it does not, open this address (it is on the clipboard):" },
+      ...(view.url.match(new RegExp(`.{1,${Math.max(10, width - 2)}}`, "g")) ?? [view.url]).map((text) => ({ text })),
+      { text: "" },
+    );
+  }
+  if (view.result === null) {
+    return [...lines, { text: "waiting for you to approve golem in the browser…", dim: true }];
+  }
+  return [...lines, { text: view.result, mark: { text: view.ok === true ? "✔" : "✘", tone: view.ok === true ? "ok" : "bad" } }];
 }
 
 function logLines(server: McpServer, view: Extract<McpManagerView, { kind: "logs" }>, room: number): McpManagerLine[] {

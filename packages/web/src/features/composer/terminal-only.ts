@@ -8,9 +8,9 @@ export const TERMINAL_ONLY: ReadonlySet<string> = new Set([
 
 export const IN_TERMINAL_LABEL = "In the terminal for now";
 
-/** `golem, then /name`, the words every not-yet notice ends with. */
+/** `golem tui, then /name`, the words every not-yet notice ends with. */
 function inTerminal(what: string, name: string): string {
-  return `${what} in the terminal for now: run golem, then ${name}.`;
+  return `${what} in the terminal for now: run golem tui, then ${name}.`;
 }
 
 export const NOT_YET = {

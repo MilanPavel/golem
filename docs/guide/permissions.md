@@ -41,6 +41,8 @@ The mode says how much the built-in defaults allow without asking. **Balanced** 
 mode = "balanced"   # careful | balanced | autopilot
 ```
 
+In the web app, Settings → Tool rules → Default mode saves it for you: click Careful, Balanced, or Autopilot and golem writes `mode` into `config.toml`, keeping your comments. Autopilot asks you to confirm first. The edit applies to new chats at once, and to a chat that has not set its own mode.
+
 A chat can use another mode than the default, set for that chat only and kept with it: pick it from the mode chip beside the model in the web composer, type `/mode careful|balanced|autopilot` (or `/mode default` to follow `config.toml` again), or press Shift-Tab in the terminal to cycle through the three. A mode changes only the built-in defaults. Your rules and the project's rules are checked first, so an `ask` or `deny` rule you wrote still applies in autopilot, and what you allowed for the session still counts.
 
 The read-only tools only see the folder you opened golem in. Reads change nothing, so they never stop to ask. The file tools cannot leave the project folder in any mode.
