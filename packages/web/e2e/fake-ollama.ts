@@ -15,6 +15,10 @@ export interface FakeOllama {
   holdPulls(): void;
   /** Lets the held pulls finish, and stops holding later ones. */
   releasePulls(): void;
+  /** How many times a call loaded a model at a different `num_ctx` than the one it held. */
+  readonly reloads: number;
+  /** What each model is loaded at right now, by name. */
+  readonly loaded: ReadonlyMap<string, { contextLength: number }>;
   stop(): Promise<void>;
 }
 
@@ -23,6 +27,12 @@ export interface FakeOllamaOptions {
   installed?: string[];
   /** What `/api/chat` answers. Default `The stub answers.` */
   answer?: string;
+  /** The window a call without `num_ctx` loads a model at. Default 32768. */
+  defaultContext?: number;
+  /** The largest window `/api/show` reports. Default 131072. */
+  maxContext?: number;
+  /** True makes `/api/ps` report half of each model in VRAM. */
+  spill?: boolean;
 }
 
 type Line = Record<string, unknown>;
@@ -59,6 +69,15 @@ function modelName(raw: string): string {
   }
 }
 
+function parse(raw: string): Record<string, unknown> {
+  try {
+    const body: unknown = JSON.parse(raw);
+    return typeof body === "object" && body !== null ? (body as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+}
+
 function json(res: ServerResponse, status: number, body: unknown): void {
   res.writeHead(status, { "content-type": "application/json" });
   res.end(JSON.stringify(body));
@@ -69,6 +88,10 @@ export async function startFakeOllama(options: FakeOllamaOptions = {}): Promise<
   const installed = [...(options.installed ?? [])];
   const pulls: string[] = [];
   const requests: string[] = [];
+  const defaultContext = options.defaultContext ?? 32768;
+  const maxContext = options.maxContext ?? 131072;
+  const loaded = new Map<string, { contextLength: number }>();
+  let reloads = 0;
   const sockets = new Set<Socket>();
   let held = false;
   let waiting: Array<() => void> = [];
@@ -94,15 +117,43 @@ export async function startFakeOllama(options: FakeOllamaOptions = {}): Promise<
     if (url.pathname === "/api/tags") {
       json(res, 200, { models: installed.map((name) => ({ name, model: name })) });
     } else if (url.pathname === "/api/show") {
-      json(res, 200, { model_info: {}, capabilities: ["completion", "tools"] });
+      json(res, 200, { model_info: { "general.architecture": "fake", "fake.context_length": maxContext }, capabilities: ["completion", "tools"] });
     } else if (url.pathname === "/api/pull") {
       const name = modelName(raw);
       pulls.push(name);
       await pull(res, name);
+    } else if (url.pathname === "/api/ps") {
+      const size = 5_000_000_000;
+      json(res, 200, {
+        models: [...loaded].map(([name, { contextLength }]) => ({
+          name,
+          model: name,
+          size,
+          size_vram: options.spill === true ? size / 2 : size,
+          context_length: contextLength,
+          details: {},
+        })),
+      });
     } else if (url.pathname === "/api/chat") {
+      const body = parse(raw);
+      const name = modelName(raw);
+      const asked = (body.options as { num_ctx?: unknown } | undefined)?.num_ctx;
+      const contextLength = typeof asked === "number" && asked > 0 ? asked : defaultContext;
+      const held = loaded.get(name);
+      if (held !== undefined && held.contextLength !== contextLength) reloads += 1;
+      loaded.set(name, { contextLength });
+      const messages = Array.isArray(body.messages) ? (body.messages as Array<{ role?: unknown; content?: unknown }>) : [];
+      const text = (m: { content?: unknown }): string => (typeof m.content === "string" ? m.content : "");
+      const totalChars = messages.reduce((sum, m) => sum + text(m).length, 0) + (body.tools === undefined ? 0 : JSON.stringify(body.tools).length);
+      const lastUser = [...messages].reverse().find((m) => m.role === "user");
+      const cut = lastUser !== undefined && text(lastUser).includes("[[cut]]");
       res.writeHead(200, { "content-type": "application/x-ndjson" });
-      res.write(`${JSON.stringify({ model: modelName(raw), message: { role: "assistant", content: options.answer ?? "The stub answers." }, done: false })}\n`);
-      res.end(`${JSON.stringify({ model: modelName(raw), message: { role: "assistant", content: "" }, done: true, done_reason: "stop", prompt_eval_count: 3, eval_count: 4 })}\n`);
+      res.write(`${JSON.stringify({ model: name, message: { role: "assistant", content: options.answer ?? "The stub answers." }, done: false })}\n`);
+      res.end(
+        `${JSON.stringify({ model: name, message: { role: "assistant", content: "" }, done: true, done_reason: cut ? "length" : "stop", prompt_eval_count: Math.min(Math.ceil(totalChars / 4), contextLength), eval_count: 4 })}\n`,
+      );
+      // keep_alive 0 unloads the model once the reply is out.
+      if (body.keep_alive === 0) loaded.delete(name);
     } else if (url.pathname === "/api/delete") {
       const name = modelName(raw);
       const at = installed.indexOf(name);
@@ -132,6 +183,10 @@ export async function startFakeOllama(options: FakeOllamaOptions = {}): Promise<
     installed,
     pulls,
     requests,
+    get reloads() {
+      return reloads;
+    },
+    loaded,
     holdPulls() {
       held = true;
     },
