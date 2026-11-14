@@ -1328,7 +1328,10 @@ public enum ListedProviderStatus: String, Codable {
 /// disabled``, or lost its name to another skill, whose folder
 /// ``shadowed_by`` names. ``model_invocable`` is false for
 /// ``disable-model-invocation: true``. ``allowed_tools`` and ``model`` are
-/// the frontmatter as written.
+/// the frontmatter as written. ``indexed`` is true when the skill is in the
+/// skill index of the system prompt: false for a skill the model may not
+/// load, and for one dropped because the index is over ``[skills]
+/// index_budget``.
 // MARK: - ListedSkill
 public struct ListedSkill: Codable {
     public let allowedTools: [String]?
@@ -1336,6 +1339,7 @@ public struct ListedSkill: Codable {
     public let description: String
     public let disabled: Bool?
     public let errors: [String]?
+    public let indexed: Bool?
     public let model: String?
     public let modelInvocable: Bool?
     public let name: String
@@ -1352,6 +1356,7 @@ public struct ListedSkill: Codable {
         case description = "description"
         case disabled = "disabled"
         case errors = "errors"
+        case indexed = "indexed"
         case model = "model"
         case modelInvocable = "model_invocable"
         case name = "name"
@@ -1363,12 +1368,13 @@ public struct ListedSkill: Codable {
         case warnings = "warnings"
     }
 
-    public init(allowedTools: [String]?, argumentHint: String?, description: String, disabled: Bool?, errors: [String]?, model: String?, modelInvocable: Bool?, name: String, path: String, shadowedBy: String?, source: ListedSkillSource, usable: Bool, userInvocable: Bool?, warnings: [String]?) {
+    public init(allowedTools: [String]?, argumentHint: String?, description: String, disabled: Bool?, errors: [String]?, indexed: Bool?, model: String?, modelInvocable: Bool?, name: String, path: String, shadowedBy: String?, source: ListedSkillSource, usable: Bool, userInvocable: Bool?, warnings: [String]?) {
         self.allowedTools = allowedTools
         self.argumentHint = argumentHint
         self.description = description
         self.disabled = disabled
         self.errors = errors
+        self.indexed = indexed
         self.model = model
         self.modelInvocable = modelInvocable
         self.name = name
@@ -6746,6 +6752,8 @@ public enum RPCNotificationMethod: String, Codable {
 ///
 /// The earlier events stay in the log. ``session.list`` hides the session.
 ///
+/// A run of a session whose origin is not ``user`` ended. It is also in the log.
+///
 /// The session switched models.
 ///
 /// It applies from the next run. A run in progress keeps its model.
@@ -6834,7 +6842,9 @@ public struct Params: Codable {
 /// ``model_provider`` and ``model_name`` are set when the daemon can resolve
 /// it, and null otherwise. ``forked_from`` is set on a session made by
 /// ``session.fork``. ``cwd`` is the project folder the file tools work in,
-/// or null for a session without one.
+/// or null for a session without one. ``origin`` is who started the session:
+/// ``cli``, ``routine:<name>``, and so on. Null means ``user``, and an older
+/// daemon leaves it out.
 ///
 /// A session attribute changed: its title, folder, allowed tools, or MCP servers.
 ///
@@ -6845,6 +6855,13 @@ public struct Params: Codable {
 /// ``mcp.enable`` or ``mcp.disable``.
 ///
 /// No payload. Used by ``run.started``, ``run.completed``, and ``session.closed``.
+///
+/// A run in a session that no user typed into has ended.
+///
+/// ``status`` is how the run ended. ``summary`` is the last assistant message
+/// cut to a few lines, null when the run left no reply (a failed or cancelled
+/// run). A run that stops on an approval does not emit this: it is
+/// ``approval.needed``.
 ///
 /// The model the session's next run uses.
 ///
@@ -6980,10 +6997,12 @@ public struct Params: Codable {
 /// ``how`` is ``invoked`` for a skill run once by name: its body is that
 /// turn's user message. It is ``pinned`` for a skill turned on for the whole
 /// session: its body is in the system prompt of every model call until it is
-/// unpinned. ``source`` is where it was found, ``path`` its folder, and
-/// ``hash`` the sha256 of its ``SKILL.md``. A pinned skill whose file changed,
-/// or that can be used again after it was skipped, is activated again in the
-/// run whose model call first reads the new body.
+/// unpinned. It is ``model`` for a skill the model loaded itself with
+/// ``load_skill``: its body is that tool's result. ``source`` is where it was
+/// found, ``path`` its folder, and ``hash`` the sha256 of its ``SKILL.md``.
+/// A pinned skill whose file changed, or that can be used again after it was
+/// skipped, is activated again in the run whose model call first reads the
+/// new body.
 ///
 /// A pinned skill is off again. ``unpinned``: the user turned it off.
 ///
@@ -7000,9 +7019,13 @@ public struct ParamsData: Codable {
     public let modelName: String?
     public let modelProfile: String?
     public let modelProvider: String?
+    public let origin: String?
     public let allowedTools: [PurpleSessionAllowance]?
     public let mcpServers: [String]?
     public let title: String?
+    public let runID: String?
+    public let status: DataStatus?
+    public let summary: String?
     public let reason: PurpleReason?
     public let options: [String: Option]?
     public let mode: Mode?
@@ -7045,7 +7068,6 @@ public struct ParamsData: Codable {
     public let artifactID: String?
     public let durationMS: Int?
     public let preview: String?
-    public let summary: String?
     public let truncated: Bool?
     public let diff: String?
     public let source: String?
@@ -7063,9 +7085,13 @@ public struct ParamsData: Codable {
         case modelName = "model_name"
         case modelProfile = "model_profile"
         case modelProvider = "model_provider"
+        case origin = "origin"
         case allowedTools = "allowed_tools"
         case mcpServers = "mcp_servers"
         case title = "title"
+        case runID = "run_id"
+        case status = "status"
+        case summary = "summary"
         case reason = "reason"
         case options = "options"
         case mode = "mode"
@@ -7108,7 +7134,6 @@ public struct ParamsData: Codable {
         case artifactID = "artifact_id"
         case durationMS = "duration_ms"
         case preview = "preview"
-        case summary = "summary"
         case truncated = "truncated"
         case diff = "diff"
         case source = "source"
@@ -7121,15 +7146,19 @@ public struct ParamsData: Codable {
         case path = "path"
     }
 
-    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, title: String?, reason: PurpleReason?, options: [String: Option]?, mode: Mode?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, contextWindow: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String?, provider: String?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, artifactID: String?, durationMS: Int?, preview: String?, summary: String?, truncated: Bool?, diff: String?, source: String?, subject: String?, decision: Decision?, rule: String?, todos: [PurpleTodo]?, hash: String?, how: How?, path: String?) {
+    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, title: String?, runID: String?, status: DataStatus?, summary: String?, reason: PurpleReason?, options: [String: Option]?, mode: Mode?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, contextWindow: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String?, provider: String?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, artifactID: String?, durationMS: Int?, preview: String?, truncated: Bool?, diff: String?, source: String?, subject: String?, decision: Decision?, rule: String?, todos: [PurpleTodo]?, hash: String?, how: How?, path: String?) {
         self.cwd = cwd
         self.forkedFrom = forkedFrom
         self.modelName = modelName
         self.modelProfile = modelProfile
         self.modelProvider = modelProvider
+        self.origin = origin
         self.allowedTools = allowedTools
         self.mcpServers = mcpServers
         self.title = title
+        self.runID = runID
+        self.status = status
+        self.summary = summary
         self.reason = reason
         self.options = options
         self.mode = mode
@@ -7172,7 +7201,6 @@ public struct ParamsData: Codable {
         self.artifactID = artifactID
         self.durationMS = durationMS
         self.preview = preview
-        self.summary = summary
         self.truncated = truncated
         self.diff = diff
         self.source = source
@@ -7227,6 +7255,7 @@ public struct PurpleForkedFrom: Codable {
 
 public enum How: String, Codable {
     case invoked = "invoked"
+    case model = "model"
     case pinned = "pinned"
 }
 
@@ -7254,6 +7283,12 @@ public struct FluffySkillCall: Codable {
         self.args = args
         self.name = name
     }
+}
+
+public enum DataStatus: String, Codable {
+    case cancelled = "cancelled"
+    case completed = "completed"
+    case failed = "failed"
 }
 
 /// One non-empty section of the system prompt sent with a model call.
@@ -7343,6 +7378,7 @@ public enum ParamsType: String, Codable {
     case runFailed = "run.failed"
     case runStarted = "run.started"
     case sessionClosed = "session.closed"
+    case sessionCompleted = "session.completed"
     case sessionCreated = "session.created"
     case sessionModeChanged = "session.mode.changed"
     case sessionUpdated = "session.updated"
@@ -8010,6 +8046,89 @@ public enum SessionClosedEventType: String, Codable {
     case sessionClosed = "session.closed"
 }
 
+/// A run in a session that no user typed into has ended.
+///
+/// ``status`` is how the run ended. ``summary`` is the last assistant message
+/// cut to a few lines, null when the run left no reply (a failed or cancelled
+/// run). A run that stops on an approval does not emit this: it is
+/// ``approval.needed``.
+// MARK: - SessionCompletedData
+public struct SessionCompletedData: Codable {
+    public let runID: String
+    public let status: DataStatus
+    public let summary: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case runID = "run_id"
+        case status = "status"
+        case summary = "summary"
+    }
+
+    public init(runID: String, status: DataStatus, summary: String?) {
+        self.runID = runID
+        self.status = status
+        self.summary = summary
+    }
+}
+
+/// A run of a session whose origin is not ``user`` ended. It is also in the log.
+// MARK: - SessionCompletedEvent
+public struct SessionCompletedEvent: Codable {
+    public let data: SessionCompletedEventData
+    public let runID: String
+    public let seq: Int
+    public let sessionID: String
+    public let ts: String
+    public let type: SessionCompletedEventType
+
+    public enum CodingKeys: String, CodingKey {
+        case data = "data"
+        case runID = "run_id"
+        case seq = "seq"
+        case sessionID = "session_id"
+        case ts = "ts"
+        case type = "type"
+    }
+
+    public init(data: SessionCompletedEventData, runID: String, seq: Int, sessionID: String, ts: String, type: SessionCompletedEventType) {
+        self.data = data
+        self.runID = runID
+        self.seq = seq
+        self.sessionID = sessionID
+        self.ts = ts
+        self.type = type
+    }
+}
+
+/// A run in a session that no user typed into has ended.
+///
+/// ``status`` is how the run ended. ``summary`` is the last assistant message
+/// cut to a few lines, null when the run left no reply (a failed or cancelled
+/// run). A run that stops on an approval does not emit this: it is
+/// ``approval.needed``.
+// MARK: - SessionCompletedEventData
+public struct SessionCompletedEventData: Codable {
+    public let runID: String
+    public let status: DataStatus
+    public let summary: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case runID = "run_id"
+        case status = "status"
+        case summary = "summary"
+    }
+
+    public init(runID: String, status: DataStatus, summary: String?) {
+        self.runID = runID
+        self.status = status
+        self.summary = summary
+    }
+}
+
+public enum SessionCompletedEventType: String, Codable {
+    case sessionCompleted = "session.completed"
+}
+
 /// ``session.create``. An empty profile uses the daemon's configured one.
 ///
 /// ``cwd`` is the session's project folder, an absolute path. File tools work
@@ -8020,21 +8139,33 @@ public enum SessionClosedEventType: String, Codable {
 /// model that does not resolve, or whose provider has no key, fails here with
 /// the same error code and message.
 ///
+/// ``origin`` says who started the session: ``user`` (the default) or ``cli``
+/// for ``golem ask --detach``. Only the daemon itself starts a ``routine:*``
+/// session, and any other value is refused.
+///
 /// The caller is not attached. ``session.attach`` replays ``session.created``.
 // MARK: - SessionCreateParams
 public struct SessionCreateParams: Codable {
     public let cwd: String?
     public let modelProfile: String?
+    public let origin: Origin?
 
     public enum CodingKeys: String, CodingKey {
         case cwd = "cwd"
         case modelProfile = "model_profile"
+        case origin = "origin"
     }
 
-    public init(cwd: String?, modelProfile: String?) {
+    public init(cwd: String?, modelProfile: String?, origin: Origin?) {
         self.cwd = cwd
         self.modelProfile = modelProfile
+        self.origin = origin
     }
+}
+
+public enum Origin: String, Codable {
+    case cli = "cli"
+    case user = "user"
 }
 
 /// The id of the session the daemon just created.
@@ -8057,7 +8188,9 @@ public struct SessionCreateResult: Codable {
 /// ``model_provider`` and ``model_name`` are set when the daemon can resolve
 /// it, and null otherwise. ``forked_from`` is set on a session made by
 /// ``session.fork``. ``cwd`` is the project folder the file tools work in,
-/// or null for a session without one.
+/// or null for a session without one. ``origin`` is who started the session:
+/// ``cli``, ``routine:<name>``, and so on. Null means ``user``, and an older
+/// daemon leaves it out.
 // MARK: - SessionCreatedData
 public struct SessionCreatedData: Codable {
     public let cwd: String?
@@ -8065,6 +8198,7 @@ public struct SessionCreatedData: Codable {
     public let modelName: String?
     public let modelProfile: String
     public let modelProvider: String?
+    public let origin: String?
 
     public enum CodingKeys: String, CodingKey {
         case cwd = "cwd"
@@ -8072,14 +8206,16 @@ public struct SessionCreatedData: Codable {
         case modelName = "model_name"
         case modelProfile = "model_profile"
         case modelProvider = "model_provider"
+        case origin = "origin"
     }
 
-    public init(cwd: String?, forkedFrom: SessionCreatedDataForkedFrom?, modelName: String?, modelProfile: String, modelProvider: String?) {
+    public init(cwd: String?, forkedFrom: SessionCreatedDataForkedFrom?, modelName: String?, modelProfile: String, modelProvider: String?, origin: String?) {
         self.cwd = cwd
         self.forkedFrom = forkedFrom
         self.modelName = modelName
         self.modelProfile = modelProfile
         self.modelProvider = modelProvider
+        self.origin = origin
     }
 }
 
@@ -8135,7 +8271,9 @@ public struct SessionCreatedEvent: Codable {
 /// ``model_provider`` and ``model_name`` are set when the daemon can resolve
 /// it, and null otherwise. ``forked_from`` is set on a session made by
 /// ``session.fork``. ``cwd`` is the project folder the file tools work in,
-/// or null for a session without one.
+/// or null for a session without one. ``origin`` is who started the session:
+/// ``cli``, ``routine:<name>``, and so on. Null means ``user``, and an older
+/// daemon leaves it out.
 // MARK: - SessionCreatedEventData
 public struct SessionCreatedEventData: Codable {
     public let cwd: String?
@@ -8143,6 +8281,7 @@ public struct SessionCreatedEventData: Codable {
     public let modelName: String?
     public let modelProfile: String
     public let modelProvider: String?
+    public let origin: String?
 
     public enum CodingKeys: String, CodingKey {
         case cwd = "cwd"
@@ -8150,14 +8289,16 @@ public struct SessionCreatedEventData: Codable {
         case modelName = "model_name"
         case modelProfile = "model_profile"
         case modelProvider = "model_provider"
+        case origin = "origin"
     }
 
-    public init(cwd: String?, forkedFrom: FluffyForkedFrom?, modelName: String?, modelProfile: String, modelProvider: String?) {
+    public init(cwd: String?, forkedFrom: FluffyForkedFrom?, modelName: String?, modelProfile: String, modelProvider: String?, origin: String?) {
         self.cwd = cwd
         self.forkedFrom = forkedFrom
         self.modelName = modelName
         self.modelProfile = modelProfile
         self.modelProvider = modelProvider
+        self.origin = origin
     }
 }
 
@@ -8353,7 +8494,8 @@ public struct SessionListResult: Codable {
 /// two summaries of one session is newer. ``cwd`` is the session's project
 /// folder, null for a session that has not been given one. ``forked_from`` is
 /// the id of the session this one was forked from, null for a session that is
-/// not a fork. An older daemon leaves it out.
+/// not a fork. An older daemon leaves it out. ``origin`` is who started the
+/// session: ``user``, ``cli``, ``routine:<name>``. A session never changes it.
 // MARK: - SessionElement
 public struct SessionElement: Codable {
     public let createdAt: String
@@ -8361,6 +8503,7 @@ public struct SessionElement: Codable {
     public let forkedFrom: String?
     public let lastSeq: Int
     public let modelProfile: String
+    public let origin: String?
     public let sessionID: String
     public let status: SessionStatus
     public let title: String?
@@ -8372,18 +8515,20 @@ public struct SessionElement: Codable {
         case forkedFrom = "forked_from"
         case lastSeq = "last_seq"
         case modelProfile = "model_profile"
+        case origin = "origin"
         case sessionID = "session_id"
         case status = "status"
         case title = "title"
         case updatedAt = "updated_at"
     }
 
-    public init(createdAt: String, cwd: String?, forkedFrom: String?, lastSeq: Int, modelProfile: String, sessionID: String, status: SessionStatus, title: String?, updatedAt: String) {
+    public init(createdAt: String, cwd: String?, forkedFrom: String?, lastSeq: Int, modelProfile: String, origin: String?, sessionID: String, status: SessionStatus, title: String?, updatedAt: String) {
         self.createdAt = createdAt
         self.cwd = cwd
         self.forkedFrom = forkedFrom
         self.lastSeq = lastSeq
         self.modelProfile = modelProfile
+        self.origin = origin
         self.sessionID = sessionID
         self.status = status
         self.title = title
@@ -8736,7 +8881,8 @@ public enum SessionSummaryNotificationMethod: String, Codable {
 /// two summaries of one session is newer. ``cwd`` is the session's project
 /// folder, null for a session that has not been given one. ``forked_from`` is
 /// the id of the session this one was forked from, null for a session that is
-/// not a fork. An older daemon leaves it out.
+/// not a fork. An older daemon leaves it out. ``origin`` is who started the
+/// session: ``user``, ``cli``, ``routine:<name>``. A session never changes it.
 // MARK: - SessionSummaryNotificationParams
 public struct SessionSummaryNotificationParams: Codable {
     public let createdAt: String
@@ -8744,6 +8890,7 @@ public struct SessionSummaryNotificationParams: Codable {
     public let forkedFrom: String?
     public let lastSeq: Int
     public let modelProfile: String
+    public let origin: String?
     public let sessionID: String
     public let status: SessionStatus
     public let title: String?
@@ -8755,18 +8902,20 @@ public struct SessionSummaryNotificationParams: Codable {
         case forkedFrom = "forked_from"
         case lastSeq = "last_seq"
         case modelProfile = "model_profile"
+        case origin = "origin"
         case sessionID = "session_id"
         case status = "status"
         case title = "title"
         case updatedAt = "updated_at"
     }
 
-    public init(createdAt: String, cwd: String?, forkedFrom: String?, lastSeq: Int, modelProfile: String, sessionID: String, status: SessionStatus, title: String?, updatedAt: String) {
+    public init(createdAt: String, cwd: String?, forkedFrom: String?, lastSeq: Int, modelProfile: String, origin: String?, sessionID: String, status: SessionStatus, title: String?, updatedAt: String) {
         self.createdAt = createdAt
         self.cwd = cwd
         self.forkedFrom = forkedFrom
         self.lastSeq = lastSeq
         self.modelProfile = modelProfile
+        self.origin = origin
         self.sessionID = sessionID
         self.status = status
         self.title = title
@@ -8783,7 +8932,8 @@ public struct SessionSummaryNotificationParams: Codable {
 /// two summaries of one session is newer. ``cwd`` is the session's project
 /// folder, null for a session that has not been given one. ``forked_from`` is
 /// the id of the session this one was forked from, null for a session that is
-/// not a fork. An older daemon leaves it out.
+/// not a fork. An older daemon leaves it out. ``origin`` is who started the
+/// session: ``user``, ``cli``, ``routine:<name>``. A session never changes it.
 // MARK: - SessionSummary
 public struct SessionSummary: Codable {
     public let createdAt: String
@@ -8791,6 +8941,7 @@ public struct SessionSummary: Codable {
     public let forkedFrom: String?
     public let lastSeq: Int
     public let modelProfile: String
+    public let origin: String?
     public let sessionID: String
     public let status: SessionStatus
     public let title: String?
@@ -8802,18 +8953,20 @@ public struct SessionSummary: Codable {
         case forkedFrom = "forked_from"
         case lastSeq = "last_seq"
         case modelProfile = "model_profile"
+        case origin = "origin"
         case sessionID = "session_id"
         case status = "status"
         case title = "title"
         case updatedAt = "updated_at"
     }
 
-    public init(createdAt: String, cwd: String?, forkedFrom: String?, lastSeq: Int, modelProfile: String, sessionID: String, status: SessionStatus, title: String?, updatedAt: String) {
+    public init(createdAt: String, cwd: String?, forkedFrom: String?, lastSeq: Int, modelProfile: String, origin: String?, sessionID: String, status: SessionStatus, title: String?, updatedAt: String) {
         self.createdAt = createdAt
         self.cwd = cwd
         self.forkedFrom = forkedFrom
         self.lastSeq = lastSeq
         self.modelProfile = modelProfile
+        self.origin = origin
         self.sessionID = sessionID
         self.status = status
         self.title = title
@@ -9225,10 +9378,12 @@ public struct RowElement: Codable {
 /// ``how`` is ``invoked`` for a skill run once by name: its body is that
 /// turn's user message. It is ``pinned`` for a skill turned on for the whole
 /// session: its body is in the system prompt of every model call until it is
-/// unpinned. ``source`` is where it was found, ``path`` its folder, and
-/// ``hash`` the sha256 of its ``SKILL.md``. A pinned skill whose file changed,
-/// or that can be used again after it was skipped, is activated again in the
-/// run whose model call first reads the new body.
+/// unpinned. It is ``model`` for a skill the model loaded itself with
+/// ``load_skill``: its body is that tool's result. ``source`` is where it was
+/// found, ``path`` its folder, and ``hash`` the sha256 of its ``SKILL.md``.
+/// A pinned skill whose file changed, or that can be used again after it was
+/// skipped, is activated again in the run whose model call first reads the
+/// new body.
 // MARK: - SkillActivatedData
 public struct SkillActivatedData: Codable {
     public let hash: String
@@ -9291,10 +9446,12 @@ public struct SkillActivatedEvent: Codable {
 /// ``how`` is ``invoked`` for a skill run once by name: its body is that
 /// turn's user message. It is ``pinned`` for a skill turned on for the whole
 /// session: its body is in the system prompt of every model call until it is
-/// unpinned. ``source`` is where it was found, ``path`` its folder, and
-/// ``hash`` the sha256 of its ``SKILL.md``. A pinned skill whose file changed,
-/// or that can be used again after it was skipped, is activated again in the
-/// run whose model call first reads the new body.
+/// unpinned. It is ``model`` for a skill the model loaded itself with
+/// ``load_skill``: its body is that tool's result. ``source`` is where it was
+/// found, ``path`` its folder, and ``hash`` the sha256 of its ``SKILL.md``.
+/// A pinned skill whose file changed, or that can be used again after it was
+/// skipped, is activated again in the run whose model call first reads the
+/// new body.
 // MARK: - SkillActivatedEventData
 public struct SkillActivatedEventData: Codable {
     public let hash: String
@@ -9510,7 +9667,10 @@ public struct SkillListResult: Codable {
 /// disabled``, or lost its name to another skill, whose folder
 /// ``shadowed_by`` names. ``model_invocable`` is false for
 /// ``disable-model-invocation: true``. ``allowed_tools`` and ``model`` are
-/// the frontmatter as written.
+/// the frontmatter as written. ``indexed`` is true when the skill is in the
+/// skill index of the system prompt: false for a skill the model may not
+/// load, and for one dropped because the index is over ``[skills]
+/// index_budget``.
 // MARK: - SkillElement
 public struct SkillElement: Codable {
     public let allowedTools: [String]?
@@ -9518,6 +9678,7 @@ public struct SkillElement: Codable {
     public let description: String
     public let disabled: Bool?
     public let errors: [String]?
+    public let indexed: Bool?
     public let model: String?
     public let modelInvocable: Bool?
     public let name: String
@@ -9534,6 +9695,7 @@ public struct SkillElement: Codable {
         case description = "description"
         case disabled = "disabled"
         case errors = "errors"
+        case indexed = "indexed"
         case model = "model"
         case modelInvocable = "model_invocable"
         case name = "name"
@@ -9545,12 +9707,13 @@ public struct SkillElement: Codable {
         case warnings = "warnings"
     }
 
-    public init(allowedTools: [String]?, argumentHint: String?, description: String, disabled: Bool?, errors: [String]?, model: String?, modelInvocable: Bool?, name: String, path: String, shadowedBy: String?, source: ListedSkillSource, usable: Bool, userInvocable: Bool?, warnings: [String]?) {
+    public init(allowedTools: [String]?, argumentHint: String?, description: String, disabled: Bool?, errors: [String]?, indexed: Bool?, model: String?, modelInvocable: Bool?, name: String, path: String, shadowedBy: String?, source: ListedSkillSource, usable: Bool, userInvocable: Bool?, warnings: [String]?) {
         self.allowedTools = allowedTools
         self.argumentHint = argumentHint
         self.description = description
         self.disabled = disabled
         self.errors = errors
+        self.indexed = indexed
         self.model = model
         self.modelInvocable = modelInvocable
         self.name = name
