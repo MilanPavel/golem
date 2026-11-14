@@ -84,6 +84,7 @@ export {
   importItems,
   initialPicks,
   missingRefsOf,
+  pickableKeys,
   scanSummary,
   type ImportItem,
   type ImportSource,

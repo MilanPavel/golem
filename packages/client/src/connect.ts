@@ -62,6 +62,8 @@ import type { ModelSetDefaultResult } from "../../protocol/gen/model-set-default
 import type { ModelOptionsGetResult } from "../../protocol/gen/model-options-get-result.ts";
 import type { ModelOptionsSaved } from "../../protocol/gen/model-options-saved.ts";
 import type { ModelOptionsSetResult } from "../../protocol/gen/model-options-set-result.ts";
+import type { PermissionsSetModeParams } from "../../protocol/gen/permissions-set-mode-params.ts";
+import type { PermissionsSetModeResult } from "../../protocol/gen/permissions-set-mode-result.ts";
 import type { SessionSetModeParams } from "../../protocol/gen/session-set-mode-params.ts";
 import type { SessionSetModeResult } from "../../protocol/gen/session-set-mode-result.ts";
 import type { SessionSetOptionsResult } from "../../protocol/gen/session-set-options-result.ts";
@@ -120,6 +122,7 @@ import {
   isModelOptionsSaved,
   isModelOptionsSetResult,
   isModelSetDefaultResult,
+  isPermissionsSetModeResult,
   isSessionSetModeResult,
   isSessionSetOptionsResult,
   isPullDone,
@@ -293,6 +296,8 @@ export interface GolemClient {
   setSessionModel(sessionId: string, model: string): Promise<SessionSetModelResult>;
   /** Write `default_model` to the user's config.toml. New sessions start on it. */
   setDefaultModel(model: string): Promise<ModelSetDefaultResult>;
+  /** Write `[permissions] mode` to the user's config.toml, keeping its comments. New chats start in it. */
+  setDefaultPermissionMode(mode: PermissionsSetModeParams["mode"]): Promise<PermissionsSetModeResult>;
   /** The tunable options of a local model, its own defaults, what is saved for it, and `sessionId`'s overrides. */
   getModelOptions(model: string, sessionId?: string): Promise<ModelOptionsGetResult>;
   /** Save options for the model in config.toml. A `null` value removes one. Every connection gets `onOptionsSaved`. */
@@ -1291,6 +1296,14 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("model.set_default", { model });
       if (!isModelSetDefaultResult(result)) {
         throw new Error("invalid model.set_default result");
+      }
+      return result;
+    },
+    async setDefaultPermissionMode(mode: PermissionsSetModeParams["mode"]): Promise<PermissionsSetModeResult> {
+      await ready;
+      const result = await call("permissions.set_mode", { mode });
+      if (!isPermissionsSetModeResult(result)) {
+        throw new Error("invalid permissions.set_mode result");
       }
       return result;
     },

@@ -22,6 +22,7 @@ import type { ModelServerStatus } from "../../protocol/gen/model-server-status.t
 import type { ModelOptionsGetResult } from "../../protocol/gen/model-options-get-result.ts";
 import type { ModelOptionsSaved } from "../../protocol/gen/model-options-saved.ts";
 import type { ModelOptionsSetResult } from "../../protocol/gen/model-options-set-result.ts";
+import type { PermissionsSetModeResult } from "../../protocol/gen/permissions-set-mode-result.ts";
 import type { SessionSetModeResult } from "../../protocol/gen/session-set-mode-result.ts";
 import type { SessionSetOptionsResult } from "../../protocol/gen/session-set-options-result.ts";
 import type { ListedSkill, SkillListResult } from "../../protocol/gen/skill-list-result.ts";
@@ -291,6 +292,14 @@ export function isSessionSetModeResult(value: unknown): value is SessionSetModeR
     typeof value["session_id"] === "string" &&
     (value["mode"] === "careful" || value["mode"] === "balanced" || value["mode"] === "autopilot") &&
     typeof value["override"] === "boolean"
+  );
+}
+
+export function isPermissionsSetModeResult(value: unknown): value is PermissionsSetModeResult {
+  return (
+    isRecord(value) &&
+    (value["mode"] === "careful" || value["mode"] === "balanced" || value["mode"] === "autopilot") &&
+    typeof value["path"] === "string"
   );
 }
 

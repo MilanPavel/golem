@@ -40,6 +40,9 @@ import { APPROVAL_DETAIL, APPROVAL_TRACE, CUT_LIKELY_DETAIL, CUT_MIDDLE_DETAIL, 
 import type { TraceRunSpan, TraceSpanResult } from "../store/trace.ts";
 import { FORM_CASES } from "../features/setup/sample.ts";
 import { GolemBlockView } from "../features/setup/golem-block.tsx";
+import { CatalogView } from "../features/settings/mcp/catalog-panel.tsx";
+import { ImportListView } from "../features/settings/mcp/import-panel.tsx";
+import { SAMPLE_CATALOG, SAMPLE_SCAN } from "../features/settings/mcp/sample.ts";
 import { AddKey, SetupFormView, SetupHeader } from "../features/setup/setup-form.tsx";
 import { ToolsOfferView } from "../features/setup/tools-offer.tsx";
 import { TOOLS_CASES } from "../features/setup/tools-sample.ts";
@@ -626,6 +629,47 @@ function SetupFormDemo() {
   );
 }
 
+/** Settings → MCP servers: the Catalog tab's cards, and the Import tab with nothing picked and with some picked. */
+function McpTabsDemo() {
+  const [picked, setPicked] = useState<ReadonlySet<string>>(new Set(["a", "e"]));
+  const none = new Set<string>();
+  return (
+    <div className="flex flex-col gap-4">
+      <section aria-label="MCP servers, Catalog" className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
+        <span className="font-mono text-xs text-faint">Catalog</span>
+        <CatalogView entries={SAMPLE_CATALOG} onAdd={() => {}} />
+      </section>
+      <section aria-label="MCP servers, Import with nothing picked" className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
+        <span className="font-mono text-xs text-faint">Import, nothing picked</span>
+        <ImportListView sources={SAMPLE_SCAN.sources} picked={none} names={{}} values={{}} busy={false} onPick={() => {}} onName={() => {}} onValue={() => {}} onImport={() => {}} />
+      </section>
+      <section aria-label="MCP servers, Import with some picked" className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
+        <span className="font-mono text-xs text-faint">Import, some picked</span>
+        <ImportListView
+          sources={SAMPLE_SCAN.sources}
+          picked={picked}
+          names={{}}
+          values={{}}
+          busy={false}
+          onPick={(keys, on) =>
+            setPicked((now) => {
+              const next = new Set(now);
+              for (const key of keys) {
+                if (on) next.add(key);
+                else next.delete(key);
+              }
+              return next;
+            })
+          }
+          onName={() => {}}
+          onValue={() => {}}
+          onImport={() => {}}
+        />
+      </section>
+    </div>
+  );
+}
+
 /** The welcome page in each step and state, in a box of its own: it is a page, so it fills its frame. */
 function WelcomeDemo() {
   return (
@@ -817,6 +861,11 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
       <section className="mt-6" id={anchor("Setup form")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Setup form</h3>
         <SetupFormDemo />
+      </section>
+
+      <section className="mt-6" id={anchor("MCP servers")}>
+        <h3 className="mb-2 font-mono text-xs text-faint">MCP servers</h3>
+        <McpTabsDemo />
       </section>
 
       <section className="mt-6" id={anchor("Tools panel")}>
