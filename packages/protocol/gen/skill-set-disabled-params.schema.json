@@ -1,0 +1,21 @@
+{
+  "additionalProperties": false,
+  "description": "``skill.set_disabled``. Add or remove ``name`` in ``[skills] disabled``.",
+  "properties": {
+    "disabled": {
+      "title": "Disabled",
+      "type": "boolean"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "disabled"
+  ],
+  "title": "SkillSetDisabledParams",
+  "type": "object"
+}

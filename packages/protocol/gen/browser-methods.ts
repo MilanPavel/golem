@@ -61,7 +61,11 @@ export const BROWSER_METHODS: ReadonlySet<string> = new Set([
   "session.set_options",
   "session.set_skills",
   "setup.status",
+  "skill.create",
   "skill.list",
+  "skill.read",
+  "skill.set_disabled",
+  "skill.write",
   "trace.get",
   "trace.span",
 ]);
@@ -70,4 +74,6 @@ export const LOCAL_ONLY_METHODS: ReadonlySet<string> = new Set([
   "auth.remove",
   "auth.set",
   "config.raw.set_protected",
+  "skill.create_protected",
+  "skill.write_protected",
 ]);

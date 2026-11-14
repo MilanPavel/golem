@@ -1153,6 +1153,116 @@ class SkillListResult(BaseModel):
     skills: list[ListedSkill]
 
 
+class SkillReadParams(BaseModel):
+    """``skill.read``. The ``SKILL.md`` of the skill called ``name`` that a session in ``cwd`` sees.
+
+    The usable skill of that name is read, or the first one listed when none is usable.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    cwd: str | None = Field(default=None, min_length=1)
+
+
+class SkillReadResult(BaseModel):
+    """The file's path and text, and its ``mtime_ns`` for a later ``skill.write``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    path: str
+    text: str
+    mtime_ns: int
+    source: SkillSource
+
+
+class SkillWriteParams(BaseModel):
+    """``skill.write`` and ``skill.write_protected``. Check a new ``SKILL.md``, and write it.
+
+    ``path`` is a ``SKILL.md`` in a folder ``skill.list`` shows for ``cwd``,
+    never a bundled one. ``base_mtime_ns`` is the ``mtime_ns`` the text was read
+    at: a file changed since is refused. ``dry_run`` checks and writes nothing.
+    ``skill.write`` refuses a project skill unless ``cwd`` is a trusted project;
+    ``skill.write_protected``, which only a local client may call, does not.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    path: str = Field(min_length=1)
+    text: str
+    base_mtime_ns: int
+    cwd: str | None = Field(default=None, min_length=1)
+    dry_run: bool = False
+
+
+class SkillIssue(BaseModel):
+    """One problem in a ``SKILL.md``. ``line`` counts from 1, when known."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    line: int | None = Field(default=None, ge=1)
+    message: str
+
+
+class SkillWriteResult(BaseModel):
+    """What the check found, and whether the file was written.
+
+    ``ok`` is false when the write was refused because the file changed since it was
+    read, and ``errors`` then says so. A text with errors is still written unless
+    ``dry_run`` is set, and then lists as broken. ``mtime_ns`` is the file's now.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    ok: bool
+    written: bool
+    errors: list[SkillIssue] = Field(default_factory=list[SkillIssue])
+    warnings: list[SkillIssue] = Field(default_factory=list[SkillIssue])
+    mtime_ns: int | None = None
+
+
+class SkillCreateParams(BaseModel):
+    """``skill.create`` and ``skill.create_protected``. Make ``<folder>/<name>/SKILL.md``.
+
+    ``scope = "user"`` is ``~/.golem/skills``. ``"project"`` is ``<cwd>/.agents/skills``
+    and needs ``cwd``. ``skill.create`` refuses a project that is not trusted;
+    ``skill.create_protected``, which only a local client may call, does not.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    scope: Literal["user", "project"]
+    cwd: str | None = Field(default=None, min_length=1)
+    description: str = Field(min_length=1)
+    model_invocable: bool = True
+
+
+class SkillCreateResult(BaseModel):
+    """The new ``SKILL.md``'s path and ``mtime_ns``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    path: str
+    mtime_ns: int
+
+
+class SkillSetDisabledParams(BaseModel):
+    """``skill.set_disabled``. Add or remove ``name`` in ``[skills] disabled``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    disabled: bool
+
+
+class SkillSetDisabledResult(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str
+    disabled: bool
+
+
 class McpListParams(BaseModel):
     """``mcp.list``. The user's MCP servers and their state.
 
@@ -2476,10 +2586,19 @@ __all__ = [
     "SetupState",
     "SetupStatusParams",
     "SetupStatusResult",
+    "SkillCreateParams",
+    "SkillCreateResult",
+    "SkillIssue",
     "SkillListParams",
     "SkillListResult",
+    "SkillReadParams",
+    "SkillReadResult",
     "SkillRegistryChanged",
+    "SkillSetDisabledParams",
+    "SkillSetDisabledResult",
     "SkillSource",
+    "SkillWriteParams",
+    "SkillWriteResult",
     "TraceContext",
     "TraceContextItem",
     "TraceContextPart",

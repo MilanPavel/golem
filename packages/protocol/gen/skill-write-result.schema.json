@@ -1,0 +1,76 @@
+{
+  "$defs": {
+    "SkillIssue": {
+      "additionalProperties": false,
+      "description": "One problem in a ``SKILL.md``. ``line`` counts from 1, when known.",
+      "properties": {
+        "line": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Line"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "message"
+      ],
+      "title": "SkillIssue",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "What the check found, and whether the file was written.\n\n``ok`` is false when the write was refused because the file changed since it was\nread, and ``errors`` then says so. A text with errors is still written unless\n``dry_run`` is set, and then lists as broken. ``mtime_ns`` is the file's now.",
+  "properties": {
+    "errors": {
+      "items": {
+        "$ref": "#/$defs/SkillIssue"
+      },
+      "title": "Errors",
+      "type": "array"
+    },
+    "mtime_ns": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Mtime Ns"
+    },
+    "ok": {
+      "title": "Ok",
+      "type": "boolean"
+    },
+    "warnings": {
+      "items": {
+        "$ref": "#/$defs/SkillIssue"
+      },
+      "title": "Warnings",
+      "type": "array"
+    },
+    "written": {
+      "title": "Written",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "ok",
+    "written"
+  ],
+  "title": "SkillWriteResult",
+  "type": "object"
+}

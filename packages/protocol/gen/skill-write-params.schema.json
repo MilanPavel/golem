@@ -1,0 +1,44 @@
+{
+  "additionalProperties": false,
+  "description": "``skill.write`` and ``skill.write_protected``. Check a new ``SKILL.md``, and write it.\n\n``path`` is a ``SKILL.md`` in a folder ``skill.list`` shows for ``cwd``,\nnever a bundled one. ``base_mtime_ns`` is the ``mtime_ns`` the text was read\nat: a file changed since is refused. ``dry_run`` checks and writes nothing.\n``skill.write`` refuses a project skill unless ``cwd`` is a trusted project;\n``skill.write_protected``, which only a local client may call, does not.",
+  "properties": {
+    "base_mtime_ns": {
+      "title": "Base Mtime Ns",
+      "type": "integer"
+    },
+    "cwd": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cwd"
+    },
+    "dry_run": {
+      "default": false,
+      "title": "Dry Run",
+      "type": "boolean"
+    },
+    "path": {
+      "minLength": 1,
+      "title": "Path",
+      "type": "string"
+    },
+    "text": {
+      "title": "Text",
+      "type": "string"
+    }
+  },
+  "required": [
+    "path",
+    "text",
+    "base_mtime_ns"
+  ],
+  "title": "SkillWriteParams",
+  "type": "object"
+}

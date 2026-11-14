@@ -1,0 +1,35 @@
+{
+  "additionalProperties": false,
+  "description": "The file's path and text, and its ``mtime_ns`` for a later ``skill.write``.",
+  "properties": {
+    "mtime_ns": {
+      "title": "Mtime Ns",
+      "type": "integer"
+    },
+    "path": {
+      "title": "Path",
+      "type": "string"
+    },
+    "source": {
+      "enum": [
+        "project",
+        "user",
+        "bundled"
+      ],
+      "title": "Source",
+      "type": "string"
+    },
+    "text": {
+      "title": "Text",
+      "type": "string"
+    }
+  },
+  "required": [
+    "path",
+    "text",
+    "mtime_ns",
+    "source"
+  ],
+  "title": "SkillReadResult",
+  "type": "object"
+}
