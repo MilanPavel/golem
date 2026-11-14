@@ -347,13 +347,18 @@ test("API keys are chips, the saved one in the allow tone, and none is open at f
   const section = await screen.findByRole("group", { name: "API keys" });
   const chips = within(section).getAllByRole("button", { expanded: false });
   expect(chips.map((chip) => chip.textContent)).toEqual([
-    "+AnthropicClaude",
-    "✓OpenAIsaved",
-    "+GoogleGemini",
-    "+DeepSeekDeepSeek V3 and R1",
-    "+xAIGrok",
-    "+MoonshotKimi",
+    "AnthropicClaude",
+    "OpenAIGPTsaved",
+    "GoogleGemini",
+    "DeepSeekDeepSeek V3 and R1",
+    "xAIGrok",
+    "MoonshotKimi",
   ]);
+  // Each chip leads with its provider's icon, and no chip is in mono.
+  for (const chip of chips) {
+    expect(chip.querySelector("svg path, svg text")).not.toBeNull();
+    expect(chip.querySelector(".font-mono")).toBeNull();
+  }
   expect(chips[1]?.className).toContain("bg-allow-soft");
   expect(chips[0]?.className).not.toContain("bg-allow-soft");
   // No full-width select, and no command until a chip is pressed.
