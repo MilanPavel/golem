@@ -380,6 +380,16 @@ class TokenUsage(BaseModel):
     cache_write: int | None = Field(default=None, ge=0)
 
 
+class CallPrice(BaseModel):
+    """USD per million tokens, as golem knew it when the call ended."""
+
+    model_config = _CONFIG
+
+    input: float | None = Field(default=None, ge=0)
+    output: float | None = Field(default=None, ge=0)
+    cached_input: float | None = Field(default=None, ge=0)
+
+
 class ModelCallCompletedData(BaseModel):
     """A model call ended.
 
@@ -394,6 +404,9 @@ class ModelCallCompletedData(BaseModel):
     reply. ``recovered`` means golem turned the text into tool calls. ``unread``
     means the text held a call golem could not read, so the reply stayed text.
     None when the reply had no such text.
+
+    ``cost_usd`` is the cost of this call at ``price``. Both are None when the
+    price is not known. A local model costs 0.
     """
 
     model_config = _CONFIG
@@ -406,6 +419,8 @@ class ModelCallCompletedData(BaseModel):
     failed: bool = False
     context_window: int | None = Field(default=None, gt=0)
     text_tool_calls: Literal["recovered", "unread"] | None = None
+    cost_usd: float | None = Field(default=None, ge=0)
+    price: CallPrice | None = None
 
 
 class ToolCompletedData(BaseModel):
@@ -985,6 +1000,7 @@ __all__ = [
     "ApprovalNeededEvent",
     "ApprovalResolvedData",
     "ApprovalResolvedEvent",
+    "CallPrice",
     "ChatEvent",
     "EmptyEventData",
     "EventType",

@@ -26,7 +26,7 @@ from langgraph.errors import GraphRecursionError
 from langgraph.graph import END, START, StateGraph  # pyright: ignore[reportMissingTypeStubs]
 from langgraph.types import Command
 
-from golem.config import PermissionMode
+from golem.config import ModelPrice, PermissionMode
 from golem.graphs.adapter import STREAM_KEY, message_text
 from golem.graphs.prompt import PINNED_KEY, PromptContext, SystemPrompt
 from golem.graphs.state import AgentState
@@ -133,6 +133,7 @@ class ChatRuntime:
         policy: Policy | None = None,
         prompt: SystemPrompt | None = None,
         window_of: WindowOf | None = None,
+        price_of: Callable[[str], ModelPrice | None] | None = None,
     ) -> None:
         self._graph = graph
         self.router = router
@@ -140,6 +141,8 @@ class ChatRuntime:
         self.policy = Policy(None) if policy is None else policy
         self.prompt = SystemPrompt() if prompt is None else prompt
         self.window_of = window_of
+        self.price_of = price_of
+        """The price of a profile's model, or None when unknown. No I/O."""
         self.enable_mcp: EnableMcp | None = None
         """Turns on an on-demand MCP server for a session, for the model's ``mcp_enable``."""
         self.skills: SkillRegistry | None = None
@@ -375,6 +378,7 @@ def open_chat(
     blobs: Blobs | None = None,
     window_of: WindowOf | None = None,
     note_loaded: Callable[[str, int | None], Awaitable[int | None]] | None = None,
+    price_of: Callable[[str], ModelPrice | None] | None = None,
 ) -> ChatRuntime:
     """Compile the chat graph against ``checkpointer``.
 
@@ -424,6 +428,7 @@ def open_chat(
         window = window_of(profile, overrides) if window_of is not None else ContextWindow()
         async with _held(router, local, profile):
             request: dict[str, object] = {STREAM_KEY: "model.request", "message_id": message_id}
+            request["profile"] = profile
             request["message_ids"] = [m.id for m in messages if m.id]
             if parts:
                 request["system_sections"] = [{"name": n, "chars": len(t)} for n, t in parts]
@@ -514,6 +519,7 @@ def open_chat(
             rules,
             system_prompt,
             window_of,
+            price_of,
         )
     )
     return runtime[0]

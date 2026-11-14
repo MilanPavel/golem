@@ -48,7 +48,7 @@ class _Log:
         text: str = "ok",
         run: str = "r1",
         window: dict[str, int | bool] | None = None,
-        done: dict[str, int | bool] | None = None,
+        done: dict[str, float | bool] | None = None,
         used: int = 5,
     ) -> None:
         self.add("message.started", {"message_id": message_id, "role": "assistant"}, run)
@@ -403,3 +403,13 @@ def test_an_exact_window_below_the_input_is_kept() -> None:
     log.model("m1", window={"context_window": 4096}, used=23600)
     (run,) = build_trace(log.events)
     assert run.children[0].context_window == 4096
+
+
+def test_a_model_span_has_the_cost_its_call_recorded() -> None:
+    log = _Log()
+    log.user("go")
+    log.model("m1", done={"cost_usd": 0.012})
+    log.model("m2")
+    log.add("run.completed", {})
+    (run,) = build_trace(log.events)
+    assert [m.cost_usd for m in run.children] == [0.012, None]

@@ -447,9 +447,13 @@ class TraceModelSpan(TraceSpan):
     "likely". ``dropped_message_ids`` are the messages the model probably did
     not see (older messages only), and ``dropped_tokens`` is an estimate of
     their size.
+
+    ``cost_usd`` is what the call cost, as its ``model.call.completed`` recorded
+    it. Null when the price was not known or the call has no token counts.
     """
 
     children: list[TraceToolSpan] = Field(default_factory=list[TraceToolSpan])
+    cost_usd: float | None = Field(default=None, ge=0)
     context_window: int | None = Field(default=None, ge=1)
     num_ctx: int | None = Field(default=None, ge=1)
     context_window_estimated: bool = False

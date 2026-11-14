@@ -229,6 +229,53 @@
       "title": "ApprovalResolvedEvent",
       "type": "object"
     },
+    "CallPrice": {
+      "additionalProperties": false,
+      "description": "USD per million tokens, as golem knew it when the call ended.",
+      "properties": {
+        "cached_input": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cached Input"
+        },
+        "input": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Input"
+        },
+        "output": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Output"
+        }
+      },
+      "title": "CallPrice",
+      "type": "object"
+    },
     "EmptyEventData": {
       "additionalProperties": false,
       "description": "No payload. Used by ``run.started``, ``run.completed``, and ``session.closed``.",
@@ -571,7 +618,7 @@
     },
     "ModelCallCompletedData": {
       "additionalProperties": false,
-      "description": "A model call ended.\n\n``first_token_ms`` is the time from the request to the first text, and\nNone when no text came. ``latency_ms`` is the time to the end.\n``failed`` is true when the call raised or was stopped.\n\n``context_window`` is the window the call ran with, read from the model server\nafter the call. Exact. None when it could not be read.\n\n``text_tool_calls`` is set when the model wrote a tool call as text in its\nreply. ``recovered`` means golem turned the text into tool calls. ``unread``\nmeans the text held a call golem could not read, so the reply stayed text.\nNone when the reply had no such text.",
+      "description": "A model call ended.\n\n``first_token_ms`` is the time from the request to the first text, and\nNone when no text came. ``latency_ms`` is the time to the end.\n``failed`` is true when the call raised or was stopped.\n\n``context_window`` is the window the call ran with, read from the model server\nafter the call. Exact. None when it could not be read.\n\n``text_tool_calls`` is set when the model wrote a tool call as text in its\nreply. ``recovered`` means golem turned the text into tool calls. ``unread``\nmeans the text held a call golem could not read, so the reply stayed text.\nNone when the reply had no such text.\n\n``cost_usd`` is the cost of this call at ``price``. Both are None when the\nprice is not known. A local model costs 0.",
       "properties": {
         "context_window": {
           "anyOf": [
@@ -585,6 +632,19 @@
           ],
           "default": null,
           "title": "Context Window"
+        },
+        "cost_usd": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cost Usd"
         },
         "failed": {
           "default": false,
@@ -613,6 +673,17 @@
           "minLength": 1,
           "title": "Message Id",
           "type": "string"
+        },
+        "price": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CallPrice"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "stop_reason": {
           "anyOf": [
