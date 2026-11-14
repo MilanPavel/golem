@@ -2,7 +2,7 @@
 name: explain-project
 description: Explain what the project in the current folder is and how it is laid out. Use when the user asks what this project is, how it is organised, or where to start reading.
 argument-hint: "[folder or question]"
-allowed-tools: Read Glob Grep
+allowed-tools: read_file list_dir glob grep
 ---
 
 # Explain this project

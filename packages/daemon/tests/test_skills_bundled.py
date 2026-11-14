@@ -29,6 +29,11 @@ def test_every_bundled_skill_passes_the_check() -> None:
     assert ok, report
 
 
+def test_the_starter_skills_are_bundled() -> None:
+    names = {path.parent.name for path in (REPO / "skills").glob("*/SKILL.md")}
+    assert {"explain-project", "commit-message", "review-diff"} <= names
+
+
 def test_a_user_skill_hides_the_bundled_one_of_the_same_name(tmp_path: Path) -> None:
     bundled = REPO / "skills"
     name = sorted(path.name for path in bundled.iterdir() if (path / "SKILL.md").is_file())[0]
