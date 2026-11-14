@@ -343,7 +343,18 @@ import {
   type SwitcherState,
 } from "./switcher.ts";
 import { SwitcherView } from "./switcher.tsx";
-import { CLAY, COMPOSER_RULE, HINT, PLACEHOLDER, QUESTION_BG, QUESTION_FG } from "./theme.ts";
+import {
+  CLAY,
+  COMPOSER_RULE,
+  DIFF_ADD,
+  DIFF_ADD_BG,
+  DIFF_DEL,
+  DIFF_DEL_BG,
+  HINT,
+  PLACEHOLDER,
+  QUESTION_BG,
+  QUESTION_FG,
+} from "./theme.ts";
 import { copiedHint, copyText } from "./clipboard.ts";
 import { openUrl } from "./open-url.ts";
 import {
@@ -4483,8 +4494,18 @@ function LineView({ line, columns }: { line: LayoutLine; columns: [number, numbe
           bold={span.bold}
           italic={span.italic}
           dimColor={span.dim === true}
-          color={span.dim === true ? undefined : span.code === true && !user ? "cyan" : color}
-          backgroundColor={backgroundColor}
+          color={
+            span.tone === "add"
+              ? DIFF_ADD
+              : span.tone === "del"
+                ? DIFF_DEL
+                : span.dim === true
+                  ? undefined
+                  : span.code === true && !user
+                    ? "cyan"
+                    : color
+          }
+          backgroundColor={span.tone === "add" ? DIFF_ADD_BG : span.tone === "del" ? DIFF_DEL_BG : backgroundColor}
           inverse={selected}
           wrap="truncate-end"
         >
