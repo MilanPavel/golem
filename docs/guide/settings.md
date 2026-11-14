@@ -188,6 +188,7 @@ Only your own file sets these ([Skills](./skills.md)).
 | `disabled` | none | Skill names that are listed but never used |
 | `claude_dirs` | `true` | Also read `~/.claude/skills` and the project's `.claude/skills` |
 | `extra_dirs` | none | More folders of skills, after your own |
+| `index_budget` | `4000` | How many characters the skill index in the system prompt may use. A skill that does not fit is left out of it, and `skill.list` shows `indexed: false` |
 
 ### `[mcp.<name>]`
 

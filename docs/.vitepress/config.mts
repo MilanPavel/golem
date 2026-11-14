@@ -156,6 +156,7 @@ const sidebar: DefaultTheme.Sidebar = [
     text: "Build golem",
     items: [
       { text: "Hacking on golem", link: "/contributing/hacking" },
+      { text: "Checking skill triggering", link: "/contributing/skills-checks" },
       { text: "Contributing", link: "/contributing/" },
       { text: "The monorepo", link: "/monorepo" },
       {
