@@ -2,6 +2,46 @@
 
 What changed in each release of golem, newest first. `just release` writes each section from the commit messages on `main` ([CONTRIBUTING.md](CONTRIBUTING.md)), and the release pull request is the place to edit it. The GitHub release shows the same section. How a release is made is in [docs/sre.md](docs/sre.md), section 5.
 
+## [0.14.0] - 2026-11-14
+
+### Features
+
+- **mcp:** sign in to a hosted server with OAuth, in the daemon ([#572](https://github.com/MilanPavel/golem/pull/572))
+- **web:** Chat detail moves to Settings → Appearance ([#823](https://github.com/MilanPavel/golem/pull/823))
+- **mcp:** needs_auth, mcp.login, mcp.logout, and OAuth catalog entries (1.12.19) ([#819](https://github.com/MilanPavel/golem/pull/819))
+- **web:** the ctx chip opens the trace side panel on the last call ([#828](https://github.com/MilanPavel/golem/pull/828))
+- **mcp:** the model turns on-demand servers on with mcp_enable ([#822](https://github.com/MilanPavel/golem/pull/822))
+- **mcp:** catalog servers are on in every chat ([#826](https://github.com/MilanPavel/golem/pull/826))
+- **web:** a compact Setup page that says where golem is installed ([#833](https://github.com/MilanPavel/golem/pull/833))
+- **mcp:** approving mcp_enable also lets that server's tools run in the session ([#834](https://github.com/MilanPavel/golem/pull/834))
+- **web:** one copy icon button everywhere, and quieter command hints ([#839](https://github.com/MilanPavel/golem/pull/839))
+- **web:** provider icons on the API key chips, in one font ([#840](https://github.com/MilanPavel/golem/pull/840))
+- **protocol:** Settings picks the default permission mode with permissions.set_mode (2.63) ([#848](https://github.com/MilanPavel/golem/pull/848))
+- **web:** MCP servers as Installed, Catalog and Import tabs, with brand icons ([#849](https://github.com/MilanPavel/golem/pull/849))
+- the relay server, with rooms, keys, and an in-memory queue ([#855](https://github.com/MilanPavel/golem/pull/855))
+- **mcp:** sign in to a hosted server from the terminal and the CLI ([#856](https://github.com/MilanPavel/golem/pull/856))
+- **skills:** the release build carries a bundled skill folder and the daemon reads it ([#857](https://github.com/MilanPavel/golem/pull/857))
+- **cli:** **Breaking:** golem opens the web UI, and golem tui opens the terminal chat ([#851](https://github.com/MilanPavel/golem/pull/851))bare golem no longer opens the terminal chat. Run golem tui.
+
+### Fixes
+
+- **web:** one gallery accessibility test per section (B.15) ([#809](https://github.com/MilanPavel/golem/pull/809))
+- **daemon:** close a killed command's output pipe before run returns (B.17) ([#817](https://github.com/MilanPavel/golem/pull/817))
+- **daemon:** the clean-start test waits for the daemon to remove last-error (B.16) ([#816](https://github.com/MilanPavel/golem/pull/816))
+- **web:** the composer chips share one height ([#824](https://github.com/MilanPavel/golem/pull/824))
+- **web:** the app offer knows golem is already installed ([#825](https://github.com/MilanPavel/golem/pull/825))
+- **cli:** CLI, gateway and packaging strings say golem and golem tui ([#853](https://github.com/MilanPavel/golem/pull/853))
+- **web:** web, view and daemon strings say golem and golem tui ([#854](https://github.com/MilanPavel/golem/pull/854))
+
+### Docs
+
+- how the iPhone reaches the Mac, the relay and pairing (ADR-051) ([#820](https://github.com/MilanPavel/golem/pull/820))
+- routines, headless sessions, and the run names (ADR-050) ([#818](https://github.com/MilanPavel/golem/pull/818))
+- ADR-052, the iPhone app and GolemKit, and Always allow from the phone (14.1.2) ([#821](https://github.com/MilanPavel/golem/pull/821))
+- ADR-050 keeps the Mac awake while a run waits, as ADR-051 does ([#832](https://github.com/MilanPavel/golem/pull/832))
+- user guides say golem opens the web UI and golem tui the terminal chat ([#852](https://github.com/MilanPavel/golem/pull/852))
+- contributor and architecture docs say golem opens the web UI and golem tui the chat ([#850](https://github.com/MilanPavel/golem/pull/850))
+
 ## [0.13.1] - 2026-11-12
 
 ### Fixes
