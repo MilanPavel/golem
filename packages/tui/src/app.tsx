@@ -56,6 +56,8 @@ import {
   setupBand,
   single,
   toolsAdded,
+  toolsSignInUrl,
+  toolsSigningIn,
   toolsFailed,
   toolsOffer,
   toolsRuntimeDone,
@@ -126,6 +128,7 @@ import {
   type StarterPick,
   changeToolFilter,
   formatLogLine,
+  loginDoneText,
   formatTestResult,
   formatTestStep,
   latestModelSpan,
@@ -268,6 +271,8 @@ import {
   mcpAddFailed,
   mcpCallDone,
   mcpCatalogLoaded,
+  mcpLoginDone,
+  mcpLoginUrl,
   mcpLogsAppended,
   mcpLogsLoaded,
   mcpManagerKeyOf,
@@ -340,6 +345,7 @@ import {
 import { SwitcherView } from "./switcher.tsx";
 import { CLAY, COMPOSER_RULE, HINT, PLACEHOLDER, QUESTION_BG, QUESTION_FG } from "./theme.ts";
 import { copiedHint, copyText } from "./clipboard.ts";
+import { openUrl } from "./open-url.ts";
 import {
   copyAnswer,
   copyCode,
@@ -1167,6 +1173,24 @@ export function App({
       setMcp((current) =>
         current.servers === null ? current : { servers: mergeMcp(current.servers, server), error: null },
       );
+    });
+  }, [client]);
+
+  useEffect(() => {
+    return client.onMcpLoginDone((done) => {
+      void (async () => {
+        let tools: number | null = null;
+        if (done.ok) {
+          tools = await client
+            .mcpTools(done.name, sessionRef.current ?? undefined)
+            .then((result) => (result.tools.length > 0 ? result.tools.length : null))
+            .catch(() => null);
+        }
+        const text = loginDoneText(done, tools);
+        setMcpManager((state) => mcpLoginDone(state, done.name, done.ok, text));
+        setChat((state) => ({ ...state, error: null, notice: text }));
+        loadMcp();
+      })();
     });
   }, [client]);
 
@@ -2296,6 +2320,10 @@ export function App({
       }
       const server = await client.addMcpServer(params);
       updateTools((tools) => ({ ...tools, created: [...tools.created, server.name] }));
+      if (setupRef.current?.tools.state?.rows.find((row) => row.id === id)?.oauth === true) {
+        await signInToolsServer(id, server.name);
+        return;
+      }
       const result = await client.mcpTest({ name: server.name });
       if (result.ok) {
         changeToolsState((state) => toolsAdded(state, id, result.tools?.length ?? 0));
@@ -2306,6 +2334,38 @@ export function App({
     })()
       .catch((error: unknown) => changeToolsState((state) => toolsFailed(state, id, messageOf(error))))
       .finally(driveTools);
+  }
+
+  /** A hosted server that signs in with the browser: open the address and wait for the daemon to say it ended. */
+  function signInToolsServer(id: string, name: string): Promise<void> {
+    changeToolsState((state) => toolsSigningIn(state, id));
+    return new Promise<void>((resolve) => {
+      const finish = (change: (state: ToolsState) => ToolsState): void => {
+        stop();
+        changeToolsState(change);
+        resolve();
+      };
+      const stop = client.onMcpLoginDone((done) => {
+        if (done.name !== name) {
+          return;
+        }
+        if (!done.ok) {
+          finish((state) => toolsFailed(state, id, done.error ?? `could not sign in to ${name}`));
+          return;
+        }
+        void client
+          .mcpTools(name)
+          .then((result) => result.tools.length, () => 0)
+          .then((count) => finish((state) => toolsAdded(state, id, count)));
+      });
+      client.mcpLogin(name).then(
+        (started) => {
+          changeToolsState((state) => toolsSignInUrl(state, id, started.authorize_url));
+          openUrl(started.authorize_url);
+        },
+        (error: unknown) => finish((state) => toolsFailed(state, id, messageOf(error))),
+      );
+    });
   }
 
   function onToolsPress(ui: SetupUi, press: Press): void {
@@ -3382,6 +3442,17 @@ export function App({
       }
       const toggle = action.on ? client.enableMcp(session, action.name) : client.disableMcp(session, action.name);
       toggle.then(done(`${action.name} is ${action.on ? "on" : "off"} for this session`), failed);
+    } else if (action.kind === "login") {
+      client.mcpLogin(action.name, session).then(
+        (started) => {
+          setMcpManager((state) => mcpLoginUrl(state, action.name, started.authorize_url));
+          openUrl(started.authorize_url);
+          void copyText(started.authorize_url).catch(() => undefined);
+        },
+        (error: unknown) => setMcpManager((state) => mcpLoginDone(state, action.name, false, messageOf(error))),
+      );
+    } else if (action.kind === "logout") {
+      client.mcpLogout(action.name, session).then(done(`signed out of ${action.name}`), failed);
     } else if (action.kind === "restart") {
       client.restartMcp(action.name, session).then(done(`reconnecting ${action.name}…`), failed);
     } else if (action.kind === "set-enabled") {

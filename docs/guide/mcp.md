@@ -86,6 +86,8 @@ golem mcp logs github -f                # its log, and new lines as they come
 golem mcp tools github --hide 'delete_*'   # keep some tools from the model
 golem mcp enable github --on-demand     # on only in the chats that turn it on
 golem mcp restart github
+golem mcp login linear                  # sign in to a hosted server in your browser
+golem mcp logout linear                 # delete that sign-in
 golem mcp edit github                  # its tables in $EDITOR
 golem config edit                       # the whole file, with the same checks
 ```
@@ -128,6 +130,7 @@ Type `/mcp` to see your servers:
 - open one to see its tools. Press Space on a tool to hide it from the model, or to show it again. This edits `tools.exclude` of the server. Press Enter on a tool to try it: type its arguments as JSON, and golem runs it at once, without asking. A try is not part of any chat;
 - test the connection, and watch each step as it ends, so you see why a server fails;
 - read the server's log, which keeps coming in while it is open;
+- sign in to a server that needs it (Sign in on its page), or sign out;
 - reconnect one, turn it off, or remove it. Remove asks first, and drops the token it stored in the Keychain. A project's server is not removed from here: change that project's `.golem/config.toml`.
 
 The web UI has the same list at Settings → MCP servers, and `/mcp` there opens it. You can open a server, see its tools, hide a tool from the model, try one with a form, test the connection, read the log, reconnect it, turn it on or off, edit it, and remove it. **Add a server** lists what golem offers by category, with a search, and Another server for a command or a URL. It asks for what the server needs (a secret is hidden, and a folder has Browse), shows the command golem will run, and has Test before Add. A server that needs Node or uv offers to install it with Homebrew and shows the output. **Edit** changes the command or URL, the working folder, the timeout, whether tool calls ask first, the variables and headers (a stored secret shows as stored, and typing replaces it), and the tool patterns. Turning on a server that was off asks first and shows the command golem will run.
@@ -222,6 +225,17 @@ A project's `.golem/config.toml` can add servers for chats in that folder, once 
 ## Servers that sign in
 
 Linear, Sentry, and Notion do not take a pasted token: you approve golem in your browser. Add one from the catalog (`golem mcp add --catalog linear`) and it shows `needs_auth` until you sign in, with no tools in the model's list. The sign-in runs in the daemon on this Mac: it gives the client an address to open, waits up to 5 minutes for the browser to come back, keeps the token in the Keychain as `mcp/<name>-oauth`, and starts the server. golem renews the token by itself, a minute before it runs out and once when the server refuses it. When renewing fails, or after you sign out, the server goes back to `needs_auth` and nothing tries again until you sign in.
+
+Sign in from the terminal in one step:
+
+```bash
+golem mcp add --catalog linear
+golem mcp login linear
+```
+
+`golem mcp login` prints the address, opens it in your browser, and waits for you to approve golem. It ends with `Signed in to linear · 12 tools` and exit code 0, or says why not and exits 1 (it gives up after about 5 minutes). `golem mcp logout linear` deletes the sign-in and stops the server. `golem mcp list` shows `needs sign-in` for a server that waits.
+
+In the chat, a server that needs a sign-in shows `!` and `Sign in needed` in `/mcp`, and the status line shows `mcp ! sign in: <name>`. Open the server and choose **Sign in**: golem opens your browser, shows the address (and copies it) in case it does not open, and tells you when you are signed in. Adding an OAuth server from `/mcp add` or the setup window's Tools panel goes straight on to the sign-in. A server you are signed in to has **Sign out** on its page.
 
 ## When a server doesn't work
 
