@@ -186,5 +186,35 @@ async def test_a_skill_the_model_may_not_load_is_refused(
     ]
 
 
+async def test_a_claude_code_skill_with_relative_links_loads_and_its_file_reads(
+    database: Database, project: Path, tmp_path: Path
+) -> None:
+    # As Claude Code writes it: in ~/.claude/skills, with a link relative to the skill.
+    folder = tmp_path / "home" / ".claude" / "skills" / "improver"
+    (folder / "references").mkdir(parents=True)
+    (folder / "SKILL.md").write_text(
+        "---\nname: improver\ndescription: Improve notes. Use when asked to improve notes.\n"
+        "tools: Read, Glob\n---\nSee [the rubric](references/rubric.md).\n",
+        encoding="utf-8",
+    )
+    (folder / "references" / "rubric.md").write_text("Be specific.\n", encoding="utf-8")
+    model = ToolCallingChatModel(
+        replies=[
+            [("load_skill", {"name": "improver"})],
+            [("read_file", {"path": str(folder / "references" / "rubric.md")})],
+            "Done.",
+        ]
+    )
+    chat = _Chat(database, tmp_path, model)
+    session_id = await chat.manager.create(None, cwd=str(project))
+
+    await chat.turn(session_id, project, "improve my notes")
+    await chat.manager.cancel_all()
+
+    assert f"Skill folder: {folder}\n" in _results(model, 1)[0]
+    assert "(references/rubric.md)" in _results(model, 1)[0]
+    assert _results(model, 2)[-1] == "     1|Be specific."
+
+
 def test_load_skill_is_allowed_without_asking() -> None:
     assert "load_skill" in default_registry().default_allowed("careful")

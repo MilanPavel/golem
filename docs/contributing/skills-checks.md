@@ -46,3 +46,26 @@ Recorded on a Mac with the daemon at protocol 2.67. A model run is not repeatabl
 **Not run on a remote model.** No provider key was available in the session that wrote this check. Run the command above with a remote `--model`, such as `anthropic/claude-sonnet-4-5`, and add a row here. Until then the ticket's second half, one remote and one local model, is open.
 
 The small model's failure is the useful part: the index told it to call `load_skill`, but it called the skill by name. That is a model limit, not a bug in the index. A smaller or weaker model may need the pinned skills (`/skill pin`) instead.
+
+## An unchanged Claude Code skill (2.4.4)
+
+The fixture skills above are golem's own. This check uses a skill written for Claude Code, copied untouched: `claude-md-improver` from Anthropic's `claude-md-management` plugin (`claude-plugins-official`). It lives in `~/.claude/skills`, reads `references/quality-criteria.md` and `references/templates.md` through links relative to itself, and is never named in the prompt. It is not copied into this repository.
+
+```sh
+uv run python scripts/skill_trigger_check.py --model ollama/qwen3.8:27b \
+  --claude-skill <path to>/claude-md-improver \
+  --project-file scripts/skill-trigger/claude-code/CLAUDE.md \
+  --prompts scripts/skill-trigger/claude-code/prompts.json \
+  --config '[permissions]; mode = "autopilot"'
+```
+
+The prompt is "Look at the CLAUDE.md in this folder and tell me how good it is, then improve it." The project folder holds one weak `CLAUDE.md`. With `qwen3.8:27b` on a local Ollama, the run was:
+
+| Step | What the model did |
+|---|---|
+| 1 | `load_skill` with `claude-md-improver`. The log has `skill.activated` with `how: "model"` |
+| 2 | `glob`, then `read_file` of `CLAUDE.md` |
+| 3 | `read_file` of `quality-criteria.md` and `templates.md`, by absolute path in the skill's folder, which `load_skill` returned |
+| 4 | `list_dir` twice and one `shell`, then the quality report: one file, score 5 out of 100, and what to add |
+
+The run ended with `run.completed`. The script keeps only the start of the answer, so whether it then edited the file was not checked. Both reference files were read, which the session could not do before the skill was loaded. `test_a_claude_code_skill_with_relative_links_loads_and_its_file_reads` in `test_skills_load.py` pins the same path with a scripted model, so it is checked on every run too. A remote model was not tried, for the reason above.
