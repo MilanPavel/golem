@@ -189,6 +189,7 @@ const sidebar: DefaultTheme.Sidebar = [
           { text: "Sub-agents", link: "/vision/sub-agents" },
           { text: "Serve mode: the agent behind your app", link: "/vision/serve-mode" },
           { text: "Core features", link: "/vision/core" },
+          { text: "Routing and context", link: "/vision/routing" },
           { text: "Security", link: "/vision/security" },
         ],
       },
