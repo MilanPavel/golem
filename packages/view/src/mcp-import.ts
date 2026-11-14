@@ -40,9 +40,14 @@ export function candidateNotes(candidate: McpImportCandidate): string[] {
   return notes;
 }
 
-/** The candidates picked to start with: every one golem does not already have. */
-export function initialPicks(items: readonly ImportItem[]): Set<string> {
-  return new Set(items.filter((item) => item.candidate.already_same !== true).map((item) => item.key));
+/** The candidates picked to start with: none, so an import adds only what a person chose. */
+export function initialPicks(): Set<string> {
+  return new Set();
+}
+
+/** The keys of `items` a person may pick: every one golem does not already have. */
+export function pickableKeys(items: readonly ImportItem[]): string[] {
+  return items.filter((item) => item.candidate.already_same !== true).map((item) => item.key);
 }
 
 /** The references the picked candidates need a value for, each once, in the order they appear. */

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { applyParams, candidateNotes, candidateTarget, importItems, initialPicks, missingRefsOf, scanSummary, type ImportSource } from "./mcp-import.ts";
+import { applyParams, candidateNotes, candidateTarget, importItems, initialPicks, missingRefsOf, pickableKeys, scanSummary, type ImportSource } from "./mcp-import.ts";
 
 const SOURCES: ImportSource[] = [
   {
@@ -31,8 +31,9 @@ test("notes say already added, the new name, and the project", () => {
   assert.deepEqual(candidateNotes(items[2]!.candidate), ["already added", "this project"]);
 });
 
-test("every server golem lacks starts picked", () => {
-  assert.deepEqual([...initialPicks(importItems(SOURCES))], ["a", "b"]);
+test("nothing starts picked, and only a server golem lacks can be picked", () => {
+  assert.deepEqual([...initialPicks()], []);
+  assert.deepEqual(pickableKeys(importItems(SOURCES)), ["a", "b"]);
 });
 
 test("a ref is asked for once, and only for a picked server", () => {

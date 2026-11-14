@@ -16,6 +16,7 @@ export const GALLERY_SECTIONS = [
   "sidebar",
   "folder-browser",
   "setup-form",
+  "mcp-servers",
   "tools-panel",
   "welcome-page",
   "download-row",
@@ -55,8 +56,8 @@ export function sectionAxeTests(theme: "slip" | "kiln"): void {
       const section = container.querySelector(`[data-theme="${theme}"] section[id="${id}"]`);
       expect(section, id).toBeTruthy();
       // The trace demos repeat the same "Context window" landmark, and the welcome cases the same "Keep golem
-      // one click away" one, so unique landmark names are not checked in those two.
-      const rules = id === "trace" || id === "welcome-page" ? { ...DIALOG_RULES, "landmark-unique": { enabled: false } } : DIALOG_RULES;
+      // one click away" one, and the two import demos the same app names, so unique landmark names are not checked in those.
+      const rules = id === "trace" || id === "welcome-page" || id === "mcp-servers" ? { ...DIALOG_RULES, "landmark-unique": { enabled: false } } : DIALOG_RULES;
       await expectAxeClean(section as Element, rules);
     });
   }

@@ -1,12 +1,9 @@
 import {
   appendInstallOutput,
   draftLine,
-  entryAvailable,
   entryInputs,
-  entryNote,
   entryParams,
   findEntry,
-  groupEntries,
   inputDefault,
   inputError,
   mcpNameError,
@@ -32,12 +29,12 @@ type Props = {
   sessionId: string | null;
   /** The folder a path input starts at. */
   folder: string | null;
-  /** The catalog id to open on (`/mcp add <id>`), `other`, or null for the list. */
+  /** The catalog id to add, or `other`. */
   initial: string | null;
   onAdded: (name: string) => void;
 };
 
-/** Adds a server: pick one golem offers (or a command or URL), fill what it asks, test it, save it. */
+/** Adds a server picked in the Catalog tab (or a command or URL): fill what it asks, test it, save it. */
 export function AddDialog({ open, onOpenChange, sessionId, folder, initial, onAdded }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -50,21 +47,19 @@ export function AddDialog({ open, onOpenChange, sessionId, folder, initial, onAd
 
 function Body({ sessionId, folder, initial, onClose, onAdded }: Omit<Props, "open" | "onOpenChange"> & { onClose: () => void }) {
   const catalog = useMcpCatalog(sessionId);
-  const [picked, setPicked] = useState<string | null>(initial);
   const entries = catalog.data?.entries ?? [];
-  const entry = findEntry(entries, picked);
-  const waiting = picked !== null && picked !== OTHER_ID && entry === null;
+  const entry = findEntry(entries, initial);
 
-  if (picked === OTHER_ID) {
-    return <OtherForm sessionId={sessionId} onBack={() => setPicked(null)} onAdded={onAdded} onClose={onClose} />;
+  if (initial === OTHER_ID) {
+    return <OtherForm sessionId={sessionId} onAdded={onAdded} onClose={onClose} />;
   }
   if (entry !== null) {
-    return <EntryForm key={entry.id} entry={entry} sessionId={sessionId} folder={folder ?? ""} onBack={() => setPicked(null)} onAdded={onAdded} onClose={onClose} />;
+    return <EntryForm key={entry.id} entry={entry} sessionId={sessionId} folder={folder ?? ""} onAdded={onAdded} onClose={onClose} />;
   }
   return (
     <>
       <DialogTitle>Add an MCP server</DialogTitle>
-      <DialogDescription>Pick one golem offers, or give a command or a URL.</DialogDescription>
+      <DialogDescription>Pick one from the Catalog tab, or give a command or a URL.</DialogDescription>
       {catalog.isError ? (
         <div className="mt-3 flex flex-col items-start gap-2">
           <p role="alert" className="text-sm text-deny">
@@ -74,10 +69,8 @@ function Body({ sessionId, folder, initial, onClose, onAdded }: Omit<Props, "ope
             Retry
           </Button>
         </div>
-      ) : catalog.data === undefined || waiting ? (
-        <p className="mt-3 font-mono text-sm text-muted">{waiting && catalog.data !== undefined ? `${picked} is not in the list.` : "asking the daemon…"}</p>
       ) : (
-        <Picker entries={entries} onPick={setPicked} />
+        <p className="mt-3 font-mono text-sm text-muted">{catalog.data !== undefined && initial !== null ? `${initial} is not in the list.` : "asking the daemon…"}</p>
       )}
       <div className="mt-4 flex justify-end">
         <Button onClick={onClose}>Close</Button>
@@ -86,52 +79,9 @@ function Body({ sessionId, folder, initial, onClose, onAdded }: Omit<Props, "ope
   );
 }
 
-function Picker({ entries, onPick }: { entries: readonly McpCatalogEntry[]; onPick: (id: string) => void }) {
-  const [query, setQuery] = useState("");
-  const groups = groupEntries(entries, query);
-  return (
-    <div className="mt-3 flex flex-col gap-3">
-      <Input aria-label="Search the list" placeholder="Search" value={query} onChange={(event) => setQuery(event.target.value)} autoFocus />
-      {groups.map((group) => (
-        <section key={group.category} aria-label={group.title} className="flex flex-col gap-2">
-          <h3 className="text-sm font-semibold">{group.title}</h3>
-          <ul className="grid gap-2 sm:grid-cols-2">
-            {group.entries.map((entry) => {
-              const usable = entryAvailable(entry) && entry.added !== true;
-              return (
-                <li key={entry.id}>
-                  <button
-                    type="button"
-                    disabled={!usable}
-                    onClick={() => onPick(entry.id)}
-                    className="flex h-full w-full flex-col gap-1 rounded-lg border border-line bg-surface px-3 py-2 text-left outline-offset-2 outline-clay hover:border-line-strong focus-visible:outline-2 disabled:opacity-60"
-                  >
-                    <span className="text-sm font-semibold">{entry.title}</span>
-                    <span className="text-xs text-muted">{entryNote(entry)}</span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      ))}
-      {groups.length === 0 ? <p className="text-sm text-muted">Nothing in the list matches “{query}”.</p> : null}
-      <button
-        type="button"
-        onClick={() => onPick(OTHER_ID)}
-        className="flex flex-col gap-1 rounded-lg border border-dashed border-line-strong px-3 py-2 text-left outline-offset-2 outline-clay hover:border-clay focus-visible:outline-2"
-      >
-        <span className="text-sm font-semibold">Another server</span>
-        <span className="text-xs text-muted">A command that runs on this Mac, or an https:// URL.</span>
-      </button>
-    </div>
-  );
-}
-
-function Actions({ onBack, onClose, children }: { onBack: () => void; onClose: () => void; children: React.ReactNode }) {
+function Actions({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="mt-4 flex flex-wrap justify-end gap-2">
-      <Button onClick={onBack}>Back</Button>
       <Button onClick={onClose}>Cancel</Button>
       {children}
     </div>
@@ -148,7 +98,7 @@ function NameField({ value, onChange, error }: { value: string; onChange: (value
   );
 }
 
-function EntryForm({ entry, sessionId, folder, onBack, onAdded, onClose }: { entry: McpCatalogEntry; sessionId: string | null; folder: string; onBack: () => void; onAdded: (name: string) => void; onClose: () => void }) {
+function EntryForm({ entry, sessionId, folder, onAdded, onClose }: { entry: McpCatalogEntry; sessionId: string | null; folder: string; onAdded: (name: string) => void; onClose: () => void }) {
   const actions = usePageActions();
   const inputs = entryInputs(entry);
   const [name, setName] = useState(entry.name);
@@ -218,7 +168,7 @@ function EntryForm({ entry, sessionId, folder, onBack, onAdded, onClose }: { ent
           {failure}
         </p>
       )}
-      <Actions onBack={onBack} onClose={onClose}>
+      <Actions onClose={onClose}>
         <Button
           onClick={() => {
             const text = problem();
@@ -291,7 +241,7 @@ function InputField({ input, value, onChange, startAt }: { input: McpCatalogInpu
   );
 }
 
-function OtherForm({ sessionId, onBack, onAdded, onClose }: { sessionId: string | null; onBack: () => void; onAdded: (name: string) => void; onClose: () => void }) {
+function OtherForm({ sessionId, onAdded, onClose }: { sessionId: string | null; onAdded: (name: string) => void; onClose: () => void }) {
   const actions = usePageActions();
   const [name, setName] = useState("");
   const [line, setLine] = useState("");
@@ -359,7 +309,7 @@ function OtherForm({ sessionId, onBack, onAdded, onClose }: { sessionId: string 
           {failure}
         </p>
       )}
-      <Actions onBack={onBack} onClose={onClose}>
+      <Actions onClose={onClose}>
         <Button
           onClick={() => {
             const text = problem();
