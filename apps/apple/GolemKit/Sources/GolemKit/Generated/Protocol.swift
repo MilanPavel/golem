@@ -464,6 +464,26 @@ public struct AuthSetResult: Codable {
     }
 }
 
+/// USD per million tokens, as golem knew it when the call ended.
+// MARK: - CallPrice
+public struct CallPrice: Codable {
+    public let cachedInput: Double?
+    public let input: Double?
+    public let output: Double?
+
+    public enum CodingKeys: String, CodingKey {
+        case cachedInput = "cached_input"
+        case input = "input"
+        case output = "output"
+    }
+
+    public init(cachedInput: Double?, input: Double?, output: Double?) {
+        self.cachedInput = cachedInput
+        self.input = input
+        self.output = output
+    }
+}
+
 /// A tool allowed for the rest of the session asked about.
 // MARK: - ConfigAllowance
 public struct ConfigAllowance: Codable {
@@ -4664,37 +4684,66 @@ public enum MessageThinkingDeltaEventType: String, Codable {
 /// reply. ``recovered`` means golem turned the text into tool calls. ``unread``
 /// means the text held a call golem could not read, so the reply stayed text.
 /// None when the reply had no such text.
+///
+/// ``cost_usd`` is the cost of this call at ``price``. Both are None when the
+/// price is not known. A local model costs 0.
 // MARK: - ModelCallCompletedData
 public struct ModelCallCompletedData: Codable {
     public let contextWindow: Int?
+    public let costUsd: Double?
     public let failed: Bool?
     public let firstTokenMS: Int?
     public let latencyMS: Int
     public let messageID: String
+    public let price: ModelCallCompletedDataCallPrice?
     public let stopReason: String?
     public let textToolCalls: TextToolCalls?
     public let usage: ModelCallCompletedDataTokenUsage?
 
     public enum CodingKeys: String, CodingKey {
         case contextWindow = "context_window"
+        case costUsd = "cost_usd"
         case failed = "failed"
         case firstTokenMS = "first_token_ms"
         case latencyMS = "latency_ms"
         case messageID = "message_id"
+        case price = "price"
         case stopReason = "stop_reason"
         case textToolCalls = "text_tool_calls"
         case usage = "usage"
     }
 
-    public init(contextWindow: Int?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int, messageID: String, stopReason: String?, textToolCalls: TextToolCalls?, usage: ModelCallCompletedDataTokenUsage?) {
+    public init(contextWindow: Int?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int, messageID: String, price: ModelCallCompletedDataCallPrice?, stopReason: String?, textToolCalls: TextToolCalls?, usage: ModelCallCompletedDataTokenUsage?) {
         self.contextWindow = contextWindow
+        self.costUsd = costUsd
         self.failed = failed
         self.firstTokenMS = firstTokenMS
         self.latencyMS = latencyMS
         self.messageID = messageID
+        self.price = price
         self.stopReason = stopReason
         self.textToolCalls = textToolCalls
         self.usage = usage
+    }
+}
+
+/// USD per million tokens, as golem knew it when the call ended.
+// MARK: - ModelCallCompletedDataCallPrice
+public struct ModelCallCompletedDataCallPrice: Codable {
+    public let cachedInput: Double?
+    public let input: Double?
+    public let output: Double?
+
+    public enum CodingKeys: String, CodingKey {
+        case cachedInput = "cached_input"
+        case input = "input"
+        case output = "output"
+    }
+
+    public init(cachedInput: Double?, input: Double?, output: Double?) {
+        self.cachedInput = cachedInput
+        self.input = input
+        self.output = output
     }
 }
 
@@ -4768,37 +4817,66 @@ public struct ModelCallCompletedEvent: Codable {
 /// reply. ``recovered`` means golem turned the text into tool calls. ``unread``
 /// means the text held a call golem could not read, so the reply stayed text.
 /// None when the reply had no such text.
+///
+/// ``cost_usd`` is the cost of this call at ``price``. Both are None when the
+/// price is not known. A local model costs 0.
 // MARK: - ModelCallCompletedEventData
 public struct ModelCallCompletedEventData: Codable {
     public let contextWindow: Int?
+    public let costUsd: Double?
     public let failed: Bool?
     public let firstTokenMS: Int?
     public let latencyMS: Int
     public let messageID: String
+    public let price: PurpleCallPrice?
     public let stopReason: String?
     public let textToolCalls: TextToolCalls?
     public let usage: PurpleTokenUsage?
 
     public enum CodingKeys: String, CodingKey {
         case contextWindow = "context_window"
+        case costUsd = "cost_usd"
         case failed = "failed"
         case firstTokenMS = "first_token_ms"
         case latencyMS = "latency_ms"
         case messageID = "message_id"
+        case price = "price"
         case stopReason = "stop_reason"
         case textToolCalls = "text_tool_calls"
         case usage = "usage"
     }
 
-    public init(contextWindow: Int?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int, messageID: String, stopReason: String?, textToolCalls: TextToolCalls?, usage: PurpleTokenUsage?) {
+    public init(contextWindow: Int?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int, messageID: String, price: PurpleCallPrice?, stopReason: String?, textToolCalls: TextToolCalls?, usage: PurpleTokenUsage?) {
         self.contextWindow = contextWindow
+        self.costUsd = costUsd
         self.failed = failed
         self.firstTokenMS = firstTokenMS
         self.latencyMS = latencyMS
         self.messageID = messageID
+        self.price = price
         self.stopReason = stopReason
         self.textToolCalls = textToolCalls
         self.usage = usage
+    }
+}
+
+/// USD per million tokens, as golem knew it when the call ended.
+// MARK: - PurpleCallPrice
+public struct PurpleCallPrice: Codable {
+    public let cachedInput: Double?
+    public let input: Double?
+    public let output: Double?
+
+    public enum CodingKeys: String, CodingKey {
+        case cachedInput = "cached_input"
+        case input = "input"
+        case output = "output"
+    }
+
+    public init(cachedInput: Double?, input: Double?, output: Double?) {
+        self.cachedInput = cachedInput
+        self.input = input
+        self.output = output
     }
 }
 
@@ -6935,6 +7013,9 @@ public struct Params: Codable {
 /// means the text held a call golem could not read, so the reply stayed text.
 /// None when the reply had no such text.
 ///
+/// ``cost_usd`` is the cost of this call at ``price``. Both are None when the
+/// price is not known. A local model costs 0.
+///
 /// Why a run stopped. No traceback.
 ///
 /// ``code`` names a failure a client can act on. ``model_unreachable``: the
@@ -7053,9 +7134,11 @@ public struct ParamsData: Codable {
     public let toolsChars: Int?
     public let toolsSHA: String?
     public let windowEstimated: Bool?
+    public let costUsd: Double?
     public let failed: Bool?
     public let firstTokenMS: Int?
     public let latencyMS: Int?
+    public let price: FluffyCallPrice?
     public let stopReason: String?
     public let textToolCalls: TextToolCalls?
     public let usage: FluffyTokenUsage?
@@ -7119,9 +7202,11 @@ public struct ParamsData: Codable {
         case toolsChars = "tools_chars"
         case toolsSHA = "tools_sha"
         case windowEstimated = "window_estimated"
+        case costUsd = "cost_usd"
         case failed = "failed"
         case firstTokenMS = "first_token_ms"
         case latencyMS = "latency_ms"
+        case price = "price"
         case stopReason = "stop_reason"
         case textToolCalls = "text_tool_calls"
         case usage = "usage"
@@ -7146,7 +7231,7 @@ public struct ParamsData: Codable {
         case path = "path"
     }
 
-    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, title: String?, runID: String?, status: DataStatus?, summary: String?, reason: PurpleReason?, options: [String: Option]?, mode: Mode?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, contextWindow: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String?, provider: String?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, artifactID: String?, durationMS: Int?, preview: String?, truncated: Bool?, diff: String?, source: String?, subject: String?, decision: Decision?, rule: String?, todos: [PurpleTodo]?, hash: String?, how: How?, path: String?) {
+    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, title: String?, runID: String?, status: DataStatus?, summary: String?, reason: PurpleReason?, options: [String: Option]?, mode: Mode?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, contextWindow: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String?, provider: String?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, price: FluffyCallPrice?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, artifactID: String?, durationMS: Int?, preview: String?, truncated: Bool?, diff: String?, source: String?, subject: String?, decision: Decision?, rule: String?, todos: [PurpleTodo]?, hash: String?, how: How?, path: String?) {
         self.cwd = cwd
         self.forkedFrom = forkedFrom
         self.modelName = modelName
@@ -7186,9 +7271,11 @@ public struct ParamsData: Codable {
         self.toolsChars = toolsChars
         self.toolsSHA = toolsSHA
         self.windowEstimated = windowEstimated
+        self.costUsd = costUsd
         self.failed = failed
         self.firstTokenMS = firstTokenMS
         self.latencyMS = latencyMS
+        self.price = price
         self.stopReason = stopReason
         self.textToolCalls = textToolCalls
         self.usage = usage
@@ -7257,6 +7344,26 @@ public enum How: String, Codable {
     case invoked = "invoked"
     case model = "model"
     case pinned = "pinned"
+}
+
+/// USD per million tokens, as golem knew it when the call ended.
+// MARK: - FluffyCallPrice
+public struct FluffyCallPrice: Codable {
+    public let cachedInput: Double?
+    public let input: Double?
+    public let output: Double?
+
+    public enum CodingKeys: String, CodingKey {
+        case cachedInput = "cached_input"
+        case input = "input"
+        case output = "output"
+    }
+
+    public init(cachedInput: Double?, input: Double?, output: Double?) {
+        self.cachedInput = cachedInput
+        self.input = input
+        self.output = output
+    }
 }
 
 public enum PurpleReason: String, Codable {
@@ -10870,12 +10977,16 @@ public struct RunElement: Codable {
 /// "likely". ``dropped_message_ids`` are the messages the model probably did
 /// not see (older messages only), and ``dropped_tokens`` is an estimate of
 /// their size.
+///
+/// ``cost_usd`` is what the call cost, as its ``model.call.completed`` recorded
+/// it. Null when the price was not known or the call has no token counts.
 // MARK: - RunChild
 public struct RunChild: Codable {
     public let approvalWaitMS: Int?
     public let children: [PurpleTraceToolSpan]?
     public let contextWindow: Int?
     public let contextWindowEstimated: Bool?
+    public let costUsd: Double?
     public let droppedMessageIDS: [String]?
     public let droppedTokens: Int?
     public let durationMS: Int?
@@ -10899,6 +11010,7 @@ public struct RunChild: Codable {
         case children = "children"
         case contextWindow = "context_window"
         case contextWindowEstimated = "context_window_estimated"
+        case costUsd = "cost_usd"
         case droppedMessageIDS = "dropped_message_ids"
         case droppedTokens = "dropped_tokens"
         case durationMS = "duration_ms"
@@ -10918,11 +11030,12 @@ public struct RunChild: Codable {
         case tokens = "tokens"
     }
 
-    public init(approvalWaitMS: Int?, children: [PurpleTraceToolSpan]?, contextWindow: Int?, contextWindowEstimated: Bool?, droppedMessageIDS: [String]?, droppedTokens: Int?, durationMS: Int?, end: String?, firstTokenMS: Int?, id: String, kind: ChildKind, model: String?, name: String, numCtx: Int?, preview: String?, promptCut: PromptCut?, promptCutKind: PromptCutKind?, recorded: Bool?, start: String, status: ChildStatus, tokens: RunTraceTokens?) {
+    public init(approvalWaitMS: Int?, children: [PurpleTraceToolSpan]?, contextWindow: Int?, contextWindowEstimated: Bool?, costUsd: Double?, droppedMessageIDS: [String]?, droppedTokens: Int?, durationMS: Int?, end: String?, firstTokenMS: Int?, id: String, kind: ChildKind, model: String?, name: String, numCtx: Int?, preview: String?, promptCut: PromptCut?, promptCutKind: PromptCutKind?, recorded: Bool?, start: String, status: ChildStatus, tokens: RunTraceTokens?) {
         self.approvalWaitMS = approvalWaitMS
         self.children = children
         self.contextWindow = contextWindow
         self.contextWindowEstimated = contextWindowEstimated
+        self.costUsd = costUsd
         self.droppedMessageIDS = droppedMessageIDS
         self.droppedTokens = droppedTokens
         self.durationMS = durationMS
@@ -11073,12 +11186,16 @@ public enum TraceMessageRole: String, Codable {
 /// "likely". ``dropped_message_ids`` are the messages the model probably did
 /// not see (older messages only), and ``dropped_tokens`` is an estimate of
 /// their size.
+///
+/// ``cost_usd`` is what the call cost, as its ``model.call.completed`` recorded
+/// it. Null when the price was not known or the call has no token counts.
 // MARK: - TraceModelSpan
 public struct TraceModelSpan: Codable {
     public let approvalWaitMS: Int?
     public let children: [TraceModelSpanChild]?
     public let contextWindow: Int?
     public let contextWindowEstimated: Bool?
+    public let costUsd: Double?
     public let droppedMessageIDS: [String]?
     public let droppedTokens: Int?
     public let durationMS: Int?
@@ -11102,6 +11219,7 @@ public struct TraceModelSpan: Codable {
         case children = "children"
         case contextWindow = "context_window"
         case contextWindowEstimated = "context_window_estimated"
+        case costUsd = "cost_usd"
         case droppedMessageIDS = "dropped_message_ids"
         case droppedTokens = "dropped_tokens"
         case durationMS = "duration_ms"
@@ -11121,11 +11239,12 @@ public struct TraceModelSpan: Codable {
         case tokens = "tokens"
     }
 
-    public init(approvalWaitMS: Int?, children: [TraceModelSpanChild]?, contextWindow: Int?, contextWindowEstimated: Bool?, droppedMessageIDS: [String]?, droppedTokens: Int?, durationMS: Int?, end: String?, firstTokenMS: Int?, id: String, kind: ChildKind, model: String?, name: String, numCtx: Int?, preview: String?, promptCut: PromptCut?, promptCutKind: PromptCutKind?, recorded: Bool?, start: String, status: ChildStatus, tokens: TraceModelSpanTraceTokens?) {
+    public init(approvalWaitMS: Int?, children: [TraceModelSpanChild]?, contextWindow: Int?, contextWindowEstimated: Bool?, costUsd: Double?, droppedMessageIDS: [String]?, droppedTokens: Int?, durationMS: Int?, end: String?, firstTokenMS: Int?, id: String, kind: ChildKind, model: String?, name: String, numCtx: Int?, preview: String?, promptCut: PromptCut?, promptCutKind: PromptCutKind?, recorded: Bool?, start: String, status: ChildStatus, tokens: TraceModelSpanTraceTokens?) {
         self.approvalWaitMS = approvalWaitMS
         self.children = children
         self.contextWindow = contextWindow
         self.contextWindowEstimated = contextWindowEstimated
+        self.costUsd = costUsd
         self.droppedMessageIDS = droppedMessageIDS
         self.droppedTokens = droppedTokens
         self.durationMS = durationMS
@@ -11280,12 +11399,16 @@ public struct TraceRunSpan: Codable {
 /// "likely". ``dropped_message_ids`` are the messages the model probably did
 /// not see (older messages only), and ``dropped_tokens`` is an estimate of
 /// their size.
+///
+/// ``cost_usd`` is what the call cost, as its ``model.call.completed`` recorded
+/// it. Null when the price was not known or the call has no token counts.
 // MARK: - TraceRunSpanChild
 public struct TraceRunSpanChild: Codable {
     public let approvalWaitMS: Int?
     public let children: [FluffyTraceToolSpan]?
     public let contextWindow: Int?
     public let contextWindowEstimated: Bool?
+    public let costUsd: Double?
     public let droppedMessageIDS: [String]?
     public let droppedTokens: Int?
     public let durationMS: Int?
@@ -11309,6 +11432,7 @@ public struct TraceRunSpanChild: Codable {
         case children = "children"
         case contextWindow = "context_window"
         case contextWindowEstimated = "context_window_estimated"
+        case costUsd = "cost_usd"
         case droppedMessageIDS = "dropped_message_ids"
         case droppedTokens = "dropped_tokens"
         case durationMS = "duration_ms"
@@ -11328,11 +11452,12 @@ public struct TraceRunSpanChild: Codable {
         case tokens = "tokens"
     }
 
-    public init(approvalWaitMS: Int?, children: [FluffyTraceToolSpan]?, contextWindow: Int?, contextWindowEstimated: Bool?, droppedMessageIDS: [String]?, droppedTokens: Int?, durationMS: Int?, end: String?, firstTokenMS: Int?, id: String, kind: ChildKind, model: String?, name: String, numCtx: Int?, preview: String?, promptCut: PromptCut?, promptCutKind: PromptCutKind?, recorded: Bool?, start: String, status: ChildStatus, tokens: TraceRunSpanTraceTokens?) {
+    public init(approvalWaitMS: Int?, children: [FluffyTraceToolSpan]?, contextWindow: Int?, contextWindowEstimated: Bool?, costUsd: Double?, droppedMessageIDS: [String]?, droppedTokens: Int?, durationMS: Int?, end: String?, firstTokenMS: Int?, id: String, kind: ChildKind, model: String?, name: String, numCtx: Int?, preview: String?, promptCut: PromptCut?, promptCutKind: PromptCutKind?, recorded: Bool?, start: String, status: ChildStatus, tokens: TraceRunSpanTraceTokens?) {
         self.approvalWaitMS = approvalWaitMS
         self.children = children
         self.contextWindow = contextWindow
         self.contextWindowEstimated = contextWindowEstimated
+        self.costUsd = costUsd
         self.droppedMessageIDS = droppedMessageIDS
         self.droppedTokens = droppedTokens
         self.durationMS = durationMS
