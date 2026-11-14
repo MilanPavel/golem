@@ -160,7 +160,7 @@ test("with an API key: a provider select, the command with Copy, and Check again
   const onCheck = vi.fn();
   render(<WelcomeView {...welcomeProps("engine", { engine: engineProps({ choice: "key", onProvider, onCheck }) })} />);
   expect(screen.getByText("golem auth set anthropic")).toBeTruthy();
-  expect(screen.getByRole("button", { name: "Copy" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: /^Copy / })).toBeTruthy();
   // The page has no field for a key.
   expect(screen.queryByRole("textbox")).toBeNull();
   await user.selectOptions(screen.getByRole("combobox", { name: "Provider" }), "openai");
@@ -315,7 +315,7 @@ test("Ready when the service is not kept: the note with the command and Copy, ne
   render(<WelcomeView {...welcomeProps("ready", { ready: readyProps({ keepNote: { command: "golem daemon install" } }) })} />);
   expect(screen.getByText("golem and this page stop when you close the terminal window. To keep them running, even after a restart:")).toBeTruthy();
   expect(screen.getByText("golem daemon install")).toBeTruthy();
-  expect(screen.getByRole("button", { name: "Copy" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: /^Copy / })).toBeTruthy();
   expect((screen.getByRole("button", { name: "Start chatting" }) as HTMLButtonElement).disabled).toBe(false);
 });
 

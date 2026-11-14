@@ -3,7 +3,7 @@ import { CopyCommand } from "../../ui/copy-command.tsx";
 /** One line under the composer: what a command did, or where to find what the page lacks. */
 export type CommandNotice = {
   text: string;
-  /** A command to run in a terminal, shown in mono with a Copy button. */
+  /** A command to run in a terminal, shown in mono with a copy icon. */
   command?: string;
 };
 

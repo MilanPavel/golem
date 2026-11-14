@@ -148,7 +148,7 @@ test("a page run by hand: the card says so and copies golem web install when the
   expect(web.getByText("golem web install")).toBeTruthy();
   // Nothing about the setup rows can change by looking again.
   expect(web.queryByRole("button", { name: "Check again" })).toBeNull();
-  await user.click(web.getByRole("button", { name: "Copy" }));
+  await user.click(web.getByRole("button", { name: /^Copy / }));
   expect(writeText).toHaveBeenCalledWith("golem web install");
 });
 
@@ -200,7 +200,7 @@ test("a service that is not kept shows the command with Copy, and Copy writes it
   const { user } = mount(rows);
   const service = await waitFor(() => card("Service"));
   await waitFor(() => expect(service.getByText("golem install")).toBeTruthy());
-  await user.click(service.getByRole("button", { name: "Copy" }));
+  await user.click(service.getByRole("button", { name: /^Copy / }));
   expect(writeText).toHaveBeenCalledWith("golem install");
   await service.findByRole("button", { name: "Copied" });
 });
@@ -335,7 +335,7 @@ test("a provider that needs a key: the command to copy for it, and Check again",
   const { user } = mount(rows);
   const openai = await waitFor(() => card("OpenAI"));
   expect(openai.getByText("golem auth set openai")).toBeTruthy();
-  await user.click(openai.getByRole("button", { name: "Copy" }));
+  await user.click(openai.getByRole("button", { name: /^Copy / }));
   expect(writeText).toHaveBeenCalledWith("golem auth set openai");
   expect(openai.getByRole("button", { name: "Check again" })).toBeTruthy();
 });
@@ -371,7 +371,7 @@ test("a chip opens one line with the command, Copy, Check again and the note; th
   expect(line.getByText("golem auth set anthropic")).toBeTruthy();
   expect(line.getByText("The page never takes a key. Paste it in a terminal.")).toBeTruthy();
   expect(line.getByRole("button", { name: "Check again" })).toBeTruthy();
-  await user.click(line.getByRole("button", { name: "Copy" }));
+  await user.click(line.getByRole("button", { name: /^Copy / }));
   expect(writeText).toHaveBeenCalledWith("golem auth set anthropic");
   // Another chip moves the line, and a saved one says to replace.
   await user.click(section.getByRole("button", { name: /^OpenAI/ }));

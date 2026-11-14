@@ -1,8 +1,8 @@
-import { Fragment, useState, type ComponentType, type ReactNode } from "react";
+import { Fragment, useRef, useState, type ComponentType, type ReactNode } from "react";
 import { formatTokens } from "@golem/view";
 import type { TraceMessage, TraceSpanResult } from "../../store/trace.ts";
 import { Button } from "../../ui/button.tsx";
-import { writeClipboard } from "../../ui/clipboard.ts";
+import { CopyButton, selectText } from "../../ui/copy-command.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../ui/tabs.tsx";
 import { Markdown } from "../chat/index.ts";
 import { ArtifactDialog } from "./artifact-dialog.tsx";
@@ -65,25 +65,6 @@ function FoldedBlock({ text }: { text: string }) {
         </Button>
       ) : null}
     </div>
-  );
-}
-
-/** Copies one text, and says so: Copy, then Copied for 2 s, or Copy failed. */
-function CopySection({ text, label }: { text: string; label: string }) {
-  const [copied, setCopied] = useState<"idle" | "done" | "failed">("idle");
-  function copy(): void {
-    void writeClipboard(text).then(
-      () => {
-        setCopied("done");
-        window.setTimeout(() => setCopied("idle"), 2000);
-      },
-      () => setCopied("failed"),
-    );
-  }
-  return (
-    <Button kind="ghost" size="sm" aria-label={`Copy ${label}`} onClick={copy}>
-      {copied === "done" ? "Copied" : copied === "failed" ? "Copy failed" : "Copy"}
-    </Button>
   );
 }
 
@@ -153,7 +134,7 @@ function SystemPrompt({ result, prompt }: { result: TraceSpanResult; prompt: str
       {sections === null ? (
         <div className="flex flex-col gap-2">
           <div className="flex justify-end">
-            <CopySection text={prompt} label="system prompt" />
+            <CopyButton text={prompt} label="system prompt" />
           </div>
           <pre className={BLOCK}>{prompt}</pre>
         </div>
@@ -166,7 +147,7 @@ function SystemPrompt({ result, prompt }: { result: TraceSpanResult; prompt: str
               <Fold key={index} title={tokens === null ? label : `${label} · ≈${formatTokens(tokens)}`}>
                 <div className="flex flex-col gap-2">
                   <div className="flex justify-end">
-                    <CopySection text={section.text} label={label} />
+                    <CopyButton text={section.text} label={label} />
                   </div>
                   <pre className={BLOCK}>{section.text}</pre>
                 </div>
@@ -362,18 +343,9 @@ function Header({ result }: { result: TraceSpanResult }) {
   );
 }
 
-/** The body of a tab: Pretty or JSON, with the switch and Copy at the top right. */
+/** The body of a tab: Pretty or JSON, with the switch and the copy icon at the top right. */
 function Panel({ tab, result, sessionId, Artifact, mode, setMode }: { tab: Tab; result: TraceSpanResult; sessionId: string; Artifact: ArtifactViewer; mode: Mode; setMode: (mode: Mode) => void }) {
-  const [copied, setCopied] = useState<"idle" | "done" | "failed">("idle");
-  function copy(): void {
-    void writeClipboard(copyText(result, tab, mode)).then(
-      () => {
-        setCopied("done");
-        window.setTimeout(() => setCopied("idle"), 2000);
-      },
-      () => setCopied("failed"),
-    );
-  }
+  const body = useRef<HTMLPreElement>(null);
   return (
     <div className="flex flex-col gap-3 p-4">
       <div className="flex items-center justify-end gap-2">
@@ -385,11 +357,9 @@ function Panel({ tab, result, sessionId, Artifact, mode, setMode }: { tab: Tab; 
             JSON
           </Button>
         </div>
-        <Button kind="ghost" size="sm" onClick={copy}>
-          {copied === "done" ? "Copied" : copied === "failed" ? "Copy failed" : "Copy"}
-        </Button>
+        <CopyButton text={copyText(result, tab, mode)} label={`${tab} as ${mode}`} onFail={() => selectText(body.current)} />
       </div>
-      {mode === "json" ? <pre className={BLOCK}>{jsonText(result, tab)}</pre> : <Pretty tab={tab} result={result} sessionId={sessionId} Artifact={Artifact} />}
+      {mode === "json" ? <pre ref={body} className={BLOCK}>{jsonText(result, tab)}</pre> : <Pretty tab={tab} result={result} sessionId={sessionId} Artifact={Artifact} />}
     </div>
   );
 }

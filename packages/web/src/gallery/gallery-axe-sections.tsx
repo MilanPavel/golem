@@ -11,6 +11,7 @@ export const GALLERY_SECTIONS = [
   "trace",
   "button",
   "icon-button",
+  "copy",
   "connection-screens",
   "sidebar",
   "folder-browser",

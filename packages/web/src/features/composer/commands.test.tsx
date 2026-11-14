@@ -399,13 +399,13 @@ test("/login and /logout show the golem command to copy, and Copy says Copied fo
   await say(user, "/login anthropic");
   const line = within(screen.getByText("Keys are set in a terminal:").closest("p") as HTMLElement);
   expect(line.getByText("golem auth set anthropic").tagName).toBe("CODE");
-  await user.click(line.getByRole("button", { name: "Copy" }));
+  await user.click(line.getByRole("button", { name: /^Copy / }));
   expect(writeText).toHaveBeenCalledWith("golem auth set anthropic");
   await waitFor(() => expect(line.getByRole("button", { name: "Copied" })).toBeTruthy());
   act(() => {
     vi.advanceTimersByTime(2100);
   });
-  expect(line.getByRole("button", { name: "Copy" })).toBeTruthy();
+  expect(line.getByRole("button", { name: /^Copy / })).toBeTruthy();
   await say(user, "/login");
   expect(screen.getByText("golem auth set <provider>")).toBeTruthy();
   await say(user, "/logout groq");
@@ -417,9 +417,9 @@ test("a clipboard that fails selects the command and does not throw", async () =
   const { user } = await session();
   mockClipboard(true);
   await say(user, "/login openai");
-  await user.click(screen.getByRole("button", { name: "Copy" }));
+  await user.click(screen.getByRole("button", { name: /^Copy / }));
   await wait();
-  expect(screen.getByRole("button", { name: "Copy" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: /^Copy / })).toBeTruthy();
   expect(window.getSelection()?.toString()).toBe("golem auth set openai");
 });
 
