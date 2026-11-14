@@ -245,6 +245,7 @@ class DaemonApp:
                     return await turn_on_for_model(sessions, mcp, session_id, scope, name)
 
                 chat.enable_mcp = enable_mcp
+                chat.skills = self.state.skills
                 if self._pulls is None:
                     pulls = PullManager(router, ram_gb=models.ram_gb)
                 else:

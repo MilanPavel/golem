@@ -24,7 +24,10 @@ from golem.skills.registry import Listed, Origin, SkillRegistry, SkillView
 
 INDEX_SECTION = "skill_index"
 
-INDEX_INTRO = "These skills are available. When a task fits one, load it before you start."
+INDEX_INTRO = (
+    "These skills are available. When a task fits one, call load_skill with its name "
+    "before you start."
+)
 
 MAX_DESCRIPTION = 250
 """A longer description is cut here, so one skill cannot use up the budget."""

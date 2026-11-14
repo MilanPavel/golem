@@ -25,6 +25,7 @@ READ_ONLY = {
     "git_log",
     "read_artifact",
     "todo_write",
+    "load_skill",
 }
 BALANCED = READ_ONLY | {"web_search", "web_fetch"}
 AUTOPILOT = BALANCED | {"shell", "write_file", "edit_file"}
