@@ -106,7 +106,7 @@ export async function useLive(args: WebArgs, runDir: string, live: Live, deps: W
   if (health.kept !== true) {
     // A foreground or older gateway is not ours to stop.
     const served = health.version === undefined ? "an older golem" : `golem ${health.version}`;
-    process.stderr.write(`the page is served by ${served}; Ctrl-C it and run golem web again for ${deps.version}\n`);
+    process.stderr.write(`the page is served by ${served}; Ctrl-C it and run golem again for ${deps.version}\n`);
     return reuse(args, runDir, health, live.port, deps);
   }
   if (!(await deps.restartWebJob())) return reuse(args, runDir, health, live.port, deps);

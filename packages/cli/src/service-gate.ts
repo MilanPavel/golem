@@ -1,4 +1,4 @@
-/** What `golem` does before the chat opens, when no daemon answers and no launch agent exists. */
+/** What `golem` and `golem tui` do before the page or chat opens, when no daemon answers and no launch agent exists. */
 
 export type ServiceChoice = "install" | "session" | "quit";
 
