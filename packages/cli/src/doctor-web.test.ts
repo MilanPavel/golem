@@ -17,7 +17,7 @@ test("web: no plist is fine", () => {
   assert.deepEqual(check, {
     name: "web",
     status: "ok",
-    detail: "not kept running · golem web opens it when you ask",
+    detail: "not kept running · golem opens it when you ask",
   });
 });
 
@@ -54,7 +54,7 @@ test("web: a live gateway older than this golem", () => {
   const check = webCheck({ ...FACTS, live: { port: 7480, version: "0.2.0" } });
   assert.equal(check.status, "warn");
   assert.equal(check.detail, "the page is served by golem 0.2.0, this golem is 0.3.0");
-  assert.equal(check.fix, "golem web");
+  assert.equal(check.fix, "golem");
   assert.equal(webCheck({ ...FACTS, live: { port: 7480, version: undefined } }).detail, "the page is served by an older golem, this golem is 0.3.0");
 });
 

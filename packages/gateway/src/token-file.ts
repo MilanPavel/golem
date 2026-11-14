@@ -72,7 +72,7 @@ export async function readTokenFile(dir: string): Promise<string> {
     if (!ownedByMe(opened)) throw new Error(`${file} is not owned by this user`);
     if ((opened.mode & 0o777) !== 0o600) throw new Error(`${file} must have mode 600. Fix: chmod 600 ${file}`);
     const token = (await handle.readFile("utf8")).trim();
-    if (!isSecretShape(token)) throw new Error(`${file} does not hold a valid token. Run golem web again`);
+    if (!isSecretShape(token)) throw new Error(`${file} does not hold a valid token. Run golem again`);
     return token;
   } finally {
     await handle.close();

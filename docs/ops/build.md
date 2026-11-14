@@ -16,13 +16,13 @@ For more detail:
 Golem has two parts:
 
 - **The daemon** is a program that runs in the background all the time. It talks to the AI models, runs tools, and saves every conversation. It is written in Python.
-- **`golem`** is the command you type. With no arguments it opens the chat screen (the **TUI**). With arguments it does small jobs, such as `golem status`. It is written in TypeScript.
+- **`golem`** is the command you type. With no arguments it opens the web UI. `golem tui` opens the chat screen (the **TUI**). Other arguments do small jobs, such as `golem status`. It is written in TypeScript.
 
 The two talk through a **socket**: a special file on disk, `~/.golem/run/golem.sock`, that works like a private phone line between programs on the same computer. Nothing is open to the network.
 
 ```mermaid
 flowchart LR
-  you([You]) --> golem["golem<br/>(chat screen and commands)"]
+  you([You]) --> golem["golem<br/>(web UI, chat screen, commands)"]
   golem <-->|"socket file<br/>~/.golem/run/golem.sock"| daemon["Daemon<br/>(runs in the background)"]
   launchd["launchd<br/>(macOS service manager)"] -->|"starts at login,<br/>restarts after a crash"| daemon
   daemon --> data[("~/.golem<br/>settings, chats, logs")]
@@ -122,12 +122,12 @@ flowchart TB
 ```
 
 - **The daemon** is packed by PyInstaller as a folder, not a single file. A single file would have to unpack itself every time it starts, which is slow. The recipe is in `packages/daemon/golem-daemon.spec`. It lists a few modules that PyInstaller cannot find on its own, because some libraries load them in a roundabout way.
-- **`golem`** is compiled by bun into one file ([ADR-019](../adr/019-single-binary.md)). It also carries the web page, the Vite build of `packages/web`, and `smoke-dist` checks that `golem web` serves it.
+- **`golem`** is compiled by bun into one file ([ADR-019](../adr/019-single-binary.md)). It also carries the web page, the Vite build of `packages/web`, and `smoke-dist` checks that `golem` serves it.
 - **Signing.** Last, `scripts/sign_dist.py` signs every program file in the folder: ad-hoc by default, or with the certificate named by `GOLEM_SIGN_IDENTITY` ([Signing](release.md#signing)). `just check-signature` checks the result, and `just package` packs the folder into the `.tar.gz` and `.sha256` a release ships.
 
 ### Developing the web page
 
-- Run `golem web` (or `just golem web`) once. It starts the gateway.
+- Run `golem` (or `just golem`) once. It starts the gateway.
 - Run `pnpm --filter @golem/web dev`, and open the `golem web dev:` link it prints.
 - The dev server sends `/ws` and `/auth` to the gateway. It reads the port from `run/web.json` (else `GOLEM_WEB_PORT`, else 7480) when it starts, so restart it after the gateway.
 - The proxy sets the `Host` and `Origin` headers the gateway expects. The gateway's checks stay as they are ([ADR-028](../adr/028-web-gateway.md)).

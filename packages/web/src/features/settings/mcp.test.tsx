@@ -124,8 +124,8 @@ test("the list groups servers by the file that names them, with each state in wo
   expect(within(yours).getAllByRole("button").map((button) => button.textContent)).toEqual([
     "running, gitrunning2 tools · 1.3K tokens · on in every chat",
     "failed, githubfailed401 Unauthorized · retry in 5s",
-    "on demand, lazyon demand",
-    "disabled, offdisabled",
+    "lon demand, lazyon demand",
+    "odisabled, offdisabled",
   ]);
 });
 
@@ -265,7 +265,7 @@ test("on a wide window the list and the selected server's details sit side by si
   expect(row("github").getAttribute("aria-current")).toBe("true");
   expect(screen.getByRole("button", { name: GIT_ROW }).getAttribute("aria-current")).toBeNull();
   expect(screen.getByText("401 Unauthorized · retry in 5s", { selector: "p" })).toBeTruthy();
-  expect(screen.getAllByRole("button", { name: /Add a server|Import/ }).length).toBe(2);
+  expect(screen.getByRole("tab", { name: "Catalog" })).toBeTruthy();
 });
 
 test("on a wide window the list and the selected server's details sit side by side, and the first is shown at once", async () => {
@@ -280,7 +280,7 @@ test("on a wide window the list and the selected server's details sit side by si
   expect(row("github").getAttribute("aria-current")).toBe("true");
   expect(screen.getByRole("button", { name: GIT_ROW }).getAttribute("aria-current")).toBeNull();
   expect(screen.getByText("401 Unauthorized · retry in 5s", { selector: "p" })).toBeTruthy();
-  expect(screen.getAllByRole("button", { name: /Add a server|Import/ }).length).toBe(2);
+  expect(screen.getByRole("tab", { name: "Catalog" })).toBeTruthy();
 });
 
 test("Back from a detail gives focus back to its row", async () => {
@@ -617,29 +617,50 @@ const GITHUB = {
 } as const;
 const NEEDS_NODE = { ...FILES, id: "memory", name: "memory", title: "Memory", description: "Remember things.", category: "other", inputs: [], available: true, missing: "node" } as const;
 
-test("Add lists what golem offers by category, searches it, and greys out what cannot be added", async () => {
+test("the Catalog tab shows a card per server with what it needs, greys out what cannot be added, and searches", async () => {
   const { fake, user } = mount("/settings/mcp", [git]);
   fake.raw.mcpCatalog.mockResolvedValue({ entries: [FILES, GITHUB, { ...NEEDS_NODE, available: false, reason: "Needs sign-in." }, { ...FILES, id: "done", title: "Done", added: true }] as never });
-  await user.click(await screen.findByRole("button", { name: "Add a server" }));
-  const dialog = await screen.findByRole("dialog");
-  expect(await within(dialog).findByRole("region", { name: "Files" })).toBeTruthy();
-  expect(within(dialog).getByRole("region", { name: "Code" })).toBeTruthy();
-  expect((within(dialog).getByRole("button", { name: /Memory/ }) as HTMLButtonElement).disabled).toBe(true);
-  expect(within(dialog).getByText(/Needs sign-in\./)).toBeTruthy();
-  expect((within(dialog).getByRole("button", { name: /Done/ }) as HTMLButtonElement).disabled).toBe(true);
-  await user.type(within(dialog).getByRole("textbox", { name: "Search the list" }), "pull");
-  expect(within(dialog).queryByRole("region", { name: "Files" })).toBeNull();
-  expect(within(dialog).getByRole("button", { name: /GitHub/ })).toBeTruthy();
-  await user.clear(within(dialog).getByRole("textbox", { name: "Search the list" }));
-  await user.type(within(dialog).getByRole("textbox", { name: "Search the list" }), "zzz");
-  expect(within(dialog).getByText(/Nothing in the list matches/)).toBeTruthy();
+  await user.click(await screen.findByRole("tab", { name: "Catalog" }));
+  const panel = await screen.findByRole("tabpanel", { name: "Catalog" });
+  expect(await within(panel).findByRole("heading", { name: "Filesystem" })).toBeTruthy();
+  expect(within(panel).getByText("needs path")).toBeTruthy();
+  expect(within(panel).getByText("needs token")).toBeTruthy();
+  expect((within(panel).getByRole("button", { name: "Add Memory" }) as HTMLButtonElement).disabled).toBe(true);
+  expect(within(panel).getByText("Needs sign-in.")).toBeTruthy();
+  expect(within(panel).queryByRole("button", { name: "Add Done" })).toBeNull();
+  expect(within(panel).getByText("Added")).toBeTruthy();
+  const cards = within(panel).getAllByRole("listitem");
+  expect(within(cards.at(-1)!).getByRole("heading", { name: "Another server" })).toBeTruthy();
+  await user.type(within(panel).getByRole("textbox", { name: "Search the list" }), "pull");
+  expect(within(panel).queryByRole("heading", { name: "Filesystem" })).toBeNull();
+  expect(within(panel).getByRole("heading", { name: "GitHub" })).toBeTruthy();
+  await user.clear(within(panel).getByRole("textbox", { name: "Search the list" }));
+  await user.type(within(panel).getByRole("textbox", { name: "Search the list" }), "zzz");
+  expect(within(panel).getByText(/Nothing in the list matches/)).toBeTruthy();
+});
+
+test("a card draws the brand mark of a catalog server, and a letter for one without", async () => {
+  const { fake, user } = mount("/settings/mcp", [git]);
+  fake.raw.mcpCatalog.mockResolvedValue({ entries: [FILES, GITHUB, { ...FILES, id: "zed", title: "Zed" }] as never });
+  await user.click(await screen.findByRole("tab", { name: "Catalog" }));
+  const panel = await screen.findByRole("tabpanel", { name: "Catalog" });
+  const card = (title: string) => within(panel).getByRole("heading", { name: title }).parentElement!;
+  expect(card("GitHub").querySelector("svg path")?.getAttribute("d")).toMatch(/^M12 \.297/);
+  expect(card("Filesystem").querySelector("svg path")).not.toBeNull();
+  expect(card("Zed").querySelector("svg")).toBeNull();
+  expect(card("Zed").textContent).toContain("Z");
+});
+
+test("Add no longer lives in the Installed list, and an empty list points to the Catalog", async () => {
+  const { user } = mount("/settings/mcp", []);
+  await user.click(await screen.findByRole("button", { name: "Browse the catalog" }));
+  expect(screen.getByRole("tab", { name: "Catalog" }).getAttribute("aria-selected")).toBe("true");
 });
 
 test("adding a catalog server fills the folder, keeps the token apart, tests the draft, and saves", async () => {
   const { fake, user } = mount("/settings/mcp", [git], "s1");
   fake.raw.mcpCatalog.mockResolvedValue({ entries: [FILES, GITHUB] as never });
-  await user.click(await screen.findByRole("button", { name: "Add a server" }));
-  await user.click(await screen.findByRole("button", { name: /Filesystem/ }));
+  await openAdd(user, "Filesystem");
   const folder = screen.getByLabelText("Folder") as HTMLInputElement;
   expect(folder.value).toBe("/work/app");
   await user.clear(folder);
@@ -657,8 +678,7 @@ test("adding a catalog server fills the folder, keeps the token apart, tests the
 test("a secret input is hidden and goes in secrets, and a missing one is named", async () => {
   const { fake, user } = mount("/settings/mcp", [git]);
   fake.raw.mcpCatalog.mockResolvedValue({ entries: [GITHUB] as never });
-  await user.click(await screen.findByRole("button", { name: "Add a server" }));
-  await user.click(await screen.findByRole("button", { name: /GitHub/ }));
+  await openAdd(user, "GitHub");
   const token = screen.getByLabelText("Token") as HTMLInputElement;
   expect(token.type).toBe("password");
   await user.click(screen.getByRole("button", { name: "Add" }));
@@ -674,8 +694,7 @@ test("a refused add shows the daemon's message and keeps the dialog", async () =
   const { fake, user } = mount("/settings/mcp", [git]);
   fake.raw.mcpCatalog.mockResolvedValue({ entries: [FILES] as never });
   fake.raw.addMcpServer.mockRejectedValue(new Error("filesystem is already there"));
-  await user.click(await screen.findByRole("button", { name: "Add a server" }));
-  await user.click(await screen.findByRole("button", { name: /Filesystem/ }));
+  await openAdd(user, "Filesystem");
   await user.type(screen.getByLabelText("Folder"), "/x");
   await user.click(screen.getByRole("button", { name: "Add" }));
   expect((await screen.findByRole("alert")).textContent).toContain("filesystem is already there");
@@ -685,8 +704,7 @@ test("a refused add shows the daemon's message and keeps the dialog", async () =
 test("another server takes a name and a command or URL, shows what will run, tests it, and saves it", async () => {
   const { fake, user } = mount("/settings/mcp", [git]);
   fake.raw.mcpCatalog.mockResolvedValue({ entries: [FILES] as never });
-  await user.click(await screen.findByRole("button", { name: "Add a server" }));
-  await user.click(await screen.findByRole("button", { name: /Another server/ }));
+  await openAdd(user, "Another server");
   await user.type(screen.getByLabelText("Name"), "mine");
   await user.click(screen.getByRole("button", { name: "Add" }));
   expect((await screen.findByRole("alert")).textContent).toBe("Type a command or an https:// URL.");
@@ -704,8 +722,7 @@ test("another server takes a name and a command or URL, shows what will run, tes
 test("a URL says golem will connect, and a bad name is refused", async () => {
   const { fake, user } = mount("/settings/mcp", [git]);
   fake.raw.mcpCatalog.mockResolvedValue({ entries: [] });
-  await user.click(await screen.findByRole("button", { name: "Add a server" }));
-  await user.click(await screen.findByRole("button", { name: /Another server/ }));
+  await openAdd(user, "Another server");
   await user.type(screen.getByLabelText("Name"), "-bad");
   expect(screen.getByText(/Use letters, digits, and dashes/)).toBeTruthy();
   await user.type(screen.getByLabelText("Command or URL"), "https://x.example/mcp");
@@ -717,8 +734,7 @@ test("a URL says golem will connect, and a bad name is refused", async () => {
 test("a server that needs Node offers to install it, shows the output, and adds only once it is there", async () => {
   const { fake, user } = mount("/settings/mcp", [git]);
   fake.raw.mcpCatalog.mockResolvedValue({ entries: [NEEDS_NODE] as never });
-  await user.click(await screen.findByRole("button", { name: "Add a server" }));
-  await user.click(await screen.findByRole("button", { name: /Memory/ }));
+  await openAdd(user, "Memory");
   expect((screen.getByRole("button", { name: "Add" }) as HTMLButtonElement).disabled).toBe(true);
   await user.click(screen.getByRole("button", { name: "Install Node" }));
   expect(fake.raw.installRuntime).toHaveBeenCalledWith("node");
@@ -737,8 +753,7 @@ test("a server that needs Node offers to install it, shows the output, and adds 
 test("a failed install says why", async () => {
   const { fake, user } = mount("/settings/mcp", [git]);
   fake.raw.mcpCatalog.mockResolvedValue({ entries: [NEEDS_NODE] as never });
-  await user.click(await screen.findByRole("button", { name: "Add a server" }));
-  await user.click(await screen.findByRole("button", { name: /Memory/ }));
+  await openAdd(user, "Memory");
   await user.click(screen.getByRole("button", { name: "Install Node" }));
   act(() => {
     fake.emitRuntime({ kind: "done", done: { name: "node", ok: false, error: "brew is not installed" } });
@@ -758,14 +773,20 @@ test("axe finds nothing on the edit form, the list of servers to add, and the ad
     expect((await axe.run(document.body, noContrast)).violations).toEqual([]);
     await user.click(screen.getByRole("button", { name: "Cancel" }));
     await user.click(screen.getByRole("button", { name: "Back" }));
-    await user.click(screen.getByRole("button", { name: "Add a server" }));
-    await screen.findByRole("region", { name: "Files" });
+    await user.click(screen.getByRole("tab", { name: "Catalog" }));
+    await screen.findByRole("heading", { name: "Filesystem" });
     expect((await axe.run(document.body, noContrast)).violations).toEqual([]);
-    await user.click(screen.getByRole("button", { name: /GitHub/ }));
+    await user.click(screen.getByRole("button", { name: "Add GitHub" }));
     expect((await axe.run(document.body, noContrast)).violations).toEqual([]);
     unmount();
   }
 });
+
+/** Opens the Catalog tab and presses Add on the card of `title`. */
+async function openAdd(user: ReturnType<typeof userEvent.setup>, title: string): Promise<void> {
+  await user.click(await screen.findByRole("tab", { name: "Catalog" }));
+  await user.click(await screen.findByRole("button", { name: title === "Another server" ? "Add another server" : `Add ${title}` }));
+}
 
 const SCAN = {
   scan_id: "scan1",
@@ -787,16 +808,20 @@ const SCAN = {
 
 async function openImport(fake: ReturnType<typeof mount>["fake"], user: ReturnType<typeof mount>["user"], scan: unknown = SCAN) {
   fake.raw.scanMcpImport.mockResolvedValue(scan as never);
-  await user.click(await screen.findByRole("button", { name: "Import" }));
-  return screen.findByRole("dialog");
+  await user.click(await screen.findByRole("tab", { name: "Import" }));
+  return screen.findByRole("tabpanel", { name: "Import" });
 }
 
-test("Import lists what other apps have, picks every server golem lacks, and notes the rest", async () => {
+test("Import lists what other apps have by app, with nothing picked, and notes the rest", async () => {
   const { fake, user } = mount("/settings/mcp", [git]);
   const dialog = await openImport(fake, user);
   expect(await within(dialog).findByText("3 servers in 1 place")).toBeTruthy();
   expect(within(dialog).getByText("/Users/me/.cursor/mcp.json", { exact: false })).toBeTruthy();
-  expect((within(dialog).getByRole("checkbox", { name: "Import git" }) as HTMLInputElement).checked).toBe(true);
+  expect((within(dialog).getByRole("checkbox", { name: "Import git" }) as HTMLInputElement).checked).toBe(false);
+  expect((within(dialog).getByRole("checkbox", { name: "Import old" }) as HTMLInputElement).disabled).toBe(true);
+  expect((within(dialog).getByRole("button", { name: "Import" }) as HTMLButtonElement).disabled).toBe(true);
+  expect(within(dialog).getByText("0 selected")).toBeTruthy();
+  expect(within(dialog).getByText("uvx mcp-server-git").getAttribute("title")).toBe("uvx mcp-server-git");
   expect((within(dialog).getByRole("checkbox", { name: "Import old" }) as HTMLInputElement).checked).toBe(false);
   expect(within(dialog).getByText("already added")).toBeTruthy();
   expect(within(dialog).getByText("will be named gh-2")).toBeTruthy();
@@ -811,11 +836,14 @@ test("Import adds the picked servers under the names typed, with a typed secret 
   const { fake, user } = mount("/settings/mcp", [git]);
   fake.raw.applyMcpImport.mockResolvedValue({ added: [{ name: "my-git", state: "running", command: "uvx" }, { name: "gh-2", state: "starting", command: "x" }], failed: [] } as never);
   const dialog = await openImport(fake, user);
-  const name = await within(dialog).findByLabelText("Name of git");
+  await user.click(await within(dialog).findByRole("button", { name: "Select all in Cursor" }));
+  expect(within(dialog).getByText("2 selected")).toBeTruthy();
+  await user.click(within(dialog).getByRole("button", { name: "Rename git" }));
+  const name = within(dialog).getByLabelText("Name of git");
   await user.clear(name);
-  await user.type(name, "my-git");
+  await user.type(name, "my-git{Enter}");
   await user.type(within(dialog).getByLabelText("Value for mcp/gh-2"), "tok");
-  await user.click(within(dialog).getByRole("button", { name: "Import 2 servers" }));
+  await user.click(within(dialog).getByRole("button", { name: "Import 2" }));
   await waitFor(() => expect(fake.raw.applyMcpImport).toHaveBeenCalled());
   expect(fake.raw.applyMcpImport.mock.calls[0]![0]).toEqual({
     scan_id: "scan1",
@@ -825,41 +853,45 @@ test("Import adds the picked servers under the names typed, with a typed secret 
     ],
     secrets: { "mcp/gh-2": "tok" },
   });
-  expect(await within(screen.getByRole("dialog")).findByText("Added 2 servers.")).toBeTruthy();
-  expect(within(screen.getByRole("dialog")).getByText("my-git · running")).toBeTruthy();
-  await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Done" }));
-  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(await within(dialog).findByText("Added 2 servers.")).toBeTruthy();
+  expect(within(dialog).getByText("my-git · running")).toBeTruthy();
+  await user.click(within(dialog).getByRole("button", { name: "Done" }));
+  expect(screen.queryByRole("tabpanel", { name: "Import" })).toBeNull();
   expect(await screen.findByText("added my-git, gh-2")).toBeTruthy();
 });
 
 test("Import says what is wrong before sending, and unticking a server drops it and its secret", async () => {
   const { fake, user } = mount("/settings/mcp", [git]);
   const dialog = await openImport(fake, user);
-  await user.clear(await within(dialog).findByLabelText("Name of git"));
+  await user.click(await within(dialog).findByRole("button", { name: "Select all in Cursor" }));
+  await user.click(within(dialog).getByRole("button", { name: "Rename git" }));
+  await user.clear(within(dialog).getByLabelText("Name of git"));
   await user.type(within(dialog).getByLabelText("Name of git"), "bad name");
-  await user.click(within(dialog).getByRole("button", { name: "Import 2 servers" }));
+  await user.click(within(dialog).getByRole("button", { name: "Import 2" }));
   expect((await within(dialog).findByRole("alert")).textContent).toContain("git: Use letters, digits, and dashes");
   expect(fake.raw.applyMcpImport).not.toHaveBeenCalled();
   await user.click(within(dialog).getByRole("checkbox", { name: "Import gh" }));
   expect(within(dialog).queryByLabelText("Value for mcp/gh-2")).toBeNull();
   await user.click(within(dialog).getByRole("checkbox", { name: "Import git" }));
-  expect((within(dialog).getByRole("button", { name: "Import 0 servers" }) as HTMLButtonElement).disabled).toBe(true);
+  expect((within(dialog).getByRole("button", { name: "Import" }) as HTMLButtonElement).disabled).toBe(true);
 });
 
 test("a pick that failed is shown with the daemon's reason, and the rest are still added", async () => {
   const { fake, user } = mount("/settings/mcp", [git]);
   fake.raw.applyMcpImport.mockResolvedValue({ added: [{ name: "git", state: "running", command: "x" }], failed: [{ key: "b", error: "gh-2 is already in use" }] } as never);
   const dialog = await openImport(fake, user);
-  await user.click(await within(dialog).findByRole("button", { name: "Import 2 servers" }));
+  await user.click(await within(dialog).findByRole("button", { name: "Select all in Cursor" }));
+  await user.click(within(dialog).getByRole("button", { name: "Import 2" }));
   expect((await screen.findByRole("alert")).textContent).toContain("gh-2 is already in use");
   expect(screen.getByText("git · running")).toBeTruthy();
 });
 
-test("a refused import keeps the dialog and shows the message", async () => {
+test("a refused import keeps the list and shows the message", async () => {
   const { fake, user } = mount("/settings/mcp", [git]);
   fake.raw.applyMcpImport.mockRejectedValue(new Error("the scan expired"));
   const dialog = await openImport(fake, user);
-  await user.click(await within(dialog).findByRole("button", { name: "Import 2 servers" }));
+  await user.click(await within(dialog).findByRole("button", { name: "Select all in Cursor" }));
+  await user.click(within(dialog).getByRole("button", { name: "Import 2" }));
   expect((await within(dialog).findByRole("alert")).textContent).toContain("the scan expired");
 });
 
@@ -870,7 +902,7 @@ test("Import with nothing found, and a scan that fails, say so", async () => {
   first.unmount();
   const second = mount("/settings/mcp", [git]);
   second.fake.raw.scanMcpImport.mockRejectedValue(new Error("daemon is down"));
-  await second.user.click(await screen.findByRole("button", { name: "Import" }));
+  await second.user.click(await screen.findByRole("tab", { name: "Import" }));
   expect((await screen.findByRole("alert")).textContent).toContain("daemon is down");
   second.fake.raw.scanMcpImport.mockResolvedValue({ scan_id: "s", sources: [] });
   await second.user.click(screen.getByRole("button", { name: "Try again" }));
@@ -888,12 +920,13 @@ test("pasted JSON is read by the daemon alone, and a session adds its project's 
   await waitFor(() => expect(fake.raw.scanMcpImport).toHaveBeenLastCalledWith({ sessionId: "s1", text: '{"mcpServers": {"x": {"command": "x"}}}' }));
 });
 
-test("axe finds nothing on the import dialog, in both themes", async () => {
+test("axe finds nothing on the Import tab, in both themes", async () => {
   for (const theme of ["slip", "kiln"]) {
     const { fake, user, unmount } = mount("/settings/mcp", [git]);
     document.documentElement.dataset.theme = theme;
     const dialog = await openImport(fake, user);
     await within(dialog).findByText("3 servers in 1 place");
+    await user.click(within(dialog).getByRole("button", { name: "Select all in Cursor" }));
     expect((await axe.run(document.body, noContrast)).violations).toEqual([]);
     unmount();
   }

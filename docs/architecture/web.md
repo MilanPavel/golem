@@ -51,17 +51,17 @@ Several open problems are the same for every local web screen:
 
 ::: golem In golem
 
-golem keeps the daemon as it is, on its Unix socket only, and puts a **gateway** in front of it ([ADR-028](../adr/028-web-gateway.md)). `golem web` starts it on `127.0.0.1:7480`, in the same `golem` binary as the TUI ([ADR-019](../adr/019-single-binary.md)). The gateway has three stages:
+golem keeps the daemon as it is, on its Unix socket only, and puts a **gateway** in front of it ([ADR-028](../adr/028-web-gateway.md)). `golem` starts it on `127.0.0.1:7480`, in the same `golem` binary as the TUI ([ADR-019](../adr/019-single-binary.md)). The gateway has three stages:
 
 - **The login.** `Host` and `Origin` must be exactly `127.0.0.1:7480`, and a WebSocket must carry a cookie whose secret the gateway made. A wrong `Host` or `Origin` gets 403. A missing cookie gets a socket that opens and closes at once with code 4401, which the page shows as "Run `golem web` for a fresh link".
 - **The filter.** One WebSocket message must be exactly one JSON object, with no line break, and a method a browser may call. Breaking the shape closes the link with 1008. A method a browser may not call, such as `auth.set`, gets the error `-32020 not allowed from the browser`, and the link stays open.
 - **The bridge.** Each WebSocket gets its own connection to `golem.sock`. Lines pass through unchanged in both directions. The gateway never speaks the protocol itself.
 
-![golem's gateway, started by golem web on 127.0.0.1 port 7480, in three stages from the page down. The login checks that Host and Origin are exactly 127.0.0.1 and the port, and that the cookie names a live secret. The filter lets through one JSON object per message, with no line break, and only a method a browser may call. The bridge opens one daemon connection per WebSocket and passes lines on unchanged to golem.sock. The daemon is unchanged, with no port and no cookie. Real refusals: Origin evil.example got 403, an upgrade with no cookie was opened and closed with 4401, two objects joined by a newline closed the link with 1008, and auth.set got error -32020. A tab that can't keep up pauses the daemon socket at 4 MiB. hello, session.create, session.attach, and message.send passed through unchanged, and 67 deltas reached the page and a terminal client on the socket alike](../images/web-gateway.svg)
+![golem's gateway, started by golem on 127.0.0.1 port 7480, in three stages from the page down. The login checks that Host and Origin are exactly 127.0.0.1 and the port, and that the cookie names a live secret. The filter lets through one JSON object per message, with no line break, and only a method a browser may call. The bridge opens one daemon connection per WebSocket and passes lines on unchanged to golem.sock. The daemon is unchanged, with no port and no cookie. Real refusals: Origin evil.example got 403, an upgrade with no cookie was opened and closed with 4401, two objects joined by a newline closed the link with 1008, and auth.set got error -32020. A tab that can't keep up pauses the daemon socket at 4 MiB. hello, session.create, session.attach, and message.send passed through unchanged, and 67 deltas reached the page and a terminal client on the socket alike](../images/web-gateway.svg)
 
-The login trades a token for a cookie. `golem web` writes a random token to `~/.golem/run/web.token`, readable only by you, and opens `http://127.0.0.1:7480/#t=TOKEN`. A browser never sends the part after `#` to a server. The page posts the token to `/auth/exchange` and gets a cookie with a fresh secret, not the token, because every local server would receive a cookie on `127.0.0.1`. Then the page removes `#t=` from the address and opens `/ws`.
+The login trades a token for a cookie. `golem` writes a random token to `~/.golem/run/web.token`, readable only by you, and opens `http://127.0.0.1:7480/#t=TOKEN`. A browser never sends the part after `#` to a server. The page posts the token to `/auth/exchange` and gets a cookie with a fresh secret, not the token, because every local server would receive a cookie on `127.0.0.1`. Then the page removes `#t=` from the address and opens `/ws`.
 
-![The login, over time, across four lanes: golem web, the page, the gateway, and the daemon. golem web starts the gateway, or reuses the one in run/web.json, and the gateway writes run/web.token with mode 0600 and O_EXCL. golem web opens 127.0.0.1 port 7480 with the token after the hash, which a browser never sends to a server. The page posts the token to /auth/exchange, and gets back 204 with a cookie that holds a fresh secret, not the token. The page removes the hash from the address with replaceState. Then it opens /ws with the cookie, the gateway connects to golem.sock, and the page's hello goes through the bridge to the daemon, which answers and sends the events](../images/web-login.svg)
+![The login, over time, across four lanes: golem, the page, the gateway, and the daemon. golem starts the gateway, or reuses the one in run/web.json, and the gateway writes run/web.token with mode 0600 and O_EXCL. golem opens 127.0.0.1 port 7480 with the token after the hash, which a browser never sends to a server. The page posts the token to /auth/exchange, and gets back 204 with a cookie that holds a fresh secret, not the token. The page removes the hash from the address with replaceState. Then it opens /ws with the cookie, the gateway connects to golem.sock, and the page's hello goes through the bridge to the daemon, which answers and sends the events](../images/web-login.svg)
 
 Inside, the page is the terminal app's client in a browser ([ADR-029](../adr/029-web-stack.md)). `@golem/client` is the same code, with `wsDial` in place of the Unix socket: `hello`, the ping, the reconnect, and the attach after the last `seq`. `reduceChat` from `@golem/view` folds each session's events. What differs is where the state lives:
 
@@ -111,7 +111,7 @@ The same rules are tests. `packages/gateway/src/framing.test.ts` and `auth.test.
 
 **Where it lives in the code:**
 
-- `packages/cli/src/web-command.ts`: `golem web`. It finds or starts the gateway, writes the token, and opens the link through `osascript`.
+- `packages/cli/src/web-command.ts`: `golem` and `golem web`, which both run `openWeb`. It finds or starts the gateway, writes the token, and opens the link through `osascript`.
 - `packages/gateway/src/bun/server.ts`: `startGateway`, the `Bun.serve` adapter: `/healthz`, `/auth/exchange`, `/ws`, and the page's files.
 - `packages/gateway/src/auth.ts`: `checkRequest`, `checkUpgrade`, and `exchangeToken`.
 - `packages/gateway/src/framing.ts`: `filterMessage`, which forwards, denies, or refuses one message.
@@ -145,19 +145,19 @@ The same rules are tests. `packages/gateway/src/framing.test.ts` and `auth.test.
 
 ## Try it
 
-1. Run `golem web`. The page opens on `127.0.0.1:7480`, and the address bar no longer shows `#t=` once the page has loaded.
-2. Run `golem` in a terminal in the same folder, and ask something there. The browser's sidebar shows the session working, and opening it shows the same answer streaming.
+1. Run `golem`. The page opens on `127.0.0.1:7480`, and the address bar no longer shows `#t=` once the page has loaded.
+2. Run `golem tui` in a terminal in the same folder, and ask something there. The browser's sidebar shows the session working, and opening it shows the same answer streaming.
 3. Open `http://localhost:7480` instead. The gateway answers `bad host`, because only `127.0.0.1` is let in.
-4. Stop `golem web` with Ctrl-C and start it again, then reload the tab. It connects without a new link, because the gateway kept a hash of the cookie. Run `golem web logout` and the next request shows "This page needs a fresh link".
+4. Stop `golem` with Ctrl-C and start it again, then reload the tab. It connects without a new link, because the gateway kept a hash of the cookie. Run `golem web logout` and the next request shows "This page needs a fresh link".
 5. In the page's devtools, open the Network tab and the `/ws` socket. Every frame is one protocol line, the same lines `/debug wire` shows in the TUI.
 
 ## The details
 
 For contributors: the reference for the gateway and the page. [ADR-028](../adr/028-web-gateway.md) and [ADR-029](../adr/029-web-stack.md) hold the reasons and the shapes that lost. [The design system](../design/index.md) holds the look, and [the gallery](/gallery/) shows it screen by screen.
 
-### golem web
+### golem and golem web
 
-`golem web` is in the `golem` binary. With no daemon running, it first asks to start golem's service ([ADR-033](../adr/033-golem-offers-to-start-the-service.md)). Then it reads `~/.golem/run/web.json`, which holds `pid`, `port`, and `started_at`. If that pid is a live `golem` process and `/healthz` answers `{"golem":"web","pid":N}` with it, `golem web` reuses that gateway: it reads `web.token` and opens the same kind of link. Otherwise it removes the stale file and starts a new gateway. The gateway starts before `web.token` is written, so a port that is taken never replaces the token of the gateway that holds it.
+Bare `golem` and `golem web` both run `openWeb` in the `golem` binary, so they do the same thing: `golem web` stays as a permanent alias. With no daemon running, it first asks to start golem's service ([ADR-033](../adr/033-golem-offers-to-start-the-service.md)). Then it reads `~/.golem/run/web.json`, which holds `pid`, `port`, and `started_at`. If that pid is a live `golem` process and `/healthz` answers `{"golem":"web","pid":N}` with it, `golem` reuses that gateway: it reads `web.token` and opens the same kind of link. Otherwise it removes the stale file and starts a new gateway. The gateway starts before `web.token` is written, so a port that is taken never replaces the token of the gateway that holds it.
 
 | Option | What it does |
 |---|---|
@@ -165,7 +165,7 @@ For contributors: the reference for the gateway and the page. [ADR-028](../adr/0
 | `--no-open` | Print the link, with its token, instead of opening the browser |
 | `--json` | Print `{url, port, pid}` and open nothing, for scripts |
 
-The browser is opened through `osascript` reading the link on stdin, because process arguments are visible to other users, and the link holds the token. Without `--no-open` the terminal shows the address without the token. `golem web` runs the gateway in the foreground until Ctrl-C. `golem web logout` signs every browser out. The gateway does not read `config.toml`.
+The browser is opened through `osascript` reading the link on stdin, because process arguments are visible to other users, and the link holds the token. Without `--no-open` the terminal shows the address without the token. `golem` runs the gateway in the foreground until Ctrl-C. `golem web logout` signs every browser out. The gateway does not read `config.toml`.
 
 ### The token and the cookie
 
@@ -268,7 +268,7 @@ In development, `vite dev` serves the page on its own port. Its proxy for `/ws` 
 
 | File | What it does |
 |---|---|
-| `packages/cli/src/web-command.ts`, `web.ts` | `golem web`: find or start the gateway, write the token, open the link |
+| `packages/cli/src/web-command.ts`, `web.ts` | `golem`, `golem web`: find or start the gateway, write the token, open the link |
 | `packages/gateway/src/bun/server.ts` | `startGateway`: the routes, the WebSocket, one daemon socket per link |
 | `packages/gateway/src/auth.ts` | `checkRequest`, `checkUpgrade`, `exchangeToken`, the cookie |
 | `packages/gateway/src/framing.ts` | `filterMessage`: forward, deny, or refuse one message |

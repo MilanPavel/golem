@@ -3,7 +3,7 @@
 - intro-wake.svg (the Introduction): "Golem, wake up!" On parchment, the golem of the other
   pictures sleeps under the moon, head bowed and eyes shut, and a shem (the scroll of the Prague
   legend) slides into the slot in its forehead. On the dark side the shem glows, the same golem's
-  eyes light up, and `$ golem` then `> hello` types out beside it.
+  eyes light up, and `$ golem tui` then `> hello` types out beside it.
 - arch-parts.svg (the architecture Overview): "Lay out the parts." On parchment the golem's
   parts float apart and come together. On a blueprint the same parts are numbered, and each
   lights up in turn next to the chapter it stands for: the head is the agent loop, the scroll is
@@ -243,7 +243,7 @@ def wake() -> str:
             f'<animate attributeName="opacity" dur="7s" begin="{delay}s" repeatCount="indefinite" values="0;0.75;0.75;0" keyTimes="0;0.2;0.75;1"/></g>'
         )
     px = 672
-    prompt_still = text(px, 330, "$ golem", 26, MINT, anchor="start") + text(px, 362, "&gt; hello", 22, MINT, anchor="start")
+    prompt_still = text(px, 330, "$ golem tui", 26, MINT, anchor="start") + text(px, 362, "&gt; hello", 22, MINT, anchor="start")
     typed = "".join(
         f'<tspan opacity="0">{ch}<animate attributeName="opacity" dur="{DUR}" repeatCount="indefinite" '
         f'keyTimes="0;{0.40 + i * 0.03:.3f};{0.401 + i * 0.03:.3f};0.94;1" values="0;0;1;1;0"/></tspan>'
@@ -259,7 +259,7 @@ def wake() -> str:
         '<animate attributeName="opacity" dur="1s" repeatCount="indefinite" values="1;1;0;0" keyTimes="0;0.5;0.51;1"/></rect>'
     )
     prompt_anim = (
-        f'<g opacity="0">{text(px, 330, "$ golem", 26, MINT, anchor="start")}'
+        f'<g opacity="0">{text(px, 330, "$ golem tui", 26, MINT, anchor="start")}'
         f'<animate attributeName="opacity" dur="{DUR}" repeatCount="indefinite" keyTimes="0;0.32;0.33;0.94;1" values="0;0;1;1;0"/></g>'
         f'<g opacity="0"><text x="{px}" y="362" font-family="{MONO}" font-size="22" fill="{MINT}" xml:space="preserve">&gt; {typed}</text>{cursor}'
         f'<animate attributeName="opacity" dur="{DUR}" repeatCount="indefinite" keyTimes="0;0.36;0.37;0.94;1" values="0;0;1;1;0"/></g>'
@@ -277,7 +277,7 @@ def wake() -> str:
         left,
         right,
         NIGHT,
-        "Golem, wake up! On parchment under a crescent moon, the golem sleeps with its head bowed and eyes shut, and the shem, a small scroll, slides into the slot in its forehead. On a dark screen the shem glows in the same golem's forehead, its eyes light up green, and a prompt types: dollar golem, then hello.",
+        "Golem, wake up! On parchment under a crescent moon, the golem sleeps with its head bowed and eyes shut, and the shem, a small scroll, slides into the slot in its forehead. On a dark screen the shem glows in the same golem's forehead, its eyes light up green, and a prompt types: dollar golem tui, then hello.",
     )
 
 

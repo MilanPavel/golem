@@ -4,7 +4,8 @@ The Homebrew tap for [golem](https://github.com/MilanPavel/golem), a personal AI
 
 ```bash
 brew install milanpavel/golem/golem
-golem                       # open the chat; the first time, it asks to start its service
+golem                       # open golem in your browser; the first time, it asks to start its service
+golem tui                   # or chat in the terminal
 ```
 
 The [install guide](https://milanpavel.github.io/golem/install) explains each step.
@@ -13,7 +14,7 @@ Upgrade:
 
 ```bash
 brew upgrade golem
-golem daemon restart        # or press Ctrl-R in golem
+golem daemon restart        # or press Ctrl-R in golem tui
 ```
 
 Remove, in this order. Chats and settings stay in `~/.golem`:

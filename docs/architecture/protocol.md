@@ -69,7 +69,7 @@ golem speaks **JSON-RPC 2.0, one object per line, over the daemon's Unix socket*
 - **Attach and replay.** A connection gets a session's events only after `session.attach` with `after_seq`. The daemon sends the stored events after that number, then the reply with `last_seq`, then live events. One lock per session covers both, so no event lands in between ([ADR-007](../adr/007-attach-and-fan-out.md)).
 - **Fan-out.** Every connection attached to a session gets every event. Each connection has its own queue and writer, so a slow one never blocks a run, and one that falls 20 000 lines behind is dropped. It reconnects, and attaches from its last `seq`.
 - **One client.** `@golem/client` is the only code that speaks the protocol, for the TUI, `golem status`, and the web UI. It sends a `ping` every 5 s, and after a reconnect attaches to each session again from its last `seq`.
-- **The browser.** A web page speaks the same lines over a WebSocket to `golem web`, which checks the token, the `Origin`, and the method, and passes each line on unchanged ([ADR-028](../adr/028-web-gateway.md)).
+- **The browser.** A web page speaks the same lines over a WebSocket to the gateway (`golem`), which checks the token, the `Origin`, and the method, and passes each line on unchanged ([ADR-028](../adr/028-web-gateway.md)).
 
 ![The real two-window trace. The log numbers 43 events of one session. A, the TUI, attached first and gets each one live. B, a web page, connects 6.081 seconds in and attaches with after_seq 0. Seq 1 to 9 come to it as one replay, then the reply says last_seq 9. From seq 10 on, A and B get each event in the same millisecond](../images/protocol-attach.svg)
 
@@ -127,7 +127,7 @@ C ← {"jsonrpc":"2.0","error":{"code":-32001,
 
 While the model loaded, A also got two `model.server.status` notifications, with no `seq`. The daemon sends those to every connection, attached or not.
 
-![One shape for the daemon and every client. The messages are Python classes in golem_protocol. just gen writes a JSON Schema and a TypeScript file for each message into packages/protocol/gen, and @golem/client uses them. The TUI and golem status reach the daemon over the Unix socket, one JSON object per line. A web page reaches it over a WebSocket through golem web, the gateway, which checks the token, the Origin, and the method, and passes the same line on. The daemon reads each line into the same Python classes](../images/protocol-one-shape.svg)
+![One shape for the daemon and every client. The messages are Python classes in golem_protocol. just gen writes a JSON Schema and a TypeScript file for each message into packages/protocol/gen, and @golem/client uses them. The TUI and golem status reach the daemon over the Unix socket, one JSON object per line. A web page reaches it over a WebSocket through the gateway, which checks the token, the Origin, and the method, and passes the same line on. The daemon reads each line into the same Python classes](../images/protocol-one-shape.svg)
 
 **Where it lives in the code:**
 
@@ -163,7 +163,7 @@ While the model loaded, A also got two `model.server.status` notifications, with
 
 ## Try it
 
-1. Open `golem`, type `/debug wire`, and send a message. It lists the recent protocol lines in both directions, with pings hidden.
+1. Open `golem tui`, type `/debug wire`, and send a message. It lists the recent protocol lines in both directions, with pings hidden.
 2. Talk to the daemon yourself:
 
    ```sh
@@ -176,7 +176,7 @@ While the model loaded, A also got two `model.server.status` notifications, with
    ```
 
    Two lines come back: the `hello` reply, and the daemon's status.
-3. Open `golem` in two terminals, and pick the same chat in `/sessions` in the second. Send a message in one: both stream it.
+3. Open `golem tui` in two terminals, and pick the same chat in `/sessions` in the second. Send a message in one: both stream it.
 
 ## The details
 
@@ -222,7 +222,7 @@ Each event line is one JSON-RPC 2.0 notification. The fields that matter:
 
 | Commands | Events |
 |---|---|
-| `hello`, `ping`, `daemon.status`, `session.create`, `session.attach`, `session.detach`, `session.list`, `session.rename`, `session.fork`, `session.close`, `session.set_skills`, `message.send`, `run.cancel`, `approval.respond`, `session.inspect`, `config.get`, `policy.update`, `policy.remove`, `session.revoke`, `auth.set`, `auth.remove`, `auth.list`, `model.list`, `session.set_model`, `model.set_default`, `model.probe`, `model.pull`, `model.pull_cancel`, `model.delete`, `artifact.read`, `mcp.list`, `mcp.enable`, `mcp.disable`, `mcp.tools`, `mcp.restart`, `mcp.login`, `mcp.logout`, `mcp.set_enabled`, `mcp.add`, `mcp.remove`, `skill.list`, `setup.status`, `ollama.install`, `ollama.install_cancel`, `ollama.start`, `fs.list_dirs` | `session.created`, `model.selected`, `message.started`, `message.delta`, `message.thinking.delta`, `message.completed`, `tool.requested`, `tool.started`, `tool.output`, `tool.completed`, `tool.failed`, `approval.needed`, `approval.resolved`, `todos.updated`, `skill.activated`, `skill.deactivated`, `skill.skipped`, `run.started`, `run.completed`, `run.failed`, `run.cancelled`, `session.updated`, `session.closed`; `session.summary` to watchers; `model.pull.progress`, `model.pull.done`, `model.options.saved`, `ollama.install.output`, `ollama.install.done`, `mcp.server.status`, `mcp.login.done`, `model.server.status`, and `skill.registry.changed` to every connection |
+| `hello`, `ping`, `daemon.status`, `session.create`, `session.attach`, `session.detach`, `session.list`, `session.rename`, `session.fork`, `session.close`, `session.set_skills`, `message.send`, `run.cancel`, `approval.respond`, `session.inspect`, `config.get`, `policy.update`, `policy.remove`, `session.revoke`, `auth.set`, `auth.remove`, `auth.list`, `model.list`, `session.set_model`, `model.set_default`, `permissions.set_mode`, `model.probe`, `model.pull`, `model.pull_cancel`, `model.delete`, `artifact.read`, `mcp.list`, `mcp.enable`, `mcp.disable`, `mcp.tools`, `mcp.restart`, `mcp.login`, `mcp.logout`, `mcp.set_enabled`, `mcp.add`, `mcp.remove`, `skill.list`, `setup.status`, `ollama.install`, `ollama.install_cancel`, `ollama.start`, `fs.list_dirs` | `session.created`, `model.selected`, `message.started`, `message.delta`, `message.thinking.delta`, `message.completed`, `tool.requested`, `tool.started`, `tool.output`, `tool.completed`, `tool.failed`, `approval.needed`, `approval.resolved`, `todos.updated`, `skill.activated`, `skill.deactivated`, `skill.skipped`, `run.started`, `run.completed`, `run.failed`, `run.cancelled`, `session.updated`, `session.closed`; `session.summary` to watchers; `model.pull.progress`, `model.pull.done`, `model.options.saved`, `ollama.install.output`, `ollama.install.done`, `mcp.server.status`, `mcp.login.done`, `model.server.status`, and `skill.registry.changed` to every connection |
 
 After `hello`, a client sends `ping` every few seconds so a half-open socket is noticed. `daemon.status` returns the pid, uptime, and configured model, and the local model servers golem has used: who runs each one, and for one golem started its pid and memory. A new chat sends `session.create` with its `cwd`, then `session.attach` with `after_seq` 0, then `message.send`. `session.list` returns sessions newest activity first, each with `idle`, `running`, or `waiting` for an approval, its title, its folder (`cwd`), and its last `seq`. With `cwd`, it lists only the sessions in that folder; `cwd` does not go with `watch`. With `watch: true`, the connection also gets a `session.summary` after every change to any session, until it closes. `session.rename` sets a title by hand. `session.fork` copies a session's history up to one message into a new session, and the client attaches to it. `session.detach` stops one session's events. `session.inspect` reads the saved checkpoint messages and does not call the model. When golem has a system prompt for the session, it comes first, with role `system`, and `message_count` leaves it out ([ADR-031](../adr/031-system-prompt.md)). A reply that called tools lists each call as `→ name(args)` after its text. `auth.set` tries a model provider's API key against the provider, then stores it in the Keychain, and a key the provider refuses is not stored ([ADR-035](../adr/035-daemon-installs-ollama.md)). `auth.remove` deletes it, and `auth.list` says where each provider's key is without returning it. The client shows `auth.set` in the wire view with the key replaced by `[redacted]`.
 

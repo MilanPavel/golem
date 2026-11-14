@@ -100,7 +100,7 @@ async function runGateway(args: WebArgs, deps: WebDeps): Promise<number> {
     // see the token.
     const winner = await findLive(runDir);
     if (winner !== null) return args.serve ? busy(winner) : useLive(args, runDir, winner, deps);
-    process.stderr.write(`port ${args.port} is in use. Try golem web --port <other>\n`);
+    process.stderr.write(`port ${args.port} is in use. Try golem --port <other>\n`);
     return 1;
   }
   try {
@@ -130,7 +130,7 @@ export function runWebLogout(): number {
       throw error;
     }
     clearSessionFile(runDir);
-    process.stdout.write("golem web: signed out every browser. Run golem web for a new link\n");
+    process.stdout.write("golem web: signed out every browser. Run golem for a new link\n");
     return 0;
   } catch (error) {
     process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);

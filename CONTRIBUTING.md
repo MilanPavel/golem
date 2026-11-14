@@ -48,6 +48,7 @@ The scope is optional. Use it when a change sits in one part of golem.
 | `tui` | The chat screen |
 | `web` | The web UI and the gateway that serves it |
 | `cli` | The `golem` command and its subcommands |
+| `relay` | The relay server that passes ciphertext between a Mac and its phones |
 | `client` | The shared TypeScript socket client |
 | `protocol` | The wire models and the generated types |
 | `models` | Providers, the model catalog, prices |

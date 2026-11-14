@@ -148,6 +148,7 @@ export function fakeClient() {
     revokeAllowance: vi.fn<PageClient["revokeAllowance"]>(async () => true),
     listModels: vi.fn<PageClient["listModels"]>(async () => EMPTY_LISTING),
     setSessionModel: vi.fn<PageClient["setSessionModel"]>(async () => ({}) as never),
+    setDefaultPermissionMode: vi.fn<PageClient["setDefaultPermissionMode"]>(async (mode) => ({ mode, path: "/h/config.toml" })),
     setDefaultModel: vi.fn<PageClient["setDefaultModel"]>(async () => ({}) as never),
     getModelOptions: vi.fn<PageClient["getModelOptions"]>(async (model) => ({ model, options: [], defaults: {}, saved: {}, session: {} })),
     setModelOptions: vi.fn<PageClient["setModelOptions"]>(async (model) => ({ model, saved: {} })),

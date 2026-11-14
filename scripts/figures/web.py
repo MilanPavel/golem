@@ -4,7 +4,7 @@
   page in the browser can reach that server. The three things it must check.
 - web-gateway.svg: golem's gateway in three stages, from the page down: the login, the filter,
   and the bridge to the socket, with the real refusals each stage gave.
-- web-login.svg: the login as a sequence over time, from `golem web` to the first `hello`.
+- web-login.svg: the login as a sequence over time, from `golem` to the first `hello`.
 - web-page.svg: inside the page. One client, and three kinds of state: session stores, the live
   store, and TanStack Query, under the components.
 
@@ -137,14 +137,14 @@ def gateway() -> str:
 <g class="anim">{"".join(anim)}</g>"""
     return card(
         548,
-        "golem's gateway, started by golem web on 127.0.0.1 port 7480, in three stages from the page down. The login checks that Host and Origin are exactly 127.0.0.1 and the port, and that the cookie names a live secret. The filter lets through one JSON object per message, with no line break, and only a method a browser may call. The bridge opens one daemon connection per WebSocket and passes lines on unchanged to golem.sock. The daemon is unchanged, with no port and no cookie. Real refusals: Origin evil.example got 403, an upgrade with no cookie was opened and closed with 4401, two objects joined by a newline closed the link with 1008, and auth.set got error -32020. A tab that can't keep up pauses the daemon socket at 4 MiB. hello, session.create, session.attach, and message.send passed through unchanged, and 67 deltas reached the page and a terminal client on the socket alike.",
+        "golem's gateway, started by golem on 127.0.0.1 port 7480, in three stages from the page down. The login checks that Host and Origin are exactly 127.0.0.1 and the port, and that the cookie names a live secret. The filter lets through one JSON object per message, with no line break, and only a method a browser may call. The bridge opens one daemon connection per WebSocket and passes lines on unchanged to golem.sock. The daemon is unchanged, with no port and no cookie. Real refusals: Origin evil.example got 403, an upgrade with no cookie was opened and closed with 4401, two objects joined by a newline closed the link with 1008, and auth.set got error -32020. A tab that can't keep up pauses the daemon socket at 4 MiB. hello, session.create, session.attach, and message.send passed through unchanged, and 67 deltas reached the page and a terminal client on the socket alike.",
         body,
     )
 
 
 # --- The login, in golem -------------------------------------------------------------------------
 
-LANES = [(90, "golem web"), (330, "page"), (570, "gateway"), (790, "daemon")]
+LANES = [(90, "golem"), (330, "page"), (570, "gateway"), (790, "daemon")]
 
 
 def login() -> str:
@@ -187,7 +187,7 @@ def login() -> str:
 <g class="anim">{"".join(anim)}</g>"""
     return card(
         548,
-        "The login, over time, across four lanes: golem web, the page, the gateway, and the daemon. golem web starts the gateway, or reuses the one in run/web.json, and the gateway writes run/web.token with mode 0600 and O_EXCL. golem web opens 127.0.0.1 port 7480 with the token after the hash, which a browser never sends to a server. The page posts the token to /auth/exchange, and gets back 204 with a cookie that holds a fresh secret, not the token. The page removes the hash from the address with replaceState. Then it opens /ws with the cookie, the gateway connects to golem.sock, and the page's hello goes through the bridge to the daemon, which answers and sends the events.",
+        "The login, over time, across four lanes: golem, the page, the gateway, and the daemon. golem starts the gateway, or reuses the one in run/web.json, and the gateway writes run/web.token with mode 0600 and O_EXCL. golem opens 127.0.0.1 port 7480 with the token after the hash, which a browser never sends to a server. The page posts the token to /auth/exchange, and gets back 204 with a cookie that holds a fresh secret, not the token. The page removes the hash from the address with replaceState. Then it opens /ws with the cookie, the gateway connects to golem.sock, and the page's hello goes through the bridge to the daemon, which answers and sends the events.",
         body,
     )
 

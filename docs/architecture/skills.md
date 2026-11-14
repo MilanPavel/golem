@@ -106,7 +106,7 @@ CHANGES.txt in the project folder, and write the notes in your answer.
 ## Try it
 
 1. Make `.golem/skills/release-notes/SKILL.md` in your project, as in the run above.
-2. Open the chat with `golem` in that folder and type `/skills`. The skill is listed under the project. Open it for its details.
+2. Open the chat with `golem tui` in that folder and type `/skills`. The skill is listed under the project. Open it for its details.
 3. Type `/rel` and see it in the suggestions, with `<version>`. Run `/release-notes 0.4.0`. Ctrl-O shows the filled-in body under your line.
 4. Break the header, for example `name: Release_Notes`, and run `golem skills check .golem/skills/release-notes` in a shell. It prints the error and exits with 1.
 
@@ -156,7 +156,7 @@ The daemon owns the skills, as it owns sessions and rules. Graph state will hold
 
 1. `<folder>/.golem/skills`, `<folder>/.agents/skills`, `<folder>/.claude/skills`
 2. `~/.golem/skills`, `~/.agents/skills`, `~/.claude/skills`, then `[skills] extra_dirs`
-3. Bundled with golem (2.7)
+3. Bundled with golem: `skills/` in the repository root in a checkout, and `libexec/golem-daemon/skills` in a release tree (`scripts/dist.sh` copies it, `golem/skills/bundled.py` finds it)
 
 Each source is read one level deep. A folder with a `SKILL.md` is a skill, and a name that starts with `.` or `_` is skipped. Symlinks are followed, and a folder reached twice counts once, so this repository's `.claude/skills`, which links to `.agents/skills`, lists each skill once.
 

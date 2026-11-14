@@ -6,6 +6,8 @@ import type { GolemClient } from "@golem/client";
 import { editConfig, mcpRegion, WHOLE_FILE, type EditIo, type RawApi, type Region } from "./config-edit.ts";
 import { askKey, editInEditor } from "./external-editor.ts";
 import { allNew, formatScan, isImportSource, missingRefs, numbered, parsePicks } from "./import-cli.ts";
+import { loginDoneText } from "@golem/view";
+
 import { formatTestResult, formatTestStep } from "./mcp-format.ts";
 import { readSecret } from "./read-secret.ts";
 
@@ -30,6 +32,58 @@ export async function testAfterAdd(client: GolemClient, name: string, sessionId?
     if (!result.ok) out(`${name} is added but does not work yet. Fix it with: golem mcp edit ${name}`);
   } catch (error) {
     process.stderr.write(`could not test ${name}: ${error instanceof Error ? error.message : String(error)}\n`);
+  }
+}
+
+/** What `golem mcp login` needs from the machine: a way to open the browser, a place to write, and how long to wait. */
+export interface LoginDeps {
+  open(url: string): void;
+  write(line: string): void;
+  error(line: string): void;
+  /** A little over the daemon's own 5 minutes, so its answer arrives first. */
+  timeoutMs: number;
+}
+
+export const LOGIN_TIMEOUT_MS = 330_000;
+
+/**
+ * `golem mcp login <name>`: print and open the address, then wait for the daemon to say the sign-in ended.
+ * Returns the exit code: 0 when signed in, 1 when it failed or nobody answered.
+ */
+export async function runMcpLogin(client: GolemClient, name: string, deps: LoginDeps): Promise<number> {
+  let finish: (done: { ok: boolean; text: string }) => void = () => undefined;
+  const ended = new Promise<{ ok: boolean; text: string }>((resolve) => {
+    finish = resolve;
+  });
+  // Listen before asking, so an answer that comes at once is not missed.
+  const stop = client.onMcpLoginDone((done) => {
+    if (done.name !== name) return;
+    if (!done.ok) {
+      finish({ ok: false, text: loginDoneText(done, null) });
+      return;
+    }
+    void client
+      .mcpTools(name)
+      .then((result) => (result.tools.length > 0 ? result.tools.length : null), () => null)
+      .then((count) => finish({ ok: true, text: loginDoneText(done, count) }));
+  });
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const started = await client.mcpLogin(name);
+    deps.write("Open this address to sign in:");
+    deps.write(started.authorize_url);
+    deps.open(started.authorize_url);
+    deps.write("waiting for the browser…");
+    const timeout = new Promise<{ ok: boolean; text: string }>((resolve) => {
+      timer = setTimeout(() => resolve({ ok: false, text: `no sign-in to ${name} after ${Math.round(deps.timeoutMs / 1000)}s` }), deps.timeoutMs);
+    });
+    const result = await Promise.race([ended, timeout]);
+    if (result.ok) deps.write(result.text);
+    else deps.error(result.text);
+    return result.ok ? 0 : 1;
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+    stop();
   }
 }
 
