@@ -253,7 +253,7 @@ export type SessionId24 = string;
 export type Ts23 = string;
 export type Type23 = 'todos.updated';
 export type Hash = string;
-export type How = 'invoked' | 'pinned';
+export type How = 'invoked' | 'pinned' | 'model';
 export type Name5 = string;
 export type Path = string;
 export type Source1 = 'project' | 'user' | 'bundled';
@@ -1095,10 +1095,12 @@ export interface SkillActivatedEvent {
  * ``how`` is ``invoked`` for a skill run once by name: its body is that
  * turn's user message. It is ``pinned`` for a skill turned on for the whole
  * session: its body is in the system prompt of every model call until it is
- * unpinned. ``source`` is where it was found, ``path`` its folder, and
- * ``hash`` the sha256 of its ``SKILL.md``. A pinned skill whose file changed,
- * or that can be used again after it was skipped, is activated again in the
- * run whose model call first reads the new body.
+ * unpinned. It is ``model`` for a skill the model loaded itself with
+ * ``load_skill``: its body is that tool's result. ``source`` is where it was
+ * found, ``path`` its folder, and ``hash`` the sha256 of its ``SKILL.md``.
+ * A pinned skill whose file changed, or that can be used again after it was
+ * skipped, is activated again in the run whose model call first reads the
+ * new body.
  *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "SkillActivatedData".
