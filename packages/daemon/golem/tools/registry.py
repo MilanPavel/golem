@@ -17,6 +17,7 @@ import httpx
 from pydantic import BaseModel, ValidationError
 
 from golem.config import PERMISSION_MODES, PermissionMode, ShellSettings, WebSettings
+from golem.skills.registry import SkillView
 
 MAX_OUTPUT_CHARS = 5_000_000
 """What one call may return, at most. Output this big goes to an artifact, not the model."""
@@ -91,6 +92,8 @@ class ToolContext:
     read_roots: tuple[Path, ...] = ()
     enable_mcp: Callable[[str], Awaitable[list[str]]] | None = None
     """Turns on an on-demand MCP server for the session. Returns its tool names."""
+    skills: SkillView | None = None
+    """The skills the session's folder sees, for ``load_skill``."""
 
 
 @dataclass(frozen=True, slots=True)

@@ -158,6 +158,15 @@ test("an interrupted reply ends with a mark", () => {
   assert.equal(last?.spans[0]?.italic, true);
 });
 
+test("a reply cut at the length limit says so, dim, under the answer", () => {
+  const lines = layoutMessages([{ ...message("a", "assistant", "Half an ans"), cut: true }], 80);
+  const last = lines.at(-1);
+  assert.equal(last?.spans[0]?.text.trimEnd(), "The reply stopped at the length limit.");
+  assert.equal(last?.spans[0]?.dim, true);
+  const whole = layoutMessages([message("a", "assistant", "Whole")], 80);
+  assert.ok(!whole.some((line) => line.spans.some((span) => span.text.includes("length limit"))));
+});
+
 test("a finished answer shows how long it took, and times sit beside the label", () => {
   const now = new Date(2026, 9, 17, 18, 0, 0).getTime();
   const at = new Date(2026, 9, 17, 14, 2, 0).toISOString();

@@ -1,4 +1,4 @@
-import { contextUsed, formatTokens, ownToolName, type TraceContextPart } from "@golem/view";
+import { contextUsed, formatTokens, ownToolName, replyWasCut, type TraceContextPart } from "@golem/view";
 import type { TraceMessage, TraceSpan, TraceSpanResult } from "../../store/trace.ts";
 import { formatDuration, localTime, throughput } from "./format.ts";
 
@@ -10,7 +10,7 @@ export type Tab = ModelTab | ToolTab;
 export type Mode = "pretty" | "json";
 
 export const NOT_RECORDED_LINE = "Not recorded. This session ran before golem kept traces.";
-export const NO_SYSTEM_PROMPT_LINE = "No system prompt was sent on this call. golem sends one only when a skill is pinned.";
+export const NO_SYSTEM_PROMPT_LINE = "No system prompt was sent on this call. golem sends one only when something needs it, such as a pinned skill or an MCP server you can turn on.";
 
 /** Lines a tool result shows before it folds. */
 export const FOLD_LINES = 20;
@@ -98,7 +98,7 @@ export function metadataRows(result: TraceSpanResult): [string, string][] {
     ["duration_ms", span.duration_ms],
     ["model", span.model],
     ["provider", result.provider],
-    ["stop_reason", result.stop_reason],
+    ["stop_reason", replyWasCut(result.stop_reason) ? `${result.stop_reason} (the reply was cut)` : result.stop_reason],
     ["text_tool_calls", TEXT_CALL_LINES[result.text_tool_calls ?? ""]],
     ["first_token_ms", span.first_token_ms],
     ["tokens.input", span.tokens?.input],

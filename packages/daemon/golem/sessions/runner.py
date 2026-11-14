@@ -27,7 +27,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from golem.config import PermissionMode
+from golem.config import ModelPrice, PermissionMode
 from golem.graphs.adapter import (
     ApprovalAsked,
     ModelRequested,
@@ -35,6 +35,7 @@ from golem.graphs.adapter import (
     ModelStarted,
     PinRead,
     PinSkipped,
+    SkillLoaded,
     TextCompleted,
     TextDelta,
     ThinkingDelta,
@@ -47,6 +48,7 @@ from golem.graphs.adapter import (
 )
 from golem.graphs.chat import ChatRuntime
 from golem.graphs.tools_node import Answer
+from golem.models.cost import cost_usd
 from golem.models.errors import ModelUnreachable
 from golem.models.router import ModelConfigError, ModelIdentity
 from golem.permissions.engine import Allowance
@@ -58,6 +60,7 @@ from golem_protocol.events import (
     ApprovalDecision,
     ApprovalNeededData,
     ApprovalResolvedData,
+    CallPrice,
     EmptyEventData,
     EventType,
     MessageCompletedData,
@@ -167,9 +170,9 @@ class _Progress:
     ``reply`` is the text of the newest finished one. ``calls`` are tool
     calls requested and not yet finished.
 
-    ``model`` names the model that answers. ``call`` is the message id of the
-    model call sent and not yet ended, ``sent_at`` when it was sent
-    (``time.monotonic()``), and ``first_at`` when its first text came.
+    ``model`` names the model that answers when a call does not name its own.
+    ``call`` is the message id of the model call sent and not yet ended, ``sent_at``
+    when it was sent (``time.monotonic()``), and ``first_at`` when its first text came.
     ``index`` counts the calls sent so far. ``ran_window`` is the window the call
     ran with, read after it. ``text_tool_calls`` is what became of a tool call it wrote as text.
     """
@@ -182,6 +185,11 @@ class _Progress:
     waiting: bool = False
     pins: PinMemory = field(default_factory=PinMemory)
     model: ModelIdentity | None = None
+    identify: Callable[[str | None], ModelIdentity] | None = None
+    """Names the model of a profile. The model of a call is read from it as the call is sent."""
+    price_of: Callable[[str], ModelPrice | None] | None = None
+    call_model: ModelIdentity | None = None
+    """The model of the call sent and not yet ended."""
     index: int = 0
     call: str | None = None
     sent_at: float = 0.0
@@ -206,7 +214,12 @@ async def run_turn(
     waits for an approval. Cancellation is re-raised after ``run.cancelled``
     is in the log.
     """
-    progress = _Progress(pins=turn.pins, model=runtime.router.identity(turn.model_profile))
+    progress = _Progress(
+        pins=turn.pins,
+        model=runtime.router.identity(turn.model_profile),
+        identify=runtime.router.identity,
+        price_of=runtime.price_of,
+    )
 
     async def emit(kind: EventType, data: BaseModel) -> None:
         await events.emit(turn.session_id, turn.run_id, kind, data)
@@ -298,6 +311,8 @@ async def resume_turn(
         calls=list(resume.open_calls),
         pins=resume.pins,
         model=runtime.router.identity(),
+        identify=runtime.router.identity,
+        price_of=runtime.price_of,
     )
 
     async def emit(kind: EventType, data: BaseModel) -> None:
@@ -400,6 +415,9 @@ async def _apply(
         progress.ran_window = None
         progress.text_tool_calls = None
         model = progress.model
+        if fact.profile is not None and progress.identify is not None:
+            model = progress.identify(fact.profile)
+        progress.call_model = model
         await emit(
             "model.call.started",
             ModelCallStartedData(
@@ -512,6 +530,10 @@ async def _apply(
             data = {"name": fact.name, "source": fact.source, "how": "pinned"}
             data |= {"path": fact.path, "hash": fact.hash}
             await emit("skill.activated", SkillActivatedData.model_validate(data))
+    elif isinstance(fact, SkillLoaded):
+        data = {"name": fact.name, "source": fact.source, "how": "model"}
+        data |= {"path": fact.path, "hash": fact.hash}
+        await emit("skill.activated", SkillActivatedData.model_validate(data))
     elif isinstance(fact, PinSkipped):
         data = {"name": fact.name, "reason": fact.reason, "message": fact.message}
         skipped = SkillSkippedData.model_validate(data)
@@ -548,6 +570,15 @@ async def _end_call(
     now = time.monotonic()
     first = progress.first_at
     usage = None if done is None or done.usage is None else TokenUsage(**done.usage)
+    cost, price = None, None
+    model = progress.call_model
+    if not failed and usage is not None and model is not None and progress.price_of is not None:
+        found = progress.price_of(model.profile)
+        cost = cost_usd(usage.model_dump(), found)
+        if cost is not None and found is not None:
+            price = CallPrice(
+                input=found.input, output=found.output, cached_input=found.cached_input
+            )
     await emit(
         "model.call.completed",
         ModelCallCompletedData(
@@ -559,6 +590,8 @@ async def _end_call(
             failed=failed,
             context_window=None if failed else progress.ran_window,
             text_tool_calls=None if failed else progress.text_tool_calls,
+            cost_usd=cost,
+            price=price,
         ),
     )
 

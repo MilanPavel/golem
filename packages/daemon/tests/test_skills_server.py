@@ -47,6 +47,7 @@ async def test_skill_list_shows_a_folders_skills_and_the_users(short_home: Path)
         assert mine["shadowed_by"] == str(REPO / ".agents" / "skills" / "ship")
         assert listed[2]["argument_hint"] == "[topic]"
         assert listed[4]["errors"] != []
+        assert [s["indexed"] for s in listed] == [True, True, True, False, False]
 
         users = await _listed(client, {})
         assert [(s["name"], s["usable"]) for s in users] == [

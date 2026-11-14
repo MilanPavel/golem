@@ -36,10 +36,11 @@ from langgraph.config import get_stream_writer
 from langgraph.types import interrupt
 
 from golem.config import PERMISSION_MODES, PermissionMode
-from golem.graphs.adapter import APPROVAL_KIND, STREAM_KEY
+from golem.graphs.adapter import APPROVAL_KIND, SKILL_LOADED_KIND, STREAM_KEY
 from golem.graphs.state import AgentState
 from golem.permissions.engine import Allowance, session_allows
 from golem.permissions.policy import Policy, describe, explain
+from golem.skills.registry import SkillRegistry
 from golem.tools.registry import (
     Artifacts,
     InvalidArguments,
@@ -84,7 +85,7 @@ TAIL_CHARS = 4_000
 CUT_CHARS = 100_000
 """Without an artifact store, what the model gets of one call at most."""
 
-STATE_KEYS = frozenset({"todos"})
+STATE_KEYS = frozenset({"todos", "skill_folders"})
 """Graph state a tool may change through ``ToolResult.update``. Anything else is dropped."""
 
 ERROR_KEY = "golem_error"
@@ -144,6 +145,7 @@ def tools_node(
     policy: Policy,
     artifacts: Artifacts | None = None,
     enable_mcp: Callable[[], EnableMcp | None] = lambda: None,
+    skills: Callable[[], SkillRegistry | None] = lambda: None,
 ) -> Callable[[AgentState, RunnableConfig], Awaitable[dict[str, object]]]:
     async def tools(state: AgentState, config: RunnableConfig) -> dict[str, object]:
         last = state["messages"][-1]
@@ -161,14 +163,17 @@ def tools_node(
                 cast(set[str], now).add(name)
             return names
 
+        skill_registry = skills()
+        root = _root(config)
         base = ToolContext(
-            root=_root(config),
+            root=root,
             shell=policy.shell(),
             web=policy.web(),
             session_id=session_id,
             artifacts=artifacts,
             read_roots=_read_roots(state, config),
             enable_mcp=enable_here if enabler is not None and session_id else None,
+            skills=None if skill_registry is None else skill_registry.view(root),
         )
         allowed = _allowed(config)
         mode = _mode(config)
@@ -268,6 +273,12 @@ def tools_node(
             changed = {k: v for k, v in (result.update or {}).items() if k in STATE_KEYS}
             if "todos" in changed:
                 write({STREAM_KEY: "todos.updated", "call_id": call_id, "todos": changed["todos"]})
+            activated = (result.update or {}).get("skill_activated")
+            if isinstance(activated, dict):
+                write({STREAM_KEY: SKILL_LOADED_KIND, "call_id": call_id, **activated})
+            if "skill_folders" in changed:
+                folders = cast(list[str], changed["skill_folders"])
+                base = replace(base, read_roots=(*base.read_roots, *map(Path, folders)))
             updates.update(changed)
         return {"messages": results, **updates}
 

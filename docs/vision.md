@@ -20,6 +20,6 @@ Five ideas carry it:
 | 4 | [Sub-agents](vision/sub-agents.md) | Golem hands parts of a task to smaller agents, each with its own brief and model |
 | 5 | [Serve mode](vision/serve-mode.md#serve-mode-the-agent-behind-your-app) | The agent deployed behind an app, with the models kept strictly outside |
 
-They stand on [the core features](vision/core.md): skills, memory, local models, routing and cost, evals.
+They stand on [the core features](vision/core.md): skills, memory, local models, routing and cost, evals. How golem picks a model and keeps a small window useful has [its own page](vision/routing.md).
 
 ---
