@@ -56,6 +56,8 @@ export type { RuntimeInstallDone } from "../../protocol/gen/runtime-install-done
 export type { McpAddParams } from "../../protocol/gen/mcp-add-params.ts";
 export type { McpRemoveResult } from "../../protocol/gen/mcp-remove-result.ts";
 export type { McpServer } from "../../protocol/gen/mcp-server.ts";
+export type { McpLoginDone } from "../../protocol/gen/mcp-login-done.ts";
+export type { McpLoginResult } from "../../protocol/gen/mcp-login-result.ts";
 export type { KeychainWait } from "../../protocol/gen/keychain-wait.ts";
 export type { ModelServerStatus } from "../../protocol/gen/model-server-status.ts";
 export type { ModelMemory } from "../../protocol/gen/model-memory.ts";
@@ -63,6 +65,8 @@ export type { ModelOption } from "../../protocol/gen/model-option.ts";
 export type { ModelOptionsGetResult } from "../../protocol/gen/model-options-get-result.ts";
 export type { ModelOptionsSaved } from "../../protocol/gen/model-options-saved.ts";
 export type { ModelOptionsSetResult } from "../../protocol/gen/model-options-set-result.ts";
+export type { PermissionsSetModeParams } from "../../protocol/gen/permissions-set-mode-params.ts";
+export type { PermissionsSetModeResult } from "../../protocol/gen/permissions-set-mode-result.ts";
 export type { SessionSetModeParams } from "../../protocol/gen/session-set-mode-params.ts";
 export type { SessionSetModeResult } from "../../protocol/gen/session-set-mode-result.ts";
 export type { SessionSetOptionsResult } from "../../protocol/gen/session-set-options-result.ts";

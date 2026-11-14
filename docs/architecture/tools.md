@@ -116,7 +116,7 @@ Three tool calls, and one of them was wrong. At line 31 the model marked both it
 
 ## Try it
 
-1. In a project folder, open the chat with `golem` and type `/debug wire`.
+1. In a project folder, open the chat with `golem tui` and type `/debug wire`.
 2. Ask: `Find every TODO in this project. Keep a todo list while you work.` The panel shows `tool.requested grep`, `tool.started`, and `tool.completed`, and the todo band appears with `todos.updated`.
 3. Press **Ctrl-O** to see a tool's output, which is what the model read.
 4. Ask: `Run seq 1 30000 in the shell.` Allow it. Its output is over 20 000 characters, so the block ends with `all of it: /artifact <id>`. Type `/artifact` to open all of it in your pager.

@@ -117,7 +117,7 @@ Answer in one sentence, and start it with "In short:".
 ## Try it
 
 1. Make a skill in your project: `.golem/skills/terse/SKILL.md`, with a `name: terse` header and one line, `Answer in one sentence.`
-2. Open the chat with `golem` in that folder, and type `/skill pin terse`. The status line shows `skills: terse`.
+2. Open the chat with `golem tui` in that folder, and type `/skill pin terse`. The status line shows `skills: terse`.
 3. Ask anything, then type `/debug model`. The first row is `system`, with the skill inside `<skill name="terse">`.
 4. Change the line in `SKILL.md` and ask again. The next answer follows the new line, with no restart.
 

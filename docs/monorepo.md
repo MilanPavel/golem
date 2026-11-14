@@ -76,7 +76,7 @@ The generated files are committed. `just check` copies `packages/protocol/gen`, 
 | `just check` | `gen`, then lint, typecheck, test, and `docs-build`; fails if `gen/` drifted or a docs link is dead |
 | `just docs` | The docs site at `localhost:5173/golem/`, reloading as you edit |
 | `just docs-build` | Builds the docs site into `docs/.vitepress/dist` ([ADR-034](adr/034-docs-site.md)) |
-| `just golem …` | The `golem` CLI (`status`, `daemon install\|start\|stop\|logs`) |
-| `just tui` | The status TUI |
+| `just golem …` | The `golem` CLI: `just golem` opens the web UI, `just golem tui` the chat (in the repository root), and `status`, `daemon install\|start\|stop\|logs` work too |
+| `just tui` | The chat TUI, started straight from `packages/tui` in the folder you ran it from, so its session works there |
 
 CI runs `uv sync --all-packages --frozen`, `pnpm install --frozen-lockfile`, then `just check`. Both lockfiles are committed, so CI installs the same versions as a local sync.

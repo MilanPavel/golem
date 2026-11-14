@@ -54,6 +54,7 @@ from golem.sessions.log import SessionLog
 from golem.sessions.manager import SessionManager
 from golem.sessions.recovery import recover_runs
 from golem.sessions.titles import ModelTitles, TitleGenerator
+from golem.skills.bundled import bundled_skills_dir
 from golem.skills.pinned import pinned_section
 from golem.skills.registry import SkillRegistry
 from golem.store.artifacts import ArtifactStore
@@ -107,6 +108,7 @@ class DaemonApp:
         mcp: McpSupervisor | None = None,
         secrets: SecretStore | None = None,
         user_home: Path | None = None,
+        bundled_skills: Path | None = None,
         local_servers: LocalServers | None = None,
         socket_check_seconds: float = SOCKET_CHECK_SECONDS,
     ) -> None:
@@ -114,6 +116,7 @@ class DaemonApp:
         self._socket_check_seconds = socket_check_seconds
         self._socket_inode: int | None = None
         self._user_home = user_home
+        self._bundled_skills = bundled_skills
         self._router = router
         self._titles = titles
         self._discovery = discovery
@@ -185,6 +188,7 @@ class DaemonApp:
                 settings.skills,
                 golem_skills=self.paths.skills_dir,
                 user_home=self._user_home,
+                bundled=self._bundled_skills,
                 config_file=self.paths.config_file,
                 load_settings=lambda: load_settings(home=home, project_dir=home).skills,
                 broadcast=self._broadcast,
@@ -509,7 +513,13 @@ async def serve_forever() -> int:
     secrets = KeychainSecrets()
     router = ModelRouter(settings, home=paths.home, keys=ProviderKeys(secrets))
     titles = ModelTitles(router) if settings.session_titles else None
-    app = DaemonApp(paths, router=router, titles=titles, secrets=secrets)
+    app = DaemonApp(
+        paths,
+        router=router,
+        titles=titles,
+        secrets=secrets,
+        bundled_skills=bundled_skills_dir(),
+    )
     try:
         await app.serve()
     except DaemonAlreadyRunning as exc:

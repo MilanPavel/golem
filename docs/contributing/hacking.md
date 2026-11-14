@@ -56,7 +56,7 @@ just check                  # lint, typecheck, and tests
 ## Run it
 
 1. Start the daemon, in a terminal with `uv run python -m golem serve`, or in the background with `just golem daemon install`.
-2. Open the chat with `just golem`, or `just tui` to open it in the folder you are in.
+2. Open the chat with `just golem tui`, or `just tui` to open it in the folder you are in. `just golem` alone opens the web UI.
 
 - **One daemon at a time.** Only one daemon runs per `~/.golem`, so uninstall a Homebrew one first with `golem daemon uninstall`.
 - **A throwaway home.** Set `GOLEM_HOME` to another folder to try things without touching your own chats and settings.

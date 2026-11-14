@@ -102,7 +102,11 @@ def main() -> int:
             return 1
         # `golem web --json` exits 1 with no daemon, so the page is checked with one running.
         def web() -> bool:
-            return check_web(tree, env, home) and check_web_serve(tree, env, home)
+            return (
+                check_skills(tree, env)
+                and check_web(tree, env, home)
+                and check_web_serve(tree, env, home)
+            )
 
         if run_daemon(daemon, env, home, "web", FIRST_START_LIMIT_S, web) is None:
             return 1
@@ -128,6 +132,35 @@ def read_first_line(proc: subprocess.Popen[bytes], limit: float) -> bytes:
         return lines.get(timeout=limit)
     except queue.Empty:
         return b""
+
+
+def check_skills(tree: Path, env: dict[str, str]) -> bool:
+    """The tarball carries the bundled skills, and the daemon lists each one as bundled."""
+    folder = tree / "libexec" / "golem-daemon" / "skills"
+    names = sorted(path.parent.name for path in folder.glob("*/SKILL.md"))
+    if not names:
+        print(f"no bundled skill in {folder}", file=sys.stderr)
+        return False
+    result = subprocess.run(
+        [str(tree / "bin" / "golem"), "skills"],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=20,
+        check=False,
+    )
+    rows = [line.split() for line in result.stdout.splitlines()]
+    listed = {row[1] for row in rows if len(row) > 2 and row[2] == "bundled"}
+    missing = [name for name in names if name not in listed]
+    if result.returncode != 0 or missing:
+        print(
+            f"golem skills (exit {result.returncode}) did not list as bundled: {missing}",
+            file=sys.stderr,
+        )
+        print(result.stdout + result.stderr, file=sys.stderr)
+        return False
+    print(f"skills ok: {', '.join(names)}")
+    return True
 
 
 def check_web(tree: Path, env: dict[str, str], home: Path) -> bool:

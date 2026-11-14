@@ -112,7 +112,7 @@ export function toolsTyping(ui: ToolsUi): boolean {
 }
 
 function busy(row: ToolsRow): boolean {
-  return row.status.kind === "waiting" || row.status.kind === "installing" || row.status.kind === "adding";
+  return row.status.kind === "waiting" || row.status.kind === "installing" || row.status.kind === "adding" || row.status.kind === "signin";
 }
 
 function typedInto(ui: ToolsUi, key: ToolsKey): ToolsUi {

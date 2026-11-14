@@ -155,7 +155,7 @@ What golem gave up: the page is web only (the TUI keeps `/debug`), it shows fini
 
 ## Try it
 
-1. Run `golem web` in a project folder, and ask something that makes golem read a file, such as `What does the README say about installing?`.
+1. Run `golem` in a project folder, and ask something that makes golem read a file, such as `What does the README say about installing?`.
 2. Press **Trace** next to **Chat** under the session's title. Or press ⌘K and pick *Trace*. A run, its model calls, and the tool it ran are a tree, with a bar for each span's time.
 3. Click the last model call. Under its name, the context meter shows how full the window was and what filled it. Open the **Context** tab: the messages are there, with a line where the part new since the last call begins.
 4. Click the tool call. **Args** is what the model asked for, and **Result** is what it got back.

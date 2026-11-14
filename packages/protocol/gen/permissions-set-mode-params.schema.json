@@ -1,0 +1,20 @@
+{
+  "additionalProperties": false,
+  "description": "``permissions.set_mode``. Write ``[permissions] mode`` to the user's ``config.toml``.\n\nNew sessions start in it, and a session that set no mode of its own follows it.\nComments and the rest of the file stay as they are. A file that changed on disk\nwhile it was being written is refused.",
+  "properties": {
+    "mode": {
+      "enum": [
+        "careful",
+        "balanced",
+        "autopilot"
+      ],
+      "title": "Mode",
+      "type": "string"
+    }
+  },
+  "required": [
+    "mode"
+  ],
+  "title": "PermissionsSetModeParams",
+  "type": "object"
+}
