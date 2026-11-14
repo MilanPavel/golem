@@ -194,11 +194,14 @@ class SkillSettings(BaseModel):
     ``disabled`` names skills that are listed but never used. ``claude_dirs``
     reads Claude Code's ``.claude/skills`` folders, in the project and in the
     home folder. ``extra_dirs`` adds folders of skills, with ``~`` for the home
-    folder, after the user's own.
+    folder, after the user's own. ``index_budget`` is how many characters the
+    skill index in the system prompt may use. Skills that do not fit are left
+    out of it, and ``skill.list`` says so.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
+    index_budget: int = Field(default=4000, gt=0)
     disabled: list[str] = Field(default_factory=list[str])
     claude_dirs: bool = True
     extra_dirs: list[str] = Field(default_factory=list[str])

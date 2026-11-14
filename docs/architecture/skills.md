@@ -122,7 +122,7 @@ A model's context is small, and most skills are not needed in most turns. So a s
 
 | Level | What the model sees | When | Status |
 |---|---|---|---|
-| 1. Index | One line per skill: its `name` and `description` | Every model call | Planned (2.4) |
+| 1. Index | One line per skill: its `name` and `description` | Every model call | Built: `golem/skills/index.py`; a skill with `disable-model-invocation: true` is left out, and `[skills] index_budget` caps it |
 | 2. Body | The instructions in `SKILL.md` | When the skill is used | Built for `/name` and pins. The model loading one is planned (2.4) |
 | 3. Files | `references/`, script output | When the body says to read or run them | Built (2.2) |
 
