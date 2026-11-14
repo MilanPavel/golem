@@ -87,7 +87,7 @@ test("the default mode is shown read-only with the line to set and a copy button
   expect(section.textContent).toContain("Also edits inside the project");
   expect(section.textContent).toContain("[permissions] mode in /Users/you/.golem/config.toml");
   expect(within(section).getByText('mode = "autopilot"')).toBeTruthy();
-  expect(within(section).getByRole("button", { name: "Copy" })).toBeTruthy();
+  expect(within(section).getByRole("button", { name: /^Copy / })).toBeTruthy();
   expect(rows()[0]?.textContent).toContain("built-in default (autopilot)");
   const results = await axe.run(section, noContrast);
   expect(results.violations).toEqual([]);

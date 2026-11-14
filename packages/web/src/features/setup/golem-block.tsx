@@ -9,7 +9,7 @@ function Fact({ fact }: { fact: GolemFact }) {
       <code title={fact.title} className="min-w-0 truncate font-mono text-xs text-ink-soft">
         {fact.value}
       </code>
-      {fact.copy === null ? null : <CopyButton text={fact.copy} label={`Copy ${fact.label.toLowerCase()} path`} />}
+      {fact.copy === null ? null : <CopyButton text={fact.copy} label={`${fact.label.toLowerCase()} path`} />}
     </div>
   );
 }

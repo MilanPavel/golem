@@ -129,7 +129,7 @@ test("Pretty and JSON switch, and JSON shows the raw part of the result for that
 
 test("Copy puts what the tab shows on the clipboard, and says Copied", async () => {
   const { user } = show(TOOL_DETAIL);
-  await user.click(screen.getByRole("button", { name: "Copy" }));
+  await user.click(screen.getByRole("button", { name: /^Copy / }));
   expect(await navigator.clipboard.readText()).toBe("path: notes.txt\noffset: 0");
   expect(await screen.findByRole("button", { name: "Copied" })).toBeTruthy();
   await user.click(screen.getByRole("button", { name: "JSON" }));
