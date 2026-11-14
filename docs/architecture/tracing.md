@@ -52,7 +52,7 @@ golem keeps every request, but once: the history is already in the checkpoint, s
 
 Three things are recorded as a session runs:
 
-1. **Each model call is marked.** `call_model` sends a `model.request` item just before the request goes out. The runner stores `model.call.started` then, and `model.call.completed` when the stream ends, with the tokens, the stop reason, the time to the first token, the latency, and, for a local model, the window it ran with (read after the call and sent by `call_model` as a `model.response` item before its reply). Building the prompt and starting MCP servers come before the mark, so they don't count as model time.
+1. **Each model call is marked.** `call_model` sends a `model.request` item just before the request goes out. The runner stores `model.call.started` then, and `model.call.completed` when the stream ends, with the tokens, the stop reason (`stop_reason` or `finish_reason`, or Ollama's `done_reason`), the time to the first token, the latency, and, for a local model, the window it ran with (read after the call and sent by `call_model` as a `model.response` item before its reply). Building the prompt and starting MCP servers come before the mark, so they don't count as model time.
 2. **The request is kept by hash.** The system prompt and the tool schemas go in the `blobs` table, keyed by their sha256. `model.call.started` holds the two hashes, the ids of the history messages sent, the model's context window, and the name and size of each part of the system prompt.
 3. **Each tool is timed.** `tool.completed` and `tool.failed` carry `duration_ms`, measured around the tool's run. The wait for an approval is not in it.
 
