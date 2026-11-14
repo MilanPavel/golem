@@ -15,11 +15,13 @@ from golem import __version__, install_info
 from golem.config import load_settings
 from golem.config_edit import (
     McpTableError,
+    RawConflictError,
     RuleIndexError,
     read_model_options,
     set_default_model,
     set_mcp_enabled,
     set_model_options,
+    set_permission_mode,
 )
 from golem.doctor import MacPlatform, run_checks
 from golem.folders import FolderError, list_dirs
@@ -163,6 +165,8 @@ from golem_protocol.commands import (
     OllamaInstallResult,
     OllamaStartParams,
     OllamaStartResult,
+    PermissionsSetModeParams,
+    PermissionsSetModeResult,
     PingParams,
     PolicyEditResult,
     PolicyRemoveParams,
@@ -661,6 +665,20 @@ async def _model_set_default(
         raise RpcCallError(INTERNAL_ERROR, f"could not write {config_file}: {exc}") from exc
     log.info("default model=%s", params.model)
     return ModelSetDefaultResult(default=params.model)
+
+
+async def _permissions_set_mode(
+    ctx: RequestContext, params: PermissionsSetModeParams
+) -> PermissionsSetModeResult:
+    config_file = ctx.state.paths.config_file
+    try:
+        await asyncio.to_thread(set_permission_mode, config_file, params.mode)
+    except RawConflictError as exc:
+        raise RpcCallError(INTERNAL_ERROR, str(exc)) from exc
+    except (OSError, ValueError) as exc:
+        raise RpcCallError(INTERNAL_ERROR, f"could not write {config_file}: {exc}") from exc
+    log.info("default permission mode=%s", params.mode)
+    return PermissionsSetModeResult(mode=params.mode, path=str(config_file))
 
 
 def _ollama_name(model: str) -> str:
@@ -1220,6 +1238,9 @@ def standard_methods() -> dict[str, Method]:
         "model.delete": Method("model.delete", ModelDeleteParams, True, _model_delete),
         "model.set_default": Method(
             "model.set_default", ModelSetDefaultParams, True, _model_set_default
+        ),
+        "permissions.set_mode": Method(
+            "permissions.set_mode", PermissionsSetModeParams, True, _permissions_set_mode
         ),
         "model.options.get": Method(
             "model.options.get", ModelOptionsGetParams, True, _model_options_get

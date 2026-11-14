@@ -71,6 +71,7 @@ METHOD_ACCESS: Final[Mapping[str, Access]] = {
     "model.pull_cancel": "browser",
     "model.delete": "browser",
     "model.set_default": "browser",
+    "permissions.set_mode": "browser",
     "session.set_model": "browser",
     "session.set_options": "browser",
     "session.set_mode": "browser",
