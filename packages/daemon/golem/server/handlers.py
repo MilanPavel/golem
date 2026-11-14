@@ -72,6 +72,14 @@ from golem.server.mcp_import import mcp_import_apply, mcp_import_scan
 from golem.server.mcp_login import mcp_login, mcp_logout
 from golem.server.mcp_model import turn_on
 from golem.server.mcp_try import mcp_call, mcp_logs, mcp_test
+from golem.server.skills_edit import (
+    skill_create,
+    skill_create_protected,
+    skill_read,
+    skill_set_disabled,
+    skill_write,
+    skill_write_protected,
+)
 from golem.sessions.manager import (
     ApprovalNotFoundError,
     BlankTitleError,
@@ -207,8 +215,12 @@ from golem_protocol.commands import (
     SetupRow,
     SetupStatusParams,
     SetupStatusResult,
+    SkillCreateParams,
     SkillListParams,
     SkillListResult,
+    SkillReadParams,
+    SkillSetDisabledParams,
+    SkillWriteParams,
     TraceGetParams,
     TraceGetResult,
     TraceSpanParams,
@@ -1227,6 +1239,18 @@ def standard_methods() -> dict[str, Method]:
             "config.raw.set_protected", ConfigRawSetParams, True, config_raw_set_protected
         ),
         "skill.list": Method("skill.list", SkillListParams, True, _skill_list),
+        "skill.read": Method("skill.read", SkillReadParams, True, skill_read),
+        "skill.write": Method("skill.write", SkillWriteParams, True, skill_write),
+        "skill.write_protected": Method(
+            "skill.write_protected", SkillWriteParams, True, skill_write_protected
+        ),
+        "skill.create": Method("skill.create", SkillCreateParams, True, skill_create),
+        "skill.create_protected": Method(
+            "skill.create_protected", SkillCreateParams, True, skill_create_protected
+        ),
+        "skill.set_disabled": Method(
+            "skill.set_disabled", SkillSetDisabledParams, True, skill_set_disabled
+        ),
         "session.set_skills": Method(
             "session.set_skills", SessionSetSkillsParams, True, _session_set_skills
         ),

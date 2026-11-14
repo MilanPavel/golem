@@ -1,0 +1,20 @@
+{
+  "additionalProperties": false,
+  "description": "The new ``SKILL.md``'s path and ``mtime_ns``.",
+  "properties": {
+    "mtime_ns": {
+      "title": "Mtime Ns",
+      "type": "integer"
+    },
+    "path": {
+      "title": "Path",
+      "type": "string"
+    }
+  },
+  "required": [
+    "path",
+    "mtime_ns"
+  ],
+  "title": "SkillCreateResult",
+  "type": "object"
+}

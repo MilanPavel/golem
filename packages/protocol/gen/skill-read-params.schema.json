@@ -1,0 +1,29 @@
+{
+  "additionalProperties": false,
+  "description": "``skill.read``. The ``SKILL.md`` of the skill called ``name`` that a session in ``cwd`` sees.\n\nThe usable skill of that name is read, or the first one listed when none is usable.",
+  "properties": {
+    "cwd": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cwd"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "title": "SkillReadParams",
+  "type": "object"
+}

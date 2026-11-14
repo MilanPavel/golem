@@ -1,0 +1,49 @@
+{
+  "additionalProperties": false,
+  "description": "``skill.create`` and ``skill.create_protected``. Make ``<folder>/<name>/SKILL.md``.\n\n``scope = \"user\"`` is ``~/.golem/skills``. ``\"project\"`` is ``<cwd>/.agents/skills``\nand needs ``cwd``. ``skill.create`` refuses a project that is not trusted;\n``skill.create_protected``, which only a local client may call, does not.",
+  "properties": {
+    "cwd": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cwd"
+    },
+    "description": {
+      "minLength": 1,
+      "title": "Description",
+      "type": "string"
+    },
+    "model_invocable": {
+      "default": true,
+      "title": "Model Invocable",
+      "type": "boolean"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "scope": {
+      "enum": [
+        "user",
+        "project"
+      ],
+      "title": "Scope",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "scope",
+    "description"
+  ],
+  "title": "SkillCreateParams",
+  "type": "object"
+}
