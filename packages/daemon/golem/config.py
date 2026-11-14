@@ -188,6 +188,31 @@ class ShellSettings(BaseModel):
     timeout_seconds: int = Field(default=120, gt=0, le=3600)
 
 
+class CheckSettings(BaseModel):
+    """``[[coding.check]]``. One command golem runs to check a project."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1, max_length=40)
+    command: str = Field(min_length=1)
+    timeout_seconds: int = Field(default=120, gt=0, le=1800)
+
+
+class CodingSettings(BaseModel):
+    """``[coding]``. Checks golem runs after it changed files.
+
+    ``checks`` says whether it asks first, runs them on its own, or never runs
+    them. ``fix_rounds`` is how many times it may fix what a check found.
+    ``check`` lists the commands. With none, golem detects them from the project.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    checks: Literal["ask", "auto", "off"] = "ask"
+    fix_rounds: int = Field(default=2, ge=0, le=5)
+    check: list[CheckSettings] = Field(default_factory=list[CheckSettings])
+
+
 class SkillSettings(BaseModel):
     """``[skills]``. Which skill folders golem reads, and which skills it leaves off.
 
@@ -428,6 +453,7 @@ PROTECTED_SETTINGS = frozenset(
         "shell",
         "web",
         "permissions",
+        "coding",
     }
 )
 """Top-level settings the browser's ``config.raw.set`` may not change (ADR-037).
@@ -481,6 +507,7 @@ class GolemSettings(BaseSettings):
     # Project folders whose .golem/policy.toml may allow tools. Ask and deny rules apply anywhere.
     trusted_projects: list[str] = Field(default_factory=list[str])
     shell: ShellSettings = Field(default_factory=ShellSettings)
+    coding: CodingSettings = Field(default_factory=CodingSettings)
     permissions: PermissionSettings = Field(default_factory=PermissionSettings)
     web: WebSettings = Field(default_factory=WebSettings)
     mcp: McpServers = Field(default_factory=dict)
