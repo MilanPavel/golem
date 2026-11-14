@@ -1,4 +1,4 @@
-import type { DiffLine } from "@golem/view";
+import { numberDiff, type DiffLine } from "@golem/view";
 
 /** One displayed line of a change. `old` and `new` are line numbers; a missing side has none. */
 export type CodeRow = {
@@ -26,8 +26,6 @@ export type DiffFile = {
   added: boolean;
   deleted: boolean;
 };
-
-const HUNK = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/;
 
 function firstHunk(lines: readonly DiffLine[]): number {
   return lines.findIndex((line) => line.tone === "hunk");
@@ -60,43 +58,26 @@ export function unifiedRows(lines: readonly DiffLine[]): UnifiedRow[] {
   const start = firstHunk(lines);
   // Text with no hunk header at all has no numbers to give, so every line shows unnumbered.
   const body = start < 0 ? lines.filter((line) => line.tone !== "meta" || line.text.startsWith("\\")) : lines.slice(start);
-  const rows: UnifiedRow[] = [];
-  let oldNo: number | undefined;
-  let newNo: number | undefined;
-  for (const line of body) {
+  return numberDiff(body).map((line): UnifiedRow => {
     switch (line.tone) {
-      case "hunk": {
-        const match = HUNK.exec(line.text);
-        oldNo = match ? Number(match[1]) : undefined;
-        newNo = match ? Number(match[2]) : undefined;
-        rows.push({ kind: "hunk", text: line.text });
-        break;
-      }
+      case "hunk":
       case "meta":
-        rows.push({ kind: "meta", text: line.text });
-        break;
+        return { kind: line.tone, text: line.text };
       case "add":
-        rows.push({ kind: "line", tone: "add", sign: "+", ...(newNo === undefined ? {} : { new: newNo }), text: line.text.slice(1) });
-        if (newNo !== undefined) newNo += 1;
-        break;
+        return { kind: "line", tone: "add", sign: "+", ...(line.new === null ? {} : { new: line.new }), text: line.text.slice(1) };
       case "del":
-        rows.push({ kind: "line", tone: "del", sign: "-", ...(oldNo === undefined ? {} : { old: oldNo }), text: line.text.slice(1) });
-        if (oldNo !== undefined) oldNo += 1;
-        break;
+        return { kind: "line", tone: "del", sign: "-", ...(line.old === null ? {} : { old: line.old }), text: line.text.slice(1) };
       default:
-        rows.push({
+        return {
           kind: "line",
           tone: "context",
           sign: " ",
-          ...(oldNo === undefined ? {} : { old: oldNo }),
-          ...(newNo === undefined ? {} : { new: newNo }),
+          ...(line.old === null ? {} : { old: line.old }),
+          ...(line.new === null ? {} : { new: line.new }),
           text: line.text.slice(1),
-        });
-        if (oldNo !== undefined) oldNo += 1;
-        if (newNo !== undefined) newNo += 1;
+        };
     }
-  }
-  return rows;
+  });
 }
 
 function cell(row: CodeRow, side: "old" | "new"): Cell {
