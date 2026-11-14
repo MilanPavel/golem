@@ -24,6 +24,9 @@ PIN_READ_KIND = "skill.pin_read"
 PIN_SKIPPED_KIND = "skill.pin_skipped"
 """``STREAM_KEY`` value of a model call's report that it left a pinned skill out."""
 
+SKILL_LOADED_KIND = "skill.loaded"
+"""``STREAM_KEY`` value of a tool call that loaded a skill for the model."""
+
 APPROVAL_KIND = "approval"
 """``STREAM_KEY`` value of an interrupt that waits for a tool approval."""
 
@@ -177,6 +180,17 @@ class PinRead:
 
 
 @dataclass(frozen=True, slots=True)
+class SkillLoaded:
+    """``load_skill`` gave the model a skill's body. ``hash`` is that of its ``SKILL.md``."""
+
+    call_id: str
+    name: str
+    source: str
+    path: str
+    hash: str
+
+
+@dataclass(frozen=True, slots=True)
 class PinSkipped:
     """A model call left a pinned skill out of the system prompt."""
 
@@ -200,6 +214,7 @@ Fact = (
     | TodosChanged
     | PinRead
     | PinSkipped
+    | SkillLoaded
 )
 
 
@@ -597,6 +612,10 @@ def _custom(data: object) -> Fact | None:
         return _pin(kind, item)
     if not isinstance(call_id, str):
         return None
+    if kind == SKILL_LOADED_KIND:
+        found = [item.get(key) for key in ("name", "source", "path", "hash")]
+        strings = [value for value in found if isinstance(value, str) and value]
+        return SkillLoaded(call_id, *strings) if len(strings) == 4 else None
     if kind == "tool.started":
         return ToolStarted(call_id)
     if kind == "tool.output":
@@ -718,6 +737,7 @@ __all__ = [
     "APPROVAL_KIND",
     "PIN_READ_KIND",
     "PIN_SKIPPED_KIND",
+    "SKILL_LOADED_KIND",
     "STREAM_KEY",
     "ApprovalAsked",
     "Fact",
@@ -728,6 +748,7 @@ __all__ = [
     "PinSkipped",
     "PlainMessage",
     "RequestedCall",
+    "SkillLoaded",
     "TextCompleted",
     "TextDelta",
     "ThinkingDelta",

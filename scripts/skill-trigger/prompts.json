@@ -1,0 +1,12 @@
+[
+  {"prompt": "Write the release notes for 0.4.0: added dark mode, fixed a crash on an empty chat.", "expect": "release-notes"},
+  {"prompt": "Draft a changelog entry for version 2.1: faster startup, a new /skills command.", "expect": "release-notes"},
+  {"prompt": "What should the commit message be for a change that renames the config key theme to color_scheme?", "expect": "commit-message"},
+  {"prompt": "Write a commit message for this: fix an off-by-one error in the pagination.", "expect": "commit-message"},
+  {"prompt": "Review this query: SELECT * FROM orders o JOIN customers c ON 1=1 WHERE c.id = o.customer_id", "expect": "sql-review"},
+  {"prompt": "Is SELECT name FROM users WHERE lower(email) = 'a@b.c' slow on a big table? Review it.", "expect": "sql-review"},
+  {"prompt": "What is the capital of Australia?", "expect": null},
+  {"prompt": "Write a Python function that reverses a string.", "expect": null},
+  {"prompt": "Open a pull request for my changes.", "expect": null},
+  {"prompt": "Translate 'good morning' into French.", "expect": null}
+]
