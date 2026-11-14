@@ -18,6 +18,7 @@ export const GALLERY_SECTIONS = [
   "setup-form",
   "mcp-servers",
   "tools-panel",
+  "mcp-sign-in",
   "welcome-page",
   "download-row",
   "session-title-rename-and-close",

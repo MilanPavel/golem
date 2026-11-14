@@ -1,4 +1,4 @@
-import { OLLAMA_FAILED, RpcError, type ApprovalChoice, type ConfigGetResult, type ConfigRawGetResult, type ConfigRawResult, type FsListDirsResult, type McpAddParams, type McpCallResult, type McpImportApplyParams, type McpImportApplyResult, type McpImportScanResult, type McpCatalogResult, type McpListResult, type McpLogsResult, type McpServerConfig, type McpServerDetail, type McpServerLog, type McpTestProgress, type McpTestResult, type GolemClient, type RuntimeName, type SetupStatusResult, type SkillListResult, type TraceGetResult, type TraceSpanResult, type ArtifactReadResult, type ModelOptionsGetResult, type ModelOptionsSetResult, type SessionSetOptionsResult } from "@golem/client";
+import { OLLAMA_FAILED, RpcError, type ApprovalChoice, type ConfigGetResult, type ConfigRawGetResult, type ConfigRawResult, type FsListDirsResult, type McpAddParams, type McpCallResult, type McpImportApplyParams, type McpImportApplyResult, type McpImportScanResult, type McpCatalogResult, type McpListResult, type McpLogsResult, type McpServerConfig, type McpServerDetail, type McpServerLog, type McpLoginDone, type McpTestProgress, type McpTestResult, type GolemClient, type RuntimeName, type SetupStatusResult, type SkillListResult, type TraceGetResult, type TraceSpanResult, type ArtifactReadResult, type ModelOptionsGetResult, type ModelOptionsSetResult, type SessionSetOptionsResult } from "@golem/client";
 import { changeToolFilter, installEventOf, type InstallEvent, type PermissionMode } from "@golem/view";
 import type { QueryClient } from "@tanstack/react-query";
 import { createDrafts, type Drafts } from "./drafts.ts";
@@ -56,6 +56,9 @@ export type PageClient = Pick<
   | "mcpTest"
   | "mcpLogs"
   | "onMcpLog"
+  | "mcpLogin"
+  | "mcpLogout"
+  | "onMcpLoginDone"
   | "mcpCall"
   | "mcpGet"
   | "updateMcpServer"
@@ -154,6 +157,12 @@ export type PageActions = {
   mcpLogs(name: string, sessionId: string | null): Promise<McpLogsResult>;
   /** New log lines of any server, until the returned function is called. */
   watchMcpLog(listener: (log: McpServerLog) => void): () => void;
+  /** Starts a sign-in to a hosted server and returns the address to open. `watchMcpLogin` says how it ended. */
+  loginMcp(name: string, sessionId: string | null): Promise<string>;
+  /** Deletes the server's sign-in. The server stops and needs one again. */
+  logoutMcp(name: string, sessionId: string | null): Promise<void>;
+  /** A sign-in ended, well or not, until the returned function is called. */
+  watchMcpLogin(listener: (done: McpLoginDone) => void): () => void;
   /** Runs one tool by hand, by the server's own tool name. No approval, and no session records it. */
   callMcp(name: string, tool: string, args: Record<string, unknown>, sessionId: string | null): Promise<McpCallResult>;
   /**
@@ -407,6 +416,18 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       testMcp: (name, sessionId, onStep) => client.mcpTest({ name, ...(sessionId === null ? {} : { sessionId }) }, onStep),
       mcpLogs: (name, sessionId) => client.mcpLogs(name, sessionId === null ? {} : { sessionId }),
       watchMcpLog: (listener) => client.onMcpLog(listener),
+      async loginMcp(name, sessionId) {
+        const result = await client.mcpLogin(name, sessionId ?? undefined);
+        return result.authorize_url;
+      },
+      async logoutMcp(name, sessionId) {
+        try {
+          await client.mcpLogout(name, sessionId ?? undefined);
+        } finally {
+          await queryClient.invalidateQueries({ queryKey: MCP_LIST_KEY });
+        }
+      },
+      watchMcpLogin: (listener) => client.onMcpLoginDone(listener),
       callMcp: (name, tool, args, sessionId) => client.mcpCall({ name, tool, arguments: args, ...(sessionId === null ? {} : { sessionId }) }),
       async setMcpToolHidden(name, tool, hide, sessionId) {
         const detail = await client.mcpGet(name, sessionId ?? undefined);

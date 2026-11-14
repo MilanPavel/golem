@@ -1,4 +1,4 @@
-import { COMMANDS, noPastes, pickerGroups, withModelChoices, withSkillChoices, type TodoItem } from "@golem/view";
+import { COMMANDS, mcpStatusWord, noPastes, pickerGroups, withModelChoices, withSkillChoices, type TodoItem } from "@golem/view";
 import { createContext, useContext, useEffect, useId, useState, type ReactNode } from "react";
 import { Badge } from "../ui/badge.tsx";
 import { Button } from "../ui/button.tsx";
@@ -16,6 +16,8 @@ import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from "../ui/pop
 import { StatusDot } from "../ui/status-dot.tsx";
 import { Textarea } from "../ui/textarea.tsx";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip.tsx";
+import { Dot, serverSummary, SignInPanel, type Login } from "../features/settings/mcp/sign-in.tsx";
+import type { McpServer } from "../store/mcp.ts";
 import { ConnectionScreen } from "../features/connection/connection-screen.tsx";
 import { connectionScreen, type ConnectionHost } from "../features/connection/connection-screen.ts";
 import { DetailSwitch, ToolLine, TranscriptMessages } from "../features/chat/index.ts";
@@ -605,6 +607,41 @@ function ToolsOfferDemo() {
   );
 }
 
+const SIGN_IN_SERVER: McpServer = { name: "linear", state: "needs_auth", command: "https://mcp.linear.app/mcp", on_demand: false, enabled: null };
+
+const SIGN_IN_CASES: { label: string; server: McpServer; login: Login | undefined }[] = [
+  { label: "Needs sign-in", server: SIGN_IN_SERVER, login: undefined },
+  { label: "Waiting for the sign-in", server: SIGN_IN_SERVER, login: { kind: "waiting", url: "https://auth.example/authorize" } },
+  { label: "Signed in", server: { ...SIGN_IN_SERVER, state: "running", tools: ["mcp__linear__list_issues", "mcp__linear__get_issue"] }, login: { kind: "done", text: "Signed in to linear · 2 tools" } },
+  { label: "Sign-in failed", server: SIGN_IN_SERVER, login: { kind: "failed", error: "the sign-in timed out" } },
+];
+
+/** A server that signs in: its row and its panel in each state of the sign-in. */
+function McpSignInDemo() {
+  return (
+    <div className="flex flex-col gap-4">
+      {SIGN_IN_CASES.map(({ label, server, login }) => (
+        <section key={label} aria-label={`MCP sign-in, ${label}`} className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
+          <span className="font-mono text-xs text-faint">{label}</span>
+          <div className="flex max-w-xl flex-col gap-0.5 rounded-lg border border-line-strong bg-surface px-3 py-2">
+            <span className="flex items-center gap-x-2">
+              <Dot server={server} />
+              <span className="font-sans text-sm font-medium">{server.name}</span>
+              <span className="font-mono text-xs text-faint">{mcpStatusWord(server)}</span>
+            </span>
+            <span className={login?.kind === "failed" ? "pl-4 font-mono text-xs text-deny" : "pl-4 font-mono text-xs text-muted"}>{serverSummary(server, false, login)}</span>
+          </div>
+          {server.state === "needs_auth" ? (
+            <div className="max-w-xl">
+              <SignInPanel name={server.name} login={login} onSignIn={() => {}} />
+            </div>
+          ) : null}
+        </section>
+      ))}
+    </div>
+  );
+}
+
 /** Settings → Setup: the golem block, the status rows, and the key chips, in each state. */
 function SetupFormDemo() {
   return (
@@ -871,6 +908,11 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
       <section className="mt-6" id={anchor("Tools panel")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Tools panel</h3>
         <ToolsOfferDemo />
+      </section>
+
+      <section className="mt-6" id={anchor("MCP sign-in")}>
+        <h3 className="mb-2 font-mono text-xs text-faint">MCP sign-in</h3>
+        <McpSignInDemo />
       </section>
 
       <section className="mt-6" id={anchor("Welcome page")}>
