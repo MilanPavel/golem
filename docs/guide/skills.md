@@ -30,7 +30,7 @@ The project's folders come first:
 | The project you chat in | `.golem/skills/`, `.agents/skills/`, `.claude/skills/` |
 | Yours, on this machine | `~/.golem/skills/`, `~/.agents/skills/`, `~/.claude/skills/` |
 
-golem also ships a few skills of its own. They come last, so a skill of the same name in your project or in `~/.golem/skills/` replaces the bundled one.
+golem also ships a few skills of its own, for the first day in any folder: `/explain-project` says what a project is and where to start reading, `/commit-message` writes a message for your changes, and `/review-diff` reviews them before you commit. They come last, so a skill of the same name in your project or in `~/.golem/skills/` replaces the bundled one.
 
 Put each skill in its own folder, named like the skill: `~/.golem/skills/release-notes/SKILL.md`. Save a change and golem sees it within two seconds, with no restart.
 
