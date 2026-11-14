@@ -94,6 +94,7 @@ from golem.sessions.manager import (
     SpanNotFoundError,
 )
 from golem.sessions.summaries import summarize
+from golem.skills.index import build_index
 from golem.skills.invoke import SkillInvokeError
 from golem.skills.pinned import SkillPinError
 from golem.skills.registry import listed_skill
@@ -320,7 +321,9 @@ async def _session_create(ctx: RequestContext, params: SessionCreateParams) -> S
     sessions = _sessions(ctx)
     _check_cwd(params.cwd)
     try:
-        session_id = await sessions.create(params.model_profile, cwd=params.cwd)
+        session_id = await sessions.create(
+            params.model_profile, cwd=params.cwd, origin=params.origin
+        )
     except ModelConfigError as exc:
         raise RpcCallError(MODEL_NOT_CONFIGURED, str(exc)) from exc
     return SessionCreateResult(session_id=session_id)
@@ -933,7 +936,10 @@ async def _skill_list(ctx: RequestContext, params: SkillListParams) -> SkillList
     if skills is None:
         return SkillListResult(skills=[])
     view = skills.view(None if params.cwd is None else Path(params.cwd))
-    return SkillListResult(skills=[listed_skill(entry) for entry in view.listed])
+    indexed = {id(entry) for entry in build_index(view, skills.index_budget).entries}
+    return SkillListResult(
+        skills=[listed_skill(entry, indexed=id(entry) in indexed) for entry in view.listed]
+    )
 
 
 async def _session_set_skills(

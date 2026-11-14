@@ -1,0 +1,84 @@
+{
+  "$defs": {
+    "SessionCompletedData": {
+      "additionalProperties": false,
+      "description": "A run in a session that no user typed into has ended.\n\n``status`` is how the run ended. ``summary`` is the last assistant message\ncut to a few lines, null when the run left no reply (a failed or cancelled\nrun). A run that stops on an approval does not emit this: it is\n``approval.needed``.",
+      "properties": {
+        "run_id": {
+          "minLength": 1,
+          "title": "Run Id",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "completed",
+            "failed",
+            "cancelled"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "summary": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Summary"
+        }
+      },
+      "required": [
+        "run_id",
+        "status"
+      ],
+      "title": "SessionCompletedData",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "A run of a session whose origin is not ``user`` ended. It is also in the log.",
+  "properties": {
+    "data": {
+      "$ref": "#/$defs/SessionCompletedData"
+    },
+    "run_id": {
+      "minLength": 1,
+      "title": "Run Id",
+      "type": "string"
+    },
+    "seq": {
+      "minimum": 1,
+      "title": "Seq",
+      "type": "integer"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    },
+    "ts": {
+      "minLength": 1,
+      "title": "Ts",
+      "type": "string"
+    },
+    "type": {
+      "const": "session.completed",
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "seq",
+    "session_id",
+    "run_id",
+    "ts",
+    "type",
+    "data"
+  ],
+  "title": "SessionCompletedEvent",
+  "type": "object"
+}

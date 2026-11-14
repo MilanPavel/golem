@@ -52,6 +52,7 @@ from golem.models.window import ContextWindow, WindowOf
 from golem.permissions.engine import Allowance
 from golem.permissions.policy import Policy
 from golem.sessions.ids import new_id
+from golem.skills.registry import SkillRegistry
 from golem.tools import default_registry
 from golem.tools.registry import Artifacts, ToolRegistry
 
@@ -141,6 +142,8 @@ class ChatRuntime:
         self.window_of = window_of
         self.enable_mcp: EnableMcp | None = None
         """Turns on an on-demand MCP server for a session, for the model's ``mcp_enable``."""
+        self.skills: SkillRegistry | None = None
+        """The skills sessions see, for the model's ``load_skill``."""
         self.until_pulled: Callable[[str], Awaitable[None]] | None = None
         """Waits until a model's download ends, given its ref. Raises with the download's error."""
 
@@ -492,7 +495,13 @@ def open_chat(
     runtime: list[ChatRuntime] = []
     builder.add_node(
         "tools",
-        tools_node(registry, rules, artifacts, lambda: runtime[0].enable_mcp if runtime else None),
+        tools_node(
+            registry,
+            rules,
+            artifacts,
+            lambda: runtime[0].enable_mcp if runtime else None,
+            lambda: runtime[0].skills if runtime else None,
+        ),
     )
     builder.add_edge(START, "call_model")
     builder.add_conditional_edges("call_model", route, {"tools": "tools", "end": END})

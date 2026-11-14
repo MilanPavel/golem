@@ -6,6 +6,7 @@ export type SessionId = string;
 export type ModelName = string | null;
 export type ModelProfile = string;
 export type ModelProvider = string | null;
+export type Origin = string | null;
 export type RunId = null;
 export type Seq = number;
 export type SessionId1 = string;
@@ -30,7 +31,9 @@ export interface SessionCreatedEvent {
  * ``model_provider`` and ``model_name`` are set when the daemon can resolve
  * it, and null otherwise. ``forked_from`` is set on a session made by
  * ``session.fork``. ``cwd`` is the project folder the file tools work in,
- * or null for a session without one.
+ * or null for a session without one. ``origin`` is who started the session:
+ * ``cli``, ``routine:<name>``, and so on. Null means ``user``, and an older
+ * daemon leaves it out.
  *
  * This interface was referenced by `SessionCreatedEvent`'s JSON-Schema
  * via the `definition` "SessionCreatedData".
@@ -41,6 +44,7 @@ export interface SessionCreatedData {
   model_name?: ModelName;
   model_profile: ModelProfile;
   model_provider?: ModelProvider;
+  origin?: Origin;
 }
 /**
  * The session and message a fork was copied from.

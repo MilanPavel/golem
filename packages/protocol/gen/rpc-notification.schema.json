@@ -1465,9 +1465,91 @@
       "title": "SessionClosedEvent",
       "type": "object"
     },
+    "SessionCompletedData": {
+      "additionalProperties": false,
+      "description": "A run in a session that no user typed into has ended.\n\n``status`` is how the run ended. ``summary`` is the last assistant message\ncut to a few lines, null when the run left no reply (a failed or cancelled\nrun). A run that stops on an approval does not emit this: it is\n``approval.needed``.",
+      "properties": {
+        "run_id": {
+          "minLength": 1,
+          "title": "Run Id",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "completed",
+            "failed",
+            "cancelled"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "summary": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Summary"
+        }
+      },
+      "required": [
+        "run_id",
+        "status"
+      ],
+      "title": "SessionCompletedData",
+      "type": "object"
+    },
+    "SessionCompletedEvent": {
+      "additionalProperties": false,
+      "description": "A run of a session whose origin is not ``user`` ended. It is also in the log.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/SessionCompletedData"
+        },
+        "run_id": {
+          "minLength": 1,
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "session.completed",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "run_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "SessionCompletedEvent",
+      "type": "object"
+    },
     "SessionCreatedData": {
       "additionalProperties": false,
-      "description": "Profile stored for a new session.\n\n``model_profile`` is a profile name or a ``provider/model`` ref.\n``model_provider`` and ``model_name`` are set when the daemon can resolve\nit, and null otherwise. ``forked_from`` is set on a session made by\n``session.fork``. ``cwd`` is the project folder the file tools work in,\nor null for a session without one.",
+      "description": "Profile stored for a new session.\n\n``model_profile`` is a profile name or a ``provider/model`` ref.\n``model_provider`` and ``model_name`` are set when the daemon can resolve\nit, and null otherwise. ``forked_from`` is set on a session made by\n``session.fork``. ``cwd`` is the project folder the file tools work in,\nor null for a session without one. ``origin`` is who started the session:\n``cli``, ``routine:<name>``, and so on. Null means ``user``, and an older\ndaemon leaves it out.",
       "properties": {
         "cwd": {
           "anyOf": [
@@ -1523,6 +1605,19 @@
           ],
           "default": null,
           "title": "Model Provider"
+        },
+        "origin": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Origin"
         }
       },
       "required": [
@@ -1753,7 +1848,7 @@
     },
     "SkillActivatedData": {
       "additionalProperties": false,
-      "description": "A skill is active in the session.\n\n``how`` is ``invoked`` for a skill run once by name: its body is that\nturn's user message. It is ``pinned`` for a skill turned on for the whole\nsession: its body is in the system prompt of every model call until it is\nunpinned. ``source`` is where it was found, ``path`` its folder, and\n``hash`` the sha256 of its ``SKILL.md``. A pinned skill whose file changed,\nor that can be used again after it was skipped, is activated again in the\nrun whose model call first reads the new body.",
+      "description": "A skill is active in the session.\n\n``how`` is ``invoked`` for a skill run once by name: its body is that\nturn's user message. It is ``pinned`` for a skill turned on for the whole\nsession: its body is in the system prompt of every model call until it is\nunpinned. It is ``model`` for a skill the model loaded itself with\n``load_skill``: its body is that tool's result. ``source`` is where it was\nfound, ``path`` its folder, and ``hash`` the sha256 of its ``SKILL.md``.\nA pinned skill whose file changed, or that can be used again after it was\nskipped, is activated again in the run whose model call first reads the\nnew body.",
       "properties": {
         "hash": {
           "title": "Hash",
@@ -1762,7 +1857,8 @@
         "how": {
           "enum": [
             "invoked",
-            "pinned"
+            "pinned",
+            "model"
           ],
           "title": "How",
           "type": "string"
@@ -2626,6 +2722,7 @@
           "run.failed": "#/$defs/RunFailedEvent",
           "run.started": "#/$defs/RunStartedEvent",
           "session.closed": "#/$defs/SessionClosedEvent",
+          "session.completed": "#/$defs/SessionCompletedEvent",
           "session.created": "#/$defs/SessionCreatedEvent",
           "session.mode.changed": "#/$defs/SessionModeChangedEvent",
           "session.updated": "#/$defs/SessionUpdatedEvent",
@@ -2650,6 +2747,9 @@
         },
         {
           "$ref": "#/$defs/SessionClosedEvent"
+        },
+        {
+          "$ref": "#/$defs/SessionCompletedEvent"
         },
         {
           "$ref": "#/$defs/ModelSelectedEvent"
