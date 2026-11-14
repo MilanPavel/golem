@@ -160,9 +160,9 @@ test("warnings alone do not fail, and all ok says so", () => {
 
 test("the next step is the first failure's fix, then the first warning's", () => {
   const checks: Check[] = [
-    { name: "model", status: "warn", detail: "no model chosen yet", fix: "golem, then pick one" },
+    { name: "model", status: "warn", detail: "no model chosen yet", fix: "golem tui, then pick one" },
     { name: "service", status: "fail", detail: "launchd has no golem job", fix: "golem daemon install" },
   ];
   assert.equal(nextStep(checks), "Next: golem daemon install");
-  assert.equal(nextStep(checks.slice(0, 1)), "Next: golem, then pick one");
+  assert.equal(nextStep(checks.slice(0, 1)), "Next: golem tui, then pick one");
 });

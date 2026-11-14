@@ -178,7 +178,7 @@ export function runsOnRuntime(execPath: string): boolean {
   return /^(bun|node|nodejs|deno)(\.exe)?$/i.test(basename(execPath));
 }
 
-export const INSTALLED_LINE = "golem web: the page now starts at login · golem web opens it";
+export const INSTALLED_LINE = "golem web: the page now starts at login · golem opens it";
 export const NOT_INSTALLED_LINE = "the web service is not installed";
 
 /** Writes the plist and bootstraps the job. Reloads it when it is already loaded. */

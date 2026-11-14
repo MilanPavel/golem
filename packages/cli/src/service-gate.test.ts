@@ -143,7 +143,7 @@ test("n starts a daemon for this window and hands it back to be stopped", async 
   const result = await gateService(gate);
   assert.equal(result.kind, "open");
   assert.ok(result.kind === "open" && result.session !== null);
-  // The web page is served by this window's `golem web`, so no job is installed or awaited.
+  // The web page is served by this window's `golem`, so no job is installed or awaited.
   assert.deepEqual(gate.calls, ["ask", "serve", "wait until it exits"]);
   assert.deepEqual(gate.output, [STARTING, SESSION_STARTED]);
   result.session.stop();
