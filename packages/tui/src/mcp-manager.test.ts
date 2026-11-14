@@ -10,6 +10,8 @@ import {
   detailChoices,
   layoutMcpManager,
   mcpAdded,
+  mcpLoginDone,
+  mcpLoginUrl,
   mcpAddFailed,
   mcpCallDone,
   mcpCatalogLoaded,
@@ -598,4 +600,54 @@ test("a list row and the details say what limits a server", () => {
   assert.ok(detail.includes("Approval:      calls run without asking"));
   const trusting = shown(press(openMcpManager(), "enter").state, [{ ...git, approval: "read-only" }]).join("\n");
   assert.ok(trusting.includes("Approval:      tools the server marks read-only run without asking"));
+});
+
+const linear: McpServer = { name: "linear", state: "needs_auth", command: "https://mcp.linear.app/mcp", enabled: true, config: "/Users/me/.golem/config.toml" };
+
+test("a server that needs a sign-in shows ! and Sign in needed, and Sign in sends mcp.login", () => {
+  const servers = [...SERVERS, linear];
+  const list = shown(openMcpManager("/f"), servers);
+  assert.ok(list.some((line) => line.includes("! linear") && line.includes("Sign in needed")));
+  const at = pressMcpManager(openMcpManager("/f"), servers, "down");
+  const detail = pressMcpManager({ ...at.state, view: { kind: "detail", name: "linear", project: null, selected: 0 } }, servers, 1);
+  assert.deepEqual(detail.action, { kind: "login", name: "linear" });
+  assert.equal(detail.state.view.kind, "login");
+  assert.ok(shown(detail.state, servers).some((line) => line.includes("asking the daemon")));
+});
+
+test("the sign-in screen shows the address, then the end: signed in, or the error", () => {
+  const servers = [...SERVERS, linear];
+  const waiting: McpManagerState = {
+    ...openMcpManager("/f"),
+    view: { kind: "login", name: "linear", project: null, url: null, result: null, ok: null },
+  };
+  const withUrl = mcpLoginUrl(waiting, "linear", "https://auth.example/authorize?x=1");
+  const lines = shown(withUrl, servers);
+  assert.ok(lines.some((line) => line.includes("https://auth.example/authorize?x=1")));
+  assert.ok(lines.some((line) => line.includes("waiting for you")));
+  const done = mcpLoginDone(withUrl, "linear", true, "Signed in to linear · 12 tools");
+  assert.ok(shown(done, servers).some((line) => line.startsWith("✔ Signed in to linear · 12 tools")));
+  const failed = mcpLoginDone(withUrl, "linear", false, "sign-in timed out");
+  assert.ok(shown(failed, servers).some((line) => line.startsWith("✘ sign-in timed out")));
+  assert.equal(mcpLoginDone(withUrl, "other", true, "x"), withUrl);
+  assert.equal(pressMcpManager(failed, servers, "back").state.view.kind, "detail");
+});
+
+test("adding a server that needs a sign-in opens its detail, where Sign in is first", () => {
+  const state = mcpAdded(loaded("linear").state, [...SERVERS, linear], "linear");
+  assert.deepEqual(state.view, { kind: "detail", name: "linear", project: null, selected: 0 });
+});
+
+test("an added OAuth catalog server that is signed in offers Sign out", () => {
+  const signedIn: McpServer = { ...git, name: "linear" };
+  const catalog = CATALOG.map((entry) => (entry.id === "linear" ? { ...entry, available: true, added: true } : entry));
+  const state: McpManagerState = {
+    ...openMcpManager("/f"),
+    catalog,
+    view: { kind: "detail", name: "linear", project: null, selected: 0 },
+  };
+  const lines = shown(state, [...SERVERS, signedIn]);
+  assert.ok(lines.some((line) => line.includes("Sign out")));
+  const index = lines.filter((line) => /^[ ❯]*\d+\. /.test(line)).findIndex((line) => line.includes("Sign out"));
+  assert.deepEqual(pressMcpManager(state, [...SERVERS, signedIn], index + 1).action, { kind: "logout", name: "linear" });
 });

@@ -13,7 +13,8 @@ golem has commands in two places: `golem …` in your shell, and `/…` inside t
 
 | Command | What it does |
 |---|---|
-| `golem` | Opens the chat in this folder |
+| `golem` | Opens golem in your browser. Asks first whether to keep the service running, when none runs |
+| `golem tui` | Opens the terminal chat in this folder. On a first run it opens the setup window |
 | `golem --version` | Prints the version |
 | `golem status` | Is the daemon up? Prints its pid, version, and uptime |
 | `golem doctor` | Checks the whole install, and says how to fix each problem |
@@ -41,19 +42,21 @@ golem has commands in two places: `golem …` in your shell, and `/…` inside t
 | `golem config show` | The settings and tool rules in effect for this folder. `--resolved` is accepted and prints the same |
 | `golem skills` | The skills this folder sees, and why one is not used. `golem skills list` is the same |
 | `golem skills check <path>` | Checks a skill, its `SKILL.md`, or a folder of skills. Needs no daemon |
-| `golem web` | Serves the chat in your browser on 127.0.0.1, until Ctrl-C |
+| `golem web` | The same as `golem`, kept as an alias |
 | `golem web install` / `uninstall` | Keeps the web page running at login (a launchd job), or removes that job |
 | `golem web logout` | Signs every browser out of the web UI |
 
-`golem web` takes three options:
+`golem` and `golem web` take three options:
 
 - `--port N` serves on that port instead of 7480.
 - `--no-open` prints the link instead of opening the browser. With no daemon running, it says what to run and exits 1.
 - `--json` prints the link, the port, and the pid as JSON, for scripts, and opens no browser.
 
+When it opens the browser, `golem` prints `Chat in the terminal: golem tui`. With `SSH_CONNECTION` set, it behaves as with `--no-open`: no browser, and the link is printed.
+
 `golem web serve [--port N]` runs the same server with no browser, no token in its output, and no service question. It is meant for a background job.
 
-If `golem web` is already running, a second one reuses it. With the web job installed, `golem web` opens the page and returns the prompt. With no daemon, `golem` and `golem web` first ask to start golem's service.
+If golem's page is already running, a second `golem` reuses it. With the web job installed, `golem` opens the page and returns the prompt. With no daemon, `golem` first asks to start golem's service.
 
 ## In the chat
 

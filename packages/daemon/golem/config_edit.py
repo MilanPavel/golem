@@ -15,7 +15,7 @@ import tomlkit
 from tomlkit.items import AoT, Table
 from tomlkit.toml_document import TOMLDocument
 
-from golem.config import McpEnabled, PolicyRule, RuleAction
+from golem.config import McpEnabled, PermissionMode, PolicyRule, RuleAction
 from golem.models import options as model_options
 
 
@@ -153,6 +153,19 @@ def set_default_model(config_file: Path, model: str) -> None:
     document = _read(config_file)
     document["default_model"] = model
     _write(config_file, document)
+
+
+def set_permission_mode(config_file: Path, mode: PermissionMode) -> int:
+    """Set ``[permissions] mode``, keeping the file's comments, and return the new ``mtime_ns``.
+
+    Creates the file when it is missing. Raises :class:`RawConflictError` when the
+    file changed on disk between reading it and writing it.
+    """
+    text, mtime = read_raw(config_file)
+    document = tomlkit.parse(text)
+    table = _sub_table(document, "permissions", create=True)
+    table["mode"] = mode
+    return write_raw(config_file, tomlkit.dumps(document), mtime)
 
 
 def add_rule(config_file: Path, rule: PolicyRule) -> None:

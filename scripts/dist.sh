@@ -55,6 +55,9 @@ else
 fi
 rm -rf "$root/dist/.pyinstaller"
 
+# The bundled skills sit next to the daemon, where golem/skills/bundled.py looks for them.
+cp -R "$root/skills" "$dest/libexec/golem-daemon/skills"
+
 if ! command -v bun >/dev/null 2>&1; then
   printf '%s\n' "bun is required to compile bin/golem" >&2
   exit 1

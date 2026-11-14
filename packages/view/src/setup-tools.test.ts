@@ -15,6 +15,8 @@ import {
   toolsRuntimeDone,
   toolsRuntimeOutput,
   toolsSetToken,
+  toolsSignInUrl,
+  toolsSigningIn,
   toolsSettled,
   toolsSkipRow,
   toolsStart,
@@ -224,4 +226,19 @@ test("the running lines show each row's progress", () => {
   const state = run(toolsStart(toolsOffer(CATALOG, "guided")) as ToolsState);
   assert.deepEqual(toolsLines(state)[0], { kind: "row", mark: "ok", label: "Fetch", text: "added · 2 tools · on in every chat" });
   assert.equal(toolsLines(state).length, 3);
+});
+
+test("a catalog server that signs in with the browser waits for it, shows the address, and then is added", () => {
+  const linear = entry("linear", { runtime: "url", auth: "oauth" });
+  let state = toolsStart(toolsOffer([linear], "guided")) as ToolsState;
+  assert.equal(state.rows[0]?.oauth, true);
+  state = toolsStep(state).state;
+  state = toolsSigningIn(state, "linear");
+  assert.equal(toolsSettled(state), false);
+  assert.equal(toolsStatusText(state.rows[0] as never), "sign in · asking the daemon");
+  state = toolsSignInUrl(state, "linear", "https://auth.example/authorize");
+  assert.equal(toolsStatusText(state.rows[0] as never), "sign in in your browser · https://auth.example/authorize");
+  state = toolsAdded(state, "linear", 12);
+  assert.equal(toolsSettled(state), true);
+  assert.equal(toolsStatusText(state.rows[0] as never), "added · 12 tools · on in every chat");
 });

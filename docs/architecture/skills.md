@@ -156,7 +156,7 @@ The daemon owns the skills, as it owns sessions and rules. Graph state will hold
 
 1. `<folder>/.golem/skills`, `<folder>/.agents/skills`, `<folder>/.claude/skills`
 2. `~/.golem/skills`, `~/.agents/skills`, `~/.claude/skills`, then `[skills] extra_dirs`
-3. Bundled with golem (2.7)
+3. Bundled with golem: `skills/` in the repository root in a checkout, and `libexec/golem-daemon/skills` in a release tree (`scripts/dist.sh` copies it, `golem/skills/bundled.py` finds it)
 
 Each source is read one level deep. A folder with a `SKILL.md` is a skill, and a name that starts with `.` or `_` is skipped. Symlinks are followed, and a folder reached twice counts once, so this repository's `.claude/skills`, which links to `.agents/skills`, lists each skill once.
 

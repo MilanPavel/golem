@@ -3,7 +3,9 @@ import { useId, useState, type ReactNode } from "react";
 import { Button } from "../../ui/button.tsx";
 import { CopyCommand } from "../../ui/copy-command.tsx";
 import { cn } from "../../ui/cn.ts";
+import { CheckIcon, PlusIcon } from "../../ui/icons.tsx";
 import { Link } from "../../ui/link.tsx";
+import { ProviderIcon } from "../../ui/provider-icons.tsx";
 import { MarkGlyph } from "./mark-glyph.tsx";
 import { installLog, type SetupActionsState } from "./use-setup-actions.ts";
 
@@ -254,9 +256,11 @@ export function AddKey({ providers, actions, onCheck, initialOpen = null }: AddK
               open === item.id && "border-clay text-ink ring-1 ring-clay",
             )}
           >
-            <span aria-hidden="true">{item.saved ? "✓" : "+"}</span>
+            <ProviderIcon provider={item.id} name={item.name} className="shrink-0" />
             {item.name}
-            <small className="font-mono text-xs">{item.saved ? "saved" : item.blurb}</small>
+            <small className="text-xs font-normal text-muted">{item.blurb}</small>
+            {item.saved ? <CheckIcon className="size-3 shrink-0" /> : <PlusIcon className="size-3 shrink-0" />}
+            {item.saved ? <span className="sr-only">saved</span> : null}
           </button>
         ))}
       </div>

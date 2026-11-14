@@ -9,13 +9,13 @@ const demos = [
   {
     id: "tui",
     label: "Terminal",
-    title: "golem · ~/my-project",
+    title: "golem tui · ~/my-project",
     alt: "In the terminal, golem is asked to fix a test that fails on an empty list. It reads stats.py, shows the edit as a diff and you allow it, asks to run the tests and you allow it, and says all three tests pass.",
   },
   {
     id: "web",
     label: "Browser",
-    title: "127.0.0.1 · golem web",
+    title: "127.0.0.1 · golem",
     alt: "In the browser, the same task: golem reads stats.py, an approval card shows the diff and you allow it, a second card asks to run the tests, and the answer says all three tests pass.",
   },
 ] as const;
