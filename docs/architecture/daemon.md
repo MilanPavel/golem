@@ -60,8 +60,8 @@ golem takes the fourth way: one daemon per user, behind a Unix socket, started b
 - **One process.** `golem-daemon serve` in a release, or `python -m golem serve` in a checkout. Every session, run, model call, tool, and MCP server lives in it, as asyncio tasks on one event loop.
 - **One socket.** Clients connect to `~/.golem/run/golem.sock`. Its mode is `0600`, so only your user can open it, and that permission is the login. No network port is opened.
 - **One lock.** A `flock` on `run/golem.pid` decides which daemon owns the socket ([ADR-004](../adr/004-pid-lock.md)).
-- **One owner of its life.** launchd starts it at login, and again 2 seconds after it exits (`KeepAlive`, `ThrottleInterval 2`). The first time `golem` finds no daemon and no launch agent, the setup window asks whether to install one, or to run a daemon only while the window is open ([ADR-036](../adr/036-setup-window-asks-for-the-service.md)).
-- **Clients only attach.** The `golem` command, one bun binary, is the TUI, `golem status`, and `golem web` ([ADR-019](../adr/019-single-binary.md)). None of them holds the chat. A browser reaches the daemon only through the gateway in `golem web` ([ADR-028](../adr/028-web-gateway.md)).
+- **One owner of its life.** launchd starts it at login, and again 2 seconds after it exits (`KeepAlive`, `ThrottleInterval 2`). The first time `golem tui` finds no daemon and no launch agent, the setup window asks whether to install one, or to run a daemon only while the window is open ([ADR-036](../adr/036-setup-window-asks-for-the-service.md)).
+- **Clients only attach.** The `golem` command, one bun binary, is the web UI, the TUI (`golem tui`), and `golem status` ([ADR-019](../adr/019-single-binary.md)). None of them holds the chat. A browser reaches the daemon only through the gateway in `golem` ([ADR-028](../adr/028-web-gateway.md)).
 
 The start, in the order it runs:
 
@@ -130,7 +130,7 @@ The `s` in `srw-------` marks a socket, and the `rw` for the owner alone is the 
 
 **A Unix socket, not a port.** A port on `127.0.0.1` is open to every program on the machine, and every web page can try to reach it. Browsers have been used to attack local servers that trusted `localhost`. A server on a port needs a login of its own, a token or a password, and code to check it. A socket file with mode `0600` has that check built in: the operating system refuses anyone but you. There is no port to collide with another program, and none to leave open by mistake.
 
-**A gateway for the browser, not a port on the daemon** ([ADR-028](../adr/028-web-gateway.md)). A browser can't open a socket file, so `golem web` stands between them. It lets in only the page it opened, and passes the same protocol lines on. All the network security lives in that one program, and the daemon has no web code at all.
+**A gateway for the browser, not a port on the daemon** ([ADR-028](../adr/028-web-gateway.md)). A browser can't open a socket file, so the gateway, started by `golem`, stands between them. It lets in only the page it opened, and passes the same protocol lines on. All the network security lives in that one program, and the daemon has no web code at all.
 
 **One process, not several services.** A run is an asyncio task, and the graph is a library the session manager calls ([ADR-002](../adr/002-langgraph-boundary.md)). Splitting the model calls, the tools, or the MCP servers into processes of their own would need a second protocol between them, and gain nothing on one machine. The cost: a crash takes everything down at once. launchd starts it again, and recovery closes what was open.
 
@@ -145,7 +145,7 @@ The `s` in `srw-------` marks a socket, and the `rw` for the owner alone is the 
 1. Run `golem status`. It prints the daemon's pid, version, protocol, and uptime.
 2. Run `ls -l ~/.golem/run`. `golem.sock` starts with `s` and has `rw` for you alone.
 3. Run `lsof -a -p $(cat ~/.golem/run/golem.pid) -i`. It prints nothing: the daemon has no network socket.
-4. Ask for a long answer in `golem`, and close the terminal while it streams. Open `golem` again: the answer has finished.
+4. Ask for a long answer in `golem tui`, and close the terminal while it streams. Open `golem tui` again: the answer has finished.
 5. Run `golem daemon restart`. It prints the new daemon's version once a different pid answers.
 
 ## The details
@@ -199,7 +199,7 @@ What the graph owns, and what it calls instead, is in [The agent loop](./agent-l
 | `packages/daemon/golem/server/start_error.py` | `run/last-error`: why a start gave up, and the next step |
 | `packages/daemon/golem/paths.py` | `resolve_paths`: the home, and every path under it |
 | `packages/daemon/golem/launchd.py` | The launch agent's plist |
-| `packages/cli/src/main.ts` | The `golem` command: the TUI, `golem status`, `golem web`, and `golem daemon …` |
+| `packages/cli/src/main.ts` | The `golem` command: the web UI, `golem tui`, `golem status`, and `golem daemon …` |
 
 ## Read more
 

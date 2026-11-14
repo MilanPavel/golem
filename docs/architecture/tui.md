@@ -125,12 +125,12 @@ The same guarantee is a test. `just golden` records five chats from a real daemo
 
 **Bands that ask for rows.** Each band asks for rows only while it has something to show, and a short window takes rows back in a fixed order until the chat has one. The layout is a pure function of the state and the window size, so a resize is just another paint.
 
-**One binary, and the tab says what it is doing** ([ADR-019](../adr/019-single-binary.md), [ADR-027](../adr/027-terminal-tab-status.md)). `bun build --compile` makes the TUI, `golem status`, and `golem web` one file to install. The terminal tab shows whether a run works, waits for you, or failed, so a waiting approval is seen from another tab.
+**One binary, and the tab says what it is doing** ([ADR-019](../adr/019-single-binary.md), [ADR-027](../adr/027-terminal-tab-status.md)). `bun build --compile` makes the web launcher, the TUI, and `golem status` one file to install. The terminal tab shows whether a run works, waits for you, or failed, so a waiting approval is seen from another tab.
 
 ## Try it
 
-1. Run `golem`, ask something, and type `/debug wire` while it answers. The panel lists the protocol lines as they arrive.
-2. Open a second terminal in the same folder and run `golem`. It attaches to the newest session there, and both windows show the same answer.
+1. Run `golem tui`, ask something, and type `/debug wire` while it answers. The panel lists the protocol lines as they arrive.
+2. Open a second terminal in the same folder and run `golem tui`. It attaches to the newest session there, and both windows show the same answer.
 3. Make the window short while an answer streams. The bands give rows back, and the chat keeps at least one.
 4. Press Ctrl-O after an answer with tool calls. Each call's output opens under its line.
 5. For contributors: `pnpm --filter @golem/view test` runs the golden test, which folds every recorded chat live, replayed, and reconnected.
@@ -139,7 +139,7 @@ The same guarantee is a test. `just golden` records five chats from a real daemo
 
 For contributors: the reference for the TUI, from the keys to the screen, and the shared client.
 
-The TUI is `@golem/tui`. `golem` with no arguments calls `runTui` in `main.tsx`, which opens one client, takes the alternate screen, and mounts `App`. `just dist` compiles that command with `bun build --compile` ([ADR-019](../adr/019-single-binary.md)). The screen draws. It does not run the model, and it does not open the socket. `@golem/client` does that. `golem status` uses the same library, asks once, and exits. `golem --version` prints the CLI version, and the daemon version when the daemon is up. `golem doctor` runs `golem-daemon doctor`, which checks the launchd job, socket, config, models, and disk with the daemon's own code and prints them as JSON (`golem/doctor.py`). The CLI adds whether it found the daemon program and whether the running daemon has its version, then prints the checklist and the next step (`packages/cli/src/doctor.ts`). The TUI asks the client to reconnect.
+The TUI is `@golem/tui`. `golem tui` calls `runTui` in `main.tsx`, which opens one client, takes the alternate screen, and mounts `App`. `just dist` compiles that command with `bun build --compile` ([ADR-019](../adr/019-single-binary.md)). The screen draws. It does not run the model, and it does not open the socket. `@golem/client` does that. `golem status` uses the same library, asks once, and exits. `golem --version` prints the CLI version, and the daemon version when the daemon is up. `golem doctor` runs `golem-daemon doctor`, which checks the launchd job, socket, config, models, and disk with the daemon's own code and prints them as JSON (`golem/doctor.py`). The CLI adds whether it found the daemon program and whether the running daemon has its version, then prints the checklist and the next step (`packages/cli/src/doctor.ts`). The TUI asks the client to reconnect.
 
 The picture is rebuilt on every paint. `chrome.ts`, `layout-chat.ts`, and `debug-view.ts` turn memory into rows, and those rows are thrown away. What stays is the conversation, the draft, and a few facts about the link.
 

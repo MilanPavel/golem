@@ -172,7 +172,7 @@ cannot approve anything.
    args = ["mcp-server-git", "--repository", "/path/to/your/repo"]
    ```
 
-2. Open the chat with `golem`, and type `/mcp`. The server is listed, with its state, its tools, and what they cost. Open it to see each tool's description.
+2. Open the chat with `golem tui`, and type `/mcp`. The server is listed, with its state, its tools, and what they cost. Open it to see each tool's description.
 3. Ask something its tools answer, such as `What changed in the last commit?`. golem asks before the call. Answer `a` to allow it once.
 4. Type `/debug model` to see the result inside `<mcp_output>`.
 

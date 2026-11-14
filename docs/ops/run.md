@@ -23,7 +23,7 @@ Section 10 explains upgrading, removing, and how the tap is kept up to date.
 git clone <repo-url> golem && cd golem
 scripts/setup.sh             # tools, packages, and git hooks (or /setup in Claude Code)
 just golem daemon install    # set up the background service and start it
-just golem                   # open the chat screen
+just golem tui               # open the chat in the terminal (or `just golem` for the web UI)
 ```
 
 `scripts/setup.sh` is safe to run again. It works in two parts:
@@ -123,8 +123,8 @@ stateDiagram-v2
 
 - **Label:** `dev.golem.web`. `--port N` at install is written into the job; without it the job serves on 7480.
 - **Logs:** `~/.golem/logs/web.stdout.log` and `web.stderr.log`, next to the daemon's `launchd.*.log`. They hold one line from `serve` and any error, never a token.
-- **A foreground `golem web` already runs:** the job starts, exits, and tries again every 10 seconds until that one stops.
-- **After `brew upgrade`:** the job names the `opt` path, so a restart runs the new build. `golem daemon restart` (or Ctrl-R in golem) and `golem web` restart the job; `golem doctor` shows a `web` line when the page is served by an older golem.
+- **A foreground `golem` already runs the gateway:** the job starts, exits, and tries again every 10 seconds until that one stops.
+- **After `brew upgrade`:** the job names the `opt` path, so a restart runs the new build. `golem daemon restart` (or Ctrl-R in golem tui) and `golem` restart the job; `golem doctor` shows a `web` line when the page is served by an older golem.
 - **Remove it:** `golem web uninstall` (or `golem uninstall` for both jobs). `~/.golem` and the logs stay. By hand: `launchctl bootout gui/$(id -u)/dev.golem.web`, then delete the plist.
 
 **A trap:** launchd does not see the environment variables from your terminal. An API key you `export` in your shell does not reach the daemon. Save keys with `golem auth set`, which puts them in the Keychain.
@@ -221,7 +221,7 @@ A colleague with an Apple Silicon Mac runs:
 brew install milanpavel/golem/golem   # download and install
 golem daemon install                  # start the background service, now and at every login
 golem auth set anthropic              # save an API key (or use Ollama, no key needed)
-golem                                 # open the chat screen
+golem tui                             # open the chat screen
 ```
 
 That's all. They don't need Python, Node, uv, bun, or the source code. After the install, Homebrew prints the three `golem daemon` commands a user needs, so they don't have to remember them.
@@ -348,7 +348,7 @@ Remember: under launchd, `GOLEM_...` variables from your terminal do not apply. 
 |---|---|---|
 | `daemon` | `golem` cannot find the daemon program ([section 6](#_6-installing-today)) | `brew reinstall golem`, or set `GOLEM_DAEMON` |
 | `service` | launchd has no golem job, runs another copy of golem, or the job is stopped | `golem daemon install`, or `golem daemon start` |
-| `web` | Never fails. Warns when the web job is installed but stopped, its program is gone, its page does not answer, or an older golem serves it | `golem web install`, or `golem web` |
+| `web` | Never fails. Warns when the web job is installed but stopped, its program is gone, its page does not answer, or an older golem serves it | `golem web install`, or `golem` |
 | `running` | The daemon does not answer, or runs another version than `golem` | `golem daemon start`, or `golem daemon restart` |
 | `socket` | Someone other than you could open the socket | `golem daemon restart` |
 | `config` | `config.toml` does not load. The line names the setting | Edit the file |

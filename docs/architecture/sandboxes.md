@@ -107,7 +107,7 @@ ls: /Users/you/.ssh: Operation not permitted
 
 ## Try it
 
-1. Open the chat with `golem` in a project folder.
+1. Open the chat with `golem tui` in a project folder.
 2. Ask: `Run ls ~/.ssh in the shell.` Allow it. The result is `Operation not permitted`, and golem's line says `~/.ssh` holds credentials.
 3. Ask: `Run curl -sI https://example.com in the shell.` Allow it. It can't connect, because the network is off.
 4. To let commands use the network, add this to `~/.golem/config.toml`, and restart the daemon with `golem daemon restart`:

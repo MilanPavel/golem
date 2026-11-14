@@ -69,7 +69,7 @@ golem speaks **JSON-RPC 2.0, one object per line, over the daemon's Unix socket*
 - **Attach and replay.** A connection gets a session's events only after `session.attach` with `after_seq`. The daemon sends the stored events after that number, then the reply with `last_seq`, then live events. One lock per session covers both, so no event lands in between ([ADR-007](../adr/007-attach-and-fan-out.md)).
 - **Fan-out.** Every connection attached to a session gets every event. Each connection has its own queue and writer, so a slow one never blocks a run, and one that falls 20 000 lines behind is dropped. It reconnects, and attaches from its last `seq`.
 - **One client.** `@golem/client` is the only code that speaks the protocol, for the TUI, `golem status`, and the web UI. It sends a `ping` every 5 s, and after a reconnect attaches to each session again from its last `seq`.
-- **The browser.** A web page speaks the same lines over a WebSocket to `golem web`, which checks the token, the `Origin`, and the method, and passes each line on unchanged ([ADR-028](../adr/028-web-gateway.md)).
+- **The browser.** A web page speaks the same lines over a WebSocket to the gateway (`golem`), which checks the token, the `Origin`, and the method, and passes each line on unchanged ([ADR-028](../adr/028-web-gateway.md)).
 
 ![The real two-window trace. The log numbers 43 events of one session. A, the TUI, attached first and gets each one live. B, a web page, connects 6.081 seconds in and attaches with after_seq 0. Seq 1 to 9 come to it as one replay, then the reply says last_seq 9. From seq 10 on, A and B get each event in the same millisecond](../images/protocol-attach.svg)
 
@@ -127,7 +127,7 @@ C ← {"jsonrpc":"2.0","error":{"code":-32001,
 
 While the model loaded, A also got two `model.server.status` notifications, with no `seq`. The daemon sends those to every connection, attached or not.
 
-![One shape for the daemon and every client. The messages are Python classes in golem_protocol. just gen writes a JSON Schema and a TypeScript file for each message into packages/protocol/gen, and @golem/client uses them. The TUI and golem status reach the daemon over the Unix socket, one JSON object per line. A web page reaches it over a WebSocket through golem web, the gateway, which checks the token, the Origin, and the method, and passes the same line on. The daemon reads each line into the same Python classes](../images/protocol-one-shape.svg)
+![One shape for the daemon and every client. The messages are Python classes in golem_protocol. just gen writes a JSON Schema and a TypeScript file for each message into packages/protocol/gen, and @golem/client uses them. The TUI and golem status reach the daemon over the Unix socket, one JSON object per line. A web page reaches it over a WebSocket through the gateway, which checks the token, the Origin, and the method, and passes the same line on. The daemon reads each line into the same Python classes](../images/protocol-one-shape.svg)
 
 **Where it lives in the code:**
 
@@ -163,7 +163,7 @@ While the model loaded, A also got two `model.server.status` notifications, with
 
 ## Try it
 
-1. Open `golem`, type `/debug wire`, and send a message. It lists the recent protocol lines in both directions, with pings hidden.
+1. Open `golem tui`, type `/debug wire`, and send a message. It lists the recent protocol lines in both directions, with pings hidden.
 2. Talk to the daemon yourself:
 
    ```sh
@@ -176,7 +176,7 @@ While the model loaded, A also got two `model.server.status` notifications, with
    ```
 
    Two lines come back: the `hello` reply, and the daemon's status.
-3. Open `golem` in two terminals, and pick the same chat in `/sessions` in the second. Send a message in one: both stream it.
+3. Open `golem tui` in two terminals, and pick the same chat in `/sessions` in the second. Send a message in one: both stream it.
 
 ## The details
 
