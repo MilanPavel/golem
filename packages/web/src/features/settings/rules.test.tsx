@@ -68,7 +68,7 @@ afterEach(() => {
   delete document.documentElement.dataset.theme;
 });
 
-test("the default mode is shown read-only with the line to set and a copy button, and the built-in rules keep their source", async () => {
+test("the default mode shows the picked mode, its line, and no snippet to paste", async () => {
   mount("/settings/rules", {
     ...CONFIG,
     default_permission_mode: "autopilot",
@@ -82,15 +82,51 @@ test("the default mode is shown read-only with the line to set and a copy button
     ["Balanced", "false"],
     ["Autopilot", "true"],
   ]);
-  expect(radios.every((radio) => radio.getAttribute("aria-disabled") === "true")).toBe(true);
   const section = modes.closest("section") as HTMLElement;
   expect(section.textContent).toContain("Also edits inside the project");
-  expect(section.textContent).toContain("[permissions] mode in /Users/you/.golem/config.toml");
-  expect(within(section).getByText('mode = "autopilot"')).toBeTruthy();
-  expect(within(section).getByRole("button", { name: /^Copy / })).toBeTruthy();
+  expect(section.textContent).toContain("pick it in the composer or with /mode");
+  expect(within(section).queryByRole("button", { name: /^Copy / })).toBeNull();
+  expect(section.textContent).not.toContain("mode =");
   expect(rows()[0]?.textContent).toContain("built-in default (autopilot)");
   const results = await axe.run(section, noContrast);
   expect(results.violations).toEqual([]);
+});
+
+test("clicking a mode saves it at once and says where", async () => {
+  const { fake, user } = mount("/settings/rules");
+  const modes = await screen.findByRole("radiogroup", { name: "Default mode" });
+  fake.raw.setDefaultPermissionMode.mockResolvedValue({ mode: "careful", path: "/Users/you/.golem/config.toml" });
+  fake.raw.getConfig.mockResolvedValue({ ...CONFIG, default_permission_mode: "careful" });
+  await user.click(within(modes).getByRole("radio", { name: "Careful" }));
+  expect(fake.raw.setDefaultPermissionMode).toHaveBeenCalledWith("careful");
+  expect(await screen.findByText("Saved to /Users/you/.golem/config.toml")).toBeTruthy();
+  await waitFor(() => expect(within(modes).getByRole("radio", { name: "Careful" }).getAttribute("aria-checked")).toBe("true"));
+});
+
+test("a refused save puts the old mode back and says why", async () => {
+  const { fake, user } = mount("/settings/rules");
+  const modes = await screen.findByRole("radiogroup", { name: "Default mode" });
+  fake.raw.setDefaultPermissionMode.mockRejectedValue(rpcError(-32603, "config.toml changed on disk; reload"));
+  await user.click(within(modes).getByRole("radio", { name: "Careful" }));
+  expect((await screen.findAllByRole("alert")).map((alert) => alert.textContent).join(" ")).toContain("changed on disk");
+  expect(within(modes).getByRole("radio", { name: "Balanced" }).getAttribute("aria-checked")).toBe("true");
+  expect(within(modes).getByRole("radio", { name: "Careful" }).getAttribute("aria-checked")).toBe("false");
+  expect(screen.queryByText(/^Saved to/)).toBeNull();
+});
+
+test("Autopilot asks first, and Cancel saves nothing", async () => {
+  const { fake, user } = mount("/settings/rules");
+  const modes = await screen.findByRole("radiogroup", { name: "Default mode" });
+  await user.click(within(modes).getByRole("radio", { name: "Autopilot" }));
+  const dialog = await screen.findByRole("dialog");
+  expect(within(dialog).getByText("Use Autopilot by default?")).toBeTruthy();
+  expect(fake.raw.setDefaultPermissionMode).not.toHaveBeenCalled();
+  await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+  expect(fake.raw.setDefaultPermissionMode).not.toHaveBeenCalled();
+  expect(within(modes).getByRole("radio", { name: "Balanced" }).getAttribute("aria-checked")).toBe("true");
+  await user.click(within(modes).getByRole("radio", { name: "Autopilot" }));
+  await user.click(await screen.findByRole("button", { name: "Use Autopilot" }));
+  expect(fake.raw.setDefaultPermissionMode).toHaveBeenCalledWith("autopilot");
 });
 
 test("without a default from the daemon the section reads balanced", async () => {
