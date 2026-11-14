@@ -12,7 +12,7 @@ import {
 } from "./first-run.ts";
 
 function model(ref: string, extra: Partial<ListedModel> = {}): ListedModel {
-  return { ref, label: ref, provider: ref.slice(0, ref.indexOf("/")), source: "remote", status: "ready", ...extra };
+  return { ref, label: ref, provider: ref.slice(0, ref.indexOf("/")), source: "remote", status: "ready", tier: ref.startsWith("ollama/") ? "local" : "frontier", ...extra };
 }
 
 const QWEN = model("ollama/qwen3:8b", { source: "installed", profiles: ["qwen"] });

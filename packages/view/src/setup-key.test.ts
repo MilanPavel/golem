@@ -30,7 +30,7 @@ import { modelChoices, modelLines, START_MODEL_PANEL } from "./setup-local.ts";
 import { advance, single } from "./setup-window.ts";
 
 function model(ref: string, extra: Partial<ListedModel> = {}): ListedModel {
-  return { ref, label: ref.slice(ref.indexOf("/") + 1), provider: ref.slice(0, ref.indexOf("/")), source: "remote", status: "ready", ...extra };
+  return { ref, label: ref.slice(ref.indexOf("/") + 1), provider: ref.slice(0, ref.indexOf("/")), source: "remote", status: "ready", tier: ref.startsWith("ollama/") ? "local" : "frontier", ...extra };
 }
 
 const LISTING: ModelListResult = {
