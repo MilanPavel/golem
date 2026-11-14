@@ -216,7 +216,32 @@ async def test_a_path_outside_the_folder_fails_and_the_model_hears_why(
     assert isinstance(result, ToolMessage)
     assert result.status == "error"
     assert result.text.startswith("error: /etc/hosts is outside")
+    assert result.additional_kwargs == {"golem_error": "tool_error"}
     assert events[-1].type == "run.completed"
+
+
+_FAILURE_KINDS: list[tuple[str, dict[str, object], str | None]] = [
+    ("read_file", {}, "invalid_args"),
+    ("no_such_tool", {}, "unknown_tool"),
+    ("read_file", {"path": "missing.txt"}, "tool_error"),
+    ("read_file", {"path": "notes.txt"}, None),
+]
+
+
+@pytest.mark.parametrize(("name", "args", "kind"), _FAILURE_KINDS)
+async def test_a_tool_result_says_why_it_failed(
+    database: Database, project: Path, name: str, args: dict[str, object], kind: str | None
+) -> None:
+    call = (name, args)
+    model = ToolCallingChatModel(replies=[[call], "done"])
+    chat = _chat(database, model)
+    session_id = await chat.manager.create(None, cwd=str(project))
+    await chat.finished(await chat.manager.send(session_id, "go"))
+
+    result = model.seen[1][-1]
+    assert isinstance(result, ToolMessage)
+    assert result.additional_kwargs == ({} if kind is None else {"golem_error": kind})
+    assert result.status == ("success" if kind is None else "error")
 
 
 async def test_a_session_without_a_folder_says_so(database: Database) -> None:
@@ -283,6 +308,7 @@ async def test_cancel_during_a_tool_leaves_a_history_the_next_turn_accepts(
     history = model.seen[-1]
     cancelled = [message for message in history if isinstance(message, ToolMessage)]
     assert [message.text for message in cancelled] == [CANCELLED_RESULT]
+    assert cancelled[0].additional_kwargs == {"golem_error": "cancelled"}
 
 
 async def test_recovery_fails_open_tool_calls(database: Database, project: Path) -> None:
@@ -441,6 +467,7 @@ async def test_a_denied_call_never_runs_and_the_model_hears_why(
     result = model.seen[1][-1]
     assert isinstance(result, ToolMessage)
     assert result.text == f"error: {failed.data.message}"
+    assert result.additional_kwargs == {"golem_error": "denied"}
 
 
 async def test_tool_output_streams_and_leaves_the_log_when_the_call_ends(

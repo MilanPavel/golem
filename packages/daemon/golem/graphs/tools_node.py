@@ -27,7 +27,7 @@ import time
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import cast
+from typing import Literal, cast
 
 from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
 from langchain_core.messages.tool import ToolCall
@@ -42,6 +42,7 @@ from golem.permissions.engine import Allowance, session_allows
 from golem.permissions.policy import Policy, describe, explain
 from golem.tools.registry import (
     Artifacts,
+    InvalidArguments,
     Preview,
     ToolContext,
     ToolError,
@@ -86,6 +87,11 @@ CUT_CHARS = 100_000
 STATE_KEYS = frozenset({"todos"})
 """Graph state a tool may change through ``ToolResult.update``. Anything else is dropped."""
 
+ERROR_KEY = "golem_error"
+"""``additional_kwargs`` key on a failed ``ToolMessage``: why the call did not give a result."""
+
+ErrorKind = Literal["invalid_args", "unknown_tool", "tool_error", "denied", "cancelled"]
+
 CANCELLED_RESULT = "cancelled: the run stopped before this tool call finished"
 DENIED_RESULT = "the user denied this tool call"
 CHANGED_RESULT = "the rules changed while the run waited, so this call did not run"
@@ -100,6 +106,7 @@ class _Verdict:
 
     run: bool
     message: str = ""
+    kind: ErrorKind = "tool_error"
     approved_diff: str | None = None
     args: dict[str, object] | None = None
 
@@ -174,7 +181,9 @@ def tools_node(
         verdicts: list[_Verdict] = []
         for index, call in enumerate(last.tool_calls):
             if session_tools.get(call["name"]) is None:
-                verdicts.append(_Verdict(run=False, message=unavailable(call["name"])))
+                verdicts.append(
+                    _Verdict(run=False, message=unavailable(call["name"]), kind="unknown_tool")
+                )
                 continue
             preview = await _preview(session_tools, call, replace(base, planned=dict(planned)))
             verdict = _decide(
@@ -205,7 +214,7 @@ def tools_node(
             if not verdict.run:
                 write({STREAM_KEY: "tool.failed", "call_id": call_id, "message": verdict.message})
                 results.append(
-                    _result(call_id, call["name"], f"error: {verdict.message}", error=True)
+                    _result(call_id, call["name"], f"error: {verdict.message}", error=verdict.kind)
                 )
                 continue
             write({STREAM_KEY: "tool.started", "call_id": call_id})
@@ -219,13 +228,20 @@ def tools_node(
             except ToolError as exc:
                 message = str(exc) or type(exc).__name__
                 write(_failure(call_id, message, started))
-                results.append(_result(call_id, call["name"], f"error: {message}", error=True))
+                failure: ErrorKind = (
+                    "invalid_args"
+                    if isinstance(exc, InvalidArguments)
+                    else ("unknown_tool" if message.startswith("unknown tool") else "tool_error")
+                )
+                results.append(_result(call_id, call["name"], f"error: {message}", error=failure))
                 continue
             except Exception as exc:
                 log.exception("tool %s failed", call["name"])
                 message = f"{type(exc).__name__}: {exc}"
                 write(_failure(call_id, message, started))
-                results.append(_result(call_id, call["name"], f"error: {message}", error=True))
+                results.append(
+                    _result(call_id, call["name"], f"error: {message}", error="tool_error")
+                )
                 continue
             duration_ms = _ms(started)
             tool = session_tools.get(call["name"])
@@ -280,11 +296,11 @@ def _decide(
             return _Verdict(run=True)
         if decision.action == "deny":
             log.info("tool %s denied by %s", name, decision.source)
-            return _Verdict(run=False, message=explain(decision, name))
+            return _Verdict(run=False, message=explain(decision, name), kind="denied")
         if session_allows(allowed, name, subject):
             return _Verdict(run=True)
         if before_last_asked:
-            return _Verdict(run=False, message=CHANGED_RESULT)
+            return _Verdict(run=False, message=CHANGED_RESULT, kind="denied")
         if isinstance(preview, str):
             return _Verdict(run=False, message=preview)
     answer = Answer.parse(
@@ -303,7 +319,7 @@ def _decide(
     )
     if decision.action == "deny" and answer.decision != "deny":
         log.info("tool %s denied by %s after it was approved", name, decision.source)
-        return _Verdict(run=False, message=explain(decision, name))
+        return _Verdict(run=False, message=explain(decision, name), kind="denied")
     if answer.decision == "allow_session":
         allowed.add((name, subject))
         return _Verdict(run=True, approved_diff=answer.diff)
@@ -311,7 +327,7 @@ def _decide(
         return _Verdict(run=True, args=answer.args)
     if answer.decision in ("allow", "allow_always"):
         return _Verdict(run=True, approved_diff=answer.diff)
-    return _Verdict(run=False, message=DENIED_RESULT)
+    return _Verdict(run=False, message=DENIED_RESULT, kind="denied")
 
 
 async def _preview(
@@ -393,16 +409,22 @@ def unanswered_calls(messages: Sequence[BaseMessage]) -> list[ToolCall]:
 
 
 def cancelled_results(calls: Sequence[ToolCall]) -> list[ToolMessage]:
-    return [_result(call_id_of(call), call["name"], CANCELLED_RESULT, error=True) for call in calls]
+    return [
+        _result(call_id_of(call), call["name"], CANCELLED_RESULT, error="cancelled")
+        for call in calls
+    ]
 
 
-def _result(call_id: str, name: str, content: str, *, error: bool = False) -> ToolMessage:
+def _result(
+    call_id: str, name: str, content: str, *, error: ErrorKind | None = None
+) -> ToolMessage:
     return ToolMessage(
         content=content,
         tool_call_id=call_id,
         name=name,
         id=f"t_{call_id}",
-        status="error" if error else "success",
+        status="success" if error is None else "error",
+        additional_kwargs={} if error is None else {ERROR_KEY: error},
     )
 
 
@@ -492,6 +514,7 @@ __all__ = [
     "CHANGED_RESULT",
     "CWD_KEY",
     "DENIED_RESULT",
+    "ERROR_KEY",
     "MCP_KEY",
     "MCP_NOW_KEY",
     "MODE_KEY",
@@ -500,6 +523,7 @@ __all__ = [
     "STATE_KEYS",
     "Answer",
     "EnableMcp",
+    "ErrorKind",
     "call_id_of",
     "cancelled_results",
     "scope_of",
