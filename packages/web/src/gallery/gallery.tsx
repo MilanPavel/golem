@@ -26,7 +26,8 @@ import { ApprovalBar } from "../features/approval/index.ts";
 import { ANSWERED, PENDING_EDIT, PENDING_SHELL } from "../features/approval/sample.ts";
 import { DiffModeSwitch, DiffView } from "../features/diff/index.ts";
 import { SAMPLE_EDIT_DIFF, SAMPLE_LONG_LINE_DIFF, SAMPLE_NEW_FILE_DIFF } from "../features/diff/sample.ts";
-import { Drawer, TodoList } from "../features/drawer/index.ts";
+import { TodoList } from "../features/drawer/index.ts";
+import { Workbench, type WorkbenchTab } from "../features/workbench/index.ts";
 import { Composer, ContextChipView, DockView, Meter, ModeChipView, TuneChipView } from "../features/composer/index.ts";
 import { createHistory } from "../features/composer/history.ts";
 import { CommandsDialog } from "../features/composer/help-dialog.tsx";
@@ -230,13 +231,12 @@ const LONG_TODO: TodoItem[] = [
   },
 ];
 
-/** The todo list in its states, and the drawer frame at a fixed height. */
-function DrawerDemo({ theme }: { theme: string }) {
+/** The todo list in its states. */
+function TodoListDemo() {
   const anchor = useAnchor();
-  const id = useId();
   return (
-    <section className="mt-6" id={anchor("Drawer")}>
-      <h3 className="mb-2 font-mono text-xs text-faint">Drawer</h3>
+    <section className="mt-6" id={anchor("Todo list")}>
+      <h3 className="mb-2 font-mono text-xs text-faint">Todo list</h3>
       <div className="flex flex-wrap items-start gap-4">
         {(
           [
@@ -250,8 +250,30 @@ function DrawerDemo({ theme }: { theme: string }) {
             <TodoList todos={todos} />
           </div>
         ))}
-        <div className="flex h-96 overflow-hidden rounded-lg border border-line">
-          <Drawer id={id} label={`Details, ${theme}`} todos={SAMPLE_TODOS} floating={false} onClose={() => {}} />
+      </div>
+    </section>
+  );
+}
+
+const DEMO_TABS: readonly WorkbenchTab[] = [
+  { id: "todos", label: "Todos", badge: "2/5", render: () => <TodoList todos={SAMPLE_TODOS} /> },
+  { id: "notes", label: "Notes", render: () => <p className="text-sm text-muted">Nothing here yet.</p> },
+];
+
+/** The tabbed panel at a fixed height, narrow and wide. The second frame forces the wide width, so the two show together. */
+function WorkbenchDemo() {
+  const anchor = useAnchor();
+  const narrow = useId();
+  const wide = useId();
+  return (
+    <section className="mt-6" id={anchor("Workbench")}>
+      <h3 className="mb-2 font-mono text-xs text-faint">Workbench</h3>
+      <div className="flex flex-wrap items-start gap-4">
+        <div className="flex h-96 overflow-hidden rounded-lg border border-line [&>aside]:w-80">
+          <Workbench id={narrow} tabs={DEMO_TABS} floating={false} onClose={() => {}} />
+        </div>
+        <div className="flex h-96 max-w-full overflow-hidden rounded-lg border border-line [&>aside]:w-workbench-wide">
+          <Workbench id={wide} tabs={DEMO_TABS.slice(0, 1)} floating={false} onClose={() => {}} />
         </div>
       </div>
     </section>
@@ -1175,7 +1197,9 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
 
       <DiffDemo />
 
-      <DrawerDemo theme={theme} />
+      <TodoListDemo />
+
+      <WorkbenchDemo />
 
       <section className="mt-6" id={anchor("Command palette and keys")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Command palette and keys</h3>
