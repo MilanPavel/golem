@@ -1,0 +1,25 @@
+{
+  "additionalProperties": false,
+  "description": "The default mode as stored, and the file it was written to.",
+  "properties": {
+    "mode": {
+      "enum": [
+        "careful",
+        "balanced",
+        "autopilot"
+      ],
+      "title": "Mode",
+      "type": "string"
+    },
+    "path": {
+      "title": "Path",
+      "type": "string"
+    }
+  },
+  "required": [
+    "mode",
+    "path"
+  ],
+  "title": "PermissionsSetModeResult",
+  "type": "object"
+}
