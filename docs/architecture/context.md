@@ -45,7 +45,7 @@ The open questions are the same in every agent:
 
 - **What earns a place in every call.** Each line is paid for on every call. Skills are the usual answer for knowledge that only some tasks need: one line each in the prompt, and the rest only when used ([Skills](./skills.md)).
 - **When an edit shows.** A rule or a skill changed mid-chat should apply from the next call, not from the next chat.
-- **What to keep when the window fills.** Planned for golem in [Phase 9](https://github.com/MilanPavel/golem/issues/110).
+- **What to keep when the window fills.** Planned for golem in [Routing and context](../vision/routing.md), tracked in [Phase 9](https://github.com/MilanPavel/golem/issues/110).
 
 ## How golem does it
 
@@ -57,7 +57,8 @@ golem builds its system prompt for each model call, and never stores it ([ADR-03
 - **Built per call.** `call_model` builds the prompt and puts it in front of the history, for that one call.
 - **Never stored.** The node returns only the model's reply, so the prompt never reaches the checkpoint.
 - **Empty means none.** With no section to say anything, no system message is sent, and the model sees exactly the stored history.
-- **One section today: the pinned skills.** `/skill pin terse` keeps a skill's instructions in front of every call, for the rest of the chat. Only the name is stored, in the session record. The body is read from disk on every call ([ADR-032](../adr/032-pinned-skills.md)).
+- **The pinned skills.** `/skill pin terse` keeps a skill's instructions in front of every call, for the rest of the chat. Only the name is stored, in the session record. The body is read from disk on every call ([ADR-032](../adr/032-pinned-skills.md)).
+- **The on-demand MCP servers.** When a server is available but not on, the section lists it by name and what it is for, and tells the model to call `mcp_enable` when a task needs it. See [MCP servers](./mcp.md).
 
 ![One model call in golem. The SystemPrompt reads the session's pins and each pinned SKILL.md, and builds the system message. It goes in front of the history from the checkpoint, for this one call. Only the model's reply is stored, so the checkpoint never holds the prompt](../images/context-build.svg)
 
@@ -127,7 +128,7 @@ For contributors: the reference for the system prompt and pinned skills.
 
 ### The system prompt
 
-- **The system prompt.** `call_model` builds it for each call from the sections in `golem/graphs/prompt.py` and sends it in front of the history. The node returns only the reply, so the prompt is never checkpointed. With no section to say anything, no system message is sent. Its one section today holds the pinned skills (`golem/skills/pinned.py`) ([ADR-031](../adr/031-system-prompt.md)).
+- **The system prompt.** `call_model` builds it for each call from the sections in `golem/graphs/prompt.py` and sends it in front of the history. The node returns only the reply, so the prompt is never checkpointed. With no section to say anything, no system message is sent. Its sections today are the pinned skills (`golem/skills/pinned.py`) and the on-demand MCP servers (`golem/mcp/prompt.py`) ([ADR-031](../adr/031-system-prompt.md)).
 - **What a section reads.** `PromptContext` holds the checkpoint values, the session folder, the pins, and `report`. `report` is set during a model call only, so building the prompt for `/debug model` logs nothing.
 - **Seen in `/debug model`.** `session.inspect` builds the same prompt for the next call and returns it as the first message, with role `system`. `message_count` counts only the stored messages.
 
@@ -154,6 +155,7 @@ For contributors: the reference for the system prompt and pinned skills.
 | `packages/daemon/golem/graphs/prompt.py` | `SystemPrompt`, its sections, and `PromptContext` |
 | `packages/daemon/golem/graphs/chat.py` | `call_model`: the prompt in front of the history, for one call |
 | `packages/daemon/golem/skills/pinned.py` | Which skills may be pinned, the pinned section, and `PinMemory` |
+| `packages/daemon/golem/mcp/prompt.py` | The on-demand MCP servers section |
 | `packages/daemon/golem/server/handlers.py` | `session.set_skills` and `session.inspect` |
 | `packages/view/src/commands.ts` | `/skill pin`, `/skill unpin`, and `/skill`, in the command table the TUI uses |
 

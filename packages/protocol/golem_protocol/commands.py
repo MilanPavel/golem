@@ -447,9 +447,13 @@ class TraceModelSpan(TraceSpan):
     "likely". ``dropped_message_ids`` are the messages the model probably did
     not see (older messages only), and ``dropped_tokens`` is an estimate of
     their size.
+
+    ``cost_usd`` is what the call cost, as its ``model.call.completed`` recorded
+    it. Null when the price was not known or the call has no token counts.
     """
 
     children: list[TraceToolSpan] = Field(default_factory=list[TraceToolSpan])
+    cost_usd: float | None = Field(default=None, ge=0)
     context_window: int | None = Field(default=None, ge=1)
     num_ctx: int | None = Field(default=None, ge=1)
     context_window_estimated: bool = False
@@ -1131,7 +1135,10 @@ class ListedSkill(BaseModel):
     disabled``, or lost its name to another skill, whose folder
     ``shadowed_by`` names. ``model_invocable`` is false for
     ``disable-model-invocation: true``. ``allowed_tools`` and ``model`` are
-    the frontmatter as written.
+    the frontmatter as written. ``indexed`` is true when the skill is in the
+    skill index of the system prompt: false for a skill the model may not
+    load, and for one dropped because the index is over ``[skills]
+    index_budget``.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -1147,6 +1154,7 @@ class ListedSkill(BaseModel):
     warnings: list[str] = Field(default_factory=list[str])
     user_invocable: bool = True
     model_invocable: bool = True
+    indexed: bool = False
     argument_hint: str | None = None
     allowed_tools: list[str] = Field(default_factory=list[str])
     model: str | None = None

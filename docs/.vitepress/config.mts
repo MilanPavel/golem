@@ -156,6 +156,7 @@ const sidebar: DefaultTheme.Sidebar = [
     text: "Build golem",
     items: [
       { text: "Hacking on golem", link: "/contributing/hacking" },
+      { text: "Checking skill triggering", link: "/contributing/skills-checks" },
       { text: "Contributing", link: "/contributing/" },
       { text: "The monorepo", link: "/monorepo" },
       {
@@ -189,6 +190,7 @@ const sidebar: DefaultTheme.Sidebar = [
           { text: "Sub-agents", link: "/vision/sub-agents" },
           { text: "Serve mode: the agent behind your app", link: "/vision/serve-mode" },
           { text: "Core features", link: "/vision/core" },
+          { text: "Routing and context", link: "/vision/routing" },
           { text: "Security", link: "/vision/security" },
         ],
       },

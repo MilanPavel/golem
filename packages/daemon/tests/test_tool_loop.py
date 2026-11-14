@@ -16,15 +16,21 @@ from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import InMemorySaver
 from pydantic import BaseModel
 
+from golem.config import GolemSettings, ModelPrice
+from golem.graphs.adapter import ModelRequested
 from golem.graphs.chat import MAX_MODEL_CALLS, ChatRuntime, open_chat
 from golem.graphs.tools_node import CANCELLED_RESULT
-from golem.models.router import ModelRouter
+from golem.models.router import ModelIdentity, ModelRouter
 from golem.permissions.policy import Policy
 from golem.sessions.bus import EventBus
 from golem.sessions.log import SessionLog
 from golem.sessions.manager import SessionManager
 from golem.sessions.recovery import STOPPED_MESSAGE, open_turn, recover_runs
-from golem.sessions.runner import CANCELLED_TOOL
+from golem.sessions.runner import (
+    CANCELLED_TOOL,
+    _apply,  # pyright: ignore[reportPrivateUsage]
+    _Progress,  # pyright: ignore[reportPrivateUsage]
+)
 from golem.store.database import Database
 from golem.store.events import EventLog
 from golem.store.records import RunRecords, SessionRecords
@@ -33,9 +39,11 @@ from golem.tools.fs import READ_ONLY_TOOLS
 from golem.tools.registry import Tool, ToolContext, ToolError, ToolRegistry, ToolResult
 from golem_protocol.events import (
     ChatEvent,
+    EventType,
     MessageCompletedEvent,
     MessageStartedEvent,
     ModelCallCompletedEvent,
+    ModelCallStartedData,
     ModelCallStartedEvent,
     RunFailedEvent,
     SessionCreatedEvent,
@@ -81,6 +89,15 @@ def _chat(
     database: Database, model: ToolCallingChatModel, tools: ToolRegistry | None = None
 ) -> _Chat:
     return _Chat(database, open_chat(ModelRouter(model=model), InMemorySaver(), tools))
+
+
+def _priced_chat(
+    database: Database, model: ToolCallingChatModel, price: ModelPrice | None
+) -> _Chat:
+    return _Chat(
+        database,
+        open_chat(ModelRouter(model=model), InMemorySaver(), price_of=lambda _profile: price),
+    )
 
 
 def _messages(values: Mapping[str, object]) -> list[BaseMessage]:
@@ -143,6 +160,7 @@ async def test_the_model_reads_a_file_then_answers(database: Database, project: 
         "web_search",
         "read_artifact",
         "todo_write",
+        "load_skill",
     ]
     tool_result = model.seen[1][-1]
     assert isinstance(tool_result, ToolMessage)
@@ -598,3 +616,77 @@ async def test_a_model_call_that_raises_is_recorded_as_failed(
     assert done.data.failed
     assert done.data.usage is None
     assert isinstance(events[-1], RunFailedEvent)
+
+
+async def test_a_finished_call_records_its_cost_and_the_price_it_used(
+    database: Database, project: Path
+) -> None:
+    usage = {
+        "input_tokens": 1_000_000,
+        "output_tokens": 100_000,
+        "total_tokens": 1_100_000,
+        "input_token_details": {"cache_read": 400_000},
+    }
+    model = ToolCallingChatModel(replies=["done"], usage=usage)
+    price = ModelPrice(input=3.0, output=15.0, cached_input=0.3)
+    chat = _priced_chat(database, model, price)
+    session_id = await chat.manager.create(None, cwd=str(project))
+    events = await chat.finished(await chat.manager.send(session_id, "hi"))
+
+    (done,) = [e for e in events if isinstance(e, ModelCallCompletedEvent)]
+    assert done.data.cost_usd == pytest.approx(1.8 + 0.12 + 1.5)
+    assert done.data.price is not None
+    assert (done.data.price.input, done.data.price.output) == (3.0, 15.0)
+    assert done.data.price.cached_input == 0.3
+
+
+async def test_a_free_price_costs_zero_and_no_price_costs_nothing_known(
+    database: Database, project: Path
+) -> None:
+    usage = {"input_tokens": 10, "output_tokens": 5, "total_tokens": 15}
+    free = _priced_chat(
+        database, ToolCallingChatModel(replies=["a"], usage=usage), ModelPrice(input=0, output=0)
+    )
+    session_id = await free.manager.create(None, cwd=str(project))
+    events = await free.finished(await free.manager.send(session_id, "hi"))
+    (done,) = [e for e in events if isinstance(e, ModelCallCompletedEvent)]
+    assert done.data.cost_usd == 0.0
+    assert done.data.price is not None
+
+    unknown = _priced_chat(database, ToolCallingChatModel(replies=["a"], usage=usage), None)
+    session_id = await unknown.manager.create(None, cwd=str(project))
+    events = await unknown.finished(await unknown.manager.send(session_id, "hi"))
+    (done,) = [e for e in events if isinstance(e, ModelCallCompletedEvent)]
+    assert (done.data.cost_usd, done.data.price) == (None, None)
+
+
+async def test_a_failed_call_has_no_cost(database: Database, project: Path) -> None:
+    usage = {"input_tokens": 10, "output_tokens": 5, "total_tokens": 15}
+    model = ToolCallingChatModel(replies=[], usage=usage)
+    chat = _priced_chat(database, model, ModelPrice(input=3.0, output=15.0))
+    session_id = await chat.manager.create(None, cwd=str(project))
+    events = await chat.finished(await chat.manager.send(session_id, "hi"))
+
+    (done,) = [e for e in events if isinstance(e, ModelCallCompletedEvent)]
+    assert done.data.failed
+    assert (done.data.cost_usd, done.data.price) == (None, None)
+
+
+async def test_each_call_names_the_model_it_used_not_the_runs_first() -> None:
+    router = ModelRouter(GolemSettings(model_provider="openai_compat", model_name="a"))
+    seen: list[ModelIdentity | None] = []
+
+    async def emit(kind: EventType, data: BaseModel) -> None:
+        if isinstance(data, ModelCallStartedData):
+            seen.append(ModelIdentity(data.profile, data.provider, data.model))
+
+    progress = _Progress(model=router.identity("anthropic/first"), identify=router.identity)
+    for number, profile in enumerate(["anthropic/first", "openai/second"]):
+        await _apply(ModelRequested(f"m{number}", profile=profile), progress, emit)
+    assert seen == [
+        ModelIdentity("anthropic/first", "anthropic", "first"),
+        ModelIdentity("openai/second", "openai", "second"),
+    ]
+    # A call that names no profile keeps the run's model.
+    await _apply(ModelRequested("m9"), progress, emit)
+    assert seen[-1] == ModelIdentity("anthropic/first", "anthropic", "first")

@@ -56,7 +56,7 @@ golem reads the Agent Skills format, so a skill written for another agent works 
 - **The first working one wins a name.** A broken skill never wins, and every skill that lost stays in the list, with the reason.
 - **Kept current.** Every two seconds the daemon checks whether a `SKILL.md` or `config.toml` changed, and tells every client.
 - **Run by name.** `/release-notes 0.4.0` gets the skill's body, with `0.4.0` filled in, as your message. The skill's folder then becomes readable for the session ([ADR-030](../adr/030-skill-read-roots.md)).
-- **Pinned.** `/skill pin terse` puts the body in the system prompt ([Context](./context.md)). The model picking a skill itself is the next step.
+- **Pinned.** `/skill pin terse` puts the body in the system prompt ([Context](./context.md)). `load_skill` (`golem/tools/skills.py`) lets the model pick one from the index itself: it gets the body and the folder, a second load says "already loaded", and the folder becomes readable. The log gets `skill.activated` with `how: "model"`.
 
 ![The skills one project folder sees, from a real skill.list. The project's folders come first: release-notes and terse win, and Notes is broken because its name must be lowercase. The user's own release-notes is shadowed by the project's. Golem bundles none yet](../images/skills-sources.svg)
 
@@ -122,8 +122,8 @@ A model's context is small, and most skills are not needed in most turns. So a s
 
 | Level | What the model sees | When | Status |
 |---|---|---|---|
-| 1. Index | One line per skill: its `name` and `description` | Every model call | Planned (2.4) |
-| 2. Body | The instructions in `SKILL.md` | When the skill is used | Built for `/name` and pins. The model loading one is planned (2.4) |
+| 1. Index | One line per skill: its `name` and `description` | Every model call | Built: `golem/skills/index.py`; a skill with `disable-model-invocation: true` is left out, and `[skills] index_budget` caps it |
+| 2. Body | The instructions in `SKILL.md` | When the skill is used | Built for `/name`, pins, and the model's `load_skill` |
 | 3. Files | `references/`, script output | When the body says to read or run them | Built (2.2) |
 
 A skill can be used in three ways, and all three need the registry below:
@@ -132,7 +132,7 @@ A skill can be used in three ways, and all three need the registry below:
 |---|---|---|---|
 | `/ship fix the mcp restart` | You | Your message, with your words filled in | Built |
 | `/skill pin ship` | You | The system prompt, until you unpin it | Built |
-| `load_skill("ship")` | The model | A tool result | Planned (2.4) |
+| `load_skill("ship")` | The model | A tool result, once per session | Built |
 
 The daemon owns the skills, as it owns sessions and rules. Graph state will hold only skill names, never bodies, so checkpoints stay small. A skill can never do more than the rules allow: whatever it asks for goes through the same permission check and approvals as any tool call (2.6).
 

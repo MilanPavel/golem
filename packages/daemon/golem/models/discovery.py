@@ -285,6 +285,29 @@ class ModelDiscovery:
             log.debug("ollama /api/ps for %s failed: %s", ref, exc)
         return None
 
+    def price_of(self, ref: str) -> ModelPrice | None:
+        """The price of ``ref``, in the order of the listing. No network call.
+
+        A profile's own price first, then a local model (free), then what the
+        provider's list gave the last time it was fetched, then the price book.
+        """
+        for _, profile in sorted(self._router.profiles().items()):
+            if profile.model == ref and profile.price is not None:
+                return profile.price
+        provider, _, model_id = ref.partition("/")
+        configured = self._router.provider(provider)
+        if provider == "ollama" or (configured is not None and configured.kind == "ollama"):
+            return _FREE
+        if model_id == "":
+            return None
+        remote = self._remote.get(provider)
+        if remote is not None:
+            for found in remote.models:
+                if found.model_id == model_id and found.price is not None:
+                    return found.price
+        info = self._prices.lookup(provider, model_id)
+        return None if info is None else info.price
+
     def known_ctx(self, ref: str) -> int | None:
         """The tokens ``ref`` can take in, as last listed or from the price book. No I/O."""
         listed = self._ctx.get(ref)

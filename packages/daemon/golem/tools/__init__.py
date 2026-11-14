@@ -6,6 +6,7 @@ from golem.tools.fs import READ_ONLY_TOOLS
 from golem.tools.registry import ToolRegistry, ToolSource
 from golem.tools.search import WEB_SEARCH
 from golem.tools.shell import SHELL_TOOLS
+from golem.tools.skills import LOAD_SKILL
 from golem.tools.todos import TODO_WRITE
 from golem.tools.web import WEB_FETCH
 from golem.tools.write import WRITE_TOOLS
@@ -28,6 +29,7 @@ def default_registry(
             *search,
             READ_ARTIFACT,
             TODO_WRITE,
+            LOAD_SKILL,
         ],
         source,
     )

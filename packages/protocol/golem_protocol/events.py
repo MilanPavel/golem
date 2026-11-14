@@ -127,17 +127,19 @@ class SkillActivatedData(BaseModel):
     ``how`` is ``invoked`` for a skill run once by name: its body is that
     turn's user message. It is ``pinned`` for a skill turned on for the whole
     session: its body is in the system prompt of every model call until it is
-    unpinned. ``source`` is where it was found, ``path`` its folder, and
-    ``hash`` the sha256 of its ``SKILL.md``. A pinned skill whose file changed,
-    or that can be used again after it was skipped, is activated again in the
-    run whose model call first reads the new body.
+    unpinned. It is ``model`` for a skill the model loaded itself with
+    ``load_skill``: its body is that tool's result. ``source`` is where it was
+    found, ``path`` its folder, and ``hash`` the sha256 of its ``SKILL.md``.
+    A pinned skill whose file changed, or that can be used again after it was
+    skipped, is activated again in the run whose model call first reads the
+    new body.
     """
 
     model_config = _CONFIG
 
     name: str = Field(min_length=1)
     source: SkillSource
-    how: Literal["invoked", "pinned"]
+    how: Literal["invoked", "pinned", "model"]
     path: str = Field(min_length=1)
     hash: str
 
@@ -378,6 +380,16 @@ class TokenUsage(BaseModel):
     cache_write: int | None = Field(default=None, ge=0)
 
 
+class CallPrice(BaseModel):
+    """USD per million tokens, as golem knew it when the call ended."""
+
+    model_config = _CONFIG
+
+    input: float | None = Field(default=None, ge=0)
+    output: float | None = Field(default=None, ge=0)
+    cached_input: float | None = Field(default=None, ge=0)
+
+
 class ModelCallCompletedData(BaseModel):
     """A model call ended.
 
@@ -392,6 +404,9 @@ class ModelCallCompletedData(BaseModel):
     reply. ``recovered`` means golem turned the text into tool calls. ``unread``
     means the text held a call golem could not read, so the reply stayed text.
     None when the reply had no such text.
+
+    ``cost_usd`` is the cost of this call at ``price``. Both are None when the
+    price is not known. A local model costs 0.
     """
 
     model_config = _CONFIG
@@ -404,6 +419,8 @@ class ModelCallCompletedData(BaseModel):
     failed: bool = False
     context_window: int | None = Field(default=None, gt=0)
     text_tool_calls: Literal["recovered", "unread"] | None = None
+    cost_usd: float | None = Field(default=None, ge=0)
+    price: CallPrice | None = None
 
 
 class ToolCompletedData(BaseModel):
@@ -983,6 +1000,7 @@ __all__ = [
     "ApprovalNeededEvent",
     "ApprovalResolvedData",
     "ApprovalResolvedEvent",
+    "CallPrice",
     "ChatEvent",
     "EmptyEventData",
     "EventType",

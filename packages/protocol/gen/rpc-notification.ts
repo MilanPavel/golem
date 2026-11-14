@@ -147,16 +147,20 @@ export type SessionId12 = string;
 export type Ts11 = string;
 export type Type11 = 'model.call.started';
 export type ContextWindow1 = number | null;
+export type CostUsd = number | null;
 export type Failed = boolean;
 export type FirstTokenMs = number | null;
 export type LatencyMs = number;
 export type MessageId6 = string;
+export type CachedInput = number | null;
+export type Input = number | null;
+export type Output = number | null;
 export type StopReason = string | null;
 export type TextToolCalls = ('recovered' | 'unread') | null;
 export type CacheRead = number | null;
 export type CacheWrite = number | null;
-export type Input = number | null;
-export type Output = number | null;
+export type Input1 = number | null;
+export type Output1 = number | null;
 export type RunId13 = string;
 export type Seq12 = number;
 export type SessionId13 = string;
@@ -263,7 +267,7 @@ export type SessionId25 = string;
 export type Ts24 = string;
 export type Type24 = 'todos.updated';
 export type Hash = string;
-export type How = 'invoked' | 'pinned';
+export type How = 'invoked' | 'pinned' | 'model';
 export type Name5 = string;
 export type Path = string;
 export type Source1 = 'project' | 'user' | 'bundled';
@@ -751,18 +755,34 @@ export interface ModelCallCompletedEvent {
  * means the text held a call golem could not read, so the reply stayed text.
  * None when the reply had no such text.
  *
+ * ``cost_usd`` is the cost of this call at ``price``. Both are None when the
+ * price is not known. A local model costs 0.
+ *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "ModelCallCompletedData".
  */
 export interface ModelCallCompletedData {
   context_window?: ContextWindow1;
+  cost_usd?: CostUsd;
   failed?: Failed;
   first_token_ms?: FirstTokenMs;
   latency_ms: LatencyMs;
   message_id: MessageId6;
+  price?: CallPrice | null;
   stop_reason?: StopReason;
   text_tool_calls?: TextToolCalls;
   usage?: TokenUsage | null;
+}
+/**
+ * USD per million tokens, as golem knew it when the call ended.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "CallPrice".
+ */
+export interface CallPrice {
+  cached_input?: CachedInput;
+  input?: Input;
+  output?: Output;
 }
 /**
  * Tokens one model call used. A field is None when the provider did not report it.
@@ -773,8 +793,8 @@ export interface ModelCallCompletedData {
 export interface TokenUsage {
   cache_read?: CacheRead;
   cache_write?: CacheWrite;
-  input?: Input;
-  output?: Output;
+  input?: Input1;
+  output?: Output1;
 }
 /**
  * A graph run is in progress for this session.
@@ -1138,10 +1158,12 @@ export interface SkillActivatedEvent {
  * ``how`` is ``invoked`` for a skill run once by name: its body is that
  * turn's user message. It is ``pinned`` for a skill turned on for the whole
  * session: its body is in the system prompt of every model call until it is
- * unpinned. ``source`` is where it was found, ``path`` its folder, and
- * ``hash`` the sha256 of its ``SKILL.md``. A pinned skill whose file changed,
- * or that can be used again after it was skipped, is activated again in the
- * run whose model call first reads the new body.
+ * unpinned. It is ``model`` for a skill the model loaded itself with
+ * ``load_skill``: its body is that tool's result. ``source`` is where it was
+ * found, ``path`` its folder, and ``hash`` the sha256 of its ``SKILL.md``.
+ * A pinned skill whose file changed, or that can be used again after it was
+ * skipped, is activated again in the run whose model call first reads the
+ * new body.
  *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "SkillActivatedData".

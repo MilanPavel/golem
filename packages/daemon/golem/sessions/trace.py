@@ -210,6 +210,7 @@ def _recorded_models(
                 status=status,
                 model=model,
                 tokens=tokens,
+                cost_usd=None if done is None else done.data.cost_usd,
                 first_token_ms=first,
                 context_window=window,
                 num_ctx=data.num_ctx,

@@ -10,7 +10,7 @@ export type Tab = ModelTab | ToolTab;
 export type Mode = "pretty" | "json";
 
 export const NOT_RECORDED_LINE = "Not recorded. This session ran before golem kept traces.";
-export const NO_SYSTEM_PROMPT_LINE = "No system prompt was sent on this call. golem sends one only when a skill is pinned.";
+export const NO_SYSTEM_PROMPT_LINE = "No system prompt was sent on this call. golem sends one only when something needs it, such as a pinned skill or an MCP server you can turn on.";
 
 /** Lines a tool result shows before it folds. */
 export const FOLD_LINES = 20;

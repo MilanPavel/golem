@@ -180,16 +180,18 @@ A model call has no id of its own. Each call makes exactly one assistant message
 | Event | Fields |
 |---|---|
 | `model.call.started` | `message_id`, `index` (1-based within the run), `profile`, `provider`, `model`, `system_prompt_sha`, `tools_sha`, `message_ids`, `context_window`, `num_ctx`, `window_estimated`, `system_sections`, `system_chars`, `system_bytes`, `tools_chars`, `tools_bytes`, `message_chars`, `message_bytes` |
-| `model.call.completed` | `message_id`, `usage` (`input`, `output`, `cache_read`, `cache_write`), `stop_reason`, `first_token_ms`, `latency_ms`, `failed`, `context_window`, `text_tool_calls` |
+| `model.call.completed` | `message_id`, `usage` (`input`, `output`, `cache_read`, `cache_write`), `stop_reason`, `first_token_ms`, `latency_ms`, `failed`, `context_window`, `text_tool_calls`, `cost_usd`, `price` |
 | `tool.completed`, `tool.failed` | `duration_ms`, as well as what they had before |
 
 Every new field is optional, so older events stay valid. A provider that reports no usage leaves `usage` empty, and one that reports only some counts leaves the rest `null`. Neither is ever zero. `model.call.completed` comes before the call's `tool.requested` events.
+
+`model.call.started` names the model of that call: the profile the call reads from the graph state, not the one the run began with, so a run that changes model shows the change. `model.call.completed` carries what the call cost. `cost_usd` is worked out when the call ends from `usage` and the price golem knows at that moment, and `price` (`input`, `output`, `cached_input`, USD per million tokens) is that price, so a later price change never rewrites history. `input` counts the whole input, cached tokens included, and the cached part is charged at `cached_input` (at `input` when the price has none). A local model costs `0`. A failed call, a call with no `usage`, and a model with no known price have no `cost_usd` and no `price`. A model span in the trace takes `cost_usd` from its completed event.
 
 ### What is kept by hash
 
 The `blobs` table is `sha256`, `kind`, `size`, `created_at`, and `text`. `BlobStore.put` inserts a row unless the hash is there, so two calls with the same prompt share one. There are two kinds:
 
-- **`system_prompt`:** the prompt, as sent. golem sends one only when a skill is pinned, so a call with none has `system_prompt_sha` `null`, and the page says so.
+- **`system_prompt`:** the prompt, as sent. golem sends one only when something needs it, so a call with none has `system_prompt_sha` `null`, and the page says so.
 - **`tools`:** the tool schemas as compact JSON with sorted keys. A model that is not offered tools has `tools_sha` `null`.
 
 `message_ids` are the checkpoint ids of the history sent, in order, not counting the system prompt. `window_estimated` is true when golem did not send the window and read it from Ollama, from the loaded context or the Modelfile, so a screen shows it with `≈`. An older event has no field and reads as false. `system_sections` lists the non-empty parts of the system prompt as `name` and `chars`. The stored prompt is those parts joined with a blank line, so their lengths split it exactly, and the prompt is not stored twice.
