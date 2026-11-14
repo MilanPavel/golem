@@ -143,7 +143,7 @@ test("a page kept running by a job: a Web page card after Service, no command", 
 test("a page run by hand: the card says so and copies golem web install when the service is kept", async () => {
   const { user } = mount(OK_ROWS, WORKING_LISTING, "/settings", false);
   const web = await waitFor(() => card("Web page"));
-  expect(web.getByText("runs only while a terminal runs golem web")).toBeTruthy();
+  expect(web.getByText("runs only while a terminal runs golem")).toBeTruthy();
   expect(web.getByText("needs attention:")).toBeTruthy();
   expect(web.getByText("golem web install")).toBeTruthy();
   // Nothing about the setup rows can change by looking again.

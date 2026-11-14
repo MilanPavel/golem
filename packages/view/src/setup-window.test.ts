@@ -352,7 +352,7 @@ test("the page's Service panel says it runs, and names the command only when it 
 test("pageHostLines: kept, not kept, and unknown", () => {
   assert.deepEqual(pageHostLines(true), [{ kind: "status", mark: "ok", text: "kept running · starts at login" }]);
   assert.deepEqual(pageHostLines(false), [
-    { kind: "status", mark: "attn", text: "runs only while a terminal runs golem web" },
+    { kind: "status", mark: "attn", text: "runs only while a terminal runs golem" },
     { kind: "text", text: "To keep it running at login, run this in a terminal:" },
   ]);
   assert.deepEqual(pageHostLines(null), []);

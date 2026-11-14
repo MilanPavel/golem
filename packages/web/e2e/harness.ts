@@ -130,7 +130,7 @@ export interface Gateway {
   stop(): Promise<void>;
 }
 
-/** `golem web --json`: the first stdout line is `{url, port, pid}`. */
+/** `golem --json`: the first stdout line is `{url, port, pid}`. */
 export async function startGateway(home: string, port = 0): Promise<Gateway> {
   const child = spawn("bun", [path.join(REPO, "packages/cli/src/main.ts"), "web", "--json", "--port", String(port)], {
     env: envFor(home),

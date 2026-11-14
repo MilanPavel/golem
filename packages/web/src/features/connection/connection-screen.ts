@@ -42,16 +42,16 @@ function shortReason(reason: string): string {
 
 const GATEWAY_DOWN = {
   kind: "gateway-down",
-  heading: "golem web is not running",
+  heading: "The golem page is not running",
   sentence: "Start it again. You will need the new link it opens.",
-  command: "golem web",
+  command: "golem",
   golem: "offline",
 } as const;
 
 /** After the command to start it: where to read why a job did not bring it back, or how to keep it running. */
 function gatewayExtras(host: ConnectionHost): readonly ScreenExtra[] {
   if (host.kept === true) {
-    return [{ sentence: null, command: "golem web logs" }];
+    return [{ sentence: null, command: "tail ~/.golem/logs/web.stderr.log" }];
   }
   if (host.kept === false) {
     return [{ sentence: "Keeps golem and this page running, even after a restart.", command: KEEP_ALL_COMMAND }];
@@ -87,7 +87,7 @@ export function connectionScreen(
         tag: "unauthorized",
         heading: "This page needs a fresh link",
         sentence: "Links last until the gateway restarts. Run this, and use the link it opens.",
-        command: "golem web",
+        command: "golem",
         extras: [],
         golem: "offline",
       };
