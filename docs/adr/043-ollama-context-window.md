@@ -46,6 +46,10 @@ What follows:
 - Whether `/api/ps` `context_length` is per request or per slot with `OLLAMA_NUM_PARALLEL` above 1 is not settled here.
 - 12.16.10 ([#625](https://github.com/MilanPavel/golem/issues/625)) uses the exact window to say when Ollama cut a prompt that did not fit, and how sure golem is. See [Tracing](../architecture/tracing.md).
 
+## Changed by ADR-056
+
+[ADR-056](056-planned-window-and-context-view.md) replaces the rule "golem never sends a `num_ctx` nobody asked for": with `[context] window = "auto"`, golem plans a window for each local model and sends it on every call, so the window is exact from the first call. `window = "ollama"` keeps the behaviour described on this page.
+
 ## Alternatives Considered
 
 ### Alternative 1: Show the model's maximum from the listing
