@@ -188,7 +188,7 @@ for (const [name, result] of [["a model call", MODEL_DETAIL], ["a full call", FU
 
 test("a recorded call with no system prompt says why, and not Not recorded", () => {
   show(NO_PROMPT_DETAIL);
-  expect(screen.getByText("No system prompt was sent on this call. golem sends one only when a skill is pinned.")).toBeTruthy();
+  expect(screen.getByText("No system prompt was sent on this call. golem sends one only when something needs it, such as a pinned skill or an MCP server you can turn on.")).toBeTruthy();
   expect(document.body.textContent).not.toContain("Not recorded");
 });
 
