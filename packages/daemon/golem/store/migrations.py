@@ -99,4 +99,24 @@ MIGRATIONS: tuple[tuple[str, ...], ...] = (
     ("ALTER TABLE sessions ADD COLUMN options TEXT",),
     ("ALTER TABLE sessions ADD COLUMN permission_mode TEXT",),
     ("ALTER TABLE sessions ADD COLUMN origin TEXT",),
+    (
+        """
+        CREATE TABLE file_changes (
+            change_id TEXT PRIMARY KEY,
+            session_id TEXT NOT NULL REFERENCES sessions (session_id),
+            seq INTEGER NOT NULL,
+            run_id TEXT,
+            call_id TEXT,
+            path TEXT NOT NULL,
+            before_sha TEXT,
+            after_sha TEXT,
+            added INTEGER NOT NULL,
+            removed INTEGER NOT NULL,
+            source TEXT NOT NULL,
+            reverts TEXT,
+            ts TEXT NOT NULL
+        )
+        """,
+        "CREATE INDEX file_changes_session ON file_changes (session_id, seq)",
+    ),
 )

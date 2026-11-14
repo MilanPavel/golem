@@ -150,12 +150,16 @@ def apply(change: Change) -> None:
 
 def unified_diff(change: Change) -> str:
     """The change as a unified diff with ``a/`` and ``b/`` paths relative to the folder."""
-    before = change.before if change.before is not None else ""
+    return diff_text(change.shown, change.before, change.after)
+
+
+def diff_text(shown: str, before: str | None, after: str | None) -> str:
+    """A unified diff of two texts of the file ``shown``. None is "no file"."""
     lines = difflib.unified_diff(
-        _lines(before),
-        _lines(change.after),
-        fromfile="/dev/null" if change.before is None else f"a/{change.shown}",
-        tofile=f"b/{change.shown}",
+        _lines(before or ""),
+        _lines(after or ""),
+        fromfile="/dev/null" if before is None else f"a/{shown}",
+        tofile="/dev/null" if after is None else f"b/{shown}",
         n=DIFF_CONTEXT,
     )
     return "".join(line if line.endswith("\n") else f"{line}\n{NO_NEWLINE}\n" for line in lines)
@@ -311,6 +315,7 @@ __all__ = [
     "apply",
     "commit",
     "diff_counts",
+    "diff_text",
     "path_subject",
     "plan_edit",
     "plan_write",
