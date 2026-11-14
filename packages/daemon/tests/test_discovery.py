@@ -399,6 +399,47 @@ async def test_a_provider_list_brings_its_own_prices(tmp_path: Path) -> None:
     await discovery.aclose()
 
 
+async def test_price_of_prefers_the_profile_then_the_provider_then_the_price_book(
+    tmp_path: Path,
+) -> None:
+    body = {
+        "data": [
+            {
+                "id": "deepseek-chat",
+                "pricing": {"prompt": "0.0000002", "completion": "0.0000006"},
+            }
+        ]
+    }
+    network = Network({**_ollama_routes(), "api.deepseek.com/v1/models": _json(body)})
+    settings = GolemSettings(
+        models={
+            "pricey": ModelSettings(
+                model="anthropic/claude-test", price=ModelPrice(input=9.0, output=10.0)
+            )
+        },
+        providers=DEEPSEEK.providers,
+    )
+    store = MemoryKeyStore({"deepseek": "sk-ds"})
+    discovery = _discovery(ModelRouter(settings, keys=store), network, tmp_path)
+    await discovery.list()
+    assert discovery.price_of("anthropic/claude-test") == ModelPrice(input=9.0, output=10.0)
+    listed = discovery.price_of("deepseek/deepseek-chat")
+    assert listed is not None and listed.input == pytest.approx(0.2)
+    book = discovery.price_of("openai/gpt-test")
+    assert book is not None and book.input == pytest.approx(1.0)
+    await discovery.aclose()
+
+
+async def test_price_of_is_free_for_ollama_and_unknown_for_an_unpriced_hosted_model(
+    tmp_path: Path,
+) -> None:
+    discovery = _discovery(ModelRouter(DEEPSEEK), Network(_ollama_routes()), tmp_path)
+    assert discovery.price_of("ollama/anything:7b") == ModelPrice(input=0.0, output=0.0)
+    assert discovery.price_of("deepseek/never-heard-of") is None
+    assert discovery.price_of("nonsense") is None
+    await discovery.aclose()
+
+
 def test_openai_chat_filter_uses_litellm_then_the_name() -> None:
     assert openai_chat_model("gpt-test", PRICES)
     assert not openai_chat_model("gpt-image-test", PRICES)

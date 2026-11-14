@@ -1,0 +1,47 @@
+{
+  "additionalProperties": false,
+  "description": "USD per million tokens, as golem knew it when the call ended.",
+  "properties": {
+    "cached_input": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cached Input"
+    },
+    "input": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Input"
+    },
+    "output": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Output"
+    }
+  },
+  "title": "CallPrice",
+  "type": "object"
+}

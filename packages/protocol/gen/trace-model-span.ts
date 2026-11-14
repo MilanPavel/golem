@@ -20,6 +20,7 @@ export type Output = number | null;
 export type Children = TraceToolSpan[];
 export type ContextWindow = number | null;
 export type ContextWindowEstimated = boolean;
+export type CostUsd = number | null;
 export type DroppedMessageIds = string[];
 export type DroppedTokens = number | null;
 export type DurationMs1 = number | null;
@@ -46,12 +47,16 @@ export type Status1 = 'ok' | 'failed' | 'cancelled' | 'denied' | 'running';
  * "likely". ``dropped_message_ids`` are the messages the model probably did
  * not see (older messages only), and ``dropped_tokens`` is an estimate of
  * their size.
+ *
+ * ``cost_usd`` is what the call cost, as its ``model.call.completed`` recorded
+ * it. Null when the price was not known or the call has no token counts.
  */
 export interface TraceModelSpan {
   approval_wait_ms?: ApprovalWaitMs;
   children?: Children;
   context_window?: ContextWindow;
   context_window_estimated?: ContextWindowEstimated;
+  cost_usd?: CostUsd;
   dropped_message_ids?: DroppedMessageIds;
   dropped_tokens?: DroppedTokens;
   duration_ms?: DurationMs1;

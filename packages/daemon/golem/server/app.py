@@ -14,7 +14,7 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from golem.config import load_settings
+from golem.config import ModelPrice, load_settings
 from golem.graphs.chat import ChatRuntime, open_chat
 from golem.graphs.prompt import SystemPrompt
 from golem.lock import DaemonAlreadyRunning, DaemonLock
@@ -26,7 +26,7 @@ from golem.models.install import RUNTIMES, OllamaInstaller, runtime_installer
 from golem.models.keys import ProviderKeys
 from golem.models.ollama import LocalServer, LocalServers, ServerState
 from golem.models.pulls import PullManager
-from golem.models.router import ModelRouter
+from golem.models.router import ModelConfigError, ModelRouter
 from golem.models.window import resolve_window
 from golem.paths import GolemPaths, resolve_paths
 from golem.permissions.policy import Policy
@@ -231,6 +231,7 @@ class DaemonApp:
                         router, profile, models, overrides=overrides
                     ),
                     note_loaded=note_loaded,
+                    price_of=lambda profile: _price_of(router, models, profile),
                 )
                 self.state.sessions = await _open_sessions(
                     database,
@@ -460,6 +461,15 @@ class DaemonApp:
         exc = task.exception()
         if exc is not None:
             log.error("client task failed", exc_info=exc)
+
+
+def _price_of(router: ModelRouter, models: ModelDiscovery, profile: str) -> ModelPrice | None:
+    """The price of the model a profile name resolves to, or None when it does not resolve."""
+    try:
+        ref = router.resolve(profile).ref
+    except ModelConfigError:
+        return None
+    return models.price_of(ref)
 
 
 async def _open_sessions(
