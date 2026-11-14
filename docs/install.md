@@ -26,7 +26,20 @@ golem --version             # golem 0.1.0, or newer
 golem
 ```
 
-`brew install` only puts the program on your Mac; nothing is set up until you run golem. The first `golem` sets up in the terminal: it opens its setup window. (The first `golem web` asks one question in the terminal, keep golem running?, and then the page opens on `/welcome` and sets up there.) It starts with the background service: the part of golem that talks to the model and keeps your chats, so a chat keeps going when you close the terminal. Enter starts it now and at every login, and it restarts by itself if it ever crashes. **Only while this terminal is open** runs it until you quit golem. The window shows each step while the service starts, then asks how golem should think. Type `/setup` later to see what is set up, fix what is broken, or walk the steps again.
+`brew install` only puts the program on your Mac; nothing is set up until you run golem. The first `golem` asks one question in the terminal, about the background service: the part of golem that talks to the model and keeps your chats, so a chat keeps going when you close the terminal.
+
+```text
+Keep golem running, now and at every login?
+  Enter  yes
+  n      only while this window is open
+  q      quit
+```
+
+Enter starts the service and the web page now and at every login, and they restart by themselves if they ever crash. `n` runs them only while this terminal is open. `q` quits. golem shows each step while the service starts, then opens the page in your browser on `/welcome`. There you pick how golem should think: on this Mac, with an API key, or later. If you have exactly one ready model, golem uses it without asking.
+
+When golem opens the browser, it prints `Chat in the terminal: golem tui`. Prefer the terminal? Run `golem tui` instead. On a first run, it opens a setup window there with the same steps. Type `/setup` later, in `golem tui`, to see what is set up, fix what is broken, or walk the steps again. On the web page, `/setup` opens Settings → Setup.
+
+Over SSH, golem opens no browser and prints the link instead. The same goes for `golem --no-open` and `golem --json`.
 
 Check it any time:
 
@@ -35,7 +48,7 @@ golem status                # prints pid, version, and uptime
 golem doctor                # checks the whole install
 ```
 
-`golem web` asks the same question once: Enter keeps golem's service and the web page running, now and at every login, and the page then opens from a bookmark with no terminal. Without the chat, for example for a script, install both with no question:
+With Enter, the page then opens from a bookmark with no terminal. Without the question, for example for a script, install both:
 
 ```bash
 golem install
@@ -64,19 +77,21 @@ Or type `/login` in the chat, pick the provider, and paste the key.
 
 ## 4. Chat
 
-Go to the folder you want golem to work in, and open the chat:
+In the browser, choose a folder for a new chat from the folder chip. To chat in the terminal, go to the folder you want golem to work in, and run:
 
 ```bash
 cd ~/my-project
-golem
+golem tui
 ```
+
+The rest of this step is the terminal chat.
 
 - On the first start, golem uses your only ready model, or opens the model picker if there are several or none. `/model` opens the picker any time. Choose a model with Up and Down, then press Enter. A local model that isn't downloaded yet asks once, then downloads with a progress bar.
 - Type a message and press Enter.
 - golem can read and search files only inside the folder you started it in. It asks before it changes a file or runs a command.
 - Type `/help` for all commands, or `?` on an empty line for all keys. Ctrl-C twice quits.
 
-Closing the chat doesn't stop an answer. Run `golem` again to see it. [First chat](guide/first-chat.md) walks through a first question and a first approval.
+Closing the chat doesn't stop an answer. Run `golem tui` again to see it. [First chat](guide/first-chat.md) walks through a first question and a first approval.
 
 ## Upgrade
 
@@ -85,7 +100,7 @@ brew update
 brew upgrade golem
 ```
 
-The running service is still the old version. golem says so in the chat: press Ctrl-R there to restart it. Or run `golem daemon restart`.
+The running service is still the old version. golem says so in the chat: press Ctrl-R in `golem tui` to restart it. Or run `golem daemon restart`.
 
 Your chats and settings carry over. If a new version changes the database, golem copies the old file first, for example to `~/.golem/golem.db.bak-5`.
 
@@ -105,11 +120,11 @@ Run `golem doctor` first. It checks the install from top to bottom, prints a fix
 ✓ config   /Users/you/.golem/config.toml is valid
 ✓ model    new chats start on ollama/qwen3:8b
 ✗ ollama   Ollama is not installed
-           fix: golem, then /setup installs it, or brew install ollama
+           fix: golem tui, then /setup installs it, or brew install ollama
 ✓ disk     154.6 GB free
 
 1 problem.
-Next: golem, then /setup installs it, or brew install ollama
+Next: golem tui, then /setup installs it, or brew install ollama
 ```
 
 | What you see | What to do |

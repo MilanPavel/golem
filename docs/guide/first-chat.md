@@ -9,16 +9,18 @@ This page starts where [Install](../install.md) ends: golem is installed, and it
 
 ## Open golem in a project
 
+This page is about the terminal chat. For the browser, see [The web UI](./web.md).
+
 golem works in the folder you start it in. It can read and search files there, and nowhere else.
 
 ```bash
 cd ~/my-project
-golem
+golem tui
 ```
 
 ## Pick a model
 
-`brew install` does nothing by itself. The first `golem` sets up in the terminal: its setup window asks where golem should think: on this Mac, with an API key, or later. The first `golem web` asks one question in the terminal (keep golem running?), then the page opens on `/welcome`, which asks the same thing in steps. If you have exactly one ready model, golem uses it without asking. Type `/model` to open the model picker at any time, and `/setup` to see the whole setup.
+`brew install` does nothing by itself. The first `golem tui` sets up in the terminal: its setup window asks where golem should think: on this Mac, with an API key, or later. The first `golem` asks one question in the terminal (keep golem running?), then the page opens on `/welcome`, which asks the same thing in steps. If you have exactly one ready model, golem uses it without asking. Type `/model` to open the model picker at any time, and `/setup` to see the whole setup.
 
 - **Up** and **Down** choose a model, and **Enter** picks it for this chat.
 - **`d`** also makes it the default for new chats.
@@ -101,13 +103,13 @@ The line under the question says which rule asked. A command goes through the sa
 ## Stop, leave, and come back
 
 - **Ctrl-C** stops the answer. Pressed twice, it quits.
-- Closing the terminal does not stop an answer. Run `golem` again in the same folder, and the chat is still there, still streaming.
+- Closing the terminal does not stop an answer. Run `golem tui` again in the same folder, and the chat is still there, still streaming.
 - `/sessions` switches between chats, and `/new` starts a fresh one.
 - `/help` lists every command, and `?` on an empty line lists every key.
 
 ## Next
 
 - [How it works](./introduction.md#how-it-works), if you skipped it.
-- Open the same chat in your browser with [`golem web`](./web.md).
+- Open the same chat in your browser with [`golem`](./web.md).
 - [Models and API keys](./models.md) and [Commands](./commands.md), for everything else.
 - Something wrong? [When something is wrong](../install.md#when-something-is-wrong) lists the usual fixes.

@@ -34,8 +34,8 @@ You need an Apple Silicon Mac and [Homebrew](https://brew.sh).
 
 ```bash
 brew install milanpavel/golem/golem   # install
-cd ~/my-project && golem              # open the chat in your project folder
-golem web                             # or open the same chats in your browser
+golem                                 # open golem in your browser
+cd ~/my-project && golem tui          # or chat in the terminal, in your project folder
 ```
 
 The first time, golem asks to start its background service. Press Enter, then pick a model: a local one downloads right there, and a hosted one asks for your API key. [Install golem on a Mac](./install.md) walks through every step, plus upgrading and removing.
