@@ -1,7 +1,7 @@
 # ADR-019: The `golem` command is one bun binary
 
 **Date**: 2026-10-20
-**Status**: accepted
+**Status**: accepted. Bare `golem` now opens the web UI and `golem tui` opens the terminal chat: [ADR-053](053-golem-opens-the-web.md).
 
 ## The idea
 

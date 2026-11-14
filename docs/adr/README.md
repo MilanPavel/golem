@@ -56,6 +56,7 @@ An Architecture Decision Record (ADR) is a short note of one choice: what was de
 | [050](050-routines-and-headless-sessions.md) | A routine fires a headless session; `runs` stay agent turns, `routine_runs` are firings | accepted, amended 2026-11-13 | 2026-11-13 |
 | [051](051-relay-and-pairing.md) | A phone reaches the Mac through a relay that sees only ciphertext | accepted | 2026-11-13 |
 | [052](052-iphone-app.md) | The iPhone app is SwiftUI on iOS 17 over a shared GolemKit package, and may save "Always allow" with Face ID | accepted | 2026-11-13 |
+| [053](053-golem-opens-the-web.md) | `golem` opens the web UI, and `golem tui` opens the terminal chat | accepted | 2026-11-14 |
 
 How the running code fits together is in [../architecture.md](../architecture.md).
 

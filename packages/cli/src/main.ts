@@ -46,6 +46,7 @@ import { readSecret } from "./read-secret.ts";
 import { type Gate, gateService, type SessionDaemon } from "./service-gate.ts";
 import { parseWebArgs, parseWebJobArgs, type WebArgs } from "./web.ts";
 import { DEFAULT_WEB_DEPS, launchDeps, runWeb, runWebLogout } from "./web-command.ts";
+import { noBrowser, routeDefault, TUI_HINT } from "./dispatch.ts";
 import { findLiveQuietly, type WebDeps } from "./web-live.ts";
 import {
   installWebJob,
@@ -69,7 +70,7 @@ const WEB_START_TIMEOUT_MS = 30_000;
 const LAUNCH_AGENT = join(homedir(), "Library", "LaunchAgents", "dev.golem.daemon.plist");
 
 const USAGE =
-  "usage: golem\n" +
+  "usage: golem [--port N] [--no-open] [--json] | golem tui\n" +
   "       golem install | golem uninstall\n" +
   "       golem --version | golem --help | golem status | golem doctor [--mcp]\n" +
   "       golem daemon install|start|stop|restart|uninstall|logs\n" +
@@ -77,7 +78,7 @@ const USAGE =
   "       golem mcp add <name> -- <command…> [--token-env VAR] | golem mcp add <name> --url <url> [--token] [--env K=V] [--header K=V] [--cwd D] [--on-demand] [--project] [--timeout S] [--approval allow] | golem mcp add --catalog <id> [--input <id>=<value>] | golem mcp remove <name> | golem mcp export [--format claude|vscode] [--scope user|project]\n" +
   "       golem mcp list [--json] | show <name> [--json] | test <name> | test --catalog <id> | edit <name> [--project] | import [--from <app>|<file>] [--all] | logs <name> [-f] | enable <name> [--on-demand] | disable <name> | restart <name> | login <name> | logout <name> | tools <name> [--hide <glob>] [--show <glob>]\n" +
   "       golem config show [--resolved] | golem config edit [--project] | golem skills [list] | golem skills check <path>\n" +
-  "       golem web [--port N] [--no-open] [--json] | golem web serve [--port N]\n" +
+  "       golem web [--port N] [--no-open] [--json] (the same as golem) | golem web serve [--port N]\n" +
   "       golem web install [--port N] | golem web uninstall | golem web logout";
 
 // exitCode, not exit(): exit() drops output a pipe has not read yet.
@@ -85,15 +86,20 @@ process.exitCode = await run(process.argv.slice(2));
 
 async function run(args: string[]): Promise<number> {
   const [command, ...rest] = args;
-  if (command === undefined) {
-    return openTui();
-  }
   if (command === "--help" || command === "-h") {
     process.stdout.write(`${USAGE}\n`);
     return 0;
   }
   if (command === "--version") {
     return runVersion();
+  }
+  const route = routeDefault(args, process.env);
+  if (route?.kind === "tui") {
+    return openTui();
+  }
+  if (route?.kind === "web") {
+    if (route.hint) process.stderr.write(`${TUI_HINT}\n`);
+    return openWeb(route.args);
   }
   if (command === "status") {
     return runStatus();
@@ -136,7 +142,7 @@ async function run(args: string[]): Promise<number> {
     const parsed = parseWebArgs(rest);
     // `serve` is what the web job runs: no service gate and no daemon check, because the gateway
     // answers "daemon down" itself and the daemon's own job may not be up yet at boot.
-    if (parsed !== null) return parsed.serve ? runWeb(parsed) : openWeb(parsed);
+    if (parsed !== null) return parsed.serve ? runWeb(parsed) : openWeb(noBrowser(process.env) ? { ...parsed, open: false } : parsed);
   }
   if (command === "config" && rest[0] === "show" && (rest.length === 1 || (rest.length === 2 && rest[1] === "--resolved"))) {
     return runConfigShow();

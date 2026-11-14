@@ -222,6 +222,7 @@ test("with --json or --no-open and no daemon, it says what to run and starts not
 test("bad options print the usage and exit 1", async () => {
   const run = golemWeb("--port", "70000");
   assert.equal(await run.exit, 1);
+  assert.match(run.stderr(), /usage: golem \[--port N\] \[--no-open\] \[--json\] \| golem tui\n/);
   assert.match(run.stderr(), /golem web \[--port N\]/);
 });
 
