@@ -1,7 +1,7 @@
 # ADR-033: `golem` offers to start the service when nothing answers, and launchd still owns it
 
 **Date**: 2026-11-01
-**Status**: accepted. For `golem`, the question is now the setup window's first panel: [ADR-036](036-setup-window-asks-for-the-service.md). `golem web` still asks as below.
+**Status**: accepted. For `golem`, the question is now the setup window's first panel: [ADR-036](036-setup-window-asks-for-the-service.md). `golem web` still asks as below, and bare `golem` now opens the web UI and asks the same way: [ADR-053](053-golem-opens-the-web.md).
 
 ## The idea
 

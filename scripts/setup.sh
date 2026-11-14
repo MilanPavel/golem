@@ -180,5 +180,5 @@ fi
 if [ "$warnings" -gt 0 ]; then
   printf '\nReady, with %s warning%s above.\n' "$warnings" "$([ "$warnings" = 1 ] || echo s)"
 else
-  printf '\nReady. Next: just check, then just golem.\n'
+  printf '\nReady. Next: just check, then just golem tui.\n'
 fi
