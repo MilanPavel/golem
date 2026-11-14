@@ -8,6 +8,7 @@ function model(ref: string, extra: Partial<ListedModel> = {}): ListedModel {
     provider: ref.slice(0, ref.indexOf("/")),
     source: "remote",
     status: "ready",
+    tier: ref.startsWith("ollama/") ? "local" : "frontier",
     ...extra,
   };
 }

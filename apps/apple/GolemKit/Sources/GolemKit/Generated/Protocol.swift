@@ -1195,6 +1195,8 @@ public struct KeychainWait: Codable {
 /// this Mac: the largest model of that category it has the memory for.
 /// ``think_values`` is what the ``think`` option takes for this model: ``off`` and
 /// ``on``, or ``low``, ``medium`` and ``high``. It is empty when the model cannot think.
+/// ``tier`` is ``local`` for Ollama, ``budget`` for a hosted model whose blended price is at
+/// or below ``[routing] budget_max_price``, and ``frontier`` otherwise.
 /// ``stale`` means a cached list was shown because the provider did not
 /// answer in time.
 // MARK: - ListedModel
@@ -1216,6 +1218,7 @@ public struct ListedModel: Codable {
     public let status: ListedModelStatus
     public let tags: [String]?
     public let thinkValues: [String]?
+    public let tier: Tier
     public let tools: Bool?
 
     public enum CodingKeys: String, CodingKey {
@@ -1236,10 +1239,11 @@ public struct ListedModel: Codable {
         case status = "status"
         case tags = "tags"
         case thinkValues = "think_values"
+        case tier = "tier"
         case tools = "tools"
     }
 
-    public init(categories: [Category]?, ctx: Int?, fit: Fit?, label: String, price: ListedModelModelPriceInfo?, profiles: [String]?, progress: Double?, provider: String, recommended: Bool?, recommendedFor: [Category]?, ref: String, sizeGB: Double?, source: ListedModelSource, stale: Bool?, status: ListedModelStatus, tags: [String]?, thinkValues: [String]?, tools: Bool?) {
+    public init(categories: [Category]?, ctx: Int?, fit: Fit?, label: String, price: ListedModelModelPriceInfo?, profiles: [String]?, progress: Double?, provider: String, recommended: Bool?, recommendedFor: [Category]?, ref: String, sizeGB: Double?, source: ListedModelSource, stale: Bool?, status: ListedModelStatus, tags: [String]?, thinkValues: [String]?, tier: Tier, tools: Bool?) {
         self.categories = categories
         self.ctx = ctx
         self.fit = fit
@@ -1257,6 +1261,7 @@ public struct ListedModel: Codable {
         self.status = status
         self.tags = tags
         self.thinkValues = thinkValues
+        self.tier = tier
         self.tools = tools
     }
 }
@@ -1309,6 +1314,12 @@ public enum ListedModelStatus: String, Codable {
     case pulling = "pulling"
     case ready = "ready"
     case serverDown = "server_down"
+}
+
+public enum Tier: String, Codable {
+    case budget = "budget"
+    case frontier = "frontier"
+    case local = "local"
 }
 
 /// ``unlisted`` is a provider golem does not ask for models: nothing uses it yet.
@@ -5256,6 +5267,8 @@ public struct ModelListResult: Codable {
 /// this Mac: the largest model of that category it has the memory for.
 /// ``think_values`` is what the ``think`` option takes for this model: ``off`` and
 /// ``on``, or ``low``, ``medium`` and ``high``. It is empty when the model cannot think.
+/// ``tier`` is ``local`` for Ollama, ``budget`` for a hosted model whose blended price is at
+/// or below ``[routing] budget_max_price``, and ``frontier`` otherwise.
 /// ``stale`` means a cached list was shown because the provider did not
 /// answer in time.
 // MARK: - ModelElement
@@ -5277,6 +5290,7 @@ public struct ModelElement: Codable {
     public let status: ListedModelStatus
     public let tags: [String]?
     public let thinkValues: [String]?
+    public let tier: Tier
     public let tools: Bool?
 
     public enum CodingKeys: String, CodingKey {
@@ -5297,10 +5311,11 @@ public struct ModelElement: Codable {
         case status = "status"
         case tags = "tags"
         case thinkValues = "think_values"
+        case tier = "tier"
         case tools = "tools"
     }
 
-    public init(categories: [Category]?, ctx: Int?, fit: Fit?, label: String, price: ModelModelPriceInfo?, profiles: [String]?, progress: Double?, provider: String, recommended: Bool?, recommendedFor: [Category]?, ref: String, sizeGB: Double?, source: ListedModelSource, stale: Bool?, status: ListedModelStatus, tags: [String]?, thinkValues: [String]?, tools: Bool?) {
+    public init(categories: [Category]?, ctx: Int?, fit: Fit?, label: String, price: ModelModelPriceInfo?, profiles: [String]?, progress: Double?, provider: String, recommended: Bool?, recommendedFor: [Category]?, ref: String, sizeGB: Double?, source: ListedModelSource, stale: Bool?, status: ListedModelStatus, tags: [String]?, thinkValues: [String]?, tier: Tier, tools: Bool?) {
         self.categories = categories
         self.ctx = ctx
         self.fit = fit
@@ -5318,6 +5333,7 @@ public struct ModelElement: Codable {
         self.status = status
         self.tags = tags
         self.thinkValues = thinkValues
+        self.tier = tier
         self.tools = tools
     }
 }

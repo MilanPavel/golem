@@ -21,6 +21,7 @@ export type Stale = boolean;
 export type Status = 'ready' | 'needs_key' | 'not_installed' | 'server_down' | 'pulling';
 export type Tags = string[];
 export type ThinkValues = string[];
+export type Tier = 'local' | 'budget' | 'frontier';
 export type Tools = boolean | null;
 export type Models = ListedModel[];
 export type Provider1 = string;
@@ -65,6 +66,8 @@ export interface ModelListResult {
  * this Mac: the largest model of that category it has the memory for.
  * ``think_values`` is what the ``think`` option takes for this model: ``off`` and
  * ``on``, or ``low``, ``medium`` and ``high``. It is empty when the model cannot think.
+ * ``tier`` is ``local`` for Ollama, ``budget`` for a hosted model whose blended price is at
+ * or below ``[routing] budget_max_price``, and ``frontier`` otherwise.
  * ``stale`` means a cached list was shown because the provider did not
  * answer in time.
  *
@@ -89,6 +92,7 @@ export interface ListedModel {
   status: Status;
   tags?: Tags;
   think_values?: ThinkValues;
+  tier: Tier;
   tools?: Tools;
 }
 /**
