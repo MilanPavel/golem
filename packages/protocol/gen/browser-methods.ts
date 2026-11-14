@@ -40,6 +40,7 @@ export const BROWSER_METHODS: ReadonlySet<string> = new Set([
   "ollama.install",
   "ollama.install_cancel",
   "ollama.start",
+  "permissions.set_mode",
   "ping",
   "policy.remove",
   "policy.update",
