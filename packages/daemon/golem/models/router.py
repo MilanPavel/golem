@@ -17,7 +17,7 @@ from __future__ import annotations
 import logging
 import os
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal, cast
 
@@ -30,6 +30,7 @@ from golem.config import (
     ModelSettings,
     ProviderKind,
     ProviderSettings,
+    RoleSettings,
     load_settings,
     unknown_provider_message,
 )
@@ -144,6 +145,7 @@ class _Catalog:
     models: dict[str, ModelSettings]
     saved: dict[str, ModelOptions]
     budget_max_price: float = BUDGET_MAX_PRICE
+    roles: RoleSettings = field(default_factory=RoleSettings)
 
 
 class ModelRouter:
@@ -439,6 +441,15 @@ class ModelRouter:
         catalog = self._current()
         return BUDGET_MAX_PRICE if catalog is None else catalog.budget_max_price
 
+    def roles(self) -> RoleSettings:
+        """``[routing.roles]``, read from the current ``config.toml``."""
+        catalog = self._current()
+        return RoleSettings() if catalog is None else catalog.roles
+
+    def think_values(self, model_id: str) -> tuple[str, ...] | None:
+        """What ``think`` takes for ``model_id`` as discovery noted it, or None when unknown."""
+        return self._think_values.get(model_id)
+
     def profiles(self) -> dict[str, ModelSettings]:
         """Every profile by name, the one from the flat settings included."""
         catalog = self._current()
@@ -540,6 +551,7 @@ def _catalog(settings: GolemSettings) -> _Catalog:
         models=models,
         saved=dict(settings.ollama.models),
         budget_max_price=settings.routing.budget_max_price,
+        roles=settings.routing.roles,
     )
 
 

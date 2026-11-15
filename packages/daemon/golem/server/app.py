@@ -202,6 +202,8 @@ class DaemonApp:
                 models = ModelDiscovery(router, self.paths.cache_dir)
             else:
                 models = self._discovery(router)
+            if isinstance(self._titles, ModelTitles):
+                self._titles.bind(models.tier_of_ref, models.budget_refs)
 
             async def note_loaded(profile: str, sent_num_ctx: int | None) -> int | None:
                 resolved = router.resolve(profile)
