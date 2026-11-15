@@ -147,7 +147,7 @@ export function SkillsSection() {
     <>
       <div className="flex min-h-0 flex-1 overflow-hidden rounded-xl border border-line bg-surface">
         <div className="w-mcp-list shrink-0 overflow-y-auto border-r border-line bg-bg p-3">{listPane}</div>
-        <div className="min-w-0 flex-1 overflow-y-auto px-6 py-5">{detail}</div>
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-6 py-5">{detail}</div>
       </div>
       {dialog}
     </>
