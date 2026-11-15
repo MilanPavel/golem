@@ -147,7 +147,30 @@ The providers are `openai`, `anthropic`, `google`, `deepseek`, `xai`, `moonshot`
 
 | Key | Default | Meaning |
 |---|---|---|
+| `mode` | `"pinned"` | How a chat picks its model. `pinned` uses the model the chat names. `local` uses only models on this Mac. `auto` picks the cheapest model that fits the call |
+| `paid` | `"ask"` | When `auto` wants a paid model: `ask` asks once per chat, `always_ask` asks every time, `never` never uses one |
+| `local_only` | `[]` | Folders whose chats stay on this Mac. Only local models are used there |
 | `budget_max_price` | `1.50` | The most a hosted model may cost, in USD per million tokens, to be in the `budget` tier. The price is blended as `(3 × input + output) / 4`. A model above it, or with no known price, is `frontier`. Ollama models are `local` |
+
+### `[routing.ladder]`
+
+The model to use in each tier when `mode` is `auto`. A value is a profile name or a `provider/model` ref. Left out, golem chooses: for `local` the chat's own model if it is local, else the ready local model with the largest window; for `budget` the cheapest ready budget model that takes tools; for `frontier` none.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `local` | none | The model of the `local` tier |
+| `budget` | none | The model of the `budget` tier |
+| `frontier` | none | The model of the `frontier` tier |
+
+### `[budget]`
+
+Caps on what paid models may cost.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `daily_usd` | none | The most paid models may cost in one day, in USD. None means no cap |
+| `session_usd` | none | The most paid models may cost in one chat, in USD. None means no cap |
+| `over` | `"local"` | What to do at a cap: `local` goes on with a local model, `ask` asks you |
 
 ### `[routing.roles]`
 

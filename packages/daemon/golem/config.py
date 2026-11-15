@@ -291,17 +291,37 @@ class RoleSettings(BaseModel):
     explore: str = Field(default="session", min_length=1)
 
 
+RouteMode = Literal["pinned", "local", "auto"]
+"""How a session picks its model: the one it names, a local one only, or by the rules."""
+
+
+class LadderSettings(BaseModel):
+    """``[routing.ladder]``. The model to use in each tier. None means golem chooses."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    local: str | None = Field(default=None, min_length=1)
+    budget: str | None = Field(default=None, min_length=1)
+    frontier: str | None = Field(default=None, min_length=1)
+
+
 class RoutingSettings(BaseModel):
     """``[routing]``. How golem files models into tiers and picks between them.
 
     ``budget_max_price`` is the most a hosted model may cost, in USD per million tokens and
     blended as ``(3 * input + output) / 4``, to be in the budget tier. A model above it is
-    frontier. ``roles`` picks the model for each internal job.
+    frontier. ``roles`` picks the model for each internal job. ``mode`` is the default route
+    mode, ``paid`` says when to ask before a paid model, ``local_only`` lists folders that
+    stay on this Mac, and ``ladder`` names the model of each tier.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
+    mode: RouteMode = "pinned"
+    paid: Literal["ask", "always_ask", "never"] = "ask"
     budget_max_price: float = Field(default=1.50, gt=0)
+    local_only: list[str] = Field(default_factory=list[str])
+    ladder: LadderSettings = Field(default_factory=LadderSettings)
     roles: RoleSettings = Field(default_factory=RoleSettings)
 
 
@@ -317,6 +337,16 @@ class ContextSettings(BaseModel):
 
     window: Literal["auto", "ollama"] | Annotated[int, Field(ge=512, le=262144)] = "auto"
     keep_alive: str | None = "30m"
+
+
+class BudgetSettings(BaseModel):
+    """``[budget]``. Caps on paid models, in USD. None means no cap."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    daily_usd: float | None = Field(default=None, ge=0)
+    session_usd: float | None = Field(default=None, ge=0)
+    over: Literal["local", "ask"] = "local"
 
 
 class WebSettings(BaseModel):
@@ -525,6 +555,7 @@ BROWSER_SETTINGS = frozenset(
         "ollama",
         "routing",
         "context",
+        "budget",
     }
 )
 """Top-level settings the browser may edit. Every ``GolemSettings`` field is in one list."""
@@ -574,6 +605,7 @@ class GolemSettings(BaseSettings):
     ollama: OllamaSettings = Field(default_factory=OllamaSettings)
     routing: RoutingSettings = Field(default_factory=RoutingSettings)
     context: ContextSettings = Field(default_factory=ContextSettings)
+    budget: BudgetSettings = Field(default_factory=BudgetSettings)
 
     _no_secrets = model_validator(mode="before")(_no_inline_secrets)
 
