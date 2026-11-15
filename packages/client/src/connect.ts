@@ -25,6 +25,8 @@ import type { ApprovalRespondResult } from "../../protocol/gen/approval-respond-
 import type { ArtifactReadResult } from "../../protocol/gen/artifact-read-result.ts";
 import type { ChangesDiffResult } from "../../protocol/gen/changes-diff-result.ts";
 import type { ChangesListResult } from "../../protocol/gen/changes-list-result.ts";
+import type { FileListResult } from "../../protocol/gen/file-list-result.ts";
+import type { FileReadResult } from "../../protocol/gen/file-read-result.ts";
 import type { ConfigGetResult } from "../../protocol/gen/config-get-result.ts";
 import type { PolicyEditResult } from "../../protocol/gen/policy-edit-result.ts";
 
@@ -104,6 +106,8 @@ import {
   isRuntimeInstallDone,
   isRuntimeName,
   isChangesListResult,
+  isFileListResult,
+  isFileReadResult,
   isFsListDirsResult,
   isSetupStatusResult,
   isDaemonStatus,
@@ -291,6 +295,10 @@ export interface GolemClient {
   changesList(sessionId: string): Promise<ChangesListResult>;
   /** The diff of a file (`path`) or of one change (`changeId`). */
   changesDiff(sessionId: string, target: ChangesDiffTarget): Promise<ChangesDiffResult>;
+  /** The start of one text file of the session's folder, with its line count. */
+  readFile(sessionId: string, path: string): Promise<FileReadResult>;
+  /** Files of the session's folder whose path holds `query`, shortest first. */
+  listFiles(sessionId: string, query?: string, limit?: number): Promise<FileListResult>;
   /** `args` are the call's arguments as the user edited them. They go only with `allow`. */
   respondApproval(
     sessionId: string,
@@ -1302,6 +1310,26 @@ export function connectGolem(options: ConnectOptions): GolemClient {
         throw new Error("invalid changes.diff result");
       }
       return { diff: result["diff"], truncated: result["truncated"] };
+    },
+    async readFile(sessionId: string, path: string): Promise<FileReadResult> {
+      await ready;
+      const result = await call("file.read", { session_id: sessionId, path });
+      if (!isFileReadResult(result)) {
+        throw new Error("invalid file.read result");
+      }
+      return result;
+    },
+    async listFiles(sessionId: string, query?: string, limit?: number): Promise<FileListResult> {
+      await ready;
+      const result = await call("file.list", {
+        session_id: sessionId,
+        ...(query === undefined ? {} : { query }),
+        ...(limit === undefined ? {} : { limit }),
+      });
+      if (!isFileListResult(result)) {
+        throw new Error("invalid file.list result");
+      }
+      return result;
     },
     async respondApproval(
       sessionId: string,

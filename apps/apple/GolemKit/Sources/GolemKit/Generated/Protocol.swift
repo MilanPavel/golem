@@ -1863,6 +1863,85 @@ public enum FileChangedEventType: String, Codable {
     case fileChanged = "file.changed"
 }
 
+/// ``file.list``. Files of the session's folder whose path holds ``query``, case-insensitive.
+// MARK: - FileListParams
+public struct FileListParams: Codable {
+    public let limit: Int?
+    public let query: String?
+    public let sessionID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case limit = "limit"
+        case query = "query"
+        case sessionID = "session_id"
+    }
+
+    public init(limit: Int?, query: String?, sessionID: String) {
+        self.limit = limit
+        self.query = query
+        self.sessionID = sessionID
+    }
+}
+
+/// Relative paths, shortest first, then alphabetical. ``more`` is true when others match.
+// MARK: - FileListResult
+public struct FileListResult: Codable {
+    public let more: Bool
+    public let paths: [String]
+
+    public enum CodingKeys: String, CodingKey {
+        case more = "more"
+        case paths = "paths"
+    }
+
+    public init(more: Bool, paths: [String]) {
+        self.more = more
+        self.paths = paths
+    }
+}
+
+/// ``file.read``. One text file of the session's folder.
+// MARK: - FileReadParams
+public struct FileReadParams: Codable {
+    public let path: String
+    public let sessionID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case path = "path"
+        case sessionID = "session_id"
+    }
+
+    public init(path: String, sessionID: String) {
+        self.path = path
+        self.sessionID = sessionID
+    }
+}
+
+/// The file's path relative to the folder, the start of its text, and its line count.
+///
+/// ``truncated`` is true when the file is longer than the limit and ``text`` is its start.
+// MARK: - FileReadResult
+public struct FileReadResult: Codable {
+    public let lines: Int
+    public let path: String
+    public let text: String
+    public let truncated: Bool
+
+    public enum CodingKeys: String, CodingKey {
+        case lines = "lines"
+        case path = "path"
+        case text = "text"
+        case truncated = "truncated"
+    }
+
+    public init(lines: Int, path: String, text: String, truncated: Bool) {
+        self.lines = lines
+        self.path = path
+        self.text = text
+        self.truncated = truncated
+    }
+}
+
 /// The session and message a fork was copied from.
 // MARK: - ForkedFrom
 public struct ForkedFrom: Codable {

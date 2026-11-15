@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict
 
 from golem import __version__, install_info
 from golem.coding.changes import ChangeStore, net_files
+from golem.coding.files import list_paths, read_text
 from golem.config import load_settings
 from golem.config_edit import (
     McpTableError,
@@ -103,7 +104,8 @@ from golem.skills.index import build_index
 from golem.skills.invoke import SkillInvokeError
 from golem.skills.pinned import SkillPinError
 from golem.skills.registry import listed_skill
-from golem.tools.registry import ToolScope
+from golem.tools.paths import NO_FOLDER
+from golem.tools.registry import ToolError, ToolScope
 from golem.tools.write import DIFF_CHARS, diff_counts, diff_text
 from golem_protocol.commands import (
     ApprovalRespondParams,
@@ -134,6 +136,10 @@ from golem_protocol.commands import (
     CostModelRow,
     CostTotals,
     DaemonStatus,
+    FileListParams,
+    FileListResult,
+    FileReadParams,
+    FileReadResult,
     FsListDirsParams,
     FsListDirsResult,
     HelloParams,
@@ -574,6 +580,26 @@ async def _changes_diff(ctx: RequestContext, params: ChangesDiffParams) -> Chang
         path, before_sha, after_sha = group[0].path, group[0].before_sha, group[-1].after_sha
     diff = diff_text(path, await store.text(before_sha), await store.text(after_sha))
     return ChangesDiffResult(diff=diff[:DIFF_CHARS], truncated=len(diff) > DIFF_CHARS)
+
+
+async def _session_files(ctx: RequestContext, session_id: str) -> Path:
+    folder = await _session_folder(ctx, session_id)
+    if folder is None:
+        raise RpcCallError(INVALID_PARAMS, NO_FOLDER)
+    return Path(folder)
+
+
+async def _file_read(ctx: RequestContext, params: FileReadParams) -> FileReadResult:
+    folder = await _session_files(ctx, params.session_id)
+    try:
+        return await asyncio.to_thread(read_text, folder, params.path)
+    except ToolError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+
+
+async def _file_list(ctx: RequestContext, params: FileListParams) -> FileListResult:
+    folder = await _session_files(ctx, params.session_id)
+    return await asyncio.to_thread(list_paths, folder, params.query, params.limit)
 
 
 async def _trace_get(ctx: RequestContext, params: TraceGetParams) -> TraceGetResult:
@@ -1415,6 +1441,8 @@ def standard_methods() -> dict[str, Method]:
         "artifact.read": Method("artifact.read", ArtifactReadParams, True, _artifact_read),
         "changes.list": Method("changes.list", ChangesListParams, True, _changes_list),
         "changes.diff": Method("changes.diff", ChangesDiffParams, True, _changes_diff),
+        "file.read": Method("file.read", FileReadParams, True, _file_read),
+        "file.list": Method("file.list", FileListParams, True, _file_list),
         "session.inspect": Method("session.inspect", SessionInspectParams, True, _session_inspect),
         "cost.get": Method("cost.get", CostGetParams, True, _cost_get),
         "trace.get": Method("trace.get", TraceGetParams, True, _trace_get),

@@ -129,6 +129,8 @@ export function fakeClient() {
     readArtifact: vi.fn<PageClient["readArtifact"]>(async () => ({ text: "", offset: 0, size: 0 })),
     changesList: vi.fn<PageClient["changesList"]>(async () => ({ files: [] })),
     changesDiff: vi.fn<PageClient["changesDiff"]>(async () => ({ diff: "", truncated: false })),
+    readFile: vi.fn<PageClient["readFile"]>(async (_id, path) => ({ path, text: "", truncated: false, lines: 0 })),
+    listFiles: vi.fn<PageClient["listFiles"]>(async () => ({ paths: [], more: false })),
     getTrace: vi.fn<PageClient["getTrace"]>(async (sessionId) => ({ session_id: sessionId, title: null, runs: [] })),
     listMcp: vi.fn<PageClient["listMcp"]>(async () => ({ servers: [] })),
     mcpTools: vi.fn<PageClient["mcpTools"]>(async (name) => ({ name, tools: [] })),

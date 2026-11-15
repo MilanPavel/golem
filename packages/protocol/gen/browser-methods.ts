@@ -11,6 +11,8 @@ export const BROWSER_METHODS: ReadonlySet<string> = new Set([
   "config.raw.set",
   "cost.get",
   "daemon.status",
+  "file.list",
+  "file.read",
   "fs.list_dirs",
   "hello",
   "mcp.add",

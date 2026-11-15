@@ -40,6 +40,8 @@ METHOD_ACCESS: Final[Mapping[str, Access]] = {
     "session.inspect": "browser",
     "changes.list": "browser",
     "changes.diff": "browser",
+    "file.read": "browser",
+    "file.list": "browser",
     "cost.get": "browser",
     "trace.get": "browser",
     "trace.span": "browser",
