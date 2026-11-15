@@ -208,3 +208,26 @@ def test_an_mcp_server_is_added_to_a_missing_file(tmp_path: Path) -> None:
     path = tmp_path / "home" / "config.toml"
     add_mcp_server(path, "git", {"command": "uvx"})
     assert load_mcp(path)["git"].command == "uvx"
+
+
+def test_routing_roles_default_to_the_session_and_load_from_toml(tmp_path: Path) -> None:
+    home = tmp_path / "home"
+    project = tmp_path / "project"
+    assert load_settings(home=home, project_dir=project).routing.roles.titles == "session"
+    _write(home / "config.toml", '[routing.roles]\ntitles = "deepseek/deepseek-chat"\n')
+    roles = load_settings(home=home, project_dir=project).routing.roles
+    assert (roles.titles, roles.summarise, roles.explore) == (
+        "deepseek/deepseek-chat",
+        "session",
+        "session",
+    )
+
+
+def test_a_blank_or_unknown_role_is_refused(tmp_path: Path) -> None:
+    home = tmp_path / "home"
+    _write(home / "config.toml", '[routing.roles]\ntitles = ""\n')
+    with pytest.raises(ValidationError):
+        load_settings(home=home, project_dir=tmp_path / "project")
+    _write(home / "config.toml", '[routing.roles]\nsearch = "x"\n')
+    with pytest.raises(ValidationError):
+        load_settings(home=home, project_dir=tmp_path / "project")

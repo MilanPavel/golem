@@ -273,17 +273,36 @@ class OllamaSettings(BaseModel):
     models: dict[str, ModelOptions] = Field(default_factory=dict[str, ModelOptions])
 
 
+Role = Literal["titles", "summarise", "explore"]
+"""An internal job golem runs with a model of its own choosing."""
+
+
+class RoleSettings(BaseModel):
+    """``[routing.roles]``. The model for each internal job.
+
+    A value is ``"session"``, a profile name, or a ``provider/model`` ref. ``"session"``
+    means the session's own model, or a ready budget model when the session is hosted.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    titles: str = Field(default="session", min_length=1)
+    summarise: str = Field(default="session", min_length=1)
+    explore: str = Field(default="session", min_length=1)
+
+
 class RoutingSettings(BaseModel):
     """``[routing]``. How golem files models into tiers and picks between them.
 
     ``budget_max_price`` is the most a hosted model may cost, in USD per million tokens and
     blended as ``(3 * input + output) / 4``, to be in the budget tier. A model above it is
-    frontier.
+    frontier. ``roles`` picks the model for each internal job.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     budget_max_price: float = Field(default=1.50, gt=0)
+    roles: RoleSettings = Field(default_factory=RoleSettings)
 
 
 class WebSettings(BaseModel):

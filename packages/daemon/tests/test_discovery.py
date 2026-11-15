@@ -1106,6 +1106,37 @@ async def test_the_catalog_tier_overrides_the_price(tmp_path: Path) -> None:
     await discovery.aclose()
 
 
+async def test_budget_refs_and_tiers_come_from_the_cache(tmp_path: Path) -> None:
+    body = {
+        "data": [
+            {
+                "id": "deepseek-chat",
+                "pricing": {"prompt": "0.0000002", "completion": "0.0000006"},
+            }
+        ]
+    }
+    network = Network({**_ollama_routes(), "api.deepseek.com/v1/models": _json(body)})
+    (tmp_path / "config.toml").write_text(
+        '[providers.deepseek]\nkind = "openai_compat"\nbase_url = "https://api.deepseek.com/v1"\n'
+        'api_key_env = "DEEPSEEK_API_KEY"\n',
+        "utf-8",
+    )
+    router = ModelRouter(
+        load_settings(home=tmp_path, project_dir=tmp_path),
+        keys=MemoryKeyStore({"deepseek": "sk-ds"}),
+        home=tmp_path,
+    )
+    discovery = _discovery(router, network, tmp_path)
+    assert discovery.budget_refs() == []
+    assert discovery.tier_of_ref("ollama/qwen3:8b") == "local"
+    assert discovery.tier_of_ref("noprovider") is None
+    await discovery.list()
+    refs = discovery.budget_refs()
+    assert "deepseek/deepseek-chat" in refs
+    assert discovery.tier_of_ref("deepseek/deepseek-chat") == "budget"
+    await discovery.aclose()
+
+
 async def test_budget_max_price_is_read_at_listing_time(tmp_path: Path) -> None:
     body = {
         "data": [
