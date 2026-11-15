@@ -20,6 +20,8 @@ from golem_protocol.events import (
     MessageThinkingDeltaData,
     MessageThinkingDeltaEvent,
     ModelCallStartedData,
+    ModelWaitingData,
+    ModelWaitingEvent,
     PromptSectionInfo,
     RunFailedData,
     RunFailedEvent,
@@ -233,3 +235,17 @@ def test_a_tool_writing_event_round_trips_and_a_path_may_be_missing() -> None:
     assert _ADAPTER.validate_python(event.model_dump()) == event
     with pytest.raises(ValidationError):
         ToolWritingData(message_id="m_abc", index=0, name="write_file", lines=-1, chars=0)
+
+
+def test_a_model_waiting_event_round_trips() -> None:
+    event = ModelWaitingEvent(
+        seq=5,
+        session_id="s_abc",
+        run_id="r_abc",
+        ts="2026-10-07T10:00:03+00:00",
+        type="model.waiting",
+        data=ModelWaitingData(message_id="m_abc", waiting=True),
+    )
+    assert _ADAPTER.validate_python(event.model_dump()) == event
+    with pytest.raises(ValidationError):
+        ModelWaitingData(message_id="", waiting=True)

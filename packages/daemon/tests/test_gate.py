@@ -266,6 +266,105 @@ async def test_a_run_cancelled_while_it_waits_for_the_model_ends_cancelled(
     assert await chat.status(one) == "completed"
 
 
+async def _waiting_events(chat: _Chat, run_id: str) -> list[bool]:
+    return [
+        event.data.waiting
+        for event in await chat.events.for_run(run_id)
+        if event.type == "model.waiting"
+    ]
+
+
+async def test_the_second_session_says_it_waits_after_the_threshold_and_clears_it(
+    database: Database,
+) -> None:
+    model = GatedChatModel(reply="ok")
+    chat = _Chat(database, ServerGate(notice_after=0.05), model)
+    one = await chat.manager.send(await chat.manager.create(None), "first")
+    await _until(_started(model))
+    two = await chat.manager.send(await chat.manager.create(None), "second")
+
+    async def told() -> bool:
+        return await _waiting_events(chat, two) == [True]
+
+    await _until(told)
+    assert await _waiting_events(chat, one) == []
+    model.release.set()
+    await chat.finished(one)
+    await chat.finished(two)
+    # message.completed drops the live rows
+    assert await _waiting_events(chat, two) == []
+
+
+async def test_a_call_that_gets_the_gate_at_once_sends_no_notice() -> None:
+    told = list[bool]()
+    gate = ServerGate(notice_after=0.05)
+    async with gate.hold(A, "chat", told.append):
+        await asyncio.sleep(0.1)
+    assert told == []
+
+
+async def test_a_waiting_chat_call_is_told_once_and_cleared_when_it_gets_its_turn() -> None:
+    told, order = list[bool](), list[str]()
+    gate = ServerGate(notice_after=0.05)
+    first = _Probe(gate, A, "chat", order, "first")
+    await _settle()
+
+    async def second() -> None:
+        async with gate.hold(A, "chat", told.append):
+            order.append("second")
+
+    task = asyncio.create_task(second())
+    await asyncio.sleep(0.15)
+    assert told == [True]
+    first.leave.set()
+    await task
+    assert told == [True, False]
+
+
+async def test_a_short_wait_and_a_job_send_no_notice() -> None:
+    told, order = list[bool](), list[str]()
+    gate = ServerGate(notice_after=0.2)
+    first = _Probe(gate, A, "chat", order, "first")
+    await _settle()
+
+    async def waiter(priority: Priority) -> None:
+        async with gate.hold(A, priority, told.append):
+            pass
+
+    quick = asyncio.create_task(waiter("chat"))
+    await _settle()
+    first.leave.set()
+    await quick
+    assert told == []
+
+    second = _Probe(gate, A, "chat", order, "second")
+    await _settle()
+    job = asyncio.create_task(waiter("job"))
+    await asyncio.sleep(0.3)
+    second.leave.set()
+    await job
+    assert told == []
+
+
+async def test_a_waiter_cancelled_while_it_waits_leaves_no_notice_state() -> None:
+    told, order = list[bool](), list[str]()
+    gate = ServerGate(notice_after=0.2)
+    first = _Probe(gate, A, "chat", order, "first")
+    await _settle()
+
+    async def waiter() -> None:
+        async with gate.hold(A, "chat", told.append):
+            pass
+
+    task = asyncio.create_task(waiter())
+    await _settle()
+    task.cancel()
+    await asyncio.sleep(0.3)
+    assert told == [] and gate.waiting(A) == 0
+    first.leave.set()
+    await first.task
+
+
 def _started(model: GatedChatModel) -> Callable[[], Awaitable[bool]]:
     async def check() -> bool:
         return model.started.is_set()

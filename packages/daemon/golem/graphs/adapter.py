@@ -44,6 +44,14 @@ class ModelStarted:
 
 
 @dataclass(frozen=True, slots=True)
+class ModelWaiting:
+    """The call with this ``message_id`` waits, or stopped waiting, for the local model."""
+
+    message_id: str
+    waiting: bool
+
+
+@dataclass(frozen=True, slots=True)
 class ModelRequested:
     """The request of the model call with this ``message_id`` is about to be sent.
 
@@ -285,6 +293,7 @@ class CheckCompleted:
 
 Fact = (
     ModelStarted
+    | ModelWaiting
     | ModelRequested
     | ModelResponded
     | ContextChanged
@@ -767,6 +776,8 @@ def _custom(data: object) -> Fact | None:
     call_id = item.get("call_id")
     if kind == "model.started" and isinstance(message_id, str):
         return ModelStarted(message_id)
+    if kind == "model.waiting" and isinstance(message_id, str):
+        return ModelWaiting(message_id, item.get("waiting") is True)
     if kind == "model.request" and isinstance(message_id, str):
         return _request(message_id, item)
     if kind == "model.response" and isinstance(message_id, str):
@@ -986,6 +997,7 @@ __all__ = [
     "ModelRequested",
     "ModelResponded",
     "ModelStarted",
+    "ModelWaiting",
     "PinRead",
     "PinSkipped",
     "PlainMessage",

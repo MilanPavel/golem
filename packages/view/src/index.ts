@@ -25,6 +25,7 @@ export {
   SHUTDOWN_NOTICE,
   skippedNotice,
   SWITCH_HINT,
+  WAITING_FOR_LOCAL_MODEL,
   thinkingLine,
   type ApprovalAnswer,
   type ChatMessage,

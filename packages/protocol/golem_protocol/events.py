@@ -431,6 +431,19 @@ class ToolWritingData(BaseModel):
     chars: int = Field(ge=0)
 
 
+class ModelWaitingData(BaseModel):
+    """A chat call waits, or no longer waits, for its turn on a local model server.
+
+    Sent for the reply ``message_id`` only, so other sessions never show it. Stored only
+    until its message completes.
+    """
+
+    model_config = _CONFIG
+
+    message_id: str = Field(min_length=1)
+    waiting: bool
+
+
 class PromptSectionInfo(BaseModel):
     """One non-empty section of the system prompt sent with a model call.
 
@@ -1090,6 +1103,19 @@ class ToolWritingEvent(BaseModel):
     data: ToolWritingData
 
 
+class ModelWaitingEvent(BaseModel):
+    """A chat call waits for the local model. A live signal: ``message.completed`` replaces it."""
+
+    model_config = _CONFIG
+
+    seq: int = Field(ge=1)
+    session_id: str = Field(min_length=1)
+    run_id: str = Field(min_length=1)
+    ts: str = Field(min_length=1)
+    type: Literal["model.waiting"]
+    data: ModelWaitingData
+
+
 class ToolCompletedEvent(BaseModel):
     """The tool call finished, and its result went back to the model."""
 
@@ -1237,6 +1263,7 @@ EventType = Literal[
     "run.cancelled",
     "tool.requested",
     "tool.writing",
+    "model.waiting",
     "tool.started",
     "tool.output",
     "tool.completed",
@@ -1278,6 +1305,7 @@ ChatEvent = Annotated[
     | RunCancelledEvent
     | ToolRequestedEvent
     | ToolWritingEvent
+    | ModelWaitingEvent
     | ToolStartedEvent
     | ToolOutputEvent
     | ToolCompletedEvent
@@ -1341,6 +1369,8 @@ __all__ = [
     "ModelRoutedEvent",
     "ModelSelectedData",
     "ModelSelectedEvent",
+    "ModelWaitingData",
+    "ModelWaitingEvent",
     "PermissionMode",
     "Ping",
     "PromptSectionInfo",
