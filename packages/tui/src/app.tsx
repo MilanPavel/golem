@@ -3274,6 +3274,7 @@ export function App({
           status: kind === "pull" ? "not_installed" : "ready",
           size_gb: probe.size_gb ?? null,
           fit: probe.fit ?? null,
+          tier: "local",
         });
         const next = openPicker(currentModelRef(), false, { ...confirm, use: false });
         pickerRef.current = next;
