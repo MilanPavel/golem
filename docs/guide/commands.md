@@ -135,6 +135,7 @@ The status line shows the options that differ from the model's default, such as 
 
 | Command | What it does |
 |---|---|
+| `/changes` | Review the files this session changed. In the terminal: the files on the left, the diff on the right, `n` and `p` jump by hunk. In the web UI it opens the Changes tab |
 | `/todos` | Show or hide the agent's todo list above the composer |
 | `/context` | See how full the model's context is, and what fills it. In the web UI it opens the trace |
 | `/time` | Show or hide the time beside each message |
