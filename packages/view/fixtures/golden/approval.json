@@ -55,6 +55,7 @@
       "data": {
         "cleared_ids": [],
         "context_window": null,
+        "estimated_tokens": 2754,
         "index": 1,
         "message_bytes": [
           10
@@ -216,6 +217,7 @@
       "data": {
         "cleared_ids": [],
         "context_window": null,
+        "estimated_tokens": 2794,
         "index": 1,
         "message_bytes": [
           10,
@@ -358,6 +360,7 @@
       "data": {
         "cleared_ids": [],
         "context_window": null,
+        "estimated_tokens": 2754,
         "index": 1,
         "message_bytes": [
           10
@@ -519,6 +522,7 @@
       "data": {
         "cleared_ids": [],
         "context_window": null,
+        "estimated_tokens": 2794,
         "index": 1,
         "message_bytes": [
           10,

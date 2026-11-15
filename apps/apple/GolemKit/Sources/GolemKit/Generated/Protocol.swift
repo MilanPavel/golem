@@ -619,6 +619,103 @@ public struct FileElement: Codable {
     }
 }
 
+/// ``changes.revert``. Put back what a change, a file, a hunk or a turn wrote.
+///
+/// Without ``force``, a file that changed on disk since golem wrote it is left alone
+/// and listed as a conflict. Refused while the session has a run.
+// MARK: - ChangesRevertParams
+public struct ChangesRevertParams: Codable {
+    public let force: Bool?
+    public let sessionID: String
+    public let target: TargetClass
+
+    public enum CodingKeys: String, CodingKey {
+        case force = "force"
+        case sessionID = "session_id"
+        case target = "target"
+    }
+
+    public init(force: Bool?, sessionID: String, target: TargetClass) {
+        self.force = force
+        self.sessionID = sessionID
+        self.target = target
+    }
+}
+
+/// What ``changes.revert`` takes back. Each kind needs its own field and no other.
+///
+/// ``change`` needs ``change_id``, ``file`` needs ``path``, ``hunk`` needs ``path`` and
+/// ``hunk`` (0-based, of the file's net diff), and ``run`` needs ``run_id``.
+// MARK: - TargetClass
+public struct TargetClass: Codable {
+    public let changeID: String?
+    public let hunk: Int?
+    public let kind: TargetKind
+    public let path: String?
+    public let runID: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case changeID = "change_id"
+        case hunk = "hunk"
+        case kind = "kind"
+        case path = "path"
+        case runID = "run_id"
+    }
+
+    public init(changeID: String?, hunk: Int?, kind: TargetKind, path: String?, runID: String?) {
+        self.changeID = changeID
+        self.hunk = hunk
+        self.kind = kind
+        self.path = path
+        self.runID = runID
+    }
+}
+
+public enum TargetKind: String, Codable {
+    case change = "change"
+    case file = "file"
+    case hunk = "hunk"
+    case run = "run"
+}
+
+/// The paths written, and the paths left alone. Each write is a change of its own.
+// MARK: - ChangesRevertResult
+public struct ChangesRevertResult: Codable {
+    public let conflicts: [ConflictElement]
+    public let reverted: [String]
+
+    public enum CodingKeys: String, CodingKey {
+        case conflicts = "conflicts"
+        case reverted = "reverted"
+    }
+
+    public init(conflicts: [ConflictElement], reverted: [String]) {
+        self.conflicts = conflicts
+        self.reverted = reverted
+    }
+}
+
+/// A file a revert did not touch.
+// MARK: - ConflictElement
+public struct ConflictElement: Codable {
+    public let path: String
+    public let reason: ConflictReason
+
+    public enum CodingKeys: String, CodingKey {
+        case path = "path"
+        case reason = "reason"
+    }
+
+    public init(path: String, reason: ConflictReason) {
+        self.path = path
+        self.reason = reason
+    }
+}
+
+public enum ConflictReason: String, Codable {
+    case changedOnDisk = "changed_on_disk"
+}
+
 /// A check ended. ``exit_code`` is null when it timed out.
 ///
 /// ``output`` is the last 4,000 characters. When there was more, the whole
@@ -1794,10 +1891,12 @@ public enum FileChangedDataSource: String, Codable {
 }
 
 /// A file in the session folder changed. Sent before the ``tool.completed`` of its call.
+///
+/// ``run_id`` is null for an undo, which is made between runs.
 // MARK: - FileChangedEvent
 public struct FileChangedEvent: Codable {
     public let data: FileChangedEventData
-    public let runID: String
+    public let runID: String?
     public let seq: Int
     public let sessionID: String
     public let ts: String
@@ -1812,7 +1911,7 @@ public struct FileChangedEvent: Codable {
         case type = "type"
     }
 
-    public init(data: FileChangedEventData, runID: String, seq: Int, sessionID: String, ts: String, type: FileChangedEventType) {
+    public init(data: FileChangedEventData, runID: String?, seq: Int, sessionID: String, ts: String, type: FileChangedEventType) {
         self.data = data
         self.runID = runID
         self.seq = seq
@@ -5904,6 +6003,7 @@ public enum ModelCallCompletedEventType: String, Codable {
 public struct ModelCallStartedData: Codable {
     public let clearedIDS: [String]?
     public let contextWindow: Int?
+    public let estimatedTokens: Int?
     public let index: Int
     public let messageBytes: [Int]?
     public let messageChars: [Int]?
@@ -5928,6 +6028,7 @@ public struct ModelCallStartedData: Codable {
     public enum CodingKeys: String, CodingKey {
         case clearedIDS = "cleared_ids"
         case contextWindow = "context_window"
+        case estimatedTokens = "estimated_tokens"
         case index = "index"
         case messageBytes = "message_bytes"
         case messageChars = "message_chars"
@@ -5950,9 +6051,10 @@ public struct ModelCallStartedData: Codable {
         case windowPlanned = "window_planned"
     }
 
-    public init(clearedIDS: [String]?, contextWindow: Int?, index: Int, messageBytes: [Int]?, messageChars: [Int]?, messageID: String, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String, provider: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [PurplePromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?) {
+    public init(clearedIDS: [String]?, contextWindow: Int?, estimatedTokens: Int?, index: Int, messageBytes: [Int]?, messageChars: [Int]?, messageID: String, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String, provider: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [PurplePromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?) {
         self.clearedIDS = clearedIDS
         self.contextWindow = contextWindow
+        self.estimatedTokens = estimatedTokens
         self.index = index
         self.messageBytes = messageBytes
         self.messageChars = messageChars
@@ -6057,6 +6159,7 @@ public struct ModelCallStartedEvent: Codable {
 public struct ModelCallStartedEventData: Codable {
     public let clearedIDS: [String]?
     public let contextWindow: Int?
+    public let estimatedTokens: Int?
     public let index: Int
     public let messageBytes: [Int]?
     public let messageChars: [Int]?
@@ -6081,6 +6184,7 @@ public struct ModelCallStartedEventData: Codable {
     public enum CodingKeys: String, CodingKey {
         case clearedIDS = "cleared_ids"
         case contextWindow = "context_window"
+        case estimatedTokens = "estimated_tokens"
         case index = "index"
         case messageBytes = "message_bytes"
         case messageChars = "message_chars"
@@ -6103,9 +6207,10 @@ public struct ModelCallStartedEventData: Codable {
         case windowPlanned = "window_planned"
     }
 
-    public init(clearedIDS: [String]?, contextWindow: Int?, index: Int, messageBytes: [Int]?, messageChars: [Int]?, messageID: String, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String, provider: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [FluffyPromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?) {
+    public init(clearedIDS: [String]?, contextWindow: Int?, estimatedTokens: Int?, index: Int, messageBytes: [Int]?, messageChars: [Int]?, messageID: String, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String, provider: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [FluffyPromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?) {
         self.clearedIDS = clearedIDS
         self.contextWindow = contextWindow
+        self.estimatedTokens = estimatedTokens
         self.index = index
         self.messageBytes = messageBytes
         self.messageChars = messageChars
@@ -8038,6 +8143,52 @@ public struct PromptSectionInfo: Codable {
     }
 }
 
+/// A file a revert did not touch.
+// MARK: - RevertConflict
+public struct RevertConflict: Codable {
+    public let path: String
+    public let reason: ConflictReason
+
+    public enum CodingKeys: String, CodingKey {
+        case path = "path"
+        case reason = "reason"
+    }
+
+    public init(path: String, reason: ConflictReason) {
+        self.path = path
+        self.reason = reason
+    }
+}
+
+/// What ``changes.revert`` takes back. Each kind needs its own field and no other.
+///
+/// ``change`` needs ``change_id``, ``file`` needs ``path``, ``hunk`` needs ``path`` and
+/// ``hunk`` (0-based, of the file's net diff), and ``run`` needs ``run_id``.
+// MARK: - RevertTarget
+public struct RevertTarget: Codable {
+    public let changeID: String?
+    public let hunk: Int?
+    public let kind: TargetKind
+    public let path: String?
+    public let runID: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case changeID = "change_id"
+        case hunk = "hunk"
+        case kind = "kind"
+        case path = "path"
+        case runID = "run_id"
+    }
+
+    public init(changeID: String?, hunk: Int?, kind: TargetKind, path: String?, runID: String?) {
+        self.changeID = changeID
+        self.hunk = hunk
+        self.kind = kind
+        self.path = path
+        self.runID = runID
+    }
+}
+
 /// Server → every connection: a routine was added, changed or removed. Not stored.
 // MARK: - RoutineChangedNotification
 public struct RoutineChangedNotification: Codable {
@@ -9255,6 +9406,8 @@ public enum RPCNotificationMethod: String, Codable {
 ///
 /// A file in the session folder changed. Sent before the ``tool.completed`` of its call.
 ///
+/// ``run_id`` is null for an undo, which is made between runs.
+///
 /// A skill became active.
 ///
 /// An invoked skill's event comes just before the user message that invoked
@@ -9442,7 +9595,8 @@ public struct Params: Codable {
 /// model's server did not answer. ``not_installed``: the model needs a local
 /// server that is not installed, such as Ollama. ``provider`` is the provider
 /// whose server it was, and ``hint`` says how to fix it, such as
-/// ``run ollama serve``.
+/// ``run ollama serve``. ``context_full``: the prompt does not fit the model's window,
+/// even after clearing and summarising, and nothing was sent.
 ///
 /// Who stopped the run. ``user`` is ``run.cancel``, ``shutdown`` the daemon stopping.
 ///
@@ -9576,6 +9730,7 @@ public struct ParamsData: Codable {
     public let thinkingMS: Int?
     public let clearedIDS: [String]?
     public let contextWindow: Int?
+    public let estimatedTokens: Int?
     public let index: Int?
     public let messageBytes: [Int]?
     public let messageChars: [Int]?
@@ -9675,6 +9830,7 @@ public struct ParamsData: Codable {
         case thinkingMS = "thinking_ms"
         case clearedIDS = "cleared_ids"
         case contextWindow = "context_window"
+        case estimatedTokens = "estimated_tokens"
         case index = "index"
         case messageBytes = "message_bytes"
         case messageChars = "message_chars"
@@ -9743,7 +9899,7 @@ public struct ParamsData: Codable {
         case output = "output"
     }
 
-    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, route: Route?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: PurpleReason?, detail: String?, model: String?, provider: String?, rejected: [FluffyModelRejection]?, tier: Tier?, options: [String: Option]?, mode: Mode?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, numCtx: Int?, profile: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, chars: Int?, lines: Int?, path: String?, waiting: Bool?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, todos: [PurpleTodo]?, added: Int?, changeID: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?) {
+    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, route: Route?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: PurpleReason?, detail: String?, model: String?, provider: String?, rejected: [FluffyModelRejection]?, tier: Tier?, options: [String: Option]?, mode: Mode?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, estimatedTokens: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, numCtx: Int?, profile: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, chars: Int?, lines: Int?, path: String?, waiting: Bool?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, todos: [PurpleTodo]?, added: Int?, changeID: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?) {
         self.cwd = cwd
         self.forkedFrom = forkedFrom
         self.modelName = modelName
@@ -9775,6 +9931,7 @@ public struct ParamsData: Codable {
         self.thinkingMS = thinkingMS
         self.clearedIDS = clearedIDS
         self.contextWindow = contextWindow
+        self.estimatedTokens = estimatedTokens
         self.index = index
         self.messageBytes = messageBytes
         self.messageChars = messageChars
@@ -9879,6 +10036,7 @@ public struct FluffyCheckInfo: Codable {
 }
 
 public enum Code: String, Codable {
+    case contextFull = "context_full"
     case modelUnreachable = "model_unreachable"
     case notInstalled = "not_installed"
 }
@@ -10322,7 +10480,8 @@ public enum RunCompletedEventType: String, Codable {
 /// model's server did not answer. ``not_installed``: the model needs a local
 /// server that is not installed, such as Ollama. ``provider`` is the provider
 /// whose server it was, and ``hint`` says how to fix it, such as
-/// ``run ollama serve``.
+/// ``run ollama serve``. ``context_full``: the prompt does not fit the model's window,
+/// even after clearing and summarising, and nothing was sent.
 // MARK: - RunFailedData
 public struct RunFailedData: Codable {
     public let code: Code?
@@ -10380,7 +10539,8 @@ public struct RunFailedEvent: Codable {
 /// model's server did not answer. ``not_installed``: the model needs a local
 /// server that is not installed, such as Ollama. ``provider`` is the provider
 /// whose server it was, and ``hint`` says how to fix it, such as
-/// ``run ollama serve``.
+/// ``run ollama serve``. ``context_full``: the prompt does not fit the model's window,
+/// even after clearing and summarising, and nothing was sent.
 // MARK: - RunFailedEventData
 public struct RunFailedEventData: Codable {
     public let code: Code?

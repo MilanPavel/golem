@@ -67,7 +67,8 @@ class ModelRequested:
     The size fields are the characters and UTF-8 bytes of what was sent, or None
     when not given. ``profile`` is the profile this call uses, or None when not given.
     ``cleared_ids`` are the tool results sent as a one-line stub. ``summary_chars`` is the
-    length of the summary sent as the first message, or None.
+    length of the summary sent as the first message, or None. ``estimated_tokens`` is the
+    prompt as golem estimated it before sending, or None.
     """
 
     message_id: str
@@ -88,6 +89,7 @@ class ModelRequested:
     profile: str | None = None
     cleared_ids: tuple[str, ...] = ()
     summary_chars: int | None = None
+    estimated_tokens: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -930,6 +932,7 @@ def _request(message_id: str, item: Mapping[str, object]) -> ModelRequested:
         if isinstance(cleared := item.get("cleared_ids"), list)
         else (),
         _count(item.get("summary_chars")),
+        _count(item.get("estimated_tokens")),
     )
 
 

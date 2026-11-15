@@ -187,13 +187,14 @@ class RunFailedData(BaseModel):
     model's server did not answer. ``not_installed``: the model needs a local
     server that is not installed, such as Ollama. ``provider`` is the provider
     whose server it was, and ``hint`` says how to fix it, such as
-    ``run ollama serve``.
+    ``run ollama serve``. ``context_full``: the prompt does not fit the model's window,
+    even after clearing and summarising, and nothing was sent.
     """
 
     model_config = _CONFIG
 
     message: str = Field(min_length=1)
-    code: Literal["model_unreachable", "not_installed"] | None = None
+    code: Literal["model_unreachable", "not_installed", "context_full"] | None = None
     provider: str | None = Field(default=None, min_length=1)
     hint: str | None = Field(default=None, min_length=1)
 
@@ -513,6 +514,9 @@ class ModelCallStartedData(BaseModel):
     """Tool results sent as a one-line stub on this call."""
     summary_chars: int | None = Field(default=None, ge=0)
     """The length of the summary of old turns sent as the first message. None when none was."""
+    estimated_tokens: int | None = Field(default=None, ge=0)
+    """What golem estimated the prompt at, in tokens, before sending it. None when the window
+    was unknown or on an older event."""
 
 
 class ContextChangedData(BaseModel):
@@ -1169,13 +1173,16 @@ class ApprovalResolvedEvent(BaseModel):
 
 
 class FileChangedEvent(BaseModel):
-    """A file in the session folder changed. Sent before the ``tool.completed`` of its call."""
+    """A file in the session folder changed. Sent before the ``tool.completed`` of its call.
+
+    ``run_id`` is null for an undo, which is made between runs.
+    """
 
     model_config = _CONFIG
 
     seq: int = Field(ge=1)
     session_id: str = Field(min_length=1)
-    run_id: str = Field(min_length=1)
+    run_id: str | None = Field(min_length=1)
     ts: str = Field(min_length=1)
     type: Literal["file.changed"]
     data: FileChangedData

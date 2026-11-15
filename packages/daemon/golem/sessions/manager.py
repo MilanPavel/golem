@@ -13,7 +13,8 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from collections.abc import Callable, Coroutine, Iterable, Mapping, Sequence
+from collections.abc import AsyncGenerator, Callable, Coroutine, Iterable, Mapping, Sequence
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import cast
@@ -59,6 +60,7 @@ from golem_protocol.events import (
     ApprovalDecision,
     ChatEvent,
     EmptyEventData,
+    FileChangedData,
     ForkedFrom,
     MessageCompletedEvent,
     ModelOptionsChangedData,
@@ -552,6 +554,25 @@ class SessionManager:
         """
         async with self._lock:
             return (await self._resolve(session_id)).cwd
+
+    @asynccontextmanager
+    async def idle(self, session_id: str) -> AsyncGenerator[str | None]:
+        """Keep the session without a run while the block runs. Yields its folder.
+
+        Raises :class:`SessionNotFoundError`, :class:`SchemaMismatchError`, or
+        :class:`SessionBusyError` when a run is active or waits on an approval.
+        """
+        async with self._lock:
+            session = await self._resolve(session_id)
+            if session.task is not None and not session.task.done():
+                raise SessionBusyError(session_id)
+            if await self._run_records.waiting(session_id) is not None:
+                raise SessionBusyError(session_id)
+            yield session.cwd
+
+    async def announce_change(self, session_id: str, data: FileChangedData) -> None:
+        """Tell the session's screens about a change made between runs."""
+        await self._events.emit(session_id, None, "file.changed", data)
 
     async def model_profile(self, session_id: str) -> str:
         """The profile or ref the session runs on.

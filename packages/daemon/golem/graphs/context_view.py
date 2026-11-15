@@ -144,7 +144,7 @@ DEFAULT_RATIO = 0.25
 MIN_RATIO, MAX_RATIO = 0.15, 0.6
 
 
-def _sent_chars(message: BaseMessage) -> int:
+def sent_chars(message: BaseMessage) -> int:
     """Characters of a message as a call sends it: its text and a reply's tool calls."""
     size = len(message_text(message))
     if isinstance(message, AIMessage) and message.tool_calls:
@@ -153,13 +153,17 @@ def _sent_chars(message: BaseMessage) -> int:
 
 
 def used_tokens(
-    messages: Sequence[BaseMessage], system_chars: int, tools_chars: int
+    messages: Sequence[BaseMessage],
+    system_chars: int,
+    tools_chars: int,
+    learned: float | None = None,
 ) -> tuple[int, float]:
     """Tokens the next call would send, and the tokens-per-character ratio used.
 
     The newest reply with a provider token count anchors it: that count is the
     size of the call that made the reply, and what came after is added by the
-    ratio the count implies. Without such a reply every character counts 0.25.
+    ratio the count implies. Without such a reply every character counts 0.25. A ``learned``
+    ratio, the one the model showed on its latest calls, replaces both.
     """
     for i in range(len(messages) - 1, -1, -1):
         message = messages[i]
@@ -167,12 +171,14 @@ def used_tokens(
         tokens = usage.get("input_tokens") if usage else None
         if not tokens:
             continue
-        before = system_chars + tools_chars + sum(_sent_chars(m) for m in messages[:i])
+        before = system_chars + tools_chars + sum(sent_chars(m) for m in messages[:i])
         ratio = min(MAX_RATIO, max(MIN_RATIO, tokens / before)) if before > 0 else DEFAULT_RATIO
-        added = sum(_sent_chars(m) for m in messages[i:])
+        ratio = ratio if learned is None else learned
+        added = sum(sent_chars(m) for m in messages[i:])
         return round(tokens + added * ratio), ratio
-    total = system_chars + tools_chars + sum(_sent_chars(m) for m in messages)
-    return round(total * DEFAULT_RATIO), DEFAULT_RATIO
+    total = system_chars + tools_chars + sum(sent_chars(m) for m in messages)
+    ratio = DEFAULT_RATIO if learned is None else learned
+    return round(total * ratio), ratio
 
 
 def _saved_chars(message: BaseMessage) -> int:
@@ -249,3 +255,28 @@ def plan_summary(
     if end <= start or not messages[end].id:
         return None
     return start, end
+
+
+def plan_stub_newest(
+    messages: Sequence[BaseMessage], ctx: ContextView | None
+) -> ContextView | None:
+    """A view that stubs every long tool result but the last tool call's, or None.
+
+    The results of the last tool call stay in full, so the model sees what it asked for last.
+    ``cleared_before`` only moves forward, and None means no result is left to stub.
+    """
+    last = next(
+        (i for i in range(len(messages) - 1, -1, -1) if isinstance(messages[i], ToolMessage)), None
+    )
+    if last is None:
+        return None
+    first = last
+    while first > 0 and isinstance(messages[first - 1], ToolMessage):
+        first -= 1
+    current = ctx or ContextView()
+    start = _summary_start(messages, current) or 0
+    before = _find(messages, current.get("cleared_before")) or 0
+    if not any(_clearable(messages[i]) for i in range(max(start, before), first)):
+        return None
+    after = messages[first].id
+    return {**current, "cleared_before": after} if after else None

@@ -6,6 +6,7 @@ export const BROWSER_METHODS: ReadonlySet<string> = new Set([
   "auth.list",
   "changes.diff",
   "changes.list",
+  "changes.revert",
   "config.get",
   "config.raw.get",
   "config.raw.set",

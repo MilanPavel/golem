@@ -787,15 +787,22 @@
     },
     "FileChangedEvent": {
       "additionalProperties": false,
-      "description": "A file in the session folder changed. Sent before the ``tool.completed`` of its call.",
+      "description": "A file in the session folder changed. Sent before the ``tool.completed`` of its call.\n\n``run_id`` is null for an undo, which is made between runs.",
       "properties": {
         "data": {
           "$ref": "#/$defs/FileChangedData"
         },
         "run_id": {
-          "minLength": 1,
-          "title": "Run Id",
-          "type": "string"
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Run Id"
         },
         "seq": {
           "minimum": 1,
@@ -1384,6 +1391,19 @@
           ],
           "default": null,
           "title": "Context Window"
+        },
+        "estimated_tokens": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Estimated Tokens"
         },
         "index": {
           "minimum": 1,
@@ -2168,14 +2188,15 @@
     },
     "RunFailedData": {
       "additionalProperties": false,
-      "description": "Why a run stopped. No traceback.\n\n``code`` names a failure a client can act on. ``model_unreachable``: the\nmodel's server did not answer. ``not_installed``: the model needs a local\nserver that is not installed, such as Ollama. ``provider`` is the provider\nwhose server it was, and ``hint`` says how to fix it, such as\n``run ollama serve``.",
+      "description": "Why a run stopped. No traceback.\n\n``code`` names a failure a client can act on. ``model_unreachable``: the\nmodel's server did not answer. ``not_installed``: the model needs a local\nserver that is not installed, such as Ollama. ``provider`` is the provider\nwhose server it was, and ``hint`` says how to fix it, such as\n``run ollama serve``. ``context_full``: the prompt does not fit the model's window,\neven after clearing and summarising, and nothing was sent.",
       "properties": {
         "code": {
           "anyOf": [
             {
               "enum": [
                 "model_unreachable",
-                "not_installed"
+                "not_installed",
+                "context_full"
               ],
               "type": "string"
             },
