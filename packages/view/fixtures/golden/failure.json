@@ -92,8 +92,11 @@
         "failed": true,
         "first_token_ms": null,
         "latency_ms": 0,
+        "load_ms": null,
         "message_id": "id-4",
         "price": null,
+        "prompt_ms": null,
+        "reply_ms": null,
         "stop_reason": null,
         "text_tool_calls": null,
         "usage": null
@@ -211,8 +214,11 @@
         "failed": true,
         "first_token_ms": null,
         "latency_ms": 0,
+        "load_ms": null,
         "message_id": "id-4",
         "price": null,
+        "prompt_ms": null,
+        "reply_ms": null,
         "stop_reason": null,
         "text_tool_calls": null,
         "usage": null

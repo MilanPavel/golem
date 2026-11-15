@@ -152,6 +152,8 @@ class ChatRuntime:
         """The price of a profile's model, or None when unknown. No I/O."""
         self.tier_of = tier_of
         """The tier of a profile's model, or None when the profile does not resolve. No I/O."""
+        self.note_speed: Callable[..., object] | None = None
+        """Told the profile and server timings of each finished call, for the speed book."""
         self.enable_mcp: EnableMcp | None = None
         """Turns on an on-demand MCP server for a session, for the model's ``mcp_enable``."""
         self.skills: SkillRegistry | None = None
@@ -513,6 +515,10 @@ def open_chat(
         }
         if text_tool_calls is not None:
             response_item["text_tool_calls"] = text_tool_calls
+        # Only Ollama sends these numbers, so a hosted reply has none.
+        timings = _timings(response)
+        if timings:
+            response_item["timings"] = timings
         get_stream_writer()(response_item)
         return {"messages": [response.model_copy(update=update)]}
 
@@ -551,6 +557,25 @@ def open_chat(
         )
     )
     return runtime[0]
+
+
+def _timings(message: AIMessage) -> dict[str, int]:
+    """The server's own numbers of a call, from Ollama's last chunk. Durations become ms."""
+    meta = message.response_metadata
+    found: dict[str, int] = {}
+    for key, name in (
+        ("load_duration", "load_ms"),
+        ("prompt_eval_duration", "prompt_ms"),
+        ("eval_duration", "reply_ms"),
+    ):
+        value = meta.get(key)
+        if isinstance(value, int | float) and not isinstance(value, bool) and value >= 0:
+            found[name] = round(value / 1_000_000)
+    for key, name in (("prompt_eval_count", "prompt_tokens"), ("eval_count", "reply_tokens")):
+        value = meta.get(key)
+        if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+            found[name] = value
+    return found
 
 
 def _without_thinking(messages: Sequence[BaseMessage]) -> list[BaseMessage]:

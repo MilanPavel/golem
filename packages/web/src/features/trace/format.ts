@@ -139,9 +139,26 @@ export function tokenCell(span: TraceNode): TokenCell | null {
   };
 }
 
-/** Tokens per second the model wrote after its first token, or null when it cannot be told. */
+/** The reply time the model server reported, in ms, or null (a server that does not say). */
+function replyMs(span: TraceSpan): number | null {
+  const ms = "reply_ms" in span ? span.reply_ms : null;
+  return typeof ms === "number" && ms > 0 ? ms : null;
+}
+
+/** True when `throughput` rests on the model server's own reply time, not an estimate. */
+export function throughputIsExact(span: TraceSpan): boolean {
+  const output = span.tokens?.output;
+  return replyMs(span) !== null && typeof output === "number" && output > 0;
+}
+
+/**
+ * Tokens per second the model wrote, or null when it cannot be told. With the server's own reply
+ * time it is exact. Else it is an estimate from the time after the first token.
+ */
 export function throughput(span: TraceSpan): number | null {
   const output = span.tokens?.output;
+  const exact = replyMs(span);
+  if (exact !== null && typeof output === "number" && output > 0) return Math.round(output / (exact / 1000));
   const first = span.first_token_ms;
   const total = span.duration_ms;
   if (output === null || output === undefined || output === 0) return null;

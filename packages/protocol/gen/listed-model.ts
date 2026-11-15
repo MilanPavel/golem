@@ -15,6 +15,9 @@ export type RecommendedFor = ('general' | 'coding' | 'reasoning' | 'vision' | 'f
 export type Ref = string;
 export type SizeGb = number | null;
 export type Source = 'installed' | 'catalog' | 'remote' | 'profile';
+export type PromptTps = number | null;
+export type ReplyTps = number | null;
+export type Samples = number;
 export type Stale = boolean;
 export type Status = 'ready' | 'needs_key' | 'not_installed' | 'server_down' | 'pulling';
 export type Tags = string[];
@@ -42,7 +45,7 @@ export type Tools = boolean | null;
  * ``tier`` is ``local`` for Ollama, ``budget`` for a hosted model whose blended price is at
  * or below ``[routing] budget_max_price``, and ``frontier`` otherwise.
  * ``stale`` means a cached list was shown because the provider did not
- * answer in time.
+ * answer in time. ``speed`` is set for a local model golem has timed.
  */
 export interface ListedModel {
   categories?: Categories;
@@ -58,6 +61,7 @@ export interface ListedModel {
   ref: Ref;
   size_gb?: SizeGb;
   source: Source;
+  speed?: ModelSpeedInfo | null;
   stale?: Stale;
   status: Status;
   tags?: Tags;
@@ -75,4 +79,17 @@ export interface ModelPriceInfo {
   cached_input?: CachedInput;
   input: Input;
   output: Output;
+}
+/**
+ * Typical speed of a local model: the median of its recent calls.
+ *
+ * From the model server's own clock. ``samples`` is how many calls it rests on.
+ *
+ * This interface was referenced by `ListedModel`'s JSON-Schema
+ * via the `definition` "ModelSpeedInfo".
+ */
+export interface ModelSpeedInfo {
+  prompt_tps?: PromptTps;
+  reply_tps?: ReplyTps;
+  samples: Samples;
 }

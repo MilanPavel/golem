@@ -28,13 +28,16 @@ export type End1 = string | null;
 export type FirstTokenMs1 = number | null;
 export type Id1 = string;
 export type Kind1 = 'run' | 'model' | 'tool';
+export type LoadMs = number | null;
 export type Model1 = string | null;
 export type Name1 = string;
 export type NumCtx = number | null;
 export type Preview1 = string;
 export type PromptCut = ('no' | 'yes' | 'likely') | null;
 export type PromptCutKind = ('older_messages' | 'middle') | null;
+export type PromptMs = number | null;
 export type Recorded1 = boolean;
+export type ReplyMs = number | null;
 export type Start1 = string;
 export type Status1 = 'ok' | 'failed' | 'cancelled' | 'denied' | 'running';
 export type WindowPlanned = boolean;
@@ -51,6 +54,9 @@ export type WindowPlanned = boolean;
  *
  * ``cost_usd`` is what the call cost, as its ``model.call.completed`` recorded
  * it. Null when the price was not known or the call has no token counts.
+ *
+ * ``load_ms``, ``prompt_ms`` and ``reply_ms`` are from the model server's own clock.
+ * Ollama only.
  */
 export interface TraceModelSpan {
   approval_wait_ms?: ApprovalWaitMs;
@@ -65,13 +71,16 @@ export interface TraceModelSpan {
   first_token_ms?: FirstTokenMs1;
   id: Id1;
   kind: Kind1;
+  load_ms?: LoadMs;
   model?: Model1;
   name: Name1;
   num_ctx?: NumCtx;
   preview?: Preview1;
   prompt_cut?: PromptCut;
   prompt_cut_kind?: PromptCutKind;
+  prompt_ms?: PromptMs;
   recorded?: Recorded1;
+  reply_ms?: ReplyMs;
   start: Start1;
   status: Status1;
   tokens?: TraceTokens | null;

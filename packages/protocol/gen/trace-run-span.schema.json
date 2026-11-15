@@ -2,7 +2,7 @@
   "$defs": {
     "TraceModelSpan": {
       "additionalProperties": false,
-      "description": "A model call, with the tool calls it asked for, in request order.\n\n``prompt_cut`` says whether Ollama cut the prompt that did not fit: \"no\"\nand \"yes\" are proven from exact numbers, \"likely\" is an estimate, and null\nmeans golem cannot tell. ``prompt_cut_kind`` is set with \"yes\" and\n\"likely\". ``dropped_message_ids`` are the messages the model probably did\nnot see (older messages only), and ``dropped_tokens`` is an estimate of\ntheir size.\n\n``cost_usd`` is what the call cost, as its ``model.call.completed`` recorded\nit. Null when the price was not known or the call has no token counts.",
+      "description": "A model call, with the tool calls it asked for, in request order.\n\n``prompt_cut`` says whether Ollama cut the prompt that did not fit: \"no\"\nand \"yes\" are proven from exact numbers, \"likely\" is an estimate, and null\nmeans golem cannot tell. ``prompt_cut_kind`` is set with \"yes\" and\n\"likely\". ``dropped_message_ids`` are the messages the model probably did\nnot see (older messages only), and ``dropped_tokens`` is an estimate of\ntheir size.\n\n``cost_usd`` is what the call cost, as its ``model.call.completed`` recorded\nit. Null when the price was not known or the call has no token counts.\n\n``load_ms``, ``prompt_ms`` and ``reply_ms`` are from the model server's own clock.\nOllama only.",
       "properties": {
         "approval_wait_ms": {
           "anyOf": [
@@ -127,6 +127,19 @@
           "title": "Kind",
           "type": "string"
         },
+        "load_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Load Ms"
+        },
         "model": {
           "anyOf": [
             {
@@ -195,10 +208,36 @@
           "default": null,
           "title": "Prompt Cut Kind"
         },
+        "prompt_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Prompt Ms"
+        },
         "recorded": {
           "default": true,
           "title": "Recorded",
           "type": "boolean"
+        },
+        "reply_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reply Ms"
         },
         "start": {
           "minLength": 1,
