@@ -132,6 +132,12 @@ export function fakeClient() {
     changesRevert: vi.fn<PageClient["changesRevert"]>(async () => ({ reverted: [], conflicts: [] })),
     readFile: vi.fn<PageClient["readFile"]>(async (_id, path) => ({ path, text: "", truncated: false, lines: 0 })),
     listFiles: vi.fn<PageClient["listFiles"]>(async () => ({ paths: [], more: false })),
+    getCost: vi.fn<PageClient["getCost"]>(async () => ({
+      today: { calls: 0, input: 0, output: 0, cost_usd: 0, saved_usd: 0 },
+      week: { calls: 0, input: 0, output: 0, cost_usd: 0, saved_usd: 0 },
+      by_model: [],
+      by_day: [],
+    })),
     getTrace: vi.fn<PageClient["getTrace"]>(async (sessionId) => ({ session_id: sessionId, title: null, runs: [] })),
     listMcp: vi.fn<PageClient["listMcp"]>(async () => ({ servers: [] })),
     mcpTools: vi.fn<PageClient["mcpTools"]>(async (name) => ({ name, tools: [] })),

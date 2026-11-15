@@ -377,6 +377,11 @@ test("/context opens the context panel and takes no argument", () => {
   assert.equal(applyComposer(closedDebug, "/context x").kind, "unknown");
 });
 
+test("/cost opens the cost report and takes no argument", () => {
+  assert.deepEqual(applyComposer(closedDebug, "/cost"), { kind: "cost" });
+  assert.equal(applyComposer(closedDebug, "/cost x").kind, "unknown");
+});
+
 test("/tune opens the tune panel, is in the model group, and takes no argument", () => {
   assert.deepEqual(applyComposer(closedDebug, "/tune"), { kind: "tune" });
   assert.equal(applyComposer(closedDebug, "/tune x").kind, "unknown");

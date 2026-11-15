@@ -1,3 +1,5 @@
+import type { CostGetResult, CostTotals } from "@golem/client";
+
 import type { ChatMessage } from "./chat-state.ts";
 import { formatTokens } from "./context.ts";
 
@@ -53,4 +55,65 @@ export function turnFooterParts(totals: TurnTotals, modelPrefix = ""): string[] 
 export function sessionCostLabel(messages: readonly ChatMessage[]): string {
   const total = turnTotals(messages).costUsd;
   return total === null || !(total > 0) ? "" : formatCost(total);
+}
+
+/** `38.2K`, `1.4M`: a token count for a report. */
+export function formatCount(count: number): string {
+  return count >= 1_000_000 ? `${(count / 1_000_000).toFixed(1)}M` : formatTokens(count);
+}
+
+/** The model of a `provider/model` ref: what the saved line and tile name. */
+export function referenceName(ref: string): string {
+  const at = ref.indexOf("/");
+  return at < 0 ? ref : ref.slice(at + 1);
+}
+
+/** A table with its columns padded by spaces. The first column is left, the rest as `right` says. */
+function table(rows: string[][], right: readonly boolean[]): string[] {
+  const widths = rows[0]!.map((_, at) => Math.max(...rows.map((row) => row[at]!.length)));
+  return rows.map((row) =>
+    row
+      .map((cell, at) => (right[at] === true ? cell.padStart(widths[at]!) : cell.padEnd(widths[at]!)))
+      .join("  ")
+      .trimEnd(),
+  );
+}
+
+/**
+ * `/cost` and `golem cost` as plain lines: tokens and cost for the session (when the result has
+ * one), today and the week, the week by model, and what running locally saved.
+ */
+export function costReportLines(result: CostGetResult): string[] {
+  const totals = (label: string, span: CostTotals): string[] => [
+    label,
+    formatCount(span.input),
+    formatCount(span.output),
+    formatCost(span.cost_usd),
+  ];
+  const spans: string[][] = [["cost", "in", "out", "cost"]];
+  if (result.session != null) spans.push(totals("this session", result.session));
+  spans.push(totals("today", result.today), totals("this week", result.week));
+  const lines = table(spans, [false, true, true, true]);
+  const models = result.by_model ?? [];
+  if (models.length > 0) {
+    lines.push(
+      "",
+      "by model (7 days)",
+      ...table(
+        models.map((row) => [
+          row.model ?? "unknown",
+          row.tier ?? "-",
+          formatCount(row.input + row.output),
+          formatCost(row.cost_usd),
+        ]),
+        [false, false, true, true],
+      ),
+    );
+  }
+  const reference = result.saved_reference;
+  if (reference != null && reference !== "") {
+    const saved = formatCost(result.week.saved_usd);
+    lines.push("", `saved \u2248 ${saved} by running locally (against ${referenceName(reference)} prices)`);
+  }
+  return lines;
 }

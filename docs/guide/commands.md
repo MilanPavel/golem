@@ -38,6 +38,7 @@ golem has commands in two places: `golem …` in your shell, and `/…` inside t
 | `golem mcp remove <name>` | Removes the server from `config.toml`, stops it, and deletes its token |
 | `golem auth list` | Which providers have a key |
 | `golem models` | Every model you can use or download, with size, price, and context. `--refresh` asks the providers again |
+| `golem cost` | What model calls cost: tokens and money for today and the last 7 days, the week by model, and what running locally saved. Same report as `/cost`, without the session row |
 | `golem config edit [--project]` | Opens `config.toml` (or the project's) in `$EDITOR`, and saves it only when the daemon accepts it. If a setting needs a restart, it offers one |
 | `golem config show` | The settings and tool rules in effect for this folder. `--resolved` is accepted and prints the same |
 | `golem skills` | The skills this folder sees, and why one is not used. `golem skills list` is the same |
@@ -140,6 +141,7 @@ The line under an answer ends with the model, `local` for a model on your machin
 | `/changes` | Review the files this session changed. In the terminal: the files on the left, the diff on the right, `n` and `p` jump by hunk. In the web UI it opens the Changes tab |
 | `/todos` | Show or hide the agent's todo list above the composer |
 | `/context` | See how full the model's context is, and what fills it. In the web UI it opens the trace |
+| `/cost` | What model calls cost: this session, today, the week, the week by model, and what running locally saved. In the web UI it opens Settings → Usage |
 | `/time` | Show or hide the time beside each message |
 | `/thinking` | Show or hide the thinking line above each answer. It only changes what you see; the `think` setting in `/tune` is what the model is asked to do |
 | `/detail [quiet\|normal\|verbose]` | Web UI: how much of a turn's tool steps shows. Quiet is the step count, Normal a one-line summary you can open, Verbose opens every step with its arguments and output. Alone, it says the current level |

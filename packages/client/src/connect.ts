@@ -101,6 +101,7 @@ import type { SessionCloseResult } from "../../protocol/gen/session-close-result
 import type { SessionCreateResult } from "../../protocol/gen/session-create-result.ts";
 import type { SessionForkResult } from "../../protocol/gen/session-fork-result.ts";
 import type { SessionInspectResult } from "../../protocol/gen/session-inspect-result.ts";
+import type { CostGetResult } from "../../protocol/gen/cost-get-result.ts";
 import type { TraceGetResult } from "../../protocol/gen/trace-get-result.ts";
 import type { TraceSpanResult } from "../../protocol/gen/trace-span-result.ts";
 import type { SessionListResult, SessionSummary } from "../../protocol/gen/session-list-result.ts";
@@ -177,6 +178,7 @@ import {
   isSessionCreateResult,
   isSessionForkResult,
   isSessionInspectResult,
+  isCostGetResult,
   isTraceGetResult,
   isTraceSpanResult,
   isSessionListResult,
@@ -293,6 +295,8 @@ export interface GolemClient {
   cancelRun(runId: string): Promise<RunCancelResult>;
   inspectSession(sessionId: string): Promise<SessionInspectResult>;
   /** A session's runs as a tree: run, then model call, then tool call. Oldest run first. */
+  /** What model calls cost: today, the week, and with a session id that session. */
+  getCost(sessionId?: string): Promise<CostGetResult>;
   getTrace(sessionId: string): Promise<TraceGetResult>;
   /** The full input and output of one model or tool span, by the `id` that `getTrace` gave. */
   getTraceSpan(sessionId: string, spanId: string): Promise<TraceSpanResult>;
@@ -1256,6 +1260,14 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("session.inspect", { session_id: sessionId });
       if (!isSessionInspectResult(result)) {
         throw new Error("invalid session.inspect result");
+      }
+      return result;
+    },
+    async getCost(sessionId?: string): Promise<CostGetResult> {
+      await ready;
+      const result = await call("cost.get", sessionId === undefined ? {} : { session_id: sessionId });
+      if (!isCostGetResult(result)) {
+        throw new Error("invalid cost.get result");
       }
       return result;
     },

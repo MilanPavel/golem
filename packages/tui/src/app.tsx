@@ -152,6 +152,7 @@ import {
   startedTry,
   tryHeading,
   sessionCostLabel,
+  costReportLines,
   tryTitle,
   type TryRun,
 } from "@golem/view";
@@ -165,6 +166,7 @@ import {
   closedDebug,
   COMMANDS,
   contextSegments,
+  fitLine,
   helpLines,
   toggleDebugTab,
   withModelChoices,
@@ -515,9 +517,12 @@ export function App({
   const [modelMessages, setModelMessages] = useState<CheckpointMessage[]>([]);
   const [modelCount, setModelCount] = useState<number | null>(null);
   const [switcher, setSwitcher] = useState<SwitcherState>(closedSwitcher);
-  const [panel, setPanel] = useState<"help" | "context" | null>(null);
+  const [panel, setPanel] = useState<"help" | "context" | "cost" | null>(null);
   const [contextReport, setContextReport] = useState<ContextReport>({ kind: "loading" });
   const contextGen = useRef(0);
+  /** The lines of the `/cost` panel, or a line saying it is loading or failed. */
+  const [costText, setCostText] = useState<string[]>([]);
+  const costGen = useRef(0);
   /** The `/tune` panel, or null while it is closed. It takes the keys while it is open. */
   const [tune, setTune] = useState<TuneState | null>(null);
   const tuneRef = useRef(tune);
@@ -747,6 +752,8 @@ export function App({
       ? tuneLines(tune, columns)
       : panel === "help"
         ? helpLines(COMMANDS, columns)
+        : panel === "cost"
+          ? costText.map((line) => fitLine(line, columns))
         : panel === "context"
           ? contextSegmentRows.map((line) => line.map((segment) => segment.text).join(""))
           : [];
@@ -826,6 +833,7 @@ export function App({
       setLiveTitle(null);
       setPanel(null);
       contextGen.current += 1;
+      costGen.current += 1;
       showTune(null);
       setKeysOpen(false);
       historyCursorRef.current = null;
@@ -1586,6 +1594,25 @@ export function App({
     })();
   }
 
+  /** `/cost`: `cost.get` for this session, printed as the report. */
+  function loadCost(): void {
+    const gen = ++costGen.current;
+    const id = sessionRef.current;
+    if (connectionRef.current.status !== "connected") {
+      setCostText(["not connected"]);
+      return;
+    }
+    setCostText(["loading\u2026"]);
+    void (async () => {
+      try {
+        const result = await (id === null ? client.getCost() : client.getCost(id));
+        if (gen === costGen.current) setCostText(costReportLines(result));
+      } catch (error) {
+        if (gen === costGen.current) setCostText([messageOf(error)]);
+      }
+    })();
+  }
+
   function showTune(next: TuneState | null): void {
     tuneRef.current = next;
     setTune(next);
@@ -1796,6 +1823,15 @@ export function App({
       }
       setChat((current) => ({ ...current, notice: null }));
       loadTune(opening.model, opening.sessionId);
+      return;
+    }
+    if (outcome.kind === "cost") {
+      setDraft(draftAt(""));
+      setPanel("cost");
+      setKeysOpen(false);
+      setSwitcher(closedSwitcher);
+      setChat((current) => ({ ...current, notice: null }));
+      loadCost();
       return;
     }
     if (outcome.kind === "context") {

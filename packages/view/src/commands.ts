@@ -26,6 +26,7 @@ export type ComposerOutcome =
   | { kind: "unknown"; notice: string }
   | { kind: "help" }
   | { kind: "context" }
+  | { kind: "cost" }
   | { kind: "tune" }
   /** Set one option for this session, or with a null `value` remove its override. `notice` is what to print. */
   | { kind: "tune-set"; name: string; value: TuneValue | null; notice: string }
@@ -176,6 +177,13 @@ export const COMMANDS: readonly Command[] = [
     args: "",
     description: "Shows what fills the model's context: the prompt, the tools, and the messages.",
     run: withoutArgs({ kind: "context" }),
+  },
+  {
+    name: "/cost",
+    group: "view",
+    args: "",
+    description: "Shows what model calls cost, by session, day and model, and what running locally saved.",
+    run: withoutArgs({ kind: "cost" }),
   },
   {
     name: "/debug",

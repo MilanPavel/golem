@@ -12,7 +12,7 @@ import type { AppInstallSnapshot } from "./app-install.ts";
 import type { PageHostSnapshot } from "./page-host.ts";
 import type { PullsSnapshot } from "./pulls.ts";
 import type { Route } from "./router.ts";
-import type { AuthListResult, McpListResult, SessionSummary, SetupStatusResult, SkillListResult } from "@golem/client";
+import type { AuthListResult, CostGetResult, McpListResult, SessionSummary, SetupStatusResult, SkillListResult } from "@golem/client";
 import { ARTIFACT_PAGE, artifactKey, traceKey, traceSpanKey, type ArtifactReadResult, type TraceGetResult, type TraceSpanResult } from "./trace.ts";
 import { mcpCatalogKey, mcpListKey, mcpToolsKey, type McpCatalogResult, type McpToolsResult } from "./mcp.ts";
 import type { Pastes } from "@golem/view";
@@ -224,6 +224,12 @@ export function useSessionReader(id: string | null): () => { view: SessionView; 
 export function useKeys(enabled = true): UseQueryResult<AuthListResult> {
   const { queries } = usePage();
   return useQuery({ queryKey: [...KEYS_KEY], queryFn: queries.keys, enabled, staleTime: 0, refetchOnWindowFocus: true });
+}
+
+/** What model calls cost. Read again whenever Settings opens and the tab is seen: nothing pushes a change. */
+export function useCost(enabled = true): UseQueryResult<CostGetResult> {
+  const { queries } = usePage();
+  return useQuery({ queryKey: ["cost.get"], queryFn: queries.cost, enabled, staleTime: 0, retry: false, refetchOnWindowFocus: true });
 }
 
 /** The skills a folder sees (all of them for null). Fetched only once `enabled`, and again after a skills change. */

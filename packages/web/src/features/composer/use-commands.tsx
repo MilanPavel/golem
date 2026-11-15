@@ -172,6 +172,9 @@ export function useCommands({ session, cwd, typing, send }: UseCommandsOptions):
             requestNewSkill();
             navigate(settingsPath("skills"));
             return "handled";
+          case "cost":
+            navigate(settingsPath("usage"));
+            return "handled";
           case "permissions":
             navigate(settingsPath("rules"));
             return "handled";

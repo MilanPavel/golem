@@ -88,6 +88,7 @@ export type { TraceContext } from "../../protocol/gen/trace-context.ts";
 export type { TraceContextItem } from "../../protocol/gen/trace-context-item.ts";
 export type { TraceContextPart } from "../../protocol/gen/trace-context-part.ts";
 export type { PromptSectionInfo } from "../../protocol/gen/prompt-section-info.ts";
+export type { CostDayRow, CostGetResult, CostModelRow, CostTotals } from "../../protocol/gen/cost-get-result.ts";
 export type { TraceGetResult } from "../../protocol/gen/trace-get-result.ts";
 export type { TraceMessage } from "../../protocol/gen/trace-message.ts";
 export type { TraceModelSpan } from "../../protocol/gen/trace-model-span.ts";
