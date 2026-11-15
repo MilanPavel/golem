@@ -23,6 +23,7 @@ from golem.mcp import McpSupervisor
 from golem.mcp.prompt import mcp_section
 from golem.models.discovery import ModelDiscovery
 from golem.models.facts import ListedFacts
+from golem.models.gate import ServerGate
 from golem.models.install import RUNTIMES, OllamaInstaller, runtime_installer
 from golem.models.keys import ProviderKeys
 from golem.models.ollama import LocalServer, LocalServers, ServerState
@@ -112,6 +113,7 @@ class DaemonApp:
         user_home: Path | None = None,
         bundled_skills: Path | None = None,
         local_servers: LocalServers | None = None,
+        gate: ServerGate | None = None,
         socket_check_seconds: float = SOCKET_CHECK_SECONDS,
     ) -> None:
         self.paths = paths
@@ -121,6 +123,7 @@ class DaemonApp:
         self._bundled_skills = bundled_skills
         self._router = router
         self._titles = titles
+        self._gate = gate
         self._discovery = discovery
         self._pulls = pulls
         self._mcp = mcp
@@ -233,6 +236,7 @@ class DaemonApp:
                     ),
                     note_loaded=note_loaded,
                     price_of=lambda profile: _price_of(router, models, profile),
+                    gate=self._gate or ServerGate(settings.ollama.parallel),
                 )
                 self.state.sessions = await _open_sessions(
                     database,
@@ -540,11 +544,13 @@ async def serve_forever() -> int:
     paths.ensure_layout()
     secrets = KeychainSecrets()
     router = ModelRouter(settings, home=paths.home, keys=ProviderKeys(secrets))
-    titles = ModelTitles(router) if settings.session_titles else None
+    gate = ServerGate(settings.ollama.parallel)
+    titles = ModelTitles(router, gate) if settings.session_titles else None
     app = DaemonApp(
         paths,
         router=router,
         titles=titles,
+        gate=gate,
         secrets=secrets,
         bundled_skills=bundled_skills_dir(),
     )

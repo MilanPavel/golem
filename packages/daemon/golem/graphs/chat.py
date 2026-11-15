@@ -47,6 +47,7 @@ from golem.graphs.tools_node import (
     tools_node,
     unanswered_calls,
 )
+from golem.models.gate import ServerGate
 from golem.models.ollama import LocalServers
 from golem.models.router import ModelRouter
 from golem.models.window import ContextWindow, WindowOf
@@ -380,6 +381,7 @@ def open_chat(
     window_of: WindowOf | None = None,
     note_loaded: Callable[[str, int | None], Awaitable[int | None]] | None = None,
     price_of: Callable[[str], ModelPrice | None] | None = None,
+    gate: ServerGate | None = None,
 ) -> ChatRuntime:
     """Compile the chat graph against ``checkpointer``.
 
@@ -396,7 +398,8 @@ def open_chat(
     model call, so the server can read the window the model loaded. It returns that window,
     or None. The window the call ran with goes out as ``model.response``, with
     ``text_tool_calls`` (``recovered`` or ``unread``) when the reply held a tool call written as
-    text. A failure there never fails the call.
+    text. A failure there never fails the call. With ``gate``, a call to a local server waits
+    for its turn first, so one generation runs at a time on it.
     """
     registry = default_registry() if tools is None else tools
     rules = Policy(None) if policy is None else policy
@@ -445,9 +448,10 @@ def open_chat(
             request.update(_sizes(system, history, schemas if binder.offers(profile) else []))
             get_stream_writer()(request)
             try:
-                response = await binder.invoke(
-                    profile, router.chat_model(profile, overrides), sent, schemas
-                )
+                async with _gated(router, gate, profile):
+                    response = await binder.invoke(
+                        profile, router.chat_model(profile, overrides), sent, schemas
+                    )
             except Exception as exc:
                 down = router.unreachable(profile, exc) or await router.refused(profile, exc)
                 if down is None:
@@ -621,6 +625,14 @@ def _held(
     target = None if local is None else router.ollama_server(profile)
     server = None if local is None or target is None else local.get(*target)
     return nullcontext() if server is None else server.hold()
+
+
+def _gated(
+    router: ModelRouter, gate: ServerGate | None, profile: str
+) -> AbstractAsyncContextManager[None]:
+    """Wait for a turn on the local server ``profile`` runs on, or not for any other model."""
+    target = None if gate is None else router.ollama_server(profile)
+    return nullcontext() if gate is None or target is None else gate.hold(target[1], "chat")
 
 
 def _ai(message: BaseMessage) -> AIMessage:
