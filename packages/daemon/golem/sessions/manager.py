@@ -1016,7 +1016,11 @@ class SessionManager:
     ) -> None:
         try:
             title = await choose_title(
-                titles, model_profile=session.model_profile, prompt=prompt, reply=reply
+                titles,
+                model_profile=session.model_profile,
+                prompt=prompt,
+                reply=reply,
+                options=dict(session.options),
             )
             async with self._lock:
                 if session.title is None and not session.closed:

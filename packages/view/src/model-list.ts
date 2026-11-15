@@ -88,6 +88,7 @@ export function withPulls(listing: ModelListResult | null, pulls: Readonly<Recor
       status: "pulling",
       progress: pulls[ref]?.progress ?? null,
       price: { input: 0, output: 0 },
+      tier: "local",
     });
   }
   return { ...listing, models };

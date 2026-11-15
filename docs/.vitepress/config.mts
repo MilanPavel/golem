@@ -148,6 +148,7 @@ const sidebar: DefaultTheme.Sidebar = [
           { text: "The terminal app", link: "/architecture/tui" },
           { text: "The web UI", link: "/architecture/web" },
           { text: "Tracing", link: "/architecture/tracing" },
+          { text: "Coding", link: "/architecture/coding" },
         ],
       },
     ],

@@ -188,6 +188,31 @@ class ShellSettings(BaseModel):
     timeout_seconds: int = Field(default=120, gt=0, le=3600)
 
 
+class CheckSettings(BaseModel):
+    """``[[coding.check]]``. One command golem runs to check a project."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1, max_length=40)
+    command: str = Field(min_length=1)
+    timeout_seconds: int = Field(default=120, gt=0, le=1800)
+
+
+class CodingSettings(BaseModel):
+    """``[coding]``. Checks golem runs after it changed files.
+
+    ``checks`` says whether it asks first, runs them on its own, or never runs
+    them. ``fix_rounds`` is how many times it may fix what a check found.
+    ``check`` lists the commands. With none, golem detects them from the project.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    checks: Literal["ask", "auto", "off"] = "ask"
+    fix_rounds: int = Field(default=2, ge=0, le=5)
+    check: list[CheckSettings] = Field(default_factory=list[CheckSettings])
+
+
 class SkillSettings(BaseModel):
     """``[skills]``. Which skill folders golem reads, and which skills it leaves off.
 
@@ -235,15 +260,49 @@ class OllamaSettings(BaseModel):
     ``start`` lets golem run ``ollama serve`` when a local model is needed and
     nothing answers. ``idle_stop_minutes`` stops a server golem started after
     that long unused, and 0 keeps it running. A server golem did not start is
-    never stopped. ``models`` holds the options saved for each model, by its
-    Ollama name, such as ``qwen3:8b``.
+    never stopped. ``parallel`` is how many generations golem sends to a local server at
+    once. Raise it only if you also set ``OLLAMA_NUM_PARALLEL``. ``models`` holds the
+    options saved for each model, by its Ollama name, such as ``qwen3:8b``.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     start: bool = True
     idle_stop_minutes: int = Field(default=30, ge=0)
+    parallel: int = Field(default=1, ge=1, le=8)
     models: dict[str, ModelOptions] = Field(default_factory=dict[str, ModelOptions])
+
+
+Role = Literal["titles", "summarise", "explore"]
+"""An internal job golem runs with a model of its own choosing."""
+
+
+class RoleSettings(BaseModel):
+    """``[routing.roles]``. The model for each internal job.
+
+    A value is ``"session"``, a profile name, or a ``provider/model`` ref. ``"session"``
+    means the session's own model, or a ready budget model when the session is hosted.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    titles: str = Field(default="session", min_length=1)
+    summarise: str = Field(default="session", min_length=1)
+    explore: str = Field(default="session", min_length=1)
+
+
+class RoutingSettings(BaseModel):
+    """``[routing]``. How golem files models into tiers and picks between them.
+
+    ``budget_max_price`` is the most a hosted model may cost, in USD per million tokens and
+    blended as ``(3 * input + output) / 4``, to be in the budget tier. A model above it is
+    frontier. ``roles`` picks the model for each internal job.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    budget_max_price: float = Field(default=1.50, gt=0)
+    roles: RoleSettings = Field(default_factory=RoleSettings)
 
 
 class WebSettings(BaseModel):
@@ -428,6 +487,7 @@ PROTECTED_SETTINGS = frozenset(
         "shell",
         "web",
         "permissions",
+        "coding",
     }
 )
 """Top-level settings the browser's ``config.raw.set`` may not change (ADR-037).
@@ -440,7 +500,17 @@ see ``PROTECTED_SKILL_SETTINGS``.
 PROTECTED_SKILL_SETTINGS = frozenset({"extra_dirs", "claude_dirs"})
 
 BROWSER_SETTINGS = frozenset(
-    {"log_level", "default_model", "models", "session_titles", "rule", "mcp", "skills", "ollama"}
+    {
+        "log_level",
+        "default_model",
+        "models",
+        "session_titles",
+        "rule",
+        "mcp",
+        "skills",
+        "ollama",
+        "routing",
+    }
 )
 """Top-level settings the browser may edit. Every ``GolemSettings`` field is in one list."""
 
@@ -481,11 +551,13 @@ class GolemSettings(BaseSettings):
     # Project folders whose .golem/policy.toml may allow tools. Ask and deny rules apply anywhere.
     trusted_projects: list[str] = Field(default_factory=list[str])
     shell: ShellSettings = Field(default_factory=ShellSettings)
+    coding: CodingSettings = Field(default_factory=CodingSettings)
     permissions: PermissionSettings = Field(default_factory=PermissionSettings)
     web: WebSettings = Field(default_factory=WebSettings)
     mcp: McpServers = Field(default_factory=dict)
     skills: SkillSettings = Field(default_factory=SkillSettings)
     ollama: OllamaSettings = Field(default_factory=OllamaSettings)
+    routing: RoutingSettings = Field(default_factory=RoutingSettings)
 
     _no_secrets = model_validator(mode="before")(_no_inline_secrets)
 

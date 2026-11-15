@@ -27,6 +27,10 @@ class ToolError(Exception):
     """A tool call that did not work. The message goes to the model as the result."""
 
 
+class InvalidArguments(ToolError):
+    """The model's arguments do not fit the tool's schema."""
+
+
 @dataclass(frozen=True, slots=True)
 class ArtifactPage:
     """``text`` starts at character ``offset`` of an artifact ``size`` characters long.
@@ -191,7 +195,7 @@ class Tool[A: BaseModel]:
         try:
             return self.args.model_validate(dict(raw))
         except ValidationError as exc:
-            raise ToolError(f"invalid arguments for {self.name}: {_problems(exc)}") from exc
+            raise InvalidArguments(f"invalid arguments for {self.name}: {_problems(exc)}") from exc
 
 
 @dataclass(frozen=True, slots=True)
@@ -319,6 +323,7 @@ __all__ = [
     "MAX_OUTPUT_CHARS",
     "ArtifactPage",
     "Artifacts",
+    "InvalidArguments",
     "Network",
     "Preview",
     "Tool",

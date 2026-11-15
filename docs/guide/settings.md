@@ -134,6 +134,25 @@ The providers are `openai`, `anthropic`, `google`, `deepseek`, `xai`, `moonshot`
 |---|---|---|
 | `start` | `true` | Run `ollama serve` when a local model is needed and nothing answers |
 | `idle_stop_minutes` | `30` | Stop a server golem started after this long unused. `0` never stops it |
+| `parallel` | `1` | How many generations golem sends to a local server at once (1 to 8). Raise it only if you also set `OLLAMA_NUM_PARALLEL` |
+
+### `[routing]`
+
+| Key | Default | Meaning |
+|---|---|---|
+| `budget_max_price` | `1.50` | The most a hosted model may cost, in USD per million tokens, to be in the `budget` tier. The price is blended as `(3 × input + output) / 4`. A model above it, or with no known price, is `frontier`. Ollama models are `local` |
+
+### `[routing.roles]`
+
+The model for each internal job. A value is `"session"`, a profile name, or a `provider/model` ref.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `titles` | `"session"` | The model that names a chat after its first run |
+| `summarise` | `"session"` | The model that summarises |
+| `explore` | `"session"` | The model that explores |
+
+`"session"` on a local chat uses the chat's own model with the chat's own options, so Ollama does not reload it. On a hosted chat it uses the cheapest ready budget model that takes tools, and the chat's own model when there is none. A model that is not ready is never downloaded for a role.
 
 ### `[[rule]]`
 
@@ -163,6 +182,34 @@ Only your own file sets these. A project can't widen them.
 | `network` | `false` | Let commands use the network |
 | `writable` | none | More folders commands may write to, beside the chat's folder |
 | `timeout_seconds` | `120` | The longest a command runs, up to 3600 |
+
+### `[coding]`
+
+Only your own file sets these.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `checks` | `"ask"` | Whether golem runs checks after it changed files: `ask`, `auto`, or `off` |
+| `fix_rounds` | `2` | How many times golem may fix what a check found, up to 5 |
+
+Each `[[coding.check]]` is one command. With none, golem looks at the project's own files: a `lint` recipe in a justfile, a `lint` or `typecheck` script in `package.json`, a ruff setup, `Cargo.toml`, or `go.mod`. Tests are never detected. Add them yourself.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `name` | required | A short name, up to 40 characters |
+| `command` | required | The command to run in the project's folder |
+| `timeout_seconds` | `120` | The longest it runs, up to 1800 |
+
+```toml
+[coding]
+checks = "auto"
+fix_rounds = 3
+
+[[coding.check]]
+name = "tests"
+command = "uv run pytest -q"
+timeout_seconds = 300
+```
 
 ### `[web]`
 
