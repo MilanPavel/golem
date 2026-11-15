@@ -5,6 +5,8 @@ public enum MethodAccess {
         "approval.respond",
         "artifact.read",
         "auth.list",
+        "changes.diff",
+        "changes.list",
         "config.get",
         "config.raw.get",
         "config.raw.set",

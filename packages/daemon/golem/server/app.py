@@ -14,6 +14,7 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
+from golem.coding.changes import ChangeStore
 from golem.config import ModelPrice, load_settings
 from golem.graphs.chat import ChatRuntime, open_chat
 from golem.graphs.prompt import SystemPrompt
@@ -233,6 +234,7 @@ class DaemonApp:
                 self.state.policy = policy
                 self.state.tools = default_registry(mcp, policy.web())
                 self.state.artifacts = ArtifactStore(database)
+                self.state.changes = ChangeStore(database, BlobStore(database))
                 usage = Usage(database)
                 replayed = await backfill(database)
                 if replayed:

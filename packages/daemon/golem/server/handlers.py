@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 import os
 import time
@@ -12,6 +13,7 @@ from typing import Literal, cast
 from pydantic import BaseModel, ConfigDict
 
 from golem import __version__, install_info
+from golem.coding.changes import ChangeStore, net_files
 from golem.config import load_settings
 from golem.config_edit import (
     McpTableError,
@@ -101,6 +103,7 @@ from golem.skills.invoke import SkillInvokeError
 from golem.skills.pinned import SkillPinError
 from golem.skills.registry import listed_skill
 from golem.tools.registry import ToolScope
+from golem.tools.write import DIFF_CHARS, diff_counts, diff_text
 from golem_protocol.commands import (
     ApprovalRespondParams,
     ApprovalRespondResult,
@@ -113,6 +116,11 @@ from golem_protocol.commands import (
     AuthRemoveResult,
     AuthSetParams,
     AuthSetResult,
+    ChangedFile,
+    ChangesDiffParams,
+    ChangesDiffResult,
+    ChangesListParams,
+    ChangesListResult,
     ConfigAllowance,
     ConfigGetParams,
     ConfigGetResult,
@@ -485,6 +493,77 @@ async def _session_inspect(
             InspectMessage(role=message.role, text=message.text) for message in view.messages
         ],
     )
+
+
+def _changes(ctx: RequestContext) -> ChangeStore:
+    changes = ctx.state.changes
+    if changes is None:
+        raise RpcCallError(INTERNAL_ERROR, "changes are not ready")
+    return changes
+
+
+def _disk_sha(path: Path) -> str | None:
+    """The sha256 of the file's text. None for no file, and "" for one that is not UTF-8."""
+    try:
+        text = path.read_bytes().decode("utf-8")
+    except FileNotFoundError:
+        return None
+    except (OSError, UnicodeDecodeError):
+        return ""
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+async def _session_folder(ctx: RequestContext, session_id: str) -> str | None:
+    try:
+        return await _sessions(ctx).cwd_of(session_id)
+    except SessionNotFoundError as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
+    except SchemaMismatchError as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, str(exc)) from exc
+
+
+async def _changes_list(ctx: RequestContext, params: ChangesListParams) -> ChangesListResult:
+    store = _changes(ctx)
+    folder = await _session_folder(ctx, params.session_id)
+    if folder is None:
+        return ChangesListResult(files=[])
+    files: list[ChangedFile] = []
+    for net in net_files(await store.list(params.session_id)):
+        diff = diff_text(
+            net.path, await store.text(net.before_sha), await store.text(net.after_sha)
+        )
+        added, removed = diff_counts(diff)
+        on_disk = await asyncio.to_thread(_disk_sha, Path(folder) / net.path)
+        files.append(
+            ChangedFile(
+                path=net.path,
+                status=net.status,
+                added=added,
+                removed=removed,
+                change_ids=list(net.change_ids),
+                stale=on_disk != net.after_sha,
+            )
+        )
+    return ChangesListResult(files=files)
+
+
+async def _changes_diff(ctx: RequestContext, params: ChangesDiffParams) -> ChangesDiffResult:
+    if (params.path is None) == (params.change_id is None):
+        raise RpcCallError(INVALID_PARAMS, "set exactly one of path and change_id")
+    store = _changes(ctx)
+    await _session_folder(ctx, params.session_id)
+    if params.change_id is not None:
+        change = await store.get(params.session_id, params.change_id)
+        if change is None:
+            raise RpcCallError(INVALID_PARAMS, "no such change in this session")
+        path, before_sha, after_sha = change.path, change.before_sha, change.after_sha
+    else:
+        group = [c for c in await store.list(params.session_id) if c.path == params.path]
+        if not group:
+            raise RpcCallError(INVALID_PARAMS, "this session has not changed that file")
+        path, before_sha, after_sha = group[0].path, group[0].before_sha, group[-1].after_sha
+    diff = diff_text(path, await store.text(before_sha), await store.text(after_sha))
+    return ChangesDiffResult(diff=diff[:DIFF_CHARS], truncated=len(diff) > DIFF_CHARS)
 
 
 async def _trace_get(ctx: RequestContext, params: TraceGetParams) -> TraceGetResult:
@@ -1298,6 +1377,8 @@ def standard_methods() -> dict[str, Method]:
         ),
         "run.cancel": Method("run.cancel", RunCancelParams, True, _run_cancel),
         "artifact.read": Method("artifact.read", ArtifactReadParams, True, _artifact_read),
+        "changes.list": Method("changes.list", ChangesListParams, True, _changes_list),
+        "changes.diff": Method("changes.diff", ChangesDiffParams, True, _changes_diff),
         "session.inspect": Method("session.inspect", SessionInspectParams, True, _session_inspect),
         "cost.get": Method("cost.get", CostGetParams, True, _cost_get),
         "trace.get": Method("trace.get", TraceGetParams, True, _trace_get),

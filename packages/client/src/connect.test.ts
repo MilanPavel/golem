@@ -1401,6 +1401,52 @@ test("getTrace and getTraceSpan send their ids and check what comes back", async
   }
 });
 
+test("changesList and changesDiff send their targets and check what comes back", async () => {
+  const sent: [string, Record<string, unknown>][] = [];
+  const list = { files: [{ path: "a.txt", status: "modified", added: 2, removed: 1, change_ids: ["c_1", "c_2"], stale: false }] };
+  const diff = { diff: "--- a/a.txt\n+++ b/a.txt\n", truncated: false };
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: { "changes.list": list, "changes.diff": diff },
+      onRequest: (_socket, method, params) => {
+        if (method.startsWith("changes.")) sent.push([method, params]);
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "web", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    assert.deepEqual(await client.changesList("s_test"), list);
+    assert.deepEqual(await client.changesDiff("s_test", { path: "a.txt" }), diff);
+    assert.deepEqual(await client.changesDiff("s_test", { changeId: "c_1" }), diff);
+    assert.deepEqual(sent, [
+      ["changes.list", { session_id: "s_test" }],
+      ["changes.diff", { session_id: "s_test", path: "a.txt" }],
+      ["changes.diff", { session_id: "s_test", change_id: "c_1" }],
+    ]);
+  } finally {
+    client.close();
+    await server.close();
+  }
+  const bad = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: {
+        "changes.list": { files: [{ ...list.files[0], status: "moved" }] },
+        "changes.diff": { diff: "x" },
+      },
+    });
+  });
+  const refused = connectGolem({ socketPath: bad.socketPath, clientName: "web", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    await assert.rejects(() => refused.changesList("s_test"), /invalid changes.list result/);
+    await assert.rejects(() => refused.changesDiff("s_test", { path: "a.txt" }), /invalid changes.diff result/);
+  } finally {
+    refused.close();
+    await bad.close();
+  }
+});
+
 test("createSession sends the folder and the model only when they are given", async () => {
   const seen: Record<string, unknown>[] = [];
   const daemon = await listen((socket) => {

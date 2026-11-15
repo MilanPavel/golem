@@ -23,8 +23,13 @@ import type { FsListDirsResult } from "../../protocol/gen/fs-list-dirs-result.ts
 import type { SetupStatusResult } from "../../protocol/gen/setup-status-result.ts";
 import type { ApprovalRespondResult } from "../../protocol/gen/approval-respond-result.ts";
 import type { ArtifactReadResult } from "../../protocol/gen/artifact-read-result.ts";
+import type { ChangesDiffResult } from "../../protocol/gen/changes-diff-result.ts";
+import type { ChangesListResult } from "../../protocol/gen/changes-list-result.ts";
 import type { ConfigGetResult } from "../../protocol/gen/config-get-result.ts";
 import type { PolicyEditResult } from "../../protocol/gen/policy-edit-result.ts";
+
+/** What `changes.diff` shows: the net change of one file, or one change. */
+export type ChangesDiffTarget = { path: string } | { changeId: string };
 
 export type ApprovalChoice = "allow" | "allow_session" | "allow_always" | "deny";
 
@@ -95,6 +100,7 @@ import {
   isMcpServerDetail,
   isRuntimeInstallDone,
   isRuntimeName,
+  isChangesListResult,
   isFsListDirsResult,
   isSetupStatusResult,
   isDaemonStatus,
@@ -275,6 +281,10 @@ export interface GolemClient {
   /** Answer the tool call the session's run waits on. The run goes on in the daemon. */
   /** `limit` characters of a session's artifact from `offset`, and the artifact's size. */
   readArtifact(sessionId: string, artifactId: string, offset?: number, limit?: number): Promise<ArtifactReadResult>;
+  /** The files a session changed, each as its net change, with counts and flags only. */
+  changesList(sessionId: string): Promise<ChangesListResult>;
+  /** The diff of a file (`path`) or of one change (`changeId`). */
+  changesDiff(sessionId: string, target: ChangesDiffTarget): Promise<ChangesDiffResult>;
   /** `args` are the call's arguments as the user edited them. They go only with `allow`. */
   respondApproval(
     sessionId: string,
@@ -1252,6 +1262,25 @@ export function connectGolem(options: ConnectOptions): GolemClient {
         throw new Error("invalid artifact.read result");
       }
       return { text: result["text"], offset: result["offset"], size: result["size"] };
+    },
+    async changesList(sessionId: string): Promise<ChangesListResult> {
+      await ready;
+      const result = await call("changes.list", { session_id: sessionId });
+      if (!isChangesListResult(result)) {
+        throw new Error("invalid changes.list result");
+      }
+      return result;
+    },
+    async changesDiff(sessionId: string, target: ChangesDiffTarget): Promise<ChangesDiffResult> {
+      await ready;
+      const result = await call("changes.diff", {
+        session_id: sessionId,
+        ...("path" in target ? { path: target.path } : { change_id: target.changeId }),
+      });
+      if (!isRecord(result) || typeof result["diff"] !== "string" || typeof result["truncated"] !== "boolean") {
+        throw new Error("invalid changes.diff result");
+      }
+      return { diff: result["diff"], truncated: result["truncated"] };
     },
     async respondApproval(
       sessionId: string,

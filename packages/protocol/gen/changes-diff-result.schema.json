@@ -1,0 +1,20 @@
+{
+  "additionalProperties": false,
+  "description": "A unified diff, cut when long, and whether it was cut.",
+  "properties": {
+    "diff": {
+      "title": "Diff",
+      "type": "string"
+    },
+    "truncated": {
+      "title": "Truncated",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "diff",
+    "truncated"
+  ],
+  "title": "ChangesDiffResult",
+  "type": "object"
+}

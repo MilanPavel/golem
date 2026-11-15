@@ -9,6 +9,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
+from golem.coding.changes import ChangeStore
 from golem.mcp import McpSupervisor
 from golem.mcp.importer import ScanStore
 from golem.models.discovery import ModelDiscovery
@@ -40,6 +41,7 @@ class DaemonState:
     policy: Policy | None = None
     tools: ToolRegistry | None = None
     artifacts: ArtifactStore | None = None
+    changes: ChangeStore | None = None
     usage: Usage | None = None
     mcp: McpSupervisor | None = None
     secrets: SecretStore | None = None

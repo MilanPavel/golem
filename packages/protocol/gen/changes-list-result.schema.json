@@ -1,0 +1,70 @@
+{
+  "$defs": {
+    "ChangedFile": {
+      "additionalProperties": false,
+      "description": "One changed file: first before against last after, as counts and flags.\n\n``stale`` is true when the file on disk is not what golem last wrote, because\nsomeone else changed it since.",
+      "properties": {
+        "added": {
+          "minimum": 0,
+          "title": "Added",
+          "type": "integer"
+        },
+        "change_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Change Ids",
+          "type": "array"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "removed": {
+          "minimum": 0,
+          "title": "Removed",
+          "type": "integer"
+        },
+        "stale": {
+          "title": "Stale",
+          "type": "boolean"
+        },
+        "status": {
+          "enum": [
+            "created",
+            "modified",
+            "deleted"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "status",
+        "added",
+        "removed",
+        "change_ids",
+        "stale"
+      ],
+      "title": "ChangedFile",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The changed files in order of first change. A session without a folder has none.",
+  "properties": {
+    "files": {
+      "items": {
+        "$ref": "#/$defs/ChangedFile"
+      },
+      "title": "Files",
+      "type": "array"
+    }
+  },
+  "required": [
+    "files"
+  ],
+  "title": "ChangesListResult",
+  "type": "object"
+}
