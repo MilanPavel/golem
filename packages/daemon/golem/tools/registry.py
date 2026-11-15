@@ -11,7 +11,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 
 import httpx
 from pydantic import BaseModel, ValidationError
@@ -105,6 +105,7 @@ class FileEdit:
     path: str  # relative to the session folder
     before: str | None
     after: str | None
+    source: Literal["tool", "shell"] = "tool"
 
 
 @dataclass(frozen=True, slots=True)
