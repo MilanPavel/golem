@@ -22,6 +22,7 @@ from golem.logging import configure_logging
 from golem.mcp import McpSupervisor
 from golem.mcp.prompt import mcp_section
 from golem.models.discovery import ModelDiscovery
+from golem.models.facts import ListedFacts
 from golem.models.install import RUNTIMES, OllamaInstaller, runtime_installer
 from golem.models.keys import ProviderKeys
 from golem.models.ollama import LocalServer, LocalServers, ServerState
@@ -257,6 +258,14 @@ class DaemonApp:
                 models.pulling = pulls.pulling
                 models.local = local
                 self.state.models = models
+                # Nothing calls it yet. The speed book of #874 plugs in as ``speed_of``.
+                self.state.facts = ListedFacts(
+                    models,
+                    router,
+                    lambda profile, overrides: resolve_window(
+                        router, profile, models, overrides=overrides
+                    ),
+                )
                 self.state.pulls = pulls
                 self.state.installer = OllamaInstaller(broadcast=self._broadcast)
                 self.state.runtimes = {
@@ -305,6 +314,7 @@ class DaemonApp:
             if self.state.models is not None:
                 await self.state.models.aclose()
             self.state.models = None
+            self.state.facts = None
             # Last, once no run or download holds it: stop the Ollama golem started.
             if self.state.local_servers is not None:
                 await self.state.local_servers.aclose()
