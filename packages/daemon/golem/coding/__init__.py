@@ -1,1 +1,1 @@
-"""Coding: the checks a project has and golem runs after it changed files."""
+"""Coding: the changes golem made to a session's files, and the checks it runs after them."""
