@@ -94,6 +94,8 @@ class ToolContext:
     """Turns on an on-demand MCP server for the session. Returns its tool names."""
     skills: SkillView | None = None
     """The skills the session's folder sees, for ``load_skill``."""
+    page_chars: int | None = None
+    """The most characters of a result page for the model's window, for ``read_artifact``."""
 
 
 @dataclass(frozen=True, slots=True)

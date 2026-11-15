@@ -32,6 +32,7 @@ from golem.graphs.adapter import STREAM_KEY, message_text
 from golem.graphs.checks_node import CHECKS_KEY, checks_node
 from golem.graphs.context_view import view
 from golem.graphs.prompt import PINNED_KEY, PromptContext, SystemPrompt
+from golem.graphs.result_budget import ResultBudget, result_budget
 from golem.graphs.state import AgentState
 from golem.graphs.text_calls import recover
 from golem.graphs.tools_node import (
@@ -43,6 +44,7 @@ from golem.graphs.tools_node import (
     MODE_KEY,
     PINNED_FOLDERS_KEY,
     Answer,
+    BudgetOf,
     EnableMcp,
     cancelled_results,
     scope_of,
@@ -544,6 +546,7 @@ def open_chat(
             artifacts,
             lambda: runtime[0].enable_mcp if runtime else None,
             lambda: runtime[0].skills if runtime else None,
+            _budget_by_window(window_of),
         ),
     )
     builder.add_edge(START, "call_model")
@@ -583,6 +586,17 @@ def _timings(message: AIMessage) -> dict[str, int]:
         if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
             found[name] = value
     return found
+
+
+def _budget_by_window(window_of: WindowOf | None) -> BudgetOf | None:
+    """The tools node's result budget from the window of the session's model."""
+    if window_of is None:
+        return None
+
+    def budget(state: AgentState, config: RunnableConfig) -> ResultBudget:
+        return result_budget(window_of(state["model_profile"], _options(config)).window)
+
+    return budget
 
 
 def _without_thinking(messages: Sequence[BaseMessage]) -> list[BaseMessage]:
