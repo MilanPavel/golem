@@ -55,8 +55,6 @@
   --spacing-mcp-list: 18.75rem;
 
   /* The trace inspector beside the chat: 26 rem to start with, never below 20 rem. */
-  /* The wide workbench panel: 56rem, or 60% of a small window. */
-  --spacing-workbench-wide: min(56rem, 60vw);
   --spacing-inspector: 26rem;
   --spacing-inspector-min: 20rem;
 

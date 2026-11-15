@@ -3,7 +3,6 @@ import { createStore } from "../../store/create-store.ts";
 import { DRAWER_KEY, drawerOpenStore } from "../drawer/drawer-open.ts";
 
 export const TAB_KEY = "golem.workbench.tab";
-export const WIDE_KEY = "golem.workbench.wide";
 
 function read(key: string): string | null {
   try {
@@ -21,9 +20,8 @@ function write(key: string, value: string): void {
   }
 }
 
-/** The chosen tab and the width, one for every session in the page. */
+/** The chosen tab, one for every session in the page. */
 export const tabStore = createStore<string | null>(read(TAB_KEY));
-export const wideStore = createStore<boolean>(read(WIDE_KEY) === "wide");
 const requestedStore = createStore<string | null>(null);
 
 /** The chosen tab, or null before a choice. */
@@ -34,15 +32,6 @@ export function useWorkbenchTab(): [string | null, (id: string) => void] {
     write(TAB_KEY, id);
   }, []);
   return [tab, setTab];
-}
-
-export function useWorkbenchWide(): [boolean, (wide: boolean) => void] {
-  const wide = useSyncExternalStore(wideStore.subscribe, wideStore.getSnapshot);
-  const setWide = useCallback((next: boolean) => {
-    wideStore.set(next);
-    write(WIDE_KEY, next ? "wide" : "narrow");
-  }, []);
-  return [wide, setWide];
 }
 
 /** Opens the panel on that tab, from anywhere. With no such tab the panel shows its first. */

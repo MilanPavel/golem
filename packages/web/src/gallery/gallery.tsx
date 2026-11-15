@@ -260,21 +260,15 @@ const DEMO_TABS: readonly WorkbenchTab[] = [
   { id: "notes", label: "Notes", render: () => <p className="text-sm text-muted">Nothing here yet.</p> },
 ];
 
-/** The tabbed panel at a fixed height, narrow and wide. The second frame forces the wide width, so the two show together. */
+/** The tabbed panel at a fixed height. Its left edge is the resize handle. */
 function WorkbenchDemo() {
   const anchor = useAnchor();
-  const narrow = useId();
-  const wide = useId();
+  const id = useId();
   return (
     <section className="mt-6" id={anchor("Workbench")}>
       <h3 className="mb-2 font-mono text-xs text-faint">Workbench</h3>
-      <div className="flex flex-wrap items-start gap-4">
-        <div className="flex h-96 overflow-hidden rounded-lg border border-line [&>aside]:w-80">
-          <Workbench id={narrow} tabs={DEMO_TABS} floating={false} onClose={() => {}} />
-        </div>
-        <div className="flex h-96 max-w-full overflow-hidden rounded-lg border border-line [&>aside]:w-workbench-wide">
-          <Workbench id={wide} tabs={DEMO_TABS.slice(0, 1)} floating={false} onClose={() => {}} />
-        </div>
+      <div className="flex h-96 max-w-full justify-end overflow-hidden rounded-lg border border-line">
+        <Workbench id={id} tabs={DEMO_TABS} floating={false} onClose={() => {}} />
       </div>
     </section>
   );
