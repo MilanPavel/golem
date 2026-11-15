@@ -6,14 +6,14 @@ import { cn } from "../../ui/cn.ts";
 import { Button } from "../../ui/button.tsx";
 import { FolderIcon, InspectIcon, PanelIcon } from "../../ui/icons.tsx";
 import { PixelGolem } from "../../ui/pixel-golem.tsx";
-import { useNavigate, useRememberOpenedFolder, useRoute, useSession, useSessionList } from "../../store/page-context.tsx";
+import { useChangedFiles, useNavigate, useRememberOpenedFolder, useRoute, useSession, useSessionList } from "../../store/page-context.tsx";
 import { inspectPath, sessionPath } from "../../store/router.ts";
 import { hasMod, modShortcut } from "../../ui/platform.ts";
 import type { SessionModel, SessionView } from "../../store/session-store.ts";
 import { Transcript } from "../chat/index.ts";
 import { SessionDock } from "../composer/index.ts";
 import { TodoList, useDrawerOpen } from "../drawer/index.ts";
-import { Workbench, WORKBENCH_ID, type WorkbenchTab } from "../workbench/index.ts";
+import { ChangesTab, Workbench, WORKBENCH_ID, type WorkbenchTab } from "../workbench/index.ts";
 import { closeModelDialog, ModelDialog, openModelDialog, useModelDialogOpen } from "../models/index.ts";
 import { folderName, useSessionActions } from "../sessions/index.ts";
 import { useRememberSettingsContext } from "../settings/index.ts";
@@ -202,8 +202,20 @@ export function SessionFrame({ id, children }: { id: string; children: ReactNode
   const remember = useRememberOpenedFolder();
   const todos = useSession(id, selectTodos);
   const [drawerOpen, setDrawerOpen] = useDrawerOpen();
+  const changed = useChangedFiles(id).files;
+  const hasFolder = typeof summary?.cwd === "string" || (summary === undefined && typeof header.cwd === "string");
   const tabs = useMemo<readonly WorkbenchTab[]>(
     () => [
+      ...(hasFolder
+        ? [
+            {
+              id: "changes",
+              label: "Changes",
+              ...(changed !== null && changed.length > 0 ? { badge: String(changed.length) } : {}),
+              render: () => <ChangesTab sessionId={id} />,
+            },
+          ]
+        : []),
       {
         id: "todos",
         label: "Todos",
@@ -211,7 +223,7 @@ export function SessionFrame({ id, children }: { id: string; children: ReactNode
         render: () => <TodoList todos={todos} />,
       },
     ],
-    [todos],
+    [todos, hasFolder, changed, id],
   );
   const toggle = useRef<HTMLButtonElement>(null);
   const inspectToggle = useRef<HTMLButtonElement>(null);

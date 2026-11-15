@@ -15,6 +15,7 @@ from typing import Literal
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
 
+from golem.graphs.notes import is_note
 from golem.graphs.tools_node import ERROR_KEY
 
 Signal = Literal[
@@ -84,7 +85,7 @@ def error_kind(message: ToolMessage) -> str | None:
 
 def _current_run(messages: Sequence[BaseMessage]) -> Sequence[BaseMessage]:
     for index in range(len(messages) - 1, -1, -1):
-        if isinstance(messages[index], HumanMessage):
+        if isinstance(messages[index], HumanMessage) and not is_note(messages[index]):
             return messages[index + 1 :]
     return messages
 

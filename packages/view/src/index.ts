@@ -515,6 +515,7 @@ export {
   type ToolsState,
 } from "./setup-tools.ts";
 export { keyWhere } from "./key-where.ts";
+export { keyGroups, mcpRefParts, savedCount, type KeyGroups, type KeyRow, type KeyServer } from "./key-groups.ts";
 export {
   GROUPS,
   skillFacts,

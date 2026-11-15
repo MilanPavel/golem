@@ -17,11 +17,14 @@ from __future__ import annotations
 
 import os
 import re
+import shlex
 import shutil
+from dataclasses import replace
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from golem.coding import shell_changes
 from golem.tools import sandbox
 from golem.tools.paths import inside, relative, session_root
 from golem.tools.registry import Tool, ToolContext, ToolError, ToolResult
@@ -115,6 +118,8 @@ async def _login_shell(
 ) -> ToolResult:
     timeout = min(args.timeout_seconds or ctx.shell.timeout_seconds, ctx.shell.timeout_seconds)
     login = os.environ.get("SHELL") or "/bin/zsh"
+    run_git = git_runner(ctx, root)
+    seen = await shell_changes.look(root, run_git)
     done = await sandbox.run(
         [login, "-lc", args.command],
         root=root,
@@ -137,10 +142,12 @@ async def _login_shell(
     if sandboxed and not ctx.shell.network and needs_network(args.command):
         lines.append(f"[{NO_NETWORK_HINT}]")
     tail = "\n".join(lines)
+    edits = await shell_changes.changed(seen, run_git) if seen else []
     return ToolResult(
         output=f"{output}\n{tail}" if output else tail,
         summary=summary,
         failed=done.timed_out or done.exit_code != 0,
+        edits=tuple(replace(edit, source="shell") for edit in edits),
     )
 
 
@@ -188,19 +195,47 @@ async def _git_log(args: GitLogArgs, ctx: ToolContext) -> ToolResult:
 
 
 async def _git(ctx: ToolContext, command: list[str]) -> str:
-    root = _sandboxed_root(ctx)
-    git = shutil.which("git", path=sandbox.environment(dict(os.environ), home=Path.home())["PATH"])
-    done = await sandbox.run(
-        [git or "/usr/bin/git", *_GIT_SAFE, *command],
-        root=root,
-        settings=ctx.shell.model_copy(update={"network": False}),
-        timeout=30,
-    )
+    done = await _run_git(ctx, _sandboxed_root(ctx), _git_argv(command))
     if done.timed_out:
         raise ToolError("git did not answer within 30 seconds")
     if done.exit_code != 0:
         raise ToolError(done.output.strip() or f"git exited with {done.exit_code}")
     return done.output
+
+
+async def _run_git(
+    ctx: ToolContext, root: Path, argv: list[str], *, timeout: float = 30
+) -> sandbox.Finished:
+    """Run ``argv`` under the sandbox with no network."""
+    return await sandbox.run(
+        argv,
+        root=root,
+        settings=ctx.shell.model_copy(update={"network": False}),
+        timeout=timeout,
+    )
+
+
+def _git_argv(command: list[str]) -> list[str]:
+    git = shutil.which("git", path=sandbox.environment(dict(os.environ), home=Path.home())["PATH"])
+    return [git or "/usr/bin/git", *_GIT_SAFE, *command]
+
+
+def git_runner(ctx: ToolContext, root: Path) -> shell_changes.RunGit:
+    """Git scripts for ``shell_changes``: the output, or None when it fails, times out, or is cut.
+
+    The script runs in ``sh`` with ``git`` defined as the safe git, stderr dropped so a
+    warning never mixes into a file's text, and the strings as ``"$@"``.
+    """
+    safe = " ".join(shlex.quote(word) for word in _git_argv(["--no-optional-locks"]))
+
+    async def run(script: str, args: tuple[str, ...]) -> str | None:
+        text = f'exec 2>/dev/null; git() {{ {safe} "$@"; }}; {script}'
+        done = await _run_git(ctx, root, ["/bin/sh", "-c", text, "sh", *args], timeout=10)
+        if done.timed_out or done.exit_code != 0 or done.cut:
+            return None
+        return done.output
+
+    return run
 
 
 def _git_path(ctx: ToolContext, raw: str) -> str:

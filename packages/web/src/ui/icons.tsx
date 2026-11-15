@@ -116,3 +116,23 @@ export const SlidersIcon = (props: IconProps) => (
     <circle cx="10" cy="12" r="1.5" />
   </Icon>
 );
+/** A padlock: a shackle over a body. */
+export const LockIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <rect x="3" y="7" width="10" height="7" rx="1.5" />
+    <path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" />
+  </Icon>
+);
+/** A chip: a square with pins on each side. */
+export const CpuIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <rect x="4" y="4" width="8" height="8" rx="1.5" />
+    <path d="M6 1.5v2M10 1.5v2M6 12.5v2M10 12.5v2M1.5 6h2M1.5 10h2M12.5 6h2M12.5 10h2" />
+  </Icon>
+);
+/** A plug: two prongs, a body, a cable. */
+export const PlugIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M6 1.5v3M10 1.5v3M4 4.5h8V7a4 4 0 0 1-8 0zM8 11v3.5" />
+  </Icon>
+);

@@ -104,6 +104,8 @@ test("Escape inside the drawer closes it, and focus goes back to the toggle", as
 test("a todos.updated event shows in the drawer, and the closed toggle shows the count", async () => {
   const user = userEvent.setup();
   const { fake } = await open();
+  // Changes is the first tab; the todos are on the second.
+  await user.click(within(drawer() as HTMLElement).getByRole("tab", { name: /Todos/ }));
   expect(within(drawer() as HTMLElement).getByText(/No todos yet/)).toBeTruthy();
   sendTodos(fake);
   const list = within(drawer() as HTMLElement).getByRole("list", { name: "Todos" });

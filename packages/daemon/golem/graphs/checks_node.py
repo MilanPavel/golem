@@ -1,9 +1,9 @@
 """The ``checks`` node: after a turn that changed files, run the project's checks.
 
 It runs each check in the shell sandbox and reports it on the custom stream as
-``check.started`` and ``check.completed``. It never feeds a failure back to the
-model. Whether it runs, or first offers the checks to the user, comes from
-``[coding] checks`` and the session's answer.
+``check.started`` and ``check.completed``. A failure goes back to the model as a
+note, at most ``fix_rounds`` times a turn. Whether it runs, or first offers the
+checks to the user, comes from ``[coding] checks`` and the session's answer.
 """
 
 from __future__ import annotations
@@ -20,6 +20,7 @@ from langgraph.config import get_stream_writer
 
 from golem.coding.checks import Check, checks_for, decide, edited_this_turn
 from golem.graphs.adapter import STREAM_KEY
+from golem.graphs.notes import note
 from golem.graphs.state import AgentState
 from golem.graphs.tools_node import CWD_KEY, MODE_KEY
 from golem.permissions.policy import Policy
@@ -34,6 +35,9 @@ CHECKS_KEY = "golem_checks"
 
 OUTPUT_CHARS = 4000
 """How much of a check's output the event carries, counted from the end."""
+
+NOTE_OUTPUT_CHARS = 3000
+"""How much of a failed check's output the note to the model carries, from the end."""
 
 Status = Literal["passed", "failed", "timed_out"]
 
@@ -74,9 +78,21 @@ def checks_node(
         if not sandbox.available():
             log.warning("checks not run: this machine has no sandbox")
             return none
+        round_no = state.get("check_round", 0)
         results: list[dict[str, object]] = []
         for check in checks:
-            results.append(await _run(check, root, policy, artifacts, state.get("session_id")))
+            results.append(
+                await _run(
+                    check, root, policy, artifacts, state.get("session_id"), round_no=round_no
+                )
+            )
+        failed = [r for r in results if r["status"] != "passed"]
+        if failed and round_no < settings.fix_rounds:
+            return {
+                "check_results": results,
+                "check_round": round_no + 1,
+                "messages": [note(_failure_text(failed, round_no + 1, settings.fix_rounds))],
+            }
         return {"check_results": results}
 
     return run_checks
@@ -132,6 +148,18 @@ async def _run(
     }
     write({STREAM_KEY: "check.completed", **result})
     return result
+
+
+def _failure_text(failed: list[dict[str, object]], round_no: int, rounds: int) -> str:
+    """The note for the model: each failed check with the end of its output."""
+    parts = ["Checks failed after your changes. Fix them, or say why they cannot be fixed."]
+    for result in failed:
+        status = str(result["status"])
+        what = "timed out" if status == "timed_out" else f"exit {result['exit_code']}"
+        output = str(result["output"])[-NOTE_OUTPUT_CHARS:]
+        parts.append(f"{result['name']} ({what}):\n{output}")
+    parts.append(f"Round {round_no} of {rounds}.")
+    return "\n\n".join(parts)
 
 
 def _ms(started: float) -> int:

@@ -1,4 +1,3 @@
-import type { AuthKeyStatus } from "../../../store/keys.ts";
 import type { ListedSkill } from "../../../store/skills.ts";
 
 /** Skills as the gallery shows them: one of each kind of row. */
@@ -22,10 +21,3 @@ description: Summarise what changed since the last release tag.
 
 Run \`git log --oneline\` from the last tag to HEAD, then group the commits by area.
 `;
-
-export const SAMPLE_KEYS: AuthKeyStatus[] = [
-  { provider: "anthropic", takes_key: true, needs_key: true, source: "env", env_var: "ANTHROPIC_API_KEY" },
-  { provider: "openai", takes_key: true, needs_key: true, source: "keychain", env_var: "OPENAI_API_KEY" },
-  { provider: "openrouter", takes_key: true, needs_key: true, source: null, env_var: "OPENROUTER_API_KEY" },
-  { provider: "ollama", takes_key: false, needs_key: false, source: null, env_var: null },
-];
