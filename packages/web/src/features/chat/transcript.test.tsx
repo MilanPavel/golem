@@ -33,6 +33,20 @@ test("a run with tool steps is one golem and one footer: the last time and every
   expect(screen.queryByText(/0m 01\.0s/)).toBeNull();
 });
 
+test("a file being written shows a row that updates and goes when the tool is requested", () => {
+  const step = (over: Partial<ChatMessage>) => chat([answer({ id: "w", text: "", streaming: true, ...over })]);
+  const { container, rerender } = render(
+    <TranscriptMessages chat={step({ writing: { name: "write_file", path: null, lines: 0, chars: 0 } })} />,
+  );
+  const row = () => container.querySelector("[data-writing]");
+  expect(row()?.textContent).toBe("writing a file · 0 lines · 0 s");
+  expect(row()?.getAttribute("aria-live")).toBe("off");
+  rerender(<TranscriptMessages chat={step({ writing: { name: "write_file", path: "tests/a.py", lines: 14, chars: 300 } })} />);
+  expect(row()?.textContent).toBe("writing tests/a.py · 14 lines · 0 s");
+  rerender(<TranscriptMessages chat={step({ tools: [{ callId: "1", name: "write_file", args: { path: "tests/a.py" }, status: "requested" }] })} />);
+  expect(row()).toBeNull();
+});
+
 test("a streaming last step shows no footer", () => {
   render(
     <TranscriptMessages

@@ -1,4 +1,4 @@
-import { formatElapsed, type ChatMessage, type RunPhase } from "@golem/view";
+import { formatElapsed, type ChatMessage, type RunPhase, type WritingBlock } from "@golem/view";
 
 export type MeterPhase = RunPhase;
 
@@ -14,14 +14,25 @@ export function assistantChars(messages: readonly ChatMessage[]): number {
   return 0;
 }
 
-export function meterPhase(busy: boolean, chars: number, waiting = false): MeterPhase | null {
+export function meterPhase(busy: boolean, chars: number, waiting = false, writingFile = false): MeterPhase | null {
   if (!busy) {
     return null;
   }
   if (waiting) {
     return "waiting";
   }
-  return chars > 0 ? "writing" : "thinking";
+  return chars > 0 || writingFile ? "writing" : "thinking";
+}
+
+/** The file the last reply is still writing, or null. */
+export function writingNow(messages: readonly ChatMessage[]): { id: string; writing: WritingBlock } | null {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message !== undefined && message.role === "assistant") {
+      return message.writing == null ? null : { id: message.id, writing: message.writing };
+    }
+  }
+  return null;
 }
 
 export function elapsedSeconds(startedAt: string | null, nowMs: number): number {
@@ -55,6 +66,7 @@ export function meterLine(
   tick: number,
   columns: number,
   starting: string | null = null,
+  writing: string | null = null,
 ): string {
   const label =
     phase === "thinking"
@@ -63,7 +75,9 @@ export function meterLine(
         : `starting ${starting}`
       : phase === "waiting"
         ? "waiting for your approval"
-        : `writing · ${chars.toLocaleString("en-US")} chars · ${formatElapsed(elapsed * 1000)}`;
+        : writing !== null
+          ? writing
+          : `writing · ${chars.toLocaleString("en-US")} chars · ${formatElapsed(elapsed * 1000)}`;
   if (columns <= 0) {
     return "";
   }

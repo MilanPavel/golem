@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { assistantChars, elapsedSeconds, meterLine, meterPhase, shuttle } from "./progress.ts";
+import { assistantChars, elapsedSeconds, meterLine, meterPhase, shuttle, writingNow } from "./progress.ts";
 
 test("the meter is hidden until a run is busy", () => {
   assert.equal(meterPhase(false, 0), null);
@@ -38,4 +38,12 @@ test("character count is the latest assistant message", () => {
     2,
   );
   assert.equal(assistantChars([]), 0);
+});
+
+test("a file being written takes the meter text and the writing phase", () => {
+  assert.equal(meterPhase(true, 0, false, true), "writing");
+  assert.equal(meterPhase(true, 0, false, false), "thinking");
+  assert.match(meterLine("writing", 0, 4, 0, 60, null, "writing a.py · 6 lines · 4 s"), /^writing a\.py · 6 lines · 4 s {2}█/);
+  assert.equal(writingNow([{ id: "a", role: "assistant", text: "", streaming: true, writing: { name: "write_file", path: null, lines: 1, chars: 3 } }])?.writing.lines, 1);
+  assert.equal(writingNow([]), null);
 });

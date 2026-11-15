@@ -9,6 +9,7 @@ import {
   REPLY_CUT_NOTE,
   thinkingLine,
   visibleText,
+  writingLabel,
   type ChatMessage,
   type Detail,
   type DiffExcerpt,
@@ -25,6 +26,8 @@ export type Span = {
   dim?: boolean;
   /** A row of a diff: drawn green or red on a tinted background. */
   tone?: "add" | "del";
+  /** Drawn yellow: a file the model is still writing. */
+  warn?: boolean;
 };
 
 export type LineRole = "user" | "assistant" | "plain";
@@ -73,6 +76,8 @@ export type TranscriptOptions = {
   thinking?: boolean;
   /** How many diff rows an edit shows under its line: none, 10 or 30. Unset is `normal`. */
   detail?: Detail;
+  /** Whole seconds since the first `tool.writing` of the call a reply is writing. Unset counts 0. */
+  writingSeconds?: (messageId: string) => number;
 };
 
 /** Output rows shown per tool call while Ctrl-O is on. */
@@ -125,6 +130,12 @@ export function layoutMessages(
     }
     for (const tool of tools) {
       for (const spans of toolLines(tool, width, options?.toolOutput === true, options?.detail)) {
+        lines.push(wrappedLine(role, spans));
+      }
+    }
+    if (message.writing != null) {
+      const label = writingLabel(message.writing, options?.writingSeconds?.(message.id) ?? 0);
+      for (const spans of wrapSpans([{ text: `◐ ${label}`, warn: true }], width)) {
         lines.push(wrappedLine(role, spans));
       }
     }

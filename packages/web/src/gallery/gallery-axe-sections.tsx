@@ -39,6 +39,7 @@ export const GALLERY_SECTIONS = [
   "turn",
   "thinking",
   "cut-reply",
+  "writing-a-file",
   "diff",
   "todo-list",
   "workbench",

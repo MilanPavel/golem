@@ -28,6 +28,8 @@ import {
   downloadEnded,
   emptyChat,
   forkPoint,
+  stopWriting,
+  writingLabel,
   NO_MODEL_NOTICE,
   noModelChosen,
   advance,
@@ -301,7 +303,7 @@ import {
   skillsManagerTyping,
   type SkillsManagerState,
 } from "./skills-manager.ts";
-import { assistantChars, elapsedSeconds, meterLine, meterPhase } from "./progress.ts";
+import { assistantChars, elapsedSeconds, meterLine, meterPhase, writingNow } from "./progress.ts";
 import {
   alertLabel,
   fitSegments,
@@ -493,6 +495,7 @@ export function App({
   const [showTodos, setShowTodos] = useState(DEFAULT_PREFS.todos);
   const [showThinking, setShowThinking] = useState(DEFAULT_PREFS.thinking);
   const [tick, setTick] = useState(0);
+  const writingStarts = useRef(new Map<string, number>());
   const [debug, setDebug] = useState<DebugState>(closedDebug);
   const [debugOffset, setDebugOffset] = useState(0);
   const [wire, setWire] = useState<readonly WireLine[]>([]);
@@ -753,7 +756,17 @@ export function App({
       : [];
   startersRef.current = starters;
   const starterRows = starterLines(starters, starters.length > 0 ? starterPick : null);
-  const transcriptOptions = { times: showTimes, now, toolOutput, thinking: showThinking };
+  // Seconds count from the first `tool.writing` of a call, on this clock.
+  const writingSince = writingStarts.current;
+  for (const message of chat.messages) {
+    if (message.writing == null) {
+      writingSince.delete(message.id);
+    } else if (!writingSince.has(message.id)) {
+      writingSince.set(message.id, Date.now());
+    }
+  }
+  const writingSeconds = (id: string) => Math.max(0, Math.floor((Date.now() - (writingSince.get(id) ?? Date.now())) / 1000));
+  const transcriptOptions = { times: showTimes, now, toolOutput, thinking: showThinking, writingSeconds };
   const measured = layoutTranscript(chat.messages, columns, chatHeight, offset, transcriptOptions);
   const widthKey = measured.overflow ? Math.max(1, columns - 1) : columns;
   const followed = followTail(tail, measured.lineCount, widthKey, offset);
@@ -763,7 +776,9 @@ export function App({
       : layoutTranscript(chat.messages, columns, chatHeight, followed.offset, transcriptOptions);
   const cwd = shortCwd(sessionCwd ?? process.cwd(), homedir());
   const versions = versionLabel(GOLEM_VERSION, daemonVersion);
-  const phase = meterPhase(chat.busy, assistantChars(chat.messages), chat.approval !== null);
+  const writing = writingNow(chat.messages);
+  const writingText = writing === null ? null : writingLabel(writing.writing, writingSeconds(writing.id));
+  const phase = meterPhase(chat.busy, assistantChars(chat.messages), chat.approval !== null, writing !== null);
   const page = Math.max(1, (keysOpen ? budget.body : Math.max(1, chatHeight)) - 1);
   const debugPage = Math.max(1, budget.debug - 2);
 
@@ -1055,6 +1070,13 @@ export function App({
       setOffset((current) => nextOffset(current, steps));
     });
   }, [onWheel]);
+
+  // A lost connection ends the file the model was writing: no `tool.requested` will come for it.
+  useEffect(() => {
+    if (connection.status === "reconnecting" || connection.status === "closed") {
+      setChat(stopWriting);
+    }
+  }, [connection.status]);
 
   useEffect(() => {
     if (!chat.busy) {
@@ -4544,6 +4566,7 @@ export function App({
             tick,
             columns,
             startingServer(servers, model.provider),
+            writingText,
           )}
         </Text>
       ) : null}
@@ -4648,7 +4671,9 @@ function LineView({ line, columns }: { line: LayoutLine; columns: [number, numbe
               ? DIFF_ADD
               : span.tone === "del"
                 ? DIFF_DEL
-                : span.dim === true
+                : span.warn === true
+                  ? "yellow"
+                  : span.dim === true
                   ? undefined
                   : span.code === true && !user
                     ? "cyan"
