@@ -143,4 +143,5 @@ MIGRATIONS: tuple[tuple[str, ...], ...] = (
         "CREATE INDEX model_calls_session ON model_calls (session_id)",
     ),
     ("ALTER TABLE sessions ADD COLUMN checks INTEGER",),
+    ("ALTER TABLE sessions ADD COLUMN route TEXT NOT NULL DEFAULT 'pinned'",),
 )

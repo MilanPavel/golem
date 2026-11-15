@@ -1,4 +1,4 @@
-import type { ToolBlock } from "./chat-state.ts";
+import type { ToolBlock, WritingBlock } from "./chat-state.ts";
 
 /** `mcp__github__get_me` reads `github · get_me`; any other name is left as it is. */
 export function displayToolName(name: string): string {
@@ -73,6 +73,15 @@ export function summarizeSteps(tools: readonly ToolBlock[]): string {
   const approvals = tools.filter((tool) => tool.approval !== undefined).length;
   if (approvals > 0) parts.push(plural(approvals, "approval", "approvals"));
   return parts.join(" · ");
+}
+
+/**
+ * The row of a file the model is still writing: `writing tests/test_fetch.py · 14 lines · 38 s`.
+ * `writing a file` stands in while the path is not known; `edit_file` reads `editing`.
+ */
+export function writingLabel(writing: WritingBlock, seconds: number): string {
+  const verb = writing.name === "edit_file" ? "editing" : "writing";
+  return `${verb} ${writing.path ?? "a file"} · ${plural(writing.lines, "line", "lines")} · ${Math.max(0, Math.floor(seconds))} s`;
 }
 
 /** The quiet form of the line: `1 step`, `5 steps`. */

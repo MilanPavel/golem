@@ -56,7 +56,8 @@
         "tools",
         "user",
         "assistant",
-        "tool_results"
+        "tool_results",
+        "summary"
       ],
       "title": "Key",
       "type": "string"

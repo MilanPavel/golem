@@ -121,6 +121,7 @@ async def test_a_model_span_reads_its_context_reply_prompt_and_tools(
         "user",
         "assistant",
         "tool_results",
+        "summary",
     ]
     assert sum(p.tokens for p in first.context.parts) == 900
     tools_part = first.context.parts[1]
