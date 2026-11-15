@@ -42,6 +42,8 @@ export type ComposerOutcome =
   | { kind: "sessions" }
   | { kind: "setup" }
   | { kind: "skills" }
+  /** `/skill new`: start the new-skill form. */
+  | { kind: "skill-new" }
   | { kind: "permissions" }
   | { kind: "new" }
   | { kind: "fork" }
@@ -128,7 +130,7 @@ export function pinnedNotice(active: readonly string[]): string {
 }
 
 const UNKNOWN = "unknown command \u2014 /help lists them";
-const SKILL_USAGE = "/skill run <name> [args] \u00b7 /skill pin <name> \u00b7 /skill unpin <name>";
+const SKILL_USAGE = "/skill run <name> [args] \u00b7 /skill pin <name> \u00b7 /skill unpin <name> \u00b7 /skill new";
 const HELD_SKILL = "a skill is not held \u2014 /debug hold turns hold off";
 
 /** Built-in providers that take an API key. A provider added in config.toml works too. */
@@ -329,8 +331,8 @@ export const COMMANDS: readonly Command[] = [
     name: "/skill",
     group: "tools",
     args: "run|pin|unpin <name>",
-    description: "Runs a skill once, or pins one for the whole session. Alone, lists the pinned skills.",
-    choices: ["run", "pin", "unpin"],
+    description: "Runs a skill once, pins one for the session, or makes one. Alone, lists the pinned ones.",
+    choices: ["run", "pin", "unpin", "new"],
     // The composer reads /skill itself, because a skill's arguments keep their spacing and quotes.
     run: () => ({ kind: "unknown", notice: SKILL_USAGE }),
   },
@@ -514,7 +516,7 @@ function applyCommand(
   return skill === undefined ? unknown() : runSkill(debug, skill.name, afterWords(text, 1), text);
 }
 
-/** `/skill` alone, `/skill run <name> [args]`, `/skill pin <name>`, and `/skill unpin <name>`. */
+/** `/skill` alone, `/skill run <name> [args]`, `/skill pin <name>`, `/skill unpin <name>`, and `/skill new`. */
 function skillCommand(
   debug: DebugState,
   text: string,
@@ -524,6 +526,9 @@ function skillCommand(
   const [, sub, name, extra] = text.split(/\s+/);
   if (sub === undefined) {
     return local(debug, null, false, pinnedNotice(pins.active));
+  }
+  if (sub === "new") {
+    return name === undefined ? { kind: "skill-new" } : { kind: "unknown", notice: SKILL_USAGE };
   }
   if (sub === "pin" || sub === "unpin") {
     return pinCommand(debug, sub === "pin", name, extra, pins);

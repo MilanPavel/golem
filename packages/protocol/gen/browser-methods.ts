@@ -4,6 +4,8 @@ export const BROWSER_METHODS: ReadonlySet<string> = new Set([
   "approval.respond",
   "artifact.read",
   "auth.list",
+  "changes.diff",
+  "changes.list",
   "config.get",
   "config.raw.get",
   "config.raw.set",
@@ -76,6 +78,7 @@ export const LOCAL_ONLY_METHODS: ReadonlySet<string> = new Set([
   "auth.remove",
   "auth.set",
   "config.raw.set_protected",
+  "notify.test",
   "skill.create_protected",
   "skill.write_protected",
 ]);

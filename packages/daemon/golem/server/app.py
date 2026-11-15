@@ -14,6 +14,7 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
+from golem.coding.changes import ChangeStore
 from golem.config import ModelPrice, load_settings
 from golem.graphs.chat import ChatRuntime, open_chat
 from golem.graphs.prompt import SystemPrompt
@@ -32,6 +33,7 @@ from golem.models.router import ModelConfigError, ModelRouter
 from golem.models.tiers import Tier
 from golem.models.window import resolve_window
 from golem.models.window_plans import WindowPlans
+from golem.notify import Notifier, Poster, SessionFacts, default_poster
 from golem.paths import GolemPaths, resolve_paths
 from golem.permissions.policy import Policy
 from golem.secrets import KeychainSecrets, SecretStore
@@ -118,6 +120,7 @@ class DaemonApp:
         local_servers: LocalServers | None = None,
         gate: ServerGate | None = None,
         socket_check_seconds: float = SOCKET_CHECK_SECONDS,
+        poster: Poster | None = None,
     ) -> None:
         self.paths = paths
         self._socket_check_seconds = socket_check_seconds
@@ -131,6 +134,7 @@ class DaemonApp:
         self._pulls = pulls
         self._mcp = mcp
         self._local = local_servers
+        self._poster = poster
         self.state = DaemonState(
             paths=paths, started_at=time.monotonic(), secrets=secrets, user_home=user_home
         )
@@ -233,6 +237,7 @@ class DaemonApp:
                 self.state.policy = policy
                 self.state.tools = default_registry(mcp, policy.web())
                 self.state.artifacts = ArtifactStore(database)
+                self.state.changes = ChangeStore(database, BlobStore(database))
                 usage = Usage(database)
                 replayed = await backfill(database)
                 if replayed:
@@ -268,20 +273,28 @@ class DaemonApp:
                     gate=self._gate or ServerGate(settings.ollama.parallel),
                     tier_of=lambda profile: _tier_of(router, models, profile),
                 )
+                bus = EventBus()
                 self.state.sessions = await _open_sessions(
                     database,
+                    bus,
                     chat,
                     self._titles,
                     self.state.skills,
                     BlobStore(database),
                 )
                 sessions = self.state.sessions
+                self.state.notifier = _open_notifier(
+                    SessionRecords(database),
+                    bus,
+                    self._poster or default_poster(self.paths.home),
+                )
 
                 async def enable_mcp(session_id: str, scope: ToolScope, name: str) -> list[str]:
                     return await turn_on_for_model(sessions, mcp, session_id, scope, name)
 
                 chat.enable_mcp = enable_mcp
                 chat.skills = self.state.skills
+                chat.changes = ChangeStore(database, BlobStore(database))
                 if self._pulls is None:
                     pulls = PullManager(router, ram_gb=models.ram_gb)
                 else:
@@ -354,6 +367,7 @@ class DaemonApp:
                 await self.state.local_servers.aclose()
             self.state.local_servers = None
             self.state.usage = None
+            self.state.notifier = None
             self.state.sessions = None
             self._lock.release()
 
@@ -526,8 +540,21 @@ def _tier_of(router: ModelRouter, models: ModelDiscovery, profile: str) -> Tier 
     return models.tier_of_ref(ref)
 
 
+def _open_notifier(records: SessionRecords, bus: EventBus, poster: Poster) -> Notifier:
+    """The notifier, watching ``bus`` for sessions no client follows."""
+
+    async def lookup(session_id: str) -> SessionFacts | None:
+        record = await records.get(session_id)
+        return None if record is None else SessionFacts(record.title, record.origin)
+
+    notifier = Notifier(poster, lookup, bus.attached)
+    bus.observe(notifier.on_event)
+    return notifier
+
+
 async def _open_sessions(
     database: Database,
+    bus: EventBus,
     runtime: ChatRuntime,
     titles: TitleGenerator | None,
     skills: SkillRegistry | None,
@@ -535,7 +562,7 @@ async def _open_sessions(
 ) -> SessionManager:
     events = EventLog(database)
     records = SessionRecords(database)
-    session_log = SessionLog(events, EventBus(), records)
+    session_log = SessionLog(events, bus, records)
     runs = RunRecords(database)
     await recover_runs(runs, events, session_log, runtime)
     return SessionManager(

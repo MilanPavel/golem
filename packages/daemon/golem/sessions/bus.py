@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from typing import Protocol
 
 from golem_protocol.commands import SessionSummary
@@ -33,6 +34,15 @@ class EventBus:
     def __init__(self) -> None:
         self._targets: dict[str, set[EventTarget]] = {}
         self._watchers: set[SummaryTarget] = set()
+        self._observers: list[Callable[[ChatEvent], None]] = []
+
+    def observe(self, observer: Callable[[ChatEvent], None]) -> None:
+        """Call ``observer`` with every published event, attached or not. It must not block."""
+        self._observers.append(observer)
+
+    def attached(self, session_id: str) -> bool:
+        """True while any client follows the session."""
+        return bool(self._targets.get(session_id))
 
     def subscribe(self, session_id: str, target: EventTarget) -> None:
         self._targets.setdefault(session_id, set()).add(target)
@@ -67,6 +77,11 @@ class EventBus:
 
     def publish(self, event: ChatEvent) -> None:
         """Hand ``event`` to each target of its session. Drops targets that are gone."""
+        for observer in self._observers:
+            try:
+                observer(event)
+            except Exception:
+                log.exception("an event observer failed on %s", event.type)
         for target in list(self._targets.get(event.session_id, ())):
             try:
                 target.deliver(event)

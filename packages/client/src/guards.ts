@@ -12,6 +12,7 @@ import type { McpTestProgress } from "../../protocol/gen/mcp-test-progress.ts";
 import type { McpTestResult } from "../../protocol/gen/mcp-test-result.ts";
 import type { RuntimeInstallDone } from "../../protocol/gen/runtime-install-done.ts";
 import type { OllamaInstallDone } from "../../protocol/gen/ollama-install-done.ts";
+import type { ChangesListResult } from "../../protocol/gen/changes-list-result.ts";
 import type { DirEntry, FsListDirsResult } from "../../protocol/gen/fs-list-dirs-result.ts";
 import type { SetupRow, SetupStatusResult } from "../../protocol/gen/setup-status-result.ts";
 import type { McpListResult } from "../../protocol/gen/mcp-list-result.ts";
@@ -29,6 +30,8 @@ import type { SessionSetOptionsResult } from "../../protocol/gen/session-set-opt
 import type { ListedSkill, SkillListResult } from "../../protocol/gen/skill-list-result.ts";
 import type { SkillCreateResult } from "../../protocol/gen/skill-create-result.ts";
 import type { SkillReadResult } from "../../protocol/gen/skill-read-result.ts";
+import type { SkillSetDisabledResult } from "../../protocol/gen/skill-set-disabled-result.ts";
+import type { SkillWriteResult } from "../../protocol/gen/skill-write-result.ts";
 import type { McpRemoveResult } from "../../protocol/gen/mcp-remove-result.ts";
 import type { McpToggleResult } from "../../protocol/gen/mcp-toggle-result.ts";
 import type { SessionSetSkillsResult } from "../../protocol/gen/session-set-skills-result.ts";
@@ -208,8 +211,16 @@ export function isSkillReadResult(value: unknown): value is SkillReadResult {
   );
 }
 
+export function isSkillWriteResult(value: unknown): value is SkillWriteResult {
+  return isRecord(value) && typeof value["ok"] === "boolean" && typeof value["written"] === "boolean";
+}
+
 export function isSkillCreateResult(value: unknown): value is SkillCreateResult {
   return isRecord(value) && typeof value["path"] === "string" && typeof value["mtime_ns"] === "number";
+}
+
+export function isSkillSetDisabledResult(value: unknown): value is SkillSetDisabledResult {
+  return isRecord(value) && typeof value["name"] === "string" && typeof value["disabled"] === "boolean";
 }
 
 export function isSessionSetSkillsResult(value: unknown): value is SessionSetSkillsResult {
@@ -376,6 +387,23 @@ export function isFsListDirsResult(value: unknown): value is FsListDirsResult {
     value["entries"].every(isDirEntry) &&
     typeof value["truncated"] === "boolean"
   );
+}
+
+function isChangedFile(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    typeof value["path"] === "string" &&
+    (value["status"] === "created" || value["status"] === "modified" || value["status"] === "deleted") &&
+    typeof value["added"] === "number" &&
+    typeof value["removed"] === "number" &&
+    Array.isArray(value["change_ids"]) &&
+    value["change_ids"].every((id) => typeof id === "string") &&
+    typeof value["stale"] === "boolean"
+  );
+}
+
+export function isChangesListResult(value: unknown): value is ChangesListResult {
+  return isRecord(value) && Array.isArray(value["files"]) && value["files"].every(isChangedFile);
 }
 
 export function isKeychainWait(value: unknown): value is KeychainWait {

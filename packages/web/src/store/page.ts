@@ -1,4 +1,4 @@
-import { OLLAMA_FAILED, RpcError, type ApprovalChoice, type ConfigGetResult, type ConfigRawGetResult, type ConfigRawResult, type FsListDirsResult, type McpAddParams, type McpCallResult, type McpImportApplyParams, type McpImportApplyResult, type McpImportScanResult, type McpCatalogResult, type McpListResult, type McpLogsResult, type McpServerConfig, type McpServerDetail, type McpServerLog, type McpLoginDone, type McpTestProgress, type McpTestResult, type GolemClient, type RuntimeName, type SetupStatusResult, type SkillListResult, type TraceGetResult, type TraceSpanResult, type ArtifactReadResult, type ModelOptionsGetResult, type ModelOptionsSetResult, type SessionSetOptionsResult } from "@golem/client";
+import { OLLAMA_FAILED, RpcError, type ApprovalChoice, type ConfigGetResult, type ConfigRawGetResult, type ConfigRawResult, type FsListDirsResult, type McpAddParams, type McpCallResult, type McpImportApplyParams, type McpImportApplyResult, type McpImportScanResult, type McpCatalogResult, type McpListResult, type McpLogsResult, type McpServerConfig, type McpServerDetail, type McpServerLog, type McpLoginDone, type McpTestProgress, type McpTestResult, type GolemClient, type RuntimeName, type SetupStatusResult, type SkillListResult, type TraceGetResult, type TraceSpanResult, type ArtifactReadResult, type ChangesDiffResult, type ChangesDiffTarget, type ChangesListResult, type ModelOptionsGetResult, type ModelOptionsSetResult, type SessionSetOptionsResult } from "@golem/client";
 import { changeToolFilter, installEventOf, type InstallEvent, type PermissionMode } from "@golem/view";
 import type { QueryClient } from "@tanstack/react-query";
 import { createDrafts, type Drafts } from "./drafts.ts";
@@ -49,6 +49,8 @@ export type PageClient = Pick<
   | "getTrace"
   | "getTraceSpan"
   | "readArtifact"
+  | "changesList"
+  | "changesDiff"
   | "restartMcp"
   | "setMcpEnabled"
   | "enableMcp"
@@ -244,6 +246,10 @@ export type PageQueries = {
   traceSpan(sessionId: string, spanId: string): Promise<TraceSpanResult>;
   /** `limit` characters of a session's artifact from `offset`. */
   artifact(sessionId: string, artifactId: string, offset: number, limit: number): Promise<ArtifactReadResult>;
+  /** The files a session changed, each as its net change. */
+  changesList(sessionId: string): Promise<ChangesListResult>;
+  /** The diff of one file or of one change of a session. */
+  changesDiff(sessionId: string, target: ChangesDiffTarget): Promise<ChangesDiffResult>;
   /** The folders directly under `path` in the home folder; `null` is home itself. */
   dirs(path: string | null): Promise<FsListDirsResult>;
 };
@@ -325,6 +331,8 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       trace: (sessionId) => client.getTrace(sessionId),
       traceSpan: (sessionId, spanId) => client.getTraceSpan(sessionId, spanId),
       artifact: (sessionId, artifactId, offset, limit) => client.readArtifact(sessionId, artifactId, offset, limit),
+      changesList: (sessionId) => client.changesList(sessionId),
+      changesDiff: (sessionId, target) => client.changesDiff(sessionId, target),
       mcpCatalog: (sessionId) => client.mcpCatalog(sessionId ?? undefined),
       dirs: (path) => (path === null ? client.listDirs() : client.listDirs(path)),
     },

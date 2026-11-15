@@ -9,6 +9,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
+from golem.coding.changes import ChangeStore
 from golem.mcp import McpSupervisor
 from golem.mcp.importer import ScanStore
 from golem.models.discovery import ModelDiscovery
@@ -16,6 +17,7 @@ from golem.models.facts import ListedFacts
 from golem.models.install import BrewInstaller, OllamaInstaller
 from golem.models.ollama import LocalServers
 from golem.models.pulls import PullManager
+from golem.notify import Notifier
 from golem.paths import GolemPaths
 from golem.permissions.policy import Policy
 from golem.secrets import SecretStore
@@ -34,12 +36,14 @@ class DaemonState:
     started_at: float
     state: Literal["running", "draining"] = "running"
     sessions: SessionManager | None = None
+    notifier: Notifier | None = None
     models: ModelDiscovery | None = None
     facts: ListedFacts | None = None
     pulls: PullManager | None = None
     policy: Policy | None = None
     tools: ToolRegistry | None = None
     artifacts: ArtifactStore | None = None
+    changes: ChangeStore | None = None
     usage: Usage | None = None
     mcp: McpSupervisor | None = None
     secrets: SecretStore | None = None

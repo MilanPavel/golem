@@ -1,0 +1,42 @@
+{
+  "additionalProperties": false,
+  "description": "``changes.diff``. The diff of a file or of one change: exactly one of the two is set.",
+  "properties": {
+    "change_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Change Id"
+    },
+    "path": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Path"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "session_id"
+  ],
+  "title": "ChangesDiffParams",
+  "type": "object"
+}

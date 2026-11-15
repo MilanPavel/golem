@@ -27,12 +27,14 @@ from typing import Literal
 
 from pydantic import BaseModel
 
+from golem.coding.changes import ChangeStore, status_of
 from golem.config import ModelPrice, PermissionMode
 from golem.graphs.adapter import (
     ApprovalAsked,
     CheckCompleted,
     CheckOffered,
     CheckStarted,
+    FileChanged,
     ModelRequested,
     ModelResponded,
     ModelStarted,
@@ -71,6 +73,7 @@ from golem_protocol.events import (
     CheckStartedData,
     EmptyEventData,
     EventType,
+    FileChangedData,
     MessageCompletedData,
     MessageDeltaData,
     MessageStartedData,
@@ -214,6 +217,10 @@ class _Progress:
     """When the first thinking fragment of the open reply came."""
     think_ms: int | None = None
     """Thinking time of the open reply, set when its first answer fragment comes."""
+    changes: ChangeStore | None = None
+    """Records the files a tool wrote. None: they are not recorded and send no event."""
+    session_id: str = ""
+    run_id: str = ""
 
 
 async def run_turn(
@@ -231,6 +238,9 @@ async def run_turn(
         identify=runtime.router.identity,
         price_of=runtime.price_of,
         tier_of=runtime.tier_of,
+        changes=runtime.changes,
+        session_id=turn.session_id,
+        run_id=turn.run_id,
     )
 
     async def emit(kind: EventType, data: BaseModel) -> None:
@@ -327,6 +337,9 @@ async def resume_turn(
         identify=runtime.router.identity,
         price_of=runtime.price_of,
         tier_of=runtime.tier_of,
+        changes=runtime.changes,
+        session_id=resume.session_id,
+        run_id=resume.run_id,
     )
 
     async def emit(kind: EventType, data: BaseModel) -> None:
@@ -543,6 +556,8 @@ async def _apply(
             "todos.updated",
             TodosUpdatedData.model_validate({"call_id": fact.call_id, "todos": list(fact.todos)}),
         )
+    elif isinstance(fact, FileChanged):
+        await _record_change(fact, progress, emit)
     elif isinstance(fact, PinRead):
         if progress.pins.read(fact.name, fact.hash):
             data = {"name": fact.name, "source": fact.source, "how": "pinned"}
@@ -597,6 +612,42 @@ async def _apply(
                 diff=fact.diff,
             ),
         )
+
+
+async def _record_change(
+    fact: FileChanged,
+    progress: _Progress,
+    emit: Callable[[EventType, BaseModel], Awaitable[None]],
+) -> None:
+    """Store the change, then tell the screens. The texts stay here and never go out."""
+    if progress.changes is None or fact.before == fact.after:
+        return
+    try:
+        change = await progress.changes.record(
+            session_id=progress.session_id,
+            run_id=progress.run_id,
+            call_id=fact.call_id,
+            path=fact.path,
+            before=fact.before,
+            after=fact.after,
+            source=fact.source,
+        )
+    except Exception:
+        log.exception("could not record the change to %s", fact.path)
+        return
+    await emit(
+        "file.changed",
+        FileChangedData(
+            change_id=change.change_id,
+            call_id=change.call_id,
+            path=change.path,
+            status=status_of(change.before_sha, change.after_sha),
+            added=change.added,
+            removed=change.removed,
+            source=change.source,
+            reverts=change.reverts,
+        ),
+    )
 
 
 def _tier(progress: _Progress, model: ModelIdentity | None) -> Tier | None:

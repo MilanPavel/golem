@@ -38,6 +38,8 @@ METHOD_ACCESS: Final[Mapping[str, Access]] = {
     "run.cancel": "browser",
     "artifact.read": "browser",
     "session.inspect": "browser",
+    "changes.list": "browser",
+    "changes.diff": "browser",
     "cost.get": "browser",
     "trace.get": "browser",
     "trace.span": "browser",
@@ -93,6 +95,7 @@ METHOD_ACCESS: Final[Mapping[str, Access]] = {
     "ollama.install_cancel": "browser",
     "ollama.start": "browser",
     "fs.list_dirs": "browser",
+    "notify.test": "local",
 }
 
 BROWSER_METHODS: Final[frozenset[str]] = frozenset(

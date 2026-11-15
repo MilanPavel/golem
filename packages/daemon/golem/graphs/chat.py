@@ -26,6 +26,7 @@ from langgraph.errors import GraphRecursionError
 from langgraph.graph import END, START, StateGraph  # pyright: ignore[reportMissingTypeStubs]
 from langgraph.types import Command
 
+from golem.coding.changes import ChangeStore
 from golem.config import ModelPrice, PermissionMode
 from golem.graphs.adapter import STREAM_KEY, message_text
 from golem.graphs.checks_node import CHECKS_KEY, checks_node
@@ -156,6 +157,8 @@ class ChatRuntime:
         """Turns on an on-demand MCP server for a session, for the model's ``mcp_enable``."""
         self.skills: SkillRegistry | None = None
         """The skills sessions see, for the model's ``load_skill``."""
+        self.changes: ChangeStore | None = None
+        """Where each file a tool writes is recorded. None: not recorded."""
         self.until_pulled: Callable[[str], Awaitable[None]] | None = None
         """Waits until a model's download ends, given its ref. Raises with the download's error."""
 

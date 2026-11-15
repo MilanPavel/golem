@@ -531,6 +531,14 @@ class SessionManager:
         async with self._lock:
             return dict((await self._resolve(session_id)).options)
 
+    async def cwd_of(self, session_id: str) -> str | None:
+        """The folder the session works in, None for a session without one.
+
+        Raises :class:`SessionNotFoundError` or :class:`SchemaMismatchError`.
+        """
+        async with self._lock:
+            return (await self._resolve(session_id)).cwd
+
     async def model_profile(self, session_id: str) -> str:
         """The profile or ref the session runs on.
 

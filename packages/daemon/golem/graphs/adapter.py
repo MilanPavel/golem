@@ -27,6 +27,9 @@ PIN_SKIPPED_KIND = "skill.pin_skipped"
 SKILL_LOADED_KIND = "skill.loaded"
 """``STREAM_KEY`` value of a tool call that loaded a skill for the model."""
 
+FILE_CHANGED_KIND = "file.changed"
+"""``STREAM_KEY`` value of a tool call that wrote a file, with the text before and after."""
+
 APPROVAL_KIND = "approval"
 """``STREAM_KEY`` value of an interrupt that waits for a tool approval."""
 
@@ -160,6 +163,17 @@ class TodosChanged:
 
 
 @dataclass(frozen=True, slots=True)
+class FileChanged:
+    """A tool wrote a file. ``before`` and ``after`` are whole texts, for the store only."""
+
+    call_id: str | None
+    path: str
+    before: str | None
+    after: str | None
+    source: Literal["tool", "shell", "revert"]
+
+
+@dataclass(frozen=True, slots=True)
 class ApprovalAsked:
     """The run paused on a tool call that needs the user's answer."""
 
@@ -243,6 +257,7 @@ Fact = (
     | ToolErrored
     | ApprovalAsked
     | TodosChanged
+    | FileChanged
     | PinRead
     | PinSkipped
     | SkillLoaded
@@ -686,6 +701,18 @@ def _custom(data: object) -> Fact | None:
             if isinstance(row, dict)
         )
         return TodosChanged(call_id, rows)
+    if kind == FILE_CHANGED_KIND:
+        path, before, after = item.get("path"), item.get("before"), item.get("after")
+        if not isinstance(path, str) or not path:
+            return None
+        if not (before is None or isinstance(before, str)):
+            return None
+        if not (after is None or isinstance(after, str)):
+            return None
+        source = item.get("source")
+        if source not in ("tool", "shell", "revert"):
+            return None
+        return FileChanged(call_id or None, path, before, after, source)
     if kind == "tool.failed":
         message = item.get("message")
         return ToolErrored(
@@ -820,12 +847,14 @@ def _pin(kind: object, item: Mapping[str, object]) -> PinRead | PinSkipped | Non
 
 __all__ = [
     "APPROVAL_KIND",
+    "FILE_CHANGED_KIND",
     "PIN_READ_KIND",
     "PIN_SKIPPED_KIND",
     "SKILL_LOADED_KIND",
     "STREAM_KEY",
     "ApprovalAsked",
     "Fact",
+    "FileChanged",
     "ModelRequested",
     "ModelResponded",
     "ModelStarted",

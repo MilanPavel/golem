@@ -26,7 +26,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from golem.tools.fs import MAX_READ_BYTES
 from golem.tools.paths import inside, relative, session_root, writable
-from golem.tools.registry import Preview, Tool, ToolContext, ToolError, ToolResult
+from golem.tools.registry import FileEdit, Preview, Tool, ToolContext, ToolError, ToolResult
 
 DIFF_CONTEXT = 3
 DIFF_CHARS = 64_000
@@ -220,6 +220,7 @@ def commit(change: Change, approved_diff: str | None = None) -> ToolResult:
         output=f"{verb} {change.shown} (+{added} -{removed})",
         summary=summary,
         diff=shown_diff(change),
+        edits=(FileEdit(change.shown, change.before, change.after),),
     )
 
 

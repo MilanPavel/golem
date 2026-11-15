@@ -23,8 +23,13 @@ import type { FsListDirsResult } from "../../protocol/gen/fs-list-dirs-result.ts
 import type { SetupStatusResult } from "../../protocol/gen/setup-status-result.ts";
 import type { ApprovalRespondResult } from "../../protocol/gen/approval-respond-result.ts";
 import type { ArtifactReadResult } from "../../protocol/gen/artifact-read-result.ts";
+import type { ChangesDiffResult } from "../../protocol/gen/changes-diff-result.ts";
+import type { ChangesListResult } from "../../protocol/gen/changes-list-result.ts";
 import type { ConfigGetResult } from "../../protocol/gen/config-get-result.ts";
 import type { PolicyEditResult } from "../../protocol/gen/policy-edit-result.ts";
+
+/** What `changes.diff` shows: the net change of one file, or one change. */
+export type ChangesDiffTarget = { path: string } | { changeId: string };
 
 export type ApprovalChoice = "allow" | "allow_session" | "allow_always" | "deny";
 
@@ -35,9 +40,11 @@ import type { McpListResult } from "../../protocol/gen/mcp-list-result.ts";
 import type { McpServer } from "../../protocol/gen/mcp-server.ts";
 import type { ModelServerStatus } from "../../protocol/gen/model-server-status.ts";
 import type { SkillCall } from "../../protocol/gen/skill-call.ts";
-import type { SkillListResult } from "../../protocol/gen/skill-list-result.ts";
 import type { SkillCreateResult } from "../../protocol/gen/skill-create-result.ts";
+import type { SkillListResult } from "../../protocol/gen/skill-list-result.ts";
 import type { SkillReadResult } from "../../protocol/gen/skill-read-result.ts";
+import type { SkillSetDisabledResult } from "../../protocol/gen/skill-set-disabled-result.ts";
+import type { SkillWriteResult } from "../../protocol/gen/skill-write-result.ts";
 import type { McpToggleResult } from "../../protocol/gen/mcp-toggle-result.ts";
 import type { SessionSetSkillsResult } from "../../protocol/gen/session-set-skills-result.ts";
 import type { McpToolsResult } from "../../protocol/gen/mcp-tools-result.ts";
@@ -96,6 +103,7 @@ import {
   isMcpServerDetail,
   isRuntimeInstallDone,
   isRuntimeName,
+  isChangesListResult,
   isFsListDirsResult,
   isSetupStatusResult,
   isDaemonStatus,
@@ -132,9 +140,11 @@ import {
   isPullDone,
   isPullProgress,
   isRefResult,
-  isSkillListResult,
   isSkillCreateResult,
+  isSkillListResult,
   isSkillReadResult,
+  isSkillSetDisabledResult,
+  isSkillWriteResult,
   isSessionSetModelResult,
   isPing,
   isRecord,
@@ -277,6 +287,10 @@ export interface GolemClient {
   /** Answer the tool call the session's run waits on. The run goes on in the daemon. */
   /** `limit` characters of a session's artifact from `offset`, and the artifact's size. */
   readArtifact(sessionId: string, artifactId: string, offset?: number, limit?: number): Promise<ArtifactReadResult>;
+  /** The files a session changed, each as its net change, with counts and flags only. */
+  changesList(sessionId: string): Promise<ChangesListResult>;
+  /** The diff of a file (`path`) or of one change (`changeId`). */
+  changesDiff(sessionId: string, target: ChangesDiffTarget): Promise<ChangesDiffResult>;
   /** `args` are the call's arguments as the user edited them. They go only with `allow`. */
   respondApproval(
     sessionId: string,
@@ -427,6 +441,18 @@ export interface GolemClient {
     params: { name: string; scope: "user" | "project"; cwd?: string; description: string; modelInvocable?: boolean },
     options?: { local?: boolean },
   ): Promise<SkillCreateResult>;
+  /**
+   * `skill.write`: check `text` and write it over the `SKILL.md` at `path` when
+   * the file is still as it was read (`baseMtimeNs`). `dryRun` only checks.
+   * With `local`, a project skill is written even when the project is not
+   * trusted (`skill.write_protected`).
+   */
+  writeSkill(
+    params: { path: string; text: string; baseMtimeNs: number; cwd?: string; dryRun?: boolean },
+    options?: { local?: boolean },
+  ): Promise<SkillWriteResult>;
+  /** `skill.set_disabled`: turn a skill off, or on again, in `config.toml`. */
+  setSkillDisabled(name: string, disabled: boolean): Promise<SkillSetDisabledResult>;
   /**
    * `skill.registry.changed`: skills changed on disk. `root` is the folder
    * whose project skills changed, or `null` when every folder's did.
@@ -1257,6 +1283,25 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       }
       return { text: result["text"], offset: result["offset"], size: result["size"] };
     },
+    async changesList(sessionId: string): Promise<ChangesListResult> {
+      await ready;
+      const result = await call("changes.list", { session_id: sessionId });
+      if (!isChangesListResult(result)) {
+        throw new Error("invalid changes.list result");
+      }
+      return result;
+    },
+    async changesDiff(sessionId: string, target: ChangesDiffTarget): Promise<ChangesDiffResult> {
+      await ready;
+      const result = await call("changes.diff", {
+        session_id: sessionId,
+        ...("path" in target ? { path: target.path } : { change_id: target.changeId }),
+      });
+      if (!isRecord(result) || typeof result["diff"] !== "string" || typeof result["truncated"] !== "boolean") {
+        throw new Error("invalid changes.diff result");
+      }
+      return { diff: result["diff"], truncated: result["truncated"] };
+    },
     async respondApproval(
       sessionId: string,
       callId: string,
@@ -1696,6 +1741,21 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       }
       return result;
     },
+    async writeSkill(params, options): Promise<SkillWriteResult> {
+      await ready;
+      const body = {
+        path: params.path,
+        text: params.text,
+        base_mtime_ns: params.baseMtimeNs,
+        ...(params.cwd === undefined ? {} : { cwd: params.cwd }),
+        ...(params.dryRun === true ? { dry_run: true } : {}),
+      };
+      const result = await call(options?.local === true ? "skill.write_protected" : "skill.write", body);
+      if (!isSkillWriteResult(result)) {
+        throw new Error("invalid skill.write result");
+      }
+      return result;
+    },
     async createSkill(params, options): Promise<SkillCreateResult> {
       await ready;
       const body = {
@@ -1708,6 +1768,14 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call(options?.local === true ? "skill.create_protected" : "skill.create", body);
       if (!isSkillCreateResult(result)) {
         throw new Error("invalid skill.create result");
+      }
+      return result;
+    },
+    async setSkillDisabled(name: string, disabled: boolean): Promise<SkillSetDisabledResult> {
+      await ready;
+      const result = await call("skill.set_disabled", { name, disabled });
+      if (!isSkillSetDisabledResult(result)) {
+        throw new Error("invalid skill.set_disabled result");
       }
       return result;
     },

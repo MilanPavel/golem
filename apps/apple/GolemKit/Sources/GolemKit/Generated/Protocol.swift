@@ -484,6 +484,141 @@ public struct CallPrice: Codable {
     }
 }
 
+/// One changed file: first before against last after, as counts and flags.
+///
+/// ``stale`` is true when the file on disk is not what golem last wrote, because
+/// someone else changed it since.
+// MARK: - ChangedFile
+public struct ChangedFile: Codable {
+    public let added: Int
+    public let changeIDS: [String]
+    public let path: String
+    public let removed: Int
+    public let stale: Bool
+    public let status: ChangedFileStatus
+
+    public enum CodingKeys: String, CodingKey {
+        case added = "added"
+        case changeIDS = "change_ids"
+        case path = "path"
+        case removed = "removed"
+        case stale = "stale"
+        case status = "status"
+    }
+
+    public init(added: Int, changeIDS: [String], path: String, removed: Int, stale: Bool, status: ChangedFileStatus) {
+        self.added = added
+        self.changeIDS = changeIDS
+        self.path = path
+        self.removed = removed
+        self.stale = stale
+        self.status = status
+    }
+}
+
+public enum ChangedFileStatus: String, Codable {
+    case created = "created"
+    case deleted = "deleted"
+    case modified = "modified"
+}
+
+/// ``changes.diff``. The diff of a file or of one change: exactly one of the two is set.
+// MARK: - ChangesDiffParams
+public struct ChangesDiffParams: Codable {
+    public let changeID: String?
+    public let path: String?
+    public let sessionID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case changeID = "change_id"
+        case path = "path"
+        case sessionID = "session_id"
+    }
+
+    public init(changeID: String?, path: String?, sessionID: String) {
+        self.changeID = changeID
+        self.path = path
+        self.sessionID = sessionID
+    }
+}
+
+/// A unified diff, cut when long, and whether it was cut.
+// MARK: - ChangesDiffResult
+public struct ChangesDiffResult: Codable {
+    public let diff: String
+    public let truncated: Bool
+
+    public enum CodingKeys: String, CodingKey {
+        case diff = "diff"
+        case truncated = "truncated"
+    }
+
+    public init(diff: String, truncated: Bool) {
+        self.diff = diff
+        self.truncated = truncated
+    }
+}
+
+/// ``changes.list``. The files a session changed, each as its net change.
+// MARK: - ChangesListParams
+public struct ChangesListParams: Codable {
+    public let sessionID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case sessionID = "session_id"
+    }
+
+    public init(sessionID: String) {
+        self.sessionID = sessionID
+    }
+}
+
+/// The changed files in order of first change. A session without a folder has none.
+// MARK: - ChangesListResult
+public struct ChangesListResult: Codable {
+    public let files: [FileElement]
+
+    public enum CodingKeys: String, CodingKey {
+        case files = "files"
+    }
+
+    public init(files: [FileElement]) {
+        self.files = files
+    }
+}
+
+/// One changed file: first before against last after, as counts and flags.
+///
+/// ``stale`` is true when the file on disk is not what golem last wrote, because
+/// someone else changed it since.
+// MARK: - FileElement
+public struct FileElement: Codable {
+    public let added: Int
+    public let changeIDS: [String]
+    public let path: String
+    public let removed: Int
+    public let stale: Bool
+    public let status: ChangedFileStatus
+
+    public enum CodingKeys: String, CodingKey {
+        case added = "added"
+        case changeIDS = "change_ids"
+        case path = "path"
+        case removed = "removed"
+        case stale = "stale"
+        case status = "status"
+    }
+
+    public init(added: Int, changeIDS: [String], path: String, removed: Int, stale: Bool, status: ChangedFileStatus) {
+        self.added = added
+        self.changeIDS = changeIDS
+        self.path = path
+        self.removed = removed
+        self.stale = stale
+        self.status = status
+    }
+}
+
 /// A check ended. ``exit_code`` is null when it timed out.
 ///
 /// ``output`` is the last 4,000 characters. When there was more, the whole
@@ -1492,6 +1627,123 @@ public struct EmptyEventData: Codable {
 
     public init() {
     }
+}
+
+/// One change to one file, recorded before this event was sent.
+///
+/// ``path`` is relative to the session folder. ``call_id`` is the tool call that
+/// made the change, and null for a shell change or an undo. ``reverts`` is the
+/// change an undo took back. The texts are not sent; read them by ``change_id``.
+// MARK: - FileChangedData
+public struct FileChangedData: Codable {
+    public let added: Int
+    public let callID: String?
+    public let changeID: String
+    public let path: String
+    public let removed: Int
+    public let reverts: String?
+    public let source: FileChangedDataSource
+    public let status: ChangedFileStatus
+
+    public enum CodingKeys: String, CodingKey {
+        case added = "added"
+        case callID = "call_id"
+        case changeID = "change_id"
+        case path = "path"
+        case removed = "removed"
+        case reverts = "reverts"
+        case source = "source"
+        case status = "status"
+    }
+
+    public init(added: Int, callID: String?, changeID: String, path: String, removed: Int, reverts: String?, source: FileChangedDataSource, status: ChangedFileStatus) {
+        self.added = added
+        self.callID = callID
+        self.changeID = changeID
+        self.path = path
+        self.removed = removed
+        self.reverts = reverts
+        self.source = source
+        self.status = status
+    }
+}
+
+public enum FileChangedDataSource: String, Codable {
+    case revert = "revert"
+    case shell = "shell"
+    case tool = "tool"
+}
+
+/// A file in the session folder changed. Sent before the ``tool.completed`` of its call.
+// MARK: - FileChangedEvent
+public struct FileChangedEvent: Codable {
+    public let data: FileChangedEventData
+    public let runID: String
+    public let seq: Int
+    public let sessionID: String
+    public let ts: String
+    public let type: FileChangedEventType
+
+    public enum CodingKeys: String, CodingKey {
+        case data = "data"
+        case runID = "run_id"
+        case seq = "seq"
+        case sessionID = "session_id"
+        case ts = "ts"
+        case type = "type"
+    }
+
+    public init(data: FileChangedEventData, runID: String, seq: Int, sessionID: String, ts: String, type: FileChangedEventType) {
+        self.data = data
+        self.runID = runID
+        self.seq = seq
+        self.sessionID = sessionID
+        self.ts = ts
+        self.type = type
+    }
+}
+
+/// One change to one file, recorded before this event was sent.
+///
+/// ``path`` is relative to the session folder. ``call_id`` is the tool call that
+/// made the change, and null for a shell change or an undo. ``reverts`` is the
+/// change an undo took back. The texts are not sent; read them by ``change_id``.
+// MARK: - FileChangedEventData
+public struct FileChangedEventData: Codable {
+    public let added: Int
+    public let callID: String?
+    public let changeID: String
+    public let path: String
+    public let removed: Int
+    public let reverts: String?
+    public let source: FileChangedDataSource
+    public let status: ChangedFileStatus
+
+    public enum CodingKeys: String, CodingKey {
+        case added = "added"
+        case callID = "call_id"
+        case changeID = "change_id"
+        case path = "path"
+        case removed = "removed"
+        case reverts = "reverts"
+        case source = "source"
+        case status = "status"
+    }
+
+    public init(added: Int, callID: String?, changeID: String, path: String, removed: Int, reverts: String?, source: FileChangedDataSource, status: ChangedFileStatus) {
+        self.added = added
+        self.callID = callID
+        self.changeID = changeID
+        self.path = path
+        self.removed = removed
+        self.reverts = reverts
+        self.source = source
+        self.status = status
+    }
+}
+
+public enum FileChangedEventType: String, Codable {
+    case fileChanged = "file.changed"
 }
 
 /// The session and message a fork was copied from.
@@ -6944,6 +7196,33 @@ public struct ModelSetup: Codable {
     }
 }
 
+/// ``notify.test``. Post a sample notification, for Settings and ``golem doctor``.
+// MARK: - NotifyTestParams
+public struct NotifyTestParams: Codable {
+
+    public init() {
+    }
+}
+
+/// ``posted`` is false when nothing was shown: no poster on this machine, or macOS refused.
+///
+/// ``mechanism`` names the poster that tried, such as ``osascript`` or ``none``.
+// MARK: - NotifyTestResult
+public struct NotifyTestResult: Codable {
+    public let mechanism: String
+    public let posted: Bool
+
+    public enum CodingKeys: String, CodingKey {
+        case mechanism = "mechanism"
+        case posted = "posted"
+    }
+
+    public init(mechanism: String, posted: Bool) {
+        self.mechanism = mechanism
+        self.posted = posted
+    }
+}
+
 /// ``ollama.install_cancel``. Stop a running install.
 // MARK: - OllamaInstallCancelParams
 public struct OllamaInstallCancelParams: Codable {
@@ -7452,6 +7731,8 @@ public enum RPCNotificationMethod: String, Codable {
 ///
 /// The agent's todo list changed. ``run_id`` is null for a list a fork copied.
 ///
+/// A file in the session folder changed. Sent before the ``tool.completed`` of its call.
+///
 /// A skill became active.
 ///
 /// An invoked skill's event comes just before the user message that invoked
@@ -7668,6 +7949,12 @@ public struct Params: Codable {
 /// ``call_id`` is the call that wrote it. It is null for a list a fork copied.
 /// An empty list clears it.
 ///
+/// One change to one file, recorded before this event was sent.
+///
+/// ``path`` is relative to the session folder. ``call_id`` is the tool call that
+/// made the change, and null for a shell change or an undo. ``reverts`` is the
+/// change an undo took back. The texts are not sent; read them by ``change_id``.
+///
 /// A skill is active in the session.
 ///
 /// ``how`` is ``invoked`` for a skill run once by name: its body is that
@@ -7767,9 +8054,13 @@ public struct ParamsData: Codable {
     public let decision: Decision?
     public let rule: String?
     public let todos: [PurpleTodo]?
+    public let added: Int?
+    public let changeID: String?
+    public let path: String?
+    public let removed: Int?
+    public let reverts: String?
     public let hash: String?
     public let how: How?
-    public let path: String?
     public let checks: [FluffyCheckInfo]?
     public let checkID: String?
     public let command: String?
@@ -7844,9 +8135,13 @@ public struct ParamsData: Codable {
         case decision = "decision"
         case rule = "rule"
         case todos = "todos"
+        case added = "added"
+        case changeID = "change_id"
+        case path = "path"
+        case removed = "removed"
+        case reverts = "reverts"
         case hash = "hash"
         case how = "how"
-        case path = "path"
         case checks = "checks"
         case checkID = "check_id"
         case command = "command"
@@ -7855,7 +8150,7 @@ public struct ParamsData: Codable {
         case output = "output"
     }
 
-    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: PurpleReason?, options: [String: Option]?, mode: Mode?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, contextWindow: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String?, provider: String?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, price: FluffyCallPrice?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, todos: [PurpleTodo]?, hash: String?, how: How?, path: String?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?) {
+    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: PurpleReason?, options: [String: Option]?, mode: Mode?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, contextWindow: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String?, provider: String?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, price: FluffyCallPrice?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, todos: [PurpleTodo]?, added: Int?, changeID: String?, path: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?) {
         self.cwd = cwd
         self.forkedFrom = forkedFrom
         self.modelName = modelName
@@ -7922,9 +8217,13 @@ public struct ParamsData: Codable {
         self.decision = decision
         self.rule = rule
         self.todos = todos
+        self.added = added
+        self.changeID = changeID
+        self.path = path
+        self.removed = removed
+        self.reverts = reverts
         self.hash = hash
         self.how = how
-        self.path = path
         self.checks = checks
         self.checkID = checkID
         self.command = command
@@ -8045,7 +8344,10 @@ public struct FluffySkillCall: Codable {
 public enum PurpleStatus: String, Codable {
     case cancelled = "cancelled"
     case completed = "completed"
+    case created = "created"
+    case deleted = "deleted"
     case failed = "failed"
+    case modified = "modified"
     case passed = "passed"
     case timedOut = "timed_out"
 }
@@ -8127,6 +8429,7 @@ public enum ParamsType: String, Codable {
     case checkCompleted = "check.completed"
     case checkOffered = "check.offered"
     case checkStarted = "check.started"
+    case fileChanged = "file.changed"
     case messageCompleted = "message.completed"
     case messageDelta = "message.delta"
     case messageStarted = "message.started"
