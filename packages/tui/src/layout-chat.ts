@@ -1,7 +1,20 @@
 import type { SkillCall } from "@golem/client";
 import { Lexer, type Token, type Tokens } from "marked";
 
-import { formatDuration, REPLY_CUT_NOTE, thinkingLine, visibleText, type ChatMessage, type ToolBlock } from "@golem/view";
+import {
+  diffCounts,
+  diffExcerpt,
+  formatDuration,
+  parseDiff,
+  REPLY_CUT_NOTE,
+  thinkingLine,
+  visibleText,
+  type ChatMessage,
+  type Detail,
+  type DiffExcerpt,
+  type DiffLine,
+  type ToolBlock,
+} from "@golem/view";
 import { formatMessageTime } from "./transcript.ts";
 
 export type Span = {
@@ -10,6 +23,8 @@ export type Span = {
   italic?: boolean;
   code?: boolean;
   dim?: boolean;
+  /** A row of a diff: drawn green or red on a tinted background. */
+  tone?: "add" | "del";
 };
 
 export type LineRole = "user" | "assistant" | "plain";
@@ -56,6 +71,8 @@ export type TranscriptOptions = {
   toolOutput?: boolean;
   /** `/thinking`: false hides the thinking line. Unset shows it. */
   thinking?: boolean;
+  /** How many diff rows an edit shows under its line: none, 10 or 30. Unset is `normal`. */
+  detail?: Detail;
 };
 
 /** Output rows shown per tool call while Ctrl-O is on. */
@@ -107,7 +124,7 @@ export function layoutMessages(
       lines.push(paint(wrappedLine(role, spans), width));
     }
     for (const tool of tools) {
-      for (const spans of toolLines(tool, width, options?.toolOutput === true)) {
+      for (const spans of toolLines(tool, width, options?.toolOutput === true, options?.detail)) {
         lines.push(wrappedLine(role, spans));
       }
     }
@@ -218,7 +235,10 @@ function firstLine(text: string): string {
 export const UNSUCCESSFUL_MARK = "✗";
 
 /** `read_file src/a.ts ✓  12 lines`, then the output while Ctrl-O is on. */
-export function toolLines(tool: ToolBlock, width: number, expanded: boolean): Span[][] {
+export function toolLines(tool: ToolBlock, width: number, expanded: boolean, detail: Detail = "normal"): Span[][] {
+  if (isFinishedEdit(tool)) {
+    return editLines(tool, tool.diff, width, expanded, detail);
+  }
   const head: Span[] = [{ text: tool.name, bold: true }];
   const label = toolLabel(tool.args);
   if (label.length > 0) {
@@ -256,6 +276,115 @@ export function toolLines(tool: ToolBlock, width: number, expanded: boolean): Sp
     lines.push(...wrapSpans([{ text: `  │ all of it: /artifact ${tool.artifactId}`, dim: true }], width));
   }
   return lines;
+}
+
+/** Diff rows shown under an edit by detail level, while Ctrl-O is off. */
+export const DIFF_ROWS: Record<Detail, number> = { quiet: 0, normal: 10, verbose: 30 };
+
+function isFinishedEdit(tool: ToolBlock): tool is ToolBlock & { diff: string } {
+  return (
+    (tool.name === "write_file" || tool.name === "edit_file") &&
+    tool.status === "done" &&
+    tool.unsuccessful !== true &&
+    tool.diff !== undefined &&
+    tool.diff.length > 0
+  );
+}
+
+// A diff is parsed once per call: the transcript is laid out again on every paint.
+type EditView = {
+  diff: string;
+  rows: DiffLine[];
+  counts: ReturnType<typeof diffCounts>;
+  excerpts: Map<number, DiffExcerpt>;
+};
+const EDITS = new Map<string, EditView>();
+const EDITS_LIMIT = 200;
+let parses = 0;
+
+/** How many diffs were parsed for the transcript so far, for tests. */
+export function diffParseCount(): number {
+  return parses;
+}
+
+function editView(callId: string, diff: string): EditView {
+  const hit = EDITS.get(callId);
+  if (hit !== undefined && hit.diff === diff) {
+    return hit;
+  }
+  if (EDITS.size >= EDITS_LIMIT) {
+    EDITS.clear();
+  }
+  parses += 1;
+  const all = parseDiff(diff);
+  const view: EditView = {
+    diff,
+    rows: all.filter((line) => line.tone !== "meta"),
+    counts: diffCounts(all),
+    excerpts: new Map(),
+  };
+  view.excerpts.set(-1, diffExcerpt(all, Number.POSITIVE_INFINITY));
+  EDITS.set(callId, view);
+  return view;
+}
+
+function excerptOf(view: EditView, limit: number): DiffExcerpt {
+  const hit = view.excerpts.get(limit);
+  if (hit !== undefined) {
+    return hit;
+  }
+  // The full excerpt holds every code row from its start, so a shorter one is a cut of it.
+  const full = view.excerpts.get(-1) as DiffExcerpt;
+  const lines = full.lines.slice(0, limit);
+  const excerpt = { lines, more: full.lines.length - lines.length };
+  view.excerpts.set(limit, excerpt);
+  return excerpt;
+}
+
+/** `● edit src/a.py +18 −4`, then the first rows of the diff, or all of it while Ctrl-O is on. */
+function editLines(tool: ToolBlock, diff: string, width: number, expanded: boolean, detail: Detail): Span[][] {
+  const view = editView(tool.callId, diff);
+  const counts = view.counts;
+  const path = typeof tool.args.path === "string" ? visibleText(tool.args.path) : toolLabel(tool.args);
+  const head: Span[] = [
+    { text: "● ", dim: true },
+    { text: counts.created ? "new" : "edit", bold: true },
+    { text: ` ${path}` },
+    { text: ` +${counts.added}`, tone: "add" },
+  ];
+  if (!counts.created) {
+    head.push({ text: ` −${counts.deleted}`, tone: "del" });
+  }
+  const lines = wrapSpans(head, width);
+  const limit = DIFF_ROWS[detail];
+  if (limit === 0) {
+    return lines;
+  }
+  const excerpt = expanded ? null : excerptOf(view, limit);
+  const shown = excerpt === null ? view.rows : excerpt.lines;
+  const more = excerpt === null ? 0 : excerpt.more;
+  const room = Math.max(1, width - 1);
+  for (const row of shown) {
+    lines.push(diffRow(row, room));
+  }
+  if (more > 0) {
+    lines.push([fitSpan({ text: `  … ${more} more ${more === 1 ? "line" : "lines"} · ctrl+o`, dim: true }, room)]);
+  }
+  return lines;
+}
+
+/** One diff row indented two columns, cut to `room` columns, and filled to them so the tint spans the row. */
+function diffRow(row: DiffLine, room: number): Span[] {
+  const tone = row.tone === "add" || row.tone === "del" ? row.tone : undefined;
+  const text = fitSpan({ text: `  ${row.text}` }, room).text;
+  if (tone === undefined) {
+    return [{ text, dim: row.tone === "hunk" }];
+  }
+  return [{ text: text.padEnd(room), tone }];
+}
+
+function fitSpan(span: Span, room: number): Span {
+  return span.text.length <= room ? span : { ...span, text: `${span.text.slice(0, Math.max(0, room - 1))}…` };
 }
 
 /** `thought for 12s`, dim, then the thinking text under it while Ctrl-O is on. */
