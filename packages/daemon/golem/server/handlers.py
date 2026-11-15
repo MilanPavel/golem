@@ -209,6 +209,8 @@ from golem_protocol.commands import (
     SessionRenameResult,
     SessionRevokeParams,
     SessionRevokeResult,
+    SessionSetChecksParams,
+    SessionSetChecksResult,
     SessionSetModelParams,
     SessionSetModelResult,
     SessionSetModeParams,
@@ -915,6 +917,17 @@ async def _session_set_mode(
     return SessionSetModeResult(session_id=params.session_id, mode=mode, override=override)
 
 
+async def _session_set_checks(
+    ctx: RequestContext, params: SessionSetChecksParams
+) -> SessionSetChecksResult:
+    try:
+        on = await _sessions(ctx).set_checks(params.session_id, params.on)
+    except (SessionNotFoundError, SchemaMismatchError) as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
+    log.info("session checks session=%s on=%s", params.session_id, on)
+    return SessionSetChecksResult(session_id=params.session_id, on=on)
+
+
 async def _config_get(ctx: RequestContext, params: ConfigGetParams) -> ConfigGetResult:
     policy, tools = ctx.state.policy, ctx.state.tools
     if policy is None or tools is None:
@@ -1374,6 +1387,9 @@ def standard_methods() -> dict[str, Method]:
         ),
         "session.set_mode": Method(
             "session.set_mode", SessionSetModeParams, True, _session_set_mode
+        ),
+        "session.set_checks": Method(
+            "session.set_checks", SessionSetChecksParams, True, _session_set_checks
         ),
         "fs.list_dirs": Method("fs.list_dirs", FsListDirsParams, True, _fs_list_dirs),
         "setup.status": Method("setup.status", SetupStatusParams, True, _setup_status),

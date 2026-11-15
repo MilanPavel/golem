@@ -29,6 +29,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from golem.config import (
+    CodingSettings,
     PermissionMode,
     PermissionSettings,
     PolicyRule,
@@ -61,6 +62,7 @@ class _UserFile(BaseModel):
     shell: ShellSettings = Field(default_factory=ShellSettings)
     web: WebSettings = Field(default_factory=WebSettings)
     permissions: PermissionSettings = Field(default_factory=PermissionSettings)
+    coding: CodingSettings = Field(default_factory=CodingSettings)
 
 
 class _ProjectFile(BaseModel):
@@ -146,6 +148,10 @@ class Policy:
     def shell(self) -> ShellSettings:
         """The user's ``[shell]`` settings. A project file cannot change them."""
         return self._load_user().shell
+
+    def coding(self) -> CodingSettings:
+        """The user's ``[coding]`` settings. A project file cannot change them."""
+        return self._load_user().coding
 
     def web(self) -> WebSettings:
         """The user's ``[web]`` settings. A project file cannot change them."""

@@ -23,6 +23,7 @@ import type { ModelOptionsGetResult } from "../../protocol/gen/model-options-get
 import type { ModelOptionsSaved } from "../../protocol/gen/model-options-saved.ts";
 import type { ModelOptionsSetResult } from "../../protocol/gen/model-options-set-result.ts";
 import type { PermissionsSetModeResult } from "../../protocol/gen/permissions-set-mode-result.ts";
+import type { SessionSetChecksResult } from "../../protocol/gen/session-set-checks-result.ts";
 import type { SessionSetModeResult } from "../../protocol/gen/session-set-mode-result.ts";
 import type { SessionSetOptionsResult } from "../../protocol/gen/session-set-options-result.ts";
 import type { ListedSkill, SkillListResult } from "../../protocol/gen/skill-list-result.ts";
@@ -66,6 +67,7 @@ const EVENT_TYPES = new Set([
   "model.selected",
   "model.options.changed",
   "session.mode.changed",
+  "session.checks.changed",
   "message.started",
   "message.delta",
   "message.thinking.delta",
@@ -87,6 +89,9 @@ const EVENT_TYPES = new Set([
   "skill.activated",
   "skill.deactivated",
   "skill.skipped",
+  "check.offered",
+  "check.started",
+  "check.completed",
 ]);
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
@@ -301,6 +306,10 @@ export function isModelOptionsSetResult(value: unknown): value is ModelOptionsSe
 
 export function isSessionSetOptionsResult(value: unknown): value is SessionSetOptionsResult {
   return isRecord(value) && typeof value["session_id"] === "string" && isOptionValues(value["options"]);
+}
+
+export function isSessionSetChecksResult(value: unknown): value is SessionSetChecksResult {
+  return isRecord(value) && typeof value["session_id"] === "string" && typeof value["on"] === "boolean";
 }
 
 export function isSessionSetModeResult(value: unknown): value is SessionSetModeResult {

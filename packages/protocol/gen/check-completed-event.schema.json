@@ -1,0 +1,120 @@
+{
+  "$defs": {
+    "CheckCompletedData": {
+      "additionalProperties": false,
+      "description": "A check ended. ``exit_code`` is null when it timed out.\n\n``output`` is the last 4,000 characters. When there was more, the whole\noutput is in the artifact ``artifact_id``.",
+      "properties": {
+        "artifact_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Artifact Id"
+        },
+        "check_id": {
+          "minLength": 1,
+          "title": "Check Id",
+          "type": "string"
+        },
+        "duration_ms": {
+          "minimum": 0,
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "exit_code": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Exit Code"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "output": {
+          "title": "Output",
+          "type": "string"
+        },
+        "round": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Round",
+          "type": "integer"
+        },
+        "status": {
+          "enum": [
+            "passed",
+            "failed",
+            "timed_out"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "check_id",
+        "name",
+        "status",
+        "exit_code",
+        "duration_ms",
+        "output"
+      ],
+      "title": "CheckCompletedData",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "A check ended.",
+  "properties": {
+    "data": {
+      "$ref": "#/$defs/CheckCompletedData"
+    },
+    "run_id": {
+      "minLength": 1,
+      "title": "Run Id",
+      "type": "string"
+    },
+    "seq": {
+      "minimum": 1,
+      "title": "Seq",
+      "type": "integer"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    },
+    "ts": {
+      "minLength": 1,
+      "title": "Ts",
+      "type": "string"
+    },
+    "type": {
+      "const": "check.completed",
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "seq",
+    "session_id",
+    "run_id",
+    "ts",
+    "type",
+    "data"
+  ],
+  "title": "CheckCompletedEvent",
+  "type": "object"
+}

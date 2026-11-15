@@ -1,0 +1,42 @@
+{
+  "$defs": {
+    "CheckInfo": {
+      "additionalProperties": false,
+      "description": "One check: its name and the shell command it runs.",
+      "properties": {
+        "command": {
+          "minLength": 1,
+          "title": "Command",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "command"
+      ],
+      "title": "CheckInfo",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The turn changed files and the session has not said whether golem may run checks.\n\nSent once per session. Nothing ran. ``session.set_checks`` answers it.",
+  "properties": {
+    "checks": {
+      "items": {
+        "$ref": "#/$defs/CheckInfo"
+      },
+      "title": "Checks",
+      "type": "array"
+    }
+  },
+  "required": [
+    "checks"
+  ],
+  "title": "CheckOfferedData",
+  "type": "object"
+}

@@ -58,6 +58,7 @@ public enum MethodAccess {
         "session.list",
         "session.rename",
         "session.revoke",
+        "session.set_checks",
         "session.set_mode",
         "session.set_model",
         "session.set_options",

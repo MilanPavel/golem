@@ -6,6 +6,9 @@ import Foundation
 /// working against a newer daemon (the protocol grows by minor versions).
 public enum GolemEvent {
     case approvalNeeded(ApprovalNeededEvent)
+    case checkCompleted(CheckCompletedEvent)
+    case checkOffered(CheckOfferedEvent)
+    case checkStarted(CheckStartedEvent)
     case approvalResolved(ApprovalResolvedEvent)
     case messageCompleted(MessageCompletedEvent)
     case messageDelta(MessageDeltaEvent)
@@ -21,6 +24,7 @@ public enum GolemEvent {
     case runStarted(RunStartedEvent)
     case sessionClosed(SessionClosedEvent)
     case sessionCreated(SessionCreatedEvent)
+    case sessionChecksChanged(SessionChecksChangedEvent)
     case sessionModeChanged(SessionModeChangedEvent)
     case sessionUpdated(SessionUpdatedEvent)
     case skillActivated(SkillActivatedEvent)
@@ -56,6 +60,12 @@ extension GolemEvent: Decodable {
     public init(from decoder: Decoder) throws {
         let type = try decoder.container(keyedBy: Probe.self).decode(String.self, forKey: .type)
         switch type {
+        case "check.completed":
+            self = .checkCompleted(try CheckCompletedEvent(from: decoder))
+        case "check.offered":
+            self = .checkOffered(try CheckOfferedEvent(from: decoder))
+        case "check.started":
+            self = .checkStarted(try CheckStartedEvent(from: decoder))
         case "approval.needed":
             self = .approvalNeeded(try ApprovalNeededEvent(from: decoder))
         case "approval.resolved":
@@ -88,6 +98,8 @@ extension GolemEvent: Decodable {
             self = .sessionClosed(try SessionClosedEvent(from: decoder))
         case "session.created":
             self = .sessionCreated(try SessionCreatedEvent(from: decoder))
+        case "session.checks.changed":
+            self = .sessionChecksChanged(try SessionChecksChangedEvent(from: decoder))
         case "session.mode.changed":
             self = .sessionModeChanged(try SessionModeChangedEvent(from: decoder))
         case "session.updated":
@@ -119,6 +131,9 @@ extension GolemEvent: Decodable {
     public var seq: Int? {
         switch self {
         case .approvalNeeded(let event): return event.seq
+        case .checkCompleted(let event): return event.seq
+        case .checkOffered(let event): return event.seq
+        case .checkStarted(let event): return event.seq
         case .approvalResolved(let event): return event.seq
         case .messageCompleted(let event): return event.seq
         case .messageDelta(let event): return event.seq
@@ -134,6 +149,7 @@ extension GolemEvent: Decodable {
         case .runStarted(let event): return event.seq
         case .sessionClosed(let event): return event.seq
         case .sessionCreated(let event): return event.seq
+        case .sessionChecksChanged(let event): return event.seq
         case .sessionModeChanged(let event): return event.seq
         case .sessionUpdated(let event): return event.seq
         case .skillActivated(let event): return event.seq
