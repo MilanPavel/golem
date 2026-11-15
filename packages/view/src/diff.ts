@@ -23,6 +23,44 @@ export function parseDiff(diff: string): DiffLine[] {
   });
 }
 
+export type NumberedLine = DiffLine & { old: number | null; new: number | null };
+
+const HUNK = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/;
+
+/** Each line with its old and new line number, from the `@@ -a,b +c,d @@` rows. Hunk and meta rows, and lines before any hunk, have none. */
+export function numberDiff(lines: readonly DiffLine[]): NumberedLine[] {
+  let oldNo: number | null = null;
+  let newNo: number | null = null;
+  return lines.map((line) => {
+    switch (line.tone) {
+      case "hunk": {
+        const match = HUNK.exec(line.text);
+        oldNo = match ? Number(match[1]) : null;
+        newNo = match ? Number(match[2]) : null;
+        return { ...line, old: null, new: null };
+      }
+      case "meta":
+        return { ...line, old: null, new: null };
+      case "add": {
+        const numbered = { ...line, old: null, new: newNo };
+        if (newNo !== null) newNo += 1;
+        return numbered;
+      }
+      case "del": {
+        const numbered = { ...line, old: oldNo, new: null };
+        if (oldNo !== null) oldNo += 1;
+        return numbered;
+      }
+      default: {
+        const numbered = { ...line, old: oldNo, new: newNo };
+        if (oldNo !== null) oldNo += 1;
+        if (newNo !== null) newNo += 1;
+        return numbered;
+      }
+    }
+  });
+}
+
 function visible(row: string): string {
   return visibleText(row.replaceAll("\t", TAB));
 }
