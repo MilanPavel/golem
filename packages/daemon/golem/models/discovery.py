@@ -56,6 +56,7 @@ from golem.models.router import (
     ModelRouter,
     Provider,
 )
+from golem.models.tiers import Tier, tier_of
 
 log = logging.getLogger(__name__)
 
@@ -116,6 +117,8 @@ class ListedModel:
     recommended: bool = False
     recommended_for: tuple[str, ...] = ()
     think_values: tuple[str, ...] = ()
+    # Set where the listing is built, once the price is settled.
+    tier: Tier = "frontier"
 
 
 @dataclass(frozen=True, slots=True)
@@ -510,6 +513,20 @@ class ModelDiscovery:
                 if price is not None:
                     listed = replace(listed, price=price)
                 by_ref[ref] = listed
+        # A custom OpenAI-compatible provider on 127.0.0.1 or localhost is not ollama. It
+        # gets no special case: its price decides, and an unknown price is frontier.
+        overrides: dict[str, Tier | None] = {entry.ref: entry.tier for entry in self._hosted}
+        budget_max_price = self._router.budget_max_price()
+        for ref, listed in by_ref.items():
+            by_ref[ref] = replace(
+                listed,
+                tier=tier_of(
+                    listed.provider,
+                    listed.price,
+                    override=overrides.get(ref),
+                    budget_max_price=budget_max_price,
+                ),
+            )
         return sorted(by_ref.values(), key=_order)
 
     def _offered(self, name: str, live: list[_Found], *, show_all: bool) -> list[_Found]:
@@ -1112,6 +1129,7 @@ def _with_pulls(models: list[ListedModel], pulling: dict[str, float | None]) -> 
                     status="pulling",
                     progress=progress,
                     price=_FREE,
+                    tier="local",
                 )
             )
     return sorted(marked, key=_order)

@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator, Iterator
 from typing import Any
 
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
 from golem.models.ollama_chat import OllamaChat
 
@@ -110,6 +110,23 @@ def test_earlier_thinking_goes_back_as_the_library_sends_it() -> None:
     ]
     list(_model(sent).stream(history))
     assert [m.get("thinking") for m in sent[0]["messages"]] == [None, "hmm", None]
+
+
+def test_the_error_marker_of_a_tool_result_is_not_sent() -> None:
+    sent: list[dict[str, Any]] = []
+    history = [
+        HumanMessage("q"),
+        AIMessage("", tool_calls=[{"name": "read_file", "args": {}, "id": "c1"}]),
+        ToolMessage(
+            "error: invalid arguments for read_file",
+            tool_call_id="c1",
+            status="error",
+            additional_kwargs={"golem_error": "invalid_args"},
+        ),
+        HumanMessage("again"),
+    ]
+    list(_model(sent).stream(history))
+    assert "golem_error" not in repr(sent[0])
 
 
 def test_think_false_is_sent_and_a_level_is_sent_as_it_is() -> None:
