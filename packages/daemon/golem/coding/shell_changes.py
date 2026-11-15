@@ -12,8 +12,9 @@ from __future__ import annotations
 
 import base64
 import hashlib
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Iterator
 from dataclasses import dataclass
+from itertools import chain
 from pathlib import Path
 from typing import Literal
 
@@ -22,23 +23,37 @@ from golem.tools.registry import FileEdit
 
 MAX_BYTES = 1_000_000
 MAX_FILES = 200
+MAX_WORKTREES = 8
 _SKIPPED = (".git", ".golem")
 # Runs a shell script in the session folder, with ``git`` defined as the safe, sandboxed git and
 # the strings as ``"$@"``. Its output, or None when it fails, times out, or is cut.
 RunGit = Callable[[str, tuple[str, ...]], Awaitable[str | None]]
 
-_STATUS = "git status --porcelain=v1 -z -uall --no-renames"
-# The top folder on the first line, then the status, which is NUL-separated.
-_LOOK = 'top=$(git rev-parse --show-toplevel) || exit 1; printf "%s\\n" "$top"; ' + _STATUS
-# ``git cat-file --batch`` gives, for each path in order, ``<id> blob <size>`` and the bytes, or
-# ``<name> missing``. It goes through base64 so the sandbox's text keeps every byte, and the
-# reader finds each file by its size, which no content can fake.
-_SHOW = 'printf "HEAD:%s\\n" "$@" | git cat-file --batch | base64 | tr -d "\\n"'
+_STATUS = 'git -C "$1" status --porcelain=v1 -z -uall --no-renames'
+_DONE = "E"
+# One line of base64 for each folder in ``"$@"``: its top folder, a newline, its status
+# (NUL-separated) and ``_DONE`` if git finished. Nothing for a folder that is not a checkout.
+_STATUSES = (
+    'one() { top=$(git -C "$1" rev-parse --show-toplevel) || return 0; '
+    '{ printf "%s\\n" "$top"; ' + _STATUS + ' && printf E; } | base64 | tr -d "\\n"; }; '
+    'for folder in "$@"; do one "$folder"; printf "\\n"; done'
+)
+# For each checkout, ``git cat-file --batch`` gives, for each path in order, ``<id> blob <size>``
+# and the bytes, or ``<name> missing``. It goes through base64 so the sandbox's text keeps every
+# byte, and the reader finds each file by its size, which no content can fake. The arguments are,
+# for each checkout, its folder, the number of paths, and the paths; the output is a line each.
+_SHOW = (
+    'names() { k=$1; shift; while [ "$k" -gt 0 ]; do printf "HEAD:%s\\n" "$1"; shift; '
+    "k=$((k-1)); done; }; "
+    "while [ $# -gt 0 ]; do folder=$1; n=$2; shift 2; "
+    'names "$n" "$@" | git -C "$folder" cat-file --batch | base64 | tr -d "\\n"; printf "\\n"; '
+    'shift "$n"; done'
+)
 
 
 @dataclass(frozen=True, slots=True)
-class Before:
-    """The state before a command. A path in ``dirty`` is one git already saw as changed or new.
+class State:
+    """One watched checkout before a command. A path in ``dirty`` was already changed or new.
 
     ``dirty`` maps it to its text, None when the file is gone. ``hashes`` has a
     fingerprint of each such file that exists, including a file too big or not
@@ -46,88 +61,181 @@ class Before:
     """
 
     top: Path
-    root: Path
     dirty: dict[str, str | None]
     hashes: dict[str, str]
 
 
-async def look(root: Path, run_git: RunGit) -> Before | None:
-    """What ``git status`` lists now, with each file's text.
+@dataclass(frozen=True, slots=True)
+class Before:
+    """The state before a command: one ``State`` per watched checkout, and the worktrees seen."""
 
-    None outside a git repository, and where there is no sandbox to run git in.
+    root: Path
+    states: tuple[State, ...]
+    seen: frozenset[Path]
+
+
+async def look(root: Path, run_git: RunGit) -> Before | None:
+    """What ``git status`` lists now, with each file's text, in the session folder's checkout
+    and in each git worktree inside the session folder.
+
+    None outside a git repository, and where there is no sandbox to run git in. A checkout
+    with too many files is not watched; the others still are.
     """
     if not sandbox.available():
         return None
     if not sandbox.git_dirs(root):
         return None
     root = root.resolve()
-    out = await run_git(_LOOK, ())
-    if out is None or "\n" not in out:
+    trees = worktrees(root)
+    answers = await _statuses([root, *trees], run_git)
+    if answers is None or answers[0] is None:
         return None
-    top, listed = out.split("\n", 1)
-    top_path = Path(top)
-    paths = list(_paths(listed, top_path))
-    if len(paths) > MAX_FILES:
-        return None
-    dirty: dict[str, str | None] = {}
-    hashes: dict[str, str] = {}
-    for path in paths:
-        digest, text = _snapshot(top_path / path)
-        if digest is None:
-            dirty[path] = None
+    states = [state for answer in answers if answer and (state := _state(*answer))]
+    return Before(root=root, states=tuple(states), seen=frozenset(trees)) if states else None
+
+
+def worktrees(root: Path) -> list[Path]:
+    """The git worktrees inside ``root``, from ``<common git folder>/worktrees/*/gitdir``.
+
+    Each file holds the path of the worktree's ``.git`` file. A folder outside ``root``, ``root``
+    itself, a missing folder and a broken file are skipped. At most ``MAX_WORKTREES``, sorted.
+    """
+    gits = sandbox.git_dirs(root)
+    if not gits:
+        return []
+    root = root.resolve()
+    found: set[Path] = set()
+    try:
+        entries = list((gits[-1] / "worktrees").iterdir())
+    except OSError:
+        return []
+    for entry in entries:
+        try:
+            pointer = (entry / "gitdir").read_text("utf-8").strip()
+            folder = Path(pointer).parent.resolve()
+            if pointer and folder != root and folder.is_relative_to(root) and folder.is_dir():
+                found.add(folder)
+        except (OSError, UnicodeDecodeError, ValueError):
             continue
-        hashes[path] = digest
-        if text is not None:
-            dirty[path] = text
-    return Before(top=top_path, root=root, dirty=dirty, hashes=hashes)
+    return sorted(found)[:MAX_WORKTREES]
 
 
 async def changed(before: Before, run_git: RunGit) -> list[FileEdit]:
-    """The files that differ now from ``before``."""
-    listed = await run_git(_STATUS, ())
-    if listed is None:
+    """The files that differ now from ``before``, in every watched checkout and in each
+    worktree the command made."""
+    new = [tree for tree in worktrees(before.root) if tree not in before.seen]
+    answers = await _statuses([*(state.top for state in before.states), *new], run_git)
+    if answers is None:
         return []
+    found: list[_Found] = []
+    for index, answer in enumerate(answers):
+        if answer is None:
+            continue
+        top, listed = answer
+        state = before.states[index] if index < len(before.states) else State(top, {}, {})
+        found.append(_found_in(before.root, state, listed))
+    committed = iter(
+        await _committed([(one.top, [p for p, _ in one.clean]) for one in found], run_git)
+    )
+    edits: list[FileEdit] = []
+    for one in found:
+        olds: dict[int, str | Literal[False] | None] = {
+            index: next(committed) for _, index in one.clean
+        }
+        for index, (shown, old, after) in enumerate(one.files):
+            text = olds.get(index, old)
+            if text is not False and text != after:
+                edits.append(FileEdit(shown, text, after))
+    return edits
+
+
+@dataclass(slots=True)
+class _Found:
+    """The files of one checkout that differ now, with their paths relative to the session folder.
+
+    ``clean`` lists the files git had at HEAD, each with its place in ``files``: their text
+    before the command is the one at HEAD, which is not known yet.
+    """
+
+    top: Path
+    files: list[tuple[str, str | None, str | None]]  # shown, before, after
+    clean: list[tuple[str, int]]  # path, index into files
+
+
+def _found_in(root: Path, before: State, listed: str) -> _Found:
     untracked = _paths(listed, before.top)
-    found: list[tuple[str, str | None, str | None]] = []  # shown, before, after
-    clean: list[tuple[str, int]] = []  # path, index into found
+    one = _Found(before.top, [], [])
     for path in sorted({*untracked, *before.dirty}):
-        shown = _shown(before, path)
+        shown = _shown(before.top, root, path)
         if shown is None:
             continue
         digest, after = _snapshot(before.top / path)
         if digest is not None and (digest == before.hashes.get(path) or after is None):
             continue  # unchanged, too big, or not UTF-8
         if path in before.dirty:
-            found.append((shown, before.dirty[path], after))
+            one.files.append((shown, before.dirty[path], after))
         elif path in before.hashes:
             continue  # too big or not UTF-8 before the command
         elif untracked.get(path):
-            found.append((shown, None, after))
+            one.files.append((shown, None, after))
         else:
-            clean.append((path, len(found)))
-            found.append((shown, None, after))
-        if len(found) >= MAX_FILES:
+            one.clean.append((path, len(one.files)))
+            one.files.append((shown, None, after))
+        if len(one.files) >= MAX_FILES:
             break
-    committed = await _committed([path for path, _ in clean], run_git)
-    skipped: set[int] = set()
-    for (_, index), old in zip(clean, committed, strict=True):
-        if old is False:
-            skipped.add(index)
-        else:
-            found[index] = (found[index][0], old, found[index][2])
-    return [
-        FileEdit(shown, old, after)
-        for index, (shown, old, after) in enumerate(found)
-        if index not in skipped and old != after
-    ]
+    return one
 
 
-def _shown(before: Before, path: str) -> str | None:
+def _state(top: Path, listed: str) -> State | None:
+    """The state of one checkout, or None when it lists too many files."""
+    paths = list(_paths(listed, top))
+    if len(paths) > MAX_FILES:
+        return None
+    dirty: dict[str, str | None] = {}
+    hashes: dict[str, str] = {}
+    for path in paths:
+        digest, text = _snapshot(top / path)
+        if digest is None:
+            dirty[path] = None
+            continue
+        hashes[path] = digest
+        if text is not None:
+            dirty[path] = text
+    return State(top, dirty, hashes)
+
+
+async def _statuses(folders: list[Path], run_git: RunGit) -> list[tuple[Path, str] | None] | None:
+    """The top folder and the status of each checkout, in one sandbox run.
+
+    One entry per folder, None for one that is not a checkout or whose status failed or was
+    cut. Each checkout is one line of base64, which no file name or content can break, and its
+    text ends in ``_DONE`` only if git finished. None when the lines do not read back exactly.
+    """
+    out = await run_git(_STATUSES, tuple(str(folder) for folder in folders))
+    if out is None:
+        return None
+    lines = out.split("\n")
+    if lines.pop() != "" or len(lines) != len(folders):
+        return None
+    answers: list[tuple[Path, str] | None] = []
+    for line in lines:
+        raw = _bytes(line)
+        try:
+            text = raw.decode("utf-8") if raw else ""
+        except UnicodeDecodeError:
+            return None
+        top, found, listed = text.partition("\n")
+        done = found and listed.endswith(_DONE)
+        answers.append((Path(top), listed.removesuffix(_DONE)) if done else None)
+    return answers
+
+
+def _shown(top: Path, root: Path, path: str) -> str | None:
     """The path relative to the session folder, or None for one that is not watched."""
     if path.split("/", 1)[0] in _SKIPPED:
         return None
     try:
-        return (before.top / path).relative_to(before.root).as_posix()
+        return (top / path).relative_to(root).as_posix()
     except ValueError:
         return None
 
@@ -142,21 +250,40 @@ def _paths(out: str, top: Path) -> dict[str, bool]:
     return found
 
 
-async def _committed(paths: list[str], run_git: RunGit) -> list[str | Literal[False] | None]:
-    """The text of each path at HEAD in one run: None for a file git does not have at HEAD.
+async def _committed(
+    groups: list[tuple[Path, list[str]]], run_git: RunGit
+) -> list[str | Literal[False] | None]:
+    """The text of each path at HEAD in one run, in order: None for a file git does not have.
 
-    False is a file to skip: not UTF-8, too big, or a name git cannot be asked about by line.
-    When the output was cut or does not read back exactly, every file is skipped, so no
-    text is ever reported wrong.
+    ``groups`` pairs a checkout's top folder with its paths. False is a file to skip: not
+    UTF-8, too big, or a name git cannot be asked about by line. When the output was cut or
+    does not read back exactly, every file is skipped, so no text is ever reported wrong.
     """
-    asked = [path for path in paths if "\n" not in path]
-    out = await run_git(_SHOW, tuple(asked)) if asked else ""
-    raw = _bytes(out)
-    found = _read_batch(raw, len(asked)) if raw is not None else None
-    if found is None:
-        return [False] * len(paths)
-    texts = iter(found)
-    return [False if "\n" in path else next(texts) for path in paths]
+    count = sum(len(paths) for _, paths in groups)
+    asked = [(top, [p for p in paths if "\n" not in p]) for top, paths in groups]
+    asked = [(top, paths) for top, paths in asked if paths]
+    args = [item for top, paths in asked for item in (str(top), str(len(paths)), *paths)]
+    texts: list[list[str | Literal[False] | None]] = []
+    if args:
+        out = await run_git(_SHOW, tuple(args))
+        lines = out.split("\n") if out is not None else []
+        if out is None or lines.pop() != "" or len(lines) != len(asked):
+            return [False] * count
+        for line, (_, paths) in zip(lines, asked, strict=True):
+            raw = _bytes(line)
+            found = _read_batch(raw, len(paths)) if raw is not None else None
+            if found is None:
+                return [False] * count
+            texts.append(found)
+    answers: Iterator[str | Literal[False] | None] = chain.from_iterable(texts)
+    result: list[str | Literal[False] | None] = []
+    for _, paths in groups:
+        for path in paths:
+            if "\n" in path:
+                result.append(False)
+            else:
+                result.append(next(answers))
+    return result
 
 
 def _bytes(encoded: str | None) -> bytes | None:
