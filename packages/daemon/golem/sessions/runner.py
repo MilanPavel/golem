@@ -51,6 +51,7 @@ from golem.graphs.tools_node import Answer
 from golem.models.cost import cost_usd
 from golem.models.errors import ModelUnreachable
 from golem.models.router import ModelConfigError, ModelIdentity
+from golem.models.tiers import Tier
 from golem.permissions.engine import Allowance
 from golem.sessions.interrupted import close_reply
 from golem.sessions.log import SessionLog
@@ -188,6 +189,7 @@ class _Progress:
     identify: Callable[[str | None], ModelIdentity] | None = None
     """Names the model of a profile. The model of a call is read from it as the call is sent."""
     price_of: Callable[[str], ModelPrice | None] | None = None
+    tier_of: Callable[[str], Tier | None] | None = None
     call_model: ModelIdentity | None = None
     """The model of the call sent and not yet ended."""
     index: int = 0
@@ -219,6 +221,7 @@ async def run_turn(
         model=runtime.router.identity(turn.model_profile),
         identify=runtime.router.identity,
         price_of=runtime.price_of,
+        tier_of=runtime.tier_of,
     )
 
     async def emit(kind: EventType, data: BaseModel) -> None:
@@ -313,6 +316,7 @@ async def resume_turn(
         model=runtime.router.identity(),
         identify=runtime.router.identity,
         price_of=runtime.price_of,
+        tier_of=runtime.tier_of,
     )
 
     async def emit(kind: EventType, data: BaseModel) -> None:
@@ -426,6 +430,7 @@ async def _apply(
                 profile=model.profile if model else "",
                 provider=model.provider if model else None,
                 model=model.name if model else None,
+                tier=_tier(progress, model),
                 system_prompt_sha=fact.system_prompt_sha,
                 tools_sha=fact.tools_sha,
                 message_ids=list(fact.message_ids),
@@ -553,6 +558,13 @@ async def _apply(
                 diff=fact.diff,
             ),
         )
+
+
+def _tier(progress: _Progress, model: ModelIdentity | None) -> Tier | None:
+    """The tier of the model of a call, or None when it does not resolve."""
+    if model is None or model.provider is None or progress.tier_of is None:
+        return None
+    return progress.tier_of(model.profile)
 
 
 async def _end_call(

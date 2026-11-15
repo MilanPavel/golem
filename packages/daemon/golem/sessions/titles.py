@@ -12,14 +12,18 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Callable, Mapping
-from typing import Protocol
+from typing import Protocol, cast
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
+from golem.config import ModelPrice
+from golem.models.cost import cost_usd
 from golem.models.gate import ServerGate
 from golem.models.roles import for_role
 from golem.models.router import ModelConfigError, ModelRouter
 from golem.models.tiers import Tier
+from golem.sessions.usage import Usage
+from golem_protocol.events import TokenUsage
 
 log = logging.getLogger("golem.sessions")
 
@@ -43,6 +47,7 @@ class TitleGenerator(Protocol):
         prompt: str,
         reply: str,
         options: Mapping[str, float | str] | None = None,
+        session_id: str | None = None,
     ) -> str: ...
 
 
@@ -53,6 +58,9 @@ class ModelTitles:
     so Ollama does not reload it. On a hosted session it is a ready budget model, when
     there is one. ``tier_of_ref`` and ``budget_refs`` read what discovery has cached, with
     no network call; until they are set, the session's model is used.
+
+    Once :meth:`record_to` has been called, each answer is written to the usage table as a
+    ``titles`` call of the session, under the model that wrote it.
     """
 
     def __init__(self, router: ModelRouter, gate: ServerGate | None = None) -> None:
@@ -60,6 +68,9 @@ class ModelTitles:
         self._gate = gate
         self._tier_of_ref: Callable[[str], Tier | None] = lambda ref: None
         self._budget_refs: Callable[[], list[str]] = list
+        self._usage: Usage | None = None
+        self._price_of: Callable[[str], ModelPrice | None] | None = None
+        self._tier_of: Callable[[str], Tier | None] | None = None
 
     def bind(
         self, tier_of_ref: Callable[[str], Tier | None], budget_refs: Callable[[], list[str]]
@@ -67,6 +78,17 @@ class ModelTitles:
         """Use the cached listing to tell tiers and find ready budget models."""
         self._tier_of_ref = tier_of_ref
         self._budget_refs = budget_refs
+
+    def record_to(
+        self,
+        usage: Usage,
+        price_of: Callable[[str], ModelPrice | None],
+        tier_of: Callable[[str], Tier | None],
+    ) -> None:
+        """Write each title call to ``usage``, priced and filed by the profile's model."""
+        self._usage = usage
+        self._price_of = price_of
+        self._tier_of = tier_of
 
     def _tier_of_profile(self, profile: str) -> Tier | None:
         try:
@@ -80,6 +102,7 @@ class ModelTitles:
         prompt: str,
         reply: str,
         options: Mapping[str, float | str] | None = None,
+        session_id: str | None = None,
     ) -> str:
         role = for_role(
             "titles",
@@ -99,14 +122,65 @@ class ModelTitles:
         model = self._router.chat_model(role.profile, overrides)
         gate = self._gate or ServerGate()
         # A title waits behind the chat on the local server of the model it runs on.
-        async with gate.hold(None if self._gate is None or server is None else server[1], "job"):
-            answer = await model.ainvoke(
-                [
-                    SystemMessage(content=_INSTRUCTION),
-                    HumanMessage(content=f"User: {prompt}\n\nAssistant: {reply[:_REPLY_CHARS]}"),
-                ]
-            )
+        try:
+            async with gate.hold(
+                None if self._gate is None or server is None else server[1], "job"
+            ):
+                answer = await model.ainvoke(
+                    [
+                        SystemMessage(content=_INSTRUCTION),
+                        HumanMessage(
+                            content=f"User: {prompt}\n\nAssistant: {reply[:_REPLY_CHARS]}"
+                        ),
+                    ]
+                )
+        except Exception:
+            await self._record(session_id, role.profile, None, failed=True)
+            raise
+        await self._record(session_id, role.profile, answer.usage_metadata)
         return answer.text
+
+    async def _record(
+        self, session_id: str | None, profile: str, metadata: object, *, failed: bool = False
+    ) -> None:
+        if self._usage is None:
+            return
+        try:
+            identity = self._router.identity(profile)
+            usage = _token_usage(metadata)
+            price = None if self._price_of is None else self._price_of(profile)
+            tier = None if self._tier_of is None else self._tier_of(profile)
+            await self._usage.record_role_call(
+                session_id=session_id,
+                role="titles",
+                provider=identity.provider,
+                model=identity.name,
+                tier=tier,
+                usage=usage,
+                cost_usd=None if usage is None else cost_usd(usage.model_dump(), price),
+                failed=failed,
+            )
+        except Exception:
+            log.warning("recording the title call failed", exc_info=True)
+
+
+def _token_usage(metadata: object) -> TokenUsage | None:
+    """The tokens of a langchain ``usage_metadata``, or None when there is none."""
+    if not isinstance(metadata, dict):
+        return None
+    meta = cast(dict[str, object], metadata)
+    details = meta.get("input_token_details")
+    cached = cast(dict[str, object], details) if isinstance(details, dict) else {}
+    return TokenUsage(
+        input=_count(meta.get("input_tokens")),
+        output=_count(meta.get("output_tokens")),
+        cache_read=_count(cached.get("cache_read")),
+        cache_write=_count(cached.get("cache_creation")),
+    )
+
+
+def _count(value: object) -> int | None:
+    return value if isinstance(value, int) and value >= 0 else None
 
 
 async def choose_title(
@@ -116,12 +190,13 @@ async def choose_title(
     prompt: str,
     reply: str,
     options: Mapping[str, float | str] | None = None,
+    session_id: str | None = None,
     timeout: float = TITLE_TIMEOUT_SECONDS,
 ) -> str:
     """A clean title from ``generator``, or from ``prompt`` when that fails."""
     try:
         async with asyncio.timeout(timeout):
-            proposed = await generator.title(model_profile, prompt, reply, options)
+            proposed = await generator.title(model_profile, prompt, reply, options, session_id)
     except Exception:
         log.warning("title generation failed; using the first line", exc_info=True)
         proposed = ""

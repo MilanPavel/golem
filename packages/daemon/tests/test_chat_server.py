@@ -684,8 +684,9 @@ class _OneTitle:
         prompt: str,
         reply: str,
         options: Mapping[str, float | str] | None = None,
+        session_id: str | None = None,
     ) -> str:
-        del model_profile, prompt, reply
+        del model_profile, prompt, reply, options, session_id
         return "Greeting"
 
 

@@ -29,6 +29,7 @@ from golem.models.keys import ProviderKeys
 from golem.models.ollama import LocalServer, LocalServers, ServerState
 from golem.models.pulls import PullManager
 from golem.models.router import ModelConfigError, ModelRouter
+from golem.models.tiers import Tier
 from golem.models.window import resolve_window
 from golem.paths import GolemPaths, resolve_paths
 from golem.permissions.policy import Policy
@@ -56,6 +57,7 @@ from golem.sessions.log import SessionLog
 from golem.sessions.manager import SessionManager
 from golem.sessions.recovery import recover_runs
 from golem.sessions.titles import ModelTitles, TitleGenerator
+from golem.sessions.usage import Usage, backfill
 from golem.skills.bundled import bundled_skills_dir
 from golem.skills.index import index_section
 from golem.skills.pinned import pinned_section
@@ -218,6 +220,17 @@ class DaemonApp:
                 self.state.policy = policy
                 self.state.tools = default_registry(mcp, policy.web())
                 self.state.artifacts = ArtifactStore(database)
+                usage = Usage(database)
+                replayed = await backfill(database)
+                if replayed:
+                    log.info("filled model_calls from %d stored model call events", replayed)
+                self.state.usage = usage
+                if isinstance(self._titles, ModelTitles):
+                    self._titles.record_to(
+                        usage,
+                        lambda profile: _price_of(router, models, profile),
+                        lambda profile: _tier_of(router, models, profile),
+                    )
                 chat = open_chat(
                     router,
                     saver,
@@ -239,6 +252,7 @@ class DaemonApp:
                     note_loaded=note_loaded,
                     price_of=lambda profile: _price_of(router, models, profile),
                     gate=self._gate or ServerGate(settings.ollama.parallel),
+                    tier_of=lambda profile: _tier_of(router, models, profile),
                 )
                 self.state.sessions = await _open_sessions(
                     database,
@@ -325,6 +339,7 @@ class DaemonApp:
             if self.state.local_servers is not None:
                 await self.state.local_servers.aclose()
             self.state.local_servers = None
+            self.state.usage = None
             self.state.sessions = None
             self._lock.release()
 
@@ -486,6 +501,15 @@ def _price_of(router: ModelRouter, models: ModelDiscovery, profile: str) -> Mode
     except ModelConfigError:
         return None
     return models.price_of(ref)
+
+
+def _tier_of(router: ModelRouter, models: ModelDiscovery, profile: str) -> Tier | None:
+    """The tier of the model a profile name resolves to, or None when it does not resolve."""
+    try:
+        ref = router.resolve(profile).ref
+    except ModelConfigError:
+        return None
+    return models.tier_of_ref(ref)
 
 
 async def _open_sessions(

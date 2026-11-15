@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from collections.abc import Sequence
 
 from golem.store.database import Database
 from golem.store.projection import project
@@ -71,6 +72,15 @@ class EventLog:
         rows = await self._database.fetch_all(
             f"SELECT {_COLUMNS} FROM events WHERE session_id = ? AND seq > ? ORDER BY seq",
             (session_id, after_seq),
+        )
+        return [_decode(row) for row in rows]
+
+    async def of_types(self, types: Sequence[str]) -> list[ChatEvent]:
+        """Every stored event of the given types, by session and in order."""
+        marks = ", ".join("?" for _ in types)
+        rows = await self._database.fetch_all(
+            f"SELECT {_COLUMNS} FROM events WHERE type IN ({marks}) ORDER BY session_id, seq",
+            tuple(types),
         )
         return [_decode(row) for row in rows]
 

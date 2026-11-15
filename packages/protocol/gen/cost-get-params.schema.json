@@ -1,0 +1,21 @@
+{
+  "additionalProperties": false,
+  "description": "``cost.get``. What model calls cost: today, the last 7 days, and one session.\n\nDays are the user's local days. Does not call a model.",
+  "properties": {
+    "session_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Session Id"
+    }
+  },
+  "title": "CostGetParams",
+  "type": "object"
+}

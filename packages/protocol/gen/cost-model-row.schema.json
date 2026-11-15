@@ -1,0 +1,75 @@
+{
+  "additionalProperties": false,
+  "description": "One model's calls over the last 7 days.\n\n``provider``, ``model`` and ``tier`` are null for a call whose model was not known.",
+  "properties": {
+    "calls": {
+      "minimum": 0,
+      "title": "Calls",
+      "type": "integer"
+    },
+    "cost_usd": {
+      "minimum": 0,
+      "title": "Cost Usd",
+      "type": "number"
+    },
+    "input": {
+      "minimum": 0,
+      "title": "Input",
+      "type": "integer"
+    },
+    "model": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Model"
+    },
+    "output": {
+      "minimum": 0,
+      "title": "Output",
+      "type": "integer"
+    },
+    "provider": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Provider"
+    },
+    "tier": {
+      "anyOf": [
+        {
+          "enum": [
+            "local",
+            "budget",
+            "frontier"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Tier"
+    }
+  },
+  "required": [
+    "calls",
+    "input",
+    "output",
+    "cost_usd"
+  ],
+  "title": "CostModelRow",
+  "type": "object"
+}
