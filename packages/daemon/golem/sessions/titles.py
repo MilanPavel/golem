@@ -13,6 +13,7 @@ from typing import Protocol
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
+from golem.models.gate import ServerGate
 from golem.models.router import ModelRouter
 
 log = logging.getLogger("golem.sessions")
@@ -36,17 +37,23 @@ class TitleGenerator(Protocol):
 class ModelTitles:
     """Asks the session's own model. Plan step 9.2 moves this to a cheap profile."""
 
-    def __init__(self, router: ModelRouter) -> None:
+    def __init__(self, router: ModelRouter, gate: ServerGate | None = None) -> None:
         self._router = router
+        self._gate = gate
 
     async def title(self, model_profile: str, prompt: str, reply: str) -> str:
         model = self._router.chat_model(model_profile)
-        answer = await model.ainvoke(
-            [
-                SystemMessage(content=_INSTRUCTION),
-                HumanMessage(content=f"User: {prompt}\n\nAssistant: {reply[:_REPLY_CHARS]}"),
-            ]
-        )
+        target = self._router.ollama_server(model_profile)
+        server = None if self._gate is None or target is None else target[1]
+        gate = self._gate or ServerGate()
+        # A title waits behind the chat on a local server.
+        async with gate.hold(server, "job"):
+            answer = await model.ainvoke(
+                [
+                    SystemMessage(content=_INSTRUCTION),
+                    HumanMessage(content=f"User: {prompt}\n\nAssistant: {reply[:_REPLY_CHARS]}"),
+                ]
+            )
         return answer.text
 
 

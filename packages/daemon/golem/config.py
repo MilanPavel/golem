@@ -260,14 +260,16 @@ class OllamaSettings(BaseModel):
     ``start`` lets golem run ``ollama serve`` when a local model is needed and
     nothing answers. ``idle_stop_minutes`` stops a server golem started after
     that long unused, and 0 keeps it running. A server golem did not start is
-    never stopped. ``models`` holds the options saved for each model, by its
-    Ollama name, such as ``qwen3:8b``.
+    never stopped. ``parallel`` is how many generations golem sends to a local server at
+    once. Raise it only if you also set ``OLLAMA_NUM_PARALLEL``. ``models`` holds the
+    options saved for each model, by its Ollama name, such as ``qwen3:8b``.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     start: bool = True
     idle_stop_minutes: int = Field(default=30, ge=0)
+    parallel: int = Field(default=1, ge=1, le=8)
     models: dict[str, ModelOptions] = Field(default_factory=dict[str, ModelOptions])
 
 

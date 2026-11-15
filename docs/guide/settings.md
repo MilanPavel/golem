@@ -134,6 +134,7 @@ The providers are `openai`, `anthropic`, `google`, `deepseek`, `xai`, `moonshot`
 |---|---|---|
 | `start` | `true` | Run `ollama serve` when a local model is needed and nothing answers |
 | `idle_stop_minutes` | `30` | Stop a server golem started after this long unused. `0` never stops it |
+| `parallel` | `1` | How many generations golem sends to a local server at once (1 to 8). Raise it only if you also set `OLLAMA_NUM_PARALLEL` |
 
 ### `[routing]`
 
