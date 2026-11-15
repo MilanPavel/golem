@@ -209,6 +209,9 @@ Every write by `write_file` and `edit_file`; changes a shell command made, as fa
 | `file.changed` | Event | [#949](https://github.com/MilanPavel/golem/issues/949) |
 | `changes.list {session_id}` | Call | [#950](https://github.com/MilanPavel/golem/issues/950) |
 | `changes.diff {session_id, path or change_id}` | Call | [#950](https://github.com/MilanPavel/golem/issues/950) |
+| `changes.commit {session_id, paths, message}` | Call | [#981](https://github.com/MilanPavel/golem/issues/981) |
+| `changes.commit_info {session_id}` | Call | [#981](https://github.com/MilanPavel/golem/issues/981) |
+| `changes.suggest_message {session_id, paths}` | Call | [#981](https://github.com/MilanPavel/golem/issues/981) |
 | `changes.revert {session_id, target, force}` | Call | [#953](https://github.com/MilanPavel/golem/issues/953) |
 | `file.read` | Call | [#966](https://github.com/MilanPavel/golem/issues/966) |
 | `session.set_plan` | Call | [#979](https://github.com/MilanPavel/golem/issues/979) |

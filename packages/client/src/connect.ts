@@ -23,8 +23,11 @@ import type { FsListDirsResult } from "../../protocol/gen/fs-list-dirs-result.ts
 import type { SetupStatusResult } from "../../protocol/gen/setup-status-result.ts";
 import type { ApprovalRespondResult } from "../../protocol/gen/approval-respond-result.ts";
 import type { ArtifactReadResult } from "../../protocol/gen/artifact-read-result.ts";
+import type { ChangesCommitInfoResult } from "../../protocol/gen/changes-commit-info-result.ts";
+import type { ChangesCommitResult } from "../../protocol/gen/changes-commit-result.ts";
 import type { ChangesDiffResult } from "../../protocol/gen/changes-diff-result.ts";
 import type { ChangesListResult } from "../../protocol/gen/changes-list-result.ts";
+import type { ChangesSuggestMessageResult } from "../../protocol/gen/changes-suggest-message-result.ts";
 import type { ConfigGetResult } from "../../protocol/gen/config-get-result.ts";
 import type { PolicyEditResult } from "../../protocol/gen/policy-edit-result.ts";
 
@@ -103,6 +106,8 @@ import {
   isMcpServerDetail,
   isRuntimeInstallDone,
   isRuntimeName,
+  isChangesCommitInfoResult,
+  isChangesCommitResult,
   isChangesListResult,
   isFsListDirsResult,
   isSetupStatusResult,
@@ -291,6 +296,12 @@ export interface GolemClient {
   changesList(sessionId: string): Promise<ChangesListResult>;
   /** The diff of a file (`path`) or of one change (`changeId`). */
   changesDiff(sessionId: string, target: ChangesDiffTarget): Promise<ChangesDiffResult>;
+  /** Commit `paths` of the session folder with the user's own git. Never pushes. */
+  changesCommit(sessionId: string, paths: string[], message: string): Promise<ChangesCommitResult>;
+  /** Whether the session folder is in a git work tree, its branch, and which of the changed files git sees. */
+  changesCommitInfo(sessionId: string): Promise<ChangesCommitInfoResult>;
+  /** A commit message the session's model suggests for `paths`. */
+  changesSuggestMessage(sessionId: string, paths: string[]): Promise<ChangesSuggestMessageResult>;
   /** `args` are the call's arguments as the user edited them. They go only with `allow`. */
   respondApproval(
     sessionId: string,
@@ -1302,6 +1313,30 @@ export function connectGolem(options: ConnectOptions): GolemClient {
         throw new Error("invalid changes.diff result");
       }
       return { diff: result["diff"], truncated: result["truncated"] };
+    },
+    async changesCommit(sessionId: string, paths: string[], message: string): Promise<ChangesCommitResult> {
+      await ready;
+      const result = await call("changes.commit", { session_id: sessionId, paths, message });
+      if (!isChangesCommitResult(result)) {
+        throw new Error("invalid changes.commit result");
+      }
+      return result;
+    },
+    async changesCommitInfo(sessionId: string): Promise<ChangesCommitInfoResult> {
+      await ready;
+      const result = await call("changes.commit_info", { session_id: sessionId });
+      if (!isChangesCommitInfoResult(result)) {
+        throw new Error("invalid changes.commit_info result");
+      }
+      return result;
+    },
+    async changesSuggestMessage(sessionId: string, paths: string[]): Promise<ChangesSuggestMessageResult> {
+      await ready;
+      const result = await call("changes.suggest_message", { session_id: sessionId, paths });
+      if (!isRecord(result) || typeof result["message"] !== "string") {
+        throw new Error("invalid changes.suggest_message result");
+      }
+      return { message: result["message"] };
     },
     async respondApproval(
       sessionId: string,

@@ -74,6 +74,9 @@ export type { SessionSetOptionsResult } from "../../protocol/gen/session-set-opt
 export type { McpToggleResult } from "../../protocol/gen/mcp-toggle-result.ts";
 export type { SessionSetSkillsResult } from "../../protocol/gen/session-set-skills-result.ts";
 export type { ArtifactReadResult } from "../../protocol/gen/artifact-read-result.ts";
+export type { ChangesCommitResult } from "../../protocol/gen/changes-commit-result.ts";
+export type { ChangesCommitInfoResult } from "../../protocol/gen/changes-commit-info-result.ts";
+export type { ChangesSuggestMessageResult } from "../../protocol/gen/changes-suggest-message-result.ts";
 export type { ChangesDiffResult } from "../../protocol/gen/changes-diff-result.ts";
 export type { ChangedFile, ChangesListResult } from "../../protocol/gen/changes-list-result.ts";
 export type { McpToolInfo, McpToolsResult } from "../../protocol/gen/mcp-tools-result.ts";

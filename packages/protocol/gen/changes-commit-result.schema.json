@@ -1,0 +1,33 @@
+{
+  "additionalProperties": false,
+  "description": "Whether git committed. ``sha`` is the short hash on success. ``output`` is git's text.",
+  "properties": {
+    "ok": {
+      "title": "Ok",
+      "type": "boolean"
+    },
+    "output": {
+      "maxLength": 4000,
+      "title": "Output",
+      "type": "string"
+    },
+    "sha": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Sha"
+    }
+  },
+  "required": [
+    "ok",
+    "sha",
+    "output"
+  ],
+  "title": "ChangesCommitResult",
+  "type": "object"
+}
