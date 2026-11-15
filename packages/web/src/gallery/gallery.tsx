@@ -27,7 +27,8 @@ import { ANSWERED, PENDING_EDIT, PENDING_SHELL } from "../features/approval/samp
 import { DiffModeSwitch, DiffView } from "../features/diff/index.ts";
 import { SAMPLE_EDIT_DIFF, SAMPLE_LONG_LINE_DIFF, SAMPLE_NEW_FILE_DIFF } from "../features/diff/sample.ts";
 import { TodoList } from "../features/drawer/index.ts";
-import { Workbench, type WorkbenchTab } from "../features/workbench/index.ts";
+import { ChangesView, Workbench, type WorkbenchTab } from "../features/workbench/index.ts";
+import type { ChangedFile } from "../store/changes.ts";
 import { Composer, ContextChipView, DockView, Meter, ModeChipView, TuneChipView } from "../features/composer/index.ts";
 import { createHistory } from "../features/composer/history.ts";
 import { CommandsDialog } from "../features/composer/help-dialog.tsx";
@@ -274,6 +275,54 @@ function WorkbenchDemo() {
       <h3 className="mb-2 font-mono text-xs text-faint">Workbench</h3>
       <div className="flex h-96 max-w-full justify-end overflow-hidden rounded-lg border border-line">
         <Workbench id={id} tabs={DEMO_TABS} floating={false} onClose={() => {}} />
+      </div>
+    </section>
+  );
+}
+
+const SAMPLE_CHANGES: ChangedFile[] = [
+  { path: "src/socket.ts", status: "modified", added: 3, removed: 3, change_ids: ["c_1"], stale: false },
+  { path: "src/utils/clamp.ts", status: "created", added: 3, removed: 0, change_ids: ["c_2"], stale: false },
+  { path: "docs/old-notes.md", status: "deleted", added: 0, removed: 12, change_ids: ["c_3"], stale: true },
+];
+
+/** The Changes tab's list with three files, the first open, in a narrow and a wide panel. */
+function ChangesDemo() {
+  const anchor = useAnchor();
+  const [open, setOpen] = useState<string | null>("src/socket.ts");
+  const [mode, setMode] = useState<"unified" | "split">("split");
+  return (
+    <section className="mt-6" id={anchor("Changes tab")}>
+      <h3 className="mb-2 font-mono text-xs text-faint">Changes tab</h3>
+      <div className="flex flex-wrap items-start gap-4">
+        {(
+          [
+            ["Narrow panel", false],
+            ["Wide panel", true],
+          ] as const
+        ).map(([title, canSplit]) => (
+          <div key={title} className={canSplit ? "flex w-full max-w-4xl flex-col gap-3" : "flex w-80 flex-col gap-3"}>
+            <p className="text-xs text-muted">{title}</p>
+            <div className="flex flex-col gap-3 rounded-lg border border-line bg-surface p-4">
+              <ChangesView
+                files={SAMPLE_CHANGES}
+                error={null}
+                open={open}
+                onOpen={setOpen}
+                diff={{ diff: SAMPLE_EDIT_DIFF, truncated: true, error: null }}
+                mode={mode}
+                onMode={setMode}
+                canSplit={canSplit}
+              />
+            </div>
+          </div>
+        ))}
+        <div className="flex w-80 flex-col gap-3">
+          <p className="text-xs text-muted">Empty</p>
+          <div className="rounded-lg border border-line bg-surface p-4">
+            <ChangesView files={[]} error={null} open={null} onOpen={() => {}} diff={{ diff: null, truncated: false, error: null }} mode="unified" onMode={() => {}} canSplit={false} />
+          </div>
+        </div>
       </div>
     </section>
   );
@@ -1241,6 +1290,8 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
       <TodoListDemo />
 
       <WorkbenchDemo />
+
+      <ChangesDemo />
 
       <section className="mt-6" id={anchor("Command palette and keys")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Command palette and keys</h3>
