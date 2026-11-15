@@ -1,6 +1,6 @@
 import { contextUsed, formatTokens, ownToolName, replyWasCut, type TraceContextPart } from "@golem/view";
 import type { TraceMessage, TraceSpan, TraceSpanResult } from "../../store/trace.ts";
-import { formatDuration, localTime, throughput } from "./format.ts";
+import { formatDuration, localTime, throughput, throughputIsExact } from "./format.ts";
 
 type TraceContextItem = NonNullable<TraceContextPart["items"]>[number];
 
@@ -88,6 +88,10 @@ export function metadataRows(result: TraceSpanResult): [string, string][] {
   const window = "context_window" in span ? span.context_window : null;
   const estimated = "context_window_estimated" in span && span.context_window_estimated === true;
   const numCtx = "num_ctx" in span ? span.num_ctx : null;
+  const promptMs = "prompt_ms" in span ? span.prompt_ms : null;
+  const loadMs = "load_ms" in span ? span.load_ms : null;
+  const input = span.tokens?.input;
+  const read = typeof input === "number" ? `read ${formatTokens(input)} in` : "read the prompt in";
   const rows: [string, unknown][] = [
     ["id", span.id],
     ["kind", span.kind],
@@ -101,6 +105,8 @@ export function metadataRows(result: TraceSpanResult): [string, string][] {
     ["stop_reason", replyWasCut(result.stop_reason) ? `${result.stop_reason} (the reply was cut)` : result.stop_reason],
     ["text_tool_calls", TEXT_CALL_LINES[result.text_tool_calls ?? ""]],
     ["first_token_ms", span.first_token_ms],
+    ["prompt", typeof promptMs === "number" ? `${read} ${formatDuration(promptMs)}` : null],
+    ["load", typeof loadMs === "number" && loadMs > 500 ? `loaded in ${formatDuration(loadMs)}` : null],
     ["tokens.input", span.tokens?.input],
     ["tokens.output", span.tokens?.output],
     ["tokens.cache_read", span.tokens?.cache_read],
@@ -201,7 +207,7 @@ export function modelLine(result: TraceSpanResult): string {
   parts.push(formatDuration(span.duration_ms));
   if (span.first_token_ms !== null && span.first_token_ms !== undefined) parts.push(`first token ${formatDuration(span.first_token_ms)}`);
   const speed = throughput(span);
-  if (speed !== null) parts.push(`≈ ${speed} tok/s`);
+  if (speed !== null) parts.push(`${throughputIsExact(span) ? "" : "≈ "}${speed} tok/s`);
   const { input, output, cache_read: read, cache_write: write } = span.tokens ?? {};
   if (input !== null && input !== undefined && output !== null && output !== undefined) parts.push(`${formatTokens(input)} → ${formatTokens(output)}`);
   if (read) parts.push(`cache read ${formatTokens(read)}`);

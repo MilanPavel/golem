@@ -1333,7 +1333,7 @@ public struct FileChangedData: Codable {
     public let removed: Int
     public let reverts: String?
     public let source: FileChangedDataSource
-    public let status: FileChangedDataStatus
+    public let status: ChangedFileStatus
 
     public enum CodingKeys: String, CodingKey {
         case added = "added"
@@ -1346,7 +1346,7 @@ public struct FileChangedData: Codable {
         case status = "status"
     }
 
-    public init(added: Int, callID: String?, changeID: String, path: String, removed: Int, reverts: String?, source: FileChangedDataSource, status: FileChangedDataStatus) {
+    public init(added: Int, callID: String?, changeID: String, path: String, removed: Int, reverts: String?, source: FileChangedDataSource, status: ChangedFileStatus) {
         self.added = added
         self.callID = callID
         self.changeID = changeID
@@ -1362,12 +1362,6 @@ public enum FileChangedDataSource: String, Codable {
     case revert = "revert"
     case shell = "shell"
     case tool = "tool"
-}
-
-public enum FileChangedDataStatus: String, Codable {
-    case created = "created"
-    case deleted = "deleted"
-    case modified = "modified"
 }
 
 /// A file in the session folder changed. Sent before the ``tool.completed`` of its call.
@@ -1413,7 +1407,7 @@ public struct FileChangedEventData: Codable {
     public let removed: Int
     public let reverts: String?
     public let source: FileChangedDataSource
-    public let status: FileChangedDataStatus
+    public let status: ChangedFileStatus
 
     public enum CodingKeys: String, CodingKey {
         case added = "added"
@@ -1426,7 +1420,7 @@ public struct FileChangedEventData: Codable {
         case status = "status"
     }
 
-    public init(added: Int, callID: String?, changeID: String, path: String, removed: Int, reverts: String?, source: FileChangedDataSource, status: FileChangedDataStatus) {
+    public init(added: Int, callID: String?, changeID: String, path: String, removed: Int, reverts: String?, source: FileChangedDataSource, status: ChangedFileStatus) {
         self.added = added
         self.callID = callID
         self.changeID = changeID
@@ -1686,7 +1680,7 @@ public struct KeychainWait: Codable {
 /// ``tier`` is ``local`` for Ollama, ``budget`` for a hosted model whose blended price is at
 /// or below ``[routing] budget_max_price``, and ``frontier`` otherwise.
 /// ``stale`` means a cached list was shown because the provider did not
-/// answer in time.
+/// answer in time. ``speed`` is set for a local model golem has timed.
 // MARK: - ListedModel
 public struct ListedModel: Codable {
     public let categories: [Category]?
@@ -1702,6 +1696,7 @@ public struct ListedModel: Codable {
     public let ref: String
     public let sizeGB: Double?
     public let source: ListedModelSource
+    public let speed: ListedModelModelSpeedInfo?
     public let stale: Bool?
     public let status: ListedModelStatus
     public let tags: [String]?
@@ -1723,6 +1718,7 @@ public struct ListedModel: Codable {
         case ref = "ref"
         case sizeGB = "size_gb"
         case source = "source"
+        case speed = "speed"
         case stale = "stale"
         case status = "status"
         case tags = "tags"
@@ -1731,7 +1727,7 @@ public struct ListedModel: Codable {
         case tools = "tools"
     }
 
-    public init(categories: [Category]?, ctx: Int?, fit: Fit?, label: String, price: ListedModelModelPriceInfo?, profiles: [String]?, progress: Double?, provider: String, recommended: Bool?, recommendedFor: [Category]?, ref: String, sizeGB: Double?, source: ListedModelSource, stale: Bool?, status: ListedModelStatus, tags: [String]?, thinkValues: [String]?, tier: Tier, tools: Bool?) {
+    public init(categories: [Category]?, ctx: Int?, fit: Fit?, label: String, price: ListedModelModelPriceInfo?, profiles: [String]?, progress: Double?, provider: String, recommended: Bool?, recommendedFor: [Category]?, ref: String, sizeGB: Double?, source: ListedModelSource, speed: ListedModelModelSpeedInfo?, stale: Bool?, status: ListedModelStatus, tags: [String]?, thinkValues: [String]?, tier: Tier, tools: Bool?) {
         self.categories = categories
         self.ctx = ctx
         self.fit = fit
@@ -1745,6 +1741,7 @@ public struct ListedModel: Codable {
         self.ref = ref
         self.sizeGB = sizeGB
         self.source = source
+        self.speed = speed
         self.stale = stale
         self.status = status
         self.tags = tags
@@ -1794,6 +1791,28 @@ public enum ListedModelSource: String, Codable {
     case installed = "installed"
     case profile = "profile"
     case remote = "remote"
+}
+
+/// Typical speed of a local model: the median of its recent calls.
+///
+/// From the model server's own clock. ``samples`` is how many calls it rests on.
+// MARK: - ListedModelModelSpeedInfo
+public struct ListedModelModelSpeedInfo: Codable {
+    public let promptTps: Double?
+    public let replyTps: Double?
+    public let samples: Int
+
+    public enum CodingKeys: String, CodingKey {
+        case promptTps = "prompt_tps"
+        case replyTps = "reply_tps"
+        case samples = "samples"
+    }
+
+    public init(promptTps: Double?, replyTps: Double?, samples: Int) {
+        self.promptTps = promptTps
+        self.replyTps = replyTps
+        self.samples = samples
+    }
 }
 
 public enum ListedModelStatus: String, Codable {
@@ -5180,6 +5199,10 @@ public enum MessageThinkingDeltaEventType: String, Codable {
 ///
 /// ``cost_usd`` is the cost of this call at ``price``. Both are None when the
 /// price is not known. A local model costs 0.
+///
+/// ``load_ms``, ``prompt_ms`` and ``reply_ms`` are the time the model server spent loading
+/// the model, reading the prompt and writing the reply. From the model server's own clock.
+/// Ollama only.
 // MARK: - ModelCallCompletedData
 public struct ModelCallCompletedData: Codable {
     public let contextWindow: Int?
@@ -5187,8 +5210,11 @@ public struct ModelCallCompletedData: Codable {
     public let failed: Bool?
     public let firstTokenMS: Int?
     public let latencyMS: Int
+    public let loadMS: Int?
     public let messageID: String
     public let price: ModelCallCompletedDataCallPrice?
+    public let promptMS: Int?
+    public let replyMS: Int?
     public let stopReason: String?
     public let textToolCalls: TextToolCalls?
     public let usage: ModelCallCompletedDataTokenUsage?
@@ -5199,21 +5225,27 @@ public struct ModelCallCompletedData: Codable {
         case failed = "failed"
         case firstTokenMS = "first_token_ms"
         case latencyMS = "latency_ms"
+        case loadMS = "load_ms"
         case messageID = "message_id"
         case price = "price"
+        case promptMS = "prompt_ms"
+        case replyMS = "reply_ms"
         case stopReason = "stop_reason"
         case textToolCalls = "text_tool_calls"
         case usage = "usage"
     }
 
-    public init(contextWindow: Int?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int, messageID: String, price: ModelCallCompletedDataCallPrice?, stopReason: String?, textToolCalls: TextToolCalls?, usage: ModelCallCompletedDataTokenUsage?) {
+    public init(contextWindow: Int?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int, loadMS: Int?, messageID: String, price: ModelCallCompletedDataCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: ModelCallCompletedDataTokenUsage?) {
         self.contextWindow = contextWindow
         self.costUsd = costUsd
         self.failed = failed
         self.firstTokenMS = firstTokenMS
         self.latencyMS = latencyMS
+        self.loadMS = loadMS
         self.messageID = messageID
         self.price = price
+        self.promptMS = promptMS
+        self.replyMS = replyMS
         self.stopReason = stopReason
         self.textToolCalls = textToolCalls
         self.usage = usage
@@ -5313,6 +5345,10 @@ public struct ModelCallCompletedEvent: Codable {
 ///
 /// ``cost_usd`` is the cost of this call at ``price``. Both are None when the
 /// price is not known. A local model costs 0.
+///
+/// ``load_ms``, ``prompt_ms`` and ``reply_ms`` are the time the model server spent loading
+/// the model, reading the prompt and writing the reply. From the model server's own clock.
+/// Ollama only.
 // MARK: - ModelCallCompletedEventData
 public struct ModelCallCompletedEventData: Codable {
     public let contextWindow: Int?
@@ -5320,8 +5356,11 @@ public struct ModelCallCompletedEventData: Codable {
     public let failed: Bool?
     public let firstTokenMS: Int?
     public let latencyMS: Int
+    public let loadMS: Int?
     public let messageID: String
     public let price: PurpleCallPrice?
+    public let promptMS: Int?
+    public let replyMS: Int?
     public let stopReason: String?
     public let textToolCalls: TextToolCalls?
     public let usage: PurpleTokenUsage?
@@ -5332,21 +5371,27 @@ public struct ModelCallCompletedEventData: Codable {
         case failed = "failed"
         case firstTokenMS = "first_token_ms"
         case latencyMS = "latency_ms"
+        case loadMS = "load_ms"
         case messageID = "message_id"
         case price = "price"
+        case promptMS = "prompt_ms"
+        case replyMS = "reply_ms"
         case stopReason = "stop_reason"
         case textToolCalls = "text_tool_calls"
         case usage = "usage"
     }
 
-    public init(contextWindow: Int?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int, messageID: String, price: PurpleCallPrice?, stopReason: String?, textToolCalls: TextToolCalls?, usage: PurpleTokenUsage?) {
+    public init(contextWindow: Int?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int, loadMS: Int?, messageID: String, price: PurpleCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: PurpleTokenUsage?) {
         self.contextWindow = contextWindow
         self.costUsd = costUsd
         self.failed = failed
         self.firstTokenMS = firstTokenMS
         self.latencyMS = latencyMS
+        self.loadMS = loadMS
         self.messageID = messageID
         self.price = price
+        self.promptMS = promptMS
+        self.replyMS = replyMS
         self.stopReason = stopReason
         self.textToolCalls = textToolCalls
         self.usage = usage
@@ -5774,7 +5819,7 @@ public struct ModelListResult: Codable {
 /// ``tier`` is ``local`` for Ollama, ``budget`` for a hosted model whose blended price is at
 /// or below ``[routing] budget_max_price``, and ``frontier`` otherwise.
 /// ``stale`` means a cached list was shown because the provider did not
-/// answer in time.
+/// answer in time. ``speed`` is set for a local model golem has timed.
 // MARK: - ModelElement
 public struct ModelElement: Codable {
     public let categories: [Category]?
@@ -5790,6 +5835,7 @@ public struct ModelElement: Codable {
     public let ref: String
     public let sizeGB: Double?
     public let source: ListedModelSource
+    public let speed: ModelModelSpeedInfo?
     public let stale: Bool?
     public let status: ListedModelStatus
     public let tags: [String]?
@@ -5811,6 +5857,7 @@ public struct ModelElement: Codable {
         case ref = "ref"
         case sizeGB = "size_gb"
         case source = "source"
+        case speed = "speed"
         case stale = "stale"
         case status = "status"
         case tags = "tags"
@@ -5819,7 +5866,7 @@ public struct ModelElement: Codable {
         case tools = "tools"
     }
 
-    public init(categories: [Category]?, ctx: Int?, fit: Fit?, label: String, price: ModelModelPriceInfo?, profiles: [String]?, progress: Double?, provider: String, recommended: Bool?, recommendedFor: [Category]?, ref: String, sizeGB: Double?, source: ListedModelSource, stale: Bool?, status: ListedModelStatus, tags: [String]?, thinkValues: [String]?, tier: Tier, tools: Bool?) {
+    public init(categories: [Category]?, ctx: Int?, fit: Fit?, label: String, price: ModelModelPriceInfo?, profiles: [String]?, progress: Double?, provider: String, recommended: Bool?, recommendedFor: [Category]?, ref: String, sizeGB: Double?, source: ListedModelSource, speed: ModelModelSpeedInfo?, stale: Bool?, status: ListedModelStatus, tags: [String]?, thinkValues: [String]?, tier: Tier, tools: Bool?) {
         self.categories = categories
         self.ctx = ctx
         self.fit = fit
@@ -5833,6 +5880,7 @@ public struct ModelElement: Codable {
         self.ref = ref
         self.sizeGB = sizeGB
         self.source = source
+        self.speed = speed
         self.stale = stale
         self.status = status
         self.tags = tags
@@ -5859,6 +5907,28 @@ public struct ModelModelPriceInfo: Codable {
         self.cachedInput = cachedInput
         self.input = input
         self.output = output
+    }
+}
+
+/// Typical speed of a local model: the median of its recent calls.
+///
+/// From the model server's own clock. ``samples`` is how many calls it rests on.
+// MARK: - ModelModelSpeedInfo
+public struct ModelModelSpeedInfo: Codable {
+    public let promptTps: Double?
+    public let replyTps: Double?
+    public let samples: Int
+
+    public enum CodingKeys: String, CodingKey {
+        case promptTps = "prompt_tps"
+        case replyTps = "reply_tps"
+        case samples = "samples"
+    }
+
+    public init(promptTps: Double?, replyTps: Double?, samples: Int) {
+        self.promptTps = promptTps
+        self.replyTps = replyTps
+        self.samples = samples
     }
 }
 
@@ -6892,6 +6962,28 @@ public struct ModelSetup: Codable {
     }
 }
 
+/// Typical speed of a local model: the median of its recent calls.
+///
+/// From the model server's own clock. ``samples`` is how many calls it rests on.
+// MARK: - ModelSpeedInfo
+public struct ModelSpeedInfo: Codable {
+    public let promptTps: Double?
+    public let replyTps: Double?
+    public let samples: Int
+
+    public enum CodingKeys: String, CodingKey {
+        case promptTps = "prompt_tps"
+        case replyTps = "reply_tps"
+        case samples = "samples"
+    }
+
+    public init(promptTps: Double?, replyTps: Double?, samples: Int) {
+        self.promptTps = promptTps
+        self.replyTps = replyTps
+        self.samples = samples
+    }
+}
+
 /// ``notify.test``. Post a sample notification, for Settings and ``golem doctor``.
 // MARK: - NotifyTestParams
 public struct NotifyTestParams: Codable {
@@ -7572,6 +7664,10 @@ public struct Params: Codable {
 /// ``cost_usd`` is the cost of this call at ``price``. Both are None when the
 /// price is not known. A local model costs 0.
 ///
+/// ``load_ms``, ``prompt_ms`` and ``reply_ms`` are the time the model server spent loading
+/// the model, reading the prompt and writing the reply. From the model server's own clock.
+/// Ollama only.
+///
 /// Why a run stopped. No traceback.
 ///
 /// ``code`` names a failure a client can act on. ``model_unreachable``: the
@@ -7704,7 +7800,10 @@ public struct ParamsData: Codable {
     public let failed: Bool?
     public let firstTokenMS: Int?
     public let latencyMS: Int?
+    public let loadMS: Int?
     public let price: FluffyCallPrice?
+    public let promptMS: Int?
+    public let replyMS: Int?
     public let stopReason: String?
     public let textToolCalls: TextToolCalls?
     public let usage: FluffyTokenUsage?
@@ -7778,7 +7877,10 @@ public struct ParamsData: Codable {
         case failed = "failed"
         case firstTokenMS = "first_token_ms"
         case latencyMS = "latency_ms"
+        case loadMS = "load_ms"
         case price = "price"
+        case promptMS = "prompt_ms"
+        case replyMS = "reply_ms"
         case stopReason = "stop_reason"
         case textToolCalls = "text_tool_calls"
         case usage = "usage"
@@ -7807,7 +7909,7 @@ public struct ParamsData: Codable {
         case how = "how"
     }
 
-    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: PurpleReason?, options: [String: Option]?, mode: Mode?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, contextWindow: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String?, provider: String?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, price: FluffyCallPrice?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, todos: [PurpleTodo]?, added: Int?, changeID: String?, path: String?, removed: Int?, reverts: String?, hash: String?, how: How?) {
+    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: PurpleReason?, options: [String: Option]?, mode: Mode?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, contextWindow: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String?, provider: String?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, todos: [PurpleTodo]?, added: Int?, changeID: String?, path: String?, removed: Int?, reverts: String?, hash: String?, how: How?) {
         self.cwd = cwd
         self.forkedFrom = forkedFrom
         self.modelName = modelName
@@ -7853,7 +7955,10 @@ public struct ParamsData: Codable {
         self.failed = failed
         self.firstTokenMS = firstTokenMS
         self.latencyMS = latencyMS
+        self.loadMS = loadMS
         self.price = price
+        self.promptMS = promptMS
+        self.replyMS = replyMS
         self.stopReason = stopReason
         self.textToolCalls = textToolCalls
         self.usage = usage
@@ -11582,6 +11687,9 @@ public struct RunElement: Codable {
 ///
 /// ``cost_usd`` is what the call cost, as its ``model.call.completed`` recorded
 /// it. Null when the price was not known or the call has no token counts.
+///
+/// ``load_ms``, ``prompt_ms`` and ``reply_ms`` are from the model server's own clock.
+/// Ollama only.
 // MARK: - RunChild
 public struct RunChild: Codable {
     public let approvalWaitMS: Int?
@@ -11596,13 +11704,16 @@ public struct RunChild: Codable {
     public let firstTokenMS: Int?
     public let id: String
     public let kind: ChildKind
+    public let loadMS: Int?
     public let model: String?
     public let name: String
     public let numCtx: Int?
     public let preview: String?
     public let promptCut: PromptCut?
     public let promptCutKind: PromptCutKind?
+    public let promptMS: Int?
     public let recorded: Bool?
+    public let replyMS: Int?
     public let start: String
     public let status: ChildStatus
     public let tokens: RunTraceTokens?
@@ -11621,20 +11732,23 @@ public struct RunChild: Codable {
         case firstTokenMS = "first_token_ms"
         case id = "id"
         case kind = "kind"
+        case loadMS = "load_ms"
         case model = "model"
         case name = "name"
         case numCtx = "num_ctx"
         case preview = "preview"
         case promptCut = "prompt_cut"
         case promptCutKind = "prompt_cut_kind"
+        case promptMS = "prompt_ms"
         case recorded = "recorded"
+        case replyMS = "reply_ms"
         case start = "start"
         case status = "status"
         case tokens = "tokens"
         case windowPlanned = "window_planned"
     }
 
-    public init(approvalWaitMS: Int?, children: [PurpleTraceToolSpan]?, contextWindow: Int?, contextWindowEstimated: Bool?, costUsd: Double?, droppedMessageIDS: [String]?, droppedTokens: Int?, durationMS: Int?, end: String?, firstTokenMS: Int?, id: String, kind: ChildKind, model: String?, name: String, numCtx: Int?, preview: String?, promptCut: PromptCut?, promptCutKind: PromptCutKind?, recorded: Bool?, start: String, status: ChildStatus, tokens: RunTraceTokens?, windowPlanned: Bool?) {
+    public init(approvalWaitMS: Int?, children: [PurpleTraceToolSpan]?, contextWindow: Int?, contextWindowEstimated: Bool?, costUsd: Double?, droppedMessageIDS: [String]?, droppedTokens: Int?, durationMS: Int?, end: String?, firstTokenMS: Int?, id: String, kind: ChildKind, loadMS: Int?, model: String?, name: String, numCtx: Int?, preview: String?, promptCut: PromptCut?, promptCutKind: PromptCutKind?, promptMS: Int?, recorded: Bool?, replyMS: Int?, start: String, status: ChildStatus, tokens: RunTraceTokens?, windowPlanned: Bool?) {
         self.approvalWaitMS = approvalWaitMS
         self.children = children
         self.contextWindow = contextWindow
@@ -11647,13 +11761,16 @@ public struct RunChild: Codable {
         self.firstTokenMS = firstTokenMS
         self.id = id
         self.kind = kind
+        self.loadMS = loadMS
         self.model = model
         self.name = name
         self.numCtx = numCtx
         self.preview = preview
         self.promptCut = promptCut
         self.promptCutKind = promptCutKind
+        self.promptMS = promptMS
         self.recorded = recorded
+        self.replyMS = replyMS
         self.start = start
         self.status = status
         self.tokens = tokens
@@ -11794,6 +11911,9 @@ public enum TraceMessageRole: String, Codable {
 ///
 /// ``cost_usd`` is what the call cost, as its ``model.call.completed`` recorded
 /// it. Null when the price was not known or the call has no token counts.
+///
+/// ``load_ms``, ``prompt_ms`` and ``reply_ms`` are from the model server's own clock.
+/// Ollama only.
 // MARK: - TraceModelSpan
 public struct TraceModelSpan: Codable {
     public let approvalWaitMS: Int?
@@ -11808,13 +11928,16 @@ public struct TraceModelSpan: Codable {
     public let firstTokenMS: Int?
     public let id: String
     public let kind: ChildKind
+    public let loadMS: Int?
     public let model: String?
     public let name: String
     public let numCtx: Int?
     public let preview: String?
     public let promptCut: PromptCut?
     public let promptCutKind: PromptCutKind?
+    public let promptMS: Int?
     public let recorded: Bool?
+    public let replyMS: Int?
     public let start: String
     public let status: ChildStatus
     public let tokens: TraceModelSpanTraceTokens?
@@ -11833,20 +11956,23 @@ public struct TraceModelSpan: Codable {
         case firstTokenMS = "first_token_ms"
         case id = "id"
         case kind = "kind"
+        case loadMS = "load_ms"
         case model = "model"
         case name = "name"
         case numCtx = "num_ctx"
         case preview = "preview"
         case promptCut = "prompt_cut"
         case promptCutKind = "prompt_cut_kind"
+        case promptMS = "prompt_ms"
         case recorded = "recorded"
+        case replyMS = "reply_ms"
         case start = "start"
         case status = "status"
         case tokens = "tokens"
         case windowPlanned = "window_planned"
     }
 
-    public init(approvalWaitMS: Int?, children: [TraceModelSpanChild]?, contextWindow: Int?, contextWindowEstimated: Bool?, costUsd: Double?, droppedMessageIDS: [String]?, droppedTokens: Int?, durationMS: Int?, end: String?, firstTokenMS: Int?, id: String, kind: ChildKind, model: String?, name: String, numCtx: Int?, preview: String?, promptCut: PromptCut?, promptCutKind: PromptCutKind?, recorded: Bool?, start: String, status: ChildStatus, tokens: TraceModelSpanTraceTokens?, windowPlanned: Bool?) {
+    public init(approvalWaitMS: Int?, children: [TraceModelSpanChild]?, contextWindow: Int?, contextWindowEstimated: Bool?, costUsd: Double?, droppedMessageIDS: [String]?, droppedTokens: Int?, durationMS: Int?, end: String?, firstTokenMS: Int?, id: String, kind: ChildKind, loadMS: Int?, model: String?, name: String, numCtx: Int?, preview: String?, promptCut: PromptCut?, promptCutKind: PromptCutKind?, promptMS: Int?, recorded: Bool?, replyMS: Int?, start: String, status: ChildStatus, tokens: TraceModelSpanTraceTokens?, windowPlanned: Bool?) {
         self.approvalWaitMS = approvalWaitMS
         self.children = children
         self.contextWindow = contextWindow
@@ -11859,13 +11985,16 @@ public struct TraceModelSpan: Codable {
         self.firstTokenMS = firstTokenMS
         self.id = id
         self.kind = kind
+        self.loadMS = loadMS
         self.model = model
         self.name = name
         self.numCtx = numCtx
         self.preview = preview
         self.promptCut = promptCut
         self.promptCutKind = promptCutKind
+        self.promptMS = promptMS
         self.recorded = recorded
+        self.replyMS = replyMS
         self.start = start
         self.status = status
         self.tokens = tokens
@@ -12010,6 +12139,9 @@ public struct TraceRunSpan: Codable {
 ///
 /// ``cost_usd`` is what the call cost, as its ``model.call.completed`` recorded
 /// it. Null when the price was not known or the call has no token counts.
+///
+/// ``load_ms``, ``prompt_ms`` and ``reply_ms`` are from the model server's own clock.
+/// Ollama only.
 // MARK: - TraceRunSpanChild
 public struct TraceRunSpanChild: Codable {
     public let approvalWaitMS: Int?
@@ -12024,13 +12156,16 @@ public struct TraceRunSpanChild: Codable {
     public let firstTokenMS: Int?
     public let id: String
     public let kind: ChildKind
+    public let loadMS: Int?
     public let model: String?
     public let name: String
     public let numCtx: Int?
     public let preview: String?
     public let promptCut: PromptCut?
     public let promptCutKind: PromptCutKind?
+    public let promptMS: Int?
     public let recorded: Bool?
+    public let replyMS: Int?
     public let start: String
     public let status: ChildStatus
     public let tokens: TraceRunSpanTraceTokens?
@@ -12049,20 +12184,23 @@ public struct TraceRunSpanChild: Codable {
         case firstTokenMS = "first_token_ms"
         case id = "id"
         case kind = "kind"
+        case loadMS = "load_ms"
         case model = "model"
         case name = "name"
         case numCtx = "num_ctx"
         case preview = "preview"
         case promptCut = "prompt_cut"
         case promptCutKind = "prompt_cut_kind"
+        case promptMS = "prompt_ms"
         case recorded = "recorded"
+        case replyMS = "reply_ms"
         case start = "start"
         case status = "status"
         case tokens = "tokens"
         case windowPlanned = "window_planned"
     }
 
-    public init(approvalWaitMS: Int?, children: [FluffyTraceToolSpan]?, contextWindow: Int?, contextWindowEstimated: Bool?, costUsd: Double?, droppedMessageIDS: [String]?, droppedTokens: Int?, durationMS: Int?, end: String?, firstTokenMS: Int?, id: String, kind: ChildKind, model: String?, name: String, numCtx: Int?, preview: String?, promptCut: PromptCut?, promptCutKind: PromptCutKind?, recorded: Bool?, start: String, status: ChildStatus, tokens: TraceRunSpanTraceTokens?, windowPlanned: Bool?) {
+    public init(approvalWaitMS: Int?, children: [FluffyTraceToolSpan]?, contextWindow: Int?, contextWindowEstimated: Bool?, costUsd: Double?, droppedMessageIDS: [String]?, droppedTokens: Int?, durationMS: Int?, end: String?, firstTokenMS: Int?, id: String, kind: ChildKind, loadMS: Int?, model: String?, name: String, numCtx: Int?, preview: String?, promptCut: PromptCut?, promptCutKind: PromptCutKind?, promptMS: Int?, recorded: Bool?, replyMS: Int?, start: String, status: ChildStatus, tokens: TraceRunSpanTraceTokens?, windowPlanned: Bool?) {
         self.approvalWaitMS = approvalWaitMS
         self.children = children
         self.contextWindow = contextWindow
@@ -12075,13 +12213,16 @@ public struct TraceRunSpanChild: Codable {
         self.firstTokenMS = firstTokenMS
         self.id = id
         self.kind = kind
+        self.loadMS = loadMS
         self.model = model
         self.name = name
         self.numCtx = numCtx
         self.preview = preview
         self.promptCut = promptCut
         self.promptCutKind = promptCutKind
+        self.promptMS = promptMS
         self.recorded = recorded
+        self.replyMS = replyMS
         self.start = start
         self.status = status
         self.tokens = tokens

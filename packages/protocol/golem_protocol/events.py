@@ -413,6 +413,10 @@ class ModelCallCompletedData(BaseModel):
 
     ``cost_usd`` is the cost of this call at ``price``. Both are None when the
     price is not known. A local model costs 0.
+
+    ``load_ms``, ``prompt_ms`` and ``reply_ms`` are the time the model server spent loading
+    the model, reading the prompt and writing the reply. From the model server's own clock.
+    Ollama only.
     """
 
     model_config = _CONFIG
@@ -427,6 +431,9 @@ class ModelCallCompletedData(BaseModel):
     text_tool_calls: Literal["recovered", "unread"] | None = None
     cost_usd: float | None = Field(default=None, ge=0)
     price: CallPrice | None = None
+    load_ms: int | None = Field(default=None, ge=0)
+    prompt_ms: int | None = Field(default=None, ge=0)
+    reply_ms: int | None = Field(default=None, ge=0)
 
 
 class ToolCompletedData(BaseModel):

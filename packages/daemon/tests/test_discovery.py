@@ -31,6 +31,7 @@ from golem.models.discovery import (
 from golem.models.keys import MemoryKeyStore
 from golem.models.prices import PriceBook
 from golem.models.router import ModelRouter
+from golem.models.speed import SpeedBook
 from golem_protocol.events import TokenUsage
 
 Handler = Callable[[httpx.Request], httpx.Response]
@@ -171,6 +172,23 @@ def _discovery(
         fetch_prices=False,
         ollama_installed=lambda: ollama_installed,
     )
+
+
+async def test_an_installed_local_model_carries_its_speed(tmp_path: Path) -> None:
+    network = Network(_ollama_routes())
+    discovery = _discovery(ModelRouter(GolemSettings(), keys=MemoryKeyStore()), network, tmp_path)
+    book = SpeedBook(None)
+    discovery.speeds = book
+    before = _by_ref((await discovery.list()).models)
+    assert before["ollama/qwen3:8b"].speed is None
+    book.note("ollama/qwen3:8b", reply_tokens=100, reply_ms=2000, prompt_tokens=1000, prompt_ms=500)
+    book.note("ollama/small:1b", reply_tokens=100, reply_ms=2000)
+    models = _by_ref((await discovery.list()).models)
+    speed = models["ollama/qwen3:8b"].speed
+    assert speed is not None
+    assert (speed.prompt_tps, speed.reply_tps, speed.samples) == (2000.0, 50.0, 1)
+    assert models["ollama/small:1b"].speed is None  # not installed
+    await discovery.aclose()
 
 
 def _by_ref(models: list[ListedModel]) -> dict[str, ListedModel]:
