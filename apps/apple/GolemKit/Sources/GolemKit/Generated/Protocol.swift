@@ -7605,6 +7605,79 @@ public struct ModelSpeedInfo: Codable {
     }
 }
 
+/// A chat call waits, or no longer waits, for its turn on a local model server.
+///
+/// Sent for the reply ``message_id`` only, so other sessions never show it. Stored only
+/// until its message completes.
+// MARK: - ModelWaitingData
+public struct ModelWaitingData: Codable {
+    public let messageID: String
+    public let waiting: Bool
+
+    public enum CodingKeys: String, CodingKey {
+        case messageID = "message_id"
+        case waiting = "waiting"
+    }
+
+    public init(messageID: String, waiting: Bool) {
+        self.messageID = messageID
+        self.waiting = waiting
+    }
+}
+
+/// A chat call waits for the local model. A live signal: ``message.completed`` replaces it.
+// MARK: - ModelWaitingEvent
+public struct ModelWaitingEvent: Codable {
+    public let data: ModelWaitingEventData
+    public let runID: String
+    public let seq: Int
+    public let sessionID: String
+    public let ts: String
+    public let type: ModelWaitingEventType
+
+    public enum CodingKeys: String, CodingKey {
+        case data = "data"
+        case runID = "run_id"
+        case seq = "seq"
+        case sessionID = "session_id"
+        case ts = "ts"
+        case type = "type"
+    }
+
+    public init(data: ModelWaitingEventData, runID: String, seq: Int, sessionID: String, ts: String, type: ModelWaitingEventType) {
+        self.data = data
+        self.runID = runID
+        self.seq = seq
+        self.sessionID = sessionID
+        self.ts = ts
+        self.type = type
+    }
+}
+
+/// A chat call waits, or no longer waits, for its turn on a local model server.
+///
+/// Sent for the reply ``message_id`` only, so other sessions never show it. Stored only
+/// until its message completes.
+// MARK: - ModelWaitingEventData
+public struct ModelWaitingEventData: Codable {
+    public let messageID: String
+    public let waiting: Bool
+
+    public enum CodingKeys: String, CodingKey {
+        case messageID = "message_id"
+        case waiting = "waiting"
+    }
+
+    public init(messageID: String, waiting: Bool) {
+        self.messageID = messageID
+        self.waiting = waiting
+    }
+}
+
+public enum ModelWaitingEventType: String, Codable {
+    case modelWaiting = "model.waiting"
+}
+
 /// ``notify.test``. Post a sample notification, for Settings and ``golem doctor``.
 // MARK: - NotifyTestParams
 public struct NotifyTestParams: Codable {
@@ -9164,6 +9237,8 @@ public enum RPCNotificationMethod: String, Codable {
 /// The model is still writing a file call. A live signal: ``message.completed`` replaces
 /// it.
 ///
+/// A chat call waits for the local model. A live signal: ``message.completed`` replaces it.
+///
 /// The tool call is running.
 ///
 /// More output from a running call. ``tool.completed`` or ``tool.failed`` replaces it.
@@ -9382,6 +9457,11 @@ public struct Params: Codable {
 /// ``path`` is None until the model has written the whole path. ``lines`` and ``chars``
 /// count the file text written so far.
 ///
+/// A chat call waits, or no longer waits, for its turn on a local model server.
+///
+/// Sent for the reply ``message_id`` only, so other sessions never show it. Stored only
+/// until its message completes.
+///
 /// A requested tool call is running.
 ///
 /// Text a running tool call printed. Stored only until the call ends.
@@ -9539,6 +9619,7 @@ public struct ParamsData: Codable {
     public let chars: Int?
     public let lines: Int?
     public let path: String?
+    public let waiting: Bool?
     public let artifactID: String?
     public let diff: String?
     public let durationMS: Int?
@@ -9637,6 +9718,7 @@ public struct ParamsData: Codable {
         case chars = "chars"
         case lines = "lines"
         case path = "path"
+        case waiting = "waiting"
         case artifactID = "artifact_id"
         case diff = "diff"
         case durationMS = "duration_ms"
@@ -9661,7 +9743,7 @@ public struct ParamsData: Codable {
         case output = "output"
     }
 
-    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, route: Route?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: PurpleReason?, detail: String?, model: String?, provider: String?, rejected: [FluffyModelRejection]?, tier: Tier?, options: [String: Option]?, mode: Mode?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, numCtx: Int?, profile: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, chars: Int?, lines: Int?, path: String?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, todos: [PurpleTodo]?, added: Int?, changeID: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?) {
+    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, route: Route?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: PurpleReason?, detail: String?, model: String?, provider: String?, rejected: [FluffyModelRejection]?, tier: Tier?, options: [String: Option]?, mode: Mode?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, numCtx: Int?, profile: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, chars: Int?, lines: Int?, path: String?, waiting: Bool?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, todos: [PurpleTodo]?, added: Int?, changeID: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?) {
         self.cwd = cwd
         self.forkedFrom = forkedFrom
         self.modelName = modelName
@@ -9736,6 +9818,7 @@ public struct ParamsData: Codable {
         self.chars = chars
         self.lines = lines
         self.path = path
+        self.waiting = waiting
         self.artifactID = artifactID
         self.diff = diff
         self.durationMS = durationMS
@@ -10001,6 +10084,7 @@ public enum ParamsType: String, Codable {
     case modelOptionsChanged = "model.options.changed"
     case modelRouted = "model.routed"
     case modelSelected = "model.selected"
+    case modelWaiting = "model.waiting"
     case runCancelled = "run.cancelled"
     case runCompleted = "run.completed"
     case runFailed = "run.failed"

@@ -4546,6 +4546,7 @@ export function App({
             tick,
             columns,
             startingServer(servers, model.provider),
+            chat.localWait,
           )}
         </Text>
       ) : null}

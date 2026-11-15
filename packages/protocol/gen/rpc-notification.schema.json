@@ -1972,6 +1972,71 @@
       "title": "ModelSelectedEvent",
       "type": "object"
     },
+    "ModelWaitingData": {
+      "additionalProperties": false,
+      "description": "A chat call waits, or no longer waits, for its turn on a local model server.\n\nSent for the reply ``message_id`` only, so other sessions never show it. Stored only\nuntil its message completes.",
+      "properties": {
+        "message_id": {
+          "minLength": 1,
+          "title": "Message Id",
+          "type": "string"
+        },
+        "waiting": {
+          "title": "Waiting",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "message_id",
+        "waiting"
+      ],
+      "title": "ModelWaitingData",
+      "type": "object"
+    },
+    "ModelWaitingEvent": {
+      "additionalProperties": false,
+      "description": "A chat call waits for the local model. A live signal: ``message.completed`` replaces it.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/ModelWaitingData"
+        },
+        "run_id": {
+          "minLength": 1,
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "model.waiting",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "run_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "ModelWaitingEvent",
+      "type": "object"
+    },
     "PromptSectionInfo": {
       "additionalProperties": false,
       "description": "One non-empty section of the system prompt sent with a model call.\n\n``chars`` is the length of the section's text after strip, counted as\nPython counts it (Unicode code points). The prompt is the sections' texts,\nin order, joined with \"\\n\\n\", so the lengths split the stored prompt\nexactly.",
@@ -3776,6 +3841,7 @@
           "model.options.changed": "#/$defs/ModelOptionsChangedEvent",
           "model.routed": "#/$defs/ModelRoutedEvent",
           "model.selected": "#/$defs/ModelSelectedEvent",
+          "model.waiting": "#/$defs/ModelWaitingEvent",
           "run.cancelled": "#/$defs/RunCancelledEvent",
           "run.completed": "#/$defs/RunCompletedEvent",
           "run.failed": "#/$defs/RunFailedEvent",
@@ -3865,6 +3931,9 @@
         },
         {
           "$ref": "#/$defs/ToolWritingEvent"
+        },
+        {
+          "$ref": "#/$defs/ModelWaitingEvent"
         },
         {
           "$ref": "#/$defs/ToolStartedEvent"

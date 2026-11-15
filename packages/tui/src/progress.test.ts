@@ -23,6 +23,11 @@ test("while a local server starts, the meter says so instead of thinking", () =>
   assert.match(meterLine("writing", 12, 1, 0, 48, "ollama"), /^writing · 12 chars/);
 });
 
+test("while a chat call waits for the local model, the meter says so", () => {
+  assert.match(meterLine("thinking", 0, 0, 0, 40, "ollama", true), /^waiting for the local model {2}█/);
+  assert.match(meterLine("thinking", 0, 0, 0, 40, null, false), /^thinking/);
+});
+
 test("elapsed seconds come from the run timestamp", () => {
   assert.equal(elapsedSeconds(null, 1_000), 0);
   assert.equal(elapsedSeconds("not-a-date", 1_000), 0);

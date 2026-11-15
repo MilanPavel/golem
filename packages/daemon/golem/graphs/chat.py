@@ -545,7 +545,7 @@ def open_chat(
             request.update(_sizes(system, history, schemas if binder.offers(profile) else []))
             get_stream_writer()(request)
             try:
-                async with _gated(router, gate, profile):
+                async with _gated(router, gate, profile, message_id):
                     response = await binder.invoke(
                         profile, router.chat_model(profile, overrides), sent, schemas
                     )
@@ -891,11 +891,18 @@ def _held(
 
 
 def _gated(
-    router: ModelRouter, gate: ServerGate | None, profile: str
+    router: ModelRouter, gate: ServerGate | None, profile: str, message_id: str
 ) -> AbstractAsyncContextManager[None]:
     """Wait for a turn on the local server ``profile`` runs on, or not for any other model."""
     target = None if gate is None else router.ollama_server(profile)
-    return nullcontext() if gate is None or target is None else gate.hold(target[1], "chat")
+    if gate is None or target is None:
+        return nullcontext()
+    write = get_stream_writer()
+
+    def notice(waiting: bool) -> None:
+        write({STREAM_KEY: "model.waiting", "message_id": message_id, "waiting": waiting})
+
+    return gate.hold(target[1], "chat", notice)
 
 
 def _ai(message: BaseMessage) -> AIMessage:

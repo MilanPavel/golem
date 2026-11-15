@@ -39,6 +39,7 @@ from golem.graphs.adapter import (
     ModelRequested,
     ModelResponded,
     ModelStarted,
+    ModelWaiting,
     PinRead,
     PinSkipped,
     SkillLoaded,
@@ -86,6 +87,7 @@ from golem_protocol.events import (
     ModelCallStartedData,
     ModelRejection,
     ModelRoutedData,
+    ModelWaitingData,
     PromptSectionInfo,
     RunCancelledData,
     RunFailedData,
@@ -468,6 +470,11 @@ async def _apply(
         _reset_thinking(progress)
         await emit(
             "message.started", MessageStartedData(message_id=fact.message_id, role="assistant")
+        )
+    elif isinstance(fact, ModelWaiting):
+        await emit(
+            "model.waiting",
+            ModelWaitingData(message_id=fact.message_id, waiting=fact.waiting),
         )
     elif isinstance(fact, ModelRequested):
         progress.index += 1

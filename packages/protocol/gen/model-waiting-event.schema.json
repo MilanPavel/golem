@@ -1,0 +1,67 @@
+{
+  "$defs": {
+    "ModelWaitingData": {
+      "additionalProperties": false,
+      "description": "A chat call waits, or no longer waits, for its turn on a local model server.\n\nSent for the reply ``message_id`` only, so other sessions never show it. Stored only\nuntil its message completes.",
+      "properties": {
+        "message_id": {
+          "minLength": 1,
+          "title": "Message Id",
+          "type": "string"
+        },
+        "waiting": {
+          "title": "Waiting",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "message_id",
+        "waiting"
+      ],
+      "title": "ModelWaitingData",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "A chat call waits for the local model. A live signal: ``message.completed`` replaces it.",
+  "properties": {
+    "data": {
+      "$ref": "#/$defs/ModelWaitingData"
+    },
+    "run_id": {
+      "minLength": 1,
+      "title": "Run Id",
+      "type": "string"
+    },
+    "seq": {
+      "minimum": 1,
+      "title": "Seq",
+      "type": "integer"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    },
+    "ts": {
+      "minLength": 1,
+      "title": "Ts",
+      "type": "string"
+    },
+    "type": {
+      "const": "model.waiting",
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "seq",
+    "session_id",
+    "run_id",
+    "ts",
+    "type",
+    "data"
+  ],
+  "title": "ModelWaitingEvent",
+  "type": "object"
+}

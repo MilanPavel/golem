@@ -120,6 +120,8 @@ export type ChatState = {
    * `not_installed`. The banner offers to install Ollama and send it again.
    */
   retry: { text: string; provider: string } | null;
+  /** True while a chat call waits for its turn on a local model, from `model.waiting`. */
+  localWait: boolean;
   /** True after a model call wrote a tool call as text that golem could not read, until the next run starts. */
   unreadCall: boolean;
   /** The context of the newest model call that reported its input, from the `model.call.*` events. */
@@ -145,6 +147,7 @@ export const emptyChat: ChatState = {
   skippedSkills: [],
   down: null,
   retry: null,
+  localWait: false,
   unreadCall: false,
   context: emptyLiveContext,
   calls: {},
@@ -153,6 +156,9 @@ export const emptyChat: ChatState = {
 };
 
 /** What to do after a model server did not answer, besides fixing it. */
+/** What the meter says while a chat call waits for the local model. */
+export const WAITING_FOR_LOCAL_MODEL = "waiting for the local model";
+
 export const SWITCH_HINT = "/model to switch";
 /** The picker installs a missing Ollama, so that beats the daemon's brew hint. */
 export const INSTALL_HINT = "/model to install it or switch";
@@ -295,11 +301,13 @@ function reduceChatEvent(state: ChatState, event: ChatEvent): ChatState {
         ],
       };
     case "message.delta":
-      return appendDelta(state, event.data.message_id, event.data.text);
+      return appendDelta(notWaiting(state), event.data.message_id, event.data.text);
     case "message.thinking.delta":
-      return appendThinking(state, event.data.message_id, event.data.text);
+      return appendThinking(notWaiting(state), event.data.message_id, event.data.text);
+    case "model.waiting":
+      return event.data.waiting === state.localWait ? state : { ...state, localWait: event.data.waiting };
     case "message.completed":
-      return { ...state, messages: upsertCompleted(state.messages, event, state.runStartedAt, state.calls) };
+      return { ...notWaiting(state), messages: upsertCompleted(state.messages, event, state.runStartedAt, state.calls) };
     case "run.started":
       return {
         ...state,
@@ -335,10 +343,10 @@ function reduceChatEvent(state: ChatState, event: ChatEvent): ChatState {
       };
     }
     case "run.completed":
-      return { ...stopWriting(state), busy: false, runStartedAt: null, runId: null, approval: null, down: null, retry: null };
+      return { ...notWaiting(stopWriting(state)), busy: false, runStartedAt: null, runId: null, approval: null, down: null, retry: null };
     case "run.failed":
       return {
-        ...stopWriting(state),
+        ...notWaiting(stopWriting(state)),
         busy: false,
         error: failureText(event.data),
         down: event.data.code != null ? (event.data.provider ?? "model") : state.down,
@@ -349,7 +357,7 @@ function reduceChatEvent(state: ChatState, event: ChatEvent): ChatState {
       };
     case "run.cancelled":
       return {
-        ...stopWriting(state),
+        ...notWaiting(stopWriting(state)),
         busy: false,
         runStartedAt: null,
         runId: null,
@@ -630,6 +638,10 @@ function upsertCompleted(
     const final = message.cut === true ? { ...done, cut: true } : done;
     return message.tools === undefined ? final : { ...final, tools: message.tools };
   });
+}
+
+function notWaiting(state: ChatState): ChatState {
+  return state.localWait ? { ...state, localWait: false } : state;
 }
 
 function withoutWriting(message: ChatMessage): ChatMessage {

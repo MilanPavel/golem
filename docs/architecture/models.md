@@ -181,6 +181,8 @@ The daemon starts a local Ollama when a model call, `model.list`, or a download 
 
 **Stopping it.** It stops when the daemon stops, and after `[ollama] idle_stop_minutes` with nothing holding it.
 
+**One at a time.** `ServerGate` lets `[ollama] parallel` generations run on a server, and chat goes ahead of titles. A chat call that waits more than a second sends `model.waiting`, and the web and the TUI show `waiting for the local model` until its turn or its first token. Only the call that waits shows it. A title never does.
+
 **What clients see.** Each change goes out as `model.server.status`. A start that fails ends the run with `model_unreachable` and the log file in `hint`.
 
 **Installing Ollama.** The daemon also installs Ollama, on `ollama.install`. It runs `/opt/homebrew/bin/brew install ollama` by its absolute path, since launchd gives it no `PATH` of yours, with auto-update and analytics off, and streams brew's output to every connection ([ADR-035](../adr/035-daemon-installs-ollama.md)).
