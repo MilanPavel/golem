@@ -6634,6 +6634,33 @@ public struct ModelSetup: Codable {
     }
 }
 
+/// ``notify.test``. Post a sample notification, for Settings and ``golem doctor``.
+// MARK: - NotifyTestParams
+public struct NotifyTestParams: Codable {
+
+    public init() {
+    }
+}
+
+/// ``posted`` is false when nothing was shown: no poster on this machine, or macOS refused.
+///
+/// ``mechanism`` names the poster that tried, such as ``osascript`` or ``none``.
+// MARK: - NotifyTestResult
+public struct NotifyTestResult: Codable {
+    public let mechanism: String
+    public let posted: Bool
+
+    public enum CodingKeys: String, CodingKey {
+        case mechanism = "mechanism"
+        case posted = "posted"
+    }
+
+    public init(mechanism: String, posted: Bool) {
+        self.mechanism = mechanism
+        self.posted = posted
+    }
+}
+
 /// ``ollama.install_cancel``. Stop a running install.
 // MARK: - OllamaInstallCancelParams
 public struct OllamaInstallCancelParams: Codable {

@@ -16,6 +16,7 @@ from golem.models.facts import ListedFacts
 from golem.models.install import BrewInstaller, OllamaInstaller
 from golem.models.ollama import LocalServers
 from golem.models.pulls import PullManager
+from golem.notify import Notifier
 from golem.paths import GolemPaths
 from golem.permissions.policy import Policy
 from golem.secrets import SecretStore
@@ -34,6 +35,7 @@ class DaemonState:
     started_at: float
     state: Literal["running", "draining"] = "running"
     sessions: SessionManager | None = None
+    notifier: Notifier | None = None
     models: ModelDiscovery | None = None
     facts: ListedFacts | None = None
     pulls: PullManager | None = None

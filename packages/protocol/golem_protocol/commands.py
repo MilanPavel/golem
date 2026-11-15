@@ -2475,6 +2475,24 @@ class OllamaStartResult(BaseModel):
     running: bool
 
 
+class NotifyTestParams(BaseModel):
+    """``notify.test``. Post a sample notification, for Settings and ``golem doctor``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+class NotifyTestResult(BaseModel):
+    """``posted`` is false when nothing was shown: no poster on this machine, or macOS refused.
+
+    ``mechanism`` names the poster that tried, such as ``osascript`` or ``none``.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    posted: bool
+    mechanism: str
+
+
 class FsListDirsParams(BaseModel):
     """``fs.list_dirs``. The folders directly under ``path``, for a folder picker.
 
@@ -2625,6 +2643,8 @@ __all__ = [
     "ModelPullResult",
     "ModelSetDefaultParams",
     "ModelSetDefaultResult",
+    "NotifyTestParams",
+    "NotifyTestResult",
     "OllamaInstallCancelParams",
     "OllamaInstallCancelResult",
     "OllamaInstallDone",

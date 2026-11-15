@@ -76,6 +76,7 @@ public enum MethodAccess {
         "auth.remove",
         "auth.set",
         "config.raw.set_protected",
+        "notify.test",
         "skill.create_protected",
         "skill.write_protected",
     ]

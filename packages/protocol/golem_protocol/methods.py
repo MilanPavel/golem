@@ -92,6 +92,7 @@ METHOD_ACCESS: Final[Mapping[str, Access]] = {
     "ollama.install_cancel": "browser",
     "ollama.start": "browser",
     "fs.list_dirs": "browser",
+    "notify.test": "local",
 }
 
 BROWSER_METHODS: Final[frozenset[str]] = frozenset(
