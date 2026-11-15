@@ -1,0 +1,61 @@
+{
+  "$defs": {
+    "RoutineChanged": {
+      "additionalProperties": false,
+      "description": "A routine was added, changed or removed. List the routines again.\n\n``name`` is null when the file changed in a way that is not one routine.",
+      "properties": {
+        "change": {
+          "enum": [
+            "added",
+            "updated",
+            "removed",
+            "reloaded"
+          ],
+          "title": "Change",
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        }
+      },
+      "required": [
+        "change"
+      ],
+      "title": "RoutineChanged",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Server → every connection: a routine was added, changed or removed. Not stored.",
+  "properties": {
+    "jsonrpc": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Jsonrpc",
+      "type": "string"
+    },
+    "method": {
+      "const": "routine.changed",
+      "default": "routine.changed",
+      "title": "Method",
+      "type": "string"
+    },
+    "params": {
+      "$ref": "#/$defs/RoutineChanged"
+    }
+  },
+  "required": [
+    "params"
+  ],
+  "title": "RoutineChangedNotification",
+  "type": "object"
+}

@@ -1,0 +1,33 @@
+{
+  "additionalProperties": false,
+  "description": "A routine was added, changed or removed. List the routines again.\n\n``name`` is null when the file changed in a way that is not one routine.",
+  "properties": {
+    "change": {
+      "enum": [
+        "added",
+        "updated",
+        "removed",
+        "reloaded"
+      ],
+      "title": "Change",
+      "type": "string"
+    },
+    "name": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Name"
+    }
+  },
+  "required": [
+    "change"
+  ],
+  "title": "RoutineChanged",
+  "type": "object"
+}

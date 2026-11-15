@@ -7344,6 +7344,1037 @@ public struct PromptSectionInfo: Codable {
     }
 }
 
+/// Server → every connection: a routine was added, changed or removed. Not stored.
+// MARK: - RoutineChangedNotification
+public struct RoutineChangedNotification: Codable {
+    public let jsonrpc: Jsonrpc?
+    public let method: RoutineChangedNotificationMethod?
+    public let params: RoutineChangedNotificationParams
+
+    public enum CodingKeys: String, CodingKey {
+        case jsonrpc = "jsonrpc"
+        case method = "method"
+        case params = "params"
+    }
+
+    public init(jsonrpc: Jsonrpc?, method: RoutineChangedNotificationMethod?, params: RoutineChangedNotificationParams) {
+        self.jsonrpc = jsonrpc
+        self.method = method
+        self.params = params
+    }
+}
+
+public enum RoutineChangedNotificationMethod: String, Codable {
+    case routineChanged = "routine.changed"
+}
+
+/// A routine was added, changed or removed. List the routines again.
+///
+/// ``name`` is null when the file changed in a way that is not one routine.
+// MARK: - RoutineChangedNotificationParams
+public struct RoutineChangedNotificationParams: Codable {
+    public let change: Change
+    public let name: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case change = "change"
+        case name = "name"
+    }
+
+    public init(change: Change, name: String?) {
+        self.change = change
+        self.name = name
+    }
+}
+
+public enum Change: String, Codable {
+    case added = "added"
+    case reloaded = "reloaded"
+    case removed = "removed"
+    case updated = "updated"
+}
+
+/// A routine was added, changed or removed. List the routines again.
+///
+/// ``name`` is null when the file changed in a way that is not one routine.
+// MARK: - RoutineChanged
+public struct RoutineChanged: Codable {
+    public let change: Change
+    public let name: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case change = "change"
+        case name = "name"
+    }
+
+    public init(change: Change, name: String?) {
+        self.change = change
+        self.name = name
+    }
+}
+
+/// One ``[[routine]]`` as written. The daemon checks it when it loads.
+///
+/// Exactly one of ``schedule`` and ``on`` is set. ``schedule`` is cron, or
+/// ``every 15m``, ``every 1h``, ``daily 08:30``, ``weekdays 08:30``, ``weekly mon 06:00``.
+/// ``missed`` is what happens to a firing that came due while golem could not
+/// run it: ``skip`` drops it, ``run_once`` fires it once, late.
+/// ``notify_finished`` and ``notify_failed`` override the notification settings
+/// for this routine, and null keeps them.
+// MARK: - RoutineConfig
+public struct RoutineConfig: Codable {
+    public let enabled: Bool?
+    public let folder: String?
+    public let mcp: [String]?
+    public let missed: Missed?
+    public let model: String?
+    public let name: String
+    public let notifyFailed: Bool?
+    public let notifyFinished: Bool?
+    public let on: RoutineConfigRoutineWatchConfig?
+    public let prompt: String
+    public let schedule: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case enabled = "enabled"
+        case folder = "folder"
+        case mcp = "mcp"
+        case missed = "missed"
+        case model = "model"
+        case name = "name"
+        case notifyFailed = "notify_failed"
+        case notifyFinished = "notify_finished"
+        case on = "on"
+        case prompt = "prompt"
+        case schedule = "schedule"
+    }
+
+    public init(enabled: Bool?, folder: String?, mcp: [String]?, missed: Missed?, model: String?, name: String, notifyFailed: Bool?, notifyFinished: Bool?, on: RoutineConfigRoutineWatchConfig?, prompt: String, schedule: String?) {
+        self.enabled = enabled
+        self.folder = folder
+        self.mcp = mcp
+        self.missed = missed
+        self.model = model
+        self.name = name
+        self.notifyFailed = notifyFailed
+        self.notifyFinished = notifyFinished
+        self.on = on
+        self.prompt = prompt
+        self.schedule = schedule
+    }
+}
+
+public enum Missed: String, Codable {
+    case runOnce = "run_once"
+    case skip = "skip"
+}
+
+/// ``on = { watch, glob }``: a new file in ``watch`` that matches ``glob``.
+// MARK: - RoutineConfigRoutineWatchConfig
+public struct RoutineConfigRoutineWatchConfig: Codable {
+    public let glob: String?
+    public let watch: String
+
+    public enum CodingKeys: String, CodingKey {
+        case glob = "glob"
+        case watch = "watch"
+    }
+
+    public init(glob: String?, watch: String) {
+        self.glob = glob
+        self.watch = watch
+    }
+}
+
+/// ``routine.get``. A routine by name. ``folder`` picks a project routine.
+// MARK: - RoutineGetParams
+public struct RoutineGetParams: Codable {
+    public let folder: String?
+    public let name: String
+
+    public enum CodingKeys: String, CodingKey {
+        case folder = "folder"
+        case name = "name"
+    }
+
+    public init(folder: String?, name: String) {
+        self.folder = folder
+        self.name = name
+    }
+}
+
+/// The routine and its last 50 runs, newest first.
+// MARK: - RoutineGetResult
+public struct RoutineGetResult: Codable {
+    public let routine: RoutineGetResultRoutine
+    public let runs: [RoutineRunSummaryElement]?
+
+    public enum CodingKeys: String, CodingKey {
+        case routine = "routine"
+        case runs = "runs"
+    }
+
+    public init(routine: RoutineGetResultRoutine, runs: [RoutineRunSummaryElement]?) {
+        self.routine = routine
+        self.runs = runs
+    }
+}
+
+/// A routine and what the daemon knows about it.
+///
+/// ``source`` is ``user`` or ``project``, and ``folder`` is the project folder
+/// of a project routine. ``path`` is the file it is written in. ``next_at`` is
+/// the next firing in the Mac's time zone, or null for a routine with ``on``,
+/// one that is disabled or paused, or one that is blocked. ``last`` is its
+/// latest run. ``paused`` is runtime state, not config. ``blocked`` is true for
+/// a project routine in a folder that is not in ``trusted_projects``: it is
+/// listed, and never runs.
+// MARK: - RoutineGetResultRoutine
+public struct RoutineGetResultRoutine: Codable {
+    public let blocked: Bool?
+    public let config: PurpleRoutineConfig
+    public let folder: String?
+    public let last: RoutineRunSummaryElement?
+    public let nextAt: String?
+    public let path: String
+    public let paused: Bool?
+    public let source: Scope
+
+    public enum CodingKeys: String, CodingKey {
+        case blocked = "blocked"
+        case config = "config"
+        case folder = "folder"
+        case last = "last"
+        case nextAt = "next_at"
+        case path = "path"
+        case paused = "paused"
+        case source = "source"
+    }
+
+    public init(blocked: Bool?, config: PurpleRoutineConfig, folder: String?, last: RoutineRunSummaryElement?, nextAt: String?, path: String, paused: Bool?, source: Scope) {
+        self.blocked = blocked
+        self.config = config
+        self.folder = folder
+        self.last = last
+        self.nextAt = nextAt
+        self.path = path
+        self.paused = paused
+        self.source = source
+    }
+}
+
+/// One ``[[routine]]`` as written. The daemon checks it when it loads.
+///
+/// Exactly one of ``schedule`` and ``on`` is set. ``schedule`` is cron, or
+/// ``every 15m``, ``every 1h``, ``daily 08:30``, ``weekdays 08:30``, ``weekly mon 06:00``.
+/// ``missed`` is what happens to a firing that came due while golem could not
+/// run it: ``skip`` drops it, ``run_once`` fires it once, late.
+/// ``notify_finished`` and ``notify_failed`` override the notification settings
+/// for this routine, and null keeps them.
+// MARK: - PurpleRoutineConfig
+public struct PurpleRoutineConfig: Codable {
+    public let enabled: Bool?
+    public let folder: String?
+    public let mcp: [String]?
+    public let missed: Missed?
+    public let model: String?
+    public let name: String
+    public let notifyFailed: Bool?
+    public let notifyFinished: Bool?
+    public let on: PurpleRoutineWatchConfig?
+    public let prompt: String
+    public let schedule: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case enabled = "enabled"
+        case folder = "folder"
+        case mcp = "mcp"
+        case missed = "missed"
+        case model = "model"
+        case name = "name"
+        case notifyFailed = "notify_failed"
+        case notifyFinished = "notify_finished"
+        case on = "on"
+        case prompt = "prompt"
+        case schedule = "schedule"
+    }
+
+    public init(enabled: Bool?, folder: String?, mcp: [String]?, missed: Missed?, model: String?, name: String, notifyFailed: Bool?, notifyFinished: Bool?, on: PurpleRoutineWatchConfig?, prompt: String, schedule: String?) {
+        self.enabled = enabled
+        self.folder = folder
+        self.mcp = mcp
+        self.missed = missed
+        self.model = model
+        self.name = name
+        self.notifyFailed = notifyFailed
+        self.notifyFinished = notifyFinished
+        self.on = on
+        self.prompt = prompt
+        self.schedule = schedule
+    }
+}
+
+/// ``on = { watch, glob }``: a new file in ``watch`` that matches ``glob``.
+// MARK: - PurpleRoutineWatchConfig
+public struct PurpleRoutineWatchConfig: Codable {
+    public let glob: String?
+    public let watch: String
+
+    public enum CodingKeys: String, CodingKey {
+        case glob = "glob"
+        case watch = "watch"
+    }
+
+    public init(glob: String?, watch: String) {
+        self.glob = glob
+        self.watch = watch
+    }
+}
+
+/// One firing of a routine: a ``routine_run`` (ADR-050).
+///
+/// The times are ISO 8601 with an offset. ``reason`` says why a firing was
+/// ``skipped``: ``missed``, ``paused``, ``untrusted``, ``still running`` or ``quiet``.
+/// ``scope`` is ``user`` or the project folder. Nothing fills these until the
+/// scheduler (4.2.2), so a list has none yet.
+// MARK: - RoutineRunSummaryElement
+public struct RoutineRunSummaryElement: Codable {
+    public let dueAt: String?
+    public let endedAt: String?
+    public let reason: String?
+    public let routine: String
+    public let routineRunID: String
+    public let scope: String
+    public let sessionID: String?
+    public let startedAt: String?
+    public let status: RoutineRunSummaryStatus
+    public let trigger: Trigger
+
+    public enum CodingKeys: String, CodingKey {
+        case dueAt = "due_at"
+        case endedAt = "ended_at"
+        case reason = "reason"
+        case routine = "routine"
+        case routineRunID = "routine_run_id"
+        case scope = "scope"
+        case sessionID = "session_id"
+        case startedAt = "started_at"
+        case status = "status"
+        case trigger = "trigger"
+    }
+
+    public init(dueAt: String?, endedAt: String?, reason: String?, routine: String, routineRunID: String, scope: String, sessionID: String?, startedAt: String?, status: RoutineRunSummaryStatus, trigger: Trigger) {
+        self.dueAt = dueAt
+        self.endedAt = endedAt
+        self.reason = reason
+        self.routine = routine
+        self.routineRunID = routineRunID
+        self.scope = scope
+        self.sessionID = sessionID
+        self.startedAt = startedAt
+        self.status = status
+        self.trigger = trigger
+    }
+}
+
+public enum RoutineRunSummaryStatus: String, Codable {
+    case cancelled = "cancelled"
+    case failed = "failed"
+    case queued = "queued"
+    case running = "running"
+    case skipped = "skipped"
+    case succeeded = "succeeded"
+    case waiting = "waiting"
+}
+
+public enum Trigger: String, Codable {
+    case hook = "hook"
+    case manual = "manual"
+    case schedule = "schedule"
+    case watch = "watch"
+}
+
+/// A routine and what the daemon knows about it.
+///
+/// ``source`` is ``user`` or ``project``, and ``folder`` is the project folder
+/// of a project routine. ``path`` is the file it is written in. ``next_at`` is
+/// the next firing in the Mac's time zone, or null for a routine with ``on``,
+/// one that is disabled or paused, or one that is blocked. ``last`` is its
+/// latest run. ``paused`` is runtime state, not config. ``blocked`` is true for
+/// a project routine in a folder that is not in ``trusted_projects``: it is
+/// listed, and never runs.
+// MARK: - RoutineInfo
+public struct RoutineInfo: Codable {
+    public let blocked: Bool?
+    public let config: RoutineInfoConfig
+    public let folder: String?
+    public let last: RoutineInfoRoutineRunSummary?
+    public let nextAt: String?
+    public let path: String
+    public let paused: Bool?
+    public let source: Scope
+
+    public enum CodingKeys: String, CodingKey {
+        case blocked = "blocked"
+        case config = "config"
+        case folder = "folder"
+        case last = "last"
+        case nextAt = "next_at"
+        case path = "path"
+        case paused = "paused"
+        case source = "source"
+    }
+
+    public init(blocked: Bool?, config: RoutineInfoConfig, folder: String?, last: RoutineInfoRoutineRunSummary?, nextAt: String?, path: String, paused: Bool?, source: Scope) {
+        self.blocked = blocked
+        self.config = config
+        self.folder = folder
+        self.last = last
+        self.nextAt = nextAt
+        self.path = path
+        self.paused = paused
+        self.source = source
+    }
+}
+
+/// One ``[[routine]]`` as written. The daemon checks it when it loads.
+///
+/// Exactly one of ``schedule`` and ``on`` is set. ``schedule`` is cron, or
+/// ``every 15m``, ``every 1h``, ``daily 08:30``, ``weekdays 08:30``, ``weekly mon 06:00``.
+/// ``missed`` is what happens to a firing that came due while golem could not
+/// run it: ``skip`` drops it, ``run_once`` fires it once, late.
+/// ``notify_finished`` and ``notify_failed`` override the notification settings
+/// for this routine, and null keeps them.
+// MARK: - RoutineInfoConfig
+public struct RoutineInfoConfig: Codable {
+    public let enabled: Bool?
+    public let folder: String?
+    public let mcp: [String]?
+    public let missed: Missed?
+    public let model: String?
+    public let name: String
+    public let notifyFailed: Bool?
+    public let notifyFinished: Bool?
+    public let on: FluffyRoutineWatchConfig?
+    public let prompt: String
+    public let schedule: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case enabled = "enabled"
+        case folder = "folder"
+        case mcp = "mcp"
+        case missed = "missed"
+        case model = "model"
+        case name = "name"
+        case notifyFailed = "notify_failed"
+        case notifyFinished = "notify_finished"
+        case on = "on"
+        case prompt = "prompt"
+        case schedule = "schedule"
+    }
+
+    public init(enabled: Bool?, folder: String?, mcp: [String]?, missed: Missed?, model: String?, name: String, notifyFailed: Bool?, notifyFinished: Bool?, on: FluffyRoutineWatchConfig?, prompt: String, schedule: String?) {
+        self.enabled = enabled
+        self.folder = folder
+        self.mcp = mcp
+        self.missed = missed
+        self.model = model
+        self.name = name
+        self.notifyFailed = notifyFailed
+        self.notifyFinished = notifyFinished
+        self.on = on
+        self.prompt = prompt
+        self.schedule = schedule
+    }
+}
+
+/// ``on = { watch, glob }``: a new file in ``watch`` that matches ``glob``.
+// MARK: - FluffyRoutineWatchConfig
+public struct FluffyRoutineWatchConfig: Codable {
+    public let glob: String?
+    public let watch: String
+
+    public enum CodingKeys: String, CodingKey {
+        case glob = "glob"
+        case watch = "watch"
+    }
+
+    public init(glob: String?, watch: String) {
+        self.glob = glob
+        self.watch = watch
+    }
+}
+
+/// One firing of a routine: a ``routine_run`` (ADR-050).
+///
+/// The times are ISO 8601 with an offset. ``reason`` says why a firing was
+/// ``skipped``: ``missed``, ``paused``, ``untrusted``, ``still running`` or ``quiet``.
+/// ``scope`` is ``user`` or the project folder. Nothing fills these until the
+/// scheduler (4.2.2), so a list has none yet.
+// MARK: - RoutineInfoRoutineRunSummary
+public struct RoutineInfoRoutineRunSummary: Codable {
+    public let dueAt: String?
+    public let endedAt: String?
+    public let reason: String?
+    public let routine: String
+    public let routineRunID: String
+    public let scope: String
+    public let sessionID: String?
+    public let startedAt: String?
+    public let status: RoutineRunSummaryStatus
+    public let trigger: Trigger
+
+    public enum CodingKeys: String, CodingKey {
+        case dueAt = "due_at"
+        case endedAt = "ended_at"
+        case reason = "reason"
+        case routine = "routine"
+        case routineRunID = "routine_run_id"
+        case scope = "scope"
+        case sessionID = "session_id"
+        case startedAt = "started_at"
+        case status = "status"
+        case trigger = "trigger"
+    }
+
+    public init(dueAt: String?, endedAt: String?, reason: String?, routine: String, routineRunID: String, scope: String, sessionID: String?, startedAt: String?, status: RoutineRunSummaryStatus, trigger: Trigger) {
+        self.dueAt = dueAt
+        self.endedAt = endedAt
+        self.reason = reason
+        self.routine = routine
+        self.routineRunID = routineRunID
+        self.scope = scope
+        self.sessionID = sessionID
+        self.startedAt = startedAt
+        self.status = status
+        self.trigger = trigger
+    }
+}
+
+/// A routine that did not load: the file, the line (from 1) when known, and why.
+// MARK: - RoutineIssue
+public struct RoutineIssue: Codable {
+    public let file: String
+    public let line: Int?
+    public let message: String
+
+    public enum CodingKeys: String, CodingKey {
+        case file = "file"
+        case line = "line"
+        case message = "message"
+    }
+
+    public init(file: String, line: Int?, message: String) {
+        self.file = file
+        self.line = line
+        self.message = message
+    }
+}
+
+/// ``routine.list``. The user's routines, and the project routines of ``folders``.
+///
+/// A folder in ``trusted_projects`` lists its routines as they are. Any other
+/// folder that has some lists them ``blocked``. The daemon never looks at a
+/// folder it is not given.
+// MARK: - RoutineListParams
+public struct RoutineListParams: Codable {
+    public let folders: [String]?
+
+    public enum CodingKeys: String, CodingKey {
+        case folders = "folders"
+    }
+
+    public init(folders: [String]?) {
+        self.folders = folders
+    }
+}
+
+/// The routines, user ones first, each group in file order, and the files' problems.
+// MARK: - RoutineListResult
+public struct RoutineListResult: Codable {
+    public let issues: [IssueElement]?
+    public let routines: [RoutineElement]
+
+    public enum CodingKeys: String, CodingKey {
+        case issues = "issues"
+        case routines = "routines"
+    }
+
+    public init(issues: [IssueElement]?, routines: [RoutineElement]) {
+        self.issues = issues
+        self.routines = routines
+    }
+}
+
+/// A routine that did not load: the file, the line (from 1) when known, and why.
+// MARK: - IssueElement
+public struct IssueElement: Codable {
+    public let file: String
+    public let line: Int?
+    public let message: String
+
+    public enum CodingKeys: String, CodingKey {
+        case file = "file"
+        case line = "line"
+        case message = "message"
+    }
+
+    public init(file: String, line: Int?, message: String) {
+        self.file = file
+        self.line = line
+        self.message = message
+    }
+}
+
+/// A routine and what the daemon knows about it.
+///
+/// ``source`` is ``user`` or ``project``, and ``folder`` is the project folder
+/// of a project routine. ``path`` is the file it is written in. ``next_at`` is
+/// the next firing in the Mac's time zone, or null for a routine with ``on``,
+/// one that is disabled or paused, or one that is blocked. ``last`` is its
+/// latest run. ``paused`` is runtime state, not config. ``blocked`` is true for
+/// a project routine in a folder that is not in ``trusted_projects``: it is
+/// listed, and never runs.
+// MARK: - RoutineElement
+public struct RoutineElement: Codable {
+    public let blocked: Bool?
+    public let config: FluffyRoutineConfig
+    public let folder: String?
+    public let last: PurpleRoutineRunSummary?
+    public let nextAt: String?
+    public let path: String
+    public let paused: Bool?
+    public let source: Scope
+
+    public enum CodingKeys: String, CodingKey {
+        case blocked = "blocked"
+        case config = "config"
+        case folder = "folder"
+        case last = "last"
+        case nextAt = "next_at"
+        case path = "path"
+        case paused = "paused"
+        case source = "source"
+    }
+
+    public init(blocked: Bool?, config: FluffyRoutineConfig, folder: String?, last: PurpleRoutineRunSummary?, nextAt: String?, path: String, paused: Bool?, source: Scope) {
+        self.blocked = blocked
+        self.config = config
+        self.folder = folder
+        self.last = last
+        self.nextAt = nextAt
+        self.path = path
+        self.paused = paused
+        self.source = source
+    }
+}
+
+/// One ``[[routine]]`` as written. The daemon checks it when it loads.
+///
+/// Exactly one of ``schedule`` and ``on`` is set. ``schedule`` is cron, or
+/// ``every 15m``, ``every 1h``, ``daily 08:30``, ``weekdays 08:30``, ``weekly mon 06:00``.
+/// ``missed`` is what happens to a firing that came due while golem could not
+/// run it: ``skip`` drops it, ``run_once`` fires it once, late.
+/// ``notify_finished`` and ``notify_failed`` override the notification settings
+/// for this routine, and null keeps them.
+// MARK: - FluffyRoutineConfig
+public struct FluffyRoutineConfig: Codable {
+    public let enabled: Bool?
+    public let folder: String?
+    public let mcp: [String]?
+    public let missed: Missed?
+    public let model: String?
+    public let name: String
+    public let notifyFailed: Bool?
+    public let notifyFinished: Bool?
+    public let on: TentacledRoutineWatchConfig?
+    public let prompt: String
+    public let schedule: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case enabled = "enabled"
+        case folder = "folder"
+        case mcp = "mcp"
+        case missed = "missed"
+        case model = "model"
+        case name = "name"
+        case notifyFailed = "notify_failed"
+        case notifyFinished = "notify_finished"
+        case on = "on"
+        case prompt = "prompt"
+        case schedule = "schedule"
+    }
+
+    public init(enabled: Bool?, folder: String?, mcp: [String]?, missed: Missed?, model: String?, name: String, notifyFailed: Bool?, notifyFinished: Bool?, on: TentacledRoutineWatchConfig?, prompt: String, schedule: String?) {
+        self.enabled = enabled
+        self.folder = folder
+        self.mcp = mcp
+        self.missed = missed
+        self.model = model
+        self.name = name
+        self.notifyFailed = notifyFailed
+        self.notifyFinished = notifyFinished
+        self.on = on
+        self.prompt = prompt
+        self.schedule = schedule
+    }
+}
+
+/// ``on = { watch, glob }``: a new file in ``watch`` that matches ``glob``.
+// MARK: - TentacledRoutineWatchConfig
+public struct TentacledRoutineWatchConfig: Codable {
+    public let glob: String?
+    public let watch: String
+
+    public enum CodingKeys: String, CodingKey {
+        case glob = "glob"
+        case watch = "watch"
+    }
+
+    public init(glob: String?, watch: String) {
+        self.glob = glob
+        self.watch = watch
+    }
+}
+
+/// One firing of a routine: a ``routine_run`` (ADR-050).
+///
+/// The times are ISO 8601 with an offset. ``reason`` says why a firing was
+/// ``skipped``: ``missed``, ``paused``, ``untrusted``, ``still running`` or ``quiet``.
+/// ``scope`` is ``user`` or the project folder. Nothing fills these until the
+/// scheduler (4.2.2), so a list has none yet.
+// MARK: - PurpleRoutineRunSummary
+public struct PurpleRoutineRunSummary: Codable {
+    public let dueAt: String?
+    public let endedAt: String?
+    public let reason: String?
+    public let routine: String
+    public let routineRunID: String
+    public let scope: String
+    public let sessionID: String?
+    public let startedAt: String?
+    public let status: RoutineRunSummaryStatus
+    public let trigger: Trigger
+
+    public enum CodingKeys: String, CodingKey {
+        case dueAt = "due_at"
+        case endedAt = "ended_at"
+        case reason = "reason"
+        case routine = "routine"
+        case routineRunID = "routine_run_id"
+        case scope = "scope"
+        case sessionID = "session_id"
+        case startedAt = "started_at"
+        case status = "status"
+        case trigger = "trigger"
+    }
+
+    public init(dueAt: String?, endedAt: String?, reason: String?, routine: String, routineRunID: String, scope: String, sessionID: String?, startedAt: String?, status: RoutineRunSummaryStatus, trigger: Trigger) {
+        self.dueAt = dueAt
+        self.endedAt = endedAt
+        self.reason = reason
+        self.routine = routine
+        self.routineRunID = routineRunID
+        self.scope = scope
+        self.sessionID = sessionID
+        self.startedAt = startedAt
+        self.status = status
+        self.trigger = trigger
+    }
+}
+
+/// ``routine.remove``. Delete a user routine from ``config.toml``.
+// MARK: - RoutineRemoveParams
+public struct RoutineRemoveParams: Codable {
+    public let folder: String?
+    public let name: String
+
+    public enum CodingKeys: String, CodingKey {
+        case folder = "folder"
+        case name = "name"
+    }
+
+    public init(folder: String?, name: String) {
+        self.folder = folder
+        self.name = name
+    }
+}
+
+// MARK: - RoutineRemoveResult
+public struct RoutineRemoveResult: Codable {
+    public let name: String
+
+    public enum CodingKeys: String, CodingKey {
+        case name = "name"
+    }
+
+    public init(name: String) {
+        self.name = name
+    }
+}
+
+/// One firing of a routine: a ``routine_run`` (ADR-050).
+///
+/// The times are ISO 8601 with an offset. ``reason`` says why a firing was
+/// ``skipped``: ``missed``, ``paused``, ``untrusted``, ``still running`` or ``quiet``.
+/// ``scope`` is ``user`` or the project folder. Nothing fills these until the
+/// scheduler (4.2.2), so a list has none yet.
+// MARK: - RoutineRunSummary
+public struct RoutineRunSummary: Codable {
+    public let dueAt: String?
+    public let endedAt: String?
+    public let reason: String?
+    public let routine: String
+    public let routineRunID: String
+    public let scope: String
+    public let sessionID: String?
+    public let startedAt: String?
+    public let status: RoutineRunSummaryStatus
+    public let trigger: Trigger
+
+    public enum CodingKeys: String, CodingKey {
+        case dueAt = "due_at"
+        case endedAt = "ended_at"
+        case reason = "reason"
+        case routine = "routine"
+        case routineRunID = "routine_run_id"
+        case scope = "scope"
+        case sessionID = "session_id"
+        case startedAt = "started_at"
+        case status = "status"
+        case trigger = "trigger"
+    }
+
+    public init(dueAt: String?, endedAt: String?, reason: String?, routine: String, routineRunID: String, scope: String, sessionID: String?, startedAt: String?, status: RoutineRunSummaryStatus, trigger: Trigger) {
+        self.dueAt = dueAt
+        self.endedAt = endedAt
+        self.reason = reason
+        self.routine = routine
+        self.routineRunID = routineRunID
+        self.scope = scope
+        self.sessionID = sessionID
+        self.startedAt = startedAt
+        self.status = status
+        self.trigger = trigger
+    }
+}
+
+/// ``routine.update``. Change keys of a user routine, or create it with ``create``.
+///
+/// ``fields`` are the keys of ``RoutineConfig`` to set. A null value removes the
+/// key. ``fields.name`` renames the routine. With ``create`` the routine must
+/// not exist yet and ``fields`` must make a whole one. Only the user's
+/// ``config.toml`` is edited: ``folder`` names a project routine and is
+/// refused, because a project's file is edited in the project.
+// MARK: - RoutineUpdateParams
+public struct RoutineUpdateParams: Codable {
+    public let create: Bool?
+    public let fields: [String: JSONAny]
+    public let folder: String?
+    public let name: String
+
+    public enum CodingKeys: String, CodingKey {
+        case create = "create"
+        case fields = "fields"
+        case folder = "folder"
+        case name = "name"
+    }
+
+    public init(create: Bool?, fields: [String: JSONAny], folder: String?, name: String) {
+        self.create = create
+        self.fields = fields
+        self.folder = folder
+        self.name = name
+    }
+}
+
+// MARK: - RoutineUpdateResult
+public struct RoutineUpdateResult: Codable {
+    public let routine: RoutineUpdateResultRoutine
+
+    public enum CodingKeys: String, CodingKey {
+        case routine = "routine"
+    }
+
+    public init(routine: RoutineUpdateResultRoutine) {
+        self.routine = routine
+    }
+}
+
+/// A routine and what the daemon knows about it.
+///
+/// ``source`` is ``user`` or ``project``, and ``folder`` is the project folder
+/// of a project routine. ``path`` is the file it is written in. ``next_at`` is
+/// the next firing in the Mac's time zone, or null for a routine with ``on``,
+/// one that is disabled or paused, or one that is blocked. ``last`` is its
+/// latest run. ``paused`` is runtime state, not config. ``blocked`` is true for
+/// a project routine in a folder that is not in ``trusted_projects``: it is
+/// listed, and never runs.
+// MARK: - RoutineUpdateResultRoutine
+public struct RoutineUpdateResultRoutine: Codable {
+    public let blocked: Bool?
+    public let config: TentacledRoutineConfig
+    public let folder: String?
+    public let last: FluffyRoutineRunSummary?
+    public let nextAt: String?
+    public let path: String
+    public let paused: Bool?
+    public let source: Scope
+
+    public enum CodingKeys: String, CodingKey {
+        case blocked = "blocked"
+        case config = "config"
+        case folder = "folder"
+        case last = "last"
+        case nextAt = "next_at"
+        case path = "path"
+        case paused = "paused"
+        case source = "source"
+    }
+
+    public init(blocked: Bool?, config: TentacledRoutineConfig, folder: String?, last: FluffyRoutineRunSummary?, nextAt: String?, path: String, paused: Bool?, source: Scope) {
+        self.blocked = blocked
+        self.config = config
+        self.folder = folder
+        self.last = last
+        self.nextAt = nextAt
+        self.path = path
+        self.paused = paused
+        self.source = source
+    }
+}
+
+/// One ``[[routine]]`` as written. The daemon checks it when it loads.
+///
+/// Exactly one of ``schedule`` and ``on`` is set. ``schedule`` is cron, or
+/// ``every 15m``, ``every 1h``, ``daily 08:30``, ``weekdays 08:30``, ``weekly mon 06:00``.
+/// ``missed`` is what happens to a firing that came due while golem could not
+/// run it: ``skip`` drops it, ``run_once`` fires it once, late.
+/// ``notify_finished`` and ``notify_failed`` override the notification settings
+/// for this routine, and null keeps them.
+// MARK: - TentacledRoutineConfig
+public struct TentacledRoutineConfig: Codable {
+    public let enabled: Bool?
+    public let folder: String?
+    public let mcp: [String]?
+    public let missed: Missed?
+    public let model: String?
+    public let name: String
+    public let notifyFailed: Bool?
+    public let notifyFinished: Bool?
+    public let on: StickyRoutineWatchConfig?
+    public let prompt: String
+    public let schedule: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case enabled = "enabled"
+        case folder = "folder"
+        case mcp = "mcp"
+        case missed = "missed"
+        case model = "model"
+        case name = "name"
+        case notifyFailed = "notify_failed"
+        case notifyFinished = "notify_finished"
+        case on = "on"
+        case prompt = "prompt"
+        case schedule = "schedule"
+    }
+
+    public init(enabled: Bool?, folder: String?, mcp: [String]?, missed: Missed?, model: String?, name: String, notifyFailed: Bool?, notifyFinished: Bool?, on: StickyRoutineWatchConfig?, prompt: String, schedule: String?) {
+        self.enabled = enabled
+        self.folder = folder
+        self.mcp = mcp
+        self.missed = missed
+        self.model = model
+        self.name = name
+        self.notifyFailed = notifyFailed
+        self.notifyFinished = notifyFinished
+        self.on = on
+        self.prompt = prompt
+        self.schedule = schedule
+    }
+}
+
+/// ``on = { watch, glob }``: a new file in ``watch`` that matches ``glob``.
+// MARK: - StickyRoutineWatchConfig
+public struct StickyRoutineWatchConfig: Codable {
+    public let glob: String?
+    public let watch: String
+
+    public enum CodingKeys: String, CodingKey {
+        case glob = "glob"
+        case watch = "watch"
+    }
+
+    public init(glob: String?, watch: String) {
+        self.glob = glob
+        self.watch = watch
+    }
+}
+
+/// One firing of a routine: a ``routine_run`` (ADR-050).
+///
+/// The times are ISO 8601 with an offset. ``reason`` says why a firing was
+/// ``skipped``: ``missed``, ``paused``, ``untrusted``, ``still running`` or ``quiet``.
+/// ``scope`` is ``user`` or the project folder. Nothing fills these until the
+/// scheduler (4.2.2), so a list has none yet.
+// MARK: - FluffyRoutineRunSummary
+public struct FluffyRoutineRunSummary: Codable {
+    public let dueAt: String?
+    public let endedAt: String?
+    public let reason: String?
+    public let routine: String
+    public let routineRunID: String
+    public let scope: String
+    public let sessionID: String?
+    public let startedAt: String?
+    public let status: RoutineRunSummaryStatus
+    public let trigger: Trigger
+
+    public enum CodingKeys: String, CodingKey {
+        case dueAt = "due_at"
+        case endedAt = "ended_at"
+        case reason = "reason"
+        case routine = "routine"
+        case routineRunID = "routine_run_id"
+        case scope = "scope"
+        case sessionID = "session_id"
+        case startedAt = "started_at"
+        case status = "status"
+        case trigger = "trigger"
+    }
+
+    public init(dueAt: String?, endedAt: String?, reason: String?, routine: String, routineRunID: String, scope: String, sessionID: String?, startedAt: String?, status: RoutineRunSummaryStatus, trigger: Trigger) {
+        self.dueAt = dueAt
+        self.endedAt = endedAt
+        self.reason = reason
+        self.routine = routine
+        self.routineRunID = routineRunID
+        self.scope = scope
+        self.sessionID = sessionID
+        self.startedAt = startedAt
+        self.status = status
+        self.trigger = trigger
+    }
+}
+
+/// ``on = { watch, glob }``: a new file in ``watch`` that matches ``glob``.
+// MARK: - RoutineWatchConfig
+public struct RoutineWatchConfig: Codable {
+    public let glob: String?
+    public let watch: String
+
+    public enum CodingKeys: String, CodingKey {
+        case glob = "glob"
+        case watch = "watch"
+    }
+
+    public init(glob: String?, watch: String) {
+        self.glob = glob
+        self.watch = watch
+    }
+}
+
 /// JSON-RPC error object.
 // MARK: - RPCErrorBody
 public struct RPCErrorBody: Codable {

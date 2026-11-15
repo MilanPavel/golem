@@ -120,3 +120,71 @@ def test_a_bad_option_is_refused_before_anything_is_written(tmp_path: Path) -> N
         with pytest.raises(ValueError):
             set_model_options(path, "qwen3:8b", cast(dict[str, float | str | None], values))
     assert not path.exists()
+
+
+ROUTINES = """# my routines
+log_level = "INFO"
+
+[[routine]]  # the brief
+name = "morning-brief"
+schedule = "weekdays 08:30"  # before work
+prompt = "/brief"
+
+[[routine]]
+name = "triage"
+schedule = "every 1h"
+prompt = "Look at the new issues."
+"""
+
+
+def test_routine_edits_round_trip_and_keep_comments(tmp_path: Path) -> None:
+    from golem.config_edit import (
+        RoutineExistsError,
+        RoutineTableError,
+        add_routine,
+        remove_routine,
+        replace_routine,
+        set_routine_enabled,
+    )
+    from golem.routine_files import read_routines
+
+    path = tmp_path / "config.toml"
+    path.write_text(ROUTINES, encoding="utf-8")
+
+    replace_routine(
+        path,
+        "morning-brief",
+        {"name": "morning-brief", "schedule": "weekdays 08:30", "prompt": "/brief now"},
+    )
+    text = path.read_text(encoding="utf-8")
+    assert "# my routines" in text and "# the brief" in text and "# before work" in text
+    assert 'prompt = "/brief now"' in text
+
+    add_routine(
+        path,
+        {"name": "weekly", "on": {"watch": "~/Downloads", "glob": "*.pdf"}, "prompt": "p"},
+    )
+    set_routine_enabled(path, "triage", False)
+    found = read_routines(path)
+    assert found.problems == []
+    assert [(r.name, r.enabled) for r in found.routines] == [
+        ("morning-brief", True),
+        ("triage", False),
+        ("weekly", True),
+    ]
+    assert found.routines[2].on is not None and found.routines[2].on.glob == "*.pdf"
+
+    set_routine_enabled(path, "triage", True)
+    assert "enabled" not in path.read_text(encoding="utf-8")
+
+    replace_routine(path, "triage", {"name": "hourly", "schedule": "every 1h", "prompt": "x"})
+    assert [r.name for r in read_routines(path).routines] == ["morning-brief", "hourly", "weekly"]
+
+    with pytest.raises(RoutineExistsError):
+        add_routine(path, {"name": "hourly", "schedule": "daily 08:30", "prompt": "p"})
+    with pytest.raises(RoutineTableError):
+        remove_routine(path, "nope")
+
+    for name in ("morning-brief", "hourly", "weekly"):
+        remove_routine(path, name)
+    assert path.read_text(encoding="utf-8") == '# my routines\nlog_level = "INFO"\n'

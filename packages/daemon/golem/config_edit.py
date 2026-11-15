@@ -31,6 +31,14 @@ class McpExistsError(ValueError):
     """The file already has an ``[mcp.<name>]`` table."""
 
 
+class RoutineTableError(ValueError):
+    """The file has no ``[[routine]]`` with this name."""
+
+
+class RoutineExistsError(ValueError):
+    """The file already has a ``[[routine]]`` with this name."""
+
+
 class RawConflictError(ValueError):
     """The file changed on disk since the text being written was read."""
 
@@ -72,6 +80,100 @@ def replace_mcp_server(
         for key, value in cast(dict[str, Any], _mcp_table(table)).items():
             existing[key] = value
     _write(config_file, document)
+
+
+def add_routine(config_file: Path, table: dict[str, Any]) -> None:
+    """Append a ``[[routine]]`` with the keys of ``table``. Creates the file when it is missing."""
+    document = _read(config_file)
+    routines = cast(object, document.get("routine"))  # pyright: ignore[reportUnknownMemberType]
+    if isinstance(routines, AoT) and _find_routine(routines, str(table["name"])) is not None:
+        raise RoutineExistsError(f"{config_file} already has a routine called {table['name']}")
+    added = _mcp_table(table)
+    if isinstance(routines, AoT):
+        added.add(tomlkit.nl())
+        routines.append(added)  # pyright: ignore[reportUnknownMemberType]
+    else:
+        aot = tomlkit.aot()
+        aot.append(added)  # pyright: ignore[reportUnknownMemberType]
+        document["routine"] = aot
+    _write(config_file, document)
+
+
+def replace_routine(config_file: Path, name: str, table: dict[str, Any]) -> None:
+    """Make ``[[routine]]`` ``name`` hold exactly the keys of ``table``.
+
+    The table keeps its place, and the comments of every key whose value stays.
+    ``table["name"]`` renames it.
+    """
+    document = _read(config_file)
+    routines = _routines(document, config_file, name)
+    existing = routines[_routine_index(routines, config_file, name)]
+    assert isinstance(existing, Table)
+    new_name = str(table.get("name", name))
+    if new_name != name and _find_routine(routines, new_name) is not None:
+        raise RoutineExistsError(f"{config_file} already has a routine called {new_name}")
+    wanted = cast(dict[str, Any], _mcp_table(table))
+    for key in [str(key) for key in existing]:
+        if key not in wanted:
+            del existing[key]
+    for key, value in wanted.items():
+        if key not in existing or _plain(existing[key]) != _plain(value):
+            existing[key] = value
+    _write(config_file, document)
+
+
+def remove_routine(config_file: Path, name: str) -> None:
+    """Delete ``[[routine]]`` ``name``, and the ``routine`` key once it is the last."""
+    document = _read(config_file)
+    routines = _routines(document, config_file, name)
+    del routines[_routine_index(routines, config_file, name)]
+    if len(routines) == 0:
+        del document["routine"]
+        # The blank line that set the table apart goes with it.
+        text = tomlkit.dumps(document).rstrip("\n")
+        document = tomlkit.parse(text + "\n" if text else "")
+    _write(config_file, document)
+
+
+def set_routine_enabled(config_file: Path, name: str, enabled: bool) -> None:
+    """Set ``enabled`` in routine ``name``. ``true`` is the default, so it removes the key."""
+    document = _read(config_file)
+    routines = _routines(document, config_file, name)
+    table = cast(object, routines[_routine_index(routines, config_file, name)])
+    assert isinstance(table, Table)
+    if enabled:
+        if "enabled" in table:
+            del table["enabled"]
+    else:
+        table["enabled"] = False
+    _write(config_file, document)
+
+
+def _routines(document: TOMLDocument, config_file: Path, name: str) -> AoT:
+    routines = cast(object, document.get("routine"))  # pyright: ignore[reportUnknownMemberType]
+    if not isinstance(routines, AoT):
+        raise RoutineTableError(f"{config_file} has no routine called {name}")
+    return routines
+
+
+def _find_routine(routines: AoT, name: str) -> int | None:
+    for index in range(len(routines)):
+        table = routines[index]
+        if table.get("name") == name:  # pyright: ignore[reportUnknownMemberType]
+            return index
+    return None
+
+
+def _routine_index(routines: AoT, config_file: Path, name: str) -> int:
+    index = _find_routine(routines, name)
+    if index is None:
+        raise RoutineTableError(f"{config_file} has no routine called {name}")
+    return index
+
+
+def _plain(value: Any) -> Any:
+    """A tomlkit value as plain Python, so two of them compare by what they hold."""
+    return value.unwrap() if hasattr(value, "unwrap") else value
 
 
 def read_raw(config_file: Path) -> tuple[str, int | None]:

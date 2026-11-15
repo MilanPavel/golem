@@ -1,7 +1,7 @@
 # ADR-050: A routine fires a headless session; `runs` stay agent turns, `routine_runs` are firings
 
 **Date**: 2026-11-13
-**Status**: accepted, amended 2026-11-13 (keep-awake matches ADR-051)
+**Status**: accepted, amended 2026-11-13 (keep-awake matches ADR-051), amended 2026-11-15 (own cron code, blocked routines)
 **Deciders**: Milan Pavel
 
 ## Context
@@ -58,18 +58,19 @@ A routine firing creates a session (origin `routine:<name>`, the routine's folde
 
 A project's `[[routine]]` runs only when its folder is in `trusted_projects`, the rule project MCP servers follow ([ADR-023](023-mcp-client.md)): a project names programs and prompts to run, so a repository must not start work on your Mac because you cloned it.
 
-- The daemon reads `.golem/config.toml` only for folders in `trusted_projects`. It does not walk the disk. An untrusted project's routines are not scheduled and are listed nowhere but by `golem doctor`, which says "routines in this folder are not running: trust it first".
+- The daemon reads `.golem/config.toml` only for folders in `trusted_projects`. It does not walk the disk. An untrusted project's routines are not scheduled. `routine.list` returns them as `blocked` only for the project folders the client passes in (the folders it has open), and never walks the disk to find more. `golem doctor` also says "routines in this folder are not running: trust it first".
 - Trust is checked **again at each firing**. A folder that lost its trust fires nothing; the run is `skipped` with reason `untrusted`.
 - A project routine's `folder` must be the project folder or inside it. A project file cannot aim a routine at your home folder.
 - A project routine cannot name an MCP server the project does not already see through the user and project config. It cannot carry rules.
 
 ### The scheduler
 
-**A small loop of our own, on a cron parser. Not APScheduler.**
+**A small loop of our own, on cron code of our own. Not APScheduler.**
 
 - One asyncio task in the daemon. It keeps each enabled routine's next due time, sleeps until the earliest one, and sleeps at most 60 seconds at a time. The cap does two jobs: it notices a changed config file (mtime) and it notices that the Mac slept, because wall time has jumped by more than the sleep.
-- Schedules are the cron the tickets show (`30 8 * * 1-5`) and a few plain forms (`weekdays 08:30`, `daily 08:30`, `mon 06:00`, `every 1h`, `every 15m`) that parse to the same thing. The web builder shows the next three runs from the same code. Times are local. A time that does not exist on a daylight-saving day fires at the next valid time; one that happens twice fires once.
-- The parser is **`cronsim`** (pure Python, no dependencies, handles daylight saving). `croniter`, which the ticket names, is the fallback, and 4.2.2 may swap them behind `next_after(expr, now)` without changing anything else. Only that function is imported from the library.
+- Schedules are the cron the tickets show (`30 8 * * 1-5`) and a few plain forms (`weekdays 08:30`, `daily 08:30`, `mon 06:00`, `every 1h`, `every 15m`) that parse to the same thing. The web builder shows the next three runs from the same code. Times are local. `every` takes a step that divides the hour or the day evenly (`every 15m`, `every 6h`), since it is cron underneath; any other period is written as cron.
+- The schedule code is **golem's own**, in `golem/routines.py`: a parser for the five cron fields (`*`, lists, ranges, steps, and the names `mon`-`sun` and `jan`-`dec`) and `next_after(expr, now, tz)`, about 150 lines on the standard library's `zoneinfo`. It replaces the `cronsim` this ADR first chose: the library could not be installed where 4.2.1 was built, and the owner chose to write it. Nothing outside `routines.py` knows how a schedule is parsed, so `cronsim` or `croniter` can still be swapped in behind `next_after` without changing anything else. Day of month and day of week are OR-ed when both are restricted (classic cron), and a day-of-month no chosen month has (`0 0 30 2 *`) is refused when the routine loads. `next_after` skips by field (month, day, hour, minute), not minute by minute.
+- **Daylight saving.** A local time that does not exist (the clock jumps forward) fires at the first valid instant after it, which is the moment the clock jumps, and fires once. A local time that happens twice (the clock goes back) fires once, at its first occurrence (`fold=0`). The repeated hour does not fire again, so an hourly routine goes from 02:00 to 03:00 on that night. Tests cover both with Europe/Prague dates.
 - Due times are written to `routine_runs` before the session starts, so the table is both the history and the memory of what was already fired.
 - **At most 2 routine runs run at once** (`[routines] max_running = 2`). The rest wait as `queued` in due order. One local model on one machine should not run eight 08:30 routines together.
 - **A routine does not overlap itself.** If its previous run is still running, or waiting on an approval, a new due time is `skipped` with reason `still running`. A pending approval holds the next firing. It does not pile up a backlog behind it.
@@ -126,7 +127,7 @@ Not holding the assertion (alternative: let the OS sleep) makes a one-hour local
 
 ### What the code does today
 
-Nothing of the above is built. `SessionManager.send` starts a run for a session no client is attached to. A run that hits an `ask` ends its task, is stored as `waiting`, and survives a restart ([ADR-013](013-approvals.md)). `SessionSummary.status` can be `waiting`. There is no `origin`, no `routine_runs`, no clock in the daemon, no notifier, and no dependency on a cron library. 4.0.2 adds the first two, 4.2.1 and 4.2.2 the rest.
+Nothing of the above is built. `SessionManager.send` starts a run for a session no client is attached to. A run that hits an `ask` ends its task, is stored as `waiting`, and survives a restart ([ADR-013](013-approvals.md)). `SessionSummary.status` can be `waiting`. There is no `origin`, no `routine_runs`, no clock in the daemon, no notifier, and no cron code beyond 4.2.1's `next_after`. 4.0.2 adds the first two, 4.2.1 and 4.2.2 the rest.
 
 ## Alternatives Considered
 
@@ -197,6 +198,6 @@ Nothing of the above is built. `SessionManager.send` starts a run for a session 
 ### Risks
 
 - A self-signed helper may be blocked when the archive is downloaded in a browser, as the rest of the release is ([ADR-021](021-release-signing.md)). The Homebrew install is not.
-- `cronsim` is a small dependency with one maintainer. It is used through one function and can be replaced with `croniter` in a day.
+- Our own cron code is ours to get right, in the corners cron libraries spend their effort on (daylight saving, leap days, the day-of-month and day-of-week OR). It sits behind one function, with tests for each corner, and can be replaced by `cronsim` or `croniter` in a day.
 - A paused-and-restarted daemon relies on the `routine_state` row. If it is lost, routines resume, which is the safe direction for a routine and the unsafe one for "on holiday". `golem status` shows `paused`, and the Mac app and the phone will show it too.
 - A retention rule that keeps failed runs 90 days could keep a lot of sessions for a routine that fails every minute. The "tells you once" rule helps the user. A cap per routine may be needed.

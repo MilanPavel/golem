@@ -23,6 +23,7 @@ from golem.config import (
     GolemSettings,
     McpServers,
     McpServerSettings,
+    RoutineSettings,
 )
 
 READ_AT_START = frozenset(
@@ -42,6 +43,7 @@ READ_AT_START = frozenset(
 
 ADDRESS_FIELDS = ("url", "command", "args", "cwd")
 _MCP: TypeAdapter[McpServers] = TypeAdapter(McpServers)
+_ROUTINES: TypeAdapter[list[RoutineSettings]] = TypeAdapter(list[RoutineSettings])
 _DECODE_AT = re.compile(r"\(at line (\d+), column (\d+)\)")
 
 
@@ -118,17 +120,37 @@ def _settings_issues(text: str, data: dict[str, Any]) -> list[Issue]:
 def _project_issues(text: str, data: dict[str, Any]) -> list[Issue]:
     issues = [
         Issue(
-            f"{key} is not allowed in a project config.toml: it holds only [mcp.*] tables",
+            f"{key} is not allowed in a project config.toml: it holds only [mcp.*] tables "
+            "and [[routine]]",
             _line_of(text, [key]),
             path=key,
         )
         for key in data
-        if key != "mcp"
+        if key not in ("mcp", "routine")
     ]
     try:
         _MCP.validate_python(data.get("mcp", {}))
     except ValidationError as exc:
         issues += _from_validation(text, exc, prefix=["mcp"])
+    try:
+        _ROUTINES.validate_python(data.get("routine", []))
+    except ValidationError as exc:
+        issues += _from_validation(text, exc, prefix=["routine"])
+    tables = data.get("routine", [])
+    names = [
+        cast(dict[str, object], t).get("name")
+        for t in (cast(list[object], tables) if isinstance(tables, list) else [])
+        if isinstance(t, dict)
+    ]
+    for index, name in enumerate(names):
+        if name is not None and name in names[:index]:
+            issues.append(
+                Issue(
+                    f"two routines are called {name}",
+                    _line_of(text, ["routine", str(index), "name"]),
+                    path="routine.name",
+                )
+            )
     return issues
 
 
@@ -149,6 +171,10 @@ def _from_validation(
 def _line_of(text: str, loc: list[str]) -> int | None:
     """The line for setting ``loc``, best effort: its key, else its table's header."""
     lines = text.splitlines()
+    if len(loc) >= 2 and loc[1].isdigit():
+        found = _array_line(lines, loc)
+        if found is not None:
+            return found
     headers = [(index, _header(line)) for index, line in enumerate(lines)]
     best: tuple[int, int] | None = None  # (index, number of loc parts the header covers)
     for index, header in headers:
@@ -175,6 +201,29 @@ def _line_of(text: str, loc: list[str]) -> int | None:
     for index, line in enumerate(lines):
         if re.match(rf"\s*{re.escape(loc[0])}\s*=", line) if loc else False:
             return index + 1
+    return None
+
+
+def line_of(text: str, loc: list[str]) -> int | None:
+    """The line for setting ``loc``, such as ``["routine", "0", "schedule"]``, best effort."""
+    return _line_of(text, loc)
+
+
+def _array_line(lines: list[str], loc: list[str]) -> int | None:
+    """The line of key ``loc[2]`` in item ``loc[1]`` of the ``[[loc[0]]]`` list, else its header."""
+    seen = -1
+    for index, line in enumerate(lines):
+        if _header(line) == [loc[0]] and line.lstrip().startswith("[["):
+            seen += 1
+            if seen == int(loc[1]):
+                if len(loc) == 2:
+                    return index + 1
+                for later in range(index + 1, len(lines)):
+                    if lines[later].lstrip().startswith("[["):
+                        break
+                    if re.match(rf"\s*{re.escape(loc[2])}\s*=", lines[later]):
+                        return later + 1
+                return index + 1
     return None
 
 
@@ -292,4 +341,4 @@ def _unique(issues: list[Issue]) -> list[Issue]:
     return unique
 
 
-__all__ = ["ADDRESS_FIELDS", "READ_AT_START", "Checked", "Issue", "check_text", "owns"]
+__all__ = ["ADDRESS_FIELDS", "READ_AT_START", "Checked", "Issue", "check_text", "line_of", "owns"]
