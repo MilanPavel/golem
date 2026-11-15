@@ -4,14 +4,16 @@ from __future__ import annotations
 
 from typing import Literal
 
-UnreachableCode = Literal["model_unreachable", "not_installed"]
+UnreachableCode = Literal["model_unreachable", "not_installed", "budget_spent"]
+
+BUDGET_HINT = "raise it in Settings \u203a Routing, or switch the model"
 
 
 class ModelUnreachable(Exception):
     """The model's server did not answer. ``hint`` says how to fix it.
 
     ``code`` is ``not_installed`` when the server is local and its program is
-    missing, so a client can offer to install it.
+    missing, so a client can offer to install it. It is ``budget_spent`` for :class:`BudgetSpent`.
     """
 
     def __init__(
@@ -51,3 +53,13 @@ class ContextFull(Exception):
         self.need = need
         self.window = window
         self.model = model
+
+
+class BudgetSpent(ModelUnreachable):
+    """A paid call was not made because a cap in ``[budget]`` is spent.
+
+    It ends a run with ``run.failed`` and the code ``budget_spent``. ``hint`` says how to go on.
+    """
+
+    def __init__(self, message: str, *, hint: str) -> None:
+        super().__init__(message, provider=None, hint=hint, code="budget_spent")

@@ -68,6 +68,7 @@ from golem.graphs.tools_node import (
     unanswered_calls,
 )
 from golem.models.discovery import Loaded
+from golem.models.errors import BUDGET_HINT, BudgetSpent
 from golem.models.gate import ServerGate
 from golem.models.ollama import LocalServers
 from golem.models.router import ModelRouter
@@ -425,6 +426,7 @@ def open_chat(
     context: ContextSettings | None = None,
     summariser: Summariser | None = None,
     ratios: TokenRatios | None = None,
+    paid_ok: Callable[[str | None], Awaitable[bool]] | None = None,
 ) -> ChatRuntime:
     """Compile the chat graph against ``checkpointer``.
 
@@ -451,6 +453,9 @@ def open_chat(
     replaced by a summary in what is sent. Before each call the prompt is estimated with the
     tokens per character ``ratios`` learned from finished calls, and a prompt that would not fit
     the window is cleared and summarised harder, or the call raises ``ContextFull``.
+    ``paid_ok`` is awaited with the session id before each call to a paid model. When it says
+    no, a cap in ``[budget]`` is spent: the run fails with ``budget_spent`` before the call,
+    so every tool result of the run is stored by then.
     """
     clearing = context
     learned = TokenRatios() if ratios is None else ratios
@@ -461,9 +466,15 @@ def open_chat(
 
     async def call_model(state: AgentState, config: RunnableConfig) -> dict[str, object]:
         messages = list(state["messages"])
+        profile = state["model_profile"]
+        paid = tier_of is not None and tier_of(profile) not in (None, "local")
+        if paid_ok is not None and paid and not await paid_ok(state.get("session_id")):
+            raise BudgetSpent(
+                "a budget cap is spent, so the run stopped before its next paid call",
+                hint=BUDGET_HINT,
+            )
         message_id = _reply_id(messages, config)
         get_stream_writer()({STREAM_KEY: "model.started", "message_id": message_id})
-        profile = state["model_profile"]
         scope = scope_of(config)
         overrides = _options(config)
         await registry.prepare(scope)

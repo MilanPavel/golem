@@ -178,6 +178,10 @@ Caps on what paid models may cost.
 | `session_usd` | none | The most paid models may cost in one chat, in USD. None means no cap |
 | `over` | `"local"` | What to do at a cap: `local` goes on with a local model, `ask` asks you |
 
+The spend is what the `model_calls` table holds for paid models: chat calls, titles and summaries. "Today" is your local day. At a cap, a chat that picks its model (`auto`) runs a local one, and its model chip says `the daily budget is spent` or `the session budget is spent`. A chat pinned to a paid model is refused with `budget_spent` and a message that names the cap and the amount. A run already going stops before its next paid call. A local model is never stopped by a cap, and a title or summary that would use a paid model is skipped.
+
+A cap is checked before a call, and a call costs what it costs only when it ends. So one call can pass a cap by its own cost. Golem does not guess the cost of the next call to block it. Until the question for `over = "ask"` exists, `ask` refuses a paid turn the same way `local` does.
+
 ### `[routing.roles]`
 
 The model for each internal job. A value is `"session"`, a profile name, or a `provider/model` ref.

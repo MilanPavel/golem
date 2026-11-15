@@ -51,6 +51,7 @@ from golem.secrets import SecretStore, SecretStoreError, check_name
 from golem.server.dispatcher import (
     APPROVAL_NOT_FOUND,
     ARTIFACT_NOT_FOUND,
+    BUDGET_SPENT,
     INTERNAL_ERROR,
     INVALID_PARAMS,
     INVALID_TOOL_ARGS,
@@ -96,6 +97,7 @@ from golem.server.skills_edit import (
 from golem.sessions.manager import (
     ApprovalNotFoundError,
     BlankTitleError,
+    BudgetSpentError,
     InvalidToolArgsError,
     MessageNotFoundError,
     RuleWriteError,
@@ -455,6 +457,8 @@ async def _message_send(ctx: RequestContext, params: MessageSendParams) -> Messa
         raise RpcCallError(SESSION_NOT_FOUND, str(exc)) from exc
     except ModelConfigError as exc:
         raise RpcCallError(MODEL_NOT_CONFIGURED, str(exc)) from exc
+    except BudgetSpentError as exc:
+        raise RpcCallError(BUDGET_SPENT, str(exc)) from exc
     except SkillInvokeError as exc:
         raise RpcCallError(SKILL_NOT_FOUND, str(exc)) from exc
     return MessageSendResult(run_id=run_id)

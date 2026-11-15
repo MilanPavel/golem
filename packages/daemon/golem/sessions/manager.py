@@ -27,6 +27,8 @@ from golem.graphs.chat import ChatRuntime
 from golem.graphs.context_view import ContextView, view
 from golem.graphs.state import SCHEMA_VERSION
 from golem.models import options as model_options
+from golem.models.budget import Budget, Room, spent_text
+from golem.models.errors import BUDGET_HINT
 from golem.models.facts import FactsSource, ModelFacts
 from golem.models.pick import Choice, Rejected, Traits, ladder, pick
 from golem.models.router import ModelConfigError, ModelIdentity, ModelRouter
@@ -139,6 +141,13 @@ class SessionView:
         return sum(1 for message in self.messages if message.role != "system")
 
 
+class BudgetSpentError(Exception):
+    """A turn on a paid model was refused because a cap in ``[budget]`` is spent."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+
+
 class SchemaMismatchError(Exception):
     """The checkpoint's ``schema_version`` is not the one this process writes."""
 
@@ -224,6 +233,8 @@ class SessionManager:
         self._titles = titles
         self.facts: FactsSource | None = None
         """Where a routed turn reads the facts of the models. None: it has none."""
+        self.budget: Budget | None = None
+        """The caps of ``[budget]``. None: a turn is never held back for its cost."""
         self.listed_refs: Callable[[], Sequence[str]] = lambda: ()
         """The refs of the models the daemon knows of, for the candidates of a pick."""
         self._sessions: dict[str, _LiveSession] = {}
@@ -741,9 +752,11 @@ class SessionManager:
                 raise SessionBusyError(session_id)
             if await self._run_records.waiting(session_id) is not None:
                 raise SessionBusyError(session_id)
+            room = None if self.budget is None else await self.budget.room(session_id)
             profile, routed = session.model_profile, None
             if session.route != "pinned":
-                profile, routed = await self._route(session, text)
+                profile, routed = await self._route(session, text, room)
+            self._check_budget(profile, room)
             self._runtime.router.chat_model(profile)
             folder = session.cwd if session.cwd is not None else cwd
             invocation = None if skill is None else self._invoke(session_id, folder, skill)
@@ -778,7 +791,27 @@ class SessionManager:
             await self._start(session, turn.run_id, control, self._turn(session, turn, control))
             return turn.run_id
 
-    async def _route(self, session: _LiveSession, text: str) -> tuple[str, Choice]:
+    def _check_budget(self, profile: str, room: Room | None) -> None:
+        """Refuse a turn on a paid model while a cap is spent. A local model is never refused.
+
+        With ``over = "ask"`` the turn is refused too, until the question of a paid step-up
+        can be asked (ticket 9.3.6): that is the place to ask instead of raising.
+        """
+        if room is None or not room.spent or self.budget is None:
+            return
+        tier = None if self._runtime.tier_of is None else self._runtime.tier_of(profile)
+        if tier in (None, "local"):
+            return
+        spent = room.spent_today if room.cap == "day" else room.spent_session
+        cap = self._runtime.router.budget_settings()
+        limit = cap.daily_usd if room.cap == "day" else cap.session_usd
+        raise BudgetSpentError(
+            f"{spent_text(room)}: ${spent:.2f} of ${limit or 0:.2f}; {BUDGET_HINT}"
+        )
+
+    async def _route(
+        self, session: _LiveSession, text: str, room: Room | None = None
+    ) -> tuple[str, Choice]:
         """The profile this turn runs on, and why. Reads cached facts, never the network.
 
         Raises :class:`~golem.models.router.ModelConfigError` on route ``local`` when the
@@ -796,7 +829,7 @@ class SessionManager:
             needs_tools=True,
             local_only=session.route == "local",
             paid_allowed=session.paid_ok,
-            paid_room_usd=None,
+            paid_room_usd=None if room is None else room.usd,
         )
         choice = Choice(None, "fallback", "no model facts", ())
         if own is not None:
@@ -810,8 +843,11 @@ class SessionManager:
             ]
             free = pick(session.route, own, [m for m in candidates if m.tier == "local"], traits)
             choice = replace(free, rejected=(*free.rejected, *held))
-        if choice.model is not None:
-            return choice.model.profile, choice
+        picked = choice.model
+        if picked is not None:
+            if choice.reason == "budget" and room is not None:
+                choice = replace(choice, detail=spent_text(room))
+            return picked.profile, choice
         tier = own.tier if own is not None else None
         if tier is None and self._runtime.tier_of is not None:
             tier = self._runtime.tier_of(session.model_profile)

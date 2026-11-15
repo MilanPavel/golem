@@ -165,6 +165,23 @@ test("a model server that did not answer says how to fix it, until a run complet
   assert.equal(completed.down, null);
 });
 
+test("a spent budget says what to do and marks no server down", () => {
+  const spent = reduceChat(emptyChat, {
+    seq: 2,
+    session_id: "s",
+    run_id: "r",
+    ts: "t",
+    type: "run.failed",
+    data: {
+      message: "the daily budget is spent",
+      code: "budget_spent",
+      hint: "raise it in Settings › Routing, or switch the model",
+    },
+  });
+  assert.equal(spent.error, "the daily budget is spent · raise it in Settings › Routing, or switch the model");
+  assert.equal(spent.down, null);
+});
+
 test("a server that answers again is no longer marked down", () => {
   const down = { ...emptyChat, down: "ollama" };
   assert.equal(serverUp(down, "ollama").down, null);

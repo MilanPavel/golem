@@ -814,3 +814,60 @@ async def test_each_call_names_the_model_it_used_not_the_runs_first() -> None:
     # A call that names no profile keeps the run's model.
     await _apply(ModelRequested("m9"), progress, emit)
     assert seen[-1] == ModelIdentity("anthropic/first", "anthropic", "first")
+
+
+async def test_a_run_stops_before_a_paid_call_when_the_cap_is_spent(
+    database: Database, project: Path
+) -> None:
+    model = ToolCallingChatModel(replies=[[("read_file", {"path": "notes.txt"})], "It says 42."])
+    answers = [True, False]
+    asked: list[str | None] = []
+
+    async def paid_ok(session_id: str | None) -> bool:
+        asked.append(session_id)
+        return answers.pop(0)
+
+    chat = _Chat(
+        database,
+        open_chat(
+            ModelRouter(model=model),
+            InMemorySaver(),
+            tier_of=lambda _profile: "frontier",
+            paid_ok=paid_ok,
+        ),
+    )
+    session_id = await chat.manager.create(None, cwd=str(project))
+    events = await chat.finished(await chat.manager.send(session_id, "what is in notes?"))
+
+    failed = events[-1]
+    assert isinstance(failed, RunFailedEvent)
+    assert failed.data.code == "budget_spent"
+    assert failed.data.hint is not None and "Settings" in failed.data.hint
+    assert asked == [session_id, session_id]
+    assert len(model.seen) == 1
+    stored = _messages(await chat.runtime.values(session_id))
+    calls = {c["id"] for m in stored if isinstance(m, AIMessage) for c in m.tool_calls}
+    answered = {m.tool_call_id for m in stored if isinstance(m, ToolMessage)}
+    assert calls and calls == answered
+
+
+async def test_a_local_model_is_never_asked_about_the_cap(
+    database: Database, project: Path
+) -> None:
+    model = ToolCallingChatModel(replies=["hello"])
+
+    async def paid_ok(session_id: str | None) -> bool:
+        raise AssertionError("a local model needs no yes")
+
+    chat = _Chat(
+        database,
+        open_chat(
+            ModelRouter(model=model),
+            InMemorySaver(),
+            tier_of=lambda _profile: "local",
+            paid_ok=paid_ok,
+        ),
+    )
+    session_id = await chat.manager.create(None, cwd=str(project))
+    events = await chat.finished(await chat.manager.send(session_id, "hi"))
+    assert events[-1].type == "run.completed"

@@ -9919,8 +9919,9 @@ public struct Params: Codable {
 ///
 /// ``code`` names a failure a client can act on. ``model_unreachable``: the
 /// model's server did not answer. ``not_installed``: the model needs a local
-/// server that is not installed, such as Ollama. ``provider`` is the provider
-/// whose server it was, and ``hint`` says how to fix it, such as
+/// server that is not installed, such as Ollama. ``budget_spent``: a cap in
+/// ``[budget]`` is spent, so a paid call was not made. ``provider`` is the
+/// provider whose server it was, and ``hint`` says how to fix it, such as
 /// ``run ollama serve``. ``context_full``: the prompt does not fit the model's window,
 /// even after clearing and summarising, and nothing was sent.
 ///
@@ -10372,6 +10373,7 @@ public struct FluffyCheckInfo: Codable {
 }
 
 public enum Code: String, Codable {
+    case budgetSpent = "budget_spent"
     case contextFull = "context_full"
     case modelUnreachable = "model_unreachable"
     case notInstalled = "not_installed"
@@ -10833,8 +10835,9 @@ public enum RunCompletedEventType: String, Codable {
 ///
 /// ``code`` names a failure a client can act on. ``model_unreachable``: the
 /// model's server did not answer. ``not_installed``: the model needs a local
-/// server that is not installed, such as Ollama. ``provider`` is the provider
-/// whose server it was, and ``hint`` says how to fix it, such as
+/// server that is not installed, such as Ollama. ``budget_spent``: a cap in
+/// ``[budget]`` is spent, so a paid call was not made. ``provider`` is the
+/// provider whose server it was, and ``hint`` says how to fix it, such as
 /// ``run ollama serve``. ``context_full``: the prompt does not fit the model's window,
 /// even after clearing and summarising, and nothing was sent.
 // MARK: - RunFailedData
@@ -10892,8 +10895,9 @@ public struct RunFailedEvent: Codable {
 ///
 /// ``code`` names a failure a client can act on. ``model_unreachable``: the
 /// model's server did not answer. ``not_installed``: the model needs a local
-/// server that is not installed, such as Ollama. ``provider`` is the provider
-/// whose server it was, and ``hint`` says how to fix it, such as
+/// server that is not installed, such as Ollama. ``budget_spent``: a cap in
+/// ``[budget]`` is spent, so a paid call was not made. ``provider`` is the
+/// provider whose server it was, and ``hint`` says how to fix it, such as
 /// ``run ollama serve``. ``context_full``: the prompt does not fit the model's window,
 /// even after clearing and summarising, and nothing was sent.
 // MARK: - RunFailedEventData

@@ -280,6 +280,7 @@ Adding a message is the same every time. Add a class, run `just gen`, and the cl
 | `-32013` | skill not found | A skill the session can't run |
 | `-32014`, `-32015` | key rejected, key unchecked | `auth.set` |
 | `-32016` | Ollama failed | |
+| `-32017` | budget spent | `message.send` on a paid model while a cap in `[budget]` is spent |
 | `-32020` | not allowed from the browser | Sent by the gateway, never by the daemon |
 
 ### Limits
