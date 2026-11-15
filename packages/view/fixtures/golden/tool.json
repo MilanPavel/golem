@@ -52,6 +52,7 @@
     },
     {
       "data": {
+        "cleared_ids": [],
         "context_window": null,
         "index": 1,
         "message_bytes": [
@@ -178,6 +179,7 @@
     },
     {
       "data": {
+        "cleared_ids": [],
         "context_window": null,
         "index": 2,
         "message_bytes": [
@@ -317,6 +319,7 @@
     },
     {
       "data": {
+        "cleared_ids": [],
         "context_window": null,
         "index": 1,
         "message_bytes": [
@@ -443,6 +446,7 @@
     },
     {
       "data": {
+        "cleared_ids": [],
         "context_window": null,
         "index": 2,
         "message_bytes": [

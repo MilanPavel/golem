@@ -7,10 +7,11 @@ it. With no record the view is the history itself.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Sequence
 from typing import TypedDict
 
-from langchain_core.messages import BaseMessage, HumanMessage, ToolMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
 
 from golem.graphs.adapter import message_text
 
@@ -29,6 +30,14 @@ SUMMARY_HEADER = "Summary of the conversation so far. The messages it covers are
 SUMMARY_ID = "summary"
 
 
+def stub_text(name: str | None, size: int) -> str:
+    """The line that stands for a cleared tool result of ``size`` characters."""
+    return (
+        f"[cleared to save context: {name or 'tool'} returned {size} characters. "
+        "Call the tool again if you need this.]"
+    )
+
+
 def stub(message: ToolMessage) -> ToolMessage:
     """``message`` with its content replaced by one line that says what it was.
 
@@ -36,12 +45,7 @@ def stub(message: ToolMessage) -> ToolMessage:
     """
     if message.status == "error":
         return message.model_copy()
-    size = len(message_text(message))
-    name = message.name or "tool"
-    note = (
-        f"[cleared to save context: {name} returned {size} characters. "
-        "Call the tool again if you need this.]"
-    )
+    note = stub_text(message.name, len(message_text(message)))
     return message.model_copy(update={"content": note})
 
 
@@ -134,3 +138,91 @@ def view(messages: Sequence[BaseMessage], ctx: ContextView | None) -> list[BaseM
         text = f"{SUMMARY_HEADER}\n\n{ctx.get('summary', '')}"
         sent.insert(0, HumanMessage(content=text, id=SUMMARY_ID))
     return sent
+
+
+DEFAULT_RATIO = 0.25
+MIN_RATIO, MAX_RATIO = 0.15, 0.6
+
+
+def _sent_chars(message: BaseMessage) -> int:
+    """Characters of a message as a call sends it: its text and a reply's tool calls."""
+    size = len(message_text(message))
+    if isinstance(message, AIMessage) and message.tool_calls:
+        size += len(json.dumps(message.tool_calls, ensure_ascii=False, default=str))
+    return size
+
+
+def used_tokens(
+    messages: Sequence[BaseMessage], system_chars: int, tools_chars: int
+) -> tuple[int, float]:
+    """Tokens the next call would send, and the tokens-per-character ratio used.
+
+    The newest reply with a provider token count anchors it: that count is the
+    size of the call that made the reply, and what came after is added by the
+    ratio the count implies. Without such a reply every character counts 0.25.
+    """
+    for i in range(len(messages) - 1, -1, -1):
+        message = messages[i]
+        usage = message.usage_metadata if isinstance(message, AIMessage) else None
+        tokens = usage.get("input_tokens") if usage else None
+        if not tokens:
+            continue
+        before = system_chars + tools_chars + sum(_sent_chars(m) for m in messages[:i])
+        ratio = min(MAX_RATIO, max(MIN_RATIO, tokens / before)) if before > 0 else DEFAULT_RATIO
+        added = sum(_sent_chars(m) for m in messages[i:])
+        return round(tokens + added * ratio), ratio
+    total = system_chars + tools_chars + sum(_sent_chars(m) for m in messages)
+    return round(total * DEFAULT_RATIO), DEFAULT_RATIO
+
+
+def _saved_chars(message: BaseMessage) -> int:
+    size = len(message_text(message))
+    return size - len(stub_text(getattr(message, "name", None), size))
+
+
+def plan_clear(
+    messages: Sequence[BaseMessage],
+    ctx: ContextView | None,
+    *,
+    used: int,
+    ratio: float,
+    room: int,
+    clear_at: float,
+    clear_to: float,
+    keep_results: int,
+) -> ContextView | None:
+    """A view that clears old tool results, or None when there is nothing to do.
+
+    None when ``used`` is under ``clear_at`` of ``room``, or when nothing can be
+    freed. Results are cleared oldest first until ``used`` is down to ``clear_to``
+    of ``room``. The newest ``keep_results`` results that could be cleared stay.
+    ``cleared_before`` only moves forward.
+    """
+    if used < clear_at * room:
+        return None
+    current = ctx or ContextView()
+    start = _summary_start(messages, current) or 0
+    before = _find(messages, current.get("cleared_before")) or 0
+    found = [i for i in range(start, len(messages)) if _clearable(messages[i])]
+    older = found[: max(0, len(found) - keep_results)]
+    freed = 0.0
+    last: int | None = None
+    for i in older:
+        if used - freed <= clear_to * room:
+            break
+        if i >= before and _saved_chars(messages[i]) > 0:
+            freed += _saved_chars(messages[i]) * ratio
+            last = i
+    if last is None or last + 1 >= len(messages):
+        return None
+    after = messages[last + 1].id
+    return {**current, "cleared_before": after} if after else None
+
+
+def freed_by(
+    messages: Sequence[BaseMessage], old: ContextView | None, new: ContextView, ratio: float
+) -> tuple[int, int]:
+    """The tokens and the number of results that ``new`` clears beyond ``old``."""
+    now = set(cleared_ids(messages, new)) - set(cleared_ids(messages, old))
+    fresh = [m for m in messages if m.id in now]
+    return round(sum(_saved_chars(m) for m in fresh) * ratio), len(fresh)

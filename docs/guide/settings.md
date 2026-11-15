@@ -142,6 +142,10 @@ The providers are `openai`, `anthropic`, `google`, `deepseek`, `xai`, `moonshot`
 |---|---|---|
 | `window` | `"auto"` | The context window golem asks Ollama for. `"auto"` plans one from the model's size and maximum and this Mac's memory. `"ollama"` sends none, so Ollama uses its own default. A number from 512 to 262144 is used as it is, and cut to the model's maximum when that is known. A `num_ctx` you set for a model, a profile's `ctx`, or a chat's option always wins |
 | `keep_alive` | `"30m"` | How long Ollama keeps the model loaded after a call. golem sends it only with a window it planned, and never over a `keep_alive` you set. Leave it out to send none |
+| `reply_reserve` | `4096` | Tokens of the window kept free for the reply. The rest is the room the history may fill |
+| `clear_at` | `0.70` | When the history passes this share of the room, golem sends old tool results as one line each |
+| `clear_to` | `0.40` | How far clearing goes down, as a share of the room. Must be above 0 and below `clear_at` |
+| `keep_results` | `4` | The newest tool results that are never cleared. A model whose window is unknown is never cleared |
 
 ### `[routing]`
 

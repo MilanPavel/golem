@@ -285,6 +285,7 @@ class DaemonApp:
                     ),
                     note_loaded=note_loaded,
                     learn_window=learn_window,
+                    context=router.context_settings(),
                     price_of=lambda profile: _price_of(router, models, profile),
                     gate=self._gate or ServerGate(settings.ollama.parallel),
                     tier_of=lambda profile: _tier_of(router, models, profile),

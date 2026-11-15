@@ -332,12 +332,26 @@ class ContextSettings(BaseModel):
     ``window`` is ``"auto"`` (golem plans it from the model and this Mac's memory),
     ``"ollama"`` (golem sends none and Ollama picks), or a number of tokens.
     ``keep_alive`` is sent with a planned window when no other ``keep_alive`` is set.
+
+    ``reply_reserve`` is the tokens kept free for the reply. When the history passes
+    ``clear_at`` of the rest of the window, old tool results go out as one line each
+    until it is down to ``clear_to``. The newest ``keep_results`` results are kept.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     window: Literal["auto", "ollama"] | Annotated[int, Field(ge=512, le=262144)] = "auto"
     keep_alive: str | None = "30m"
+    reply_reserve: int = Field(default=4096, ge=0)
+    clear_at: float = 0.70
+    clear_to: float = 0.40
+    keep_results: int = Field(default=4, ge=0)
+
+    @model_validator(mode="after")
+    def _ordered(self) -> ContextSettings:
+        if not 0 < self.clear_to < self.clear_at < 1:
+            raise ValueError("[context] needs 0 < clear_to < clear_at < 1")
+        return self
 
 
 class BudgetSettings(BaseModel):

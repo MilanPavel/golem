@@ -34,6 +34,7 @@ from golem.graphs.adapter import (
     CheckCompleted,
     CheckOffered,
     CheckStarted,
+    ContextChanged,
     FileChanged,
     ModelRequested,
     ModelResponded,
@@ -71,6 +72,7 @@ from golem_protocol.events import (
     CheckInfo,
     CheckOfferedData,
     CheckStartedData,
+    ContextChangedData,
     EmptyEventData,
     EventType,
     FileChangedData,
@@ -477,6 +479,17 @@ async def _apply(
                 tools_bytes=fact.tools_bytes,
                 message_chars=None if fact.message_chars is None else list(fact.message_chars),
                 message_bytes=None if fact.message_bytes is None else list(fact.message_bytes),
+                cleared_ids=list(fact.cleared_ids),
+            ),
+        )
+    elif isinstance(fact, ContextChanged):
+        await emit(
+            "context.changed",
+            ContextChangedData(
+                action=fact.action,
+                before_tokens=fact.before_tokens,
+                after_tokens=fact.after_tokens,
+                count=fact.count,
             ),
         )
     elif isinstance(fact, ModelResponded):

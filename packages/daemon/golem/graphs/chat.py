@@ -14,6 +14,7 @@ import json
 import logging
 from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable, Mapping, Sequence
 from contextlib import AbstractAsyncContextManager, aclosing, nullcontext
+from dataclasses import dataclass
 from typing import Literal, Protocol, cast
 
 from langchain_core.language_models import BaseChatModel
@@ -27,10 +28,17 @@ from langgraph.graph import END, START, StateGraph  # pyright: ignore[reportMiss
 from langgraph.types import Command
 
 from golem.coding.changes import ChangeStore
-from golem.config import ModelPrice, PermissionMode
+from golem.config import ContextSettings, ModelPrice, PermissionMode
 from golem.graphs.adapter import STREAM_KEY, message_text
 from golem.graphs.checks_node import CHECKS_KEY, checks_node
-from golem.graphs.context_view import view
+from golem.graphs.context_view import (
+    ContextView,
+    cleared_ids,
+    freed_by,
+    plan_clear,
+    used_tokens,
+    view,
+)
 from golem.graphs.prompt import PINNED_KEY, PromptContext, SystemPrompt
 from golem.graphs.result_budget import ResultBudget, result_budget
 from golem.graphs.state import AgentState
@@ -402,6 +410,7 @@ def open_chat(
     gate: ServerGate | None = None,
     tier_of: Callable[[str], Tier | None] | None = None,
     learn_window: Callable[[str], Awaitable[None]] | None = None,
+    context: ContextSettings | None = None,
 ) -> ChatRuntime:
     """Compile the chat graph against ``checkpointer``.
 
@@ -422,13 +431,16 @@ def open_chat(
     ``model.response``, with ``text_tool_calls`` (``recovered`` or ``unread``) when the reply
     held a tool call written as text. A failure there never fails the call. With ``gate``,
     a call to a local server waits for its turn first, so one generation runs at a time on it.
+    ``context`` holds the ``[context]`` settings. When the history fills the window past
+    ``clear_at``, old tool results are sent as one line each. Without it, nothing is cleared.
     """
+    clearing = context
     registry = default_registry() if tools is None else tools
     rules = Policy(None) if policy is None else policy
     binder = _ToolBinder()
     system_prompt = SystemPrompt() if prompt is None else prompt
 
-    async def call_model(state: AgentState, config: RunnableConfig) -> dict[str, list[BaseMessage]]:
+    async def call_model(state: AgentState, config: RunnableConfig) -> dict[str, object]:
         messages = list(state["messages"])
         message_id = _reply_id(messages, config)
         get_stream_writer()({STREAM_KEY: "model.started", "message_id": message_id})
@@ -458,9 +470,27 @@ def open_chat(
                 except Exception:
                     log.debug("learning the model %s failed", profile, exc_info=True)
             window = window_of(profile, overrides) if window_of is not None else ContextWindow()
+            current = state.get("context_view")
+            cleared = _clear_old(
+                _without_thinking(messages),
+                history,
+                current,
+                clearing,
+                window,
+                0 if system is None else len(message_text(system)),
+                len(json.dumps(schemas, sort_keys=True, separators=(",", ":")))
+                if schemas and binder.offers(profile)
+                else 0,
+            )
+            if cleared is not None:
+                current = cleared.view
+                history = view(_without_thinking(messages), current)
+                sent = history if system is None else [system, *history]
+                get_stream_writer()(cleared.item)
             request: dict[str, object] = {STREAM_KEY: "model.request", "message_id": message_id}
             request["profile"] = profile
             request["message_ids"] = [m.id for m in history if m.id]
+            request["cleared_ids"] = cleared_ids(messages, current)
             if parts:
                 request["system_sections"] = [{"name": n, "chars": len(t)} for n, t in parts]
             request["context_window"] = window.window
@@ -527,7 +557,10 @@ def open_chat(
         if timings:
             response_item["timings"] = timings
         get_stream_writer()(response_item)
-        return {"messages": [response.model_copy(update=update)]}
+        result: dict[str, object] = {"messages": [response.model_copy(update=update)]}
+        if cleared is not None:
+            result["context_view"] = cleared.view
+        return result
 
     def route(state: AgentState) -> Literal["tools", "end"]:
         last = state["messages"][-1] if state["messages"] else None
@@ -597,6 +630,57 @@ def _budget_by_window(window_of: WindowOf | None) -> BudgetOf | None:
         return result_budget(window_of(state["model_profile"], _options(config)).window)
 
     return budget
+
+
+@dataclass(frozen=True, slots=True)
+class _Cleared:
+    view: ContextView
+    item: dict[str, object]
+
+
+def _clear_old(
+    messages: Sequence[BaseMessage],
+    sent: Sequence[BaseMessage],
+    current: ContextView | None,
+    settings: ContextSettings | None,
+    window: ContextWindow,
+    system_chars: int,
+    tools_chars: int,
+) -> _Cleared | None:
+    """The view that clears old tool results and the ``context.changed`` item, or None.
+
+    ``messages`` is the stored history and ``sent`` what the call would send. An unknown
+    window, or one no bigger than the reply reserve, never clears.
+    """
+    if settings is None or window.window is None:
+        return None
+    room = window.window - settings.reply_reserve
+    if room <= 0:
+        return None
+    used, ratio = used_tokens(sent, system_chars, tools_chars)
+    planned = plan_clear(
+        messages,
+        current,
+        used=used,
+        ratio=ratio,
+        room=room,
+        clear_at=settings.clear_at,
+        clear_to=settings.clear_to,
+        keep_results=settings.keep_results,
+    )
+    if planned is None:
+        return None
+    freed, count = freed_by(messages, current, planned, ratio)
+    if count == 0:
+        return None
+    item: dict[str, object] = {
+        STREAM_KEY: "context.changed",
+        "action": "cleared",
+        "before_tokens": used,
+        "after_tokens": max(0, used - freed),
+        "count": count,
+    }
+    return _Cleared(planned, item)
 
 
 def _without_thinking(messages: Sequence[BaseMessage]) -> list[BaseMessage]:

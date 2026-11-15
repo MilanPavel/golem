@@ -417,6 +417,7 @@ class SessionManager:
                 sections=found.result.system_sections,
                 tools=tools,
                 messages=found.result.messages,
+                cleared_ids=found.cleared_ids,
             )
             updates["context"] = context.model_copy(
                 update={

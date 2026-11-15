@@ -419,6 +419,7 @@ class SpanRead:
     num_ctx: int | None = None
     window_estimated: bool = False
     cut: PromptCut = field(default_factory=PromptCut)
+    cleared_ids: tuple[str, ...] = ()
 
 
 def read_span(
@@ -526,6 +527,7 @@ def _model_read(
         context_window=window,
         num_ctx=None if here is None else here.num_ctx,
         window_estimated=estimated,
+        cleared_ids=() if here is None else tuple(here.cleared_ids),
     )
 
 
