@@ -41,7 +41,11 @@ Type `/skills` in the chat to see every skill golem found, and why one is not us
 ```bash
 golem skills                                       # the same list, in a shell
 golem skills check ~/.golem/skills/release-notes   # find mistakes before you share one
+golem skills new release-checklist                 # make one and open it in $EDITOR (--project: for this folder)
+golem skills edit release-checklist                # open it again, then check it
 ```
+
+`new` takes `--description "…"`; without it the description is a line to replace. After the editor closes, both commands run the same check as `golem skills check` and print its mistakes. The file is saved even when it has mistakes, and then lists as broken until you fix it.
 
 ## Run one by name
 

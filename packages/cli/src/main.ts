@@ -41,6 +41,8 @@ import {
   formatTestStep,
 } from "./mcp-format.ts";
 import { LOGIN_TIMEOUT_MS, projectSession, runConfigEdit, runMcpEdit, runMcpImport, runMcpLogin, testAfterAdd } from "./mcp-run.ts";
+import { editFile } from "./external-editor.ts";
+import { parseSkillsNew, runSkillsEdit, runSkillsNew } from "./skills-run.ts";
 import { readChoice } from "./read-choice.ts";
 import { readSecret } from "./read-secret.ts";
 import { type Gate, gateService, type SessionDaemon } from "./service-gate.ts";
@@ -78,6 +80,7 @@ const USAGE =
   "       golem mcp add <name> -- <command…> [--token-env VAR] | golem mcp add <name> --url <url> [--token] [--env K=V] [--header K=V] [--cwd D] [--on-demand] [--project] [--timeout S] [--approval allow] | golem mcp add --catalog <id> [--input <id>=<value>] | golem mcp remove <name> | golem mcp export [--format claude|vscode] [--scope user|project]\n" +
   "       golem mcp list [--json] | show <name> [--json] | test <name> | test --catalog <id> | edit <name> [--project] | import [--from <app>|<file>] [--all] | logs <name> [-f] | enable <name> [--on-demand] | disable <name> | restart <name> | login <name> | logout <name> | tools <name> [--hide <glob>] [--show <glob>]\n" +
   "       golem config show [--resolved] | golem config edit [--project] | golem skills [list] | golem skills check <path>\n" +
+  "       golem skills new <name> [--project] [--description \"…\"] | golem skills edit <name>\n" +
   "       golem web [--port N] [--no-open] [--json] (the same as golem) | golem web serve [--port N]\n" +
   "       golem web install [--port N] | golem web uninstall | golem web logout";
 
@@ -131,6 +134,18 @@ async function run(args: string[]): Promise<number> {
   if (command === "skills" && rest[0] === "check" && rest.length === 2 && rest[1] !== undefined) {
     return runSkillsCheck(rest[1]);
   }
+  if (command === "skills" && (rest[0] === "new" || rest[0] === "edit")) {
+    const deps = { ...SKILLS_DEPS, cwd: process.cwd() };
+    if (rest[0] === "new") {
+      const parsed = parseSkillsNew(rest.slice(1));
+      if (parsed !== null) return runWithClient((client) => runSkillsNew(client, parsed, deps));
+    } else if (rest.length === 2 && rest[1] !== undefined && !rest[1].startsWith("-")) {
+      const name = rest[1];
+      return runWithClient((client) => runSkillsEdit(client, name, deps));
+    }
+    process.stderr.write(`${USAGE}\n`);
+    return 1;
+  }
   if (command === "web" && rest.length === 1 && rest[0] === "logout") {
     return runWebLogout();
   }
@@ -153,6 +168,17 @@ async function run(args: string[]): Promise<number> {
   process.stderr.write(`${USAGE}\n`);
   return 1;
 }
+
+const SKILLS_DEPS = {
+  editFile: (path: string) => editFile(path),
+  check: runSkillsCheck,
+  write: (line: string): void => {
+    process.stdout.write(`${line}\n`);
+  },
+  error: (line: string): void => {
+    process.stderr.write(`${line}\n`);
+  },
+};
 
 /** Runs `body` with a client, says what went wrong, and always closes the client. */
 async function runWithClient(body: (client: ReturnType<typeof connectOnce>) => Promise<number>): Promise<number> {

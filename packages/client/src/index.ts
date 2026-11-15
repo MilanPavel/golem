@@ -87,6 +87,8 @@ export type { TraceSpanResult } from "../../protocol/gen/trace-span-result.ts";
 export type { TraceTokens } from "../../protocol/gen/trace-tokens.ts";
 export type { TraceToolSpan } from "../../protocol/gen/trace-tool-span.ts";
 export type { SkillCall } from "../../protocol/gen/skill-call.ts";
+export type { SkillCreateResult } from "../../protocol/gen/skill-create-result.ts";
+export type { SkillReadResult } from "../../protocol/gen/skill-read-result.ts";
 export type { ListedSkill, SkillListResult } from "../../protocol/gen/skill-list-result.ts";
 export type { ConfigAllowance, ConfigGetResult, ConfigRule } from "../../protocol/gen/config-get-result.ts";
 export type { ListedModel, ModelListResult } from "../../protocol/gen/model-list-result.ts";

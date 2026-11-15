@@ -26,6 +26,8 @@ import type { PermissionsSetModeResult } from "../../protocol/gen/permissions-se
 import type { SessionSetModeResult } from "../../protocol/gen/session-set-mode-result.ts";
 import type { SessionSetOptionsResult } from "../../protocol/gen/session-set-options-result.ts";
 import type { ListedSkill, SkillListResult } from "../../protocol/gen/skill-list-result.ts";
+import type { SkillCreateResult } from "../../protocol/gen/skill-create-result.ts";
+import type { SkillReadResult } from "../../protocol/gen/skill-read-result.ts";
 import type { McpRemoveResult } from "../../protocol/gen/mcp-remove-result.ts";
 import type { McpToggleResult } from "../../protocol/gen/mcp-toggle-result.ts";
 import type { SessionSetSkillsResult } from "../../protocol/gen/session-set-skills-result.ts";
@@ -189,6 +191,20 @@ export function isListedSkill(value: unknown): value is ListedSkill {
 
 export function isSkillListResult(value: unknown): value is SkillListResult {
   return isRecord(value) && Array.isArray(value["skills"]) && value["skills"].every(isListedSkill);
+}
+
+export function isSkillReadResult(value: unknown): value is SkillReadResult {
+  return (
+    isRecord(value) &&
+    typeof value["path"] === "string" &&
+    typeof value["text"] === "string" &&
+    typeof value["mtime_ns"] === "number" &&
+    typeof value["source"] === "string"
+  );
+}
+
+export function isSkillCreateResult(value: unknown): value is SkillCreateResult {
+  return isRecord(value) && typeof value["path"] === "string" && typeof value["mtime_ns"] === "number";
 }
 
 export function isSessionSetSkillsResult(value: unknown): value is SessionSetSkillsResult {
