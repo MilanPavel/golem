@@ -216,6 +216,7 @@ export type Ts19 = string;
 export type Type19 = 'tool.output';
 export type ArtifactId = string | null;
 export type CallId3 = string;
+export type Diff = string | null;
 export type DurationMs = number | null;
 export type Failed1 = boolean;
 export type Preview = string;
@@ -235,7 +236,7 @@ export type SessionId22 = string;
 export type Ts21 = string;
 export type Type21 = 'tool.failed';
 export type CallId5 = string;
-export type Diff = string | null;
+export type Diff1 = string | null;
 export type MessageId8 = string | null;
 export type Name3 = string;
 export type Source = string;
@@ -995,12 +996,15 @@ export interface ToolCompletedEvent {
  * ``duration_ms`` is how long the tool ran, from ``tool.started`` to its
  * result, without the wait for an approval. None means it was not measured.
  *
+ * ``diff`` is the change a file tool made, as a unified diff.
+ *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "ToolCompletedData".
  */
 export interface ToolCompletedData {
   artifact_id?: ArtifactId;
   call_id: CallId3;
+  diff?: Diff;
   duration_ms?: DurationMs;
   failed?: Failed1;
   preview: Preview;
@@ -1063,7 +1067,7 @@ export interface ApprovalNeededEvent {
 export interface ApprovalNeededData {
   args: Args2;
   call_id: CallId5;
-  diff?: Diff;
+  diff?: Diff1;
   message_id?: MessageId8;
   name: Name3;
   source: Source;

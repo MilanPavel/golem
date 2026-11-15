@@ -112,6 +112,10 @@ async def test_the_approval_carries_the_diff_and_allowing_applies_it(
     assert (project / "a.py").read_text(encoding="utf-8") == "one\nTWO\nthree\n"
     completed = [event for event in events if isinstance(event, ToolCompletedEvent)]
     assert completed[0].data.summary == "+1 -1 a.py"
+    assert completed[0].data.diff is not None and "-two\n+TWO\n" in completed[0].data.diff
+    assert "-two" not in completed[0].data.preview
+    sent = [m for m in chat.model.seen[-1] if isinstance(m, ToolMessage)]
+    assert [m.text for m in sent] == ["edited a.py (+1 -1)"]
 
 
 async def test_a_file_changed_while_waiting_is_not_overwritten(

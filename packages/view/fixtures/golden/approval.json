@@ -182,6 +182,7 @@
       "data": {
         "artifact_id": null,
         "call_id": "call_1",
+        "diff": null,
         "duration_ms": 0,
         "failed": false,
         "preview": "     1|the answer is 42",
@@ -473,6 +474,7 @@
       "data": {
         "artifact_id": null,
         "call_id": "call_1",
+        "diff": null,
         "duration_ms": 0,
         "failed": false,
         "preview": "     1|the answer is 42",

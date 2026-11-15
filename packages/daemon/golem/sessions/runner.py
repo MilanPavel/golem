@@ -516,6 +516,7 @@ async def _apply(
                 artifact_id=fact.artifact_id,
                 failed=fact.failed,
                 duration_ms=fact.duration_ms,
+                diff=fact.diff,
             ),
         )
     elif isinstance(fact, ToolErrored):

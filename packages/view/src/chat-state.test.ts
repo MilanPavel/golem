@@ -526,6 +526,32 @@ test("a call that ran but failed is done and unsuccessful", () => {
   assert.deepEqual([tool?.status, tool?.summary, tool?.unsuccessful], ["done", "exit 1", true]);
 });
 
+test("tool.completed with a diff replaces the approval diff, one without keeps it", () => {
+  const base = { session_id: "s", run_id: "r", ts: "t" } as const;
+  const head: ChatEvent[] = [
+    { ...base, seq: 1, type: "message.started", data: { message_id: "a", role: "assistant" } },
+    { ...base, seq: 2, type: "message.completed", data: { message_id: "a", role: "assistant", text: "" } },
+    {
+      ...base,
+      seq: 3,
+      type: "tool.requested",
+      data: { call_id: "c1", message_id: "a", name: "edit_file", args: { path: "a.py" } },
+    },
+    {
+      ...base,
+      seq: 4,
+      type: "approval.needed",
+      data: { call_id: "c1", name: "edit_file", args: { path: "a.py" }, source: "rule", diff: "approved diff" },
+    },
+  ];
+  const done = (data: object): ChatEvent =>
+    ({ ...base, seq: 5, type: "tool.completed", data: { call_id: "c1", summary: "s", preview: "p", ...data } }) as ChatEvent;
+  const applied = [...head, done({ diff: "applied diff" })].reduce(reduceChat, emptyChat);
+  assert.equal(applied.messages[0]?.tools?.[0]?.diff, "applied diff");
+  const kept = [...head, done({})].reduce(reduceChat, emptyChat);
+  assert.equal(kept.messages[0]?.tools?.[0]?.diff, "approved diff");
+});
+
 test("approval events set and clear the waiting call", () => {
   const base = { session_id: "s", run_id: "r", ts: "t" } as const;
   const events: ChatEvent[] = [

@@ -406,6 +406,7 @@ function reduceChatEvent(state: ChatState, event: ChatEvent): ChatState {
         truncated: event.data.truncated === true,
         ...(event.data.artifact_id == null ? {} : { artifactId: event.data.artifact_id }),
         ...(event.data.failed === true ? { unsuccessful: true } : {}),
+        ...(event.data.diff ? { diff: event.data.diff } : {}),
       }));
     case "tool.failed":
       return updateTool(state, event.data.call_id, (tool) => ({
