@@ -70,6 +70,8 @@ import type { SessionInspectResult } from "../../protocol/gen/session-inspect-re
 import type { SessionListResult, SessionSummary } from "../../protocol/gen/session-list-result.ts";
 import type { SessionRenameResult } from "../../protocol/gen/session-rename-result.ts";
 
+// Every event type of the protocol. `guards.test.ts` checks it against the generated schema,
+// because an event that is not here is dropped before any screen sees it.
 const EVENT_TYPES = new Set([
   "session.created",
   "session.updated",
@@ -78,6 +80,7 @@ const EVENT_TYPES = new Set([
   "model.selected",
   "model.options.changed",
   "model.routed",
+  "model.waiting",
   "session.mode.changed",
   "session.checks.changed",
   "session.plan.changed",
@@ -87,16 +90,19 @@ const EVENT_TYPES = new Set([
   "message.completed",
   "model.call.started",
   "model.call.completed",
+  "context.changed",
   "run.started",
   "run.completed",
   "run.failed",
   "run.cancelled",
   "tool.requested",
+  "tool.writing",
   "tool.started",
   "tool.output",
   "todos.updated",
   "plan.proposed",
   "tool.completed",
+  "file.changed",
   "tool.failed",
   "approval.needed",
   "approval.resolved",

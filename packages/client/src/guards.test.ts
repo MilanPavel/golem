@@ -1,0 +1,46 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { test } from "node:test";
+
+import { asChatEvent } from "./guards.ts";
+
+/** Every `type` constant in the generated schema of the `event` notification. */
+function eventTypes(): string[] {
+  const schema: unknown = JSON.parse(
+    readFileSync(new URL("../../protocol/gen/rpc-notification.schema.json", import.meta.url), "utf8"),
+  );
+  const found = new Set<string>();
+  const walk = (node: unknown): void => {
+    if (Array.isArray(node)) {
+      node.forEach(walk);
+      return;
+    }
+    if (typeof node !== "object" || node === null) {
+      return;
+    }
+    const record = node as Record<string, unknown>;
+    const type = record["type"];
+    if (typeof type === "object" && type !== null && typeof (type as Record<string, unknown>)["const"] === "string") {
+      found.add((type as Record<string, unknown>)["const"] as string);
+    }
+    Object.values(record).forEach(walk);
+  };
+  walk(schema);
+  return [...found].sort();
+}
+
+test("every event type of the protocol passes the client's filter", () => {
+  const types = eventTypes();
+  assert.ok(types.includes("file.changed"));
+  assert.ok(types.length > 30);
+  const dropped = types.filter(
+    (type) => asChatEvent({ type, seq: 1, session_id: "s_test", run_id: null, ts: "t", data: {} }) === undefined,
+  );
+  assert.deepEqual(dropped, []);
+});
+
+test("an unknown type and a malformed event are dropped", () => {
+  assert.equal(asChatEvent({ type: "no.such", seq: 1, session_id: "s_test", data: {} }), undefined);
+  assert.equal(asChatEvent({ type: "file.changed", session_id: "s_test", data: {} }), undefined);
+  assert.equal(asChatEvent(null), undefined);
+});
