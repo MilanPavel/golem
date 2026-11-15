@@ -244,6 +244,18 @@ export {
   type NumberedLine,
 } from "./diff.ts";
 export {
+  changedPaths,
+  changesLine,
+  noChanges,
+  reduceChanges,
+  totals,
+  turnOf,
+  type ChangesState,
+  type FileStatus,
+  type TurnChanges,
+  type TurnFile,
+} from "./changes.ts";
+export {
   addNote,
   editNote,
   noNotes,
