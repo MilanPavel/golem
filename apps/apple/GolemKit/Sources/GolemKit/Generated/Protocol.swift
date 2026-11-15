@@ -7065,6 +7065,8 @@ public struct Params: Codable {
 /// ``duration_ms`` is how long the tool ran, from ``tool.started`` to its
 /// result, without the wait for an approval. None means it was not measured.
 ///
+/// ``diff`` is the change a file tool made, as a unified diff.
+///
 /// A tool call did not run, or stopped with an error. The model sees the same message.
 ///
 /// ``duration_ms`` is how long the tool ran before it raised. None means a
@@ -7165,10 +7167,10 @@ public struct ParamsData: Codable {
     public let callID: String?
     public let name: String?
     public let artifactID: String?
+    public let diff: String?
     public let durationMS: Int?
     public let preview: String?
     public let truncated: Bool?
-    public let diff: String?
     public let source: String?
     public let subject: String?
     public let decision: Decision?
@@ -7233,10 +7235,10 @@ public struct ParamsData: Codable {
         case callID = "call_id"
         case name = "name"
         case artifactID = "artifact_id"
+        case diff = "diff"
         case durationMS = "duration_ms"
         case preview = "preview"
         case truncated = "truncated"
-        case diff = "diff"
         case source = "source"
         case subject = "subject"
         case decision = "decision"
@@ -7247,7 +7249,7 @@ public struct ParamsData: Codable {
         case path = "path"
     }
 
-    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, title: String?, runID: String?, status: DataStatus?, summary: String?, reason: PurpleReason?, options: [String: Option]?, mode: Mode?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, contextWindow: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String?, provider: String?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, price: FluffyCallPrice?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, artifactID: String?, durationMS: Int?, preview: String?, truncated: Bool?, diff: String?, source: String?, subject: String?, decision: Decision?, rule: String?, todos: [PurpleTodo]?, hash: String?, how: How?, path: String?) {
+    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, title: String?, runID: String?, status: DataStatus?, summary: String?, reason: PurpleReason?, options: [String: Option]?, mode: Mode?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, contextWindow: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String?, provider: String?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, price: FluffyCallPrice?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, todos: [PurpleTodo]?, hash: String?, how: How?, path: String?) {
         self.cwd = cwd
         self.forkedFrom = forkedFrom
         self.modelName = modelName
@@ -7302,10 +7304,10 @@ public struct ParamsData: Codable {
         self.callID = callID
         self.name = name
         self.artifactID = artifactID
+        self.diff = diff
         self.durationMS = durationMS
         self.preview = preview
         self.truncated = truncated
-        self.diff = diff
         self.source = source
         self.subject = subject
         self.decision = decision
@@ -10324,10 +10326,13 @@ public struct TokenUsage: Codable {
 ///
 /// ``duration_ms`` is how long the tool ran, from ``tool.started`` to its
 /// result, without the wait for an approval. None means it was not measured.
+///
+/// ``diff`` is the change a file tool made, as a unified diff.
 // MARK: - ToolCompletedData
 public struct ToolCompletedData: Codable {
     public let artifactID: String?
     public let callID: String
+    public let diff: String?
     public let durationMS: Int?
     public let failed: Bool?
     public let preview: String
@@ -10337,6 +10342,7 @@ public struct ToolCompletedData: Codable {
     public enum CodingKeys: String, CodingKey {
         case artifactID = "artifact_id"
         case callID = "call_id"
+        case diff = "diff"
         case durationMS = "duration_ms"
         case failed = "failed"
         case preview = "preview"
@@ -10344,9 +10350,10 @@ public struct ToolCompletedData: Codable {
         case truncated = "truncated"
     }
 
-    public init(artifactID: String?, callID: String, durationMS: Int?, failed: Bool?, preview: String, summary: String, truncated: Bool?) {
+    public init(artifactID: String?, callID: String, diff: String?, durationMS: Int?, failed: Bool?, preview: String, summary: String, truncated: Bool?) {
         self.artifactID = artifactID
         self.callID = callID
+        self.diff = diff
         self.durationMS = durationMS
         self.failed = failed
         self.preview = preview
@@ -10397,10 +10404,13 @@ public struct ToolCompletedEvent: Codable {
 ///
 /// ``duration_ms`` is how long the tool ran, from ``tool.started`` to its
 /// result, without the wait for an approval. None means it was not measured.
+///
+/// ``diff`` is the change a file tool made, as a unified diff.
 // MARK: - ToolCompletedEventData
 public struct ToolCompletedEventData: Codable {
     public let artifactID: String?
     public let callID: String
+    public let diff: String?
     public let durationMS: Int?
     public let failed: Bool?
     public let preview: String
@@ -10410,6 +10420,7 @@ public struct ToolCompletedEventData: Codable {
     public enum CodingKeys: String, CodingKey {
         case artifactID = "artifact_id"
         case callID = "call_id"
+        case diff = "diff"
         case durationMS = "duration_ms"
         case failed = "failed"
         case preview = "preview"
@@ -10417,9 +10428,10 @@ public struct ToolCompletedEventData: Codable {
         case truncated = "truncated"
     }
 
-    public init(artifactID: String?, callID: String, durationMS: Int?, failed: Bool?, preview: String, summary: String, truncated: Bool?) {
+    public init(artifactID: String?, callID: String, diff: String?, durationMS: Int?, failed: Bool?, preview: String, summary: String, truncated: Bool?) {
         self.artifactID = artifactID
         self.callID = callID
+        self.diff = diff
         self.durationMS = durationMS
         self.failed = failed
         self.preview = preview
