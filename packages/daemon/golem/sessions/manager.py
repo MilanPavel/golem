@@ -418,6 +418,7 @@ class SessionManager:
                 tools=tools,
                 messages=found.result.messages,
                 cleared_ids=found.cleared_ids,
+                summary_chars=found.summary_chars,
             )
             updates["context"] = context.model_copy(
                 update={

@@ -81,6 +81,7 @@ test("contextCells and contextBar: largest remainder, free at the end", () => {
     { key: "user", cells: 0 },
     { key: "assistant", cells: 1 },
     { key: "tool_results", cells: 3 },
+    { key: "summary", cells: 0 },
     { key: "free", cells: 10 },
   ]);
   assert.equal(contextBar(parts, 200, 20), "██████████░░░░░░░░░░");

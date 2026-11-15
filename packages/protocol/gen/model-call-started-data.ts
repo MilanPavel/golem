@@ -11,6 +11,7 @@ export type Model = string | null;
 export type NumCtx = number | null;
 export type Profile = string;
 export type Provider = string | null;
+export type SummaryChars = number | null;
 export type SystemBytes = number | null;
 export type SystemChars = number | null;
 export type SystemPromptSha = string | null;
@@ -63,6 +64,7 @@ export interface ModelCallStartedData {
   num_ctx?: NumCtx;
   profile: Profile;
   provider?: Provider;
+  summary_chars?: SummaryChars;
   system_bytes?: SystemBytes;
   system_chars?: SystemChars;
   system_prompt_sha?: SystemPromptSha;

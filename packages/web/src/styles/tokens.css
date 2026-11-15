@@ -37,6 +37,7 @@
   --color-ctx-user: light-dark(#59855C, #8DB88A);
   --color-ctx-replies: light-dark(#95752F, #D9B45E);
   --color-ctx-results: light-dark(#8A5A86, #B98BB4);
+  --color-ctx-summary: light-dark(#3F8A8A, #6FB5B5);
 
   /* A user message in the chat: 15 px. */
   --text-chat: 0.9375rem;

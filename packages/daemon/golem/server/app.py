@@ -18,6 +18,7 @@ from golem.coding.changes import ChangeStore
 from golem.config import ModelPrice, load_settings
 from golem.graphs.chat import ChatRuntime, open_chat
 from golem.graphs.prompt import SystemPrompt
+from golem.graphs.summarise import Summariser
 from golem.lock import DaemonAlreadyRunning, DaemonLock
 from golem.logging import configure_logging
 from golem.mcp import McpSupervisor
@@ -265,6 +266,7 @@ class DaemonApp:
                         lambda profile: _price_of(router, models, profile),
                         lambda profile: _tier_of(router, models, profile),
                     )
+                gate = self._gate or ServerGate(settings.ollama.parallel)
                 chat = open_chat(
                     router,
                     saver,
@@ -287,8 +289,19 @@ class DaemonApp:
                     learn_window=learn_window,
                     context=router.context_settings(),
                     price_of=lambda profile: _price_of(router, models, profile),
-                    gate=self._gate or ServerGate(settings.ollama.parallel),
+                    gate=gate,
                     tier_of=lambda profile: _tier_of(router, models, profile),
+                    summariser=Summariser(
+                        router,
+                        gate=gate,
+                        usage=usage,
+                        price_of=lambda profile: _price_of(router, models, profile),
+                        tier_of=lambda profile: _tier_of(router, models, profile),
+                        budget_refs=models.budget_refs,
+                        window_of=lambda profile, overrides: (
+                            resolve_window(router, profile, models, overrides=overrides).window
+                        ),
+                    ),
                 )
                 bus = EventBus()
                 self.state.sessions = await _open_sessions(

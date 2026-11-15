@@ -18,6 +18,7 @@ from golem.graphs.context_view import (
     cleared_ids,
     freed_by,
     plan_clear,
+    plan_summary,
     safe_boundary,
     stub,
     stub_text,
@@ -362,3 +363,46 @@ def test_freed_by_counts_only_what_is_new() -> None:
     tokens, count = freed_by(messages, {"cleared_before": "a3"}, {"cleared_before": "a5"}, 0.25)
     assert count == 2
     assert tokens == round(2 * (1000 - len(stub_text("read_file", 1000))) * 0.25)
+
+
+def _turns(count: int) -> list[BaseMessage]:
+    messages: list[BaseMessage] = []
+    for n in range(1, count + 1):
+        messages += [HumanMessage(content=f"ask {n}", id=f"h{n}"), *_pair(n)]
+        messages.append(AIMessage(content=f"answer {n}", id=f"r{n}"))
+    return messages
+
+
+def test_plan_summary_stops_before_the_last_turns() -> None:
+    messages = _turns(6)
+    found = plan_summary(messages, None, keep_turns=4)
+    assert found is not None
+    start, end = found
+    assert start == 0 and messages[end].id == "h3"
+    assert [m.id for m in messages[start:end]][-1] == "r2"
+
+
+def test_plan_summary_needs_more_turns_than_it_keeps() -> None:
+    assert plan_summary(_turns(4), None, keep_turns=4) is None
+    assert plan_summary(_turns(5), None, keep_turns=4) is not None
+    assert plan_summary([], None, keep_turns=4) is None
+
+
+def test_plan_summary_has_nothing_in_one_long_turn() -> None:
+    messages: list[BaseMessage] = [HumanMessage(content="read all", id="h1")]
+    for n in range(20):
+        messages += _pair(n)
+    assert plan_summary(messages, None, keep_turns=4) is None
+    assert plan_summary(messages, None, keep_turns=1) is None
+
+
+def test_plan_summary_starts_where_the_last_summary_ended() -> None:
+    messages = _turns(10)
+    ctx: ContextView = {"summary": "earlier", "summarised_before": "h4"}
+    found = plan_summary(messages, ctx, keep_turns=4)
+    assert found is not None
+    start, end = found
+    assert messages[start].id == "h4" and messages[end].id == "h7"
+    # Too few turns are left after the summary.
+    late: ContextView = {"summary": "earlier", "summarised_before": "h7"}
+    assert plan_summary(messages, late, keep_turns=4) is None

@@ -8,7 +8,7 @@ export type ContextLevel = "ok" | "high" | "full";
 export const CHARS_PER_TOKEN = 4;
 
 /** The display order of the parts. */
-export const CONTEXT_KEYS: readonly ContextKey[] = ["system", "tools", "user", "assistant", "tool_results"];
+export const CONTEXT_KEYS: readonly ContextKey[] = ["system", "tools", "user", "assistant", "tool_results", "summary"];
 
 export const CONTEXT_LABELS: Record<ContextKey | "free", string> = {
   system: "System prompt",
@@ -16,6 +16,7 @@ export const CONTEXT_LABELS: Record<ContextKey | "free", string> = {
   user: "Your messages",
   assistant: "Replies",
   tool_results: "Tool results",
+  summary: "Summary",
   free: "Free",
 };
 
@@ -322,7 +323,7 @@ export function contextReportLines(report: ContextReport, columns: number): Cont
     }
   } else {
     lines.push(plain(`context · ${report.model === null ? "" : `${report.model} · `}${summary}`));
-    for (const part of ctx.parts) {
+    for (const part of ctx.parts.filter((p) => p.key !== "summary" || p.tokens > 0)) {
       lines.push(plain(row(CONTEXT_LABELS[part.key], part.tokens)));
       if (part.key === "tools") lines.push(...servers);
     }

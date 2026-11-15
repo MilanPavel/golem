@@ -147,7 +147,7 @@ class ModelTitles:
             return
         try:
             identity = self._router.identity(profile)
-            usage = _token_usage(metadata)
+            usage = token_usage(metadata)
             price = None if self._price_of is None else self._price_of(profile)
             tier = None if self._tier_of is None else self._tier_of(profile)
             await self._usage.record_role_call(
@@ -164,7 +164,7 @@ class ModelTitles:
             log.warning("recording the title call failed", exc_info=True)
 
 
-def _token_usage(metadata: object) -> TokenUsage | None:
+def token_usage(metadata: object) -> TokenUsage | None:
     """The tokens of a langchain ``usage_metadata``, or None when there is none."""
     if not isinstance(metadata, dict):
         return None

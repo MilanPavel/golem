@@ -145,6 +145,7 @@ export type Model = string | null;
 export type NumCtx = number | null;
 export type Profile = string;
 export type Provider = string | null;
+export type SummaryChars = number | null;
 export type SystemBytes = number | null;
 export type SystemChars = number | null;
 export type SystemPromptSha = string | null;
@@ -820,6 +821,7 @@ export interface ModelCallStartedData {
   num_ctx?: NumCtx;
   profile: Profile;
   provider?: Provider;
+  summary_chars?: SummaryChars;
   system_bytes?: SystemBytes;
   system_chars?: SystemChars;
   system_prompt_sha?: SystemPromptSha;
@@ -942,10 +944,11 @@ export interface ContextChangedEvent {
  *
  * ``cleared`` means old tool results are now sent as one line each: ``count`` is how
  * many, and ``before_tokens`` and ``after_tokens`` are rough sizes of the history before
- * and after. ``summarised`` and ``grew`` are for later changes: ``count`` is the
- * messages summarised, ``window_from`` and ``window_to`` the window before and after,
- * and ``reload_ms`` the time the model took to load again. The checkpoint keeps every
- * message, so no transcript event changes. A field a change does not use is None.
+ * and after. For ``summarised``, ``count`` is the messages a summary now stands for.
+ * ``grew`` is for a later change: ``window_from`` and ``window_to`` are the window
+ * before and after, and ``reload_ms`` the time the model took to load again. The
+ * checkpoint keeps every message, so no transcript event changes. A field a change
+ * does not use is None.
  *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "ContextChangedData".

@@ -456,6 +456,8 @@ class ModelCallStartedData(BaseModel):
     message_bytes: list[int] | None = None
     cleared_ids: list[str] = Field(default_factory=list[str])
     """Tool results sent as a one-line stub on this call."""
+    summary_chars: int | None = Field(default=None, ge=0)
+    """The length of the summary of old turns sent as the first message. None when none was."""
 
 
 class ContextChangedData(BaseModel):
@@ -463,10 +465,11 @@ class ContextChangedData(BaseModel):
 
     ``cleared`` means old tool results are now sent as one line each: ``count`` is how
     many, and ``before_tokens`` and ``after_tokens`` are rough sizes of the history before
-    and after. ``summarised`` and ``grew`` are for later changes: ``count`` is the
-    messages summarised, ``window_from`` and ``window_to`` the window before and after,
-    and ``reload_ms`` the time the model took to load again. The checkpoint keeps every
-    message, so no transcript event changes. A field a change does not use is None.
+    and after. For ``summarised``, ``count`` is the messages a summary now stands for.
+    ``grew`` is for a later change: ``window_from`` and ``window_to`` are the window
+    before and after, and ``reload_ms`` the time the model took to load again. The
+    checkpoint keeps every message, so no transcript event changes. A field a change
+    does not use is None.
     """
 
     model_config = _CONFIG
