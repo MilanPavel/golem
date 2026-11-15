@@ -1,0 +1,26 @@
+{
+  "additionalProperties": false,
+  "description": "The session's route mode after the change.",
+  "properties": {
+    "mode": {
+      "enum": [
+        "pinned",
+        "local",
+        "auto"
+      ],
+      "title": "Mode",
+      "type": "string"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "session_id",
+    "mode"
+  ],
+  "title": "SessionSetRouteResult",
+  "type": "object"
+}

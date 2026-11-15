@@ -23,6 +23,9 @@ class Ping(BaseModel):
 PermissionMode = Literal["careful", "balanced", "autopilot"]
 """How much the built-in permission rules allow without asking. See ADR-047."""
 
+RouteMode = Literal["pinned", "local", "auto"]
+"""How a session picks the model of each turn. See ADR-055."""
+
 
 class ForkedFrom(BaseModel):
     """The session and message a fork was copied from."""
@@ -42,7 +45,8 @@ class SessionCreatedData(BaseModel):
     ``session.fork``. ``cwd`` is the project folder the file tools work in,
     or null for a session without one. ``origin`` is who started the session:
     ``cli``, ``routine:<name>``, and so on. Null means ``user``, and an older
-    daemon leaves it out.
+    daemon leaves it out. ``route`` is the session's route mode when it was
+    made. Null means ``pinned``, and an older daemon leaves it out.
     """
 
     model_config = _CONFIG
@@ -53,6 +57,7 @@ class SessionCreatedData(BaseModel):
     forked_from: ForkedFrom | None = None
     cwd: str | None = Field(default=None, min_length=1)
     origin: str | None = Field(default=None, min_length=1)
+    route: RouteMode | None = None
 
 
 class MessageStartedData(BaseModel):
@@ -211,9 +216,10 @@ class SessionAllowance(BaseModel):
 
 
 class SessionUpdatedData(BaseModel):
-    """A session attribute changed: its title, folder, allowed tools, or MCP servers.
+    """A session attribute changed: its title, folder, allowed tools, MCP servers, or route.
 
-    A field left null did not change. ``cwd`` is set once, on a session made
+    A field left null did not change. ``route`` is the session's route mode after
+    ``session.set_route``. ``cwd`` is set once, on a session made
     before sessions had a folder, by the first ``message.send`` that names one.
     ``allowed_tools`` is the whole list after ``session.revoke``, and
     ``mcp_servers`` the on-demand MCP servers the session turned on, after
@@ -226,12 +232,15 @@ class SessionUpdatedData(BaseModel):
     cwd: str | None = Field(default=None, min_length=1)
     allowed_tools: list[SessionAllowance] | None = None
     mcp_servers: list[str] | None = None
+    route: RouteMode | None = None
 
     @model_validator(mode="after")
     def _changes_something(self) -> Self:
-        fields = (self.title, self.cwd, self.allowed_tools, self.mcp_servers)
+        fields = (self.title, self.cwd, self.allowed_tools, self.mcp_servers, self.route)
         if all(field is None for field in fields):
-            raise ValueError("session.updated needs a title, a cwd, allowed_tools, or mcp_servers")
+            raise ValueError(
+                "session.updated needs a title, a cwd, allowed_tools, mcp_servers, or a route"
+            )
         return self
 
 
@@ -262,6 +271,39 @@ class ModelSelectedData(BaseModel):
     model_provider: str | None = Field(default=None, min_length=1)
     model_name: str | None = Field(default=None, min_length=1)
     reason: Literal["user"]
+
+
+class ModelRejection(BaseModel):
+    """A candidate the pick left out, and why in plain words."""
+
+    model_config = _CONFIG
+
+    ref: str = Field(min_length=1)
+    tier: Literal["local", "budget", "frontier"]
+    why: str = Field(min_length=1)
+
+
+class ModelRoutedData(BaseModel):
+    """Which model a run uses, and why golem picked it.
+
+    Sent right after ``run.started`` in a session whose route is not ``pinned``.
+    ``model_profile`` is the profile that runs. ``provider`` and ``model`` are what
+    it resolves to, null when it does not resolve. ``reason`` is why this model
+    (ADR-055), ``detail`` one short sentence, and ``rejected`` the candidates the
+    pick dropped. The session's own model does not change.
+    """
+
+    model_config = _CONFIG
+
+    model_profile: str = Field(min_length=1)
+    provider: str | None = Field(default=None, min_length=1)
+    model: str | None = Field(default=None, min_length=1)
+    tier: Literal["local", "budget", "frontier"]
+    reason: Literal[
+        "pinned", "privacy", "fit", "budget", "cheapest", "escalated", "fallback", "user"
+    ]
+    detail: str
+    rejected: list[ModelRejection] = Field(default_factory=list[ModelRejection])
 
 
 class ModelOptionsChangedData(BaseModel):
@@ -762,6 +804,19 @@ class ModelSelectedEvent(BaseModel):
     data: ModelSelectedData
 
 
+class ModelRoutedEvent(BaseModel):
+    """The pick for this run: the model that runs it and why."""
+
+    model_config = _CONFIG
+
+    seq: int = Field(ge=1)
+    session_id: str = Field(min_length=1)
+    run_id: str = Field(min_length=1)
+    ts: str = Field(min_length=1)
+    type: Literal["model.routed"]
+    data: ModelRoutedData
+
+
 class ModelOptionsChangedEvent(BaseModel):
     """``session.set_options`` changed the session's option overrides."""
 
@@ -1165,6 +1220,7 @@ EventType = Literal[
     "session.closed",
     "session.completed",
     "model.selected",
+    "model.routed",
     "model.options.changed",
     "session.mode.changed",
     "session.checks.changed",
@@ -1205,6 +1261,7 @@ ChatEvent = Annotated[
     | SessionClosedEvent
     | SessionCompletedEvent
     | ModelSelectedEvent
+    | ModelRoutedEvent
     | ModelOptionsChangedEvent
     | SessionModeChangedEvent
     | SessionChecksChangedEvent
@@ -1279,11 +1336,15 @@ __all__ = [
     "ModelCallStartedEvent",
     "ModelOptionsChangedData",
     "ModelOptionsChangedEvent",
+    "ModelRejection",
+    "ModelRoutedData",
+    "ModelRoutedEvent",
     "ModelSelectedData",
     "ModelSelectedEvent",
     "PermissionMode",
     "Ping",
     "PromptSectionInfo",
+    "RouteMode",
     "RunCancelledData",
     "RunCancelledEvent",
     "RunCompletedEvent",

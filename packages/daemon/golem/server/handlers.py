@@ -233,6 +233,8 @@ from golem_protocol.commands import (
     SessionSetModeResult,
     SessionSetOptionsParams,
     SessionSetOptionsResult,
+    SessionSetRouteParams,
+    SessionSetRouteResult,
     SessionSetSkillsParams,
     SessionSetSkillsResult,
     SetupInstall,
@@ -1022,6 +1024,17 @@ async def _session_set_checks(
     return SessionSetChecksResult(session_id=params.session_id, on=on)
 
 
+async def _session_set_route(
+    ctx: RequestContext, params: SessionSetRouteParams
+) -> SessionSetRouteResult:
+    try:
+        mode = await _sessions(ctx).set_route(params.session_id, params.mode)
+    except (SessionNotFoundError, SchemaMismatchError) as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
+    log.info("session route session=%s mode=%s", params.session_id, mode)
+    return SessionSetRouteResult(session_id=params.session_id, mode=mode)
+
+
 async def _config_get(ctx: RequestContext, params: ConfigGetParams) -> ConfigGetResult:
     policy, tools = ctx.state.policy, ctx.state.tools
     if policy is None or tools is None:
@@ -1495,6 +1508,9 @@ def standard_methods() -> dict[str, Method]:
         ),
         "session.set_mode": Method(
             "session.set_mode", SessionSetModeParams, True, _session_set_mode
+        ),
+        "session.set_route": Method(
+            "session.set_route", SessionSetRouteParams, True, _session_set_route
         ),
         "session.set_checks": Method(
             "session.set_checks", SessionSetChecksParams, True, _session_set_checks

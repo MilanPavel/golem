@@ -7,7 +7,14 @@ from typing import Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
 
-from golem_protocol.events import PermissionMode, PromptSectionInfo, SkillCall, SkillSource
+from golem_protocol.events import (
+    ModelRejection,
+    PermissionMode,
+    PromptSectionInfo,
+    RouteMode,
+    SkillCall,
+    SkillSource,
+)
 
 
 class HelloParams(BaseModel):
@@ -194,6 +201,7 @@ class SessionSummary(BaseModel):
     the id of the session this one was forked from, null for a session that is
     not a fork. An older daemon leaves it out. ``origin`` is who started the
     session: ``user``, ``cli``, ``routine:<name>``. A session never changes it.
+    ``route`` is the session's route mode. An older daemon leaves it out.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -208,6 +216,7 @@ class SessionSummary(BaseModel):
     cwd: str | None = Field(default=None, min_length=1)
     forked_from: str | None = Field(default=None, min_length=1)
     origin: str = Field(default="user", min_length=1)
+    route: RouteMode = "pinned"
 
 
 class SessionListResult(BaseModel):
@@ -543,9 +552,29 @@ class TraceModelSpan(TraceSpan):
     dropped_tokens: int | None = Field(default=None, ge=0)
 
 
-class TraceRunSpan(TraceSpan):
-    """A run, with its model calls in order."""
+class TraceRoute(BaseModel):
+    """Why a run used the model it did: the pick of a session that is not ``pinned``.
 
+    ``reason`` and ``detail`` are those of ``model.routed``, and ``rejected`` the
+    candidates the pick dropped.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    reason: Literal[
+        "pinned", "privacy", "fit", "budget", "cheapest", "escalated", "fallback", "user"
+    ]
+    detail: str
+    rejected: list[ModelRejection] = Field(default_factory=list[ModelRejection])
+
+
+class TraceRunSpan(TraceSpan):
+    """A run, with its model calls in order.
+
+    ``route`` is the pick for the run, null for a run of a ``pinned`` session.
+    """
+
+    route: TraceRoute | None = None
     children: list[TraceModelSpan] = Field(default_factory=list[TraceModelSpan])
 
 
@@ -1073,6 +1102,31 @@ class SessionSetModeResult(BaseModel):
     session_id: str = Field(min_length=1)
     mode: PermissionMode
     override: bool
+
+
+class SessionSetRouteParams(BaseModel):
+    """``session.set_route``. Set how this session picks the model of each turn.
+
+    ``pinned`` runs the session's own model. ``local`` never uses a hosted model.
+    ``auto`` starts local and uses a hosted model only when the routing rules allow
+    it (ADR-055). The daemon emits ``session.updated`` with ``route``, and the mode
+    applies from the session's next turn. It is kept with the session and is not
+    written to ``config.toml``.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    mode: RouteMode
+
+
+class SessionSetRouteResult(BaseModel):
+    """The session's route mode after the change."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    mode: RouteMode
 
 
 class SessionSetChecksParams(BaseModel):
@@ -3017,6 +3071,8 @@ __all__ = [
     "SessionSetModelResult",
     "SessionSetOptionsParams",
     "SessionSetOptionsResult",
+    "SessionSetRouteParams",
+    "SessionSetRouteResult",
     "SessionSetSkillsParams",
     "SessionSetSkillsResult",
     "SessionSummary",
@@ -3050,6 +3106,7 @@ __all__ = [
     "TraceGetResult",
     "TraceMessage",
     "TraceModelSpan",
+    "TraceRoute",
     "TraceRunSpan",
     "TraceSpan",
     "TraceSpanParams",
