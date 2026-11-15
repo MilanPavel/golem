@@ -170,6 +170,34 @@ Only your own file sets these. A project can't widen them.
 | `writable` | none | More folders commands may write to, beside the chat's folder |
 | `timeout_seconds` | `120` | The longest a command runs, up to 3600 |
 
+### `[coding]`
+
+Only your own file sets these.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `checks` | `"ask"` | Whether golem runs checks after it changed files: `ask`, `auto`, or `off` |
+| `fix_rounds` | `2` | How many times golem may fix what a check found, up to 5 |
+
+Each `[[coding.check]]` is one command. With none, golem looks at the project's own files: a `lint` recipe in a justfile, a `lint` or `typecheck` script in `package.json`, a ruff setup, `Cargo.toml`, or `go.mod`. Tests are never detected. Add them yourself.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `name` | required | A short name, up to 40 characters |
+| `command` | required | The command to run in the project's folder |
+| `timeout_seconds` | `120` | The longest it runs, up to 1800 |
+
+```toml
+[coding]
+checks = "auto"
+fix_rounds = 3
+
+[[coding.check]]
+name = "tests"
+command = "uv run pytest -q"
+timeout_seconds = 300
+```
+
 ### `[web]`
 
 Only your own file sets these.
