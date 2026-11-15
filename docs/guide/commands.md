@@ -44,6 +44,9 @@ golem has commands in two places: `golem …` in your shell, and `/…` inside t
 | `golem skills check <path>` | Checks a skill, its `SKILL.md`, or a folder of skills. Needs no daemon |
 | `golem skills new <name> [--project] [--description "…"]` | Makes a skill in `~/.golem/skills`, or in `.agents/skills` of this folder with `--project`, and opens it in `$EDITOR` |
 | `golem skills edit <name>` | Opens the skill's `SKILL.md` in `$EDITOR`, then checks it and prints its mistakes |
+| `golem ask "<prompt>" [--folder <dir>] [--model <profile>] [--skill <name>]` | Starts a session, waits, and prints the answer. If the run stops to ask you about a tool, it prints the question and exits with 3: answer it with `golem open <id>`. A failed run exits with 1 |
+| `golem ask --detach "<prompt>"` | Starts the session and prints its id at once. The work goes on without this window. Open it later with `golem open <id>` |
+| `golem open <id> [--web]` | Opens the terminal chat on that session. With `--web`, opens the web page at that session |
 | `golem web` | The same as `golem`, kept as an alias |
 | `golem web install` / `uninstall` | Keeps the web page running at login (a launchd job), or removes that job |
 | `golem web logout` | Signs every browser out of the web UI |

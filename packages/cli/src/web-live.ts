@@ -82,7 +82,7 @@ export async function show(
     process.stdout.write(`${lines.join("\n")}\n`);
     return;
   }
-  const link = webLink(port, token);
+  const link = webLink(port, token, args.path);
   const opened = args.open && (await openBrowser(link));
   const lines = formatWebOutput({ json: args.json, opened, link, port, pid, started, firstRun });
   process.stdout.write(`${lines.join("\n")}\n`);

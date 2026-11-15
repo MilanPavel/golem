@@ -9,6 +9,8 @@ export interface WebArgs {
   json: boolean;
   /** `golem web serve`: a gateway for a job. It opens nothing and prints no token. */
   serve: boolean;
+  /** A page on the gateway to open instead of the home page, such as `/s/<id>`. */
+  path?: string;
 }
 
 /** The options of `golem web`, or null for anything else, or an option given twice. */
@@ -45,8 +47,8 @@ export function parseWebJobArgs(args: string[]): { kind: "install" | "uninstall"
 }
 
 /** The address that logs the browser in. The token sits in the fragment, which is never sent to a server. */
-export function webLink(port: number, token: string): string {
-  return `http://127.0.0.1:${port}/#t=${token}`;
+export function webLink(port: number, token: string, path = "/"): string {
+  return `http://127.0.0.1:${port}${path}#t=${token}`;
 }
 
 /** True when the link has only characters that need no escaping in a script. */
