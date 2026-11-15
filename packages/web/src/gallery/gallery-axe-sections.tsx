@@ -44,6 +44,7 @@ export const GALLERY_SECTIONS = [
   "diff",
   "todo-list",
   "workbench",
+  "changes-tab",
   "command-palette-and-keys",
   "model-dialog",
   "model-list",
