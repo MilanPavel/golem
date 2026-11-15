@@ -482,6 +482,7 @@ async def _apply(
                 message_chars=None if fact.message_chars is None else list(fact.message_chars),
                 message_bytes=None if fact.message_bytes is None else list(fact.message_bytes),
                 cleared_ids=list(fact.cleared_ids),
+                summary_chars=fact.summary_chars,
             ),
         )
     elif isinstance(fact, ContextChanged):

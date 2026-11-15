@@ -587,7 +587,7 @@ class TraceContextPart(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    key: Literal["system", "tools", "user", "assistant", "tool_results"]
+    key: Literal["system", "tools", "user", "assistant", "tool_results", "summary"]
     tokens: int = Field(ge=0)
     chars: int = Field(ge=0)
     items: list[TraceContextItem] = Field(default_factory=list[TraceContextItem])
@@ -605,7 +605,8 @@ class TraceContextCleared(BaseModel):
 class TraceContext(BaseModel):
     """What filled one model call's context, and how big the window was.
 
-    ``parts`` always has the five keys, in order. They add up to ``used``
+    ``parts`` always has the six keys, in order. ``summary`` is the summary of old turns
+    that was sent as the first message, and 0 when none was. They add up to ``used``
     when it is known. The split between them is an estimate (about four
     characters a token, scaled to ``used``), so ``estimated`` is always true.
     The ``prompt_cut`` fields are those of the model span. A cleared result counts as its

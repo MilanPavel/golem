@@ -1288,10 +1288,11 @@ public struct ConfigRule: Codable {
 ///
 /// ``cleared`` means old tool results are now sent as one line each: ``count`` is how
 /// many, and ``before_tokens`` and ``after_tokens`` are rough sizes of the history before
-/// and after. ``summarised`` and ``grew`` are for later changes: ``count`` is the
-/// messages summarised, ``window_from`` and ``window_to`` the window before and after,
-/// and ``reload_ms`` the time the model took to load again. The checkpoint keeps every
-/// message, so no transcript event changes. A field a change does not use is None.
+/// and after. For ``summarised``, ``count`` is the messages a summary now stands for.
+/// ``grew`` is for a later change: ``window_from`` and ``window_to`` are the window
+/// before and after, and ``reload_ms`` the time the model took to load again. The
+/// checkpoint keeps every message, so no transcript event changes. A field a change
+/// does not use is None.
 // MARK: - ContextChangedData
 public struct ContextChangedData: Codable {
     public let action: ContextChangedDataAction
@@ -1362,10 +1363,11 @@ public struct ContextChangedEvent: Codable {
 ///
 /// ``cleared`` means old tool results are now sent as one line each: ``count`` is how
 /// many, and ``before_tokens`` and ``after_tokens`` are rough sizes of the history before
-/// and after. ``summarised`` and ``grew`` are for later changes: ``count`` is the
-/// messages summarised, ``window_from`` and ``window_to`` the window before and after,
-/// and ``reload_ms`` the time the model took to load again. The checkpoint keeps every
-/// message, so no transcript event changes. A field a change does not use is None.
+/// and after. For ``summarised``, ``count`` is the messages a summary now stands for.
+/// ``grew`` is for a later change: ``window_from`` and ``window_to`` are the window
+/// before and after, and ``reload_ms`` the time the model took to load again. The
+/// checkpoint keeps every message, so no transcript event changes. A field a change
+/// does not use is None.
 // MARK: - ContextChangedEventData
 public struct ContextChangedEventData: Codable {
     public let action: ContextChangedDataAction
@@ -5911,6 +5913,7 @@ public struct ModelCallStartedData: Codable {
     public let numCtx: Int?
     public let profile: String
     public let provider: String?
+    public let summaryChars: Int?
     public let systemBytes: Int?
     public let systemChars: Int?
     public let systemPromptSHA: String?
@@ -5934,6 +5937,7 @@ public struct ModelCallStartedData: Codable {
         case numCtx = "num_ctx"
         case profile = "profile"
         case provider = "provider"
+        case summaryChars = "summary_chars"
         case systemBytes = "system_bytes"
         case systemChars = "system_chars"
         case systemPromptSHA = "system_prompt_sha"
@@ -5946,7 +5950,7 @@ public struct ModelCallStartedData: Codable {
         case windowPlanned = "window_planned"
     }
 
-    public init(clearedIDS: [String]?, contextWindow: Int?, index: Int, messageBytes: [Int]?, messageChars: [Int]?, messageID: String, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String, provider: String?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [PurplePromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?) {
+    public init(clearedIDS: [String]?, contextWindow: Int?, index: Int, messageBytes: [Int]?, messageChars: [Int]?, messageID: String, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String, provider: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [PurplePromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?) {
         self.clearedIDS = clearedIDS
         self.contextWindow = contextWindow
         self.index = index
@@ -5958,6 +5962,7 @@ public struct ModelCallStartedData: Codable {
         self.numCtx = numCtx
         self.profile = profile
         self.provider = provider
+        self.summaryChars = summaryChars
         self.systemBytes = systemBytes
         self.systemChars = systemChars
         self.systemPromptSHA = systemPromptSHA
@@ -6061,6 +6066,7 @@ public struct ModelCallStartedEventData: Codable {
     public let numCtx: Int?
     public let profile: String
     public let provider: String?
+    public let summaryChars: Int?
     public let systemBytes: Int?
     public let systemChars: Int?
     public let systemPromptSHA: String?
@@ -6084,6 +6090,7 @@ public struct ModelCallStartedEventData: Codable {
         case numCtx = "num_ctx"
         case profile = "profile"
         case provider = "provider"
+        case summaryChars = "summary_chars"
         case systemBytes = "system_bytes"
         case systemChars = "system_chars"
         case systemPromptSHA = "system_prompt_sha"
@@ -6096,7 +6103,7 @@ public struct ModelCallStartedEventData: Codable {
         case windowPlanned = "window_planned"
     }
 
-    public init(clearedIDS: [String]?, contextWindow: Int?, index: Int, messageBytes: [Int]?, messageChars: [Int]?, messageID: String, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String, provider: String?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [FluffyPromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?) {
+    public init(clearedIDS: [String]?, contextWindow: Int?, index: Int, messageBytes: [Int]?, messageChars: [Int]?, messageID: String, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String, provider: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [FluffyPromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?) {
         self.clearedIDS = clearedIDS
         self.contextWindow = contextWindow
         self.index = index
@@ -6108,6 +6115,7 @@ public struct ModelCallStartedEventData: Codable {
         self.numCtx = numCtx
         self.profile = profile
         self.provider = provider
+        self.summaryChars = summaryChars
         self.systemBytes = systemBytes
         self.systemChars = systemChars
         self.systemPromptSHA = systemPromptSHA
@@ -9155,10 +9163,11 @@ public struct Params: Codable {
 ///
 /// ``cleared`` means old tool results are now sent as one line each: ``count`` is how
 /// many, and ``before_tokens`` and ``after_tokens`` are rough sizes of the history before
-/// and after. ``summarised`` and ``grew`` are for later changes: ``count`` is the
-/// messages summarised, ``window_from`` and ``window_to`` the window before and after,
-/// and ``reload_ms`` the time the model took to load again. The checkpoint keeps every
-/// message, so no transcript event changes. A field a change does not use is None.
+/// and after. For ``summarised``, ``count`` is the messages a summary now stands for.
+/// ``grew`` is for a later change: ``window_from`` and ``window_to`` are the window
+/// before and after, and ``reload_ms`` the time the model took to load again. The
+/// checkpoint keeps every message, so no transcript event changes. A field a change
+/// does not use is None.
 ///
 /// Why a run stopped. No traceback.
 ///
@@ -9297,6 +9306,7 @@ public struct ParamsData: Codable {
     public let numCtx: Int?
     public let profile: String?
     public let provider: String?
+    public let summaryChars: Int?
     public let systemBytes: Int?
     public let systemChars: Int?
     public let systemPromptSHA: String?
@@ -9391,6 +9401,7 @@ public struct ParamsData: Codable {
         case numCtx = "num_ctx"
         case profile = "profile"
         case provider = "provider"
+        case summaryChars = "summary_chars"
         case systemBytes = "system_bytes"
         case systemChars = "system_chars"
         case systemPromptSHA = "system_prompt_sha"
@@ -9452,7 +9463,7 @@ public struct ParamsData: Codable {
         case output = "output"
     }
 
-    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: PurpleReason?, options: [String: Option]?, mode: Mode?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String?, provider: String?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, chars: Int?, lines: Int?, path: String?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, todos: [PurpleTodo]?, added: Int?, changeID: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?) {
+    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: PurpleReason?, options: [String: Option]?, mode: Mode?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String?, provider: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, chars: Int?, lines: Int?, path: String?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, todos: [PurpleTodo]?, added: Int?, changeID: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?) {
         self.cwd = cwd
         self.forkedFrom = forkedFrom
         self.modelName = modelName
@@ -9486,6 +9497,7 @@ public struct ParamsData: Codable {
         self.numCtx = numCtx
         self.profile = profile
         self.provider = provider
+        self.summaryChars = summaryChars
         self.systemBytes = systemBytes
         self.systemChars = systemChars
         self.systemPromptSHA = systemPromptSHA
@@ -13289,6 +13301,7 @@ public struct TraceContextPartItem: Codable {
 
 public enum Key: String, Codable {
     case assistant = "assistant"
+    case summary = "summary"
     case system = "system"
     case toolResults = "tool_results"
     case tools = "tools"
@@ -13297,7 +13310,8 @@ public enum Key: String, Codable {
 
 /// What filled one model call's context, and how big the window was.
 ///
-/// ``parts`` always has the five keys, in order. They add up to ``used``
+/// ``parts`` always has the six keys, in order. ``summary`` is the summary of old turns
+/// that was sent as the first message, and 0 when none was. They add up to ``used``
 /// when it is known. The split between them is an estimate (about four
 /// characters a token, scaled to ``used``), so ``estimated`` is always true.
 /// The ``prompt_cut`` fields are those of the model span. A cleared result counts as its
@@ -14218,7 +14232,8 @@ public struct TraceSpanResult: Codable {
 
 /// What filled one model call's context, and how big the window was.
 ///
-/// ``parts`` always has the five keys, in order. They add up to ``used``
+/// ``parts`` always has the six keys, in order. ``summary`` is the summary of old turns
+/// that was sent as the first message, and 0 when none was. They add up to ``used``
 /// when it is known. The split between them is an estimate (about four
 /// characters a token, scaled to ``used``), so ``estimated`` is always true.
 /// The ``prompt_cut`` fields are those of the model span. A cleared result counts as its
