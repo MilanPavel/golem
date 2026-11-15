@@ -45,7 +45,7 @@ export function ConfigSection() {
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
       <div role="group" aria-label="Which file" className="flex gap-2">
         <Button size="sm" aria-pressed={!project} onClick={() => choose(false)}>
           Yours
@@ -173,7 +173,7 @@ function Editor({
 
   const diff = unifiedDiff(original, text, shortPath(path, ""));
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
       <p className="font-mono text-xs text-muted wrap-anywhere">
         {shortPath(path, "")}
         {exists ? "" : " (does not exist yet: saving creates it)"}

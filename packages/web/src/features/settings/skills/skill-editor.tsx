@@ -146,7 +146,7 @@ function Editor({
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
       {saved && !dirty ? (
         <p role="status" className="font-mono text-xs text-allow">
           Saved. The registry reloaded.
@@ -175,7 +175,6 @@ function Editor({
         label={`${skill.name} SKILL.md`}
         language="markdown"
         readOnly={bundled}
-        className="h-72"
       />
       {errors.length > 0 ? (
         <ul aria-label="Errors" role="alert" className="flex flex-col gap-1 rounded-md border border-deny bg-deny-soft px-3 py-2 font-mono text-xs text-deny">

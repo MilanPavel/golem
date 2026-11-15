@@ -751,7 +751,7 @@ function SkillsDemo() {
       </section>
       <section aria-label="Skills, SKILL.md" className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
         <span className="font-mono text-xs text-faint">SKILL.md with a problem on line 3</span>
-        <CodeEditor value={SAMPLE_BROKEN_SKILL_MD} onChange={() => {}} marked={new Set([3])} label="broken-one SKILL.md" language="markdown" className="h-56" />
+        <CodeEditor value={SAMPLE_BROKEN_SKILL_MD} onChange={() => {}} marked={new Set([3])} label="broken-one SKILL.md" language="markdown" className="h-72" />
         <p role="alert" className="rounded-md border border-deny bg-deny-soft px-3 py-2 font-mono text-xs text-deny">
           line 3: expected &apos;,&apos; or &apos;]&apos;
         </p>
