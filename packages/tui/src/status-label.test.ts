@@ -354,3 +354,12 @@ test("the tune segment sits after the context, below context and above skills", 
   const empty = statusSegments({ connection: "c", title: "t", model: "m", folder: "", messageCount: null, uptimeSeconds: null });
   assert.equal(empty.find((part) => part.id === "tune")?.text, "");
 });
+
+test("the cost segment ends the line, and is empty until the session has a paid call", () => {
+  const base = { connection: "c", title: "t", model: "m", folder: "", messageCount: null, uptimeSeconds: null };
+  const none = statusSegments(base).find((part) => part.id === "cost");
+  assert.equal(none?.text, "");
+  const paid = statusSegments({ ...base, cost: "$0.03" });
+  assert.equal(paid[paid.length - 1]?.id, "cost");
+  assert.deepEqual(fitSegments(paid, 80).map((part) => part.text).slice(-1), ["$0.03"]);
+});

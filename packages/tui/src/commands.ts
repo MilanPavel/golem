@@ -1,6 +1,6 @@
 import { contextReportLines, type Command, type ContextKey, type ContextLine, type ContextReport } from "@golem/view";
 
-import { CTX_REPLIES, CTX_RESULTS, CTX_SYSTEM, CTX_TOOLS, CTX_USER, HINT } from "./theme.ts";
+import { CTX_REPLIES, CTX_RESULTS, CTX_SUMMARY, CTX_SYSTEM, CTX_TOOLS, CTX_USER, HINT } from "./theme.ts";
 
 export {
   applyComposer,
@@ -37,6 +37,7 @@ const PART_COLORS: Record<ContextKey | "free", string> = {
   user: CTX_USER,
   assistant: CTX_REPLIES,
   tool_results: CTX_RESULTS,
+  summary: CTX_SUMMARY,
   free: HINT,
 };
 

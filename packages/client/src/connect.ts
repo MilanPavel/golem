@@ -82,6 +82,8 @@ import type { ModelOptionsSetResult } from "../../protocol/gen/model-options-set
 import type { PermissionsSetModeParams } from "../../protocol/gen/permissions-set-mode-params.ts";
 import type { PermissionsSetModeResult } from "../../protocol/gen/permissions-set-mode-result.ts";
 import type { SessionSetChecksResult } from "../../protocol/gen/session-set-checks-result.ts";
+import type { SessionSetRouteParams } from "../../protocol/gen/session-set-route-params.ts";
+import type { SessionSetRouteResult } from "../../protocol/gen/session-set-route-result.ts";
 import type { SessionSetModeParams } from "../../protocol/gen/session-set-mode-params.ts";
 import type { SessionSetModeResult } from "../../protocol/gen/session-set-mode-result.ts";
 import type { SessionSetOptionsResult } from "../../protocol/gen/session-set-options-result.ts";
@@ -144,6 +146,7 @@ import {
   isModelSetDefaultResult,
   isPermissionsSetModeResult,
   isSessionSetChecksResult,
+  isSessionSetRouteResult,
   isSessionSetModeResult,
   isSessionSetOptionsResult,
   isPullDone,
@@ -342,6 +345,8 @@ export interface GolemClient {
   setSessionMode(sessionId: string, mode: SessionSetModeParams["mode"]): Promise<SessionSetModeResult>;
   /** Say whether golem may run the project's checks in one session. The session stores `session.checks.changed`. */
   setChecks(sessionId: string, on: boolean): Promise<SessionSetChecksResult>;
+  /** Set how one session picks the model of each turn. The session stores `session.updated` with its `route`. */
+  setRoute(sessionId: string, mode: SessionSetRouteParams["mode"]): Promise<SessionSetRouteResult>;
   /** `model.options.saved`: the options saved for a model changed, from any client. */
   onOptionsSaved(listener: (saved: ModelOptionsSaved) => void): () => void;
   /** Size, fit, and free disk for a local model before downloading it. */
@@ -1433,6 +1438,14 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("session.set_mode", { session_id: sessionId, mode });
       if (!isSessionSetModeResult(result)) {
         throw new Error("invalid session.set_mode result");
+      }
+      return result;
+    },
+    async setRoute(sessionId: string, mode: SessionSetRouteParams["mode"]): Promise<SessionSetRouteResult> {
+      await ready;
+      const result = await call("session.set_route", { session_id: sessionId, mode });
+      if (!isSessionSetRouteResult(result)) {
+        throw new Error("invalid session.set_route result");
       }
       return result;
     },

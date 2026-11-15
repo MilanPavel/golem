@@ -226,3 +226,26 @@ def freed_by(
     now = set(cleared_ids(messages, new)) - set(cleared_ids(messages, old))
     fresh = [m for m in messages if m.id in now]
     return round(sum(_saved_chars(m) for m in fresh) * ratio), len(fresh)
+
+
+def plan_summary(
+    messages: Sequence[BaseMessage], ctx: ContextView | None, *, keep_turns: int
+) -> tuple[int, int] | None:
+    """The slice ``(start, end)`` of ``messages`` to summarise, or None.
+
+    ``start`` is where the current summary ends (0 with none). ``end`` is the human
+    message that starts the ``keep_turns``-th turn from the end, so the last ``keep_turns``
+    turns, the running one included, are never summarised. None when fewer than
+    ``keep_turns + 1`` turns are left after ``start``, which is also the case of one long
+    turn, and when the slice would be empty.
+    """
+    if keep_turns < 1:
+        return None
+    start = (_summary_start(messages, ctx) if ctx else None) or 0
+    turns = [i for i in range(start, len(messages)) if isinstance(messages[i], HumanMessage)]
+    if len(turns) < keep_turns + 1:
+        return None
+    end = turns[-keep_turns]
+    if end <= start or not messages[end].id:
+        return None
+    return start, end

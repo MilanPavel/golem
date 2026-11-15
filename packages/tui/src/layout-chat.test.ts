@@ -454,3 +454,23 @@ test("laying out the same edit again does not parse its diff again", () => {
   layoutMessages([reply], 80, { times: false, now: 0, detail: "verbose" });
   assert.equal(diffParseCount(), before + 1);
 });
+
+test("an answer's footer adds the model, tier, tokens and cost of the whole run", () => {
+  const call = (tokens: number, costUsd: number) => ({ model: "qwen3:27b", tier: "local" as const, tokens, costUsd, done: true });
+  const lines = layoutMessages(
+    [
+      message("u", "user", "hello"),
+      { ...message("s", "assistant", ""), tools: [{ callId: "c", name: "grep", args: {}, status: "done" }], call: call(1000, 0) },
+      { ...message("a", "assistant", "ok"), durationMs: 12_400, call: call(3100, 0) },
+    ],
+    80,
+  );
+  const footers = lines.filter((line) => textOf(line.spans).startsWith("0m 12.4s"));
+  assert.equal(footers.length, 1);
+  assert.equal(textOf(footers[0]?.spans ?? []), "0m 12.4s · qwen3:27b · local · 4.1K tok · $0.00");
+});
+
+test("an answer from an old session with no call data shows its time only", () => {
+  const lines = layoutMessages([{ ...message("a", "assistant", "ok"), durationMs: 12_400 }], 80);
+  assert.ok(lines.some((line) => textOf(line.spans) === "0m 12.4s"));
+});

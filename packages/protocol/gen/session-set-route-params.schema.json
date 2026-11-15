@@ -1,0 +1,26 @@
+{
+  "additionalProperties": false,
+  "description": "``session.set_route``. Set how this session picks the model of each turn.\n\n``pinned`` runs the session's own model. ``local`` never uses a hosted model.\n``auto`` starts local and uses a hosted model only when the routing rules allow\nit (ADR-055). The daemon emits ``session.updated`` with ``route``, and the mode\napplies from the session's next turn. It is kept with the session and is not\nwritten to ``config.toml``.",
+  "properties": {
+    "mode": {
+      "enum": [
+        "pinned",
+        "local",
+        "auto"
+      ],
+      "title": "Mode",
+      "type": "string"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "session_id",
+    "mode"
+  ],
+  "title": "SessionSetRouteParams",
+  "type": "object"
+}

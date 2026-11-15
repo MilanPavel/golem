@@ -18,7 +18,7 @@ export type Group = string | null;
 export type Name = string;
 export type Tokens1 = number;
 export type Items = TraceContextItem[];
-export type Key = 'system' | 'tools' | 'user' | 'assistant' | 'tool_results';
+export type Key = 'system' | 'tools' | 'user' | 'assistant' | 'tool_results' | 'summary';
 export type Tokens2 = number;
 export type Parts = TraceContextPart[];
 export type PromptCut = ('no' | 'yes' | 'likely') | null;
@@ -98,7 +98,8 @@ export interface TraceSpanResult {
 /**
  * What filled one model call's context, and how big the window was.
  *
- * ``parts`` always has the five keys, in order. They add up to ``used``
+ * ``parts`` always has the six keys, in order. ``summary`` is the summary of old turns
+ * that was sent as the first message, and 0 when none was. They add up to ``used``
  * when it is known. The split between them is an estimate (about four
  * characters a token, scaled to ``used``), so ``estimated`` is always true.
  * The ``prompt_cut`` fields are those of the model span. A cleared result counts as its

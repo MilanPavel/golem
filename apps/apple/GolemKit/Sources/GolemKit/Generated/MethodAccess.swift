@@ -69,6 +69,7 @@ public enum MethodAccess {
         "session.set_mode",
         "session.set_model",
         "session.set_options",
+        "session.set_route",
         "session.set_skills",
         "setup.status",
         "skill.create",
