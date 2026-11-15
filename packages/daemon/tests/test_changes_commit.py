@@ -143,8 +143,13 @@ async def test_a_failing_hook_is_a_result_with_its_output(setup: Setup) -> None:
     assert _git(setup.folder, "rev-list", "--count", "HEAD").strip() == "1"
 
 
-async def test_a_folder_that_is_not_a_repository_gives_ok_false(short_home: Path) -> None:
+async def test_a_folder_that_is_not_a_repository_gives_ok_false(
+    short_home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     ready, (app, task) = await _serve(short_home, repo=False)
+    # The test folder can sit inside a checkout (CI puts it under the repository), so git
+    # is told not to look above it.
+    monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(ready.folder.resolve().parent))
     try:
         (ready.folder / "a.txt").write_text("x\n", "utf-8")
 
