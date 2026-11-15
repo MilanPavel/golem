@@ -24,7 +24,7 @@
     },
     "TraceContext": {
       "additionalProperties": false,
-      "description": "What filled one model call's context, and how big the window was.\n\n``parts`` always has the five keys, in order. They add up to ``used``\nwhen it is known. The split between them is an estimate (about four\ncharacters a token, scaled to ``used``), so ``estimated`` is always true.\nThe ``prompt_cut`` fields are those of the model span. A cleared result counts as its\nstub in ``tool_results``, and ``cleared`` says how many there were and the tokens\nnot sent because of it.",
+      "description": "What filled one model call's context, and how big the window was.\n\n``parts`` always has the six keys, in order. ``summary`` is the summary of old turns\nthat was sent as the first message, and 0 when none was. They add up to ``used``\nwhen it is known. The split between them is an estimate (about four\ncharacters a token, scaled to ``used``), so ``estimated`` is always true.\nThe ``prompt_cut`` fields are those of the model span. A cleared result counts as its\nstub in ``tool_results``, and ``cleared`` says how many there were and the tokens\nnot sent because of it.",
       "properties": {
         "cleared": {
           "$ref": "#/$defs/TraceContextCleared"
@@ -221,7 +221,8 @@
             "tools",
             "user",
             "assistant",
-            "tool_results"
+            "tool_results",
+            "summary"
           ],
           "title": "Key",
           "type": "string"

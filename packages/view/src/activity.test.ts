@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { approvalQuestion, displayToolName, isDetail, stepCount, stepMark, summarizeSteps } from "./activity.ts";
+import { approvalQuestion, displayToolName, isDetail, stepCount, stepMark, summarizeSteps, writingLabel } from "./activity.ts";
 import type { ToolBlock } from "./chat-state.ts";
 
 const tool = (name: string, over: Partial<ToolBlock> = {}): ToolBlock => ({ callId: name, name, args: {}, status: "done", ...over });
@@ -62,4 +62,12 @@ test("approvalQuestion says an mcp_enable approval also covers the server's tool
   assert.equal(approvalQuestion("mcp_enable", { name: "playwright", reason: "r" }), "Turn on playwright and let it use its tools in this chat?");
   assert.equal(approvalQuestion("mcp_enable", {}), null);
   assert.equal(approvalQuestion("shell", { name: "x" }), null);
+});
+
+test("writingLabel names the file, the lines and the seconds", () => {
+  assert.equal(writingLabel({ name: "write_file", path: "tests/test_fetch.py", lines: 14, chars: 400 }, 38), "writing tests/test_fetch.py · 14 lines · 38 s");
+  assert.equal(writingLabel({ name: "write_file", path: null, lines: 14, chars: 400 }, 38), "writing a file · 14 lines · 38 s");
+  assert.equal(writingLabel({ name: "write_file", path: null, lines: 1, chars: 4 }, 0), "writing a file · 1 line · 0 s");
+  assert.equal(writingLabel({ name: "edit_file", path: "src/fetch.py", lines: 6, chars: 90 }, 4), "editing src/fetch.py · 6 lines · 4 s");
+  assert.equal(writingLabel({ name: "edit_file", path: null, lines: 6, chars: 90 }, 4.7), "editing a file · 6 lines · 4 s");
 });

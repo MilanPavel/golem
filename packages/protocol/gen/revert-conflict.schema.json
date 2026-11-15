@@ -1,0 +1,21 @@
+{
+  "additionalProperties": false,
+  "description": "A file a revert did not touch.",
+  "properties": {
+    "path": {
+      "title": "Path",
+      "type": "string"
+    },
+    "reason": {
+      "const": "changed_on_disk",
+      "title": "Reason",
+      "type": "string"
+    }
+  },
+  "required": [
+    "path",
+    "reason"
+  ],
+  "title": "RevertConflict",
+  "type": "object"
+}

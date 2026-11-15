@@ -13,7 +13,14 @@ from typing import Literal, cast
 from pydantic import BaseModel, ConfigDict
 
 from golem import __version__, install_info
-from golem.coding.changes import ChangeStore, net_files
+from golem.coding.changes import (
+    ChangeStore,
+    FileChange,
+    before_run,
+    net_files,
+    revert_hunk,
+    status_of,
+)
 from golem.config import load_settings
 from golem.config_edit import (
     McpTableError,
@@ -103,8 +110,9 @@ from golem.skills.index import build_index
 from golem.skills.invoke import SkillInvokeError
 from golem.skills.pinned import SkillPinError
 from golem.skills.registry import listed_skill
-from golem.tools.registry import ToolScope
-from golem.tools.write import DIFF_CHARS, diff_counts, diff_text
+from golem.tools.paths import writable
+from golem.tools.registry import ToolError, ToolScope
+from golem.tools.write import DIFF_CHARS, Change, apply, diff_counts, diff_text
 from golem_protocol.commands import (
     ApprovalRespondParams,
     ApprovalRespondResult,
@@ -122,6 +130,8 @@ from golem_protocol.commands import (
     ChangesDiffResult,
     ChangesListParams,
     ChangesListResult,
+    ChangesRevertParams,
+    ChangesRevertResult,
     ConfigAllowance,
     ConfigGetParams,
     ConfigGetResult,
@@ -199,6 +209,8 @@ from golem_protocol.commands import (
     PolicyEditResult,
     PolicyRemoveParams,
     PolicyUpdateParams,
+    RevertConflict,
+    RevertTarget,
     RoutineGetParams,
     RoutineListParams,
     RoutineRemoveParams,
@@ -233,6 +245,8 @@ from golem_protocol.commands import (
     SessionSetModeResult,
     SessionSetOptionsParams,
     SessionSetOptionsResult,
+    SessionSetRouteParams,
+    SessionSetRouteResult,
     SessionSetSkillsParams,
     SessionSetSkillsResult,
     SetupInstall,
@@ -252,7 +266,7 @@ from golem_protocol.commands import (
     TraceSpanParams,
     TraceSpanResult,
 )
-from golem_protocol.events import Ping
+from golem_protocol.events import FileChangedData, Ping
 from golem_protocol.rpc import ModelOptionsSavedNotification
 from golem_protocol.version import PROTOCOL_MAJOR, PROTOCOL_MINOR
 
@@ -523,6 +537,14 @@ def _disk_sha(path: Path) -> str | None:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
+def _disk_text(path: Path) -> str | None:
+    """The file's text, None when there is no file or it is not UTF-8."""
+    try:
+        return path.read_bytes().decode("utf-8")
+    except (OSError, UnicodeDecodeError):
+        return None
+
+
 async def _session_folder(ctx: RequestContext, session_id: str) -> str | None:
     try:
         return await _sessions(ctx).cwd_of(session_id)
@@ -574,6 +596,136 @@ async def _changes_diff(ctx: RequestContext, params: ChangesDiffParams) -> Chang
         path, before_sha, after_sha = group[0].path, group[0].before_sha, group[-1].after_sha
     diff = diff_text(path, await store.text(before_sha), await store.text(after_sha))
     return ChangesDiffResult(diff=diff[:DIFF_CHARS], truncated=len(diff) > DIFF_CHARS)
+
+
+def _text_sha(text: str | None) -> str | None:
+    return None if text is None else hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+async def _revert_texts(
+    store: ChangeStore, session_id: str, target: RevertTarget
+) -> dict[str, tuple[str | None, str]]:
+    """For each path a revert writes: its new text (None: delete) and the change it takes back.
+
+    Raises :class:`RpcCallError` for a target that is malformed or names nothing.
+    """
+    changes = await store.list(session_id)
+    last = {change.path: change.change_id for change in changes}
+    by_path: dict[str, list[FileChange]] = {}
+    for change in changes:
+        by_path.setdefault(change.path, []).append(change)
+    needs = {
+        "change": (target.change_id,),
+        "file": (target.path,),
+        "hunk": (target.path, target.hunk),
+        "run": (target.run_id,),
+    }[target.kind]
+    given = {
+        "change_id": target.change_id,
+        "path": target.path,
+        "hunk": target.hunk,
+        "run_id": target.run_id,
+    }
+    if any(value is None for value in needs) or sum(v is not None for v in given.values()) != len(
+        needs
+    ):
+        raise RpcCallError(INVALID_PARAMS, f"a {target.kind} target takes only its own fields")
+    if target.kind == "change":
+        change = await store.get(session_id, cast(str, target.change_id))
+        if change is None:
+            raise RpcCallError(INVALID_PARAMS, "no such change in this session")
+        return {change.path: (await store.text(change.before_sha), change.change_id)}
+    if target.kind == "run":
+        shas = before_run(changes, cast(str, target.run_id))
+        return {path: (await store.text(sha), last[path]) for path, sha in shas.items()}
+    group = by_path.get(cast(str, target.path))
+    if not group:
+        raise RpcCallError(INVALID_PARAMS, "this session has not changed that file")
+    path = cast(str, target.path)
+    if target.kind == "file":
+        return {path: (await store.text(group[0].before_sha), last[path])}
+    before = await store.text(group[0].before_sha) or ""
+    after = await store.text(group[-1].after_sha) or ""
+    try:
+        text = revert_hunk(before, after, cast(int, target.hunk))
+    except IndexError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+    return {path: (text, last[path])}
+
+
+def _write_back(folder: Path, path: str, text: str | None, before: str | None) -> None:
+    """Write ``text`` to the file, or delete it for None. Never removes a folder."""
+    target = writable(folder, path)
+    if text is not None:
+        apply(Change(folder, target, path, before, text))
+        return
+    try:
+        target.unlink(missing_ok=True)
+    except OSError as exc:
+        raise ToolError(f"cannot delete {path}: {exc.strerror or exc}") from exc
+
+
+async def _changes_revert(ctx: RequestContext, params: ChangesRevertParams) -> ChangesRevertResult:
+    store = _changes(ctx)
+    sessions = _sessions(ctx)
+    try:
+        async with sessions.idle(params.session_id) as folder:
+            if folder is None:
+                raise RpcCallError(INVALID_PARAMS, "this session has no folder")
+            root = Path(folder)
+            wanted = await _revert_texts(store, params.session_id, params.target)
+            last_after = {c.path: c.after_sha for c in await store.list(params.session_id)}
+            todo: list[tuple[str, str | None, str]] = []
+            conflicts: list[RevertConflict] = []
+            for path, (text, reverts) in wanted.items():
+                try:
+                    writable(root, path)
+                except ToolError as exc:
+                    raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+                on_disk = await asyncio.to_thread(_disk_sha, root / path)
+                if on_disk == _text_sha(text):
+                    continue
+                if on_disk == "" or (on_disk != last_after[path] and not params.force):
+                    conflicts.append(RevertConflict(path=path, reason="changed_on_disk"))
+                    continue
+                todo.append((path, text, reverts))
+            reverted: list[str] = []
+            for path, text, reverts in todo:
+                before = await asyncio.to_thread(_disk_text, root / path)
+                try:
+                    await asyncio.to_thread(_write_back, root, path, text, before)
+                except ToolError as exc:
+                    raise RpcCallError(INTERNAL_ERROR, str(exc)) from exc
+                change = await store.record(
+                    session_id=params.session_id,
+                    run_id=None,
+                    call_id=None,
+                    path=path,
+                    before=before,
+                    after=text,
+                    source="revert",
+                    reverts=reverts,
+                )
+                await sessions.announce_change(
+                    params.session_id,
+                    FileChangedData(
+                        change_id=change.change_id,
+                        path=path,
+                        status=status_of(change.before_sha, change.after_sha),
+                        added=change.added,
+                        removed=change.removed,
+                        source="revert",
+                        reverts=reverts,
+                    ),
+                )
+                reverted.append(path)
+    except SessionNotFoundError as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
+    except SessionBusyError as exc:
+        raise RpcCallError(SESSION_BUSY, "session is busy") from exc
+    except SchemaMismatchError as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, str(exc)) from exc
+    return ChangesRevertResult(reverted=reverted, conflicts=conflicts)
 
 
 async def _trace_get(ctx: RequestContext, params: TraceGetParams) -> TraceGetResult:
@@ -1022,6 +1174,17 @@ async def _session_set_checks(
     return SessionSetChecksResult(session_id=params.session_id, on=on)
 
 
+async def _session_set_route(
+    ctx: RequestContext, params: SessionSetRouteParams
+) -> SessionSetRouteResult:
+    try:
+        mode = await _sessions(ctx).set_route(params.session_id, params.mode)
+    except (SessionNotFoundError, SchemaMismatchError) as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
+    log.info("session route session=%s mode=%s", params.session_id, mode)
+    return SessionSetRouteResult(session_id=params.session_id, mode=mode)
+
+
 async def _config_get(ctx: RequestContext, params: ConfigGetParams) -> ConfigGetResult:
     policy, tools = ctx.state.policy, ctx.state.tools
     if policy is None or tools is None:
@@ -1415,6 +1578,7 @@ def standard_methods() -> dict[str, Method]:
         "artifact.read": Method("artifact.read", ArtifactReadParams, True, _artifact_read),
         "changes.list": Method("changes.list", ChangesListParams, True, _changes_list),
         "changes.diff": Method("changes.diff", ChangesDiffParams, True, _changes_diff),
+        "changes.revert": Method("changes.revert", ChangesRevertParams, True, _changes_revert),
         "session.inspect": Method("session.inspect", SessionInspectParams, True, _session_inspect),
         "cost.get": Method("cost.get", CostGetParams, True, _cost_get),
         "trace.get": Method("trace.get", TraceGetParams, True, _trace_get),
@@ -1495,6 +1659,9 @@ def standard_methods() -> dict[str, Method]:
         ),
         "session.set_mode": Method(
             "session.set_mode", SessionSetModeParams, True, _session_set_mode
+        ),
+        "session.set_route": Method(
+            "session.set_route", SessionSetRouteParams, True, _session_set_route
         ),
         "session.set_checks": Method(
             "session.set_checks", SessionSetChecksParams, True, _session_set_checks
