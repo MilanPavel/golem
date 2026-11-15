@@ -94,6 +94,17 @@ class ToolContext:
     """Turns on an on-demand MCP server for the session. Returns its tool names."""
     skills: SkillView | None = None
     """The skills the session's folder sees, for ``load_skill``."""
+    page_chars: int | None = None
+    """The most characters of a result page for the model's window, for ``read_artifact``."""
+
+
+@dataclass(frozen=True, slots=True)
+class FileEdit:
+    """One file a call wrote. ``before`` is None for a new file, ``after`` for a deleted one."""
+
+    path: str  # relative to the session folder
+    before: str | None
+    after: str | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -106,7 +117,8 @@ class ToolResult:
     exited non-zero. The screen marks it, and the model gets the output as usual.
 
     ``diff`` is what the call changed, as a unified diff, for the screen. Not
-    sent to the model.
+    sent to the model. ``edits`` are the files the call wrote, whole texts, for the
+    tools node to report. They never reach the wire.
     """
 
     output: str
@@ -114,6 +126,7 @@ class ToolResult:
     update: Mapping[str, object] | None = None
     failed: bool = False
     diff: str | None = None
+    edits: tuple[FileEdit, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

@@ -142,6 +142,10 @@ The providers are `openai`, `anthropic`, `google`, `deepseek`, `xai`, `moonshot`
 |---|---|---|
 | `window` | `"auto"` | The context window golem asks Ollama for. `"auto"` plans one from the model's size and maximum and this Mac's memory. `"ollama"` sends none, so Ollama uses its own default. A number from 512 to 262144 is used as it is, and cut to the model's maximum when that is known. A `num_ctx` you set for a model, a profile's `ctx`, or a chat's option always wins |
 | `keep_alive` | `"30m"` | How long Ollama keeps the model loaded after a call. golem sends it only with a window it planned, and never over a `keep_alive` you set. Leave it out to send none |
+| `reply_reserve` | `4096` | Tokens of the window kept free for the reply. The rest is the room the history may fill |
+| `clear_at` | `0.70` | When the history passes this share of the room, golem sends old tool results as one line each |
+| `clear_to` | `0.40` | How far clearing goes down, as a share of the room. Must be above 0 and below `clear_at` |
+| `keep_results` | `4` | The newest tool results that are never cleared. A model whose window is unknown is never cleared |
 
 ### `[routing]`
 
@@ -221,6 +225,8 @@ Only your own file sets these.
 |---|---|---|
 | `checks` | `"ask"` | Whether golem runs checks after it changed files: `ask`, `auto`, or `off` |
 | `fix_rounds` | `2` | How many times golem may fix what a check found, up to 5 |
+
+After a turn in which the model wrote a file, edited a file, or ran a shell command that succeeded, golem runs the checks one by one in the shell sandbox, with your `[shell]` settings, and shows each as it starts and ends. With `ask`, it offers them once in a session and runs nothing until you say yes. In autopilot mode `ask` runs them without asking. `auto` runs them unless you said no in that session. A failed check is shown to you only, and is not yet given to the model.
 
 Each `[[coding.check]]` is one command. With none, golem looks at the project's own files: a `lint` recipe in a justfile, a `lint` or `typecheck` script in `package.json`, a ruff setup, `Cargo.toml`, or `go.mod`. Tests are never detected. Add them yourself.
 

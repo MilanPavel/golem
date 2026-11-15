@@ -1,0 +1,60 @@
+{
+  "$defs": {
+    "SessionChecksChangedData": {
+      "additionalProperties": false,
+      "description": "Whether the session lets golem run the project's checks, after a change.\n\n``on`` true is the user's yes and false their no. The last event holds the\nanswer, so a replayed session gets it back. A session without one has not\nbeen asked.",
+      "properties": {
+        "on": {
+          "title": "On",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "on"
+      ],
+      "title": "SessionChecksChangedData",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "``session.set_checks`` changed whether the session lets golem run checks.",
+  "properties": {
+    "data": {
+      "$ref": "#/$defs/SessionChecksChangedData"
+    },
+    "run_id": {
+      "title": "Run Id",
+      "type": "null"
+    },
+    "seq": {
+      "minimum": 1,
+      "title": "Seq",
+      "type": "integer"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    },
+    "ts": {
+      "minLength": 1,
+      "title": "Ts",
+      "type": "string"
+    },
+    "type": {
+      "const": "session.checks.changed",
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "seq",
+    "session_id",
+    "run_id",
+    "ts",
+    "type",
+    "data"
+  ],
+  "title": "SessionChecksChangedEvent",
+  "type": "object"
+}

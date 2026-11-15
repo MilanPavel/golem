@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "``changes.list``. The files a session changed, each as its net change.",
+  "properties": {
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "session_id"
+  ],
+  "title": "ChangesListParams",
+  "type": "object"
+}

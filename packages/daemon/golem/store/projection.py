@@ -26,6 +26,7 @@ from golem_protocol.events import (
     RunCompletedEvent,
     RunFailedEvent,
     RunStartedEvent,
+    SessionChecksChangedEvent,
     SessionClosedEvent,
     SessionCreatedEvent,
     SessionModeChangedEvent,
@@ -88,6 +89,11 @@ async def project(tx: Transaction, event: ChatEvent) -> None:
         await tx.execute(
             "UPDATE sessions SET options = ? WHERE session_id = ?",
             (json.dumps(event.data.options), event.session_id),
+        )
+    elif isinstance(event, SessionChecksChangedEvent):
+        await tx.execute(
+            "UPDATE sessions SET checks = ? WHERE session_id = ?",
+            (int(event.data.on), event.session_id),
         )
     elif isinstance(event, SessionModeChangedEvent):
         await tx.execute(

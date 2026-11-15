@@ -1,4 +1,4 @@
-import { OLLAMA_FAILED, RpcError, type ApprovalChoice, type ConfigGetResult, type ConfigRawGetResult, type ConfigRawResult, type FsListDirsResult, type McpAddParams, type McpCallResult, type McpImportApplyParams, type McpImportApplyResult, type McpImportScanResult, type McpCatalogResult, type McpListResult, type McpLogsResult, type McpServerConfig, type McpServerDetail, type McpServerLog, type McpLoginDone, type McpTestProgress, type McpTestResult, type GolemClient, type RuntimeName, type SetupStatusResult, type SkillListResult, type TraceGetResult, type TraceSpanResult, type ArtifactReadResult, type ModelOptionsGetResult, type ModelOptionsSetResult, type SessionSetOptionsResult } from "@golem/client";
+import { OLLAMA_FAILED, RpcError, type ApprovalChoice, type ConfigGetResult, type ConfigRawGetResult, type ConfigRawResult, type FsListDirsResult, type McpAddParams, type McpCallResult, type McpImportApplyParams, type McpImportApplyResult, type McpImportScanResult, type McpCatalogResult, type McpListResult, type McpLogsResult, type McpServerConfig, type McpServerDetail, type McpServerLog, type McpLoginDone, type McpTestProgress, type McpTestResult, type GolemClient, type RuntimeName, type SetupStatusResult, type SkillListResult, type TraceGetResult, type TraceSpanResult, type ArtifactReadResult, type ChangesDiffResult, type ChangesDiffTarget, type ChangesListResult, type ModelOptionsGetResult, type ModelOptionsSetResult, type SessionSetOptionsResult, type SkillCreateResult, type SkillReadResult, type SkillWriteResult, type AuthListResult } from "@golem/client";
 import { changeToolFilter, installEventOf, type InstallEvent, type PermissionMode } from "@golem/view";
 import type { QueryClient } from "@tanstack/react-query";
 import { createDrafts, type Drafts } from "./drafts.ts";
@@ -9,6 +9,7 @@ import { createNewSession, type NewSessionStore } from "./new-session.ts";
 import { CONFIG_KEY } from "./config.ts";
 import { MCP_CATALOG_KEY, MCP_LIST_KEY, MCP_TOOLS_KEY, type McpToolsResult } from "./mcp.ts";
 import { MODEL_LIST_ALL_KEY, MODEL_LIST_KEY, SETUP_STATUS_KEY, type ModelListResult } from "./models.ts";
+import { SKILL_LIST_KEY } from "./skills.ts";
 import { createPulls, type Pulls } from "./pulls.ts";
 import { createQueryClient, keepQueriesHonest } from "./query.ts";
 import { createRouter, type Router } from "./router.ts";
@@ -41,6 +42,11 @@ export type PageClient = Pick<
   | "cancelRun"
   | "listModels"
   | "listSkills"
+  | "readSkill"
+  | "writeSkill"
+  | "createSkill"
+  | "setSkillDisabled"
+  | "listKeys"
   | "setSkills"
   | "setSessionMode"
   | "getConfig"
@@ -49,6 +55,8 @@ export type PageClient = Pick<
   | "getTrace"
   | "getTraceSpan"
   | "readArtifact"
+  | "changesList"
+  | "changesDiff"
   | "restartMcp"
   | "setMcpEnabled"
   | "enableMcp"
@@ -104,6 +112,17 @@ export type PageActions = {
   send(sessionId: string, text: string, skill?: { name: string; args: string }): Promise<void>;
   /** Pins a skill for the session, or unpins it. The pinned list arrives as `chat.activeSkills`. */
   pinSkill(sessionId: string, name: string, pin: boolean): Promise<void>;
+  /** The `SKILL.md` of the skill `name` that a session in `cwd` sees, with its `mtime_ns`. */
+  readSkill(name: string, cwd: string | null): Promise<SkillReadResult>;
+  /**
+   * Checks a `SKILL.md` and, unless `dryRun`, writes it when the file is still at `baseMtimeNs`. A refusal
+   * to write is in the result (`ok: false`). A project skill of an untrusted project rejects.
+   */
+  writeSkill(params: { path: string; text: string; baseMtimeNs: number; cwd: string | null; dryRun: boolean }): Promise<SkillWriteResult>;
+  /** Makes a skill folder with a `SKILL.md`. A project skill of an untrusted project rejects. */
+  createSkill(params: { name: string; description: string; scope: "user" | "project"; cwd: string | null; modelInvocable: boolean }): Promise<SkillCreateResult>;
+  /** Adds or removes a skill in `[skills] disabled` of config.toml. */
+  setSkillDisabled(name: string, disabled: boolean): Promise<void>;
   /** Sets the session's permission mode, or with null follows config.toml. The chip changes from `session.mode.changed`. */
   setMode(sessionId: string, mode: PermissionMode | null): Promise<void>;
   /**
@@ -228,6 +247,8 @@ export type PageQueries = {
   modelList(showAll?: boolean): Promise<ModelListResult>;
   /** The overview rows, from the same checks as `golem doctor`. */
   setupStatus(): Promise<SetupStatusResult>;
+  /** Where each provider's key is kept. Never a key. */
+  keys(): Promise<AuthListResult>;
   /** The skills a folder sees. `null` is no folder. */
   skillList(cwd: string | null): Promise<SkillListResult>;
   /** The tool rules in check order, and what the session allows. `null` is no folder or no session. */
@@ -244,6 +265,10 @@ export type PageQueries = {
   traceSpan(sessionId: string, spanId: string): Promise<TraceSpanResult>;
   /** `limit` characters of a session's artifact from `offset`. */
   artifact(sessionId: string, artifactId: string, offset: number, limit: number): Promise<ArtifactReadResult>;
+  /** The files a session changed, each as its net change. */
+  changesList(sessionId: string): Promise<ChangesListResult>;
+  /** The diff of one file or of one change of a session. */
+  changesDiff(sessionId: string, target: ChangesDiffTarget): Promise<ChangesDiffResult>;
   /** The folders directly under `path` in the home folder; `null` is home itself. */
   dirs(path: string | null): Promise<FsListDirsResult>;
 };
@@ -318,6 +343,10 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
     queries: {
       modelList: (showAll = false) => client.listModels(false, showAll),
       setupStatus: () => client.setupStatus(),
+      // Only the key-less fields are kept: whatever else a reply carried never reaches the cache or the tree (ADR-028).
+      keys: async () => ({
+        providers: (await client.listKeys()).providers.map(({ provider, takes_key, needs_key, source, env_var }) => ({ provider, takes_key, needs_key, source, env_var })),
+      }),
       skillList: (cwd) => (cwd === null ? client.listSkills() : client.listSkills(cwd)),
       config: (cwd, sessionId) => client.getConfig(cwd ?? undefined, sessionId ?? undefined),
       mcpList: (sessionId) => client.listMcp(sessionId ?? undefined),
@@ -325,6 +354,8 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       trace: (sessionId) => client.getTrace(sessionId),
       traceSpan: (sessionId, spanId) => client.getTraceSpan(sessionId, spanId),
       artifact: (sessionId, artifactId, offset, limit) => client.readArtifact(sessionId, artifactId, offset, limit),
+      changesList: (sessionId) => client.changesList(sessionId),
+      changesDiff: (sessionId, target) => client.changesDiff(sessionId, target),
       mcpCatalog: (sessionId) => client.mcpCatalog(sessionId ?? undefined),
       dirs: (path) => (path === null ? client.listDirs() : client.listDirs(path)),
     },
@@ -343,6 +374,21 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       },
       async pinSkill(sessionId, name, pin) {
         await client.setSkills(sessionId, pin ? { pin: [name] } : { unpin: [name] });
+      },
+      readSkill: (name, cwd) => (cwd === null ? client.readSkill(name) : client.readSkill(name, cwd)),
+      async writeSkill({ path, text, baseMtimeNs, cwd, dryRun }) {
+        const result = await client.writeSkill({ path, text, baseMtimeNs, dryRun, ...(cwd === null ? {} : { cwd }) });
+        if (result.written) void queryClient.invalidateQueries({ queryKey: SKILL_LIST_KEY });
+        return result;
+      },
+      async createSkill({ name, description, scope, cwd, modelInvocable }) {
+        const created = await client.createSkill({ name, description, scope, modelInvocable, ...(cwd === null ? {} : { cwd }) });
+        void queryClient.invalidateQueries({ queryKey: SKILL_LIST_KEY });
+        return created;
+      },
+      async setSkillDisabled(name, disabled) {
+        await client.setSkillDisabled(name, disabled);
+        void queryClient.invalidateQueries({ queryKey: SKILL_LIST_KEY });
       },
       async setMode(sessionId, mode) {
         try {

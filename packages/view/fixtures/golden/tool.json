@@ -52,6 +52,7 @@
     },
     {
       "data": {
+        "cleared_ids": [],
         "context_window": null,
         "index": 1,
         "message_bytes": [
@@ -108,8 +109,11 @@
         "failed": false,
         "first_token_ms": null,
         "latency_ms": 0,
+        "load_ms": null,
         "message_id": "id-4",
         "price": null,
+        "prompt_ms": null,
+        "reply_ms": null,
         "stop_reason": null,
         "text_tool_calls": null,
         "usage": null
@@ -175,6 +179,7 @@
     },
     {
       "data": {
+        "cleared_ids": [],
         "context_window": null,
         "index": 2,
         "message_bytes": [
@@ -237,8 +242,11 @@
         "failed": false,
         "first_token_ms": null,
         "latency_ms": 0,
+        "load_ms": null,
         "message_id": "id-5",
         "price": null,
+        "prompt_ms": null,
+        "reply_ms": null,
         "stop_reason": null,
         "text_tool_calls": null,
         "usage": null
@@ -311,6 +319,7 @@
     },
     {
       "data": {
+        "cleared_ids": [],
         "context_window": null,
         "index": 1,
         "message_bytes": [
@@ -367,8 +376,11 @@
         "failed": false,
         "first_token_ms": null,
         "latency_ms": 0,
+        "load_ms": null,
         "message_id": "id-4",
         "price": null,
+        "prompt_ms": null,
+        "reply_ms": null,
         "stop_reason": null,
         "text_tool_calls": null,
         "usage": null
@@ -434,6 +446,7 @@
     },
     {
       "data": {
+        "cleared_ids": [],
         "context_window": null,
         "index": 2,
         "message_bytes": [
@@ -496,8 +509,11 @@
         "failed": false,
         "first_token_ms": null,
         "latency_ms": 0,
+        "load_ms": null,
         "message_id": "id-5",
         "price": null,
+        "prompt_ms": null,
+        "reply_ms": null,
         "stop_reason": null,
         "text_tool_calls": null,
         "usage": null

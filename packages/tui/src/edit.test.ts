@@ -3,7 +3,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { test } from "node:test";
 
 import { applyComposer, closedDebug } from "./commands.ts";
-import { draftAt, edit, editDraft, editorCommand, insertText } from "./edit.ts";
+import { draftAt, edit, editDraft, editFile, editorCommand, insertText } from "./edit.ts";
 
 test("the cursor edits the middle of the draft", () => {
   let draft = insertText(draftAt(""), "hello");
@@ -87,4 +87,26 @@ test("a temp draft is removed after the editor exits", async () => {
     return 0;
   });
   await assert.rejects(readFile(seen, "utf8"));
+});
+
+test("editFile runs the editor on the real file, with the terminal suspended", async () => {
+  const seen: string[] = [];
+  let suspended = false;
+  const ok = await editFile(
+    "/tmp/skill/SKILL.md",
+    async (run) => {
+      suspended = true;
+      await run();
+      suspended = false;
+    },
+    async (command, file) => {
+      assert.equal(suspended, true);
+      seen.push(...command, file);
+      return 0;
+    },
+    { EDITOR: "nvim -u NONE" },
+  );
+  assert.equal(ok, true);
+  assert.deepEqual(seen, ["nvim", "-u", "NONE", "/tmp/skill/SKILL.md"]);
+  assert.equal(await editFile("/x", async (run) => run(), async () => 2), false);
 });

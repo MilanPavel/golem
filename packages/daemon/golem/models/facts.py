@@ -26,7 +26,7 @@ _WHY_NOT_READY = {
 
 
 class Speed(Protocol):
-    """Measured tokens per second of a model. The speed book of #874 gives these."""
+    """Measured tokens per second of a model. ``SpeedBook`` gives these."""
 
     @property
     def prompt_tps(self) -> float | None: ...
@@ -109,7 +109,7 @@ class FactsDiscovery(Protocol):
 
 
 SpeedOf = Callable[[str], Speed | None]
-"""The speed of a ref. The place to plug the speed book of #874 in."""
+"""The speed of a ref. The daemon passes ``SpeedBook.speed``."""
 
 
 class ListedFacts:

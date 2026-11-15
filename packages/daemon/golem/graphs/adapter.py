@@ -29,6 +29,9 @@ PIN_SKIPPED_KIND = "skill.pin_skipped"
 SKILL_LOADED_KIND = "skill.loaded"
 """``STREAM_KEY`` value of a tool call that loaded a skill for the model."""
 
+FILE_CHANGED_KIND = "file.changed"
+"""``STREAM_KEY`` value of a tool call that wrote a file, with the text before and after."""
+
 APPROVAL_KIND = "approval"
 """``STREAM_KEY`` value of an interrupt that waits for a tool approval."""
 
@@ -55,6 +58,7 @@ class ModelRequested:
 
     The size fields are the characters and UTF-8 bytes of what was sent, or None
     when not given. ``profile`` is the profile this call uses, or None when not given.
+    ``cleared_ids`` are the tool results sent as a one-line stub.
     """
 
     message_id: str
@@ -73,6 +77,20 @@ class ModelRequested:
     message_chars: tuple[int, ...] | None = None
     message_bytes: tuple[int, ...] | None = None
     profile: str | None = None
+    cleared_ids: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class ContextChanged:
+    """The context view changed before a model call: old tool results were cleared.
+
+    The token counts are rough. ``count`` is the number of results cleared.
+    """
+
+    action: Literal["cleared"]
+    before_tokens: int | None = None
+    after_tokens: int | None = None
+    count: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,6 +105,9 @@ class ModelResponded:
     message_id: str
     context_window: int | None = None
     text_tool_calls: Literal["recovered", "unread"] | None = None
+    timings: Mapping[str, int] = field(default_factory=dict[str, int])
+    """The model server's own numbers: ``load_ms``, ``prompt_ms``, ``reply_ms``,
+    ``prompt_tokens``, ``reply_tokens``. Each may be absent. Ollama only."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -177,6 +198,17 @@ class TodosChanged:
 
 
 @dataclass(frozen=True, slots=True)
+class FileChanged:
+    """A tool wrote a file. ``before`` and ``after`` are whole texts, for the store only."""
+
+    call_id: str | None
+    path: str
+    before: str | None
+    after: str | None
+    source: Literal["tool", "shell", "revert"]
+
+
+@dataclass(frozen=True, slots=True)
 class ApprovalAsked:
     """The run paused on a tool call that needs the user's answer."""
 
@@ -219,10 +251,39 @@ class PinSkipped:
     message: str
 
 
+@dataclass(frozen=True, slots=True)
+class CheckOffered:
+    """The turn changed files and the session has not said whether the checks may run."""
+
+    checks: tuple[tuple[str, str], ...]
+    """``(name, command)`` of each check."""
+
+
+@dataclass(frozen=True, slots=True)
+class CheckStarted:
+    check_id: str
+    name: str
+    command: str
+    round: int = 0
+
+
+@dataclass(frozen=True, slots=True)
+class CheckCompleted:
+    check_id: str
+    name: str
+    status: str
+    exit_code: int | None
+    duration_ms: int
+    output: str
+    artifact_id: str | None = None
+    round: int = 0
+
+
 Fact = (
     ModelStarted
     | ModelRequested
     | ModelResponded
+    | ContextChanged
     | TextDelta
     | ThinkingDelta
     | ToolWriting
@@ -233,9 +294,13 @@ Fact = (
     | ToolErrored
     | ApprovalAsked
     | TodosChanged
+    | FileChanged
     | PinRead
     | PinSkipped
     | SkillLoaded
+    | CheckOffered
+    | CheckStarted
+    | CheckCompleted
 )
 
 
@@ -678,6 +743,17 @@ def _text_calls(value: object) -> Literal["recovered", "unread"] | None:
     return "unread" if value == "unread" else None
 
 
+def _timings(value: object) -> dict[str, int]:
+    if not isinstance(value, dict):
+        return {}
+    raw = cast(dict[str, object], value)
+    return {
+        key: number
+        for key in ("load_ms", "prompt_ms", "reply_ms", "prompt_tokens", "reply_tokens")
+        if isinstance(number := raw.get(key), int) and not isinstance(number, bool) and number >= 0
+    }
+
+
 def _custom(data: object) -> Fact | None:
     if not isinstance(data, dict):
         return None
@@ -695,9 +771,19 @@ def _custom(data: object) -> Fact | None:
             message_id,
             _positive(item.get("context_window")),
             _text_calls(text_calls),
+            _timings(item.get("timings")),
+        )
+    if kind == "context.changed" and item.get("action") == "cleared":
+        return ContextChanged(
+            "cleared",
+            _count(item.get("before_tokens")),
+            _count(item.get("after_tokens")),
+            _count(item.get("count")),
         )
     if kind in (PIN_READ_KIND, PIN_SKIPPED_KIND):
         return _pin(kind, item)
+    if kind in ("check.offered", "check.started", "check.completed"):
+        return _check(kind, item)
     if not isinstance(call_id, str):
         return None
     if kind == SKILL_LOADED_KIND:
@@ -734,12 +820,65 @@ def _custom(data: object) -> Fact | None:
             if isinstance(row, dict)
         )
         return TodosChanged(call_id, rows)
+    if kind == FILE_CHANGED_KIND:
+        path, before, after = item.get("path"), item.get("before"), item.get("after")
+        if not isinstance(path, str) or not path:
+            return None
+        if not (before is None or isinstance(before, str)):
+            return None
+        if not (after is None or isinstance(after, str)):
+            return None
+        source = item.get("source")
+        if source not in ("tool", "shell", "revert"):
+            return None
+        return FileChanged(call_id or None, path, before, after, source)
     if kind == "tool.failed":
         message = item.get("message")
         return ToolErrored(
             call_id, message if isinstance(message, str) and message else "failed", _duration(item)
         )
     return None
+
+
+def _check(kind: object, item: Mapping[str, object]) -> Fact | None:
+    if kind == "check.offered":
+        rows = item.get("checks")
+        if not isinstance(rows, list):
+            return None
+        pairs = [
+            (row.get("name"), row.get("command"))
+            for row in cast(list[object], rows)
+            if isinstance(row, dict)
+            for row in [cast(dict[str, object], row)]
+        ]
+        found = tuple((n, c) for n, c in pairs if isinstance(n, str) and isinstance(c, str))
+        return CheckOffered(found) if found else None
+    check_id, name = item.get("check_id"), item.get("name")
+    if not isinstance(check_id, str) or not isinstance(name, str):
+        return None
+    number = item.get("round")
+    round_no = number if isinstance(number, int) else 0
+    if kind == "check.started":
+        command = item.get("command")
+        return CheckStarted(check_id, name, command, round_no) if isinstance(command, str) else None
+    status, exit_code = item.get("status"), item.get("exit_code")
+    duration, output, artifact_id = (
+        item.get("duration_ms"),
+        item.get("output"),
+        item.get("artifact_id"),
+    )
+    if not isinstance(status, str) or not isinstance(duration, int) or not isinstance(output, str):
+        return None
+    return CheckCompleted(
+        check_id,
+        name,
+        status,
+        exit_code if isinstance(exit_code, int) else None,
+        duration,
+        output,
+        artifact_id if isinstance(artifact_id, str) else None,
+        round_no,
+    )
 
 
 def _duration(item: Mapping[str, object]) -> int | None:
@@ -772,6 +911,9 @@ def _request(message_id: str, item: Mapping[str, object]) -> ModelRequested:
         _counts(item.get("message_chars")),
         _counts(item.get("message_bytes")),
         profile if isinstance(profile := item.get("profile"), str) and profile else None,
+        tuple(i for i in cast(list[object], cleared) if isinstance(i, str))
+        if isinstance(cleared := item.get("cleared_ids"), list)
+        else (),
     )
 
 
@@ -827,12 +969,15 @@ def _pin(kind: object, item: Mapping[str, object]) -> PinRead | PinSkipped | Non
 
 __all__ = [
     "APPROVAL_KIND",
+    "FILE_CHANGED_KIND",
     "PIN_READ_KIND",
     "PIN_SKIPPED_KIND",
     "SKILL_LOADED_KIND",
     "STREAM_KEY",
     "ApprovalAsked",
+    "ContextChanged",
     "Fact",
+    "FileChanged",
     "ModelRequested",
     "ModelResponded",
     "ModelStarted",

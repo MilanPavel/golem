@@ -4,6 +4,8 @@ export type SettingsSection = { id: string; title: string };
 export const SECTIONS: readonly SettingsSection[] = [
   { id: "setup", title: "Setup" },
   { id: "mcp", title: "MCP servers" },
+  { id: "skills", title: "Skills" },
+  { id: "keys", title: "API keys" },
   { id: "rules", title: "Tool rules" },
   { id: "config", title: "Config file" },
   { id: "appearance", title: "Appearance" },

@@ -211,6 +211,9 @@ def _recorded_models(
                 model=model,
                 tokens=tokens,
                 cost_usd=None if done is None else done.data.cost_usd,
+                load_ms=None if done is None else done.data.load_ms,
+                prompt_ms=None if done is None else done.data.prompt_ms,
+                reply_ms=None if done is None else done.data.reply_ms,
                 first_token_ms=first,
                 context_window=window,
                 num_ctx=data.num_ctx,
@@ -416,6 +419,7 @@ class SpanRead:
     num_ctx: int | None = None
     window_estimated: bool = False
     cut: PromptCut = field(default_factory=PromptCut)
+    cleared_ids: tuple[str, ...] = ()
 
 
 def read_span(
@@ -523,6 +527,7 @@ def _model_read(
         context_window=window,
         num_ctx=None if here is None else here.num_ctx,
         window_estimated=estimated,
+        cleared_ids=() if here is None else tuple(here.cleared_ids),
     )
 
 

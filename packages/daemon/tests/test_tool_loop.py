@@ -672,6 +672,48 @@ async def test_a_reply_cut_by_the_length_limit_records_it(
     assert done.data.stop_reason == "length"
 
 
+_OLLAMA_TIMES = {
+    "total_duration": 9_000_000_000,
+    "load_duration": 8_200_400_000,
+    "prompt_eval_count": 35_000,
+    "prompt_eval_duration": 192_000_000_000,
+    "eval_count": 210,
+    "eval_duration": 1_800_600_000,
+}
+
+
+async def test_an_ollama_reply_records_its_server_timings(
+    database: Database, project: Path
+) -> None:
+    model = ToolCallingChatModel(replies=["hi"], response_metadata=_OLLAMA_TIMES)
+    chat = _chat(database, model)
+    noted: list[tuple[str, dict[str, int]]] = []
+
+    def note(profile: str, timings: Mapping[str, int]) -> None:
+        noted.append((profile, dict(timings)))
+
+    chat.runtime.note_speed = note
+    session_id = await chat.manager.create(None, cwd=str(project))
+    events = await chat.finished(await chat.manager.send(session_id, "hello"))
+
+    (done,) = [e for e in events if isinstance(e, ModelCallCompletedEvent)]
+    assert (done.data.load_ms, done.data.prompt_ms, done.data.reply_ms) == (8200, 192000, 1801)
+    ((_, timings),) = noted
+    assert (timings["prompt_tokens"], timings["reply_tokens"]) == (35_000, 210)
+
+
+async def test_a_hosted_style_reply_has_no_server_timings(
+    database: Database, project: Path
+) -> None:
+    model = ToolCallingChatModel(replies=["hi"], response_metadata={"stop_reason": "end_turn"})
+    chat = _chat(database, model)
+    session_id = await chat.manager.create(None, cwd=str(project))
+    events = await chat.finished(await chat.manager.send(session_id, "hello"))
+
+    (done,) = [e for e in events if isinstance(e, ModelCallCompletedEvent)]
+    assert (done.data.load_ms, done.data.prompt_ms, done.data.reply_ms) == (None, None, None)
+
+
 async def test_a_model_without_usage_records_none_not_zeros(
     database: Database, project: Path
 ) -> None:

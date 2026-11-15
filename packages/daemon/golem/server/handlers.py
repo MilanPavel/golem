@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 import os
 import time
@@ -12,6 +13,7 @@ from typing import Literal, cast
 from pydantic import BaseModel, ConfigDict
 
 from golem import __version__, install_info
+from golem.coding.changes import ChangeStore, net_files
 from golem.config import load_settings
 from golem.config_edit import (
     McpTableError,
@@ -73,6 +75,7 @@ from golem.server.mcp_import import mcp_import_apply, mcp_import_scan
 from golem.server.mcp_login import mcp_login, mcp_logout
 from golem.server.mcp_model import turn_on
 from golem.server.mcp_try import mcp_call, mcp_logs, mcp_test
+from golem.server.routines import routine_get, routine_list, routine_remove, routine_update
 from golem.server.skills_edit import (
     skill_create,
     skill_create_protected,
@@ -101,6 +104,7 @@ from golem.skills.invoke import SkillInvokeError
 from golem.skills.pinned import SkillPinError
 from golem.skills.registry import listed_skill
 from golem.tools.registry import ToolScope
+from golem.tools.write import DIFF_CHARS, diff_counts, diff_text
 from golem_protocol.commands import (
     ApprovalRespondParams,
     ApprovalRespondResult,
@@ -113,6 +117,11 @@ from golem_protocol.commands import (
     AuthRemoveResult,
     AuthSetParams,
     AuthSetResult,
+    ChangedFile,
+    ChangesDiffParams,
+    ChangesDiffResult,
+    ChangesListParams,
+    ChangesListResult,
     ConfigAllowance,
     ConfigGetParams,
     ConfigGetResult,
@@ -175,6 +184,9 @@ from golem_protocol.commands import (
     ModelSetDefaultParams,
     ModelSetDefaultResult,
     ModelSetup,
+    ModelSpeedInfo,
+    NotifyTestParams,
+    NotifyTestResult,
     OllamaInstallCancelParams,
     OllamaInstallCancelResult,
     OllamaInstallParams,
@@ -187,6 +199,10 @@ from golem_protocol.commands import (
     PolicyEditResult,
     PolicyRemoveParams,
     PolicyUpdateParams,
+    RoutineGetParams,
+    RoutineListParams,
+    RoutineRemoveParams,
+    RoutineUpdateParams,
     RunCancelParams,
     RunCancelResult,
     RuntimeInstallCancelParams,
@@ -209,6 +225,8 @@ from golem_protocol.commands import (
     SessionRenameResult,
     SessionRevokeParams,
     SessionRevokeResult,
+    SessionSetChecksParams,
+    SessionSetChecksResult,
     SessionSetModelParams,
     SessionSetModelResult,
     SessionSetModeParams,
@@ -487,6 +505,77 @@ async def _session_inspect(
     )
 
 
+def _changes(ctx: RequestContext) -> ChangeStore:
+    changes = ctx.state.changes
+    if changes is None:
+        raise RpcCallError(INTERNAL_ERROR, "changes are not ready")
+    return changes
+
+
+def _disk_sha(path: Path) -> str | None:
+    """The sha256 of the file's text. None for no file, and "" for one that is not UTF-8."""
+    try:
+        text = path.read_bytes().decode("utf-8")
+    except FileNotFoundError:
+        return None
+    except (OSError, UnicodeDecodeError):
+        return ""
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+async def _session_folder(ctx: RequestContext, session_id: str) -> str | None:
+    try:
+        return await _sessions(ctx).cwd_of(session_id)
+    except SessionNotFoundError as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
+    except SchemaMismatchError as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, str(exc)) from exc
+
+
+async def _changes_list(ctx: RequestContext, params: ChangesListParams) -> ChangesListResult:
+    store = _changes(ctx)
+    folder = await _session_folder(ctx, params.session_id)
+    if folder is None:
+        return ChangesListResult(files=[])
+    files: list[ChangedFile] = []
+    for net in net_files(await store.list(params.session_id)):
+        diff = diff_text(
+            net.path, await store.text(net.before_sha), await store.text(net.after_sha)
+        )
+        added, removed = diff_counts(diff)
+        on_disk = await asyncio.to_thread(_disk_sha, Path(folder) / net.path)
+        files.append(
+            ChangedFile(
+                path=net.path,
+                status=net.status,
+                added=added,
+                removed=removed,
+                change_ids=list(net.change_ids),
+                stale=on_disk != net.after_sha,
+            )
+        )
+    return ChangesListResult(files=files)
+
+
+async def _changes_diff(ctx: RequestContext, params: ChangesDiffParams) -> ChangesDiffResult:
+    if (params.path is None) == (params.change_id is None):
+        raise RpcCallError(INVALID_PARAMS, "set exactly one of path and change_id")
+    store = _changes(ctx)
+    await _session_folder(ctx, params.session_id)
+    if params.change_id is not None:
+        change = await store.get(params.session_id, params.change_id)
+        if change is None:
+            raise RpcCallError(INVALID_PARAMS, "no such change in this session")
+        path, before_sha, after_sha = change.path, change.before_sha, change.after_sha
+    else:
+        group = [c for c in await store.list(params.session_id) if c.path == params.path]
+        if not group:
+            raise RpcCallError(INVALID_PARAMS, "this session has not changed that file")
+        path, before_sha, after_sha = group[0].path, group[0].before_sha, group[-1].after_sha
+    diff = diff_text(path, await store.text(before_sha), await store.text(after_sha))
+    return ChangesDiffResult(diff=diff[:DIFF_CHARS], truncated=len(diff) > DIFF_CHARS)
+
+
 async def _trace_get(ctx: RequestContext, params: TraceGetParams) -> TraceGetResult:
     try:
         title, runs = await _sessions(ctx).trace(params.session_id)
@@ -709,6 +798,13 @@ async def _model_list(ctx: RequestContext, params: ModelListParams) -> ModelList
                 recommended_for=cast(list[ModelCategory], list(model.recommended_for)),
                 think_values=list(model.think_values),
                 tier=model.tier,
+                speed=None
+                if model.speed is None
+                else ModelSpeedInfo(
+                    prompt_tps=model.speed.prompt_tps,
+                    reply_tps=model.speed.reply_tps,
+                    samples=model.speed.samples,
+                ),
             )
             for model in listing.models
         ],
@@ -913,6 +1009,17 @@ async def _session_set_mode(
         raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
     log.info("session mode session=%s mode=%s override=%s", params.session_id, mode, override)
     return SessionSetModeResult(session_id=params.session_id, mode=mode, override=override)
+
+
+async def _session_set_checks(
+    ctx: RequestContext, params: SessionSetChecksParams
+) -> SessionSetChecksResult:
+    try:
+        on = await _sessions(ctx).set_checks(params.session_id, params.on)
+    except (SessionNotFoundError, SchemaMismatchError) as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
+    log.info("session checks session=%s on=%s", params.session_id, on)
+    return SessionSetChecksResult(session_id=params.session_id, on=on)
 
 
 async def _config_get(ctx: RequestContext, params: ConfigGetParams) -> ConfigGetResult:
@@ -1257,6 +1364,14 @@ async def _ollama_start(ctx: RequestContext, _params: OllamaStartParams) -> Olla
     return OllamaStartResult(running=running)
 
 
+async def _notify_test(ctx: RequestContext, _params: NotifyTestParams) -> NotifyTestResult:
+    notifier = ctx.state.notifier
+    if notifier is None:
+        raise RpcCallError(INVALID_PARAMS, "the daemon is not ready for notifications yet")
+    posted = await notifier.test()
+    return NotifyTestResult(posted=posted, mechanism=notifier.poster.name)
+
+
 def _key_store(router: ModelRouter, provider_name: str) -> KeyStore:
     provider = router.provider(provider_name)
     if provider is None:
@@ -1298,6 +1413,8 @@ def standard_methods() -> dict[str, Method]:
         ),
         "run.cancel": Method("run.cancel", RunCancelParams, True, _run_cancel),
         "artifact.read": Method("artifact.read", ArtifactReadParams, True, _artifact_read),
+        "changes.list": Method("changes.list", ChangesListParams, True, _changes_list),
+        "changes.diff": Method("changes.diff", ChangesDiffParams, True, _changes_diff),
         "session.inspect": Method("session.inspect", SessionInspectParams, True, _session_inspect),
         "cost.get": Method("cost.get", CostGetParams, True, _cost_get),
         "trace.get": Method("trace.get", TraceGetParams, True, _trace_get),
@@ -1348,6 +1465,10 @@ def standard_methods() -> dict[str, Method]:
         "skill.set_disabled": Method(
             "skill.set_disabled", SkillSetDisabledParams, True, skill_set_disabled
         ),
+        "routine.list": Method("routine.list", RoutineListParams, True, routine_list),
+        "routine.get": Method("routine.get", RoutineGetParams, True, routine_get),
+        "routine.update": Method("routine.update", RoutineUpdateParams, True, routine_update),
+        "routine.remove": Method("routine.remove", RoutineRemoveParams, True, routine_remove),
         "session.set_skills": Method(
             "session.set_skills", SessionSetSkillsParams, True, _session_set_skills
         ),
@@ -1375,12 +1496,16 @@ def standard_methods() -> dict[str, Method]:
         "session.set_mode": Method(
             "session.set_mode", SessionSetModeParams, True, _session_set_mode
         ),
+        "session.set_checks": Method(
+            "session.set_checks", SessionSetChecksParams, True, _session_set_checks
+        ),
         "fs.list_dirs": Method("fs.list_dirs", FsListDirsParams, True, _fs_list_dirs),
         "setup.status": Method("setup.status", SetupStatusParams, True, _setup_status),
         "ollama.install": Method("ollama.install", OllamaInstallParams, True, _ollama_install),
         "ollama.install_cancel": Method(
             "ollama.install_cancel", OllamaInstallCancelParams, True, _ollama_install_cancel
         ),
+        "notify.test": Method("notify.test", NotifyTestParams, True, _notify_test),
         "ollama.start": Method("ollama.start", OllamaStartParams, True, _ollama_start),
         "session.set_model": Method(
             "session.set_model", SessionSetModelParams, True, _session_set_model

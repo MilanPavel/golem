@@ -17,6 +17,8 @@ export const GALLERY_SECTIONS = [
   "folder-browser",
   "setup-form",
   "mcp-servers",
+  "skills",
+  "api-keys",
   "tools-panel",
   "mcp-sign-in",
   "welcome-page",

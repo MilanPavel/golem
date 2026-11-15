@@ -484,6 +484,451 @@ public struct CallPrice: Codable {
     }
 }
 
+/// One changed file: first before against last after, as counts and flags.
+///
+/// ``stale`` is true when the file on disk is not what golem last wrote, because
+/// someone else changed it since.
+// MARK: - ChangedFile
+public struct ChangedFile: Codable {
+    public let added: Int
+    public let changeIDS: [String]
+    public let path: String
+    public let removed: Int
+    public let stale: Bool
+    public let status: ChangedFileStatus
+
+    public enum CodingKeys: String, CodingKey {
+        case added = "added"
+        case changeIDS = "change_ids"
+        case path = "path"
+        case removed = "removed"
+        case stale = "stale"
+        case status = "status"
+    }
+
+    public init(added: Int, changeIDS: [String], path: String, removed: Int, stale: Bool, status: ChangedFileStatus) {
+        self.added = added
+        self.changeIDS = changeIDS
+        self.path = path
+        self.removed = removed
+        self.stale = stale
+        self.status = status
+    }
+}
+
+public enum ChangedFileStatus: String, Codable {
+    case created = "created"
+    case deleted = "deleted"
+    case modified = "modified"
+}
+
+/// ``changes.diff``. The diff of a file or of one change: exactly one of the two is set.
+// MARK: - ChangesDiffParams
+public struct ChangesDiffParams: Codable {
+    public let changeID: String?
+    public let path: String?
+    public let sessionID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case changeID = "change_id"
+        case path = "path"
+        case sessionID = "session_id"
+    }
+
+    public init(changeID: String?, path: String?, sessionID: String) {
+        self.changeID = changeID
+        self.path = path
+        self.sessionID = sessionID
+    }
+}
+
+/// A unified diff, cut when long, and whether it was cut.
+// MARK: - ChangesDiffResult
+public struct ChangesDiffResult: Codable {
+    public let diff: String
+    public let truncated: Bool
+
+    public enum CodingKeys: String, CodingKey {
+        case diff = "diff"
+        case truncated = "truncated"
+    }
+
+    public init(diff: String, truncated: Bool) {
+        self.diff = diff
+        self.truncated = truncated
+    }
+}
+
+/// ``changes.list``. The files a session changed, each as its net change.
+// MARK: - ChangesListParams
+public struct ChangesListParams: Codable {
+    public let sessionID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case sessionID = "session_id"
+    }
+
+    public init(sessionID: String) {
+        self.sessionID = sessionID
+    }
+}
+
+/// The changed files in order of first change. A session without a folder has none.
+// MARK: - ChangesListResult
+public struct ChangesListResult: Codable {
+    public let files: [FileElement]
+
+    public enum CodingKeys: String, CodingKey {
+        case files = "files"
+    }
+
+    public init(files: [FileElement]) {
+        self.files = files
+    }
+}
+
+/// One changed file: first before against last after, as counts and flags.
+///
+/// ``stale`` is true when the file on disk is not what golem last wrote, because
+/// someone else changed it since.
+// MARK: - FileElement
+public struct FileElement: Codable {
+    public let added: Int
+    public let changeIDS: [String]
+    public let path: String
+    public let removed: Int
+    public let stale: Bool
+    public let status: ChangedFileStatus
+
+    public enum CodingKeys: String, CodingKey {
+        case added = "added"
+        case changeIDS = "change_ids"
+        case path = "path"
+        case removed = "removed"
+        case stale = "stale"
+        case status = "status"
+    }
+
+    public init(added: Int, changeIDS: [String], path: String, removed: Int, stale: Bool, status: ChangedFileStatus) {
+        self.added = added
+        self.changeIDS = changeIDS
+        self.path = path
+        self.removed = removed
+        self.stale = stale
+        self.status = status
+    }
+}
+
+/// A check ended. ``exit_code`` is null when it timed out.
+///
+/// ``output`` is the last 4,000 characters. When there was more, the whole
+/// output is in the artifact ``artifact_id``.
+// MARK: - CheckCompletedData
+public struct CheckCompletedData: Codable {
+    public let artifactID: String?
+    public let checkID: String
+    public let durationMS: Int
+    public let exitCode: Int?
+    public let name: String
+    public let output: String
+    public let round: Int?
+    public let status: CheckCompletedDataStatus
+
+    public enum CodingKeys: String, CodingKey {
+        case artifactID = "artifact_id"
+        case checkID = "check_id"
+        case durationMS = "duration_ms"
+        case exitCode = "exit_code"
+        case name = "name"
+        case output = "output"
+        case round = "round"
+        case status = "status"
+    }
+
+    public init(artifactID: String?, checkID: String, durationMS: Int, exitCode: Int?, name: String, output: String, round: Int?, status: CheckCompletedDataStatus) {
+        self.artifactID = artifactID
+        self.checkID = checkID
+        self.durationMS = durationMS
+        self.exitCode = exitCode
+        self.name = name
+        self.output = output
+        self.round = round
+        self.status = status
+    }
+}
+
+public enum CheckCompletedDataStatus: String, Codable {
+    case failed = "failed"
+    case passed = "passed"
+    case timedOut = "timed_out"
+}
+
+/// A check ended.
+// MARK: - CheckCompletedEvent
+public struct CheckCompletedEvent: Codable {
+    public let data: CheckCompletedEventData
+    public let runID: String
+    public let seq: Int
+    public let sessionID: String
+    public let ts: String
+    public let type: CheckCompletedEventType
+
+    public enum CodingKeys: String, CodingKey {
+        case data = "data"
+        case runID = "run_id"
+        case seq = "seq"
+        case sessionID = "session_id"
+        case ts = "ts"
+        case type = "type"
+    }
+
+    public init(data: CheckCompletedEventData, runID: String, seq: Int, sessionID: String, ts: String, type: CheckCompletedEventType) {
+        self.data = data
+        self.runID = runID
+        self.seq = seq
+        self.sessionID = sessionID
+        self.ts = ts
+        self.type = type
+    }
+}
+
+/// A check ended. ``exit_code`` is null when it timed out.
+///
+/// ``output`` is the last 4,000 characters. When there was more, the whole
+/// output is in the artifact ``artifact_id``.
+// MARK: - CheckCompletedEventData
+public struct CheckCompletedEventData: Codable {
+    public let artifactID: String?
+    public let checkID: String
+    public let durationMS: Int
+    public let exitCode: Int?
+    public let name: String
+    public let output: String
+    public let round: Int?
+    public let status: CheckCompletedDataStatus
+
+    public enum CodingKeys: String, CodingKey {
+        case artifactID = "artifact_id"
+        case checkID = "check_id"
+        case durationMS = "duration_ms"
+        case exitCode = "exit_code"
+        case name = "name"
+        case output = "output"
+        case round = "round"
+        case status = "status"
+    }
+
+    public init(artifactID: String?, checkID: String, durationMS: Int, exitCode: Int?, name: String, output: String, round: Int?, status: CheckCompletedDataStatus) {
+        self.artifactID = artifactID
+        self.checkID = checkID
+        self.durationMS = durationMS
+        self.exitCode = exitCode
+        self.name = name
+        self.output = output
+        self.round = round
+        self.status = status
+    }
+}
+
+public enum CheckCompletedEventType: String, Codable {
+    case checkCompleted = "check.completed"
+}
+
+/// One check: its name and the shell command it runs.
+// MARK: - CheckInfo
+public struct CheckInfo: Codable {
+    public let command: String
+    public let name: String
+
+    public enum CodingKeys: String, CodingKey {
+        case command = "command"
+        case name = "name"
+    }
+
+    public init(command: String, name: String) {
+        self.command = command
+        self.name = name
+    }
+}
+
+/// The turn changed files and the session has not said whether golem may run checks.
+///
+/// Sent once per session. Nothing ran. ``session.set_checks`` answers it.
+// MARK: - CheckOfferedData
+public struct CheckOfferedData: Codable {
+    public let checks: [CheckOfferedDataCheck]
+
+    public enum CodingKeys: String, CodingKey {
+        case checks = "checks"
+    }
+
+    public init(checks: [CheckOfferedDataCheck]) {
+        self.checks = checks
+    }
+}
+
+/// One check: its name and the shell command it runs.
+// MARK: - CheckOfferedDataCheck
+public struct CheckOfferedDataCheck: Codable {
+    public let command: String
+    public let name: String
+
+    public enum CodingKeys: String, CodingKey {
+        case command = "command"
+        case name = "name"
+    }
+
+    public init(command: String, name: String) {
+        self.command = command
+        self.name = name
+    }
+}
+
+/// The turn changed files and golem asks whether it may run the project's checks.
+// MARK: - CheckOfferedEvent
+public struct CheckOfferedEvent: Codable {
+    public let data: CheckOfferedEventData
+    public let runID: String
+    public let seq: Int
+    public let sessionID: String
+    public let ts: String
+    public let type: CheckOfferedEventType
+
+    public enum CodingKeys: String, CodingKey {
+        case data = "data"
+        case runID = "run_id"
+        case seq = "seq"
+        case sessionID = "session_id"
+        case ts = "ts"
+        case type = "type"
+    }
+
+    public init(data: CheckOfferedEventData, runID: String, seq: Int, sessionID: String, ts: String, type: CheckOfferedEventType) {
+        self.data = data
+        self.runID = runID
+        self.seq = seq
+        self.sessionID = sessionID
+        self.ts = ts
+        self.type = type
+    }
+}
+
+/// The turn changed files and the session has not said whether golem may run checks.
+///
+/// Sent once per session. Nothing ran. ``session.set_checks`` answers it.
+// MARK: - CheckOfferedEventData
+public struct CheckOfferedEventData: Codable {
+    public let checks: [PurpleCheckInfo]
+
+    public enum CodingKeys: String, CodingKey {
+        case checks = "checks"
+    }
+
+    public init(checks: [PurpleCheckInfo]) {
+        self.checks = checks
+    }
+}
+
+/// One check: its name and the shell command it runs.
+// MARK: - PurpleCheckInfo
+public struct PurpleCheckInfo: Codable {
+    public let command: String
+    public let name: String
+
+    public enum CodingKeys: String, CodingKey {
+        case command = "command"
+        case name = "name"
+    }
+
+    public init(command: String, name: String) {
+        self.command = command
+        self.name = name
+    }
+}
+
+public enum CheckOfferedEventType: String, Codable {
+    case checkOffered = "check.offered"
+}
+
+/// A check began. ``round`` is 0 for the first run after a turn.
+// MARK: - CheckStartedData
+public struct CheckStartedData: Codable {
+    public let checkID: String
+    public let command: String
+    public let name: String
+    public let round: Int?
+
+    public enum CodingKeys: String, CodingKey {
+        case checkID = "check_id"
+        case command = "command"
+        case name = "name"
+        case round = "round"
+    }
+
+    public init(checkID: String, command: String, name: String, round: Int?) {
+        self.checkID = checkID
+        self.command = command
+        self.name = name
+        self.round = round
+    }
+}
+
+/// A check is running.
+// MARK: - CheckStartedEvent
+public struct CheckStartedEvent: Codable {
+    public let data: CheckStartedEventData
+    public let runID: String
+    public let seq: Int
+    public let sessionID: String
+    public let ts: String
+    public let type: CheckStartedEventType
+
+    public enum CodingKeys: String, CodingKey {
+        case data = "data"
+        case runID = "run_id"
+        case seq = "seq"
+        case sessionID = "session_id"
+        case ts = "ts"
+        case type = "type"
+    }
+
+    public init(data: CheckStartedEventData, runID: String, seq: Int, sessionID: String, ts: String, type: CheckStartedEventType) {
+        self.data = data
+        self.runID = runID
+        self.seq = seq
+        self.sessionID = sessionID
+        self.ts = ts
+        self.type = type
+    }
+}
+
+/// A check began. ``round`` is 0 for the first run after a turn.
+// MARK: - CheckStartedEventData
+public struct CheckStartedEventData: Codable {
+    public let checkID: String
+    public let command: String
+    public let name: String
+    public let round: Int?
+
+    public enum CodingKeys: String, CodingKey {
+        case checkID = "check_id"
+        case command = "command"
+        case name = "name"
+        case round = "round"
+    }
+
+    public init(checkID: String, command: String, name: String, round: Int?) {
+        self.checkID = checkID
+        self.command = command
+        self.name = name
+        self.round = round
+    }
+}
+
+public enum CheckStartedEventType: String, Codable {
+    case checkStarted = "check.started"
+}
+
 /// A tool allowed for the rest of the session asked about.
 // MARK: - ConfigAllowance
 public struct ConfigAllowance: Codable {
@@ -839,6 +1284,123 @@ public struct ConfigRule: Codable {
     }
 }
 
+/// What golem sends of the history changed before a model call.
+///
+/// ``cleared`` means old tool results are now sent as one line each: ``count`` is how
+/// many, and ``before_tokens`` and ``after_tokens`` are rough sizes of the history before
+/// and after. ``summarised`` and ``grew`` are for later changes: ``count`` is the
+/// messages summarised, ``window_from`` and ``window_to`` the window before and after,
+/// and ``reload_ms`` the time the model took to load again. The checkpoint keeps every
+/// message, so no transcript event changes. A field a change does not use is None.
+// MARK: - ContextChangedData
+public struct ContextChangedData: Codable {
+    public let action: ContextChangedDataAction
+    public let afterTokens: Int?
+    public let beforeTokens: Int?
+    public let count: Int?
+    public let reloadMS: Int?
+    public let windowFrom: Int?
+    public let windowTo: Int?
+
+    public enum CodingKeys: String, CodingKey {
+        case action = "action"
+        case afterTokens = "after_tokens"
+        case beforeTokens = "before_tokens"
+        case count = "count"
+        case reloadMS = "reload_ms"
+        case windowFrom = "window_from"
+        case windowTo = "window_to"
+    }
+
+    public init(action: ContextChangedDataAction, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, windowFrom: Int?, windowTo: Int?) {
+        self.action = action
+        self.afterTokens = afterTokens
+        self.beforeTokens = beforeTokens
+        self.count = count
+        self.reloadMS = reloadMS
+        self.windowFrom = windowFrom
+        self.windowTo = windowTo
+    }
+}
+
+public enum ContextChangedDataAction: String, Codable {
+    case cleared = "cleared"
+    case grew = "grew"
+    case summarised = "summarised"
+}
+
+/// What golem sends of the history changed, before the model call that follows.
+// MARK: - ContextChangedEvent
+public struct ContextChangedEvent: Codable {
+    public let data: ContextChangedEventData
+    public let runID: String
+    public let seq: Int
+    public let sessionID: String
+    public let ts: String
+    public let type: ContextChangedEventType
+
+    public enum CodingKeys: String, CodingKey {
+        case data = "data"
+        case runID = "run_id"
+        case seq = "seq"
+        case sessionID = "session_id"
+        case ts = "ts"
+        case type = "type"
+    }
+
+    public init(data: ContextChangedEventData, runID: String, seq: Int, sessionID: String, ts: String, type: ContextChangedEventType) {
+        self.data = data
+        self.runID = runID
+        self.seq = seq
+        self.sessionID = sessionID
+        self.ts = ts
+        self.type = type
+    }
+}
+
+/// What golem sends of the history changed before a model call.
+///
+/// ``cleared`` means old tool results are now sent as one line each: ``count`` is how
+/// many, and ``before_tokens`` and ``after_tokens`` are rough sizes of the history before
+/// and after. ``summarised`` and ``grew`` are for later changes: ``count`` is the
+/// messages summarised, ``window_from`` and ``window_to`` the window before and after,
+/// and ``reload_ms`` the time the model took to load again. The checkpoint keeps every
+/// message, so no transcript event changes. A field a change does not use is None.
+// MARK: - ContextChangedEventData
+public struct ContextChangedEventData: Codable {
+    public let action: ContextChangedDataAction
+    public let afterTokens: Int?
+    public let beforeTokens: Int?
+    public let count: Int?
+    public let reloadMS: Int?
+    public let windowFrom: Int?
+    public let windowTo: Int?
+
+    public enum CodingKeys: String, CodingKey {
+        case action = "action"
+        case afterTokens = "after_tokens"
+        case beforeTokens = "before_tokens"
+        case count = "count"
+        case reloadMS = "reload_ms"
+        case windowFrom = "window_from"
+        case windowTo = "window_to"
+    }
+
+    public init(action: ContextChangedDataAction, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, windowFrom: Int?, windowTo: Int?) {
+        self.action = action
+        self.afterTokens = afterTokens
+        self.beforeTokens = beforeTokens
+        self.count = count
+        self.reloadMS = reloadMS
+        self.windowFrom = windowFrom
+        self.windowTo = windowTo
+    }
+}
+
+public enum ContextChangedEventType: String, Codable {
+    case contextChanged = "context.changed"
+}
+
 /// One local day. ``local_tokens`` are input plus output of ``local`` calls, and
 /// ``paid_tokens`` those of every other call.
 // MARK: - CostDayRow
@@ -1184,6 +1746,123 @@ public struct EmptyEventData: Codable {
     }
 }
 
+/// One change to one file, recorded before this event was sent.
+///
+/// ``path`` is relative to the session folder. ``call_id`` is the tool call that
+/// made the change, and null for a shell change or an undo. ``reverts`` is the
+/// change an undo took back. The texts are not sent; read them by ``change_id``.
+// MARK: - FileChangedData
+public struct FileChangedData: Codable {
+    public let added: Int
+    public let callID: String?
+    public let changeID: String
+    public let path: String
+    public let removed: Int
+    public let reverts: String?
+    public let source: FileChangedDataSource
+    public let status: ChangedFileStatus
+
+    public enum CodingKeys: String, CodingKey {
+        case added = "added"
+        case callID = "call_id"
+        case changeID = "change_id"
+        case path = "path"
+        case removed = "removed"
+        case reverts = "reverts"
+        case source = "source"
+        case status = "status"
+    }
+
+    public init(added: Int, callID: String?, changeID: String, path: String, removed: Int, reverts: String?, source: FileChangedDataSource, status: ChangedFileStatus) {
+        self.added = added
+        self.callID = callID
+        self.changeID = changeID
+        self.path = path
+        self.removed = removed
+        self.reverts = reverts
+        self.source = source
+        self.status = status
+    }
+}
+
+public enum FileChangedDataSource: String, Codable {
+    case revert = "revert"
+    case shell = "shell"
+    case tool = "tool"
+}
+
+/// A file in the session folder changed. Sent before the ``tool.completed`` of its call.
+// MARK: - FileChangedEvent
+public struct FileChangedEvent: Codable {
+    public let data: FileChangedEventData
+    public let runID: String
+    public let seq: Int
+    public let sessionID: String
+    public let ts: String
+    public let type: FileChangedEventType
+
+    public enum CodingKeys: String, CodingKey {
+        case data = "data"
+        case runID = "run_id"
+        case seq = "seq"
+        case sessionID = "session_id"
+        case ts = "ts"
+        case type = "type"
+    }
+
+    public init(data: FileChangedEventData, runID: String, seq: Int, sessionID: String, ts: String, type: FileChangedEventType) {
+        self.data = data
+        self.runID = runID
+        self.seq = seq
+        self.sessionID = sessionID
+        self.ts = ts
+        self.type = type
+    }
+}
+
+/// One change to one file, recorded before this event was sent.
+///
+/// ``path`` is relative to the session folder. ``call_id`` is the tool call that
+/// made the change, and null for a shell change or an undo. ``reverts`` is the
+/// change an undo took back. The texts are not sent; read them by ``change_id``.
+// MARK: - FileChangedEventData
+public struct FileChangedEventData: Codable {
+    public let added: Int
+    public let callID: String?
+    public let changeID: String
+    public let path: String
+    public let removed: Int
+    public let reverts: String?
+    public let source: FileChangedDataSource
+    public let status: ChangedFileStatus
+
+    public enum CodingKeys: String, CodingKey {
+        case added = "added"
+        case callID = "call_id"
+        case changeID = "change_id"
+        case path = "path"
+        case removed = "removed"
+        case reverts = "reverts"
+        case source = "source"
+        case status = "status"
+    }
+
+    public init(added: Int, callID: String?, changeID: String, path: String, removed: Int, reverts: String?, source: FileChangedDataSource, status: ChangedFileStatus) {
+        self.added = added
+        self.callID = callID
+        self.changeID = changeID
+        self.path = path
+        self.removed = removed
+        self.reverts = reverts
+        self.source = source
+        self.status = status
+    }
+}
+
+public enum FileChangedEventType: String, Codable {
+    case fileChanged = "file.changed"
+}
+
 /// The session and message a fork was copied from.
 // MARK: - ForkedFrom
 public struct ForkedFrom: Codable {
@@ -1428,7 +2107,7 @@ public struct KeychainWait: Codable {
 /// ``tier`` is ``local`` for Ollama, ``budget`` for a hosted model whose blended price is at
 /// or below ``[routing] budget_max_price``, and ``frontier`` otherwise.
 /// ``stale`` means a cached list was shown because the provider did not
-/// answer in time.
+/// answer in time. ``speed`` is set for a local model golem has timed.
 // MARK: - ListedModel
 public struct ListedModel: Codable {
     public let categories: [Category]?
@@ -1444,6 +2123,7 @@ public struct ListedModel: Codable {
     public let ref: String
     public let sizeGB: Double?
     public let source: ListedModelSource
+    public let speed: ListedModelModelSpeedInfo?
     public let stale: Bool?
     public let status: ListedModelStatus
     public let tags: [String]?
@@ -1465,6 +2145,7 @@ public struct ListedModel: Codable {
         case ref = "ref"
         case sizeGB = "size_gb"
         case source = "source"
+        case speed = "speed"
         case stale = "stale"
         case status = "status"
         case tags = "tags"
@@ -1473,7 +2154,7 @@ public struct ListedModel: Codable {
         case tools = "tools"
     }
 
-    public init(categories: [Category]?, ctx: Int?, fit: Fit?, label: String, price: ListedModelModelPriceInfo?, profiles: [String]?, progress: Double?, provider: String, recommended: Bool?, recommendedFor: [Category]?, ref: String, sizeGB: Double?, source: ListedModelSource, stale: Bool?, status: ListedModelStatus, tags: [String]?, thinkValues: [String]?, tier: Tier, tools: Bool?) {
+    public init(categories: [Category]?, ctx: Int?, fit: Fit?, label: String, price: ListedModelModelPriceInfo?, profiles: [String]?, progress: Double?, provider: String, recommended: Bool?, recommendedFor: [Category]?, ref: String, sizeGB: Double?, source: ListedModelSource, speed: ListedModelModelSpeedInfo?, stale: Bool?, status: ListedModelStatus, tags: [String]?, thinkValues: [String]?, tier: Tier, tools: Bool?) {
         self.categories = categories
         self.ctx = ctx
         self.fit = fit
@@ -1487,6 +2168,7 @@ public struct ListedModel: Codable {
         self.ref = ref
         self.sizeGB = sizeGB
         self.source = source
+        self.speed = speed
         self.stale = stale
         self.status = status
         self.tags = tags
@@ -1536,6 +2218,28 @@ public enum ListedModelSource: String, Codable {
     case installed = "installed"
     case profile = "profile"
     case remote = "remote"
+}
+
+/// Typical speed of a local model: the median of its recent calls.
+///
+/// From the model server's own clock. ``samples`` is how many calls it rests on.
+// MARK: - ListedModelModelSpeedInfo
+public struct ListedModelModelSpeedInfo: Codable {
+    public let promptTps: Double?
+    public let replyTps: Double?
+    public let samples: Int
+
+    public enum CodingKeys: String, CodingKey {
+        case promptTps = "prompt_tps"
+        case replyTps = "reply_tps"
+        case samples = "samples"
+    }
+
+    public init(promptTps: Double?, replyTps: Double?, samples: Int) {
+        self.promptTps = promptTps
+        self.replyTps = replyTps
+        self.samples = samples
+    }
 }
 
 public enum ListedModelStatus: String, Codable {
@@ -4922,6 +5626,10 @@ public enum MessageThinkingDeltaEventType: String, Codable {
 ///
 /// ``cost_usd`` is the cost of this call at ``price``. Both are None when the
 /// price is not known. A local model costs 0.
+///
+/// ``load_ms``, ``prompt_ms`` and ``reply_ms`` are the time the model server spent loading
+/// the model, reading the prompt and writing the reply. From the model server's own clock.
+/// Ollama only.
 // MARK: - ModelCallCompletedData
 public struct ModelCallCompletedData: Codable {
     public let contextWindow: Int?
@@ -4929,8 +5637,11 @@ public struct ModelCallCompletedData: Codable {
     public let failed: Bool?
     public let firstTokenMS: Int?
     public let latencyMS: Int
+    public let loadMS: Int?
     public let messageID: String
     public let price: ModelCallCompletedDataCallPrice?
+    public let promptMS: Int?
+    public let replyMS: Int?
     public let stopReason: String?
     public let textToolCalls: TextToolCalls?
     public let usage: ModelCallCompletedDataTokenUsage?
@@ -4941,21 +5652,27 @@ public struct ModelCallCompletedData: Codable {
         case failed = "failed"
         case firstTokenMS = "first_token_ms"
         case latencyMS = "latency_ms"
+        case loadMS = "load_ms"
         case messageID = "message_id"
         case price = "price"
+        case promptMS = "prompt_ms"
+        case replyMS = "reply_ms"
         case stopReason = "stop_reason"
         case textToolCalls = "text_tool_calls"
         case usage = "usage"
     }
 
-    public init(contextWindow: Int?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int, messageID: String, price: ModelCallCompletedDataCallPrice?, stopReason: String?, textToolCalls: TextToolCalls?, usage: ModelCallCompletedDataTokenUsage?) {
+    public init(contextWindow: Int?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int, loadMS: Int?, messageID: String, price: ModelCallCompletedDataCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: ModelCallCompletedDataTokenUsage?) {
         self.contextWindow = contextWindow
         self.costUsd = costUsd
         self.failed = failed
         self.firstTokenMS = firstTokenMS
         self.latencyMS = latencyMS
+        self.loadMS = loadMS
         self.messageID = messageID
         self.price = price
+        self.promptMS = promptMS
+        self.replyMS = replyMS
         self.stopReason = stopReason
         self.textToolCalls = textToolCalls
         self.usage = usage
@@ -5055,6 +5772,10 @@ public struct ModelCallCompletedEvent: Codable {
 ///
 /// ``cost_usd`` is the cost of this call at ``price``. Both are None when the
 /// price is not known. A local model costs 0.
+///
+/// ``load_ms``, ``prompt_ms`` and ``reply_ms`` are the time the model server spent loading
+/// the model, reading the prompt and writing the reply. From the model server's own clock.
+/// Ollama only.
 // MARK: - ModelCallCompletedEventData
 public struct ModelCallCompletedEventData: Codable {
     public let contextWindow: Int?
@@ -5062,8 +5783,11 @@ public struct ModelCallCompletedEventData: Codable {
     public let failed: Bool?
     public let firstTokenMS: Int?
     public let latencyMS: Int
+    public let loadMS: Int?
     public let messageID: String
     public let price: PurpleCallPrice?
+    public let promptMS: Int?
+    public let replyMS: Int?
     public let stopReason: String?
     public let textToolCalls: TextToolCalls?
     public let usage: PurpleTokenUsage?
@@ -5074,21 +5798,27 @@ public struct ModelCallCompletedEventData: Codable {
         case failed = "failed"
         case firstTokenMS = "first_token_ms"
         case latencyMS = "latency_ms"
+        case loadMS = "load_ms"
         case messageID = "message_id"
         case price = "price"
+        case promptMS = "prompt_ms"
+        case replyMS = "reply_ms"
         case stopReason = "stop_reason"
         case textToolCalls = "text_tool_calls"
         case usage = "usage"
     }
 
-    public init(contextWindow: Int?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int, messageID: String, price: PurpleCallPrice?, stopReason: String?, textToolCalls: TextToolCalls?, usage: PurpleTokenUsage?) {
+    public init(contextWindow: Int?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int, loadMS: Int?, messageID: String, price: PurpleCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: PurpleTokenUsage?) {
         self.contextWindow = contextWindow
         self.costUsd = costUsd
         self.failed = failed
         self.firstTokenMS = firstTokenMS
         self.latencyMS = latencyMS
+        self.loadMS = loadMS
         self.messageID = messageID
         self.price = price
+        self.promptMS = promptMS
+        self.replyMS = replyMS
         self.stopReason = stopReason
         self.textToolCalls = textToolCalls
         self.usage = usage
@@ -5170,6 +5900,7 @@ public enum ModelCallCompletedEventType: String, Codable {
 /// event recorded before they existed.
 // MARK: - ModelCallStartedData
 public struct ModelCallStartedData: Codable {
+    public let clearedIDS: [String]?
     public let contextWindow: Int?
     public let index: Int
     public let messageBytes: [Int]?
@@ -5192,6 +5923,7 @@ public struct ModelCallStartedData: Codable {
     public let windowPlanned: Bool?
 
     public enum CodingKeys: String, CodingKey {
+        case clearedIDS = "cleared_ids"
         case contextWindow = "context_window"
         case index = "index"
         case messageBytes = "message_bytes"
@@ -5214,7 +5946,8 @@ public struct ModelCallStartedData: Codable {
         case windowPlanned = "window_planned"
     }
 
-    public init(contextWindow: Int?, index: Int, messageBytes: [Int]?, messageChars: [Int]?, messageID: String, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String, provider: String?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [PurplePromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?) {
+    public init(clearedIDS: [String]?, contextWindow: Int?, index: Int, messageBytes: [Int]?, messageChars: [Int]?, messageID: String, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String, provider: String?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [PurplePromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?) {
+        self.clearedIDS = clearedIDS
         self.contextWindow = contextWindow
         self.index = index
         self.messageBytes = messageBytes
@@ -5317,6 +6050,7 @@ public struct ModelCallStartedEvent: Codable {
 /// event recorded before they existed.
 // MARK: - ModelCallStartedEventData
 public struct ModelCallStartedEventData: Codable {
+    public let clearedIDS: [String]?
     public let contextWindow: Int?
     public let index: Int
     public let messageBytes: [Int]?
@@ -5339,6 +6073,7 @@ public struct ModelCallStartedEventData: Codable {
     public let windowPlanned: Bool?
 
     public enum CodingKeys: String, CodingKey {
+        case clearedIDS = "cleared_ids"
         case contextWindow = "context_window"
         case index = "index"
         case messageBytes = "message_bytes"
@@ -5361,7 +6096,8 @@ public struct ModelCallStartedEventData: Codable {
         case windowPlanned = "window_planned"
     }
 
-    public init(contextWindow: Int?, index: Int, messageBytes: [Int]?, messageChars: [Int]?, messageID: String, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String, provider: String?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [FluffyPromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?) {
+    public init(clearedIDS: [String]?, contextWindow: Int?, index: Int, messageBytes: [Int]?, messageChars: [Int]?, messageID: String, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String, provider: String?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [FluffyPromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?) {
+        self.clearedIDS = clearedIDS
         self.contextWindow = contextWindow
         self.index = index
         self.messageBytes = messageBytes
@@ -5516,7 +6252,7 @@ public struct ModelListResult: Codable {
 /// ``tier`` is ``local`` for Ollama, ``budget`` for a hosted model whose blended price is at
 /// or below ``[routing] budget_max_price``, and ``frontier`` otherwise.
 /// ``stale`` means a cached list was shown because the provider did not
-/// answer in time.
+/// answer in time. ``speed`` is set for a local model golem has timed.
 // MARK: - ModelElement
 public struct ModelElement: Codable {
     public let categories: [Category]?
@@ -5532,6 +6268,7 @@ public struct ModelElement: Codable {
     public let ref: String
     public let sizeGB: Double?
     public let source: ListedModelSource
+    public let speed: ModelModelSpeedInfo?
     public let stale: Bool?
     public let status: ListedModelStatus
     public let tags: [String]?
@@ -5553,6 +6290,7 @@ public struct ModelElement: Codable {
         case ref = "ref"
         case sizeGB = "size_gb"
         case source = "source"
+        case speed = "speed"
         case stale = "stale"
         case status = "status"
         case tags = "tags"
@@ -5561,7 +6299,7 @@ public struct ModelElement: Codable {
         case tools = "tools"
     }
 
-    public init(categories: [Category]?, ctx: Int?, fit: Fit?, label: String, price: ModelModelPriceInfo?, profiles: [String]?, progress: Double?, provider: String, recommended: Bool?, recommendedFor: [Category]?, ref: String, sizeGB: Double?, source: ListedModelSource, stale: Bool?, status: ListedModelStatus, tags: [String]?, thinkValues: [String]?, tier: Tier, tools: Bool?) {
+    public init(categories: [Category]?, ctx: Int?, fit: Fit?, label: String, price: ModelModelPriceInfo?, profiles: [String]?, progress: Double?, provider: String, recommended: Bool?, recommendedFor: [Category]?, ref: String, sizeGB: Double?, source: ListedModelSource, speed: ModelModelSpeedInfo?, stale: Bool?, status: ListedModelStatus, tags: [String]?, thinkValues: [String]?, tier: Tier, tools: Bool?) {
         self.categories = categories
         self.ctx = ctx
         self.fit = fit
@@ -5575,6 +6313,7 @@ public struct ModelElement: Codable {
         self.ref = ref
         self.sizeGB = sizeGB
         self.source = source
+        self.speed = speed
         self.stale = stale
         self.status = status
         self.tags = tags
@@ -5601,6 +6340,28 @@ public struct ModelModelPriceInfo: Codable {
         self.cachedInput = cachedInput
         self.input = input
         self.output = output
+    }
+}
+
+/// Typical speed of a local model: the median of its recent calls.
+///
+/// From the model server's own clock. ``samples`` is how many calls it rests on.
+// MARK: - ModelModelSpeedInfo
+public struct ModelModelSpeedInfo: Codable {
+    public let promptTps: Double?
+    public let replyTps: Double?
+    public let samples: Int
+
+    public enum CodingKeys: String, CodingKey {
+        case promptTps = "prompt_tps"
+        case replyTps = "reply_tps"
+        case samples = "samples"
+    }
+
+    public init(promptTps: Double?, replyTps: Double?, samples: Int) {
+        self.promptTps = promptTps
+        self.replyTps = replyTps
+        self.samples = samples
     }
 }
 
@@ -6634,6 +7395,55 @@ public struct ModelSetup: Codable {
     }
 }
 
+/// Typical speed of a local model: the median of its recent calls.
+///
+/// From the model server's own clock. ``samples`` is how many calls it rests on.
+// MARK: - ModelSpeedInfo
+public struct ModelSpeedInfo: Codable {
+    public let promptTps: Double?
+    public let replyTps: Double?
+    public let samples: Int
+
+    public enum CodingKeys: String, CodingKey {
+        case promptTps = "prompt_tps"
+        case replyTps = "reply_tps"
+        case samples = "samples"
+    }
+
+    public init(promptTps: Double?, replyTps: Double?, samples: Int) {
+        self.promptTps = promptTps
+        self.replyTps = replyTps
+        self.samples = samples
+    }
+}
+
+/// ``notify.test``. Post a sample notification, for Settings and ``golem doctor``.
+// MARK: - NotifyTestParams
+public struct NotifyTestParams: Codable {
+
+    public init() {
+    }
+}
+
+/// ``posted`` is false when nothing was shown: no poster on this machine, or macOS refused.
+///
+/// ``mechanism`` names the poster that tried, such as ``osascript`` or ``none``.
+// MARK: - NotifyTestResult
+public struct NotifyTestResult: Codable {
+    public let mechanism: String
+    public let posted: Bool
+
+    public enum CodingKeys: String, CodingKey {
+        case mechanism = "mechanism"
+        case posted = "posted"
+    }
+
+    public init(mechanism: String, posted: Bool) {
+        self.mechanism = mechanism
+        self.posted = posted
+    }
+}
+
 /// ``ollama.install_cancel``. Stop a running install.
 // MARK: - OllamaInstallCancelParams
 public struct OllamaInstallCancelParams: Codable {
@@ -6967,6 +7777,1037 @@ public struct PromptSectionInfo: Codable {
     }
 }
 
+/// Server → every connection: a routine was added, changed or removed. Not stored.
+// MARK: - RoutineChangedNotification
+public struct RoutineChangedNotification: Codable {
+    public let jsonrpc: Jsonrpc?
+    public let method: RoutineChangedNotificationMethod?
+    public let params: RoutineChangedNotificationParams
+
+    public enum CodingKeys: String, CodingKey {
+        case jsonrpc = "jsonrpc"
+        case method = "method"
+        case params = "params"
+    }
+
+    public init(jsonrpc: Jsonrpc?, method: RoutineChangedNotificationMethod?, params: RoutineChangedNotificationParams) {
+        self.jsonrpc = jsonrpc
+        self.method = method
+        self.params = params
+    }
+}
+
+public enum RoutineChangedNotificationMethod: String, Codable {
+    case routineChanged = "routine.changed"
+}
+
+/// A routine was added, changed or removed. List the routines again.
+///
+/// ``name`` is null when the file changed in a way that is not one routine.
+// MARK: - RoutineChangedNotificationParams
+public struct RoutineChangedNotificationParams: Codable {
+    public let change: Change
+    public let name: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case change = "change"
+        case name = "name"
+    }
+
+    public init(change: Change, name: String?) {
+        self.change = change
+        self.name = name
+    }
+}
+
+public enum Change: String, Codable {
+    case added = "added"
+    case reloaded = "reloaded"
+    case removed = "removed"
+    case updated = "updated"
+}
+
+/// A routine was added, changed or removed. List the routines again.
+///
+/// ``name`` is null when the file changed in a way that is not one routine.
+// MARK: - RoutineChanged
+public struct RoutineChanged: Codable {
+    public let change: Change
+    public let name: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case change = "change"
+        case name = "name"
+    }
+
+    public init(change: Change, name: String?) {
+        self.change = change
+        self.name = name
+    }
+}
+
+/// One ``[[routine]]`` as written. The daemon checks it when it loads.
+///
+/// Exactly one of ``schedule`` and ``on`` is set. ``schedule`` is cron, or
+/// ``every 15m``, ``every 1h``, ``daily 08:30``, ``weekdays 08:30``, ``weekly mon 06:00``.
+/// ``missed`` is what happens to a firing that came due while golem could not
+/// run it: ``skip`` drops it, ``run_once`` fires it once, late.
+/// ``notify_finished`` and ``notify_failed`` override the notification settings
+/// for this routine, and null keeps them.
+// MARK: - RoutineConfig
+public struct RoutineConfig: Codable {
+    public let enabled: Bool?
+    public let folder: String?
+    public let mcp: [String]?
+    public let missed: Missed?
+    public let model: String?
+    public let name: String
+    public let notifyFailed: Bool?
+    public let notifyFinished: Bool?
+    public let on: RoutineConfigRoutineWatchConfig?
+    public let prompt: String
+    public let schedule: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case enabled = "enabled"
+        case folder = "folder"
+        case mcp = "mcp"
+        case missed = "missed"
+        case model = "model"
+        case name = "name"
+        case notifyFailed = "notify_failed"
+        case notifyFinished = "notify_finished"
+        case on = "on"
+        case prompt = "prompt"
+        case schedule = "schedule"
+    }
+
+    public init(enabled: Bool?, folder: String?, mcp: [String]?, missed: Missed?, model: String?, name: String, notifyFailed: Bool?, notifyFinished: Bool?, on: RoutineConfigRoutineWatchConfig?, prompt: String, schedule: String?) {
+        self.enabled = enabled
+        self.folder = folder
+        self.mcp = mcp
+        self.missed = missed
+        self.model = model
+        self.name = name
+        self.notifyFailed = notifyFailed
+        self.notifyFinished = notifyFinished
+        self.on = on
+        self.prompt = prompt
+        self.schedule = schedule
+    }
+}
+
+public enum Missed: String, Codable {
+    case runOnce = "run_once"
+    case skip = "skip"
+}
+
+/// ``on = { watch, glob }``: a new file in ``watch`` that matches ``glob``.
+// MARK: - RoutineConfigRoutineWatchConfig
+public struct RoutineConfigRoutineWatchConfig: Codable {
+    public let glob: String?
+    public let watch: String
+
+    public enum CodingKeys: String, CodingKey {
+        case glob = "glob"
+        case watch = "watch"
+    }
+
+    public init(glob: String?, watch: String) {
+        self.glob = glob
+        self.watch = watch
+    }
+}
+
+/// ``routine.get``. A routine by name. ``folder`` picks a project routine.
+// MARK: - RoutineGetParams
+public struct RoutineGetParams: Codable {
+    public let folder: String?
+    public let name: String
+
+    public enum CodingKeys: String, CodingKey {
+        case folder = "folder"
+        case name = "name"
+    }
+
+    public init(folder: String?, name: String) {
+        self.folder = folder
+        self.name = name
+    }
+}
+
+/// The routine and its last 50 runs, newest first.
+// MARK: - RoutineGetResult
+public struct RoutineGetResult: Codable {
+    public let routine: RoutineGetResultRoutine
+    public let runs: [RoutineRunSummaryElement]?
+
+    public enum CodingKeys: String, CodingKey {
+        case routine = "routine"
+        case runs = "runs"
+    }
+
+    public init(routine: RoutineGetResultRoutine, runs: [RoutineRunSummaryElement]?) {
+        self.routine = routine
+        self.runs = runs
+    }
+}
+
+/// A routine and what the daemon knows about it.
+///
+/// ``source`` is ``user`` or ``project``, and ``folder`` is the project folder
+/// of a project routine. ``path`` is the file it is written in. ``next_at`` is
+/// the next firing in the Mac's time zone, or null for a routine with ``on``,
+/// one that is disabled or paused, or one that is blocked. ``last`` is its
+/// latest run. ``paused`` is runtime state, not config. ``blocked`` is true for
+/// a project routine in a folder that is not in ``trusted_projects``: it is
+/// listed, and never runs.
+// MARK: - RoutineGetResultRoutine
+public struct RoutineGetResultRoutine: Codable {
+    public let blocked: Bool?
+    public let config: PurpleRoutineConfig
+    public let folder: String?
+    public let last: RoutineRunSummaryElement?
+    public let nextAt: String?
+    public let path: String
+    public let paused: Bool?
+    public let source: Scope
+
+    public enum CodingKeys: String, CodingKey {
+        case blocked = "blocked"
+        case config = "config"
+        case folder = "folder"
+        case last = "last"
+        case nextAt = "next_at"
+        case path = "path"
+        case paused = "paused"
+        case source = "source"
+    }
+
+    public init(blocked: Bool?, config: PurpleRoutineConfig, folder: String?, last: RoutineRunSummaryElement?, nextAt: String?, path: String, paused: Bool?, source: Scope) {
+        self.blocked = blocked
+        self.config = config
+        self.folder = folder
+        self.last = last
+        self.nextAt = nextAt
+        self.path = path
+        self.paused = paused
+        self.source = source
+    }
+}
+
+/// One ``[[routine]]`` as written. The daemon checks it when it loads.
+///
+/// Exactly one of ``schedule`` and ``on`` is set. ``schedule`` is cron, or
+/// ``every 15m``, ``every 1h``, ``daily 08:30``, ``weekdays 08:30``, ``weekly mon 06:00``.
+/// ``missed`` is what happens to a firing that came due while golem could not
+/// run it: ``skip`` drops it, ``run_once`` fires it once, late.
+/// ``notify_finished`` and ``notify_failed`` override the notification settings
+/// for this routine, and null keeps them.
+// MARK: - PurpleRoutineConfig
+public struct PurpleRoutineConfig: Codable {
+    public let enabled: Bool?
+    public let folder: String?
+    public let mcp: [String]?
+    public let missed: Missed?
+    public let model: String?
+    public let name: String
+    public let notifyFailed: Bool?
+    public let notifyFinished: Bool?
+    public let on: PurpleRoutineWatchConfig?
+    public let prompt: String
+    public let schedule: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case enabled = "enabled"
+        case folder = "folder"
+        case mcp = "mcp"
+        case missed = "missed"
+        case model = "model"
+        case name = "name"
+        case notifyFailed = "notify_failed"
+        case notifyFinished = "notify_finished"
+        case on = "on"
+        case prompt = "prompt"
+        case schedule = "schedule"
+    }
+
+    public init(enabled: Bool?, folder: String?, mcp: [String]?, missed: Missed?, model: String?, name: String, notifyFailed: Bool?, notifyFinished: Bool?, on: PurpleRoutineWatchConfig?, prompt: String, schedule: String?) {
+        self.enabled = enabled
+        self.folder = folder
+        self.mcp = mcp
+        self.missed = missed
+        self.model = model
+        self.name = name
+        self.notifyFailed = notifyFailed
+        self.notifyFinished = notifyFinished
+        self.on = on
+        self.prompt = prompt
+        self.schedule = schedule
+    }
+}
+
+/// ``on = { watch, glob }``: a new file in ``watch`` that matches ``glob``.
+// MARK: - PurpleRoutineWatchConfig
+public struct PurpleRoutineWatchConfig: Codable {
+    public let glob: String?
+    public let watch: String
+
+    public enum CodingKeys: String, CodingKey {
+        case glob = "glob"
+        case watch = "watch"
+    }
+
+    public init(glob: String?, watch: String) {
+        self.glob = glob
+        self.watch = watch
+    }
+}
+
+/// One firing of a routine: a ``routine_run`` (ADR-050).
+///
+/// The times are ISO 8601 with an offset. ``reason`` says why a firing was
+/// ``skipped``: ``missed``, ``paused``, ``untrusted``, ``still running`` or ``quiet``.
+/// ``scope`` is ``user`` or the project folder. Nothing fills these until the
+/// scheduler (4.2.2), so a list has none yet.
+// MARK: - RoutineRunSummaryElement
+public struct RoutineRunSummaryElement: Codable {
+    public let dueAt: String?
+    public let endedAt: String?
+    public let reason: String?
+    public let routine: String
+    public let routineRunID: String
+    public let scope: String
+    public let sessionID: String?
+    public let startedAt: String?
+    public let status: RoutineRunSummaryStatus
+    public let trigger: Trigger
+
+    public enum CodingKeys: String, CodingKey {
+        case dueAt = "due_at"
+        case endedAt = "ended_at"
+        case reason = "reason"
+        case routine = "routine"
+        case routineRunID = "routine_run_id"
+        case scope = "scope"
+        case sessionID = "session_id"
+        case startedAt = "started_at"
+        case status = "status"
+        case trigger = "trigger"
+    }
+
+    public init(dueAt: String?, endedAt: String?, reason: String?, routine: String, routineRunID: String, scope: String, sessionID: String?, startedAt: String?, status: RoutineRunSummaryStatus, trigger: Trigger) {
+        self.dueAt = dueAt
+        self.endedAt = endedAt
+        self.reason = reason
+        self.routine = routine
+        self.routineRunID = routineRunID
+        self.scope = scope
+        self.sessionID = sessionID
+        self.startedAt = startedAt
+        self.status = status
+        self.trigger = trigger
+    }
+}
+
+public enum RoutineRunSummaryStatus: String, Codable {
+    case cancelled = "cancelled"
+    case failed = "failed"
+    case queued = "queued"
+    case running = "running"
+    case skipped = "skipped"
+    case succeeded = "succeeded"
+    case waiting = "waiting"
+}
+
+public enum Trigger: String, Codable {
+    case hook = "hook"
+    case manual = "manual"
+    case schedule = "schedule"
+    case watch = "watch"
+}
+
+/// A routine and what the daemon knows about it.
+///
+/// ``source`` is ``user`` or ``project``, and ``folder`` is the project folder
+/// of a project routine. ``path`` is the file it is written in. ``next_at`` is
+/// the next firing in the Mac's time zone, or null for a routine with ``on``,
+/// one that is disabled or paused, or one that is blocked. ``last`` is its
+/// latest run. ``paused`` is runtime state, not config. ``blocked`` is true for
+/// a project routine in a folder that is not in ``trusted_projects``: it is
+/// listed, and never runs.
+// MARK: - RoutineInfo
+public struct RoutineInfo: Codable {
+    public let blocked: Bool?
+    public let config: RoutineInfoConfig
+    public let folder: String?
+    public let last: RoutineInfoRoutineRunSummary?
+    public let nextAt: String?
+    public let path: String
+    public let paused: Bool?
+    public let source: Scope
+
+    public enum CodingKeys: String, CodingKey {
+        case blocked = "blocked"
+        case config = "config"
+        case folder = "folder"
+        case last = "last"
+        case nextAt = "next_at"
+        case path = "path"
+        case paused = "paused"
+        case source = "source"
+    }
+
+    public init(blocked: Bool?, config: RoutineInfoConfig, folder: String?, last: RoutineInfoRoutineRunSummary?, nextAt: String?, path: String, paused: Bool?, source: Scope) {
+        self.blocked = blocked
+        self.config = config
+        self.folder = folder
+        self.last = last
+        self.nextAt = nextAt
+        self.path = path
+        self.paused = paused
+        self.source = source
+    }
+}
+
+/// One ``[[routine]]`` as written. The daemon checks it when it loads.
+///
+/// Exactly one of ``schedule`` and ``on`` is set. ``schedule`` is cron, or
+/// ``every 15m``, ``every 1h``, ``daily 08:30``, ``weekdays 08:30``, ``weekly mon 06:00``.
+/// ``missed`` is what happens to a firing that came due while golem could not
+/// run it: ``skip`` drops it, ``run_once`` fires it once, late.
+/// ``notify_finished`` and ``notify_failed`` override the notification settings
+/// for this routine, and null keeps them.
+// MARK: - RoutineInfoConfig
+public struct RoutineInfoConfig: Codable {
+    public let enabled: Bool?
+    public let folder: String?
+    public let mcp: [String]?
+    public let missed: Missed?
+    public let model: String?
+    public let name: String
+    public let notifyFailed: Bool?
+    public let notifyFinished: Bool?
+    public let on: FluffyRoutineWatchConfig?
+    public let prompt: String
+    public let schedule: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case enabled = "enabled"
+        case folder = "folder"
+        case mcp = "mcp"
+        case missed = "missed"
+        case model = "model"
+        case name = "name"
+        case notifyFailed = "notify_failed"
+        case notifyFinished = "notify_finished"
+        case on = "on"
+        case prompt = "prompt"
+        case schedule = "schedule"
+    }
+
+    public init(enabled: Bool?, folder: String?, mcp: [String]?, missed: Missed?, model: String?, name: String, notifyFailed: Bool?, notifyFinished: Bool?, on: FluffyRoutineWatchConfig?, prompt: String, schedule: String?) {
+        self.enabled = enabled
+        self.folder = folder
+        self.mcp = mcp
+        self.missed = missed
+        self.model = model
+        self.name = name
+        self.notifyFailed = notifyFailed
+        self.notifyFinished = notifyFinished
+        self.on = on
+        self.prompt = prompt
+        self.schedule = schedule
+    }
+}
+
+/// ``on = { watch, glob }``: a new file in ``watch`` that matches ``glob``.
+// MARK: - FluffyRoutineWatchConfig
+public struct FluffyRoutineWatchConfig: Codable {
+    public let glob: String?
+    public let watch: String
+
+    public enum CodingKeys: String, CodingKey {
+        case glob = "glob"
+        case watch = "watch"
+    }
+
+    public init(glob: String?, watch: String) {
+        self.glob = glob
+        self.watch = watch
+    }
+}
+
+/// One firing of a routine: a ``routine_run`` (ADR-050).
+///
+/// The times are ISO 8601 with an offset. ``reason`` says why a firing was
+/// ``skipped``: ``missed``, ``paused``, ``untrusted``, ``still running`` or ``quiet``.
+/// ``scope`` is ``user`` or the project folder. Nothing fills these until the
+/// scheduler (4.2.2), so a list has none yet.
+// MARK: - RoutineInfoRoutineRunSummary
+public struct RoutineInfoRoutineRunSummary: Codable {
+    public let dueAt: String?
+    public let endedAt: String?
+    public let reason: String?
+    public let routine: String
+    public let routineRunID: String
+    public let scope: String
+    public let sessionID: String?
+    public let startedAt: String?
+    public let status: RoutineRunSummaryStatus
+    public let trigger: Trigger
+
+    public enum CodingKeys: String, CodingKey {
+        case dueAt = "due_at"
+        case endedAt = "ended_at"
+        case reason = "reason"
+        case routine = "routine"
+        case routineRunID = "routine_run_id"
+        case scope = "scope"
+        case sessionID = "session_id"
+        case startedAt = "started_at"
+        case status = "status"
+        case trigger = "trigger"
+    }
+
+    public init(dueAt: String?, endedAt: String?, reason: String?, routine: String, routineRunID: String, scope: String, sessionID: String?, startedAt: String?, status: RoutineRunSummaryStatus, trigger: Trigger) {
+        self.dueAt = dueAt
+        self.endedAt = endedAt
+        self.reason = reason
+        self.routine = routine
+        self.routineRunID = routineRunID
+        self.scope = scope
+        self.sessionID = sessionID
+        self.startedAt = startedAt
+        self.status = status
+        self.trigger = trigger
+    }
+}
+
+/// A routine that did not load: the file, the line (from 1) when known, and why.
+// MARK: - RoutineIssue
+public struct RoutineIssue: Codable {
+    public let file: String
+    public let line: Int?
+    public let message: String
+
+    public enum CodingKeys: String, CodingKey {
+        case file = "file"
+        case line = "line"
+        case message = "message"
+    }
+
+    public init(file: String, line: Int?, message: String) {
+        self.file = file
+        self.line = line
+        self.message = message
+    }
+}
+
+/// ``routine.list``. The user's routines, and the project routines of ``folders``.
+///
+/// A folder in ``trusted_projects`` lists its routines as they are. Any other
+/// folder that has some lists them ``blocked``. The daemon never looks at a
+/// folder it is not given.
+// MARK: - RoutineListParams
+public struct RoutineListParams: Codable {
+    public let folders: [String]?
+
+    public enum CodingKeys: String, CodingKey {
+        case folders = "folders"
+    }
+
+    public init(folders: [String]?) {
+        self.folders = folders
+    }
+}
+
+/// The routines, user ones first, each group in file order, and the files' problems.
+// MARK: - RoutineListResult
+public struct RoutineListResult: Codable {
+    public let issues: [IssueElement]?
+    public let routines: [RoutineElement]
+
+    public enum CodingKeys: String, CodingKey {
+        case issues = "issues"
+        case routines = "routines"
+    }
+
+    public init(issues: [IssueElement]?, routines: [RoutineElement]) {
+        self.issues = issues
+        self.routines = routines
+    }
+}
+
+/// A routine that did not load: the file, the line (from 1) when known, and why.
+// MARK: - IssueElement
+public struct IssueElement: Codable {
+    public let file: String
+    public let line: Int?
+    public let message: String
+
+    public enum CodingKeys: String, CodingKey {
+        case file = "file"
+        case line = "line"
+        case message = "message"
+    }
+
+    public init(file: String, line: Int?, message: String) {
+        self.file = file
+        self.line = line
+        self.message = message
+    }
+}
+
+/// A routine and what the daemon knows about it.
+///
+/// ``source`` is ``user`` or ``project``, and ``folder`` is the project folder
+/// of a project routine. ``path`` is the file it is written in. ``next_at`` is
+/// the next firing in the Mac's time zone, or null for a routine with ``on``,
+/// one that is disabled or paused, or one that is blocked. ``last`` is its
+/// latest run. ``paused`` is runtime state, not config. ``blocked`` is true for
+/// a project routine in a folder that is not in ``trusted_projects``: it is
+/// listed, and never runs.
+// MARK: - RoutineElement
+public struct RoutineElement: Codable {
+    public let blocked: Bool?
+    public let config: FluffyRoutineConfig
+    public let folder: String?
+    public let last: PurpleRoutineRunSummary?
+    public let nextAt: String?
+    public let path: String
+    public let paused: Bool?
+    public let source: Scope
+
+    public enum CodingKeys: String, CodingKey {
+        case blocked = "blocked"
+        case config = "config"
+        case folder = "folder"
+        case last = "last"
+        case nextAt = "next_at"
+        case path = "path"
+        case paused = "paused"
+        case source = "source"
+    }
+
+    public init(blocked: Bool?, config: FluffyRoutineConfig, folder: String?, last: PurpleRoutineRunSummary?, nextAt: String?, path: String, paused: Bool?, source: Scope) {
+        self.blocked = blocked
+        self.config = config
+        self.folder = folder
+        self.last = last
+        self.nextAt = nextAt
+        self.path = path
+        self.paused = paused
+        self.source = source
+    }
+}
+
+/// One ``[[routine]]`` as written. The daemon checks it when it loads.
+///
+/// Exactly one of ``schedule`` and ``on`` is set. ``schedule`` is cron, or
+/// ``every 15m``, ``every 1h``, ``daily 08:30``, ``weekdays 08:30``, ``weekly mon 06:00``.
+/// ``missed`` is what happens to a firing that came due while golem could not
+/// run it: ``skip`` drops it, ``run_once`` fires it once, late.
+/// ``notify_finished`` and ``notify_failed`` override the notification settings
+/// for this routine, and null keeps them.
+// MARK: - FluffyRoutineConfig
+public struct FluffyRoutineConfig: Codable {
+    public let enabled: Bool?
+    public let folder: String?
+    public let mcp: [String]?
+    public let missed: Missed?
+    public let model: String?
+    public let name: String
+    public let notifyFailed: Bool?
+    public let notifyFinished: Bool?
+    public let on: TentacledRoutineWatchConfig?
+    public let prompt: String
+    public let schedule: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case enabled = "enabled"
+        case folder = "folder"
+        case mcp = "mcp"
+        case missed = "missed"
+        case model = "model"
+        case name = "name"
+        case notifyFailed = "notify_failed"
+        case notifyFinished = "notify_finished"
+        case on = "on"
+        case prompt = "prompt"
+        case schedule = "schedule"
+    }
+
+    public init(enabled: Bool?, folder: String?, mcp: [String]?, missed: Missed?, model: String?, name: String, notifyFailed: Bool?, notifyFinished: Bool?, on: TentacledRoutineWatchConfig?, prompt: String, schedule: String?) {
+        self.enabled = enabled
+        self.folder = folder
+        self.mcp = mcp
+        self.missed = missed
+        self.model = model
+        self.name = name
+        self.notifyFailed = notifyFailed
+        self.notifyFinished = notifyFinished
+        self.on = on
+        self.prompt = prompt
+        self.schedule = schedule
+    }
+}
+
+/// ``on = { watch, glob }``: a new file in ``watch`` that matches ``glob``.
+// MARK: - TentacledRoutineWatchConfig
+public struct TentacledRoutineWatchConfig: Codable {
+    public let glob: String?
+    public let watch: String
+
+    public enum CodingKeys: String, CodingKey {
+        case glob = "glob"
+        case watch = "watch"
+    }
+
+    public init(glob: String?, watch: String) {
+        self.glob = glob
+        self.watch = watch
+    }
+}
+
+/// One firing of a routine: a ``routine_run`` (ADR-050).
+///
+/// The times are ISO 8601 with an offset. ``reason`` says why a firing was
+/// ``skipped``: ``missed``, ``paused``, ``untrusted``, ``still running`` or ``quiet``.
+/// ``scope`` is ``user`` or the project folder. Nothing fills these until the
+/// scheduler (4.2.2), so a list has none yet.
+// MARK: - PurpleRoutineRunSummary
+public struct PurpleRoutineRunSummary: Codable {
+    public let dueAt: String?
+    public let endedAt: String?
+    public let reason: String?
+    public let routine: String
+    public let routineRunID: String
+    public let scope: String
+    public let sessionID: String?
+    public let startedAt: String?
+    public let status: RoutineRunSummaryStatus
+    public let trigger: Trigger
+
+    public enum CodingKeys: String, CodingKey {
+        case dueAt = "due_at"
+        case endedAt = "ended_at"
+        case reason = "reason"
+        case routine = "routine"
+        case routineRunID = "routine_run_id"
+        case scope = "scope"
+        case sessionID = "session_id"
+        case startedAt = "started_at"
+        case status = "status"
+        case trigger = "trigger"
+    }
+
+    public init(dueAt: String?, endedAt: String?, reason: String?, routine: String, routineRunID: String, scope: String, sessionID: String?, startedAt: String?, status: RoutineRunSummaryStatus, trigger: Trigger) {
+        self.dueAt = dueAt
+        self.endedAt = endedAt
+        self.reason = reason
+        self.routine = routine
+        self.routineRunID = routineRunID
+        self.scope = scope
+        self.sessionID = sessionID
+        self.startedAt = startedAt
+        self.status = status
+        self.trigger = trigger
+    }
+}
+
+/// ``routine.remove``. Delete a user routine from ``config.toml``.
+// MARK: - RoutineRemoveParams
+public struct RoutineRemoveParams: Codable {
+    public let folder: String?
+    public let name: String
+
+    public enum CodingKeys: String, CodingKey {
+        case folder = "folder"
+        case name = "name"
+    }
+
+    public init(folder: String?, name: String) {
+        self.folder = folder
+        self.name = name
+    }
+}
+
+// MARK: - RoutineRemoveResult
+public struct RoutineRemoveResult: Codable {
+    public let name: String
+
+    public enum CodingKeys: String, CodingKey {
+        case name = "name"
+    }
+
+    public init(name: String) {
+        self.name = name
+    }
+}
+
+/// One firing of a routine: a ``routine_run`` (ADR-050).
+///
+/// The times are ISO 8601 with an offset. ``reason`` says why a firing was
+/// ``skipped``: ``missed``, ``paused``, ``untrusted``, ``still running`` or ``quiet``.
+/// ``scope`` is ``user`` or the project folder. Nothing fills these until the
+/// scheduler (4.2.2), so a list has none yet.
+// MARK: - RoutineRunSummary
+public struct RoutineRunSummary: Codable {
+    public let dueAt: String?
+    public let endedAt: String?
+    public let reason: String?
+    public let routine: String
+    public let routineRunID: String
+    public let scope: String
+    public let sessionID: String?
+    public let startedAt: String?
+    public let status: RoutineRunSummaryStatus
+    public let trigger: Trigger
+
+    public enum CodingKeys: String, CodingKey {
+        case dueAt = "due_at"
+        case endedAt = "ended_at"
+        case reason = "reason"
+        case routine = "routine"
+        case routineRunID = "routine_run_id"
+        case scope = "scope"
+        case sessionID = "session_id"
+        case startedAt = "started_at"
+        case status = "status"
+        case trigger = "trigger"
+    }
+
+    public init(dueAt: String?, endedAt: String?, reason: String?, routine: String, routineRunID: String, scope: String, sessionID: String?, startedAt: String?, status: RoutineRunSummaryStatus, trigger: Trigger) {
+        self.dueAt = dueAt
+        self.endedAt = endedAt
+        self.reason = reason
+        self.routine = routine
+        self.routineRunID = routineRunID
+        self.scope = scope
+        self.sessionID = sessionID
+        self.startedAt = startedAt
+        self.status = status
+        self.trigger = trigger
+    }
+}
+
+/// ``routine.update``. Change keys of a user routine, or create it with ``create``.
+///
+/// ``fields`` are the keys of ``RoutineConfig`` to set. A null value removes the
+/// key. ``fields.name`` renames the routine. With ``create`` the routine must
+/// not exist yet and ``fields`` must make a whole one. Only the user's
+/// ``config.toml`` is edited: ``folder`` names a project routine and is
+/// refused, because a project's file is edited in the project.
+// MARK: - RoutineUpdateParams
+public struct RoutineUpdateParams: Codable {
+    public let create: Bool?
+    public let fields: [String: JSONAny]
+    public let folder: String?
+    public let name: String
+
+    public enum CodingKeys: String, CodingKey {
+        case create = "create"
+        case fields = "fields"
+        case folder = "folder"
+        case name = "name"
+    }
+
+    public init(create: Bool?, fields: [String: JSONAny], folder: String?, name: String) {
+        self.create = create
+        self.fields = fields
+        self.folder = folder
+        self.name = name
+    }
+}
+
+// MARK: - RoutineUpdateResult
+public struct RoutineUpdateResult: Codable {
+    public let routine: RoutineUpdateResultRoutine
+
+    public enum CodingKeys: String, CodingKey {
+        case routine = "routine"
+    }
+
+    public init(routine: RoutineUpdateResultRoutine) {
+        self.routine = routine
+    }
+}
+
+/// A routine and what the daemon knows about it.
+///
+/// ``source`` is ``user`` or ``project``, and ``folder`` is the project folder
+/// of a project routine. ``path`` is the file it is written in. ``next_at`` is
+/// the next firing in the Mac's time zone, or null for a routine with ``on``,
+/// one that is disabled or paused, or one that is blocked. ``last`` is its
+/// latest run. ``paused`` is runtime state, not config. ``blocked`` is true for
+/// a project routine in a folder that is not in ``trusted_projects``: it is
+/// listed, and never runs.
+// MARK: - RoutineUpdateResultRoutine
+public struct RoutineUpdateResultRoutine: Codable {
+    public let blocked: Bool?
+    public let config: TentacledRoutineConfig
+    public let folder: String?
+    public let last: FluffyRoutineRunSummary?
+    public let nextAt: String?
+    public let path: String
+    public let paused: Bool?
+    public let source: Scope
+
+    public enum CodingKeys: String, CodingKey {
+        case blocked = "blocked"
+        case config = "config"
+        case folder = "folder"
+        case last = "last"
+        case nextAt = "next_at"
+        case path = "path"
+        case paused = "paused"
+        case source = "source"
+    }
+
+    public init(blocked: Bool?, config: TentacledRoutineConfig, folder: String?, last: FluffyRoutineRunSummary?, nextAt: String?, path: String, paused: Bool?, source: Scope) {
+        self.blocked = blocked
+        self.config = config
+        self.folder = folder
+        self.last = last
+        self.nextAt = nextAt
+        self.path = path
+        self.paused = paused
+        self.source = source
+    }
+}
+
+/// One ``[[routine]]`` as written. The daemon checks it when it loads.
+///
+/// Exactly one of ``schedule`` and ``on`` is set. ``schedule`` is cron, or
+/// ``every 15m``, ``every 1h``, ``daily 08:30``, ``weekdays 08:30``, ``weekly mon 06:00``.
+/// ``missed`` is what happens to a firing that came due while golem could not
+/// run it: ``skip`` drops it, ``run_once`` fires it once, late.
+/// ``notify_finished`` and ``notify_failed`` override the notification settings
+/// for this routine, and null keeps them.
+// MARK: - TentacledRoutineConfig
+public struct TentacledRoutineConfig: Codable {
+    public let enabled: Bool?
+    public let folder: String?
+    public let mcp: [String]?
+    public let missed: Missed?
+    public let model: String?
+    public let name: String
+    public let notifyFailed: Bool?
+    public let notifyFinished: Bool?
+    public let on: StickyRoutineWatchConfig?
+    public let prompt: String
+    public let schedule: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case enabled = "enabled"
+        case folder = "folder"
+        case mcp = "mcp"
+        case missed = "missed"
+        case model = "model"
+        case name = "name"
+        case notifyFailed = "notify_failed"
+        case notifyFinished = "notify_finished"
+        case on = "on"
+        case prompt = "prompt"
+        case schedule = "schedule"
+    }
+
+    public init(enabled: Bool?, folder: String?, mcp: [String]?, missed: Missed?, model: String?, name: String, notifyFailed: Bool?, notifyFinished: Bool?, on: StickyRoutineWatchConfig?, prompt: String, schedule: String?) {
+        self.enabled = enabled
+        self.folder = folder
+        self.mcp = mcp
+        self.missed = missed
+        self.model = model
+        self.name = name
+        self.notifyFailed = notifyFailed
+        self.notifyFinished = notifyFinished
+        self.on = on
+        self.prompt = prompt
+        self.schedule = schedule
+    }
+}
+
+/// ``on = { watch, glob }``: a new file in ``watch`` that matches ``glob``.
+// MARK: - StickyRoutineWatchConfig
+public struct StickyRoutineWatchConfig: Codable {
+    public let glob: String?
+    public let watch: String
+
+    public enum CodingKeys: String, CodingKey {
+        case glob = "glob"
+        case watch = "watch"
+    }
+
+    public init(glob: String?, watch: String) {
+        self.glob = glob
+        self.watch = watch
+    }
+}
+
+/// One firing of a routine: a ``routine_run`` (ADR-050).
+///
+/// The times are ISO 8601 with an offset. ``reason`` says why a firing was
+/// ``skipped``: ``missed``, ``paused``, ``untrusted``, ``still running`` or ``quiet``.
+/// ``scope`` is ``user`` or the project folder. Nothing fills these until the
+/// scheduler (4.2.2), so a list has none yet.
+// MARK: - FluffyRoutineRunSummary
+public struct FluffyRoutineRunSummary: Codable {
+    public let dueAt: String?
+    public let endedAt: String?
+    public let reason: String?
+    public let routine: String
+    public let routineRunID: String
+    public let scope: String
+    public let sessionID: String?
+    public let startedAt: String?
+    public let status: RoutineRunSummaryStatus
+    public let trigger: Trigger
+
+    public enum CodingKeys: String, CodingKey {
+        case dueAt = "due_at"
+        case endedAt = "ended_at"
+        case reason = "reason"
+        case routine = "routine"
+        case routineRunID = "routine_run_id"
+        case scope = "scope"
+        case sessionID = "session_id"
+        case startedAt = "started_at"
+        case status = "status"
+        case trigger = "trigger"
+    }
+
+    public init(dueAt: String?, endedAt: String?, reason: String?, routine: String, routineRunID: String, scope: String, sessionID: String?, startedAt: String?, status: RoutineRunSummaryStatus, trigger: Trigger) {
+        self.dueAt = dueAt
+        self.endedAt = endedAt
+        self.reason = reason
+        self.routine = routine
+        self.routineRunID = routineRunID
+        self.scope = scope
+        self.sessionID = sessionID
+        self.startedAt = startedAt
+        self.status = status
+        self.trigger = trigger
+    }
+}
+
+/// ``on = { watch, glob }``: a new file in ``watch`` that matches ``glob``.
+// MARK: - RoutineWatchConfig
+public struct RoutineWatchConfig: Codable {
+    public let glob: String?
+    public let watch: String
+
+    public enum CodingKeys: String, CodingKey {
+        case glob = "glob"
+        case watch = "watch"
+    }
+
+    public init(glob: String?, watch: String) {
+        self.glob = glob
+        self.watch = watch
+    }
+}
+
 /// JSON-RPC error object.
 // MARK: - RPCErrorBody
 public struct RPCErrorBody: Codable {
@@ -7104,6 +8945,8 @@ public enum RPCNotificationMethod: String, Codable {
 ///
 /// ``session.set_mode`` changed the session's permission mode.
 ///
+/// ``session.set_checks`` changed whether the session lets golem run checks.
+///
 /// The assistant bubble is open.
 ///
 /// Tokens to append to the open assistant message.
@@ -7115,6 +8958,8 @@ public enum RPCNotificationMethod: String, Codable {
 /// The request for one assistant message went to the model.
 ///
 /// The model call ended. Comes before the call's ``tool.requested`` events.
+///
+/// What golem sends of the history changed, before the model call that follows.
 ///
 /// A graph run is in progress for this session.
 ///
@@ -7143,6 +8988,8 @@ public enum RPCNotificationMethod: String, Codable {
 ///
 /// The agent's todo list changed. ``run_id`` is null for a list a fork copied.
 ///
+/// A file in the session folder changed. Sent before the ``tool.completed`` of its call.
+///
 /// A skill became active.
 ///
 /// An invoked skill's event comes just before the user message that invoked
@@ -7153,6 +9000,12 @@ public enum RPCNotificationMethod: String, Codable {
 /// A pinned skill was left out of the run's model calls.
 ///
 /// Logged once when it becomes unusable, not for every call.
+///
+/// The turn changed files and golem asks whether it may run the project's checks.
+///
+/// A check is running.
+///
+/// A check ended.
 // MARK: - Params
 public struct Params: Codable {
     public let data: ParamsData
@@ -7225,6 +9078,12 @@ public struct Params: Codable {
 /// mode`` in ``config.toml``. The last event holds what applies from the next
 /// tool call, so a replayed session gets its mode back.
 ///
+/// Whether the session lets golem run the project's checks, after a change.
+///
+/// ``on`` true is the user's yes and false their no. The last event holds the
+/// answer, so a replayed session gets it back. A session without one has not
+/// been asked.
+///
 /// An assistant message is open and tokens may follow.
 ///
 /// One incremental fragment of an assistant message.
@@ -7287,6 +9146,19 @@ public struct Params: Codable {
 ///
 /// ``cost_usd`` is the cost of this call at ``price``. Both are None when the
 /// price is not known. A local model costs 0.
+///
+/// ``load_ms``, ``prompt_ms`` and ``reply_ms`` are the time the model server spent loading
+/// the model, reading the prompt and writing the reply. From the model server's own clock.
+/// Ollama only.
+///
+/// What golem sends of the history changed before a model call.
+///
+/// ``cleared`` means old tool results are now sent as one line each: ``count`` is how
+/// many, and ``before_tokens`` and ``after_tokens`` are rough sizes of the history before
+/// and after. ``summarised`` and ``grew`` are for later changes: ``count`` is the
+/// messages summarised, ``window_from`` and ``window_to`` the window before and after,
+/// and ``reload_ms`` the time the model took to load again. The checkpoint keeps every
+/// message, so no transcript event changes. A field a change does not use is None.
 ///
 /// Why a run stopped. No traceback.
 ///
@@ -7353,6 +9225,12 @@ public struct Params: Codable {
 /// ``call_id`` is the call that wrote it. It is null for a list a fork copied.
 /// An empty list clears it.
 ///
+/// One change to one file, recorded before this event was sent.
+///
+/// ``path`` is relative to the session folder. ``call_id`` is the tool call that
+/// made the change, and null for a shell change or an undo. ``reverts`` is the
+/// change an undo took back. The texts are not sent; read them by ``change_id``.
+///
 /// A skill is active in the session.
 ///
 /// ``how`` is ``invoked`` for a skill run once by name: its body is that
@@ -7373,6 +9251,17 @@ public struct Params: Codable {
 /// ``disabled`` when ``[skills]`` turns it off, and ``broken`` when its
 /// ``SKILL.md`` cannot be read or is not valid. ``message`` says it for a
 /// person.
+///
+/// The turn changed files and the session has not said whether golem may run checks.
+///
+/// Sent once per session. Nothing ran. ``session.set_checks`` answers it.
+///
+/// A check began. ``round`` is 0 for the first run after a turn.
+///
+/// A check ended. ``exit_code`` is null when it timed out.
+///
+/// ``output`` is the last 4,000 characters. When there was more, the whole
+/// output is in the artifact ``artifact_id``.
 // MARK: - ParamsData
 public struct ParamsData: Codable {
     public let cwd: String?
@@ -7385,11 +9274,12 @@ public struct ParamsData: Codable {
     public let mcpServers: [String]?
     public let title: String?
     public let runID: String?
-    public let status: DataStatus?
+    public let status: PurpleStatus?
     public let summary: String?
     public let reason: PurpleReason?
     public let options: [String: Option]?
     public let mode: Mode?
+    public let on: Bool?
     public let messageID: String?
     public let role: MessageCompletedDataRole?
     public let text: String?
@@ -7397,6 +9287,7 @@ public struct ParamsData: Codable {
     public let skill: FluffySkillCall?
     public let thinking: String?
     public let thinkingMS: Int?
+    public let clearedIDS: [String]?
     public let contextWindow: Int?
     public let index: Int?
     public let messageBytes: [Int]?
@@ -7420,10 +9311,20 @@ public struct ParamsData: Codable {
     public let failed: Bool?
     public let firstTokenMS: Int?
     public let latencyMS: Int?
+    public let loadMS: Int?
     public let price: FluffyCallPrice?
+    public let promptMS: Int?
+    public let replyMS: Int?
     public let stopReason: String?
     public let textToolCalls: TextToolCalls?
     public let usage: FluffyTokenUsage?
+    public let action: ContextChangedDataAction?
+    public let afterTokens: Int?
+    public let beforeTokens: Int?
+    public let count: Int?
+    public let reloadMS: Int?
+    public let windowFrom: Int?
+    public let windowTo: Int?
     public let code: Code?
     public let hint: String?
     public let message: String?
@@ -7443,8 +9344,18 @@ public struct ParamsData: Codable {
     public let decision: Decision?
     public let rule: String?
     public let todos: [PurpleTodo]?
+    public let added: Int?
+    public let changeID: String?
+    public let removed: Int?
+    public let reverts: String?
     public let hash: String?
     public let how: How?
+    public let checks: [FluffyCheckInfo]?
+    public let checkID: String?
+    public let command: String?
+    public let round: Int?
+    public let exitCode: Int?
+    public let output: String?
 
     public enum CodingKeys: String, CodingKey {
         case cwd = "cwd"
@@ -7462,6 +9373,7 @@ public struct ParamsData: Codable {
         case reason = "reason"
         case options = "options"
         case mode = "mode"
+        case on = "on"
         case messageID = "message_id"
         case role = "role"
         case text = "text"
@@ -7469,6 +9381,7 @@ public struct ParamsData: Codable {
         case skill = "skill"
         case thinking = "thinking"
         case thinkingMS = "thinking_ms"
+        case clearedIDS = "cleared_ids"
         case contextWindow = "context_window"
         case index = "index"
         case messageBytes = "message_bytes"
@@ -7492,10 +9405,20 @@ public struct ParamsData: Codable {
         case failed = "failed"
         case firstTokenMS = "first_token_ms"
         case latencyMS = "latency_ms"
+        case loadMS = "load_ms"
         case price = "price"
+        case promptMS = "prompt_ms"
+        case replyMS = "reply_ms"
         case stopReason = "stop_reason"
         case textToolCalls = "text_tool_calls"
         case usage = "usage"
+        case action = "action"
+        case afterTokens = "after_tokens"
+        case beforeTokens = "before_tokens"
+        case count = "count"
+        case reloadMS = "reload_ms"
+        case windowFrom = "window_from"
+        case windowTo = "window_to"
         case code = "code"
         case hint = "hint"
         case message = "message"
@@ -7515,11 +9438,21 @@ public struct ParamsData: Codable {
         case decision = "decision"
         case rule = "rule"
         case todos = "todos"
+        case added = "added"
+        case changeID = "change_id"
+        case removed = "removed"
+        case reverts = "reverts"
         case hash = "hash"
         case how = "how"
+        case checks = "checks"
+        case checkID = "check_id"
+        case command = "command"
+        case round = "round"
+        case exitCode = "exit_code"
+        case output = "output"
     }
 
-    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, title: String?, runID: String?, status: DataStatus?, summary: String?, reason: PurpleReason?, options: [String: Option]?, mode: Mode?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, contextWindow: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String?, provider: String?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, price: FluffyCallPrice?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, chars: Int?, lines: Int?, path: String?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, todos: [PurpleTodo]?, hash: String?, how: How?) {
+    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: PurpleReason?, options: [String: Option]?, mode: Mode?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String?, provider: String?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, chars: Int?, lines: Int?, path: String?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, todos: [PurpleTodo]?, added: Int?, changeID: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?) {
         self.cwd = cwd
         self.forkedFrom = forkedFrom
         self.modelName = modelName
@@ -7535,6 +9468,7 @@ public struct ParamsData: Codable {
         self.reason = reason
         self.options = options
         self.mode = mode
+        self.on = on
         self.messageID = messageID
         self.role = role
         self.text = text
@@ -7542,6 +9476,7 @@ public struct ParamsData: Codable {
         self.skill = skill
         self.thinking = thinking
         self.thinkingMS = thinkingMS
+        self.clearedIDS = clearedIDS
         self.contextWindow = contextWindow
         self.index = index
         self.messageBytes = messageBytes
@@ -7565,10 +9500,20 @@ public struct ParamsData: Codable {
         self.failed = failed
         self.firstTokenMS = firstTokenMS
         self.latencyMS = latencyMS
+        self.loadMS = loadMS
         self.price = price
+        self.promptMS = promptMS
+        self.replyMS = replyMS
         self.stopReason = stopReason
         self.textToolCalls = textToolCalls
         self.usage = usage
+        self.action = action
+        self.afterTokens = afterTokens
+        self.beforeTokens = beforeTokens
+        self.count = count
+        self.reloadMS = reloadMS
+        self.windowFrom = windowFrom
+        self.windowTo = windowTo
         self.code = code
         self.hint = hint
         self.message = message
@@ -7588,8 +9533,18 @@ public struct ParamsData: Codable {
         self.decision = decision
         self.rule = rule
         self.todos = todos
+        self.added = added
+        self.changeID = changeID
+        self.removed = removed
+        self.reverts = reverts
         self.hash = hash
         self.how = how
+        self.checks = checks
+        self.checkID = checkID
+        self.command = command
+        self.round = round
+        self.exitCode = exitCode
+        self.output = output
     }
 }
 
@@ -7607,6 +9562,23 @@ public struct PurpleSessionAllowance: Codable {
     public init(subject: String?, tool: String) {
         self.subject = subject
         self.tool = tool
+    }
+}
+
+/// One check: its name and the shell command it runs.
+// MARK: - FluffyCheckInfo
+public struct FluffyCheckInfo: Codable {
+    public let command: String
+    public let name: String
+
+    public enum CodingKeys: String, CodingKey {
+        case command = "command"
+        case name = "name"
+    }
+
+    public init(command: String, name: String) {
+        self.command = command
+        self.name = name
     }
 }
 
@@ -7684,10 +9656,15 @@ public struct FluffySkillCall: Codable {
     }
 }
 
-public enum DataStatus: String, Codable {
+public enum PurpleStatus: String, Codable {
     case cancelled = "cancelled"
     case completed = "completed"
+    case created = "created"
+    case deleted = "deleted"
     case failed = "failed"
+    case modified = "modified"
+    case passed = "passed"
+    case timedOut = "timed_out"
 }
 
 /// One non-empty section of the system prompt sent with a model call.
@@ -7764,6 +9741,11 @@ public struct FluffyTokenUsage: Codable {
 public enum ParamsType: String, Codable {
     case approvalNeeded = "approval.needed"
     case approvalResolved = "approval.resolved"
+    case checkCompleted = "check.completed"
+    case checkOffered = "check.offered"
+    case checkStarted = "check.started"
+    case contextChanged = "context.changed"
+    case fileChanged = "file.changed"
     case messageCompleted = "message.completed"
     case messageDelta = "message.delta"
     case messageStarted = "message.started"
@@ -7776,6 +9758,7 @@ public enum ParamsType: String, Codable {
     case runCompleted = "run.completed"
     case runFailed = "run.failed"
     case runStarted = "run.started"
+    case sessionChecksChanged = "session.checks.changed"
     case sessionClosed = "session.closed"
     case sessionCompleted = "session.completed"
     case sessionCreated = "session.created"
@@ -8372,6 +10355,75 @@ public struct SessionAttachResult: Codable {
     }
 }
 
+/// Whether the session lets golem run the project's checks, after a change.
+///
+/// ``on`` true is the user's yes and false their no. The last event holds the
+/// answer, so a replayed session gets it back. A session without one has not
+/// been asked.
+// MARK: - SessionChecksChangedData
+public struct SessionChecksChangedData: Codable {
+    public let on: Bool
+
+    public enum CodingKeys: String, CodingKey {
+        case on = "on"
+    }
+
+    public init(on: Bool) {
+        self.on = on
+    }
+}
+
+/// ``session.set_checks`` changed whether the session lets golem run checks.
+// MARK: - SessionChecksChangedEvent
+public struct SessionChecksChangedEvent: Codable {
+    public let data: SessionChecksChangedEventData
+    public let runID: JSONNull?
+    public let seq: Int
+    public let sessionID: String
+    public let ts: String
+    public let type: SessionChecksChangedEventType
+
+    public enum CodingKeys: String, CodingKey {
+        case data = "data"
+        case runID = "run_id"
+        case seq = "seq"
+        case sessionID = "session_id"
+        case ts = "ts"
+        case type = "type"
+    }
+
+    public init(data: SessionChecksChangedEventData, runID: JSONNull?, seq: Int, sessionID: String, ts: String, type: SessionChecksChangedEventType) {
+        self.data = data
+        self.runID = runID
+        self.seq = seq
+        self.sessionID = sessionID
+        self.ts = ts
+        self.type = type
+    }
+}
+
+/// Whether the session lets golem run the project's checks, after a change.
+///
+/// ``on`` true is the user's yes and false their no. The last event holds the
+/// answer, so a replayed session gets it back. A session without one has not
+/// been asked.
+// MARK: - SessionChecksChangedEventData
+public struct SessionChecksChangedEventData: Codable {
+    public let on: Bool
+
+    public enum CodingKeys: String, CodingKey {
+        case on = "on"
+    }
+
+    public init(on: Bool) {
+        self.on = on
+    }
+}
+
+public enum SessionChecksChangedEventType: String, Codable {
+    case sessionChecksChanged = "session.checks.changed"
+}
+
 /// ``session.close``. Hide the session from ``session.list``.
 ///
 /// Its events stay in the log. A run still in progress is cancelled first.
@@ -8455,7 +10507,7 @@ public enum SessionClosedEventType: String, Codable {
 // MARK: - SessionCompletedData
 public struct SessionCompletedData: Codable {
     public let runID: String
-    public let status: DataStatus
+    public let status: SessionCompletedDataStatus
     public let summary: String?
 
     public enum CodingKeys: String, CodingKey {
@@ -8464,11 +10516,17 @@ public struct SessionCompletedData: Codable {
         case summary = "summary"
     }
 
-    public init(runID: String, status: DataStatus, summary: String?) {
+    public init(runID: String, status: SessionCompletedDataStatus, summary: String?) {
         self.runID = runID
         self.status = status
         self.summary = summary
     }
+}
+
+public enum SessionCompletedDataStatus: String, Codable {
+    case cancelled = "cancelled"
+    case completed = "completed"
+    case failed = "failed"
 }
 
 /// A run of a session whose origin is not ``user`` ended. It is also in the log.
@@ -8509,7 +10567,7 @@ public struct SessionCompletedEvent: Codable {
 // MARK: - SessionCompletedEventData
 public struct SessionCompletedEventData: Codable {
     public let runID: String
-    public let status: DataStatus
+    public let status: SessionCompletedDataStatus
     public let summary: String?
 
     public enum CodingKeys: String, CodingKey {
@@ -8518,7 +10576,7 @@ public struct SessionCompletedEventData: Codable {
         case summary = "summary"
     }
 
-    public init(runID: String, status: DataStatus, summary: String?) {
+    public init(runID: String, status: SessionCompletedDataStatus, summary: String?) {
         self.runID = runID
         self.status = status
         self.summary = summary
@@ -9074,6 +11132,45 @@ public struct SessionRevokeResult: Codable {
 
     public init(revoked: Bool) {
         self.revoked = revoked
+    }
+}
+
+/// ``session.set_checks``. Say whether golem may run the project's checks in this session.
+///
+/// ``on`` true lets it run them after a turn that changed files, false stops
+/// it. The daemon emits ``session.checks.changed``. The answer is kept with
+/// the session and is not written to ``config.toml``. It matters when
+/// ``[coding] checks`` is ``ask``, and ``auto`` follows it only for a no.
+// MARK: - SessionSetChecksParams
+public struct SessionSetChecksParams: Codable {
+    public let on: Bool
+    public let sessionID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case on = "on"
+        case sessionID = "session_id"
+    }
+
+    public init(on: Bool, sessionID: String) {
+        self.on = on
+        self.sessionID = sessionID
+    }
+}
+
+/// The session's answer after the change.
+// MARK: - SessionSetChecksResult
+public struct SessionSetChecksResult: Codable {
+    public let on: Bool
+    public let sessionID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case on = "on"
+        case sessionID = "session_id"
+    }
+
+    public init(on: Bool, sessionID: String) {
+        self.on = on
+        self.sessionID = sessionID
     }
 }
 
@@ -11110,6 +13207,23 @@ public enum ToolWritingEventType: String, Codable {
     case toolWriting = "tool.writing"
 }
 
+/// Tool results the call sent as a one-line stub, and the tokens that saved.
+// MARK: - TraceContextCleared
+public struct TraceContextCleared: Codable {
+    public let count: Int?
+    public let tokens: Int?
+
+    public enum CodingKeys: String, CodingKey {
+        case count = "count"
+        case tokens = "tokens"
+    }
+
+    public init(count: Int?, tokens: Int?) {
+        self.count = count
+        self.tokens = tokens
+    }
+}
+
 /// One tool or one prompt section, with its share of the tokens.
 // MARK: - TraceContextItem
 public struct TraceContextItem: Codable {
@@ -11186,9 +13300,12 @@ public enum Key: String, Codable {
 /// ``parts`` always has the five keys, in order. They add up to ``used``
 /// when it is known. The split between them is an estimate (about four
 /// characters a token, scaled to ``used``), so ``estimated`` is always true.
-/// The ``prompt_cut`` fields are those of the model span.
+/// The ``prompt_cut`` fields are those of the model span. A cleared result counts as its
+/// stub in ``tool_results``, and ``cleared`` says how many there were and the tokens
+/// not sent because of it.
 // MARK: - TraceContext
 public struct TraceContext: Codable {
+    public let cleared: PurpleTraceContextCleared?
     public let droppedMessageIDS: [String]?
     public let droppedTokens: Int?
     public let estimated: Bool?
@@ -11201,6 +13318,7 @@ public struct TraceContext: Codable {
     public let windowEstimated: Bool?
 
     public enum CodingKeys: String, CodingKey {
+        case cleared = "cleared"
         case droppedMessageIDS = "dropped_message_ids"
         case droppedTokens = "dropped_tokens"
         case estimated = "estimated"
@@ -11213,7 +13331,8 @@ public struct TraceContext: Codable {
         case windowEstimated = "window_estimated"
     }
 
-    public init(droppedMessageIDS: [String]?, droppedTokens: Int?, estimated: Bool?, numCtx: Int?, parts: [PurpleTraceContextPart], promptCut: PromptCut?, promptCutKind: PromptCutKind?, used: Int?, window: Int?, windowEstimated: Bool?) {
+    public init(cleared: PurpleTraceContextCleared?, droppedMessageIDS: [String]?, droppedTokens: Int?, estimated: Bool?, numCtx: Int?, parts: [PurpleTraceContextPart], promptCut: PromptCut?, promptCutKind: PromptCutKind?, used: Int?, window: Int?, windowEstimated: Bool?) {
+        self.cleared = cleared
         self.droppedMessageIDS = droppedMessageIDS
         self.droppedTokens = droppedTokens
         self.estimated = estimated
@@ -11224,6 +13343,23 @@ public struct TraceContext: Codable {
         self.used = used
         self.window = window
         self.windowEstimated = windowEstimated
+    }
+}
+
+/// Tool results the call sent as a one-line stub, and the tokens that saved.
+// MARK: - PurpleTraceContextCleared
+public struct PurpleTraceContextCleared: Codable {
+    public let count: Int?
+    public let tokens: Int?
+
+    public enum CodingKeys: String, CodingKey {
+        case count = "count"
+        case tokens = "tokens"
+    }
+
+    public init(count: Int?, tokens: Int?) {
+        self.count = count
+        self.tokens = tokens
     }
 }
 
@@ -11382,6 +13518,9 @@ public struct RunElement: Codable {
 ///
 /// ``cost_usd`` is what the call cost, as its ``model.call.completed`` recorded
 /// it. Null when the price was not known or the call has no token counts.
+///
+/// ``load_ms``, ``prompt_ms`` and ``reply_ms`` are from the model server's own clock.
+/// Ollama only.
 // MARK: - RunChild
 public struct RunChild: Codable {
     public let approvalWaitMS: Int?
@@ -11396,13 +13535,16 @@ public struct RunChild: Codable {
     public let firstTokenMS: Int?
     public let id: String
     public let kind: ChildKind
+    public let loadMS: Int?
     public let model: String?
     public let name: String
     public let numCtx: Int?
     public let preview: String?
     public let promptCut: PromptCut?
     public let promptCutKind: PromptCutKind?
+    public let promptMS: Int?
     public let recorded: Bool?
+    public let replyMS: Int?
     public let start: String
     public let status: ChildStatus
     public let tokens: RunTraceTokens?
@@ -11421,20 +13563,23 @@ public struct RunChild: Codable {
         case firstTokenMS = "first_token_ms"
         case id = "id"
         case kind = "kind"
+        case loadMS = "load_ms"
         case model = "model"
         case name = "name"
         case numCtx = "num_ctx"
         case preview = "preview"
         case promptCut = "prompt_cut"
         case promptCutKind = "prompt_cut_kind"
+        case promptMS = "prompt_ms"
         case recorded = "recorded"
+        case replyMS = "reply_ms"
         case start = "start"
         case status = "status"
         case tokens = "tokens"
         case windowPlanned = "window_planned"
     }
 
-    public init(approvalWaitMS: Int?, children: [PurpleTraceToolSpan]?, contextWindow: Int?, contextWindowEstimated: Bool?, costUsd: Double?, droppedMessageIDS: [String]?, droppedTokens: Int?, durationMS: Int?, end: String?, firstTokenMS: Int?, id: String, kind: ChildKind, model: String?, name: String, numCtx: Int?, preview: String?, promptCut: PromptCut?, promptCutKind: PromptCutKind?, recorded: Bool?, start: String, status: ChildStatus, tokens: RunTraceTokens?, windowPlanned: Bool?) {
+    public init(approvalWaitMS: Int?, children: [PurpleTraceToolSpan]?, contextWindow: Int?, contextWindowEstimated: Bool?, costUsd: Double?, droppedMessageIDS: [String]?, droppedTokens: Int?, durationMS: Int?, end: String?, firstTokenMS: Int?, id: String, kind: ChildKind, loadMS: Int?, model: String?, name: String, numCtx: Int?, preview: String?, promptCut: PromptCut?, promptCutKind: PromptCutKind?, promptMS: Int?, recorded: Bool?, replyMS: Int?, start: String, status: ChildStatus, tokens: RunTraceTokens?, windowPlanned: Bool?) {
         self.approvalWaitMS = approvalWaitMS
         self.children = children
         self.contextWindow = contextWindow
@@ -11447,13 +13592,16 @@ public struct RunChild: Codable {
         self.firstTokenMS = firstTokenMS
         self.id = id
         self.kind = kind
+        self.loadMS = loadMS
         self.model = model
         self.name = name
         self.numCtx = numCtx
         self.preview = preview
         self.promptCut = promptCut
         self.promptCutKind = promptCutKind
+        self.promptMS = promptMS
         self.recorded = recorded
+        self.replyMS = replyMS
         self.start = start
         self.status = status
         self.tokens = tokens
@@ -11594,6 +13742,9 @@ public enum TraceMessageRole: String, Codable {
 ///
 /// ``cost_usd`` is what the call cost, as its ``model.call.completed`` recorded
 /// it. Null when the price was not known or the call has no token counts.
+///
+/// ``load_ms``, ``prompt_ms`` and ``reply_ms`` are from the model server's own clock.
+/// Ollama only.
 // MARK: - TraceModelSpan
 public struct TraceModelSpan: Codable {
     public let approvalWaitMS: Int?
@@ -11608,13 +13759,16 @@ public struct TraceModelSpan: Codable {
     public let firstTokenMS: Int?
     public let id: String
     public let kind: ChildKind
+    public let loadMS: Int?
     public let model: String?
     public let name: String
     public let numCtx: Int?
     public let preview: String?
     public let promptCut: PromptCut?
     public let promptCutKind: PromptCutKind?
+    public let promptMS: Int?
     public let recorded: Bool?
+    public let replyMS: Int?
     public let start: String
     public let status: ChildStatus
     public let tokens: TraceModelSpanTraceTokens?
@@ -11633,20 +13787,23 @@ public struct TraceModelSpan: Codable {
         case firstTokenMS = "first_token_ms"
         case id = "id"
         case kind = "kind"
+        case loadMS = "load_ms"
         case model = "model"
         case name = "name"
         case numCtx = "num_ctx"
         case preview = "preview"
         case promptCut = "prompt_cut"
         case promptCutKind = "prompt_cut_kind"
+        case promptMS = "prompt_ms"
         case recorded = "recorded"
+        case replyMS = "reply_ms"
         case start = "start"
         case status = "status"
         case tokens = "tokens"
         case windowPlanned = "window_planned"
     }
 
-    public init(approvalWaitMS: Int?, children: [TraceModelSpanChild]?, contextWindow: Int?, contextWindowEstimated: Bool?, costUsd: Double?, droppedMessageIDS: [String]?, droppedTokens: Int?, durationMS: Int?, end: String?, firstTokenMS: Int?, id: String, kind: ChildKind, model: String?, name: String, numCtx: Int?, preview: String?, promptCut: PromptCut?, promptCutKind: PromptCutKind?, recorded: Bool?, start: String, status: ChildStatus, tokens: TraceModelSpanTraceTokens?, windowPlanned: Bool?) {
+    public init(approvalWaitMS: Int?, children: [TraceModelSpanChild]?, contextWindow: Int?, contextWindowEstimated: Bool?, costUsd: Double?, droppedMessageIDS: [String]?, droppedTokens: Int?, durationMS: Int?, end: String?, firstTokenMS: Int?, id: String, kind: ChildKind, loadMS: Int?, model: String?, name: String, numCtx: Int?, preview: String?, promptCut: PromptCut?, promptCutKind: PromptCutKind?, promptMS: Int?, recorded: Bool?, replyMS: Int?, start: String, status: ChildStatus, tokens: TraceModelSpanTraceTokens?, windowPlanned: Bool?) {
         self.approvalWaitMS = approvalWaitMS
         self.children = children
         self.contextWindow = contextWindow
@@ -11659,13 +13816,16 @@ public struct TraceModelSpan: Codable {
         self.firstTokenMS = firstTokenMS
         self.id = id
         self.kind = kind
+        self.loadMS = loadMS
         self.model = model
         self.name = name
         self.numCtx = numCtx
         self.preview = preview
         self.promptCut = promptCut
         self.promptCutKind = promptCutKind
+        self.promptMS = promptMS
         self.recorded = recorded
+        self.replyMS = replyMS
         self.start = start
         self.status = status
         self.tokens = tokens
@@ -11810,6 +13970,9 @@ public struct TraceRunSpan: Codable {
 ///
 /// ``cost_usd`` is what the call cost, as its ``model.call.completed`` recorded
 /// it. Null when the price was not known or the call has no token counts.
+///
+/// ``load_ms``, ``prompt_ms`` and ``reply_ms`` are from the model server's own clock.
+/// Ollama only.
 // MARK: - TraceRunSpanChild
 public struct TraceRunSpanChild: Codable {
     public let approvalWaitMS: Int?
@@ -11824,13 +13987,16 @@ public struct TraceRunSpanChild: Codable {
     public let firstTokenMS: Int?
     public let id: String
     public let kind: ChildKind
+    public let loadMS: Int?
     public let model: String?
     public let name: String
     public let numCtx: Int?
     public let preview: String?
     public let promptCut: PromptCut?
     public let promptCutKind: PromptCutKind?
+    public let promptMS: Int?
     public let recorded: Bool?
+    public let replyMS: Int?
     public let start: String
     public let status: ChildStatus
     public let tokens: TraceRunSpanTraceTokens?
@@ -11849,20 +14015,23 @@ public struct TraceRunSpanChild: Codable {
         case firstTokenMS = "first_token_ms"
         case id = "id"
         case kind = "kind"
+        case loadMS = "load_ms"
         case model = "model"
         case name = "name"
         case numCtx = "num_ctx"
         case preview = "preview"
         case promptCut = "prompt_cut"
         case promptCutKind = "prompt_cut_kind"
+        case promptMS = "prompt_ms"
         case recorded = "recorded"
+        case replyMS = "reply_ms"
         case start = "start"
         case status = "status"
         case tokens = "tokens"
         case windowPlanned = "window_planned"
     }
 
-    public init(approvalWaitMS: Int?, children: [FluffyTraceToolSpan]?, contextWindow: Int?, contextWindowEstimated: Bool?, costUsd: Double?, droppedMessageIDS: [String]?, droppedTokens: Int?, durationMS: Int?, end: String?, firstTokenMS: Int?, id: String, kind: ChildKind, model: String?, name: String, numCtx: Int?, preview: String?, promptCut: PromptCut?, promptCutKind: PromptCutKind?, recorded: Bool?, start: String, status: ChildStatus, tokens: TraceRunSpanTraceTokens?, windowPlanned: Bool?) {
+    public init(approvalWaitMS: Int?, children: [FluffyTraceToolSpan]?, contextWindow: Int?, contextWindowEstimated: Bool?, costUsd: Double?, droppedMessageIDS: [String]?, droppedTokens: Int?, durationMS: Int?, end: String?, firstTokenMS: Int?, id: String, kind: ChildKind, loadMS: Int?, model: String?, name: String, numCtx: Int?, preview: String?, promptCut: PromptCut?, promptCutKind: PromptCutKind?, promptMS: Int?, recorded: Bool?, replyMS: Int?, start: String, status: ChildStatus, tokens: TraceRunSpanTraceTokens?, windowPlanned: Bool?) {
         self.approvalWaitMS = approvalWaitMS
         self.children = children
         self.contextWindow = contextWindow
@@ -11875,13 +14044,16 @@ public struct TraceRunSpanChild: Codable {
         self.firstTokenMS = firstTokenMS
         self.id = id
         self.kind = kind
+        self.loadMS = loadMS
         self.model = model
         self.name = name
         self.numCtx = numCtx
         self.preview = preview
         self.promptCut = promptCut
         self.promptCutKind = promptCutKind
+        self.promptMS = promptMS
         self.recorded = recorded
+        self.replyMS = replyMS
         self.start = start
         self.status = status
         self.tokens = tokens
@@ -12049,9 +14221,12 @@ public struct TraceSpanResult: Codable {
 /// ``parts`` always has the five keys, in order. They add up to ``used``
 /// when it is known. The split between them is an estimate (about four
 /// characters a token, scaled to ``used``), so ``estimated`` is always true.
-/// The ``prompt_cut`` fields are those of the model span.
+/// The ``prompt_cut`` fields are those of the model span. A cleared result counts as its
+/// stub in ``tool_results``, and ``cleared`` says how many there were and the tokens
+/// not sent because of it.
 // MARK: - TraceContextClass
 public struct TraceContextClass: Codable {
+    public let cleared: FluffyTraceContextCleared?
     public let droppedMessageIDS: [String]?
     public let droppedTokens: Int?
     public let estimated: Bool?
@@ -12064,6 +14239,7 @@ public struct TraceContextClass: Codable {
     public let windowEstimated: Bool?
 
     public enum CodingKeys: String, CodingKey {
+        case cleared = "cleared"
         case droppedMessageIDS = "dropped_message_ids"
         case droppedTokens = "dropped_tokens"
         case estimated = "estimated"
@@ -12076,7 +14252,8 @@ public struct TraceContextClass: Codable {
         case windowEstimated = "window_estimated"
     }
 
-    public init(droppedMessageIDS: [String]?, droppedTokens: Int?, estimated: Bool?, numCtx: Int?, parts: [FluffyTraceContextPart], promptCut: PromptCut?, promptCutKind: PromptCutKind?, used: Int?, window: Int?, windowEstimated: Bool?) {
+    public init(cleared: FluffyTraceContextCleared?, droppedMessageIDS: [String]?, droppedTokens: Int?, estimated: Bool?, numCtx: Int?, parts: [FluffyTraceContextPart], promptCut: PromptCut?, promptCutKind: PromptCutKind?, used: Int?, window: Int?, windowEstimated: Bool?) {
+        self.cleared = cleared
         self.droppedMessageIDS = droppedMessageIDS
         self.droppedTokens = droppedTokens
         self.estimated = estimated
@@ -12087,6 +14264,23 @@ public struct TraceContextClass: Codable {
         self.used = used
         self.window = window
         self.windowEstimated = windowEstimated
+    }
+}
+
+/// Tool results the call sent as a one-line stub, and the tokens that saved.
+// MARK: - FluffyTraceContextCleared
+public struct FluffyTraceContextCleared: Codable {
+    public let count: Int?
+    public let tokens: Int?
+
+    public enum CodingKeys: String, CodingKey {
+        case count = "count"
+        case tokens = "tokens"
+    }
+
+    public init(count: Int?, tokens: Int?) {
+        self.count = count
+        self.tokens = tokens
     }
 }
 

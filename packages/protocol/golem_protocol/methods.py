@@ -38,6 +38,8 @@ METHOD_ACCESS: Final[Mapping[str, Access]] = {
     "run.cancel": "browser",
     "artifact.read": "browser",
     "session.inspect": "browser",
+    "changes.list": "browser",
+    "changes.diff": "browser",
     "cost.get": "browser",
     "trace.get": "browser",
     "trace.span": "browser",
@@ -75,6 +77,10 @@ METHOD_ACCESS: Final[Mapping[str, Access]] = {
     "skill.create": "browser",
     "skill.create_protected": "local",
     "skill.set_disabled": "browser",
+    "routine.list": "browser",
+    "routine.get": "browser",
+    "routine.update": "browser",
+    "routine.remove": "browser",
     "session.set_skills": "browser",
     "model.probe": "browser",
     "model.pull": "browser",
@@ -85,6 +91,7 @@ METHOD_ACCESS: Final[Mapping[str, Access]] = {
     "session.set_model": "browser",
     "session.set_options": "browser",
     "session.set_mode": "browser",
+    "session.set_checks": "browser",
     "model.options.get": "browser",
     "model.options.set": "browser",
     "setup.status": "browser",
@@ -92,6 +99,7 @@ METHOD_ACCESS: Final[Mapping[str, Access]] = {
     "ollama.install_cancel": "browser",
     "ollama.start": "browser",
     "fs.list_dirs": "browser",
+    "notify.test": "local",
 }
 
 BROWSER_METHODS: Final[frozenset[str]] = frozenset(

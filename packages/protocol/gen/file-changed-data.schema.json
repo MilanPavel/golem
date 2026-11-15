@@ -1,0 +1,80 @@
+{
+  "additionalProperties": false,
+  "description": "One change to one file, recorded before this event was sent.\n\n``path`` is relative to the session folder. ``call_id`` is the tool call that\nmade the change, and null for a shell change or an undo. ``reverts`` is the\nchange an undo took back. The texts are not sent; read them by ``change_id``.",
+  "properties": {
+    "added": {
+      "minimum": 0,
+      "title": "Added",
+      "type": "integer"
+    },
+    "call_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Call Id"
+    },
+    "change_id": {
+      "minLength": 1,
+      "title": "Change Id",
+      "type": "string"
+    },
+    "path": {
+      "minLength": 1,
+      "title": "Path",
+      "type": "string"
+    },
+    "removed": {
+      "minimum": 0,
+      "title": "Removed",
+      "type": "integer"
+    },
+    "reverts": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reverts"
+    },
+    "source": {
+      "enum": [
+        "tool",
+        "shell",
+        "revert"
+      ],
+      "title": "Source",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "created",
+        "modified",
+        "deleted"
+      ],
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "change_id",
+    "path",
+    "status",
+    "added",
+    "removed",
+    "source"
+  ],
+  "title": "FileChangedData",
+  "type": "object"
+}

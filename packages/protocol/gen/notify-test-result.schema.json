@@ -1,0 +1,20 @@
+{
+  "additionalProperties": false,
+  "description": "``posted`` is false when nothing was shown: no poster on this machine, or macOS refused.\n\n``mechanism`` names the poster that tried, such as ``osascript`` or ``none``.",
+  "properties": {
+    "mechanism": {
+      "title": "Mechanism",
+      "type": "string"
+    },
+    "posted": {
+      "title": "Posted",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "posted",
+    "mechanism"
+  ],
+  "title": "NotifyTestResult",
+  "type": "object"
+}

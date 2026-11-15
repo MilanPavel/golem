@@ -1,0 +1,29 @@
+{
+  "additionalProperties": false,
+  "description": "``routine.get``. A routine by name. ``folder`` picks a project routine.",
+  "properties": {
+    "folder": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Folder"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "title": "RoutineGetParams",
+  "type": "object"
+}

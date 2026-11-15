@@ -20,16 +20,22 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from collections.abc import AsyncGenerator, Awaitable, Callable, Sequence
+from collections.abc import AsyncGenerator, Awaitable, Callable, Mapping, Sequence
 from contextlib import aclosing
 from dataclasses import dataclass, field
 from typing import Literal
 
 from pydantic import BaseModel
 
+from golem.coding.changes import ChangeStore, status_of
 from golem.config import ModelPrice, PermissionMode
 from golem.graphs.adapter import (
     ApprovalAsked,
+    CheckCompleted,
+    CheckOffered,
+    CheckStarted,
+    ContextChanged,
+    FileChanged,
     ModelRequested,
     ModelResponded,
     ModelStarted,
@@ -63,8 +69,14 @@ from golem_protocol.events import (
     ApprovalNeededData,
     ApprovalResolvedData,
     CallPrice,
+    CheckCompletedData,
+    CheckInfo,
+    CheckOfferedData,
+    CheckStartedData,
+    ContextChangedData,
     EmptyEventData,
     EventType,
+    FileChangedData,
     MessageCompletedData,
     MessageDeltaData,
     MessageStartedData,
@@ -116,6 +128,7 @@ class Turn:
     pinned_folders: tuple[str, ...] = ()
     options: dict[str, float | str] = field(default_factory=dict[str, float | str], compare=False)
     permission_mode: PermissionMode | None = None
+    checks: bool | None = None
     pins: PinMemory = field(default_factory=PinMemory, compare=False)
     skill: Invocation | None = None
     typed: str | None = None
@@ -151,6 +164,7 @@ class Resume:
     pinned_folders: tuple[str, ...] = ()
     options: dict[str, float | str] = field(default_factory=dict[str, float | str], compare=False)
     permission_mode: PermissionMode | None = None
+    checks: bool | None = None
     pins: PinMemory = field(default_factory=PinMemory, compare=False)
 
 
@@ -200,6 +214,9 @@ class _Progress:
     first_at: float | None = None
     ran_window: int | None = None
     text_tool_calls: Literal["recovered", "unread"] | None = None
+    timings: Mapping[str, int] = field(default_factory=dict[str, int])
+    """The model server's own numbers for the call, from ``model.response``."""
+    note_speed: Callable[..., object] | None = None
     translate: Translator = field(default_factory=Translator)
     """Turns stream parts into facts. It holds text that may be half of a ``<think>`` tag."""
     thinking: list[str] = field(default_factory=list[str])
@@ -207,6 +224,10 @@ class _Progress:
     """When the first thinking fragment of the open reply came."""
     think_ms: int | None = None
     """Thinking time of the open reply, set when its first answer fragment comes."""
+    changes: ChangeStore | None = None
+    """Records the files a tool wrote. None: they are not recorded and send no event."""
+    session_id: str = ""
+    run_id: str = ""
 
 
 async def run_turn(
@@ -224,6 +245,10 @@ async def run_turn(
         identify=runtime.router.identity,
         price_of=runtime.price_of,
         tier_of=runtime.tier_of,
+        changes=runtime.changes,
+        session_id=turn.session_id,
+        run_id=turn.run_id,
+        note_speed=runtime.note_speed,
     )
 
     async def emit(kind: EventType, data: BaseModel) -> None:
@@ -275,6 +300,7 @@ async def run_turn(
             pinned_folders=turn.pinned_folders,
             options=turn.options,
             permission_mode=turn.permission_mode,
+            checks=turn.checks,
             skill_folder=None if skill is None else str(skill.path),
         )
         return await _finish(stream, progress, emit)
@@ -319,6 +345,10 @@ async def resume_turn(
         identify=runtime.router.identity,
         price_of=runtime.price_of,
         tier_of=runtime.tier_of,
+        changes=runtime.changes,
+        session_id=resume.session_id,
+        run_id=resume.run_id,
+        note_speed=runtime.note_speed,
     )
 
     async def emit(kind: EventType, data: BaseModel) -> None:
@@ -348,6 +378,7 @@ async def resume_turn(
             pinned_folders=resume.pinned_folders,
             options=resume.options,
             permission_mode=resume.permission_mode,
+            checks=resume.checks,
         )
         return await _finish(stream, progress, emit)
     except asyncio.CancelledError:
@@ -420,6 +451,7 @@ async def _apply(
         progress.first_at = None
         progress.ran_window = None
         progress.text_tool_calls = None
+        progress.timings = {}
         model = progress.model
         if fact.profile is not None and progress.identify is not None:
             model = progress.identify(fact.profile)
@@ -449,11 +481,23 @@ async def _apply(
                 tools_bytes=fact.tools_bytes,
                 message_chars=None if fact.message_chars is None else list(fact.message_chars),
                 message_bytes=None if fact.message_bytes is None else list(fact.message_bytes),
+                cleared_ids=list(fact.cleared_ids),
+            ),
+        )
+    elif isinstance(fact, ContextChanged):
+        await emit(
+            "context.changed",
+            ContextChangedData(
+                action=fact.action,
+                before_tokens=fact.before_tokens,
+                after_tokens=fact.after_tokens,
+                count=fact.count,
             ),
         )
     elif isinstance(fact, ModelResponded):
         progress.ran_window = fact.context_window
         progress.text_tool_calls = fact.text_tool_calls
+        progress.timings = fact.timings
     elif isinstance(fact, ThinkingDelta) and progress.open is not None:
         if progress.think_at is None:
             progress.think_at = time.monotonic()
@@ -546,6 +590,8 @@ async def _apply(
             "todos.updated",
             TodosUpdatedData.model_validate({"call_id": fact.call_id, "todos": list(fact.todos)}),
         )
+    elif isinstance(fact, FileChanged):
+        await _record_change(fact, progress, emit)
     elif isinstance(fact, PinRead):
         if progress.pins.read(fact.name, fact.hash):
             data = {"name": fact.name, "source": fact.source, "how": "pinned"}
@@ -560,6 +606,32 @@ async def _apply(
         skipped = SkillSkippedData.model_validate(data)
         if progress.pins.skipped(skipped.name, skipped.reason):
             await emit("skill.skipped", skipped)
+    elif isinstance(fact, CheckOffered):
+        infos = [CheckInfo(name=name, command=command) for name, command in fact.checks]
+        await emit("check.offered", CheckOfferedData(checks=infos))
+    elif isinstance(fact, CheckStarted):
+        await emit(
+            "check.started",
+            CheckStartedData(
+                check_id=fact.check_id, name=fact.name, command=fact.command, round=fact.round
+            ),
+        )
+    elif isinstance(fact, CheckCompleted):
+        await emit(
+            "check.completed",
+            CheckCompletedData.model_validate(
+                {
+                    "check_id": fact.check_id,
+                    "name": fact.name,
+                    "status": fact.status,
+                    "exit_code": fact.exit_code,
+                    "duration_ms": fact.duration_ms,
+                    "output": fact.output,
+                    "artifact_id": fact.artifact_id,
+                    "round": fact.round,
+                }
+            ),
+        )
     elif isinstance(fact, ApprovalAsked):
         progress.waiting = True
         await emit(
@@ -574,6 +646,42 @@ async def _apply(
                 diff=fact.diff,
             ),
         )
+
+
+async def _record_change(
+    fact: FileChanged,
+    progress: _Progress,
+    emit: Callable[[EventType, BaseModel], Awaitable[None]],
+) -> None:
+    """Store the change, then tell the screens. The texts stay here and never go out."""
+    if progress.changes is None or fact.before == fact.after:
+        return
+    try:
+        change = await progress.changes.record(
+            session_id=progress.session_id,
+            run_id=progress.run_id,
+            call_id=fact.call_id,
+            path=fact.path,
+            before=fact.before,
+            after=fact.after,
+            source=fact.source,
+        )
+    except Exception:
+        log.exception("could not record the change to %s", fact.path)
+        return
+    await emit(
+        "file.changed",
+        FileChangedData(
+            change_id=change.change_id,
+            call_id=change.call_id,
+            path=change.path,
+            status=status_of(change.before_sha, change.after_sha),
+            added=change.added,
+            removed=change.removed,
+            source=change.source,
+            reverts=change.reverts,
+        ),
+    )
 
 
 def _tier(progress: _Progress, model: ModelIdentity | None) -> Tier | None:
@@ -607,6 +715,12 @@ async def _end_call(
             price = CallPrice(
                 input=found.input, output=found.output, cached_input=found.cached_input
             )
+    timings: Mapping[str, int] = {} if failed else progress.timings
+    if timings and model is not None and progress.note_speed is not None:
+        try:
+            progress.note_speed(model.profile, timings)
+        except Exception:
+            log.debug("noting the speed of %s failed", model.profile, exc_info=True)
     await emit(
         "model.call.completed",
         ModelCallCompletedData(
@@ -620,6 +734,9 @@ async def _end_call(
             text_tool_calls=None if failed else progress.text_tool_calls,
             cost_usd=cost,
             price=price,
+            load_ms=timings.get("load_ms"),
+            prompt_ms=timings.get("prompt_ms"),
+            reply_ms=timings.get("reply_ms"),
         ),
     )
 

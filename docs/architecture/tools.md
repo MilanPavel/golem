@@ -173,12 +173,12 @@ Output up to 20 000 characters goes to the model as a `ToolMessage` in the check
 
 ![Long tool output: output over 20 000 characters is stored whole as an artifact in golem.db. The model reads its first 12 000 and last 4 000 characters, with a note in between that names the artifact, and pages through the rest with read_artifact, up to 20 000 characters at a time](../images/tools-artifact.svg)
 
-Longer output is stored whole in the `artifacts` table, and the message keeps the first 12 000 and the last 4 000 characters and a note with the artifact's id, which `read_artifact` pages through ([ADR-016](../adr/016-artifacts.md)).
+Longer output is stored whole in the `artifacts` table, and the message keeps its head and its tail and a note with the artifact's id, which `read_artifact` pages through ([ADR-016](../adr/016-artifacts.md)). The numbers above are for a 32K window. The rule: one result may take an eighth of the model's window, at four characters a token, from 4 000 to 48 000 characters, rounded down to a thousand. The head is three quarters of that, the tail the rest, and output over five quarters of it goes to an artifact. An 8K window gets 3 000 + 1 000 (artifact above 5 000), a 128K window 36 000 + 12 000 (above 60 000). An unknown window gets the 32K numbers (`packages/daemon/golem/graphs/result_budget.py`).
 
 - **The cut** happens in the node's run pass, after every approval, so nothing is stored twice when a run resumes.
-- **`read_artifact`** reads up to 20 000 characters from an offset, only from the session's own artifacts. A page of an `untrusted` artifact, such as a long web page, comes back in the same wrapper as the page.
+- **`read_artifact`** reads up to 20 000 characters from an offset (at most the head plus the tail of the window's budget), only from the session's own artifacts. A page of an `untrusted` artifact, such as a long web page, comes back in the same wrapper as the page.
 - **On the wire,** `tool.completed` carries `artifact_id`, and `artifact.read` returns a page of it. The TUI shows `all of it: /artifact <id>` under an expanded block, and `/artifact` opens the text in `$PAGER`.
-- **Without an artifact store,** as in some tests, the model gets at most 100 000 characters of one call.
+- **Without an artifact store,** as in some tests, the model gets at most 100 000 characters of one call, or five times the artifact limit of its window when that is less.
 
 ### Todos
 
@@ -242,6 +242,7 @@ Longer output is stored whole in the `artifacts` table, and the message keeps th
 | `packages/daemon/golem/tools/untrusted.py` | The wrapper for outside content |
 | `packages/daemon/golem/tools/artifacts.py` | `read_artifact` |
 | `packages/daemon/golem/tools/todos.py` | `todo_write` |
+| `packages/daemon/golem/graphs/result_budget.py` | How much of one result the model reads, by window |
 | `packages/daemon/golem/graphs/tools_node.py` | The `tools` node: decide, run, results, artifacts, and state updates |
 | `packages/daemon/golem/store/artifacts.py` | `ArtifactStore`, the `artifacts` table |
 

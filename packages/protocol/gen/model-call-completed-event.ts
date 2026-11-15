@@ -5,10 +5,13 @@ export type CostUsd = number | null;
 export type Failed = boolean;
 export type FirstTokenMs = number | null;
 export type LatencyMs = number;
+export type LoadMs = number | null;
 export type MessageId = string;
 export type CachedInput = number | null;
 export type Input = number | null;
 export type Output = number | null;
+export type PromptMs = number | null;
+export type ReplyMs = number | null;
 export type StopReason = string | null;
 export type TextToolCalls = ('recovered' | 'unread') | null;
 export type CacheRead = number | null;
@@ -50,6 +53,10 @@ export interface ModelCallCompletedEvent {
  * ``cost_usd`` is the cost of this call at ``price``. Both are None when the
  * price is not known. A local model costs 0.
  *
+ * ``load_ms``, ``prompt_ms`` and ``reply_ms`` are the time the model server spent loading
+ * the model, reading the prompt and writing the reply. From the model server's own clock.
+ * Ollama only.
+ *
  * This interface was referenced by `ModelCallCompletedEvent`'s JSON-Schema
  * via the `definition` "ModelCallCompletedData".
  */
@@ -59,8 +66,11 @@ export interface ModelCallCompletedData {
   failed?: Failed;
   first_token_ms?: FirstTokenMs;
   latency_ms: LatencyMs;
+  load_ms?: LoadMs;
   message_id: MessageId;
   price?: CallPrice | null;
+  prompt_ms?: PromptMs;
+  reply_ms?: ReplyMs;
   stop_reason?: StopReason;
   text_tool_calls?: TextToolCalls;
   usage?: TokenUsage | null;

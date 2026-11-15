@@ -36,6 +36,7 @@ import { settingsPath, tracePath, welcomePath } from "../../store/router.ts";
 import { requestConfig } from "../settings/config-request.ts";
 import { requestMcpAdd } from "../settings/mcp-add-request.ts";
 import { NEEDS_SESSION, NOT_YET } from "./terminal-only.ts";
+import { requestNewSkill } from "../settings/skill-request.ts";
 
 /**
  * What a run came to. "sent" went to the daemon; "handled" was a command the page ran; "busy" is
@@ -164,7 +165,12 @@ export function useCommands({ session, cwd, typing, send }: UseCommandsOptions):
             navigate(settingsPath("config"));
             return "handled";
           case "skills":
-            return say(NOT_YET.skills);
+            navigate(settingsPath("skills"));
+            return "handled";
+          case "skill-new":
+            requestNewSkill();
+            navigate(settingsPath("skills"));
+            return "handled";
           case "permissions":
             navigate(settingsPath("rules"));
             return "handled";

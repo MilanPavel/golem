@@ -63,6 +63,7 @@ from golem_protocol.events import (
     ModelSelectedData,
     RunCancelledData,
     SessionAllowance,
+    SessionChecksChangedData,
     SessionCompletedData,
     SessionCreatedData,
     SessionModeChangedData,
@@ -157,6 +158,8 @@ class _LiveSession:
     """The Ollama option overrides of this session."""
     permission_mode: PermissionMode | None = None
     """The session's permission mode override, None to follow ``config.toml``."""
+    checks: bool | None = None
+    """Whether the session lets golem run checks. None until it answers the offer."""
     pins: PinMemory = field(default_factory=PinMemory)
     """What the log last said about each pin, so a run logs only a change."""
     title: str | None = None
@@ -414,6 +417,7 @@ class SessionManager:
                 sections=found.result.system_sections,
                 tools=tools,
                 messages=found.result.messages,
+                cleared_ids=found.cleared_ids,
             )
             updates["context"] = context.model_copy(
                 update={
@@ -528,6 +532,14 @@ class SessionManager:
         async with self._lock:
             return dict((await self._resolve(session_id)).options)
 
+    async def cwd_of(self, session_id: str) -> str | None:
+        """The folder the session works in, None for a session without one.
+
+        Raises :class:`SessionNotFoundError` or :class:`SchemaMismatchError`.
+        """
+        async with self._lock:
+            return (await self._resolve(session_id)).cwd
+
     async def model_profile(self, session_id: str) -> str:
         """The profile or ref the session runs on.
 
@@ -589,6 +601,23 @@ class SessionManager:
                 )
                 session.permission_mode = mode
             return self._effective_mode(session), session.permission_mode is not None
+
+    async def set_checks(self, session_id: str, on: bool) -> bool:
+        """Say whether golem may run the project's checks in this session.
+
+        Stores ``session.checks.changed`` unless the answer is the one it already has.
+        It applies from the next turn.
+
+        Raises :class:`SessionNotFoundError` or :class:`SchemaMismatchError`.
+        """
+        async with self._lock:
+            session = await self._resolve(session_id)
+            if on != session.checks:
+                await self._events.emit(
+                    session_id, None, "session.checks.changed", SessionChecksChangedData(on=on)
+                )
+                session.checks = on
+            return on
 
     async def permission_mode(self, session_id: str) -> PermissionMode:
         """The mode the session runs in: its override, else the one in ``config.toml``.
@@ -655,6 +684,7 @@ class SessionManager:
                 pinned_folders=self._pinned_folders(session),
                 options=dict(session.options),
                 permission_mode=session.permission_mode,
+                checks=session.checks,
                 pins=session.pins,
             )
             control = RunControl()
@@ -729,6 +759,7 @@ class SessionManager:
                 pinned_folders=self._pinned_folders(session),
                 options=dict(session.options),
                 permission_mode=session.permission_mode,
+                checks=session.checks,
                 pins=session.pins,
             )
             control = RunControl()
@@ -1074,6 +1105,7 @@ class SessionManager:
             skills=[] if record is None else list(record.skills),
             options={} if record is None else dict(record.options),
             permission_mode=None if record is None else record.permission_mode,
+            checks=None if record is None else record.checks,
         )
         if session.skills:
             session.pins = PinMemory.from_events(await self._events.stored(session_id))

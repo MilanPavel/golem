@@ -3,6 +3,7 @@ import { createContext, useCallback, useContext, useSyncExternalStore, type Reac
 import { useSyncExternalStoreWithSelector } from "use-sync-external-store/with-selector";
 import { ConnectionProvider } from "./connection-context.tsx";
 import { configKey, type ConfigGetResult } from "./config.ts";
+import { KEYS_KEY } from "./keys.ts";
 import type { FsListDirsResult } from "./dirs.ts";
 import { MODEL_LIST_ALL_KEY, MODEL_LIST_KEY, SETUP_STATUS_KEY, type ModelListResult } from "./models.ts";
 import type { Page, PageActions } from "./page.ts";
@@ -10,7 +11,7 @@ import type { AppInstallSnapshot } from "./app-install.ts";
 import type { PageHostSnapshot } from "./page-host.ts";
 import type { PullsSnapshot } from "./pulls.ts";
 import type { Route } from "./router.ts";
-import type { McpListResult, SessionSummary, SetupStatusResult, SkillListResult } from "@golem/client";
+import type { AuthListResult, McpListResult, SessionSummary, SetupStatusResult, SkillListResult } from "@golem/client";
 import { ARTIFACT_PAGE, artifactKey, traceKey, traceSpanKey, type ArtifactReadResult, type TraceGetResult, type TraceSpanResult } from "./trace.ts";
 import { mcpCatalogKey, mcpListKey, mcpToolsKey, type McpCatalogResult, type McpToolsResult } from "./mcp.ts";
 import type { Pastes } from "@golem/view";
@@ -213,6 +214,15 @@ export function useSessionReader(id: string | null): () => { view: SessionView; 
     }),
     [sessions, sessionList, id],
   );
+}
+
+/**
+ * Where each provider's key is kept (`auth.list`, never a key). A key set in a terminal pushes no event, so
+ * the answer is read again whenever the tab is seen, and whenever Settings asks.
+ */
+export function useKeys(enabled = true): UseQueryResult<AuthListResult> {
+  const { queries } = usePage();
+  return useQuery({ queryKey: [...KEYS_KEY], queryFn: queries.keys, enabled, staleTime: 0, refetchOnWindowFocus: true });
 }
 
 /** The skills a folder sees (all of them for null). Fetched only once `enabled`, and again after a skills change. */

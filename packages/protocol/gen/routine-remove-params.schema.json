@@ -1,0 +1,29 @@
+{
+  "additionalProperties": false,
+  "description": "``routine.remove``. Delete a user routine from ``config.toml``.",
+  "properties": {
+    "folder": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Folder"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "title": "RoutineRemoveParams",
+  "type": "object"
+}

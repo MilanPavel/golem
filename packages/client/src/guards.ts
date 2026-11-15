@@ -12,6 +12,7 @@ import type { McpTestProgress } from "../../protocol/gen/mcp-test-progress.ts";
 import type { McpTestResult } from "../../protocol/gen/mcp-test-result.ts";
 import type { RuntimeInstallDone } from "../../protocol/gen/runtime-install-done.ts";
 import type { OllamaInstallDone } from "../../protocol/gen/ollama-install-done.ts";
+import type { ChangesListResult } from "../../protocol/gen/changes-list-result.ts";
 import type { DirEntry, FsListDirsResult } from "../../protocol/gen/fs-list-dirs-result.ts";
 import type { SetupRow, SetupStatusResult } from "../../protocol/gen/setup-status-result.ts";
 import type { McpListResult } from "../../protocol/gen/mcp-list-result.ts";
@@ -23,11 +24,14 @@ import type { ModelOptionsGetResult } from "../../protocol/gen/model-options-get
 import type { ModelOptionsSaved } from "../../protocol/gen/model-options-saved.ts";
 import type { ModelOptionsSetResult } from "../../protocol/gen/model-options-set-result.ts";
 import type { PermissionsSetModeResult } from "../../protocol/gen/permissions-set-mode-result.ts";
+import type { SessionSetChecksResult } from "../../protocol/gen/session-set-checks-result.ts";
 import type { SessionSetModeResult } from "../../protocol/gen/session-set-mode-result.ts";
 import type { SessionSetOptionsResult } from "../../protocol/gen/session-set-options-result.ts";
 import type { ListedSkill, SkillListResult } from "../../protocol/gen/skill-list-result.ts";
 import type { SkillCreateResult } from "../../protocol/gen/skill-create-result.ts";
 import type { SkillReadResult } from "../../protocol/gen/skill-read-result.ts";
+import type { SkillSetDisabledResult } from "../../protocol/gen/skill-set-disabled-result.ts";
+import type { SkillWriteResult } from "../../protocol/gen/skill-write-result.ts";
 import type { McpRemoveResult } from "../../protocol/gen/mcp-remove-result.ts";
 import type { McpToggleResult } from "../../protocol/gen/mcp-toggle-result.ts";
 import type { SessionSetSkillsResult } from "../../protocol/gen/session-set-skills-result.ts";
@@ -66,6 +70,7 @@ const EVENT_TYPES = new Set([
   "model.selected",
   "model.options.changed",
   "session.mode.changed",
+  "session.checks.changed",
   "message.started",
   "message.delta",
   "message.thinking.delta",
@@ -87,6 +92,9 @@ const EVENT_TYPES = new Set([
   "skill.activated",
   "skill.deactivated",
   "skill.skipped",
+  "check.offered",
+  "check.started",
+  "check.completed",
 ]);
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
@@ -203,8 +211,16 @@ export function isSkillReadResult(value: unknown): value is SkillReadResult {
   );
 }
 
+export function isSkillWriteResult(value: unknown): value is SkillWriteResult {
+  return isRecord(value) && typeof value["ok"] === "boolean" && typeof value["written"] === "boolean";
+}
+
 export function isSkillCreateResult(value: unknown): value is SkillCreateResult {
   return isRecord(value) && typeof value["path"] === "string" && typeof value["mtime_ns"] === "number";
+}
+
+export function isSkillSetDisabledResult(value: unknown): value is SkillSetDisabledResult {
+  return isRecord(value) && typeof value["name"] === "string" && typeof value["disabled"] === "boolean";
 }
 
 export function isSessionSetSkillsResult(value: unknown): value is SessionSetSkillsResult {
@@ -303,6 +319,10 @@ export function isSessionSetOptionsResult(value: unknown): value is SessionSetOp
   return isRecord(value) && typeof value["session_id"] === "string" && isOptionValues(value["options"]);
 }
 
+export function isSessionSetChecksResult(value: unknown): value is SessionSetChecksResult {
+  return isRecord(value) && typeof value["session_id"] === "string" && typeof value["on"] === "boolean";
+}
+
 export function isSessionSetModeResult(value: unknown): value is SessionSetModeResult {
   return (
     isRecord(value) &&
@@ -367,6 +387,23 @@ export function isFsListDirsResult(value: unknown): value is FsListDirsResult {
     value["entries"].every(isDirEntry) &&
     typeof value["truncated"] === "boolean"
   );
+}
+
+function isChangedFile(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    typeof value["path"] === "string" &&
+    (value["status"] === "created" || value["status"] === "modified" || value["status"] === "deleted") &&
+    typeof value["added"] === "number" &&
+    typeof value["removed"] === "number" &&
+    Array.isArray(value["change_ids"]) &&
+    value["change_ids"].every((id) => typeof id === "string") &&
+    typeof value["stale"] === "boolean"
+  );
+}
+
+export function isChangesListResult(value: unknown): value is ChangesListResult {
+  return isRecord(value) && Array.isArray(value["files"]) && value["files"].every(isChangedFile);
 }
 
 export function isKeychainWait(value: unknown): value is KeychainWait {

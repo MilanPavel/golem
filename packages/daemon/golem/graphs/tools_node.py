@@ -36,7 +36,8 @@ from langgraph.config import get_stream_writer
 from langgraph.types import interrupt
 
 from golem.config import PERMISSION_MODES, PermissionMode
-from golem.graphs.adapter import APPROVAL_KIND, SKILL_LOADED_KIND, STREAM_KEY
+from golem.graphs.adapter import APPROVAL_KIND, FILE_CHANGED_KIND, SKILL_LOADED_KIND, STREAM_KEY
+from golem.graphs.result_budget import DEFAULT_BUDGET, ResultBudget
 from golem.graphs.state import AgentState
 from golem.permissions.engine import Allowance, session_allows
 from golem.permissions.policy import Policy, describe, explain
@@ -78,12 +79,13 @@ runs, and returns its tool names. Raises :class:`ToolError` when it cannot."""
 
 PREVIEW_CHARS = 4_000
 
-ARTIFACT_CHARS = 20_000
-"""Output longer than this goes to an artifact, and the model gets its head and tail."""
-HEAD_CHARS = 12_000
-TAIL_CHARS = 4_000
+ARTIFACT_CHARS = DEFAULT_BUDGET.artifact_chars
+"""Output longer than this goes to an artifact, for a 32K window or an unknown one."""
 CUT_CHARS = 100_000
-"""Without an artifact store, what the model gets of one call at most."""
+"""Without an artifact store, what the model gets of one call at most, for the default budget."""
+
+BudgetOf = Callable[[AgentState, RunnableConfig], ResultBudget]
+"""The budget for one tool result, from the window of the model that will read it."""
 
 STATE_KEYS = frozenset({"todos", "skill_folders"})
 """Graph state a tool may change through ``ToolResult.update``. Anything else is dropped."""
@@ -146,11 +148,13 @@ def tools_node(
     artifacts: Artifacts | None = None,
     enable_mcp: Callable[[], EnableMcp | None] = lambda: None,
     skills: Callable[[], SkillRegistry | None] = lambda: None,
+    budget_of: BudgetOf | None = None,
 ) -> Callable[[AgentState, RunnableConfig], Awaitable[dict[str, object]]]:
     async def tools(state: AgentState, config: RunnableConfig) -> dict[str, object]:
         last = state["messages"][-1]
         if not isinstance(last, AIMessage):
             return {"messages": []}
+        budget = DEFAULT_BUDGET if budget_of is None else budget_of(state, config)
         session_tools = registry.scoped(scope_of(config))
         session_id = state.get("session_id")
         enabler = enable_mcp()
@@ -174,6 +178,7 @@ def tools_node(
             read_roots=_read_roots(state, config),
             enable_mcp=enable_here if enabler is not None and session_id else None,
             skills=None if skill_registry is None else skill_registry.view(root),
+            page_chars=budget.page_chars,
         )
         allowed = _allowed(config)
         mode = _mode(config)
@@ -252,8 +257,19 @@ def tools_node(
             tool = session_tools.get(call["name"])
             kind = "untrusted" if tool is not None and tool.untrusted else "tool_output"
             output, artifact_id = await _for_model(
-                artifacts, session_id, call_id, result.output, kind
+                artifacts, session_id, call_id, result.output, kind, budget
             )
+            for edit in result.edits:
+                write(
+                    {
+                        STREAM_KEY: FILE_CHANGED_KIND,
+                        "call_id": call_id,
+                        "path": edit.path,
+                        "before": edit.before,
+                        "after": edit.after,
+                        "source": "tool",
+                    }
+                )
             preview = result.output[:PREVIEW_CHARS]
             write(
                 {
@@ -358,25 +374,27 @@ async def _for_model(
     call_id: str,
     output: str,
     kind: str = "tool_output",
+    budget: ResultBudget = DEFAULT_BUDGET,
 ) -> tuple[str, str | None]:
     """What the model reads of ``output``, and the artifact that holds all of it.
 
     Long output is stored whole, and the model gets its head and its tail,
-    where a failing command prints the part that matters.
+    where a failing command prints the part that matters. ``budget`` follows the window.
     """
-    if len(output) <= ARTIFACT_CHARS:
+    if len(output) <= budget.artifact_chars:
         return output, None
     if artifacts is None or session_id is None:
-        if len(output) <= CUT_CHARS:
+        cut = min(CUT_CHARS, budget.artifact_chars * 5)
+        if len(output) <= cut:
             return output, None
-        return f"{output[:CUT_CHARS]}\n[output cut at {CUT_CHARS} characters]", None
+        return f"{output[:cut]}\n[output cut at {cut} characters]", None
     artifact_id = await artifacts.put(session_id, call_id, kind, output)
-    skipped = len(output) - HEAD_CHARS - TAIL_CHARS
+    skipped = len(output) - budget.head_chars - budget.tail_chars
     note = (
         f"[{skipped} characters cut; the whole output is {len(output)} characters in artifact "
         f"{artifact_id}. Read it with read_artifact(artifact_id, offset, limit).]"
     )
-    return f"{output[:HEAD_CHARS]}\n{note}\n{output[-TAIL_CHARS:]}", artifact_id
+    return f"{output[: budget.head_chars]}\n{note}\n{output[-budget.tail_chars :]}", artifact_id
 
 
 def _ms(started: float) -> int:
@@ -534,6 +552,7 @@ __all__ = [
     "PREVIEW_CHARS",
     "STATE_KEYS",
     "Answer",
+    "BudgetOf",
     "EnableMcp",
     "ErrorKind",
     "call_id_of",

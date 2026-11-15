@@ -322,6 +322,12 @@ test("/skill pin and /skill unpin name one skill", () => {
   });
 });
 
+test("/skill new opens the new-skill form, and /skills keeps opening the list", () => {
+  assert.deepEqual(applyComposer(closedDebug, "/skill new", SKILLS, PINS), { kind: "skill-new" });
+  assert.equal(applyComposer(closedDebug, "/skill new extra", SKILLS, PINS).kind, "unknown");
+  assert.deepEqual(applyComposer(closedDebug, "/skills", SKILLS, PINS), { kind: "skills" });
+});
+
 test("/skill pin and unpin say why when there is nothing to do", () => {
   const notice = (line: string): string | null => {
     const outcome = applyComposer(closedDebug, line, SKILLS, PINS);

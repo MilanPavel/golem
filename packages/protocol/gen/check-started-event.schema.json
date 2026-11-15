@@ -1,0 +1,80 @@
+{
+  "$defs": {
+    "CheckStartedData": {
+      "additionalProperties": false,
+      "description": "A check began. ``round`` is 0 for the first run after a turn.",
+      "properties": {
+        "check_id": {
+          "minLength": 1,
+          "title": "Check Id",
+          "type": "string"
+        },
+        "command": {
+          "minLength": 1,
+          "title": "Command",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "round": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Round",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "check_id",
+        "name",
+        "command"
+      ],
+      "title": "CheckStartedData",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "A check is running.",
+  "properties": {
+    "data": {
+      "$ref": "#/$defs/CheckStartedData"
+    },
+    "run_id": {
+      "minLength": 1,
+      "title": "Run Id",
+      "type": "string"
+    },
+    "seq": {
+      "minimum": 1,
+      "title": "Seq",
+      "type": "integer"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    },
+    "ts": {
+      "minLength": 1,
+      "title": "Ts",
+      "type": "string"
+    },
+    "type": {
+      "const": "check.started",
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "seq",
+    "session_id",
+    "run_id",
+    "ts",
+    "type",
+    "data"
+  ],
+  "title": "CheckStartedEvent",
+  "type": "object"
+}
