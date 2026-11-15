@@ -17,6 +17,7 @@ from pydantic import BaseModel
 from golem.coding.changes import ChangeStore
 from golem.config import ModelPrice, load_settings
 from golem.graphs.chat import ChatRuntime, open_chat
+from golem.graphs.estimate import TokenRatios
 from golem.graphs.prompt import SystemPrompt
 from golem.graphs.summarise import Summariser
 from golem.lock import DaemonAlreadyRunning, DaemonLock
@@ -293,6 +294,7 @@ class DaemonApp:
                     price_of=lambda profile: _price_of(router, models, profile),
                     gate=gate,
                     tier_of=lambda profile: _tier_of(router, models, profile),
+                    ratios=TokenRatios(),
                     summariser=Summariser(
                         router,
                         gate=gate,

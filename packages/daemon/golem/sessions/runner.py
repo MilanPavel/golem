@@ -57,7 +57,7 @@ from golem.graphs.adapter import (
 from golem.graphs.chat import ChatRuntime
 from golem.graphs.tools_node import Answer
 from golem.models.cost import cost_usd
-from golem.models.errors import ModelUnreachable
+from golem.models.errors import ContextFull, ModelUnreachable
 from golem.models.pick import Choice
 from golem.models.router import ModelConfigError, ModelIdentity
 from golem.models.tiers import Tier
@@ -452,6 +452,10 @@ async def _failed(
         )
         await emit("run.failed", data)
         return
+    if isinstance(exc, ContextFull):
+        log.warning("run %s failed: needs about %d of %d tokens", run_id, exc.need, exc.window)
+        await emit("run.failed", RunFailedData(message=exc.message, code=exc.code, hint=exc.hint))
+        return
     log.exception("run %s failed", run_id, exc_info=exc)
     message = str(exc).strip() or type(exc).__name__
     await emit("run.failed", RunFailedData(message=message))
@@ -515,6 +519,7 @@ async def _apply(
                 message_bytes=None if fact.message_bytes is None else list(fact.message_bytes),
                 cleared_ids=list(fact.cleared_ids),
                 summary_chars=fact.summary_chars,
+                estimated_tokens=fact.estimated_tokens,
             ),
         )
     elif isinstance(fact, ContextChanged):

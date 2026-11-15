@@ -5904,6 +5904,7 @@ public enum ModelCallCompletedEventType: String, Codable {
 public struct ModelCallStartedData: Codable {
     public let clearedIDS: [String]?
     public let contextWindow: Int?
+    public let estimatedTokens: Int?
     public let index: Int
     public let messageBytes: [Int]?
     public let messageChars: [Int]?
@@ -5928,6 +5929,7 @@ public struct ModelCallStartedData: Codable {
     public enum CodingKeys: String, CodingKey {
         case clearedIDS = "cleared_ids"
         case contextWindow = "context_window"
+        case estimatedTokens = "estimated_tokens"
         case index = "index"
         case messageBytes = "message_bytes"
         case messageChars = "message_chars"
@@ -5950,9 +5952,10 @@ public struct ModelCallStartedData: Codable {
         case windowPlanned = "window_planned"
     }
 
-    public init(clearedIDS: [String]?, contextWindow: Int?, index: Int, messageBytes: [Int]?, messageChars: [Int]?, messageID: String, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String, provider: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [PurplePromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?) {
+    public init(clearedIDS: [String]?, contextWindow: Int?, estimatedTokens: Int?, index: Int, messageBytes: [Int]?, messageChars: [Int]?, messageID: String, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String, provider: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [PurplePromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?) {
         self.clearedIDS = clearedIDS
         self.contextWindow = contextWindow
+        self.estimatedTokens = estimatedTokens
         self.index = index
         self.messageBytes = messageBytes
         self.messageChars = messageChars
@@ -6057,6 +6060,7 @@ public struct ModelCallStartedEvent: Codable {
 public struct ModelCallStartedEventData: Codable {
     public let clearedIDS: [String]?
     public let contextWindow: Int?
+    public let estimatedTokens: Int?
     public let index: Int
     public let messageBytes: [Int]?
     public let messageChars: [Int]?
@@ -6081,6 +6085,7 @@ public struct ModelCallStartedEventData: Codable {
     public enum CodingKeys: String, CodingKey {
         case clearedIDS = "cleared_ids"
         case contextWindow = "context_window"
+        case estimatedTokens = "estimated_tokens"
         case index = "index"
         case messageBytes = "message_bytes"
         case messageChars = "message_chars"
@@ -6103,9 +6108,10 @@ public struct ModelCallStartedEventData: Codable {
         case windowPlanned = "window_planned"
     }
 
-    public init(clearedIDS: [String]?, contextWindow: Int?, index: Int, messageBytes: [Int]?, messageChars: [Int]?, messageID: String, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String, provider: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [FluffyPromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?) {
+    public init(clearedIDS: [String]?, contextWindow: Int?, estimatedTokens: Int?, index: Int, messageBytes: [Int]?, messageChars: [Int]?, messageID: String, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String, provider: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [FluffyPromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?) {
         self.clearedIDS = clearedIDS
         self.contextWindow = contextWindow
+        self.estimatedTokens = estimatedTokens
         self.index = index
         self.messageBytes = messageBytes
         self.messageChars = messageChars
@@ -9442,7 +9448,8 @@ public struct Params: Codable {
 /// model's server did not answer. ``not_installed``: the model needs a local
 /// server that is not installed, such as Ollama. ``provider`` is the provider
 /// whose server it was, and ``hint`` says how to fix it, such as
-/// ``run ollama serve``.
+/// ``run ollama serve``. ``context_full``: the prompt does not fit the model's window,
+/// even after clearing and summarising, and nothing was sent.
 ///
 /// Who stopped the run. ``user`` is ``run.cancel``, ``shutdown`` the daemon stopping.
 ///
@@ -9576,6 +9583,7 @@ public struct ParamsData: Codable {
     public let thinkingMS: Int?
     public let clearedIDS: [String]?
     public let contextWindow: Int?
+    public let estimatedTokens: Int?
     public let index: Int?
     public let messageBytes: [Int]?
     public let messageChars: [Int]?
@@ -9675,6 +9683,7 @@ public struct ParamsData: Codable {
         case thinkingMS = "thinking_ms"
         case clearedIDS = "cleared_ids"
         case contextWindow = "context_window"
+        case estimatedTokens = "estimated_tokens"
         case index = "index"
         case messageBytes = "message_bytes"
         case messageChars = "message_chars"
@@ -9743,7 +9752,7 @@ public struct ParamsData: Codable {
         case output = "output"
     }
 
-    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, route: Route?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: PurpleReason?, detail: String?, model: String?, provider: String?, rejected: [FluffyModelRejection]?, tier: Tier?, options: [String: Option]?, mode: Mode?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, numCtx: Int?, profile: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, chars: Int?, lines: Int?, path: String?, waiting: Bool?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, todos: [PurpleTodo]?, added: Int?, changeID: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?) {
+    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, route: Route?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: PurpleReason?, detail: String?, model: String?, provider: String?, rejected: [FluffyModelRejection]?, tier: Tier?, options: [String: Option]?, mode: Mode?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, estimatedTokens: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, numCtx: Int?, profile: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, chars: Int?, lines: Int?, path: String?, waiting: Bool?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, todos: [PurpleTodo]?, added: Int?, changeID: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?) {
         self.cwd = cwd
         self.forkedFrom = forkedFrom
         self.modelName = modelName
@@ -9775,6 +9784,7 @@ public struct ParamsData: Codable {
         self.thinkingMS = thinkingMS
         self.clearedIDS = clearedIDS
         self.contextWindow = contextWindow
+        self.estimatedTokens = estimatedTokens
         self.index = index
         self.messageBytes = messageBytes
         self.messageChars = messageChars
@@ -9879,6 +9889,7 @@ public struct FluffyCheckInfo: Codable {
 }
 
 public enum Code: String, Codable {
+    case contextFull = "context_full"
     case modelUnreachable = "model_unreachable"
     case notInstalled = "not_installed"
 }
@@ -10322,7 +10333,8 @@ public enum RunCompletedEventType: String, Codable {
 /// model's server did not answer. ``not_installed``: the model needs a local
 /// server that is not installed, such as Ollama. ``provider`` is the provider
 /// whose server it was, and ``hint`` says how to fix it, such as
-/// ``run ollama serve``.
+/// ``run ollama serve``. ``context_full``: the prompt does not fit the model's window,
+/// even after clearing and summarising, and nothing was sent.
 // MARK: - RunFailedData
 public struct RunFailedData: Codable {
     public let code: Code?
@@ -10380,7 +10392,8 @@ public struct RunFailedEvent: Codable {
 /// model's server did not answer. ``not_installed``: the model needs a local
 /// server that is not installed, such as Ollama. ``provider`` is the provider
 /// whose server it was, and ``hint`` says how to fix it, such as
-/// ``run ollama serve``.
+/// ``run ollama serve``. ``context_full``: the prompt does not fit the model's window,
+/// even after clearing and summarising, and nothing was sent.
 // MARK: - RunFailedEventData
 public struct RunFailedEventData: Codable {
     public let code: Code?

@@ -155,6 +155,7 @@ export type Ts12 = string;
 export type Type12 = 'message.completed';
 export type ClearedIds = string[];
 export type ContextWindow = number | null;
+export type EstimatedTokens = number | null;
 export type Index = number;
 export type MessageBytes = number[] | null;
 export type MessageChars = number[] | null;
@@ -227,7 +228,7 @@ export type Seq17 = number;
 export type SessionId18 = string;
 export type Ts17 = string;
 export type Type17 = 'run.completed';
-export type Code = ('model_unreachable' | 'not_installed') | null;
+export type Code = ('model_unreachable' | 'not_installed' | 'context_full') | null;
 export type Hint = string | null;
 export type Message = string;
 export type Provider2 = string | null;
@@ -888,6 +889,7 @@ export interface ModelCallStartedEvent {
 export interface ModelCallStartedData {
   cleared_ids?: ClearedIds;
   context_window?: ContextWindow;
+  estimated_tokens?: EstimatedTokens;
   index: Index;
   message_bytes?: MessageBytes;
   message_chars?: MessageChars;
@@ -1087,7 +1089,8 @@ export interface RunFailedEvent {
  * model's server did not answer. ``not_installed``: the model needs a local
  * server that is not installed, such as Ollama. ``provider`` is the provider
  * whose server it was, and ``hint`` says how to fix it, such as
- * ``run ollama serve``.
+ * ``run ollama serve``. ``context_full``: the prompt does not fit the model's window,
+ * even after clearing and summarising, and nothing was sent.
  *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "RunFailedData".
