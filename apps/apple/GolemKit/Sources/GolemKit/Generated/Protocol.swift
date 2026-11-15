@@ -619,6 +619,103 @@ public struct FileElement: Codable {
     }
 }
 
+/// ``changes.revert``. Put back what a change, a file, a hunk or a turn wrote.
+///
+/// Without ``force``, a file that changed on disk since golem wrote it is left alone
+/// and listed as a conflict. Refused while the session has a run.
+// MARK: - ChangesRevertParams
+public struct ChangesRevertParams: Codable {
+    public let force: Bool?
+    public let sessionID: String
+    public let target: TargetClass
+
+    public enum CodingKeys: String, CodingKey {
+        case force = "force"
+        case sessionID = "session_id"
+        case target = "target"
+    }
+
+    public init(force: Bool?, sessionID: String, target: TargetClass) {
+        self.force = force
+        self.sessionID = sessionID
+        self.target = target
+    }
+}
+
+/// What ``changes.revert`` takes back. Each kind needs its own field and no other.
+///
+/// ``change`` needs ``change_id``, ``file`` needs ``path``, ``hunk`` needs ``path`` and
+/// ``hunk`` (0-based, of the file's net diff), and ``run`` needs ``run_id``.
+// MARK: - TargetClass
+public struct TargetClass: Codable {
+    public let changeID: String?
+    public let hunk: Int?
+    public let kind: TargetKind
+    public let path: String?
+    public let runID: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case changeID = "change_id"
+        case hunk = "hunk"
+        case kind = "kind"
+        case path = "path"
+        case runID = "run_id"
+    }
+
+    public init(changeID: String?, hunk: Int?, kind: TargetKind, path: String?, runID: String?) {
+        self.changeID = changeID
+        self.hunk = hunk
+        self.kind = kind
+        self.path = path
+        self.runID = runID
+    }
+}
+
+public enum TargetKind: String, Codable {
+    case change = "change"
+    case file = "file"
+    case hunk = "hunk"
+    case run = "run"
+}
+
+/// The paths written, and the paths left alone. Each write is a change of its own.
+// MARK: - ChangesRevertResult
+public struct ChangesRevertResult: Codable {
+    public let conflicts: [ConflictElement]
+    public let reverted: [String]
+
+    public enum CodingKeys: String, CodingKey {
+        case conflicts = "conflicts"
+        case reverted = "reverted"
+    }
+
+    public init(conflicts: [ConflictElement], reverted: [String]) {
+        self.conflicts = conflicts
+        self.reverted = reverted
+    }
+}
+
+/// A file a revert did not touch.
+// MARK: - ConflictElement
+public struct ConflictElement: Codable {
+    public let path: String
+    public let reason: ConflictReason
+
+    public enum CodingKeys: String, CodingKey {
+        case path = "path"
+        case reason = "reason"
+    }
+
+    public init(path: String, reason: ConflictReason) {
+        self.path = path
+        self.reason = reason
+    }
+}
+
+public enum ConflictReason: String, Codable {
+    case changedOnDisk = "changed_on_disk"
+}
+
 /// A check ended. ``exit_code`` is null when it timed out.
 ///
 /// ``output`` is the last 4,000 characters. When there was more, the whole
@@ -1794,10 +1891,12 @@ public enum FileChangedDataSource: String, Codable {
 }
 
 /// A file in the session folder changed. Sent before the ``tool.completed`` of its call.
+///
+/// ``run_id`` is null for an undo, which is made between runs.
 // MARK: - FileChangedEvent
 public struct FileChangedEvent: Codable {
     public let data: FileChangedEventData
-    public let runID: String
+    public let runID: String?
     public let seq: Int
     public let sessionID: String
     public let ts: String
@@ -1812,7 +1911,7 @@ public struct FileChangedEvent: Codable {
         case type = "type"
     }
 
-    public init(data: FileChangedEventData, runID: String, seq: Int, sessionID: String, ts: String, type: FileChangedEventType) {
+    public init(data: FileChangedEventData, runID: String?, seq: Int, sessionID: String, ts: String, type: FileChangedEventType) {
         self.data = data
         self.runID = runID
         self.seq = seq
@@ -8038,6 +8137,52 @@ public struct PromptSectionInfo: Codable {
     }
 }
 
+/// A file a revert did not touch.
+// MARK: - RevertConflict
+public struct RevertConflict: Codable {
+    public let path: String
+    public let reason: ConflictReason
+
+    public enum CodingKeys: String, CodingKey {
+        case path = "path"
+        case reason = "reason"
+    }
+
+    public init(path: String, reason: ConflictReason) {
+        self.path = path
+        self.reason = reason
+    }
+}
+
+/// What ``changes.revert`` takes back. Each kind needs its own field and no other.
+///
+/// ``change`` needs ``change_id``, ``file`` needs ``path``, ``hunk`` needs ``path`` and
+/// ``hunk`` (0-based, of the file's net diff), and ``run`` needs ``run_id``.
+// MARK: - RevertTarget
+public struct RevertTarget: Codable {
+    public let changeID: String?
+    public let hunk: Int?
+    public let kind: TargetKind
+    public let path: String?
+    public let runID: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case changeID = "change_id"
+        case hunk = "hunk"
+        case kind = "kind"
+        case path = "path"
+        case runID = "run_id"
+    }
+
+    public init(changeID: String?, hunk: Int?, kind: TargetKind, path: String?, runID: String?) {
+        self.changeID = changeID
+        self.hunk = hunk
+        self.kind = kind
+        self.path = path
+        self.runID = runID
+    }
+}
+
 /// Server → every connection: a routine was added, changed or removed. Not stored.
 // MARK: - RoutineChangedNotification
 public struct RoutineChangedNotification: Codable {
@@ -9254,6 +9399,8 @@ public enum RPCNotificationMethod: String, Codable {
 /// The agent's todo list changed. ``run_id`` is null for a list a fork copied.
 ///
 /// A file in the session folder changed. Sent before the ``tool.completed`` of its call.
+///
+/// ``run_id`` is null for an undo, which is made between runs.
 ///
 /// A skill became active.
 ///

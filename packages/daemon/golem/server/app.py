@@ -326,7 +326,7 @@ class DaemonApp:
 
                 chat.enable_mcp = enable_mcp
                 chat.skills = self.state.skills
-                chat.changes = ChangeStore(database, BlobStore(database))
+                chat.changes = self.state.changes
                 if self._pulls is None:
                     pulls = PullManager(router, ram_gb=models.ram_gb)
                 else:

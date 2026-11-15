@@ -8,7 +8,7 @@ export type Removed = number;
 export type Reverts = string | null;
 export type Source = 'tool' | 'shell' | 'revert';
 export type Status = 'created' | 'modified' | 'deleted';
-export type RunId = string;
+export type RunId = string | null;
 export type Seq = number;
 export type SessionId = string;
 export type Ts = string;
@@ -16,6 +16,8 @@ export type Type = 'file.changed';
 
 /**
  * A file in the session folder changed. Sent before the ``tool.completed`` of its call.
+ *
+ * ``run_id`` is null for an undo, which is made between runs.
  */
 export interface FileChangedEvent {
   data: FileChangedData;

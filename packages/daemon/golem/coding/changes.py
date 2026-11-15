@@ -6,6 +6,7 @@ records alone: the net change of each file, and the state a run started from.
 
 from __future__ import annotations
 
+import difflib
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -14,7 +15,7 @@ from typing import Literal
 from golem.sessions.ids import new_id
 from golem.store.blobs import BlobStore
 from golem.store.database import Database
-from golem.tools.write import diff_counts, diff_text
+from golem.tools.write import DIFF_CONTEXT, diff_counts, diff_text, split_lines
 
 Source = Literal["tool", "shell", "revert"]
 Status = Literal["created", "modified", "deleted"]
@@ -186,6 +187,27 @@ def before_run(changes: Sequence[FileChange], run_id: str) -> dict[str, str | No
     return shas
 
 
+def revert_hunk(before: str, after: str, index: int) -> str:
+    """``after`` with hunk ``index`` of the diff before to after put back to its ``before`` lines.
+
+    Hunks count from 0, in the diff with :data:`~golem.tools.write.DIFF_CONTEXT` lines of
+    context. Raises ``IndexError`` for a hunk that does not exist.
+    """
+    old, new = split_lines(before), split_lines(after)
+    groups = list(difflib.SequenceMatcher(None, old, new).get_grouped_opcodes(DIFF_CONTEXT))
+    if not 0 <= index < len(groups):
+        raise IndexError(f"hunk {index} does not exist, the diff has {len(groups)}")
+    out: list[str] = []
+    at = 0
+    for tag, i1, i2, j1, j2 in groups[index]:
+        if tag == "equal":
+            continue
+        out += new[at:j1] + old[i1:i2]
+        at = j2
+    out += new[at:]
+    return "".join(out)
+
+
 __all__ = [
     "ChangeStore",
     "FileChange",
@@ -193,5 +215,6 @@ __all__ = [
     "Source",
     "before_run",
     "net_files",
+    "revert_hunk",
     "status_of",
 ]

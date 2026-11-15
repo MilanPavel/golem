@@ -787,15 +787,22 @@
     },
     "FileChangedEvent": {
       "additionalProperties": false,
-      "description": "A file in the session folder changed. Sent before the ``tool.completed`` of its call.",
+      "description": "A file in the session folder changed. Sent before the ``tool.completed`` of its call.\n\n``run_id`` is null for an undo, which is made between runs.",
       "properties": {
         "data": {
           "$ref": "#/$defs/FileChangedData"
         },
         "run_id": {
-          "minLength": 1,
-          "title": "Run Id",
-          "type": "string"
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Run Id"
         },
         "seq": {
           "minimum": 1,
