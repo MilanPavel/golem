@@ -291,6 +291,69 @@ class ToolRequestedData(BaseModel):
     args: dict[str, Any]
 
 
+class SessionChecksChangedData(BaseModel):
+    """Whether the session lets golem run the project's checks, after a change.
+
+    ``on`` true is the user's yes and false their no. The last event holds the
+    answer, so a replayed session gets it back. A session without one has not
+    been asked.
+    """
+
+    model_config = _CONFIG
+
+    on: bool
+
+
+class CheckInfo(BaseModel):
+    """One check: its name and the shell command it runs."""
+
+    model_config = _CONFIG
+
+    name: str = Field(min_length=1)
+    command: str = Field(min_length=1)
+
+
+class CheckOfferedData(BaseModel):
+    """The turn changed files and the session has not said whether golem may run checks.
+
+    Sent once per session. Nothing ran. ``session.set_checks`` answers it.
+    """
+
+    model_config = _CONFIG
+
+    checks: list[CheckInfo]
+
+
+class CheckStartedData(BaseModel):
+    """A check began. ``round`` is 0 for the first run after a turn."""
+
+    model_config = _CONFIG
+
+    check_id: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    command: str = Field(min_length=1)
+    round: int = Field(default=0, ge=0)
+
+
+class CheckCompletedData(BaseModel):
+    """A check ended. ``exit_code`` is null when it timed out.
+
+    ``output`` is the last 4,000 characters. When there was more, the whole
+    output is in the artifact ``artifact_id``.
+    """
+
+    model_config = _CONFIG
+
+    check_id: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    status: Literal["passed", "failed", "timed_out"]
+    exit_code: int | None
+    duration_ms: int = Field(ge=0)
+    output: str
+    artifact_id: str | None = Field(default=None, min_length=1)
+    round: int = Field(default=0, ge=0)
+
+
 class ToolStartedData(BaseModel):
     """A requested tool call is running."""
 
@@ -680,6 +743,58 @@ class SessionModeChangedEvent(BaseModel):
     data: SessionModeChangedData
 
 
+class SessionChecksChangedEvent(BaseModel):
+    """``session.set_checks`` changed whether the session lets golem run checks."""
+
+    model_config = _CONFIG
+
+    seq: int = Field(ge=1)
+    session_id: str = Field(min_length=1)
+    run_id: None
+    ts: str = Field(min_length=1)
+    type: Literal["session.checks.changed"]
+    data: SessionChecksChangedData
+
+
+class CheckOfferedEvent(BaseModel):
+    """The turn changed files and golem asks whether it may run the project's checks."""
+
+    model_config = _CONFIG
+
+    seq: int = Field(ge=1)
+    session_id: str = Field(min_length=1)
+    run_id: str = Field(min_length=1)
+    ts: str = Field(min_length=1)
+    type: Literal["check.offered"]
+    data: CheckOfferedData
+
+
+class CheckStartedEvent(BaseModel):
+    """A check is running."""
+
+    model_config = _CONFIG
+
+    seq: int = Field(ge=1)
+    session_id: str = Field(min_length=1)
+    run_id: str = Field(min_length=1)
+    ts: str = Field(min_length=1)
+    type: Literal["check.started"]
+    data: CheckStartedData
+
+
+class CheckCompletedEvent(BaseModel):
+    """A check ended."""
+
+    model_config = _CONFIG
+
+    seq: int = Field(ge=1)
+    session_id: str = Field(min_length=1)
+    run_id: str = Field(min_length=1)
+    ts: str = Field(min_length=1)
+    type: Literal["check.completed"]
+    data: CheckCompletedData
+
+
 class MessageStartedEvent(BaseModel):
     """The assistant bubble is open."""
 
@@ -981,6 +1096,7 @@ EventType = Literal[
     "model.selected",
     "model.options.changed",
     "session.mode.changed",
+    "session.checks.changed",
     "message.started",
     "message.delta",
     "message.thinking.delta",
@@ -1003,6 +1119,9 @@ EventType = Literal[
     "skill.activated",
     "skill.deactivated",
     "skill.skipped",
+    "check.offered",
+    "check.started",
+    "check.completed",
 ]
 """The ``type`` of each :data:`ChatEvent` member."""
 
@@ -1015,6 +1134,7 @@ ChatEvent = Annotated[
     | ModelSelectedEvent
     | ModelOptionsChangedEvent
     | SessionModeChangedEvent
+    | SessionChecksChangedEvent
     | MessageStartedEvent
     | MessageDeltaEvent
     | MessageThinkingDeltaEvent
@@ -1036,7 +1156,10 @@ ChatEvent = Annotated[
     | FileChangedEvent
     | SkillActivatedEvent
     | SkillDeactivatedEvent
-    | SkillSkippedEvent,
+    | SkillSkippedEvent
+    | CheckOfferedEvent
+    | CheckStartedEvent
+    | CheckCompletedEvent,
     Field(discriminator="type"),
 ]
 
@@ -1053,6 +1176,13 @@ __all__ = [
     "ApprovalResolvedEvent",
     "CallPrice",
     "ChatEvent",
+    "CheckCompletedData",
+    "CheckCompletedEvent",
+    "CheckInfo",
+    "CheckOfferedData",
+    "CheckOfferedEvent",
+    "CheckStartedData",
+    "CheckStartedEvent",
     "EmptyEventData",
     "EventType",
     "FileChangedData",
@@ -1084,6 +1214,8 @@ __all__ = [
     "RunFailedEvent",
     "RunStartedEvent",
     "SessionAllowance",
+    "SessionChecksChangedData",
+    "SessionChecksChangedEvent",
     "SessionClosedEvent",
     "SessionCompletedData",
     "SessionCompletedEvent",

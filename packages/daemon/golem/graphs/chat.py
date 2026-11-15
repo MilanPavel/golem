@@ -1,5 +1,5 @@
 """The chat graph: ``START → call_model``, then ``tools → call_model`` while
-the reply asks for tools, then ``END``.
+the reply asks for tools, then ``checks`` and ``END``.
 
 Checkpoint messages carry the protocol ``message_id`` as their LangChain
 ``id``, so the event log and the checkpoint name the same message. The first
@@ -29,6 +29,7 @@ from langgraph.types import Command
 from golem.coding.changes import ChangeStore
 from golem.config import ModelPrice, PermissionMode
 from golem.graphs.adapter import STREAM_KEY, message_text
+from golem.graphs.checks_node import CHECKS_KEY, checks_node
 from golem.graphs.context_view import view
 from golem.graphs.prompt import PINNED_KEY, PromptContext, SystemPrompt
 from golem.graphs.state import AgentState
@@ -200,6 +201,7 @@ class ChatRuntime:
         pinned_folders: Sequence[str] = (),
         options: Mapping[str, float | str] | None = None,
         permission_mode: PermissionMode | None = None,
+        checks: bool | None = None,
     ) -> AsyncGenerator[object]:
         """Stream one user turn. The first turn writes the state fields.
 
@@ -227,6 +229,7 @@ class ChatRuntime:
                 PINNED_FOLDERS_KEY: list(pinned_folders),
                 OPTIONS_KEY: dict(options or {}),
                 MODE_KEY: permission_mode,
+                CHECKS_KEY: checks,
             },
             "recursion_limit": _RECURSION_LIMIT,
         }
@@ -258,6 +261,7 @@ class ChatRuntime:
         pinned_folders: Sequence[str] = (),
         options: Mapping[str, float | str] | None = None,
         permission_mode: PermissionMode | None = None,
+        checks: bool | None = None,
     ) -> AsyncGenerator[object]:
         """Go on with a run paused on a tool approval, with the user's ``answer``.
 
@@ -277,6 +281,7 @@ class ChatRuntime:
                 PINNED_FOLDERS_KEY: list(pinned_folders),
                 OPTIONS_KEY: dict(options or {}),
                 MODE_KEY: permission_mode,
+                CHECKS_KEY: checks,
             },
             "recursion_limit": _RECURSION_LIMIT,
         }
@@ -542,8 +547,10 @@ def open_chat(
         ),
     )
     builder.add_edge(START, "call_model")
-    builder.add_conditional_edges("call_model", route, {"tools": "tools", "end": END})
+    builder.add_node("checks", checks_node(rules, artifacts))
+    builder.add_conditional_edges("call_model", route, {"tools": "tools", "end": "checks"})
     builder.add_edge("tools", "call_model")
+    builder.add_edge("checks", END)
     runtime.append(
         ChatRuntime(
             builder.compile(checkpointer=checkpointer),

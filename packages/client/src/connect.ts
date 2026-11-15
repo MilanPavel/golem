@@ -73,6 +73,7 @@ import type { ModelOptionsSaved } from "../../protocol/gen/model-options-saved.t
 import type { ModelOptionsSetResult } from "../../protocol/gen/model-options-set-result.ts";
 import type { PermissionsSetModeParams } from "../../protocol/gen/permissions-set-mode-params.ts";
 import type { PermissionsSetModeResult } from "../../protocol/gen/permissions-set-mode-result.ts";
+import type { SessionSetChecksResult } from "../../protocol/gen/session-set-checks-result.ts";
 import type { SessionSetModeParams } from "../../protocol/gen/session-set-mode-params.ts";
 import type { SessionSetModeResult } from "../../protocol/gen/session-set-mode-result.ts";
 import type { SessionSetOptionsResult } from "../../protocol/gen/session-set-options-result.ts";
@@ -133,6 +134,7 @@ import {
   isModelOptionsSetResult,
   isModelSetDefaultResult,
   isPermissionsSetModeResult,
+  isSessionSetChecksResult,
   isSessionSetModeResult,
   isSessionSetOptionsResult,
   isPullDone,
@@ -324,6 +326,8 @@ export interface GolemClient {
   setSessionOptions(sessionId: string, options: Record<string, number | string | null>): Promise<SessionSetOptionsResult>;
   /** Set the permission mode of one session, or `null` to follow config.toml again. The session stores `session.mode.changed`. */
   setSessionMode(sessionId: string, mode: SessionSetModeParams["mode"]): Promise<SessionSetModeResult>;
+  /** Say whether golem may run the project's checks in one session. The session stores `session.checks.changed`. */
+  setChecks(sessionId: string, on: boolean): Promise<SessionSetChecksResult>;
   /** `model.options.saved`: the options saved for a model changed, from any client. */
   onOptionsSaved(listener: (saved: ModelOptionsSaved) => void): () => void;
   /** Size, fit, and free disk for a local model before downloading it. */
@@ -1399,6 +1403,14 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("session.set_mode", { session_id: sessionId, mode });
       if (!isSessionSetModeResult(result)) {
         throw new Error("invalid session.set_mode result");
+      }
+      return result;
+    },
+    async setChecks(sessionId: string, on: boolean): Promise<SessionSetChecksResult> {
+      await ready;
+      const result = await call("session.set_checks", { session_id: sessionId, on });
+      if (!isSessionSetChecksResult(result)) {
+        throw new Error("invalid session.set_checks result");
       }
       return result;
     },

@@ -222,6 +222,8 @@ Only your own file sets these.
 | `checks` | `"ask"` | Whether golem runs checks after it changed files: `ask`, `auto`, or `off` |
 | `fix_rounds` | `2` | How many times golem may fix what a check found, up to 5 |
 
+After a turn in which the model wrote a file, edited a file, or ran a shell command that succeeded, golem runs the checks one by one in the shell sandbox, with your `[shell]` settings, and shows each as it starts and ends. With `ask`, it offers them once in a session and runs nothing until you say yes. In autopilot mode `ask` runs them without asking. `auto` runs them unless you said no in that session. A failed check is shown to you only, and is not yet given to the model.
+
 Each `[[coding.check]]` is one command. With none, golem looks at the project's own files: a `lint` recipe in a justfile, a `lint` or `typecheck` script in `package.json`, a ruff setup, `Cargo.toml`, or `go.mod`. Tests are never detected. Add them yourself.
 
 | Key | Default | Meaning |

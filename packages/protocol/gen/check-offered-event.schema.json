@@ -1,0 +1,86 @@
+{
+  "$defs": {
+    "CheckInfo": {
+      "additionalProperties": false,
+      "description": "One check: its name and the shell command it runs.",
+      "properties": {
+        "command": {
+          "minLength": 1,
+          "title": "Command",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "command"
+      ],
+      "title": "CheckInfo",
+      "type": "object"
+    },
+    "CheckOfferedData": {
+      "additionalProperties": false,
+      "description": "The turn changed files and the session has not said whether golem may run checks.\n\nSent once per session. Nothing ran. ``session.set_checks`` answers it.",
+      "properties": {
+        "checks": {
+          "items": {
+            "$ref": "#/$defs/CheckInfo"
+          },
+          "title": "Checks",
+          "type": "array"
+        }
+      },
+      "required": [
+        "checks"
+      ],
+      "title": "CheckOfferedData",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The turn changed files and golem asks whether it may run the project's checks.",
+  "properties": {
+    "data": {
+      "$ref": "#/$defs/CheckOfferedData"
+    },
+    "run_id": {
+      "minLength": 1,
+      "title": "Run Id",
+      "type": "string"
+    },
+    "seq": {
+      "minimum": 1,
+      "title": "Seq",
+      "type": "integer"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    },
+    "ts": {
+      "minLength": 1,
+      "title": "Ts",
+      "type": "string"
+    },
+    "type": {
+      "const": "check.offered",
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "seq",
+    "session_id",
+    "run_id",
+    "ts",
+    "type",
+    "data"
+  ],
+  "title": "CheckOfferedEvent",
+  "type": "object"
+}

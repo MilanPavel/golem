@@ -1,0 +1,22 @@
+{
+  "additionalProperties": false,
+  "description": "One check: its name and the shell command it runs.",
+  "properties": {
+    "command": {
+      "minLength": 1,
+      "title": "Command",
+      "type": "string"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "command"
+  ],
+  "title": "CheckInfo",
+  "type": "object"
+}

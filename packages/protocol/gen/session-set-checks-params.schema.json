@@ -1,0 +1,21 @@
+{
+  "additionalProperties": false,
+  "description": "``session.set_checks``. Say whether golem may run the project's checks in this session.\n\n``on`` true lets it run them after a turn that changed files, false stops\nit. The daemon emits ``session.checks.changed``. The answer is kept with\nthe session and is not written to ``config.toml``. It matters when\n``[coding] checks`` is ``ask``, and ``auto`` follows it only for a no.",
+  "properties": {
+    "on": {
+      "title": "On",
+      "type": "boolean"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "session_id",
+    "on"
+  ],
+  "title": "SessionSetChecksParams",
+  "type": "object"
+}

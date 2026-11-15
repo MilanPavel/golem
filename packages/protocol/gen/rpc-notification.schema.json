@@ -276,6 +276,286 @@
       "title": "CallPrice",
       "type": "object"
     },
+    "CheckCompletedData": {
+      "additionalProperties": false,
+      "description": "A check ended. ``exit_code`` is null when it timed out.\n\n``output`` is the last 4,000 characters. When there was more, the whole\noutput is in the artifact ``artifact_id``.",
+      "properties": {
+        "artifact_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Artifact Id"
+        },
+        "check_id": {
+          "minLength": 1,
+          "title": "Check Id",
+          "type": "string"
+        },
+        "duration_ms": {
+          "minimum": 0,
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "exit_code": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Exit Code"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "output": {
+          "title": "Output",
+          "type": "string"
+        },
+        "round": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Round",
+          "type": "integer"
+        },
+        "status": {
+          "enum": [
+            "passed",
+            "failed",
+            "timed_out"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "check_id",
+        "name",
+        "status",
+        "exit_code",
+        "duration_ms",
+        "output"
+      ],
+      "title": "CheckCompletedData",
+      "type": "object"
+    },
+    "CheckCompletedEvent": {
+      "additionalProperties": false,
+      "description": "A check ended.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/CheckCompletedData"
+        },
+        "run_id": {
+          "minLength": 1,
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "check.completed",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "run_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "CheckCompletedEvent",
+      "type": "object"
+    },
+    "CheckInfo": {
+      "additionalProperties": false,
+      "description": "One check: its name and the shell command it runs.",
+      "properties": {
+        "command": {
+          "minLength": 1,
+          "title": "Command",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "command"
+      ],
+      "title": "CheckInfo",
+      "type": "object"
+    },
+    "CheckOfferedData": {
+      "additionalProperties": false,
+      "description": "The turn changed files and the session has not said whether golem may run checks.\n\nSent once per session. Nothing ran. ``session.set_checks`` answers it.",
+      "properties": {
+        "checks": {
+          "items": {
+            "$ref": "#/$defs/CheckInfo"
+          },
+          "title": "Checks",
+          "type": "array"
+        }
+      },
+      "required": [
+        "checks"
+      ],
+      "title": "CheckOfferedData",
+      "type": "object"
+    },
+    "CheckOfferedEvent": {
+      "additionalProperties": false,
+      "description": "The turn changed files and golem asks whether it may run the project's checks.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/CheckOfferedData"
+        },
+        "run_id": {
+          "minLength": 1,
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "check.offered",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "run_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "CheckOfferedEvent",
+      "type": "object"
+    },
+    "CheckStartedData": {
+      "additionalProperties": false,
+      "description": "A check began. ``round`` is 0 for the first run after a turn.",
+      "properties": {
+        "check_id": {
+          "minLength": 1,
+          "title": "Check Id",
+          "type": "string"
+        },
+        "command": {
+          "minLength": 1,
+          "title": "Command",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "round": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Round",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "check_id",
+        "name",
+        "command"
+      ],
+      "title": "CheckStartedData",
+      "type": "object"
+    },
+    "CheckStartedEvent": {
+      "additionalProperties": false,
+      "description": "A check is running.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/CheckStartedData"
+        },
+        "run_id": {
+          "minLength": 1,
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "check.started",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "run_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "CheckStartedEvent",
+      "type": "object"
+    },
     "EmptyEventData": {
       "additionalProperties": false,
       "description": "No payload. Used by ``run.started``, ``run.completed``, and ``session.closed``.",
@@ -1678,6 +1958,64 @@
       "title": "SessionAllowance",
       "type": "object"
     },
+    "SessionChecksChangedData": {
+      "additionalProperties": false,
+      "description": "Whether the session lets golem run the project's checks, after a change.\n\n``on`` true is the user's yes and false their no. The last event holds the\nanswer, so a replayed session gets it back. A session without one has not\nbeen asked.",
+      "properties": {
+        "on": {
+          "title": "On",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "on"
+      ],
+      "title": "SessionChecksChangedData",
+      "type": "object"
+    },
+    "SessionChecksChangedEvent": {
+      "additionalProperties": false,
+      "description": "``session.set_checks`` changed whether the session lets golem run checks.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/SessionChecksChangedData"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "null"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "session.checks.changed",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "run_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "SessionChecksChangedEvent",
+      "type": "object"
+    },
     "SessionClosedEvent": {
       "additionalProperties": false,
       "description": "The session left the list. ``run_id`` is null: no run owns the change.\n\nThe earlier events stay in the log. ``session.list`` hides the session.",
@@ -2977,6 +3315,9 @@
         "mapping": {
           "approval.needed": "#/$defs/ApprovalNeededEvent",
           "approval.resolved": "#/$defs/ApprovalResolvedEvent",
+          "check.completed": "#/$defs/CheckCompletedEvent",
+          "check.offered": "#/$defs/CheckOfferedEvent",
+          "check.started": "#/$defs/CheckStartedEvent",
           "file.changed": "#/$defs/FileChangedEvent",
           "message.completed": "#/$defs/MessageCompletedEvent",
           "message.delta": "#/$defs/MessageDeltaEvent",
@@ -2990,6 +3331,7 @@
           "run.completed": "#/$defs/RunCompletedEvent",
           "run.failed": "#/$defs/RunFailedEvent",
           "run.started": "#/$defs/RunStartedEvent",
+          "session.checks.changed": "#/$defs/SessionChecksChangedEvent",
           "session.closed": "#/$defs/SessionClosedEvent",
           "session.completed": "#/$defs/SessionCompletedEvent",
           "session.created": "#/$defs/SessionCreatedEvent",
@@ -3028,6 +3370,9 @@
         },
         {
           "$ref": "#/$defs/SessionModeChangedEvent"
+        },
+        {
+          "$ref": "#/$defs/SessionChecksChangedEvent"
         },
         {
           "$ref": "#/$defs/MessageStartedEvent"
@@ -3094,6 +3439,15 @@
         },
         {
           "$ref": "#/$defs/SkillSkippedEvent"
+        },
+        {
+          "$ref": "#/$defs/CheckOfferedEvent"
+        },
+        {
+          "$ref": "#/$defs/CheckStartedEvent"
+        },
+        {
+          "$ref": "#/$defs/CheckCompletedEvent"
         }
       ],
       "title": "Params"

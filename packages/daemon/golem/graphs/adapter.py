@@ -219,6 +219,34 @@ class PinSkipped:
     message: str
 
 
+@dataclass(frozen=True, slots=True)
+class CheckOffered:
+    """The turn changed files and the session has not said whether the checks may run."""
+
+    checks: tuple[tuple[str, str], ...]
+    """``(name, command)`` of each check."""
+
+
+@dataclass(frozen=True, slots=True)
+class CheckStarted:
+    check_id: str
+    name: str
+    command: str
+    round: int = 0
+
+
+@dataclass(frozen=True, slots=True)
+class CheckCompleted:
+    check_id: str
+    name: str
+    status: str
+    exit_code: int | None
+    duration_ms: int
+    output: str
+    artifact_id: str | None = None
+    round: int = 0
+
+
 Fact = (
     ModelStarted
     | ModelRequested
@@ -236,6 +264,9 @@ Fact = (
     | PinRead
     | PinSkipped
     | SkillLoaded
+    | CheckOffered
+    | CheckStarted
+    | CheckCompleted
 )
 
 
@@ -647,6 +678,8 @@ def _custom(data: object) -> Fact | None:
         )
     if kind in (PIN_READ_KIND, PIN_SKIPPED_KIND):
         return _pin(kind, item)
+    if kind in ("check.offered", "check.started", "check.completed"):
+        return _check(kind, item)
     if not isinstance(call_id, str):
         return None
     if kind == SKILL_LOADED_KIND:
@@ -701,6 +734,47 @@ def _custom(data: object) -> Fact | None:
             call_id, message if isinstance(message, str) and message else "failed", _duration(item)
         )
     return None
+
+
+def _check(kind: object, item: Mapping[str, object]) -> Fact | None:
+    if kind == "check.offered":
+        rows = item.get("checks")
+        if not isinstance(rows, list):
+            return None
+        pairs = [
+            (row.get("name"), row.get("command"))
+            for row in cast(list[object], rows)
+            if isinstance(row, dict)
+            for row in [cast(dict[str, object], row)]
+        ]
+        found = tuple((n, c) for n, c in pairs if isinstance(n, str) and isinstance(c, str))
+        return CheckOffered(found) if found else None
+    check_id, name = item.get("check_id"), item.get("name")
+    if not isinstance(check_id, str) or not isinstance(name, str):
+        return None
+    number = item.get("round")
+    round_no = number if isinstance(number, int) else 0
+    if kind == "check.started":
+        command = item.get("command")
+        return CheckStarted(check_id, name, command, round_no) if isinstance(command, str) else None
+    status, exit_code = item.get("status"), item.get("exit_code")
+    duration, output, artifact_id = (
+        item.get("duration_ms"),
+        item.get("output"),
+        item.get("artifact_id"),
+    )
+    if not isinstance(status, str) or not isinstance(duration, int) or not isinstance(output, str):
+        return None
+    return CheckCompleted(
+        check_id,
+        name,
+        status,
+        exit_code if isinstance(exit_code, int) else None,
+        duration,
+        output,
+        artifact_id if isinstance(artifact_id, str) else None,
+        round_no,
+    )
 
 
 def _duration(item: Mapping[str, object]) -> int | None:

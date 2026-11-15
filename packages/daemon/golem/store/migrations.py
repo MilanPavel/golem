@@ -142,4 +142,5 @@ MIGRATIONS: tuple[tuple[str, ...], ...] = (
         "CREATE INDEX model_calls_day ON model_calls (day)",
         "CREATE INDEX model_calls_session ON model_calls (session_id)",
     ),
+    ("ALTER TABLE sessions ADD COLUMN checks INTEGER",),
 )

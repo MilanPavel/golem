@@ -619,6 +619,316 @@ public struct FileElement: Codable {
     }
 }
 
+/// A check ended. ``exit_code`` is null when it timed out.
+///
+/// ``output`` is the last 4,000 characters. When there was more, the whole
+/// output is in the artifact ``artifact_id``.
+// MARK: - CheckCompletedData
+public struct CheckCompletedData: Codable {
+    public let artifactID: String?
+    public let checkID: String
+    public let durationMS: Int
+    public let exitCode: Int?
+    public let name: String
+    public let output: String
+    public let round: Int?
+    public let status: CheckCompletedDataStatus
+
+    public enum CodingKeys: String, CodingKey {
+        case artifactID = "artifact_id"
+        case checkID = "check_id"
+        case durationMS = "duration_ms"
+        case exitCode = "exit_code"
+        case name = "name"
+        case output = "output"
+        case round = "round"
+        case status = "status"
+    }
+
+    public init(artifactID: String?, checkID: String, durationMS: Int, exitCode: Int?, name: String, output: String, round: Int?, status: CheckCompletedDataStatus) {
+        self.artifactID = artifactID
+        self.checkID = checkID
+        self.durationMS = durationMS
+        self.exitCode = exitCode
+        self.name = name
+        self.output = output
+        self.round = round
+        self.status = status
+    }
+}
+
+public enum CheckCompletedDataStatus: String, Codable {
+    case failed = "failed"
+    case passed = "passed"
+    case timedOut = "timed_out"
+}
+
+/// A check ended.
+// MARK: - CheckCompletedEvent
+public struct CheckCompletedEvent: Codable {
+    public let data: CheckCompletedEventData
+    public let runID: String
+    public let seq: Int
+    public let sessionID: String
+    public let ts: String
+    public let type: CheckCompletedEventType
+
+    public enum CodingKeys: String, CodingKey {
+        case data = "data"
+        case runID = "run_id"
+        case seq = "seq"
+        case sessionID = "session_id"
+        case ts = "ts"
+        case type = "type"
+    }
+
+    public init(data: CheckCompletedEventData, runID: String, seq: Int, sessionID: String, ts: String, type: CheckCompletedEventType) {
+        self.data = data
+        self.runID = runID
+        self.seq = seq
+        self.sessionID = sessionID
+        self.ts = ts
+        self.type = type
+    }
+}
+
+/// A check ended. ``exit_code`` is null when it timed out.
+///
+/// ``output`` is the last 4,000 characters. When there was more, the whole
+/// output is in the artifact ``artifact_id``.
+// MARK: - CheckCompletedEventData
+public struct CheckCompletedEventData: Codable {
+    public let artifactID: String?
+    public let checkID: String
+    public let durationMS: Int
+    public let exitCode: Int?
+    public let name: String
+    public let output: String
+    public let round: Int?
+    public let status: CheckCompletedDataStatus
+
+    public enum CodingKeys: String, CodingKey {
+        case artifactID = "artifact_id"
+        case checkID = "check_id"
+        case durationMS = "duration_ms"
+        case exitCode = "exit_code"
+        case name = "name"
+        case output = "output"
+        case round = "round"
+        case status = "status"
+    }
+
+    public init(artifactID: String?, checkID: String, durationMS: Int, exitCode: Int?, name: String, output: String, round: Int?, status: CheckCompletedDataStatus) {
+        self.artifactID = artifactID
+        self.checkID = checkID
+        self.durationMS = durationMS
+        self.exitCode = exitCode
+        self.name = name
+        self.output = output
+        self.round = round
+        self.status = status
+    }
+}
+
+public enum CheckCompletedEventType: String, Codable {
+    case checkCompleted = "check.completed"
+}
+
+/// One check: its name and the shell command it runs.
+// MARK: - CheckInfo
+public struct CheckInfo: Codable {
+    public let command: String
+    public let name: String
+
+    public enum CodingKeys: String, CodingKey {
+        case command = "command"
+        case name = "name"
+    }
+
+    public init(command: String, name: String) {
+        self.command = command
+        self.name = name
+    }
+}
+
+/// The turn changed files and the session has not said whether golem may run checks.
+///
+/// Sent once per session. Nothing ran. ``session.set_checks`` answers it.
+// MARK: - CheckOfferedData
+public struct CheckOfferedData: Codable {
+    public let checks: [CheckOfferedDataCheck]
+
+    public enum CodingKeys: String, CodingKey {
+        case checks = "checks"
+    }
+
+    public init(checks: [CheckOfferedDataCheck]) {
+        self.checks = checks
+    }
+}
+
+/// One check: its name and the shell command it runs.
+// MARK: - CheckOfferedDataCheck
+public struct CheckOfferedDataCheck: Codable {
+    public let command: String
+    public let name: String
+
+    public enum CodingKeys: String, CodingKey {
+        case command = "command"
+        case name = "name"
+    }
+
+    public init(command: String, name: String) {
+        self.command = command
+        self.name = name
+    }
+}
+
+/// The turn changed files and golem asks whether it may run the project's checks.
+// MARK: - CheckOfferedEvent
+public struct CheckOfferedEvent: Codable {
+    public let data: CheckOfferedEventData
+    public let runID: String
+    public let seq: Int
+    public let sessionID: String
+    public let ts: String
+    public let type: CheckOfferedEventType
+
+    public enum CodingKeys: String, CodingKey {
+        case data = "data"
+        case runID = "run_id"
+        case seq = "seq"
+        case sessionID = "session_id"
+        case ts = "ts"
+        case type = "type"
+    }
+
+    public init(data: CheckOfferedEventData, runID: String, seq: Int, sessionID: String, ts: String, type: CheckOfferedEventType) {
+        self.data = data
+        self.runID = runID
+        self.seq = seq
+        self.sessionID = sessionID
+        self.ts = ts
+        self.type = type
+    }
+}
+
+/// The turn changed files and the session has not said whether golem may run checks.
+///
+/// Sent once per session. Nothing ran. ``session.set_checks`` answers it.
+// MARK: - CheckOfferedEventData
+public struct CheckOfferedEventData: Codable {
+    public let checks: [PurpleCheckInfo]
+
+    public enum CodingKeys: String, CodingKey {
+        case checks = "checks"
+    }
+
+    public init(checks: [PurpleCheckInfo]) {
+        self.checks = checks
+    }
+}
+
+/// One check: its name and the shell command it runs.
+// MARK: - PurpleCheckInfo
+public struct PurpleCheckInfo: Codable {
+    public let command: String
+    public let name: String
+
+    public enum CodingKeys: String, CodingKey {
+        case command = "command"
+        case name = "name"
+    }
+
+    public init(command: String, name: String) {
+        self.command = command
+        self.name = name
+    }
+}
+
+public enum CheckOfferedEventType: String, Codable {
+    case checkOffered = "check.offered"
+}
+
+/// A check began. ``round`` is 0 for the first run after a turn.
+// MARK: - CheckStartedData
+public struct CheckStartedData: Codable {
+    public let checkID: String
+    public let command: String
+    public let name: String
+    public let round: Int?
+
+    public enum CodingKeys: String, CodingKey {
+        case checkID = "check_id"
+        case command = "command"
+        case name = "name"
+        case round = "round"
+    }
+
+    public init(checkID: String, command: String, name: String, round: Int?) {
+        self.checkID = checkID
+        self.command = command
+        self.name = name
+        self.round = round
+    }
+}
+
+/// A check is running.
+// MARK: - CheckStartedEvent
+public struct CheckStartedEvent: Codable {
+    public let data: CheckStartedEventData
+    public let runID: String
+    public let seq: Int
+    public let sessionID: String
+    public let ts: String
+    public let type: CheckStartedEventType
+
+    public enum CodingKeys: String, CodingKey {
+        case data = "data"
+        case runID = "run_id"
+        case seq = "seq"
+        case sessionID = "session_id"
+        case ts = "ts"
+        case type = "type"
+    }
+
+    public init(data: CheckStartedEventData, runID: String, seq: Int, sessionID: String, ts: String, type: CheckStartedEventType) {
+        self.data = data
+        self.runID = runID
+        self.seq = seq
+        self.sessionID = sessionID
+        self.ts = ts
+        self.type = type
+    }
+}
+
+/// A check began. ``round`` is 0 for the first run after a turn.
+// MARK: - CheckStartedEventData
+public struct CheckStartedEventData: Codable {
+    public let checkID: String
+    public let command: String
+    public let name: String
+    public let round: Int?
+
+    public enum CodingKeys: String, CodingKey {
+        case checkID = "check_id"
+        case command = "command"
+        case name = "name"
+        case round = "round"
+    }
+
+    public init(checkID: String, command: String, name: String, round: Int?) {
+        self.checkID = checkID
+        self.command = command
+        self.name = name
+        self.round = round
+    }
+}
+
+public enum CheckStartedEventType: String, Codable {
+    case checkStarted = "check.started"
+}
+
 /// A tool allowed for the rest of the session asked about.
 // MARK: - ConfigAllowance
 public struct ConfigAllowance: Codable {
@@ -8512,6 +8822,8 @@ public enum RPCNotificationMethod: String, Codable {
 ///
 /// ``session.set_mode`` changed the session's permission mode.
 ///
+/// ``session.set_checks`` changed whether the session lets golem run checks.
+///
 /// The assistant bubble is open.
 ///
 /// Tokens to append to the open assistant message.
@@ -8560,6 +8872,12 @@ public enum RPCNotificationMethod: String, Codable {
 /// A pinned skill was left out of the run's model calls.
 ///
 /// Logged once when it becomes unusable, not for every call.
+///
+/// The turn changed files and golem asks whether it may run the project's checks.
+///
+/// A check is running.
+///
+/// A check ended.
 // MARK: - Params
 public struct Params: Codable {
     public let data: ParamsData
@@ -8631,6 +8949,12 @@ public struct Params: Codable {
 /// ``mode`` null means the session has no override and follows ``[permissions]
 /// mode`` in ``config.toml``. The last event holds what applies from the next
 /// tool call, so a replayed session gets its mode back.
+///
+/// Whether the session lets golem run the project's checks, after a change.
+///
+/// ``on`` true is the user's yes and false their no. The last event holds the
+/// answer, so a replayed session gets it back. A session without one has not
+/// been asked.
 ///
 /// An assistant message is open and tokens may follow.
 ///
@@ -8784,6 +9108,17 @@ public struct Params: Codable {
 /// ``disabled`` when ``[skills]`` turns it off, and ``broken`` when its
 /// ``SKILL.md`` cannot be read or is not valid. ``message`` says it for a
 /// person.
+///
+/// The turn changed files and the session has not said whether golem may run checks.
+///
+/// Sent once per session. Nothing ran. ``session.set_checks`` answers it.
+///
+/// A check began. ``round`` is 0 for the first run after a turn.
+///
+/// A check ended. ``exit_code`` is null when it timed out.
+///
+/// ``output`` is the last 4,000 characters. When there was more, the whole
+/// output is in the artifact ``artifact_id``.
 // MARK: - ParamsData
 public struct ParamsData: Codable {
     public let cwd: String?
@@ -8801,6 +9136,7 @@ public struct ParamsData: Codable {
     public let reason: PurpleReason?
     public let options: [String: Option]?
     public let mode: Mode?
+    public let on: Bool?
     public let messageID: String?
     public let role: MessageCompletedDataRole?
     public let text: String?
@@ -8861,6 +9197,12 @@ public struct ParamsData: Codable {
     public let reverts: String?
     public let hash: String?
     public let how: How?
+    public let checks: [FluffyCheckInfo]?
+    public let checkID: String?
+    public let command: String?
+    public let round: Int?
+    public let exitCode: Int?
+    public let output: String?
 
     public enum CodingKeys: String, CodingKey {
         case cwd = "cwd"
@@ -8878,6 +9220,7 @@ public struct ParamsData: Codable {
         case reason = "reason"
         case options = "options"
         case mode = "mode"
+        case on = "on"
         case messageID = "message_id"
         case role = "role"
         case text = "text"
@@ -8938,9 +9281,15 @@ public struct ParamsData: Codable {
         case reverts = "reverts"
         case hash = "hash"
         case how = "how"
+        case checks = "checks"
+        case checkID = "check_id"
+        case command = "command"
+        case round = "round"
+        case exitCode = "exit_code"
+        case output = "output"
     }
 
-    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: PurpleReason?, options: [String: Option]?, mode: Mode?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, contextWindow: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String?, provider: String?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, todos: [PurpleTodo]?, added: Int?, changeID: String?, path: String?, removed: Int?, reverts: String?, hash: String?, how: How?) {
+    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: PurpleReason?, options: [String: Option]?, mode: Mode?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, contextWindow: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String?, provider: String?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, todos: [PurpleTodo]?, added: Int?, changeID: String?, path: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?) {
         self.cwd = cwd
         self.forkedFrom = forkedFrom
         self.modelName = modelName
@@ -8956,6 +9305,7 @@ public struct ParamsData: Codable {
         self.reason = reason
         self.options = options
         self.mode = mode
+        self.on = on
         self.messageID = messageID
         self.role = role
         self.text = text
@@ -9016,6 +9366,12 @@ public struct ParamsData: Codable {
         self.reverts = reverts
         self.hash = hash
         self.how = how
+        self.checks = checks
+        self.checkID = checkID
+        self.command = command
+        self.round = round
+        self.exitCode = exitCode
+        self.output = output
     }
 }
 
@@ -9033,6 +9389,23 @@ public struct PurpleSessionAllowance: Codable {
     public init(subject: String?, tool: String) {
         self.subject = subject
         self.tool = tool
+    }
+}
+
+/// One check: its name and the shell command it runs.
+// MARK: - FluffyCheckInfo
+public struct FluffyCheckInfo: Codable {
+    public let command: String
+    public let name: String
+
+    public enum CodingKeys: String, CodingKey {
+        case command = "command"
+        case name = "name"
+    }
+
+    public init(command: String, name: String) {
+        self.command = command
+        self.name = name
     }
 }
 
@@ -9117,6 +9490,8 @@ public enum PurpleStatus: String, Codable {
     case deleted = "deleted"
     case failed = "failed"
     case modified = "modified"
+    case passed = "passed"
+    case timedOut = "timed_out"
 }
 
 /// One non-empty section of the system prompt sent with a model call.
@@ -9193,6 +9568,9 @@ public struct FluffyTokenUsage: Codable {
 public enum ParamsType: String, Codable {
     case approvalNeeded = "approval.needed"
     case approvalResolved = "approval.resolved"
+    case checkCompleted = "check.completed"
+    case checkOffered = "check.offered"
+    case checkStarted = "check.started"
     case fileChanged = "file.changed"
     case messageCompleted = "message.completed"
     case messageDelta = "message.delta"
@@ -9206,6 +9584,7 @@ public enum ParamsType: String, Codable {
     case runCompleted = "run.completed"
     case runFailed = "run.failed"
     case runStarted = "run.started"
+    case sessionChecksChanged = "session.checks.changed"
     case sessionClosed = "session.closed"
     case sessionCompleted = "session.completed"
     case sessionCreated = "session.created"
@@ -9799,6 +10178,75 @@ public struct SessionAttachResult: Codable {
         self.lastSeq = lastSeq
         self.sessionID = sessionID
     }
+}
+
+/// Whether the session lets golem run the project's checks, after a change.
+///
+/// ``on`` true is the user's yes and false their no. The last event holds the
+/// answer, so a replayed session gets it back. A session without one has not
+/// been asked.
+// MARK: - SessionChecksChangedData
+public struct SessionChecksChangedData: Codable {
+    public let on: Bool
+
+    public enum CodingKeys: String, CodingKey {
+        case on = "on"
+    }
+
+    public init(on: Bool) {
+        self.on = on
+    }
+}
+
+/// ``session.set_checks`` changed whether the session lets golem run checks.
+// MARK: - SessionChecksChangedEvent
+public struct SessionChecksChangedEvent: Codable {
+    public let data: SessionChecksChangedEventData
+    public let runID: JSONNull?
+    public let seq: Int
+    public let sessionID: String
+    public let ts: String
+    public let type: SessionChecksChangedEventType
+
+    public enum CodingKeys: String, CodingKey {
+        case data = "data"
+        case runID = "run_id"
+        case seq = "seq"
+        case sessionID = "session_id"
+        case ts = "ts"
+        case type = "type"
+    }
+
+    public init(data: SessionChecksChangedEventData, runID: JSONNull?, seq: Int, sessionID: String, ts: String, type: SessionChecksChangedEventType) {
+        self.data = data
+        self.runID = runID
+        self.seq = seq
+        self.sessionID = sessionID
+        self.ts = ts
+        self.type = type
+    }
+}
+
+/// Whether the session lets golem run the project's checks, after a change.
+///
+/// ``on`` true is the user's yes and false their no. The last event holds the
+/// answer, so a replayed session gets it back. A session without one has not
+/// been asked.
+// MARK: - SessionChecksChangedEventData
+public struct SessionChecksChangedEventData: Codable {
+    public let on: Bool
+
+    public enum CodingKeys: String, CodingKey {
+        case on = "on"
+    }
+
+    public init(on: Bool) {
+        self.on = on
+    }
+}
+
+public enum SessionChecksChangedEventType: String, Codable {
+    case sessionChecksChanged = "session.checks.changed"
 }
 
 /// ``session.close``. Hide the session from ``session.list``.
@@ -10509,6 +10957,45 @@ public struct SessionRevokeResult: Codable {
 
     public init(revoked: Bool) {
         self.revoked = revoked
+    }
+}
+
+/// ``session.set_checks``. Say whether golem may run the project's checks in this session.
+///
+/// ``on`` true lets it run them after a turn that changed files, false stops
+/// it. The daemon emits ``session.checks.changed``. The answer is kept with
+/// the session and is not written to ``config.toml``. It matters when
+/// ``[coding] checks`` is ``ask``, and ``auto`` follows it only for a no.
+// MARK: - SessionSetChecksParams
+public struct SessionSetChecksParams: Codable {
+    public let on: Bool
+    public let sessionID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case on = "on"
+        case sessionID = "session_id"
+    }
+
+    public init(on: Bool, sessionID: String) {
+        self.on = on
+        self.sessionID = sessionID
+    }
+}
+
+/// The session's answer after the change.
+// MARK: - SessionSetChecksResult
+public struct SessionSetChecksResult: Codable {
+    public let on: Bool
+    public let sessionID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case on = "on"
+        case sessionID = "session_id"
+    }
+
+    public init(on: Bool, sessionID: String) {
+        self.on = on
+        self.sessionID = sessionID
     }
 }
 

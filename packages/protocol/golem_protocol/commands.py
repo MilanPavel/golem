@@ -1062,6 +1062,30 @@ class SessionSetModeResult(BaseModel):
     override: bool
 
 
+class SessionSetChecksParams(BaseModel):
+    """``session.set_checks``. Say whether golem may run the project's checks in this session.
+
+    ``on`` true lets it run them after a turn that changed files, false stops
+    it. The daemon emits ``session.checks.changed``. The answer is kept with
+    the session and is not written to ``config.toml``. It matters when
+    ``[coding] checks`` is ``ask``, and ``auto`` follows it only for a no.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    on: bool
+
+
+class SessionSetChecksResult(BaseModel):
+    """The session's answer after the change."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    on: bool
+
+
 class PermissionsSetModeParams(BaseModel):
     """``permissions.set_mode``. Write ``[permissions] mode`` to the user's ``config.toml``.
 
@@ -2972,6 +2996,8 @@ __all__ = [
     "SessionRenameResult",
     "SessionRevokeParams",
     "SessionRevokeResult",
+    "SessionSetChecksParams",
+    "SessionSetChecksResult",
     "SessionSetModeParams",
     "SessionSetModeResult",
     "SessionSetModelParams",

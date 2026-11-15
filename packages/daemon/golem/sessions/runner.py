@@ -31,6 +31,9 @@ from golem.coding.changes import ChangeStore, status_of
 from golem.config import ModelPrice, PermissionMode
 from golem.graphs.adapter import (
     ApprovalAsked,
+    CheckCompleted,
+    CheckOffered,
+    CheckStarted,
     FileChanged,
     ModelRequested,
     ModelResponded,
@@ -64,6 +67,10 @@ from golem_protocol.events import (
     ApprovalNeededData,
     ApprovalResolvedData,
     CallPrice,
+    CheckCompletedData,
+    CheckInfo,
+    CheckOfferedData,
+    CheckStartedData,
     EmptyEventData,
     EventType,
     FileChangedData,
@@ -117,6 +124,7 @@ class Turn:
     pinned_folders: tuple[str, ...] = ()
     options: dict[str, float | str] = field(default_factory=dict[str, float | str], compare=False)
     permission_mode: PermissionMode | None = None
+    checks: bool | None = None
     pins: PinMemory = field(default_factory=PinMemory, compare=False)
     skill: Invocation | None = None
     typed: str | None = None
@@ -152,6 +160,7 @@ class Resume:
     pinned_folders: tuple[str, ...] = ()
     options: dict[str, float | str] = field(default_factory=dict[str, float | str], compare=False)
     permission_mode: PermissionMode | None = None
+    checks: bool | None = None
     pins: PinMemory = field(default_factory=PinMemory, compare=False)
 
 
@@ -287,6 +296,7 @@ async def run_turn(
             pinned_folders=turn.pinned_folders,
             options=turn.options,
             permission_mode=turn.permission_mode,
+            checks=turn.checks,
             skill_folder=None if skill is None else str(skill.path),
         )
         return await _finish(stream, progress, emit)
@@ -364,6 +374,7 @@ async def resume_turn(
             pinned_folders=resume.pinned_folders,
             options=resume.options,
             permission_mode=resume.permission_mode,
+            checks=resume.checks,
         )
         return await _finish(stream, progress, emit)
     except asyncio.CancelledError:
@@ -568,6 +579,32 @@ async def _apply(
         skipped = SkillSkippedData.model_validate(data)
         if progress.pins.skipped(skipped.name, skipped.reason):
             await emit("skill.skipped", skipped)
+    elif isinstance(fact, CheckOffered):
+        infos = [CheckInfo(name=name, command=command) for name, command in fact.checks]
+        await emit("check.offered", CheckOfferedData(checks=infos))
+    elif isinstance(fact, CheckStarted):
+        await emit(
+            "check.started",
+            CheckStartedData(
+                check_id=fact.check_id, name=fact.name, command=fact.command, round=fact.round
+            ),
+        )
+    elif isinstance(fact, CheckCompleted):
+        await emit(
+            "check.completed",
+            CheckCompletedData.model_validate(
+                {
+                    "check_id": fact.check_id,
+                    "name": fact.name,
+                    "status": fact.status,
+                    "exit_code": fact.exit_code,
+                    "duration_ms": fact.duration_ms,
+                    "output": fact.output,
+                    "artifact_id": fact.artifact_id,
+                    "round": fact.round,
+                }
+            ),
+        )
     elif isinstance(fact, ApprovalAsked):
         progress.waiting = True
         await emit(

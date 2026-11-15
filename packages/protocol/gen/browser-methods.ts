@@ -63,6 +63,7 @@ export const BROWSER_METHODS: ReadonlySet<string> = new Set([
   "session.list",
   "session.rename",
   "session.revoke",
+  "session.set_checks",
   "session.set_mode",
   "session.set_model",
   "session.set_options",
