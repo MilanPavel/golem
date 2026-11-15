@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import pytest
-from fakes import ToolCallingChatModel
+from fakes import StreamingToolChatModel, ToolCallingChatModel
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
 from langchain_ollama import ChatOllama
@@ -50,6 +50,7 @@ from golem_protocol.events import (
     ToolCompletedEvent,
     ToolFailedEvent,
     ToolRequestedEvent,
+    ToolWritingEvent,
 )
 
 
@@ -516,6 +517,60 @@ async def test_tool_output_streams_and_leaves_the_log_when_the_call_ends(
     assert live == ["step 1\n", "step 2\n"]
     assert "tool.output" not in [event.type for event in events]
     assert events[-1].type == "run.completed"
+
+
+class _WriteArgs(BaseModel):
+    path: str
+    content: str
+
+
+class _Collect:
+    def __init__(self) -> None:
+        self.seen: list[ChatEvent] = []
+
+    def deliver(self, event: ChatEvent) -> None:
+        self.seen.append(event)
+
+
+async def test_a_file_call_that_streams_reports_its_progress_and_leaves_the_log(
+    database: Database, project: Path
+) -> None:
+    async def run(args: _WriteArgs, ctx: ToolContext) -> ToolResult:
+        del ctx
+        return ToolResult(output="ok", summary=f"{len(args.content)} chars")
+
+    writer = Tool(name="write_file", description="writes", args=_WriteArgs, run=run, read_only=True)
+    content = "one\ntwo\nthree\n" * 20
+    model = StreamingToolChatModel(
+        replies=[[("write_file", {"path": "out/notes.txt", "content": content})], "done"]
+    )
+    chat = _chat(database, model, ToolRegistry([*READ_ONLY_TOOLS, writer]))
+    session_id = await chat.manager.create(None, cwd=str(project))
+    target = _Collect()
+    await chat.manager.attach(session_id, 0, target)  # type: ignore[arg-type]
+    events = await chat.finished(await chat.manager.send(session_id, "write it"))
+
+    writing = [event for event in target.seen if isinstance(event, ToolWritingEvent)]
+    assert writing
+    assert (writing[0].data.name, writing[0].data.index) == ("write_file", 0)
+    started = [event for event in target.seen if isinstance(event, MessageStartedEvent)]
+    assert writing[0].data.message_id == started[0].data.message_id
+    assert "tool.writing" not in [event.type for event in events]
+    assert events[-1].type == "run.completed"
+
+
+async def test_a_call_that_is_not_a_file_write_reports_no_progress(
+    database: Database, project: Path
+) -> None:
+    model = StreamingToolChatModel(replies=[[("read_file", {"path": "notes.txt"})], "ok"])
+    chat = _chat(database, model)
+    session_id = await chat.manager.create(None, cwd=str(project))
+    target = _Collect()
+    await chat.manager.attach(session_id, 0, target)  # type: ignore[arg-type]
+    await chat.finished(await chat.manager.send(session_id, "read it"))
+    types = [event.type for event in target.seen]
+    assert "tool.requested" in types
+    assert "tool.writing" not in types
 
 
 async def test_a_call_that_ran_but_failed_is_marked_and_the_model_still_gets_the_output(

@@ -8971,6 +8971,9 @@ public enum RPCNotificationMethod: String, Codable {
 ///
 /// The model asked for a tool. Follows the asking message's ``message.completed``.
 ///
+/// The model is still writing a file call. A live signal: ``message.completed`` replaces
+/// it.
+///
 /// The tool call is running.
 ///
 /// More output from a running call. ``tool.completed`` or ``tool.failed`` replaces it.
@@ -9172,6 +9175,12 @@ public struct Params: Codable {
 /// ``message_id`` is the assistant message that asked. ``args`` are the
 /// arguments as the model wrote them.
 ///
+/// How far the model got writing a ``write_file`` or ``edit_file`` call.
+///
+/// Stored only until its message completes. ``index`` is the call's place in the reply.
+/// ``path`` is None until the model has written the whole path. ``lines`` and ``chars``
+/// count the file text written so far.
+///
 /// A requested tool call is running.
 ///
 /// Text a running tool call printed. Stored only until the call ends.
@@ -9322,6 +9331,9 @@ public struct ParamsData: Codable {
     public let args: [String: JSONAny]?
     public let callID: String?
     public let name: String?
+    public let chars: Int?
+    public let lines: Int?
+    public let path: String?
     public let artifactID: String?
     public let diff: String?
     public let durationMS: Int?
@@ -9334,7 +9346,6 @@ public struct ParamsData: Codable {
     public let todos: [PurpleTodo]?
     public let added: Int?
     public let changeID: String?
-    public let path: String?
     public let removed: Int?
     public let reverts: String?
     public let hash: String?
@@ -9414,6 +9425,9 @@ public struct ParamsData: Codable {
         case args = "args"
         case callID = "call_id"
         case name = "name"
+        case chars = "chars"
+        case lines = "lines"
+        case path = "path"
         case artifactID = "artifact_id"
         case diff = "diff"
         case durationMS = "duration_ms"
@@ -9426,7 +9440,6 @@ public struct ParamsData: Codable {
         case todos = "todos"
         case added = "added"
         case changeID = "change_id"
-        case path = "path"
         case removed = "removed"
         case reverts = "reverts"
         case hash = "hash"
@@ -9439,7 +9452,7 @@ public struct ParamsData: Codable {
         case output = "output"
     }
 
-    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: PurpleReason?, options: [String: Option]?, mode: Mode?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String?, provider: String?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, todos: [PurpleTodo]?, added: Int?, changeID: String?, path: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?) {
+    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: PurpleReason?, options: [String: Option]?, mode: Mode?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String?, provider: String?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, chars: Int?, lines: Int?, path: String?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, todos: [PurpleTodo]?, added: Int?, changeID: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?) {
         self.cwd = cwd
         self.forkedFrom = forkedFrom
         self.modelName = modelName
@@ -9507,6 +9520,9 @@ public struct ParamsData: Codable {
         self.args = args
         self.callID = callID
         self.name = name
+        self.chars = chars
+        self.lines = lines
+        self.path = path
         self.artifactID = artifactID
         self.diff = diff
         self.durationMS = durationMS
@@ -9519,7 +9535,6 @@ public struct ParamsData: Codable {
         self.todos = todos
         self.added = added
         self.changeID = changeID
-        self.path = path
         self.removed = removed
         self.reverts = reverts
         self.hash = hash
@@ -9758,6 +9773,7 @@ public enum ParamsType: String, Codable {
     case toolOutput = "tool.output"
     case toolRequested = "tool.requested"
     case toolStarted = "tool.started"
+    case toolWriting = "tool.writing"
 }
 
 /// Client → daemon request. ``id`` is required; notifications are not accepted.
@@ -13090,6 +13106,105 @@ public struct ToolStartedEventData: Codable {
 
 public enum ToolStartedEventType: String, Codable {
     case toolStarted = "tool.started"
+}
+
+/// How far the model got writing a ``write_file`` or ``edit_file`` call.
+///
+/// Stored only until its message completes. ``index`` is the call's place in the reply.
+/// ``path`` is None until the model has written the whole path. ``lines`` and ``chars``
+/// count the file text written so far.
+// MARK: - ToolWritingData
+public struct ToolWritingData: Codable {
+    public let chars: Int
+    public let index: Int
+    public let lines: Int
+    public let messageID: String
+    public let name: String
+    public let path: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case chars = "chars"
+        case index = "index"
+        case lines = "lines"
+        case messageID = "message_id"
+        case name = "name"
+        case path = "path"
+    }
+
+    public init(chars: Int, index: Int, lines: Int, messageID: String, name: String, path: String?) {
+        self.chars = chars
+        self.index = index
+        self.lines = lines
+        self.messageID = messageID
+        self.name = name
+        self.path = path
+    }
+}
+
+/// The model is still writing a file call. A live signal: ``message.completed`` replaces it.
+// MARK: - ToolWritingEvent
+public struct ToolWritingEvent: Codable {
+    public let data: ToolWritingEventData
+    public let runID: String
+    public let seq: Int
+    public let sessionID: String
+    public let ts: String
+    public let type: ToolWritingEventType
+
+    public enum CodingKeys: String, CodingKey {
+        case data = "data"
+        case runID = "run_id"
+        case seq = "seq"
+        case sessionID = "session_id"
+        case ts = "ts"
+        case type = "type"
+    }
+
+    public init(data: ToolWritingEventData, runID: String, seq: Int, sessionID: String, ts: String, type: ToolWritingEventType) {
+        self.data = data
+        self.runID = runID
+        self.seq = seq
+        self.sessionID = sessionID
+        self.ts = ts
+        self.type = type
+    }
+}
+
+/// How far the model got writing a ``write_file`` or ``edit_file`` call.
+///
+/// Stored only until its message completes. ``index`` is the call's place in the reply.
+/// ``path`` is None until the model has written the whole path. ``lines`` and ``chars``
+/// count the file text written so far.
+// MARK: - ToolWritingEventData
+public struct ToolWritingEventData: Codable {
+    public let chars: Int
+    public let index: Int
+    public let lines: Int
+    public let messageID: String
+    public let name: String
+    public let path: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case chars = "chars"
+        case index = "index"
+        case lines = "lines"
+        case messageID = "message_id"
+        case name = "name"
+        case path = "path"
+    }
+
+    public init(chars: Int, index: Int, lines: Int, messageID: String, name: String, path: String?) {
+        self.chars = chars
+        self.index = index
+        self.lines = lines
+        self.messageID = messageID
+        self.name = name
+        self.path = path
+    }
+}
+
+public enum ToolWritingEventType: String, Codable {
+    case toolWriting = "tool.writing"
 }
 
 /// Tool results the call sent as a one-line stub, and the tokens that saved.

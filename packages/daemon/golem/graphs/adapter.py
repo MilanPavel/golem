@@ -7,12 +7,14 @@ items only. Provider clients stay in the model router.
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping
+import time
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Literal, cast
 
 from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage, ToolMessage
 
+from golem.graphs.partial_args import partial_field, partial_string
 from golem_protocol.commands import TraceMessage
 
 STREAM_KEY = "golem"
@@ -127,6 +129,21 @@ class RequestedCall:
     call_id: str
     name: str
     args: dict[str, object]
+
+
+@dataclass(frozen=True, slots=True)
+class ToolWriting:
+    """How far the model got writing a file tool call, from its streamed arguments.
+
+    ``path`` is set once the model has written all of it. ``lines`` and ``chars``
+    count the file text so far: ``content`` of ``write_file``, ``new_string`` of ``edit_file``.
+    """
+
+    index: int
+    name: str
+    path: str | None
+    lines: int
+    chars: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -269,6 +286,7 @@ Fact = (
     | ContextChanged
     | TextDelta
     | ThinkingDelta
+    | ToolWriting
     | TextCompleted
     | ToolStarted
     | ToolOutput
@@ -522,16 +540,37 @@ def _partial_suffix(text: str, tag: str) -> int:
     return 0
 
 
+WRITING_FIELDS = {"write_file": "content", "edit_file": "new_string"}
+"""The tools whose writing is reported, and the argument that holds the file text."""
+
+WRITING_EVERY = 1.0
+"""Seconds between two :class:`ToolWriting` facts of one call."""
+
+
+@dataclass
+class _Writing:
+    """The streamed call at one ``index``: its name, and its argument text in pieces."""
+
+    name: str = ""
+    args: list[str] = field(default_factory=list[str])
+    sent_at: float | None = None
+
+
 class Translator:
     """:func:`translate` that also separates thinking from the answer while streaming.
 
     A chunk's ``reasoning_content`` becomes a :class:`ThinkingDelta`. Content that
     starts with ``<think>`` is split into thinking and answer, across chunks. One
     translator serves one run, and a new model call starts it over.
+
+    The ``tool_call_chunks`` of a ``write_file`` or ``edit_file`` call become a
+    :class:`ToolWriting`, at most once per second per call. ``clock`` is in seconds.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, clock: Callable[[], float] = time.monotonic) -> None:
         self._split = _ThinkSplitter()
+        self._clock = clock
+        self._writing: dict[int, _Writing] = {}
 
     def __call__(self, part: object) -> list[Fact]:
         if isinstance(part, dict):
@@ -541,9 +580,11 @@ class Translator:
                 return self._streamed(raw.get("data"))
             fact = translate(raw)
             if isinstance(fact, TextCompleted):
+                self._writing.clear()
                 return [*self._split.finish(), fact]
             if isinstance(fact, ModelStarted):
                 self._split.finish()
+                self._writing.clear()
             return [] if fact is None else [fact]
         return []
 
@@ -558,7 +599,47 @@ class Translator:
         text = message_text(chunk)
         if text:
             facts.extend(self._split.feed(text))
+        facts.extend(self._writes(chunk))
         return facts
+
+    def _writes(self, chunk: AIMessageChunk) -> list[Fact]:
+        """Collect the tool-call pieces of ``chunk``, and report the file calls that are due."""
+        due: list[int] = []
+        for piece in chunk.tool_call_chunks:
+            index = piece.get("index")
+            index = index if isinstance(index, int) else 0
+            call = self._writing.setdefault(index, _Writing())
+            name = piece.get("name")
+            if name:
+                call.name = name
+            args = piece.get("args")
+            if args:
+                call.args.append(args)
+            if call.name in WRITING_FIELDS and index not in due:
+                due.append(index)
+        facts: list[Fact] = []
+        now = self._clock()
+        for index in due:
+            call = self._writing[index]
+            if call.sent_at is not None and now - call.sent_at < WRITING_EVERY:
+                continue
+            call.sent_at = now
+            facts.append(_writing_fact(index, call))
+        return facts
+
+
+def _writing_fact(index: int, call: _Writing) -> ToolWriting:
+    """What ``call`` has written so far. The text is read only when a fact is due, not per chunk."""
+    text = "".join(call.args)
+    path = partial_field(text, "path")
+    body = partial_string(text, WRITING_FIELDS[call.name]) or ""
+    return ToolWriting(
+        index=index,
+        name=call.name,
+        path=path[0] if path is not None and path[1] else None,
+        lines=len(body.splitlines()),
+        chars=len(body),
+    )
 
 
 def _completed(data: object) -> TextCompleted | ApprovalAsked | None:
@@ -913,6 +994,7 @@ __all__ = [
     "ToolFinished",
     "ToolOutput",
     "ToolStarted",
+    "ToolWriting",
     "Translator",
     "message_text",
     "plain_messages",
