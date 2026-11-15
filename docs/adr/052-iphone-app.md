@@ -1,7 +1,7 @@
 # ADR-052: The iPhone app is SwiftUI on iOS 17, built on a shared GolemKit package, and may save "Always allow" with Face ID
 
 **Date**: 2026-11-13
-**Status**: accepted
+**Status**: accepted, amended 2026-11-15 (no crypto dependency)
 **Deciders**: Milan Pavel
 
 ## Context
@@ -23,7 +23,7 @@ Phase 14 ([#745](https://github.com/MilanPavel/golem/issues/745)) puts golem on 
 
 - **SwiftUI and the Apple frameworks only.** No UIKit screens unless SwiftUI cannot do the thing (the camera scanner may wrap VisionKit). No third-party UI, networking, or state libraries.
 - **Minimum iOS 17.0.** iOS 17 gives `@Observable` (the Observation framework, so GolemKit's view state is plain Swift types without Combine), interactive Live Activities and widgets (Allow and Deny buttons on a Live Activity), and, from 17.2, push-to-start for a Live Activity (14.6.3). iOS 16 would need a second state model and would lose both. The phones that stop at iOS 16 (iPhone 8 and X) are nine years old, and the user of this app is a developer with a Mac.
-- **One dependency besides Apple's frameworks: the crypto library [ADR-051](051-relay-and-pairing.md) names.** Nothing else is added without an amendment to this record.
+- **No dependency besides Apple's frameworks.** The Noise handshake is written by hand on CryptoKit and checked against the published vectors [ADR-051](051-relay-and-pairing.md) keeps in `packages/protocol` (amended 2026-11-15; this line first allowed one crypto library). Nothing is added without an amendment to this record.
 
 ### Repo layout
 

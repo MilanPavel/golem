@@ -1,7 +1,7 @@
 # ADR-051: A phone reaches the Mac through a relay that sees only ciphertext
 
 **Date**: 2026-11-13
-**Status**: accepted
+**Status**: accepted, amended 2026-11-15 (the cipher, the libraries, and [The wire in detail](#the-wire-in-detail))
 
 ## The idea
 
@@ -71,12 +71,12 @@ What it does **not** hide, on purpose: who talks to whom and when, and message s
 
 - **Why the phone key is P-256 in the Secure Enclave, not X25519 in the Keychain.** The Secure Enclave holds only P-256, not X25519. A key that cannot be exported is what the security vision promises for a stolen phone: malware or a forensic copy of the file system gets nothing it could use from another machine. So the phone's long-term key is the Secure Enclave key, and it is used only to **sign**. It takes no part in the key agreement, so Noise needs nothing from it that Noise does not define.
 - **Why ECDSA P-256 for the Mac too.** One signature algorithm means one verifier in the relay, the gateway, the daemon, and CryptoKit. WebCrypto in Bun and Cloudflare, Python's `cryptography`, and CryptoKit all have it natively, in the same raw 64-byte `r‖s` format.
-- **The Mac's key is in the Keychain, held by the daemon.** The daemon's secret store (`golem/secrets.py`) gets a new namespace, `relay/<name>`: the Mac key pair is `relay/identity`, a push key is `relay/push-<device id>`. The gateway never reads the Keychain. The daemon exposes two methods for the gateway only (`local` in `METHOD_ACCESS`): `relay.sign(message)` and `relay.dh(public key)`. Each connection to the relay needs one signature, and each phone handshake needs one Diffie-Hellman with the Mac's Noise key, so the daemon does both and the private key never leaves it. This costs one Unix-socket round trip per new connection.
-- **Python needs a primitives library** for P-256 and X25519. `cryptography` is not a dependency today. It is the usual choice, wheels exist for every golem platform, and 14.3.1 adds it.
+- **The Mac's key is in the Keychain, held by the daemon.** The daemon's secret store (`golem/secrets.py`) gets a new namespace, `relay/<name>`: the Mac's signing key is `relay/identity`, its Noise key is `relay/noise`, a push key is `relay/push-<device id>`. The gateway never reads the Keychain. The daemon exposes two methods for the gateway only (`local` in `METHOD_ACCESS`): `relay.sign(message)` and `relay.dh(public key)`. Each connection to the relay needs one signature, and each phone handshake needs one Diffie-Hellman with the Mac's Noise key, so the daemon does both and the private key never leaves it. This costs one Unix-socket round trip per new connection.
+- **Python needs a primitives library** for P-256 and X25519. `cryptography` is the usual choice, and wheels exist for every golem platform. It is already in `uv.lock` through another package, and 14.3.1 makes it a direct dependency of the daemon.
 
 ### The encryption: Noise NK, with the device's signature over the handshake
 
-**`Noise_NK_25519_ChaChaPoly_SHA256`**, the prologue `golem-noise-v1 ‖ room id`.
+**`Noise_NK_25519_AESGCM_SHA256`**, the prologue `golem-noise-v1 ‖ room id`.
 
 ```mermaid
 sequenceDiagram
@@ -95,7 +95,8 @@ sequenceDiagram
 - **The handshake takes one round trip,** like IK, and the phone needs no X25519 static key at all, so no software key exists that could be copied and used without the Secure Enclave.
 - **A connection lives at most 24 hours.** Then the phone opens a new one, with a new handshake. Inside a connection, Noise's own nonce counter rejects a repeated or reordered frame.
 - **Inside the channel** each Noise message holds `type (1 byte) ‖ flags (1 byte) ‖ body`. Type `0` is one protocol line, with the framing rules of ADR-028 (one JSON object, no `\n` or `\r`). Type `1` is a control message for the gateway (`auth`, `pair`, `push.register`, `unpair`), never forwarded to the daemon. Flag bit 0 means "more follows". A line may be up to 1 MiB (`MAX_LINE_BYTES`) and is cut into pieces that fit a relay frame.
-- **Libraries.** On the Mac: `@noble/curves`, `@noble/ciphers`, and `@noble/hashes` (audited, pure TypeScript, no native code, already the usual pick in Bun) under a small Noise handshake in the gateway package, about 250 lines. On the phone: CryptoKit has every primitive this suite uses (`Curve25519`, `ChaChaPoly`, `SHA256`, `HKDF`, and `SecureEnclave.P256`), and no BLAKE2, which is why the hash is SHA-256. Whether the phone's handshake is written by hand or taken from a package is ADR-052's call. Either way **both implementations must pass the same Noise test vectors**, kept in `packages/protocol` and run by both test suites, and a test in which the Swift and the TypeScript side shake hands. Inventing or mis-writing a handshake is the real risk here, and the vectors are the gate.
+- **Libraries: none. The Noise state machine is written by hand on each platform's own primitives** (amended 2026-11-15). The gateway uses `node:crypto` for X25519 and WebCrypto for AES-256-GCM, SHA-256, and HMAC, which Bun and Node both have. The phone uses CryptoKit (`Curve25519`, `AES.GCM`, `SHA256`, `HMAC`, and `SecureEnclave.P256`). The daemon uses `cryptography` for its two operations (`relay.sign`, `relay.dh`). The suite was ChaCha20-Poly1305 with `@noble/*` on the Mac. It is AES-GCM because Bun's `node:crypto` has no ChaCha20-Poly1305, and AES-GCM is native everywhere this runs (hardware-accelerated on Apple silicon), so the only hand-written code is the Noise state machine, never a cipher. No package is added on the Mac or the phone (ADR-052's one allowed dependency stays unused).
+- **The vectors are the gate.** `packages/protocol/vectors/noise/` holds the `Noise_NK_25519_AESGCM_SHA256` entries of the published cacophony vectors (`vectors/cacophony.txt` of haskell-cryptography/cacophony, BSD-3-Clause, with its licence and source commit next to the file). The gateway's tests and GolemKit's tests both run every entry, and a test in which the Swift and the TypeScript side shake hands is added with the phone's side (14.4.2). Vectors made by our own code would prove nothing, so none are.
 
 ### Pairing
 
@@ -275,12 +276,54 @@ The daemon cannot tell a phone from a browser: both come through the gateway. So
 
 **Why not a `device` field in `hello`.** The phone writes `hello`, so it could write any device id. Rewriting the message in the gateway goes against ADR-028's rule that the daemon reads exactly what the page sent.
 
+### The wire in detail
+
+Amended 2026-11-15. 14.3.1 found that the record named the messages but not their bytes, and the phone and the Mac must agree on them exactly.
+
+**Encodings.**
+
+- **P-256 public keys are 65 bytes, uncompressed** (`0x04 ‖ x ‖ y`), everywhere on the wire, in the database, and inside hashes. The room id is `SHA-256` of those 65 bytes, and a device id is its first 16 bytes. This is what WebCrypto exports and what the relay already checks. The QR code alone carries the Mac's key **compressed** (33 bytes) to stay short. The phone expands it (CryptoKit's `compressedRepresentation`, then `x963Representation`) before it hashes or compares it.
+- **Signatures are 64 bytes, raw `r ‖ s`**, ECDSA with SHA-256, as WebCrypto, CryptoKit (`rawRepresentation`), and `cryptography` (after `decode_dss_signature`) all produce.
+- **X25519 keys are 32 raw bytes.** AES-GCM nonces follow the Noise specification: 4 zero bytes, then the 64-bit counter, big-endian.
+- **Bytes inside JSON are base64url without padding.** A device id in a JSON field is 32 lowercase hex characters, as in the `devices` table.
+
+**Control messages (inside the channel, type `1`).** The body is one UTF-8 JSON object with a `type`, and it fits one relay frame (flag bit 0 clear). Until the gateway has sent `ok` or `paired`, a session accepts only `auth` or `pair`. Anything else ends it.
+
+| From | Message | Notes |
+|---|---|---|
+| Phone | `{"type":"auth","v":1,"key":"<65 bytes>","sig":"<64 bytes>"}` | `sig` is over the bytes `golem-auth-v1` ‖ `h` |
+| Gateway | `{"type":"ok","device":"<hex id>"}` | Then protocol lines (type `0`) flow both ways |
+| Phone | `{"type":"pair","v":1,"code":"<16 bytes>","key":"<65 bytes>","name":"…","model":"…","sig":"<64 bytes>"}` | `sig` is over `golem-pair-v1` ‖ `h`. Handled in 14.3.2 |
+| Gateway | `{"type":"pair.words","words":["kiln","otter","maple"]}` | Then waits for the owner. 14.3.2 |
+| Gateway | `{"type":"paired","device":"<hex id>"}` | 14.3.2 |
+| Gateway | `{"type":"push.key","epoch":n,"key":"<32 bytes>"}` | After `ok` or `paired` (see [Push](#push)). 14.2.3 |
+| Phone | `{"type":"push.register","token":"<hex>","env":"production"\|"sandbox"}` | Answered by `ok`. 14.2.3 |
+| Phone | `{"type":"unpair"}` | The daemon revokes this device. The session then ends |
+| Gateway | `{"type":"error","code":"…","message":"…"}` | Then the session ends |
+
+Error codes: `bad_message` (not JSON, unknown type, wrong `v`, or out of order), `bad_signature`, `unknown_device`, `revoked`, `pair_expired`, `pair_wrong_code`, `pair_refused`, `daemon_unavailable`. **A session ends** when the gateway forgets its keys: it drops further frames on that `sid`, and the phone starts a new handshake with a new `sid`. The relay is not told, since it never knew a session existed.
+
+**The gateway's daemon methods** (all `local`):
+
+| Method | Params | Result |
+|---|---|---|
+| `relay.sign` | `message` (bytes) | `sig` (64 bytes). The daemon signs only messages that start with `golem-relay-v1\0`, so the gateway cannot use the Mac's key for anything else |
+| `relay.dh` | `public_key` (32 bytes) | `shared` (32 bytes). Refused for an all-zero result |
+| `device.sync` | none | `url`, `room`, `mac_key` (65 bytes), `noise_key` (32 bytes, public), `seq`, `devices` (`id`, `key`), `pairs` (`slot`, `exp`) |
+| `connection.identify` | `device` (hex id) | `{}`, or an error for an unknown or revoked device |
+
+`device.changed` is a notification with no params; the gateway calls `device.sync` again. `seq` grows by one with each change and becomes the `seq` of the relay's `allow` message.
+
+**Keys at rest.** `relay/identity` holds the P-256 private key as PKCS#8 DER, and `relay/noise` holds the 32 raw bytes of the X25519 private key, both in the daemon's secret store. The daemon makes both on first use and never returns either.
+
+**When the gateway connects.** When `[relay] url` is set **and** at least one device is paired or a pairing is open. It disconnects when neither holds, so a Mac with no phone opens no socket. It reconnects with backoff (1 s doubling to 60 s, with jitter), and at once after a `device.changed` that makes the condition true.
+
 ### Push
 
 The relay holds the APNs key (token auth, a `.p8` file) and calls APNs. The Mac and the phone never do.
 
 1. **At pairing,** the daemon makes a 32-byte **push key** and sends it to the phone inside the encrypted channel. **At each later connection,** the Mac sends a fresh one the same way, and keeps the last one for 7 days so a push in flight still opens. A phone that has not connected for longer gets only the generic text (point 4).
-2. **To push,** the Mac encrypts the body with ChaCha20-Poly1305 under the push key: a random 12-byte nonce, and the key epoch, a kind, an id, and a timestamp as associated data. It sends `{"type":"push","device":"<id>","apns_token":..., "env":..., "class":"alert"|"liveactivity", "collapse_id":..., "ciphertext":..., "expires_in":...}`. The ciphertext is padded to a multiple of 256 bytes and at most about 2.5 KiB, to fit APNs' 4 KiB.
+2. **To push,** the Mac encrypts the body with AES-256-GCM under the push key: a random 12-byte nonce, and the key epoch, a kind, an id, and a timestamp as associated data. It sends `{"type":"push","device":"<id>","apns_token":..., "env":..., "class":"alert"|"liveactivity", "collapse_id":..., "ciphertext":..., "expires_in":...}`. The ciphertext is padded to a multiple of 256 bytes and at most about 2.5 KiB, to fit APNs' 4 KiB.
 3. **The relay** checks that the device is on that Mac's allow list and that the rate limits hold, then calls APNs with `mutable-content: 1`, the fixed visible text `golem needs you`, `apns-collapse-id`, `apns-expiration` (the `expires_in`, one hour for an approval), and the ciphertext in a custom field. It keeps nothing. APNs answers 410 (token gone) become `token_gone`, and the Mac forgets the token.
 4. **On the phone,** a Notification Service Extension decrypts the body, and sets the title, the text, and the category (which carries Allow and Deny). Whatever the visible text, **the extension overwrites it**: with the decrypted text, or with the fixed `golem needs you` if decryption fails. A relay (or an attacker who holds the APNs key) can therefore not put its own words on the lock screen; at worst it makes the phone say "golem needs you". The extension drops a push it has already seen (the id) or that is older than 1 hour, which covers replay by a relay or Apple.
 5. **The kind of notice** (an approval, a finished run, a failure) is inside the ciphertext, not in the payload, so the relay and Apple see only `alert` or `liveactivity`. The collapse id is an opaque value derived from the push key, so it links two pushes but names nothing.
