@@ -1402,6 +1402,40 @@ test("forkSession sends the message id and reads the new session", async () => {
   }
 });
 
+test("getCost sends the session id when it has one and checks what comes back", async () => {
+  const sent: Record<string, unknown>[] = [];
+  const totals = { calls: 1, input: 2, output: 3, cost_usd: 0.5, saved_usd: 0 };
+  const result = { today: totals, week: totals, by_model: [], by_day: [] };
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: { "cost.get": result },
+      onRequest: (_socket, method, params) => {
+        if (method === "cost.get") sent.push(params);
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "web", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    assert.deepEqual(await client.getCost(), result);
+    await client.getCost("s_test");
+    assert.deepEqual(sent, [{}, { session_id: "s_test" }]);
+  } finally {
+    client.close();
+    await server.close();
+  }
+  const bad = await listen((socket) => {
+    attach(socket, { answerPing: true, results: { "cost.get": { today: totals } } });
+  });
+  const refused = connectGolem({ socketPath: bad.socketPath, clientName: "web", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    await assert.rejects(() => refused.getCost(), /invalid cost.get result/);
+  } finally {
+    refused.close();
+    await bad.close();
+  }
+});
+
 test("getTrace and getTraceSpan send their ids and check what comes back", async () => {
   const sent: [string, Record<string, unknown>][] = [];
   const span = { id: "m_1", kind: "model", name: "model 1", start: "t", status: "ok" };

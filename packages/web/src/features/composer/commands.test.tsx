@@ -148,6 +148,12 @@ test("/permissions opens Settings on the tool rules", async () => {
   expect(screen.getByRole("heading", { level: 2, name: "Tool rules" })).toBeTruthy();
 });
 
+test("/cost opens Settings, Usage", async () => {
+  const { user } = await session();
+  await say(user, "/cost");
+  expect(location.pathname).toBe("/settings/usage");
+});
+
 test("/context opens the trace before any model call", async () => {
   const { user } = await session();
   await say(user, "/context");

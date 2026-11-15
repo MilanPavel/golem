@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import type { ChatEvent } from "@golem/client";
+import type { ChatEvent, CostGetResult } from "@golem/client";
 
 import { emptyChat, reduceChat, type ChatMessage } from "./chat-state.ts";
-import { formatCost, sessionCostLabel, turnFooterParts, turnTotals } from "./cost.ts";
+import { costReportLines, formatCost, sessionCostLabel, turnFooterParts, turnTotals } from "./cost.ts";
 import { turnFooter } from "./turns.ts";
 
 function ev(type: string, data: Record<string, unknown>): ChatEvent {
@@ -82,4 +82,59 @@ test("the session's cost shows only once a call has cost something", () => {
   assert.equal(sessionCostLabel([paid(0)]), "");
   assert.equal(sessionCostLabel([paid(null)]), "");
   assert.equal(sessionCostLabel([paid(0.02), paid(0.01)]), "$0.03");
+});
+
+const NONE = { calls: 0, input: 0, output: 0, cost_usd: 0, saved_usd: 0 };
+
+const FULL: CostGetResult = {
+  session: { calls: 3, input: 38_200, output: 4_100, cost_usd: 0.03, saved_usd: 0 },
+  today: { calls: 9, input: 212_000, output: 19_000, cost_usd: 0.42, saved_usd: 0 },
+  week: { calls: 40, input: 1_400_000, output: 120_000, cost_usd: 2.1, saved_usd: 3.4 },
+  saved_reference: "deepseek/deepseek-chat",
+  by_model: [
+    { provider: "ollama", model: "qwen3:27b", tier: "local", calls: 30, input: 1_000_000, output: 100_000, cost_usd: 0 },
+    { provider: "deepseek", model: "deepseek-chat", tier: "budget", calls: 8, input: 240_000, output: 20_000, cost_usd: 0.19 },
+    { provider: "anthropic", model: "claude-opus", tier: "frontier", calls: 2, input: 38_000, output: 3_000, cost_usd: 1.91 },
+  ],
+  by_day: [],
+};
+
+test("costReportLines: a full result, columns aligned with spaces", () => {
+  assert.deepEqual(costReportLines(FULL), [
+    "cost              in     out   cost",
+    "this session   38.2K    4.1K  $0.03",
+    "today         212.0K   19.0K  $0.42",
+    "this week       1.4M  120.0K  $2.10",
+    "",
+    "by model (7 days)",
+    "qwen3:27b      local       1.1M  $0.00",
+    "deepseek-chat  budget    260.0K  $0.19",
+    "claude-opus    frontier   41.0K  $1.91",
+    "",
+    "saved \u2248 $3.40 by running locally (against deepseek-chat prices)",
+  ]);
+});
+
+test("costReportLines: no session row without a session, no saved line without a reference", () => {
+  const lines = costReportLines({ ...FULL, session: null, saved_reference: null });
+  assert.equal(lines.some((line) => line.startsWith("this session")), false);
+  assert.equal(lines.some((line) => line.startsWith("saved")), false);
+  assert.equal(lines[1]?.startsWith("today"), true);
+});
+
+test("costReportLines: zero everything is two rows and no model table", () => {
+  assert.deepEqual(costReportLines({ today: NONE, week: NONE }), [
+    "cost       in  out   cost",
+    "today       0    0  $0.00",
+    "this week   0    0  $0.00",
+  ]);
+});
+
+test("costReportLines: an unknown model and tier are named", () => {
+  const lines = costReportLines({
+    today: NONE,
+    week: NONE,
+    by_model: [{ calls: 1, input: 5, output: 5, cost_usd: 0 }],
+  });
+  assert.equal(lines.at(-1), "unknown  -  10  $0.00");
 });

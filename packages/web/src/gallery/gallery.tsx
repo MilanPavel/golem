@@ -49,6 +49,8 @@ import { KEYS_CASES } from "../features/settings/keys-sample.ts";
 import { SkillList } from "../features/settings/skills-section.tsx";
 import { SkillOverview } from "../features/settings/skills/skill-detail.tsx";
 import { SAMPLE_BROKEN_SKILL_MD, SAMPLE_SKILLS } from "../features/settings/skills/sample.ts";
+import { UsageView } from "../features/settings/usage-section.tsx";
+import { EMPTY_USAGE, SAMPLE_USAGE } from "../features/settings/usage-sample.ts";
 import { CodeEditor } from "../features/settings/config/code-editor.tsx";
 import { CatalogView } from "../features/settings/mcp/catalog-panel.tsx";
 import { ImportListView } from "../features/settings/mcp/import-panel.tsx";
@@ -774,6 +776,23 @@ function ApiKeysDemo() {
   );
 }
 
+/** Settings → Usage, with a week of calls and with none. */
+function UsageDemo() {
+  return (
+    <div className="flex flex-col gap-4">
+      {[
+        ["Usage, filled", SAMPLE_USAGE],
+        ["Usage, empty", EMPTY_USAGE],
+      ].map(([label, result]) => (
+        <section key={label as string} aria-label={label as string} className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
+          <span className="font-mono text-xs text-faint">{label as string}</span>
+          <UsageView result={result as typeof SAMPLE_USAGE} />
+        </section>
+      ))}
+    </div>
+  );
+}
+
 function McpTabsDemo() {
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set(["a", "e"]));
   const none = new Set<string>();
@@ -1020,6 +1039,11 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
       <section className="mt-6" id={anchor("API keys")}>
         <h3 className="mb-2 font-mono text-xs text-faint">API keys</h3>
         <ApiKeysDemo />
+      </section>
+
+      <section className="mt-6" id={anchor("Usage")}>
+        <h3 className="mb-2 font-mono text-xs text-faint">Usage</h3>
+        <UsageDemo />
       </section>
 
       <section className="mt-6" id={anchor("Tools panel")}>

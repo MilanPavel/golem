@@ -63,6 +63,7 @@ import type { SessionAttachResult } from "../../protocol/gen/session-attach-resu
 import type { SessionCloseResult } from "../../protocol/gen/session-close-result.ts";
 import type { SessionCreateResult } from "../../protocol/gen/session-create-result.ts";
 import type { SessionForkResult } from "../../protocol/gen/session-fork-result.ts";
+import type { CostGetResult } from "../../protocol/gen/cost-get-result.ts";
 import type { TraceGetResult } from "../../protocol/gen/trace-get-result.ts";
 import type { TraceSpanResult } from "../../protocol/gen/trace-span-result.ts";
 import type { SessionInspectResult } from "../../protocol/gen/session-inspect-result.ts";
@@ -610,6 +611,24 @@ function isTraceSpan(value: unknown): boolean {
     SPAN_STATUSES.has(value["status"]) &&
     (value["children"] === undefined ||
       (Array.isArray(value["children"]) && value["children"].every(isTraceSpan)))
+  );
+}
+
+function isCostTotals(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    ["calls", "input", "output", "cost_usd", "saved_usd"].every((key) => typeof value[key] === "number")
+  );
+}
+
+export function isCostGetResult(value: unknown): value is CostGetResult {
+  return (
+    isRecord(value) &&
+    isCostTotals(value["today"]) &&
+    isCostTotals(value["week"]) &&
+    (value["session"] == null || isCostTotals(value["session"])) &&
+    (value["by_model"] === undefined || Array.isArray(value["by_model"])) &&
+    (value["by_day"] === undefined || Array.isArray(value["by_day"]))
   );
 }
 
