@@ -47,6 +47,7 @@ const local = (name: string, label: string, sizeGb: number, extra: Partial<Liste
   provider: "ollama",
   source: "catalog",
   status: "not_installed",
+  tier: "local",
   size_gb: sizeGb,
   fit: "fits",
   ...extra,

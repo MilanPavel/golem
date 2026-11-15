@@ -12,7 +12,8 @@ import { hasMod, modShortcut } from "../../ui/platform.ts";
 import type { SessionModel, SessionView } from "../../store/session-store.ts";
 import { Transcript } from "../chat/index.ts";
 import { SessionDock } from "../composer/index.ts";
-import { Drawer, DRAWER_ID, useDrawerOpen } from "../drawer/index.ts";
+import { TodoList, useDrawerOpen } from "../drawer/index.ts";
+import { Workbench, WORKBENCH_ID, type WorkbenchTab } from "../workbench/index.ts";
 import { closeModelDialog, ModelDialog, openModelDialog, useModelDialogOpen } from "../models/index.ts";
 import { folderName, useSessionActions } from "../sessions/index.ts";
 import { useRememberSettingsContext } from "../settings/index.ts";
@@ -155,7 +156,7 @@ function DrawerToggle({
       size="sm"
       aria-label={open ? "Hide details" : "Show details"}
       aria-expanded={open}
-      aria-controls={DRAWER_ID}
+      aria-controls={WORKBENCH_ID}
       title={count === null ? undefined : `${done} of ${todos.length} todos done`}
       onClick={onToggle}
       ref={ref}
@@ -201,6 +202,17 @@ export function SessionFrame({ id, children }: { id: string; children: ReactNode
   const remember = useRememberOpenedFolder();
   const todos = useSession(id, selectTodos);
   const [drawerOpen, setDrawerOpen] = useDrawerOpen();
+  const tabs = useMemo<readonly WorkbenchTab[]>(
+    () => [
+      {
+        id: "todos",
+        label: "Todos",
+        ...(todos.length > 0 ? { badge: `${todos.filter((todo) => todo.status === "done").length}/${todos.length}` } : {}),
+        render: () => <TodoList todos={todos} />,
+      },
+    ],
+    [todos],
+  );
   const toggle = useRef<HTMLButtonElement>(null);
   const inspectToggle = useRef<HTMLButtonElement>(null);
   const route = useRoute();
@@ -282,8 +294,8 @@ export function SessionFrame({ id, children }: { id: string; children: ReactNode
       )}
       <SessionModelDialog sessionId={id} model={model} chip={chip} />
       {drawerOpen ? (
-        <Drawer
-          todos={todos}
+        <Workbench
+          tabs={tabs}
           onClose={() => {
             // The drawer's own button goes away with it, so focus goes back to the toggle.
             setDrawerOpen(false);

@@ -271,6 +271,19 @@ class OllamaSettings(BaseModel):
     models: dict[str, ModelOptions] = Field(default_factory=dict[str, ModelOptions])
 
 
+class RoutingSettings(BaseModel):
+    """``[routing]``. How golem files models into tiers and picks between them.
+
+    ``budget_max_price`` is the most a hosted model may cost, in USD per million tokens and
+    blended as ``(3 * input + output) / 4``, to be in the budget tier. A model above it is
+    frontier.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    budget_max_price: float = Field(default=1.50, gt=0)
+
+
 class WebSettings(BaseModel):
     """``[web]``. What ``web_fetch`` may reach and how much it reads, and who searches.
 
@@ -466,7 +479,17 @@ see ``PROTECTED_SKILL_SETTINGS``.
 PROTECTED_SKILL_SETTINGS = frozenset({"extra_dirs", "claude_dirs"})
 
 BROWSER_SETTINGS = frozenset(
-    {"log_level", "default_model", "models", "session_titles", "rule", "mcp", "skills", "ollama"}
+    {
+        "log_level",
+        "default_model",
+        "models",
+        "session_titles",
+        "rule",
+        "mcp",
+        "skills",
+        "ollama",
+        "routing",
+    }
 )
 """Top-level settings the browser may edit. Every ``GolemSettings`` field is in one list."""
 
@@ -513,6 +536,7 @@ class GolemSettings(BaseSettings):
     mcp: McpServers = Field(default_factory=dict)
     skills: SkillSettings = Field(default_factory=SkillSettings)
     ollama: OllamaSettings = Field(default_factory=OllamaSettings)
+    routing: RoutingSettings = Field(default_factory=RoutingSettings)
 
     _no_secrets = model_validator(mode="before")(_no_inline_secrets)
 

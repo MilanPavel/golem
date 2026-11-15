@@ -135,6 +135,12 @@ The providers are `openai`, `anthropic`, `google`, `deepseek`, `xai`, `moonshot`
 | `start` | `true` | Run `ollama serve` when a local model is needed and nothing answers |
 | `idle_stop_minutes` | `30` | Stop a server golem started after this long unused. `0` never stops it |
 
+### `[routing]`
+
+| Key | Default | Meaning |
+|---|---|---|
+| `budget_max_price` | `1.50` | The most a hosted model may cost, in USD per million tokens, to be in the `budget` tier. The price is blended as `(3 × input + output) / 4`. A model above it, or with no known price, is `frontier`. Ollama models are `local` |
+
 ### `[[rule]]`
 
 One tool rule. The first rule that matches a call decides it ([Tools and permissions](./permissions.md)).

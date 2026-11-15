@@ -43,7 +43,7 @@ import {
 } from "./setup-window.ts";
 
 function model(ref: string, extra: Partial<ListedModel> = {}): ListedModel {
-  return { ref, label: ref, provider: ref.slice(0, ref.indexOf("/")), source: "remote", status: "ready", ...extra };
+  return { ref, label: ref, provider: ref.slice(0, ref.indexOf("/")), source: "remote", status: "ready", tier: ref.startsWith("ollama/") ? "local" : "frontier", ...extra };
 }
 
 const FRESH: ModelListResult = {

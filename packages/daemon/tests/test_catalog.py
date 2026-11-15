@@ -89,3 +89,11 @@ def test_think_values_follow_capabilities_the_catalog_and_the_name() -> None:
     assert think_values("llama3.2:3b", ["completion", "tools"]) == []
     assert think_values("gpt-oss:20b", ["completion"]) == []
     assert think_values("qwen3.5:4b", None) == []
+
+
+def test_a_hosted_entry_may_set_a_tier_and_a_wrong_one_is_a_problem() -> None:
+    good = load_hosted_catalog()
+    ok = HostedEntry("openai/gpt", "G", "one line", ("general",), tier="budget")
+    assert not any("openai/gpt" in line for line in hosted_problems([*good, ok]))
+    bad = HostedEntry("openai/gpt-x", "G", "one line", ("general",), tier="cheap")  # type: ignore[arg-type]
+    assert any("openai/gpt-x" in line and "tier" in line for line in hosted_problems([*good, bad]))
