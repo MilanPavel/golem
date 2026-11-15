@@ -104,6 +104,7 @@ export {
   CONTEXT_KEYS,
   CONTEXT_LABELS,
   contextBar,
+  clearedNote,
   cutNote,
   type CutFields,
   contextCells,
