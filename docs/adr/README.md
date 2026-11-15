@@ -60,7 +60,8 @@ An Architecture Decision Record (ADR) is a short note of one choice: what was de
 | [054](054-browser-edits-skills.md) | The browser edits user skills, and project skills only in a trusted project; writing a skill never trusts it | accepted | 2026-11-14 |
 | [055](055-model-routing.md) | golem picks a model by fixed rules: three tiers, a route mode per session, and caps on spending | accepted | 2026-11-14 |
 | [056](056-planned-window-and-context-view.md) | golem plans the window of a local model, and sends a view of the history, never a shorter history | accepted | 2026-11-14 |
+| [057](057-change-set.md) | golem keeps a snapshot of every file it changes, and undo is a new change | accepted | 2026-11-15 |
 
 How the running code fits together is in [../architecture.md](../architecture.md).
 
-New records use [template.md](template.md). Number the next file `057-….md` and add a row here.
+New records use [template.md](template.md). Number the next file `058-….md` and add a row here.
