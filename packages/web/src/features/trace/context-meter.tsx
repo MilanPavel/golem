@@ -1,6 +1,7 @@
 import {
   CONTEXT_KEYS,
   CONTEXT_LABELS,
+  clearedNote,
   contextLevel,
   contextSummary,
   contextUsed,
@@ -29,6 +30,7 @@ export function ContextMeter({ context, provider }: { context: TraceContext; pro
   const parts = CONTEXT_KEYS.map((key) => context.parts.find((part) => part.key === key) ?? { key, tokens: 0, chars: 0, items: [] });
   const warning = contextWarning(context);
   const note = cutNote(context);
+  const cleared = clearedNote(context);
   const severe = contextLevel(used, size) === "full";
   const summary = contextSummary(used, size, context.window_estimated ?? false);
   return (
@@ -50,6 +52,11 @@ export function ContextMeter({ context, provider }: { context: TraceContext; pro
             <span key={part.key} className={PART_COLOR[part.key]} style={{ width: `${(part.tokens / total) * 100}%` }} />
           ))}
       </div>
+      {cleared === null ? null : (
+        <p role="note" className="text-xs text-muted">
+          {cleared}
+        </p>
+      )}
       {note === null ? null : (
         <p role="note" className={`text-xs ${note.warn ? "text-wait" : "text-muted"}`}>
           {note.text}

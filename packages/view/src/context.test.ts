@@ -4,6 +4,7 @@ import { test } from "node:test";
 import type { ChatEvent, TraceModelSpan, TraceRunSpan } from "@golem/client";
 import {
   contextBar,
+  clearedNote,
   cutNote,
   contextCells,
   contextGrid,
@@ -343,4 +344,10 @@ test("contextReportLines: the cut note is one line under the parts", () => {
   const lines = contextReport(ready, 80);
   assert.ok(lines.includes("! Ollama dropped older messages to fit the window. About 1 (≈300) was not seen."));
   assert.ok(!contextReport({ ...ready, context: context({ prompt_cut: "no" }) }, 80).some((line) => line.includes("Ollama")));
+});
+
+test("clearedNote: says how many results were cleared at the call, nothing when none", () => {
+  assert.equal(clearedNote({ cleared: { count: 0, tokens: 0 } }), null);
+  assert.equal(clearedNote({ cleared: { count: 1, tokens: 900 } }), "1 old tool result was sent as one line at this call, saving ≈900.");
+  assert.equal(clearedNote({ cleared: { count: 5, tokens: 1200 } }), "5 old tool results were sent as one line at this call, saving ≈1.2K.");
 });

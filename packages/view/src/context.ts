@@ -112,6 +112,14 @@ export function cutNote(span: CutFields): { text: string; warn: boolean } | null
   return null;
 }
 
+/** What was cleared at one model call: a line for the Context tab, or null when nothing was. */
+export function clearedNote(context: Pick<TraceContext, "cleared">): string | null {
+  const count = context.cleared?.count ?? 0;
+  const tokens = context.cleared?.tokens ?? 0;
+  if (count <= 0) return null;
+  return `${count} old tool ${count === 1 ? "result was" : "results were"} sent as one line at this call, saving ≈${formatTokens(tokens)}.`;
+}
+
 /** Cells of a bar `width` wide for each part, in display order, and the free rest. */
 export function contextCells(
   parts: readonly TraceContextPart[],
