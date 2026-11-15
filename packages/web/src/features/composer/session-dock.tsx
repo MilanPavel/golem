@@ -19,6 +19,7 @@ type Run = {
   runId: string | null;
   runStartedAt: string | null;
   waiting: boolean;
+  localWait: boolean;
   failed: boolean;
 };
 
@@ -27,6 +28,7 @@ const selectRun = ({ chat }: SessionView): Run => ({
   runId: chat.runId,
   runStartedAt: chat.runStartedAt,
   waiting: chat.approval !== null,
+  localWait: chat.localWait,
   failed: chat.error !== null,
 });
 
@@ -38,6 +40,7 @@ const sameRun = (a: Run, b: Run): boolean =>
   a.runId === b.runId &&
   a.runStartedAt === b.runStartedAt &&
   a.waiting === b.waiting &&
+  a.localWait === b.localWait &&
   a.failed === b.failed;
 
 /** The dock of a session: the meter, the composer, and the key hints. */
@@ -83,7 +86,7 @@ export function SessionDock({ sessionId }: { sessionId: string }) {
         busy={run.busy}
         error={line}
         notice={commands.notice}
-        meter={<Meter state={state} runStartedAt={run.runStartedAt} aside={
+        meter={<Meter state={state} runStartedAt={run.runStartedAt} localWait={run.localWait} aside={
               <span className="flex items-center gap-2">
                 <TuneChip sessionId={sessionId} />
                 <ModeChip sessionId={sessionId} onSelect={(mode) => setMode.mutate(mode)} />

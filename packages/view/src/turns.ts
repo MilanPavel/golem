@@ -1,4 +1,5 @@
 import type { ChatMessage } from "./chat-state.ts";
+import { turnTotals, type TurnTotals } from "./cost.ts";
 
 /** One user message, or the run of assistant steps that answered it. */
 export type Turn =
@@ -24,8 +25,8 @@ export function groupTurns(messages: readonly ChatMessage[]): Turn[] {
 }
 
 /** The footer of a finished turn: the last step's time (counted from the run start) and every step's tools. Null while streaming. */
-export function turnFooter(steps: readonly ChatMessage[]): { durationMs: number | undefined; tools: number } | null {
+export function turnFooter(steps: readonly ChatMessage[]): ({ durationMs: number | undefined; tools: number } & TurnTotals) | null {
   if (steps.some((step) => step.streaming)) return null;
   const tools = steps.reduce((sum, step) => sum + (step.tools?.length ?? 0), 0);
-  return { durationMs: steps[steps.length - 1]?.durationMs, tools };
+  return { durationMs: steps[steps.length - 1]?.durationMs, tools, ...turnTotals(steps) };
 }

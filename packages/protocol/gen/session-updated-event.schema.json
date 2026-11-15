@@ -30,7 +30,7 @@
     },
     "SessionUpdatedData": {
       "additionalProperties": false,
-      "description": "A session attribute changed: its title, folder, allowed tools, or MCP servers.\n\nA field left null did not change. ``cwd`` is set once, on a session made\nbefore sessions had a folder, by the first ``message.send`` that names one.\n``allowed_tools`` is the whole list after ``session.revoke``, and\n``mcp_servers`` the on-demand MCP servers the session turned on, after\n``mcp.enable`` or ``mcp.disable``.",
+      "description": "A session attribute changed: its title, folder, allowed tools, MCP servers, or route.\n\nA field left null did not change. ``route`` is the session's route mode after\n``session.set_route``. ``cwd`` is set once, on a session made\nbefore sessions had a folder, by the first ``message.send`` that names one.\n``allowed_tools`` is the whole list after ``session.revoke``, and\n``mcp_servers`` the on-demand MCP servers the session turned on, after\n``mcp.enable`` or ``mcp.disable``.",
       "properties": {
         "allowed_tools": {
           "anyOf": [
@@ -74,6 +74,23 @@
           ],
           "default": null,
           "title": "Mcp Servers"
+        },
+        "route": {
+          "anyOf": [
+            {
+              "enum": [
+                "pinned",
+                "local",
+                "auto"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Route"
         },
         "title": {
           "anyOf": [

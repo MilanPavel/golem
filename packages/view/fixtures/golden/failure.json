@@ -7,7 +7,8 @@
         "model_name": null,
         "model_profile": "remote",
         "model_provider": null,
-        "origin": null
+        "origin": null,
+        "route": "pinned"
       },
       "run_id": null,
       "seq": 1,
@@ -54,6 +55,7 @@
       "data": {
         "cleared_ids": [],
         "context_window": null,
+        "estimated_tokens": 2753,
         "index": 1,
         "message_bytes": [
           5
@@ -69,6 +71,7 @@
         "num_ctx": null,
         "profile": "remote",
         "provider": null,
+        "summary_chars": null,
         "system_bytes": 0,
         "system_chars": 0,
         "system_prompt_sha": null,
@@ -130,7 +133,8 @@
         "model_name": null,
         "model_profile": "remote",
         "model_provider": null,
-        "origin": null
+        "origin": null,
+        "route": "pinned"
       },
       "run_id": null,
       "seq": 1,
@@ -177,6 +181,7 @@
       "data": {
         "cleared_ids": [],
         "context_window": null,
+        "estimated_tokens": 2753,
         "index": 1,
         "message_bytes": [
           5
@@ -192,6 +197,7 @@
         "num_ctx": null,
         "profile": "remote",
         "provider": null,
+        "summary_chars": null,
         "system_bytes": 0,
         "system_chars": 0,
         "system_prompt_sha": null,

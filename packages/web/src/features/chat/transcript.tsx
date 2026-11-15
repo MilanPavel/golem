@@ -1,5 +1,5 @@
-import { displayToolName, formatTurnTime, groupTurns, stepCount, stepMark, summarizeSteps, turnFooter, LIVE_OUTPUT_CHARS, thinkingLine, unreadCallNotice, REPLY_CUT_NOTE, type ChatMessage, type ChatState, type Detail, type StepMark, type ToolBlock } from "@golem/view";
-import { memo, useCallback, useId, useLayoutEffect, useRef, useState } from "react";
+import { displayToolName, formatTurnTime, groupTurns, turnFooterParts, stepCount, stepMark, summarizeSteps, turnFooter, LIVE_OUTPUT_CHARS, thinkingLine, unreadCallNotice, writingLabel, REPLY_CUT_NOTE, type ChatMessage, type ChatState, type Detail, type StepMark, type ToolBlock, type WritingBlock } from "@golem/view";
+import { memo, useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { usePulls, useSession } from "../../store/page-context.tsx";
 import type { PullsSnapshot } from "../../store/pulls.ts";
 import type { SessionModel } from "../../store/session-store.ts";
@@ -230,6 +230,29 @@ const MARK_CLASS: Record<StepMark, string> = {
 };
 
 /**
+ * The file the model is still writing, where its tool line will appear. The seconds count from the
+ * first `tool.writing` of the call: the row mounts then and goes when `tool.requested` clears it.
+ */
+export function WritingRow({ writing }: { writing: WritingBlock }) {
+  const [started] = useState(() => Date.now());
+  const [now, setNow] = useState(started);
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+    return () => {
+      clearInterval(timer);
+    };
+  }, []);
+  return (
+    <p aria-live="off" data-writing className="flex items-center gap-2 font-mono text-xs leading-snug text-muted">
+      <span aria-hidden="true" className="block size-1.5 shrink-0 animate-pulse rounded-full bg-wait motion-reduce:animate-none" />
+      <span className="truncate">{writingLabel(writing, (now - started) / 1000)}</span>
+    </p>
+  );
+}
+
+/**
  * The tools of a whole turn as one line under the answer: a dot each and a summary. It opens into
  * the steps. A tool that waits for you keeps it open, and Verbose opens it with every row expanded. A tool
  * that had an approval shows how it ended as a chip; the one still waiting is asked in the dock instead.
@@ -292,7 +315,7 @@ export function GolemTurn({
   const footer = turnFooter(steps);
   const tools = steps.flatMap((step) => step.tools ?? []);
   const foot = footer
-    ? [footer.durationMs === undefined ? "" : formatTurnTime(footer.durationMs), footer.tools > 0 ? stepCount(footer.tools) : ""].filter(Boolean)
+    ? [footer.durationMs === undefined ? "" : formatTurnTime(footer.durationMs), footer.tools > 0 ? stepCount(footer.tools) : "", ...turnFooterParts(footer)].filter(Boolean)
     : [];
   return (
     <article aria-label="golem" className="flex min-w-0 flex-col gap-2.5">
@@ -302,7 +325,8 @@ export function GolemTurn({
       ))}
       {detail === "quiet" ? null : <EditCards tools={tools.filter(isEditCard)} />}
       <ActivityLine tools={tools} detail={detail} streaming={steps.some((step) => step.streaming)} pendingId={pendingId} />
-      {foot.length > 0 ? <p className="font-mono text-xs text-faint">{foot.join(" · ")}</p> : null}
+      {steps.map((step) => (step.writing == null ? null : <WritingRow key={step.id} writing={step.writing} />))}
+      {foot.length > 0 ?<p className="font-mono text-xs text-faint">{foot.join(" · ")}</p> : null}
     </article>
   );
 }

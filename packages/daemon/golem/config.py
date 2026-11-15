@@ -336,6 +336,8 @@ class ContextSettings(BaseModel):
     ``reply_reserve`` is the tokens kept free for the reply. When the history passes
     ``clear_at`` of the rest of the window, old tool results go out as one line each
     until it is down to ``clear_to``. The newest ``keep_results`` results are kept.
+    When clearing is not enough and the history is still past ``compact_at``, every turn
+    but the last ``keep_turns`` is replaced by a summary in what is sent.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -345,12 +347,14 @@ class ContextSettings(BaseModel):
     reply_reserve: int = Field(default=4096, ge=0)
     clear_at: float = 0.70
     clear_to: float = 0.40
+    compact_at: float = 0.85
     keep_results: int = Field(default=4, ge=0)
+    keep_turns: int = Field(default=4, ge=1)
 
     @model_validator(mode="after")
     def _ordered(self) -> ContextSettings:
-        if not 0 < self.clear_to < self.clear_at < 1:
-            raise ValueError("[context] needs 0 < clear_to < clear_at < 1")
+        if not 0 < self.clear_to < self.clear_at < self.compact_at < 1:
+            raise ValueError("[context] needs 0 < clear_to < clear_at < compact_at < 1")
         return self
 
 

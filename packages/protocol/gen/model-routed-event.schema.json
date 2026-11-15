@@ -1,0 +1,157 @@
+{
+  "$defs": {
+    "ModelRejection": {
+      "additionalProperties": false,
+      "description": "A candidate the pick left out, and why in plain words.",
+      "properties": {
+        "ref": {
+          "minLength": 1,
+          "title": "Ref",
+          "type": "string"
+        },
+        "tier": {
+          "enum": [
+            "local",
+            "budget",
+            "frontier"
+          ],
+          "title": "Tier",
+          "type": "string"
+        },
+        "why": {
+          "minLength": 1,
+          "title": "Why",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ref",
+        "tier",
+        "why"
+      ],
+      "title": "ModelRejection",
+      "type": "object"
+    },
+    "ModelRoutedData": {
+      "additionalProperties": false,
+      "description": "Which model a run uses, and why golem picked it.\n\nSent right after ``run.started`` in a session whose route is not ``pinned``.\n``model_profile`` is the profile that runs. ``provider`` and ``model`` are what\nit resolves to, null when it does not resolve. ``reason`` is why this model\n(ADR-055), ``detail`` one short sentence, and ``rejected`` the candidates the\npick dropped. The session's own model does not change.",
+      "properties": {
+        "detail": {
+          "title": "Detail",
+          "type": "string"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
+        },
+        "model_profile": {
+          "minLength": 1,
+          "title": "Model Profile",
+          "type": "string"
+        },
+        "provider": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Provider"
+        },
+        "reason": {
+          "enum": [
+            "pinned",
+            "privacy",
+            "fit",
+            "budget",
+            "cheapest",
+            "escalated",
+            "fallback",
+            "user"
+          ],
+          "title": "Reason",
+          "type": "string"
+        },
+        "rejected": {
+          "items": {
+            "$ref": "#/$defs/ModelRejection"
+          },
+          "title": "Rejected",
+          "type": "array"
+        },
+        "tier": {
+          "enum": [
+            "local",
+            "budget",
+            "frontier"
+          ],
+          "title": "Tier",
+          "type": "string"
+        }
+      },
+      "required": [
+        "model_profile",
+        "tier",
+        "reason",
+        "detail"
+      ],
+      "title": "ModelRoutedData",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The pick for this run: the model that runs it and why.",
+  "properties": {
+    "data": {
+      "$ref": "#/$defs/ModelRoutedData"
+    },
+    "run_id": {
+      "minLength": 1,
+      "title": "Run Id",
+      "type": "string"
+    },
+    "seq": {
+      "minimum": 1,
+      "title": "Seq",
+      "type": "integer"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    },
+    "ts": {
+      "minLength": 1,
+      "title": "Ts",
+      "type": "string"
+    },
+    "type": {
+      "const": "model.routed",
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "seq",
+    "session_id",
+    "run_id",
+    "ts",
+    "type",
+    "data"
+  ],
+  "title": "ModelRoutedEvent",
+  "type": "object"
+}

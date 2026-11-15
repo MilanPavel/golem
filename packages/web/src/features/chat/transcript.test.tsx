@@ -33,6 +33,20 @@ test("a run with tool steps is one golem and one footer: the last time and every
   expect(screen.queryByText(/0m 01\.0s/)).toBeNull();
 });
 
+test("a file being written shows a row that updates and goes when the tool is requested", () => {
+  const step = (over: Partial<ChatMessage>) => chat([answer({ id: "w", text: "", streaming: true, ...over })]);
+  const { container, rerender } = render(
+    <TranscriptMessages chat={step({ writing: { name: "write_file", path: null, lines: 0, chars: 0 } })} />,
+  );
+  const row = () => container.querySelector("[data-writing]");
+  expect(row()?.textContent).toBe("writing a file · 0 lines · 0 s");
+  expect(row()?.getAttribute("aria-live")).toBe("off");
+  rerender(<TranscriptMessages chat={step({ writing: { name: "write_file", path: "tests/a.py", lines: 14, chars: 300 } })} />);
+  expect(row()?.textContent).toBe("writing tests/a.py · 14 lines · 0 s");
+  rerender(<TranscriptMessages chat={step({ tools: [{ callId: "1", name: "write_file", args: { path: "tests/a.py" }, status: "requested" }] })} />);
+  expect(row()).toBeNull();
+});
+
 test("a streaming last step shows no footer", () => {
   render(
     <TranscriptMessages
@@ -518,4 +532,22 @@ test("a reply cut at the length limit says so under the answer", () => {
 test("a reply that was not cut shows no length note", () => {
   render(<TranscriptMessages chat={chat([answer({ text: "Whole" })])} />);
   expect(screen.queryByText("The reply stopped at the length limit.")).toBeNull();
+});
+
+test("the footer adds the model, tier, tokens and cost after the time and steps", () => {
+  const call = { model: "qwen3:27b", tier: "local" as const, tokens: 4100, costUsd: 0, done: true };
+  render(<TranscriptMessages chat={chat([answer({ durationMs: 3000, call })])} />);
+  expect(screen.getByText("3.0s · qwen3:27b · local · 4.1K tok · $0.00")).toBeTruthy();
+});
+
+test("a hosted answer shows its model and cost, with no tier word", () => {
+  const call = { model: "deepseek-chat", tier: "budget" as const, tokens: 900, costUsd: 0.31, done: true };
+  render(<TranscriptMessages chat={chat([answer({ durationMs: 3000, call })])} />);
+  expect(screen.getByText("3.0s · deepseek-chat · 900 tok · $0.31")).toBeTruthy();
+});
+
+test("an old answer with no cost data shows tokens only", () => {
+  const call = { model: null, tier: null, tokens: 900, costUsd: null, done: true };
+  render(<TranscriptMessages chat={chat([answer({ durationMs: 3000, call })])} />);
+  expect(screen.getByText("3.0s · 900 tok")).toBeTruthy();
 });

@@ -39,6 +39,7 @@ from golem.graphs.adapter import (
     ModelRequested,
     ModelResponded,
     ModelStarted,
+    ModelWaiting,
     PinRead,
     PinSkipped,
     SkillLoaded,
@@ -56,7 +57,8 @@ from golem.graphs.adapter import (
 from golem.graphs.chat import ChatRuntime
 from golem.graphs.tools_node import Answer
 from golem.models.cost import cost_usd
-from golem.models.errors import ModelUnreachable
+from golem.models.errors import ContextFull, ModelUnreachable
+from golem.models.pick import Choice
 from golem.models.router import ModelConfigError, ModelIdentity
 from golem.models.tiers import Tier
 from golem.permissions.engine import Allowance
@@ -83,6 +85,9 @@ from golem_protocol.events import (
     MessageThinkingDeltaData,
     ModelCallCompletedData,
     ModelCallStartedData,
+    ModelRejection,
+    ModelRoutedData,
+    ModelWaitingData,
     PromptSectionInfo,
     RunCancelledData,
     RunFailedData,
@@ -132,6 +137,8 @@ class Turn:
     pins: PinMemory = field(default_factory=PinMemory, compare=False)
     skill: Invocation | None = None
     typed: str | None = None
+    routed: Choice | None = field(default=None, compare=False)
+    """The pick for this turn, None on a ``pinned`` session. ``model_profile`` is its model."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -280,6 +287,8 @@ async def run_turn(
         # Emits are shielded: once one is awaited, it lands even if this task is cancelled.
         progress.run_started = True
         await emit("run.started", EmptyEventData())
+        if turn.routed is not None:
+            await emit("model.routed", _routed(runtime, turn.model_profile, turn.routed))
         progress.open = turn.assistant_message_id
         await emit(
             "message.started",
@@ -317,6 +326,24 @@ async def run_turn(
         raise
     except Exception as exc:
         return await _failed(turn.run_id, exc, progress, emit)
+
+
+def _routed(runtime: ChatRuntime, profile: str, choice: Choice) -> ModelRoutedData:
+    identity = runtime.router.identity(profile)
+    tier = None
+    if choice.model is not None:
+        tier = choice.model.tier
+    elif runtime.tier_of is not None:
+        tier = runtime.tier_of(profile)
+    return ModelRoutedData(
+        model_profile=profile,
+        provider=identity.provider,
+        model=identity.name,
+        tier=tier or "frontier",
+        reason=choice.reason,
+        detail=choice.detail,
+        rejected=[ModelRejection(ref=r.ref, tier=r.tier, why=r.why) for r in choice.rejected],
+    )
 
 
 async def _until_pulled(runtime: ChatRuntime, profile: str) -> None:
@@ -425,6 +452,10 @@ async def _failed(
         )
         await emit("run.failed", data)
         return
+    if isinstance(exc, ContextFull):
+        log.warning("run %s failed: needs about %d of %d tokens", run_id, exc.need, exc.window)
+        await emit("run.failed", RunFailedData(message=exc.message, code=exc.code, hint=exc.hint))
+        return
     log.exception("run %s failed", run_id, exc_info=exc)
     message = str(exc).strip() or type(exc).__name__
     await emit("run.failed", RunFailedData(message=message))
@@ -443,6 +474,11 @@ async def _apply(
         _reset_thinking(progress)
         await emit(
             "message.started", MessageStartedData(message_id=fact.message_id, role="assistant")
+        )
+    elif isinstance(fact, ModelWaiting):
+        await emit(
+            "model.waiting",
+            ModelWaitingData(message_id=fact.message_id, waiting=fact.waiting),
         )
     elif isinstance(fact, ModelRequested):
         progress.index += 1
@@ -482,6 +518,8 @@ async def _apply(
                 message_chars=None if fact.message_chars is None else list(fact.message_chars),
                 message_bytes=None if fact.message_bytes is None else list(fact.message_bytes),
                 cleared_ids=list(fact.cleared_ids),
+                summary_chars=fact.summary_chars,
+                estimated_tokens=fact.estimated_tokens,
             ),
         )
     elif isinstance(fact, ContextChanged):

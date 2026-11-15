@@ -8,6 +8,7 @@ export type ForkedFrom = string | null;
 export type LastSeq = number;
 export type ModelProfile = string;
 export type Origin = string;
+export type Route = 'pinned' | 'local' | 'auto';
 export type SessionId = string;
 export type Status = 'idle' | 'running' | 'waiting' | 'closed';
 export type Title = string | null;
@@ -35,6 +36,7 @@ export interface SessionSummaryNotification {
  * the id of the session this one was forked from, null for a session that is
  * not a fork. An older daemon leaves it out. ``origin`` is who started the
  * session: ``user``, ``cli``, ``routine:<name>``. A session never changes it.
+ * ``route`` is the session's route mode. An older daemon leaves it out.
  *
  * This interface was referenced by `SessionSummaryNotification`'s JSON-Schema
  * via the `definition` "SessionSummary".
@@ -46,6 +48,7 @@ export interface SessionSummary {
   last_seq: LastSeq;
   model_profile: ModelProfile;
   origin?: Origin;
+  route?: Route;
   session_id: SessionId;
   status: Status;
   title?: Title;

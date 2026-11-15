@@ -7,7 +7,14 @@ from typing import Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
 
-from golem_protocol.events import PermissionMode, PromptSectionInfo, SkillCall, SkillSource
+from golem_protocol.events import (
+    ModelRejection,
+    PermissionMode,
+    PromptSectionInfo,
+    RouteMode,
+    SkillCall,
+    SkillSource,
+)
 
 
 class HelloParams(BaseModel):
@@ -194,6 +201,7 @@ class SessionSummary(BaseModel):
     the id of the session this one was forked from, null for a session that is
     not a fork. An older daemon leaves it out. ``origin`` is who started the
     session: ``user``, ``cli``, ``routine:<name>``. A session never changes it.
+    ``route`` is the session's route mode. An older daemon leaves it out.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -208,6 +216,7 @@ class SessionSummary(BaseModel):
     cwd: str | None = Field(default=None, min_length=1)
     forked_from: str | None = Field(default=None, min_length=1)
     origin: str = Field(default="user", min_length=1)
+    route: RouteMode = "pinned"
 
 
 class SessionListResult(BaseModel):
@@ -543,9 +552,29 @@ class TraceModelSpan(TraceSpan):
     dropped_tokens: int | None = Field(default=None, ge=0)
 
 
-class TraceRunSpan(TraceSpan):
-    """A run, with its model calls in order."""
+class TraceRoute(BaseModel):
+    """Why a run used the model it did: the pick of a session that is not ``pinned``.
 
+    ``reason`` and ``detail`` are those of ``model.routed``, and ``rejected`` the
+    candidates the pick dropped.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    reason: Literal[
+        "pinned", "privacy", "fit", "budget", "cheapest", "escalated", "fallback", "user"
+    ]
+    detail: str
+    rejected: list[ModelRejection] = Field(default_factory=list[ModelRejection])
+
+
+class TraceRunSpan(TraceSpan):
+    """A run, with its model calls in order.
+
+    ``route`` is the pick for the run, null for a run of a ``pinned`` session.
+    """
+
+    route: TraceRoute | None = None
     children: list[TraceModelSpan] = Field(default_factory=list[TraceModelSpan])
 
 
@@ -587,7 +616,7 @@ class TraceContextPart(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    key: Literal["system", "tools", "user", "assistant", "tool_results"]
+    key: Literal["system", "tools", "user", "assistant", "tool_results", "summary"]
     tokens: int = Field(ge=0)
     chars: int = Field(ge=0)
     items: list[TraceContextItem] = Field(default_factory=list[TraceContextItem])
@@ -605,7 +634,8 @@ class TraceContextCleared(BaseModel):
 class TraceContext(BaseModel):
     """What filled one model call's context, and how big the window was.
 
-    ``parts`` always has the five keys, in order. They add up to ``used``
+    ``parts`` always has the six keys, in order. ``summary`` is the summary of old turns
+    that was sent as the first message, and 0 when none was. They add up to ``used``
     when it is known. The split between them is an estimate (about four
     characters a token, scaled to ``used``), so ``estimated`` is always true.
     The ``prompt_cut`` fields are those of the model span. A cleared result counts as its
@@ -1072,6 +1102,31 @@ class SessionSetModeResult(BaseModel):
     session_id: str = Field(min_length=1)
     mode: PermissionMode
     override: bool
+
+
+class SessionSetRouteParams(BaseModel):
+    """``session.set_route``. Set how this session picks the model of each turn.
+
+    ``pinned`` runs the session's own model. ``local`` never uses a hosted model.
+    ``auto`` starts local and uses a hosted model only when the routing rules allow
+    it (ADR-055). The daemon emits ``session.updated`` with ``route``, and the mode
+    applies from the session's next turn. It is kept with the session and is not
+    written to ``config.toml``.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    mode: RouteMode
+
+
+class SessionSetRouteResult(BaseModel):
+    """The session's route mode after the change."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    mode: RouteMode
 
 
 class SessionSetChecksParams(BaseModel):
@@ -2590,6 +2645,54 @@ class ChangesDiffResult(BaseModel):
     truncated: bool
 
 
+class RevertTarget(BaseModel):
+    """What ``changes.revert`` takes back. Each kind needs its own field and no other.
+
+    ``change`` needs ``change_id``, ``file`` needs ``path``, ``hunk`` needs ``path`` and
+    ``hunk`` (0-based, of the file's net diff), and ``run`` needs ``run_id``.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    kind: Literal["change", "file", "hunk", "run"]
+    change_id: str | None = Field(default=None, min_length=1)
+    path: str | None = Field(default=None, min_length=1)
+    hunk: int | None = Field(default=None, ge=0)
+    run_id: str | None = Field(default=None, min_length=1)
+
+
+class ChangesRevertParams(BaseModel):
+    """``changes.revert``. Put back what a change, a file, a hunk or a turn wrote.
+
+    Without ``force``, a file that changed on disk since golem wrote it is left alone
+    and listed as a conflict. Refused while the session has a run.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    target: RevertTarget
+    force: bool = False
+
+
+class RevertConflict(BaseModel):
+    """A file a revert did not touch."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    path: str
+    reason: Literal["changed_on_disk"]
+
+
+class ChangesRevertResult(BaseModel):
+    """The paths written, and the paths left alone. Each write is a change of its own."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    reverted: list[str]
+    conflicts: list[RevertConflict]
+
+
 class ApprovalRespondParams(BaseModel):
     """``approval.respond``. Answer the tool call a session's run waits on.
 
@@ -3016,6 +3119,8 @@ __all__ = [
     "SessionSetModelResult",
     "SessionSetOptionsParams",
     "SessionSetOptionsResult",
+    "SessionSetRouteParams",
+    "SessionSetRouteResult",
     "SessionSetSkillsParams",
     "SessionSetSkillsResult",
     "SessionSummary",
@@ -3049,6 +3154,7 @@ __all__ = [
     "TraceGetResult",
     "TraceMessage",
     "TraceModelSpan",
+    "TraceRoute",
     "TraceRunSpan",
     "TraceSpan",
     "TraceSpanParams",
