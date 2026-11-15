@@ -12,6 +12,7 @@ import type { McpTestProgress } from "../../protocol/gen/mcp-test-progress.ts";
 import type { McpTestResult } from "../../protocol/gen/mcp-test-result.ts";
 import type { RuntimeInstallDone } from "../../protocol/gen/runtime-install-done.ts";
 import type { OllamaInstallDone } from "../../protocol/gen/ollama-install-done.ts";
+import type { ChangesListResult } from "../../protocol/gen/changes-list-result.ts";
 import type { DirEntry, FsListDirsResult } from "../../protocol/gen/fs-list-dirs-result.ts";
 import type { SetupRow, SetupStatusResult } from "../../protocol/gen/setup-status-result.ts";
 import type { McpListResult } from "../../protocol/gen/mcp-list-result.ts";
@@ -377,6 +378,23 @@ export function isFsListDirsResult(value: unknown): value is FsListDirsResult {
     value["entries"].every(isDirEntry) &&
     typeof value["truncated"] === "boolean"
   );
+}
+
+function isChangedFile(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    typeof value["path"] === "string" &&
+    (value["status"] === "created" || value["status"] === "modified" || value["status"] === "deleted") &&
+    typeof value["added"] === "number" &&
+    typeof value["removed"] === "number" &&
+    Array.isArray(value["change_ids"]) &&
+    value["change_ids"].every((id) => typeof id === "string") &&
+    typeof value["stale"] === "boolean"
+  );
+}
+
+export function isChangesListResult(value: unknown): value is ChangesListResult {
+  return isRecord(value) && Array.isArray(value["files"]) && value["files"].every(isChangedFile);
 }
 
 export function isKeychainWait(value: unknown): value is KeychainWait {

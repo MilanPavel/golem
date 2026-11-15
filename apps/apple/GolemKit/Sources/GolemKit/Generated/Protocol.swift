@@ -484,6 +484,141 @@ public struct CallPrice: Codable {
     }
 }
 
+/// One changed file: first before against last after, as counts and flags.
+///
+/// ``stale`` is true when the file on disk is not what golem last wrote, because
+/// someone else changed it since.
+// MARK: - ChangedFile
+public struct ChangedFile: Codable {
+    public let added: Int
+    public let changeIDS: [String]
+    public let path: String
+    public let removed: Int
+    public let stale: Bool
+    public let status: ChangedFileStatus
+
+    public enum CodingKeys: String, CodingKey {
+        case added = "added"
+        case changeIDS = "change_ids"
+        case path = "path"
+        case removed = "removed"
+        case stale = "stale"
+        case status = "status"
+    }
+
+    public init(added: Int, changeIDS: [String], path: String, removed: Int, stale: Bool, status: ChangedFileStatus) {
+        self.added = added
+        self.changeIDS = changeIDS
+        self.path = path
+        self.removed = removed
+        self.stale = stale
+        self.status = status
+    }
+}
+
+public enum ChangedFileStatus: String, Codable {
+    case created = "created"
+    case deleted = "deleted"
+    case modified = "modified"
+}
+
+/// ``changes.diff``. The diff of a file or of one change: exactly one of the two is set.
+// MARK: - ChangesDiffParams
+public struct ChangesDiffParams: Codable {
+    public let changeID: String?
+    public let path: String?
+    public let sessionID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case changeID = "change_id"
+        case path = "path"
+        case sessionID = "session_id"
+    }
+
+    public init(changeID: String?, path: String?, sessionID: String) {
+        self.changeID = changeID
+        self.path = path
+        self.sessionID = sessionID
+    }
+}
+
+/// A unified diff, cut when long, and whether it was cut.
+// MARK: - ChangesDiffResult
+public struct ChangesDiffResult: Codable {
+    public let diff: String
+    public let truncated: Bool
+
+    public enum CodingKeys: String, CodingKey {
+        case diff = "diff"
+        case truncated = "truncated"
+    }
+
+    public init(diff: String, truncated: Bool) {
+        self.diff = diff
+        self.truncated = truncated
+    }
+}
+
+/// ``changes.list``. The files a session changed, each as its net change.
+// MARK: - ChangesListParams
+public struct ChangesListParams: Codable {
+    public let sessionID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case sessionID = "session_id"
+    }
+
+    public init(sessionID: String) {
+        self.sessionID = sessionID
+    }
+}
+
+/// The changed files in order of first change. A session without a folder has none.
+// MARK: - ChangesListResult
+public struct ChangesListResult: Codable {
+    public let files: [FileElement]
+
+    public enum CodingKeys: String, CodingKey {
+        case files = "files"
+    }
+
+    public init(files: [FileElement]) {
+        self.files = files
+    }
+}
+
+/// One changed file: first before against last after, as counts and flags.
+///
+/// ``stale`` is true when the file on disk is not what golem last wrote, because
+/// someone else changed it since.
+// MARK: - FileElement
+public struct FileElement: Codable {
+    public let added: Int
+    public let changeIDS: [String]
+    public let path: String
+    public let removed: Int
+    public let stale: Bool
+    public let status: ChangedFileStatus
+
+    public enum CodingKeys: String, CodingKey {
+        case added = "added"
+        case changeIDS = "change_ids"
+        case path = "path"
+        case removed = "removed"
+        case stale = "stale"
+        case status = "status"
+    }
+
+    public init(added: Int, changeIDS: [String], path: String, removed: Int, stale: Bool, status: ChangedFileStatus) {
+        self.added = added
+        self.changeIDS = changeIDS
+        self.path = path
+        self.removed = removed
+        self.stale = stale
+        self.status = status
+    }
+}
+
 /// A tool allowed for the rest of the session asked about.
 // MARK: - ConfigAllowance
 public struct ConfigAllowance: Codable {

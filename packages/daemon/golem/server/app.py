@@ -237,6 +237,7 @@ class DaemonApp:
                 self.state.policy = policy
                 self.state.tools = default_registry(mcp, policy.web())
                 self.state.artifacts = ArtifactStore(database)
+                self.state.changes = ChangeStore(database, BlobStore(database))
                 usage = Usage(database)
                 replayed = await backfill(database)
                 if replayed:

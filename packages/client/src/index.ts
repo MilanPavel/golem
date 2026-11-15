@@ -20,6 +20,7 @@ export {
   SESSION_BUSY,
   SESSION_NOT_FOUND,
   type ApprovalChoice,
+  type ChangesDiffTarget,
   type SendOptions,
   type ChatEvent,
   type ConnectionState,
@@ -73,6 +74,8 @@ export type { SessionSetOptionsResult } from "../../protocol/gen/session-set-opt
 export type { McpToggleResult } from "../../protocol/gen/mcp-toggle-result.ts";
 export type { SessionSetSkillsResult } from "../../protocol/gen/session-set-skills-result.ts";
 export type { ArtifactReadResult } from "../../protocol/gen/artifact-read-result.ts";
+export type { ChangesDiffResult } from "../../protocol/gen/changes-diff-result.ts";
+export type { ChangedFile, ChangesListResult } from "../../protocol/gen/changes-list-result.ts";
 export type { McpToolInfo, McpToolsResult } from "../../protocol/gen/mcp-tools-result.ts";
 export type { TraceContext } from "../../protocol/gen/trace-context.ts";
 export type { TraceContextItem } from "../../protocol/gen/trace-context-item.ts";

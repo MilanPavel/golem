@@ -2288,6 +2288,58 @@ class ArtifactReadResult(BaseModel):
     size: int = Field(ge=0)
 
 
+class ChangesListParams(BaseModel):
+    """``changes.list``. The files a session changed, each as its net change."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+
+
+class ChangedFile(BaseModel):
+    """One changed file: first before against last after, as counts and flags.
+
+    ``stale`` is true when the file on disk is not what golem last wrote, because
+    someone else changed it since.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    path: str
+    status: Literal["created", "modified", "deleted"]
+    added: int = Field(ge=0)
+    removed: int = Field(ge=0)
+    change_ids: list[str]
+    stale: bool
+
+
+class ChangesListResult(BaseModel):
+    """The changed files in order of first change. A session without a folder has none."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    files: list[ChangedFile]
+
+
+class ChangesDiffParams(BaseModel):
+    """``changes.diff``. The diff of a file or of one change: exactly one of the two is set."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    path: str | None = Field(default=None, min_length=1)
+    change_id: str | None = Field(default=None, min_length=1)
+
+
+class ChangesDiffResult(BaseModel):
+    """A unified diff, cut when long, and whether it was cut."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    diff: str
+    truncated: bool
+
+
 class ApprovalRespondParams(BaseModel):
     """``approval.respond``. Answer the tool call a session's run waits on.
 
@@ -2547,6 +2599,11 @@ __all__ = [
     "AuthRemoveResult",
     "AuthSetParams",
     "AuthSetResult",
+    "ChangedFile",
+    "ChangesDiffParams",
+    "ChangesDiffResult",
+    "ChangesListParams",
+    "ChangesListResult",
     "ConfigAllowance",
     "ConfigError",
     "ConfigGetParams",
