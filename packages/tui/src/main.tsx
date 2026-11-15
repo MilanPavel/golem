@@ -31,7 +31,7 @@ const READ_ONLY_SERVICE: ServiceControl = {
  * true there too and would open a second screen that can't install the
  * service. `dev.tsx` opens it on its own for `just tui`.
  */
-export async function runTui(options: { service?: ServiceControl } = {}): Promise<void> {
+export async function runTui(options: { service?: ServiceControl; sessionId?: string } = {}): Promise<void> {
   const client = connectGolem({
     socketPath: resolveSocketPath(),
     clientName: "tui",
@@ -69,6 +69,7 @@ export async function runTui(options: { service?: ServiceControl } = {}): Promis
         onWheel={pointer.subscribe}
         onPointer={pointer.subscribePointer}
         service={options.service ?? READ_ONLY_SERVICE}
+        sessionId={options.sessionId}
       />, {
       stdin: pointer.stdin,
       alternateScreen: true,

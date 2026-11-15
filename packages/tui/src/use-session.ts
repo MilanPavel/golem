@@ -30,6 +30,8 @@ export function useSession(
   connected: boolean,
   cwd: string,
   callbacks: SessionCallbacks,
+  /** `golem open <id>`: follow this session first, in place of the newest one in `cwd`. */
+  firstSession?: string,
 ): SessionHandle {
   const [id, setId] = useState<string | null>(null);
   const ref = useRef<string | null>(null);
@@ -71,9 +73,11 @@ export function useSession(
 
   useEffect(() => {
     if (connected && ref.current === null) {
-      void open((opener, choose) => openLatest(opener, cwd, choose));
+      void open((opener, choose) =>
+        firstSession === undefined ? openLatest(opener, cwd, choose) : openOne(opener, firstSession, choose),
+      );
     }
-  }, [connected, open, cwd]);
+  }, [connected, open, cwd, firstSession]);
 
   const startNew = useCallback(() => {
     void open(openNew);

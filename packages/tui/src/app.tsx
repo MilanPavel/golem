@@ -405,11 +405,14 @@ export function App({
   onWheel,
   onPointer,
   service,
+  sessionId: firstSession,
 }: {
   client: GolemClient;
   onWheel?: WheelSubscribe;
   onPointer?: PointerSubscribe;
   service?: ServiceControl;
+  /** Follow this session at start, in place of the newest one in the folder (`golem open <id>`). */
+  sessionId?: string;
 }) {
   const [connection, setConnection] = useState<ConnectionState>(client.state);
   const [problem, setProblem] = useState<ServiceProblem | null>(null);
@@ -795,7 +798,7 @@ export function App({
     onError: (error) => {
       setChat((current) => ({ ...current, error: messageOf(error) }));
     },
-  });
+  }, firstSession);
   const sessionRef = session.ref;
   const sessionId = session.id;
 
