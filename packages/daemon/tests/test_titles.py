@@ -7,11 +7,11 @@ from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from typing import Any
 
 import pytest
-from fakes import ScriptedChatModel
+from fakes import ScriptedChatModel, ToolCallingChatModel
 from langchain_core.language_models import BaseChatModel
 from langgraph.checkpoint.memory import InMemorySaver
 
-from golem.config import GolemSettings
+from golem.config import GolemSettings, ModelPrice
 from golem.graphs.chat import open_chat
 from golem.models.router import ModelRouter
 from golem.models.tiers import Tier
@@ -25,6 +25,7 @@ from golem.sessions.titles import (
     choose_title,
     clean_title,
 )
+from golem.sessions.usage import Usage
 from golem.store.database import Database
 from golem.store.events import EventLog
 from golem.store.records import RunRecords, SessionRecords
@@ -44,6 +45,7 @@ class _Titles:
         prompt: str,
         reply: str,
         options: Mapping[str, float | str] | None = None,
+        session_id: str | None = None,
     ) -> str:
         self.asked.append((model_profile, prompt, reply))
         proposal = self._proposals.pop(0)
@@ -64,8 +66,9 @@ class _Gated:
         prompt: str,
         reply: str,
         options: Mapping[str, float | str] | None = None,
+        session_id: str | None = None,
     ) -> str:
-        del model_profile, prompt, reply
+        del model_profile, prompt, reply, options, session_id
         self.asked.set()
         await self.release.wait()
         return self.proposal
@@ -81,8 +84,9 @@ class _Never:
         prompt: str,
         reply: str,
         options: Mapping[str, float | str] | None = None,
+        session_id: str | None = None,
     ) -> str:
-        del model_profile, prompt, reply
+        del model_profile, prompt, reply, options, session_id
         self.asked.set()
         await asyncio.Event().wait()
         return ""
@@ -107,15 +111,21 @@ def test_clean_title(raw: str, expected: str) -> None:
 async def test_a_failed_or_blank_proposal_falls_back_to_the_first_line() -> None:
     prompt = "How do I\nsplit a string?"
     failed = await choose_title(
-        _Titles(RuntimeError("no key")), model_profile="remote", prompt=prompt, reply="r"
+        _Titles(RuntimeError("no key")),
+        model_profile="remote",
+        prompt=prompt,
+        reply="r",
+        session_id="s_1",
     )
-    blank = await choose_title(_Titles("  "), model_profile="remote", prompt=prompt, reply="r")
+    blank = await choose_title(
+        _Titles("  "), model_profile="remote", prompt=prompt, reply="r", session_id="s_1"
+    )
     assert failed == blank == "How do I"
 
 
 async def test_a_slow_proposal_times_out_to_the_first_line() -> None:
     title = await choose_title(
-        _Never(), model_profile="remote", prompt="hi", reply="r", timeout=0.01
+        _Never(), model_profile="remote", prompt="hi", reply="r", session_id="s_1", timeout=0.01
     )
     assert title == "hi"
 
@@ -123,9 +133,29 @@ async def test_a_slow_proposal_times_out_to_the_first_line() -> None:
 async def test_model_titles_ask_the_session_model() -> None:
     model = ScriptedChatModel(replies=['"Greeting."'])
     titles = ModelTitles(ModelRouter(model=model))
-    title = await choose_title(titles, model_profile="remote", prompt="hello", reply="Hi there")
+    title = await choose_title(
+        titles, model_profile="remote", prompt="hello", reply="Hi there", session_id="s_1"
+    )
     assert title == "Greeting"
     assert "User: hello\n\nAssistant: Hi there" in model.seen[0][1]
+
+
+async def test_a_title_call_writes_a_titles_row(database: Database) -> None:
+    model = ToolCallingChatModel(
+        replies=['"Greeting."'],
+        usage={"input_tokens": 1_000, "output_tokens": 10, "total_tokens": 1_010},
+    )
+    titles = ModelTitles(ModelRouter(model=model))
+    usage = Usage(database)
+    titles.record_to(
+        usage, lambda _profile: ModelPrice(input=2.0, output=4.0), lambda _profile: "budget"
+    )
+    await choose_title(titles, model_profile="remote", prompt="hello", reply="Hi", session_id="s_1")
+    (row,) = await database.fetch_all(
+        "SELECT session_id, role, tier, input, output, cost_usd, failed FROM model_calls"
+    )
+    assert tuple(row) == ("s_1", "titles", "budget", 1_000, 10, pytest.approx(0.00204), 0)
+    assert await usage.spent(session_id="s_1") == pytest.approx(0.00204)
 
 
 def _manager(

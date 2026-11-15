@@ -30,6 +30,7 @@ from golem.models.discovery import (
 from golem.models.keys import MemoryKeyStore
 from golem.models.prices import PriceBook
 from golem.models.router import ModelRouter
+from golem_protocol.events import TokenUsage
 
 Handler = Callable[[httpx.Request], httpx.Response]
 
@@ -588,6 +589,55 @@ async def test_model_list_over_the_socket(short_home: Path) -> None:
         assert qwen["profiles"] == ["qwen"]
         assert qwen["price"] == {"input": 0.0, "output": 0.0, "cached_input": None}
         assert models["ollama/small:1b"]["status"] == "not_installed"
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+
+
+async def test_cost_get_sums_the_calls_of_a_session(short_home: Path) -> None:
+    network = Network(_ollama_routes())
+    router = ModelRouter(
+        GolemSettings(models={"qwen": ModelSettings(model="ollama/qwen3:8b")}, default_model="qwen")
+    )
+    app, task = await start_daemon(
+        short_home,
+        router=router,
+        discovery=lambda routed: _discovery(routed, network, short_home),
+    )
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        usage = app.state.usage
+        assert usage is not None
+        for session, tier, cost in (
+            ("s_1", "budget", 0.5),
+            ("s_1", "local", 0.0),
+            ("s_2", "budget", 1.0),
+        ):
+            await usage.record_role_call(
+                session_id=session,
+                role="titles",
+                provider="ollama" if tier == "local" else "deepseek",
+                model="m",
+                tier=tier,
+                usage=TokenUsage(input=100, output=10),
+                cost_usd=cost,
+            )
+        result = rpc_result(await client.call("cost.get", {"session_id": "s_1"}))
+        session = cast(dict[str, object], result["session"])
+        assert (session["calls"], session["input"], session["output"]) == (2, 200, 20)
+        assert session["cost_usd"] == 0.5
+        today = cast(dict[str, object], result["today"])
+        assert (today["calls"], today["cost_usd"]) == (3, 1.5)
+        assert cast(dict[str, object], result["week"])["calls"] == 3
+        assert result["saved_reference"] is None
+        by_day = cast(list[dict[str, object]], result["by_day"])
+        assert len(by_day) == 7
+        assert (by_day[-1]["local_tokens"], by_day[-1]["paid_tokens"]) == (110, 220)
+        by_model = cast(list[dict[str, object]], result["by_model"])
+        assert [(m["provider"], m["calls"]) for m in by_model] == [("deepseek", 2), ("ollama", 1)]
+        nobody = rpc_result(await client.call("cost.get", {}))
+        assert nobody["session"] is None
     finally:
         await client.close()
         await stop_daemon(app, task)

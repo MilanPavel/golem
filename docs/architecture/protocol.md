@@ -234,6 +234,8 @@ The MCP methods, `mcp.list` to `mcp.server.status`, are in [MCP](./mcp.md#on-the
 
 The default model and `model.list` are in [Talking to models](./models.md#the-model-list).
 
+`cost.get` answers "what did I spend", from the `model_calls` table ([The usage table](./sessions.md#the-usage-table)). It takes an optional `session_id` and does not call a model. The result has `today` and `week` (the last 7 local days), and `session` when a session was asked for. Each is `{calls, input, output, cost_usd, saved_usd}`. `by_model` lists `{provider, model, tier, calls, input, output, cost_usd}` for the week, the dearest first. `by_day` has `{day, local_tokens, paid_tokens, cost_usd}` for each of the 7 days, oldest first. `saved_usd` prices the tokens of `local` calls at a reference model, the cheapest `budget`-tier model in the model list that does not refuse tools, and `saved_reference` names it, or is null when there is none. A browser may call it. `model.call.started` has a `tier`.
+
 The `model.call.started` and `model.call.completed` events, and the `trace.get` and `trace.span` commands, are in [Tracing](./tracing.md#the-details).
 
 ### Why a protocol package

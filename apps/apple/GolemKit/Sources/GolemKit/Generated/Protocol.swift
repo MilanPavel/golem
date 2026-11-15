@@ -839,6 +839,236 @@ public struct ConfigRule: Codable {
     }
 }
 
+/// One local day. ``local_tokens`` are input plus output of ``local`` calls, and
+/// ``paid_tokens`` those of every other call.
+// MARK: - CostDayRow
+public struct CostDayRow: Codable {
+    public let costUsd: Double
+    public let day: String
+    public let localTokens: Int
+    public let paidTokens: Int
+
+    public enum CodingKeys: String, CodingKey {
+        case costUsd = "cost_usd"
+        case day = "day"
+        case localTokens = "local_tokens"
+        case paidTokens = "paid_tokens"
+    }
+
+    public init(costUsd: Double, day: String, localTokens: Int, paidTokens: Int) {
+        self.costUsd = costUsd
+        self.day = day
+        self.localTokens = localTokens
+        self.paidTokens = paidTokens
+    }
+}
+
+/// ``cost.get``. What model calls cost: today, the last 7 days, and one session.
+///
+/// Days are the user's local days. Does not call a model.
+// MARK: - CostGetParams
+public struct CostGetParams: Codable {
+    public let sessionID: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case sessionID = "session_id"
+    }
+
+    public init(sessionID: String?) {
+        self.sessionID = sessionID
+    }
+}
+
+/// ``week`` is the last 7 local days, today included. ``session`` is set when the
+/// request named a session. ``by_model`` is sorted by cost, highest first, and ``by_day``
+/// has one row for each of the 7 days, oldest first. ``saved_reference`` is the
+/// ``provider/model`` ref whose prices ``saved_usd`` uses, or null when there is none.
+// MARK: - CostGetResult
+public struct CostGetResult: Codable {
+    public let byDay: [ByDayElement]?
+    public let byModel: [ByModelElement]?
+    public let savedReference: String?
+    public let session: CostTotalsClass?
+    public let today: CostTotalsClass
+    public let week: CostTotalsClass
+
+    public enum CodingKeys: String, CodingKey {
+        case byDay = "by_day"
+        case byModel = "by_model"
+        case savedReference = "saved_reference"
+        case session = "session"
+        case today = "today"
+        case week = "week"
+    }
+
+    public init(byDay: [ByDayElement]?, byModel: [ByModelElement]?, savedReference: String?, session: CostTotalsClass?, today: CostTotalsClass, week: CostTotalsClass) {
+        self.byDay = byDay
+        self.byModel = byModel
+        self.savedReference = savedReference
+        self.session = session
+        self.today = today
+        self.week = week
+    }
+}
+
+/// One local day. ``local_tokens`` are input plus output of ``local`` calls, and
+/// ``paid_tokens`` those of every other call.
+// MARK: - ByDayElement
+public struct ByDayElement: Codable {
+    public let costUsd: Double
+    public let day: String
+    public let localTokens: Int
+    public let paidTokens: Int
+
+    public enum CodingKeys: String, CodingKey {
+        case costUsd = "cost_usd"
+        case day = "day"
+        case localTokens = "local_tokens"
+        case paidTokens = "paid_tokens"
+    }
+
+    public init(costUsd: Double, day: String, localTokens: Int, paidTokens: Int) {
+        self.costUsd = costUsd
+        self.day = day
+        self.localTokens = localTokens
+        self.paidTokens = paidTokens
+    }
+}
+
+/// One model's calls over the last 7 days.
+///
+/// ``provider``, ``model`` and ``tier`` are null for a call whose model was not known.
+// MARK: - ByModelElement
+public struct ByModelElement: Codable {
+    public let calls: Int
+    public let costUsd: Double
+    public let input: Int
+    public let model: String?
+    public let output: Int
+    public let provider: String?
+    public let tier: Tier?
+
+    public enum CodingKeys: String, CodingKey {
+        case calls = "calls"
+        case costUsd = "cost_usd"
+        case input = "input"
+        case model = "model"
+        case output = "output"
+        case provider = "provider"
+        case tier = "tier"
+    }
+
+    public init(calls: Int, costUsd: Double, input: Int, model: String?, output: Int, provider: String?, tier: Tier?) {
+        self.calls = calls
+        self.costUsd = costUsd
+        self.input = input
+        self.model = model
+        self.output = output
+        self.provider = provider
+        self.tier = tier
+    }
+}
+
+public enum Tier: String, Codable {
+    case budget = "budget"
+    case frontier = "frontier"
+    case local = "local"
+}
+
+/// Calls, tokens and money over one span.
+///
+/// ``cost_usd`` is what paid calls cost, at the price golem knew then. ``saved_usd`` is what
+/// the tokens of ``local`` calls would have cost at the reference model's price, and 0 when
+/// there is no reference. Money is a float on purpose: sub-cent amounts. Round to show it.
+// MARK: - CostTotalsClass
+public struct CostTotalsClass: Codable {
+    public let calls: Int
+    public let costUsd: Double
+    public let input: Int
+    public let output: Int
+    public let savedUsd: Double
+
+    public enum CodingKeys: String, CodingKey {
+        case calls = "calls"
+        case costUsd = "cost_usd"
+        case input = "input"
+        case output = "output"
+        case savedUsd = "saved_usd"
+    }
+
+    public init(calls: Int, costUsd: Double, input: Int, output: Int, savedUsd: Double) {
+        self.calls = calls
+        self.costUsd = costUsd
+        self.input = input
+        self.output = output
+        self.savedUsd = savedUsd
+    }
+}
+
+/// One model's calls over the last 7 days.
+///
+/// ``provider``, ``model`` and ``tier`` are null for a call whose model was not known.
+// MARK: - CostModelRow
+public struct CostModelRow: Codable {
+    public let calls: Int
+    public let costUsd: Double
+    public let input: Int
+    public let model: String?
+    public let output: Int
+    public let provider: String?
+    public let tier: Tier?
+
+    public enum CodingKeys: String, CodingKey {
+        case calls = "calls"
+        case costUsd = "cost_usd"
+        case input = "input"
+        case model = "model"
+        case output = "output"
+        case provider = "provider"
+        case tier = "tier"
+    }
+
+    public init(calls: Int, costUsd: Double, input: Int, model: String?, output: Int, provider: String?, tier: Tier?) {
+        self.calls = calls
+        self.costUsd = costUsd
+        self.input = input
+        self.model = model
+        self.output = output
+        self.provider = provider
+        self.tier = tier
+    }
+}
+
+/// Calls, tokens and money over one span.
+///
+/// ``cost_usd`` is what paid calls cost, at the price golem knew then. ``saved_usd`` is what
+/// the tokens of ``local`` calls would have cost at the reference model's price, and 0 when
+/// there is no reference. Money is a float on purpose: sub-cent amounts. Round to show it.
+// MARK: - CostTotals
+public struct CostTotals: Codable {
+    public let calls: Int
+    public let costUsd: Double
+    public let input: Int
+    public let output: Int
+    public let savedUsd: Double
+
+    public enum CodingKeys: String, CodingKey {
+        case calls = "calls"
+        case costUsd = "cost_usd"
+        case input = "input"
+        case output = "output"
+        case savedUsd = "saved_usd"
+    }
+
+    public init(calls: Int, costUsd: Double, input: Int, output: Int, savedUsd: Double) {
+        self.calls = calls
+        self.costUsd = costUsd
+        self.input = input
+        self.output = output
+        self.savedUsd = savedUsd
+    }
+}
+
 /// Result of ``daemon.status``.
 ///
 /// ``model_profile``, ``model_provider``, and ``model_name`` describe the
@@ -1314,12 +1544,6 @@ public enum ListedModelStatus: String, Codable {
     case pulling = "pulling"
     case ready = "ready"
     case serverDown = "server_down"
-}
-
-public enum Tier: String, Codable {
-    case budget = "budget"
-    case frontier = "frontier"
-    case local = "local"
 }
 
 /// ``unlisted`` is a provider golem does not ask for models: nothing uses it yet.
@@ -4924,6 +5148,9 @@ public enum ModelCallCompletedEventType: String, Codable {
 /// call. ``index`` counts the calls of this run from 1. ``provider`` and
 /// ``model`` are None when the profile does not resolve.
 ///
+/// ``tier`` is the model's tier when the call was sent (``local``, ``budget`` or
+/// ``frontier``), and None on an older event or when the profile does not resolve.
+///
 /// ``system_prompt_sha`` and ``tools_sha`` are the sha256 of the system
 /// prompt and of the tool schemas (compact JSON, sorted keys) sent with the
 /// call, which the daemon keeps by hash. Each is None when it was not sent.
@@ -4955,6 +5182,7 @@ public struct ModelCallStartedData: Codable {
     public let systemChars: Int?
     public let systemPromptSHA: String?
     public let systemSections: [PurplePromptSectionInfo]?
+    public let tier: Tier?
     public let toolsBytes: Int?
     public let toolsChars: Int?
     public let toolsSHA: String?
@@ -4975,13 +5203,14 @@ public struct ModelCallStartedData: Codable {
         case systemChars = "system_chars"
         case systemPromptSHA = "system_prompt_sha"
         case systemSections = "system_sections"
+        case tier = "tier"
         case toolsBytes = "tools_bytes"
         case toolsChars = "tools_chars"
         case toolsSHA = "tools_sha"
         case windowEstimated = "window_estimated"
     }
 
-    public init(contextWindow: Int?, index: Int, messageBytes: [Int]?, messageChars: [Int]?, messageID: String, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String, provider: String?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [PurplePromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?) {
+    public init(contextWindow: Int?, index: Int, messageBytes: [Int]?, messageChars: [Int]?, messageID: String, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String, provider: String?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [PurplePromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?) {
         self.contextWindow = contextWindow
         self.index = index
         self.messageBytes = messageBytes
@@ -4996,6 +5225,7 @@ public struct ModelCallStartedData: Codable {
         self.systemChars = systemChars
         self.systemPromptSHA = systemPromptSHA
         self.systemSections = systemSections
+        self.tier = tier
         self.toolsBytes = toolsBytes
         self.toolsChars = toolsChars
         self.toolsSHA = toolsSHA
@@ -5060,6 +5290,9 @@ public struct ModelCallStartedEvent: Codable {
 /// call. ``index`` counts the calls of this run from 1. ``provider`` and
 /// ``model`` are None when the profile does not resolve.
 ///
+/// ``tier`` is the model's tier when the call was sent (``local``, ``budget`` or
+/// ``frontier``), and None on an older event or when the profile does not resolve.
+///
 /// ``system_prompt_sha`` and ``tools_sha`` are the sha256 of the system
 /// prompt and of the tool schemas (compact JSON, sorted keys) sent with the
 /// call, which the daemon keeps by hash. Each is None when it was not sent.
@@ -5091,6 +5324,7 @@ public struct ModelCallStartedEventData: Codable {
     public let systemChars: Int?
     public let systemPromptSHA: String?
     public let systemSections: [FluffyPromptSectionInfo]?
+    public let tier: Tier?
     public let toolsBytes: Int?
     public let toolsChars: Int?
     public let toolsSHA: String?
@@ -5111,13 +5345,14 @@ public struct ModelCallStartedEventData: Codable {
         case systemChars = "system_chars"
         case systemPromptSHA = "system_prompt_sha"
         case systemSections = "system_sections"
+        case tier = "tier"
         case toolsBytes = "tools_bytes"
         case toolsChars = "tools_chars"
         case toolsSHA = "tools_sha"
         case windowEstimated = "window_estimated"
     }
 
-    public init(contextWindow: Int?, index: Int, messageBytes: [Int]?, messageChars: [Int]?, messageID: String, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String, provider: String?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [FluffyPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?) {
+    public init(contextWindow: Int?, index: Int, messageBytes: [Int]?, messageChars: [Int]?, messageID: String, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String, provider: String?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [FluffyPromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?) {
         self.contextWindow = contextWindow
         self.index = index
         self.messageBytes = messageBytes
@@ -5132,6 +5367,7 @@ public struct ModelCallStartedEventData: Codable {
         self.systemChars = systemChars
         self.systemPromptSHA = systemPromptSHA
         self.systemSections = systemSections
+        self.tier = tier
         self.toolsBytes = toolsBytes
         self.toolsChars = toolsChars
         self.toolsSHA = toolsSHA
@@ -6999,6 +7235,9 @@ public struct Params: Codable {
 /// call. ``index`` counts the calls of this run from 1. ``provider`` and
 /// ``model`` are None when the profile does not resolve.
 ///
+/// ``tier`` is the model's tier when the call was sent (``local``, ``budget`` or
+/// ``frontier``), and None on an older event or when the profile does not resolve.
+///
 /// ``system_prompt_sha`` and ``tools_sha`` are the sha256 of the system
 /// prompt and of the tool schemas (compact JSON, sorted keys) sent with the
 /// call, which the daemon keeps by hash. Each is None when it was not sent.
@@ -7148,6 +7387,7 @@ public struct ParamsData: Codable {
     public let systemChars: Int?
     public let systemPromptSHA: String?
     public let systemSections: [TentacledPromptSectionInfo]?
+    public let tier: Tier?
     public let toolsBytes: Int?
     public let toolsChars: Int?
     public let toolsSHA: String?
@@ -7216,6 +7456,7 @@ public struct ParamsData: Codable {
         case systemChars = "system_chars"
         case systemPromptSHA = "system_prompt_sha"
         case systemSections = "system_sections"
+        case tier = "tier"
         case toolsBytes = "tools_bytes"
         case toolsChars = "tools_chars"
         case toolsSHA = "tools_sha"
@@ -7249,7 +7490,7 @@ public struct ParamsData: Codable {
         case path = "path"
     }
 
-    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, title: String?, runID: String?, status: DataStatus?, summary: String?, reason: PurpleReason?, options: [String: Option]?, mode: Mode?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, contextWindow: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String?, provider: String?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, price: FluffyCallPrice?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, todos: [PurpleTodo]?, hash: String?, how: How?, path: String?) {
+    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, title: String?, runID: String?, status: DataStatus?, summary: String?, reason: PurpleReason?, options: [String: Option]?, mode: Mode?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, contextWindow: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String?, provider: String?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, price: FluffyCallPrice?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, todos: [PurpleTodo]?, hash: String?, how: How?, path: String?) {
         self.cwd = cwd
         self.forkedFrom = forkedFrom
         self.modelName = modelName
@@ -7285,6 +7526,7 @@ public struct ParamsData: Codable {
         self.systemChars = systemChars
         self.systemPromptSHA = systemPromptSHA
         self.systemSections = systemSections
+        self.tier = tier
         self.toolsBytes = toolsBytes
         self.toolsChars = toolsChars
         self.toolsSHA = toolsSHA

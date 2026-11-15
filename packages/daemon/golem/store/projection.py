@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable
+from datetime import datetime, tzinfo
 
 from golem.store.database import Transaction
 from golem.store.records import decode_allowances, decode_names, encode_allowances
@@ -17,6 +18,8 @@ from golem_protocol.events import (
     ChatEvent,
     MessageDeltaEvent,
     MessageThinkingDeltaEvent,
+    ModelCallCompletedEvent,
+    ModelCallStartedEvent,
     ModelOptionsChangedEvent,
     ModelSelectedEvent,
     RunCancelledEvent,
@@ -96,6 +99,8 @@ async def project(tx: Transaction, event: ChatEvent) -> None:
             "UPDATE sessions SET model_profile = ? WHERE session_id = ?",
             (event.data.model_profile, event.session_id),
         )
+    elif isinstance(event, ModelCallStartedEvent | ModelCallCompletedEvent):
+        await project_model_call(tx, event)
     elif isinstance(event, SessionClosedEvent):
         await tx.execute(
             "UPDATE sessions SET closed_at = ? WHERE session_id = ? AND closed_at IS NULL",
@@ -131,6 +136,58 @@ async def project(tx: Transaction, event: ChatEvent) -> None:
         )
 
 
+def local_day(ts: str, zone: tzinfo | None = None) -> str:
+    """The local calendar date, ``YYYY-MM-DD``, of the ISO time ``ts``.
+
+    ``zone`` is the user's time zone, and None means the machine's.
+    """
+    return datetime.fromisoformat(ts).astimezone(zone).date().isoformat()
+
+
+async def project_model_call(
+    tx: Transaction, event: ModelCallStartedEvent | ModelCallCompletedEvent
+) -> None:
+    """Write a call into ``model_calls``. Replaying the same events gives the same rows.
+
+    ``started`` inserts the row, and ``completed`` fills in its tokens, cost and ``failed``.
+    A ``completed`` with no ``started`` row changes nothing. An event with no ``tier`` (one
+    from before it was recorded) is ``local`` for ollama and unknown for any other provider.
+    """
+    if isinstance(event, ModelCallStartedEvent):
+        data = event.data
+        tier = data.tier or ("local" if data.provider == "ollama" else None)
+        await tx.execute(
+            "INSERT OR REPLACE INTO model_calls (call_id, session_id, run_id, role, provider,"
+            " model, tier, started_at, day) VALUES (?, ?, ?, 'chat', ?, ?, ?, ?, ?)",
+            (
+                data.message_id,
+                event.session_id,
+                event.run_id,
+                data.provider,
+                data.model,
+                tier,
+                event.ts,
+                local_day(event.ts),
+            ),
+        )
+        return
+    done = event.data
+    usage = done.usage
+    await tx.execute(
+        "UPDATE model_calls SET input = ?, output = ?, cache_read = ?, cache_write = ?,"
+        " cost_usd = ?, failed = ? WHERE call_id = ?",
+        (
+            None if usage is None else usage.input,
+            None if usage is None else usage.output,
+            None if usage is None else usage.cache_read,
+            None if usage is None else usage.cache_write,
+            done.cost_usd,
+            1 if done.failed else 0,
+            done.message_id,
+        ),
+    )
+
+
 async def _allow_tool(tx: Transaction, session_id: str, name: str, subject: str | None) -> None:
     rows = await tx.fetch_all(
         "SELECT allowed_tools FROM sessions WHERE session_id = ?", (session_id,)
@@ -157,7 +214,7 @@ async def _finish_run(
     )
 
 
-__all__ = ["project"]
+__all__ = ["local_day", "project", "project_model_call"]
 
 
 async def _set_skills(

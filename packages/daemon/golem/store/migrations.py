@@ -119,4 +119,27 @@ MIGRATIONS: tuple[tuple[str, ...], ...] = (
         """,
         "CREATE INDEX file_changes_session ON file_changes (session_id, seq)",
     ),
+    (
+        """
+        CREATE TABLE model_calls (
+            call_id TEXT PRIMARY KEY,
+            session_id TEXT,
+            run_id TEXT,
+            role TEXT NOT NULL DEFAULT 'chat',
+            provider TEXT,
+            model TEXT,
+            tier TEXT,
+            started_at TEXT NOT NULL,
+            day TEXT NOT NULL,
+            input INTEGER,
+            output INTEGER,
+            cache_read INTEGER,
+            cache_write INTEGER,
+            cost_usd REAL,
+            failed INTEGER NOT NULL DEFAULT 0
+        )
+        """,
+        "CREATE INDEX model_calls_day ON model_calls (day)",
+        "CREATE INDEX model_calls_session ON model_calls (session_id)",
+    ),
 )

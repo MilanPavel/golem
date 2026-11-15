@@ -1021,6 +1021,7 @@ class SessionManager:
                 prompt=prompt,
                 reply=reply,
                 options=dict(session.options),
+                session_id=session.session_id,
             )
             async with self._lock:
                 if session.title is None and not session.closed:

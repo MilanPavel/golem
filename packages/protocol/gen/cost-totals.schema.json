@@ -1,0 +1,40 @@
+{
+  "additionalProperties": false,
+  "description": "Calls, tokens and money over one span.\n\n``cost_usd`` is what paid calls cost, at the price golem knew then. ``saved_usd`` is what\nthe tokens of ``local`` calls would have cost at the reference model's price, and 0 when\nthere is no reference. Money is a float on purpose: sub-cent amounts. Round to show it.",
+  "properties": {
+    "calls": {
+      "minimum": 0,
+      "title": "Calls",
+      "type": "integer"
+    },
+    "cost_usd": {
+      "minimum": 0,
+      "title": "Cost Usd",
+      "type": "number"
+    },
+    "input": {
+      "minimum": 0,
+      "title": "Input",
+      "type": "integer"
+    },
+    "output": {
+      "minimum": 0,
+      "title": "Output",
+      "type": "integer"
+    },
+    "saved_usd": {
+      "minimum": 0,
+      "title": "Saved Usd",
+      "type": "number"
+    }
+  },
+  "required": [
+    "calls",
+    "input",
+    "output",
+    "cost_usd",
+    "saved_usd"
+  ],
+  "title": "CostTotals",
+  "type": "object"
+}

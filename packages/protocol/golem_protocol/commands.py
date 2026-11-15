@@ -386,6 +386,79 @@ class SessionInspectResult(BaseModel):
     messages: list[InspectMessage]
 
 
+class CostGetParams(BaseModel):
+    """``cost.get``. What model calls cost: today, the last 7 days, and one session.
+
+    Days are the user's local days. Does not call a model.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str | None = Field(default=None, min_length=1)
+
+
+class CostTotals(BaseModel):
+    """Calls, tokens and money over one span.
+
+    ``cost_usd`` is what paid calls cost, at the price golem knew then. ``saved_usd`` is what
+    the tokens of ``local`` calls would have cost at the reference model's price, and 0 when
+    there is no reference. Money is a float on purpose: sub-cent amounts. Round to show it.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    calls: int = Field(ge=0)
+    input: int = Field(ge=0)
+    output: int = Field(ge=0)
+    cost_usd: float = Field(ge=0)
+    saved_usd: float = Field(ge=0)
+
+
+class CostModelRow(BaseModel):
+    """One model's calls over the last 7 days.
+
+    ``provider``, ``model`` and ``tier`` are null for a call whose model was not known.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    provider: str | None = None
+    model: str | None = None
+    tier: Literal["local", "budget", "frontier"] | None = None
+    calls: int = Field(ge=0)
+    input: int = Field(ge=0)
+    output: int = Field(ge=0)
+    cost_usd: float = Field(ge=0)
+
+
+class CostDayRow(BaseModel):
+    """One local day. ``local_tokens`` are input plus output of ``local`` calls, and
+    ``paid_tokens`` those of every other call."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    day: str = Field(min_length=10, max_length=10)
+    local_tokens: int = Field(ge=0)
+    paid_tokens: int = Field(ge=0)
+    cost_usd: float = Field(ge=0)
+
+
+class CostGetResult(BaseModel):
+    """``week`` is the last 7 local days, today included. ``session`` is set when the
+    request named a session. ``by_model`` is sorted by cost, highest first, and ``by_day``
+    has one row for each of the 7 days, oldest first. ``saved_reference`` is the
+    ``provider/model`` ref whose prices ``saved_usd`` uses, or null when there is none."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    today: CostTotals
+    week: CostTotals
+    session: CostTotals | None = None
+    by_model: list[CostModelRow] = Field(default_factory=list[CostModelRow])
+    by_day: list[CostDayRow] = Field(default_factory=list[CostDayRow])
+    saved_reference: str | None = None
+
+
 class TraceGetParams(BaseModel):
     """``trace.get``. Read one session as a tree of spans. Does not call the model."""
 
@@ -2463,6 +2536,11 @@ __all__ = [
     "ConfigRawResult",
     "ConfigRawSetParams",
     "ConfigRule",
+    "CostDayRow",
+    "CostGetParams",
+    "CostGetResult",
+    "CostModelRow",
+    "CostTotals",
     "DaemonStatus",
     "DirEntry",
     "FsListDirsParams",

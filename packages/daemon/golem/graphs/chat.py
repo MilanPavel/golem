@@ -50,6 +50,7 @@ from golem.graphs.tools_node import (
 from golem.models.gate import ServerGate
 from golem.models.ollama import LocalServers
 from golem.models.router import ModelRouter
+from golem.models.tiers import Tier
 from golem.models.window import ContextWindow, WindowOf
 from golem.permissions.engine import Allowance
 from golem.permissions.policy import Policy
@@ -136,6 +137,7 @@ class ChatRuntime:
         prompt: SystemPrompt | None = None,
         window_of: WindowOf | None = None,
         price_of: Callable[[str], ModelPrice | None] | None = None,
+        tier_of: Callable[[str], Tier | None] | None = None,
     ) -> None:
         self._graph = graph
         self.router = router
@@ -145,6 +147,8 @@ class ChatRuntime:
         self.window_of = window_of
         self.price_of = price_of
         """The price of a profile's model, or None when unknown. No I/O."""
+        self.tier_of = tier_of
+        """The tier of a profile's model, or None when the profile does not resolve. No I/O."""
         self.enable_mcp: EnableMcp | None = None
         """Turns on an on-demand MCP server for a session, for the model's ``mcp_enable``."""
         self.skills: SkillRegistry | None = None
@@ -382,6 +386,7 @@ def open_chat(
     note_loaded: Callable[[str, int | None], Awaitable[int | None]] | None = None,
     price_of: Callable[[str], ModelPrice | None] | None = None,
     gate: ServerGate | None = None,
+    tier_of: Callable[[str], Tier | None] | None = None,
 ) -> ChatRuntime:
     """Compile the chat graph against ``checkpointer``.
 
@@ -525,6 +530,7 @@ def open_chat(
             system_prompt,
             window_of,
             price_of,
+            tier_of,
         )
     )
     return runtime[0]

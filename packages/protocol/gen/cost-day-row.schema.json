@@ -1,0 +1,35 @@
+{
+  "additionalProperties": false,
+  "description": "One local day. ``local_tokens`` are input plus output of ``local`` calls, and\n``paid_tokens`` those of every other call.",
+  "properties": {
+    "cost_usd": {
+      "minimum": 0,
+      "title": "Cost Usd",
+      "type": "number"
+    },
+    "day": {
+      "maxLength": 10,
+      "minLength": 10,
+      "title": "Day",
+      "type": "string"
+    },
+    "local_tokens": {
+      "minimum": 0,
+      "title": "Local Tokens",
+      "type": "integer"
+    },
+    "paid_tokens": {
+      "minimum": 0,
+      "title": "Paid Tokens",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "day",
+    "local_tokens",
+    "paid_tokens",
+    "cost_usd"
+  ],
+  "title": "CostDayRow",
+  "type": "object"
+}
