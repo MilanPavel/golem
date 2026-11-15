@@ -1,0 +1,15 @@
+{
+  "additionalProperties": false,
+  "description": "Whether the session is in plan first, after a change.\n\nThe last event holds the switch, so a replayed session gets it back.",
+  "properties": {
+    "on": {
+      "title": "On",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "on"
+  ],
+  "title": "SessionPlanChangedData",
+  "type": "object"
+}

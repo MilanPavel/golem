@@ -356,6 +356,40 @@ class CheckInfo(BaseModel):
     command: str = Field(min_length=1)
 
 
+class SessionPlanChangedData(BaseModel):
+    """Whether the session is in plan first, after a change.
+
+    The last event holds the switch, so a replayed session gets it back.
+    """
+
+    model_config = _CONFIG
+
+    on: bool
+
+
+class PlanStep(BaseModel):
+    """One step of a plan: what to do, and the files it will touch."""
+
+    model_config = _CONFIG
+
+    text: str = Field(min_length=1, max_length=300)
+    files: list[str] = Field(default_factory=list[str], max_length=20)
+
+
+class PlanProposedData(BaseModel):
+    """The plan a plan first run ended with, sent for the user to read.
+
+    ``plan_id`` names this plan. ``call_id`` is the ``propose_plan`` call.
+    """
+
+    model_config = _CONFIG
+
+    plan_id: str = Field(min_length=1)
+    call_id: str = Field(min_length=1)
+    title: str = Field(min_length=1, max_length=120)
+    steps: list[PlanStep] = Field(min_length=1, max_length=20)
+
+
 class CheckOfferedData(BaseModel):
     """The turn changed files and the session has not said whether golem may run checks.
 
@@ -873,6 +907,32 @@ class SessionChecksChangedEvent(BaseModel):
     data: SessionChecksChangedData
 
 
+class SessionPlanChangedEvent(BaseModel):
+    """``session.set_plan`` put the session in plan first, or took it out."""
+
+    model_config = _CONFIG
+
+    seq: int = Field(ge=1)
+    session_id: str = Field(min_length=1)
+    run_id: None
+    ts: str = Field(min_length=1)
+    type: Literal["session.plan.changed"]
+    data: SessionPlanChangedData
+
+
+class PlanProposedEvent(BaseModel):
+    """A plan first run proposed its plan with ``propose_plan``."""
+
+    model_config = _CONFIG
+
+    seq: int = Field(ge=1)
+    session_id: str = Field(min_length=1)
+    run_id: str = Field(min_length=1)
+    ts: str = Field(min_length=1)
+    type: Literal["plan.proposed"]
+    data: PlanProposedData
+
+
 class CheckOfferedEvent(BaseModel):
     """The turn changed files and golem asks whether it may run the project's checks."""
 
@@ -1257,6 +1317,7 @@ EventType = Literal[
     "model.options.changed",
     "session.mode.changed",
     "session.checks.changed",
+    "session.plan.changed",
     "message.started",
     "message.delta",
     "message.thinking.delta",
@@ -1278,6 +1339,7 @@ EventType = Literal[
     "approval.needed",
     "approval.resolved",
     "todos.updated",
+    "plan.proposed",
     "file.changed",
     "skill.activated",
     "skill.deactivated",
@@ -1299,6 +1361,7 @@ ChatEvent = Annotated[
     | ModelOptionsChangedEvent
     | SessionModeChangedEvent
     | SessionChecksChangedEvent
+    | SessionPlanChangedEvent
     | MessageStartedEvent
     | MessageDeltaEvent
     | MessageThinkingDeltaEvent
@@ -1320,6 +1383,7 @@ ChatEvent = Annotated[
     | ApprovalNeededEvent
     | ApprovalResolvedEvent
     | TodosUpdatedEvent
+    | PlanProposedEvent
     | FileChangedEvent
     | SkillActivatedEvent
     | SkillDeactivatedEvent
@@ -1380,6 +1444,9 @@ __all__ = [
     "ModelWaitingEvent",
     "PermissionMode",
     "Ping",
+    "PlanProposedData",
+    "PlanProposedEvent",
+    "PlanStep",
     "PromptSectionInfo",
     "RouteMode",
     "RunCancelledData",
@@ -1398,6 +1465,8 @@ __all__ = [
     "SessionCreatedEvent",
     "SessionModeChangedData",
     "SessionModeChangedEvent",
+    "SessionPlanChangedData",
+    "SessionPlanChangedEvent",
     "SessionUpdatedData",
     "SessionUpdatedEvent",
     "SkillActivatedData",

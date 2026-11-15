@@ -8141,6 +8141,140 @@ public enum PingType: String, Codable {
     case systemPing = "system.ping"
 }
 
+/// The plan a plan first run ended with, sent for the user to read.
+///
+/// ``plan_id`` names this plan. ``call_id`` is the ``propose_plan`` call.
+// MARK: - PlanProposedData
+public struct PlanProposedData: Codable {
+    public let callID: String
+    public let planID: String
+    public let steps: [PlanProposedDataStep]
+    public let title: String
+
+    public enum CodingKeys: String, CodingKey {
+        case callID = "call_id"
+        case planID = "plan_id"
+        case steps = "steps"
+        case title = "title"
+    }
+
+    public init(callID: String, planID: String, steps: [PlanProposedDataStep], title: String) {
+        self.callID = callID
+        self.planID = planID
+        self.steps = steps
+        self.title = title
+    }
+}
+
+/// One step of a plan: what to do, and the files it will touch.
+// MARK: - PlanProposedDataStep
+public struct PlanProposedDataStep: Codable {
+    public let files: [String]?
+    public let text: String
+
+    public enum CodingKeys: String, CodingKey {
+        case files = "files"
+        case text = "text"
+    }
+
+    public init(files: [String]?, text: String) {
+        self.files = files
+        self.text = text
+    }
+}
+
+/// A plan first run proposed its plan with ``propose_plan``.
+// MARK: - PlanProposedEvent
+public struct PlanProposedEvent: Codable {
+    public let data: PlanProposedEventData
+    public let runID: String
+    public let seq: Int
+    public let sessionID: String
+    public let ts: String
+    public let type: PlanProposedEventType
+
+    public enum CodingKeys: String, CodingKey {
+        case data = "data"
+        case runID = "run_id"
+        case seq = "seq"
+        case sessionID = "session_id"
+        case ts = "ts"
+        case type = "type"
+    }
+
+    public init(data: PlanProposedEventData, runID: String, seq: Int, sessionID: String, ts: String, type: PlanProposedEventType) {
+        self.data = data
+        self.runID = runID
+        self.seq = seq
+        self.sessionID = sessionID
+        self.ts = ts
+        self.type = type
+    }
+}
+
+/// The plan a plan first run ended with, sent for the user to read.
+///
+/// ``plan_id`` names this plan. ``call_id`` is the ``propose_plan`` call.
+// MARK: - PlanProposedEventData
+public struct PlanProposedEventData: Codable {
+    public let callID: String
+    public let planID: String
+    public let steps: [PurplePlanStep]
+    public let title: String
+
+    public enum CodingKeys: String, CodingKey {
+        case callID = "call_id"
+        case planID = "plan_id"
+        case steps = "steps"
+        case title = "title"
+    }
+
+    public init(callID: String, planID: String, steps: [PurplePlanStep], title: String) {
+        self.callID = callID
+        self.planID = planID
+        self.steps = steps
+        self.title = title
+    }
+}
+
+/// One step of a plan: what to do, and the files it will touch.
+// MARK: - PurplePlanStep
+public struct PurplePlanStep: Codable {
+    public let files: [String]?
+    public let text: String
+
+    public enum CodingKeys: String, CodingKey {
+        case files = "files"
+        case text = "text"
+    }
+
+    public init(files: [String]?, text: String) {
+        self.files = files
+        self.text = text
+    }
+}
+
+public enum PlanProposedEventType: String, Codable {
+    case planProposed = "plan.proposed"
+}
+
+/// One step of a plan: what to do, and the files it will touch.
+// MARK: - PlanStep
+public struct PlanStep: Codable {
+    public let files: [String]?
+    public let text: String
+
+    public enum CodingKeys: String, CodingKey {
+        case files = "files"
+        case text = "text"
+    }
+
+    public init(files: [String]?, text: String) {
+        self.files = files
+        self.text = text
+    }
+}
+
 /// The file that was written.
 // MARK: - PolicyEditResult
 public struct PolicyEditResult: Codable {
@@ -9440,6 +9574,8 @@ public enum RPCNotificationMethod: String, Codable {
 ///
 /// ``session.set_checks`` changed whether the session lets golem run checks.
 ///
+/// ``session.set_plan`` put the session in plan first, or took it out.
+///
 /// The assistant bubble is open.
 ///
 /// Tokens to append to the open assistant message.
@@ -9482,6 +9618,8 @@ public enum RPCNotificationMethod: String, Codable {
 /// The waiting tool call was answered, and the run goes on.
 ///
 /// The agent's todo list changed. ``run_id`` is null for a list a fork copied.
+///
+/// A plan first run proposed its plan with ``propose_plan``.
 ///
 /// A file in the session folder changed. Sent before the ``tool.completed`` of its call.
 ///
@@ -9590,6 +9728,10 @@ public struct Params: Codable {
 /// ``on`` true is the user's yes and false their no. The last event holds the
 /// answer, so a replayed session gets it back. A session without one has not
 /// been asked.
+///
+/// Whether the session is in plan first, after a change.
+///
+/// The last event holds the switch, so a replayed session gets it back.
 ///
 /// An assistant message is open and tokens may follow.
 ///
@@ -9739,6 +9881,10 @@ public struct Params: Codable {
 /// ``call_id`` is the call that wrote it. It is null for a list a fork copied.
 /// An empty list clears it.
 ///
+/// The plan a plan first run ended with, sent for the user to read.
+///
+/// ``plan_id`` names this plan. ``call_id`` is the ``propose_plan`` call.
+///
 /// One change to one file, recorded before this event was sent.
 ///
 /// ``path`` is relative to the session folder. ``call_id`` is the tool call that
@@ -9864,6 +10010,8 @@ public struct ParamsData: Codable {
     public let decision: Decision?
     public let rule: String?
     public let todos: [PurpleTodo]?
+    public let planID: String?
+    public let steps: [FluffyPlanStep]?
     public let added: Int?
     public let changeID: String?
     public let removed: Int?
@@ -9964,6 +10112,8 @@ public struct ParamsData: Codable {
         case decision = "decision"
         case rule = "rule"
         case todos = "todos"
+        case planID = "plan_id"
+        case steps = "steps"
         case added = "added"
         case changeID = "change_id"
         case removed = "removed"
@@ -9978,7 +10128,7 @@ public struct ParamsData: Codable {
         case output = "output"
     }
 
-    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, route: Route?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: PurpleReason?, detail: String?, model: String?, provider: String?, rejected: [FluffyModelRejection]?, tier: Tier?, options: [String: Option]?, mode: Mode?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, estimatedTokens: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, numCtx: Int?, profile: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, chars: Int?, lines: Int?, path: String?, waiting: Bool?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, todos: [PurpleTodo]?, added: Int?, changeID: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?) {
+    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, route: Route?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: PurpleReason?, detail: String?, model: String?, provider: String?, rejected: [FluffyModelRejection]?, tier: Tier?, options: [String: Option]?, mode: Mode?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, estimatedTokens: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, numCtx: Int?, profile: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, chars: Int?, lines: Int?, path: String?, waiting: Bool?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, todos: [PurpleTodo]?, planID: String?, steps: [FluffyPlanStep]?, added: Int?, changeID: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?) {
         self.cwd = cwd
         self.forkedFrom = forkedFrom
         self.modelName = modelName
@@ -10065,6 +10215,8 @@ public struct ParamsData: Codable {
         self.decision = decision
         self.rule = rule
         self.todos = todos
+        self.planID = planID
+        self.steps = steps
         self.added = added
         self.changeID = changeID
         self.removed = removed
@@ -10233,6 +10385,23 @@ public enum PurpleStatus: String, Codable {
     case timedOut = "timed_out"
 }
 
+/// One step of a plan: what to do, and the files it will touch.
+// MARK: - FluffyPlanStep
+public struct FluffyPlanStep: Codable {
+    public let files: [String]?
+    public let text: String
+
+    public enum CodingKeys: String, CodingKey {
+        case files = "files"
+        case text = "text"
+    }
+
+    public init(files: [String]?, text: String) {
+        self.files = files
+        self.text = text
+    }
+}
+
 /// One non-empty section of the system prompt sent with a model call.
 ///
 /// ``chars`` is the length of the section's text after strip, counted as
@@ -10322,6 +10491,7 @@ public enum ParamsType: String, Codable {
     case modelRouted = "model.routed"
     case modelSelected = "model.selected"
     case modelWaiting = "model.waiting"
+    case planProposed = "plan.proposed"
     case runCancelled = "run.cancelled"
     case runCompleted = "run.completed"
     case runFailed = "run.failed"
@@ -10331,6 +10501,7 @@ public enum ParamsType: String, Codable {
     case sessionCompleted = "session.completed"
     case sessionCreated = "session.created"
     case sessionModeChanged = "session.mode.changed"
+    case sessionPlanChanged = "session.plan.changed"
     case sessionUpdated = "session.updated"
     case skillActivated = "skill.activated"
     case skillDeactivated = "skill.deactivated"
@@ -11533,6 +11704,7 @@ public struct SessionListResult: Codable {
 /// not a fork. An older daemon leaves it out. ``origin`` is who started the
 /// session: ``user``, ``cli``, ``routine:<name>``. A session never changes it.
 /// ``route`` is the session's route mode. An older daemon leaves it out.
+/// ``plan_first`` is true while the session is in plan first (``session.set_plan``).
 // MARK: - SessionElement
 public struct SessionElement: Codable {
     public let createdAt: String
@@ -11541,6 +11713,7 @@ public struct SessionElement: Codable {
     public let lastSeq: Int
     public let modelProfile: String
     public let origin: String?
+    public let planFirst: Bool?
     public let route: Route?
     public let sessionID: String
     public let status: SessionStatus
@@ -11554,6 +11727,7 @@ public struct SessionElement: Codable {
         case lastSeq = "last_seq"
         case modelProfile = "model_profile"
         case origin = "origin"
+        case planFirst = "plan_first"
         case route = "route"
         case sessionID = "session_id"
         case status = "status"
@@ -11561,13 +11735,14 @@ public struct SessionElement: Codable {
         case updatedAt = "updated_at"
     }
 
-    public init(createdAt: String, cwd: String?, forkedFrom: String?, lastSeq: Int, modelProfile: String, origin: String?, route: Route?, sessionID: String, status: SessionStatus, title: String?, updatedAt: String) {
+    public init(createdAt: String, cwd: String?, forkedFrom: String?, lastSeq: Int, modelProfile: String, origin: String?, planFirst: Bool?, route: Route?, sessionID: String, status: SessionStatus, title: String?, updatedAt: String) {
         self.createdAt = createdAt
         self.cwd = cwd
         self.forkedFrom = forkedFrom
         self.lastSeq = lastSeq
         self.modelProfile = modelProfile
         self.origin = origin
+        self.planFirst = planFirst
         self.route = route
         self.sessionID = sessionID
         self.status = status
@@ -11650,6 +11825,71 @@ public struct SessionModeChangedEventData: Codable {
 
 public enum SessionModeChangedEventType: String, Codable {
     case sessionModeChanged = "session.mode.changed"
+}
+
+/// Whether the session is in plan first, after a change.
+///
+/// The last event holds the switch, so a replayed session gets it back.
+// MARK: - SessionPlanChangedData
+public struct SessionPlanChangedData: Codable {
+    public let on: Bool
+
+    public enum CodingKeys: String, CodingKey {
+        case on = "on"
+    }
+
+    public init(on: Bool) {
+        self.on = on
+    }
+}
+
+/// ``session.set_plan`` put the session in plan first, or took it out.
+// MARK: - SessionPlanChangedEvent
+public struct SessionPlanChangedEvent: Codable {
+    public let data: SessionPlanChangedEventData
+    public let runID: JSONNull?
+    public let seq: Int
+    public let sessionID: String
+    public let ts: String
+    public let type: SessionPlanChangedEventType
+
+    public enum CodingKeys: String, CodingKey {
+        case data = "data"
+        case runID = "run_id"
+        case seq = "seq"
+        case sessionID = "session_id"
+        case ts = "ts"
+        case type = "type"
+    }
+
+    public init(data: SessionPlanChangedEventData, runID: JSONNull?, seq: Int, sessionID: String, ts: String, type: SessionPlanChangedEventType) {
+        self.data = data
+        self.runID = runID
+        self.seq = seq
+        self.sessionID = sessionID
+        self.ts = ts
+        self.type = type
+    }
+}
+
+/// Whether the session is in plan first, after a change.
+///
+/// The last event holds the switch, so a replayed session gets it back.
+// MARK: - SessionPlanChangedEventData
+public struct SessionPlanChangedEventData: Codable {
+    public let on: Bool
+
+    public enum CodingKeys: String, CodingKey {
+        case on = "on"
+    }
+
+    public init(on: Bool) {
+        self.on = on
+    }
+}
+
+public enum SessionPlanChangedEventType: String, Codable {
+    case sessionPlanChanged = "session.plan.changed"
 }
 
 /// ``session.rename``. Set the title by hand. An automatic title never replaces it.
@@ -11883,6 +12123,45 @@ public struct SessionSetOptionsResult: Codable {
     }
 }
 
+/// ``session.set_plan``. Put one session in plan first, or take it out.
+///
+/// With ``on`` true the session's runs only read, and each ends with a plan
+/// sent as ``plan.proposed``. The daemon emits ``session.plan.changed``. It
+/// applies from the session's next turn, is kept with the session, and is
+/// not written to ``config.toml``. A new session starts with it off.
+// MARK: - SessionSetPlanParams
+public struct SessionSetPlanParams: Codable {
+    public let on: Bool
+    public let sessionID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case on = "on"
+        case sessionID = "session_id"
+    }
+
+    public init(on: Bool, sessionID: String) {
+        self.on = on
+        self.sessionID = sessionID
+    }
+}
+
+/// Whether the session is in plan first after the change.
+// MARK: - SessionSetPlanResult
+public struct SessionSetPlanResult: Codable {
+    public let on: Bool
+    public let sessionID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case on = "on"
+        case sessionID = "session_id"
+    }
+
+    public init(on: Bool, sessionID: String) {
+        self.on = on
+        self.sessionID = sessionID
+    }
+}
+
 /// ``session.set_route``. Set how this session picks the model of each turn.
 ///
 /// ``pinned`` runs the session's own model. ``local`` never uses a hosted model.
@@ -12003,6 +12282,7 @@ public enum SessionSummaryNotificationMethod: String, Codable {
 /// not a fork. An older daemon leaves it out. ``origin`` is who started the
 /// session: ``user``, ``cli``, ``routine:<name>``. A session never changes it.
 /// ``route`` is the session's route mode. An older daemon leaves it out.
+/// ``plan_first`` is true while the session is in plan first (``session.set_plan``).
 // MARK: - SessionSummaryNotificationParams
 public struct SessionSummaryNotificationParams: Codable {
     public let createdAt: String
@@ -12011,6 +12291,7 @@ public struct SessionSummaryNotificationParams: Codable {
     public let lastSeq: Int
     public let modelProfile: String
     public let origin: String?
+    public let planFirst: Bool?
     public let route: Route?
     public let sessionID: String
     public let status: SessionStatus
@@ -12024,6 +12305,7 @@ public struct SessionSummaryNotificationParams: Codable {
         case lastSeq = "last_seq"
         case modelProfile = "model_profile"
         case origin = "origin"
+        case planFirst = "plan_first"
         case route = "route"
         case sessionID = "session_id"
         case status = "status"
@@ -12031,13 +12313,14 @@ public struct SessionSummaryNotificationParams: Codable {
         case updatedAt = "updated_at"
     }
 
-    public init(createdAt: String, cwd: String?, forkedFrom: String?, lastSeq: Int, modelProfile: String, origin: String?, route: Route?, sessionID: String, status: SessionStatus, title: String?, updatedAt: String) {
+    public init(createdAt: String, cwd: String?, forkedFrom: String?, lastSeq: Int, modelProfile: String, origin: String?, planFirst: Bool?, route: Route?, sessionID: String, status: SessionStatus, title: String?, updatedAt: String) {
         self.createdAt = createdAt
         self.cwd = cwd
         self.forkedFrom = forkedFrom
         self.lastSeq = lastSeq
         self.modelProfile = modelProfile
         self.origin = origin
+        self.planFirst = planFirst
         self.route = route
         self.sessionID = sessionID
         self.status = status
@@ -12058,6 +12341,7 @@ public struct SessionSummaryNotificationParams: Codable {
 /// not a fork. An older daemon leaves it out. ``origin`` is who started the
 /// session: ``user``, ``cli``, ``routine:<name>``. A session never changes it.
 /// ``route`` is the session's route mode. An older daemon leaves it out.
+/// ``plan_first`` is true while the session is in plan first (``session.set_plan``).
 // MARK: - SessionSummary
 public struct SessionSummary: Codable {
     public let createdAt: String
@@ -12066,6 +12350,7 @@ public struct SessionSummary: Codable {
     public let lastSeq: Int
     public let modelProfile: String
     public let origin: String?
+    public let planFirst: Bool?
     public let route: Route?
     public let sessionID: String
     public let status: SessionStatus
@@ -12079,6 +12364,7 @@ public struct SessionSummary: Codable {
         case lastSeq = "last_seq"
         case modelProfile = "model_profile"
         case origin = "origin"
+        case planFirst = "plan_first"
         case route = "route"
         case sessionID = "session_id"
         case status = "status"
@@ -12086,13 +12372,14 @@ public struct SessionSummary: Codable {
         case updatedAt = "updated_at"
     }
 
-    public init(createdAt: String, cwd: String?, forkedFrom: String?, lastSeq: Int, modelProfile: String, origin: String?, route: Route?, sessionID: String, status: SessionStatus, title: String?, updatedAt: String) {
+    public init(createdAt: String, cwd: String?, forkedFrom: String?, lastSeq: Int, modelProfile: String, origin: String?, planFirst: Bool?, route: Route?, sessionID: String, status: SessionStatus, title: String?, updatedAt: String) {
         self.createdAt = createdAt
         self.cwd = cwd
         self.forkedFrom = forkedFrom
         self.lastSeq = lastSeq
         self.modelProfile = modelProfile
         self.origin = origin
+        self.planFirst = planFirst
         self.route = route
         self.sessionID = sessionID
         self.status = status

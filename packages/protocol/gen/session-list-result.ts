@@ -6,6 +6,7 @@ export type ForkedFrom = string | null;
 export type LastSeq = number;
 export type ModelProfile = string;
 export type Origin = string;
+export type PlanFirst = boolean;
 export type Route = 'pinned' | 'local' | 'auto';
 export type SessionId = string;
 export type Status = 'idle' | 'running' | 'waiting' | 'closed';
@@ -31,6 +32,7 @@ export interface SessionListResult {
  * not a fork. An older daemon leaves it out. ``origin`` is who started the
  * session: ``user``, ``cli``, ``routine:<name>``. A session never changes it.
  * ``route`` is the session's route mode. An older daemon leaves it out.
+ * ``plan_first`` is true while the session is in plan first (``session.set_plan``).
  *
  * This interface was referenced by `SessionListResult`'s JSON-Schema
  * via the `definition` "SessionSummary".
@@ -42,6 +44,7 @@ export interface SessionSummary {
   last_seq: LastSeq;
   model_profile: ModelProfile;
   origin?: Origin;
+  plan_first?: PlanFirst;
   route?: Route;
   session_id: SessionId;
   status: Status;

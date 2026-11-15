@@ -36,7 +36,13 @@ from langgraph.config import get_stream_writer
 from langgraph.types import interrupt
 
 from golem.config import PERMISSION_MODES, PermissionMode
-from golem.graphs.adapter import APPROVAL_KIND, FILE_CHANGED_KIND, SKILL_LOADED_KIND, STREAM_KEY
+from golem.graphs.adapter import (
+    APPROVAL_KIND,
+    FILE_CHANGED_KIND,
+    PLAN_PROPOSED_KIND,
+    SKILL_LOADED_KIND,
+    STREAM_KEY,
+)
 from golem.graphs.result_budget import DEFAULT_BUDGET, ResultBudget
 from golem.graphs.state import AgentState
 from golem.permissions.engine import Allowance, session_allows
@@ -61,6 +67,10 @@ PINNED_FOLDERS_KEY = "golem_pinned_folders"
 
 ALLOWED_KEY = "golem_allowed_tools"
 MODE_KEY = "golem_permission_mode"
+PLAN_KEY = "golem_plan_first"
+"""``configurable`` key for whether the session is in plan first: its runs only read."""
+
+PLAN_REFUSAL = "plan first is on: this run only reads. End with propose_plan."
 """``configurable`` key for the ``[tool, subject]`` pairs allowed for the rest of the session."""
 
 ASKED_KEY = "golem_asked_calls"
@@ -182,6 +192,7 @@ def tools_node(
         )
         allowed = _allowed(config)
         mode = _mode(config)
+        plan_first = _plan_first(config)
         asked = _asked(config)
         ids = [call_id_of(call) for call in last.tool_calls]
         last_asked = max(
@@ -194,6 +205,13 @@ def tools_node(
                 verdicts.append(
                     _Verdict(run=False, message=unavailable(call["name"]), kind="unknown_tool")
                 )
+                continue
+            if plan_first and not session_tools.plan_allows(call["name"]):
+                verdicts.append(_Verdict(run=False, message=PLAN_REFUSAL, kind="denied"))
+                continue
+            if not plan_first and (called := session_tools.get(call["name"])) and called.plan_only:
+                message = f"{call['name']} is only for a plan first run"
+                verdicts.append(_Verdict(run=False, message=message, kind="denied"))
                 continue
             preview = await _preview(session_tools, call, replace(base, planned=dict(planned)))
             verdict = _decide(
@@ -290,6 +308,9 @@ def tools_node(
             changed = {k: v for k, v in (result.update or {}).items() if k in STATE_KEYS}
             if "todos" in changed:
                 write({STREAM_KEY: "todos.updated", "call_id": call_id, "todos": changed["todos"]})
+            plan = (result.update or {}).get("plan")
+            if isinstance(plan, dict):
+                write({STREAM_KEY: PLAN_PROPOSED_KIND, "call_id": call_id, **plan})
             activated = (result.update or {}).get("skill_activated")
             if isinstance(activated, dict):
                 write({STREAM_KEY: SKILL_LOADED_KIND, "call_id": call_id, **activated})
@@ -487,6 +508,11 @@ def _mode(config: RunnableConfig) -> PermissionMode | None:
     return next((mode for mode in PERMISSION_MODES if mode == raw), None)
 
 
+def _plan_first(config: RunnableConfig) -> bool:
+    """Whether the session is in plan first."""
+    return cast(Mapping[str, object], config.get("configurable", {})).get(PLAN_KEY) is True
+
+
 def _asked(config: RunnableConfig) -> set[str]:
     configurable = cast(Mapping[str, object], config.get("configurable", {}))
     raw = configurable.get(ASKED_KEY)
@@ -549,6 +575,8 @@ __all__ = [
     "MCP_NOW_KEY",
     "MODE_KEY",
     "PINNED_FOLDERS_KEY",
+    "PLAN_KEY",
+    "PLAN_REFUSAL",
     "PREVIEW_CHARS",
     "STATE_KEYS",
     "Answer",

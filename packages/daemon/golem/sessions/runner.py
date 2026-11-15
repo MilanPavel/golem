@@ -42,6 +42,7 @@ from golem.graphs.adapter import (
     ModelWaiting,
     PinRead,
     PinSkipped,
+    PlanProposed,
     SkillLoaded,
     TextCompleted,
     TextDelta,
@@ -88,6 +89,7 @@ from golem_protocol.events import (
     ModelRejection,
     ModelRoutedData,
     ModelWaitingData,
+    PlanProposedData,
     PromptSectionInfo,
     RunCancelledData,
     RunFailedData,
@@ -134,6 +136,7 @@ class Turn:
     options: dict[str, float | str] = field(default_factory=dict[str, float | str], compare=False)
     permission_mode: PermissionMode | None = None
     checks: bool | None = None
+    plan_first: bool = False
     pins: PinMemory = field(default_factory=PinMemory, compare=False)
     skill: Invocation | None = None
     typed: str | None = None
@@ -172,6 +175,7 @@ class Resume:
     options: dict[str, float | str] = field(default_factory=dict[str, float | str], compare=False)
     permission_mode: PermissionMode | None = None
     checks: bool | None = None
+    plan_first: bool = False
     pins: PinMemory = field(default_factory=PinMemory, compare=False)
 
 
@@ -310,6 +314,7 @@ async def run_turn(
             options=turn.options,
             permission_mode=turn.permission_mode,
             checks=turn.checks,
+            plan_first=turn.plan_first,
             skill_folder=None if skill is None else str(skill.path),
         )
         return await _finish(stream, progress, emit)
@@ -406,6 +411,7 @@ async def resume_turn(
             options=resume.options,
             permission_mode=resume.permission_mode,
             checks=resume.checks,
+            plan_first=resume.plan_first,
         )
         return await _finish(stream, progress, emit)
     except asyncio.CancelledError:
@@ -627,6 +633,18 @@ async def _apply(
         await emit(
             "todos.updated",
             TodosUpdatedData.model_validate({"call_id": fact.call_id, "todos": list(fact.todos)}),
+        )
+    elif isinstance(fact, PlanProposed):
+        await emit(
+            "plan.proposed",
+            PlanProposedData.model_validate(
+                {
+                    "plan_id": fact.plan_id,
+                    "call_id": fact.call_id,
+                    "title": fact.title,
+                    "steps": list(fact.steps),
+                }
+            ),
         )
     elif isinstance(fact, FileChanged):
         await _record_change(fact, progress, emit)

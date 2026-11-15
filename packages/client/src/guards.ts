@@ -29,6 +29,7 @@ import type { ModelOptionsSetResult } from "../../protocol/gen/model-options-set
 import type { PermissionsSetModeResult } from "../../protocol/gen/permissions-set-mode-result.ts";
 import type { SessionSetChecksResult } from "../../protocol/gen/session-set-checks-result.ts";
 import type { SessionSetRouteResult } from "../../protocol/gen/session-set-route-result.ts";
+import type { SessionSetPlanResult } from "../../protocol/gen/session-set-plan-result.ts";
 import type { SessionSetModeResult } from "../../protocol/gen/session-set-mode-result.ts";
 import type { SessionSetOptionsResult } from "../../protocol/gen/session-set-options-result.ts";
 import type { ListedSkill, SkillListResult } from "../../protocol/gen/skill-list-result.ts";
@@ -76,6 +77,7 @@ const EVENT_TYPES = new Set([
   "model.routed",
   "session.mode.changed",
   "session.checks.changed",
+  "session.plan.changed",
   "message.started",
   "message.delta",
   "message.thinking.delta",
@@ -90,6 +92,7 @@ const EVENT_TYPES = new Set([
   "tool.started",
   "tool.output",
   "todos.updated",
+  "plan.proposed",
   "tool.completed",
   "tool.failed",
   "approval.needed",
@@ -334,6 +337,10 @@ export function isSessionSetRouteResult(value: unknown): value is SessionSetRout
     typeof value["session_id"] === "string" &&
     (value["mode"] === "pinned" || value["mode"] === "local" || value["mode"] === "auto")
   );
+}
+
+export function isSessionSetPlanResult(value: unknown): value is SessionSetPlanResult {
+  return isRecord(value) && typeof value["session_id"] === "string" && typeof value["on"] === "boolean";
 }
 
 export function isSessionSetModeResult(value: unknown): value is SessionSetModeResult {

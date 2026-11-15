@@ -26,12 +26,14 @@ public enum GolemEvent {
     case sessionClosed(SessionClosedEvent)
     case sessionCreated(SessionCreatedEvent)
     case sessionChecksChanged(SessionChecksChangedEvent)
+    case sessionPlanChanged(SessionPlanChangedEvent)
     case sessionModeChanged(SessionModeChangedEvent)
     case sessionUpdated(SessionUpdatedEvent)
     case skillActivated(SkillActivatedEvent)
     case skillDeactivated(SkillDeactivatedEvent)
     case skillSkipped(SkillSkippedEvent)
     case todosUpdated(TodosUpdatedEvent)
+    case planProposed(PlanProposedEvent)
     case toolCompleted(ToolCompletedEvent)
     case toolFailed(ToolFailedEvent)
     case toolOutput(ToolOutputEvent)
@@ -103,6 +105,8 @@ extension GolemEvent: Decodable {
             self = .sessionCreated(try SessionCreatedEvent(from: decoder))
         case "session.checks.changed":
             self = .sessionChecksChanged(try SessionChecksChangedEvent(from: decoder))
+        case "session.plan.changed":
+            self = .sessionPlanChanged(try SessionPlanChangedEvent(from: decoder))
         case "session.mode.changed":
             self = .sessionModeChanged(try SessionModeChangedEvent(from: decoder))
         case "session.updated":
@@ -115,6 +119,8 @@ extension GolemEvent: Decodable {
             self = .skillSkipped(try SkillSkippedEvent(from: decoder))
         case "todos.updated":
             self = .todosUpdated(try TodosUpdatedEvent(from: decoder))
+        case "plan.proposed":
+            self = .planProposed(try PlanProposedEvent(from: decoder))
         case "tool.completed":
             self = .toolCompleted(try ToolCompletedEvent(from: decoder))
         case "tool.failed":
@@ -154,12 +160,14 @@ extension GolemEvent: Decodable {
         case .sessionClosed(let event): return event.seq
         case .sessionCreated(let event): return event.seq
         case .sessionChecksChanged(let event): return event.seq
+        case .sessionPlanChanged(let event): return event.seq
         case .sessionModeChanged(let event): return event.seq
         case .sessionUpdated(let event): return event.seq
         case .skillActivated(let event): return event.seq
         case .skillDeactivated(let event): return event.seq
         case .skillSkipped(let event): return event.seq
         case .todosUpdated(let event): return event.seq
+        case .planProposed(let event): return event.seq
         case .toolCompleted(let event): return event.seq
         case .toolFailed(let event): return event.seq
         case .toolOutput(let event): return event.seq

@@ -3,6 +3,7 @@
 from golem.config import WebSettings
 from golem.tools.artifacts import READ_ARTIFACT
 from golem.tools.fs import READ_ONLY_TOOLS
+from golem.tools.plan import PROPOSE_PLAN
 from golem.tools.registry import ToolRegistry, ToolSource
 from golem.tools.search import WEB_SEARCH
 from golem.tools.shell import SHELL_TOOLS
@@ -29,6 +30,7 @@ def default_registry(
             *search,
             READ_ARTIFACT,
             TODO_WRITE,
+            PROPOSE_PLAN,
             LOAD_SKILL,
         ],
         source,

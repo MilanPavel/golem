@@ -1,0 +1,25 @@
+{
+  "additionalProperties": false,
+  "description": "One step of a plan: what to do, and the files it will touch.",
+  "properties": {
+    "files": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 20,
+      "title": "Files",
+      "type": "array"
+    },
+    "text": {
+      "maxLength": 300,
+      "minLength": 1,
+      "title": "Text",
+      "type": "string"
+    }
+  },
+  "required": [
+    "text"
+  ],
+  "title": "PlanStep",
+  "type": "object"
+}

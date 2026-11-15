@@ -96,6 +96,7 @@ METHOD_ACCESS: Final[Mapping[str, Access]] = {
     "session.set_mode": "browser",
     "session.set_checks": "browser",
     "session.set_route": "browser",
+    "session.set_plan": "browser",
     "model.options.get": "browser",
     "model.options.set": "browser",
     "setup.status": "browser",

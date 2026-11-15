@@ -27,6 +27,7 @@ PIN_SKIPPED_KIND = "skill.pin_skipped"
 """``STREAM_KEY`` value of a model call's report that it left a pinned skill out."""
 
 SKILL_LOADED_KIND = "skill.loaded"
+PLAN_PROPOSED_KIND = "plan.proposed"
 """``STREAM_KEY`` value of a tool call that loaded a skill for the model."""
 
 FILE_CHANGED_KIND = "file.changed"
@@ -236,6 +237,16 @@ class ApprovalAsked:
 
 
 @dataclass(frozen=True, slots=True)
+class PlanProposed:
+    """``propose_plan`` ended a plan first run with this plan."""
+
+    call_id: str
+    plan_id: str
+    title: str
+    steps: tuple[dict[str, object], ...]
+
+
+@dataclass(frozen=True, slots=True)
 class PinRead:
     """A model call read a pinned skill's ``SKILL.md``, with this ``hash``."""
 
@@ -309,6 +320,7 @@ Fact = (
     | ToolErrored
     | ApprovalAsked
     | TodosChanged
+    | PlanProposed
     | FileChanged
     | PinRead
     | PinSkipped
@@ -837,6 +849,16 @@ def _custom(data: object) -> Fact | None:
             if isinstance(row, dict)
         )
         return TodosChanged(call_id, rows)
+    if kind == PLAN_PROPOSED_KIND:
+        plan_id, title, steps = item.get("plan_id"), item.get("title"), item.get("steps")
+        if not (isinstance(plan_id, str) and isinstance(title, str) and isinstance(steps, list)):
+            return None
+        rows = tuple(
+            dict(cast(dict[str, object], row))
+            for row in cast(list[object], steps)
+            if isinstance(row, dict)
+        )
+        return PlanProposed(call_id, plan_id, title, rows)
     if kind == FILE_CHANGED_KIND:
         path, before, after = item.get("path"), item.get("before"), item.get("after")
         if not isinstance(path, str) or not path:
@@ -991,6 +1013,7 @@ __all__ = [
     "FILE_CHANGED_KIND",
     "PIN_READ_KIND",
     "PIN_SKIPPED_KIND",
+    "PLAN_PROPOSED_KIND",
     "SKILL_LOADED_KIND",
     "STREAM_KEY",
     "ApprovalAsked",
@@ -1004,6 +1027,7 @@ __all__ = [
     "PinRead",
     "PinSkipped",
     "PlainMessage",
+    "PlanProposed",
     "RequestedCall",
     "SkillLoaded",
     "TextCompleted",

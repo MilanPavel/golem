@@ -1,0 +1,21 @@
+{
+  "additionalProperties": false,
+  "description": "Whether the session is in plan first after the change.",
+  "properties": {
+    "on": {
+      "title": "On",
+      "type": "boolean"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "session_id",
+    "on"
+  ],
+  "title": "SessionSetPlanResult",
+  "type": "object"
+}

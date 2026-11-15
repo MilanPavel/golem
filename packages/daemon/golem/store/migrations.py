@@ -144,4 +144,5 @@ MIGRATIONS: tuple[tuple[str, ...], ...] = (
     ),
     ("ALTER TABLE sessions ADD COLUMN checks INTEGER",),
     ("ALTER TABLE sessions ADD COLUMN route TEXT NOT NULL DEFAULT 'pinned'",),
+    ("ALTER TABLE sessions ADD COLUMN plan_first INTEGER",),
 )
