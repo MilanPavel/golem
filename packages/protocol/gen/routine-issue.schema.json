@@ -1,0 +1,33 @@
+{
+  "additionalProperties": false,
+  "description": "A routine that did not load: the file, the line (from 1) when known, and why.",
+  "properties": {
+    "file": {
+      "title": "File",
+      "type": "string"
+    },
+    "line": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Line"
+    },
+    "message": {
+      "title": "Message",
+      "type": "string"
+    }
+  },
+  "required": [
+    "file",
+    "message"
+  ],
+  "title": "RoutineIssue",
+  "type": "object"
+}

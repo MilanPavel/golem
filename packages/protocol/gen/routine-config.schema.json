@@ -1,0 +1,138 @@
+{
+  "$defs": {
+    "RoutineWatchConfig": {
+      "additionalProperties": false,
+      "description": "``on = { watch, glob }``: a new file in ``watch`` that matches ``glob``.",
+      "properties": {
+        "glob": {
+          "default": "*",
+          "minLength": 1,
+          "title": "Glob",
+          "type": "string"
+        },
+        "watch": {
+          "minLength": 1,
+          "title": "Watch",
+          "type": "string"
+        }
+      },
+      "required": [
+        "watch"
+      ],
+      "title": "RoutineWatchConfig",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "One ``[[routine]]`` as written. The daemon checks it when it loads.\n\nExactly one of ``schedule`` and ``on`` is set. ``schedule`` is cron, or\n``every 15m``, ``every 1h``, ``daily 08:30``, ``weekdays 08:30``, ``weekly mon 06:00``.\n``missed`` is what happens to a firing that came due while golem could not\nrun it: ``skip`` drops it, ``run_once`` fires it once, late.\n``notify_finished`` and ``notify_failed`` override the notification settings\nfor this routine, and null keeps them.",
+  "properties": {
+    "enabled": {
+      "default": true,
+      "title": "Enabled",
+      "type": "boolean"
+    },
+    "folder": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Folder"
+    },
+    "mcp": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Mcp",
+      "type": "array"
+    },
+    "missed": {
+      "default": "skip",
+      "enum": [
+        "skip",
+        "run_once"
+      ],
+      "title": "Missed",
+      "type": "string"
+    },
+    "model": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Model"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "notify_failed": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notify Failed"
+    },
+    "notify_finished": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notify Finished"
+    },
+    "on": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RoutineWatchConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "prompt": {
+      "minLength": 1,
+      "title": "Prompt",
+      "type": "string"
+    },
+    "schedule": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Schedule"
+    }
+  },
+  "required": [
+    "name",
+    "prompt"
+  ],
+  "title": "RoutineConfig",
+  "type": "object"
+}

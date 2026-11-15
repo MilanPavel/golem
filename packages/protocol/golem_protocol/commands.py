@@ -1376,6 +1376,200 @@ class SkillSetDisabledResult(BaseModel):
     disabled: bool
 
 
+RoutineSource = Literal["user", "project"]
+"""Where a routine is written: the user's ``config.toml``, or a project's."""
+
+RoutineRunStatus = Literal[
+    "queued", "running", "waiting", "succeeded", "failed", "skipped", "cancelled"
+]
+"""``waiting`` is never stored: it is a running session that waits for an answer."""
+
+RoutineTrigger = Literal["schedule", "watch", "manual", "hook"]
+
+
+class RoutineWatchConfig(BaseModel):
+    """``on = { watch, glob }``: a new file in ``watch`` that matches ``glob``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    watch: str = Field(min_length=1)
+    glob: str = Field(default="*", min_length=1)
+
+
+class RoutineConfig(BaseModel):
+    """One ``[[routine]]`` as written. The daemon checks it when it loads.
+
+    Exactly one of ``schedule`` and ``on`` is set. ``schedule`` is cron, or
+    ``every 15m``, ``every 1h``, ``daily 08:30``, ``weekdays 08:30``, ``weekly mon 06:00``.
+    ``missed`` is what happens to a firing that came due while golem could not
+    run it: ``skip`` drops it, ``run_once`` fires it once, late.
+    ``notify_finished`` and ``notify_failed`` override the notification settings
+    for this routine, and null keeps them.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    schedule: str | None = None
+    on: RoutineWatchConfig | None = None
+    prompt: str = Field(min_length=1)
+    folder: str | None = None
+    model: str | None = None
+    mcp: list[str] = Field(default_factory=list[str])
+    missed: Literal["skip", "run_once"] = "skip"
+    enabled: bool = True
+    notify_finished: bool | None = None
+    notify_failed: bool | None = None
+
+
+class RoutineRunSummary(BaseModel):
+    """One firing of a routine: a ``routine_run`` (ADR-050).
+
+    The times are ISO 8601 with an offset. ``reason`` says why a firing was
+    ``skipped``: ``missed``, ``paused``, ``untrusted``, ``still running`` or ``quiet``.
+    ``scope`` is ``user`` or the project folder. Nothing fills these until the
+    scheduler (4.2.2), so a list has none yet.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    routine_run_id: str = Field(min_length=1)
+    routine: str = Field(min_length=1)
+    scope: str = Field(min_length=1)
+    session_id: str | None = None
+    trigger: RoutineTrigger
+    due_at: str | None = None
+    started_at: str | None = None
+    ended_at: str | None = None
+    status: RoutineRunStatus
+    reason: str | None = None
+
+
+class RoutineInfo(BaseModel):
+    """A routine and what the daemon knows about it.
+
+    ``source`` is ``user`` or ``project``, and ``folder`` is the project folder
+    of a project routine. ``path`` is the file it is written in. ``next_at`` is
+    the next firing in the Mac's time zone, or null for a routine with ``on``,
+    one that is disabled or paused, or one that is blocked. ``last`` is its
+    latest run. ``paused`` is runtime state, not config. ``blocked`` is true for
+    a project routine in a folder that is not in ``trusted_projects``: it is
+    listed, and never runs.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    config: RoutineConfig
+    source: RoutineSource
+    folder: str | None = None
+    path: str
+    next_at: str | None = None
+    last: RoutineRunSummary | None = None
+    paused: bool = False
+    blocked: bool = False
+
+
+class RoutineIssue(BaseModel):
+    """A routine that did not load: the file, the line (from 1) when known, and why."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    file: str
+    line: int | None = Field(default=None, ge=1)
+    message: str
+
+
+class RoutineListParams(BaseModel):
+    """``routine.list``. The user's routines, and the project routines of ``folders``.
+
+    A folder in ``trusted_projects`` lists its routines as they are. Any other
+    folder that has some lists them ``blocked``. The daemon never looks at a
+    folder it is not given.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    folders: list[str] = Field(default_factory=list[str])
+
+
+class RoutineListResult(BaseModel):
+    """The routines, user ones first, each group in file order, and the files' problems."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    routines: list[RoutineInfo]
+    issues: list[RoutineIssue] = Field(default_factory=list[RoutineIssue])
+
+
+class RoutineGetParams(BaseModel):
+    """``routine.get``. A routine by name. ``folder`` picks a project routine."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    folder: str | None = Field(default=None, min_length=1)
+
+
+class RoutineGetResult(BaseModel):
+    """The routine and its last 50 runs, newest first."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    routine: RoutineInfo
+    runs: list[RoutineRunSummary] = Field(default_factory=list[RoutineRunSummary])
+
+
+class RoutineUpdateParams(BaseModel):
+    """``routine.update``. Change keys of a user routine, or create it with ``create``.
+
+    ``fields`` are the keys of ``RoutineConfig`` to set. A null value removes the
+    key. ``fields.name`` renames the routine. With ``create`` the routine must
+    not exist yet and ``fields`` must make a whole one. Only the user's
+    ``config.toml`` is edited: ``folder`` names a project routine and is
+    refused, because a project's file is edited in the project.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    fields: dict[str, Any]
+    create: bool = False
+    folder: str | None = Field(default=None, min_length=1)
+
+
+class RoutineUpdateResult(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    routine: RoutineInfo
+
+
+class RoutineRemoveParams(BaseModel):
+    """``routine.remove``. Delete a user routine from ``config.toml``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    folder: str | None = Field(default=None, min_length=1)
+
+
+class RoutineRemoveResult(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+
+
+class RoutineChanged(BaseModel):
+    """A routine was added, changed or removed. List the routines again.
+
+    ``name`` is null when the file changed in a way that is not one routine.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str | None = None
+    change: Literal["added", "updated", "removed", "reloaded"]
+
+
 class McpListParams(BaseModel):
     """``mcp.list``. The user's MCP servers and their state.
 
@@ -2737,6 +2931,20 @@ __all__ = [
     "PolicyEditResult",
     "PolicyRemoveParams",
     "PolicyUpdateParams",
+    "RoutineChanged",
+    "RoutineConfig",
+    "RoutineGetParams",
+    "RoutineGetResult",
+    "RoutineInfo",
+    "RoutineIssue",
+    "RoutineListParams",
+    "RoutineListResult",
+    "RoutineRemoveParams",
+    "RoutineRemoveResult",
+    "RoutineRunSummary",
+    "RoutineUpdateParams",
+    "RoutineUpdateResult",
+    "RoutineWatchConfig",
     "RunCancelParams",
     "RunCancelResult",
     "RuntimeInstallCancelParams",

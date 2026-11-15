@@ -16,6 +16,7 @@ from golem_protocol.commands import (
     ModelServerStatus,
     OllamaInstallDone,
     OllamaInstallOutput,
+    RoutineChanged,
     RuntimeInstallDone,
     RuntimeInstallOutput,
     SessionSummary,
@@ -208,6 +209,16 @@ class SkillRegistryChangedNotification(BaseModel):
     params: SkillRegistryChanged
 
 
+class RoutineChangedNotification(BaseModel):
+    """Server → every connection: a routine was added, changed or removed. Not stored."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    jsonrpc: Literal["2.0"] = "2.0"
+    method: Literal["routine.changed"] = "routine.changed"
+    params: RoutineChanged
+
+
 __all__ = [
     "KeychainWaitNotification",
     "McpLoginDoneNotification",
@@ -218,6 +229,7 @@ __all__ = [
     "ModelPullDoneNotification",
     "ModelPullProgressNotification",
     "ModelServerStatusNotification",
+    "RoutineChangedNotification",
     "RpcErrorBody",
     "RpcFailure",
     "RpcId",

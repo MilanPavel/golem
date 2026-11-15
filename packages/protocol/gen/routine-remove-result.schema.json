@@ -1,0 +1,15 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "title": "RoutineRemoveResult",
+  "type": "object"
+}

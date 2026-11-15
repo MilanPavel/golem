@@ -1,0 +1,22 @@
+{
+  "additionalProperties": false,
+  "description": "``on = { watch, glob }``: a new file in ``watch`` that matches ``glob``.",
+  "properties": {
+    "glob": {
+      "default": "*",
+      "minLength": 1,
+      "title": "Glob",
+      "type": "string"
+    },
+    "watch": {
+      "minLength": 1,
+      "title": "Watch",
+      "type": "string"
+    }
+  },
+  "required": [
+    "watch"
+  ],
+  "title": "RoutineWatchConfig",
+  "type": "object"
+}

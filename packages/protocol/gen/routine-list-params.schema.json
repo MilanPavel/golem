@@ -1,0 +1,15 @@
+{
+  "additionalProperties": false,
+  "description": "``routine.list``. The user's routines, and the project routines of ``folders``.\n\nA folder in ``trusted_projects`` lists its routines as they are. Any other\nfolder that has some lists them ``blocked``. The daemon never looks at a\nfolder it is not given.",
+  "properties": {
+    "folders": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Folders",
+      "type": "array"
+    }
+  },
+  "title": "RoutineListParams",
+  "type": "object"
+}

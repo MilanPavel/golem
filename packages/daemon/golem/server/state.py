@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Literal
 
@@ -20,6 +21,7 @@ from golem.models.pulls import PullManager
 from golem.notify import Notifier
 from golem.paths import GolemPaths
 from golem.permissions.policy import Policy
+from golem.routines import local_zone
 from golem.secrets import SecretStore
 from golem.sessions.manager import SessionManager
 from golem.sessions.usage import Usage
@@ -56,3 +58,5 @@ class DaemonState:
     mcp_imports: ScanStore = field(default_factory=ScanStore)
     broadcast: Callable[[BaseModel], None] = field(default=lambda _notification: None)
     """Queues a notification on every connection that said hello."""
+    clock: Callable[[], datetime] = field(default=lambda: datetime.now(local_zone()))
+    """The time, with the Mac's zone. A test sets its own."""

@@ -1,0 +1,40 @@
+{
+  "additionalProperties": false,
+  "description": "``routine.update``. Change keys of a user routine, or create it with ``create``.\n\n``fields`` are the keys of ``RoutineConfig`` to set. A null value removes the\nkey. ``fields.name`` renames the routine. With ``create`` the routine must\nnot exist yet and ``fields`` must make a whole one. Only the user's\n``config.toml`` is edited: ``folder`` names a project routine and is\nrefused, because a project's file is edited in the project.",
+  "properties": {
+    "create": {
+      "default": false,
+      "title": "Create",
+      "type": "boolean"
+    },
+    "fields": {
+      "additionalProperties": true,
+      "title": "Fields",
+      "type": "object"
+    },
+    "folder": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Folder"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "fields"
+  ],
+  "title": "RoutineUpdateParams",
+  "type": "object"
+}
