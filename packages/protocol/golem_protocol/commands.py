@@ -530,6 +530,7 @@ class TraceModelSpan(TraceSpan):
     context_window: int | None = Field(default=None, ge=1)
     num_ctx: int | None = Field(default=None, ge=1)
     context_window_estimated: bool = False
+    window_planned: bool = False
     prompt_cut: Literal["no", "yes", "likely"] | None = None
     prompt_cut_kind: Literal["older_messages", "middle"] | None = None
     dropped_message_ids: list[str] = Field(default_factory=list[str])
@@ -942,7 +943,8 @@ class ModelOptionsGetResult(BaseModel):
     ``default_from`` says where a default came from when it is not Ollama's fixed one:
     ``modelfile`` for the model's own, ``ollama`` for the window Ollama gave the model
     on a call that sent no ``num_ctx``. ``num_ctx`` has no default until one of the two
-    is known.
+    is known. ``golem`` is the window golem plans for the model, which it sends when nothing
+    else sets ``num_ctx``.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -950,7 +952,7 @@ class ModelOptionsGetResult(BaseModel):
     model: str = Field(min_length=1)
     options: list[ModelOption]
     defaults: dict[str, float | str]
-    default_from: dict[str, Literal["modelfile", "ollama"]] = Field(default_factory=dict)
+    default_from: dict[str, Literal["modelfile", "ollama", "golem"]] = Field(default_factory=dict)
     saved: dict[str, float | str]
     session: dict[str, float | str] | None = None
     memory: ModelMemory | None = None

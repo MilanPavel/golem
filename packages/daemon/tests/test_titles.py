@@ -375,3 +375,25 @@ async def test_the_title_request_carries_the_session_num_ctx() -> None:
     assert title == "Greeting"
     assert sent[0]["options"]["num_ctx"] == 16384
     assert sent[0]["options"]["num_predict"] == 64
+
+
+async def test_a_title_call_sends_the_same_num_ctx_as_the_chat_call() -> None:
+    """Two requests that differ in num_ctx make Ollama reload the model."""
+
+    class _Plans:
+        def planned(self, model_id: str) -> int | None:
+            return 16384
+
+    seen: list[object] = []
+
+    class _Router(ModelRouter):
+        def chat_model(self, profile: str, overrides: object = None) -> BaseChatModel:
+            made = super().chat_model(profile, overrides)  # type: ignore[arg-type]
+            seen.append(getattr(made, "num_ctx", None))
+            return ScriptedChatModel(replies=["A title"])
+
+    router = _Router(GolemSettings())
+    router.plans = _Plans()  # type: ignore[assignment]
+    router.chat_model("ollama/qwen3:8b")
+    await ModelTitles(router).title("ollama/qwen3:8b", "hello", "hi")
+    assert seen == [16384, 16384]

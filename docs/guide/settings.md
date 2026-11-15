@@ -136,6 +136,13 @@ The providers are `openai`, `anthropic`, `google`, `deepseek`, `xai`, `moonshot`
 | `idle_stop_minutes` | `30` | Stop a server golem started after this long unused. `0` never stops it |
 | `parallel` | `1` | How many generations golem sends to a local server at once (1 to 8). Raise it only if you also set `OLLAMA_NUM_PARALLEL` |
 
+### `[context]`
+
+| Key | Default | Meaning |
+|---|---|---|
+| `window` | `"auto"` | The context window golem asks Ollama for. `"auto"` plans one from the model's size and maximum and this Mac's memory. `"ollama"` sends none, so Ollama uses its own default. A number from 512 to 262144 is used as it is, and cut to the model's maximum when that is known. A `num_ctx` you set for a model, a profile's `ctx`, or a chat's option always wins |
+| `keep_alive` | `"30m"` | How long Ollama keeps the model loaded after a call. golem sends it only with a window it planned, and never over a `keep_alive` you set. Leave it out to send none |
+
 ### `[routing]`
 
 | Key | Default | Meaning |

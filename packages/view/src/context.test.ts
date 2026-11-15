@@ -98,7 +98,7 @@ const completed = (id: string, usage?: Record<string, unknown>, extra: Record<st
 
 test("foldLiveContext: started then completed gives the last context", () => {
   const state = foldLiveContext(foldLiveContext(emptyLiveContext, started("m1")), completed("m1", { input: 32000, output: 10 }));
-  assert.deepEqual(state, { last: { spanId: "m1", used: 32000, window: 128000, windowEstimated: false, numCtx: null }, pending: null });
+  assert.deepEqual(state, { last: { spanId: "m1", used: 32000, window: 128000, windowEstimated: false, windowPlanned: false, numCtx: null }, pending: null });
 });
 
 test("foldLiveContext: window_estimated on the start reaches last, and a missing field is false", () => {
@@ -106,6 +106,13 @@ test("foldLiveContext: window_estimated on the start reaches last, and a missing
     foldLiveContext(foldLiveContext(emptyLiveContext, started("m1", 8192, extra)), completed("m1", { input: 100 }));
   assert.equal(done({ window_estimated: true }).last?.windowEstimated, true);
   assert.equal(done({}).last?.windowEstimated, false);
+});
+
+test("foldLiveContext: window_planned on the start reaches last, and a missing field is false", () => {
+  const done = (extra: Record<string, unknown>) =>
+    foldLiveContext(foldLiveContext(emptyLiveContext, started("m1", 8192, extra)), completed("m1", { input: 100 }));
+  assert.equal(done({ window_planned: true }).last?.windowPlanned, true);
+  assert.equal(done({}).last?.windowPlanned, false);
 });
 
 test("windowUnknownHint: an Ollama model learns its window after the first answer", () => {

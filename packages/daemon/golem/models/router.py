@@ -25,6 +25,7 @@ import httpx
 from langchain_core.language_models import BaseChatModel
 
 from golem.config import (
+    ContextSettings,
     GolemSettings,
     ModelOptions,
     ModelSettings,
@@ -40,6 +41,7 @@ from golem.models.errors import ModelUnreachable
 from golem.models.keys import KeyStore, KeyStoreError
 from golem.models.ollama_chat import OllamaChat
 from golem.models.tiers import BUDGET_MAX_PRICE
+from golem.models.window_plans import WindowPlans
 from golem.paths import resolve_paths
 
 log = logging.getLogger(__name__)
@@ -146,6 +148,7 @@ class _Catalog:
     saved: dict[str, ModelOptions]
     budget_max_price: float = BUDGET_MAX_PRICE
     roles: RoleSettings = field(default_factory=RoleSettings)
+    context: ContextSettings = field(default_factory=ContextSettings)
 
 
 class ModelRouter:
@@ -175,6 +178,8 @@ class ModelRouter:
         self._model = model
         self._home = home
         self.keys = keys
+        # The planned window of a local model. Set after construction.
+        self.plans: WindowPlans | None = None
         self._think_values: dict[str, tuple[str, ...]] = {}
         self._config_file = resolve_paths(home).config_file if home is not None else None
         self._stamp = self._file_stamp()
@@ -301,6 +306,15 @@ class ModelRouter:
             if resolved.ctx is not None:
                 options["num_ctx"] = resolved.ctx
             options.update(self.ollama_options(resolved.model_id, overrides))
+            planned = None
+            if "num_ctx" not in options and self.plans is not None:
+                planned = self.plans.planned(resolved.model_id)
+                if planned is not None:
+                    options["num_ctx"] = planned
+            if planned is not None and "keep_alive" not in options:
+                keep_alive = self.context_settings().keep_alive
+                if keep_alive:
+                    options["keep_alive"] = keep_alive
             return OllamaChat.model_validate(options)
         from langchain_openai import ChatOpenAI
 
@@ -436,6 +450,11 @@ class ModelRouter:
         catalog = self._current()
         return dict(PRESETS if catalog is None else catalog.providers)
 
+    def context_settings(self) -> ContextSettings:
+        """``[context]``, read from the current ``config.toml``."""
+        catalog = self._current()
+        return ContextSettings() if catalog is None else catalog.context
+
     def budget_max_price(self) -> float:
         """``[routing] budget_max_price``, read from the current ``config.toml``."""
         catalog = self._current()
@@ -552,6 +571,7 @@ def _catalog(settings: GolemSettings) -> _Catalog:
         saved=dict(settings.ollama.models),
         budget_max_price=settings.routing.budget_max_price,
         roles=settings.routing.roles,
+        context=settings.context,
     )
 
 

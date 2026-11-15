@@ -151,3 +151,37 @@ def test_a_modelfile_window_is_estimated() -> None:
 def test_an_ollama_model_with_nothing_known_has_no_window() -> None:
     assert resolve_window(_router(), "ollama/llama3.2:3b", _Listed()) == ContextWindow()
     assert resolve_window(_router(), "ollama/llama3.2:3b", None) == ContextWindow()
+
+
+class _Plans:
+    def __init__(self, plan: int | None) -> None:
+        self.plan = plan
+
+    def planned(self, model_id: str) -> int | None:
+        return self.plan
+
+
+def test_the_plan_is_exact_and_planned_when_nothing_else_sets_num_ctx() -> None:
+    router = _router()
+    router.plans = _Plans(16384)  # type: ignore[assignment]
+    bare = "ollama/llama3.2:3b"
+    got = resolve_window(router, bare, _Listed(default=1, modelfile=2))
+    assert got == ContextWindow(16384, 16384, estimated=False, planned=True)
+
+
+def test_a_profile_ctx_a_saved_option_and_an_override_win_over_the_plan() -> None:
+    router = _router(32768)
+    router.plans = _Plans(8192)  # type: ignore[assignment]
+    assert resolve_window(router, "qwen", None) == ContextWindow(32768, 32768)
+    router = _router()
+    router.plans = _Plans(8192)  # type: ignore[assignment]
+    assert resolve_window(router, "qwen", None) == ContextWindow(16384, 16384)
+    got = resolve_window(router, "ollama/x", None, overrides={"num_ctx": 4096})
+    assert got == ContextWindow(4096, 4096)
+
+
+def test_no_plan_leaves_the_modelfile_and_the_default() -> None:
+    router = _router()
+    router.plans = _Plans(None)  # type: ignore[assignment]
+    got = resolve_window(router, "ollama/llama3.2:3b", _Listed(modelfile=2048))
+    assert got == ContextWindow(2048, None, estimated=True)

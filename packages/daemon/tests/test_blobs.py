@@ -12,10 +12,14 @@ from fakes import ToolCallingChatModel
 from langchain_core.messages import BaseMessage
 from langgraph.checkpoint.memory import InMemorySaver
 
+from golem.config import ContextSettings, GolemSettings
 from golem.graphs.chat import open_chat
 from golem.graphs.prompt import PromptContext, Section, SystemPrompt
+from golem.models.discovery import Loaded
 from golem.models.router import ModelRouter
-from golem.models.window import ContextWindow, WindowOf
+from golem.models.window import ContextWindow, WindowOf, resolve_window
+from golem.models.window_plan import step_down
+from golem.models.window_plans import WindowPlans
 from golem.sessions.bus import EventBus
 from golem.sessions.log import SessionLog
 from golem.sessions.manager import SessionManager
@@ -54,7 +58,7 @@ class _Chat:
         model: ToolCallingChatModel,
         prompt: SystemPrompt | None,
         window_of: WindowOf | None = None,
-        note_loaded: Callable[[str, int | None], Awaitable[int | None]] | None = None,
+        note_loaded: Callable[[str, int | None], Awaitable[Loaded]] | None = None,
     ) -> None:
         self.database = database
         self.runtime = open_chat(
@@ -230,12 +234,27 @@ async def test_the_window_is_recorded_when_it_is_known(database: Database) -> No
     await chat.manager.cancel_all()
     assert (first.data.context_window, first.data.num_ctx) == (8192, 8192)
     assert first.data.window_estimated is False
+    assert first.data.window_planned is False
 
     plain = _Chat(database, ToolCallingChatModel(replies=["hi"]), None)
     other = await plain.manager.create(None)
     (second,) = await plain.send(other, "hello")
     await plain.manager.cancel_all()
     assert (second.data.context_window, second.data.num_ctx) == (None, None)
+
+
+async def test_a_planned_window_is_recorded_as_planned(database: Database) -> None:
+    chat = _Chat(
+        database,
+        ToolCallingChatModel(replies=["hi"]),
+        None,
+        window_of=lambda _, __: ContextWindow(16384, 16384, planned=True),
+    )
+    session_id = await chat.manager.create(None)
+    (first,) = await chat.send(session_id, "hello")
+    await chat.manager.cancel_all()
+    assert (first.data.context_window, first.data.num_ctx) == (16384, 16384)
+    assert (first.data.window_estimated, first.data.window_planned) == (False, True)
 
 
 async def test_an_estimated_window_is_recorded_as_estimated(database: Database) -> None:
@@ -255,9 +274,9 @@ async def test_an_estimated_window_is_recorded_as_estimated(database: Database) 
 async def test_a_model_call_tells_note_loaded_the_profile(database: Database) -> None:
     seen: list[str] = []
 
-    async def note(profile: str, sent: int | None) -> int | None:
+    async def note(profile: str, sent: int | None) -> Loaded:
         seen.append(profile)
-        return None
+        return Loaded()
 
     chat = _Chat(database, ToolCallingChatModel(replies=["hi"]), None, note_loaded=note)
     session_id = await chat.manager.create(None)
@@ -267,7 +286,7 @@ async def test_a_model_call_tells_note_loaded_the_profile(database: Database) ->
 
 
 async def test_a_note_loaded_that_raises_does_not_fail_the_call(database: Database) -> None:
-    async def note(profile: str, sent: int | None) -> int | None:
+    async def note(profile: str, sent: int | None) -> Loaded:
         raise RuntimeError("boom")
 
     chat = _Chat(database, ToolCallingChatModel(replies=["hi"]), None, note_loaded=note)
@@ -284,9 +303,9 @@ async def _ran_with(
 ) -> tuple[int | None, list[int | None]]:
     asked: list[int | None] = []
 
-    async def note(profile: str, num_ctx: int | None) -> int | None:
+    async def note(profile: str, num_ctx: int | None) -> Loaded:
         asked.append(num_ctx)
-        return loaded
+        return Loaded(loaded)
 
     chat = _Chat(
         database,
@@ -349,3 +368,65 @@ async def test_no_prompt_and_no_tools_record_zero_sizes(database: Database) -> N
     await chat.manager.cancel_all()
     assert (second.data.system_chars, second.data.system_bytes) == (0, 0)
     assert (second.data.tools_chars, second.data.tools_bytes) == (0, 0)
+
+
+class _Ollama(ModelRouter):
+    """A router for an Ollama profile whose chat model is a fake, and that records num_ctx."""
+
+    def __init__(self, fake: ToolCallingChatModel) -> None:
+        super().__init__(
+            GolemSettings(default_model="ollama/qwen3:8b"),
+        )
+        self.fake = fake
+        self.sent: list[object] = []
+
+    def chat_model(self, profile: str, overrides: Any = None) -> Any:
+        self.sent.append(super().chat_model(profile, overrides).num_ctx)  # type: ignore[attr-defined]
+        return self.fake
+
+
+class _Facts:
+    def ollama_facts(self, model_id: str) -> tuple[int | None, float | None]:
+        return 40960, 5.2
+
+
+async def test_a_spilled_planned_window_is_lowered_for_the_next_call(database: Database) -> None:
+    router = _Ollama(ToolCallingChatModel(replies=[[("todo_write", {"todos": []})], "done"]))
+    router.plans = WindowPlans(
+        settings=lambda: ContextSettings(), discovery=_Facts(), ram_gb=16.0, cache_dir=None
+    )
+    first_plan = router.plans.planned("qwen3:8b")
+    assert first_plan is not None and first_plan > 8192
+    asked: list[int | None] = []
+
+    async def note(profile: str, num_ctx: int | None) -> Loaded:
+        asked.append(num_ctx)
+        return Loaded(num_ctx, 1000, 500 if num_ctx == first_plan else 1000)
+
+    records = SessionRecords(database)
+    events = EventLog(database)
+    runtime = open_chat(
+        router,
+        InMemorySaver(),
+        default_registry(),
+        window_of=lambda profile, overrides: resolve_window(router, profile, None),
+        note_loaded=note,
+    )
+    manager = SessionManager(
+        runtime, SessionLog(events, EventBus(), records), records, RunRecords(database)
+    )
+    session_id = await manager.create(None)
+    run_id = await manager.send(session_id, "hello")
+
+    async def done() -> bool:
+        run = await RunRecords(database).get(run_id)
+        return run is not None and run.status != "running"
+
+    await _until(done)
+    await manager.cancel_all()
+    started = [e for e in await events.for_run(run_id) if isinstance(e, ModelCallStartedEvent)]
+    assert all(e.data.window_planned for e in started)
+    assert asked[0] == first_plan
+    assert router.plans.planned("qwen3:8b") == step_down(first_plan)
+    assert router.sent[0] == first_plan
+    assert router.sent[-1] == step_down(first_plan)

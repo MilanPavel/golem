@@ -305,6 +305,20 @@ class RoutingSettings(BaseModel):
     roles: RoleSettings = Field(default_factory=RoleSettings)
 
 
+class ContextSettings(BaseModel):
+    """``[context]``. The window golem asks Ollama for.
+
+    ``window`` is ``"auto"`` (golem plans it from the model and this Mac's memory),
+    ``"ollama"`` (golem sends none and Ollama picks), or a number of tokens.
+    ``keep_alive`` is sent with a planned window when no other ``keep_alive`` is set.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    window: Literal["auto", "ollama"] | Annotated[int, Field(ge=512, le=262144)] = "auto"
+    keep_alive: str | None = "30m"
+
+
 class WebSettings(BaseModel):
     """``[web]``. What ``web_fetch`` may reach and how much it reads, and who searches.
 
@@ -510,6 +524,7 @@ BROWSER_SETTINGS = frozenset(
         "skills",
         "ollama",
         "routing",
+        "context",
     }
 )
 """Top-level settings the browser may edit. Every ``GolemSettings`` field is in one list."""
@@ -558,6 +573,7 @@ class GolemSettings(BaseSettings):
     skills: SkillSettings = Field(default_factory=SkillSettings)
     ollama: OllamaSettings = Field(default_factory=OllamaSettings)
     routing: RoutingSettings = Field(default_factory=RoutingSettings)
+    context: ContextSettings = Field(default_factory=ContextSettings)
 
     _no_secrets = model_validator(mode="before")(_no_inline_secrets)
 

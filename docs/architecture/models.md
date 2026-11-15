@@ -195,11 +195,14 @@ Downloads go through Ollama (`golem/models/pulls.py`):
 - **What an entry carries:** its status (`ready`, `needs_key`, `not_installed`, or `server_down`), the profile names that point at it, context size, tool support, price in USD per million tokens, download size, and whether it fits in memory.
 - **Price and context precedence:** the profile, then the provider's own list (Ollama), then LiteLLM (`golem/models/prices.py`).
 - **Caching and time limit:** hosted lists are cached for a day under `cache/`. A listing waits at most 2 seconds for the network. A slower fetch keeps running, and its result is used next time, with `stale` set on what was shown meanwhile. `refresh: true` skips the cache.
-- **The window of a local model:** Ollama runs a model at its own default window unless `num_ctx` is sent, so the listing's context size is the model's maximum, not the window. golem finds the window from what it sent, then from Ollama's `/api/ps`, then from the Modelfile, and shows an estimated one with a leading `≈` ([ADR-043](../adr/043-ollama-context-window.md)).
+- **The window of a local model:** Ollama runs a model at its own default window unless `num_ctx` is sent, so the listing's context size is the model's maximum, not the window. golem finds the window from what it sent, then from the window it planned, then from Ollama's `/api/ps`, then from the Modelfile, and shows an estimated one with a leading `≈` ([ADR-043](../adr/043-ollama-context-window.md)).
+  - **The plan** (`golem/models/window_plans.py`, [ADR-056](../adr/056-planned-window-and-context-view.md)): with `[context] window = "auto"`, `WindowPlans` runs `plan_window` over the size and maximum discovery already knows and this Mac's memory, with no network call. It gives one number for a model until the settings or what it remembers change. The router applies it inside `chat_model`, when no `num_ctx` is set by a saved option, a session option, or the profile's `ctx`, so a chat, a tool step, and a title call all send the same number and Ollama never reloads for a difference. It adds `keep_alive` with it. The call's `model.call.started` has `window_planned`.
+  - **Lowering:** after a call, `/api/ps` says how much of the model is in GPU memory. When a planned window spilled onto the CPU, the plan steps down once and is saved in `cache/windows.json`. The lower number applies from the next call.
 
 | File | What it does |
 |---|---|
 | `packages/daemon/golem/models/router.py` | `ModelRouter`: names to chat models, keys, and unreachable errors |
+| `packages/daemon/golem/models/window_plans.py` | `WindowPlans`: the planned window of each local model, and what is remembered |
 | `packages/daemon/golem/models/keys.py` | A provider's key: the environment, then the Keychain |
 | `packages/daemon/golem/secrets.py` | The one store for every secret, in the Keychain |
 | `packages/daemon/golem/models/ollama.py` | `LocalServer`: start, hold, and stop a local Ollama |
