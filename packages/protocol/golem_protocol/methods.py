@@ -41,6 +41,8 @@ METHOD_ACCESS: Final[Mapping[str, Access]] = {
     "changes.list": "browser",
     "changes.diff": "browser",
     "changes.revert": "browser",
+    "file.read": "browser",
+    "file.list": "browser",
     "cost.get": "browser",
     "trace.get": "browser",
     "trace.span": "browser",

@@ -14,6 +14,8 @@ import type { McpTestResult } from "../../protocol/gen/mcp-test-result.ts";
 import type { RuntimeInstallDone } from "../../protocol/gen/runtime-install-done.ts";
 import type { OllamaInstallDone } from "../../protocol/gen/ollama-install-done.ts";
 import type { ChangesListResult } from "../../protocol/gen/changes-list-result.ts";
+import type { FileListResult } from "../../protocol/gen/file-list-result.ts";
+import type { FileReadResult } from "../../protocol/gen/file-read-result.ts";
 import type { DirEntry, FsListDirsResult } from "../../protocol/gen/fs-list-dirs-result.ts";
 import type { SetupRow, SetupStatusResult } from "../../protocol/gen/setup-status-result.ts";
 import type { McpListResult } from "../../protocol/gen/mcp-list-result.ts";
@@ -427,6 +429,25 @@ export function isChangesRevertResult(value: unknown): value is ChangesRevertRes
       (conflict) =>
         isRecord(conflict) && typeof conflict["path"] === "string" && conflict["reason"] === "changed_on_disk",
     )
+  );
+}
+
+export function isFileReadResult(value: unknown): value is FileReadResult {
+  return (
+    isRecord(value) &&
+    typeof value["path"] === "string" &&
+    typeof value["text"] === "string" &&
+    typeof value["truncated"] === "boolean" &&
+    typeof value["lines"] === "number"
+  );
+}
+
+export function isFileListResult(value: unknown): value is FileListResult {
+  return (
+    isRecord(value) &&
+    Array.isArray(value["paths"]) &&
+    value["paths"].every((path) => typeof path === "string") &&
+    typeof value["more"] === "boolean"
   );
 }
 

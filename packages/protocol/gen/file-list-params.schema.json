@@ -1,0 +1,28 @@
+{
+  "additionalProperties": false,
+  "description": "``file.list``. Files of the session's folder whose path holds ``query``, case-insensitive.",
+  "properties": {
+    "limit": {
+      "default": 50,
+      "maximum": 200,
+      "minimum": 1,
+      "title": "Limit",
+      "type": "integer"
+    },
+    "query": {
+      "default": "",
+      "title": "Query",
+      "type": "string"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "session_id"
+  ],
+  "title": "FileListParams",
+  "type": "object"
+}

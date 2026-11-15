@@ -2693,6 +2693,48 @@ class ChangesRevertResult(BaseModel):
     conflicts: list[RevertConflict]
 
 
+class FileReadParams(BaseModel):
+    """``file.read``. One text file of the session's folder."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    path: str = Field(min_length=1)
+
+
+class FileReadResult(BaseModel):
+    """The file's path relative to the folder, the start of its text, and its line count.
+
+    ``truncated`` is true when the file is longer than the limit and ``text`` is its start.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    path: str
+    text: str
+    truncated: bool
+    lines: int = Field(ge=0)
+
+
+class FileListParams(BaseModel):
+    """``file.list``. Files of the session's folder whose path holds ``query``, case-insensitive."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    query: str = ""
+    limit: int = Field(default=50, ge=1, le=200)
+
+
+class FileListResult(BaseModel):
+    """Relative paths, shortest first, then alphabetical. ``more`` is true when others match."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    paths: list[str]
+    more: bool
+
+
 class ApprovalRespondParams(BaseModel):
     """``approval.respond``. Answer the tool call a session's run waits on.
 
@@ -2973,6 +3015,10 @@ __all__ = [
     "CostTotals",
     "DaemonStatus",
     "DirEntry",
+    "FileListParams",
+    "FileListResult",
+    "FileReadParams",
+    "FileReadResult",
     "FsListDirsParams",
     "FsListDirsResult",
     "HelloParams",
