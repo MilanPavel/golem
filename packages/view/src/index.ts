@@ -508,3 +508,14 @@ export {
   type ToolsRuntime,
   type ToolsState,
 } from "./setup-tools.ts";
+export { keyWhere } from "./key-where.ts";
+export {
+  GROUPS,
+  skillFacts,
+  skillIssues,
+  skillMark,
+  skillRunAs,
+  SKILLS_HINT,
+  skillStatusWord,
+  skillSummary,
+} from "./skills-view.ts";

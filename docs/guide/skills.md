@@ -36,7 +36,7 @@ Put each skill in its own folder, named like the skill: `~/.golem/skills/release
 
 ## See them
 
-Type `/skills` in the chat to see every skill golem found, and why one is not used: it is broken, turned off, or a skill of the same name in the project hides it.
+Type `/skills` in the chat, or open Settings, Skills in the web app, to see every skill golem found, and why one is not used: it is broken, turned off, or a skill of the same name in the project hides it. In the web app you can also create a skill, edit its `SKILL.md`, turn it off, or copy a bundled one to your own skills.
 
 ```bash
 golem skills                                       # the same list, in a shell

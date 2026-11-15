@@ -43,6 +43,11 @@ import { APPROVAL_DETAIL, APPROVAL_TRACE, CUT_LIKELY_DETAIL, CUT_MIDDLE_DETAIL, 
 import type { TraceRunSpan, TraceSpanResult } from "../store/trace.ts";
 import { FORM_CASES } from "../features/setup/sample.ts";
 import { GolemBlockView } from "../features/setup/golem-block.tsx";
+import { KeysList } from "../features/settings/keys-section.tsx";
+import { SkillList } from "../features/settings/skills-section.tsx";
+import { SkillOverview } from "../features/settings/skills/skill-detail.tsx";
+import { SAMPLE_BROKEN_SKILL_MD, SAMPLE_KEYS, SAMPLE_SKILLS } from "../features/settings/skills/sample.ts";
+import { CodeEditor } from "../features/settings/config/code-editor.tsx";
 import { CatalogView } from "../features/settings/mcp/catalog-panel.tsx";
 import { ImportListView } from "../features/settings/mcp/import-panel.tsx";
 import { SAMPLE_CATALOG, SAMPLE_SCAN } from "../features/settings/mcp/sample.ts";
@@ -683,6 +688,38 @@ function SetupFormDemo() {
 }
 
 /** Settings → MCP servers: the Catalog tab's cards, and the Import tab with nothing picked and with some picked. */
+function SkillsDemo() {
+  const broken = SAMPLE_SKILLS[3];
+  return (
+    <div className="flex flex-col gap-4">
+      <section aria-label="Skills, list" className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
+        <span className="font-mono text-xs text-faint">List</span>
+        <SkillList skills={SAMPLE_SKILLS} wide selected={SAMPLE_SKILLS[1]?.path ?? null} register={() => {}} onNew={() => {}} onOpen={() => {}} />
+      </section>
+      <section aria-label="Skills, overview" className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
+        <span className="font-mono text-xs text-faint">Overview of a broken skill</span>
+        {broken === undefined ? null : <SkillOverview skill={broken} />}
+      </section>
+      <section aria-label="Skills, SKILL.md" className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
+        <span className="font-mono text-xs text-faint">SKILL.md with a problem on line 3</span>
+        <CodeEditor value={SAMPLE_BROKEN_SKILL_MD} onChange={() => {}} marked={new Set([3])} label="broken-one SKILL.md" language="markdown" className="h-56" />
+        <p role="alert" className="rounded-md border border-deny bg-deny-soft px-3 py-2 font-mono text-xs text-deny">
+          line 3: expected &apos;,&apos; or &apos;]&apos;
+        </p>
+      </section>
+    </div>
+  );
+}
+
+function ApiKeysDemo() {
+  return (
+    <div className="flex max-w-column flex-col gap-3">
+      <p className="text-sm text-muted">Keys are set and removed in a terminal. The page never sees one.</p>
+      <KeysList providers={SAMPLE_KEYS} />
+    </div>
+  );
+}
+
 function McpTabsDemo() {
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set(["a", "e"]));
   const none = new Set<string>();
@@ -919,6 +956,16 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
       <section className="mt-6" id={anchor("MCP servers")}>
         <h3 className="mb-2 font-mono text-xs text-faint">MCP servers</h3>
         <McpTabsDemo />
+      </section>
+
+      <section className="mt-6" id={anchor("Skills")}>
+        <h3 className="mb-2 font-mono text-xs text-faint">Skills</h3>
+        <SkillsDemo />
+      </section>
+
+      <section className="mt-6" id={anchor("API keys")}>
+        <h3 className="mb-2 font-mono text-xs text-faint">API keys</h3>
+        <ApiKeysDemo />
       </section>
 
       <section className="mt-6" id={anchor("Tools panel")}>
