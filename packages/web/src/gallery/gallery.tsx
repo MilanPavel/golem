@@ -20,7 +20,7 @@ import { Dot, serverSummary, SignInPanel, type Login } from "../features/setting
 import type { McpServer } from "../store/mcp.ts";
 import { ConnectionScreen } from "../features/connection/connection-screen.tsx";
 import { connectionScreen, type ConnectionHost } from "../features/connection/connection-screen.ts";
-import { DetailSwitch, ToolLine, TranscriptMessages } from "../features/chat/index.ts";
+import { DetailSwitch, EditCards, ToolLine, TranscriptMessages } from "../features/chat/index.ts";
 import { CUT_REPLY, SAMPLE_CHAT, SAMPLE_TOOLS, THINKING_CASES, TURN_CHAT } from "../features/chat/sample.ts";
 import { ApprovalBar } from "../features/approval/index.ts";
 import { ANSWERED, PENDING_EDIT, PENDING_SHELL } from "../features/approval/sample.ts";
@@ -1214,6 +1214,16 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
               <TranscriptMessages chat={TURN_CHAT} detail={detail} />
             </div>
           ))}
+          <div aria-label="Edit cards" role="group" className="flex flex-col gap-2 rounded-lg border border-line bg-bg p-4">
+            <p className="font-mono text-xs text-faint">edit cards: an edit, a new file, an edit with no diff kept</p>
+            <EditCards
+              tools={[
+                { callId: "ec1", name: "edit_file", args: { path: "src/socket.ts" }, status: "done", summary: "+3 -3 src/socket.ts", diff: SAMPLE_EDIT_DIFF },
+                { callId: "ec2", name: "write_file", args: { path: "src/clamp.ts" }, status: "done", summary: "new file +4 -0 src/clamp.ts", diff: SAMPLE_NEW_FILE_DIFF },
+                { callId: "ec3", name: "edit_file", args: { path: "src/old.ts" }, status: "done", summary: "done" },
+              ]}
+            />
+          </div>
         </div>
       </section>
 

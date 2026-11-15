@@ -17,6 +17,7 @@ import type { DiffMode } from "../diff/diff-mode.ts";
 import { DiffModeSwitch } from "../diff/diff-mode-switch.tsx";
 import { useDiffMode } from "../diff/diff-mode.ts";
 import { DiffView } from "../diff/diff-view.tsx";
+import { EditCards, isEditCard } from "./edit-card.tsx";
 import { Markdown } from "./markdown-view.tsx";
 
 function ToolResult({ tool }: { tool: ToolBlock }) {
@@ -237,6 +238,8 @@ export function ActivityLine({ tools, detail, streaming = false, pendingId = nul
   const [chosen, setChosen] = useState<boolean | null>(null);
   const listId = useId();
   if (tools.length === 0) return null;
+  // Outside Quiet a finished edit is a card above the line, not a row in it.
+  const rows = detail === "quiet" ? tools : tools.filter((tool) => !isEditCard(tool));
   const verbose = detail === "verbose";
   const waiting = tools.some((tool) => tool.status === "waiting");
   const open = waiting || (chosen ?? verbose);
@@ -266,9 +269,9 @@ export function ActivityLine({ tools, detail, streaming = false, pendingId = nul
         </span>
         <span>{text}</span>
       </button>
-      {open ? (
+      {open && rows.length > 0 ? (
         <ul id={listId} aria-label="Tool calls" className="flex list-none flex-col gap-0.5 border-l border-line py-0.5 pl-3 font-mono text-xs leading-snug">
-          {tools.map((tool) => (
+          {rows.map((tool) => (
             <ToolLine key={`${tool.callId}:${verbose}`} tool={tool} defaultOpen={verbose} pending={tool.callId === pendingId} />
           ))}
         </ul>
@@ -297,6 +300,7 @@ export function GolemTurn({
       {steps.map((message) => (
         <GolemStep key={message.id} message={message} thinkingShown={thinkingShown} />
       ))}
+      {detail === "quiet" ? null : <EditCards tools={tools.filter(isEditCard)} />}
       <ActivityLine tools={tools} detail={detail} streaming={steps.some((step) => step.streaming)} pendingId={pendingId} />
       {foot.length > 0 ? <p className="font-mono text-xs text-faint">{foot.join(" · ")}</p> : null}
     </article>
