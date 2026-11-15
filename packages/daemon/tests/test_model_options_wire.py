@@ -9,11 +9,13 @@ from pathlib import Path
 from typing import Any, cast
 
 import httpx
+import pytest
 from test_server import HELLO, RpcClient, error_code, rpc_result, start_daemon, stop_daemon
 
 from golem.config import GolemSettings, ModelSettings
 from golem.models import hardware
 from golem.models.discovery import ModelDiscovery
+from golem.models.ollama import LocalServer
 from golem.models.router import ModelRouter
 from golem.server.dispatcher import INVALID_PARAMS, SESSION_NOT_FOUND
 
@@ -278,10 +280,10 @@ async def test_num_ctx_has_no_default_until_ollama_or_the_modelfile_gives_one(
         assert "num_ctx" not in cast(dict[str, object], first["defaults"])
         assert first["default_from"] == {}
         assert app.state.models is not None
-        assert await app.state.models.note_loaded("ollama/qwen3:8b", 8192) == 32768
+        assert (await app.state.models.note_loaded("ollama/qwen3:8b", 8192)).context_length == 32768
         again = rpc_result(await client.call("model.options.get", {"model": "qwen3:8b"}))
         assert "num_ctx" not in cast(dict[str, object], again["defaults"])
-        assert await app.state.models.note_loaded("ollama/qwen3:8b", None) == 32768
+        assert (await app.state.models.note_loaded("ollama/qwen3:8b", None)).context_length == 32768
         later = rpc_result(await client.call("model.options.get", {"model": "qwen3:8b"}))
         assert cast(dict[str, object], later["defaults"])["num_ctx"] == 32768
         assert later["default_from"] == {"num_ctx": "ollama"}
@@ -350,6 +352,42 @@ async def test_think_is_a_row_only_for_a_model_that_thinks_and_checks_its_values
                 "model.options.set", {"model": model, "options": {"think": value}}
             )
             assert error_code(bad) == INVALID_PARAMS
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+
+
+def _installed() -> httpx.MockTransport:
+    def handle(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/tags":
+            body = {"models": [{"name": "qwen3:8b", "digest": "d", "size": 5_200_000_000}]}
+            return httpx.Response(200, json=body)
+        if request.url.path == "/api/show":
+            return httpx.Response(200, json={"model_info": {"qwen3.context_length": 40960}})
+        return httpx.Response(404)
+
+    return httpx.MockTransport(handle)
+
+
+def _has_binary(server: LocalServer) -> bool:
+    del server
+    return True
+
+
+async def test_num_ctx_default_is_the_planned_window_when_golem_plans_one(
+    short_home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The daemon's own server asks whether the ollama binary is here. CI has none.
+    monkeypatch.setattr(LocalServer, "installed", _has_binary)
+    app, task = await start_daemon(
+        short_home, router=_router(), discovery=_discovery(tmp_path, _installed(), 36.0)
+    )
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        got = rpc_result(await client.call("model.options.get", {"model": "qwen3:8b"}))
+        assert got["default_from"] == {"num_ctx": "golem"}
+        assert cast(dict[str, object], got["defaults"])["num_ctx"] in (8192, 16384, 32768, 65536)
     finally:
         await client.close()
         await stop_daemon(app, task)

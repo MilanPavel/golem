@@ -821,8 +821,16 @@ async def _model_options_get(
             )
     thinks = [] if discovery is None else await discovery.ollama_think_values(f"ollama/{name}")
     values = model_options.defaults(own)
-    default_from: dict[str, Literal["modelfile", "ollama"]] = {}
-    if "num_ctx" in values:
+    default_from: dict[str, Literal["modelfile", "ollama", "golem"]] = {}
+    plans = _sessions(ctx).router.plans
+    plan = None
+    if plans is not None and discovery is not None:
+        await discovery.learn(f"ollama/{name}")
+        plan = plans.planned(name)
+    if plan is not None:
+        values["num_ctx"] = plan
+        default_from["num_ctx"] = "golem"
+    elif "num_ctx" in values:
         default_from["num_ctx"] = "modelfile"
     elif discovery is not None:
         seen = discovery.default_ctx(f"ollama/{name}")

@@ -37,6 +37,7 @@ export type PromptCutKind = ('older_messages' | 'middle') | null;
 export type Recorded1 = boolean;
 export type Start1 = string;
 export type Status1 = 'ok' | 'failed' | 'cancelled' | 'denied' | 'running';
+export type WindowPlanned = boolean;
 
 /**
  * A model call, with the tool calls it asked for, in request order.
@@ -74,6 +75,7 @@ export interface TraceModelSpan {
   start: Start1;
   status: Status1;
   tokens?: TraceTokens | null;
+  window_planned?: WindowPlanned;
 }
 /**
  * A tool call. It has no children.

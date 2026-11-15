@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from typing import Any
 
 import pytest
 from fakes import ScriptedChatModel
@@ -408,3 +409,65 @@ def test_a_saved_think_is_dropped_for_a_model_that_cannot_think() -> None:
     assert "reasoning" not in router.ollama_options("llama3.2:3b", None)
     assert "reasoning" not in router.ollama_options("qwen3:8b", None)
     assert router.ollama_options("qwen3:8b", {"think": "on"})["reasoning"] is True
+
+
+class _Plans:
+    def __init__(self, plan: int | None) -> None:
+        self.plan = plan
+
+    def planned(self, model_id: str) -> int | None:
+        return self.plan
+
+
+def _planned_router(plan: int | None = 16384, **settings: Any) -> ModelRouter:
+    router = ModelRouter(GolemSettings.model_validate(settings))
+    router.plans = _Plans(plan)  # type: ignore[assignment]
+    return router
+
+
+def test_a_planned_window_is_sent_when_nothing_sets_num_ctx() -> None:
+    model = _planned_router().chat_model("ollama/qwen3:8b")
+    assert isinstance(model, ChatOllama)
+    assert model.num_ctx == 16384
+    assert model.keep_alive == "30m"
+    assert _sent(model)["num_ctx"] == 16384
+
+
+def test_nothing_is_added_without_a_plan() -> None:
+    model = _planned_router(None).chat_model("ollama/qwen3:8b")
+    assert isinstance(model, ChatOllama)
+    assert model.num_ctx is None
+    assert model.keep_alive is None
+
+
+def test_a_number_someone_set_wins_over_the_plan() -> None:
+    saved = {"ollama": {"models": {"qwen3:8b": {"num_ctx": 4096}}}}
+    model = _planned_router(16384, **saved).chat_model("ollama/qwen3:8b")
+    assert isinstance(model, ChatOllama)
+    assert model.num_ctx == 4096
+    # The plan was not applied, so keep_alive is not added either.
+    assert model.keep_alive is None
+    over = _planned_router().chat_model("ollama/qwen3:8b", {"num_ctx": 2048})
+    assert isinstance(over, ChatOllama)
+    assert over.num_ctx == 2048
+    profile = _planned_router(
+        default_model="qwen", models={"qwen": {"model": "ollama/qwen3:8b", "ctx": 8192}}
+    ).chat_model("qwen")
+    assert isinstance(profile, ChatOllama)
+    assert profile.num_ctx == 8192
+
+
+def test_keep_alive_is_set_only_when_nobody_set_one() -> None:
+    saved = {"ollama": {"models": {"qwen3:8b": {"keep_alive": "5m"}}}}
+    model = _planned_router(16384, **saved).chat_model("ollama/qwen3:8b")
+    assert isinstance(model, ChatOllama)
+    assert (model.num_ctx, model.keep_alive) == (16384, "5m")
+    off = _planned_router(context={"keep_alive": None}).chat_model("ollama/qwen3:8b")
+    assert isinstance(off, ChatOllama)
+    assert (off.num_ctx, off.keep_alive) == (16384, None)
+
+
+def test_a_hosted_model_is_untouched_by_the_plan() -> None:
+    router = _planned_router()
+    router.keys = MemoryKeyStore({"anthropic": "sk-test"})
+    assert isinstance(router.chat_model("anthropic/claude-test"), ChatAnthropic)

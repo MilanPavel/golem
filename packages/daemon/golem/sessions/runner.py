@@ -437,6 +437,7 @@ async def _apply(
                 context_window=fact.context_window,
                 num_ctx=fact.num_ctx,
                 window_estimated=fact.window_estimated,
+                window_planned=fact.window_planned,
                 system_sections=None
                 if fact.system_sections is None
                 else [PromptSectionInfo(name=n, chars=c) for n, c in fact.system_sections],

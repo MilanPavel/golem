@@ -166,6 +166,23 @@ def _modelfile_num_ctx(parameters: object) -> int | None:
 
 
 @dataclass(frozen=True, slots=True)
+class Loaded:
+    """What ``/api/ps`` says about a loaded model: its context and its bytes in memory.
+
+    ``size_vram`` is the part on the GPU. Each is None when Ollama did not say.
+    """
+
+    context_length: int | None = None
+    size: int | None = None
+    size_vram: int | None = None
+
+
+def _size_vram(entry: dict[str, Any]) -> int | None:
+    value = entry.get("size_vram")
+    return value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else None
+
+
+@dataclass(frozen=True, slots=True)
 class _Found:
     """One model as a provider reported it."""
 
@@ -254,6 +271,8 @@ class ModelDiscovery:
         self._modelfile_ctx: dict[str, int] = {}
         self._default_ctx: dict[str, int] = {}
         self._last: tuple[ListedModel, ...] = ()
+        # An installed Ollama model's (maximum context, size in GB), by model id.
+        self._facts: dict[str, tuple[int | None, float | None]] = {}
 
     def tier_of_ref(self, ref: str) -> Tier | None:
         """The tier of ``ref`` from what is cached. No I/O. None when the ref has no provider."""
@@ -293,18 +312,40 @@ class ModelDiscovery:
         """
         return self._default_ctx.get(ref)
 
-    async def note_loaded(self, ref: str, sent_num_ctx: int | None) -> int | None:
-        """Read ``ref``'s loaded context length from ``/api/ps`` and return it. Never raises.
+    def ollama_facts(self, model_id: str) -> tuple[int | None, float | None]:
+        """An installed Ollama model's ``(maximum context, size in GB)`` as last listed. No I/O."""
+        return self._facts.get(model_id, (None, None))
+
+    async def learn(self, ref: str) -> None:
+        """List the Ollama behind ``ref`` once if its model's facts are unknown. Never raises."""
+        try:
+            server = self._router.ollama_server(ref)
+            provider = self._router.provider(ref.partition("/")[0])
+            if server is None or provider is None:
+                return
+            if ref.partition("/")[2] in self._facts:
+                return
+            result = await self._ollama(server[0], provider)
+            self._note_facts(result.found)
+        except Exception:
+            log.debug("learning %s failed", ref, exc_info=True)
+
+    def _note_facts(self, found: list[_Found]) -> None:
+        for model in found:
+            self._facts[model.model_id] = (model.ctx, model.size_gb)
+
+    async def note_loaded(self, ref: str, sent_num_ctx: int | None) -> Loaded:
+        """Read ``ref``'s loaded model from ``/api/ps`` and return it. Never raises.
 
         ``sent_num_ctx`` is the ``num_ctx`` golem sent with the call. Only a call that sent
         none says what Ollama's own default is, so only then is the value kept. Returns
-        None when Ollama does not answer or has nothing loaded, and changes nothing.
-        It does not start the server.
+        an empty :class:`Loaded` when Ollama does not answer or has nothing loaded, and
+        changes nothing. It does not start the server.
         """
         try:
             server = self._router.ollama_server(ref)
             if server is None:
-                return None
+                return Loaded()
             base = server[1].rstrip("/").removesuffix("/v1")
             name = ref.removeprefix("ollama/")
             response = await self._http().get(f"{base}/api/ps", timeout=_OLLAMA_TIMEOUT)
@@ -315,10 +356,10 @@ class ModelDiscovery:
                     ctx = _positive_int(entry.get("context_length"))
                     if ctx is not None and sent_num_ctx is None:
                         self._default_ctx[ref] = ctx
-                    return ctx
+                    return Loaded(ctx, _positive_int(entry.get("size")), _size_vram(entry))
         except (httpx.HTTPError, ValueError) as exc:
             log.debug("ollama /api/ps for %s failed: %s", ref, exc)
-        return None
+        return Loaded()
 
     def price_of(self, ref: str) -> ModelPrice | None:
         """The price of ``ref``, in the order of the listing. No network call.
@@ -430,6 +471,8 @@ class ModelDiscovery:
         )
         self._last = tuple(models)
         self._ctx = {m.ref: m.ctx for m in models if m.ctx is not None}
+        for result in results.values():
+            self._note_facts(result.found)
         self._modelfile_ctx = {
             f"{name}/{found.model_id}": found.modelfile_num_ctx
             for name, result in results.items()

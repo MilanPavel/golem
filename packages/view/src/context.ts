@@ -144,12 +144,12 @@ export function contextBar(parts: readonly TraceContextPart[], window: number | 
 }
 
 /** The context of the latest model call that reported its input tokens. */
-export type LiveContext = { spanId: string; used: number; window: number | null; windowEstimated: boolean; numCtx: number | null };
+export type LiveContext = { spanId: string; used: number; window: number | null; windowEstimated: boolean; windowPlanned: boolean; numCtx: number | null };
 
 /** `pending` is the call that started and has not ended: its window waits for its usage. */
 export type LiveContextState = {
   last: LiveContext | null;
-  pending: { spanId: string; window: number | null; windowEstimated: boolean; numCtx: number | null } | null;
+  pending: { spanId: string; window: number | null; windowEstimated: boolean; windowPlanned: boolean; numCtx: number | null } | null;
 };
 
 export const emptyLiveContext: LiveContextState = { last: null, pending: null };
@@ -166,6 +166,7 @@ export function foldLiveContext(state: LiveContextState, event: ChatEvent): Live
         spanId: event.data.message_id,
         window: event.data.context_window ?? null,
         windowEstimated: event.data.window_estimated ?? false,
+        windowPlanned: event.data.window_planned ?? false,
         numCtx: event.data.num_ctx ?? null,
       },
     };
@@ -185,7 +186,7 @@ export function foldLiveContext(state: LiveContextState, event: ChatEvent): Live
       window = null;
       windowEstimated = false;
     }
-    return { last: { spanId: pending.spanId, used: input, window, windowEstimated, numCtx: pending.numCtx }, pending: null };
+    return { last: { spanId: pending.spanId, used: input, window, windowEstimated, windowPlanned: pending.windowPlanned, numCtx: pending.numCtx }, pending: null };
   }
   return state;
 }

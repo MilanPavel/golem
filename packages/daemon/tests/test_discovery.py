@@ -23,6 +23,7 @@ from golem.config import (
 from golem.models.catalog import CatalogEntry, HostedEntry
 from golem.models.discovery import (
     ListedModel,
+    Loaded,
     ModelDiscovery,
     _modelfile_num_ctx,  # pyright: ignore[reportPrivateUsage]
     openai_chat_model,
@@ -1016,14 +1017,14 @@ async def test_note_loaded_returns_the_context_and_keeps_only_a_default(
     router = ModelRouter(GolemSettings(), keys=MemoryKeyStore())
     discovery = _discovery(router, _ps(lambda _r: httpx.Response(200, json=body)), tmp_path)
     assert discovery.default_ctx(ref) is None
-    assert await discovery.note_loaded(ref, 8192) == 8192
+    assert (await discovery.note_loaded(ref, 8192)).context_length == 8192
     assert discovery.default_ctx(ref) is None
-    assert await discovery.note_loaded(ref, None) == 8192
+    assert (await discovery.note_loaded(ref, None)).context_length == 8192
     assert discovery.default_ctx(ref) == 8192
     body["models"] = [{"model": "qwen3:8b", "context_length": 32768}]
-    assert await discovery.note_loaded(ref, 4096) == 32768
+    assert (await discovery.note_loaded(ref, 4096)).context_length == 32768
     assert discovery.default_ctx(ref) == 8192
-    assert await discovery.note_loaded(ref, None) == 32768
+    assert (await discovery.note_loaded(ref, None)).context_length == 32768
     assert discovery.default_ctx(ref) == 32768
     await discovery.aclose()
 
@@ -1046,7 +1047,7 @@ async def test_note_loaded_leaves_nothing_when_ollama_cannot_say(
     router = ModelRouter(GolemSettings(), keys=MemoryKeyStore())
     network = Network({} if answer is None else {"127.0.0.1/api/ps": lambda _r: answer})
     discovery = _discovery(router, network, tmp_path)
-    assert await discovery.note_loaded("ollama/qwen3:8b", None) is None
+    assert await discovery.note_loaded("ollama/qwen3:8b", None) == Loaded()
     assert discovery.default_ctx("ollama/qwen3:8b") is None
     await discovery.aclose()
 
@@ -1217,4 +1218,28 @@ async def test_budget_max_price_is_read_at_listing_time(tmp_path: Path) -> None:
         _by_ref((await discovery.list(refresh=True)).models)["deepseek/deepseek-chat"].tier
         == "frontier"
     )
+    await discovery.aclose()
+
+
+async def test_note_loaded_returns_the_size_and_the_part_on_the_gpu(tmp_path: Path) -> None:
+    body: dict[str, object] = {
+        "models": [{"name": "qwen3:8b", "context_length": 8192, "size": 8000, "size_vram": 4000}]
+    }
+    router = ModelRouter(GolemSettings(), keys=MemoryKeyStore())
+    discovery = _discovery(router, _ps(lambda _r: httpx.Response(200, json=body)), tmp_path)
+    assert await discovery.note_loaded("ollama/qwen3:8b", 8192) == Loaded(8192, 8000, 4000)
+    await discovery.aclose()
+
+
+async def test_learn_reads_the_size_and_maximum_of_an_installed_model_once(
+    tmp_path: Path,
+) -> None:
+    router = ModelRouter(GolemSettings(), keys=MemoryKeyStore())
+    network = Network(_ollama_routes())
+    discovery = _discovery(router, network, tmp_path)
+    assert discovery.ollama_facts("qwen3:8b") == (None, None)
+    await discovery.learn("ollama/qwen3:8b")
+    assert discovery.ollama_facts("qwen3:8b") == (40960, 5.2)
+    await discovery.learn("ollama/qwen3:8b")
+    assert network.calls["127.0.0.1/api/tags"] == 1
     await discovery.aclose()

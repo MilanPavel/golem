@@ -21,7 +21,7 @@ from golem.lock import DaemonAlreadyRunning, DaemonLock
 from golem.logging import configure_logging
 from golem.mcp import McpSupervisor
 from golem.mcp.prompt import mcp_section
-from golem.models.discovery import ModelDiscovery
+from golem.models.discovery import Loaded, ModelDiscovery
 from golem.models.facts import ListedFacts
 from golem.models.gate import ServerGate
 from golem.models.install import RUNTIMES, OllamaInstaller, runtime_installer
@@ -31,6 +31,7 @@ from golem.models.pulls import PullManager
 from golem.models.router import ModelConfigError, ModelRouter
 from golem.models.tiers import Tier
 from golem.models.window import resolve_window
+from golem.models.window_plans import WindowPlans
 from golem.paths import GolemPaths, resolve_paths
 from golem.permissions.policy import Policy
 from golem.secrets import KeychainSecrets, SecretStore
@@ -207,11 +208,23 @@ class DaemonApp:
             if isinstance(self._titles, ModelTitles):
                 self._titles.bind(models.tier_of_ref, models.budget_refs)
 
-            async def note_loaded(profile: str, sent_num_ctx: int | None) -> int | None:
+            router.plans = WindowPlans(
+                settings=router.context_settings,
+                discovery=models,
+                ram_gb=models.ram_gb,
+                cache_dir=self.paths.cache_dir,
+            )
+
+            async def note_loaded(profile: str, sent_num_ctx: int | None) -> Loaded:
                 resolved = router.resolve(profile)
                 if resolved.provider.kind != "ollama":
-                    return None
+                    return Loaded()
                 return await models.note_loaded(resolved.ref, sent_num_ctx)
+
+            async def learn_window(profile: str) -> None:
+                resolved = router.resolve(profile)
+                if resolved.provider.kind == "ollama":
+                    await models.learn(resolved.ref)
 
             async with (
                 Database.open(self.paths.database_file) as database,
@@ -250,6 +263,7 @@ class DaemonApp:
                         router, profile, models, overrides=overrides
                     ),
                     note_loaded=note_loaded,
+                    learn_window=learn_window,
                     price_of=lambda profile: _price_of(router, models, profile),
                     gate=self._gate or ServerGate(settings.ollama.parallel),
                     tier_of=lambda profile: _tier_of(router, models, profile),

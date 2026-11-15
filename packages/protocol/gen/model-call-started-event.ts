@@ -21,6 +21,7 @@ export type ToolsBytes = number | null;
 export type ToolsChars = number | null;
 export type ToolsSha = string | null;
 export type WindowEstimated = boolean;
+export type WindowPlanned = boolean;
 export type RunId = string;
 export type Seq = number;
 export type SessionId = string;
@@ -56,7 +57,8 @@ export interface ModelCallStartedEvent {
  *
  * ``window_estimated`` is true when golem did not send the window and read it
  * from Ollama (the loaded context or the Modelfile). An older event has no
- * field and reads as False.
+ * field and reads as False. ``window_planned`` is true when golem chose the ``num_ctx`` it
+ * sent (``[context] window``), and false for one that someone set or that golem did not send.
  *
  * The size fields count what was sent, in UTF-8 bytes and in characters: the
  * system text, the tool schemas as compact JSON, and each history message in
@@ -87,6 +89,7 @@ export interface ModelCallStartedData {
   tools_chars?: ToolsChars;
   tools_sha?: ToolsSha;
   window_estimated?: WindowEstimated;
+  window_planned?: WindowPlanned;
 }
 /**
  * One non-empty section of the system prompt sent with a model call.

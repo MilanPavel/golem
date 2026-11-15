@@ -49,7 +49,7 @@ class ModelRequested:
     Ollama option sent, and ``system_sections`` the ``(name, chars)`` of each
     non-empty section of the system prompt. Each is None when unknown.
     ``window_estimated`` is true when golem did not send the window and read it
-    from Ollama.
+    from Ollama. ``window_planned`` is true when golem chose the ``num_ctx``.
 
     The size fields are the characters and UTF-8 bytes of what was sent, or None
     when not given. ``profile`` is the profile this call uses, or None when not given.
@@ -62,6 +62,7 @@ class ModelRequested:
     context_window: int | None = None
     num_ctx: int | None = None
     window_estimated: bool = False
+    window_planned: bool = False
     system_sections: tuple[tuple[str, int], ...] | None = None
     system_chars: int | None = None
     system_bytes: int | None = None
@@ -678,6 +679,7 @@ def _request(message_id: str, item: Mapping[str, object]) -> ModelRequested:
         _positive(item.get("context_window")),
         _positive(item.get("num_ctx")),
         item.get("window_estimated") is True,
+        item.get("window_planned") is True,
         _sections(item.get("system_sections")),
         _count(item.get("system_chars")),
         _count(item.get("system_bytes")),

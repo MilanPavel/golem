@@ -47,11 +47,13 @@ from golem.graphs.tools_node import (
     tools_node,
     unanswered_calls,
 )
+from golem.models.discovery import Loaded
 from golem.models.gate import ServerGate
 from golem.models.ollama import LocalServers
 from golem.models.router import ModelRouter
 from golem.models.tiers import Tier
 from golem.models.window import ContextWindow, WindowOf
+from golem.models.window_plan import spilled
 from golem.permissions.engine import Allowance
 from golem.permissions.policy import Policy
 from golem.sessions.ids import new_id
@@ -383,10 +385,11 @@ def open_chat(
     prompt: SystemPrompt | None = None,
     blobs: Blobs | None = None,
     window_of: WindowOf | None = None,
-    note_loaded: Callable[[str, int | None], Awaitable[int | None]] | None = None,
+    note_loaded: Callable[[str, int | None], Awaitable[Loaded]] | None = None,
     price_of: Callable[[str], ModelPrice | None] | None = None,
     gate: ServerGate | None = None,
     tier_of: Callable[[str], Tier | None] | None = None,
+    learn_window: Callable[[str], Awaitable[None]] | None = None,
 ) -> ChatRuntime:
     """Compile the chat graph against ``checkpointer``.
 
@@ -400,11 +403,13 @@ def open_chat(
     ``window_of`` gives the context window of a profile. Each model call reports it
     with the lengths of the system prompt's sections. Without it, the window is unknown.
     ``note_loaded`` is awaited with the profile and the ``num_ctx`` sent (or None) after each
-    model call, so the server can read the window the model loaded. It returns that window,
-    or None. The window the call ran with goes out as ``model.response``, with
-    ``text_tool_calls`` (``recovered`` or ``unread``) when the reply held a tool call written as
-    text. A failure there never fails the call. With ``gate``, a call to a local server waits
-    for its turn first, so one generation runs at a time on it.
+    model call, so the server can read what the model loaded. When golem planned the window
+    and the model did not fit on the GPU, the plan is lowered one step for the next call.
+    ``learn_window`` is awaited before the window is worked out, so a local model's size
+    and maximum are known on the first call. The window the call ran with goes out as
+    ``model.response``, with ``text_tool_calls`` (``recovered`` or ``unread``) when the reply
+    held a tool call written as text. A failure there never fails the call. With ``gate``,
+    a call to a local server waits for its turn first, so one generation runs at a time on it.
     """
     registry = default_registry() if tools is None else tools
     rules = Policy(None) if policy is None else policy
@@ -434,8 +439,13 @@ def open_chat(
         # The system message is sent, never returned, so it stays out of the checkpoint.
         history = view(_without_thinking(messages), state.get("context_view"))
         sent = history if system is None else [system, *history]
-        window = window_of(profile, overrides) if window_of is not None else ContextWindow()
         async with _held(router, local, profile):
+            if learn_window is not None:
+                try:
+                    await learn_window(profile)
+                except Exception:
+                    log.debug("learning the model %s failed", profile, exc_info=True)
+            window = window_of(profile, overrides) if window_of is not None else ContextWindow()
             request: dict[str, object] = {STREAM_KEY: "model.request", "message_id": message_id}
             request["profile"] = profile
             request["message_ids"] = [m.id for m in history if m.id]
@@ -444,6 +454,7 @@ def open_chat(
             request["context_window"] = window.window
             request["num_ctx"] = window.num_ctx
             request["window_estimated"] = window.estimated
+            request["window_planned"] = window.planned
             if blobs is not None:
                 if system is not None and isinstance(system.content, str):
                     request["system_prompt_sha"] = await blobs.put("system_prompt", system.content)
@@ -465,7 +476,10 @@ def open_chat(
         loaded: int | None = None
         if note_loaded is not None:
             try:
-                loaded = await note_loaded(profile, window.num_ctx)
+                state_loaded = await note_loaded(profile, window.num_ctx)
+                loaded = state_loaded.context_length
+                if window.planned and router.plans is not None:
+                    _lower_when_spilled(router, profile, state_loaded)
             except Exception:
                 log.debug("noting the loaded model %s failed", profile, exc_info=True)
         ran = loaded
@@ -622,6 +636,20 @@ class _ToolBinder:
                     log.info("profile %s does not take tools; asking without them", profile)
                     self._refused.add(profile)
         return _ai(await model.ainvoke(list(messages)))
+
+
+def _lower_when_spilled(router: ModelRouter, profile: str, loaded: Loaded) -> None:
+    """Step a planned window down when part of the model runs on the CPU."""
+    plans = router.plans
+    if plans is None or not spilled(loaded.size, loaded.size_vram):
+        return
+    name = router.resolve(profile).model_id
+    before = plans.planned(name)
+    lower = plans.lower(name)
+    if lower is not None:
+        log.warning(
+            "%s at %s tokens did not fit on the GPU; next call uses %d", name, before, lower
+        )
 
 
 def _held(

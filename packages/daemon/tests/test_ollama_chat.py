@@ -134,3 +134,22 @@ def test_think_false_is_sent_and_a_level_is_sent_as_it_is() -> None:
         sent: list[dict[str, Any]] = []
         list(_model(sent, reasoning=reasoning).stream([HumanMessage("What is 17*23?")]))
         assert sent[0]["think"] == reasoning
+
+
+def test_the_request_carries_the_planned_window() -> None:
+    from golem.config import GolemSettings
+    from golem.models.router import ModelRouter
+
+    class _Plans:
+        def planned(self, model_id: str) -> int | None:
+            return 24576
+
+    router = ModelRouter(GolemSettings())
+    router.plans = _Plans()  # type: ignore[assignment]
+    made = router.chat_model("ollama/qwen3.5:4b")
+    assert isinstance(made, OllamaChat)
+    sent: list[dict[str, Any]] = []
+    object.__setattr__(made, "_client", _Client(sent))
+    list(made.stream([HumanMessage("hi")]))
+    assert sent[0]["options"]["num_ctx"] == 24576
+    assert sent[0]["keep_alive"] == "30m"
