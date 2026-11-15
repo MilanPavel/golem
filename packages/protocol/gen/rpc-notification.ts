@@ -28,6 +28,7 @@ export type Params =
   | ApprovalNeededEvent
   | ApprovalResolvedEvent
   | TodosUpdatedEvent
+  | FileChangedEvent
   | SkillActivatedEvent
   | SkillDeactivatedEvent
   | SkillSkippedEvent;
@@ -269,31 +270,44 @@ export type Seq24 = number;
 export type SessionId25 = string;
 export type Ts24 = string;
 export type Type24 = 'todos.updated';
-export type Hash = string;
-export type How = 'invoked' | 'pinned' | 'model';
-export type Name5 = string;
+export type Added = number;
+export type CallId8 = string | null;
+export type ChangeId = string;
 export type Path = string;
-export type Source1 = 'project' | 'user' | 'bundled';
-export type RunId26 = string | null;
+export type Removed = number;
+export type Reverts = string | null;
+export type Source1 = 'tool' | 'shell' | 'revert';
+export type Status2 = 'created' | 'modified' | 'deleted';
+export type RunId26 = string;
 export type Seq25 = number;
 export type SessionId26 = string;
 export type Ts25 = string;
-export type Type25 = 'skill.activated';
-export type Name6 = string;
-export type Reason2 = 'unpinned';
+export type Type25 = 'file.changed';
+export type Hash = string;
+export type How = 'invoked' | 'pinned' | 'model';
+export type Name5 = string;
+export type Path1 = string;
+export type Source2 = 'project' | 'user' | 'bundled';
 export type RunId27 = string | null;
 export type Seq26 = number;
 export type SessionId27 = string;
 export type Ts26 = string;
-export type Type26 = 'skill.deactivated';
-export type Message2 = string;
-export type Name7 = string;
-export type Reason3 = 'missing' | 'disabled' | 'broken';
+export type Type26 = 'skill.activated';
+export type Name6 = string;
+export type Reason2 = 'unpinned';
 export type RunId28 = string | null;
 export type Seq27 = number;
 export type SessionId28 = string;
 export type Ts27 = string;
-export type Type27 = 'skill.skipped';
+export type Type27 = 'skill.deactivated';
+export type Message2 = string;
+export type Name7 = string;
+export type Reason3 = 'missing' | 'disabled' | 'broken';
+export type RunId29 = string | null;
+export type Seq28 = number;
+export type SessionId29 = string;
+export type Ts28 = string;
+export type Type28 = 'skill.skipped';
 
 /**
  * Server → client event. No ``id``; this is not a response to a request.
@@ -1148,6 +1162,40 @@ export interface Todo {
   text: Text4;
 }
 /**
+ * A file in the session folder changed. Sent before the ``tool.completed`` of its call.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "FileChangedEvent".
+ */
+export interface FileChangedEvent {
+  data: FileChangedData;
+  run_id: RunId26;
+  seq: Seq25;
+  session_id: SessionId26;
+  ts: Ts25;
+  type: Type25;
+}
+/**
+ * One change to one file, recorded before this event was sent.
+ *
+ * ``path`` is relative to the session folder. ``call_id`` is the tool call that
+ * made the change, and null for a shell change or an undo. ``reverts`` is the
+ * change an undo took back. The texts are not sent; read them by ``change_id``.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "FileChangedData".
+ */
+export interface FileChangedData {
+  added: Added;
+  call_id?: CallId8;
+  change_id: ChangeId;
+  path: Path;
+  removed: Removed;
+  reverts?: Reverts;
+  source: Source1;
+  status: Status2;
+}
+/**
  * A skill became active.
  *
  * An invoked skill's event comes just before the user message that invoked
@@ -1158,11 +1206,11 @@ export interface Todo {
  */
 export interface SkillActivatedEvent {
   data: SkillActivatedData;
-  run_id?: RunId26;
-  seq: Seq25;
-  session_id: SessionId26;
-  ts: Ts25;
-  type: Type25;
+  run_id?: RunId27;
+  seq: Seq26;
+  session_id: SessionId27;
+  ts: Ts26;
+  type: Type26;
 }
 /**
  * A skill is active in the session.
@@ -1184,8 +1232,8 @@ export interface SkillActivatedData {
   hash: Hash;
   how: How;
   name: Name5;
-  path: Path;
-  source: Source1;
+  path: Path1;
+  source: Source2;
 }
 /**
  * A pinned skill was turned off. Not part of a run, so ``run_id`` is null.
@@ -1195,11 +1243,11 @@ export interface SkillActivatedData {
  */
 export interface SkillDeactivatedEvent {
   data: SkillDeactivatedData;
-  run_id?: RunId27;
-  seq: Seq26;
-  session_id: SessionId27;
-  ts: Ts26;
-  type: Type26;
+  run_id?: RunId28;
+  seq: Seq27;
+  session_id: SessionId28;
+  ts: Ts27;
+  type: Type27;
 }
 /**
  * A pinned skill is off again. ``unpinned``: the user turned it off.
@@ -1221,11 +1269,11 @@ export interface SkillDeactivatedData {
  */
 export interface SkillSkippedEvent {
   data: SkillSkippedData;
-  run_id?: RunId28;
-  seq: Seq27;
-  session_id: SessionId28;
-  ts: Ts27;
-  type: Type27;
+  run_id?: RunId29;
+  seq: Seq28;
+  session_id: SessionId29;
+  ts: Ts28;
+  type: Type28;
 }
 /**
  * A pinned skill was left out of a model call. It stays pinned.

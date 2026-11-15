@@ -14,6 +14,7 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
+from golem.coding.changes import ChangeStore
 from golem.config import ModelPrice, load_settings
 from golem.graphs.chat import ChatRuntime, open_chat
 from golem.graphs.prompt import SystemPrompt
@@ -282,6 +283,7 @@ class DaemonApp:
 
                 chat.enable_mcp = enable_mcp
                 chat.skills = self.state.skills
+                chat.changes = ChangeStore(database, BlobStore(database))
                 if self._pulls is None:
                     pulls = PullManager(router, ram_gb=models.ram_gb)
                 else:
