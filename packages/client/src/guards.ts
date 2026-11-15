@@ -28,6 +28,8 @@ import type { SessionSetOptionsResult } from "../../protocol/gen/session-set-opt
 import type { ListedSkill, SkillListResult } from "../../protocol/gen/skill-list-result.ts";
 import type { SkillCreateResult } from "../../protocol/gen/skill-create-result.ts";
 import type { SkillReadResult } from "../../protocol/gen/skill-read-result.ts";
+import type { SkillSetDisabledResult } from "../../protocol/gen/skill-set-disabled-result.ts";
+import type { SkillWriteResult } from "../../protocol/gen/skill-write-result.ts";
 import type { McpRemoveResult } from "../../protocol/gen/mcp-remove-result.ts";
 import type { McpToggleResult } from "../../protocol/gen/mcp-toggle-result.ts";
 import type { SessionSetSkillsResult } from "../../protocol/gen/session-set-skills-result.ts";
@@ -203,8 +205,16 @@ export function isSkillReadResult(value: unknown): value is SkillReadResult {
   );
 }
 
+export function isSkillWriteResult(value: unknown): value is SkillWriteResult {
+  return isRecord(value) && typeof value["ok"] === "boolean" && typeof value["written"] === "boolean";
+}
+
 export function isSkillCreateResult(value: unknown): value is SkillCreateResult {
   return isRecord(value) && typeof value["path"] === "string" && typeof value["mtime_ns"] === "number";
+}
+
+export function isSkillSetDisabledResult(value: unknown): value is SkillSetDisabledResult {
+  return isRecord(value) && typeof value["name"] === "string" && typeof value["disabled"] === "boolean";
 }
 
 export function isSessionSetSkillsResult(value: unknown): value is SessionSetSkillsResult {

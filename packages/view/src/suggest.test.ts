@@ -122,7 +122,7 @@ test("a skill named like a command is suggested only after /skill run", () => {
 test("/skill suggests run, pin, and unpin, and nothing after run without skills", () => {
   assert.deepEqual(
     suggest("/skill ", COMMANDS).map((item) => item.label),
-    ["run", "pin", "unpin"],
+    ["run", "pin", "unpin", "new"],
   );
   assert.deepEqual(suggest("/skill run ", COMMANDS), []);
 });

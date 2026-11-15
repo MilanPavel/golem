@@ -164,6 +164,7 @@ export function useCommands({ session, cwd, typing, send }: UseCommandsOptions):
             navigate(settingsPath("config"));
             return "handled";
           case "skills":
+          case "skill-new":
             return say(NOT_YET.skills);
           case "permissions":
             navigate(settingsPath("rules"));
