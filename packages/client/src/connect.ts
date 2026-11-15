@@ -36,6 +36,8 @@ import type { McpServer } from "../../protocol/gen/mcp-server.ts";
 import type { ModelServerStatus } from "../../protocol/gen/model-server-status.ts";
 import type { SkillCall } from "../../protocol/gen/skill-call.ts";
 import type { SkillListResult } from "../../protocol/gen/skill-list-result.ts";
+import type { SkillCreateResult } from "../../protocol/gen/skill-create-result.ts";
+import type { SkillReadResult } from "../../protocol/gen/skill-read-result.ts";
 import type { McpToggleResult } from "../../protocol/gen/mcp-toggle-result.ts";
 import type { SessionSetSkillsResult } from "../../protocol/gen/session-set-skills-result.ts";
 import type { McpToolsResult } from "../../protocol/gen/mcp-tools-result.ts";
@@ -129,6 +131,8 @@ import {
   isPullProgress,
   isRefResult,
   isSkillListResult,
+  isSkillCreateResult,
+  isSkillReadResult,
   isSessionSetModelResult,
   isPing,
   isRecord,
@@ -409,6 +413,16 @@ export interface GolemClient {
    * that lost their name or are broken. Without `cwd`, only the user's.
    */
   listSkills(cwd?: string): Promise<SkillListResult>;
+  /** `skill.read`: the `SKILL.md` of the skill called `name` that a session in `cwd` sees, with its path and `mtime_ns`. */
+  readSkill(name: string, cwd?: string): Promise<SkillReadResult>;
+  /**
+   * `skill.create`: make `<folder>/<name>/SKILL.md`. `local` uses the terminal's call, which also writes
+   * into a project that is not trusted yet (`skill.create_protected`).
+   */
+  createSkill(
+    params: { name: string; scope: "user" | "project"; cwd?: string; description: string; modelInvocable?: boolean },
+    options?: { local?: boolean },
+  ): Promise<SkillCreateResult>;
   /**
    * `skill.registry.changed`: skills changed on disk. `root` is the folder
    * whose project skills changed, or `null` when every folder's did.
@@ -1659,6 +1673,29 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("skill.list", cwd === undefined ? {} : { cwd });
       if (!isSkillListResult(result)) {
         throw new Error("invalid skill.list result");
+      }
+      return result;
+    },
+    async readSkill(name: string, cwd?: string): Promise<SkillReadResult> {
+      await ready;
+      const result = await call("skill.read", cwd === undefined ? { name } : { name, cwd });
+      if (!isSkillReadResult(result)) {
+        throw new Error("invalid skill.read result");
+      }
+      return result;
+    },
+    async createSkill(params, options): Promise<SkillCreateResult> {
+      await ready;
+      const body = {
+        name: params.name,
+        scope: params.scope,
+        description: params.description,
+        ...(params.cwd === undefined ? {} : { cwd: params.cwd }),
+        ...(params.modelInvocable === undefined ? {} : { model_invocable: params.modelInvocable }),
+      };
+      const result = await call(options?.local === true ? "skill.create_protected" : "skill.create", body);
+      if (!isSkillCreateResult(result)) {
+        throw new Error("invalid skill.create result");
       }
       return result;
     },

@@ -39,6 +39,19 @@ export async function editInEditor(
   }
 }
 
+/** Runs the editor on the file itself, with no copy. Returns false when the editor failed or could not start. */
+export async function editFile(
+  path: string,
+  run: (command: readonly string[], file: string) => Promise<number> = runEditor,
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<boolean> {
+  try {
+    return (await run(editorCommand(env), path)) === 0;
+  } catch {
+    return false;
+  }
+}
+
 /** One key from `keys`, asked on the terminal. Without a terminal there is nobody to ask, so it is the last key (the safe one). */
 export async function askKey(question: string, keys: string): Promise<string> {
   const stdin = process.stdin;
