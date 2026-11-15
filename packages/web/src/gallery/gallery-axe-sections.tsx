@@ -40,6 +40,7 @@ export const GALLERY_SECTIONS = [
   "thinking",
   "cost",
   "cut-reply",
+  "writing-a-file",
   "diff",
   "todo-list",
   "workbench",

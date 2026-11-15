@@ -455,6 +455,19 @@ test("laying out the same edit again does not parse its diff again", () => {
   assert.equal(diffParseCount(), before + 1);
 });
 
+test("a file being written is a yellow row that updates and goes when the tool is requested", () => {
+  const rows = (message: ChatMessage, seconds = 0) =>
+    layoutMessages([message], 80, { times: false, now: 0, writingSeconds: () => seconds }).map((line) => line.spans.map((span) => span.text).join(""));
+  const reply: ChatMessage = { id: "a", role: "assistant", text: "", streaming: true, writing: { name: "write_file", path: null, lines: 0, chars: 0 } };
+  assert.ok(rows(reply).includes("◐ writing a file · 0 lines · 0 s"));
+  const next: ChatMessage = { ...reply, writing: { name: "write_file", path: "tests/a.py", lines: 14, chars: 300 } };
+  assert.ok(rows(next, 38).includes("◐ writing tests/a.py · 14 lines · 38 s"));
+  const row = layoutMessages([next], 80, { times: false, now: 0 }).find((line) => line.spans[0]?.text.startsWith("◐"));
+  assert.equal(row?.spans[0]?.warn, true);
+  const requested: ChatMessage = { id: "a", role: "assistant", text: "", streaming: true, tools: [{ callId: "1", name: "write_file", args: { path: "tests/a.py" }, status: "requested" }] };
+  assert.ok(!rows(requested).some((text) => text.startsWith("◐")));
+});
+
 test("an answer's footer adds the model, tier, tokens and cost of the whole run", () => {
   const call = (tokens: number, costUsd: number) => ({ model: "qwen3:27b", tier: "local" as const, tokens, costUsd, done: true });
   const lines = layoutMessages(
