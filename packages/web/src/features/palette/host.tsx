@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 import { useNavigate, useRoute } from "../../store/page-context.tsx";
 import { settingsPath, tracePath } from "../../store/router.ts";
 import { hasMod } from "../../ui/platform.ts";
+import { requestNewSkill } from "../settings/index.ts";
 import { activeComposer, useHasComposer } from "../composer/index.ts";
 import { CommandPaletteView } from "./command-palette.tsx";
 import { KeysDialog } from "./keys-dialog.tsx";
@@ -68,7 +69,13 @@ export function PaletteHost() {
     switch (row.kind) {
       case "page":
         if (row.page === "settings") then.current = () => navigate(settingsPath());
-        else if (row.page === "trace") then.current = () => sessionId !== null && navigate(tracePath(sessionId));
+        else if (row.page === "skills") then.current = () => navigate(settingsPath("skills"));
+        else if (row.page === "new-skill") {
+          then.current = () => {
+            requestNewSkill();
+            navigate(settingsPath("skills"));
+          };
+        } else if (row.page === "trace") then.current = () => sessionId !== null && navigate(tracePath(sessionId));
         else then.current = () => openKeys(target);
         break;
       case "message":

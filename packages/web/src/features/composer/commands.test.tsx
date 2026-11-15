@@ -127,8 +127,10 @@ test("/help opens the Commands dialog, grouped, with the terminal-only ones mark
   await say(user, "/help");
   const dialog = screen.getByRole("dialog", { name: "Commands" });
   expect(within(dialog).getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual(["Session", "Model", "Tools", "View"]);
+  const tune = within(dialog).getByText("/tune").closest("li") as HTMLElement;
+  expect(tune.textContent).toContain("In the terminal for now");
   const skills = within(dialog).getByText("/skills").closest("li") as HTMLElement;
-  expect(skills.textContent).toContain("In the terminal for now");
+  expect(skills.textContent).not.toContain("In the terminal for now");
   const mcp = within(dialog).getByText("/mcp").closest("li") as HTMLElement;
   expect(mcp.textContent).not.toContain("In the terminal for now");
   const fork = within(dialog).getByText("/fork").closest("li") as HTMLElement;
@@ -438,7 +440,6 @@ test("/mcp add opens the Add dialog in Settings, on the server named, or on the 
 });
 
 const NOT_YET: [string, string][] = [
-  ["/skills", "The skills list is in the terminal for now: run golem tui, then /skills."],
   ["/artifact", "Tool output opens in the terminal for now: run golem tui, then /artifact."],
   ["/sessions", "The sidebar lists your sessions."],
   ["/debug", "The debug panel is in the terminal for now: run golem tui, then /debug."],
@@ -533,6 +534,12 @@ for (const theme of ["slip", "kiln"]) {
     expect((await axe.run(document.body, popup)).violations).toEqual([]);
   });
 }
+
+test("/skills opens the Skills section of Settings", async () => {
+  const { user } = await session();
+  await say(user, "/skills");
+  expect(location.pathname).toBe("/settings/skills");
+});
 
 test("/mcp opens the MCP servers section of Settings", async () => {
   const { user } = await session();

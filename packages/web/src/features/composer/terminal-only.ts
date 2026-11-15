@@ -2,7 +2,6 @@
 export const TERMINAL_ONLY: ReadonlySet<string> = new Set([
   "/artifact",
   "/debug",
-  "/skills",
   "/tune",
 ]);
 
@@ -14,7 +13,6 @@ function inTerminal(what: string, name: string): string {
 }
 
 export const NOT_YET = {
-  skills: inTerminal("The skills list is", "/skills"),
   artifact: inTerminal("Tool output opens", "/artifact"),
   debug: inTerminal("The debug panel is", "/debug"),
   tune: inTerminal("Tuning a model is", "/tune"),
