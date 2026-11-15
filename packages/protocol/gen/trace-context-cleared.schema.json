@@ -1,0 +1,20 @@
+{
+  "additionalProperties": false,
+  "description": "Tool results the call sent as a one-line stub, and the tokens that saved.",
+  "properties": {
+    "count": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Count",
+      "type": "integer"
+    },
+    "tokens": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Tokens",
+      "type": "integer"
+    }
+  },
+  "title": "TraceContextCleared",
+  "type": "object"
+}

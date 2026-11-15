@@ -556,6 +556,148 @@
       "title": "CheckStartedEvent",
       "type": "object"
     },
+    "ContextChangedData": {
+      "additionalProperties": false,
+      "description": "What golem sends of the history changed before a model call.\n\n``cleared`` means old tool results are now sent as one line each: ``count`` is how\nmany, and ``before_tokens`` and ``after_tokens`` are rough sizes of the history before\nand after. ``summarised`` and ``grew`` are for later changes: ``count`` is the\nmessages summarised, ``window_from`` and ``window_to`` the window before and after,\nand ``reload_ms`` the time the model took to load again. The checkpoint keeps every\nmessage, so no transcript event changes. A field a change does not use is None.",
+      "properties": {
+        "action": {
+          "enum": [
+            "cleared",
+            "summarised",
+            "grew"
+          ],
+          "title": "Action",
+          "type": "string"
+        },
+        "after_tokens": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "After Tokens"
+        },
+        "before_tokens": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Before Tokens"
+        },
+        "count": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Count"
+        },
+        "reload_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reload Ms"
+        },
+        "window_from": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Window From"
+        },
+        "window_to": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Window To"
+        }
+      },
+      "required": [
+        "action"
+      ],
+      "title": "ContextChangedData",
+      "type": "object"
+    },
+    "ContextChangedEvent": {
+      "additionalProperties": false,
+      "description": "What golem sends of the history changed, before the model call that follows.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/ContextChangedData"
+        },
+        "run_id": {
+          "minLength": 1,
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "context.changed",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "run_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "ContextChangedEvent",
+      "type": "object"
+    },
     "EmptyEventData": {
       "additionalProperties": false,
       "description": "No payload. Used by ``run.started``, ``run.completed``, and ``session.closed``.",
@@ -1223,6 +1365,13 @@
       "additionalProperties": false,
       "description": "A request went to the model.\n\n``message_id`` is the assistant reply's id, which identifies the model\ncall. ``index`` counts the calls of this run from 1. ``provider`` and\n``model`` are None when the profile does not resolve.\n\n``tier`` is the model's tier when the call was sent (``local``, ``budget`` or\n``frontier``), and None on an older event or when the profile does not resolve.\n\n``system_prompt_sha`` and ``tools_sha`` are the sha256 of the system\nprompt and of the tool schemas (compact JSON, sorted keys) sent with the\ncall, which the daemon keeps by hash. Each is None when it was not sent.\n``message_ids`` are the history messages sent, in order, not counting the\nsystem prompt.\n\n``window_estimated`` is true when golem did not send the window and read it\nfrom Ollama (the loaded context or the Modelfile). An older event has no\nfield and reads as False. ``window_planned`` is true when golem chose the ``num_ctx`` it\nsent (``[context] window``), and false for one that someone set or that golem did not send.\n\nThe size fields count what was sent, in UTF-8 bytes and in characters: the\nsystem text, the tool schemas as compact JSON, and each history message in\n``message_ids`` order (its text and its tool calls as JSON). ``message_chars``\nand ``message_bytes`` have one number per message sent. Each is None on an\nevent recorded before they existed.",
       "properties": {
+        "cleared_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Cleared Ids",
+          "type": "array"
+        },
         "context_window": {
           "anyOf": [
             {
@@ -3318,6 +3467,7 @@
           "check.completed": "#/$defs/CheckCompletedEvent",
           "check.offered": "#/$defs/CheckOfferedEvent",
           "check.started": "#/$defs/CheckStartedEvent",
+          "context.changed": "#/$defs/ContextChangedEvent",
           "file.changed": "#/$defs/FileChangedEvent",
           "message.completed": "#/$defs/MessageCompletedEvent",
           "message.delta": "#/$defs/MessageDeltaEvent",
@@ -3391,6 +3541,9 @@
         },
         {
           "$ref": "#/$defs/ModelCallCompletedEvent"
+        },
+        {
+          "$ref": "#/$defs/ContextChangedEvent"
         },
         {
           "$ref": "#/$defs/RunStartedEvent"

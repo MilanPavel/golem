@@ -1284,6 +1284,123 @@ public struct ConfigRule: Codable {
     }
 }
 
+/// What golem sends of the history changed before a model call.
+///
+/// ``cleared`` means old tool results are now sent as one line each: ``count`` is how
+/// many, and ``before_tokens`` and ``after_tokens`` are rough sizes of the history before
+/// and after. ``summarised`` and ``grew`` are for later changes: ``count`` is the
+/// messages summarised, ``window_from`` and ``window_to`` the window before and after,
+/// and ``reload_ms`` the time the model took to load again. The checkpoint keeps every
+/// message, so no transcript event changes. A field a change does not use is None.
+// MARK: - ContextChangedData
+public struct ContextChangedData: Codable {
+    public let action: ContextChangedDataAction
+    public let afterTokens: Int?
+    public let beforeTokens: Int?
+    public let count: Int?
+    public let reloadMS: Int?
+    public let windowFrom: Int?
+    public let windowTo: Int?
+
+    public enum CodingKeys: String, CodingKey {
+        case action = "action"
+        case afterTokens = "after_tokens"
+        case beforeTokens = "before_tokens"
+        case count = "count"
+        case reloadMS = "reload_ms"
+        case windowFrom = "window_from"
+        case windowTo = "window_to"
+    }
+
+    public init(action: ContextChangedDataAction, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, windowFrom: Int?, windowTo: Int?) {
+        self.action = action
+        self.afterTokens = afterTokens
+        self.beforeTokens = beforeTokens
+        self.count = count
+        self.reloadMS = reloadMS
+        self.windowFrom = windowFrom
+        self.windowTo = windowTo
+    }
+}
+
+public enum ContextChangedDataAction: String, Codable {
+    case cleared = "cleared"
+    case grew = "grew"
+    case summarised = "summarised"
+}
+
+/// What golem sends of the history changed, before the model call that follows.
+// MARK: - ContextChangedEvent
+public struct ContextChangedEvent: Codable {
+    public let data: ContextChangedEventData
+    public let runID: String
+    public let seq: Int
+    public let sessionID: String
+    public let ts: String
+    public let type: ContextChangedEventType
+
+    public enum CodingKeys: String, CodingKey {
+        case data = "data"
+        case runID = "run_id"
+        case seq = "seq"
+        case sessionID = "session_id"
+        case ts = "ts"
+        case type = "type"
+    }
+
+    public init(data: ContextChangedEventData, runID: String, seq: Int, sessionID: String, ts: String, type: ContextChangedEventType) {
+        self.data = data
+        self.runID = runID
+        self.seq = seq
+        self.sessionID = sessionID
+        self.ts = ts
+        self.type = type
+    }
+}
+
+/// What golem sends of the history changed before a model call.
+///
+/// ``cleared`` means old tool results are now sent as one line each: ``count`` is how
+/// many, and ``before_tokens`` and ``after_tokens`` are rough sizes of the history before
+/// and after. ``summarised`` and ``grew`` are for later changes: ``count`` is the
+/// messages summarised, ``window_from`` and ``window_to`` the window before and after,
+/// and ``reload_ms`` the time the model took to load again. The checkpoint keeps every
+/// message, so no transcript event changes. A field a change does not use is None.
+// MARK: - ContextChangedEventData
+public struct ContextChangedEventData: Codable {
+    public let action: ContextChangedDataAction
+    public let afterTokens: Int?
+    public let beforeTokens: Int?
+    public let count: Int?
+    public let reloadMS: Int?
+    public let windowFrom: Int?
+    public let windowTo: Int?
+
+    public enum CodingKeys: String, CodingKey {
+        case action = "action"
+        case afterTokens = "after_tokens"
+        case beforeTokens = "before_tokens"
+        case count = "count"
+        case reloadMS = "reload_ms"
+        case windowFrom = "window_from"
+        case windowTo = "window_to"
+    }
+
+    public init(action: ContextChangedDataAction, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, windowFrom: Int?, windowTo: Int?) {
+        self.action = action
+        self.afterTokens = afterTokens
+        self.beforeTokens = beforeTokens
+        self.count = count
+        self.reloadMS = reloadMS
+        self.windowFrom = windowFrom
+        self.windowTo = windowTo
+    }
+}
+
+public enum ContextChangedEventType: String, Codable {
+    case contextChanged = "context.changed"
+}
+
 /// One local day. ``local_tokens`` are input plus output of ``local`` calls, and
 /// ``paid_tokens`` those of every other call.
 // MARK: - CostDayRow
@@ -5783,6 +5900,7 @@ public enum ModelCallCompletedEventType: String, Codable {
 /// event recorded before they existed.
 // MARK: - ModelCallStartedData
 public struct ModelCallStartedData: Codable {
+    public let clearedIDS: [String]?
     public let contextWindow: Int?
     public let index: Int
     public let messageBytes: [Int]?
@@ -5805,6 +5923,7 @@ public struct ModelCallStartedData: Codable {
     public let windowPlanned: Bool?
 
     public enum CodingKeys: String, CodingKey {
+        case clearedIDS = "cleared_ids"
         case contextWindow = "context_window"
         case index = "index"
         case messageBytes = "message_bytes"
@@ -5827,7 +5946,8 @@ public struct ModelCallStartedData: Codable {
         case windowPlanned = "window_planned"
     }
 
-    public init(contextWindow: Int?, index: Int, messageBytes: [Int]?, messageChars: [Int]?, messageID: String, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String, provider: String?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [PurplePromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?) {
+    public init(clearedIDS: [String]?, contextWindow: Int?, index: Int, messageBytes: [Int]?, messageChars: [Int]?, messageID: String, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String, provider: String?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [PurplePromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?) {
+        self.clearedIDS = clearedIDS
         self.contextWindow = contextWindow
         self.index = index
         self.messageBytes = messageBytes
@@ -5930,6 +6050,7 @@ public struct ModelCallStartedEvent: Codable {
 /// event recorded before they existed.
 // MARK: - ModelCallStartedEventData
 public struct ModelCallStartedEventData: Codable {
+    public let clearedIDS: [String]?
     public let contextWindow: Int?
     public let index: Int
     public let messageBytes: [Int]?
@@ -5952,6 +6073,7 @@ public struct ModelCallStartedEventData: Codable {
     public let windowPlanned: Bool?
 
     public enum CodingKeys: String, CodingKey {
+        case clearedIDS = "cleared_ids"
         case contextWindow = "context_window"
         case index = "index"
         case messageBytes = "message_bytes"
@@ -5974,7 +6096,8 @@ public struct ModelCallStartedEventData: Codable {
         case windowPlanned = "window_planned"
     }
 
-    public init(contextWindow: Int?, index: Int, messageBytes: [Int]?, messageChars: [Int]?, messageID: String, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String, provider: String?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [FluffyPromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?) {
+    public init(clearedIDS: [String]?, contextWindow: Int?, index: Int, messageBytes: [Int]?, messageChars: [Int]?, messageID: String, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String, provider: String?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [FluffyPromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?) {
+        self.clearedIDS = clearedIDS
         self.contextWindow = contextWindow
         self.index = index
         self.messageBytes = messageBytes
@@ -8836,6 +8959,8 @@ public enum RPCNotificationMethod: String, Codable {
 ///
 /// The model call ended. Comes before the call's ``tool.requested`` events.
 ///
+/// What golem sends of the history changed, before the model call that follows.
+///
 /// A graph run is in progress for this session.
 ///
 /// The graph run finished and the checkpoint is current.
@@ -9023,6 +9148,15 @@ public struct Params: Codable {
 /// the model, reading the prompt and writing the reply. From the model server's own clock.
 /// Ollama only.
 ///
+/// What golem sends of the history changed before a model call.
+///
+/// ``cleared`` means old tool results are now sent as one line each: ``count`` is how
+/// many, and ``before_tokens`` and ``after_tokens`` are rough sizes of the history before
+/// and after. ``summarised`` and ``grew`` are for later changes: ``count`` is the
+/// messages summarised, ``window_from`` and ``window_to`` the window before and after,
+/// and ``reload_ms`` the time the model took to load again. The checkpoint keeps every
+/// message, so no transcript event changes. A field a change does not use is None.
+///
 /// Why a run stopped. No traceback.
 ///
 /// ``code`` names a failure a client can act on. ``model_unreachable``: the
@@ -9144,6 +9278,7 @@ public struct ParamsData: Codable {
     public let skill: FluffySkillCall?
     public let thinking: String?
     public let thinkingMS: Int?
+    public let clearedIDS: [String]?
     public let contextWindow: Int?
     public let index: Int?
     public let messageBytes: [Int]?
@@ -9174,6 +9309,13 @@ public struct ParamsData: Codable {
     public let stopReason: String?
     public let textToolCalls: TextToolCalls?
     public let usage: FluffyTokenUsage?
+    public let action: ContextChangedDataAction?
+    public let afterTokens: Int?
+    public let beforeTokens: Int?
+    public let count: Int?
+    public let reloadMS: Int?
+    public let windowFrom: Int?
+    public let windowTo: Int?
     public let code: Code?
     public let hint: String?
     public let message: String?
@@ -9228,6 +9370,7 @@ public struct ParamsData: Codable {
         case skill = "skill"
         case thinking = "thinking"
         case thinkingMS = "thinking_ms"
+        case clearedIDS = "cleared_ids"
         case contextWindow = "context_window"
         case index = "index"
         case messageBytes = "message_bytes"
@@ -9258,6 +9401,13 @@ public struct ParamsData: Codable {
         case stopReason = "stop_reason"
         case textToolCalls = "text_tool_calls"
         case usage = "usage"
+        case action = "action"
+        case afterTokens = "after_tokens"
+        case beforeTokens = "before_tokens"
+        case count = "count"
+        case reloadMS = "reload_ms"
+        case windowFrom = "window_from"
+        case windowTo = "window_to"
         case code = "code"
         case hint = "hint"
         case message = "message"
@@ -9289,7 +9439,7 @@ public struct ParamsData: Codable {
         case output = "output"
     }
 
-    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: PurpleReason?, options: [String: Option]?, mode: Mode?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, contextWindow: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String?, provider: String?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, todos: [PurpleTodo]?, added: Int?, changeID: String?, path: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?) {
+    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: PurpleReason?, options: [String: Option]?, mode: Mode?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String?, provider: String?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, todos: [PurpleTodo]?, added: Int?, changeID: String?, path: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?) {
         self.cwd = cwd
         self.forkedFrom = forkedFrom
         self.modelName = modelName
@@ -9313,6 +9463,7 @@ public struct ParamsData: Codable {
         self.skill = skill
         self.thinking = thinking
         self.thinkingMS = thinkingMS
+        self.clearedIDS = clearedIDS
         self.contextWindow = contextWindow
         self.index = index
         self.messageBytes = messageBytes
@@ -9343,6 +9494,13 @@ public struct ParamsData: Codable {
         self.stopReason = stopReason
         self.textToolCalls = textToolCalls
         self.usage = usage
+        self.action = action
+        self.afterTokens = afterTokens
+        self.beforeTokens = beforeTokens
+        self.count = count
+        self.reloadMS = reloadMS
+        self.windowFrom = windowFrom
+        self.windowTo = windowTo
         self.code = code
         self.hint = hint
         self.message = message
@@ -9571,6 +9729,7 @@ public enum ParamsType: String, Codable {
     case checkCompleted = "check.completed"
     case checkOffered = "check.offered"
     case checkStarted = "check.started"
+    case contextChanged = "context.changed"
     case fileChanged = "file.changed"
     case messageCompleted = "message.completed"
     case messageDelta = "message.delta"
@@ -12933,6 +13092,23 @@ public enum ToolStartedEventType: String, Codable {
     case toolStarted = "tool.started"
 }
 
+/// Tool results the call sent as a one-line stub, and the tokens that saved.
+// MARK: - TraceContextCleared
+public struct TraceContextCleared: Codable {
+    public let count: Int?
+    public let tokens: Int?
+
+    public enum CodingKeys: String, CodingKey {
+        case count = "count"
+        case tokens = "tokens"
+    }
+
+    public init(count: Int?, tokens: Int?) {
+        self.count = count
+        self.tokens = tokens
+    }
+}
+
 /// One tool or one prompt section, with its share of the tokens.
 // MARK: - TraceContextItem
 public struct TraceContextItem: Codable {
@@ -13009,9 +13185,12 @@ public enum Key: String, Codable {
 /// ``parts`` always has the five keys, in order. They add up to ``used``
 /// when it is known. The split between them is an estimate (about four
 /// characters a token, scaled to ``used``), so ``estimated`` is always true.
-/// The ``prompt_cut`` fields are those of the model span.
+/// The ``prompt_cut`` fields are those of the model span. A cleared result counts as its
+/// stub in ``tool_results``, and ``cleared`` says how many there were and the tokens
+/// not sent because of it.
 // MARK: - TraceContext
 public struct TraceContext: Codable {
+    public let cleared: PurpleTraceContextCleared?
     public let droppedMessageIDS: [String]?
     public let droppedTokens: Int?
     public let estimated: Bool?
@@ -13024,6 +13203,7 @@ public struct TraceContext: Codable {
     public let windowEstimated: Bool?
 
     public enum CodingKeys: String, CodingKey {
+        case cleared = "cleared"
         case droppedMessageIDS = "dropped_message_ids"
         case droppedTokens = "dropped_tokens"
         case estimated = "estimated"
@@ -13036,7 +13216,8 @@ public struct TraceContext: Codable {
         case windowEstimated = "window_estimated"
     }
 
-    public init(droppedMessageIDS: [String]?, droppedTokens: Int?, estimated: Bool?, numCtx: Int?, parts: [PurpleTraceContextPart], promptCut: PromptCut?, promptCutKind: PromptCutKind?, used: Int?, window: Int?, windowEstimated: Bool?) {
+    public init(cleared: PurpleTraceContextCleared?, droppedMessageIDS: [String]?, droppedTokens: Int?, estimated: Bool?, numCtx: Int?, parts: [PurpleTraceContextPart], promptCut: PromptCut?, promptCutKind: PromptCutKind?, used: Int?, window: Int?, windowEstimated: Bool?) {
+        self.cleared = cleared
         self.droppedMessageIDS = droppedMessageIDS
         self.droppedTokens = droppedTokens
         self.estimated = estimated
@@ -13047,6 +13228,23 @@ public struct TraceContext: Codable {
         self.used = used
         self.window = window
         self.windowEstimated = windowEstimated
+    }
+}
+
+/// Tool results the call sent as a one-line stub, and the tokens that saved.
+// MARK: - PurpleTraceContextCleared
+public struct PurpleTraceContextCleared: Codable {
+    public let count: Int?
+    public let tokens: Int?
+
+    public enum CodingKeys: String, CodingKey {
+        case count = "count"
+        case tokens = "tokens"
+    }
+
+    public init(count: Int?, tokens: Int?) {
+        self.count = count
+        self.tokens = tokens
     }
 }
 
@@ -13908,9 +14106,12 @@ public struct TraceSpanResult: Codable {
 /// ``parts`` always has the five keys, in order. They add up to ``used``
 /// when it is known. The split between them is an estimate (about four
 /// characters a token, scaled to ``used``), so ``estimated`` is always true.
-/// The ``prompt_cut`` fields are those of the model span.
+/// The ``prompt_cut`` fields are those of the model span. A cleared result counts as its
+/// stub in ``tool_results``, and ``cleared`` says how many there were and the tokens
+/// not sent because of it.
 // MARK: - TraceContextClass
 public struct TraceContextClass: Codable {
+    public let cleared: FluffyTraceContextCleared?
     public let droppedMessageIDS: [String]?
     public let droppedTokens: Int?
     public let estimated: Bool?
@@ -13923,6 +14124,7 @@ public struct TraceContextClass: Codable {
     public let windowEstimated: Bool?
 
     public enum CodingKeys: String, CodingKey {
+        case cleared = "cleared"
         case droppedMessageIDS = "dropped_message_ids"
         case droppedTokens = "dropped_tokens"
         case estimated = "estimated"
@@ -13935,7 +14137,8 @@ public struct TraceContextClass: Codable {
         case windowEstimated = "window_estimated"
     }
 
-    public init(droppedMessageIDS: [String]?, droppedTokens: Int?, estimated: Bool?, numCtx: Int?, parts: [FluffyTraceContextPart], promptCut: PromptCut?, promptCutKind: PromptCutKind?, used: Int?, window: Int?, windowEstimated: Bool?) {
+    public init(cleared: FluffyTraceContextCleared?, droppedMessageIDS: [String]?, droppedTokens: Int?, estimated: Bool?, numCtx: Int?, parts: [FluffyTraceContextPart], promptCut: PromptCut?, promptCutKind: PromptCutKind?, used: Int?, window: Int?, windowEstimated: Bool?) {
+        self.cleared = cleared
         self.droppedMessageIDS = droppedMessageIDS
         self.droppedTokens = droppedTokens
         self.estimated = estimated
@@ -13946,6 +14149,23 @@ public struct TraceContextClass: Codable {
         self.used = used
         self.window = window
         self.windowEstimated = windowEstimated
+    }
+}
+
+/// Tool results the call sent as a one-line stub, and the tokens that saved.
+// MARK: - FluffyTraceContextCleared
+public struct FluffyTraceContextCleared: Codable {
+    public let count: Int?
+    public let tokens: Int?
+
+    public enum CodingKeys: String, CodingKey {
+        case count = "count"
+        case tokens = "tokens"
+    }
+
+    public init(count: Int?, tokens: Int?) {
+        self.count = count
+        self.tokens = tokens
     }
 }
 

@@ -148,6 +148,14 @@ For contributors: the reference for the system prompt and pinned skills.
 
 **Limits.** A turn that is already running keeps the pins it started with: a pin applies from the next turn. The registry notices an edit by the file's size and time, so two edits of the same size within the file system's time step could look like one.
 
+### When the window fills
+
+The checkpoint keeps every message. What a model call sends is the history seen through a **context view** (`packages/daemon/golem/graphs/context_view.py`): a small record in the graph state, `cleared_before` among other fields, and `view()` applies it. A tool result before `cleared_before` that is longer than 400 characters and not an error goes out as one line: `[cleared to save context: read_file returned 9012 characters. Call the tool again if you need this.]`. The ids, the order, and each call with its result stay. The transcript, `tool.completed`, and the artifacts do not change.
+
+Before each call, `call_model` sizes what it would send. The size is the tokens the provider counted for the last reply, plus the characters added since, at the same tokens-per-character ratio (0.25 with no count yet). The room is the model's window minus `[context] reply_reserve`. With an unknown window, nothing is cleared. When the size passes `clear_at` of the room (70%), `plan_clear` clears tool results, oldest first, until the size is down to `clear_to` (40%). The newest `keep_results` results that could be cleared stay. `cleared_before` only moves forward.
+
+Clearing is one big step, not a little on each call. A local model server keeps a cache of the prompt it has read, and it only helps while the start of the next prompt is the same. One step changes the start once, and then it stays the same for many calls. The step writes the new view to the state, emits one `context.changed` event (`action: "cleared"`, `before_tokens`, `after_tokens`, `count`), and every call lists the stubbed ids as `cleared_ids` on `model.call.started`. A hosted model is cleared by the same rule, which saves money there.
+
 ### Files
 
 | File | What it does |

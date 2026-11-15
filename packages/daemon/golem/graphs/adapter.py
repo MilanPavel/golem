@@ -56,6 +56,7 @@ class ModelRequested:
 
     The size fields are the characters and UTF-8 bytes of what was sent, or None
     when not given. ``profile`` is the profile this call uses, or None when not given.
+    ``cleared_ids`` are the tool results sent as a one-line stub.
     """
 
     message_id: str
@@ -74,6 +75,20 @@ class ModelRequested:
     message_chars: tuple[int, ...] | None = None
     message_bytes: tuple[int, ...] | None = None
     profile: str | None = None
+    cleared_ids: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class ContextChanged:
+    """The context view changed before a model call: old tool results were cleared.
+
+    The token counts are rough. ``count`` is the number of results cleared.
+    """
+
+    action: Literal["cleared"]
+    before_tokens: int | None = None
+    after_tokens: int | None = None
+    count: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -251,6 +266,7 @@ Fact = (
     ModelStarted
     | ModelRequested
     | ModelResponded
+    | ContextChanged
     | TextDelta
     | ThinkingDelta
     | TextCompleted
@@ -676,6 +692,13 @@ def _custom(data: object) -> Fact | None:
             _text_calls(text_calls),
             _timings(item.get("timings")),
         )
+    if kind == "context.changed" and item.get("action") == "cleared":
+        return ContextChanged(
+            "cleared",
+            _count(item.get("before_tokens")),
+            _count(item.get("after_tokens")),
+            _count(item.get("count")),
+        )
     if kind in (PIN_READ_KIND, PIN_SKIPPED_KIND):
         return _pin(kind, item)
     if kind in ("check.offered", "check.started", "check.completed"):
@@ -807,6 +830,9 @@ def _request(message_id: str, item: Mapping[str, object]) -> ModelRequested:
         _counts(item.get("message_chars")),
         _counts(item.get("message_bytes")),
         profile if isinstance(profile := item.get("profile"), str) and profile else None,
+        tuple(i for i in cast(list[object], cleared) if isinstance(i, str))
+        if isinstance(cleared := item.get("cleared_ids"), list)
+        else (),
     )
 
 
@@ -868,6 +894,7 @@ __all__ = [
     "SKILL_LOADED_KIND",
     "STREAM_KEY",
     "ApprovalAsked",
+    "ContextChanged",
     "Fact",
     "FileChanged",
     "ModelRequested",

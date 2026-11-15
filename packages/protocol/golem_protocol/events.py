@@ -436,6 +436,30 @@ class ModelCallStartedData(BaseModel):
     tools_bytes: int | None = Field(default=None, ge=0)
     message_chars: list[int] | None = None
     message_bytes: list[int] | None = None
+    cleared_ids: list[str] = Field(default_factory=list[str])
+    """Tool results sent as a one-line stub on this call."""
+
+
+class ContextChangedData(BaseModel):
+    """What golem sends of the history changed before a model call.
+
+    ``cleared`` means old tool results are now sent as one line each: ``count`` is how
+    many, and ``before_tokens`` and ``after_tokens`` are rough sizes of the history before
+    and after. ``summarised`` and ``grew`` are for later changes: ``count`` is the
+    messages summarised, ``window_from`` and ``window_to`` the window before and after,
+    and ``reload_ms`` the time the model took to load again. The checkpoint keeps every
+    message, so no transcript event changes. A field a change does not use is None.
+    """
+
+    model_config = _CONFIG
+
+    action: Literal["cleared", "summarised", "grew"]
+    before_tokens: int | None = Field(default=None, ge=0)
+    after_tokens: int | None = Field(default=None, ge=0)
+    count: int | None = Field(default=None, ge=0)
+    window_from: int | None = Field(default=None, ge=1)
+    window_to: int | None = Field(default=None, ge=1)
+    reload_ms: int | None = Field(default=None, ge=0)
 
 
 class TokenUsage(BaseModel):
@@ -860,6 +884,19 @@ class ModelCallStartedEvent(BaseModel):
     data: ModelCallStartedData
 
 
+class ContextChangedEvent(BaseModel):
+    """What golem sends of the history changed, before the model call that follows."""
+
+    model_config = _CONFIG
+
+    seq: int = Field(ge=1)
+    session_id: str = Field(min_length=1)
+    run_id: str = Field(min_length=1)
+    ts: str = Field(min_length=1)
+    type: Literal["context.changed"]
+    data: ContextChangedData
+
+
 class ModelCallCompletedEvent(BaseModel):
     """The model call ended. Comes before the call's ``tool.requested`` events."""
 
@@ -1103,6 +1140,7 @@ EventType = Literal[
     "message.completed",
     "model.call.started",
     "model.call.completed",
+    "context.changed",
     "run.started",
     "run.completed",
     "run.failed",
@@ -1141,6 +1179,7 @@ ChatEvent = Annotated[
     | MessageCompletedEvent
     | ModelCallStartedEvent
     | ModelCallCompletedEvent
+    | ContextChangedEvent
     | RunStartedEvent
     | RunCompletedEvent
     | RunFailedEvent
@@ -1183,6 +1222,8 @@ __all__ = [
     "CheckOfferedEvent",
     "CheckStartedData",
     "CheckStartedEvent",
+    "ContextChangedData",
+    "ContextChangedEvent",
     "EmptyEventData",
     "EventType",
     "FileChangedData",

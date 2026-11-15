@@ -16,9 +16,13 @@ from golem.graphs.context_view import (
     SUMMARY_HEADER,
     ContextView,
     cleared_ids,
+    freed_by,
+    plan_clear,
     safe_boundary,
     stub,
+    stub_text,
     summarised_ids,
+    used_tokens,
     view,
 )
 from golem.models.router import ModelRouter
@@ -248,3 +252,113 @@ async def test_a_fork_has_the_context_view_of_its_source() -> None:
     await _set(runtime, ctx)
     assert await runtime.fork("s_view", "s_fork", at_message_id="m_reply1")
     assert (await runtime.values("s_fork")).get("context_view") == ctx
+
+
+def _used(tokens: int | None, text: str = "hi") -> list[BaseMessage]:
+    reply = AIMessage(content=text, id="r")
+    if tokens is not None:
+        reply.usage_metadata = _count(tokens)
+    return [HumanMessage(content="a" * 100, id="h"), reply, HumanMessage(content="b" * 40, id="h2")]
+
+
+def _count(tokens: int) -> Any:
+    return {"input_tokens": tokens, "output_tokens": 0, "total_tokens": tokens}
+
+
+def test_used_tokens_without_a_count_is_a_quarter_per_character() -> None:
+    assert used_tokens(_used(None), 50, 50) == (round(0.25 * (240 + 2)), 0.25)
+
+
+def test_used_tokens_adds_what_came_after_the_count_by_its_ratio() -> None:
+    # The call that made the reply sent 50 + 50 + 100 characters and 40 tokens: ratio 0.2.
+    used, ratio = used_tokens(_used(40), 50, 50)
+    assert ratio == 0.2
+    assert used == round(40 + (2 + 40) * 0.2)
+
+
+def test_the_ratio_is_clamped() -> None:
+    assert used_tokens(_used(1), 50, 50)[1] == 0.15
+    assert used_tokens(_used(100_000), 50, 50)[1] == 0.6
+    assert used_tokens([AIMessage(content="", usage_metadata=_count(10))], 0, 0)[1] == 0.25
+
+
+def _long() -> list[BaseMessage]:
+    messages: list[BaseMessage] = [HumanMessage(content="go", id="h1")]
+    for n in range(1, 7):
+        messages += _pair(n, "y" * 1000)
+    messages.append(AIMessage(content="end", id="end"))
+    return messages
+
+
+def _plan(ctx: ContextView | None = None, used: int = 800, keep: int = 2) -> ContextView | None:
+    return plan_clear(
+        _long(),
+        ctx,
+        used=used,
+        ratio=0.25,
+        room=1000,
+        clear_at=0.7,
+        clear_to=0.4,
+        keep_results=keep,
+    )
+
+
+def test_nothing_is_cleared_under_the_threshold() -> None:
+    assert _plan(used=699) is None
+
+
+def test_clearing_goes_oldest_first_and_stops_at_the_target() -> None:
+    # Each result frees about 940 characters, 235 tokens. 800 down to 400 takes two.
+    planned = _plan()
+    assert planned == {"cleared_before": "a3"}
+    assert cleared_ids(_long(), planned) == ["t_c1", "t_c2"]
+
+
+def test_the_newest_results_are_kept() -> None:
+    planned = _plan(used=10_000, keep=2)
+    assert cleared_ids(_long(), planned) == ["t_c1", "t_c2", "t_c3", "t_c4"]
+    assert _plan(used=10_000, keep=6) is None
+    assert _plan(used=10_000, keep=7) is None
+
+
+def test_clearing_never_goes_backward() -> None:
+    first = _plan(used=10_000, keep=2)
+    assert first == {"cleared_before": "a5"}
+    assert _plan(first, used=10_000, keep=4) is None
+    assert _plan({"cleared_before": "a2"}, used=10_000, keep=2) == {"cleared_before": "a5"}
+
+
+def test_short_results_and_errors_are_not_candidates() -> None:
+    messages = [
+        HumanMessage(content="go", id="h1"),
+        *_pair(1, "z" * 1000, status="error"),
+        *_pair(2, "short"),
+        *_pair(3, "y" * 1000),
+        *_pair(4, "y" * 1000),
+        AIMessage(content="end", id="end"),
+    ]
+    planned = plan_clear(
+        messages, None, used=900, ratio=0.25, room=1000, clear_at=0.7, clear_to=0.4, keep_results=1
+    )
+    assert planned == {"cleared_before": "a4"}
+    assert cleared_ids(messages, planned) == ["t_c3"]
+
+
+def test_nothing_that_could_be_freed_is_none() -> None:
+    messages = [
+        HumanMessage(content="go", id="h1"),
+        *_pair(1, "short"),
+        *_pair(2, "short"),
+        AIMessage(content="end", id="end"),
+    ]
+    planned = plan_clear(
+        messages, None, used=900, ratio=0.25, room=1000, clear_at=0.7, clear_to=0.4, keep_results=0
+    )
+    assert planned is None
+
+
+def test_freed_by_counts_only_what_is_new() -> None:
+    messages = _long()
+    tokens, count = freed_by(messages, {"cleared_before": "a3"}, {"cleared_before": "a5"}, 0.25)
+    assert count == 2
+    assert tokens == round(2 * (1000 - len(stub_text("read_file", 1000))) * 0.25)

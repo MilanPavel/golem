@@ -593,13 +593,24 @@ class TraceContextPart(BaseModel):
     items: list[TraceContextItem] = Field(default_factory=list[TraceContextItem])
 
 
+class TraceContextCleared(BaseModel):
+    """Tool results the call sent as a one-line stub, and the tokens that saved."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    count: int = Field(default=0, ge=0)
+    tokens: int = Field(default=0, ge=0)
+
+
 class TraceContext(BaseModel):
     """What filled one model call's context, and how big the window was.
 
     ``parts`` always has the five keys, in order. They add up to ``used``
     when it is known. The split between them is an estimate (about four
     characters a token, scaled to ``used``), so ``estimated`` is always true.
-    The ``prompt_cut`` fields are those of the model span.
+    The ``prompt_cut`` fields are those of the model span. A cleared result counts as its
+    stub in ``tool_results``, and ``cleared`` says how many there were and the tokens
+    not sent because of it.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -614,6 +625,7 @@ class TraceContext(BaseModel):
     prompt_cut_kind: Literal["older_messages", "middle"] | None = None
     dropped_message_ids: list[str] = Field(default_factory=list[str])
     dropped_tokens: int | None = Field(default=None, ge=0)
+    cleared: TraceContextCleared = Field(default_factory=TraceContextCleared)
 
 
 class TraceMessage(BaseModel):
@@ -3030,6 +3042,7 @@ __all__ = [
     "SkillWriteParams",
     "SkillWriteResult",
     "TraceContext",
+    "TraceContextCleared",
     "TraceContextItem",
     "TraceContextPart",
     "TraceGetParams",

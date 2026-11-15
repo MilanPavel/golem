@@ -179,7 +179,8 @@ A model call has no id of its own. Each call makes exactly one assistant message
 
 | Event | Fields |
 |---|---|
-| `model.call.started` | `message_id`, `index` (1-based within the run), `profile`, `provider`, `model`, `system_prompt_sha`, `tools_sha`, `message_ids`, `context_window`, `num_ctx`, `window_estimated`, `system_sections`, `system_chars`, `system_bytes`, `tools_chars`, `tools_bytes`, `message_chars`, `message_bytes` |
+| `model.call.started` | `message_id`, `index` (1-based within the run), `profile`, `provider`, `model`, `system_prompt_sha`, `tools_sha`, `message_ids`, `context_window`, `num_ctx`, `window_estimated`, `system_sections`, `system_chars`, `system_bytes`, `tools_chars`, `tools_bytes`, `message_chars`, `message_bytes`, `cleared_ids` (tool results sent as a one-line stub on this call) |
+| `context.changed` | `action` (`cleared`, `summarised`, or `grew`), `before_tokens`, `after_tokens`, `count`, `window_from`, `window_to`, `reload_ms`. Only `cleared` is sent so far: old tool results are now sent as one line each, `count` of them, and the tokens are rough sizes of the history. It comes before the `model.call.started` of the call it changed |
 | `model.call.completed` | `message_id`, `usage` (`input`, `output`, `cache_read`, `cache_write`), `stop_reason`, `first_token_ms`, `latency_ms`, `failed`, `context_window`, `text_tool_calls`, `cost_usd`, `price`, `load_ms`, `prompt_ms`, `reply_ms` |
 | `tool.completed`, `tool.failed` | `duration_ms`, as well as what they had before |
 
@@ -253,6 +254,7 @@ An unknown `span_id` is an error. Neither method calls the model or starts a run
 - **The total** is the input tokens the provider counted. With none, it is the characters divided by four.
 - **The shares** are whole numbers that add up to the total exactly. The tokens left after rounding down go, one each, to the largest remainders.
 - **The items** split a part further. The system part has one item for each section. The tools part has one for each tool, with `group` set to the MCP server that offers it, largest first. The messages of a role share that role's part.
+- **A cleared result** counts as its stub, and its message in the span is the stub. `cleared` has `count`, the results sent as a stub, and `tokens`, the tokens that were not sent because of it. A call lists them as `cleared_ids` on `model.call.started`.
 - **The window** is the one recorded, or today's, with `window_estimated` set. `estimated` is always true, because of the split.
 - **A local model's window** comes from what golem sent, then from Ollama's `/api/ps`, then from the Modelfile, and the last two are estimated ([ADR-043](../adr/043-ollama-context-window.md)).
 

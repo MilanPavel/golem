@@ -7,6 +7,8 @@ export type Args = {
   [k: string]: unknown;
 } | null;
 export type ArtifactId = string | null;
+export type Count = number;
+export type Tokens = number;
 export type DroppedMessageIds = string[];
 export type DroppedTokens = number | null;
 export type Estimated = boolean;
@@ -14,10 +16,10 @@ export type NumCtx = number | null;
 export type Chars = number;
 export type Group = string | null;
 export type Name = string;
-export type Tokens = number;
+export type Tokens1 = number;
 export type Items = TraceContextItem[];
 export type Key = 'system' | 'tools' | 'user' | 'assistant' | 'tool_results';
-export type Tokens1 = number;
+export type Tokens2 = number;
 export type Parts = TraceContextPart[];
 export type PromptCut = ('no' | 'yes' | 'likely') | null;
 export type PromptCutKind = ('older_messages' | 'middle') | null;
@@ -28,7 +30,7 @@ export type CallId = string | null;
 export type Id = string | null;
 export type Role = 'user' | 'assistant' | 'tool';
 export type Text = string;
-export type Tokens2 = number | null;
+export type Tokens3 = number | null;
 export type ToolCalls = {
   [k: string]: unknown;
 }[];
@@ -99,12 +101,15 @@ export interface TraceSpanResult {
  * ``parts`` always has the five keys, in order. They add up to ``used``
  * when it is known. The split between them is an estimate (about four
  * characters a token, scaled to ``used``), so ``estimated`` is always true.
- * The ``prompt_cut`` fields are those of the model span.
+ * The ``prompt_cut`` fields are those of the model span. A cleared result counts as its
+ * stub in ``tool_results``, and ``cleared`` says how many there were and the tokens
+ * not sent because of it.
  *
  * This interface was referenced by `TraceSpanResult`'s JSON-Schema
  * via the `definition` "TraceContext".
  */
 export interface TraceContext {
+  cleared?: TraceContextCleared;
   dropped_message_ids?: DroppedMessageIds;
   dropped_tokens?: DroppedTokens;
   estimated?: Estimated;
@@ -117,6 +122,16 @@ export interface TraceContext {
   window_estimated?: WindowEstimated;
 }
 /**
+ * Tool results the call sent as a one-line stub, and the tokens that saved.
+ *
+ * This interface was referenced by `TraceSpanResult`'s JSON-Schema
+ * via the `definition` "TraceContextCleared".
+ */
+export interface TraceContextCleared {
+  count?: Count;
+  tokens?: Tokens;
+}
+/**
  * One kind of content in the context.
  *
  * This interface was referenced by `TraceSpanResult`'s JSON-Schema
@@ -126,7 +141,7 @@ export interface TraceContextPart {
   chars: Chars;
   items?: Items;
   key: Key;
-  tokens: Tokens1;
+  tokens: Tokens2;
 }
 /**
  * One tool or one prompt section, with its share of the tokens.
@@ -137,7 +152,7 @@ export interface TraceContextPart {
 export interface TraceContextItem {
   group?: Group;
   name: Name;
-  tokens: Tokens;
+  tokens: Tokens1;
 }
 /**
  * One checkpoint message with its id, as plain text.
@@ -150,7 +165,7 @@ export interface TraceMessage {
   id?: Id;
   role: Role;
   text: Text;
-  tokens?: Tokens2;
+  tokens?: Tokens3;
   tool_calls?: ToolCalls;
 }
 /**
