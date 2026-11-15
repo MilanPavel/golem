@@ -25,7 +25,7 @@ import logging
 import re
 import shutil
 import time
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -253,6 +253,7 @@ class ModelDiscovery:
         self._ctx: dict[str, int] = {}
         self._modelfile_ctx: dict[str, int] = {}
         self._default_ctx: dict[str, int] = {}
+        self._last: tuple[ListedModel, ...] = ()
 
     def default_ctx(self, ref: str) -> int | None:
         """The window Ollama gave ``ref`` the last time golem sent no ``num_ctx``. No I/O.
@@ -310,6 +311,10 @@ class ModelDiscovery:
                     return found.price
         info = self._prices.lookup(provider, model_id)
         return None if info is None else info.price
+
+    def cached(self) -> Sequence[ListedModel]:
+        """The models of the last listing. No network call. Empty before the first listing."""
+        return self._last
 
     def known_ctx(self, ref: str) -> int | None:
         """The tokens ``ref`` can take in, as last listed or from the price book. No I/O."""
@@ -392,6 +397,7 @@ class ModelDiscovery:
             self._merge(providers, profiles, default, keys, results, states, show_all),
             self.pulling(),
         )
+        self._last = tuple(models)
         self._ctx = {m.ref: m.ctx for m in models if m.ctx is not None}
         self._modelfile_ctx = {
             f"{name}/{found.model_id}": found.modelfile_num_ctx
