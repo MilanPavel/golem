@@ -32,6 +32,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../ui/tabs.tsx";
 import { useNarrow } from "../trace/use-narrow.ts";
 import { useSettingsContext, useSettingsFolder } from "./context.ts";
 import { mcpAddRequestStore, useMcpAddRequest } from "./mcp-add-request.ts";
+import { mcpOpenRequestStore, useMcpOpenRequest } from "./mcp-open-request.ts";
 
 type Selected = { name: string; project: string | null };
 type View = { kind: "list" } | { kind: "detail"; at: Selected };
@@ -132,6 +133,18 @@ function Installed({ sessionId, added, onCatalog }: { sessionId: string | null; 
     if (node === null) rows.current.delete(key);
     else rows.current.set(key, node);
   }, []);
+
+  // The API keys page asks for one server. Once the list is there it opens that server, and the request is taken.
+  const openRequest = useMcpOpenRequest();
+  const [handled, setHandled] = useState<typeof openRequest>(null);
+  if (openRequest !== null && openRequest !== handled && list.data !== undefined) {
+    setHandled(openRequest);
+    const found = list.data.servers.find((item) => item.name === openRequest.name);
+    if (found !== undefined) setView({ kind: "detail", at: { name: found.name, project: found.project ?? null } });
+  }
+  useEffect(() => {
+    if (handled !== null && handled === openRequest) mcpOpenRequestStore.set(null);
+  }, [handled, openRequest]);
 
   useEffect(() => {
     if (view.kind !== "list" || back.current === null) return;

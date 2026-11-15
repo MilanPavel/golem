@@ -44,15 +44,16 @@ import { APPROVAL_DETAIL, APPROVAL_TRACE, CUT_LIKELY_DETAIL, CUT_MIDDLE_DETAIL, 
 import type { TraceRunSpan, TraceSpanResult } from "../store/trace.ts";
 import { FORM_CASES } from "../features/setup/sample.ts";
 import { GolemBlockView } from "../features/setup/golem-block.tsx";
-import { KeysList } from "../features/settings/keys-section.tsx";
+import { KeysView } from "../features/settings/keys-section.tsx";
+import { KEYS_CASES } from "../features/settings/keys-sample.ts";
 import { SkillList } from "../features/settings/skills-section.tsx";
 import { SkillOverview } from "../features/settings/skills/skill-detail.tsx";
-import { SAMPLE_BROKEN_SKILL_MD, SAMPLE_KEYS, SAMPLE_SKILLS } from "../features/settings/skills/sample.ts";
+import { SAMPLE_BROKEN_SKILL_MD, SAMPLE_SKILLS } from "../features/settings/skills/sample.ts";
 import { CodeEditor } from "../features/settings/config/code-editor.tsx";
 import { CatalogView } from "../features/settings/mcp/catalog-panel.tsx";
 import { ImportListView } from "../features/settings/mcp/import-panel.tsx";
 import { SAMPLE_CATALOG, SAMPLE_SCAN } from "../features/settings/mcp/sample.ts";
-import { AddKey, SetupFormView, SetupHeader } from "../features/setup/setup-form.tsx";
+import { SetupFormView, SetupHeader } from "../features/setup/setup-form.tsx";
 import { ToolsOfferView } from "../features/setup/tools-offer.tsx";
 import { TOOLS_CASES } from "../features/setup/tools-sample.ts";
 import { PullStatusView, pullSummary } from "../features/models/index.ts";
@@ -712,11 +713,11 @@ function McpSignInDemo() {
   );
 }
 
-/** Settings → Setup: the golem block, the status rows, and the key chips, in each state. */
+/** Settings → Setup: the golem block and the status rows, in each state. */
 function SetupFormDemo() {
   return (
     <div className="flex flex-col gap-4">
-      {FORM_CASES.map(({ label, rows, actions, providers, header, block, openKey }) => (
+      {FORM_CASES.map(({ label, rows, actions, header, block }) => (
         <section key={label} aria-label={`Setup, ${label}`} className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
           <span className="font-mono text-xs text-faint">{label}</span>
           <SetupHeader mark={header.mark} text={header.text} onRunAgain={() => {}} />
@@ -729,7 +730,6 @@ function SetupFormDemo() {
             onNavigate={() => {}}
             hasPage={() => false}
           />
-          <AddKey providers={providers} actions={actions} onCheck={() => {}} initialOpen={openKey ?? null} />
         </section>
       ))}
     </div>
@@ -760,11 +760,16 @@ function SkillsDemo() {
   );
 }
 
+/** Settings → API keys in each state: mixed, a fresh install, all set, no MCP keys, and a drawer open. */
 function ApiKeysDemo() {
   return (
-    <div className="flex max-w-column flex-col gap-3">
-      <p className="text-sm text-muted">Keys are set and removed in a terminal. The page never sees one.</p>
-      <KeysList providers={SAMPLE_KEYS} />
+    <div className="flex flex-col gap-4">
+      {KEYS_CASES.map(({ label, providers, servers, openKey }) => (
+        <section key={label} aria-label={`API keys, ${label}`} className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
+          <span className="font-mono text-xs text-faint">{label}</span>
+          <KeysView providers={providers} servers={servers} onRefresh={() => {}} onNavigate={() => {}} onServer={() => {}} initialOpen={openKey ?? null} />
+        </section>
+      ))}
     </div>
   );
 }
