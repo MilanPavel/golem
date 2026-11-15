@@ -12,6 +12,7 @@ from golem.tools.registry import ToolContext, ToolError, ToolResult
 from golem.tools.write import (
     EditFileArgs,
     WriteFileArgs,
+    commit,
     diff_counts,
     plan_edit,
     plan_write,
@@ -159,7 +160,7 @@ async def test_a_new_file_gets_the_umask_mode_and_an_unchanged_write_does_nothin
 def test_a_crlf_file_says_why_old_string_is_missing(project: Path) -> None:
     (project / "w.txt").write_bytes(b"one\r\ntwo\r\n")
     with pytest.raises(ToolError, match="CRLF"):
-        plan_edit(project, EditFileArgs(path="w.txt", old_string="one\ntwo", new_string="x"))
+        plan_edit(project, EditFileArgs(path="w.txt", old_string="one\nthree", new_string="x"))
 
 
 def test_a_missing_final_newline_is_marked(project: Path) -> None:
@@ -175,3 +176,86 @@ def test_a_cut_diff_still_tells_two_changes_apart(project: Path) -> None:
     assert shown_diff(one)[:DIFF_CHARS] == shown_diff(two)[:DIFF_CHARS]
     assert shown_diff(one) != shown_diff(two)
     assert "sha256" in shown_diff(one)
+
+
+def _method_file(project: Path) -> None:
+    text = (
+        "class A:\n    def go(self):\n        return 1\n\n    def stop(self):\n        return 2\n"
+    )
+    (project / "m.py").write_text(text, encoding="utf-8")
+
+
+def test_an_edit_with_the_wrong_base_indentation_applies_with_the_files_indentation(
+    project: Path,
+) -> None:
+    _method_file(project)
+    args = EditFileArgs(
+        path="m.py",
+        old_string="def go(self):\n    return 1\n",
+        new_string="def go(self):\n    return 10\n",
+    )
+    change = plan_edit(project, args)
+    assert change.rung == "indent"
+    assert change.after.startswith("class A:\n    def go(self):\n        return 10\n")
+    assert commit(change).output.endswith(
+        "; note: old_string matched after adjusting the indentation; check the result"
+    )
+
+
+def test_an_edit_missing_trailing_spaces_applies(project: Path) -> None:
+    (project / "t.txt").write_text("one  \ntwo\n", encoding="utf-8")
+    change = plan_edit(
+        project, EditFileArgs(path="t.txt", old_string="one\ntwo", new_string="1\n2")
+    )
+    assert change.rung == "trailing_space"
+    assert change.after == "1\n2\n"
+    assert commit(change).output == (
+        "edited t.txt (+2 -2); note: old_string matched after ignoring trailing spaces"
+    )
+
+
+def test_an_exact_edit_has_no_note(project: Path) -> None:
+    result = commit(
+        plan_edit(project, EditFileArgs(path="src/a.py", old_string="y = 2", new_string="y = 3"))
+    )
+    assert "note" not in result.output
+
+
+def test_an_ambiguous_fuzzy_edit_errors_and_writes_nothing(project: Path) -> None:
+    (project / "t.txt").write_text("a = 1  \nb\na = 1 \n", encoding="utf-8")
+    args = EditFileArgs(path="t.txt", old_string="a = 1", new_string="a = 2")
+    (project / "t.txt").write_text("key  \nval\nkey  \nval\n", encoding="utf-8")
+    args = EditFileArgs(path="t.txt", old_string="key\nval", new_string="x")
+    with pytest.raises(ToolError, match="places match when spacing is ignored"):
+        plan_edit(project, args)
+    (project / "u.txt").write_text("k\n  v\nk\n  v\n", encoding="utf-8")
+    assert (project / "t.txt").read_text(encoding="utf-8") == "key  \nval\nkey  \nval\n"
+
+
+def test_replace_all_does_not_apply_to_fuzzy_matches(project: Path) -> None:
+    (project / "t.txt").write_text("key  \nval\nkey  \nval\n", encoding="utf-8")
+    args = EditFileArgs(path="t.txt", old_string="key\nval", new_string="x", replace_all=True)
+    with pytest.raises(ToolError, match="2 places match"):
+        plan_edit(project, args)
+
+
+def test_a_miss_quotes_the_nearest_lines_with_their_numbers(project: Path) -> None:
+    (project / "f.py").write_text(
+        "import os\n\ndef fetch(url):\n    return get(url)\n\ndef other():\n    pass\n",
+        encoding="utf-8",
+    )
+    args = EditFileArgs(
+        path="f.py", old_string="def fetch(uri):\n    return get(uri)", new_string="x"
+    )
+    with pytest.raises(ToolError) as caught:
+        plan_edit(project, args)
+    message = str(caught.value)
+    assert "old_string is not in f.py. The closest text is lines 3-4:" in message
+    assert "def fetch(url):\n    return get(url)\n" in message
+    assert message.endswith("Copy the text from the file exactly, or read the file again.")
+
+
+def test_a_far_miss_keeps_the_plain_hint(project: Path) -> None:
+    args = EditFileArgs(path="src/a.py", old_string="zzzzzzzz\nqqqqqqqq", new_string="x")
+    with pytest.raises(ToolError, match="read the file and copy it exactly"):
+        plan_edit(project, args)

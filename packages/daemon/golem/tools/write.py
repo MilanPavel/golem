@@ -25,18 +25,25 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict, Field
 
 from golem.tools.fs import MAX_READ_BYTES
+from golem.tools.match import find, nearest, reindent
 from golem.tools.paths import inside, relative, session_root, writable
 from golem.tools.registry import Preview, Tool, ToolContext, ToolError, ToolResult
 
 DIFF_CONTEXT = 3
 DIFF_CHARS = 64_000
 """The most of a diff an approval shows, and stores in its event."""
+NEAREST_CHARS = 1_500
+"""The most of the closest text a missed edit quotes."""
 NO_NEWLINE = "\\ No newline at end of file"
 CHANGED_SINCE_APPROVAL = (
     "{path} changed after the user approved this change, so it was not applied; "
     "read the file again and make the change again"
 )
 
+_NOTES = {
+    "trailing_space": "; note: old_string matched after ignoring trailing spaces",
+    "indent": "; note: old_string matched after adjusting the indentation; check the result",
+}
 _ARGS = ConfigDict(extra="forbid")
 _LINE = re.compile(r"[^\n]*\n|[^\n]+")
 
@@ -80,6 +87,7 @@ class Change:
     shown: str
     before: str | None
     after: str
+    rung: str = "exact"
 
 
 def plan_write(
@@ -102,21 +110,53 @@ def plan_edit(root: Path, args: EditFileArgs, planned: Mapping[Path, str] | None
     if args.old_string == args.new_string:
         raise ToolError("old_string and new_string are the same, so nothing would change")
     before = _current(path, args.path, planned)
-    count = before.count(args.old_string)
-    if count == 0:
-        hint = (
-            "; the file has CRLF line endings, so old_string needs them too"
-            if "\r\n" in before and "\r\n" not in args.old_string and "\n" in args.old_string
-            else "; read the file and copy it exactly"
-        )
-        raise ToolError(f"old_string is not in {args.path}{hint}")
-    if count > 1 and not args.replace_all:
+    found = find(before, args.old_string)
+    if found is None:
+        raise ToolError(_miss(args, before))
+    count = len(found.spans)
+    if count > 1 and (not args.replace_all or found.rung != "exact"):
+        if found.rung == "exact":
+            raise ToolError(
+                f"old_string is in {args.path} {count} times; add context to make it unique, "
+                "or set replace_all"
+            )
         raise ToolError(
-            f"old_string is in {args.path} {count} times; add context to make it unique, "
-            "or set replace_all"
+            f"old_string is in {args.path}: {count} places match when spacing is ignored; "
+            "add context to make it unique"
         )
-    after = before.replace(args.old_string, args.new_string)
-    return Change(root, path, relative(root, path), before, after)
+    after = before
+    for span in reversed(found.spans):
+        new = args.new_string
+        if found.rung == "indent":
+            new = reindent(new, span.remove, span.add)
+        after = after[: span.start] + new + after[span.end :]
+    return Change(root, path, relative(root, path), before, after, found.rung)
+
+
+def _miss(args: EditFileArgs, before: str) -> str:
+    """The error for an ``old_string`` that is not in the file, with the closest lines if any."""
+    crlf = "\r\n" in before and "\r\n" not in args.old_string and "\n" in args.old_string
+    near = nearest(before, args.old_string)
+    if near is not None:
+        where = (
+            f"line {near.first_line}"
+            if near.first_line == near.last_line
+            else f"lines {near.first_line}-{near.last_line}"
+        )
+        text = near.text
+        if len(text) > NEAREST_CHARS:
+            text = f"{text[:NEAREST_CHARS]}..."
+        why = " The file has CRLF line endings, so old_string needs them too." if crlf else ""
+        return (
+            f"old_string is not in {args.path}. The closest text is {where}:\n{text}\n"
+            f"Copy the text from the file exactly, or read the file again.{why}"
+        )
+    hint = (
+        "; the file has CRLF line endings, so old_string needs them too"
+        if crlf
+        else "; read the file and copy it exactly"
+    )
+    return f"old_string is not in {args.path}{hint}"
 
 
 def apply(change: Change) -> None:
@@ -216,8 +256,9 @@ def commit(change: Change, approved_diff: str | None = None) -> ToolResult:
     created = change.before is None
     summary = f"{'new file ' if created else ''}+{added} -{removed} {change.shown}"
     verb = "created" if created else "edited"
+    note = _NOTES.get(change.rung, "")
     return ToolResult(
-        output=f"{verb} {change.shown} (+{added} -{removed})",
+        output=f"{verb} {change.shown} (+{added} -{removed}){note}",
         summary=summary,
         diff=shown_diff(change),
     )
@@ -296,6 +337,7 @@ EDIT_FILE = Tool(
     description=(
         "Replace exact text in a file in the project folder. old_string must match the "
         "file exactly, including indentation, and be unique unless replace_all is set. "
+        "golem tolerates a wrong base indentation and trailing spaces when the match is unique. "
         "Read the file first."
     ),
     args=EditFileArgs,
