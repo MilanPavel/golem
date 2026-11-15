@@ -200,7 +200,7 @@ The contracts of each part are in the step issues: [#936](https://github.com/Mil
 
 ### What is recorded
 
-Every write by `write_file` and `edit_file`; changes a shell command made, as far as golem can see them ([#952](https://github.com/MilanPavel/golem/issues/952), planned); and every undo. Not recorded: binary files, files that are not UTF-8, files over the read limit, and anything outside the session folder. A forked session starts with an empty change set.
+Every write by `write_file` and `edit_file`; changes a shell command made, as far as golem can see them, which is only in a git repository and where the sandbox exists, because git runs in it: a folder with no git records nothing from the shell ([#952](https://github.com/MilanPavel/golem/issues/952)); and every undo. Not recorded: binary files, files that are not UTF-8, files over the read limit, and anything outside the session folder. A forked session starts with an empty change set.
 
 ### The calls and the event
 

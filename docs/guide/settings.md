@@ -145,7 +145,9 @@ The providers are `openai`, `anthropic`, `google`, `deepseek`, `xai`, `moonshot`
 | `reply_reserve` | `4096` | Tokens of the window kept free for the reply. The rest is the room the history may fill |
 | `clear_at` | `0.70` | When the history passes this share of the room, golem sends old tool results as one line each |
 | `clear_to` | `0.40` | How far clearing goes down, as a share of the room. Must be above 0 and below `clear_at` |
+| `compact_at` | `0.85` | When the history is still past this share of the room after clearing, golem replaces the old turns with a summary in what it sends. Must be above `clear_at` and below 1 |
 | `keep_results` | `4` | The newest tool results that are never cleared. A model whose window is unknown is never cleared |
+| `keep_turns` | `4` | The newest turns that are never summarised. At least 1 |
 
 ### `[routing]`
 

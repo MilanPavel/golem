@@ -156,8 +156,8 @@ def unified_diff(change: Change) -> str:
 def diff_text(shown: str, before: str | None, after: str | None) -> str:
     """A unified diff of two texts of the file ``shown``. None is "no file"."""
     lines = difflib.unified_diff(
-        _lines(before or ""),
-        _lines(after or ""),
+        split_lines(before or ""),
+        split_lines(after or ""),
         fromfile="/dev/null" if before is None else f"a/{shown}",
         tofile="/dev/null" if after is None else f"b/{shown}",
         n=DIFF_CONTEXT,
@@ -248,7 +248,7 @@ def _preview(change: Change) -> Preview:
     return Preview(diff=shown_diff(change), path=change.path, after=change.after)
 
 
-def _lines(text: str) -> list[str]:
+def split_lines(text: str) -> list[str]:
     """Lines split on ``\\n`` only, each with its ending, unlike ``str.splitlines``."""
     return _LINE.findall(text)
 

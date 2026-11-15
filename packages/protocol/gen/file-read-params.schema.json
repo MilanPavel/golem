@@ -1,0 +1,22 @@
+{
+  "additionalProperties": false,
+  "description": "``file.read``. One text file of the session's folder.",
+  "properties": {
+    "path": {
+      "minLength": 1,
+      "title": "Path",
+      "type": "string"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "session_id",
+    "path"
+  ],
+  "title": "FileReadParams",
+  "type": "object"
+}

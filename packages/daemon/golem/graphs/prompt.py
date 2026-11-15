@@ -38,6 +38,8 @@ class PromptContext:
     report: Callable[[Mapping[str, object]], None] | None = None
     mcp_servers: tuple[str, ...] = ()
     """The on-demand MCP servers the session has turned on."""
+    plan_first: bool = False
+    """Whether the session is in plan first."""
 
 
 SectionFn = Callable[[PromptContext], str | None]
@@ -52,6 +54,25 @@ class Section:
 
     def __call__(self, context: PromptContext) -> str | None:
         return self.build(context)
+
+
+PLAN_SECTION = "plan_first"
+
+PLAN_TEXT = (
+    "Plan first is on. Do not change files or run commands that change anything.\n"
+    "Read what you need, then call propose_plan with short steps and the files each step "
+    "will touch.\n"
+    "After propose_plan, stop."
+)
+
+
+def plan_section(context: PromptContext) -> str | None:
+    """The plan first rules, only while the session is in plan first."""
+    return PLAN_TEXT if context.plan_first else None
+
+
+PLAN = Section(PLAN_SECTION, plan_section)
+"""The section that tells a plan first run what to do."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,4 +108,14 @@ class SystemPrompt:
         return SystemMessage(content=text) if text else None
 
 
-__all__ = ["PINNED_KEY", "PromptContext", "Section", "SectionFn", "SystemPrompt"]
+__all__ = [
+    "PINNED_KEY",
+    "PLAN",
+    "PLAN_SECTION",
+    "PLAN_TEXT",
+    "PromptContext",
+    "Section",
+    "SectionFn",
+    "SystemPrompt",
+    "plan_section",
+]

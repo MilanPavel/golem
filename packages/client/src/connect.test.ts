@@ -1497,6 +1497,49 @@ test("changesList and changesDiff send their targets and check what comes back",
   }
 });
 
+test("changesRevert sends each kind of target and checks what comes back", async () => {
+  const sent: [string, Record<string, unknown>][] = [];
+  const reply = { reverted: ["a.txt"], conflicts: [{ path: "b.txt", reason: "changed_on_disk" }] };
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: { "changes.revert": reply },
+      onRequest: (_socket, method, params) => {
+        if (method === "changes.revert") sent.push([method, params]);
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "web", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    assert.deepEqual(await client.changesRevert("s_test", { kind: "change", changeId: "c_1" }), reply);
+    await client.changesRevert("s_test", { kind: "file", path: "a.txt" }, true);
+    await client.changesRevert("s_test", { kind: "hunk", path: "a.txt", hunk: 2 });
+    await client.changesRevert("s_test", { kind: "run", runId: "r_1" });
+    assert.deepEqual(sent, [
+      ["changes.revert", { session_id: "s_test", target: { kind: "change", change_id: "c_1" }, force: false }],
+      ["changes.revert", { session_id: "s_test", target: { kind: "file", path: "a.txt" }, force: true }],
+      ["changes.revert", { session_id: "s_test", target: { kind: "hunk", path: "a.txt", hunk: 2 }, force: false }],
+      ["changes.revert", { session_id: "s_test", target: { kind: "run", run_id: "r_1" }, force: false }],
+    ]);
+  } finally {
+    client.close();
+    await server.close();
+  }
+  const bad = await listen((socket) => {
+    attach(socket, { answerPing: true, results: { "changes.revert": { reverted: ["a.txt"] } } });
+  });
+  const refused = connectGolem({ socketPath: bad.socketPath, clientName: "web", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    await assert.rejects(
+      () => refused.changesRevert("s_test", { kind: "file", path: "a.txt" }),
+      /invalid changes.revert result/,
+    );
+  } finally {
+    refused.close();
+    await bad.close();
+  }
+});
+
 test("the commit calls send their targets and check what comes back", async () => {
   const sent: [string, Record<string, unknown>][] = [];
   const commit = { ok: true, sha: "abc1234", output: "[main abc1234] msg" };
@@ -1607,6 +1650,45 @@ test("listDirs sends the path only when given, and rejects a malformed listing",
   const refused = connectGolem({ socketPath: bad.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
   try {
     await assert.rejects(() => refused.listDirs(), /invalid fs.list_dirs result/);
+  } finally {
+    refused.close();
+    await bad.close();
+  }
+});
+
+test("readFile and listFiles send their arguments and reject a malformed result", async () => {
+  const seen: [string, Record<string, unknown>][] = [];
+  const read = { path: "a.txt", text: "hi", truncated: false, lines: 1 };
+  const daemon = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: { "file.read": read, "file.list": { paths: ["a.txt"], more: false } },
+      onRequest: (_socket, method, params) => {
+        if (method.startsWith("file.")) seen.push([method, params]);
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: daemon.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    assert.deepEqual(await client.readFile("s_1", "a.txt"), read);
+    assert.deepEqual(await client.listFiles("s_1"), { paths: ["a.txt"], more: false });
+    await client.listFiles("s_1", "a", 5);
+    assert.deepEqual(seen, [
+      ["file.read", { session_id: "s_1", path: "a.txt" }],
+      ["file.list", { session_id: "s_1" }],
+      ["file.list", { session_id: "s_1", query: "a", limit: 5 }],
+    ]);
+  } finally {
+    client.close();
+    await daemon.close();
+  }
+  const bad = await listen((socket) => {
+    attach(socket, { answerPing: true, results: { "file.read": { path: "a" }, "file.list": { paths: [1] } } });
+  });
+  const refused = connectGolem({ socketPath: bad.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    await assert.rejects(() => refused.readFile("s_1", "a"), /invalid file.read result/);
+    await assert.rejects(() => refused.listFiles("s_1"), /invalid file.list result/);
   } finally {
     refused.close();
     await bad.close();

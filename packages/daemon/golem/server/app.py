@@ -17,13 +17,15 @@ from pydantic import BaseModel
 from golem.coding.changes import ChangeStore
 from golem.config import ModelPrice, load_settings
 from golem.graphs.chat import ChatRuntime, open_chat
-from golem.graphs.prompt import SystemPrompt
+from golem.graphs.estimate import TokenRatios
+from golem.graphs.prompt import PLAN, SystemPrompt
+from golem.graphs.summarise import Summariser
 from golem.lock import DaemonAlreadyRunning, DaemonLock
 from golem.logging import configure_logging
 from golem.mcp import McpSupervisor
 from golem.mcp.prompt import mcp_section
 from golem.models.discovery import Loaded, ModelDiscovery
-from golem.models.facts import ListedFacts
+from golem.models.facts import FactsSource, ListedFacts
 from golem.models.gate import ServerGate
 from golem.models.install import RUNTIMES, OllamaInstaller, runtime_installer
 from golem.models.keys import ProviderKeys
@@ -113,6 +115,7 @@ class DaemonApp:
         router: ModelRouter | None = None,
         titles: TitleGenerator | None = None,
         discovery: Callable[[ModelRouter], ModelDiscovery] | None = None,
+        facts: FactsSource | None = None,
         pulls: Callable[[ModelRouter, float | None], PullManager] | None = None,
         mcp: McpSupervisor | None = None,
         secrets: SecretStore | None = None,
@@ -132,6 +135,7 @@ class DaemonApp:
         self._titles = titles
         self._gate = gate
         self._discovery = discovery
+        self._facts = facts
         self._pulls = pulls
         self._mcp = mcp
         self._local = local_servers
@@ -265,6 +269,7 @@ class DaemonApp:
                         lambda profile: _price_of(router, models, profile),
                         lambda profile: _tier_of(router, models, profile),
                     )
+                gate = self._gate or ServerGate(settings.ollama.parallel)
                 chat = open_chat(
                     router,
                     saver,
@@ -277,6 +282,7 @@ class DaemonApp:
                             pinned_section(self.state.skills),
                             index_section(self.state.skills),
                             mcp_section(mcp),
+                            PLAN,
                         )
                     ),
                     BlobStore(database),
@@ -287,8 +293,20 @@ class DaemonApp:
                     learn_window=learn_window,
                     context=router.context_settings(),
                     price_of=lambda profile: _price_of(router, models, profile),
-                    gate=self._gate or ServerGate(settings.ollama.parallel),
+                    gate=gate,
                     tier_of=lambda profile: _tier_of(router, models, profile),
+                    ratios=TokenRatios(),
+                    summariser=Summariser(
+                        router,
+                        gate=gate,
+                        usage=usage,
+                        price_of=lambda profile: _price_of(router, models, profile),
+                        tier_of=lambda profile: _tier_of(router, models, profile),
+                        budget_refs=models.budget_refs,
+                        window_of=lambda profile, overrides: (
+                            resolve_window(router, profile, models, overrides=overrides).window
+                        ),
+                    ),
                 )
                 bus = EventBus()
                 self.state.sessions = await _open_sessions(
@@ -311,7 +329,7 @@ class DaemonApp:
 
                 chat.enable_mcp = enable_mcp
                 chat.skills = self.state.skills
-                chat.changes = ChangeStore(database, BlobStore(database))
+                chat.changes = self.state.changes
                 if self._pulls is None:
                     pulls = PullManager(router, ram_gb=models.ram_gb)
                 else:
@@ -323,8 +341,7 @@ class DaemonApp:
                 models.local = local
                 self.state.models = models
                 chat.note_speed = note_speed
-                # Nothing calls it yet. The routing rules read it.
-                self.state.facts = ListedFacts(
+                self.state.facts = self._facts or ListedFacts(
                     models,
                     router,
                     lambda profile, overrides: resolve_window(
@@ -332,6 +349,8 @@ class DaemonApp:
                     ),
                     speeds.speed,
                 )
+                sessions.facts = self.state.facts
+                sessions.listed_refs = lambda: [listed.ref for listed in models.cached()]
                 self.state.pulls = pulls
                 self.state.installer = OllamaInstaller(broadcast=self._broadcast)
                 self.state.runtimes = {

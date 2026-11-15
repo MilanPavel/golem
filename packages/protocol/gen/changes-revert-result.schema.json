@@ -1,0 +1,49 @@
+{
+  "$defs": {
+    "RevertConflict": {
+      "additionalProperties": false,
+      "description": "A file a revert did not touch.",
+      "properties": {
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "reason": {
+          "const": "changed_on_disk",
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "reason"
+      ],
+      "title": "RevertConflict",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The paths written, and the paths left alone. Each write is a change of its own.",
+  "properties": {
+    "conflicts": {
+      "items": {
+        "$ref": "#/$defs/RevertConflict"
+      },
+      "title": "Conflicts",
+      "type": "array"
+    },
+    "reverted": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Reverted",
+      "type": "array"
+    }
+  },
+  "required": [
+    "reverted",
+    "conflicts"
+  ],
+  "title": "ChangesRevertResult",
+  "type": "object"
+}

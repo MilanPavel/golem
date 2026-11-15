@@ -2,6 +2,7 @@
 
 export type ClearedIds = string[];
 export type ContextWindow = number | null;
+export type EstimatedTokens = number | null;
 export type Index = number;
 export type MessageBytes = number[] | null;
 export type MessageChars = number[] | null;
@@ -11,6 +12,7 @@ export type Model = string | null;
 export type NumCtx = number | null;
 export type Profile = string;
 export type Provider = string | null;
+export type SummaryChars = number | null;
 export type SystemBytes = number | null;
 export type SystemChars = number | null;
 export type SystemPromptSha = string | null;
@@ -54,6 +56,7 @@ export type WindowPlanned = boolean;
 export interface ModelCallStartedData {
   cleared_ids?: ClearedIds;
   context_window?: ContextWindow;
+  estimated_tokens?: EstimatedTokens;
   index: Index;
   message_bytes?: MessageBytes;
   message_chars?: MessageChars;
@@ -63,6 +66,7 @@ export interface ModelCallStartedData {
   num_ctx?: NumCtx;
   profile: Profile;
   provider?: Provider;
+  summary_chars?: SummaryChars;
   system_bytes?: SystemBytes;
   system_chars?: SystemChars;
   system_prompt_sha?: SystemPromptSha;

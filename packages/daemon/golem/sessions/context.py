@@ -23,7 +23,7 @@ from golem_protocol.commands import (
 )
 from golem_protocol.events import PromptSectionInfo
 
-Key = Literal["system", "tools", "user", "assistant", "tool_results"]
+Key = Literal["system", "tools", "user", "assistant", "tool_results", "summary"]
 _KEYS: tuple[Key, ...] = get_args(Key)
 _ROLE_KEY: dict[str, Key] = {"user": "user", "assistant": "assistant", "tool": "tool_results"}
 
@@ -96,6 +96,7 @@ def context_breakdown(
     tools: Sequence[Mapping[str, object]] | None,
     messages: Sequence[TraceMessage],
     cleared_ids: Collection[str] = (),
+    summary_chars: int = 0,
 ) -> tuple[TraceContext, list[TraceMessage]]:
     """The context of one model call, and ``messages`` with ``tokens`` set on each.
 
@@ -103,6 +104,7 @@ def context_breakdown(
     four characters a token. Items add up to their part, and the messages of
     one role to theirs. A result in ``cleared_ids`` counts as its stub, and its
     message comes back as the stub; ``cleared`` has their number and the tokens saved.
+    ``summary_chars`` is the summary of old turns sent as the first message. It is its own part.
     """
     messages, saved = _stubbed(messages, cleared_ids)
     prompt_chars = 0 if system_prompt is None else len(system_prompt)
@@ -120,6 +122,7 @@ def context_breakdown(
         "user": 0,
         "assistant": 0,
         "tool_results": 0,
+        "summary": summary_chars,
     }
     for key in ("user", "assistant", "tool_results"):
         chars[key] = sum(message_weights[i] for i in by_key[key])

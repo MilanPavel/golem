@@ -1,5 +1,5 @@
-import { displayToolName, formatTurnTime, groupTurns, stepCount, stepMark, summarizeSteps, turnFooter, LIVE_OUTPUT_CHARS, thinkingLine, unreadCallNotice, REPLY_CUT_NOTE, type ChatMessage, type ChatState, type Detail, type StepMark, type ToolBlock } from "@golem/view";
-import { memo, useCallback, useId, useLayoutEffect, useRef, useState } from "react";
+import { displayToolName, formatTurnTime, groupTurns, turnFooterParts, stepCount, stepMark, summarizeSteps, turnFooter, LIVE_OUTPUT_CHARS, thinkingLine, unreadCallNotice, writingLabel, REPLY_CUT_NOTE, type ChatMessage, type ChatState, type Detail, type StepMark, type ToolBlock, type WritingBlock } from "@golem/view";
+import { memo, useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { usePulls, useSession } from "../../store/page-context.tsx";
 import type { PullsSnapshot } from "../../store/pulls.ts";
 import type { SessionModel } from "../../store/session-store.ts";
@@ -17,6 +17,7 @@ import type { DiffMode } from "../diff/diff-mode.ts";
 import { DiffModeSwitch } from "../diff/diff-mode-switch.tsx";
 import { useDiffMode } from "../diff/diff-mode.ts";
 import { DiffView } from "../diff/diff-view.tsx";
+import { EditCards, isEditCard } from "./edit-card.tsx";
 import { Markdown } from "./markdown-view.tsx";
 
 function ToolResult({ tool }: { tool: ToolBlock }) {
@@ -229,6 +230,29 @@ const MARK_CLASS: Record<StepMark, string> = {
 };
 
 /**
+ * The file the model is still writing, where its tool line will appear. The seconds count from the
+ * first `tool.writing` of the call: the row mounts then and goes when `tool.requested` clears it.
+ */
+export function WritingRow({ writing }: { writing: WritingBlock }) {
+  const [started] = useState(() => Date.now());
+  const [now, setNow] = useState(started);
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+    return () => {
+      clearInterval(timer);
+    };
+  }, []);
+  return (
+    <p aria-live="off" data-writing className="flex items-center gap-2 font-mono text-xs leading-snug text-muted">
+      <span aria-hidden="true" className="block size-1.5 shrink-0 animate-pulse rounded-full bg-wait motion-reduce:animate-none" />
+      <span className="truncate">{writingLabel(writing, (now - started) / 1000)}</span>
+    </p>
+  );
+}
+
+/**
  * The tools of a whole turn as one line under the answer: a dot each and a summary. It opens into
  * the steps. A tool that waits for you keeps it open, and Verbose opens it with every row expanded. A tool
  * that had an approval shows how it ended as a chip; the one still waiting is asked in the dock instead.
@@ -237,6 +261,8 @@ export function ActivityLine({ tools, detail, streaming = false, pendingId = nul
   const [chosen, setChosen] = useState<boolean | null>(null);
   const listId = useId();
   if (tools.length === 0) return null;
+  // Outside Quiet a finished edit is a card above the line, not a row in it.
+  const rows = detail === "quiet" ? tools : tools.filter((tool) => !isEditCard(tool));
   const verbose = detail === "verbose";
   const waiting = tools.some((tool) => tool.status === "waiting");
   const open = waiting || (chosen ?? verbose);
@@ -266,9 +292,9 @@ export function ActivityLine({ tools, detail, streaming = false, pendingId = nul
         </span>
         <span>{text}</span>
       </button>
-      {open ? (
+      {open && rows.length > 0 ? (
         <ul id={listId} aria-label="Tool calls" className="flex list-none flex-col gap-0.5 border-l border-line py-0.5 pl-3 font-mono text-xs leading-snug">
-          {tools.map((tool) => (
+          {rows.map((tool) => (
             <ToolLine key={`${tool.callId}:${verbose}`} tool={tool} defaultOpen={verbose} pending={tool.callId === pendingId} />
           ))}
         </ul>
@@ -289,7 +315,7 @@ export function GolemTurn({
   const footer = turnFooter(steps);
   const tools = steps.flatMap((step) => step.tools ?? []);
   const foot = footer
-    ? [footer.durationMs === undefined ? "" : formatTurnTime(footer.durationMs), footer.tools > 0 ? stepCount(footer.tools) : ""].filter(Boolean)
+    ? [footer.durationMs === undefined ? "" : formatTurnTime(footer.durationMs), footer.tools > 0 ? stepCount(footer.tools) : "", ...turnFooterParts(footer)].filter(Boolean)
     : [];
   return (
     <article aria-label="golem" className="flex min-w-0 flex-col gap-2.5">
@@ -297,8 +323,10 @@ export function GolemTurn({
       {steps.map((message) => (
         <GolemStep key={message.id} message={message} thinkingShown={thinkingShown} />
       ))}
+      {detail === "quiet" ? null : <EditCards tools={tools.filter(isEditCard)} />}
       <ActivityLine tools={tools} detail={detail} streaming={steps.some((step) => step.streaming)} pendingId={pendingId} />
-      {foot.length > 0 ? <p className="font-mono text-xs text-faint">{foot.join(" · ")}</p> : null}
+      {steps.map((step) => (step.writing == null ? null : <WritingRow key={step.id} writing={step.writing} />))}
+      {foot.length > 0 ?<p className="font-mono text-xs text-faint">{foot.join(" · ")}</p> : null}
     </article>
   );
 }

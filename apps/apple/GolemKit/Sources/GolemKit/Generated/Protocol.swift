@@ -693,6 +693,103 @@ public struct FileElement: Codable {
     }
 }
 
+/// ``changes.revert``. Put back what a change, a file, a hunk or a turn wrote.
+///
+/// Without ``force``, a file that changed on disk since golem wrote it is left alone
+/// and listed as a conflict. Refused while the session has a run.
+// MARK: - ChangesRevertParams
+public struct ChangesRevertParams: Codable {
+    public let force: Bool?
+    public let sessionID: String
+    public let target: TargetClass
+
+    public enum CodingKeys: String, CodingKey {
+        case force = "force"
+        case sessionID = "session_id"
+        case target = "target"
+    }
+
+    public init(force: Bool?, sessionID: String, target: TargetClass) {
+        self.force = force
+        self.sessionID = sessionID
+        self.target = target
+    }
+}
+
+/// What ``changes.revert`` takes back. Each kind needs its own field and no other.
+///
+/// ``change`` needs ``change_id``, ``file`` needs ``path``, ``hunk`` needs ``path`` and
+/// ``hunk`` (0-based, of the file's net diff), and ``run`` needs ``run_id``.
+// MARK: - TargetClass
+public struct TargetClass: Codable {
+    public let changeID: String?
+    public let hunk: Int?
+    public let kind: TargetKind
+    public let path: String?
+    public let runID: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case changeID = "change_id"
+        case hunk = "hunk"
+        case kind = "kind"
+        case path = "path"
+        case runID = "run_id"
+    }
+
+    public init(changeID: String?, hunk: Int?, kind: TargetKind, path: String?, runID: String?) {
+        self.changeID = changeID
+        self.hunk = hunk
+        self.kind = kind
+        self.path = path
+        self.runID = runID
+    }
+}
+
+public enum TargetKind: String, Codable {
+    case change = "change"
+    case file = "file"
+    case hunk = "hunk"
+    case run = "run"
+}
+
+/// The paths written, and the paths left alone. Each write is a change of its own.
+// MARK: - ChangesRevertResult
+public struct ChangesRevertResult: Codable {
+    public let conflicts: [ConflictElement]
+    public let reverted: [String]
+
+    public enum CodingKeys: String, CodingKey {
+        case conflicts = "conflicts"
+        case reverted = "reverted"
+    }
+
+    public init(conflicts: [ConflictElement], reverted: [String]) {
+        self.conflicts = conflicts
+        self.reverted = reverted
+    }
+}
+
+/// A file a revert did not touch.
+// MARK: - ConflictElement
+public struct ConflictElement: Codable {
+    public let path: String
+    public let reason: ConflictReason
+
+    public enum CodingKeys: String, CodingKey {
+        case path = "path"
+        case reason = "reason"
+    }
+
+    public init(path: String, reason: ConflictReason) {
+        self.path = path
+        self.reason = reason
+    }
+}
+
+public enum ConflictReason: String, Codable {
+    case changedOnDisk = "changed_on_disk"
+}
+
 /// ``changes.suggest_message``. Ask the session's model for a commit message.
 // MARK: - ChangesSuggestMessageParams
 public struct ChangesSuggestMessageParams: Codable {
@@ -1393,10 +1490,11 @@ public struct ConfigRule: Codable {
 ///
 /// ``cleared`` means old tool results are now sent as one line each: ``count`` is how
 /// many, and ``before_tokens`` and ``after_tokens`` are rough sizes of the history before
-/// and after. ``summarised`` and ``grew`` are for later changes: ``count`` is the
-/// messages summarised, ``window_from`` and ``window_to`` the window before and after,
-/// and ``reload_ms`` the time the model took to load again. The checkpoint keeps every
-/// message, so no transcript event changes. A field a change does not use is None.
+/// and after. For ``summarised``, ``count`` is the messages a summary now stands for.
+/// ``grew`` is for a later change: ``window_from`` and ``window_to`` are the window
+/// before and after, and ``reload_ms`` the time the model took to load again. The
+/// checkpoint keeps every message, so no transcript event changes. A field a change
+/// does not use is None.
 // MARK: - ContextChangedData
 public struct ContextChangedData: Codable {
     public let action: ContextChangedDataAction
@@ -1467,10 +1565,11 @@ public struct ContextChangedEvent: Codable {
 ///
 /// ``cleared`` means old tool results are now sent as one line each: ``count`` is how
 /// many, and ``before_tokens`` and ``after_tokens`` are rough sizes of the history before
-/// and after. ``summarised`` and ``grew`` are for later changes: ``count`` is the
-/// messages summarised, ``window_from`` and ``window_to`` the window before and after,
-/// and ``reload_ms`` the time the model took to load again. The checkpoint keeps every
-/// message, so no transcript event changes. A field a change does not use is None.
+/// and after. For ``summarised``, ``count`` is the messages a summary now stands for.
+/// ``grew`` is for a later change: ``window_from`` and ``window_to`` are the window
+/// before and after, and ``reload_ms`` the time the model took to load again. The
+/// checkpoint keeps every message, so no transcript event changes. A field a change
+/// does not use is None.
 // MARK: - ContextChangedEventData
 public struct ContextChangedEventData: Codable {
     public let action: ContextChangedDataAction
@@ -1897,10 +1996,12 @@ public enum FileChangedDataSource: String, Codable {
 }
 
 /// A file in the session folder changed. Sent before the ``tool.completed`` of its call.
+///
+/// ``run_id`` is null for an undo, which is made between runs.
 // MARK: - FileChangedEvent
 public struct FileChangedEvent: Codable {
     public let data: FileChangedEventData
-    public let runID: String
+    public let runID: String?
     public let seq: Int
     public let sessionID: String
     public let ts: String
@@ -1915,7 +2016,7 @@ public struct FileChangedEvent: Codable {
         case type = "type"
     }
 
-    public init(data: FileChangedEventData, runID: String, seq: Int, sessionID: String, ts: String, type: FileChangedEventType) {
+    public init(data: FileChangedEventData, runID: String?, seq: Int, sessionID: String, ts: String, type: FileChangedEventType) {
         self.data = data
         self.runID = runID
         self.seq = seq
@@ -1966,6 +2067,85 @@ public struct FileChangedEventData: Codable {
 
 public enum FileChangedEventType: String, Codable {
     case fileChanged = "file.changed"
+}
+
+/// ``file.list``. Files of the session's folder whose path holds ``query``, case-insensitive.
+// MARK: - FileListParams
+public struct FileListParams: Codable {
+    public let limit: Int?
+    public let query: String?
+    public let sessionID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case limit = "limit"
+        case query = "query"
+        case sessionID = "session_id"
+    }
+
+    public init(limit: Int?, query: String?, sessionID: String) {
+        self.limit = limit
+        self.query = query
+        self.sessionID = sessionID
+    }
+}
+
+/// Relative paths, shortest first, then alphabetical. ``more`` is true when others match.
+// MARK: - FileListResult
+public struct FileListResult: Codable {
+    public let more: Bool
+    public let paths: [String]
+
+    public enum CodingKeys: String, CodingKey {
+        case more = "more"
+        case paths = "paths"
+    }
+
+    public init(more: Bool, paths: [String]) {
+        self.more = more
+        self.paths = paths
+    }
+}
+
+/// ``file.read``. One text file of the session's folder.
+// MARK: - FileReadParams
+public struct FileReadParams: Codable {
+    public let path: String
+    public let sessionID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case path = "path"
+        case sessionID = "session_id"
+    }
+
+    public init(path: String, sessionID: String) {
+        self.path = path
+        self.sessionID = sessionID
+    }
+}
+
+/// The file's path relative to the folder, the start of its text, and its line count.
+///
+/// ``truncated`` is true when the file is longer than the limit and ``text`` is its start.
+// MARK: - FileReadResult
+public struct FileReadResult: Codable {
+    public let lines: Int
+    public let path: String
+    public let text: String
+    public let truncated: Bool
+
+    public enum CodingKeys: String, CodingKey {
+        case lines = "lines"
+        case path = "path"
+        case text = "text"
+        case truncated = "truncated"
+    }
+
+    public init(lines: Int, path: String, text: String, truncated: Bool) {
+        self.lines = lines
+        self.path = path
+        self.text = text
+        self.truncated = truncated
+    }
 }
 
 /// The session and message a fork was copied from.
@@ -6007,6 +6187,7 @@ public enum ModelCallCompletedEventType: String, Codable {
 public struct ModelCallStartedData: Codable {
     public let clearedIDS: [String]?
     public let contextWindow: Int?
+    public let estimatedTokens: Int?
     public let index: Int
     public let messageBytes: [Int]?
     public let messageChars: [Int]?
@@ -6016,6 +6197,7 @@ public struct ModelCallStartedData: Codable {
     public let numCtx: Int?
     public let profile: String
     public let provider: String?
+    public let summaryChars: Int?
     public let systemBytes: Int?
     public let systemChars: Int?
     public let systemPromptSHA: String?
@@ -6030,6 +6212,7 @@ public struct ModelCallStartedData: Codable {
     public enum CodingKeys: String, CodingKey {
         case clearedIDS = "cleared_ids"
         case contextWindow = "context_window"
+        case estimatedTokens = "estimated_tokens"
         case index = "index"
         case messageBytes = "message_bytes"
         case messageChars = "message_chars"
@@ -6039,6 +6222,7 @@ public struct ModelCallStartedData: Codable {
         case numCtx = "num_ctx"
         case profile = "profile"
         case provider = "provider"
+        case summaryChars = "summary_chars"
         case systemBytes = "system_bytes"
         case systemChars = "system_chars"
         case systemPromptSHA = "system_prompt_sha"
@@ -6051,9 +6235,10 @@ public struct ModelCallStartedData: Codable {
         case windowPlanned = "window_planned"
     }
 
-    public init(clearedIDS: [String]?, contextWindow: Int?, index: Int, messageBytes: [Int]?, messageChars: [Int]?, messageID: String, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String, provider: String?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [PurplePromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?) {
+    public init(clearedIDS: [String]?, contextWindow: Int?, estimatedTokens: Int?, index: Int, messageBytes: [Int]?, messageChars: [Int]?, messageID: String, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String, provider: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [PurplePromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?) {
         self.clearedIDS = clearedIDS
         self.contextWindow = contextWindow
+        self.estimatedTokens = estimatedTokens
         self.index = index
         self.messageBytes = messageBytes
         self.messageChars = messageChars
@@ -6063,6 +6248,7 @@ public struct ModelCallStartedData: Codable {
         self.numCtx = numCtx
         self.profile = profile
         self.provider = provider
+        self.summaryChars = summaryChars
         self.systemBytes = systemBytes
         self.systemChars = systemChars
         self.systemPromptSHA = systemPromptSHA
@@ -6157,6 +6343,7 @@ public struct ModelCallStartedEvent: Codable {
 public struct ModelCallStartedEventData: Codable {
     public let clearedIDS: [String]?
     public let contextWindow: Int?
+    public let estimatedTokens: Int?
     public let index: Int
     public let messageBytes: [Int]?
     public let messageChars: [Int]?
@@ -6166,6 +6353,7 @@ public struct ModelCallStartedEventData: Codable {
     public let numCtx: Int?
     public let profile: String
     public let provider: String?
+    public let summaryChars: Int?
     public let systemBytes: Int?
     public let systemChars: Int?
     public let systemPromptSHA: String?
@@ -6180,6 +6368,7 @@ public struct ModelCallStartedEventData: Codable {
     public enum CodingKeys: String, CodingKey {
         case clearedIDS = "cleared_ids"
         case contextWindow = "context_window"
+        case estimatedTokens = "estimated_tokens"
         case index = "index"
         case messageBytes = "message_bytes"
         case messageChars = "message_chars"
@@ -6189,6 +6378,7 @@ public struct ModelCallStartedEventData: Codable {
         case numCtx = "num_ctx"
         case profile = "profile"
         case provider = "provider"
+        case summaryChars = "summary_chars"
         case systemBytes = "system_bytes"
         case systemChars = "system_chars"
         case systemPromptSHA = "system_prompt_sha"
@@ -6201,9 +6391,10 @@ public struct ModelCallStartedEventData: Codable {
         case windowPlanned = "window_planned"
     }
 
-    public init(clearedIDS: [String]?, contextWindow: Int?, index: Int, messageBytes: [Int]?, messageChars: [Int]?, messageID: String, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String, provider: String?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [FluffyPromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?) {
+    public init(clearedIDS: [String]?, contextWindow: Int?, estimatedTokens: Int?, index: Int, messageBytes: [Int]?, messageChars: [Int]?, messageID: String, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String, provider: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [FluffyPromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?) {
         self.clearedIDS = clearedIDS
         self.contextWindow = contextWindow
+        self.estimatedTokens = estimatedTokens
         self.index = index
         self.messageBytes = messageBytes
         self.messageChars = messageChars
@@ -6213,6 +6404,7 @@ public struct ModelCallStartedEventData: Codable {
         self.numCtx = numCtx
         self.profile = profile
         self.provider = provider
+        self.summaryChars = summaryChars
         self.systemBytes = systemBytes
         self.systemChars = systemChars
         self.systemPromptSHA = systemPromptSHA
@@ -7266,6 +7458,186 @@ public struct ModelPullResult: Codable {
     }
 }
 
+/// A candidate the pick left out, and why in plain words.
+// MARK: - ModelRejection
+public struct ModelRejection: Codable {
+    public let ref: String
+    public let tier: Tier
+    public let why: String
+
+    public enum CodingKeys: String, CodingKey {
+        case ref = "ref"
+        case tier = "tier"
+        case why = "why"
+    }
+
+    public init(ref: String, tier: Tier, why: String) {
+        self.ref = ref
+        self.tier = tier
+        self.why = why
+    }
+}
+
+/// Which model a run uses, and why golem picked it.
+///
+/// Sent right after ``run.started`` in a session whose route is not ``pinned``.
+/// ``model_profile`` is the profile that runs. ``provider`` and ``model`` are what
+/// it resolves to, null when it does not resolve. ``reason`` is why this model
+/// (ADR-055), ``detail`` one short sentence, and ``rejected`` the candidates the
+/// pick dropped. The session's own model does not change.
+// MARK: - ModelRoutedData
+public struct ModelRoutedData: Codable {
+    public let detail: String
+    public let model: String?
+    public let modelProfile: String
+    public let provider: String?
+    public let reason: ModelRoutedDataReason
+    public let rejected: [ModelRoutedDataRejected]?
+    public let tier: Tier
+
+    public enum CodingKeys: String, CodingKey {
+        case detail = "detail"
+        case model = "model"
+        case modelProfile = "model_profile"
+        case provider = "provider"
+        case reason = "reason"
+        case rejected = "rejected"
+        case tier = "tier"
+    }
+
+    public init(detail: String, model: String?, modelProfile: String, provider: String?, reason: ModelRoutedDataReason, rejected: [ModelRoutedDataRejected]?, tier: Tier) {
+        self.detail = detail
+        self.model = model
+        self.modelProfile = modelProfile
+        self.provider = provider
+        self.reason = reason
+        self.rejected = rejected
+        self.tier = tier
+    }
+}
+
+public enum ModelRoutedDataReason: String, Codable {
+    case budget = "budget"
+    case cheapest = "cheapest"
+    case escalated = "escalated"
+    case fallback = "fallback"
+    case fit = "fit"
+    case pinned = "pinned"
+    case privacy = "privacy"
+    case user = "user"
+}
+
+/// A candidate the pick left out, and why in plain words.
+// MARK: - ModelRoutedDataRejected
+public struct ModelRoutedDataRejected: Codable {
+    public let ref: String
+    public let tier: Tier
+    public let why: String
+
+    public enum CodingKeys: String, CodingKey {
+        case ref = "ref"
+        case tier = "tier"
+        case why = "why"
+    }
+
+    public init(ref: String, tier: Tier, why: String) {
+        self.ref = ref
+        self.tier = tier
+        self.why = why
+    }
+}
+
+/// The pick for this run: the model that runs it and why.
+// MARK: - ModelRoutedEvent
+public struct ModelRoutedEvent: Codable {
+    public let data: ModelRoutedEventData
+    public let runID: String
+    public let seq: Int
+    public let sessionID: String
+    public let ts: String
+    public let type: ModelRoutedEventType
+
+    public enum CodingKeys: String, CodingKey {
+        case data = "data"
+        case runID = "run_id"
+        case seq = "seq"
+        case sessionID = "session_id"
+        case ts = "ts"
+        case type = "type"
+    }
+
+    public init(data: ModelRoutedEventData, runID: String, seq: Int, sessionID: String, ts: String, type: ModelRoutedEventType) {
+        self.data = data
+        self.runID = runID
+        self.seq = seq
+        self.sessionID = sessionID
+        self.ts = ts
+        self.type = type
+    }
+}
+
+/// Which model a run uses, and why golem picked it.
+///
+/// Sent right after ``run.started`` in a session whose route is not ``pinned``.
+/// ``model_profile`` is the profile that runs. ``provider`` and ``model`` are what
+/// it resolves to, null when it does not resolve. ``reason`` is why this model
+/// (ADR-055), ``detail`` one short sentence, and ``rejected`` the candidates the
+/// pick dropped. The session's own model does not change.
+// MARK: - ModelRoutedEventData
+public struct ModelRoutedEventData: Codable {
+    public let detail: String
+    public let model: String?
+    public let modelProfile: String
+    public let provider: String?
+    public let reason: ModelRoutedDataReason
+    public let rejected: [PurpleModelRejection]?
+    public let tier: Tier
+
+    public enum CodingKeys: String, CodingKey {
+        case detail = "detail"
+        case model = "model"
+        case modelProfile = "model_profile"
+        case provider = "provider"
+        case reason = "reason"
+        case rejected = "rejected"
+        case tier = "tier"
+    }
+
+    public init(detail: String, model: String?, modelProfile: String, provider: String?, reason: ModelRoutedDataReason, rejected: [PurpleModelRejection]?, tier: Tier) {
+        self.detail = detail
+        self.model = model
+        self.modelProfile = modelProfile
+        self.provider = provider
+        self.reason = reason
+        self.rejected = rejected
+        self.tier = tier
+    }
+}
+
+/// A candidate the pick left out, and why in plain words.
+// MARK: - PurpleModelRejection
+public struct PurpleModelRejection: Codable {
+    public let ref: String
+    public let tier: Tier
+    public let why: String
+
+    public enum CodingKeys: String, CodingKey {
+        case ref = "ref"
+        case tier = "tier"
+        case why = "why"
+    }
+
+    public init(ref: String, tier: Tier, why: String) {
+        self.ref = ref
+        self.tier = tier
+        self.why = why
+    }
+}
+
+public enum ModelRoutedEventType: String, Codable {
+    case modelRouted = "model.routed"
+}
+
 /// The model the session's next run uses.
 ///
 /// ``model_profile`` is the name asked for, a profile or a ``provider/model``
@@ -7520,6 +7892,79 @@ public struct ModelSpeedInfo: Codable {
         self.replyTps = replyTps
         self.samples = samples
     }
+}
+
+/// A chat call waits, or no longer waits, for its turn on a local model server.
+///
+/// Sent for the reply ``message_id`` only, so other sessions never show it. Stored only
+/// until its message completes.
+// MARK: - ModelWaitingData
+public struct ModelWaitingData: Codable {
+    public let messageID: String
+    public let waiting: Bool
+
+    public enum CodingKeys: String, CodingKey {
+        case messageID = "message_id"
+        case waiting = "waiting"
+    }
+
+    public init(messageID: String, waiting: Bool) {
+        self.messageID = messageID
+        self.waiting = waiting
+    }
+}
+
+/// A chat call waits for the local model. A live signal: ``message.completed`` replaces it.
+// MARK: - ModelWaitingEvent
+public struct ModelWaitingEvent: Codable {
+    public let data: ModelWaitingEventData
+    public let runID: String
+    public let seq: Int
+    public let sessionID: String
+    public let ts: String
+    public let type: ModelWaitingEventType
+
+    public enum CodingKeys: String, CodingKey {
+        case data = "data"
+        case runID = "run_id"
+        case seq = "seq"
+        case sessionID = "session_id"
+        case ts = "ts"
+        case type = "type"
+    }
+
+    public init(data: ModelWaitingEventData, runID: String, seq: Int, sessionID: String, ts: String, type: ModelWaitingEventType) {
+        self.data = data
+        self.runID = runID
+        self.seq = seq
+        self.sessionID = sessionID
+        self.ts = ts
+        self.type = type
+    }
+}
+
+/// A chat call waits, or no longer waits, for its turn on a local model server.
+///
+/// Sent for the reply ``message_id`` only, so other sessions never show it. Stored only
+/// until its message completes.
+// MARK: - ModelWaitingEventData
+public struct ModelWaitingEventData: Codable {
+    public let messageID: String
+    public let waiting: Bool
+
+    public enum CodingKeys: String, CodingKey {
+        case messageID = "message_id"
+        case waiting = "waiting"
+    }
+
+    public init(messageID: String, waiting: Bool) {
+        self.messageID = messageID
+        self.waiting = waiting
+    }
+}
+
+public enum ModelWaitingEventType: String, Codable {
+    case modelWaiting = "model.waiting"
 }
 
 /// ``notify.test``. Post a sample notification, for Settings and ``golem doctor``.
@@ -7801,6 +8246,140 @@ public enum PingType: String, Codable {
     case systemPing = "system.ping"
 }
 
+/// The plan a plan first run ended with, sent for the user to read.
+///
+/// ``plan_id`` names this plan. ``call_id`` is the ``propose_plan`` call.
+// MARK: - PlanProposedData
+public struct PlanProposedData: Codable {
+    public let callID: String
+    public let planID: String
+    public let steps: [PlanProposedDataStep]
+    public let title: String
+
+    public enum CodingKeys: String, CodingKey {
+        case callID = "call_id"
+        case planID = "plan_id"
+        case steps = "steps"
+        case title = "title"
+    }
+
+    public init(callID: String, planID: String, steps: [PlanProposedDataStep], title: String) {
+        self.callID = callID
+        self.planID = planID
+        self.steps = steps
+        self.title = title
+    }
+}
+
+/// One step of a plan: what to do, and the files it will touch.
+// MARK: - PlanProposedDataStep
+public struct PlanProposedDataStep: Codable {
+    public let files: [String]?
+    public let text: String
+
+    public enum CodingKeys: String, CodingKey {
+        case files = "files"
+        case text = "text"
+    }
+
+    public init(files: [String]?, text: String) {
+        self.files = files
+        self.text = text
+    }
+}
+
+/// A plan first run proposed its plan with ``propose_plan``.
+// MARK: - PlanProposedEvent
+public struct PlanProposedEvent: Codable {
+    public let data: PlanProposedEventData
+    public let runID: String
+    public let seq: Int
+    public let sessionID: String
+    public let ts: String
+    public let type: PlanProposedEventType
+
+    public enum CodingKeys: String, CodingKey {
+        case data = "data"
+        case runID = "run_id"
+        case seq = "seq"
+        case sessionID = "session_id"
+        case ts = "ts"
+        case type = "type"
+    }
+
+    public init(data: PlanProposedEventData, runID: String, seq: Int, sessionID: String, ts: String, type: PlanProposedEventType) {
+        self.data = data
+        self.runID = runID
+        self.seq = seq
+        self.sessionID = sessionID
+        self.ts = ts
+        self.type = type
+    }
+}
+
+/// The plan a plan first run ended with, sent for the user to read.
+///
+/// ``plan_id`` names this plan. ``call_id`` is the ``propose_plan`` call.
+// MARK: - PlanProposedEventData
+public struct PlanProposedEventData: Codable {
+    public let callID: String
+    public let planID: String
+    public let steps: [PurplePlanStep]
+    public let title: String
+
+    public enum CodingKeys: String, CodingKey {
+        case callID = "call_id"
+        case planID = "plan_id"
+        case steps = "steps"
+        case title = "title"
+    }
+
+    public init(callID: String, planID: String, steps: [PurplePlanStep], title: String) {
+        self.callID = callID
+        self.planID = planID
+        self.steps = steps
+        self.title = title
+    }
+}
+
+/// One step of a plan: what to do, and the files it will touch.
+// MARK: - PurplePlanStep
+public struct PurplePlanStep: Codable {
+    public let files: [String]?
+    public let text: String
+
+    public enum CodingKeys: String, CodingKey {
+        case files = "files"
+        case text = "text"
+    }
+
+    public init(files: [String]?, text: String) {
+        self.files = files
+        self.text = text
+    }
+}
+
+public enum PlanProposedEventType: String, Codable {
+    case planProposed = "plan.proposed"
+}
+
+/// One step of a plan: what to do, and the files it will touch.
+// MARK: - PlanStep
+public struct PlanStep: Codable {
+    public let files: [String]?
+    public let text: String
+
+    public enum CodingKeys: String, CodingKey {
+        case files = "files"
+        case text = "text"
+    }
+
+    public init(files: [String]?, text: String) {
+        self.files = files
+        self.text = text
+    }
+}
+
 /// The file that was written.
 // MARK: - PolicyEditResult
 public struct PolicyEditResult: Codable {
@@ -7879,6 +8458,52 @@ public struct PromptSectionInfo: Codable {
     public init(chars: Int, name: String) {
         self.chars = chars
         self.name = name
+    }
+}
+
+/// A file a revert did not touch.
+// MARK: - RevertConflict
+public struct RevertConflict: Codable {
+    public let path: String
+    public let reason: ConflictReason
+
+    public enum CodingKeys: String, CodingKey {
+        case path = "path"
+        case reason = "reason"
+    }
+
+    public init(path: String, reason: ConflictReason) {
+        self.path = path
+        self.reason = reason
+    }
+}
+
+/// What ``changes.revert`` takes back. Each kind needs its own field and no other.
+///
+/// ``change`` needs ``change_id``, ``file`` needs ``path``, ``hunk`` needs ``path`` and
+/// ``hunk`` (0-based, of the file's net diff), and ``run`` needs ``run_id``.
+// MARK: - RevertTarget
+public struct RevertTarget: Codable {
+    public let changeID: String?
+    public let hunk: Int?
+    public let kind: TargetKind
+    public let path: String?
+    public let runID: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case changeID = "change_id"
+        case hunk = "hunk"
+        case kind = "kind"
+        case path = "path"
+        case runID = "run_id"
+    }
+
+    public init(changeID: String?, hunk: Int?, kind: TargetKind, path: String?, runID: String?) {
+        self.changeID = changeID
+        self.hunk = hunk
+        self.kind = kind
+        self.path = path
+        self.runID = runID
     }
 }
 
@@ -9046,11 +9671,15 @@ public enum RPCNotificationMethod: String, Codable {
 ///
 /// It applies from the next run. A run in progress keeps its model.
 ///
+/// The pick for this run: the model that runs it and why.
+///
 /// ``session.set_options`` changed the session's option overrides.
 ///
 /// ``session.set_mode`` changed the session's permission mode.
 ///
 /// ``session.set_checks`` changed whether the session lets golem run checks.
+///
+/// ``session.set_plan`` put the session in plan first, or took it out.
 ///
 /// The assistant bubble is open.
 ///
@@ -9079,6 +9708,8 @@ public enum RPCNotificationMethod: String, Codable {
 /// The model is still writing a file call. A live signal: ``message.completed`` replaces
 /// it.
 ///
+/// A chat call waits for the local model. A live signal: ``message.completed`` replaces it.
+///
 /// The tool call is running.
 ///
 /// More output from a running call. ``tool.completed`` or ``tool.failed`` replaces it.
@@ -9093,7 +9724,11 @@ public enum RPCNotificationMethod: String, Codable {
 ///
 /// The agent's todo list changed. ``run_id`` is null for a list a fork copied.
 ///
+/// A plan first run proposed its plan with ``propose_plan``.
+///
 /// A file in the session folder changed. Sent before the ``tool.completed`` of its call.
+///
+/// ``run_id`` is null for an undo, which is made between runs.
 ///
 /// A skill became active.
 ///
@@ -9147,11 +9782,13 @@ public struct Params: Codable {
 /// ``session.fork``. ``cwd`` is the project folder the file tools work in,
 /// or null for a session without one. ``origin`` is who started the session:
 /// ``cli``, ``routine:<name>``, and so on. Null means ``user``, and an older
-/// daemon leaves it out.
+/// daemon leaves it out. ``route`` is the session's route mode when it was
+/// made. Null means ``pinned``, and an older daemon leaves it out.
 ///
-/// A session attribute changed: its title, folder, allowed tools, or MCP servers.
+/// A session attribute changed: its title, folder, allowed tools, MCP servers, or route.
 ///
-/// A field left null did not change. ``cwd`` is set once, on a session made
+/// A field left null did not change. ``route`` is the session's route mode after
+/// ``session.set_route``. ``cwd`` is set once, on a session made
 /// before sessions had a folder, by the first ``message.send`` that names one.
 /// ``allowed_tools`` is the whole list after ``session.revoke``, and
 /// ``mcp_servers`` the on-demand MCP servers the session turned on, after
@@ -9172,6 +9809,14 @@ public struct Params: Codable {
 /// ref. ``model_provider`` and ``model_name`` are what it resolved to when it
 /// was chosen. ``reason`` ``user`` is ``session.set_model``.
 ///
+/// Which model a run uses, and why golem picked it.
+///
+/// Sent right after ``run.started`` in a session whose route is not ``pinned``.
+/// ``model_profile`` is the profile that runs. ``provider`` and ``model`` are what
+/// it resolves to, null when it does not resolve. ``reason`` is why this model
+/// (ADR-055), ``detail`` one short sentence, and ``rejected`` the candidates the
+/// pick dropped. The session's own model does not change.
+///
 /// The session's option overrides, whole, after a change.
 ///
 /// The last event holds what applies from the next run, so a replayed session
@@ -9188,6 +9833,10 @@ public struct Params: Codable {
 /// ``on`` true is the user's yes and false their no. The last event holds the
 /// answer, so a replayed session gets it back. A session without one has not
 /// been asked.
+///
+/// Whether the session is in plan first, after a change.
+///
+/// The last event holds the switch, so a replayed session gets it back.
 ///
 /// An assistant message is open and tokens may follow.
 ///
@@ -9260,10 +9909,11 @@ public struct Params: Codable {
 ///
 /// ``cleared`` means old tool results are now sent as one line each: ``count`` is how
 /// many, and ``before_tokens`` and ``after_tokens`` are rough sizes of the history before
-/// and after. ``summarised`` and ``grew`` are for later changes: ``count`` is the
-/// messages summarised, ``window_from`` and ``window_to`` the window before and after,
-/// and ``reload_ms`` the time the model took to load again. The checkpoint keeps every
-/// message, so no transcript event changes. A field a change does not use is None.
+/// and after. For ``summarised``, ``count`` is the messages a summary now stands for.
+/// ``grew`` is for a later change: ``window_from`` and ``window_to`` are the window
+/// before and after, and ``reload_ms`` the time the model took to load again. The
+/// checkpoint keeps every message, so no transcript event changes. A field a change
+/// does not use is None.
 ///
 /// Why a run stopped. No traceback.
 ///
@@ -9271,7 +9921,8 @@ public struct Params: Codable {
 /// model's server did not answer. ``not_installed``: the model needs a local
 /// server that is not installed, such as Ollama. ``provider`` is the provider
 /// whose server it was, and ``hint`` says how to fix it, such as
-/// ``run ollama serve``.
+/// ``run ollama serve``. ``context_full``: the prompt does not fit the model's window,
+/// even after clearing and summarising, and nothing was sent.
 ///
 /// Who stopped the run. ``user`` is ``run.cancel``, ``shutdown`` the daemon stopping.
 ///
@@ -9285,6 +9936,11 @@ public struct Params: Codable {
 /// Stored only until its message completes. ``index`` is the call's place in the reply.
 /// ``path`` is None until the model has written the whole path. ``lines`` and ``chars``
 /// count the file text written so far.
+///
+/// A chat call waits, or no longer waits, for its turn on a local model server.
+///
+/// Sent for the reply ``message_id`` only, so other sessions never show it. Stored only
+/// until its message completes.
 ///
 /// A requested tool call is running.
 ///
@@ -9329,6 +9985,10 @@ public struct Params: Codable {
 ///
 /// ``call_id`` is the call that wrote it. It is null for a list a fork copied.
 /// An empty list clears it.
+///
+/// The plan a plan first run ended with, sent for the user to read.
+///
+/// ``plan_id`` names this plan. ``call_id`` is the ``propose_plan`` call.
 ///
 /// One change to one file, recorded before this event was sent.
 ///
@@ -9375,6 +10035,7 @@ public struct ParamsData: Codable {
     public let modelProfile: String?
     public let modelProvider: String?
     public let origin: String?
+    public let route: Route?
     public let allowedTools: [PurpleSessionAllowance]?
     public let mcpServers: [String]?
     public let title: String?
@@ -9382,6 +10043,11 @@ public struct ParamsData: Codable {
     public let status: PurpleStatus?
     public let summary: String?
     public let reason: PurpleReason?
+    public let detail: String?
+    public let model: String?
+    public let provider: String?
+    public let rejected: [FluffyModelRejection]?
+    public let tier: Tier?
     public let options: [String: Option]?
     public let mode: Mode?
     public let on: Bool?
@@ -9394,19 +10060,18 @@ public struct ParamsData: Codable {
     public let thinkingMS: Int?
     public let clearedIDS: [String]?
     public let contextWindow: Int?
+    public let estimatedTokens: Int?
     public let index: Int?
     public let messageBytes: [Int]?
     public let messageChars: [Int]?
     public let messageIDS: [String]?
-    public let model: String?
     public let numCtx: Int?
     public let profile: String?
-    public let provider: String?
+    public let summaryChars: Int?
     public let systemBytes: Int?
     public let systemChars: Int?
     public let systemPromptSHA: String?
     public let systemSections: [TentacledPromptSectionInfo]?
-    public let tier: Tier?
     public let toolsBytes: Int?
     public let toolsChars: Int?
     public let toolsSHA: String?
@@ -9439,6 +10104,7 @@ public struct ParamsData: Codable {
     public let chars: Int?
     public let lines: Int?
     public let path: String?
+    public let waiting: Bool?
     public let artifactID: String?
     public let diff: String?
     public let durationMS: Int?
@@ -9449,6 +10115,8 @@ public struct ParamsData: Codable {
     public let decision: Decision?
     public let rule: String?
     public let todos: [PurpleTodo]?
+    public let planID: String?
+    public let steps: [FluffyPlanStep]?
     public let added: Int?
     public let changeID: String?
     public let removed: Int?
@@ -9469,6 +10137,7 @@ public struct ParamsData: Codable {
         case modelProfile = "model_profile"
         case modelProvider = "model_provider"
         case origin = "origin"
+        case route = "route"
         case allowedTools = "allowed_tools"
         case mcpServers = "mcp_servers"
         case title = "title"
@@ -9476,6 +10145,11 @@ public struct ParamsData: Codable {
         case status = "status"
         case summary = "summary"
         case reason = "reason"
+        case detail = "detail"
+        case model = "model"
+        case provider = "provider"
+        case rejected = "rejected"
+        case tier = "tier"
         case options = "options"
         case mode = "mode"
         case on = "on"
@@ -9488,19 +10162,18 @@ public struct ParamsData: Codable {
         case thinkingMS = "thinking_ms"
         case clearedIDS = "cleared_ids"
         case contextWindow = "context_window"
+        case estimatedTokens = "estimated_tokens"
         case index = "index"
         case messageBytes = "message_bytes"
         case messageChars = "message_chars"
         case messageIDS = "message_ids"
-        case model = "model"
         case numCtx = "num_ctx"
         case profile = "profile"
-        case provider = "provider"
+        case summaryChars = "summary_chars"
         case systemBytes = "system_bytes"
         case systemChars = "system_chars"
         case systemPromptSHA = "system_prompt_sha"
         case systemSections = "system_sections"
-        case tier = "tier"
         case toolsBytes = "tools_bytes"
         case toolsChars = "tools_chars"
         case toolsSHA = "tools_sha"
@@ -9533,6 +10206,7 @@ public struct ParamsData: Codable {
         case chars = "chars"
         case lines = "lines"
         case path = "path"
+        case waiting = "waiting"
         case artifactID = "artifact_id"
         case diff = "diff"
         case durationMS = "duration_ms"
@@ -9543,6 +10217,8 @@ public struct ParamsData: Codable {
         case decision = "decision"
         case rule = "rule"
         case todos = "todos"
+        case planID = "plan_id"
+        case steps = "steps"
         case added = "added"
         case changeID = "change_id"
         case removed = "removed"
@@ -9557,13 +10233,14 @@ public struct ParamsData: Codable {
         case output = "output"
     }
 
-    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: PurpleReason?, options: [String: Option]?, mode: Mode?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String?, provider: String?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, chars: Int?, lines: Int?, path: String?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, todos: [PurpleTodo]?, added: Int?, changeID: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?) {
+    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, route: Route?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: PurpleReason?, detail: String?, model: String?, provider: String?, rejected: [FluffyModelRejection]?, tier: Tier?, options: [String: Option]?, mode: Mode?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, estimatedTokens: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, numCtx: Int?, profile: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, chars: Int?, lines: Int?, path: String?, waiting: Bool?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, todos: [PurpleTodo]?, planID: String?, steps: [FluffyPlanStep]?, added: Int?, changeID: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?) {
         self.cwd = cwd
         self.forkedFrom = forkedFrom
         self.modelName = modelName
         self.modelProfile = modelProfile
         self.modelProvider = modelProvider
         self.origin = origin
+        self.route = route
         self.allowedTools = allowedTools
         self.mcpServers = mcpServers
         self.title = title
@@ -9571,6 +10248,11 @@ public struct ParamsData: Codable {
         self.status = status
         self.summary = summary
         self.reason = reason
+        self.detail = detail
+        self.model = model
+        self.provider = provider
+        self.rejected = rejected
+        self.tier = tier
         self.options = options
         self.mode = mode
         self.on = on
@@ -9583,19 +10265,18 @@ public struct ParamsData: Codable {
         self.thinkingMS = thinkingMS
         self.clearedIDS = clearedIDS
         self.contextWindow = contextWindow
+        self.estimatedTokens = estimatedTokens
         self.index = index
         self.messageBytes = messageBytes
         self.messageChars = messageChars
         self.messageIDS = messageIDS
-        self.model = model
         self.numCtx = numCtx
         self.profile = profile
-        self.provider = provider
+        self.summaryChars = summaryChars
         self.systemBytes = systemBytes
         self.systemChars = systemChars
         self.systemPromptSHA = systemPromptSHA
         self.systemSections = systemSections
-        self.tier = tier
         self.toolsBytes = toolsBytes
         self.toolsChars = toolsChars
         self.toolsSHA = toolsSHA
@@ -9628,6 +10309,7 @@ public struct ParamsData: Codable {
         self.chars = chars
         self.lines = lines
         self.path = path
+        self.waiting = waiting
         self.artifactID = artifactID
         self.diff = diff
         self.durationMS = durationMS
@@ -9638,6 +10320,8 @@ public struct ParamsData: Codable {
         self.decision = decision
         self.rule = rule
         self.todos = todos
+        self.planID = planID
+        self.steps = steps
         self.added = added
         self.changeID = changeID
         self.removed = removed
@@ -9688,6 +10372,7 @@ public struct FluffyCheckInfo: Codable {
 }
 
 public enum Code: String, Codable {
+    case contextFull = "context_full"
     case modelUnreachable = "model_unreachable"
     case notInstalled = "not_installed"
 }
@@ -9737,11 +10422,44 @@ public struct FluffyCallPrice: Codable {
 
 public enum PurpleReason: String, Codable {
     case broken = "broken"
+    case budget = "budget"
+    case cheapest = "cheapest"
     case disabled = "disabled"
+    case escalated = "escalated"
+    case fallback = "fallback"
+    case fit = "fit"
     case missing = "missing"
+    case pinned = "pinned"
+    case privacy = "privacy"
     case shutdown = "shutdown"
     case unpinned = "unpinned"
     case user = "user"
+}
+
+/// A candidate the pick left out, and why in plain words.
+// MARK: - FluffyModelRejection
+public struct FluffyModelRejection: Codable {
+    public let ref: String
+    public let tier: Tier
+    public let why: String
+
+    public enum CodingKeys: String, CodingKey {
+        case ref = "ref"
+        case tier = "tier"
+        case why = "why"
+    }
+
+    public init(ref: String, tier: Tier, why: String) {
+        self.ref = ref
+        self.tier = tier
+        self.why = why
+    }
+}
+
+public enum Route: String, Codable {
+    case auto = "auto"
+    case local = "local"
+    case pinned = "pinned"
 }
 
 /// A skill run once by name, with what was typed after it.
@@ -9770,6 +10488,23 @@ public enum PurpleStatus: String, Codable {
     case modified = "modified"
     case passed = "passed"
     case timedOut = "timed_out"
+}
+
+/// One step of a plan: what to do, and the files it will touch.
+// MARK: - FluffyPlanStep
+public struct FluffyPlanStep: Codable {
+    public let files: [String]?
+    public let text: String
+
+    public enum CodingKeys: String, CodingKey {
+        case files = "files"
+        case text = "text"
+    }
+
+    public init(files: [String]?, text: String) {
+        self.files = files
+        self.text = text
+    }
 }
 
 /// One non-empty section of the system prompt sent with a model call.
@@ -9858,7 +10593,10 @@ public enum ParamsType: String, Codable {
     case modelCallCompleted = "model.call.completed"
     case modelCallStarted = "model.call.started"
     case modelOptionsChanged = "model.options.changed"
+    case modelRouted = "model.routed"
     case modelSelected = "model.selected"
+    case modelWaiting = "model.waiting"
+    case planProposed = "plan.proposed"
     case runCancelled = "run.cancelled"
     case runCompleted = "run.completed"
     case runFailed = "run.failed"
@@ -9868,6 +10606,7 @@ public enum ParamsType: String, Codable {
     case sessionCompleted = "session.completed"
     case sessionCreated = "session.created"
     case sessionModeChanged = "session.mode.changed"
+    case sessionPlanChanged = "session.plan.changed"
     case sessionUpdated = "session.updated"
     case skillActivated = "skill.activated"
     case skillDeactivated = "skill.deactivated"
@@ -10096,7 +10835,8 @@ public enum RunCompletedEventType: String, Codable {
 /// model's server did not answer. ``not_installed``: the model needs a local
 /// server that is not installed, such as Ollama. ``provider`` is the provider
 /// whose server it was, and ``hint`` says how to fix it, such as
-/// ``run ollama serve``.
+/// ``run ollama serve``. ``context_full``: the prompt does not fit the model's window,
+/// even after clearing and summarising, and nothing was sent.
 // MARK: - RunFailedData
 public struct RunFailedData: Codable {
     public let code: Code?
@@ -10154,7 +10894,8 @@ public struct RunFailedEvent: Codable {
 /// model's server did not answer. ``not_installed``: the model needs a local
 /// server that is not installed, such as Ollama. ``provider`` is the provider
 /// whose server it was, and ``hint`` says how to fix it, such as
-/// ``run ollama serve``.
+/// ``run ollama serve``. ``context_full``: the prompt does not fit the model's window,
+/// even after clearing and summarising, and nothing was sent.
 // MARK: - RunFailedEventData
 public struct RunFailedEventData: Codable {
     public let code: Code?
@@ -10753,7 +11494,8 @@ public struct SessionCreateResult: Codable {
 /// ``session.fork``. ``cwd`` is the project folder the file tools work in,
 /// or null for a session without one. ``origin`` is who started the session:
 /// ``cli``, ``routine:<name>``, and so on. Null means ``user``, and an older
-/// daemon leaves it out.
+/// daemon leaves it out. ``route`` is the session's route mode when it was
+/// made. Null means ``pinned``, and an older daemon leaves it out.
 // MARK: - SessionCreatedData
 public struct SessionCreatedData: Codable {
     public let cwd: String?
@@ -10762,6 +11504,7 @@ public struct SessionCreatedData: Codable {
     public let modelProfile: String
     public let modelProvider: String?
     public let origin: String?
+    public let route: Route?
 
     public enum CodingKeys: String, CodingKey {
         case cwd = "cwd"
@@ -10770,15 +11513,17 @@ public struct SessionCreatedData: Codable {
         case modelProfile = "model_profile"
         case modelProvider = "model_provider"
         case origin = "origin"
+        case route = "route"
     }
 
-    public init(cwd: String?, forkedFrom: SessionCreatedDataForkedFrom?, modelName: String?, modelProfile: String, modelProvider: String?, origin: String?) {
+    public init(cwd: String?, forkedFrom: SessionCreatedDataForkedFrom?, modelName: String?, modelProfile: String, modelProvider: String?, origin: String?, route: Route?) {
         self.cwd = cwd
         self.forkedFrom = forkedFrom
         self.modelName = modelName
         self.modelProfile = modelProfile
         self.modelProvider = modelProvider
         self.origin = origin
+        self.route = route
     }
 }
 
@@ -10836,7 +11581,8 @@ public struct SessionCreatedEvent: Codable {
 /// ``session.fork``. ``cwd`` is the project folder the file tools work in,
 /// or null for a session without one. ``origin`` is who started the session:
 /// ``cli``, ``routine:<name>``, and so on. Null means ``user``, and an older
-/// daemon leaves it out.
+/// daemon leaves it out. ``route`` is the session's route mode when it was
+/// made. Null means ``pinned``, and an older daemon leaves it out.
 // MARK: - SessionCreatedEventData
 public struct SessionCreatedEventData: Codable {
     public let cwd: String?
@@ -10845,6 +11591,7 @@ public struct SessionCreatedEventData: Codable {
     public let modelProfile: String
     public let modelProvider: String?
     public let origin: String?
+    public let route: Route?
 
     public enum CodingKeys: String, CodingKey {
         case cwd = "cwd"
@@ -10853,15 +11600,17 @@ public struct SessionCreatedEventData: Codable {
         case modelProfile = "model_profile"
         case modelProvider = "model_provider"
         case origin = "origin"
+        case route = "route"
     }
 
-    public init(cwd: String?, forkedFrom: FluffyForkedFrom?, modelName: String?, modelProfile: String, modelProvider: String?, origin: String?) {
+    public init(cwd: String?, forkedFrom: FluffyForkedFrom?, modelName: String?, modelProfile: String, modelProvider: String?, origin: String?, route: Route?) {
         self.cwd = cwd
         self.forkedFrom = forkedFrom
         self.modelName = modelName
         self.modelProfile = modelProfile
         self.modelProvider = modelProvider
         self.origin = origin
+        self.route = route
     }
 }
 
@@ -11059,6 +11808,8 @@ public struct SessionListResult: Codable {
 /// the id of the session this one was forked from, null for a session that is
 /// not a fork. An older daemon leaves it out. ``origin`` is who started the
 /// session: ``user``, ``cli``, ``routine:<name>``. A session never changes it.
+/// ``route`` is the session's route mode. An older daemon leaves it out.
+/// ``plan_first`` is true while the session is in plan first (``session.set_plan``).
 // MARK: - SessionElement
 public struct SessionElement: Codable {
     public let createdAt: String
@@ -11067,6 +11818,8 @@ public struct SessionElement: Codable {
     public let lastSeq: Int
     public let modelProfile: String
     public let origin: String?
+    public let planFirst: Bool?
+    public let route: Route?
     public let sessionID: String
     public let status: SessionStatus
     public let title: String?
@@ -11079,19 +11832,23 @@ public struct SessionElement: Codable {
         case lastSeq = "last_seq"
         case modelProfile = "model_profile"
         case origin = "origin"
+        case planFirst = "plan_first"
+        case route = "route"
         case sessionID = "session_id"
         case status = "status"
         case title = "title"
         case updatedAt = "updated_at"
     }
 
-    public init(createdAt: String, cwd: String?, forkedFrom: String?, lastSeq: Int, modelProfile: String, origin: String?, sessionID: String, status: SessionStatus, title: String?, updatedAt: String) {
+    public init(createdAt: String, cwd: String?, forkedFrom: String?, lastSeq: Int, modelProfile: String, origin: String?, planFirst: Bool?, route: Route?, sessionID: String, status: SessionStatus, title: String?, updatedAt: String) {
         self.createdAt = createdAt
         self.cwd = cwd
         self.forkedFrom = forkedFrom
         self.lastSeq = lastSeq
         self.modelProfile = modelProfile
         self.origin = origin
+        self.planFirst = planFirst
+        self.route = route
         self.sessionID = sessionID
         self.status = status
         self.title = title
@@ -11173,6 +11930,71 @@ public struct SessionModeChangedEventData: Codable {
 
 public enum SessionModeChangedEventType: String, Codable {
     case sessionModeChanged = "session.mode.changed"
+}
+
+/// Whether the session is in plan first, after a change.
+///
+/// The last event holds the switch, so a replayed session gets it back.
+// MARK: - SessionPlanChangedData
+public struct SessionPlanChangedData: Codable {
+    public let on: Bool
+
+    public enum CodingKeys: String, CodingKey {
+        case on = "on"
+    }
+
+    public init(on: Bool) {
+        self.on = on
+    }
+}
+
+/// ``session.set_plan`` put the session in plan first, or took it out.
+// MARK: - SessionPlanChangedEvent
+public struct SessionPlanChangedEvent: Codable {
+    public let data: SessionPlanChangedEventData
+    public let runID: JSONNull?
+    public let seq: Int
+    public let sessionID: String
+    public let ts: String
+    public let type: SessionPlanChangedEventType
+
+    public enum CodingKeys: String, CodingKey {
+        case data = "data"
+        case runID = "run_id"
+        case seq = "seq"
+        case sessionID = "session_id"
+        case ts = "ts"
+        case type = "type"
+    }
+
+    public init(data: SessionPlanChangedEventData, runID: JSONNull?, seq: Int, sessionID: String, ts: String, type: SessionPlanChangedEventType) {
+        self.data = data
+        self.runID = runID
+        self.seq = seq
+        self.sessionID = sessionID
+        self.ts = ts
+        self.type = type
+    }
+}
+
+/// Whether the session is in plan first, after a change.
+///
+/// The last event holds the switch, so a replayed session gets it back.
+// MARK: - SessionPlanChangedEventData
+public struct SessionPlanChangedEventData: Codable {
+    public let on: Bool
+
+    public enum CodingKeys: String, CodingKey {
+        case on = "on"
+    }
+
+    public init(on: Bool) {
+        self.on = on
+    }
+}
+
+public enum SessionPlanChangedEventType: String, Codable {
+    case sessionPlanChanged = "session.plan.changed"
 }
 
 /// ``session.rename``. Set the title by hand. An automatic title never replaces it.
@@ -11406,6 +12228,85 @@ public struct SessionSetOptionsResult: Codable {
     }
 }
 
+/// ``session.set_plan``. Put one session in plan first, or take it out.
+///
+/// With ``on`` true the session's runs only read, and each ends with a plan
+/// sent as ``plan.proposed``. The daemon emits ``session.plan.changed``. It
+/// applies from the session's next turn, is kept with the session, and is
+/// not written to ``config.toml``. A new session starts with it off.
+// MARK: - SessionSetPlanParams
+public struct SessionSetPlanParams: Codable {
+    public let on: Bool
+    public let sessionID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case on = "on"
+        case sessionID = "session_id"
+    }
+
+    public init(on: Bool, sessionID: String) {
+        self.on = on
+        self.sessionID = sessionID
+    }
+}
+
+/// Whether the session is in plan first after the change.
+// MARK: - SessionSetPlanResult
+public struct SessionSetPlanResult: Codable {
+    public let on: Bool
+    public let sessionID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case on = "on"
+        case sessionID = "session_id"
+    }
+
+    public init(on: Bool, sessionID: String) {
+        self.on = on
+        self.sessionID = sessionID
+    }
+}
+
+/// ``session.set_route``. Set how this session picks the model of each turn.
+///
+/// ``pinned`` runs the session's own model. ``local`` never uses a hosted model.
+/// ``auto`` starts local and uses a hosted model only when the routing rules allow
+/// it (ADR-055). The daemon emits ``session.updated`` with ``route``, and the mode
+/// applies from the session's next turn. It is kept with the session and is not
+/// written to ``config.toml``.
+// MARK: - SessionSetRouteParams
+public struct SessionSetRouteParams: Codable {
+    public let mode: Route
+    public let sessionID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case mode = "mode"
+        case sessionID = "session_id"
+    }
+
+    public init(mode: Route, sessionID: String) {
+        self.mode = mode
+        self.sessionID = sessionID
+    }
+}
+
+/// The session's route mode after the change.
+// MARK: - SessionSetRouteResult
+public struct SessionSetRouteResult: Codable {
+    public let mode: Route
+    public let sessionID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case mode = "mode"
+        case sessionID = "session_id"
+    }
+
+    public init(mode: Route, sessionID: String) {
+        self.mode = mode
+        self.sessionID = sessionID
+    }
+}
+
 /// ``session.set_skills``. Pin skills for the whole session, or unpin them.
 ///
 /// A pinned skill's body is in the system prompt of every model call. Names
@@ -11485,6 +12386,8 @@ public enum SessionSummaryNotificationMethod: String, Codable {
 /// the id of the session this one was forked from, null for a session that is
 /// not a fork. An older daemon leaves it out. ``origin`` is who started the
 /// session: ``user``, ``cli``, ``routine:<name>``. A session never changes it.
+/// ``route`` is the session's route mode. An older daemon leaves it out.
+/// ``plan_first`` is true while the session is in plan first (``session.set_plan``).
 // MARK: - SessionSummaryNotificationParams
 public struct SessionSummaryNotificationParams: Codable {
     public let createdAt: String
@@ -11493,6 +12396,8 @@ public struct SessionSummaryNotificationParams: Codable {
     public let lastSeq: Int
     public let modelProfile: String
     public let origin: String?
+    public let planFirst: Bool?
+    public let route: Route?
     public let sessionID: String
     public let status: SessionStatus
     public let title: String?
@@ -11505,19 +12410,23 @@ public struct SessionSummaryNotificationParams: Codable {
         case lastSeq = "last_seq"
         case modelProfile = "model_profile"
         case origin = "origin"
+        case planFirst = "plan_first"
+        case route = "route"
         case sessionID = "session_id"
         case status = "status"
         case title = "title"
         case updatedAt = "updated_at"
     }
 
-    public init(createdAt: String, cwd: String?, forkedFrom: String?, lastSeq: Int, modelProfile: String, origin: String?, sessionID: String, status: SessionStatus, title: String?, updatedAt: String) {
+    public init(createdAt: String, cwd: String?, forkedFrom: String?, lastSeq: Int, modelProfile: String, origin: String?, planFirst: Bool?, route: Route?, sessionID: String, status: SessionStatus, title: String?, updatedAt: String) {
         self.createdAt = createdAt
         self.cwd = cwd
         self.forkedFrom = forkedFrom
         self.lastSeq = lastSeq
         self.modelProfile = modelProfile
         self.origin = origin
+        self.planFirst = planFirst
+        self.route = route
         self.sessionID = sessionID
         self.status = status
         self.title = title
@@ -11536,6 +12445,8 @@ public struct SessionSummaryNotificationParams: Codable {
 /// the id of the session this one was forked from, null for a session that is
 /// not a fork. An older daemon leaves it out. ``origin`` is who started the
 /// session: ``user``, ``cli``, ``routine:<name>``. A session never changes it.
+/// ``route`` is the session's route mode. An older daemon leaves it out.
+/// ``plan_first`` is true while the session is in plan first (``session.set_plan``).
 // MARK: - SessionSummary
 public struct SessionSummary: Codable {
     public let createdAt: String
@@ -11544,6 +12455,8 @@ public struct SessionSummary: Codable {
     public let lastSeq: Int
     public let modelProfile: String
     public let origin: String?
+    public let planFirst: Bool?
+    public let route: Route?
     public let sessionID: String
     public let status: SessionStatus
     public let title: String?
@@ -11556,19 +12469,23 @@ public struct SessionSummary: Codable {
         case lastSeq = "last_seq"
         case modelProfile = "model_profile"
         case origin = "origin"
+        case planFirst = "plan_first"
+        case route = "route"
         case sessionID = "session_id"
         case status = "status"
         case title = "title"
         case updatedAt = "updated_at"
     }
 
-    public init(createdAt: String, cwd: String?, forkedFrom: String?, lastSeq: Int, modelProfile: String, origin: String?, sessionID: String, status: SessionStatus, title: String?, updatedAt: String) {
+    public init(createdAt: String, cwd: String?, forkedFrom: String?, lastSeq: Int, modelProfile: String, origin: String?, planFirst: Bool?, route: Route?, sessionID: String, status: SessionStatus, title: String?, updatedAt: String) {
         self.createdAt = createdAt
         self.cwd = cwd
         self.forkedFrom = forkedFrom
         self.lastSeq = lastSeq
         self.modelProfile = modelProfile
         self.origin = origin
+        self.planFirst = planFirst
+        self.route = route
         self.sessionID = sessionID
         self.status = status
         self.title = title
@@ -11576,9 +12493,10 @@ public struct SessionSummary: Codable {
     }
 }
 
-/// A session attribute changed: its title, folder, allowed tools, or MCP servers.
+/// A session attribute changed: its title, folder, allowed tools, MCP servers, or route.
 ///
-/// A field left null did not change. ``cwd`` is set once, on a session made
+/// A field left null did not change. ``route`` is the session's route mode after
+/// ``session.set_route``. ``cwd`` is set once, on a session made
 /// before sessions had a folder, by the first ``message.send`` that names one.
 /// ``allowed_tools`` is the whole list after ``session.revoke``, and
 /// ``mcp_servers`` the on-demand MCP servers the session turned on, after
@@ -11588,19 +12506,22 @@ public struct SessionUpdatedData: Codable {
     public let allowedTools: [FluffySessionAllowance]?
     public let cwd: String?
     public let mcpServers: [String]?
+    public let route: Route?
     public let title: String?
 
     public enum CodingKeys: String, CodingKey {
         case allowedTools = "allowed_tools"
         case cwd = "cwd"
         case mcpServers = "mcp_servers"
+        case route = "route"
         case title = "title"
     }
 
-    public init(allowedTools: [FluffySessionAllowance]?, cwd: String?, mcpServers: [String]?, title: String?) {
+    public init(allowedTools: [FluffySessionAllowance]?, cwd: String?, mcpServers: [String]?, route: Route?, title: String?) {
         self.allowedTools = allowedTools
         self.cwd = cwd
         self.mcpServers = mcpServers
+        self.route = route
         self.title = title
     }
 }
@@ -11651,9 +12572,10 @@ public struct SessionUpdatedEvent: Codable {
     }
 }
 
-/// A session attribute changed: its title, folder, allowed tools, or MCP servers.
+/// A session attribute changed: its title, folder, allowed tools, MCP servers, or route.
 ///
-/// A field left null did not change. ``cwd`` is set once, on a session made
+/// A field left null did not change. ``route`` is the session's route mode after
+/// ``session.set_route``. ``cwd`` is set once, on a session made
 /// before sessions had a folder, by the first ``message.send`` that names one.
 /// ``allowed_tools`` is the whole list after ``session.revoke``, and
 /// ``mcp_servers`` the on-demand MCP servers the session turned on, after
@@ -11663,19 +12585,22 @@ public struct SessionUpdatedEventData: Codable {
     public let allowedTools: [TentacledSessionAllowance]?
     public let cwd: String?
     public let mcpServers: [String]?
+    public let route: Route?
     public let title: String?
 
     public enum CodingKeys: String, CodingKey {
         case allowedTools = "allowed_tools"
         case cwd = "cwd"
         case mcpServers = "mcp_servers"
+        case route = "route"
         case title = "title"
     }
 
-    public init(allowedTools: [TentacledSessionAllowance]?, cwd: String?, mcpServers: [String]?, title: String?) {
+    public init(allowedTools: [TentacledSessionAllowance]?, cwd: String?, mcpServers: [String]?, route: Route?, title: String?) {
         self.allowedTools = allowedTools
         self.cwd = cwd
         self.mcpServers = mcpServers
+        self.route = route
         self.title = title
     }
 }
@@ -13394,6 +14319,7 @@ public struct TraceContextPartItem: Codable {
 
 public enum Key: String, Codable {
     case assistant = "assistant"
+    case summary = "summary"
     case system = "system"
     case toolResults = "tool_results"
     case tools = "tools"
@@ -13402,7 +14328,8 @@ public enum Key: String, Codable {
 
 /// What filled one model call's context, and how big the window was.
 ///
-/// ``parts`` always has the five keys, in order. They add up to ``used``
+/// ``parts`` always has the six keys, in order. ``summary`` is the summary of old turns
+/// that was sent as the first message, and 0 when none was. They add up to ``used``
 /// when it is known. The split between them is an estimate (about four
 /// characters a token, scaled to ``used``), so ``estimated`` is always true.
 /// The ``prompt_cut`` fields are those of the model span. A cleared result counts as its
@@ -13560,6 +14487,8 @@ public struct TraceGetResult: Codable {
 }
 
 /// A run, with its model calls in order.
+///
+/// ``route`` is the pick for the run, null for a run of a ``pinned`` session.
 // MARK: - RunElement
 public struct RunElement: Codable {
     public let approvalWaitMS: Int?
@@ -13573,6 +14502,7 @@ public struct RunElement: Codable {
     public let name: String
     public let preview: String?
     public let recorded: Bool?
+    public let route: RunTraceRoute?
     public let start: String
     public let status: ChildStatus
     public let tokens: RunTraceTokens?
@@ -13589,12 +14519,13 @@ public struct RunElement: Codable {
         case name = "name"
         case preview = "preview"
         case recorded = "recorded"
+        case route = "route"
         case start = "start"
         case status = "status"
         case tokens = "tokens"
     }
 
-    public init(approvalWaitMS: Int?, children: [RunChild]?, durationMS: Int?, end: String?, firstTokenMS: Int?, id: String, kind: ChildKind, model: String?, name: String, preview: String?, recorded: Bool?, start: String, status: ChildStatus, tokens: RunTraceTokens?) {
+    public init(approvalWaitMS: Int?, children: [RunChild]?, durationMS: Int?, end: String?, firstTokenMS: Int?, id: String, kind: ChildKind, model: String?, name: String, preview: String?, recorded: Bool?, route: RunTraceRoute?, start: String, status: ChildStatus, tokens: RunTraceTokens?) {
         self.approvalWaitMS = approvalWaitMS
         self.children = children
         self.durationMS = durationMS
@@ -13606,6 +14537,7 @@ public struct RunElement: Codable {
         self.name = name
         self.preview = preview
         self.recorded = recorded
+        self.route = route
         self.start = start
         self.status = status
         self.tokens = tokens
@@ -13798,6 +14730,49 @@ public struct RunTraceTokens: Codable {
         self.cacheWrite = cacheWrite
         self.input = input
         self.output = output
+    }
+}
+
+/// Why a run used the model it did: the pick of a session that is not ``pinned``.
+///
+/// ``reason`` and ``detail`` are those of ``model.routed``, and ``rejected`` the
+/// candidates the pick dropped.
+// MARK: - RunTraceRoute
+public struct RunTraceRoute: Codable {
+    public let detail: String
+    public let reason: ModelRoutedDataReason
+    public let rejected: [TentacledModelRejection]?
+
+    public enum CodingKeys: String, CodingKey {
+        case detail = "detail"
+        case reason = "reason"
+        case rejected = "rejected"
+    }
+
+    public init(detail: String, reason: ModelRoutedDataReason, rejected: [TentacledModelRejection]?) {
+        self.detail = detail
+        self.reason = reason
+        self.rejected = rejected
+    }
+}
+
+/// A candidate the pick left out, and why in plain words.
+// MARK: - TentacledModelRejection
+public struct TentacledModelRejection: Codable {
+    public let ref: String
+    public let tier: Tier
+    public let why: String
+
+    public enum CodingKeys: String, CodingKey {
+        case ref = "ref"
+        case tier = "tier"
+        case why = "why"
+    }
+
+    public init(ref: String, tier: Tier, why: String) {
+        self.ref = ref
+        self.tier = tier
+        self.why = why
     }
 }
 
@@ -14011,7 +14986,52 @@ public struct TraceModelSpanTraceTokens: Codable {
     }
 }
 
+/// Why a run used the model it did: the pick of a session that is not ``pinned``.
+///
+/// ``reason`` and ``detail`` are those of ``model.routed``, and ``rejected`` the
+/// candidates the pick dropped.
+// MARK: - TraceRoute
+public struct TraceRoute: Codable {
+    public let detail: String
+    public let reason: ModelRoutedDataReason
+    public let rejected: [StickyModelRejection]?
+
+    public enum CodingKeys: String, CodingKey {
+        case detail = "detail"
+        case reason = "reason"
+        case rejected = "rejected"
+    }
+
+    public init(detail: String, reason: ModelRoutedDataReason, rejected: [StickyModelRejection]?) {
+        self.detail = detail
+        self.reason = reason
+        self.rejected = rejected
+    }
+}
+
+/// A candidate the pick left out, and why in plain words.
+// MARK: - StickyModelRejection
+public struct StickyModelRejection: Codable {
+    public let ref: String
+    public let tier: Tier
+    public let why: String
+
+    public enum CodingKeys: String, CodingKey {
+        case ref = "ref"
+        case tier = "tier"
+        case why = "why"
+    }
+
+    public init(ref: String, tier: Tier, why: String) {
+        self.ref = ref
+        self.tier = tier
+        self.why = why
+    }
+}
+
 /// A run, with its model calls in order.
+///
+/// ``route`` is the pick for the run, null for a run of a ``pinned`` session.
 // MARK: - TraceRunSpan
 public struct TraceRunSpan: Codable {
     public let approvalWaitMS: Int?
@@ -14025,6 +15045,7 @@ public struct TraceRunSpan: Codable {
     public let name: String
     public let preview: String?
     public let recorded: Bool?
+    public let route: TraceRunSpanTraceRoute?
     public let start: String
     public let status: ChildStatus
     public let tokens: TraceRunSpanTraceTokens?
@@ -14041,12 +15062,13 @@ public struct TraceRunSpan: Codable {
         case name = "name"
         case preview = "preview"
         case recorded = "recorded"
+        case route = "route"
         case start = "start"
         case status = "status"
         case tokens = "tokens"
     }
 
-    public init(approvalWaitMS: Int?, children: [TraceRunSpanChild]?, durationMS: Int?, end: String?, firstTokenMS: Int?, id: String, kind: ChildKind, model: String?, name: String, preview: String?, recorded: Bool?, start: String, status: ChildStatus, tokens: TraceRunSpanTraceTokens?) {
+    public init(approvalWaitMS: Int?, children: [TraceRunSpanChild]?, durationMS: Int?, end: String?, firstTokenMS: Int?, id: String, kind: ChildKind, model: String?, name: String, preview: String?, recorded: Bool?, route: TraceRunSpanTraceRoute?, start: String, status: ChildStatus, tokens: TraceRunSpanTraceTokens?) {
         self.approvalWaitMS = approvalWaitMS
         self.children = children
         self.durationMS = durationMS
@@ -14058,6 +15080,7 @@ public struct TraceRunSpan: Codable {
         self.name = name
         self.preview = preview
         self.recorded = recorded
+        self.route = route
         self.start = start
         self.status = status
         self.tokens = tokens
@@ -14239,6 +15262,49 @@ public struct TraceRunSpanTraceTokens: Codable {
     }
 }
 
+/// Why a run used the model it did: the pick of a session that is not ``pinned``.
+///
+/// ``reason`` and ``detail`` are those of ``model.routed``, and ``rejected`` the
+/// candidates the pick dropped.
+// MARK: - TraceRunSpanTraceRoute
+public struct TraceRunSpanTraceRoute: Codable {
+    public let detail: String
+    public let reason: ModelRoutedDataReason
+    public let rejected: [IndigoModelRejection]?
+
+    public enum CodingKeys: String, CodingKey {
+        case detail = "detail"
+        case reason = "reason"
+        case rejected = "rejected"
+    }
+
+    public init(detail: String, reason: ModelRoutedDataReason, rejected: [IndigoModelRejection]?) {
+        self.detail = detail
+        self.reason = reason
+        self.rejected = rejected
+    }
+}
+
+/// A candidate the pick left out, and why in plain words.
+// MARK: - IndigoModelRejection
+public struct IndigoModelRejection: Codable {
+    public let ref: String
+    public let tier: Tier
+    public let why: String
+
+    public enum CodingKeys: String, CodingKey {
+        case ref = "ref"
+        case tier = "tier"
+        case why = "why"
+    }
+
+    public init(ref: String, tier: Tier, why: String) {
+        self.ref = ref
+        self.tier = tier
+        self.why = why
+    }
+}
+
 /// ``trace.span``. Read the full input and output of one model or tool span.
 // MARK: - TraceSpanParams
 public struct TraceSpanParams: Codable {
@@ -14323,7 +15389,8 @@ public struct TraceSpanResult: Codable {
 
 /// What filled one model call's context, and how big the window was.
 ///
-/// ``parts`` always has the five keys, in order. They add up to ``used``
+/// ``parts`` always has the six keys, in order. ``summary`` is the summary of old turns
+/// that was sent as the first message, and 0 when none was. They add up to ``used``
 /// when it is known. The split between them is an estimate (about four
 /// characters a token, scaled to ``used``), so ``estimated`` is always true.
 /// The ``prompt_cut`` fields are those of the model span. A cleared result counts as its

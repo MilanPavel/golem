@@ -24,7 +24,13 @@ from golem.store.events import EventLog
 from golem.store.records import SessionActivity, SessionRecords
 from golem_protocol.events import CHAT_EVENT, ChatEvent, EventType
 
-_DELTAS = ("message.delta", "message.thinking.delta", "tool.output", "tool.writing")
+_DELTAS = (
+    "message.delta",
+    "message.thinking.delta",
+    "tool.output",
+    "tool.writing",
+    "model.waiting",
+)
 """Events that do not change a session's summary."""
 
 
