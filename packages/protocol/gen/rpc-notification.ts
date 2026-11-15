@@ -317,7 +317,7 @@ export type Removed = number;
 export type Reverts = string | null;
 export type Source1 = 'tool' | 'shell' | 'revert';
 export type Status2 = 'created' | 'modified' | 'deleted';
-export type RunId29 = string;
+export type RunId29 = string | null;
 export type Seq28 = number;
 export type SessionId29 = string;
 export type Ts28 = string;
@@ -1335,6 +1335,8 @@ export interface Todo {
 }
 /**
  * A file in the session folder changed. Sent before the ``tool.completed`` of its call.
+ *
+ * ``run_id`` is null for an undo, which is made between runs.
  *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "FileChangedEvent".

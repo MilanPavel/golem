@@ -1,3 +1,4 @@
+import type { ChangesRevertResult } from "../../protocol/gen/changes-revert-result.ts";
 import type { KeychainWait } from "../../protocol/gen/keychain-wait.ts";
 import type { McpCatalogResult } from "../../protocol/gen/mcp-catalog-result.ts";
 import type { McpServerDetail } from "../../protocol/gen/mcp-server-detail.ts";
@@ -404,6 +405,19 @@ function isChangedFile(value: unknown): boolean {
 
 export function isChangesListResult(value: unknown): value is ChangesListResult {
   return isRecord(value) && Array.isArray(value["files"]) && value["files"].every(isChangedFile);
+}
+
+export function isChangesRevertResult(value: unknown): value is ChangesRevertResult {
+  return (
+    isRecord(value) &&
+    Array.isArray(value["reverted"]) &&
+    value["reverted"].every((path) => typeof path === "string") &&
+    Array.isArray(value["conflicts"]) &&
+    value["conflicts"].every(
+      (conflict) =>
+        isRecord(conflict) && typeof conflict["path"] === "string" && conflict["reason"] === "changed_on_disk",
+    )
+  );
 }
 
 export function isKeychainWait(value: unknown): value is KeychainWait {

@@ -2590,6 +2590,54 @@ class ChangesDiffResult(BaseModel):
     truncated: bool
 
 
+class RevertTarget(BaseModel):
+    """What ``changes.revert`` takes back. Each kind needs its own field and no other.
+
+    ``change`` needs ``change_id``, ``file`` needs ``path``, ``hunk`` needs ``path`` and
+    ``hunk`` (0-based, of the file's net diff), and ``run`` needs ``run_id``.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    kind: Literal["change", "file", "hunk", "run"]
+    change_id: str | None = Field(default=None, min_length=1)
+    path: str | None = Field(default=None, min_length=1)
+    hunk: int | None = Field(default=None, ge=0)
+    run_id: str | None = Field(default=None, min_length=1)
+
+
+class ChangesRevertParams(BaseModel):
+    """``changes.revert``. Put back what a change, a file, a hunk or a turn wrote.
+
+    Without ``force``, a file that changed on disk since golem wrote it is left alone
+    and listed as a conflict. Refused while the session has a run.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    target: RevertTarget
+    force: bool = False
+
+
+class RevertConflict(BaseModel):
+    """A file a revert did not touch."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    path: str
+    reason: Literal["changed_on_disk"]
+
+
+class ChangesRevertResult(BaseModel):
+    """The paths written, and the paths left alone. Each write is a change of its own."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    reverted: list[str]
+    conflicts: list[RevertConflict]
+
+
 class ApprovalRespondParams(BaseModel):
     """``approval.respond``. Answer the tool call a session's run waits on.
 

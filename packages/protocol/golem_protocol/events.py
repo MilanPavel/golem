@@ -1085,13 +1085,16 @@ class ApprovalResolvedEvent(BaseModel):
 
 
 class FileChangedEvent(BaseModel):
-    """A file in the session folder changed. Sent before the ``tool.completed`` of its call."""
+    """A file in the session folder changed. Sent before the ``tool.completed`` of its call.
+
+    ``run_id`` is null for an undo, which is made between runs.
+    """
 
     model_config = _CONFIG
 
     seq: int = Field(ge=1)
     session_id: str = Field(min_length=1)
-    run_id: str = Field(min_length=1)
+    run_id: str | None = Field(min_length=1)
     ts: str = Field(min_length=1)
     type: Literal["file.changed"]
     data: FileChangedData

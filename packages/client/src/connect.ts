@@ -25,11 +25,19 @@ import type { ApprovalRespondResult } from "../../protocol/gen/approval-respond-
 import type { ArtifactReadResult } from "../../protocol/gen/artifact-read-result.ts";
 import type { ChangesDiffResult } from "../../protocol/gen/changes-diff-result.ts";
 import type { ChangesListResult } from "../../protocol/gen/changes-list-result.ts";
+import type { ChangesRevertResult } from "../../protocol/gen/changes-revert-result.ts";
 import type { ConfigGetResult } from "../../protocol/gen/config-get-result.ts";
 import type { PolicyEditResult } from "../../protocol/gen/policy-edit-result.ts";
 
 /** What `changes.diff` shows: the net change of one file, or one change. */
 export type ChangesDiffTarget = { path: string } | { changeId: string };
+
+/** What `changes.revert` takes back: one change, a file, one hunk of a file, or a turn and all after it. */
+export type ChangesRevertTarget =
+  | { kind: "change"; changeId: string }
+  | { kind: "file"; path: string }
+  | { kind: "hunk"; path: string; hunk: number }
+  | { kind: "run"; runId: string };
 
 export type ApprovalChoice = "allow" | "allow_session" | "allow_always" | "deny";
 
@@ -104,6 +112,7 @@ import {
   isRuntimeInstallDone,
   isRuntimeName,
   isChangesListResult,
+  isChangesRevertResult,
   isFsListDirsResult,
   isSetupStatusResult,
   isDaemonStatus,
@@ -291,6 +300,11 @@ export interface GolemClient {
   changesList(sessionId: string): Promise<ChangesListResult>;
   /** The diff of a file (`path`) or of one change (`changeId`). */
   changesDiff(sessionId: string, target: ChangesDiffTarget): Promise<ChangesDiffResult>;
+  /**
+   * Put back what a change, a file, a hunk or a turn wrote. A file that changed on disk is left
+   * alone and listed in `conflicts`, unless `force`. Refused while the session has a run.
+   */
+  changesRevert(sessionId: string, target: ChangesRevertTarget, force?: boolean): Promise<ChangesRevertResult>;
   /** `args` are the call's arguments as the user edited them. They go only with `allow`. */
   respondApproval(
     sessionId: string,
@@ -1302,6 +1316,22 @@ export function connectGolem(options: ConnectOptions): GolemClient {
         throw new Error("invalid changes.diff result");
       }
       return { diff: result["diff"], truncated: result["truncated"] };
+    },
+    async changesRevert(sessionId: string, target: ChangesRevertTarget, force = false): Promise<ChangesRevertResult> {
+      await ready;
+      const wire =
+        target.kind === "change"
+          ? { kind: "change", change_id: target.changeId }
+          : target.kind === "file"
+            ? { kind: "file", path: target.path }
+            : target.kind === "hunk"
+              ? { kind: "hunk", path: target.path, hunk: target.hunk }
+              : { kind: "run", run_id: target.runId };
+      const result = await call("changes.revert", { session_id: sessionId, target: wire, force });
+      if (!isChangesRevertResult(result)) {
+        throw new Error("invalid changes.revert result");
+      }
+      return result;
     },
     async respondApproval(
       sessionId: string,
