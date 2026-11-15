@@ -1,0 +1,7 @@
+{
+  "additionalProperties": false,
+  "description": "``notify.test``. Post a sample notification, for Settings and ``golem doctor``.",
+  "properties": {},
+  "title": "NotifyTestParams",
+  "type": "object"
+}

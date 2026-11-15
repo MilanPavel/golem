@@ -175,6 +175,8 @@ from golem_protocol.commands import (
     ModelSetDefaultParams,
     ModelSetDefaultResult,
     ModelSetup,
+    NotifyTestParams,
+    NotifyTestResult,
     OllamaInstallCancelParams,
     OllamaInstallCancelResult,
     OllamaInstallParams,
@@ -1257,6 +1259,14 @@ async def _ollama_start(ctx: RequestContext, _params: OllamaStartParams) -> Olla
     return OllamaStartResult(running=running)
 
 
+async def _notify_test(ctx: RequestContext, _params: NotifyTestParams) -> NotifyTestResult:
+    notifier = ctx.state.notifier
+    if notifier is None:
+        raise RpcCallError(INVALID_PARAMS, "the daemon is not ready for notifications yet")
+    posted = await notifier.test()
+    return NotifyTestResult(posted=posted, mechanism=notifier.poster.name)
+
+
 def _key_store(router: ModelRouter, provider_name: str) -> KeyStore:
     provider = router.provider(provider_name)
     if provider is None:
@@ -1381,6 +1391,7 @@ def standard_methods() -> dict[str, Method]:
         "ollama.install_cancel": Method(
             "ollama.install_cancel", OllamaInstallCancelParams, True, _ollama_install_cancel
         ),
+        "notify.test": Method("notify.test", NotifyTestParams, True, _notify_test),
         "ollama.start": Method("ollama.start", OllamaStartParams, True, _ollama_start),
         "session.set_model": Method(
             "session.set_model", SessionSetModelParams, True, _session_set_model
