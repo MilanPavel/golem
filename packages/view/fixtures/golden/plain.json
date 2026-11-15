@@ -55,6 +55,7 @@
       "data": {
         "cleared_ids": [],
         "context_window": null,
+        "estimated_tokens": 2753,
         "index": 1,
         "message_bytes": [
           6
@@ -323,6 +324,7 @@
       "data": {
         "cleared_ids": [],
         "context_window": null,
+        "estimated_tokens": 2753,
         "index": 1,
         "message_bytes": [
           6

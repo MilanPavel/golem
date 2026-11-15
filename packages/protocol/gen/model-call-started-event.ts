@@ -2,6 +2,7 @@
 
 export type ClearedIds = string[];
 export type ContextWindow = number | null;
+export type EstimatedTokens = number | null;
 export type Index = number;
 export type MessageBytes = number[] | null;
 export type MessageChars = number[] | null;
@@ -74,6 +75,7 @@ export interface ModelCallStartedEvent {
 export interface ModelCallStartedData {
   cleared_ids?: ClearedIds;
   context_window?: ContextWindow;
+  estimated_tokens?: EstimatedTokens;
   index: Index;
   message_bytes?: MessageBytes;
   message_chars?: MessageChars;

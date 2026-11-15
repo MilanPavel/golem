@@ -38,9 +38,12 @@ from golem.graphs.context_view import (
     freed_by,
     plan_clear,
     plan_summary,
+    sent_chars,
     used_tokens,
     view,
 )
+from golem.graphs.estimate import TokenRatios
+from golem.graphs.fit import Fitted, fit_prompt, num_predict_of, prompt_estimate, reply_reserve
 from golem.graphs.prompt import PINNED_KEY, PromptContext, SystemPrompt
 from golem.graphs.result_budget import ResultBudget, result_budget
 from golem.graphs.state import AgentState
@@ -415,6 +418,7 @@ def open_chat(
     learn_window: Callable[[str], Awaitable[None]] | None = None,
     context: ContextSettings | None = None,
     summariser: Summariser | None = None,
+    ratios: TokenRatios | None = None,
 ) -> ChatRuntime:
     """Compile the chat graph against ``checkpointer``.
 
@@ -438,9 +442,12 @@ def open_chat(
     ``context`` holds the ``[context]`` settings. When the history fills the window past
     ``clear_at``, old tool results are sent as one line each. Without it, nothing is cleared.
     With ``summariser``, a history still past ``compact_at`` after that has its old turns
-    replaced by a summary in what is sent.
+    replaced by a summary in what is sent. Before each call the prompt is estimated with the
+    tokens per character ``ratios`` learned from finished calls, and a prompt that would not fit
+    the window is cleared and summarised harder, or the call raises ``ContextFull``.
     """
     clearing = context
+    learned = TokenRatios() if ratios is None else ratios
     registry = default_registry() if tools is None else tools
     rules = Policy(None) if policy is None else policy
     binder = _ToolBinder()
@@ -486,7 +493,7 @@ def open_chat(
                 else 0
             )
             room = _room(clearing, window)
-            used, ratio = used_tokens(history, system_chars, tools_chars)
+            used, ratio = used_tokens(history, system_chars, tools_chars, learned.learned(profile))
             if clearing is not None and room is not None:
                 cleared = _clear_old(plain, current, clearing, room, used, ratio)
                 if cleared is not None:
@@ -521,6 +528,14 @@ def open_chat(
                             get_stream_writer()(again.item)
                         if used >= clearing.compact_at * room:
                             log.info("the prompt is still at %d of %d tokens", used, room)
+            if clearing is not None and window.window is not None:
+                fitted = await _fit(
+                    learned, router, profile, plain, current, system_chars + tools_chars,
+                    window.window, clearing, summariser, state.get("session_id"), overrides,
+                )  # fmt: skip
+                current = fitted.view
+                for change in fitted.items:
+                    get_stream_writer()(change)
             if current is not original:
                 history = view(plain, current)
                 sent = history if system is None else [system, *history]
@@ -533,6 +548,9 @@ def open_chat(
             if parts:
                 request["system_sections"] = [{"name": n, "chars": len(t)} for n, t in parts]
             request["context_window"] = window.window
+            request["estimated_tokens"] = prompt_estimate(
+                learned, profile, history, system_chars + tools_chars
+            )
             request["num_ctx"] = window.num_ctx
             request["window_estimated"] = window.estimated
             request["window_planned"] = window.planned
@@ -554,6 +572,7 @@ def open_chat(
                 if down is None:
                     raise
                 raise down from exc
+        _learn(learned, profile, history, system_chars + tools_chars, response, window.window)
         loaded: int | None = None
         if note_loaded is not None:
             try:
@@ -777,6 +796,88 @@ async def _summarise_old(
         "count": end - start,
     }
     return _Cleared(planned, item)
+
+
+async def _fit(
+    learned: TokenRatios,
+    router: ModelRouter,
+    profile: str,
+    plain: Sequence[BaseMessage],
+    current: ContextView | None,
+    fixed_chars: int,
+    window: int,
+    settings: ContextSettings,
+    summariser: Summariser | None,
+    session_id: str | None,
+    options: Mapping[str, float | str],
+) -> Fitted:
+    """The view that fits ``window`` with the reply reserve, or raises ``ContextFull``."""
+
+    async def summarise(ctx: ContextView | None) -> tuple[ContextView, int] | None:
+        last_turn = settings.model_copy(update={"keep_turns": 1})
+        found = await _summarise_old(
+            summariser, plain, ctx, last_turn, 0, 1.0,
+            session_id=session_id, profile=profile, options=options,
+        )  # fmt: skip
+        return None if found is None else (found.view, cast(int, found.item["count"]))
+
+    def changed(action: str, before: int, after: int, count: int) -> dict[str, object]:
+        return {
+            STREAM_KEY: "context.changed",
+            "action": action,
+            "before_tokens": before,
+            "after_tokens": after,
+            "count": count,
+        }
+
+    reserve = reply_reserve(settings.reply_reserve, _num_predict(router, profile, options), window)
+    return await fit_prompt(
+        plain,
+        current,
+        model=profile,
+        ratios=learned,
+        fixed_chars=fixed_chars,
+        window=window,
+        reserve=reserve,
+        summarise=summarise,
+        item=changed,
+    )
+
+
+def _num_predict(
+    router: ModelRouter, profile: str, overrides: Mapping[str, float | str]
+) -> float | str | None:
+    """The ``num_predict`` the call is sent with: the session's, else the saved one."""
+    if "num_predict" in overrides:
+        return num_predict_of(overrides)
+    try:
+        saved = router.ollama_options(router.resolve(profile).model_id, overrides)
+    except Exception:
+        return None
+    return num_predict_of(saved)
+
+
+def _learn(
+    learned: TokenRatios,
+    profile: str,
+    history: Sequence[BaseMessage],
+    fixed_chars: int,
+    response: AIMessage,
+    window: int | None,
+) -> None:
+    """Teach ``learned`` from a finished call, and log the estimate against the real count."""
+    usage = response.usage_metadata
+    tokens = usage.get("input_tokens") if usage else None
+    if not tokens:
+        return
+    chars = fixed_chars + sum(sent_chars(m) for m in history)
+    log.debug(
+        "%s: estimated %d tokens, the server counted %d",
+        profile,
+        prompt_estimate(learned, profile, history, fixed_chars),
+        tokens,
+    )
+    learned.note(profile, chars=chars, tokens=tokens, window=window)
 
 
 def _without_thinking(messages: Sequence[BaseMessage]) -> list[BaseMessage]:
