@@ -5,7 +5,7 @@ export type Group = string | null;
 export type Name = string;
 export type Tokens = number;
 export type Items = TraceContextItem[];
-export type Key = 'system' | 'tools' | 'user' | 'assistant' | 'tool_results';
+export type Key = 'system' | 'tools' | 'user' | 'assistant' | 'tool_results' | 'summary';
 export type Tokens1 = number;
 
 /**

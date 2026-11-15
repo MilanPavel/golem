@@ -533,3 +533,21 @@ test("a reply that was not cut shows no length note", () => {
   render(<TranscriptMessages chat={chat([answer({ text: "Whole" })])} />);
   expect(screen.queryByText("The reply stopped at the length limit.")).toBeNull();
 });
+
+test("the footer adds the model, tier, tokens and cost after the time and steps", () => {
+  const call = { model: "qwen3:27b", tier: "local" as const, tokens: 4100, costUsd: 0, done: true };
+  render(<TranscriptMessages chat={chat([answer({ durationMs: 3000, call })])} />);
+  expect(screen.getByText("3.0s · qwen3:27b · local · 4.1K tok · $0.00")).toBeTruthy();
+});
+
+test("a hosted answer shows its model and cost, with no tier word", () => {
+  const call = { model: "deepseek-chat", tier: "budget" as const, tokens: 900, costUsd: 0.31, done: true };
+  render(<TranscriptMessages chat={chat([answer({ durationMs: 3000, call })])} />);
+  expect(screen.getByText("3.0s · deepseek-chat · 900 tok · $0.31")).toBeTruthy();
+});
+
+test("an old answer with no cost data shows tokens only", () => {
+  const call = { model: null, tier: null, tokens: 900, costUsd: null, done: true };
+  render(<TranscriptMessages chat={chat([answer({ durationMs: 3000, call })])} />);
+  expect(screen.getByText("3.0s · 900 tok")).toBeTruthy();
+});

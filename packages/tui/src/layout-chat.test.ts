@@ -467,3 +467,23 @@ test("a file being written is a yellow row that updates and goes when the tool i
   const requested: ChatMessage = { id: "a", role: "assistant", text: "", streaming: true, tools: [{ callId: "1", name: "write_file", args: { path: "tests/a.py" }, status: "requested" }] };
   assert.ok(!rows(requested).some((text) => text.startsWith("◐")));
 });
+
+test("an answer's footer adds the model, tier, tokens and cost of the whole run", () => {
+  const call = (tokens: number, costUsd: number) => ({ model: "qwen3:27b", tier: "local" as const, tokens, costUsd, done: true });
+  const lines = layoutMessages(
+    [
+      message("u", "user", "hello"),
+      { ...message("s", "assistant", ""), tools: [{ callId: "c", name: "grep", args: {}, status: "done" }], call: call(1000, 0) },
+      { ...message("a", "assistant", "ok"), durationMs: 12_400, call: call(3100, 0) },
+    ],
+    80,
+  );
+  const footers = lines.filter((line) => textOf(line.spans).startsWith("0m 12.4s"));
+  assert.equal(footers.length, 1);
+  assert.equal(textOf(footers[0]?.spans ?? []), "0m 12.4s · qwen3:27b · local · 4.1K tok · $0.00");
+});
+
+test("an answer from an old session with no call data shows its time only", () => {
+  const lines = layoutMessages([{ ...message("a", "assistant", "ok"), durationMs: 12_400 }], 80);
+  assert.ok(lines.some((line) => textOf(line.spans) === "0m 12.4s"));
+});

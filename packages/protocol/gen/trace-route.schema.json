@@ -1,0 +1,71 @@
+{
+  "$defs": {
+    "ModelRejection": {
+      "additionalProperties": false,
+      "description": "A candidate the pick left out, and why in plain words.",
+      "properties": {
+        "ref": {
+          "minLength": 1,
+          "title": "Ref",
+          "type": "string"
+        },
+        "tier": {
+          "enum": [
+            "local",
+            "budget",
+            "frontier"
+          ],
+          "title": "Tier",
+          "type": "string"
+        },
+        "why": {
+          "minLength": 1,
+          "title": "Why",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ref",
+        "tier",
+        "why"
+      ],
+      "title": "ModelRejection",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Why a run used the model it did: the pick of a session that is not ``pinned``.\n\n``reason`` and ``detail`` are those of ``model.routed``, and ``rejected`` the\ncandidates the pick dropped.",
+  "properties": {
+    "detail": {
+      "title": "Detail",
+      "type": "string"
+    },
+    "reason": {
+      "enum": [
+        "pinned",
+        "privacy",
+        "fit",
+        "budget",
+        "cheapest",
+        "escalated",
+        "fallback",
+        "user"
+      ],
+      "title": "Reason",
+      "type": "string"
+    },
+    "rejected": {
+      "items": {
+        "$ref": "#/$defs/ModelRejection"
+      },
+      "title": "Rejected",
+      "type": "array"
+    }
+  },
+  "required": [
+    "reason",
+    "detail"
+  ],
+  "title": "TraceRoute",
+  "type": "object"
+}

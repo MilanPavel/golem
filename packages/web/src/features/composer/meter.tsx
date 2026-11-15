@@ -1,4 +1,4 @@
-import { formatElapsed, type GolemState } from "@golem/view";
+import { formatElapsed, WAITING_FOR_LOCAL_MODEL, type GolemState } from "@golem/view";
 import { useEffect, useState, type ReactNode } from "react";
 import { GOLEM_STATE_LABEL } from "../../ui/golem-state.ts";
 import { PixelGolem } from "../../ui/pixel-golem.tsx";
@@ -26,6 +26,8 @@ export type MeterProps = {
   state: GolemState;
   /** When the run began (an ISO time), for the elapsed seconds. */
   runStartedAt: string | null;
+  /** A chat call waits for its turn on the local model. */
+  localWait?: boolean;
   /** Something small at the right end of the row, such as the context chip. */
   aside?: ReactNode;
 };
@@ -45,9 +47,10 @@ export function meterText(state: GolemState, seconds: number): string {
 }
 
 /** The small golem and what golem is doing, above the composer. */
-export function Meter({ state, runStartedAt, aside }: MeterProps) {
+export function Meter({ state, runStartedAt, localWait = false, aside }: MeterProps) {
   const now = useTicker(state === "thinking");
-  const text = meterText(state, elapsedSeconds(runStartedAt, now));
+  const text =
+    localWait && state === "thinking" ? WAITING_FOR_LOCAL_MODEL : meterText(state, elapsedSeconds(runStartedAt, now));
   return (
     <div data-meter={state} className="flex min-h-5 items-center gap-2.5 px-1 font-mono text-xs text-muted">
       <PixelGolem state={state} size="sm" />

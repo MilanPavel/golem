@@ -82,6 +82,7 @@ export const STATUS_PRIORITY = {
   tune: 48,
   skills: 45,
   folder: 40,
+  cost: 30,
   messages: 20,
   uptime: 10,
 } as const;
@@ -248,6 +249,8 @@ export function statusSegments(input: {
   tune?: string;
   /** The permission mode the session runs in: `balanced`. */
   mode?: string;
+  /** The session's cost so far, as `$0.03`. Empty until a call has cost something. */
+  cost?: string;
 }): StatusSegment[] {
   return [
     segment("connection", input.connection, STATUS_PRIORITY.connection, "connection", true),
@@ -272,6 +275,7 @@ export function statusSegments(input: {
       STATUS_PRIORITY.uptime,
       "dim",
     ),
+    segment("cost", input.cost ?? "", STATUS_PRIORITY.cost, "dim"),
   ];
 }
 

@@ -23,6 +23,11 @@ test("while a local server starts, the meter says so instead of thinking", () =>
   assert.match(meterLine("writing", 12, 1, 0, 48, "ollama"), /^writing · 12 chars/);
 });
 
+test("while a chat call waits for the local model, the meter says so", () => {
+  assert.match(meterLine("thinking", 0, 0, 0, 40, "ollama", true), /^waiting for the local model {2}█/);
+  assert.match(meterLine("thinking", 0, 0, 0, 40, null, false), /^thinking/);
+});
+
 test("elapsed seconds come from the run timestamp", () => {
   assert.equal(elapsedSeconds(null, 1_000), 0);
   assert.equal(elapsedSeconds("not-a-date", 1_000), 0);
@@ -43,7 +48,7 @@ test("character count is the latest assistant message", () => {
 test("a file being written takes the meter text and the writing phase", () => {
   assert.equal(meterPhase(true, 0, false, true), "writing");
   assert.equal(meterPhase(true, 0, false, false), "thinking");
-  assert.match(meterLine("writing", 0, 4, 0, 60, null, "writing a.py · 6 lines · 4 s"), /^writing a\.py · 6 lines · 4 s {2}█/);
+  assert.match(meterLine("writing", 0, 4, 0, 60, null, false, "writing a.py · 6 lines · 4 s"), /^writing a\.py · 6 lines · 4 s {2}█/);
   assert.equal(writingNow([{ id: "a", role: "assistant", text: "", streaming: true, writing: { name: "write_file", path: null, lines: 1, chars: 3 } }])?.writing.lines, 1);
   assert.equal(writingNow([]), null);
 });

@@ -558,7 +558,7 @@
     },
     "ContextChangedData": {
       "additionalProperties": false,
-      "description": "What golem sends of the history changed before a model call.\n\n``cleared`` means old tool results are now sent as one line each: ``count`` is how\nmany, and ``before_tokens`` and ``after_tokens`` are rough sizes of the history before\nand after. ``summarised`` and ``grew`` are for later changes: ``count`` is the\nmessages summarised, ``window_from`` and ``window_to`` the window before and after,\nand ``reload_ms`` the time the model took to load again. The checkpoint keeps every\nmessage, so no transcript event changes. A field a change does not use is None.",
+      "description": "What golem sends of the history changed before a model call.\n\n``cleared`` means old tool results are now sent as one line each: ``count`` is how\nmany, and ``before_tokens`` and ``after_tokens`` are rough sizes of the history before\nand after. For ``summarised``, ``count`` is the messages a summary now stands for.\n``grew`` is for a later change: ``window_from`` and ``window_to`` are the window\nbefore and after, and ``reload_ms`` the time the model took to load again. The\ncheckpoint keeps every message, so no transcript event changes. A field a change\ndoes not use is None.",
       "properties": {
         "action": {
           "enum": [
@@ -1474,6 +1474,19 @@
           "default": null,
           "title": "Provider"
         },
+        "summary_chars": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Summary Chars"
+        },
         "system_bytes": {
           "anyOf": [
             {
@@ -1713,6 +1726,161 @@
       "title": "ModelOptionsChangedEvent",
       "type": "object"
     },
+    "ModelRejection": {
+      "additionalProperties": false,
+      "description": "A candidate the pick left out, and why in plain words.",
+      "properties": {
+        "ref": {
+          "minLength": 1,
+          "title": "Ref",
+          "type": "string"
+        },
+        "tier": {
+          "enum": [
+            "local",
+            "budget",
+            "frontier"
+          ],
+          "title": "Tier",
+          "type": "string"
+        },
+        "why": {
+          "minLength": 1,
+          "title": "Why",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ref",
+        "tier",
+        "why"
+      ],
+      "title": "ModelRejection",
+      "type": "object"
+    },
+    "ModelRoutedData": {
+      "additionalProperties": false,
+      "description": "Which model a run uses, and why golem picked it.\n\nSent right after ``run.started`` in a session whose route is not ``pinned``.\n``model_profile`` is the profile that runs. ``provider`` and ``model`` are what\nit resolves to, null when it does not resolve. ``reason`` is why this model\n(ADR-055), ``detail`` one short sentence, and ``rejected`` the candidates the\npick dropped. The session's own model does not change.",
+      "properties": {
+        "detail": {
+          "title": "Detail",
+          "type": "string"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
+        },
+        "model_profile": {
+          "minLength": 1,
+          "title": "Model Profile",
+          "type": "string"
+        },
+        "provider": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Provider"
+        },
+        "reason": {
+          "enum": [
+            "pinned",
+            "privacy",
+            "fit",
+            "budget",
+            "cheapest",
+            "escalated",
+            "fallback",
+            "user"
+          ],
+          "title": "Reason",
+          "type": "string"
+        },
+        "rejected": {
+          "items": {
+            "$ref": "#/$defs/ModelRejection"
+          },
+          "title": "Rejected",
+          "type": "array"
+        },
+        "tier": {
+          "enum": [
+            "local",
+            "budget",
+            "frontier"
+          ],
+          "title": "Tier",
+          "type": "string"
+        }
+      },
+      "required": [
+        "model_profile",
+        "tier",
+        "reason",
+        "detail"
+      ],
+      "title": "ModelRoutedData",
+      "type": "object"
+    },
+    "ModelRoutedEvent": {
+      "additionalProperties": false,
+      "description": "The pick for this run: the model that runs it and why.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/ModelRoutedData"
+        },
+        "run_id": {
+          "minLength": 1,
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "model.routed",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "run_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "ModelRoutedEvent",
+      "type": "object"
+    },
     "ModelSelectedData": {
       "additionalProperties": false,
       "description": "The model the session's next run uses.\n\n``model_profile`` is the name asked for, a profile or a ``provider/model``\nref. ``model_provider`` and ``model_name`` are what it resolved to when it\nwas chosen. ``reason`` ``user`` is ``session.set_model``.",
@@ -1802,6 +1970,71 @@
         "data"
       ],
       "title": "ModelSelectedEvent",
+      "type": "object"
+    },
+    "ModelWaitingData": {
+      "additionalProperties": false,
+      "description": "A chat call waits, or no longer waits, for its turn on a local model server.\n\nSent for the reply ``message_id`` only, so other sessions never show it. Stored only\nuntil its message completes.",
+      "properties": {
+        "message_id": {
+          "minLength": 1,
+          "title": "Message Id",
+          "type": "string"
+        },
+        "waiting": {
+          "title": "Waiting",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "message_id",
+        "waiting"
+      ],
+      "title": "ModelWaitingData",
+      "type": "object"
+    },
+    "ModelWaitingEvent": {
+      "additionalProperties": false,
+      "description": "A chat call waits for the local model. A live signal: ``message.completed`` replaces it.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/ModelWaitingData"
+        },
+        "run_id": {
+          "minLength": 1,
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "model.waiting",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "run_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "ModelWaitingEvent",
       "type": "object"
     },
     "PromptSectionInfo": {
@@ -2292,7 +2525,7 @@
     },
     "SessionCreatedData": {
       "additionalProperties": false,
-      "description": "Profile stored for a new session.\n\n``model_profile`` is a profile name or a ``provider/model`` ref.\n``model_provider`` and ``model_name`` are set when the daemon can resolve\nit, and null otherwise. ``forked_from`` is set on a session made by\n``session.fork``. ``cwd`` is the project folder the file tools work in,\nor null for a session without one. ``origin`` is who started the session:\n``cli``, ``routine:<name>``, and so on. Null means ``user``, and an older\ndaemon leaves it out.",
+      "description": "Profile stored for a new session.\n\n``model_profile`` is a profile name or a ``provider/model`` ref.\n``model_provider`` and ``model_name`` are set when the daemon can resolve\nit, and null otherwise. ``forked_from`` is set on a session made by\n``session.fork``. ``cwd`` is the project folder the file tools work in,\nor null for a session without one. ``origin`` is who started the session:\n``cli``, ``routine:<name>``, and so on. Null means ``user``, and an older\ndaemon leaves it out. ``route`` is the session's route mode when it was\nmade. Null means ``pinned``, and an older daemon leaves it out.",
       "properties": {
         "cwd": {
           "anyOf": [
@@ -2361,6 +2594,23 @@
           ],
           "default": null,
           "title": "Origin"
+        },
+        "route": {
+          "anyOf": [
+            {
+              "enum": [
+                "pinned",
+                "local",
+                "auto"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Route"
         }
       },
       "required": [
@@ -2484,7 +2734,7 @@
     },
     "SessionUpdatedData": {
       "additionalProperties": false,
-      "description": "A session attribute changed: its title, folder, allowed tools, or MCP servers.\n\nA field left null did not change. ``cwd`` is set once, on a session made\nbefore sessions had a folder, by the first ``message.send`` that names one.\n``allowed_tools`` is the whole list after ``session.revoke``, and\n``mcp_servers`` the on-demand MCP servers the session turned on, after\n``mcp.enable`` or ``mcp.disable``.",
+      "description": "A session attribute changed: its title, folder, allowed tools, MCP servers, or route.\n\nA field left null did not change. ``route`` is the session's route mode after\n``session.set_route``. ``cwd`` is set once, on a session made\nbefore sessions had a folder, by the first ``message.send`` that names one.\n``allowed_tools`` is the whole list after ``session.revoke``, and\n``mcp_servers`` the on-demand MCP servers the session turned on, after\n``mcp.enable`` or ``mcp.disable``.",
       "properties": {
         "allowed_tools": {
           "anyOf": [
@@ -2528,6 +2778,23 @@
           ],
           "default": null,
           "title": "Mcp Servers"
+        },
+        "route": {
+          "anyOf": [
+            {
+              "enum": [
+                "pinned",
+                "local",
+                "auto"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Route"
         },
         "title": {
           "anyOf": [
@@ -3572,7 +3839,9 @@
           "model.call.completed": "#/$defs/ModelCallCompletedEvent",
           "model.call.started": "#/$defs/ModelCallStartedEvent",
           "model.options.changed": "#/$defs/ModelOptionsChangedEvent",
+          "model.routed": "#/$defs/ModelRoutedEvent",
           "model.selected": "#/$defs/ModelSelectedEvent",
+          "model.waiting": "#/$defs/ModelWaitingEvent",
           "run.cancelled": "#/$defs/RunCancelledEvent",
           "run.completed": "#/$defs/RunCompletedEvent",
           "run.failed": "#/$defs/RunFailedEvent",
@@ -3611,6 +3880,9 @@
         },
         {
           "$ref": "#/$defs/ModelSelectedEvent"
+        },
+        {
+          "$ref": "#/$defs/ModelRoutedEvent"
         },
         {
           "$ref": "#/$defs/ModelOptionsChangedEvent"
@@ -3659,6 +3931,9 @@
         },
         {
           "$ref": "#/$defs/ToolWritingEvent"
+        },
+        {
+          "$ref": "#/$defs/ModelWaitingEvent"
         },
         {
           "$ref": "#/$defs/ToolStartedEvent"

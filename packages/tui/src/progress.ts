@@ -1,4 +1,4 @@
-import { formatElapsed, type ChatMessage, type RunPhase, type WritingBlock } from "@golem/view";
+import { formatElapsed, WAITING_FOR_LOCAL_MODEL, type ChatMessage, type RunPhase, type WritingBlock } from "@golem/view";
 
 export type MeterPhase = RunPhase;
 
@@ -66,13 +66,16 @@ export function meterLine(
   tick: number,
   columns: number,
   starting: string | null = null,
+  localWait = false,
   writing: string | null = null,
 ): string {
   const label =
     phase === "thinking"
-      ? starting === null
-        ? "thinking"
-        : `starting ${starting}`
+      ? localWait
+        ? WAITING_FOR_LOCAL_MODEL
+        : starting === null
+          ? "thinking"
+          : `starting ${starting}`
       : phase === "waiting"
         ? "waiting for your approval"
         : writing !== null

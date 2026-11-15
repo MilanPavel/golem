@@ -54,6 +54,7 @@ export type ComposerOutcome =
   | { kind: "export"; path: string | null }
   | { kind: "time" }
   | { kind: "todos" }
+  | { kind: "changes" }
   | { kind: "thinking" }
   | { kind: "detail"; level: Detail | null }
   /** Show the permission mode ("show"), or set it for this chat. A null `mode` returns to the default. */
@@ -375,6 +376,13 @@ export const COMMANDS: readonly Command[] = [
     args: "[name]",
     description: "Shows the title, or sets it.",
     run: (_debug, args) => ({ kind: "title", title: args.length === 0 ? null : args.join(" ") }),
+  },
+  {
+    name: "/changes",
+    group: "view",
+    args: "",
+    description: "Shows the files this session changed, with their diffs.",
+    run: withoutArgs({ kind: "changes" }),
   },
   {
     name: "/todos",
