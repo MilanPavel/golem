@@ -13,6 +13,7 @@ from typing import Any, Literal, cast
 from langchain_core.messages import BaseMessage, HumanMessage, ToolMessage
 
 from golem.config import CodingSettings, PermissionMode
+from golem.graphs.notes import is_note
 
 MAX_DETECTED = 4
 _DEFAULT_TIMEOUT = 120
@@ -37,9 +38,14 @@ def checks_for(root: Path, settings: CodingSettings) -> list[Check]:
 
 
 def edited_this_turn(messages: Sequence[BaseMessage]) -> bool:
-    """A successful write_file, edit_file or shell result since the last human message."""
+    """A successful write_file, edit_file or shell result since the last human message.
+
+    A note from golem is not a human message here, so a fix round still counts the edits before it.
+    """
     for message in reversed(messages):
         if isinstance(message, HumanMessage):
+            if is_note(message):
+                continue
             return False
         if not isinstance(message, ToolMessage) or message.status != "success":
             continue

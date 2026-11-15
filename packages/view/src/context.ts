@@ -8,7 +8,7 @@ export type ContextLevel = "ok" | "high" | "full";
 export const CHARS_PER_TOKEN = 4;
 
 /** The display order of the parts. */
-export const CONTEXT_KEYS: readonly ContextKey[] = ["system", "tools", "user", "assistant", "tool_results"];
+export const CONTEXT_KEYS: readonly ContextKey[] = ["system", "tools", "user", "assistant", "tool_results", "summary"];
 
 export const CONTEXT_LABELS: Record<ContextKey | "free", string> = {
   system: "System prompt",
@@ -16,6 +16,7 @@ export const CONTEXT_LABELS: Record<ContextKey | "free", string> = {
   user: "Your messages",
   assistant: "Replies",
   tool_results: "Tool results",
+  summary: "Summary",
   free: "Free",
 };
 
@@ -110,6 +111,14 @@ export function cutNote(span: CutFields): { text: string; warn: boolean } | null
     return { text, warn: false };
   }
   return null;
+}
+
+/** What was cleared at one model call: a line for the Context tab, or null when nothing was. */
+export function clearedNote(context: Pick<TraceContext, "cleared">): string | null {
+  const count = context.cleared?.count ?? 0;
+  const tokens = context.cleared?.tokens ?? 0;
+  if (count <= 0) return null;
+  return `${count} old tool ${count === 1 ? "result was" : "results were"} sent as one line at this call, saving ≈${formatTokens(tokens)}.`;
 }
 
 /** Cells of a bar `width` wide for each part, in display order, and the free rest. */
@@ -322,7 +331,7 @@ export function contextReportLines(report: ContextReport, columns: number): Cont
     }
   } else {
     lines.push(plain(`context · ${report.model === null ? "" : `${report.model} · `}${summary}`));
-    for (const part of ctx.parts) {
+    for (const part of ctx.parts.filter((p) => p.key !== "summary" || p.tokens > 0)) {
       lines.push(plain(row(CONTEXT_LABELS[part.key], part.tokens)));
       if (part.key === "tools") lines.push(...servers);
     }

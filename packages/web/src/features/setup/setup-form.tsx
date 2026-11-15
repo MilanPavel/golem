@@ -1,11 +1,8 @@
 import { OLLAMA_DOWNLOAD_URL, providerName, type FormButtonId, type FormFix, type FormMark, type FormRow, type Mark } from "@golem/view";
-import { useId, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Button } from "../../ui/button.tsx";
 import { CopyCommand } from "../../ui/copy-command.tsx";
-import { cn } from "../../ui/cn.ts";
-import { CheckIcon, PlusIcon } from "../../ui/icons.tsx";
 import { Link } from "../../ui/link.tsx";
-import { ProviderIcon } from "../../ui/provider-icons.tsx";
 import { MarkGlyph } from "./mark-glyph.tsx";
 import { installLog, type SetupActionsState } from "./use-setup-actions.ts";
 
@@ -213,87 +210,3 @@ export function SetupFormView(props: SetupFormViewProps) {
 
 /** A provider that takes an API key, and whether golem has one saved for it. */
 export type KeyProvider = { id: string; name: string; blurb: string; saved: boolean };
-
-export type AddKeyProps = {
-  /** Every provider that takes a key, in the order to show them. */
-  providers: readonly KeyProvider[];
-  actions: SetupActionsState;
-  onCheck: (from: HTMLElement) => void;
-  /** The provider whose line starts open. The gallery uses it. */
-  initialOpen?: string | null;
-};
-
-const CHIP = "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium outline-offset-2 outline-clay focus-visible:outline-2";
-
-/**
- * Under the status rows: a chip for each provider, saved ones in the allow tone. A chip opens one
- * line with the command that stores a key. The page only knows whether a key is saved, never its
- * value, and never takes one.
- */
-export function AddKey({ providers, actions, onCheck, initialOpen = null }: AddKeyProps) {
-  const id = useId();
-  const [open, setOpen] = useState<string | null>(initialOpen);
-  const chosen = providers.find((item) => item.id === open) ?? null;
-  const checking = actions.running === "check" && actions.from === "key";
-  if (providers.length === 0) return null;
-  return (
-    <div role="group" aria-labelledby={`${id}-title`} className="flex flex-col gap-2">
-      <h3 className="text-sm font-semibold">
-        <span id={`${id}-title`}>API keys</span> <span className="font-normal text-muted">· optional, for cloud models</span>
-      </h3>
-      <div className="flex flex-wrap gap-2">
-        {providers.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            aria-expanded={open === item.id}
-            onClick={() => {
-              setOpen(open === item.id ? null : item.id);
-            }}
-            className={cn(
-              CHIP,
-              item.saved ? "border-transparent bg-allow-soft text-allow" : "border-line-strong bg-surface text-muted hover:border-ink hover:text-ink",
-              open === item.id && "border-clay text-ink ring-1 ring-clay",
-            )}
-          >
-            <ProviderIcon provider={item.id} name={item.name} className="shrink-0" />
-            {item.name}
-            <small className="text-xs font-normal text-muted">{item.blurb}</small>
-            {item.saved ? <CheckIcon className="size-3 shrink-0" /> : <PlusIcon className="size-3 shrink-0" />}
-            {item.saved ? <span className="sr-only">saved</span> : null}
-          </button>
-        ))}
-      </div>
-      {chosen === null ? null : (
-        <div
-          role="group"
-          aria-label={`${chosen.name} key`}
-          className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border border-dashed border-line-strong px-3 py-2"
-        >
-          {chosen.saved ? <span className="text-sm">Key saved. To replace it:</span> : null}
-          <CopyCommand command={`golem auth set ${chosen.id}`} />
-          {checking ? (
-            <Working>Checking…</Working>
-          ) : (
-            <Button
-              size="sm"
-              kind="ghost"
-              disabled={actions.running !== null}
-              onClick={(event) => {
-                onCheck(event.currentTarget);
-              }}
-            >
-              Check again
-            </Button>
-          )}
-          <p className="w-full text-sm text-muted">The page never takes a key. Paste it in a terminal.</p>
-          {actions.error?.action === "check" && actions.from === "key" ? (
-            <p role="alert" className="w-full text-sm text-deny">
-              {actions.error.text}
-            </p>
-          ) : null}
-        </div>
-      )}
-    </div>
-  );
-}

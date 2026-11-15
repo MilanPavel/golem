@@ -1,6 +1,5 @@
 import { golemBlock, pageServiceRow, setupFormRows, setupProblem, setupProblemState, type FormRow, type GolemBlock, type Mark } from "@golem/view";
 import type { ListedModel, ModelListResult, SetupRow, SetupStatusResult } from "../../store/models.ts";
-import type { KeyProvider } from "./setup-form.tsx";
 import type { SetupActionsState } from "./use-setup-actions.ts";
 
 const FREE = { input: 0, output: 0 };
@@ -127,26 +126,9 @@ export type FormCase = {
   label: string;
   rows: FormRow[];
   actions: SetupActionsState;
-  providers: KeyProvider[];
   header: { mark: Mark; text: string };
   block: GolemBlock | null;
-  /** The provider whose key line starts open. */
-  openKey?: string;
 };
-
-const key = (id: string, name: string, blurb: string, saved: boolean): KeyProvider => ({ id, name, blurb, saved });
-const keys = (saved: (id: string) => boolean): KeyProvider[] =>
-  [
-    ["anthropic", "Anthropic", "Claude"],
-    ["openai", "OpenAI", "GPT"],
-    ["google", "Google", "Gemini"],
-    ["deepseek", "DeepSeek", "DeepSeek V3 and R1"],
-    ["xai", "xAI", "Grok"],
-    ["moonshot", "Moonshot", "Kimi"],
-  ].map(([id = "", name = "", blurb = ""]) => key(id, name, blurb, saved(id)));
-const NO_KEYS = keys(() => false);
-const OPENAI_SAVED = keys((id) => id === "openai" || id === "xai");
-const ALL_SAVED = keys(() => true);
 
 const NO_ACTION: SetupActionsState = { running: null, output: "", noBrew: false, error: null, from: null };
 
@@ -176,12 +158,11 @@ const ONE_FAILING: SetupRow[] = OK_ROWS.map((row) =>
 
 /** Settings → Setup in the states the page draws, for the gallery. */
 export const FORM_CASES: FormCase[] = [
-  { label: "All set", rows: setupFormRows(OK_ROWS, KEPT, true), actions: NO_ACTION, providers: ALL_SAVED, header: head(OK_ROWS), block: BLOCK },
+  { label: "All set", rows: setupFormRows(OK_ROWS, KEPT, true), actions: NO_ACTION, header: head(OK_ROWS), block: BLOCK },
   {
     label: "Ollama stopped",
     rows: setupFormRows(OLLAMA_STOPPED, KEPT, true),
     actions: NO_ACTION,
-    providers: OPENAI_SAVED,
     header: head(OLLAMA_STOPPED),
     block: BLOCK,
   },
@@ -189,24 +170,13 @@ export const FORM_CASES: FormCase[] = [
     label: "One failing row",
     rows: setupFormRows(ONE_FAILING, KEPT, true),
     actions: NO_ACTION,
-    providers: OPENAI_SAVED,
     header: head(ONE_FAILING),
     block: BLOCK,
-  },
-  {
-    label: "A key line open",
-    rows: setupFormRows(OK_ROWS, KEPT, true),
-    actions: NO_ACTION,
-    providers: OPENAI_SAVED,
-    header: head(OK_ROWS),
-    block: BLOCK,
-    openKey: "anthropic",
   },
   {
     label: "All set, page run by hand, an older daemon",
     rows: setupFormRows(OK_ROWS, KEPT, false),
     actions: NO_ACTION,
-    providers: OPENAI_SAVED,
     header: head(OK_ROWS),
     block: null,
   },
@@ -214,7 +184,6 @@ export const FORM_CASES: FormCase[] = [
     label: "Ollama missing, service not kept, a key missing",
     rows: setupFormRows(PROBLEM_ROWS, pageServiceRow(null, "0.5.0")),
     actions: NO_ACTION,
-    providers: NO_KEYS,
     header: head(PROBLEM_ROWS),
     block: BLOCK,
   },
@@ -226,7 +195,6 @@ export const FORM_CASES: FormCase[] = [
       running: "install",
       output: "==> Fetching ollama\n==> Downloading https://ghcr.io/v2/homebrew/core/ollama\n==> Pouring ollama--0.12.0.arm64_sequoia.bottle.tar.gz\n",
     },
-    providers: NO_KEYS,
     header: head(PROBLEM_ROWS),
     block: BLOCK,
   },
@@ -234,7 +202,6 @@ export const FORM_CASES: FormCase[] = [
     label: "Install failed",
     rows: setupFormRows(PROBLEM_ROWS, KEPT),
     actions: { ...NO_ACTION, error: { action: "install", text: "Error: no space left on device" } },
-    providers: OPENAI_SAVED,
     header: head(PROBLEM_ROWS),
     block: BLOCK,
   },

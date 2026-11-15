@@ -757,6 +757,7 @@ async def test_rename_sets_the_title_a_watcher_sees(short_home: Path) -> None:
             "cwd": None,
             "allowed_tools": None,
             "mcp_servers": None,
+            "route": None,
         }
 
         blank = await client.call("session.rename", {"session_id": session_id, "title": " "})

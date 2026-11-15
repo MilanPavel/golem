@@ -45,6 +45,14 @@ class ModelStarted:
 
 
 @dataclass(frozen=True, slots=True)
+class ModelWaiting:
+    """The call with this ``message_id`` waits, or stopped waiting, for the local model."""
+
+    message_id: str
+    waiting: bool
+
+
+@dataclass(frozen=True, slots=True)
 class ModelRequested:
     """The request of the model call with this ``message_id`` is about to be sent.
 
@@ -59,7 +67,9 @@ class ModelRequested:
 
     The size fields are the characters and UTF-8 bytes of what was sent, or None
     when not given. ``profile`` is the profile this call uses, or None when not given.
-    ``cleared_ids`` are the tool results sent as a one-line stub.
+    ``cleared_ids`` are the tool results sent as a one-line stub. ``summary_chars`` is the
+    length of the summary sent as the first message, or None. ``estimated_tokens`` is the
+    prompt as golem estimated it before sending, or None.
     """
 
     message_id: str
@@ -79,16 +89,20 @@ class ModelRequested:
     message_bytes: tuple[int, ...] | None = None
     profile: str | None = None
     cleared_ids: tuple[str, ...] = ()
+    summary_chars: int | None = None
+    estimated_tokens: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class ContextChanged:
-    """The context view changed before a model call: old tool results were cleared.
+    """The context view changed before a model call: old tool results were cleared, or old
+    turns were summarised.
 
-    The token counts are rough. ``count`` is the number of results cleared.
+    The token counts are rough. ``count`` is the number of results cleared, or of messages
+    the summary stands for.
     """
 
-    action: Literal["cleared"]
+    action: Literal["cleared", "summarised"]
     before_tokens: int | None = None
     after_tokens: int | None = None
     count: int | None = None
@@ -292,6 +306,7 @@ class CheckCompleted:
 
 Fact = (
     ModelStarted
+    | ModelWaiting
     | ModelRequested
     | ModelResponded
     | ContextChanged
@@ -775,6 +790,8 @@ def _custom(data: object) -> Fact | None:
     call_id = item.get("call_id")
     if kind == "model.started" and isinstance(message_id, str):
         return ModelStarted(message_id)
+    if kind == "model.waiting" and isinstance(message_id, str):
+        return ModelWaiting(message_id, item.get("waiting") is True)
     if kind == "model.request" and isinstance(message_id, str):
         return _request(message_id, item)
     if kind == "model.response" and isinstance(message_id, str):
@@ -785,9 +802,9 @@ def _custom(data: object) -> Fact | None:
             _text_calls(text_calls),
             _timings(item.get("timings")),
         )
-    if kind == "context.changed" and item.get("action") == "cleared":
+    if kind == "context.changed" and item.get("action") in ("cleared", "summarised"):
         return ContextChanged(
-            "cleared",
+            "summarised" if item.get("action") == "summarised" else "cleared",
             _count(item.get("before_tokens")),
             _count(item.get("after_tokens")),
             _count(item.get("count")),
@@ -936,6 +953,8 @@ def _request(message_id: str, item: Mapping[str, object]) -> ModelRequested:
         tuple(i for i in cast(list[object], cleared) if isinstance(i, str))
         if isinstance(cleared := item.get("cleared_ids"), list)
         else (),
+        _count(item.get("summary_chars")),
+        _count(item.get("estimated_tokens")),
     )
 
 
@@ -1004,6 +1023,7 @@ __all__ = [
     "ModelRequested",
     "ModelResponded",
     "ModelStarted",
+    "ModelWaiting",
     "PinRead",
     "PinSkipped",
     "PlainMessage",

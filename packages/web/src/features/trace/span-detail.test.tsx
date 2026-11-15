@@ -338,3 +338,12 @@ test("a call proven uncut shows no cut line, no tag, and no badge", () => {
   expect(document.body.textContent).not.toContain("Ollama");
   expect(document.body.textContent).not.toContain("not seen");
 });
+
+test("the meter says how many results were cleared at the selected call, and says nothing before", () => {
+  const cleared = { ...MODEL_DETAIL, context: { ...MODEL_DETAIL.context!, cleared: { count: 5, tokens: 1200 } } };
+  const view = show(cleared);
+  expect(screen.getByRole("region", { name: "Context window" }).textContent).toContain("5 old tool results were sent as one line at this call");
+  view.unmount();
+  show(MODEL_DETAIL);
+  expect(screen.getByRole("region", { name: "Context window" }).textContent).not.toContain("one line");
+});

@@ -340,70 +340,11 @@ test("a provider that needs a key: the command to copy for it, and Check again",
   expect(openai.getByRole("button", { name: "Check again" })).toBeTruthy();
 });
 
-const KEYED_LISTING: ModelListResult = { ...WORKING_LISTING, setup: { ...WORKING_LISTING.setup, keys: ["openai"] } };
-
-test("API keys are chips, the saved one in the allow tone, and none is open at first", async () => {
-  mount(OK_ROWS, KEYED_LISTING);
-  const section = await screen.findByRole("group", { name: "API keys" });
-  const chips = within(section).getAllByRole("button", { expanded: false });
-  expect(chips.map((chip) => chip.textContent)).toEqual([
-    "AnthropicClaude",
-    "OpenAIGPTsaved",
-    "GoogleGemini",
-    "DeepSeekDeepSeek V3 and R1",
-    "xAIGrok",
-    "MoonshotKimi",
-  ]);
-  // Each chip leads with its provider's icon, and no chip is in mono.
-  for (const chip of chips) {
-    expect(chip.querySelector("svg path, svg text")).not.toBeNull();
-    expect(chip.querySelector(".font-mono")).toBeNull();
-  }
-  expect(chips[1]?.className).toContain("bg-allow-soft");
-  expect(chips[0]?.className).not.toContain("bg-allow-soft");
-  // No full-width select, and no command until a chip is pressed.
-  expect(within(section).queryByRole("combobox")).toBeNull();
-  expect(within(section).queryByText("golem auth set anthropic")).toBeNull();
-});
-
-test("a chip opens one line with the command, Copy, Check again and the note; the same chip closes it", async () => {
-  const { user } = mount(OK_ROWS, KEYED_LISTING);
-  const section = within(await screen.findByRole("group", { name: "API keys" }));
-  const anthropic = section.getByRole("button", { name: /^Anthropic/ });
-  await user.click(anthropic);
-  expect(anthropic.getAttribute("aria-expanded")).toBe("true");
-  const line = within(section.getByRole("group", { name: "Anthropic key" }));
-  expect(line.getByText("golem auth set anthropic")).toBeTruthy();
-  expect(line.getByText("The page never takes a key. Paste it in a terminal.")).toBeTruthy();
-  expect(line.getByRole("button", { name: "Check again" })).toBeTruthy();
-  await user.click(line.getByRole("button", { name: /^Copy / }));
-  expect(writeText).toHaveBeenCalledWith("golem auth set anthropic");
-  // Another chip moves the line, and a saved one says to replace.
-  await user.click(section.getByRole("button", { name: /^OpenAI/ }));
-  expect(section.queryByText("golem auth set anthropic")).toBeNull();
-  const saved = within(section.getByRole("group", { name: "OpenAI key" }));
-  expect(saved.getByText("golem auth set openai")).toBeTruthy();
-  expect(saved.getByText(/Key saved/)).toBeTruthy();
-  await user.click(section.getByRole("button", { name: /^OpenAI/ }));
-  expect(section.queryByRole("group", { name: "OpenAI key" })).toBeNull();
-});
-
-test("a key saved from the terminal shows after Check again", async () => {
-  const { fake, user } = mount(OK_ROWS, WORKING_LISTING);
-  const section = await screen.findByRole("group", { name: "API keys" });
-  await user.click(within(section).getByRole("button", { name: /^OpenAI/ }));
-  expect(within(section).queryByText("saved")).toBeNull();
-  fake.raw.listModels.mockResolvedValue(KEYED_LISTING);
-  await user.click(within(section).getByRole("button", { name: "Check again" }));
-  await waitFor(() => expect(within(section).getByText("saved")).toBeTruthy());
-});
-
-test("API keys never asks for a key itself", async () => {
-  const { user } = mount(OK_ROWS);
-  const section = await screen.findByRole("group", { name: "API keys" });
-  await user.click(within(section).getByRole("button", { name: /^Anthropic/ }));
-  expect(section.querySelector("input")).toBeNull();
-  expect(document.querySelector("input[type=password]")).toBeNull();
+test("Setup has no API keys section: the keys are on their own page", async () => {
+  mount(OK_ROWS, WORKING_LISTING);
+  await screen.findByRole("list", { name: "Setup" });
+  expect(screen.queryByRole("group", { name: "API keys" })).toBeNull();
+  expect(screen.queryByRole("button", { name: /^Anthropic/ })).toBeNull();
 });
 
 test("Run setup again goes to /welcome, and there is no setup dialog", async () => {

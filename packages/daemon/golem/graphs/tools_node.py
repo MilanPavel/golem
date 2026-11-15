@@ -285,7 +285,7 @@ def tools_node(
                         "path": edit.path,
                         "before": edit.before,
                         "after": edit.after,
-                        "source": "tool",
+                        "source": edit.source,
                     }
                 )
             preview = result.output[:PREVIEW_CHARS]

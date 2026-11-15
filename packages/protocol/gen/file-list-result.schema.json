@@ -1,0 +1,23 @@
+{
+  "additionalProperties": false,
+  "description": "Relative paths, shortest first, then alphabetical. ``more`` is true when others match.",
+  "properties": {
+    "more": {
+      "title": "More",
+      "type": "boolean"
+    },
+    "paths": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Paths",
+      "type": "array"
+    }
+  },
+  "required": [
+    "paths",
+    "more"
+  ],
+  "title": "FileListResult",
+  "type": "object"
+}

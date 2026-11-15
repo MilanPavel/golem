@@ -2,6 +2,7 @@ import { keepPreviousData, QueryClientProvider, useInfiniteQuery, useQuery, type
 import { createContext, useCallback, useContext, useSyncExternalStore, type ReactNode } from "react";
 import { useSyncExternalStoreWithSelector } from "use-sync-external-store/with-selector";
 import { ConnectionProvider } from "./connection-context.tsx";
+import { changesDiffKey, changesListKey, type ChangedFiles, type FileDiff } from "./changes.ts";
 import { configKey, type ConfigGetResult } from "./config.ts";
 import { KEYS_KEY } from "./keys.ts";
 import type { FsListDirsResult } from "./dirs.ts";
@@ -247,6 +248,31 @@ export function useTraceSpan(sessionId: string, spanId: string | null): UseQuery
     enabled: spanId !== null,
     retry: false,
   });
+}
+
+/** The files a session changed. Read when first used, and again after a `file.changed` event. */
+export function useChangedFiles(sessionId: string): ChangedFiles {
+  const { queries } = usePage();
+  const result = useQuery({
+    queryKey: changesListKey(sessionId),
+    queryFn: async () => (await queries.changesList(sessionId)).files,
+  });
+  return { files: result.data ?? null, error: result.error === null ? null : result.error.message };
+}
+
+/** One file's diff. Not read for a null path. */
+export function useFileDiff(sessionId: string, path: string | null): FileDiff {
+  const { queries } = usePage();
+  const result = useQuery({
+    queryKey: changesDiffKey(sessionId, path ?? ""),
+    queryFn: () => queries.changesDiff(sessionId, { path: path ?? "" }),
+    enabled: path !== null,
+  });
+  return {
+    diff: result.data?.diff ?? null,
+    truncated: result.data?.truncated ?? false,
+    error: result.error === null ? null : result.error.message,
+  };
 }
 
 /** An artifact, a page of characters at a time. Fetched only once `enabled`, and `fetchNextPage` reads the next one. */

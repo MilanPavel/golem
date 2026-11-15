@@ -7,6 +7,7 @@ export type LastSeq = number;
 export type ModelProfile = string;
 export type Origin = string;
 export type PlanFirst = boolean;
+export type Route = 'pinned' | 'local' | 'auto';
 export type SessionId = string;
 export type Status = 'idle' | 'running' | 'waiting' | 'closed';
 export type Title = string | null;
@@ -23,6 +24,7 @@ export type UpdatedAt = string;
  * the id of the session this one was forked from, null for a session that is
  * not a fork. An older daemon leaves it out. ``origin`` is who started the
  * session: ``user``, ``cli``, ``routine:<name>``. A session never changes it.
+ * ``route`` is the session's route mode. An older daemon leaves it out.
  * ``plan_first`` is true while the session is in plan first (``session.set_plan``).
  */
 export interface SessionSummary {
@@ -33,6 +35,7 @@ export interface SessionSummary {
   model_profile: ModelProfile;
   origin?: Origin;
   plan_first?: PlanFirst;
+  route?: Route;
   session_id: SessionId;
   status: Status;
   title?: Title;

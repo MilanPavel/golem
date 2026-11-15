@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import asyncio
 from collections import deque
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager, suppress
 from typing import Literal
 
@@ -40,17 +40,25 @@ class _Line:
 class ServerGate:
     """One at a time per local server. Chat waits ahead of jobs."""
 
-    def __init__(self, slots: int = 1) -> None:
+    def __init__(self, slots: int = 1, notice_after: float = 1.0) -> None:
         if slots < 1:
             raise ValueError("slots must be at least 1")
         self._slots = slots
+        self._notice_after = notice_after
         self._lines: dict[str, _Line] = {}
 
     def hold(
-        self, server: str | None, priority: Priority = "chat"
+        self,
+        server: str | None,
+        priority: Priority = "chat",
+        notice: Callable[[bool], None] | None = None,
     ) -> AbstractAsyncContextManager[None]:
-        """Hold one slot of ``server`` (its base URL). None, a hosted model, never waits."""
-        return self._hold(server, priority)
+        """Hold one slot of ``server`` (its base URL). None, a hosted model, never waits.
+
+        A chat call that waits longer than ``notice_after`` seconds calls ``notice(True)``,
+        and ``notice(False)`` once it has its turn. A call that does not wait calls nothing.
+        """
+        return self._hold(server, priority, notice if priority == "chat" else None)
 
     def waiting(self, server: str) -> int:
         """How many calls wait for a slot of ``server``."""
@@ -58,26 +66,43 @@ class ServerGate:
         return 0 if line is None else line.count()
 
     @asynccontextmanager
-    async def _hold(self, server: str | None, priority: Priority) -> AsyncGenerator[None]:
+    async def _hold(
+        self, server: str | None, priority: Priority, notice: Callable[[bool], None] | None
+    ) -> AsyncGenerator[None]:
         if server is None:
             yield
             return
         line = self._lines.setdefault(server, _Line())
-        await self._acquire(line, priority)
+        await self._acquire(line, priority, notice)
         try:
             yield
         finally:
             self._release(line)
 
-    async def _acquire(self, line: _Line, priority: Priority) -> None:
+    async def _acquire(
+        self, line: _Line, priority: Priority, notice: Callable[[bool], None] | None
+    ) -> None:
         if line.running < self._slots and line.count() == 0:
             line.running += 1
             return
         waiter: asyncio.Future[None] = asyncio.get_running_loop().create_future()
         line.waiters[priority].append(waiter)
+        told = False
+
+        def tell() -> None:
+            nonlocal told
+            told = True
+            if notice is not None:
+                notice(True)
+
+        timer = asyncio.get_running_loop().call_later(self._notice_after, tell)
         try:
             await waiter
+            timer.cancel()
+            if told and notice is not None:
+                notice(False)
         except BaseException:
+            timer.cancel()
             if waiter.done() and not waiter.cancelled():
                 # The slot was handed over as the wait was cancelled. Pass it on.
                 self._release(line)

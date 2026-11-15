@@ -1,3 +1,4 @@
+import type { ChangesRevertResult } from "../../protocol/gen/changes-revert-result.ts";
 import type { KeychainWait } from "../../protocol/gen/keychain-wait.ts";
 import type { McpCatalogResult } from "../../protocol/gen/mcp-catalog-result.ts";
 import type { McpServerDetail } from "../../protocol/gen/mcp-server-detail.ts";
@@ -13,6 +14,8 @@ import type { McpTestResult } from "../../protocol/gen/mcp-test-result.ts";
 import type { RuntimeInstallDone } from "../../protocol/gen/runtime-install-done.ts";
 import type { OllamaInstallDone } from "../../protocol/gen/ollama-install-done.ts";
 import type { ChangesListResult } from "../../protocol/gen/changes-list-result.ts";
+import type { FileListResult } from "../../protocol/gen/file-list-result.ts";
+import type { FileReadResult } from "../../protocol/gen/file-read-result.ts";
 import type { DirEntry, FsListDirsResult } from "../../protocol/gen/fs-list-dirs-result.ts";
 import type { SetupRow, SetupStatusResult } from "../../protocol/gen/setup-status-result.ts";
 import type { McpListResult } from "../../protocol/gen/mcp-list-result.ts";
@@ -25,6 +28,7 @@ import type { ModelOptionsSaved } from "../../protocol/gen/model-options-saved.t
 import type { ModelOptionsSetResult } from "../../protocol/gen/model-options-set-result.ts";
 import type { PermissionsSetModeResult } from "../../protocol/gen/permissions-set-mode-result.ts";
 import type { SessionSetChecksResult } from "../../protocol/gen/session-set-checks-result.ts";
+import type { SessionSetRouteResult } from "../../protocol/gen/session-set-route-result.ts";
 import type { SessionSetPlanResult } from "../../protocol/gen/session-set-plan-result.ts";
 import type { SessionSetModeResult } from "../../protocol/gen/session-set-mode-result.ts";
 import type { SessionSetOptionsResult } from "../../protocol/gen/session-set-options-result.ts";
@@ -70,6 +74,7 @@ const EVENT_TYPES = new Set([
   "session.completed",
   "model.selected",
   "model.options.changed",
+  "model.routed",
   "session.mode.changed",
   "session.checks.changed",
   "session.plan.changed",
@@ -326,6 +331,14 @@ export function isSessionSetChecksResult(value: unknown): value is SessionSetChe
   return isRecord(value) && typeof value["session_id"] === "string" && typeof value["on"] === "boolean";
 }
 
+export function isSessionSetRouteResult(value: unknown): value is SessionSetRouteResult {
+  return (
+    isRecord(value) &&
+    typeof value["session_id"] === "string" &&
+    (value["mode"] === "pinned" || value["mode"] === "local" || value["mode"] === "auto")
+  );
+}
+
 export function isSessionSetPlanResult(value: unknown): value is SessionSetPlanResult {
   return isRecord(value) && typeof value["session_id"] === "string" && typeof value["on"] === "boolean";
 }
@@ -411,6 +424,38 @@ function isChangedFile(value: unknown): boolean {
 
 export function isChangesListResult(value: unknown): value is ChangesListResult {
   return isRecord(value) && Array.isArray(value["files"]) && value["files"].every(isChangedFile);
+}
+
+export function isChangesRevertResult(value: unknown): value is ChangesRevertResult {
+  return (
+    isRecord(value) &&
+    Array.isArray(value["reverted"]) &&
+    value["reverted"].every((path) => typeof path === "string") &&
+    Array.isArray(value["conflicts"]) &&
+    value["conflicts"].every(
+      (conflict) =>
+        isRecord(conflict) && typeof conflict["path"] === "string" && conflict["reason"] === "changed_on_disk",
+    )
+  );
+}
+
+export function isFileReadResult(value: unknown): value is FileReadResult {
+  return (
+    isRecord(value) &&
+    typeof value["path"] === "string" &&
+    typeof value["text"] === "string" &&
+    typeof value["truncated"] === "boolean" &&
+    typeof value["lines"] === "number"
+  );
+}
+
+export function isFileListResult(value: unknown): value is FileListResult {
+  return (
+    isRecord(value) &&
+    Array.isArray(value["paths"]) &&
+    value["paths"].every((path) => typeof path === "string") &&
+    typeof value["more"] === "boolean"
+  );
 }
 
 export function isKeychainWait(value: unknown): value is KeychainWait {

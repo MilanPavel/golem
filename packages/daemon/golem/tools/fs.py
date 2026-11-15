@@ -152,7 +152,7 @@ def glob_files(where: Readable, args: GlobArgs) -> ToolResult:
         raise ToolError("the pattern must be relative and stay under path")
     found: list[str] = []
     for match in sorted(base.glob(args.pattern)):
-        if not match.is_file() or _skipped(match.relative_to(base)):
+        if not match.is_file() or in_skipped_dir(match.relative_to(base)):
             continue
         try:
             resolved = where.resolve(str(match))
@@ -177,7 +177,7 @@ def grep(where: Readable, args: GrepArgs) -> ToolResult:
     if base.is_file():
         files: Iterator[Path] = iter([base])
     elif base.is_dir():
-        files = _walk(base)
+        files = walk_files(base)
     else:
         raise ToolError(f"{args.path} does not exist")
     matches: list[str] = []
@@ -221,14 +221,14 @@ def _grep_file(where: Readable, path: Path, regex: re.Pattern[str]) -> list[str]
     return hits
 
 
-def _walk(base: Path) -> Iterator[Path]:
+def walk_files(base: Path) -> Iterator[Path]:
     for folder, dirs, names in os.walk(base):
         dirs[:] = sorted(name for name in dirs if name not in SKIPPED_DIRS)
         for name in sorted(names):
             yield Path(folder) / name
 
 
-def _skipped(rel: Path) -> bool:
+def in_skipped_dir(rel: Path) -> bool:
     return any(part in SKIPPED_DIRS for part in rel.parts[:-1])
 
 

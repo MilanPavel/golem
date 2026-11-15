@@ -11,6 +11,7 @@ from golem.coding.changes import (
     FileChange,
     before_run,
     net_files,
+    revert_hunk,
     status_of,
 )
 from golem.store.blobs import BlobStore
@@ -181,3 +182,39 @@ def test_diff_text_of_a_deleted_file_has_no_file_to_the_right() -> None:
     diff = diff_text("a.txt", "one\n", None)
     assert diff.splitlines()[:3] == ["--- a/a.txt", "+++ /dev/null", "@@ -1 +0,0 @@"]
     assert diff_text("a.txt", None, "one\n").startswith("--- /dev/null\n+++ b/a.txt\n")
+
+
+def _numbered(*changed: int) -> tuple[str, str]:
+    """Thirty lines, and the same with the given line numbers changed, far apart."""
+    before = [f"line {n}\n" for n in range(1, 31)]
+    after = [f"LINE {n}\n" if n in changed else line for n, line in enumerate(before, 1)]
+    return "".join(before), "".join(after)
+
+
+@pytest.mark.parametrize("index", [0, 1, 2])
+def test_revert_hunk_puts_back_the_first_middle_and_last_hunk(index: int) -> None:
+    before, after = _numbered(2, 15, 29)
+    changed = [2, 15, 29]
+    expected = _numbered(*[n for i, n in enumerate(changed) if i != index])[1]
+
+    assert revert_hunk(before, after, index) == expected
+
+
+def test_revert_hunk_of_a_one_hunk_diff_gives_back_before() -> None:
+    assert revert_hunk("a\nb\nc\n", "a\nB\nc\n", 0) == "a\nb\nc\n"
+
+
+def test_revert_hunk_without_a_trailing_newline() -> None:
+    assert revert_hunk("a\nb", "a\nB", 0) == "a\nb"
+    assert revert_hunk("a\nb\n", "a\nb", 0) == "a\nb\n"
+
+
+def test_revert_hunk_of_a_new_and_of_an_emptied_file() -> None:
+    assert revert_hunk("", "a\nb\n", 0) == ""
+    assert revert_hunk("a\nb\n", "", 0) == "a\nb\n"
+
+
+@pytest.mark.parametrize("index", [-1, 1, 5])
+def test_revert_hunk_refuses_a_hunk_that_does_not_exist(index: int) -> None:
+    with pytest.raises(IndexError):
+        revert_hunk("a\n", "b\n", index)

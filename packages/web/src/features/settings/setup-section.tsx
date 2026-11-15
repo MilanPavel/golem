@@ -1,11 +1,11 @@
-import { daemonServiceRow, golemBlock, HOSTED_PROVIDERS, pageServiceRow, setupFormRows, setupProblem, setupProblemState, toolsSettled, type FormButtonId, type Mark } from "@golem/view";
+import { daemonServiceRow, golemBlock, pageServiceRow, setupFormRows, setupProblem, setupProblemState, toolsSettled, type FormButtonId, type Mark } from "@golem/view";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useConnection } from "../../store/connection-context.tsx";
-import { useModelList, useNavigate, usePageHost, useSetupStatus } from "../../store/page-context.tsx";
+import { useNavigate, usePageHost, useSetupStatus } from "../../store/page-context.tsx";
 import { Button } from "../../ui/button.tsx";
 import { openModelDialog } from "../models/index.ts";
 import { GolemBlockView } from "../setup/golem-block.tsx";
-import { AddKey, SetupFormView, SetupHeader } from "../setup/setup-form.tsx";
+import { SetupFormView, SetupHeader } from "../setup/setup-form.tsx";
 import { ToolsOfferView } from "../setup/tools-offer.tsx";
 import { useSetupActions } from "../setup/use-setup-actions.ts";
 import { useTools } from "../setup/use-tools.ts";
@@ -62,7 +62,6 @@ function AddTools({ onClose, onAdded }: { onClose: () => void; onAdded: () => vo
  */
 export function SetupSection() {
   const status = useSetupStatus();
-  const listing = useModelList(true);
   const connection = useConnection();
   const pageHost = usePageHost();
   const navigate = useNavigate();
@@ -87,8 +86,6 @@ export function SetupSection() {
   const line = sourceRows === null ? null : (setupProblem(sourceRows) ?? "all set");
   const headMark: Mark = sourceRows === null ? "spin" : HEAD_MARKS[setupProblemState(sourceRows)];
   const block = useMemo(() => (status.data === undefined || status.isError ? null : golemBlock(status.data)), [status.data, status.isError]);
-  const saved = new Set(listing.data?.setup.keys ?? []);
-  const keyProviders = HOSTED_PROVIDERS.map((item) => ({ id: item.id, name: item.name, blurb: item.blurb, saved: saved.has(item.id) }));
 
   function press(id: FormButtonId, card: string, from: HTMLElement): void {
     switch (id) {
@@ -156,13 +153,6 @@ export function SetupSection() {
               onAdded={reread}
             />
           ) : null}
-          <AddKey
-            providers={listing.data === undefined ? [] : keyProviders}
-            actions={actions.state}
-            onCheck={() => {
-              actions.checkAgain("key");
-            }}
-          />
         </>
       )}
     </div>
