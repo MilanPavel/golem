@@ -44,6 +44,7 @@ from golem.graphs.adapter import (
     ToolFinished,
     ToolOutput,
     ToolStarted,
+    ToolWriting,
     Translator,
 )
 from golem.graphs.chat import ChatRuntime
@@ -82,6 +83,7 @@ from golem_protocol.events import (
     ToolOutputData,
     ToolRequestedData,
     ToolStartedData,
+    ToolWritingData,
 )
 
 log = logging.getLogger("golem.sessions")
@@ -468,6 +470,18 @@ async def _apply(
             progress.think_ms = _ms(now - progress.think_at)
         progress.parts.append(fact.text)
         await emit("message.delta", MessageDeltaData(message_id=progress.open, text=fact.text))
+    elif isinstance(fact, ToolWriting) and progress.open is not None:
+        await emit(
+            "tool.writing",
+            ToolWritingData(
+                message_id=progress.open,
+                index=fact.index,
+                name=fact.name,
+                path=fact.path,
+                lines=fact.lines,
+                chars=fact.chars,
+            ),
+        )
     elif isinstance(fact, TextCompleted):
         message_id = fact.message_id or progress.open
         if message_id is None:

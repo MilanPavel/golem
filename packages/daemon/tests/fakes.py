@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from collections.abc import AsyncIterator, Iterator
 from typing import Any
 
@@ -111,6 +112,38 @@ class ToolCallingChatModel(BaseChatModel):
         message.usage_metadata = self.usage  # type: ignore[assignment]
         message.response_metadata = dict(self.response_metadata)
         return ChatResult(generations=[ChatGeneration(message=message)])
+
+
+class StreamingToolChatModel(ToolCallingChatModel):
+    """:class:`ToolCallingChatModel` that streams each tool call as pieces of its JSON text.
+
+    A call comes as one chunk with its name and id, then its arguments ``piece`` characters
+    at a time, like a hosted provider. Text replies stream one character at a time.
+    """
+
+    piece: int = 8
+
+    def _stream(
+        self,
+        messages: list[BaseMessage],
+        stop: list[str] | None = None,
+        run_manager: CallbackManagerForLLMRun | None = None,
+        **kwargs: Any,
+    ) -> Iterator[ChatGenerationChunk]:
+        message = self._generate(messages, stop, run_manager, **kwargs).generations[0].message
+        assert isinstance(message, AIMessage)
+        for char in message.text:
+            yield ChatGenerationChunk(message=AIMessageChunk(content=char))
+        for index, call in enumerate(message.tool_calls):
+            head = {"name": call["name"], "args": "", "id": call.get("id"), "index": index}
+            yield ChatGenerationChunk(message=AIMessageChunk(content="", tool_call_chunks=[head]))  # type: ignore[list-item]
+            text = json.dumps(call["args"])
+            for start in range(0, len(text), self.piece):
+                args = text[start : start + self.piece]
+                part = {"name": None, "args": args, "id": None, "index": index}
+                yield ChatGenerationChunk(
+                    message=AIMessageChunk(content="", tool_call_chunks=[part])  # type: ignore[list-item]
+                )
 
 
 def _check_answered(messages: list[BaseMessage]) -> None:

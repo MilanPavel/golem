@@ -16,6 +16,7 @@ import {
   providersUp,
   reduceChat,
   serverUp,
+  stopWriting,
   thinkingLine,
 } from "./chat-state.ts";
 
@@ -980,4 +981,46 @@ test("a reply that hit the length limit is marked cut unless it asked for a tool
   assert.equal(run([done("a"), call("a", "max_tokens")])?.cut, true);
   assert.equal(run([done("a"), call("a", "stop")])?.cut, undefined);
   assert.equal(run([done("a"), call("a", "length"), tool("a")])?.cut, undefined);
+});
+
+test("tool.writing sets what the reply is writing, and the reply completing, a request, or the run ending clears it", () => {
+  const base = { session_id: "s", run_id: "r", ts: "t" } as const;
+  const started: ChatEvent = { ...base, seq: 1, type: "message.started", data: { message_id: "a", role: "assistant" } };
+  const writing = (seq: number, path: string | null, lines: number, chars: number): ChatEvent => ({
+    ...base,
+    seq,
+    type: "tool.writing",
+    data: { message_id: "a", index: 0, name: "write_file", path, lines, chars },
+  });
+  let state = [started, writing(2, null, 0, 0)].reduce(reduceChat, emptyChat);
+  assert.deepEqual(state.messages[0]?.writing, { name: "write_file", path: null, lines: 0, chars: 0 });
+  state = reduceChat(state, writing(3, "src/a.ts", 12, 340));
+  assert.deepEqual(state.messages[0]?.writing, { name: "write_file", path: "src/a.ts", lines: 12, chars: 340 });
+
+  const completed = reduceChat(state, {
+    ...base,
+    seq: 4,
+    type: "message.completed",
+    data: { message_id: "a", role: "assistant", text: "" },
+  });
+  assert.equal(completed.messages[0]?.writing, undefined);
+
+  const requested = reduceChat(state, {
+    ...base,
+    seq: 4,
+    type: "tool.requested",
+    data: { call_id: "c1", message_id: "a", name: "write_file", args: { path: "src/a.ts" } },
+  });
+  assert.equal(requested.messages[0]?.writing, undefined);
+  assert.equal(requested.messages[0]?.tools?.length, 1);
+
+  for (const type of ["run.completed", "run.cancelled", "run.failed"] as const) {
+    const data = type === "run.cancelled" ? { reason: "user" } : type === "run.failed" ? { message: "x" } : {};
+    const ended = reduceChat(state, { ...base, seq: 4, type, data } as ChatEvent);
+    assert.equal(ended.messages[0]?.writing, undefined, type);
+  }
+
+  // A reply that was never opened is left alone.
+  assert.deepEqual(reduceChat(emptyChat, writing(2, "x", 1, 1)), emptyChat);
+  assert.equal(stopWriting(emptyChat), emptyChat);
 });

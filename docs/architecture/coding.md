@@ -124,7 +124,7 @@ A small model often gets `old_string` right in substance and wrong by a space. `
 - **More than one match on a rung is an error,** never a guess. The model is told, and adds context.
 - **On a miss,** the error says which lines of the file come closest, so the model can copy them.
 - **What the model gets back is one line,** `edited src/fetch.py (+18 -4)`. The screen gets the diff from `tool.completed` and `file.changed`. Today the model reads the whole diff, so every edit is paid twice in its context.
-- **Progress.** While the model is still writing a `write_file` or `edit_file` call, an event says which file and how many lines so far, so a slow write never looks like a hang.
+- **Progress.** While the model is still writing a `write_file` or `edit_file` call, `tool.writing` says which file and how many lines so far, at most once a second per call, so a slow write never looks like a hang. It is a live signal like `message.delta`: `golem.db` deletes it when the message completes. A provider that sends the whole call at the end sends no `tool.writing`.
 
 ### Checks
 

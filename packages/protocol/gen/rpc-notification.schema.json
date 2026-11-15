@@ -2792,6 +2792,102 @@
       ],
       "title": "ToolStartedEvent",
       "type": "object"
+    },
+    "ToolWritingData": {
+      "additionalProperties": false,
+      "description": "How far the model got writing a ``write_file`` or ``edit_file`` call.\n\nStored only until its message completes. ``index`` is the call's place in the reply.\n``path`` is None until the model has written the whole path. ``lines`` and ``chars``\ncount the file text written so far.",
+      "properties": {
+        "chars": {
+          "minimum": 0,
+          "title": "Chars",
+          "type": "integer"
+        },
+        "index": {
+          "minimum": 0,
+          "title": "Index",
+          "type": "integer"
+        },
+        "lines": {
+          "minimum": 0,
+          "title": "Lines",
+          "type": "integer"
+        },
+        "message_id": {
+          "minLength": 1,
+          "title": "Message Id",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Path"
+        }
+      },
+      "required": [
+        "message_id",
+        "index",
+        "name",
+        "lines",
+        "chars"
+      ],
+      "title": "ToolWritingData",
+      "type": "object"
+    },
+    "ToolWritingEvent": {
+      "additionalProperties": false,
+      "description": "The model is still writing a file call. A live signal: ``message.completed`` replaces it.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/ToolWritingData"
+        },
+        "run_id": {
+          "minLength": 1,
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "tool.writing",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "run_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "ToolWritingEvent",
+      "type": "object"
     }
   },
   "additionalProperties": false,
@@ -2839,7 +2935,8 @@
           "tool.failed": "#/$defs/ToolFailedEvent",
           "tool.output": "#/$defs/ToolOutputEvent",
           "tool.requested": "#/$defs/ToolRequestedEvent",
-          "tool.started": "#/$defs/ToolStartedEvent"
+          "tool.started": "#/$defs/ToolStartedEvent",
+          "tool.writing": "#/$defs/ToolWritingEvent"
         },
         "propertyName": "type"
       },
@@ -2897,6 +2994,9 @@
         },
         {
           "$ref": "#/$defs/ToolRequestedEvent"
+        },
+        {
+          "$ref": "#/$defs/ToolWritingEvent"
         },
         {
           "$ref": "#/$defs/ToolStartedEvent"

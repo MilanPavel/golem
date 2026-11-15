@@ -308,6 +308,24 @@ class ToolOutputData(BaseModel):
     text: str = Field(min_length=1)
 
 
+class ToolWritingData(BaseModel):
+    """How far the model got writing a ``write_file`` or ``edit_file`` call.
+
+    Stored only until its message completes. ``index`` is the call's place in the reply.
+    ``path`` is None until the model has written the whole path. ``lines`` and ``chars``
+    count the file text written so far.
+    """
+
+    model_config = _CONFIG
+
+    message_id: str = Field(min_length=1)
+    index: int = Field(ge=0)
+    name: str = Field(min_length=1)
+    path: str | None = None
+    lines: int = Field(ge=0)
+    chars: int = Field(ge=0)
+
+
 class PromptSectionInfo(BaseModel):
     """One non-empty section of the system prompt sent with a model call.
 
@@ -822,6 +840,19 @@ class ToolOutputEvent(BaseModel):
     data: ToolOutputData
 
 
+class ToolWritingEvent(BaseModel):
+    """The model is still writing a file call. A live signal: ``message.completed`` replaces it."""
+
+    model_config = _CONFIG
+
+    seq: int = Field(ge=1)
+    session_id: str = Field(min_length=1)
+    run_id: str = Field(min_length=1)
+    ts: str = Field(min_length=1)
+    type: Literal["tool.writing"]
+    data: ToolWritingData
+
+
 class ToolCompletedEvent(BaseModel):
     """The tool call finished, and its result went back to the model."""
 
@@ -952,6 +983,7 @@ EventType = Literal[
     "run.failed",
     "run.cancelled",
     "tool.requested",
+    "tool.writing",
     "tool.started",
     "tool.output",
     "tool.completed",
@@ -985,6 +1017,7 @@ ChatEvent = Annotated[
     | RunFailedEvent
     | RunCancelledEvent
     | ToolRequestedEvent
+    | ToolWritingEvent
     | ToolStartedEvent
     | ToolOutputEvent
     | ToolCompletedEvent
@@ -1072,4 +1105,6 @@ __all__ = [
     "ToolRequestedEvent",
     "ToolStartedData",
     "ToolStartedEvent",
+    "ToolWritingData",
+    "ToolWritingEvent",
 ]

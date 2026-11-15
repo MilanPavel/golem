@@ -257,6 +257,8 @@ from golem_protocol.events import (
     ToolRequestedEvent,
     ToolStartedData,
     ToolStartedEvent,
+    ToolWritingData,
+    ToolWritingEvent,
 )
 from golem_protocol.methods import METHOD_ACCESS
 from golem_protocol.rpc import (
@@ -440,6 +442,8 @@ MODELS: tuple[type[BaseModel], ...] = (
     ArtifactReadResult,
     ToolOutputData,
     ToolOutputEvent,
+    ToolWritingData,
+    ToolWritingEvent,
     Todo,
     TodosUpdatedData,
     TodosUpdatedEvent,

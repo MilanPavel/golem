@@ -51,6 +51,9 @@ export type ToolBlock = {
 /** Characters of live output kept per tool call. */
 export const LIVE_OUTPUT_CHARS = 4_000;
 
+/** How far the model got writing a `write_file` or `edit_file` call. `path` is null until it is whole. */
+export type WritingBlock = { name: string; path: string | null; lines: number; chars: number };
+
 export type ChatMessage = {
   id: string;
   role: "user" | "assistant";
@@ -70,6 +73,8 @@ export type ChatMessage = {
   cut?: boolean;
   /** Tool calls this reply asked for, in order. */
   tools?: ToolBlock[];
+  /** A file the model is still writing, from `tool.writing`. Gone once the call is requested or the reply completes. */
+  writing?: WritingBlock | null;
   /** Set on a user message that ran a skill. `text` is then the filled-in body. */
   skill?: SkillCall;
 };
@@ -291,10 +296,10 @@ function reduceChatEvent(state: ChatState, event: ChatEvent): ChatState {
       };
     }
     case "run.completed":
-      return { ...state, busy: false, runStartedAt: null, runId: null, approval: null, down: null, retry: null };
+      return { ...stopWriting(state), busy: false, runStartedAt: null, runId: null, approval: null, down: null, retry: null };
     case "run.failed":
       return {
-        ...state,
+        ...stopWriting(state),
         busy: false,
         error: failureText(event.data),
         down: event.data.code != null ? (event.data.provider ?? "model") : state.down,
@@ -305,7 +310,7 @@ function reduceChatEvent(state: ChatState, event: ChatEvent): ChatState {
       };
     case "run.cancelled":
       return {
-        ...state,
+        ...stopWriting(state),
         busy: false,
         runStartedAt: null,
         runId: null,
@@ -325,13 +330,30 @@ function reduceChatEvent(state: ChatState, event: ChatEvent): ChatState {
         messages: state.messages.map((message) =>
           message.id === event.data.message_id
             ? {
-                ...withoutCut(message),
+                ...withoutWriting(withoutCut(message)),
                 tools: [...(message.tools ?? []).filter((tool) => tool.callId !== block.callId), block],
               }
             : message,
         ),
       };
     }
+    case "tool.writing":
+      return {
+        ...state,
+        messages: state.messages.map((message) =>
+          message.id === event.data.message_id
+            ? {
+                ...message,
+                writing: {
+                  name: event.data.name,
+                  path: event.data.path ?? null,
+                  lines: event.data.lines,
+                  chars: event.data.chars,
+                },
+              }
+            : message,
+        ),
+      };
     case "approval.needed": {
       const waiting = updateTool(state, event.data.call_id, (tool) => ({
         ...tool,
@@ -553,6 +575,20 @@ function upsertCompleted(
     const final = message.cut === true ? { ...done, cut: true } : done;
     return message.tools === undefined ? final : { ...final, tools: message.tools };
   });
+}
+
+function withoutWriting(message: ChatMessage): ChatMessage {
+  const rest = { ...message };
+  delete rest.writing;
+  return rest;
+}
+
+/** Forget every file a reply was writing: the run ended, or the connection to it was lost. */
+export function stopWriting(state: ChatState): ChatState {
+  if (!state.messages.some((message) => message.writing != null)) {
+    return state;
+  }
+  return { ...state, messages: state.messages.map((message) => (message.writing == null ? message : withoutWriting(message))) };
 }
 
 function withoutCut(message: ChatMessage): ChatMessage {
