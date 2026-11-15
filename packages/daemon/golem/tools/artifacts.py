@@ -23,7 +23,8 @@ class ReadArtifactArgs(BaseModel):
 async def _read_artifact(args: ReadArtifactArgs, ctx: ToolContext) -> ToolResult:
     if ctx.artifacts is None or ctx.session_id is None:
         raise ToolError("artifacts are not available here")
-    page = await ctx.artifacts.read(ctx.session_id, args.artifact_id, args.offset, args.limit)
+    limit = args.limit if ctx.page_chars is None else min(args.limit, ctx.page_chars)
+    page = await ctx.artifacts.read(ctx.session_id, args.artifact_id, args.offset, limit)
     if page is None:
         raise ToolError(f"no artifact {args.artifact_id} in this session")
     if page.offset >= page.size and page.size > 0:
