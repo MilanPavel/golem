@@ -227,7 +227,27 @@ export {
 } from "./mcp-try.ts";
 export { applySuggestion, moveSuggestion, suggest, type Suggestion, type SuggestCommand } from "./suggest.ts";
 export { connectionLabel, serviceProblem, type ServiceProblem } from "./connection.ts";
-export { diffCounts, diffExcerpt, parseDiff, type DiffExcerpt, type DiffLine, type DiffTone } from "./diff.ts";
+export {
+  diffCounts,
+  diffExcerpt,
+  numberDiff,
+  parseDiff,
+  type DiffExcerpt,
+  type DiffLine,
+  type DiffTone,
+  type NumberedLine,
+} from "./diff.ts";
+export {
+  addNote,
+  editNote,
+  noNotes,
+  notesChip,
+  notesFor,
+  removeNote,
+  withNotes,
+  type NotesState,
+  type ReviewNote,
+} from "./notes.ts";
 export {
   firstRunChoice,
   hostedProviders,
