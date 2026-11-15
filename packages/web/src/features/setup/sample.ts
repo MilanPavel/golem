@@ -13,6 +13,7 @@ function model(ref: string, extra: Partial<ListedModel> = {}): ListedModel {
     source: "catalog",
     status: "not_installed",
     price: FREE,
+    tier: ref.startsWith("ollama/") ? "local" : "frontier",
     ...extra,
   };
 }

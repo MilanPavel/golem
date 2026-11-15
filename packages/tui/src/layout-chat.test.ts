@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import type { ChatMessage } from "@golem/view";
+import type { ChatMessage, ToolBlock } from "@golem/view";
 import {
+  diffParseCount,
   gutterColumn,
   INTERRUPTED_MARK,
   layoutMessages,
@@ -370,4 +371,86 @@ test("every thinking row fits the columns", () => {
       assert.ok(textOf(line.spans).length <= columns, `${textOf(line.spans)} is wider than ${columns}`);
     }
   }
+});
+
+function edit(overrides: Partial<ToolBlock> = {}): ChatMessage {
+  const rows = Array.from({ length: 14 }, (_, index) => `+new line ${index}`).join("\n");
+  const diff = `--- a/src/fetch.py\n+++ b/src/fetch.py\n@@ -1,3 +1,16 @@\n keep\n-old\n${rows}\n tail\n`;
+  const tool: ToolBlock = {
+    callId: "e1",
+    name: "edit_file",
+    args: { path: "src/fetch.py", old_string: "old", new_string: "new" },
+    status: "done",
+    summary: "edited",
+    diff,
+    ...overrides,
+  };
+  return { ...message("a", "assistant", ""), tools: [tool] };
+}
+
+const rowsOf = (lines: readonly { spans: readonly Span[] }[]): string[] => lines.map((line) => textOf(line.spans));
+
+test("an edit shows the first ten diff rows with their tone, and a row for the rest", () => {
+  const lines = layoutMessages([edit()], 80);
+  const rows = rowsOf(lines);
+  assert.equal(rows[1], "● edit src/fetch.py +14 −1");
+  assert.equal(rows.length, 1 + 1 + 10 + 1);
+  assert.equal(rows[2]?.trimEnd(), "   keep");
+  assert.equal(lines[3]?.spans[0]?.tone, "del");
+  assert.equal(lines[4]?.spans[0]?.tone, "add");
+  assert.equal(rows[11]?.trimEnd(), "  +new line 7");
+  assert.equal(rows[12], "  … 7 more lines · ctrl+o");
+  for (const line of rows) {
+    assert.ok(line.length <= 79);
+  }
+});
+
+test("at 40 columns every diff row leaves the last column empty", () => {
+  const rows = rowsOf(layoutMessages([edit()], 40));
+  assert.ok(rows.length > 4);
+  for (const row of rows) {
+    assert.ok(row.length <= 39, row);
+  }
+});
+
+test("a new file says new and counts only additions", () => {
+  const diff = "--- /dev/null\n+++ b/t.py\n@@ -0,0 +1,2 @@\n+a\n+b\n";
+  const rows = rowsOf(layoutMessages([edit({ name: "write_file", args: { path: "t.py" }, diff })], 80));
+  assert.deepEqual(
+    rows.map((row) => row.trimEnd()),
+    ["golem", "● new t.py +2", "  +a", "  +b"],
+  );
+});
+
+test("quiet shows the one line, verbose shows thirty rows", () => {
+  const quiet = rowsOf(layoutMessages([edit()], 80, { times: false, now: 0, detail: "quiet" }));
+  assert.deepEqual(quiet, ["golem", "● edit src/fetch.py +14 −1"]);
+  const verbose = rowsOf(layoutMessages([edit()], 80, { times: false, now: 0, detail: "verbose" }));
+  assert.equal(verbose.length, 1 + 1 + 17);
+  assert.ok(!verbose.some((row) => row.includes("more line")));
+});
+
+test("Ctrl-O shows the whole diff and no more row", () => {
+  const rows = rowsOf(layoutMessages([edit()], 80, { times: false, now: 0, toolOutput: true }));
+  assert.equal(rows.length, 1 + 1 + 1 + 17);
+  assert.ok(rows.some((row) => row.startsWith("  @@")));
+  assert.ok(!rows.some((row) => row.includes("ctrl+o")));
+  assert.ok(rows.at(-1)?.trimEnd().endsWith("tail"));
+});
+
+test("a failed or unsuccessful edit shows no diff", () => {
+  const failed = rowsOf(layoutMessages([edit({ status: "failed", error: "no match" })], 80));
+  assert.deepEqual(failed, ["golem", "edit_file src/fetch.py old new ✗  no match"]);
+  const unsuccessful = rowsOf(layoutMessages([edit({ unsuccessful: true })], 80));
+  assert.ok(!unsuccessful.some((row) => row.includes("+new line")));
+});
+
+test("laying out the same edit again does not parse its diff again", () => {
+  const reply = edit({ callId: "parse-once" });
+  const before = diffParseCount();
+  layoutMessages([reply], 80);
+  layoutMessages([reply], 40);
+  layoutMessages([reply], 80, { times: false, now: 0, toolOutput: true });
+  layoutMessages([reply], 80, { times: false, now: 0, detail: "verbose" });
+  assert.equal(diffParseCount(), before + 1);
 });

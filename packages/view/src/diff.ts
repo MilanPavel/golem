@@ -80,3 +80,28 @@ function toneOf(row: string, inHunk: boolean): DiffTone {
   }
   return "context";
 }
+
+export type DiffExcerpt = { lines: DiffLine[]; more: number };
+
+const isCode = (line: DiffLine): boolean => line.tone === "add" || line.tone === "del" || line.tone === "context";
+
+/**
+ * The first rows of a parsed diff: the first hunk, from at most one context row before its first change,
+ * without the file header or the `@@` rows. `more` counts the add, delete and context rows after the shown ones.
+ */
+export function diffExcerpt(rows: readonly DiffLine[], maxRows: number): DiffExcerpt {
+  const code = rows.filter(isCode);
+  const first = code.findIndex((line) => line.tone !== "context");
+  const start = Math.max(0, first - 1);
+  const lines = code.slice(start, start + Math.max(0, Math.floor(maxRows)));
+  return { lines, more: code.length - start - lines.length };
+}
+
+/** The added and deleted rows of a parsed diff, and whether it makes a new file. */
+export function diffCounts(rows: readonly DiffLine[]): { added: number; deleted: number; created: boolean } {
+  return {
+    added: rows.filter((line) => line.tone === "add").length,
+    deleted: rows.filter((line) => line.tone === "del").length,
+    created: rows.some((line) => line.tone === "meta" && line.text.startsWith("--- /dev/null")),
+  };
+}

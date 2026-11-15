@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from golem.mcp import McpSupervisor
 from golem.mcp.importer import ScanStore
 from golem.models.discovery import ModelDiscovery
+from golem.models.facts import ListedFacts
 from golem.models.install import BrewInstaller, OllamaInstaller
 from golem.models.ollama import LocalServers
 from golem.models.pulls import PullManager
@@ -33,6 +34,7 @@ class DaemonState:
     state: Literal["running", "draining"] = "running"
     sessions: SessionManager | None = None
     models: ModelDiscovery | None = None
+    facts: ListedFacts | None = None
     pulls: PullManager | None = None
     policy: Policy | None = None
     tools: ToolRegistry | None = None
