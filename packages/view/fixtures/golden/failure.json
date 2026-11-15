@@ -86,10 +86,12 @@
     {
       "data": {
         "context_window": null,
+        "cost_usd": null,
         "failed": true,
         "first_token_ms": null,
         "latency_ms": 0,
         "message_id": "id-4",
+        "price": null,
         "stop_reason": null,
         "text_tool_calls": null,
         "usage": null
@@ -201,10 +203,12 @@
     {
       "data": {
         "context_window": null,
+        "cost_usd": null,
         "failed": true,
         "first_token_ms": null,
         "latency_ms": 0,
         "message_id": "id-4",
+        "price": null,
         "stop_reason": null,
         "text_tool_calls": null,
         "usage": null

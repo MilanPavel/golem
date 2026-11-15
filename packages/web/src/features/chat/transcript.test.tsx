@@ -509,3 +509,13 @@ test("a message waits with the download's name and share, and only while it down
   render(<TranscriptMessages chat={chat([answer()])} waiting="waiting for gemma4:e4b · 12%" />);
   expect(screen.getByRole("status").textContent).toBe("waiting for gemma4:e4b · 12%");
 });
+
+test("a reply cut at the length limit says so under the answer", () => {
+  render(<TranscriptMessages chat={chat([answer({ text: "Half an ans", cut: true })])} />);
+  expect(screen.getByText("The reply stopped at the length limit.")).toBeTruthy();
+});
+
+test("a reply that was not cut shows no length note", () => {
+  render(<TranscriptMessages chat={chat([answer({ text: "Whole" })])} />);
+  expect(screen.queryByText("The reply stopped at the length limit.")).toBeNull();
+});

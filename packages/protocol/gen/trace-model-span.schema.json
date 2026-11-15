@@ -192,7 +192,7 @@
     }
   },
   "additionalProperties": false,
-  "description": "A model call, with the tool calls it asked for, in request order.\n\n``prompt_cut`` says whether Ollama cut the prompt that did not fit: \"no\"\nand \"yes\" are proven from exact numbers, \"likely\" is an estimate, and null\nmeans golem cannot tell. ``prompt_cut_kind`` is set with \"yes\" and\n\"likely\". ``dropped_message_ids`` are the messages the model probably did\nnot see (older messages only), and ``dropped_tokens`` is an estimate of\ntheir size.",
+  "description": "A model call, with the tool calls it asked for, in request order.\n\n``prompt_cut`` says whether Ollama cut the prompt that did not fit: \"no\"\nand \"yes\" are proven from exact numbers, \"likely\" is an estimate, and null\nmeans golem cannot tell. ``prompt_cut_kind`` is set with \"yes\" and\n\"likely\". ``dropped_message_ids`` are the messages the model probably did\nnot see (older messages only), and ``dropped_tokens`` is an estimate of\ntheir size.\n\n``cost_usd`` is what the call cost, as its ``model.call.completed`` recorded\nit. Null when the price was not known or the call has no token counts.",
   "properties": {
     "approval_wait_ms": {
       "anyOf": [
@@ -231,6 +231,19 @@
       "default": false,
       "title": "Context Window Estimated",
       "type": "boolean"
+    },
+    "cost_usd": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cost Usd"
     },
     "dropped_message_ids": {
       "items": {

@@ -149,6 +149,25 @@ def test_completed_reads_openai_finish_reason_and_no_usage() -> None:
     assert fact.stop_reason == "stop"
 
 
+def test_completed_reads_ollama_done_reason() -> None:
+    for reason in ("length", "stop"):
+        message = AIMessage(content="hi", id="m1", response_metadata={"done_reason": reason})
+        fact = translate(_completed_update(message))
+        assert isinstance(fact, TextCompleted)
+        assert fact.stop_reason == reason
+
+
+def test_stop_reason_wins_over_done_reason() -> None:
+    message = AIMessage(
+        content="hi",
+        id="m1",
+        response_metadata={"stop_reason": "end_turn", "done_reason": "length"},
+    )
+    fact = translate(_completed_update(message))
+    assert isinstance(fact, TextCompleted)
+    assert fact.stop_reason == "end_turn"
+
+
 def test_a_model_request_item_becomes_a_fact() -> None:
     part = {"type": "custom", "data": {"golem": "model.request", "message_id": "m1"}}
     assert translate(part) == ModelRequested("m1")

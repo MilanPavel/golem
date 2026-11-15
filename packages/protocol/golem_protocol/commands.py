@@ -447,9 +447,13 @@ class TraceModelSpan(TraceSpan):
     "likely". ``dropped_message_ids`` are the messages the model probably did
     not see (older messages only), and ``dropped_tokens`` is an estimate of
     their size.
+
+    ``cost_usd`` is what the call cost, as its ``model.call.completed`` recorded
+    it. Null when the price was not known or the call has no token counts.
     """
 
     children: list[TraceToolSpan] = Field(default_factory=list[TraceToolSpan])
+    cost_usd: float | None = Field(default=None, ge=0)
     context_window: int | None = Field(default=None, ge=1)
     num_ctx: int | None = Field(default=None, ge=1)
     context_window_estimated: bool = False
@@ -693,6 +697,8 @@ class ListedModel(BaseModel):
     this Mac: the largest model of that category it has the memory for.
     ``think_values`` is what the ``think`` option takes for this model: ``off`` and
     ``on``, or ``low``, ``medium`` and ``high``. It is empty when the model cannot think.
+    ``tier`` is ``local`` for Ollama, ``budget`` for a hosted model whose blended price is at
+    or below ``[routing] budget_max_price``, and ``frontier`` otherwise.
     ``stale`` means a cached list was shown because the provider did not
     answer in time.
     """
@@ -717,6 +723,7 @@ class ListedModel(BaseModel):
     recommended: bool = False
     recommended_for: list[ModelCategory] = Field(default_factory=list[ModelCategory])
     think_values: list[str] = Field(default_factory=list[str])
+    tier: Literal["local", "budget", "frontier"]
 
 
 class ListedProvider(BaseModel):

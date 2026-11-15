@@ -56,6 +56,7 @@ from golem.models.router import (
     ModelRouter,
     Provider,
 )
+from golem.models.tiers import Tier, tier_of
 
 log = logging.getLogger(__name__)
 
@@ -116,6 +117,8 @@ class ListedModel:
     recommended: bool = False
     recommended_for: tuple[str, ...] = ()
     think_values: tuple[str, ...] = ()
+    # Set where the listing is built, once the price is settled.
+    tier: Tier = "frontier"
 
 
 @dataclass(frozen=True, slots=True)
@@ -284,6 +287,29 @@ class ModelDiscovery:
         except (httpx.HTTPError, ValueError) as exc:
             log.debug("ollama /api/ps for %s failed: %s", ref, exc)
         return None
+
+    def price_of(self, ref: str) -> ModelPrice | None:
+        """The price of ``ref``, in the order of the listing. No network call.
+
+        A profile's own price first, then a local model (free), then what the
+        provider's list gave the last time it was fetched, then the price book.
+        """
+        for _, profile in sorted(self._router.profiles().items()):
+            if profile.model == ref and profile.price is not None:
+                return profile.price
+        provider, _, model_id = ref.partition("/")
+        configured = self._router.provider(provider)
+        if provider == "ollama" or (configured is not None and configured.kind == "ollama"):
+            return _FREE
+        if model_id == "":
+            return None
+        remote = self._remote.get(provider)
+        if remote is not None:
+            for found in remote.models:
+                if found.model_id == model_id and found.price is not None:
+                    return found.price
+        info = self._prices.lookup(provider, model_id)
+        return None if info is None else info.price
 
     def known_ctx(self, ref: str) -> int | None:
         """The tokens ``ref`` can take in, as last listed or from the price book. No I/O."""
@@ -487,6 +513,20 @@ class ModelDiscovery:
                 if price is not None:
                     listed = replace(listed, price=price)
                 by_ref[ref] = listed
+        # A custom OpenAI-compatible provider on 127.0.0.1 or localhost is not ollama. It
+        # gets no special case: its price decides, and an unknown price is frontier.
+        overrides: dict[str, Tier | None] = {entry.ref: entry.tier for entry in self._hosted}
+        budget_max_price = self._router.budget_max_price()
+        for ref, listed in by_ref.items():
+            by_ref[ref] = replace(
+                listed,
+                tier=tier_of(
+                    listed.provider,
+                    listed.price,
+                    override=overrides.get(ref),
+                    budget_max_price=budget_max_price,
+                ),
+            )
         return sorted(by_ref.values(), key=_order)
 
     def _offered(self, name: str, live: list[_Found], *, show_all: bool) -> list[_Found]:
@@ -1089,6 +1129,7 @@ def _with_pulls(models: list[ListedModel], pulling: dict[str, float | None]) -> 
                     status="pulling",
                     progress=progress,
                     price=_FREE,
+                    tier="local",
                 )
             )
     return sorted(marked, key=_order)

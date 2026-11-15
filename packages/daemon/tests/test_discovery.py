@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 from collections.abc import Callable
 from pathlib import Path
 from typing import cast
@@ -12,7 +13,13 @@ import httpx
 import pytest
 from test_server import HELLO, RpcClient, rpc_result, start_daemon, stop_daemon
 
-from golem.config import GolemSettings, ModelPrice, ModelSettings, ProviderSettings
+from golem.config import (
+    GolemSettings,
+    ModelPrice,
+    ModelSettings,
+    ProviderSettings,
+    load_settings,
+)
 from golem.models.catalog import CatalogEntry, HostedEntry
 from golem.models.discovery import (
     ListedModel,
@@ -396,6 +403,47 @@ async def test_a_provider_list_brings_its_own_prices(tmp_path: Path) -> None:
     assert model.price is not None
     assert (model.price.input, model.price.output) == (pytest.approx(0.2), pytest.approx(0.6))
     assert (model.ctx, model.tools, model.label) == (131072, True, "DeepSeek Chat")
+    await discovery.aclose()
+
+
+async def test_price_of_prefers_the_profile_then_the_provider_then_the_price_book(
+    tmp_path: Path,
+) -> None:
+    body = {
+        "data": [
+            {
+                "id": "deepseek-chat",
+                "pricing": {"prompt": "0.0000002", "completion": "0.0000006"},
+            }
+        ]
+    }
+    network = Network({**_ollama_routes(), "api.deepseek.com/v1/models": _json(body)})
+    settings = GolemSettings(
+        models={
+            "pricey": ModelSettings(
+                model="anthropic/claude-test", price=ModelPrice(input=9.0, output=10.0)
+            )
+        },
+        providers=DEEPSEEK.providers,
+    )
+    store = MemoryKeyStore({"deepseek": "sk-ds"})
+    discovery = _discovery(ModelRouter(settings, keys=store), network, tmp_path)
+    await discovery.list()
+    assert discovery.price_of("anthropic/claude-test") == ModelPrice(input=9.0, output=10.0)
+    listed = discovery.price_of("deepseek/deepseek-chat")
+    assert listed is not None and listed.input == pytest.approx(0.2)
+    book = discovery.price_of("openai/gpt-test")
+    assert book is not None and book.input == pytest.approx(1.0)
+    await discovery.aclose()
+
+
+async def test_price_of_is_free_for_ollama_and_unknown_for_an_unpriced_hosted_model(
+    tmp_path: Path,
+) -> None:
+    discovery = _discovery(ModelRouter(DEEPSEEK), Network(_ollama_routes()), tmp_path)
+    assert discovery.price_of("ollama/anything:7b") == ModelPrice(input=0.0, output=0.0)
+    assert discovery.price_of("deepseek/never-heard-of") is None
+    assert discovery.price_of("nonsense") is None
     await discovery.aclose()
 
 
@@ -985,3 +1033,107 @@ async def test_a_listed_model_says_what_think_takes() -> None:
     assert models["ollama/gpt-oss:7b"].think_values == ("low", "medium", "high")
     assert models["ollama/llama3.2:3b"].think_values == ()
     assert router.ollama_options("llama3.2:3b", {"think": "off"}) == {}
+
+
+async def test_every_listed_model_has_a_tier_from_its_provider_and_price(tmp_path: Path) -> None:
+    body = {
+        "data": [
+            {
+                "id": "deepseek-chat",
+                "context_length": 131072,
+                "pricing": {"prompt": "0.0000002", "completion": "0.0000006"},
+            }
+        ]
+    }
+    network = Network({**_ollama_routes(), "api.deepseek.com/v1/models": _json(body)})
+    store = MemoryKeyStore({"deepseek": "sk-ds"})
+    discovery = _discovery(ModelRouter(DEEPSEEK, keys=store), network, tmp_path)
+    models = _by_ref((await discovery.list()).models)
+    assert models["ollama/qwen3:8b"].tier == "local"
+    assert models["ollama/small:1b"].tier == "local"
+    assert models["deepseek/deepseek-chat"].tier == "budget"
+    await discovery.aclose()
+
+
+async def test_a_hosted_model_with_a_dear_or_unknown_price_is_frontier(tmp_path: Path) -> None:
+    network = Network(
+        {
+            **_ollama_routes(),
+            "api.anthropic.com/v1/models": _json(
+                {"data": [{"id": "claude-test"}, {"id": "claude-next"}]}
+            ),
+        }
+    )
+    store = MemoryKeyStore({"anthropic": "sk-ant"})
+    discovery = _discovery(ModelRouter(GolemSettings(), keys=store), network, tmp_path)
+    models = _by_ref((await discovery.list()).models)
+    assert models["anthropic/claude-test"].tier == "frontier"
+    assert models["anthropic/claude-next"].price is None
+    assert models["anthropic/claude-next"].tier == "frontier"
+    await discovery.aclose()
+
+
+async def test_the_catalog_tier_overrides_the_price(tmp_path: Path) -> None:
+    network = Network(
+        {
+            **_ollama_routes(),
+            "api.anthropic.com/v1/models": _json({"data": [{"id": "claude-test"}]}),
+        }
+    )
+    hosted = [
+        HostedEntry(
+            ref="anthropic/claude-test",
+            label="Claude Test",
+            blurb="a blurb",
+            categories=("general",),
+            tier="budget",
+        )
+    ]
+    store = MemoryKeyStore({"anthropic": "sk-ant"})
+    discovery = ModelDiscovery(
+        ModelRouter(GolemSettings(), keys=store),
+        tmp_path / "cache",
+        transport=httpx.MockTransport(network),
+        ram_gb=36.0,
+        catalog=CATALOG,
+        hosted=hosted,
+        price_book=PRICES,
+        fetch_prices=False,
+        ollama_installed=lambda: True,
+    )
+    models = _by_ref((await discovery.list()).models)
+    assert models["anthropic/claude-test"].tier == "budget"
+    await discovery.aclose()
+
+
+async def test_budget_max_price_is_read_at_listing_time(tmp_path: Path) -> None:
+    body = {
+        "data": [
+            {
+                "id": "deepseek-chat",
+                "pricing": {"prompt": "0.0000002", "completion": "0.0000006"},
+            }
+        ]
+    }
+    network = Network({**_ollama_routes(), "api.deepseek.com/v1/models": _json(body)})
+    config = tmp_path / "config.toml"
+    config.write_text(
+        '[providers.deepseek]\nkind = "openai_compat"\nbase_url = "https://api.deepseek.com/v1"\n'
+        'api_key_env = "DEEPSEEK_API_KEY"\n',
+        "utf-8",
+    )
+    router = ModelRouter(
+        load_settings(home=tmp_path, project_dir=tmp_path),
+        keys=MemoryKeyStore({"deepseek": "sk-ds"}),
+        home=tmp_path,
+    )
+    discovery = _discovery(router, network, tmp_path)
+    assert _by_ref((await discovery.list()).models)["deepseek/deepseek-chat"].tier == "budget"
+    config.write_text(config.read_text("utf-8") + "[routing]\nbudget_max_price = 0.1\n", "utf-8")
+    later = config.stat().st_mtime + 5
+    os.utime(config, (later, later))
+    assert (
+        _by_ref((await discovery.list(refresh=True)).models)["deepseek/deepseek-chat"].tier
+        == "frontier"
+    )
+    await discovery.aclose()

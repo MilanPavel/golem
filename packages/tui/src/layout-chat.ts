@@ -1,7 +1,7 @@
 import type { SkillCall } from "@golem/client";
 import { Lexer, type Token, type Tokens } from "marked";
 
-import { formatDuration, thinkingLine, visibleText, type ChatMessage, type ToolBlock } from "@golem/view";
+import { formatDuration, REPLY_CUT_NOTE, thinkingLine, visibleText, type ChatMessage, type ToolBlock } from "@golem/view";
 import { formatMessageTime } from "./transcript.ts";
 
 export type Span = {
@@ -114,6 +114,9 @@ export function layoutMessages(
     const duration = tools.length > 0 ? null : answerDuration(message);
     if (duration !== null) {
       lines.push(paint({ role, spans: [{ text: duration, dim: true }] }, width));
+    }
+    if (message.cut === true) {
+      lines.push(paint({ role, spans: [{ text: REPLY_CUT_NOTE, dim: true }] }, width));
     }
     if (message.interrupted === true) {
       lines.push(paint({ role, spans: [{ text: INTERRUPTED_MARK, italic: true }] }, width));
