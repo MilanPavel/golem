@@ -296,6 +296,29 @@ class _RecordingRouter(ModelRouter):
         return self.model
 
 
+async def test_a_paid_title_is_skipped_when_a_cap_is_spent() -> None:
+    router = _RecordingRouter(_settings())
+    titles = ModelTitles(router)
+    titles.bind(_tiers, lambda: ["deepseek/deepseek-chat"])
+
+    async def paid_ok(session_id: str | None) -> bool:
+        return False
+
+    titles.limit(paid_ok)
+    title = await choose_title(
+        titles,
+        model_profile="anthropic/claude-opus",
+        prompt="how do I rebase",
+        reply="Use git rebase.",
+        session_id="s_1",
+    )
+    assert title == "how do I rebase"
+    assert router.asked == []
+    # A local title model is not held back by a cap.
+    await titles.title("ollama/qwen3:8b", "hi", "hello", None, "s_1")
+    assert len(router.asked) == 1
+
+
 def _settings(**roles: str) -> GolemSettings:
     return GolemSettings.model_validate(
         {"default_model": "ollama/qwen3:8b", "routing": {"roles": roles}}

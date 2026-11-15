@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import sqlite3
 from collections.abc import Mapping, Sequence
+from datetime import datetime
 from pathlib import Path
 from typing import cast
 
@@ -12,12 +13,17 @@ from fakes import ScriptedChatModel
 from langchain_core.language_models import BaseChatModel
 from test_server import HELLO, RpcClient, error_code, rpc_result, start_daemon, stop_daemon
 
-from golem.config import GolemSettings, ModelPrice, RoutingSettings
+from golem.config import BudgetSettings, GolemSettings, ModelPrice, RoutingSettings
 from golem.models.facts import ModelFacts
 from golem.models.router import ModelRouter
 from golem.models.tiers import Tier, blended
 from golem.server.app import DaemonApp
-from golem.server.dispatcher import INVALID_PARAMS, MODEL_NOT_CONFIGURED, SESSION_NOT_FOUND
+from golem.server.dispatcher import (
+    BUDGET_SPENT,
+    INVALID_PARAMS,
+    MODEL_NOT_CONFIGURED,
+    SESSION_NOT_FOUND,
+)
 
 LOCAL = "ollama/small"
 CHEAP = "deepseek/cheap"
@@ -72,8 +78,13 @@ class _Router(ModelRouter):
         return model
 
 
-def _router(mode: str = "pinned") -> _Router:
-    return _Router(GolemSettings(routing=RoutingSettings.model_validate({"mode": mode})))
+def _router(mode: str = "pinned", budget: BudgetSettings | None = None) -> _Router:
+    return _Router(
+        GolemSettings(
+            routing=RoutingSettings.model_validate({"mode": mode}),
+            budget=budget or BudgetSettings(),
+        )
+    )
 
 
 def _data(event: Mapping[str, object]) -> dict[str, object]:
@@ -359,6 +370,108 @@ async def test_the_trace_of_a_routed_run_has_the_pick(short_home: Path) -> None:
             "detail": "this chat stays on this Mac",
             "rejected": [{"ref": BIG, "tier": "frontier", "why": "this chat stays on this Mac"}],
         }
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+
+
+def _spend(app: DaemonApp, session_id: str, usd: float) -> None:
+    """Record that a paid call of the session cost ``usd`` today."""
+    now = datetime.now().astimezone()
+    with sqlite3.connect(app.paths.database_file) as db:
+        db.execute(
+            "INSERT INTO model_calls (call_id, session_id, run_id, role, started_at, day,"
+            " cost_usd) VALUES (?, ?, 'r_seed', 'chat', ?, ?, ?)",
+            (f"c_{usd}", session_id, now.isoformat(), now.date().isoformat(), usd),
+        )
+
+
+_ALL = (
+    _facts(LOCAL, "local", 32000),
+    _facts(CHEAP, "budget", 128000, 0.5),
+    _facts(BIG, "frontier", 200000, 5.0),
+)
+
+
+async def test_auto_with_a_spent_daily_cap_runs_local_and_says_why(short_home: Path) -> None:
+    router = _router(budget=BudgetSettings(daily_usd=0.01))
+    app, task = await start_daemon(short_home, router=router, facts=_Facts(*_ALL))
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        session_id = await _session(client, BIG, "auto")
+        _spend(app, session_id, 0.01)
+        await _turn(client, session_id)
+        routed = _routed(client)
+        assert [(r["model_profile"], r["reason"]) for r in routed] == [(LOCAL, "budget")]
+        assert routed[0]["detail"] == "the daily budget is spent"
+        assert _call_models(client) == ["small"]
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+
+
+async def test_auto_with_a_spent_session_cap_names_the_session_budget(short_home: Path) -> None:
+    router = _router(budget=BudgetSettings(daily_usd=100.0, session_usd=0.5))
+    app, task = await start_daemon(short_home, router=router, facts=_Facts(*_ALL))
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        session_id = await _session(client, BIG, "auto")
+        _spend(app, session_id, 0.6)
+        await _turn(client, session_id)
+        assert _routed(client)[0]["detail"] == "the session budget is spent"
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+
+
+async def test_pinned_on_a_paid_model_with_a_spent_cap_is_refused(short_home: Path) -> None:
+    router = _router(budget=BudgetSettings(daily_usd=0.01))
+    app, task = await start_daemon(short_home, router=router, facts=_Facts(*_ALL))
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        session_id = await _session(client, BIG)
+        _spend(app, session_id, 0.02)
+        refused = await client.call("message.send", {"session_id": session_id, "text": "hi"})
+        assert error_code(refused) == BUDGET_SPENT
+        text = str(refused)
+        assert "daily budget is spent" in text and "$0.02 of $0.01" in text
+        assert "Settings" in text and "switch the model" in text
+        assert "run.started" not in _types(client)
+        assert router.models[BIG].seen == []
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+
+
+async def test_over_ask_also_refuses_until_the_question_exists(short_home: Path) -> None:
+    router = _router(budget=BudgetSettings(daily_usd=0.01, over="ask"))
+    app, task = await start_daemon(short_home, router=router, facts=_Facts(*_ALL))
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        session_id = await _session(client, BIG)
+        _spend(app, session_id, 0.02)
+        refused = await client.call("message.send", {"session_id": session_id, "text": "hi"})
+        assert error_code(refused) == BUDGET_SPENT
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+
+
+async def test_a_local_pinned_session_is_never_refused(short_home: Path) -> None:
+    router = _router(budget=BudgetSettings(daily_usd=0.0))
+    app, task = await start_daemon(short_home, router=router, facts=_Facts(*_ALL))
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        session_id = await _session(client, LOCAL)
+        _spend(app, session_id, 1.0)
+        await _turn(client, session_id)
+        assert _call_models(client) == ["small"]
+        assert "run.completed" in _types(client)
     finally:
         await client.close()
         await stop_daemon(app, task)

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import json
 import logging
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from contextvars import ContextVar
 
 from langchain_core.callbacks import BaseCallbackHandler
@@ -31,6 +31,7 @@ from pydantic import BaseModel
 from golem.config import ModelPrice
 from golem.graphs.adapter import message_text
 from golem.models.cost import cost_usd
+from golem.models.errors import BUDGET_HINT, BudgetSpent
 from golem.models.gate import ServerGate
 from golem.models.roles import for_role
 from golem.models.router import ModelRouter
@@ -198,6 +199,7 @@ class Summariser:
         tier_of: Callable[[str], Tier | None] | None = None,
         budget_refs: Callable[[], list[str]] | None = None,
         window_of: Callable[[str, Mapping[str, float | str]], int | None] | None = None,
+        paid_ok: Callable[[str | None], Awaitable[bool]] | None = None,
     ) -> None:
         self._router = router
         self._gate = gate
@@ -206,6 +208,7 @@ class Summariser:
         self._tier_of = tier_of
         self._budget_refs = budget_refs
         self._window_of = window_of
+        self._paid_ok = paid_ok
 
     async def make(
         self,
@@ -224,6 +227,11 @@ class Summariser:
             tier_of_profile=self._tier_of or (lambda _profile: None),
             budget_models=self._budget_refs() if self._budget_refs else [],
         )
+        paid = self._tier_of is not None and self._tier_of(role.profile) not in (None, "local")
+        if paid and self._paid_ok is not None and not await self._paid_ok(session_id):
+            raise BudgetSpent(
+                "a budget cap is spent, so there is no paid summary", hint=BUDGET_HINT
+            )
         overrides: dict[str, float | str] = dict(options or {}) if role.same_as_session else {}
         server = self._router.ollama_server(role.profile)
         if server is not None:

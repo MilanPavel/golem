@@ -205,6 +205,8 @@ export const KEY_REJECTED = -32014;
 export const KEY_UNCHECKED = -32015;
 /** Installing or starting Ollama failed. `data.no_brew` means Homebrew is missing. */
 export const OLLAMA_FAILED = -32016;
+/** A paid model was refused because a cap in `[budget]` is spent. The message says which and what to do. */
+export const BUDGET_SPENT = -32017;
 
 export type { ChatEvent, SessionSummary };
 /** The web gateway closes a link with this code when its token is missing or wrong. Retrying cannot help. */

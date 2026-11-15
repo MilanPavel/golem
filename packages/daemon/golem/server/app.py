@@ -24,6 +24,7 @@ from golem.lock import DaemonAlreadyRunning, DaemonLock
 from golem.logging import configure_logging
 from golem.mcp import McpSupervisor
 from golem.mcp.prompt import mcp_section
+from golem.models.budget import Budget
 from golem.models.discovery import Loaded, ModelDiscovery
 from golem.models.facts import FactsSource, ListedFacts
 from golem.models.gate import ServerGate
@@ -263,7 +264,9 @@ class DaemonApp:
                 if replayed:
                     log.info("filled model_calls from %d stored model call events", replayed)
                 self.state.usage = usage
+                budget = Budget(usage, router.budget_settings)
                 if isinstance(self._titles, ModelTitles):
+                    self._titles.limit(budget.paid_ok)
                     self._titles.record_to(
                         usage,
                         lambda profile: _price_of(router, models, profile),
@@ -296,10 +299,12 @@ class DaemonApp:
                     gate=gate,
                     tier_of=lambda profile: _tier_of(router, models, profile),
                     ratios=TokenRatios(),
+                    paid_ok=budget.paid_ok,
                     summariser=Summariser(
                         router,
                         gate=gate,
                         usage=usage,
+                        paid_ok=budget.paid_ok,
                         price_of=lambda profile: _price_of(router, models, profile),
                         tier_of=lambda profile: _tier_of(router, models, profile),
                         budget_refs=models.budget_refs,
@@ -318,6 +323,7 @@ class DaemonApp:
                     BlobStore(database),
                 )
                 sessions = self.state.sessions
+                sessions.budget = budget
                 self.state.notifier = _open_notifier(
                     SessionRecords(database),
                     bus,

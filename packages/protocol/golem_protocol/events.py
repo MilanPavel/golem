@@ -185,8 +185,9 @@ class RunFailedData(BaseModel):
 
     ``code`` names a failure a client can act on. ``model_unreachable``: the
     model's server did not answer. ``not_installed``: the model needs a local
-    server that is not installed, such as Ollama. ``provider`` is the provider
-    whose server it was, and ``hint`` says how to fix it, such as
+    server that is not installed, such as Ollama. ``budget_spent``: a cap in
+    ``[budget]`` is spent, so a paid call was not made. ``provider`` is the
+    provider whose server it was, and ``hint`` says how to fix it, such as
     ``run ollama serve``. ``context_full``: the prompt does not fit the model's window,
     even after clearing and summarising, and nothing was sent.
     """
@@ -194,7 +195,9 @@ class RunFailedData(BaseModel):
     model_config = _CONFIG
 
     message: str = Field(min_length=1)
-    code: Literal["model_unreachable", "not_installed", "context_full"] | None = None
+    code: Literal["model_unreachable", "not_installed", "context_full", "budget_spent"] | None = (
+        None
+    )
     provider: str | None = Field(default=None, min_length=1)
     hint: str | None = Field(default=None, min_length=1)
 

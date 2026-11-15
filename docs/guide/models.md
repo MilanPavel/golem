@@ -60,6 +60,10 @@ In the chat, `/login` opens the key panel: pick the provider, then paste the key
 
 An environment variable such as `ANTHROPIC_API_KEY` wins over the Keychain, which helps in scripts.
 
+### Caps on paid models
+
+`[budget] daily_usd` and `session_usd` cap what hosted models may cost. A cap is checked before each paid call, and a call's cost is known only after it ends, so one call can pass a cap by its own cost. When a cap is spent, a chat that picks its model runs a local one, a chat pinned to a paid model is refused with `budget_spent` (raise the cap in Settings › Routing, or switch the model), and a run that is under way stops before its next paid call. A local model is never blocked. See [Settings](./settings.md#budget).
+
 ## Short names, and other providers
 
 golem reads `~/.golem/config.toml`, and picks up model changes without a restart. A **profile** gives a model a short name:
