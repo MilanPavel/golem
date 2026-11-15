@@ -39,6 +39,7 @@ from golem.graphs.context_view import (
     used_tokens,
     view,
 )
+from golem.graphs.notes import is_note
 from golem.graphs.prompt import PINNED_KEY, PromptContext, SystemPrompt
 from golem.graphs.result_budget import ResultBudget, result_budget
 from golem.graphs.state import AgentState
@@ -568,6 +569,11 @@ def open_chat(
             return "tools"
         return "end"
 
+    def route_after_checks(state: AgentState) -> Literal["call_model", "end"]:
+        # The checks node adds a note only when a check failed and a round is left.
+        last = state["messages"][-1] if state["messages"] else None
+        return "call_model" if last is not None and is_note(last) else "end"
+
     builder = cast(_GraphBuilder, StateGraph(AgentState))
     builder.add_node("call_model", call_model)
     runtime: list[ChatRuntime] = []
@@ -586,7 +592,9 @@ def open_chat(
     builder.add_node("checks", checks_node(rules, artifacts))
     builder.add_conditional_edges("call_model", route, {"tools": "tools", "end": "checks"})
     builder.add_edge("tools", "call_model")
-    builder.add_edge("checks", END)
+    builder.add_conditional_edges(
+        "checks", route_after_checks, {"call_model": "call_model", "end": END}
+    )
     runtime.append(
         ChatRuntime(
             builder.compile(checkpointer=checkpointer),
@@ -868,9 +876,13 @@ def _turn_input(
 ) -> AgentState:
     if has_checkpoint:
         # model_profile rides along so that session.set_model applies from this turn.
-        return cast(AgentState, {"messages": [message], "model_profile": model_profile})
+        return cast(
+            AgentState,
+            {"messages": [message], "model_profile": model_profile, "check_round": 0},
+        )
     return {
         "messages": [message],
+        "check_round": 0,
         "session_id": session_id,
         "model_profile": model_profile,
         "schema_version": schema_version,

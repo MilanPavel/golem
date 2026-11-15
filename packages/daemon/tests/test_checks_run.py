@@ -37,6 +37,11 @@ def _runtime(tmp_path: Path, config: str, replies: list[str | Calls]) -> tuple[C
     home.mkdir()
     project.mkdir()
     file = home / "config.toml"
+    # These tests are about one round, so a failed check is not sent back to the model.
+    if "[coding]\n" in config:
+        config = config.replace("[coding]\n", "[coding]\nfix_rounds = 0\n", 1)
+    else:
+        config = "[coding]\nfix_rounds = 0\n" + config
     file.write_text(config, encoding="utf-8")
     model = ToolCallingChatModel(replies=replies)
     return open_chat(
