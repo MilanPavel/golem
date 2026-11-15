@@ -23,6 +23,7 @@ from golem.sessions.cut import CallFacts, PromptCut, judge
 from golem_protocol.commands import (
     TraceMessage,
     TraceModelSpan,
+    TraceRoute,
     TraceRunSpan,
     TraceSpan,
     TraceSpanResult,
@@ -37,6 +38,7 @@ from golem_protocol.events import (
     MessageStartedEvent,
     ModelCallCompletedEvent,
     ModelCallStartedEvent,
+    ModelRoutedEvent,
     RunCancelledEvent,
     RunCompletedEvent,
     RunFailedEvent,
@@ -117,8 +119,15 @@ def _run(run_id: str, events: list[ChatEvent]) -> TraceRunSpan | None:
     end: str | None = None
     status: Status = "running"
     name = ""
+    route: TraceRoute | None = None
     for event in events:
-        if isinstance(event, MessageCompletedEvent) and event.data.role == "user" and not name:
+        if isinstance(event, ModelRoutedEvent):
+            route = TraceRoute(
+                reason=event.data.reason,
+                detail=event.data.detail,
+                rejected=list(event.data.rejected),
+            )
+        elif isinstance(event, MessageCompletedEvent) and event.data.role == "user" and not name:
             name = event.data.text[:_NAME_CHARS]
         elif event.type == "run.started":
             start = event.ts
@@ -139,6 +148,7 @@ def _run(run_id: str, events: list[ChatEvent]) -> TraceRunSpan | None:
         end=end,
         duration_ms=None if end is None else _between(start, end),
         status=status,
+        route=route,
         children=models,
     )
 

@@ -24,7 +24,7 @@ from golem.logging import configure_logging
 from golem.mcp import McpSupervisor
 from golem.mcp.prompt import mcp_section
 from golem.models.discovery import Loaded, ModelDiscovery
-from golem.models.facts import ListedFacts
+from golem.models.facts import FactsSource, ListedFacts
 from golem.models.gate import ServerGate
 from golem.models.install import RUNTIMES, OllamaInstaller, runtime_installer
 from golem.models.keys import ProviderKeys
@@ -114,6 +114,7 @@ class DaemonApp:
         router: ModelRouter | None = None,
         titles: TitleGenerator | None = None,
         discovery: Callable[[ModelRouter], ModelDiscovery] | None = None,
+        facts: FactsSource | None = None,
         pulls: Callable[[ModelRouter, float | None], PullManager] | None = None,
         mcp: McpSupervisor | None = None,
         secrets: SecretStore | None = None,
@@ -133,6 +134,7 @@ class DaemonApp:
         self._titles = titles
         self._gate = gate
         self._discovery = discovery
+        self._facts = facts
         self._pulls = pulls
         self._mcp = mcp
         self._local = local_servers
@@ -336,8 +338,7 @@ class DaemonApp:
                 models.local = local
                 self.state.models = models
                 chat.note_speed = note_speed
-                # Nothing calls it yet. The routing rules read it.
-                self.state.facts = ListedFacts(
+                self.state.facts = self._facts or ListedFacts(
                     models,
                     router,
                     lambda profile, overrides: resolve_window(
@@ -345,6 +346,8 @@ class DaemonApp:
                     ),
                     speeds.speed,
                 )
+                sessions.facts = self.state.facts
+                sessions.listed_refs = lambda: [listed.ref for listed in models.cached()]
                 self.state.pulls = pulls
                 self.state.installer = OllamaInstaller(broadcast=self._broadcast)
                 self.state.runtimes = {
