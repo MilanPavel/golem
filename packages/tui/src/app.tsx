@@ -289,6 +289,17 @@ import {
   pressMcpManager,
 } from "./mcp-manager.ts";
 import {
+  changesKeyOf,
+  closedChangesManager,
+  layoutChanges,
+  openChangesManager,
+  pressChanges,
+  type ChangesAction,
+  type ChangesData,
+  type ChangesLine,
+  type ChangesManagerState,
+} from "./changes-manager.ts";
+import {
   closedSkillsManager,
   layoutSkillsManager,
   openNewSkill,
@@ -357,6 +368,7 @@ import {
   DIFF_ADD_BG,
   DIFF_DEL,
   DIFF_DEL_BG,
+  DIFF_HUNK,
   HINT,
   PLACEHOLDER,
   QUESTION_BG,
@@ -532,6 +544,15 @@ export function App({
   const [skillList, setSkillList] = useState<SkillList>({ skills: null, error: null });
   const skillListRef = useRef(skillList);
   skillListRef.current = skillList;
+  const [changesManager, setChangesManager] = useState<ChangesManagerState>(closedChangesManager);
+  const changesManagerRef = useRef(changesManager);
+  changesManagerRef.current = changesManager;
+  const [changes, setChanges] = useState<ChangesData>({ files: null, error: null, diffs: {} });
+  const changesRef = useRef(changes);
+  changesRef.current = changes;
+  // The paths whose diff is being read, so a key press does not ask twice.
+  const changesAsked = useRef(new Set<string>());
+  const budgetBodyRef = useRef(0);
   const helpOpen = panel !== null;
   const [keysOpen, setKeysOpen] = useState(false);
   const [keysOffset, setKeysOffset] = useState(0);
@@ -679,6 +700,7 @@ export function App({
     perms.open ||
     mcpManager.open ||
     skillsManager.open ||
+    changesManager.open ||
     picker.open ||
     keysOpen ||
     suggestDismissed ||
@@ -714,6 +736,7 @@ export function App({
     open: budget.suggestions > 0 && suggestMatches.length > 0,
   };
   overlayFrame.current = { columns, body: budget.body };
+  budgetBodyRef.current = budget.body;
   const diffOffset = chat.approval !== null && diffScroll.callId === chat.approval.callId ? diffScroll.offset : 0;
   const contextSegmentRows = panel === "context" && tune === null ? contextSegments(contextReport, columns) : [];
   const panelLines =
@@ -1156,6 +1179,9 @@ export function App({
       setChat((current) => reduceChat(current, event));
       if (event.type === "run.cancelled" && event.data.reason === "user") {
         showHint(CANCELLED_NOTICE);
+      }
+      if (event.type === "file.changed" && changesManagerRef.current.open) {
+        loadChanges(event.session_id, event.data.path);
       }
       if (event.type === "run.completed" && panelOpen.current) {
         loadCheckpointRef.current(event.session_id);
@@ -1788,6 +1814,19 @@ export function App({
         ...current,
         notice: `The config file opens in your editor with: golem config edit${outcome.project ? " --project" : ""}`,
       }));
+      return;
+    }
+    if (outcome.kind === "changes") {
+      const id = sessionRef.current;
+      if (id === null) {
+        setChat((state) => ({ ...state, notice: "open a session first" }));
+        return;
+      }
+      setDraft(draftAt(""));
+      setKeysOpen(false);
+      setSwitcher(closedSwitcher);
+      showChangesManager(openChangesManager());
+      loadChanges(id, null);
       return;
     }
     if (outcome.kind === "skills") {
@@ -3493,6 +3532,72 @@ export function App({
     }
   }
 
+  function showChangesManager(next: ChangesManagerState): void {
+    changesManagerRef.current = next;
+    setChangesManager(next);
+  }
+
+  function showChanges(next: ChangesData): void {
+    changesRef.current = next;
+    setChanges(next);
+  }
+
+  /** Read the file list, then the diff of the selected file. `stale` is a path whose diff changed. */
+  function loadChanges(id: string, stale: string | null): void {
+    if (stale !== null) {
+      changesAsked.current.delete(stale);
+      const diffs = { ...changesRef.current.diffs };
+      delete diffs[stale];
+      showChanges({ ...changesRef.current, diffs });
+    }
+    client.changesList(id).then(
+      (result) => {
+        if (!changesManagerRef.current.open) {
+          return;
+        }
+        showChanges({ ...changesRef.current, files: result.files, error: null });
+        const path = result.files[Math.min(changesManagerRef.current.file, result.files.length - 1)]?.path;
+        if (path !== undefined) {
+          loadChangesDiff(id, path);
+        }
+      },
+      (error: unknown) => showChanges({ ...changesRef.current, error: messageOf(error) }),
+    );
+  }
+
+  function loadChangesDiff(id: string, path: string): void {
+    if (changesAsked.current.has(path) || changesRef.current.diffs[path] !== undefined) {
+      return;
+    }
+    changesAsked.current.add(path);
+    client.changesDiff(id, { path }).then(
+      (result) => showChanges({ ...changesRef.current, diffs: { ...changesRef.current.diffs, [path]: result.diff } }),
+      (error: unknown) => {
+        changesAsked.current.delete(path);
+        showChanges({ ...changesRef.current, failed: { ...changesRef.current.failed, [path]: messageOf(error) } });
+      },
+    );
+  }
+
+  function runChangesAction(action: ChangesAction): void {
+    if (action.kind === "close") {
+      changesAsked.current.clear();
+      showChanges({ files: null, error: null, diffs: {} });
+    } else if (action.kind === "load" && sessionRef.current !== null) {
+      loadChangesDiff(sessionRef.current, action.path);
+    }
+  }
+
+  function onChangesManagerPress(press: Press): void {
+    const key = changesKeyOf(press);
+    if (key === null) {
+      return;
+    }
+    const pressed = pressChanges(changesManagerRef.current, changesRef.current, key, Math.max(1, budgetBodyRef.current - 3));
+    showChangesManager(pressed.state);
+    runChangesAction(pressed.action);
+  }
+
   function onSkillsManagerPress(press: Press): void {
     const key = skillsManagerKeyOf(press, skillsManagerTyping(skillsManagerRef.current));
     if (key === null) {
@@ -4139,6 +4244,10 @@ export function App({
       onSkillsManagerPress(press);
       return;
     }
+    if (changesManagerRef.current.open && !keysOpenRef.current && press.name !== "f1" && press.name !== "ctrl-c") {
+      onChangesManagerPress(press);
+      return;
+    }
     const installing = installRef.current;
     if (installing !== null && press.name === "escape" && !keysOpenRef.current) {
       // Esc stops brew while it runs, and puts the band away after.
@@ -4271,6 +4380,7 @@ export function App({
       permsRef.current.open ||
       mcpManagerRef.current.open ||
       skillsManagerRef.current.open ||
+      changesManagerRef.current.open ||
       tuneRef.current !== null ||
       keysOpenRef.current
     ) {
@@ -4315,7 +4425,7 @@ export function App({
     },
     all: transcript.all,
     pinned: transcript.pinned === null ? null : { row: budget.header, offset: transcript.pinned.offset },
-    shown: !keysOpen && !picker.open && !mcpManager.open && !skillsManager.open && !perms.open && !switcher.open,
+    shown: !keysOpen && !picker.open && !mcpManager.open && !skillsManager.open && !changesManager.open && !perms.open && !switcher.open,
   };
   const composer =
     argsEdit !== null
@@ -4422,6 +4532,12 @@ export function App({
             pinned: chat.activeSkills,
           }).map((line, index) => (
             <McpManagerRow key={index} line={line} />
+          ))}
+        </Box>
+      ) : changesManager.open ? (
+        <Box flexDirection="column" width={columns} height={budget.body} flexShrink={0} overflow="hidden">
+          {layoutChanges(changesManager, changes, columns, budget.body).map((line, index) => (
+            <ChangesRow key={index} line={line} />
           ))}
         </Box>
       ) : perms.open ? (
@@ -4818,6 +4934,21 @@ function StatusSegmentView({
     return <Text color="red">{text}</Text>;
   }
   return <Text dimColor>{text}</Text>;
+}
+
+function ChangesRow({ line }: { line: ChangesLine }) {
+  const color = line.tone === "add" ? DIFF_ADD : line.tone === "del" ? DIFF_DEL : line.tone === "hunk" ? DIFF_HUNK : undefined;
+  return (
+    <Text wrap="truncate-end" bold={line.bold === true} dimColor={line.dim === true || line.tone === "meta"}>
+      {line.left === null ? null : (
+        <>
+          <Text inverse={line.leftSelected === true}>{line.left}</Text>
+          {"│"}
+        </>
+      )}
+      <Text color={color}>{line.text}</Text>
+    </Text>
+  );
 }
 
 function McpManagerRow({ line }: { line: McpManagerLine }) {
