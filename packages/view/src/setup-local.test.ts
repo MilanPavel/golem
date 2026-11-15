@@ -26,7 +26,7 @@ import {
 } from "./setup-local.ts";
 
 function model(ref: string, extra: Partial<ListedModel> = {}): ListedModel {
-  return { ref, label: ref, provider: ref.slice(0, ref.indexOf("/")), source: "catalog", status: "not_installed", fit: "fits", ...extra };
+  return { ref, label: ref, provider: ref.slice(0, ref.indexOf("/")), source: "catalog", status: "not_installed", fit: "fits", tier: ref.startsWith("ollama/") ? "local" : "frontier", ...extra };
 }
 
 const LLAMA = model("ollama/llama3.2:3b", { label: "Llama 3.2 3B", size_gb: 2, tags: ["starter", "small"] });

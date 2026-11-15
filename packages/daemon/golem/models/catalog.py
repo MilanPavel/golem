@@ -6,10 +6,11 @@ import tomllib
 from collections.abc import Collection
 from dataclasses import dataclass
 from importlib import resources
-from typing import Any
+from typing import Any, cast
 
 from golem.config import HOSTED_PROVIDERS
 from golem.models.options import LEVELS, ON_OFF
+from golem.models.tiers import TIERS, Tier
 
 # The fixed set a model can be filed under.
 CATEGORIES = ("general", "coding", "reasoning", "vision", "fast", "long-context")
@@ -58,6 +59,8 @@ class HostedEntry:
     label: str
     blurb: str
     categories: tuple[str, ...]
+    # Set to override the tier the price gives. Unset for every entry unless it needs one.
+    tier: Tier | None = None
 
     @property
     def provider(self) -> str:
@@ -112,6 +115,7 @@ def load_hosted_catalog() -> list[HostedEntry]:
             label=str(item["label"]),
             blurb=str(item["blurb"]),
             categories=tuple(str(name) for name in item["categories"]),
+            tier=cast("Tier", item["tier"]) if "tier" in item else None,
         )
         for item in _raw().get("hosted", [])
     ]
@@ -137,6 +141,10 @@ def hosted_problems(entries: list[HostedEntry]) -> list[str]:
         for name in entry.categories:
             if name not in CATEGORIES:
                 problems.append(f"{entry.ref}: unknown category {name!r}")
+        if entry.tier is not None and entry.tier not in TIERS:
+            problems.append(
+                f"{entry.ref}: tier must be one of {', '.join(TIERS)}, not {entry.tier!r}"
+            )
     for provider in HOSTED_PROVIDERS:
         if not any(entry.provider == provider for entry in entries):
             problems.append(f"{provider}: no entries")

@@ -24,7 +24,7 @@ Sleep 500ms
 Show
 
 Sleep 600ms
-Type "golem"
+Type "golem tui"
 Enter
 Wait+Screen@20s /qwen3-coder:30b/
 Sleep 1.2s
