@@ -454,3 +454,36 @@ test("laying out the same edit again does not parse its diff again", () => {
   layoutMessages([reply], 80, { times: false, now: 0, detail: "verbose" });
   assert.equal(diffParseCount(), before + 1);
 });
+
+test("a file being written is a yellow row that updates and goes when the tool is requested", () => {
+  const rows = (message: ChatMessage, seconds = 0) =>
+    layoutMessages([message], 80, { times: false, now: 0, writingSeconds: () => seconds }).map((line) => line.spans.map((span) => span.text).join(""));
+  const reply: ChatMessage = { id: "a", role: "assistant", text: "", streaming: true, writing: { name: "write_file", path: null, lines: 0, chars: 0 } };
+  assert.ok(rows(reply).includes("◐ writing a file · 0 lines · 0 s"));
+  const next: ChatMessage = { ...reply, writing: { name: "write_file", path: "tests/a.py", lines: 14, chars: 300 } };
+  assert.ok(rows(next, 38).includes("◐ writing tests/a.py · 14 lines · 38 s"));
+  const row = layoutMessages([next], 80, { times: false, now: 0 }).find((line) => line.spans[0]?.text.startsWith("◐"));
+  assert.equal(row?.spans[0]?.warn, true);
+  const requested: ChatMessage = { id: "a", role: "assistant", text: "", streaming: true, tools: [{ callId: "1", name: "write_file", args: { path: "tests/a.py" }, status: "requested" }] };
+  assert.ok(!rows(requested).some((text) => text.startsWith("◐")));
+});
+
+test("an answer's footer adds the model, tier, tokens and cost of the whole run", () => {
+  const call = (tokens: number, costUsd: number) => ({ model: "qwen3:27b", tier: "local" as const, tokens, costUsd, done: true });
+  const lines = layoutMessages(
+    [
+      message("u", "user", "hello"),
+      { ...message("s", "assistant", ""), tools: [{ callId: "c", name: "grep", args: {}, status: "done" }], call: call(1000, 0) },
+      { ...message("a", "assistant", "ok"), durationMs: 12_400, call: call(3100, 0) },
+    ],
+    80,
+  );
+  const footers = lines.filter((line) => textOf(line.spans).startsWith("0m 12.4s"));
+  assert.equal(footers.length, 1);
+  assert.equal(textOf(footers[0]?.spans ?? []), "0m 12.4s · qwen3:27b · local · 4.1K tok · $0.00");
+});
+
+test("an answer from an old session with no call data shows its time only", () => {
+  const lines = layoutMessages([{ ...message("a", "assistant", "ok"), durationMs: 12_400 }], 80);
+  assert.ok(lines.some((line) => textOf(line.spans) === "0m 12.4s"));
+});

@@ -25,6 +25,7 @@ import type { ApprovalRespondResult } from "../../protocol/gen/approval-respond-
 import type { ArtifactReadResult } from "../../protocol/gen/artifact-read-result.ts";
 import type { ChangesDiffResult } from "../../protocol/gen/changes-diff-result.ts";
 import type { ChangesListResult } from "../../protocol/gen/changes-list-result.ts";
+import type { ChangesRevertResult } from "../../protocol/gen/changes-revert-result.ts";
 import type { FileListResult } from "../../protocol/gen/file-list-result.ts";
 import type { FileReadResult } from "../../protocol/gen/file-read-result.ts";
 import type { ConfigGetResult } from "../../protocol/gen/config-get-result.ts";
@@ -32,6 +33,13 @@ import type { PolicyEditResult } from "../../protocol/gen/policy-edit-result.ts"
 
 /** What `changes.diff` shows: the net change of one file, or one change. */
 export type ChangesDiffTarget = { path: string } | { changeId: string };
+
+/** What `changes.revert` takes back: one change, a file, one hunk of a file, or a turn and all after it. */
+export type ChangesRevertTarget =
+  | { kind: "change"; changeId: string }
+  | { kind: "file"; path: string }
+  | { kind: "hunk"; path: string; hunk: number }
+  | { kind: "run"; runId: string };
 
 export type ApprovalChoice = "allow" | "allow_session" | "allow_always" | "deny";
 
@@ -76,6 +84,8 @@ import type { ModelOptionsSetResult } from "../../protocol/gen/model-options-set
 import type { PermissionsSetModeParams } from "../../protocol/gen/permissions-set-mode-params.ts";
 import type { PermissionsSetModeResult } from "../../protocol/gen/permissions-set-mode-result.ts";
 import type { SessionSetChecksResult } from "../../protocol/gen/session-set-checks-result.ts";
+import type { SessionSetRouteParams } from "../../protocol/gen/session-set-route-params.ts";
+import type { SessionSetRouteResult } from "../../protocol/gen/session-set-route-result.ts";
 import type { SessionSetModeParams } from "../../protocol/gen/session-set-mode-params.ts";
 import type { SessionSetModeResult } from "../../protocol/gen/session-set-mode-result.ts";
 import type { SessionSetOptionsResult } from "../../protocol/gen/session-set-options-result.ts";
@@ -106,6 +116,7 @@ import {
   isRuntimeInstallDone,
   isRuntimeName,
   isChangesListResult,
+  isChangesRevertResult,
   isFileListResult,
   isFileReadResult,
   isFsListDirsResult,
@@ -139,6 +150,7 @@ import {
   isModelSetDefaultResult,
   isPermissionsSetModeResult,
   isSessionSetChecksResult,
+  isSessionSetRouteResult,
   isSessionSetModeResult,
   isSessionSetOptionsResult,
   isPullDone,
@@ -295,6 +307,11 @@ export interface GolemClient {
   changesList(sessionId: string): Promise<ChangesListResult>;
   /** The diff of a file (`path`) or of one change (`changeId`). */
   changesDiff(sessionId: string, target: ChangesDiffTarget): Promise<ChangesDiffResult>;
+  /**
+   * Put back what a change, a file, a hunk or a turn wrote. A file that changed on disk is left
+   * alone and listed in `conflicts`, unless `force`. Refused while the session has a run.
+   */
+  changesRevert(sessionId: string, target: ChangesRevertTarget, force?: boolean): Promise<ChangesRevertResult>;
   /** The start of one text file of the session's folder, with its line count. */
   readFile(sessionId: string, path: string): Promise<FileReadResult>;
   /** Files of the session's folder whose path holds `query`, shortest first. */
@@ -336,6 +353,8 @@ export interface GolemClient {
   setSessionMode(sessionId: string, mode: SessionSetModeParams["mode"]): Promise<SessionSetModeResult>;
   /** Say whether golem may run the project's checks in one session. The session stores `session.checks.changed`. */
   setChecks(sessionId: string, on: boolean): Promise<SessionSetChecksResult>;
+  /** Set how one session picks the model of each turn. The session stores `session.updated` with its `route`. */
+  setRoute(sessionId: string, mode: SessionSetRouteParams["mode"]): Promise<SessionSetRouteResult>;
   /** `model.options.saved`: the options saved for a model changed, from any client. */
   onOptionsSaved(listener: (saved: ModelOptionsSaved) => void): () => void;
   /** Size, fit, and free disk for a local model before downloading it. */
@@ -1311,6 +1330,22 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       }
       return { diff: result["diff"], truncated: result["truncated"] };
     },
+    async changesRevert(sessionId: string, target: ChangesRevertTarget, force = false): Promise<ChangesRevertResult> {
+      await ready;
+      const wire =
+        target.kind === "change"
+          ? { kind: "change", change_id: target.changeId }
+          : target.kind === "file"
+            ? { kind: "file", path: target.path }
+            : target.kind === "hunk"
+              ? { kind: "hunk", path: target.path, hunk: target.hunk }
+              : { kind: "run", run_id: target.runId };
+      const result = await call("changes.revert", { session_id: sessionId, target: wire, force });
+      if (!isChangesRevertResult(result)) {
+        throw new Error("invalid changes.revert result");
+      }
+      return result;
+    },
     async readFile(sessionId: string, path: string): Promise<FileReadResult> {
       await ready;
       const result = await call("file.read", { session_id: sessionId, path });
@@ -1431,6 +1466,14 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("session.set_mode", { session_id: sessionId, mode });
       if (!isSessionSetModeResult(result)) {
         throw new Error("invalid session.set_mode result");
+      }
+      return result;
+    },
+    async setRoute(sessionId: string, mode: SessionSetRouteParams["mode"]): Promise<SessionSetRouteResult> {
+      await ready;
+      const result = await call("session.set_route", { session_id: sessionId, mode });
+      if (!isSessionSetRouteResult(result)) {
+        throw new Error("invalid session.set_route result");
       }
       return result;
     },

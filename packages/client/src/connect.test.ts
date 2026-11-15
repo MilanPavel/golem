@@ -1497,6 +1497,49 @@ test("changesList and changesDiff send their targets and check what comes back",
   }
 });
 
+test("changesRevert sends each kind of target and checks what comes back", async () => {
+  const sent: [string, Record<string, unknown>][] = [];
+  const reply = { reverted: ["a.txt"], conflicts: [{ path: "b.txt", reason: "changed_on_disk" }] };
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: { "changes.revert": reply },
+      onRequest: (_socket, method, params) => {
+        if (method === "changes.revert") sent.push([method, params]);
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "web", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    assert.deepEqual(await client.changesRevert("s_test", { kind: "change", changeId: "c_1" }), reply);
+    await client.changesRevert("s_test", { kind: "file", path: "a.txt" }, true);
+    await client.changesRevert("s_test", { kind: "hunk", path: "a.txt", hunk: 2 });
+    await client.changesRevert("s_test", { kind: "run", runId: "r_1" });
+    assert.deepEqual(sent, [
+      ["changes.revert", { session_id: "s_test", target: { kind: "change", change_id: "c_1" }, force: false }],
+      ["changes.revert", { session_id: "s_test", target: { kind: "file", path: "a.txt" }, force: true }],
+      ["changes.revert", { session_id: "s_test", target: { kind: "hunk", path: "a.txt", hunk: 2 }, force: false }],
+      ["changes.revert", { session_id: "s_test", target: { kind: "run", run_id: "r_1" }, force: false }],
+    ]);
+  } finally {
+    client.close();
+    await server.close();
+  }
+  const bad = await listen((socket) => {
+    attach(socket, { answerPing: true, results: { "changes.revert": { reverted: ["a.txt"] } } });
+  });
+  const refused = connectGolem({ socketPath: bad.socketPath, clientName: "web", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    await assert.rejects(
+      () => refused.changesRevert("s_test", { kind: "file", path: "a.txt" }),
+      /invalid changes.revert result/,
+    );
+  } finally {
+    refused.close();
+    await bad.close();
+  }
+});
+
 test("createSession sends the folder and the model only when they are given", async () => {
   const seen: Record<string, unknown>[] = [];
   const daemon = await listen((socket) => {

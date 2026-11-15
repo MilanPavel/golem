@@ -46,6 +46,19 @@
       "default": null,
       "title": "Context Window"
     },
+    "estimated_tokens": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Estimated Tokens"
+    },
     "index": {
       "minimum": 1,
       "title": "Index",
@@ -134,6 +147,19 @@
       ],
       "default": null,
       "title": "Provider"
+    },
+    "summary_chars": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Summary Chars"
     },
     "system_bytes": {
       "anyOf": [

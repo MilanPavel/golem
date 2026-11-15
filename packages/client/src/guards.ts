@@ -1,3 +1,4 @@
+import type { ChangesRevertResult } from "../../protocol/gen/changes-revert-result.ts";
 import type { KeychainWait } from "../../protocol/gen/keychain-wait.ts";
 import type { McpCatalogResult } from "../../protocol/gen/mcp-catalog-result.ts";
 import type { McpServerDetail } from "../../protocol/gen/mcp-server-detail.ts";
@@ -27,6 +28,7 @@ import type { ModelOptionsSaved } from "../../protocol/gen/model-options-saved.t
 import type { ModelOptionsSetResult } from "../../protocol/gen/model-options-set-result.ts";
 import type { PermissionsSetModeResult } from "../../protocol/gen/permissions-set-mode-result.ts";
 import type { SessionSetChecksResult } from "../../protocol/gen/session-set-checks-result.ts";
+import type { SessionSetRouteResult } from "../../protocol/gen/session-set-route-result.ts";
 import type { SessionSetModeResult } from "../../protocol/gen/session-set-mode-result.ts";
 import type { SessionSetOptionsResult } from "../../protocol/gen/session-set-options-result.ts";
 import type { ListedSkill, SkillListResult } from "../../protocol/gen/skill-list-result.ts";
@@ -71,6 +73,7 @@ const EVENT_TYPES = new Set([
   "session.completed",
   "model.selected",
   "model.options.changed",
+  "model.routed",
   "session.mode.changed",
   "session.checks.changed",
   "message.started",
@@ -325,6 +328,14 @@ export function isSessionSetChecksResult(value: unknown): value is SessionSetChe
   return isRecord(value) && typeof value["session_id"] === "string" && typeof value["on"] === "boolean";
 }
 
+export function isSessionSetRouteResult(value: unknown): value is SessionSetRouteResult {
+  return (
+    isRecord(value) &&
+    typeof value["session_id"] === "string" &&
+    (value["mode"] === "pinned" || value["mode"] === "local" || value["mode"] === "auto")
+  );
+}
+
 export function isSessionSetModeResult(value: unknown): value is SessionSetModeResult {
   return (
     isRecord(value) &&
@@ -406,6 +417,19 @@ function isChangedFile(value: unknown): boolean {
 
 export function isChangesListResult(value: unknown): value is ChangesListResult {
   return isRecord(value) && Array.isArray(value["files"]) && value["files"].every(isChangedFile);
+}
+
+export function isChangesRevertResult(value: unknown): value is ChangesRevertResult {
+  return (
+    isRecord(value) &&
+    Array.isArray(value["reverted"]) &&
+    value["reverted"].every((path) => typeof path === "string") &&
+    Array.isArray(value["conflicts"]) &&
+    value["conflicts"].every(
+      (conflict) =>
+        isRecord(conflict) && typeof conflict["path"] === "string" && conflict["reason"] === "changed_on_disk",
+    )
+  );
 }
 
 export function isFileReadResult(value: unknown): value is FileReadResult {

@@ -215,3 +215,27 @@ async def test_the_trace_counts_a_cleared_result_as_its_stub(
     first = await chat.manager.trace_span(chat.session_id, starts[0].message_id)
     assert first.context is not None
     assert first.context.cleared.count == 0 and first.context.cleared.tokens == 0
+
+
+async def test_each_call_shows_only_the_results_cleared_at_that_call(
+    database: Database, project: Path
+) -> None:
+    model = _Counting(replies=[*_reads(13), "done"])
+    chat = _chat(database, model, SETTINGS)
+    events = await _run(chat, project)
+    starts = [e.data for e in events if isinstance(e, ModelCallStartedEvent)]
+    cleared_later = set(starts[-1].cleared_ids)
+    assert cleared_later
+    # A call before clearing began: the same results are in it, in full.
+    early = next(s for s in starts if not s.cleared_ids and cleared_later & set(s.message_ids))
+    result = await chat.manager.trace_span(chat.session_id, early.message_id)
+    assert result.context is not None and result.context.cleared.count == 0
+    shown = {m.id: m for m in result.messages}
+    for message_id in cleared_later & set(early.message_ids):
+        assert shown[message_id].text.count("line of a file") == 600
+    # Every call stubs exactly its own ids.
+    for start in starts:
+        span = await chat.manager.trace_span(chat.session_id, start.message_id)
+        ids = set(start.cleared_ids)
+        for m in span.messages:
+            assert m.text.startswith("[cleared to save") == (m.id in ids)
