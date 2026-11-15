@@ -36,7 +36,7 @@ from langgraph.config import get_stream_writer
 from langgraph.types import interrupt
 
 from golem.config import PERMISSION_MODES, PermissionMode
-from golem.graphs.adapter import APPROVAL_KIND, SKILL_LOADED_KIND, STREAM_KEY
+from golem.graphs.adapter import APPROVAL_KIND, FILE_CHANGED_KIND, SKILL_LOADED_KIND, STREAM_KEY
 from golem.graphs.state import AgentState
 from golem.permissions.engine import Allowance, session_allows
 from golem.permissions.policy import Policy, describe, explain
@@ -254,6 +254,17 @@ def tools_node(
             output, artifact_id = await _for_model(
                 artifacts, session_id, call_id, result.output, kind
             )
+            for edit in result.edits:
+                write(
+                    {
+                        STREAM_KEY: FILE_CHANGED_KIND,
+                        "call_id": call_id,
+                        "path": edit.path,
+                        "before": edit.before,
+                        "after": edit.after,
+                        "source": "tool",
+                    }
+                )
             preview = result.output[:PREVIEW_CHARS]
             write(
                 {

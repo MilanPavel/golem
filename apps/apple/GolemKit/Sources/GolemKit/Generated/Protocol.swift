@@ -1184,6 +1184,129 @@ public struct EmptyEventData: Codable {
     }
 }
 
+/// One change to one file, recorded before this event was sent.
+///
+/// ``path`` is relative to the session folder. ``call_id`` is the tool call that
+/// made the change, and null for a shell change or an undo. ``reverts`` is the
+/// change an undo took back. The texts are not sent; read them by ``change_id``.
+// MARK: - FileChangedData
+public struct FileChangedData: Codable {
+    public let added: Int
+    public let callID: String?
+    public let changeID: String
+    public let path: String
+    public let removed: Int
+    public let reverts: String?
+    public let source: FileChangedDataSource
+    public let status: FileChangedDataStatus
+
+    public enum CodingKeys: String, CodingKey {
+        case added = "added"
+        case callID = "call_id"
+        case changeID = "change_id"
+        case path = "path"
+        case removed = "removed"
+        case reverts = "reverts"
+        case source = "source"
+        case status = "status"
+    }
+
+    public init(added: Int, callID: String?, changeID: String, path: String, removed: Int, reverts: String?, source: FileChangedDataSource, status: FileChangedDataStatus) {
+        self.added = added
+        self.callID = callID
+        self.changeID = changeID
+        self.path = path
+        self.removed = removed
+        self.reverts = reverts
+        self.source = source
+        self.status = status
+    }
+}
+
+public enum FileChangedDataSource: String, Codable {
+    case revert = "revert"
+    case shell = "shell"
+    case tool = "tool"
+}
+
+public enum FileChangedDataStatus: String, Codable {
+    case created = "created"
+    case deleted = "deleted"
+    case modified = "modified"
+}
+
+/// A file in the session folder changed. Sent before the ``tool.completed`` of its call.
+// MARK: - FileChangedEvent
+public struct FileChangedEvent: Codable {
+    public let data: FileChangedEventData
+    public let runID: String
+    public let seq: Int
+    public let sessionID: String
+    public let ts: String
+    public let type: FileChangedEventType
+
+    public enum CodingKeys: String, CodingKey {
+        case data = "data"
+        case runID = "run_id"
+        case seq = "seq"
+        case sessionID = "session_id"
+        case ts = "ts"
+        case type = "type"
+    }
+
+    public init(data: FileChangedEventData, runID: String, seq: Int, sessionID: String, ts: String, type: FileChangedEventType) {
+        self.data = data
+        self.runID = runID
+        self.seq = seq
+        self.sessionID = sessionID
+        self.ts = ts
+        self.type = type
+    }
+}
+
+/// One change to one file, recorded before this event was sent.
+///
+/// ``path`` is relative to the session folder. ``call_id`` is the tool call that
+/// made the change, and null for a shell change or an undo. ``reverts`` is the
+/// change an undo took back. The texts are not sent; read them by ``change_id``.
+// MARK: - FileChangedEventData
+public struct FileChangedEventData: Codable {
+    public let added: Int
+    public let callID: String?
+    public let changeID: String
+    public let path: String
+    public let removed: Int
+    public let reverts: String?
+    public let source: FileChangedDataSource
+    public let status: FileChangedDataStatus
+
+    public enum CodingKeys: String, CodingKey {
+        case added = "added"
+        case callID = "call_id"
+        case changeID = "change_id"
+        case path = "path"
+        case removed = "removed"
+        case reverts = "reverts"
+        case source = "source"
+        case status = "status"
+    }
+
+    public init(added: Int, callID: String?, changeID: String, path: String, removed: Int, reverts: String?, source: FileChangedDataSource, status: FileChangedDataStatus) {
+        self.added = added
+        self.callID = callID
+        self.changeID = changeID
+        self.path = path
+        self.removed = removed
+        self.reverts = reverts
+        self.source = source
+        self.status = status
+    }
+}
+
+public enum FileChangedEventType: String, Codable {
+    case fileChanged = "file.changed"
+}
+
 /// The session and message a fork was copied from.
 // MARK: - ForkedFrom
 public struct ForkedFrom: Codable {
@@ -7167,6 +7290,8 @@ public enum RPCNotificationMethod: String, Codable {
 ///
 /// The agent's todo list changed. ``run_id`` is null for a list a fork copied.
 ///
+/// A file in the session folder changed. Sent before the ``tool.completed`` of its call.
+///
 /// A skill became active.
 ///
 /// An invoked skill's event comes just before the user message that invoked
@@ -7371,6 +7496,12 @@ public struct Params: Codable {
 /// ``call_id`` is the call that wrote it. It is null for a list a fork copied.
 /// An empty list clears it.
 ///
+/// One change to one file, recorded before this event was sent.
+///
+/// ``path`` is relative to the session folder. ``call_id`` is the tool call that
+/// made the change, and null for a shell change or an undo. ``reverts`` is the
+/// change an undo took back. The texts are not sent; read them by ``change_id``.
+///
 /// A skill is active in the session.
 ///
 /// ``how`` is ``invoked`` for a skill run once by name: its body is that
@@ -7403,7 +7534,7 @@ public struct ParamsData: Codable {
     public let mcpServers: [String]?
     public let title: String?
     public let runID: String?
-    public let status: DataStatus?
+    public let status: PurpleStatus?
     public let summary: String?
     public let reason: PurpleReason?
     public let options: [String: Option]?
@@ -7458,9 +7589,13 @@ public struct ParamsData: Codable {
     public let decision: Decision?
     public let rule: String?
     public let todos: [PurpleTodo]?
+    public let added: Int?
+    public let changeID: String?
+    public let path: String?
+    public let removed: Int?
+    public let reverts: String?
     public let hash: String?
     public let how: How?
-    public let path: String?
 
     public enum CodingKeys: String, CodingKey {
         case cwd = "cwd"
@@ -7528,12 +7663,16 @@ public struct ParamsData: Codable {
         case decision = "decision"
         case rule = "rule"
         case todos = "todos"
+        case added = "added"
+        case changeID = "change_id"
+        case path = "path"
+        case removed = "removed"
+        case reverts = "reverts"
         case hash = "hash"
         case how = "how"
-        case path = "path"
     }
 
-    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, title: String?, runID: String?, status: DataStatus?, summary: String?, reason: PurpleReason?, options: [String: Option]?, mode: Mode?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, contextWindow: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String?, provider: String?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, price: FluffyCallPrice?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, todos: [PurpleTodo]?, hash: String?, how: How?, path: String?) {
+    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: PurpleReason?, options: [String: Option]?, mode: Mode?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, contextWindow: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String?, provider: String?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, price: FluffyCallPrice?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, todos: [PurpleTodo]?, added: Int?, changeID: String?, path: String?, removed: Int?, reverts: String?, hash: String?, how: How?) {
         self.cwd = cwd
         self.forkedFrom = forkedFrom
         self.modelName = modelName
@@ -7599,9 +7738,13 @@ public struct ParamsData: Codable {
         self.decision = decision
         self.rule = rule
         self.todos = todos
+        self.added = added
+        self.changeID = changeID
+        self.path = path
+        self.removed = removed
+        self.reverts = reverts
         self.hash = hash
         self.how = how
-        self.path = path
     }
 }
 
@@ -7696,10 +7839,13 @@ public struct FluffySkillCall: Codable {
     }
 }
 
-public enum DataStatus: String, Codable {
+public enum PurpleStatus: String, Codable {
     case cancelled = "cancelled"
     case completed = "completed"
+    case created = "created"
+    case deleted = "deleted"
     case failed = "failed"
+    case modified = "modified"
 }
 
 /// One non-empty section of the system prompt sent with a model call.
@@ -7776,6 +7922,7 @@ public struct FluffyTokenUsage: Codable {
 public enum ParamsType: String, Codable {
     case approvalNeeded = "approval.needed"
     case approvalResolved = "approval.resolved"
+    case fileChanged = "file.changed"
     case messageCompleted = "message.completed"
     case messageDelta = "message.delta"
     case messageStarted = "message.started"
@@ -8466,7 +8613,7 @@ public enum SessionClosedEventType: String, Codable {
 // MARK: - SessionCompletedData
 public struct SessionCompletedData: Codable {
     public let runID: String
-    public let status: DataStatus
+    public let status: SessionCompletedDataStatus
     public let summary: String?
 
     public enum CodingKeys: String, CodingKey {
@@ -8475,11 +8622,17 @@ public struct SessionCompletedData: Codable {
         case summary = "summary"
     }
 
-    public init(runID: String, status: DataStatus, summary: String?) {
+    public init(runID: String, status: SessionCompletedDataStatus, summary: String?) {
         self.runID = runID
         self.status = status
         self.summary = summary
     }
+}
+
+public enum SessionCompletedDataStatus: String, Codable {
+    case cancelled = "cancelled"
+    case completed = "completed"
+    case failed = "failed"
 }
 
 /// A run of a session whose origin is not ``user`` ended. It is also in the log.
@@ -8520,7 +8673,7 @@ public struct SessionCompletedEvent: Codable {
 // MARK: - SessionCompletedEventData
 public struct SessionCompletedEventData: Codable {
     public let runID: String
-    public let status: DataStatus
+    public let status: SessionCompletedDataStatus
     public let summary: String?
 
     public enum CodingKeys: String, CodingKey {
@@ -8529,7 +8682,7 @@ public struct SessionCompletedEventData: Codable {
         case summary = "summary"
     }
 
-    public init(runID: String, status: DataStatus, summary: String?) {
+    public init(runID: String, status: SessionCompletedDataStatus, summary: String?) {
         self.runID = runID
         self.status = status
         self.summary = summary

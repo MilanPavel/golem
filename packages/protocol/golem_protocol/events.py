@@ -473,6 +473,26 @@ class ToolFailedData(BaseModel):
     duration_ms: int | None = Field(default=None, ge=0)
 
 
+class FileChangedData(BaseModel):
+    """One change to one file, recorded before this event was sent.
+
+    ``path`` is relative to the session folder. ``call_id`` is the tool call that
+    made the change, and null for a shell change or an undo. ``reverts`` is the
+    change an undo took back. The texts are not sent; read them by ``change_id``.
+    """
+
+    model_config = _CONFIG
+
+    change_id: str = Field(min_length=1)
+    call_id: str | None = Field(default=None, min_length=1)
+    path: str = Field(min_length=1)
+    status: Literal["created", "modified", "deleted"]
+    added: int = Field(ge=0)
+    removed: int = Field(ge=0)
+    source: Literal["tool", "shell", "revert"]
+    reverts: str | None = Field(default=None, min_length=1)
+
+
 ApprovalDecision = Literal["allow", "allow_session", "allow_always", "deny"]
 
 TodoStatus = Literal["pending", "in_progress", "done"]
@@ -874,6 +894,19 @@ class ApprovalResolvedEvent(BaseModel):
     data: ApprovalResolvedData
 
 
+class FileChangedEvent(BaseModel):
+    """A file in the session folder changed. Sent before the ``tool.completed`` of its call."""
+
+    model_config = _CONFIG
+
+    seq: int = Field(ge=1)
+    session_id: str = Field(min_length=1)
+    run_id: str = Field(min_length=1)
+    ts: str = Field(min_length=1)
+    type: Literal["file.changed"]
+    data: FileChangedData
+
+
 class TodosUpdatedEvent(BaseModel):
     """The agent's todo list changed. ``run_id`` is null for a list a fork copied."""
 
@@ -959,6 +992,7 @@ EventType = Literal[
     "approval.needed",
     "approval.resolved",
     "todos.updated",
+    "file.changed",
     "skill.activated",
     "skill.deactivated",
     "skill.skipped",
@@ -992,6 +1026,7 @@ ChatEvent = Annotated[
     | ApprovalNeededEvent
     | ApprovalResolvedEvent
     | TodosUpdatedEvent
+    | FileChangedEvent
     | SkillActivatedEvent
     | SkillDeactivatedEvent
     | SkillSkippedEvent,
@@ -1013,6 +1048,8 @@ __all__ = [
     "ChatEvent",
     "EmptyEventData",
     "EventType",
+    "FileChangedData",
+    "FileChangedEvent",
     "ForkedFrom",
     "MessageCompletedData",
     "MessageCompletedEvent",
