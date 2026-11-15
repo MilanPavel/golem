@@ -194,6 +194,7 @@ class SessionSummary(BaseModel):
     the id of the session this one was forked from, null for a session that is
     not a fork. An older daemon leaves it out. ``origin`` is who started the
     session: ``user``, ``cli``, ``routine:<name>``. A session never changes it.
+    ``plan_first`` is true while the session is in plan first (``session.set_plan``).
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -208,6 +209,7 @@ class SessionSummary(BaseModel):
     cwd: str | None = Field(default=None, min_length=1)
     forked_from: str | None = Field(default=None, min_length=1)
     origin: str = Field(default="user", min_length=1)
+    plan_first: bool = False
 
 
 class SessionListResult(BaseModel):
@@ -1091,6 +1093,30 @@ class SessionSetChecksParams(BaseModel):
 
 class SessionSetChecksResult(BaseModel):
     """The session's answer after the change."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    on: bool
+
+
+class SessionSetPlanParams(BaseModel):
+    """``session.set_plan``. Put one session in plan first, or take it out.
+
+    With ``on`` true the session's runs only read, and each ends with a plan
+    sent as ``plan.proposed``. The daemon emits ``session.plan.changed``. It
+    applies from the session's next turn, is kept with the session, and is
+    not written to ``config.toml``. A new session starts with it off.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    on: bool
+
+
+class SessionSetPlanResult(BaseModel):
+    """Whether the session is in plan first after the change."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -3016,6 +3042,8 @@ __all__ = [
     "SessionSetModelResult",
     "SessionSetOptionsParams",
     "SessionSetOptionsResult",
+    "SessionSetPlanParams",
+    "SessionSetPlanResult",
     "SessionSetSkillsParams",
     "SessionSetSkillsResult",
     "SessionSummary",

@@ -67,6 +67,7 @@ export const BROWSER_METHODS: ReadonlySet<string> = new Set([
   "session.set_mode",
   "session.set_model",
   "session.set_options",
+  "session.set_plan",
   "session.set_skills",
   "setup.status",
   "skill.create",

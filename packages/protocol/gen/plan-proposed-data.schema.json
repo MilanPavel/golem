@@ -1,0 +1,66 @@
+{
+  "$defs": {
+    "PlanStep": {
+      "additionalProperties": false,
+      "description": "One step of a plan: what to do, and the files it will touch.",
+      "properties": {
+        "files": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Files",
+          "type": "array"
+        },
+        "text": {
+          "maxLength": 300,
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "title": "PlanStep",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The plan a plan first run ended with, sent for the user to read.\n\n``plan_id`` names this plan. ``call_id`` is the ``propose_plan`` call.",
+  "properties": {
+    "call_id": {
+      "minLength": 1,
+      "title": "Call Id",
+      "type": "string"
+    },
+    "plan_id": {
+      "minLength": 1,
+      "title": "Plan Id",
+      "type": "string"
+    },
+    "steps": {
+      "items": {
+        "$ref": "#/$defs/PlanStep"
+      },
+      "maxItems": 20,
+      "minItems": 1,
+      "title": "Steps",
+      "type": "array"
+    },
+    "title": {
+      "maxLength": 120,
+      "minLength": 1,
+      "title": "Title",
+      "type": "string"
+    }
+  },
+  "required": [
+    "plan_id",
+    "call_id",
+    "title",
+    "steps"
+  ],
+  "title": "PlanProposedData",
+  "type": "object"
+}

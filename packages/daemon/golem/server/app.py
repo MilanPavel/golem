@@ -17,7 +17,7 @@ from pydantic import BaseModel
 from golem.coding.changes import ChangeStore
 from golem.config import ModelPrice, load_settings
 from golem.graphs.chat import ChatRuntime, open_chat
-from golem.graphs.prompt import SystemPrompt
+from golem.graphs.prompt import PLAN, SystemPrompt
 from golem.lock import DaemonAlreadyRunning, DaemonLock
 from golem.logging import configure_logging
 from golem.mcp import McpSupervisor
@@ -277,6 +277,7 @@ class DaemonApp:
                             pinned_section(self.state.skills),
                             index_section(self.state.skills),
                             mcp_section(mcp),
+                            PLAN,
                         )
                     ),
                     BlobStore(database),

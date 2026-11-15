@@ -1,0 +1,21 @@
+{
+  "additionalProperties": false,
+  "description": "``session.set_plan``. Put one session in plan first, or take it out.\n\nWith ``on`` true the session's runs only read, and each ends with a plan\nsent as ``plan.proposed``. The daemon emits ``session.plan.changed``. It\napplies from the session's next turn, is kept with the session, and is\nnot written to ``config.toml``. A new session starts with it off.",
+  "properties": {
+    "on": {
+      "title": "On",
+      "type": "boolean"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "session_id",
+    "on"
+  ],
+  "title": "SessionSetPlanParams",
+  "type": "object"
+}

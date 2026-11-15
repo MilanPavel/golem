@@ -74,6 +74,7 @@ import type { ModelOptionsSetResult } from "../../protocol/gen/model-options-set
 import type { PermissionsSetModeParams } from "../../protocol/gen/permissions-set-mode-params.ts";
 import type { PermissionsSetModeResult } from "../../protocol/gen/permissions-set-mode-result.ts";
 import type { SessionSetChecksResult } from "../../protocol/gen/session-set-checks-result.ts";
+import type { SessionSetPlanResult } from "../../protocol/gen/session-set-plan-result.ts";
 import type { SessionSetModeParams } from "../../protocol/gen/session-set-mode-params.ts";
 import type { SessionSetModeResult } from "../../protocol/gen/session-set-mode-result.ts";
 import type { SessionSetOptionsResult } from "../../protocol/gen/session-set-options-result.ts";
@@ -135,6 +136,7 @@ import {
   isModelSetDefaultResult,
   isPermissionsSetModeResult,
   isSessionSetChecksResult,
+  isSessionSetPlanResult,
   isSessionSetModeResult,
   isSessionSetOptionsResult,
   isPullDone,
@@ -328,6 +330,8 @@ export interface GolemClient {
   setSessionMode(sessionId: string, mode: SessionSetModeParams["mode"]): Promise<SessionSetModeResult>;
   /** Say whether golem may run the project's checks in one session. The session stores `session.checks.changed`. */
   setChecks(sessionId: string, on: boolean): Promise<SessionSetChecksResult>;
+  /** Put one session in plan first, or take it out. Its runs then only read and end in `plan.proposed`. The session stores `session.plan.changed`. */
+  setPlan(sessionId: string, on: boolean): Promise<SessionSetPlanResult>;
   /** `model.options.saved`: the options saved for a model changed, from any client. */
   onOptionsSaved(listener: (saved: ModelOptionsSaved) => void): () => void;
   /** Size, fit, and free disk for a local model before downloading it. */
@@ -1411,6 +1415,14 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("session.set_checks", { session_id: sessionId, on });
       if (!isSessionSetChecksResult(result)) {
         throw new Error("invalid session.set_checks result");
+      }
+      return result;
+    },
+    async setPlan(sessionId: string, on: boolean): Promise<SessionSetPlanResult> {
+      await ready;
+      const result = await call("session.set_plan", { session_id: sessionId, on });
+      if (!isSessionSetPlanResult(result)) {
+        throw new Error("invalid session.set_plan result");
       }
       return result;
     },

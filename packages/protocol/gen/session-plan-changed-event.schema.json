@@ -1,0 +1,60 @@
+{
+  "$defs": {
+    "SessionPlanChangedData": {
+      "additionalProperties": false,
+      "description": "Whether the session is in plan first, after a change.\n\nThe last event holds the switch, so a replayed session gets it back.",
+      "properties": {
+        "on": {
+          "title": "On",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "on"
+      ],
+      "title": "SessionPlanChangedData",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "``session.set_plan`` put the session in plan first, or took it out.",
+  "properties": {
+    "data": {
+      "$ref": "#/$defs/SessionPlanChangedData"
+    },
+    "run_id": {
+      "title": "Run Id",
+      "type": "null"
+    },
+    "seq": {
+      "minimum": 1,
+      "title": "Seq",
+      "type": "integer"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    },
+    "ts": {
+      "minLength": 1,
+      "title": "Ts",
+      "type": "string"
+    },
+    "type": {
+      "const": "session.plan.changed",
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "seq",
+    "session_id",
+    "run_id",
+    "ts",
+    "type",
+    "data"
+  ],
+  "title": "SessionPlanChangedEvent",
+  "type": "object"
+}

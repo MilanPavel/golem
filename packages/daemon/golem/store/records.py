@@ -16,6 +16,7 @@ RunStatus = Literal["running", "waiting", "completed", "failed", "cancelled"]
 _ACTIVITY = (
     "SELECT s.session_id, s.model_profile, s.title, s.created_at, s.updated_at, s.closed_at,"
     " s.cwd, s.allowed_tools, s.mcp_servers, s.skills, s.options, s.permission_mode, s.checks,"
+    " s.plan_first,"
     " s.forked_from_session_id, s.origin,"
     " EXISTS (SELECT 1 FROM runs r"
     "  WHERE r.session_id = s.session_id AND r.status = 'running') AS running,"
@@ -48,6 +49,8 @@ class SessionRecord:
     """The session's permission mode override, from ``session.mode.changed``."""
     checks: bool | None = None
     """Whether the session lets golem run checks, from ``session.checks.changed``. None: unasked."""
+    plan_first: bool = False
+    """Whether the session is in plan first, from ``session.plan.changed``."""
     origin: str = "user"
     """Who started the session: ``user``, ``cli``, ``routine:<name>``. Never changes."""
 
@@ -80,6 +83,7 @@ class SessionRecords:
         row = await self._database.fetch_one(
             "SELECT session_id, model_profile, title, created_at, updated_at, closed_at, cwd,"
             " allowed_tools, mcp_servers, skills, options, permission_mode, checks,"
+            " plan_first,"
             " forked_from_session_id, origin FROM sessions WHERE session_id = ?",
             (session_id,),
         )
@@ -204,6 +208,7 @@ def _session(row: sqlite3.Row) -> SessionRecord:
         options=decode_options(row["options"]),
         permission_mode=decode_mode(row["permission_mode"]),
         checks=None if row["checks"] is None else bool(row["checks"]),
+        plan_first=bool(row["plan_first"]),
         origin=row["origin"] or "user",
     )
 

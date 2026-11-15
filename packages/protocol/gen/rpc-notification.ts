@@ -11,6 +11,7 @@ export type Params =
   | ModelOptionsChangedEvent
   | SessionModeChangedEvent
   | SessionChecksChangedEvent
+  | SessionPlanChangedEvent
   | MessageStartedEvent
   | MessageDeltaEvent
   | MessageThinkingDeltaEvent
@@ -31,6 +32,7 @@ export type Params =
   | ApprovalNeededEvent
   | ApprovalResolvedEvent
   | TodosUpdatedEvent
+  | PlanProposedEvent
   | FileChangedEvent
   | SkillActivatedEvent
   | SkillDeactivatedEvent
@@ -100,27 +102,33 @@ export type Seq7 = number;
 export type SessionId8 = string;
 export type Ts7 = string;
 export type Type7 = 'session.checks.changed';
-export type MessageId1 = string;
-export type Role = 'assistant';
-export type RunId9 = string;
+export type On1 = boolean;
+export type RunId9 = null;
 export type Seq8 = number;
 export type SessionId9 = string;
 export type Ts8 = string;
-export type Type8 = 'message.started';
-export type MessageId2 = string;
-export type Text = string;
+export type Type8 = 'session.plan.changed';
+export type MessageId1 = string;
+export type Role = 'assistant';
 export type RunId10 = string;
 export type Seq9 = number;
 export type SessionId10 = string;
 export type Ts9 = string;
-export type Type9 = 'message.delta';
-export type MessageId3 = string;
-export type Text1 = string;
+export type Type9 = 'message.started';
+export type MessageId2 = string;
+export type Text = string;
 export type RunId11 = string;
 export type Seq10 = number;
 export type SessionId11 = string;
 export type Ts10 = string;
-export type Type10 = 'message.thinking.delta';
+export type Type10 = 'message.delta';
+export type MessageId3 = string;
+export type Text1 = string;
+export type RunId12 = string;
+export type Seq11 = number;
+export type SessionId12 = string;
+export type Ts11 = string;
+export type Type11 = 'message.thinking.delta';
 export type Interrupted = boolean;
 export type MessageId4 = string;
 export type Role1 = 'user' | 'assistant';
@@ -129,11 +137,11 @@ export type Name = string;
 export type Text2 = string;
 export type Thinking = string | null;
 export type ThinkingMs = number | null;
-export type RunId12 = string;
-export type Seq11 = number;
-export type SessionId12 = string;
-export type Ts11 = string;
-export type Type11 = 'message.completed';
+export type RunId13 = string;
+export type Seq12 = number;
+export type SessionId13 = string;
+export type Ts12 = string;
+export type Type12 = 'message.completed';
 export type ClearedIds = string[];
 export type ContextWindow = number | null;
 export type Index = number;
@@ -157,11 +165,11 @@ export type ToolsChars = number | null;
 export type ToolsSha = string | null;
 export type WindowEstimated = boolean;
 export type WindowPlanned = boolean;
-export type RunId13 = string;
-export type Seq12 = number;
-export type SessionId13 = string;
-export type Ts12 = string;
-export type Type12 = 'model.call.started';
+export type RunId14 = string;
+export type Seq13 = number;
+export type SessionId14 = string;
+export type Ts13 = string;
+export type Type13 = 'model.call.started';
 export type ContextWindow1 = number | null;
 export type CostUsd = number | null;
 export type Failed = boolean;
@@ -180,11 +188,11 @@ export type CacheRead = number | null;
 export type CacheWrite = number | null;
 export type Input1 = number | null;
 export type Output1 = number | null;
-export type RunId14 = string;
-export type Seq13 = number;
-export type SessionId14 = string;
-export type Ts13 = string;
-export type Type13 = 'model.call.completed';
+export type RunId15 = string;
+export type Seq14 = number;
+export type SessionId15 = string;
+export type Ts14 = string;
+export type Type14 = 'model.call.completed';
 export type Action = 'cleared' | 'summarised' | 'grew';
 export type AfterTokens = number | null;
 export type BeforeTokens = number | null;
@@ -192,68 +200,68 @@ export type Count = number | null;
 export type ReloadMs = number | null;
 export type WindowFrom = number | null;
 export type WindowTo = number | null;
-export type RunId15 = string;
-export type Seq14 = number;
-export type SessionId15 = string;
-export type Ts14 = string;
-export type Type14 = 'context.changed';
 export type RunId16 = string;
 export type Seq15 = number;
 export type SessionId16 = string;
 export type Ts15 = string;
-export type Type15 = 'run.started';
+export type Type15 = 'context.changed';
 export type RunId17 = string;
 export type Seq16 = number;
 export type SessionId17 = string;
 export type Ts16 = string;
-export type Type16 = 'run.completed';
-export type Code = ('model_unreachable' | 'not_installed') | null;
-export type Hint = string | null;
-export type Message = string;
-export type Provider1 = string | null;
+export type Type16 = 'run.started';
 export type RunId18 = string;
 export type Seq17 = number;
 export type SessionId18 = string;
 export type Ts17 = string;
-export type Type17 = 'run.failed';
-export type Reason1 = 'user' | 'shutdown';
+export type Type17 = 'run.completed';
+export type Code = ('model_unreachable' | 'not_installed') | null;
+export type Hint = string | null;
+export type Message = string;
+export type Provider1 = string | null;
 export type RunId19 = string;
 export type Seq18 = number;
 export type SessionId19 = string;
 export type Ts18 = string;
-export type Type18 = 'run.cancelled';
-export type CallId = string;
-export type MessageId7 = string;
-export type Name2 = string;
+export type Type18 = 'run.failed';
+export type Reason1 = 'user' | 'shutdown';
 export type RunId20 = string;
 export type Seq19 = number;
 export type SessionId20 = string;
 export type Ts19 = string;
-export type Type19 = 'tool.requested';
+export type Type19 = 'run.cancelled';
+export type CallId = string;
+export type MessageId7 = string;
+export type Name2 = string;
+export type RunId21 = string;
+export type Seq20 = number;
+export type SessionId21 = string;
+export type Ts20 = string;
+export type Type20 = 'tool.requested';
 export type Chars1 = number;
 export type Index1 = number;
 export type Lines = number;
 export type MessageId8 = string;
 export type Name3 = string;
 export type Path = string | null;
-export type RunId21 = string;
-export type Seq20 = number;
-export type SessionId21 = string;
-export type Ts20 = string;
-export type Type20 = 'tool.writing';
-export type CallId1 = string;
 export type RunId22 = string;
 export type Seq21 = number;
 export type SessionId22 = string;
 export type Ts21 = string;
-export type Type21 = 'tool.started';
-export type CallId2 = string;
-export type Text3 = string;
+export type Type21 = 'tool.writing';
+export type CallId1 = string;
 export type RunId23 = string;
 export type Seq22 = number;
 export type SessionId23 = string;
 export type Ts22 = string;
-export type Type22 = 'tool.output';
+export type Type22 = 'tool.started';
+export type CallId2 = string;
+export type Text3 = string;
+export type RunId24 = string;
+export type Seq23 = number;
+export type SessionId24 = string;
+export type Ts23 = string;
+export type Type23 = 'tool.output';
 export type ArtifactId = string | null;
 export type CallId3 = string;
 export type Diff = string | null;
@@ -262,30 +270,30 @@ export type Failed1 = boolean;
 export type Preview = string;
 export type Summary1 = string;
 export type Truncated = boolean;
-export type RunId24 = string;
-export type Seq23 = number;
-export type SessionId24 = string;
-export type Ts23 = string;
-export type Type23 = 'tool.completed';
-export type CallId4 = string;
-export type DurationMs1 = number | null;
-export type Message1 = string;
 export type RunId25 = string;
 export type Seq24 = number;
 export type SessionId25 = string;
 export type Ts24 = string;
-export type Type24 = 'tool.failed';
+export type Type24 = 'tool.completed';
+export type CallId4 = string;
+export type DurationMs1 = number | null;
+export type Message1 = string;
+export type RunId26 = string;
+export type Seq25 = number;
+export type SessionId26 = string;
+export type Ts25 = string;
+export type Type25 = 'tool.failed';
 export type CallId5 = string;
 export type Diff1 = string | null;
 export type MessageId9 = string | null;
 export type Name4 = string;
 export type Source = string;
 export type Subject1 = string | null;
-export type RunId26 = string;
-export type Seq25 = number;
-export type SessionId26 = string;
-export type Ts25 = string;
-export type Type25 = 'approval.needed';
+export type RunId27 = string;
+export type Seq26 = number;
+export type SessionId27 = string;
+export type Ts26 = string;
+export type Type26 = 'approval.needed';
 export type Args3 = {
   [k: string]: unknown;
 } | null;
@@ -294,76 +302,399 @@ export type Decision = 'allow' | 'allow_session' | 'allow_always' | 'deny';
 export type Name5 = string;
 export type Rule = string | null;
 export type Subject2 = string | null;
-export type RunId27 = string;
-export type Seq26 = number;
-export type SessionId27 = string;
-export type Ts26 = string;
-export type Type26 = 'approval.resolved';
+export type RunId28 = string;
+export type Seq27 = number;
+export type SessionId28 = string;
+export type Ts27 = string;
+export type Type27 = 'approval.resolved';
 export type CallId7 = string | null;
 export type Id = string;
 export type Status1 = 'pending' | 'in_progress' | 'done';
 export type Text4 = string;
 export type Todos = Todo[];
-export type RunId28 = string | null;
-export type Seq27 = number;
-export type SessionId28 = string;
-export type Ts27 = string;
-export type Type27 = 'todos.updated';
+export type RunId29 = string | null;
+export type Seq28 = number;
+export type SessionId29 = string;
+export type Ts28 = string;
+export type Type28 = 'todos.updated';
+export type CallId8 = string;
+export type PlanId = string;
+/**
+ * @minItems 1
+ * @maxItems 20
+ */
+export type Steps =
+  | [PlanStep]
+  | [PlanStep, PlanStep]
+  | [PlanStep, PlanStep, PlanStep]
+  | [PlanStep, PlanStep, PlanStep, PlanStep]
+  | [PlanStep, PlanStep, PlanStep, PlanStep, PlanStep]
+  | [PlanStep, PlanStep, PlanStep, PlanStep, PlanStep, PlanStep]
+  | [PlanStep, PlanStep, PlanStep, PlanStep, PlanStep, PlanStep, PlanStep]
+  | [PlanStep, PlanStep, PlanStep, PlanStep, PlanStep, PlanStep, PlanStep, PlanStep]
+  | [PlanStep, PlanStep, PlanStep, PlanStep, PlanStep, PlanStep, PlanStep, PlanStep, PlanStep]
+  | [PlanStep, PlanStep, PlanStep, PlanStep, PlanStep, PlanStep, PlanStep, PlanStep, PlanStep, PlanStep]
+  | [PlanStep, PlanStep, PlanStep, PlanStep, PlanStep, PlanStep, PlanStep, PlanStep, PlanStep, PlanStep, PlanStep]
+  | [
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep
+    ]
+  | [
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep
+    ]
+  | [
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep
+    ]
+  | [
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep
+    ]
+  | [
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep
+    ]
+  | [
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep
+    ]
+  | [
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep
+    ]
+  | [
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep
+    ]
+  | [
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep,
+      PlanStep
+    ];
+/**
+ * @maxItems 20
+ */
+export type Files =
+  | []
+  | [string]
+  | [string, string]
+  | [string, string, string]
+  | [string, string, string, string]
+  | [string, string, string, string, string]
+  | [string, string, string, string, string, string]
+  | [string, string, string, string, string, string, string]
+  | [string, string, string, string, string, string, string, string]
+  | [string, string, string, string, string, string, string, string, string]
+  | [string, string, string, string, string, string, string, string, string, string]
+  | [string, string, string, string, string, string, string, string, string, string, string]
+  | [string, string, string, string, string, string, string, string, string, string, string, string]
+  | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+  | [string, string, string, string, string, string, string, string, string, string, string, string, string, string]
+  | [
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string
+    ]
+  | [
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string
+    ]
+  | [
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string
+    ]
+  | [
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string
+    ]
+  | [
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string
+    ]
+  | [
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string
+    ];
+export type Text5 = string;
+export type Title1 = string;
+export type RunId30 = string;
+export type Seq29 = number;
+export type SessionId30 = string;
+export type Ts29 = string;
+export type Type29 = 'plan.proposed';
 export type Added = number;
-export type CallId8 = string | null;
+export type CallId9 = string | null;
 export type ChangeId = string;
 export type Path1 = string;
 export type Removed = number;
 export type Reverts = string | null;
 export type Source1 = 'tool' | 'shell' | 'revert';
 export type Status2 = 'created' | 'modified' | 'deleted';
-export type RunId29 = string;
-export type Seq28 = number;
-export type SessionId29 = string;
-export type Ts28 = string;
-export type Type28 = 'file.changed';
+export type RunId31 = string;
+export type Seq30 = number;
+export type SessionId31 = string;
+export type Ts30 = string;
+export type Type30 = 'file.changed';
 export type Hash = string;
 export type How = 'invoked' | 'pinned' | 'model';
 export type Name6 = string;
 export type Path2 = string;
 export type Source2 = 'project' | 'user' | 'bundled';
-export type RunId30 = string | null;
-export type Seq29 = number;
-export type SessionId30 = string;
-export type Ts29 = string;
-export type Type29 = 'skill.activated';
-export type Name7 = string;
-export type Reason2 = 'unpinned';
-export type RunId31 = string | null;
-export type Seq30 = number;
-export type SessionId31 = string;
-export type Ts30 = string;
-export type Type30 = 'skill.deactivated';
-export type Message2 = string;
-export type Name8 = string;
-export type Reason3 = 'missing' | 'disabled' | 'broken';
 export type RunId32 = string | null;
 export type Seq31 = number;
 export type SessionId32 = string;
 export type Ts31 = string;
-export type Type31 = 'skill.skipped';
-export type Command = string;
-export type Name9 = string;
-export type Checks = CheckInfo[];
-export type RunId33 = string;
+export type Type31 = 'skill.activated';
+export type Name7 = string;
+export type Reason2 = 'unpinned';
+export type RunId33 = string | null;
 export type Seq32 = number;
 export type SessionId33 = string;
 export type Ts32 = string;
-export type Type32 = 'check.offered';
+export type Type32 = 'skill.deactivated';
+export type Message2 = string;
+export type Name8 = string;
+export type Reason3 = 'missing' | 'disabled' | 'broken';
+export type RunId34 = string | null;
+export type Seq33 = number;
+export type SessionId34 = string;
+export type Ts33 = string;
+export type Type33 = 'skill.skipped';
+export type Command = string;
+export type Name9 = string;
+export type Checks = CheckInfo[];
+export type RunId35 = string;
+export type Seq34 = number;
+export type SessionId35 = string;
+export type Ts34 = string;
+export type Type34 = 'check.offered';
 export type CheckId = string;
 export type Command1 = string;
 export type Name10 = string;
 export type Round = number;
-export type RunId34 = string;
-export type Seq33 = number;
-export type SessionId34 = string;
-export type Ts33 = string;
-export type Type33 = 'check.started';
+export type RunId36 = string;
+export type Seq35 = number;
+export type SessionId36 = string;
+export type Ts35 = string;
+export type Type35 = 'check.started';
 export type ArtifactId1 = string | null;
 export type CheckId1 = string;
 export type DurationMs2 = number;
@@ -372,11 +703,11 @@ export type Name11 = string;
 export type Output2 = string;
 export type Round1 = number;
 export type Status3 = 'passed' | 'failed' | 'timed_out';
-export type RunId35 = string;
-export type Seq34 = number;
-export type SessionId35 = string;
-export type Ts34 = string;
-export type Type34 = 'check.completed';
+export type RunId37 = string;
+export type Seq36 = number;
+export type SessionId37 = string;
+export type Ts36 = string;
+export type Type36 = 'check.completed';
 
 /**
  * Server → client event. No ``id``; this is not a response to a request.
@@ -643,6 +974,31 @@ export interface SessionChecksChangedData {
   on: On;
 }
 /**
+ * ``session.set_plan`` put the session in plan first, or took it out.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "SessionPlanChangedEvent".
+ */
+export interface SessionPlanChangedEvent {
+  data: SessionPlanChangedData;
+  run_id: RunId9;
+  seq: Seq8;
+  session_id: SessionId9;
+  ts: Ts8;
+  type: Type8;
+}
+/**
+ * Whether the session is in plan first, after a change.
+ *
+ * The last event holds the switch, so a replayed session gets it back.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "SessionPlanChangedData".
+ */
+export interface SessionPlanChangedData {
+  on: On1;
+}
+/**
  * The assistant bubble is open.
  *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
@@ -650,11 +1006,11 @@ export interface SessionChecksChangedData {
  */
 export interface MessageStartedEvent {
   data: MessageStartedData;
-  run_id: RunId9;
-  seq: Seq8;
-  session_id: SessionId9;
-  ts: Ts8;
-  type: Type8;
+  run_id: RunId10;
+  seq: Seq9;
+  session_id: SessionId10;
+  ts: Ts9;
+  type: Type9;
 }
 /**
  * An assistant message is open and tokens may follow.
@@ -674,11 +1030,11 @@ export interface MessageStartedData {
  */
 export interface MessageDeltaEvent {
   data: MessageDeltaData;
-  run_id: RunId10;
-  seq: Seq9;
-  session_id: SessionId10;
-  ts: Ts9;
-  type: Type9;
+  run_id: RunId11;
+  seq: Seq10;
+  session_id: SessionId11;
+  ts: Ts10;
+  type: Type10;
 }
 /**
  * One incremental fragment of an assistant message.
@@ -698,11 +1054,11 @@ export interface MessageDeltaData {
  */
 export interface MessageThinkingDeltaEvent {
   data: MessageThinkingDeltaData;
-  run_id: RunId11;
-  seq: Seq10;
-  session_id: SessionId11;
-  ts: Ts10;
-  type: Type10;
+  run_id: RunId12;
+  seq: Seq11;
+  session_id: SessionId12;
+  ts: Ts11;
+  type: Type11;
 }
 /**
  * One incremental fragment of the thinking a model did before or while it answered.
@@ -722,11 +1078,11 @@ export interface MessageThinkingDeltaData {
  */
 export interface MessageCompletedEvent {
   data: MessageCompletedData;
-  run_id: RunId12;
-  seq: Seq11;
-  session_id: SessionId12;
-  ts: Ts11;
-  type: Type11;
+  run_id: RunId13;
+  seq: Seq12;
+  session_id: SessionId13;
+  ts: Ts12;
+  type: Type12;
 }
 /**
  * Full text of a user or assistant message.
@@ -772,11 +1128,11 @@ export interface SkillCall {
  */
 export interface ModelCallStartedEvent {
   data: ModelCallStartedData;
-  run_id: RunId13;
-  seq: Seq12;
-  session_id: SessionId13;
-  ts: Ts12;
-  type: Type12;
+  run_id: RunId14;
+  seq: Seq13;
+  session_id: SessionId14;
+  ts: Ts13;
+  type: Type13;
 }
 /**
  * A request went to the model.
@@ -854,11 +1210,11 @@ export interface PromptSectionInfo {
  */
 export interface ModelCallCompletedEvent {
   data: ModelCallCompletedData;
-  run_id: RunId14;
-  seq: Seq13;
-  session_id: SessionId14;
-  ts: Ts13;
-  type: Type13;
+  run_id: RunId15;
+  seq: Seq14;
+  session_id: SessionId15;
+  ts: Ts14;
+  type: Type14;
 }
 /**
  * A model call ended.
@@ -931,11 +1287,11 @@ export interface TokenUsage {
  */
 export interface ContextChangedEvent {
   data: ContextChangedData;
-  run_id: RunId15;
-  seq: Seq14;
-  session_id: SessionId15;
-  ts: Ts14;
-  type: Type14;
+  run_id: RunId16;
+  seq: Seq15;
+  session_id: SessionId16;
+  ts: Ts15;
+  type: Type15;
 }
 /**
  * What golem sends of the history changed before a model call.
@@ -967,11 +1323,11 @@ export interface ContextChangedData {
  */
 export interface RunStartedEvent {
   data: EmptyEventData;
-  run_id: RunId16;
-  seq: Seq15;
-  session_id: SessionId16;
-  ts: Ts15;
-  type: Type15;
+  run_id: RunId17;
+  seq: Seq16;
+  session_id: SessionId17;
+  ts: Ts16;
+  type: Type16;
 }
 /**
  * The graph run finished and the checkpoint is current.
@@ -981,11 +1337,11 @@ export interface RunStartedEvent {
  */
 export interface RunCompletedEvent {
   data: EmptyEventData;
-  run_id: RunId17;
-  seq: Seq16;
-  session_id: SessionId17;
-  ts: Ts16;
-  type: Type16;
+  run_id: RunId18;
+  seq: Seq17;
+  session_id: SessionId18;
+  ts: Ts17;
+  type: Type17;
 }
 /**
  * The graph run stopped with an error.
@@ -995,11 +1351,11 @@ export interface RunCompletedEvent {
  */
 export interface RunFailedEvent {
   data: RunFailedData;
-  run_id: RunId18;
-  seq: Seq17;
-  session_id: SessionId18;
-  ts: Ts17;
-  type: Type17;
+  run_id: RunId19;
+  seq: Seq18;
+  session_id: SessionId19;
+  ts: Ts18;
+  type: Type18;
 }
 /**
  * Why a run stopped. No traceback.
@@ -1027,11 +1383,11 @@ export interface RunFailedData {
  */
 export interface RunCancelledEvent {
   data: RunCancelledData;
-  run_id: RunId19;
-  seq: Seq18;
-  session_id: SessionId19;
-  ts: Ts18;
-  type: Type18;
+  run_id: RunId20;
+  seq: Seq19;
+  session_id: SessionId20;
+  ts: Ts19;
+  type: Type19;
 }
 /**
  * Who stopped the run. ``user`` is ``run.cancel``, ``shutdown`` the daemon stopping.
@@ -1050,11 +1406,11 @@ export interface RunCancelledData {
  */
 export interface ToolRequestedEvent {
   data: ToolRequestedData;
-  run_id: RunId20;
-  seq: Seq19;
-  session_id: SessionId20;
-  ts: Ts19;
-  type: Type19;
+  run_id: RunId21;
+  seq: Seq20;
+  session_id: SessionId21;
+  ts: Ts20;
+  type: Type20;
 }
 /**
  * The model asked for one tool call.
@@ -1082,11 +1438,11 @@ export interface Args1 {
  */
 export interface ToolWritingEvent {
   data: ToolWritingData;
-  run_id: RunId21;
-  seq: Seq20;
-  session_id: SessionId21;
-  ts: Ts20;
-  type: Type20;
+  run_id: RunId22;
+  seq: Seq21;
+  session_id: SessionId22;
+  ts: Ts21;
+  type: Type21;
 }
 /**
  * How far the model got writing a ``write_file`` or ``edit_file`` call.
@@ -1114,11 +1470,11 @@ export interface ToolWritingData {
  */
 export interface ToolStartedEvent {
   data: ToolStartedData;
-  run_id: RunId22;
-  seq: Seq21;
-  session_id: SessionId22;
-  ts: Ts21;
-  type: Type21;
+  run_id: RunId23;
+  seq: Seq22;
+  session_id: SessionId23;
+  ts: Ts22;
+  type: Type22;
 }
 /**
  * A requested tool call is running.
@@ -1137,11 +1493,11 @@ export interface ToolStartedData {
  */
 export interface ToolOutputEvent {
   data: ToolOutputData;
-  run_id: RunId23;
-  seq: Seq22;
-  session_id: SessionId23;
-  ts: Ts22;
-  type: Type22;
+  run_id: RunId24;
+  seq: Seq23;
+  session_id: SessionId24;
+  ts: Ts23;
+  type: Type23;
 }
 /**
  * Text a running tool call printed. Stored only until the call ends.
@@ -1161,11 +1517,11 @@ export interface ToolOutputData {
  */
 export interface ToolCompletedEvent {
   data: ToolCompletedData;
-  run_id: RunId24;
-  seq: Seq23;
-  session_id: SessionId24;
-  ts: Ts23;
-  type: Type23;
+  run_id: RunId25;
+  seq: Seq24;
+  session_id: SessionId25;
+  ts: Ts24;
+  type: Type24;
 }
 /**
  * A tool call finished.
@@ -1205,11 +1561,11 @@ export interface ToolCompletedData {
  */
 export interface ToolFailedEvent {
   data: ToolFailedData;
-  run_id: RunId25;
-  seq: Seq24;
-  session_id: SessionId25;
-  ts: Ts24;
-  type: Type24;
+  run_id: RunId26;
+  seq: Seq25;
+  session_id: SessionId26;
+  ts: Ts25;
+  type: Type25;
 }
 /**
  * A tool call did not run, or stopped with an error. The model sees the same message.
@@ -1233,11 +1589,11 @@ export interface ToolFailedData {
  */
 export interface ApprovalNeededEvent {
   data: ApprovalNeededData;
-  run_id: RunId26;
-  seq: Seq25;
-  session_id: SessionId26;
-  ts: Ts25;
-  type: Type25;
+  run_id: RunId27;
+  seq: Seq26;
+  session_id: SessionId27;
+  ts: Ts26;
+  type: Type26;
 }
 /**
  * A tool call waits for the user. The run is paused until ``approval.respond``.
@@ -1270,11 +1626,11 @@ export interface Args2 {
  */
 export interface ApprovalResolvedEvent {
   data: ApprovalResolvedData;
-  run_id: RunId27;
-  seq: Seq26;
-  session_id: SessionId27;
-  ts: Ts26;
-  type: Type26;
+  run_id: RunId28;
+  seq: Seq27;
+  session_id: SessionId28;
+  ts: Ts27;
+  type: Type27;
 }
 /**
  * The user answered.
@@ -1303,11 +1659,11 @@ export interface ApprovalResolvedData {
  */
 export interface TodosUpdatedEvent {
   data: TodosUpdatedData;
-  run_id: RunId28;
-  seq: Seq27;
-  session_id: SessionId28;
-  ts: Ts27;
-  type: Type27;
+  run_id: RunId29;
+  seq: Seq28;
+  session_id: SessionId29;
+  ts: Ts28;
+  type: Type28;
 }
 /**
  * The agent's todo list, whole, after ``todo_write`` replaced it.
@@ -1334,6 +1690,44 @@ export interface Todo {
   text: Text4;
 }
 /**
+ * A plan first run proposed its plan with ``propose_plan``.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "PlanProposedEvent".
+ */
+export interface PlanProposedEvent {
+  data: PlanProposedData;
+  run_id: RunId30;
+  seq: Seq29;
+  session_id: SessionId30;
+  ts: Ts29;
+  type: Type29;
+}
+/**
+ * The plan a plan first run ended with, sent for the user to read.
+ *
+ * ``plan_id`` names this plan. ``call_id`` is the ``propose_plan`` call.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "PlanProposedData".
+ */
+export interface PlanProposedData {
+  call_id: CallId8;
+  plan_id: PlanId;
+  steps: Steps;
+  title: Title1;
+}
+/**
+ * One step of a plan: what to do, and the files it will touch.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "PlanStep".
+ */
+export interface PlanStep {
+  files?: Files;
+  text: Text5;
+}
+/**
  * A file in the session folder changed. Sent before the ``tool.completed`` of its call.
  *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
@@ -1341,11 +1735,11 @@ export interface Todo {
  */
 export interface FileChangedEvent {
   data: FileChangedData;
-  run_id: RunId29;
-  seq: Seq28;
-  session_id: SessionId29;
-  ts: Ts28;
-  type: Type28;
+  run_id: RunId31;
+  seq: Seq30;
+  session_id: SessionId31;
+  ts: Ts30;
+  type: Type30;
 }
 /**
  * One change to one file, recorded before this event was sent.
@@ -1359,7 +1753,7 @@ export interface FileChangedEvent {
  */
 export interface FileChangedData {
   added: Added;
-  call_id?: CallId8;
+  call_id?: CallId9;
   change_id: ChangeId;
   path: Path1;
   removed: Removed;
@@ -1378,11 +1772,11 @@ export interface FileChangedData {
  */
 export interface SkillActivatedEvent {
   data: SkillActivatedData;
-  run_id?: RunId30;
-  seq: Seq29;
-  session_id: SessionId30;
-  ts: Ts29;
-  type: Type29;
+  run_id?: RunId32;
+  seq: Seq31;
+  session_id: SessionId32;
+  ts: Ts31;
+  type: Type31;
 }
 /**
  * A skill is active in the session.
@@ -1415,11 +1809,11 @@ export interface SkillActivatedData {
  */
 export interface SkillDeactivatedEvent {
   data: SkillDeactivatedData;
-  run_id?: RunId31;
-  seq: Seq30;
-  session_id: SessionId31;
-  ts: Ts30;
-  type: Type30;
+  run_id?: RunId33;
+  seq: Seq32;
+  session_id: SessionId33;
+  ts: Ts32;
+  type: Type32;
 }
 /**
  * A pinned skill is off again. ``unpinned``: the user turned it off.
@@ -1441,11 +1835,11 @@ export interface SkillDeactivatedData {
  */
 export interface SkillSkippedEvent {
   data: SkillSkippedData;
-  run_id?: RunId32;
-  seq: Seq31;
-  session_id: SessionId32;
-  ts: Ts31;
-  type: Type31;
+  run_id?: RunId34;
+  seq: Seq33;
+  session_id: SessionId34;
+  ts: Ts33;
+  type: Type33;
 }
 /**
  * A pinned skill was left out of a model call. It stays pinned.
@@ -1471,11 +1865,11 @@ export interface SkillSkippedData {
  */
 export interface CheckOfferedEvent {
   data: CheckOfferedData;
-  run_id: RunId33;
-  seq: Seq32;
-  session_id: SessionId33;
-  ts: Ts32;
-  type: Type32;
+  run_id: RunId35;
+  seq: Seq34;
+  session_id: SessionId35;
+  ts: Ts34;
+  type: Type34;
 }
 /**
  * The turn changed files and the session has not said whether golem may run checks.
@@ -1506,11 +1900,11 @@ export interface CheckInfo {
  */
 export interface CheckStartedEvent {
   data: CheckStartedData;
-  run_id: RunId34;
-  seq: Seq33;
-  session_id: SessionId34;
-  ts: Ts33;
-  type: Type33;
+  run_id: RunId36;
+  seq: Seq35;
+  session_id: SessionId36;
+  ts: Ts35;
+  type: Type35;
 }
 /**
  * A check began. ``round`` is 0 for the first run after a turn.
@@ -1532,11 +1926,11 @@ export interface CheckStartedData {
  */
 export interface CheckCompletedEvent {
   data: CheckCompletedData;
-  run_id: RunId35;
-  seq: Seq34;
-  session_id: SessionId35;
-  ts: Ts34;
-  type: Type34;
+  run_id: RunId37;
+  seq: Seq36;
+  session_id: SessionId37;
+  ts: Ts36;
+  type: Type36;
 }
 /**
  * A check ended. ``exit_code`` is null when it timed out.

@@ -67,6 +67,7 @@ from golem_protocol.events import (
     SessionCompletedData,
     SessionCreatedData,
     SessionModeChangedData,
+    SessionPlanChangedData,
     SessionUpdatedData,
     SkillActivatedData,
     SkillActivatedEvent,
@@ -160,6 +161,8 @@ class _LiveSession:
     """The session's permission mode override, None to follow ``config.toml``."""
     checks: bool | None = None
     """Whether the session lets golem run checks. None until it answers the offer."""
+    plan_first: bool = False
+    """Whether the session is in plan first: its runs only read and end in a plan."""
     pins: PinMemory = field(default_factory=PinMemory)
     """What the log last said about each pin, so a run logs only a change."""
     title: str | None = None
@@ -619,6 +622,23 @@ class SessionManager:
                 session.checks = on
             return on
 
+    async def set_plan(self, session_id: str, on: bool) -> bool:
+        """Put the session in plan first, or take it out.
+
+        Stores ``session.plan.changed`` unless the session is already so. It applies
+        from the next turn.
+
+        Raises :class:`SessionNotFoundError` or :class:`SchemaMismatchError`.
+        """
+        async with self._lock:
+            session = await self._resolve(session_id)
+            if on != session.plan_first:
+                await self._events.emit(
+                    session_id, None, "session.plan.changed", SessionPlanChangedData(on=on)
+                )
+                session.plan_first = on
+            return on
+
     async def permission_mode(self, session_id: str) -> PermissionMode:
         """The mode the session runs in: its override, else the one in ``config.toml``.
 
@@ -685,6 +705,7 @@ class SessionManager:
                 options=dict(session.options),
                 permission_mode=session.permission_mode,
                 checks=session.checks,
+                plan_first=session.plan_first,
                 pins=session.pins,
             )
             control = RunControl()
@@ -760,6 +781,7 @@ class SessionManager:
                 options=dict(session.options),
                 permission_mode=session.permission_mode,
                 checks=session.checks,
+                plan_first=session.plan_first,
                 pins=session.pins,
             )
             control = RunControl()
@@ -1106,6 +1128,7 @@ class SessionManager:
             options={} if record is None else dict(record.options),
             permission_mode=None if record is None else record.permission_mode,
             checks=None if record is None else record.checks,
+            plan_first=False if record is None else record.plan_first,
         )
         if session.skills:
             session.pins = PinMemory.from_events(await self._events.stored(session_id))

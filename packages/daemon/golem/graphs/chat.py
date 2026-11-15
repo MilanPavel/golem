@@ -51,6 +51,7 @@ from golem.graphs.tools_node import (
     MCP_NOW_KEY,
     MODE_KEY,
     PINNED_FOLDERS_KEY,
+    PLAN_KEY,
     Answer,
     BudgetOf,
     EnableMcp,
@@ -212,6 +213,7 @@ class ChatRuntime:
         options: Mapping[str, float | str] | None = None,
         permission_mode: PermissionMode | None = None,
         checks: bool | None = None,
+        plan_first: bool = False,
     ) -> AsyncGenerator[object]:
         """Stream one user turn. The first turn writes the state fields.
 
@@ -240,6 +242,7 @@ class ChatRuntime:
                 OPTIONS_KEY: dict(options or {}),
                 MODE_KEY: permission_mode,
                 CHECKS_KEY: checks,
+                PLAN_KEY: plan_first,
             },
             "recursion_limit": _RECURSION_LIMIT,
         }
@@ -272,6 +275,7 @@ class ChatRuntime:
         options: Mapping[str, float | str] | None = None,
         permission_mode: PermissionMode | None = None,
         checks: bool | None = None,
+        plan_first: bool = False,
     ) -> AsyncGenerator[object]:
         """Go on with a run paused on a tool approval, with the user's ``answer``.
 
@@ -292,6 +296,7 @@ class ChatRuntime:
                 OPTIONS_KEY: dict(options or {}),
                 MODE_KEY: permission_mode,
                 CHECKS_KEY: checks,
+                PLAN_KEY: plan_first,
             },
             "recursion_limit": _RECURSION_LIMIT,
         }
@@ -449,13 +454,15 @@ def open_chat(
         overrides = _options(config)
         await registry.prepare(scope)
         tools = registry.scoped(scope)
-        schemas = tools.schemas()
+        plan_first = _plan(config)
+        schemas = tools.schemas(plan_first=plan_first)
         context = PromptContext(
             state,
             _cwd(config),
             _pinned(config),
             get_stream_writer(),
             tuple(sorted(scope.enabled)),
+            plan_first=plan_first,
         )
         parts = system_prompt.parts(context)
         text = "\n\n".join(t for _, t in parts)
@@ -824,6 +831,11 @@ def _options(config: RunnableConfig) -> dict[str, float | str]:
         for key, value in cast(dict[object, object], raw).items()
         if isinstance(key, str) and isinstance(value, (int, float, str))
     }
+
+
+def _plan(config: RunnableConfig) -> bool:
+    """Whether the session is in plan first."""
+    return cast(Mapping[str, object], config.get("configurable", {})).get(PLAN_KEY) is True
 
 
 def _pinned(config: RunnableConfig) -> tuple[str, ...]:

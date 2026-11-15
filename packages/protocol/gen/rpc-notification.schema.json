@@ -1804,6 +1804,114 @@
       "title": "ModelSelectedEvent",
       "type": "object"
     },
+    "PlanProposedData": {
+      "additionalProperties": false,
+      "description": "The plan a plan first run ended with, sent for the user to read.\n\n``plan_id`` names this plan. ``call_id`` is the ``propose_plan`` call.",
+      "properties": {
+        "call_id": {
+          "minLength": 1,
+          "title": "Call Id",
+          "type": "string"
+        },
+        "plan_id": {
+          "minLength": 1,
+          "title": "Plan Id",
+          "type": "string"
+        },
+        "steps": {
+          "items": {
+            "$ref": "#/$defs/PlanStep"
+          },
+          "maxItems": 20,
+          "minItems": 1,
+          "title": "Steps",
+          "type": "array"
+        },
+        "title": {
+          "maxLength": 120,
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "plan_id",
+        "call_id",
+        "title",
+        "steps"
+      ],
+      "title": "PlanProposedData",
+      "type": "object"
+    },
+    "PlanProposedEvent": {
+      "additionalProperties": false,
+      "description": "A plan first run proposed its plan with ``propose_plan``.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/PlanProposedData"
+        },
+        "run_id": {
+          "minLength": 1,
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "plan.proposed",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "run_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "PlanProposedEvent",
+      "type": "object"
+    },
+    "PlanStep": {
+      "additionalProperties": false,
+      "description": "One step of a plan: what to do, and the files it will touch.",
+      "properties": {
+        "files": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Files",
+          "type": "array"
+        },
+        "text": {
+          "maxLength": 300,
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "title": "PlanStep",
+      "type": "object"
+    },
     "PromptSectionInfo": {
       "additionalProperties": false,
       "description": "One non-empty section of the system prompt sent with a model call.\n\n``chars`` is the length of the section's text after strip, counted as\nPython counts it (Unicode code points). The prompt is the sections' texts,\nin order, joined with \"\\n\\n\", so the lengths split the stored prompt\nexactly.",
@@ -2480,6 +2588,64 @@
         "data"
       ],
       "title": "SessionModeChangedEvent",
+      "type": "object"
+    },
+    "SessionPlanChangedData": {
+      "additionalProperties": false,
+      "description": "Whether the session is in plan first, after a change.\n\nThe last event holds the switch, so a replayed session gets it back.",
+      "properties": {
+        "on": {
+          "title": "On",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "on"
+      ],
+      "title": "SessionPlanChangedData",
+      "type": "object"
+    },
+    "SessionPlanChangedEvent": {
+      "additionalProperties": false,
+      "description": "``session.set_plan`` put the session in plan first, or took it out.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/SessionPlanChangedData"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "null"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "session.plan.changed",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "run_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "SessionPlanChangedEvent",
       "type": "object"
     },
     "SessionUpdatedData": {
@@ -3573,6 +3739,7 @@
           "model.call.started": "#/$defs/ModelCallStartedEvent",
           "model.options.changed": "#/$defs/ModelOptionsChangedEvent",
           "model.selected": "#/$defs/ModelSelectedEvent",
+          "plan.proposed": "#/$defs/PlanProposedEvent",
           "run.cancelled": "#/$defs/RunCancelledEvent",
           "run.completed": "#/$defs/RunCompletedEvent",
           "run.failed": "#/$defs/RunFailedEvent",
@@ -3582,6 +3749,7 @@
           "session.completed": "#/$defs/SessionCompletedEvent",
           "session.created": "#/$defs/SessionCreatedEvent",
           "session.mode.changed": "#/$defs/SessionModeChangedEvent",
+          "session.plan.changed": "#/$defs/SessionPlanChangedEvent",
           "session.updated": "#/$defs/SessionUpdatedEvent",
           "skill.activated": "#/$defs/SkillActivatedEvent",
           "skill.deactivated": "#/$defs/SkillDeactivatedEvent",
@@ -3620,6 +3788,9 @@
         },
         {
           "$ref": "#/$defs/SessionChecksChangedEvent"
+        },
+        {
+          "$ref": "#/$defs/SessionPlanChangedEvent"
         },
         {
           "$ref": "#/$defs/MessageStartedEvent"
@@ -3680,6 +3851,9 @@
         },
         {
           "$ref": "#/$defs/TodosUpdatedEvent"
+        },
+        {
+          "$ref": "#/$defs/PlanProposedEvent"
         },
         {
           "$ref": "#/$defs/FileChangedEvent"
