@@ -1,9 +1,18 @@
-import { act, render, renderHook, screen } from "@testing-library/react";
+import { act, fireEvent, render, renderHook, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { drawerOpenStore } from "../drawer/drawer-open.ts";
 import { Workbench, type WorkbenchTab } from "./workbench.tsx";
-import { TAB_KEY, WIDE_KEY, openChange, openWorkbench, tabStore, useRequestedChange, wideStore } from "./workbench-state.ts";
+import { TAB_KEY, openChange, openWorkbench, tabStore, useRequestedChange } from "./workbench-state.ts";
+import {
+  WORKBENCH_DEFAULT,
+  WORKBENCH_MAX,
+  WORKBENCH_MIN,
+  WORKBENCH_STEP,
+  WORKBENCH_WIDTH_KEY,
+  clampWorkbenchWidth,
+  workbenchWidthStore,
+} from "./workbench-width.ts";
 
 const tabs: WorkbenchTab[] = [
   { id: "todos", label: "Todos", badge: "2/5", render: () => <p>todo content</p> },
@@ -13,7 +22,7 @@ const tabs: WorkbenchTab[] = [
 beforeEach(() => {
   localStorage.clear();
   tabStore.set(null);
-  wideStore.set(false);
+  workbenchWidthStore.set(WORKBENCH_DEFAULT);
 });
 afterEach(() => {
   drawerOpenStore.set(false);
@@ -41,17 +50,51 @@ test("an unknown stored tab falls back to the first", () => {
   expect(screen.getByText("todo content")).toBeTruthy();
 });
 
-test("the wide toggle sets the width class and is remembered", async () => {
+test("the header has the tabs and the close button, and no width button", () => {
+  render(<Workbench tabs={tabs} onClose={() => {}} />);
+  expect(screen.getAllByRole("button").map((button) => button.getAttribute("aria-label"))).toEqual(["Hide details"]);
+});
+
+test("the separator resizes with the arrow keys, within its limits, and remembers the width", async () => {
   render(<Workbench tabs={tabs} onClose={() => {}} />);
   const panel = screen.getByRole("complementary", { name: "Details" });
+  const handle = screen.getByRole("separator", { name: "Resize the details" });
   expect(panel.className).toContain("w-80");
-  const toggle = screen.getByRole("button", { name: "Wide" });
-  expect(toggle.getAttribute("aria-pressed")).toBe("false");
-  await userEvent.click(toggle);
-  expect(toggle.getAttribute("aria-pressed")).toBe("true");
-  expect(panel.className).toContain("w-workbench-wide");
-  expect(panel.className).not.toContain("w-80");
-  expect(localStorage.getItem(WIDE_KEY)).toBe("wide");
+  expect(panel.style.width).toBe("");
+  expect(handle.getAttribute("aria-valuenow")).toBe(String(WORKBENCH_DEFAULT));
+  handle.focus();
+  await userEvent.keyboard("{ArrowLeft}");
+  expect(handle.getAttribute("aria-valuenow")).toBe(String(WORKBENCH_DEFAULT + WORKBENCH_STEP));
+  expect(panel.style.width).toBe(`${WORKBENCH_DEFAULT + WORKBENCH_STEP}rem`);
+  expect(localStorage.getItem(WORKBENCH_WIDTH_KEY)).toBe(String(WORKBENCH_DEFAULT + WORKBENCH_STEP));
+  await userEvent.keyboard("{Home}{ArrowRight}");
+  expect(handle.getAttribute("aria-valuenow")).toBe(String(WORKBENCH_MIN));
+  await userEvent.keyboard("{End}{ArrowLeft}");
+  expect(handle.getAttribute("aria-valuenow")).toBe(String(WORKBENCH_MAX));
+});
+
+test("dragging the handle sets the width from the pointer", () => {
+  render(<Workbench tabs={tabs} onClose={() => {}} />);
+  const panel = screen.getByRole("complementary", { name: "Details" });
+  panel.getBoundingClientRect = () => ({ right: 1000 }) as DOMRect;
+  const handle = screen.getByRole("separator");
+  fireEvent.pointerDown(handle, { pointerId: 1 });
+  fireEvent.pointerMove(handle, { clientX: 1000 - 30 * 16 });
+  expect(panel.style.width).toBe("30rem");
+  fireEvent.pointerUp(handle, { pointerId: 1 });
+  fireEvent.pointerMove(handle, { clientX: 1000 - 40 * 16 });
+  expect(panel.style.width).toBe("30rem");
+});
+
+test("a width is kept within its limits", () => {
+  expect(clampWorkbenchWidth(3)).toBe(WORKBENCH_MIN);
+  expect(clampWorkbenchWidth(500)).toBe(WORKBENCH_MAX);
+  expect(clampWorkbenchWidth(24.4)).toBe(24);
+});
+
+test("the floating panel hides the handle until it sits beside the chat", () => {
+  render(<Workbench tabs={tabs} onClose={() => {}} />);
+  expect(screen.getByRole("separator").className).toContain("max-wide:hidden");
 });
 
 test("Escape and the close button call onClose", async () => {

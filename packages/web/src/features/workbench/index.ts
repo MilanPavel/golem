@@ -5,5 +5,5 @@ export {
   openWorkbench,
   useRequestedChange,
   useWorkbenchTab,
-  useWorkbenchWide,
 } from "./workbench-state.ts";
+export { useWorkbenchWidth } from "./workbench-width.ts";

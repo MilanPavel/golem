@@ -1,9 +1,11 @@
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import { cn } from "../../ui/cn.ts";
 import { IconButton } from "../../ui/icon-button.tsx";
 import { CloseIcon } from "../../ui/icons.tsx";
+import { ResizeHandle } from "../../ui/resize-handle.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../ui/tabs.tsx";
-import { useWorkbenchTab, useWorkbenchWide } from "./workbench-state.ts";
+import { useWorkbenchTab } from "./workbench-state.ts";
+import { WORKBENCH_DEFAULT, WORKBENCH_MAX, WORKBENCH_MIN, WORKBENCH_STEP, useWorkbenchWidth } from "./workbench-width.ts";
 
 export const WORKBENCH_ID = "session-details";
 
@@ -12,20 +14,22 @@ export type WorkbenchTab = { id: string; label: string; badge?: string; render: 
 type WorkbenchProps = { tabs: readonly WorkbenchTab[]; onClose: () => void; id?: string; floating?: boolean };
 
 /**
- * The panel beside the chat, with a tab per view. On a wide window it is a column of the layout; on a
- * narrow one it floats over the right edge. Escape inside it closes it.
+ * The panel beside the chat, with a tab per view. On a wide window it is a column of the layout, and
+ * dragging its left edge resizes it; on a narrow one it floats over the right edge. Escape inside it
+ * closes it.
  */
 export function Workbench({ tabs, onClose, id = WORKBENCH_ID, floating = true }: WorkbenchProps) {
   const [chosen, setTab] = useWorkbenchTab();
-  const [wide, setWide] = useWorkbenchWide();
+  const [width, setWidth] = useWorkbenchWidth();
+  const panel = useRef<HTMLElement>(null);
   const first = tabs[0];
   if (first === undefined) {
     return null;
   }
   const active = tabs.find((tab) => tab.id === chosen)?.id ?? first.id;
-  const width = wide ? "w-workbench-wide" : "w-80";
   return (
     <aside
+      ref={panel}
       id={id}
       aria-label="Details"
       onKeyDown={(event) => {
@@ -33,15 +37,24 @@ export function Workbench({ tabs, onClose, id = WORKBENCH_ID, floating = true }:
           onClose();
         }
       }}
-      className={
+      style={width === WORKBENCH_DEFAULT ? undefined : { width: `${width}rem` }}
+      className={cn(
+        "flex min-h-0 w-80 flex-col border-l border-line bg-surface",
         floating
-          ? cn(
-              "fixed inset-y-0 right-0 z-20 flex min-h-0 max-w-11/12 flex-col border-l border-line bg-surface shadow-soft wide:static wide:z-auto wide:max-w-none wide:flex-none wide:shadow-none",
-              width,
-            )
-          : cn("flex min-h-0 flex-none flex-col border-l border-line bg-surface", width)
-      }
+          ? "fixed inset-y-0 right-0 z-20 max-w-11/12 shadow-soft wide:relative wide:z-auto wide:max-w-3/5 wide:flex-none wide:shadow-none"
+          : "relative max-w-3/5 flex-none",
+      )}
     >
+      <ResizeHandle
+        width={width}
+        min={WORKBENCH_MIN}
+        max={WORKBENCH_MAX}
+        step={WORKBENCH_STEP}
+        label="Resize the details"
+        onResize={setWidth}
+        panel={panel}
+        className={floating ? "max-wide:hidden" : undefined}
+      />
       <Tabs value={active} onValueChange={setTab} className="flex min-h-0 flex-1 flex-col">
         <div className="flex items-center justify-between gap-2 border-b border-line px-3 py-2">
           <TabsList className="min-w-0 border-b-0">
@@ -56,22 +69,9 @@ export function Workbench({ tabs, onClose, id = WORKBENCH_ID, floating = true }:
               </TabsTrigger>
             ))}
           </TabsList>
-          <div className="flex flex-none items-center gap-1">
-            <button
-              type="button"
-              aria-pressed={wide}
-              onClick={() => setWide(!wide)}
-              className={cn(
-                "rounded-sm px-2 py-2 text-xs leading-none text-muted outline-offset-2 outline-clay hover:text-ink focus-visible:outline-2",
-                wide && "bg-sunken text-ink",
-              )}
-            >
-              Wide
-            </button>
-            <IconButton label="Hide details" aria-controls={id} onClick={onClose}>
-              <CloseIcon />
-            </IconButton>
-          </div>
+          <IconButton label="Hide details" aria-controls={id} onClick={onClose}>
+            <CloseIcon />
+          </IconButton>
         </div>
         {tabs.map((tab) => (
           <TabsContent key={tab.id} value={tab.id} className="min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 data-[state=active]:flex">
