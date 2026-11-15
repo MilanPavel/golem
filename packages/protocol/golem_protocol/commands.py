@@ -2761,6 +2761,61 @@ class FileListResult(BaseModel):
     more: bool
 
 
+class ChangesCommitParams(BaseModel):
+    """``changes.commit``. Commit these files of the session folder with the user's own git."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    paths: list[str] = Field(min_length=1, max_length=500)
+    message: str = Field(min_length=1, max_length=10_000)
+
+
+class ChangesCommitResult(BaseModel):
+    """Whether git committed. ``sha`` is the short hash on success. ``output`` is git's text."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    ok: bool
+    sha: str | None
+    output: str = Field(max_length=4_000)
+
+
+class ChangesCommitInfoParams(BaseModel):
+    """``changes.commit_info``. What git says about the session folder and its changes."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+
+
+class ChangesCommitInfoResult(BaseModel):
+    """``repository`` is false outside a git work tree. ``paths`` are the changed files git sees."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    repository: bool
+    branch: str | None
+    paths: list[str]
+
+
+class ChangesSuggestMessageParams(BaseModel):
+    """``changes.suggest_message``. Ask the session's model for a commit message."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    paths: list[str] = Field(min_length=1, max_length=500)
+
+
+class ChangesSuggestMessageResult(BaseModel):
+    """The subject, then a blank line and the body when there is one."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    message: str
+
+
 class ApprovalRespondParams(BaseModel):
     """``approval.respond``. Answer the tool call a session's run waits on.
 
@@ -3021,10 +3076,16 @@ __all__ = [
     "AuthSetParams",
     "AuthSetResult",
     "ChangedFile",
+    "ChangesCommitInfoParams",
+    "ChangesCommitInfoResult",
+    "ChangesCommitParams",
+    "ChangesCommitResult",
     "ChangesDiffParams",
     "ChangesDiffResult",
     "ChangesListParams",
     "ChangesListResult",
+    "ChangesSuggestMessageParams",
+    "ChangesSuggestMessageResult",
     "ConfigAllowance",
     "ConfigError",
     "ConfigGetParams",

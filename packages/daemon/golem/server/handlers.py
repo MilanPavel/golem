@@ -13,6 +13,7 @@ from typing import Literal, cast
 from pydantic import BaseModel, ConfigDict
 
 from golem import __version__, install_info
+from golem.coding import commit as commit_git
 from golem.coding.changes import (
     ChangeStore,
     FileChange,
@@ -127,12 +128,18 @@ from golem_protocol.commands import (
     AuthSetParams,
     AuthSetResult,
     ChangedFile,
+    ChangesCommitInfoParams,
+    ChangesCommitInfoResult,
+    ChangesCommitParams,
+    ChangesCommitResult,
     ChangesDiffParams,
     ChangesDiffResult,
     ChangesListParams,
     ChangesListResult,
     ChangesRevertParams,
     ChangesRevertResult,
+    ChangesSuggestMessageParams,
+    ChangesSuggestMessageResult,
     ConfigAllowance,
     ConfigGetParams,
     ConfigGetResult,
@@ -753,6 +760,64 @@ async def _file_read(ctx: RequestContext, params: FileReadParams) -> FileReadRes
 async def _file_list(ctx: RequestContext, params: FileListParams) -> FileListResult:
     folder = await _session_files(ctx, params.session_id)
     return await asyncio.to_thread(list_paths, folder, params.query, params.limit)
+
+
+async def _commit_folder(ctx: RequestContext, session_id: str) -> str:
+    folder = await _session_folder(ctx, session_id)
+    if folder is None:
+        raise RpcCallError(INVALID_PARAMS, "this session has no folder")
+    return folder
+
+
+async def _changes_commit(ctx: RequestContext, params: ChangesCommitParams) -> ChangesCommitResult:
+    folder = await _commit_folder(ctx, params.session_id)
+    try:
+        if await _sessions(ctx).is_busy(params.session_id):
+            raise RpcCallError(SESSION_BUSY, "session is busy")
+        outcome = await commit_git.commit(folder, params.paths, params.message)
+    except ToolError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+    except SessionNotFoundError as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
+    except SchemaMismatchError as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, str(exc)) from exc
+    return ChangesCommitResult(ok=outcome.ok, sha=outcome.sha, output=outcome.output)
+
+
+async def _changes_commit_info(
+    ctx: RequestContext, params: ChangesCommitInfoParams
+) -> ChangesCommitInfoResult:
+    store = _changes(ctx)
+    folder = await _commit_folder(ctx, params.session_id)
+    paths = [net.path for net in net_files(await store.list(params.session_id))]
+    found = await commit_git.info(folder, paths)
+    return ChangesCommitInfoResult(
+        repository=found.repository, branch=found.branch, paths=found.paths
+    )
+
+
+async def _changes_suggest_message(
+    ctx: RequestContext, params: ChangesSuggestMessageParams
+) -> ChangesSuggestMessageResult:
+    sessions = _sessions(ctx)
+    folder = await _commit_folder(ctx, params.session_id)
+    try:
+        profile = await sessions.model_profile(params.session_id)
+        model = sessions.router.chat_model(
+            profile, await sessions.session_options(params.session_id)
+        )
+        message = await commit_git.suggest(folder, params.paths, model)
+    except ToolError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+    except commit_git.SuggestError as exc:
+        raise RpcCallError(INTERNAL_ERROR, str(exc)) from exc
+    except ModelConfigError as exc:
+        raise RpcCallError(MODEL_NOT_CONFIGURED, str(exc)) from exc
+    except SessionNotFoundError as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
+    except SchemaMismatchError as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, str(exc)) from exc
+    return ChangesSuggestMessageResult(message=message)
 
 
 async def _trace_get(ctx: RequestContext, params: TraceGetParams) -> TraceGetResult:
@@ -1619,6 +1684,13 @@ def standard_methods() -> dict[str, Method]:
         "changes.revert": Method("changes.revert", ChangesRevertParams, True, _changes_revert),
         "file.read": Method("file.read", FileReadParams, True, _file_read),
         "file.list": Method("file.list", FileListParams, True, _file_list),
+        "changes.commit": Method("changes.commit", ChangesCommitParams, True, _changes_commit),
+        "changes.commit_info": Method(
+            "changes.commit_info", ChangesCommitInfoParams, True, _changes_commit_info
+        ),
+        "changes.suggest_message": Method(
+            "changes.suggest_message", ChangesSuggestMessageParams, True, _changes_suggest_message
+        ),
         "session.inspect": Method("session.inspect", SessionInspectParams, True, _session_inspect),
         "cost.get": Method("cost.get", CostGetParams, True, _cost_get),
         "trace.get": Method("trace.get", TraceGetParams, True, _trace_get),

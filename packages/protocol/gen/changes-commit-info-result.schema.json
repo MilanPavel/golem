@@ -1,0 +1,35 @@
+{
+  "additionalProperties": false,
+  "description": "``repository`` is false outside a git work tree. ``paths`` are the changed files git sees.",
+  "properties": {
+    "branch": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Branch"
+    },
+    "paths": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Paths",
+      "type": "array"
+    },
+    "repository": {
+      "title": "Repository",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "repository",
+    "branch",
+    "paths"
+  ],
+  "title": "ChangesCommitInfoResult",
+  "type": "object"
+}

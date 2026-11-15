@@ -1540,6 +1540,55 @@ test("changesRevert sends each kind of target and checks what comes back", async
   }
 });
 
+test("the commit calls send their targets and check what comes back", async () => {
+  const sent: [string, Record<string, unknown>][] = [];
+  const commit = { ok: true, sha: "abc1234", output: "[main abc1234] msg" };
+  const info = { repository: true, branch: "main", paths: ["a.txt"] };
+  const suggested = { message: "Update a.txt" };
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: { "changes.commit": commit, "changes.commit_info": info, "changes.suggest_message": suggested },
+      onRequest: (_socket, method, params) => {
+        if (method.startsWith("changes.")) sent.push([method, params]);
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "web", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    assert.deepEqual(await client.changesCommit("s_test", ["a.txt"], "msg"), commit);
+    assert.deepEqual(await client.changesCommitInfo("s_test"), info);
+    assert.deepEqual(await client.changesSuggestMessage("s_test", ["a.txt"]), suggested);
+    assert.deepEqual(sent, [
+      ["changes.commit", { session_id: "s_test", paths: ["a.txt"], message: "msg" }],
+      ["changes.commit_info", { session_id: "s_test" }],
+      ["changes.suggest_message", { session_id: "s_test", paths: ["a.txt"] }],
+    ]);
+  } finally {
+    client.close();
+    await server.close();
+  }
+  const bad = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: {
+        "changes.commit": { ok: "yes" },
+        "changes.commit_info": { repository: true },
+        "changes.suggest_message": {},
+      },
+    });
+  });
+  const refused = connectGolem({ socketPath: bad.socketPath, clientName: "web", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    await assert.rejects(() => refused.changesCommit("s_test", ["a.txt"], "m"), /invalid changes.commit result/);
+    await assert.rejects(() => refused.changesCommitInfo("s_test"), /invalid changes.commit_info result/);
+    await assert.rejects(() => refused.changesSuggestMessage("s_test", ["a.txt"]), /invalid changes.suggest_message result/);
+  } finally {
+    refused.close();
+    await bad.close();
+  }
+});
+
 test("createSession sends the folder and the model only when they are given", async () => {
   const seen: Record<string, unknown>[] = [];
   const daemon = await listen((socket) => {

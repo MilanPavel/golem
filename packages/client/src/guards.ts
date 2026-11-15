@@ -13,6 +13,8 @@ import type { McpTestProgress } from "../../protocol/gen/mcp-test-progress.ts";
 import type { McpTestResult } from "../../protocol/gen/mcp-test-result.ts";
 import type { RuntimeInstallDone } from "../../protocol/gen/runtime-install-done.ts";
 import type { OllamaInstallDone } from "../../protocol/gen/ollama-install-done.ts";
+import type { ChangesCommitInfoResult } from "../../protocol/gen/changes-commit-info-result.ts";
+import type { ChangesCommitResult } from "../../protocol/gen/changes-commit-result.ts";
 import type { ChangesListResult } from "../../protocol/gen/changes-list-result.ts";
 import type { FileListResult } from "../../protocol/gen/file-list-result.ts";
 import type { FileReadResult } from "../../protocol/gen/file-read-result.ts";
@@ -455,6 +457,25 @@ export function isFileListResult(value: unknown): value is FileListResult {
     Array.isArray(value["paths"]) &&
     value["paths"].every((path) => typeof path === "string") &&
     typeof value["more"] === "boolean"
+  );
+}
+
+export function isChangesCommitResult(value: unknown): value is ChangesCommitResult {
+  return (
+    isRecord(value) &&
+    typeof value["ok"] === "boolean" &&
+    (value["sha"] === null || typeof value["sha"] === "string") &&
+    typeof value["output"] === "string"
+  );
+}
+
+export function isChangesCommitInfoResult(value: unknown): value is ChangesCommitInfoResult {
+  return (
+    isRecord(value) &&
+    typeof value["repository"] === "boolean" &&
+    (value["branch"] === null || typeof value["branch"] === "string") &&
+    Array.isArray(value["paths"]) &&
+    value["paths"].every((path) => typeof path === "string")
   );
 }
 

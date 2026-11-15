@@ -577,6 +577,17 @@ class SessionManager:
         """Tell the session's screens about a change made between runs."""
         await self._events.emit(session_id, None, "file.changed", data)
 
+    async def is_busy(self, session_id: str) -> bool:
+        """Whether a run is active or waits for an approval.
+
+        Raises :class:`SessionNotFoundError` or :class:`SchemaMismatchError`.
+        """
+        async with self._lock:
+            session = await self._resolve(session_id)
+            if session.task is not None and not session.task.done():
+                return True
+            return await self._run_records.waiting(session_id) is not None
+
     async def model_profile(self, session_id: str) -> str:
         """The profile or ref the session runs on.
 

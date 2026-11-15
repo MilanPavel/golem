@@ -522,6 +522,80 @@ public enum ChangedFileStatus: String, Codable {
     case modified = "modified"
 }
 
+/// ``changes.commit_info``. What git says about the session folder and its changes.
+// MARK: - ChangesCommitInfoParams
+public struct ChangesCommitInfoParams: Codable {
+    public let sessionID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case sessionID = "session_id"
+    }
+
+    public init(sessionID: String) {
+        self.sessionID = sessionID
+    }
+}
+
+/// ``repository`` is false outside a git work tree. ``paths`` are the changed files git sees.
+// MARK: - ChangesCommitInfoResult
+public struct ChangesCommitInfoResult: Codable {
+    public let branch: String?
+    public let paths: [String]
+    public let repository: Bool
+
+    public enum CodingKeys: String, CodingKey {
+        case branch = "branch"
+        case paths = "paths"
+        case repository = "repository"
+    }
+
+    public init(branch: String?, paths: [String], repository: Bool) {
+        self.branch = branch
+        self.paths = paths
+        self.repository = repository
+    }
+}
+
+/// ``changes.commit``. Commit these files of the session folder with the user's own git.
+// MARK: - ChangesCommitParams
+public struct ChangesCommitParams: Codable {
+    public let message: String
+    public let paths: [String]
+    public let sessionID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case message = "message"
+        case paths = "paths"
+        case sessionID = "session_id"
+    }
+
+    public init(message: String, paths: [String], sessionID: String) {
+        self.message = message
+        self.paths = paths
+        self.sessionID = sessionID
+    }
+}
+
+/// Whether git committed. ``sha`` is the short hash on success. ``output`` is git's text.
+// MARK: - ChangesCommitResult
+public struct ChangesCommitResult: Codable {
+    public let ok: Bool
+    public let output: String
+    public let sha: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case ok = "ok"
+        case output = "output"
+        case sha = "sha"
+    }
+
+    public init(ok: Bool, output: String, sha: String?) {
+        self.ok = ok
+        self.output = output
+        self.sha = sha
+    }
+}
+
 /// ``changes.diff``. The diff of a file or of one change: exactly one of the two is set.
 // MARK: - ChangesDiffParams
 public struct ChangesDiffParams: Codable {
@@ -714,6 +788,37 @@ public struct ConflictElement: Codable {
 
 public enum ConflictReason: String, Codable {
     case changedOnDisk = "changed_on_disk"
+}
+
+/// ``changes.suggest_message``. Ask the session's model for a commit message.
+// MARK: - ChangesSuggestMessageParams
+public struct ChangesSuggestMessageParams: Codable {
+    public let paths: [String]
+    public let sessionID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case paths = "paths"
+        case sessionID = "session_id"
+    }
+
+    public init(paths: [String], sessionID: String) {
+        self.paths = paths
+        self.sessionID = sessionID
+    }
+}
+
+/// The subject, then a blank line and the body when there is one.
+// MARK: - ChangesSuggestMessageResult
+public struct ChangesSuggestMessageResult: Codable {
+    public let message: String
+
+    public enum CodingKeys: String, CodingKey {
+        case message = "message"
+    }
+
+    public init(message: String) {
+        self.message = message
+    }
 }
 
 /// A check ended. ``exit_code`` is null when it timed out.
