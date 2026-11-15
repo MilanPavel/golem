@@ -20,8 +20,8 @@ import { Dot, serverSummary, SignInPanel, type Login } from "../features/setting
 import type { McpServer } from "../store/mcp.ts";
 import { ConnectionScreen } from "../features/connection/connection-screen.tsx";
 import { connectionScreen, type ConnectionHost } from "../features/connection/connection-screen.ts";
-import { DetailSwitch, ToolLine, TranscriptMessages } from "../features/chat/index.ts";
-import { CUT_REPLY, SAMPLE_CHAT, SAMPLE_TOOLS, THINKING_CASES, TURN_CHAT } from "../features/chat/sample.ts";
+import { DetailSwitch, ToolLine, TranscriptMessages, WritingRow } from "../features/chat/index.ts";
+import { COST_CASES, CUT_REPLY, SAMPLE_CHAT, SAMPLE_TOOLS, THINKING_CASES, TURN_CHAT } from "../features/chat/sample.ts";
 import { ApprovalBar } from "../features/approval/index.ts";
 import { ANSWERED, PENDING_EDIT, PENDING_SHELL } from "../features/approval/sample.ts";
 import { DiffModeSwitch, DiffView } from "../features/diff/index.ts";
@@ -1278,10 +1278,31 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
         </div>
       </section>
 
+      <section className="mt-6" id={anchor("Cost")}>
+        <h3 className="mb-2 font-mono text-xs text-faint">Cost</h3>
+        <div className="flex flex-col gap-6 rounded-lg border border-line bg-bg p-4">
+          {COST_CASES.map(({ label, message }) => (
+            <div key={label} aria-label={`Cost, ${label}`} role="group" className="flex flex-col gap-1">
+              <p className="font-mono text-xs text-faint">{label}</p>
+              <TranscriptMessages chat={{ messages: [message], error: null, notice: null }} />
+            </div>
+          ))}
+        </div>
+      </section>
+
       <section className="mt-6" id={anchor("Cut reply")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Cut reply</h3>
         <div className="rounded-lg border border-line bg-bg p-4">
           <TranscriptMessages chat={{ messages: [CUT_REPLY], error: null, notice: null }} />
+        </div>
+      </section>
+
+      <section className="mt-6" id={anchor("Writing a file")}>
+        <h3 className="mb-2 font-mono text-xs text-faint">Writing a file</h3>
+        <div className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
+          <WritingRow writing={{ name: "write_file", path: "tests/test_fetch.py", lines: 14, chars: 420 }} />
+          <WritingRow writing={{ name: "write_file", path: null, lines: 0, chars: 0 }} />
+          <WritingRow writing={{ name: "edit_file", path: "src/fetch.py", lines: 6, chars: 180 }} />
         </div>
       </section>
 

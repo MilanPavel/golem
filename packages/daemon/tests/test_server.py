@@ -21,6 +21,7 @@ from golem import __version__
 from golem.config import OllamaSettings, load_settings
 from golem.logging import configure_logging
 from golem.models.discovery import ModelDiscovery
+from golem.models.facts import FactsSource
 from golem.models.ollama import LocalServers
 from golem.models.pulls import PullManager
 from golem.models.router import ModelRouter
@@ -221,6 +222,7 @@ async def start_daemon(
     router: ModelRouter | None = None,
     titles: TitleGenerator | None = None,
     discovery: Callable[[ModelRouter], ModelDiscovery] | None = None,
+    facts: FactsSource | None = None,
     pulls: Callable[[ModelRouter, float | None], PullManager] | None = None,
     secrets: SecretStore | None = None,
     user_home: Path | None = None,
@@ -242,6 +244,7 @@ async def start_daemon(
         router=router,
         titles=titles,
         discovery=discovery,
+        facts=facts,
         pulls=pulls,
         secrets=secrets,
         user_home=user_home if user_home is not None else home,

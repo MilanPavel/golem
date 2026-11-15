@@ -22,6 +22,7 @@ from golem_protocol.events import (
     MessageDeltaEvent,
     MessageStartedEvent,
     MessageThinkingDeltaEvent,
+    ModelWaitingEvent,
     ToolCompletedEvent,
     ToolFailedEvent,
     ToolOutputEvent,
@@ -59,7 +60,8 @@ class EventLog:
                 await tx.execute(
                     "DELETE FROM events"
                     " WHERE session_id = ? AND message_id = ?"
-                    " AND type IN ('message.delta', 'message.thinking.delta', 'tool.writing')",
+                    " AND type IN ('message.delta', 'message.thinking.delta', 'tool.writing',"
+                    " 'model.waiting')",
                     (event.session_id, message_id),
                 )
             elif isinstance(event, ToolCompletedEvent | ToolFailedEvent):
@@ -110,7 +112,8 @@ def _message_id(event: ChatEvent) -> str | None:
         | MessageDeltaEvent
         | MessageThinkingDeltaEvent
         | MessageCompletedEvent
-        | ToolWritingEvent,
+        | ToolWritingEvent
+        | ModelWaitingEvent,
     ):
         return event.data.message_id
     if isinstance(event, ToolOutputEvent):

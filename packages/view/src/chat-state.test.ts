@@ -1024,3 +1024,23 @@ test("tool.writing sets what the reply is writing, and the reply completing, a r
   assert.deepEqual(reduceChat(emptyChat, writing(2, "x", 1, 1)), emptyChat);
   assert.equal(stopWriting(emptyChat), emptyChat);
 });
+
+test("model.waiting shows the local-model wait, and the first token, the end of the wait, or the run ending clears it", () => {
+  const base = { session_id: "s", run_id: "r", ts: "t" } as const;
+  const waiting = (seq: number, on: boolean): ChatEvent => ({
+    ...base,
+    seq,
+    type: "model.waiting",
+    data: { message_id: "a", waiting: on },
+  });
+  const started: ChatEvent = { ...base, seq: 1, type: "message.started", data: { message_id: "a", role: "assistant" } };
+  const on = [started, waiting(2, true)].reduce(reduceChat, emptyChat);
+  assert.equal(on.localWait, true);
+  assert.equal(reduceChat(on, waiting(3, false)).localWait, false);
+  const delta: ChatEvent = { ...base, seq: 3, type: "message.delta", data: { message_id: "a", text: "hi" } };
+  assert.equal(reduceChat(on, delta).localWait, false);
+  for (const type of ["run.completed", "run.cancelled"] as const) {
+    assert.equal(reduceChat(on, { ...base, seq: 3, type, data: type === "run.cancelled" ? { reason: "user" } : {} } as ChatEvent).localWait, false);
+  }
+  assert.equal(emptyChat.localWait, false);
+});

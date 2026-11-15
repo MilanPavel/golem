@@ -62,6 +62,22 @@ export const CUT_REPLY: ChatMessage = {
   cut: true,
 };
 
+/** Answers with the cost under them, for the gallery: local, hosted, and a price golem does not know. */
+export const COST_CASES: { label: string; message: ChatMessage }[] = [
+  {
+    label: "local",
+    message: { id: "q1", role: "assistant", text: "It is set in `socket.ts`.", streaming: false, durationMs: 8400, call: { model: "qwen3:27b", tier: "local", tokens: 4100, costUsd: 0, done: true } },
+  },
+  {
+    label: "hosted",
+    message: { id: "q2", role: "assistant", text: "It is set in `socket.ts`.", streaming: false, durationMs: 8400, call: { model: "deepseek-chat", tier: "budget", tokens: 12400, costUsd: 0.31, done: true } },
+  },
+  {
+    label: "unknown cost",
+    message: { id: "q3", role: "assistant", text: "It is set in `socket.ts`.", streaming: false, durationMs: 8400, call: { model: "my-model", tier: null, tokens: 3200, costUsd: null, done: true } },
+  },
+];
+
 /** Replies with thinking, for the gallery and the tests: streaming, done, none, and a long text. */
 export const THINKING_CASES: { label: string; message: ChatMessage; shown?: boolean }[] = [
   {
