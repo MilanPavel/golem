@@ -288,6 +288,7 @@ Blobs hold prompts, which can hold anything a skill or a pinned file says. They 
 
 ## Read more
 
+- Next: [Coding](./coding.md), how an edit is recorded, checked, and undone.
 - Before: [The web UI](./web.md), the page the trace opens in.
 - [Trace a session](../guide/web.md#trace-a-session): how to open it and read it.
 - [The protocol](./protocol.md): events and commands, and [Sessions](./sessions.md): the event log and the checkpoint that the trace joins.

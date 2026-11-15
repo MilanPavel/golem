@@ -38,6 +38,7 @@ from golem.models import options as model_options
 from golem.models.errors import ModelUnreachable
 from golem.models.keys import KeyStore, KeyStoreError
 from golem.models.ollama_chat import OllamaChat
+from golem.models.tiers import BUDGET_MAX_PRICE
 from golem.paths import resolve_paths
 
 log = logging.getLogger(__name__)
@@ -142,6 +143,7 @@ class _Catalog:
     providers: dict[str, Provider]
     models: dict[str, ModelSettings]
     saved: dict[str, ModelOptions]
+    budget_max_price: float = BUDGET_MAX_PRICE
 
 
 class ModelRouter:
@@ -432,6 +434,11 @@ class ModelRouter:
         catalog = self._current()
         return dict(PRESETS if catalog is None else catalog.providers)
 
+    def budget_max_price(self) -> float:
+        """``[routing] budget_max_price``, read from the current ``config.toml``."""
+        catalog = self._current()
+        return BUDGET_MAX_PRICE if catalog is None else catalog.budget_max_price
+
     def profiles(self) -> dict[str, ModelSettings]:
         """Every profile by name, the one from the flat settings included."""
         catalog = self._current()
@@ -528,7 +535,11 @@ def _catalog(settings: GolemSettings) -> _Catalog:
         models[legacy_name] = legacy
     default = settings.default_model or (legacy_name if legacy is not None else None)
     return _Catalog(
-        default=default, providers=providers, models=models, saved=dict(settings.ollama.models)
+        default=default,
+        providers=providers,
+        models=models,
+        saved=dict(settings.ollama.models),
+        budget_max_price=settings.routing.budget_max_price,
     )
 
 
