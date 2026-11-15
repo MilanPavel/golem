@@ -113,6 +113,8 @@ To change one option without the panel, type `/tune <option> <value>`, for examp
 
 The status line shows the options that differ from the model's default, such as `temp 0.2 · top_p 0.9`, at most three and then `+N`. The context size is left out, because the context bar already shows it.
 
+The line under an answer ends with the model, `local` for a model on your machine, the tokens the run used, and golem's estimate of its cost, such as `qwen3:27b · local · 4.1K tok · $0.00`. Once a call in the session has cost something, the status line ends with the session's total so far, such as `$0.03`.
+
 ### Tools, skills, and MCP
 
 | Command | What it does |

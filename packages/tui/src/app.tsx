@@ -149,6 +149,7 @@ import {
   runningTry,
   startedTry,
   tryHeading,
+  sessionCostLabel,
   tryTitle,
   type TryRun,
 } from "@golem/view";
@@ -909,6 +910,7 @@ export function App({
       skippedSkills: chat.skippedSkills,
       context: sessionId === null ? null : chat.context.last,
       mode: sessionId === null ? "" : effectiveMode(chat.permissionMode, defaultMode),
+      cost: sessionId === null ? "" : sessionCostLabel(chat.messages),
       tune: sessionId === null || chipTune === null ? "" : tuneChip(withSession(chipTune, chat.options), model.provider),
     }),
     columns,
