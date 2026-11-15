@@ -23,6 +23,9 @@ class Ping(BaseModel):
 PermissionMode = Literal["careful", "balanced", "autopilot"]
 """How much the built-in permission rules allow without asking. See ADR-047."""
 
+RouteMode = Literal["pinned", "local", "auto"]
+"""How a session picks the model of each turn. See ADR-055."""
+
 
 class ForkedFrom(BaseModel):
     """The session and message a fork was copied from."""
@@ -42,7 +45,8 @@ class SessionCreatedData(BaseModel):
     ``session.fork``. ``cwd`` is the project folder the file tools work in,
     or null for a session without one. ``origin`` is who started the session:
     ``cli``, ``routine:<name>``, and so on. Null means ``user``, and an older
-    daemon leaves it out.
+    daemon leaves it out. ``route`` is the session's route mode when it was
+    made. Null means ``pinned``, and an older daemon leaves it out.
     """
 
     model_config = _CONFIG
@@ -53,6 +57,7 @@ class SessionCreatedData(BaseModel):
     forked_from: ForkedFrom | None = None
     cwd: str | None = Field(default=None, min_length=1)
     origin: str | None = Field(default=None, min_length=1)
+    route: RouteMode | None = None
 
 
 class MessageStartedData(BaseModel):
@@ -182,13 +187,14 @@ class RunFailedData(BaseModel):
     model's server did not answer. ``not_installed``: the model needs a local
     server that is not installed, such as Ollama. ``provider`` is the provider
     whose server it was, and ``hint`` says how to fix it, such as
-    ``run ollama serve``.
+    ``run ollama serve``. ``context_full``: the prompt does not fit the model's window,
+    even after clearing and summarising, and nothing was sent.
     """
 
     model_config = _CONFIG
 
     message: str = Field(min_length=1)
-    code: Literal["model_unreachable", "not_installed"] | None = None
+    code: Literal["model_unreachable", "not_installed", "context_full"] | None = None
     provider: str | None = Field(default=None, min_length=1)
     hint: str | None = Field(default=None, min_length=1)
 
@@ -211,9 +217,10 @@ class SessionAllowance(BaseModel):
 
 
 class SessionUpdatedData(BaseModel):
-    """A session attribute changed: its title, folder, allowed tools, or MCP servers.
+    """A session attribute changed: its title, folder, allowed tools, MCP servers, or route.
 
-    A field left null did not change. ``cwd`` is set once, on a session made
+    A field left null did not change. ``route`` is the session's route mode after
+    ``session.set_route``. ``cwd`` is set once, on a session made
     before sessions had a folder, by the first ``message.send`` that names one.
     ``allowed_tools`` is the whole list after ``session.revoke``, and
     ``mcp_servers`` the on-demand MCP servers the session turned on, after
@@ -226,12 +233,15 @@ class SessionUpdatedData(BaseModel):
     cwd: str | None = Field(default=None, min_length=1)
     allowed_tools: list[SessionAllowance] | None = None
     mcp_servers: list[str] | None = None
+    route: RouteMode | None = None
 
     @model_validator(mode="after")
     def _changes_something(self) -> Self:
-        fields = (self.title, self.cwd, self.allowed_tools, self.mcp_servers)
+        fields = (self.title, self.cwd, self.allowed_tools, self.mcp_servers, self.route)
         if all(field is None for field in fields):
-            raise ValueError("session.updated needs a title, a cwd, allowed_tools, or mcp_servers")
+            raise ValueError(
+                "session.updated needs a title, a cwd, allowed_tools, mcp_servers, or a route"
+            )
         return self
 
 
@@ -262,6 +272,39 @@ class ModelSelectedData(BaseModel):
     model_provider: str | None = Field(default=None, min_length=1)
     model_name: str | None = Field(default=None, min_length=1)
     reason: Literal["user"]
+
+
+class ModelRejection(BaseModel):
+    """A candidate the pick left out, and why in plain words."""
+
+    model_config = _CONFIG
+
+    ref: str = Field(min_length=1)
+    tier: Literal["local", "budget", "frontier"]
+    why: str = Field(min_length=1)
+
+
+class ModelRoutedData(BaseModel):
+    """Which model a run uses, and why golem picked it.
+
+    Sent right after ``run.started`` in a session whose route is not ``pinned``.
+    ``model_profile`` is the profile that runs. ``provider`` and ``model`` are what
+    it resolves to, null when it does not resolve. ``reason`` is why this model
+    (ADR-055), ``detail`` one short sentence, and ``rejected`` the candidates the
+    pick dropped. The session's own model does not change.
+    """
+
+    model_config = _CONFIG
+
+    model_profile: str = Field(min_length=1)
+    provider: str | None = Field(default=None, min_length=1)
+    model: str | None = Field(default=None, min_length=1)
+    tier: Literal["local", "budget", "frontier"]
+    reason: Literal[
+        "pinned", "privacy", "fit", "budget", "cheapest", "escalated", "fallback", "user"
+    ]
+    detail: str
+    rejected: list[ModelRejection] = Field(default_factory=list[ModelRejection])
 
 
 class ModelOptionsChangedData(BaseModel):
@@ -311,6 +354,40 @@ class CheckInfo(BaseModel):
 
     name: str = Field(min_length=1)
     command: str = Field(min_length=1)
+
+
+class SessionPlanChangedData(BaseModel):
+    """Whether the session is in plan first, after a change.
+
+    The last event holds the switch, so a replayed session gets it back.
+    """
+
+    model_config = _CONFIG
+
+    on: bool
+
+
+class PlanStep(BaseModel):
+    """One step of a plan: what to do, and the files it will touch."""
+
+    model_config = _CONFIG
+
+    text: str = Field(min_length=1, max_length=300)
+    files: list[str] = Field(default_factory=list[str], max_length=20)
+
+
+class PlanProposedData(BaseModel):
+    """The plan a plan first run ended with, sent for the user to read.
+
+    ``plan_id`` names this plan. ``call_id`` is the ``propose_plan`` call.
+    """
+
+    model_config = _CONFIG
+
+    plan_id: str = Field(min_length=1)
+    call_id: str = Field(min_length=1)
+    title: str = Field(min_length=1, max_length=120)
+    steps: list[PlanStep] = Field(min_length=1, max_length=20)
 
 
 class CheckOfferedData(BaseModel):
@@ -389,6 +466,19 @@ class ToolWritingData(BaseModel):
     chars: int = Field(ge=0)
 
 
+class ModelWaitingData(BaseModel):
+    """A chat call waits, or no longer waits, for its turn on a local model server.
+
+    Sent for the reply ``message_id`` only, so other sessions never show it. Stored only
+    until its message completes.
+    """
+
+    model_config = _CONFIG
+
+    message_id: str = Field(min_length=1)
+    waiting: bool
+
+
 class PromptSectionInfo(BaseModel):
     """One non-empty section of the system prompt sent with a model call.
 
@@ -456,6 +546,11 @@ class ModelCallStartedData(BaseModel):
     message_bytes: list[int] | None = None
     cleared_ids: list[str] = Field(default_factory=list[str])
     """Tool results sent as a one-line stub on this call."""
+    summary_chars: int | None = Field(default=None, ge=0)
+    """The length of the summary of old turns sent as the first message. None when none was."""
+    estimated_tokens: int | None = Field(default=None, ge=0)
+    """What golem estimated the prompt at, in tokens, before sending it. None when the window
+    was unknown or on an older event."""
 
 
 class ContextChangedData(BaseModel):
@@ -463,10 +558,11 @@ class ContextChangedData(BaseModel):
 
     ``cleared`` means old tool results are now sent as one line each: ``count`` is how
     many, and ``before_tokens`` and ``after_tokens`` are rough sizes of the history before
-    and after. ``summarised`` and ``grew`` are for later changes: ``count`` is the
-    messages summarised, ``window_from`` and ``window_to`` the window before and after,
-    and ``reload_ms`` the time the model took to load again. The checkpoint keeps every
-    message, so no transcript event changes. A field a change does not use is None.
+    and after. For ``summarised``, ``count`` is the messages a summary now stands for.
+    ``grew`` is for a later change: ``window_from`` and ``window_to`` are the window
+    before and after, and ``reload_ms`` the time the model took to load again. The
+    checkpoint keeps every message, so no transcript event changes. A field a change
+    does not use is None.
     """
 
     model_config = _CONFIG
@@ -759,6 +855,19 @@ class ModelSelectedEvent(BaseModel):
     data: ModelSelectedData
 
 
+class ModelRoutedEvent(BaseModel):
+    """The pick for this run: the model that runs it and why."""
+
+    model_config = _CONFIG
+
+    seq: int = Field(ge=1)
+    session_id: str = Field(min_length=1)
+    run_id: str = Field(min_length=1)
+    ts: str = Field(min_length=1)
+    type: Literal["model.routed"]
+    data: ModelRoutedData
+
+
 class ModelOptionsChangedEvent(BaseModel):
     """``session.set_options`` changed the session's option overrides."""
 
@@ -796,6 +905,32 @@ class SessionChecksChangedEvent(BaseModel):
     ts: str = Field(min_length=1)
     type: Literal["session.checks.changed"]
     data: SessionChecksChangedData
+
+
+class SessionPlanChangedEvent(BaseModel):
+    """``session.set_plan`` put the session in plan first, or took it out."""
+
+    model_config = _CONFIG
+
+    seq: int = Field(ge=1)
+    session_id: str = Field(min_length=1)
+    run_id: None
+    ts: str = Field(min_length=1)
+    type: Literal["session.plan.changed"]
+    data: SessionPlanChangedData
+
+
+class PlanProposedEvent(BaseModel):
+    """A plan first run proposed its plan with ``propose_plan``."""
+
+    model_config = _CONFIG
+
+    seq: int = Field(ge=1)
+    session_id: str = Field(min_length=1)
+    run_id: str = Field(min_length=1)
+    ts: str = Field(min_length=1)
+    type: Literal["plan.proposed"]
+    data: PlanProposedData
 
 
 class CheckOfferedEvent(BaseModel):
@@ -1032,6 +1167,19 @@ class ToolWritingEvent(BaseModel):
     data: ToolWritingData
 
 
+class ModelWaitingEvent(BaseModel):
+    """A chat call waits for the local model. A live signal: ``message.completed`` replaces it."""
+
+    model_config = _CONFIG
+
+    seq: int = Field(ge=1)
+    session_id: str = Field(min_length=1)
+    run_id: str = Field(min_length=1)
+    ts: str = Field(min_length=1)
+    type: Literal["model.waiting"]
+    data: ModelWaitingData
+
+
 class ToolCompletedEvent(BaseModel):
     """The tool call finished, and its result went back to the model."""
 
@@ -1085,13 +1233,16 @@ class ApprovalResolvedEvent(BaseModel):
 
 
 class FileChangedEvent(BaseModel):
-    """A file in the session folder changed. Sent before the ``tool.completed`` of its call."""
+    """A file in the session folder changed. Sent before the ``tool.completed`` of its call.
+
+    ``run_id`` is null for an undo, which is made between runs.
+    """
 
     model_config = _CONFIG
 
     seq: int = Field(ge=1)
     session_id: str = Field(min_length=1)
-    run_id: str = Field(min_length=1)
+    run_id: str | None = Field(min_length=1)
     ts: str = Field(min_length=1)
     type: Literal["file.changed"]
     data: FileChangedData
@@ -1162,9 +1313,11 @@ EventType = Literal[
     "session.closed",
     "session.completed",
     "model.selected",
+    "model.routed",
     "model.options.changed",
     "session.mode.changed",
     "session.checks.changed",
+    "session.plan.changed",
     "message.started",
     "message.delta",
     "message.thinking.delta",
@@ -1178,6 +1331,7 @@ EventType = Literal[
     "run.cancelled",
     "tool.requested",
     "tool.writing",
+    "model.waiting",
     "tool.started",
     "tool.output",
     "tool.completed",
@@ -1185,6 +1339,7 @@ EventType = Literal[
     "approval.needed",
     "approval.resolved",
     "todos.updated",
+    "plan.proposed",
     "file.changed",
     "skill.activated",
     "skill.deactivated",
@@ -1202,9 +1357,11 @@ ChatEvent = Annotated[
     | SessionClosedEvent
     | SessionCompletedEvent
     | ModelSelectedEvent
+    | ModelRoutedEvent
     | ModelOptionsChangedEvent
     | SessionModeChangedEvent
     | SessionChecksChangedEvent
+    | SessionPlanChangedEvent
     | MessageStartedEvent
     | MessageDeltaEvent
     | MessageThinkingDeltaEvent
@@ -1218,6 +1375,7 @@ ChatEvent = Annotated[
     | RunCancelledEvent
     | ToolRequestedEvent
     | ToolWritingEvent
+    | ModelWaitingEvent
     | ToolStartedEvent
     | ToolOutputEvent
     | ToolCompletedEvent
@@ -1225,6 +1383,7 @@ ChatEvent = Annotated[
     | ApprovalNeededEvent
     | ApprovalResolvedEvent
     | TodosUpdatedEvent
+    | PlanProposedEvent
     | FileChangedEvent
     | SkillActivatedEvent
     | SkillDeactivatedEvent
@@ -1276,11 +1435,20 @@ __all__ = [
     "ModelCallStartedEvent",
     "ModelOptionsChangedData",
     "ModelOptionsChangedEvent",
+    "ModelRejection",
+    "ModelRoutedData",
+    "ModelRoutedEvent",
     "ModelSelectedData",
     "ModelSelectedEvent",
+    "ModelWaitingData",
+    "ModelWaitingEvent",
     "PermissionMode",
     "Ping",
+    "PlanProposedData",
+    "PlanProposedEvent",
+    "PlanStep",
     "PromptSectionInfo",
+    "RouteMode",
     "RunCancelledData",
     "RunCancelledEvent",
     "RunCompletedEvent",
@@ -1297,6 +1465,8 @@ __all__ = [
     "SessionCreatedEvent",
     "SessionModeChangedData",
     "SessionModeChangedEvent",
+    "SessionPlanChangedData",
+    "SessionPlanChangedEvent",
     "SessionUpdatedData",
     "SessionUpdatedEvent",
     "SkillActivatedData",

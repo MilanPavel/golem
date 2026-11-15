@@ -7,7 +7,7 @@ import sqlite3
 from dataclasses import dataclass, field
 from typing import Literal, cast
 
-from golem.config import PERMISSION_MODES, PermissionMode
+from golem.config import PERMISSION_MODES, PermissionMode, RouteMode
 from golem.permissions.engine import Allowance
 from golem.store.database import Database
 
@@ -16,6 +16,8 @@ RunStatus = Literal["running", "waiting", "completed", "failed", "cancelled"]
 _ACTIVITY = (
     "SELECT s.session_id, s.model_profile, s.title, s.created_at, s.updated_at, s.closed_at,"
     " s.cwd, s.allowed_tools, s.mcp_servers, s.skills, s.options, s.permission_mode, s.checks,"
+    " s.route,"
+    " s.plan_first,"
     " s.forked_from_session_id, s.origin,"
     " EXISTS (SELECT 1 FROM runs r"
     "  WHERE r.session_id = s.session_id AND r.status = 'running') AS running,"
@@ -48,6 +50,10 @@ class SessionRecord:
     """The session's permission mode override, from ``session.mode.changed``."""
     checks: bool | None = None
     """Whether the session lets golem run checks, from ``session.checks.changed``. None: unasked."""
+    route: RouteMode = "pinned"
+    """The session's route mode, from ``session.created`` and ``session.updated``."""
+    plan_first: bool = False
+    """Whether the session is in plan first, from ``session.plan.changed``."""
     origin: str = "user"
     """Who started the session: ``user``, ``cli``, ``routine:<name>``. Never changes."""
 
@@ -76,10 +82,20 @@ class SessionRecords:
     def __init__(self, database: Database) -> None:
         self._database = database
 
+    async def last_input(self, session_id: str) -> int | None:
+        """The input tokens of the newest chat model call of the session, None when unknown."""
+        row = await self._database.fetch_one(
+            "SELECT input FROM model_calls WHERE session_id = ? AND role = 'chat'"
+            " AND input IS NOT NULL ORDER BY started_at DESC, rowid DESC LIMIT 1",
+            (session_id,),
+        )
+        return None if row is None else int(row["input"])
+
     async def get(self, session_id: str) -> SessionRecord | None:
         row = await self._database.fetch_one(
             "SELECT session_id, model_profile, title, created_at, updated_at, closed_at, cwd,"
-            " allowed_tools, mcp_servers, skills, options, permission_mode, checks,"
+            " allowed_tools, mcp_servers, skills, options, permission_mode, checks, route,"
+            " plan_first,"
             " forked_from_session_id, origin FROM sessions WHERE session_id = ?",
             (session_id,),
         )
@@ -184,6 +200,13 @@ def decode_mode(raw: object) -> PermissionMode | None:
     return next((mode for mode in PERMISSION_MODES if mode == raw), None)
 
 
+def decode_route(raw: object) -> RouteMode:
+    """``sessions.route``: a route mode name, ``pinned`` for anything else."""
+    if raw == "local":
+        return "local"
+    return "auto" if raw == "auto" else "pinned"
+
+
 def encode_allowances(allowed: list[Allowance]) -> str:
     return json.dumps([[tool, subject] for tool, subject in allowed])
 
@@ -204,6 +227,8 @@ def _session(row: sqlite3.Row) -> SessionRecord:
         options=decode_options(row["options"]),
         permission_mode=decode_mode(row["permission_mode"]),
         checks=None if row["checks"] is None else bool(row["checks"]),
+        route=decode_route(row["route"]),
+        plan_first=bool(row["plan_first"]),
         origin=row["origin"] or "user",
     )
 

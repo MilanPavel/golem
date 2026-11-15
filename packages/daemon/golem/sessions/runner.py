@@ -39,8 +39,10 @@ from golem.graphs.adapter import (
     ModelRequested,
     ModelResponded,
     ModelStarted,
+    ModelWaiting,
     PinRead,
     PinSkipped,
+    PlanProposed,
     SkillLoaded,
     TextCompleted,
     TextDelta,
@@ -56,7 +58,8 @@ from golem.graphs.adapter import (
 from golem.graphs.chat import ChatRuntime
 from golem.graphs.tools_node import Answer
 from golem.models.cost import cost_usd
-from golem.models.errors import ModelUnreachable
+from golem.models.errors import ContextFull, ModelUnreachable
+from golem.models.pick import Choice
 from golem.models.router import ModelConfigError, ModelIdentity
 from golem.models.tiers import Tier
 from golem.permissions.engine import Allowance
@@ -83,6 +86,10 @@ from golem_protocol.events import (
     MessageThinkingDeltaData,
     ModelCallCompletedData,
     ModelCallStartedData,
+    ModelRejection,
+    ModelRoutedData,
+    ModelWaitingData,
+    PlanProposedData,
     PromptSectionInfo,
     RunCancelledData,
     RunFailedData,
@@ -129,9 +136,12 @@ class Turn:
     options: dict[str, float | str] = field(default_factory=dict[str, float | str], compare=False)
     permission_mode: PermissionMode | None = None
     checks: bool | None = None
+    plan_first: bool = False
     pins: PinMemory = field(default_factory=PinMemory, compare=False)
     skill: Invocation | None = None
     typed: str | None = None
+    routed: Choice | None = field(default=None, compare=False)
+    """The pick for this turn, None on a ``pinned`` session. ``model_profile`` is its model."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -165,6 +175,7 @@ class Resume:
     options: dict[str, float | str] = field(default_factory=dict[str, float | str], compare=False)
     permission_mode: PermissionMode | None = None
     checks: bool | None = None
+    plan_first: bool = False
     pins: PinMemory = field(default_factory=PinMemory, compare=False)
 
 
@@ -280,6 +291,8 @@ async def run_turn(
         # Emits are shielded: once one is awaited, it lands even if this task is cancelled.
         progress.run_started = True
         await emit("run.started", EmptyEventData())
+        if turn.routed is not None:
+            await emit("model.routed", _routed(runtime, turn.model_profile, turn.routed))
         progress.open = turn.assistant_message_id
         await emit(
             "message.started",
@@ -301,6 +314,7 @@ async def run_turn(
             options=turn.options,
             permission_mode=turn.permission_mode,
             checks=turn.checks,
+            plan_first=turn.plan_first,
             skill_folder=None if skill is None else str(skill.path),
         )
         return await _finish(stream, progress, emit)
@@ -317,6 +331,24 @@ async def run_turn(
         raise
     except Exception as exc:
         return await _failed(turn.run_id, exc, progress, emit)
+
+
+def _routed(runtime: ChatRuntime, profile: str, choice: Choice) -> ModelRoutedData:
+    identity = runtime.router.identity(profile)
+    tier = None
+    if choice.model is not None:
+        tier = choice.model.tier
+    elif runtime.tier_of is not None:
+        tier = runtime.tier_of(profile)
+    return ModelRoutedData(
+        model_profile=profile,
+        provider=identity.provider,
+        model=identity.name,
+        tier=tier or "frontier",
+        reason=choice.reason,
+        detail=choice.detail,
+        rejected=[ModelRejection(ref=r.ref, tier=r.tier, why=r.why) for r in choice.rejected],
+    )
 
 
 async def _until_pulled(runtime: ChatRuntime, profile: str) -> None:
@@ -379,6 +411,7 @@ async def resume_turn(
             options=resume.options,
             permission_mode=resume.permission_mode,
             checks=resume.checks,
+            plan_first=resume.plan_first,
         )
         return await _finish(stream, progress, emit)
     except asyncio.CancelledError:
@@ -425,6 +458,10 @@ async def _failed(
         )
         await emit("run.failed", data)
         return
+    if isinstance(exc, ContextFull):
+        log.warning("run %s failed: needs about %d of %d tokens", run_id, exc.need, exc.window)
+        await emit("run.failed", RunFailedData(message=exc.message, code=exc.code, hint=exc.hint))
+        return
     log.exception("run %s failed", run_id, exc_info=exc)
     message = str(exc).strip() or type(exc).__name__
     await emit("run.failed", RunFailedData(message=message))
@@ -443,6 +480,11 @@ async def _apply(
         _reset_thinking(progress)
         await emit(
             "message.started", MessageStartedData(message_id=fact.message_id, role="assistant")
+        )
+    elif isinstance(fact, ModelWaiting):
+        await emit(
+            "model.waiting",
+            ModelWaitingData(message_id=fact.message_id, waiting=fact.waiting),
         )
     elif isinstance(fact, ModelRequested):
         progress.index += 1
@@ -482,6 +524,8 @@ async def _apply(
                 message_chars=None if fact.message_chars is None else list(fact.message_chars),
                 message_bytes=None if fact.message_bytes is None else list(fact.message_bytes),
                 cleared_ids=list(fact.cleared_ids),
+                summary_chars=fact.summary_chars,
+                estimated_tokens=fact.estimated_tokens,
             ),
         )
     elif isinstance(fact, ContextChanged):
@@ -589,6 +633,18 @@ async def _apply(
         await emit(
             "todos.updated",
             TodosUpdatedData.model_validate({"call_id": fact.call_id, "todos": list(fact.todos)}),
+        )
+    elif isinstance(fact, PlanProposed):
+        await emit(
+            "plan.proposed",
+            PlanProposedData.model_validate(
+                {
+                    "plan_id": fact.plan_id,
+                    "call_id": fact.call_id,
+                    "title": fact.title,
+                    "steps": list(fact.steps),
+                }
+            ),
         )
     elif isinstance(fact, FileChanged):
         await _record_change(fact, progress, emit)

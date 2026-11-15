@@ -52,6 +52,12 @@ export type Model2 = string | null;
 export type Name2 = string;
 export type Preview2 = string;
 export type Recorded2 = boolean;
+export type Detail = string;
+export type Reason = 'pinned' | 'privacy' | 'fit' | 'budget' | 'cheapest' | 'escalated' | 'fallback' | 'user';
+export type Ref = string;
+export type Tier = 'local' | 'budget' | 'frontier';
+export type Why = string;
+export type Rejected = ModelRejection[];
 export type Start2 = string;
 export type Status2 = 'ok' | 'failed' | 'cancelled' | 'denied' | 'running';
 export type Runs = TraceRunSpan[];
@@ -72,6 +78,8 @@ export interface TraceGetResult {
 /**
  * A run, with its model calls in order.
  *
+ * ``route`` is the pick for the run, null for a run of a ``pinned`` session.
+ *
  * This interface was referenced by `TraceGetResult`'s JSON-Schema
  * via the `definition` "TraceRunSpan".
  */
@@ -87,6 +95,7 @@ export interface TraceRunSpan {
   name: Name2;
   preview?: Preview2;
   recorded?: Recorded2;
+  route?: TraceRoute | null;
   start: Start2;
   status: Status2;
   tokens?: TraceTokens | null;
@@ -170,4 +179,29 @@ export interface TraceTokens {
   cache_write?: CacheWrite;
   input?: Input;
   output?: Output;
+}
+/**
+ * Why a run used the model it did: the pick of a session that is not ``pinned``.
+ *
+ * ``reason`` and ``detail`` are those of ``model.routed``, and ``rejected`` the
+ * candidates the pick dropped.
+ *
+ * This interface was referenced by `TraceGetResult`'s JSON-Schema
+ * via the `definition` "TraceRoute".
+ */
+export interface TraceRoute {
+  detail: Detail;
+  reason: Reason;
+  rejected?: Rejected;
+}
+/**
+ * A candidate the pick left out, and why in plain words.
+ *
+ * This interface was referenced by `TraceGetResult`'s JSON-Schema
+ * via the `definition` "ModelRejection".
+ */
+export interface ModelRejection {
+  ref: Ref;
+  tier: Tier;
+  why: Why;
 }

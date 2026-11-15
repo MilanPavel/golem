@@ -52,7 +52,7 @@ export function CodeEditor({
   label: string;
   language?: Language;
   readOnly?: boolean;
-  /** Replaces the default height (`h-96`). */
+  /** Replaces the default sizing: fills the free height of its parent, at least `min-h-72`. */
   className?: string;
 }) {
   const tokens = useTokens(value, language);
@@ -70,7 +70,7 @@ export function CodeEditor({
   }
 
   return (
-    <div className={cn("code-editor flex h-96 overflow-hidden rounded-md border border-line-strong bg-surface focus-within:border-clay", className)}>
+    <div className={cn("code-editor flex min-h-72 flex-1 overflow-hidden rounded-md border border-line-strong bg-surface focus-within:border-clay", className)}>
       <div
         ref={gutter}
         aria-hidden="true"

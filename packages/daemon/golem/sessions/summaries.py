@@ -47,6 +47,8 @@ def summarize(activity: SessionActivity) -> SessionSummary:
         cwd=session.cwd,
         forked_from=session.forked_from,
         origin=session.origin,
+        route=session.route,
+        plan_first=session.plan_first,
     )
 
 

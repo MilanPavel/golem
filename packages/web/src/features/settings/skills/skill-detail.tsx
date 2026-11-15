@@ -194,7 +194,7 @@ export function SkillDetail({
   };
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
       {onBack === null ? null : (
         <div>
           <Button size="sm" onClick={onBack}>
@@ -257,7 +257,7 @@ export function SkillDetail({
           {error}
         </p>
       )}
-      <Tabs value={tab} onValueChange={(next) => onTab(next as SkillTab)} className="flex flex-col gap-4">
+      <Tabs value={tab} onValueChange={(next) => onTab(next as SkillTab)} className="flex min-h-0 flex-1 flex-col gap-4">
         <TabsList aria-label={`${skill.name} details`}>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="skill-md">SKILL.md</TabsTrigger>
@@ -265,7 +265,7 @@ export function SkillDetail({
         <TabsContent value="overview">
           <SkillOverview skill={skill} />
         </TabsContent>
-        <TabsContent value="skill-md">
+        <TabsContent value="skill-md" className="flex min-h-0 flex-1 flex-col">
           <SkillEditor skill={skill} cwd={cwd} onCopy={() => void copy()} />
         </TabsContent>
       </Tabs>

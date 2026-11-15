@@ -1,0 +1,73 @@
+{
+  "additionalProperties": false,
+  "description": "What ``changes.revert`` takes back. Each kind needs its own field and no other.\n\n``change`` needs ``change_id``, ``file`` needs ``path``, ``hunk`` needs ``path`` and\n``hunk`` (0-based, of the file's net diff), and ``run`` needs ``run_id``.",
+  "properties": {
+    "change_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Change Id"
+    },
+    "hunk": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Hunk"
+    },
+    "kind": {
+      "enum": [
+        "change",
+        "file",
+        "hunk",
+        "run"
+      ],
+      "title": "Kind",
+      "type": "string"
+    },
+    "path": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Path"
+    },
+    "run_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Run Id"
+    }
+  },
+  "required": [
+    "kind"
+  ],
+  "title": "RevertTarget",
+  "type": "object"
+}

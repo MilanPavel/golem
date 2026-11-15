@@ -26,7 +26,7 @@ test("three tool steps and a final answer are one turn, with one footer", () => 
   assert.ok(golem?.kind === "golem");
   assert.equal(golem.steps.length, 4);
   assert.equal(golem.id, "a1");
-  assert.deepEqual(turnFooter(golem.steps), { durationMs: 4000, tools: 4 });
+  assert.deepEqual(turnFooter(golem.steps), { durationMs: 4000, tools: 4, model: null, tier: null, tokens: null, costUsd: null });
 });
 
 test("two user turns are two golem turns", () => {
