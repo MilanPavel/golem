@@ -20,7 +20,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from collections.abc import AsyncGenerator, Awaitable, Callable, Sequence
+from collections.abc import AsyncGenerator, Awaitable, Callable, Mapping, Sequence
 from contextlib import aclosing
 from dataclasses import dataclass, field
 from typing import Literal
@@ -210,6 +210,9 @@ class _Progress:
     first_at: float | None = None
     ran_window: int | None = None
     text_tool_calls: Literal["recovered", "unread"] | None = None
+    timings: Mapping[str, int] = field(default_factory=dict[str, int])
+    """The model server's own numbers for the call, from ``model.response``."""
+    note_speed: Callable[..., object] | None = None
     translate: Translator = field(default_factory=Translator)
     """Turns stream parts into facts. It holds text that may be half of a ``<think>`` tag."""
     thinking: list[str] = field(default_factory=list[str])
@@ -241,6 +244,7 @@ async def run_turn(
         changes=runtime.changes,
         session_id=turn.session_id,
         run_id=turn.run_id,
+        note_speed=runtime.note_speed,
     )
 
     async def emit(kind: EventType, data: BaseModel) -> None:
@@ -340,6 +344,7 @@ async def resume_turn(
         changes=runtime.changes,
         session_id=resume.session_id,
         run_id=resume.run_id,
+        note_speed=runtime.note_speed,
     )
 
     async def emit(kind: EventType, data: BaseModel) -> None:
@@ -442,6 +447,7 @@ async def _apply(
         progress.first_at = None
         progress.ran_window = None
         progress.text_tool_calls = None
+        progress.timings = {}
         model = progress.model
         if fact.profile is not None and progress.identify is not None:
             model = progress.identify(fact.profile)
@@ -476,6 +482,7 @@ async def _apply(
     elif isinstance(fact, ModelResponded):
         progress.ran_window = fact.context_window
         progress.text_tool_calls = fact.text_tool_calls
+        progress.timings = fact.timings
     elif isinstance(fact, ThinkingDelta) and progress.open is not None:
         if progress.think_at is None:
             progress.think_at = time.monotonic()
@@ -681,6 +688,12 @@ async def _end_call(
             price = CallPrice(
                 input=found.input, output=found.output, cached_input=found.cached_input
             )
+    timings: Mapping[str, int] = {} if failed else progress.timings
+    if timings and model is not None and progress.note_speed is not None:
+        try:
+            progress.note_speed(model.profile, timings)
+        except Exception:
+            log.debug("noting the speed of %s failed", model.profile, exc_info=True)
     await emit(
         "model.call.completed",
         ModelCallCompletedData(
@@ -694,6 +707,9 @@ async def _end_call(
             text_tool_calls=None if failed else progress.text_tool_calls,
             cost_usd=cost,
             price=price,
+            load_ms=timings.get("load_ms"),
+            prompt_ms=timings.get("prompt_ms"),
+            reply_ms=timings.get("reply_ms"),
         ),
     )
 

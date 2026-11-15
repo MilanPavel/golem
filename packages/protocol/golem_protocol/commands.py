@@ -523,10 +523,16 @@ class TraceModelSpan(TraceSpan):
 
     ``cost_usd`` is what the call cost, as its ``model.call.completed`` recorded
     it. Null when the price was not known or the call has no token counts.
+
+    ``load_ms``, ``prompt_ms`` and ``reply_ms`` are from the model server's own clock.
+    Ollama only.
     """
 
     children: list[TraceToolSpan] = Field(default_factory=list[TraceToolSpan])
     cost_usd: float | None = Field(default=None, ge=0)
+    load_ms: int | None = Field(default=None, ge=0)
+    prompt_ms: int | None = Field(default=None, ge=0)
+    reply_ms: int | None = Field(default=None, ge=0)
     context_window: int | None = Field(default=None, ge=1)
     num_ctx: int | None = Field(default=None, ge=1)
     context_window_estimated: bool = False
@@ -754,6 +760,19 @@ class ModelPriceInfo(BaseModel):
 ModelCategory = Literal["general", "coding", "reasoning", "vision", "fast", "long-context"]
 
 
+class ModelSpeedInfo(BaseModel):
+    """Typical speed of a local model: the median of its recent calls.
+
+    From the model server's own clock. ``samples`` is how many calls it rests on.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    prompt_tps: float | None = Field(default=None, ge=0)
+    reply_tps: float | None = Field(default=None, ge=0)
+    samples: int = Field(ge=0)
+
+
 class ListedModel(BaseModel):
     """One model, by ``provider/model`` ref.
 
@@ -774,7 +793,7 @@ class ListedModel(BaseModel):
     ``tier`` is ``local`` for Ollama, ``budget`` for a hosted model whose blended price is at
     or below ``[routing] budget_max_price``, and ``frontier`` otherwise.
     ``stale`` means a cached list was shown because the provider did not
-    answer in time.
+    answer in time. ``speed`` is set for a local model golem has timed.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -798,6 +817,7 @@ class ListedModel(BaseModel):
     recommended_for: list[ModelCategory] = Field(default_factory=list[ModelCategory])
     think_values: list[str] = Field(default_factory=list[str])
     tier: Literal["local", "budget", "frontier"]
+    speed: ModelSpeedInfo | None = None
 
 
 class ListedProvider(BaseModel):
@@ -2724,6 +2744,7 @@ __all__ = [
     "ModelPullResult",
     "ModelSetDefaultParams",
     "ModelSetDefaultResult",
+    "ModelSpeedInfo",
     "NotifyTestParams",
     "NotifyTestResult",
     "OllamaInstallCancelParams",

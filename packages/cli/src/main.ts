@@ -17,6 +17,7 @@ import type { DaemonStatus } from "../../protocol/gen/daemon-status.ts";
 
 import { entryAvailable, entryInputs, entryParams, findEntry, inputDefault, inputError } from "@golem/view";
 
+import { type AskArgs, parseAskArgs, parseOpenArgs, runAsk, sessionPath } from "./ask.ts";
 import { awaitRestart, formatRestarted } from "./await-restart.ts";
 import { type DaemonCommand, locateDaemon } from "./daemon-locator.ts";
 import { explainDaemonDown, isDaemonDown } from "./daemon-down.ts";
@@ -46,7 +47,7 @@ import { parseSkillsNew, runSkillsEdit, runSkillsNew } from "./skills-run.ts";
 import { readChoice } from "./read-choice.ts";
 import { readSecret } from "./read-secret.ts";
 import { type Gate, gateService, type SessionDaemon } from "./service-gate.ts";
-import { parseWebArgs, parseWebJobArgs, type WebArgs } from "./web.ts";
+import { DEFAULT_WEB_PORT, parseWebArgs, parseWebJobArgs, type WebArgs } from "./web.ts";
 import { DEFAULT_WEB_DEPS, launchDeps, runWeb, runWebLogout } from "./web-command.ts";
 import { noBrowser, routeDefault, TUI_HINT } from "./dispatch.ts";
 import { findLiveQuietly, type WebDeps } from "./web-live.ts";
@@ -79,6 +80,7 @@ const USAGE =
   "       golem auth set <provider> [--no-check] | golem auth remove <provider> | golem auth list | golem models [--refresh]\n" +
   "       golem mcp add <name> -- <command…> [--token-env VAR] | golem mcp add <name> --url <url> [--token] [--env K=V] [--header K=V] [--cwd D] [--on-demand] [--project] [--timeout S] [--approval allow] | golem mcp add --catalog <id> [--input <id>=<value>] | golem mcp remove <name> | golem mcp export [--format claude|vscode] [--scope user|project]\n" +
   "       golem mcp list [--json] | show <name> [--json] | test <name> | test --catalog <id> | edit <name> [--project] | import [--from <app>|<file>] [--all] | logs <name> [-f] | enable <name> [--on-demand] | disable <name> | restart <name> | login <name> | logout <name> | tools <name> [--hide <glob>] [--show <glob>]\n" +
+  "       golem ask \"<prompt>\" [--folder <dir>] [--model <profile>] [--skill <name>] [--detach] | golem open <id> [--web]\n" +
   "       golem config show [--resolved] | golem config edit [--project] | golem skills [list] | golem skills check <path>\n" +
   "       golem skills new <name> [--project] [--description \"…\"] | golem skills edit <name>\n" +
   "       golem web [--port N] [--no-open] [--json] (the same as golem) | golem web serve [--port N]\n" +
@@ -146,6 +148,12 @@ async function run(args: string[]): Promise<number> {
     process.stderr.write(`${USAGE}\n`);
     return 1;
   }
+  if (command === "ask") {
+    return runAskCommand(rest);
+  }
+  if (command === "open") {
+    return runOpen(rest);
+  }
   if (command === "web" && rest.length === 1 && rest[0] === "logout") {
     return runWebLogout();
   }
@@ -179,6 +187,46 @@ const SKILLS_DEPS = {
     process.stderr.write(`${line}\n`);
   },
 };
+
+/** `golem ask`: a session with origin `cli`. It waits for the answer, or with `--detach` prints the id. */
+async function runAskCommand(given: string[]): Promise<number> {
+  const parsed = parseAskArgs(given);
+  if (parsed.kind === "error") {
+    process.stderr.write(`${parsed.message}\n`);
+    return 1;
+  }
+  const args: AskArgs = parsed.args;
+  const gate = await daemonDown();
+  if (gate !== null) {
+    process.stderr.write(`${gate}\n`);
+    return 1;
+  }
+  return runWithClient((client) =>
+    runAsk(client, args, { out: (text) => process.stdout.write(text), err: (text) => process.stderr.write(text) }),
+  );
+}
+
+/** `golem open <id>`: the terminal chat on that session, or with `--web` the page at that session. */
+async function runOpen(given: string[]): Promise<number> {
+  const parsed = parseOpenArgs(given);
+  if (parsed === null) {
+    process.stderr.write(`${USAGE}\n`);
+    return 1;
+  }
+  // With a daemon up, an unknown id is said here, not inside the chat screen.
+  if ((await daemonDown()) === null) {
+    const known = await runWithClient(async (client) => {
+      await client.inspectSession(parsed.sessionId);
+      return 0;
+    });
+    if (known !== 0) return known;
+  }
+  if (parsed.web) {
+    const args: WebArgs = { port: DEFAULT_WEB_PORT, portGiven: false, open: true, json: false, serve: false, path: sessionPath(parsed.sessionId) };
+    return openWeb(noBrowser(process.env) ? { ...args, open: false } : args);
+  }
+  return openTui(parsed.sessionId);
+}
 
 /** Runs `body` with a client, says what went wrong, and always closes the client. */
 async function runWithClient(body: (client: ReturnType<typeof connectOnce>) => Promise<number>): Promise<number> {
@@ -869,7 +917,7 @@ async function captureLocated(command: string, args: string[]): Promise<string> 
  * The chat screen. With no service it opens on the setup window, which asks
  * whether golem may start one. A daemon it starts for this terminal stops when golem quits.
  */
-async function openTui(): Promise<number> {
+async function openTui(sessionId?: string): Promise<number> {
   const owned: { session: SessionDaemon | null } = { session: null };
   const daemon = async (...args: string[]): Promise<void> => {
     const located = locate();
@@ -878,6 +926,7 @@ async function openTui(): Promise<number> {
   try {
     const tui = await import("@golem/tui");
     await tui.runTui({
+      ...(sessionId === undefined ? {} : { sessionId }),
       service: {
         startError: readStartError,
         installed: () => existsSync(LAUNCH_AGENT),

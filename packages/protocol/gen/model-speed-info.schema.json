@@ -1,0 +1,42 @@
+{
+  "additionalProperties": false,
+  "description": "Typical speed of a local model: the median of its recent calls.\n\nFrom the model server's own clock. ``samples`` is how many calls it rests on.",
+  "properties": {
+    "prompt_tps": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Prompt Tps"
+    },
+    "reply_tps": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reply Tps"
+    },
+    "samples": {
+      "minimum": 0,
+      "title": "Samples",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "samples"
+  ],
+  "title": "ModelSpeedInfo",
+  "type": "object"
+}

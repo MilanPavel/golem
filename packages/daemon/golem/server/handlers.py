@@ -183,6 +183,7 @@ from golem_protocol.commands import (
     ModelSetDefaultParams,
     ModelSetDefaultResult,
     ModelSetup,
+    ModelSpeedInfo,
     NotifyTestParams,
     NotifyTestResult,
     OllamaInstallCancelParams,
@@ -792,6 +793,13 @@ async def _model_list(ctx: RequestContext, params: ModelListParams) -> ModelList
                 recommended_for=cast(list[ModelCategory], list(model.recommended_for)),
                 think_values=list(model.think_values),
                 tier=model.tier,
+                speed=None
+                if model.speed is None
+                else ModelSpeedInfo(
+                    prompt_tps=model.speed.prompt_tps,
+                    reply_tps=model.speed.reply_tps,
+                    samples=model.speed.samples,
+                ),
             )
             for model in listing.models
         ],

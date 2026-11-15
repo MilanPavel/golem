@@ -88,6 +88,9 @@ class ModelResponded:
     message_id: str
     context_window: int | None = None
     text_tool_calls: Literal["recovered", "unread"] | None = None
+    timings: Mapping[str, int] = field(default_factory=dict[str, int])
+    """The model server's own numbers: ``load_ms``, ``prompt_ms``, ``reply_ms``,
+    ``prompt_tokens``, ``reply_tokens``. Each may be absent. Ollama only."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -643,6 +646,17 @@ def _text_calls(value: object) -> Literal["recovered", "unread"] | None:
     return "unread" if value == "unread" else None
 
 
+def _timings(value: object) -> dict[str, int]:
+    if not isinstance(value, dict):
+        return {}
+    raw = cast(dict[str, object], value)
+    return {
+        key: number
+        for key in ("load_ms", "prompt_ms", "reply_ms", "prompt_tokens", "reply_tokens")
+        if isinstance(number := raw.get(key), int) and not isinstance(number, bool) and number >= 0
+    }
+
+
 def _custom(data: object) -> Fact | None:
     if not isinstance(data, dict):
         return None
@@ -660,6 +674,7 @@ def _custom(data: object) -> Fact | None:
             message_id,
             _positive(item.get("context_window")),
             _text_calls(text_calls),
+            _timings(item.get("timings")),
         )
     if kind in (PIN_READ_KIND, PIN_SKIPPED_KIND):
         return _pin(kind, item)

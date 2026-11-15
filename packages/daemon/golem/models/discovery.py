@@ -56,6 +56,7 @@ from golem.models.router import (
     ModelRouter,
     Provider,
 )
+from golem.models.speed import Speed, SpeedBook
 from golem.models.tiers import Tier, blended, tier_of
 
 log = logging.getLogger(__name__)
@@ -119,6 +120,8 @@ class ListedModel:
     think_values: tuple[str, ...] = ()
     # Set where the listing is built, once the price is settled.
     tier: Tier = "frontier"
+    # The typical speed of an installed local model, filled from the speed book.
+    speed: Speed | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -247,7 +250,10 @@ class ModelDiscovery:
         fetch_prices: bool = True,
         pulling: Callable[[], dict[str, float | None]] | None = None,
         ollama_installed: Callable[[], bool] | None = None,
+        speeds: SpeedBook | None = None,
     ) -> None:
+        # Set by the server too, so a discovery made elsewhere shares its book.
+        self.speeds = speeds
         self._fetch_prices_enabled = fetch_prices
         self._ollama_installed = ollama_installed or ollama.installed
         self.pulling: Callable[[], dict[str, float | None]] = pulling or dict
@@ -469,6 +475,7 @@ class ModelDiscovery:
             self._merge(providers, profiles, default, keys, results, states, show_all),
             self.pulling(),
         )
+        models = self._with_speeds(models)
         self._last = tuple(models)
         self._ctx = {m.ref: m.ctx for m in models if m.ctx is not None}
         for result in results.values():
@@ -608,6 +615,18 @@ class ModelDiscovery:
                 ),
             )
         return sorted(by_ref.values(), key=_order)
+
+    def _with_speeds(self, models: list[ListedModel]) -> list[ListedModel]:
+        """Each installed local model with its typical speed, when the book has one."""
+        speeds = self.speeds
+        if speeds is None:
+            return models
+        return [
+            replace(model, speed=speeds.speed(model.ref))
+            if model.tier == "local" and model.source == "installed"
+            else model
+            for model in models
+        ]
 
     def _offered(self, name: str, live: list[_Found], *, show_all: bool) -> list[_Found]:
         """The live models of a hosted provider that golem puts in the picker."""

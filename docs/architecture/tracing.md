@@ -180,12 +180,14 @@ A model call has no id of its own. Each call makes exactly one assistant message
 | Event | Fields |
 |---|---|
 | `model.call.started` | `message_id`, `index` (1-based within the run), `profile`, `provider`, `model`, `system_prompt_sha`, `tools_sha`, `message_ids`, `context_window`, `num_ctx`, `window_estimated`, `system_sections`, `system_chars`, `system_bytes`, `tools_chars`, `tools_bytes`, `message_chars`, `message_bytes` |
-| `model.call.completed` | `message_id`, `usage` (`input`, `output`, `cache_read`, `cache_write`), `stop_reason`, `first_token_ms`, `latency_ms`, `failed`, `context_window`, `text_tool_calls`, `cost_usd`, `price` |
+| `model.call.completed` | `message_id`, `usage` (`input`, `output`, `cache_read`, `cache_write`), `stop_reason`, `first_token_ms`, `latency_ms`, `failed`, `context_window`, `text_tool_calls`, `cost_usd`, `price`, `load_ms`, `prompt_ms`, `reply_ms` |
 | `tool.completed`, `tool.failed` | `duration_ms`, as well as what they had before |
 
 Every new field is optional, so older events stay valid. A provider that reports no usage leaves `usage` empty, and one that reports only some counts leaves the rest `null`. Neither is ever zero. `model.call.completed` comes before the call's `tool.requested` events.
 
 `model.call.started` names the model of that call: the profile the call reads from the graph state, not the one the run began with, so a run that changes model shows the change. `model.call.completed` carries what the call cost. `cost_usd` is worked out when the call ends from `usage` and the price golem knows at that moment, and `price` (`input`, `output`, `cached_input`, USD per million tokens) is that price, so a later price change never rewrites history. `input` counts the whole input, cached tokens included, and the cached part is charged at `cached_input` (at `input` when the price has none). A local model costs `0`. A failed call, a call with no `usage`, and a model with no known price have no `cost_usd` and no `price`. A model span in the trace takes `cost_usd` from its completed event.
+
+`load_ms`, `prompt_ms` and `reply_ms` are how long the model server took to load the model, to read the prompt, and to write the reply. They come from the server's own clock: `call_model` reads Ollama's `load_duration`, `prompt_eval_duration` and `eval_duration` (nanoseconds) from the reply's `response_metadata`, rounds them to milliseconds, and sends them in the `model.response` item with the token counts `prompt_eval_count` and `eval_count`. A hosted model gives no such split, so the three fields are `null`. golem times nothing itself for them. A model span takes the three from its completed event. The web trace shows the exact reply speed (`reply tokens / reply_ms`, without the `≈`), `read 35.0K in 3m 12s` for the prompt, and `loaded in 8s` when the load took over 500 ms. The runner also hands the five numbers to the speed book ([models](models.md)).
 
 ### What is kept by hash
 

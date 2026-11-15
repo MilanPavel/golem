@@ -30,6 +30,7 @@ from golem.models.keys import ProviderKeys
 from golem.models.ollama import LocalServer, LocalServers, ServerState
 from golem.models.pulls import PullManager
 from golem.models.router import ModelConfigError, ModelRouter
+from golem.models.speed import SpeedBook
 from golem.models.tiers import Tier
 from golem.models.window import resolve_window
 from golem.models.window_plans import WindowPlans
@@ -211,6 +212,21 @@ class DaemonApp:
                 models = self._discovery(router)
             if isinstance(self._titles, ModelTitles):
                 self._titles.bind(models.tier_of_ref, models.budget_refs)
+            speeds = SpeedBook(self.paths.cache_dir)
+            models.speeds = speeds
+
+            def note_speed(profile: str, timings: Mapping[str, int]) -> None:
+                resolved = router.resolve(profile)
+                if resolved.provider.kind != "ollama":
+                    return
+                speeds.note(
+                    resolved.ref,
+                    prompt_tokens=timings.get("prompt_tokens"),
+                    prompt_ms=timings.get("prompt_ms"),
+                    reply_tokens=timings.get("reply_tokens"),
+                    reply_ms=timings.get("reply_ms"),
+                    load_ms=timings.get("load_ms"),
+                )
 
             router.plans = WindowPlans(
                 settings=router.context_settings,
@@ -305,13 +321,15 @@ class DaemonApp:
                 models.pulling = pulls.pulling
                 models.local = local
                 self.state.models = models
-                # Nothing calls it yet. The speed book of #874 plugs in as ``speed_of``.
+                chat.note_speed = note_speed
+                # Nothing calls it yet. The routing rules read it.
                 self.state.facts = ListedFacts(
                     models,
                     router,
                     lambda profile, overrides: resolve_window(
                         router, profile, models, overrides=overrides
                     ),
+                    speeds.speed,
                 )
                 self.state.pulls = pulls
                 self.state.installer = OllamaInstaller(broadcast=self._broadcast)
@@ -454,6 +472,8 @@ class DaemonApp:
                 await writer.wait_closed()
 
     async def _shutdown(self) -> None:
+        if self.state.models is not None and self.state.models.speeds is not None:
+            self.state.models.speeds.save()
         self.state.state = "draining"
         self._draining = True
         if self._server is not None:
