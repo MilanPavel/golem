@@ -1533,10 +1533,12 @@ public enum ContextChangedDataAction: String, Codable {
 }
 
 /// What golem sends of the history changed, before the model call that follows.
+///
+/// ``run_id`` is null when ``session.compact`` made the change: no run owns it.
 // MARK: - ContextChangedEvent
 public struct ContextChangedEvent: Codable {
     public let data: ContextChangedEventData
-    public let runID: String
+    public let runID: String?
     public let seq: Int
     public let sessionID: String
     public let ts: String
@@ -1551,7 +1553,7 @@ public struct ContextChangedEvent: Codable {
         case type = "type"
     }
 
-    public init(data: ContextChangedEventData, runID: String, seq: Int, sessionID: String, ts: String, type: ContextChangedEventType) {
+    public init(data: ContextChangedEventData, runID: String?, seq: Int, sessionID: String, ts: String, type: ContextChangedEventType) {
         self.data = data
         self.runID = runID
         self.seq = seq
@@ -9695,6 +9697,8 @@ public enum RPCNotificationMethod: String, Codable {
 ///
 /// What golem sends of the history changed, before the model call that follows.
 ///
+/// ``run_id`` is null when ``session.compact`` made the change: no run owns it.
+///
 /// A graph run is in progress for this session.
 ///
 /// The graph run finished and the checkpoint is current.
@@ -11346,6 +11350,69 @@ public struct SessionClosedEventData: Codable {
 
 public enum SessionClosedEventType: String, Codable {
     case sessionClosed = "session.closed"
+}
+
+/// ``session.compact``. Shrink what the next model call sends, between turns.
+///
+/// ``clear`` sends all but the newest tool results as one line each. ``summarise`` replaces
+/// the old turns with a summary written by the ``summarise`` role's model, and ``focus``,
+/// when
+/// given, says what the summary must keep. Nothing is deleted from the session: only the
+/// context view changes. The call can take a minute with a local model, and other requests
+/// go on meanwhile. Error ``-32004`` when the session has a run or is compacting.
+// MARK: - SessionCompactParams
+public struct SessionCompactParams: Codable {
+    public let action: SessionCompactParamsAction
+    public let focus: String?
+    public let sessionID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case action = "action"
+        case focus = "focus"
+        case sessionID = "session_id"
+    }
+
+    public init(action: SessionCompactParamsAction, focus: String?, sessionID: String) {
+        self.action = action
+        self.focus = focus
+        self.sessionID = sessionID
+    }
+}
+
+public enum SessionCompactParamsAction: String, Codable {
+    case clear = "clear"
+    case summarise = "summarise"
+}
+
+/// What the compaction did.
+///
+/// ``count`` is the tool results cleared, or the turns summarised, and 0 when there was
+/// nothing to do (``before_tokens`` and ``after_tokens`` are then equal, and no event is
+/// stored). ``window`` is the tokens the history may fill (the model's window less the
+/// reply reserve), None when it is unknown. ``model`` is the model that wrote a summary.
+// MARK: - SessionCompactResult
+public struct SessionCompactResult: Codable {
+    public let afterTokens: Int
+    public let beforeTokens: Int
+    public let count: Int
+    public let model: String?
+    public let window: Int?
+
+    public enum CodingKeys: String, CodingKey {
+        case afterTokens = "after_tokens"
+        case beforeTokens = "before_tokens"
+        case count = "count"
+        case model = "model"
+        case window = "window"
+    }
+
+    public init(afterTokens: Int, beforeTokens: Int, count: Int, model: String?, window: Int?) {
+        self.afterTokens = afterTokens
+        self.beforeTokens = beforeTokens
+        self.count = count
+        self.model = model
+        self.window = window
+    }
 }
 
 /// A run in a session that no user typed into has ended.

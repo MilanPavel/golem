@@ -326,6 +326,27 @@ test("/todos toggles the drawer", async () => {
   expect(screen.queryByRole("complementary", { name: "Details" })).toBeTruthy();
 });
 
+test("/compact summarises through the client and prints one line, and /context clear clears", async () => {
+  const { fake, user } = await session();
+  fake.raw.compactSession.mockResolvedValueOnce({ before_tokens: 5880, after_tokens: 2170, count: 9, window: 7000, model: "qwen3:27b" });
+  await say(user, "/compact the file names");
+  expect(fake.raw.compactSession).toHaveBeenCalledWith("a", "summarise", "the file names");
+  expect(dockNotice()).toMatch(/^summarised 9 earlier turns with qwen3:27b \u00b7 ctx 84% \u2192 31% \u00b7 /);
+  fake.raw.compactSession.mockResolvedValueOnce({ before_tokens: 4970, after_tokens: 2660, count: 12, window: 7000 });
+  await say(user, "/context clear");
+  expect(fake.raw.compactSession).toHaveBeenLastCalledWith("a", "clear", undefined);
+  expect(dockNotice()).toBe("cleared 12 old tool results \u00b7 ctx 71% \u2192 38%");
+  await say(user, "/compact");
+  expect(dockNotice()).toBe("nothing to compact yet");
+});
+
+test("/compact reports a busy session", async () => {
+  const { fake, user } = await session();
+  fake.raw.compactSession.mockRejectedValueOnce(rpcError(-32004, "session is busy"));
+  await say(user, "/compact");
+  expect(alertText()).toBe("session is busy");
+});
+
 test("/model opens the model dialog, and focus returns to the composer", async () => {
   const { user } = await session();
   await say(user, "/model");

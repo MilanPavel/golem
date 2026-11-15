@@ -71,6 +71,8 @@ export type { ModelOptionsSetResult } from "../../protocol/gen/model-options-set
 export type { PermissionsSetModeParams } from "../../protocol/gen/permissions-set-mode-params.ts";
 export type { PermissionsSetModeResult } from "../../protocol/gen/permissions-set-mode-result.ts";
 export type { SessionSetModeParams } from "../../protocol/gen/session-set-mode-params.ts";
+export type { SessionCompactParams } from "../../protocol/gen/session-compact-params.ts";
+export type { SessionCompactResult } from "../../protocol/gen/session-compact-result.ts";
 export type { SessionSetModeResult } from "../../protocol/gen/session-set-mode-result.ts";
 export type { SessionSetOptionsResult } from "../../protocol/gen/session-set-options-result.ts";
 export type { McpToggleResult } from "../../protocol/gen/mcp-toggle-result.ts";

@@ -17,7 +17,7 @@ from collections.abc import AsyncGenerator, Callable, Coroutine, Iterable, Mappi
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import cast
+from typing import Literal, cast
 
 from langchain_core.messages import BaseMessage
 
@@ -57,10 +57,11 @@ from golem.skills.registry import SkillRegistry
 from golem.store.blobs import BlobStore
 from golem.store.records import RunRecords, SessionActivity, SessionRecords
 from golem.tools.registry import ToolError, ToolScope
-from golem_protocol.commands import TraceRunSpan, TraceSpanResult
+from golem_protocol.commands import SessionCompactResult, TraceRunSpan, TraceSpanResult
 from golem_protocol.events import (
     ApprovalDecision,
     ChatEvent,
+    ContextChangedData,
     EmptyEventData,
     FileChangedData,
     ForkedFrom,
@@ -186,6 +187,8 @@ class _LiveSession:
     titling: bool = False
     closed: bool = False
     task: asyncio.Task[None] | None = None
+    compacting: bool = False
+    """A compaction is writing the session's context view. No run may start."""
 
 
 def _schemas(text: str | None) -> list[dict[str, object]] | None:
@@ -380,6 +383,62 @@ class SessionManager:
                 model_name=identity.name,
                 messages=[PlainMessage("system", system), *messages] if system else messages,
             )
+
+    async def compact(
+        self, session_id: str, action: Literal["clear", "summarise"], focus: str | None
+    ) -> SessionCompactResult:
+        """Clear old tool results or summarise old turns of an idle session.
+
+        Only the context view changes: the checkpoint keeps every message, and the next
+        model call sends the smaller view. Stores ``context.changed`` (no run) unless there was
+        nothing to do. The summary call can take a minute, and the session stays busy meanwhile.
+
+        Raises :class:`SessionNotFoundError`, :class:`SchemaMismatchError`,
+        :class:`SessionBusyError` when a run is open, waits for an approval, or a compaction
+        is running, and whatever the summary call raises.
+        """
+        async with self._lock:
+            session = await self._resolve(session_id)
+            if (session.task is not None and not session.task.done()) or session.compacting:
+                raise SessionBusyError(session_id)
+            if await self._run_records.waiting(session_id) is not None:
+                raise SessionBusyError(session_id)
+            session.compacting = True
+        try:
+            system = await self._runtime.system_prompt(
+                session_id, session.cwd, session.skills, sorted(session.mcp_servers)
+            )
+            schemas = self._runtime.tools.scoped(_scope(session)).schemas()
+            done = await self._runtime.compact(
+                session_id,
+                action,
+                profile=session.model_profile,
+                options=dict(session.options),
+                focus=focus,
+                system_chars=len(system),
+                tools_chars=len(json.dumps(schemas, sort_keys=True, separators=(",", ":"))),
+            )
+            if done.view is not None:
+                await self._events.emit(
+                    session_id,
+                    None,
+                    "context.changed",
+                    ContextChangedData(
+                        action=done.action,
+                        before_tokens=done.before_tokens,
+                        after_tokens=done.after_tokens,
+                        count=done.messages,
+                    ),
+                )
+        finally:
+            session.compacting = False
+        return SessionCompactResult(
+            before_tokens=done.before_tokens,
+            after_tokens=done.after_tokens,
+            count=done.count,
+            window=done.window,
+            model=done.model,
+        )
 
     async def trace(self, session_id: str) -> tuple[str | None, list[TraceRunSpan]]:
         """The session's title and its runs as a tree of spans. Does not start a run.
@@ -749,6 +808,8 @@ class SessionManager:
         async with self._lock:
             session = await self._resolve(session_id)
             if session.task is not None and not session.task.done():
+                raise SessionBusyError(session_id)
+            if session.compacting:
                 raise SessionBusyError(session_id)
             if await self._run_records.waiting(session_id) is not None:
                 raise SessionBusyError(session_id)

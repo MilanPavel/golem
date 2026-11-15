@@ -1131,6 +1131,41 @@ class SessionSetRouteResult(BaseModel):
     mode: RouteMode
 
 
+class SessionCompactParams(BaseModel):
+    """``session.compact``. Shrink what the next model call sends, between turns.
+
+    ``clear`` sends all but the newest tool results as one line each. ``summarise`` replaces
+    the old turns with a summary written by the ``summarise`` role's model, and ``focus``, when
+    given, says what the summary must keep. Nothing is deleted from the session: only the
+    context view changes. The call can take a minute with a local model, and other requests
+    go on meanwhile. Error ``-32004`` when the session has a run or is compacting.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    action: Literal["clear", "summarise"]
+    focus: str | None = None
+
+
+class SessionCompactResult(BaseModel):
+    """What the compaction did.
+
+    ``count`` is the tool results cleared, or the turns summarised, and 0 when there was
+    nothing to do (``before_tokens`` and ``after_tokens`` are then equal, and no event is
+    stored). ``window`` is the tokens the history may fill (the model's window less the
+    reply reserve), None when it is unknown. ``model`` is the model that wrote a summary.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    before_tokens: int = Field(ge=0)
+    after_tokens: int = Field(ge=0)
+    count: int = Field(ge=0)
+    window: int | None = Field(default=None, ge=1)
+    model: str | None = None
+
+
 class SessionSetChecksParams(BaseModel):
     """``session.set_checks``. Say whether golem may run the project's checks in this session.
 
@@ -3230,6 +3265,8 @@ __all__ = [
     "SessionAttachResult",
     "SessionCloseParams",
     "SessionCloseResult",
+    "SessionCompactParams",
+    "SessionCompactResult",
     "SessionCreateParams",
     "SessionCreateResult",
     "SessionDetachParams",

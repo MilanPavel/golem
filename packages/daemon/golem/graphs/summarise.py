@@ -33,7 +33,7 @@ from golem.graphs.adapter import message_text
 from golem.models.cost import cost_usd
 from golem.models.errors import BUDGET_HINT, BudgetSpent
 from golem.models.gate import ServerGate
-from golem.models.roles import for_role
+from golem.models.roles import RoleModel, for_role
 from golem.models.router import ModelRouter
 from golem.models.structured import StructuredError, structured
 from golem.models.tiers import Tier
@@ -135,17 +135,34 @@ def _chunks(lines: Sequence[str], limit: int) -> list[str]:
     return groups
 
 
-async def _one(model: BaseChatModel, text: str, earlier: str | None) -> str:
+def _with_focus(instruction: str, focus: str | None) -> str:
+    """``instruction``, and when ``focus`` is given, what the summary must keep."""
+    if focus is None or not focus.strip():
+        return instruction
+    return f"{instruction} Keep especially: {focus.strip()}"
+
+
+async def _one(
+    model: BaseChatModel, text: str, earlier: str | None, focus: str | None = None
+) -> str:
     body = text if not earlier else f"Earlier summary:\n{earlier}\n\nNew messages:\n{text}"
     try:
         found = await structured(
-            model, Summary, [SystemMessage(content=_INSTRUCTION), HumanMessage(content=body)]
+            model,
+            Summary,
+            [
+                SystemMessage(content=_with_focus(_INSTRUCTION, focus)),
+                HumanMessage(content=body),
+            ],
         )
         return render_summary(found)
     except StructuredError:
         log.info("the summary did not come as structured output; asking for plain text")
     reply = await model.ainvoke(
-        [SystemMessage(content=_PLAIN_INSTRUCTION), HumanMessage(content=body)]
+        [
+            SystemMessage(content=_with_focus(_PLAIN_INSTRUCTION, focus)),
+            HumanMessage(content=body),
+        ]
     )
     answer = reply.text.strip()
     if not answer:
@@ -159,13 +176,15 @@ async def summarise(
     earlier: str | None,
     *,
     room: int | None = None,
+    focus: str | None = None,
 ) -> str:
     """A summary of ``messages`` as text.
 
     ``earlier`` is a summary that came before them. It goes first, marked as earlier, so the
     new summary builds on it. ``room`` is the tokens the model takes in a call; with
     messages that do not fit, each chunk is summarised and then the summaries are summarised.
-    That is two levels at most. The model gets no tools. Raises when the model fails.
+    That is two levels at most. ``focus`` is added to the instruction as what to keep
+    especially. The model gets no tools. Raises when the model fails.
     """
     tokens = (room or DEFAULT_ROOM) - ANSWER_TOKENS
     limit = max(
@@ -175,10 +194,10 @@ async def summarise(
     if not chunks:
         raise ValueError("nothing to summarise")
     if len(chunks) == 1:
-        return await _one(model, chunks[0], earlier)
-    parts = [await _one(model, c, earlier if i == 0 else None) for i, c in enumerate(chunks)]
+        return await _one(model, chunks[0], earlier, focus)
+    parts = [await _one(model, c, earlier if i == 0 else None, focus) for i, c in enumerate(chunks)]
     joined = "\n\n".join(f"Part {i + 1} of {len(parts)}:\n{p}" for i, p in enumerate(parts))
-    return await _one(model, joined[:limit], None)
+    return await _one(model, joined[:limit], None, focus)
 
 
 class Summariser:
@@ -210,6 +229,20 @@ class Summariser:
         self._window_of = window_of
         self._paid_ok = paid_ok
 
+    def _role(self, session_profile: str) -> RoleModel:
+        return for_role(
+            "summarise",
+            session_profile=session_profile,
+            settings=self._router.roles(),
+            tier_of_profile=self._tier_of or (lambda _profile: None),
+            budget_models=self._budget_refs() if self._budget_refs else [],
+        )
+
+    def model_name(self, session_profile: str) -> str:
+        """The name of the model that would write a summary for a session on this profile."""
+        profile = self._role(session_profile).profile
+        return self._router.identity(profile).name or profile
+
     async def make(
         self,
         *,
@@ -218,15 +251,10 @@ class Summariser:
         options: Mapping[str, float | str] | None,
         messages: Sequence[BaseMessage],
         earlier: str | None,
+        focus: str | None = None,
     ) -> str:
         """The summary of ``messages``, built on ``earlier``. Raises when the call fails."""
-        role = for_role(
-            "summarise",
-            session_profile=session_profile,
-            settings=self._router.roles(),
-            tier_of_profile=self._tier_of or (lambda _profile: None),
-            budget_models=self._budget_refs() if self._budget_refs else [],
-        )
+        role = self._role(session_profile)
         paid = self._tier_of is not None and self._tier_of(role.profile) not in (None, "local")
         if paid and self._paid_ok is not None and not await self._paid_ok(session_id):
             raise BudgetSpent(
@@ -249,7 +277,7 @@ class Summariser:
             at = _COUNTING.set(seen)
             try:
                 async with gate.hold(held, "job"):
-                    text = await summarise(model, messages, earlier, room=room)
+                    text = await summarise(model, messages, earlier, room=room, focus=focus)
             finally:
                 _COUNTING.reset(at)
         except Exception:

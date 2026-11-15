@@ -1041,13 +1041,16 @@ class ModelCallStartedEvent(BaseModel):
 
 
 class ContextChangedEvent(BaseModel):
-    """What golem sends of the history changed, before the model call that follows."""
+    """What golem sends of the history changed, before the model call that follows.
+
+    ``run_id`` is null when ``session.compact`` made the change: no run owns it.
+    """
 
     model_config = _CONFIG
 
     seq: int = Field(ge=1)
     session_id: str = Field(min_length=1)
-    run_id: str = Field(min_length=1)
+    run_id: str | None = Field(default=None, min_length=1)
     ts: str = Field(min_length=1)
     type: Literal["context.changed"]
     data: ContextChangedData

@@ -14,7 +14,7 @@ import json
 import logging
 from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable, Mapping, Sequence
 from contextlib import AbstractAsyncContextManager, aclosing, nullcontext
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Literal, Protocol, cast
 
 from langchain_core.language_models import BaseChatModel
@@ -31,6 +31,7 @@ from golem.coding.changes import ChangeStore
 from golem.config import ContextSettings, ModelPrice, PermissionMode
 from golem.graphs.adapter import STREAM_KEY, message_text
 from golem.graphs.checks_node import CHECKS_KEY, checks_node
+from golem.graphs.compact import Compaction, clear_now, summarise_now
 from golem.graphs.context_view import (
     SUMMARY_ID,
     ContextView,
@@ -182,6 +183,10 @@ class ChatRuntime:
         """Where each file a tool writes is recorded. None: not recorded."""
         self.until_pulled: Callable[[str], Awaitable[None]] | None = None
         """Waits until a model's download ends, given its ref. Raises with the download's error."""
+        self.context: ContextSettings | None = None
+        """The ``[context]`` settings the graph was built with."""
+        self.summariser: Summariser | None = None
+        """Writes the summaries of the graph, and of a manual compaction."""
 
     async def values(self, session_id: str) -> Mapping[str, object]:
         """Checkpoint values for ``session_id``, or an empty mapping."""
@@ -345,6 +350,55 @@ class ChatRuntime:
             as_node="call_model",
         )
         return len(calls)
+
+    async def compact(
+        self,
+        session_id: str,
+        action: Literal["clear", "summarise"],
+        *,
+        profile: str,
+        options: Mapping[str, float | str],
+        focus: str | None,
+        system_chars: int,
+        tools_chars: int,
+    ) -> Compaction:
+        """Clear or summarise the history of an idle session, and store the new context view.
+
+        The checkpoint keeps every message. ``system_chars`` and ``tools_chars`` are the sizes
+        of what a call sends besides the history. Raises when the summary call fails.
+        """
+        values = await self.values(session_id)
+        messages = _without_thinking(_messages(values))
+        ctx = cast(ContextView | None, values.get("context_view"))
+        settings = self.context if self.context is not None else self.router.context_settings()
+        window = self.window_of(profile, options) if self.window_of is not None else ContextWindow()
+        room = _room(settings, window)
+        used, ratio = used_tokens(view(messages, ctx), system_chars, tools_chars)
+        if action == "clear":
+            done = clear_now(
+                messages, ctx, used=used, ratio=ratio, keep_results=settings.keep_results
+            )
+        elif self.summariser is None:
+            raise ValueError("this daemon has no summariser")
+        else:
+            done = await summarise_now(
+                self.summariser,
+                messages,
+                ctx,
+                keep_turns=settings.keep_turns,
+                focus=focus,
+                used=used,
+                ratio=ratio,
+                session_id=session_id,
+                profile=profile,
+                options=options,
+            )
+        done = replace(done, window=room)
+        if done.view is not None:
+            await self._graph.aupdate_state(
+                self._config(session_id), {"context_view": done.view}, as_node="call_model"
+            )
+        return done
 
     async def message_text(self, session_id: str, message_id: str) -> str | None:
         """Text of the checkpoint message with ``message_id``, or None."""
@@ -683,6 +737,8 @@ def open_chat(
             tier_of,
         )
     )
+    runtime[0].context = context
+    runtime[0].summariser = summariser
     return runtime[0]
 
 

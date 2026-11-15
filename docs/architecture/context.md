@@ -168,6 +168,10 @@ The prompt fits when its estimate plus the reply reserve is at most the window. 
 
 When nothing is left, the call is not sent. `fit_prompt` raises `ContextFull(need, window)` (`golem/models/errors.py`). A router that can step up to a larger window can catch it there. Otherwise the run ends with `run.failed`, the code `context_full`, the message `This does not fit <model>'s <window> window, even after clearing and summarising.`, and the hint `Use a model with a larger window, raise the window in /tune, or start a new session.` With an unknown window the check is skipped. `model.call.started` has `estimated_tokens`, and a debug line logs it against the tokens the server counted. The cut judge (`sessions/cut.py`) stays as the safety net for a prompt the server cut anyway.
 
+### Compacting on request
+
+`session.compact` (`{session_id, action: "clear" | "summarise", focus}`) does the same two steps between turns, without a threshold. `SessionManager.compact` refuses a session that has a run, waits on an approval, or is already compacting (`-32004`), and marks the session busy while it works, so a `message.send` meanwhile is refused too. The request does not block the connection's other requests. `ChatRuntime.compact` reads the state, and `golem/graphs/compact.py` plans the change: `clear` is `plan_clear` with `clear_at` and `clear_to` at 0, so everything but the newest `keep_results` results is cleared; `summarise` is `plan_summary` with `keep_turns` (at least 1) and `Summariser.make`, with `focus` added to the instruction as `Keep especially: <focus>`. The new view is written with `aupdate_state`, and `context.changed` is stored with a null `run_id`, because no run owns it (the trace builder skips events without a run). The result is `before_tokens`, `after_tokens`, `count` (results cleared, or turns summarised), `window` (the room, when known) and `model` (the summary model). With nothing to do, the result has `count: 0`, equal tokens, and no event. A failed summary is an error and changes nothing.
+
 ### Files
 
 | File | What it does |

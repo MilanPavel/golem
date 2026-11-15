@@ -1,0 +1,37 @@
+{
+  "additionalProperties": false,
+  "description": "``session.compact``. Shrink what the next model call sends, between turns.\n\n``clear`` sends all but the newest tool results as one line each. ``summarise`` replaces\nthe old turns with a summary written by the ``summarise`` role's model, and ``focus``, when\ngiven, says what the summary must keep. Nothing is deleted from the session: only the\ncontext view changes. The call can take a minute with a local model, and other requests\ngo on meanwhile. Error ``-32004`` when the session has a run or is compacting.",
+  "properties": {
+    "action": {
+      "enum": [
+        "clear",
+        "summarise"
+      ],
+      "title": "Action",
+      "type": "string"
+    },
+    "focus": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Focus"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "session_id",
+    "action"
+  ],
+  "title": "SessionCompactParams",
+  "type": "object"
+}

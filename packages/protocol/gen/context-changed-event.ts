@@ -7,7 +7,7 @@ export type Count = number | null;
 export type ReloadMs = number | null;
 export type WindowFrom = number | null;
 export type WindowTo = number | null;
-export type RunId = string;
+export type RunId = string | null;
 export type Seq = number;
 export type SessionId = string;
 export type Ts = string;
@@ -15,10 +15,12 @@ export type Type = 'context.changed';
 
 /**
  * What golem sends of the history changed, before the model call that follows.
+ *
+ * ``run_id`` is null when ``session.compact`` made the change: no run owns it.
  */
 export interface ContextChangedEvent {
   data: ContextChangedData;
-  run_id: RunId;
+  run_id?: RunId;
   seq: Seq;
   session_id: SessionId;
   ts: Ts;

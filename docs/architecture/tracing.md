@@ -180,7 +180,7 @@ A model call has no id of its own. Each call makes exactly one assistant message
 | Event | Fields |
 |---|---|
 | `model.call.started` | `message_id`, `index` (1-based within the run), `profile`, `provider`, `model`, `system_prompt_sha`, `tools_sha`, `message_ids`, `context_window`, `num_ctx`, `window_estimated`, `system_sections`, `system_chars`, `system_bytes`, `tools_chars`, `tools_bytes`, `message_chars`, `message_bytes`, `cleared_ids` (tool results sent as a one-line stub on this call), `estimated_tokens` (golem's estimate of the prompt before it was sent) |
-| `context.changed` | `action` (`cleared`, `summarised`, or `grew`), `before_tokens`, `after_tokens`, `count`, `window_from`, `window_to`, `reload_ms`. Only `cleared` is sent so far: old tool results are now sent as one line each, `count` of them, and the tokens are rough sizes of the history. It comes before the `model.call.started` of the call it changed |
+| `context.changed` | `action` (`cleared`, `summarised`, or `grew`), `before_tokens`, `after_tokens`, `count`, `window_from`, `window_to`, `reload_ms`. Only `cleared` is sent so far: old tool results are now sent as one line each, `count` of them, and the tokens are rough sizes of the history. It comes before the `model.call.started` of the call it changed. `session.compact` stores the same event with a null `run_id`, so the trace does not show it |
 | `model.call.completed` | `message_id`, `usage` (`input`, `output`, `cache_read`, `cache_write`), `stop_reason`, `first_token_ms`, `latency_ms`, `failed`, `context_window`, `text_tool_calls`, `cost_usd`, `price`, `load_ms`, `prompt_ms`, `reply_ms` |
 | `tool.completed`, `tool.failed` | `duration_ms`, as well as what they had before |
 

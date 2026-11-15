@@ -237,6 +237,8 @@ from golem_protocol.commands import (
     SessionAttachResult,
     SessionCloseParams,
     SessionCloseResult,
+    SessionCompactParams,
+    SessionCompactResult,
     SessionCreateParams,
     SessionCreateResult,
     SessionDetachParams,
@@ -1259,6 +1261,27 @@ async def _session_set_mode(
     return SessionSetModeResult(session_id=params.session_id, mode=mode, override=override)
 
 
+async def _session_compact(
+    ctx: RequestContext, params: SessionCompactParams
+) -> SessionCompactResult:
+    try:
+        result = await _sessions(ctx).compact(params.session_id, params.action, params.focus)
+    except (SessionNotFoundError, SchemaMismatchError) as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
+    except SessionBusyError as exc:
+        raise RpcCallError(SESSION_BUSY, "session is busy") from exc
+    except Exception as exc:
+        log.warning("session compact failed session=%s", params.session_id, exc_info=True)
+        raise RpcCallError(INTERNAL_ERROR, f"could not {params.action}: {exc}") from exc
+    log.info(
+        "session compact session=%s action=%s count=%d",
+        params.session_id,
+        params.action,
+        result.count,
+    )
+    return result
+
+
 async def _session_set_checks(
     ctx: RequestContext, params: SessionSetChecksParams
 ) -> SessionSetChecksResult:
@@ -1779,6 +1802,7 @@ def standard_methods() -> dict[str, Method]:
         "session.set_route": Method(
             "session.set_route", SessionSetRouteParams, True, _session_set_route
         ),
+        "session.compact": Method("session.compact", SessionCompactParams, True, _session_compact),
         "session.set_checks": Method(
             "session.set_checks", SessionSetChecksParams, True, _session_set_checks
         ),

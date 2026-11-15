@@ -62,6 +62,7 @@ export const BROWSER_METHODS: ReadonlySet<string> = new Set([
   "runtime.install_cancel",
   "session.attach",
   "session.close",
+  "session.compact",
   "session.create",
   "session.detach",
   "session.fork",

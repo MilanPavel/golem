@@ -156,6 +156,7 @@ import {
   tryTitle,
   type TryRun,
 } from "@golem/view";
+import { compactWaiting, runCompact } from "./compact.ts";
 import { dropTry, startTry, tryLines } from "./try-again.ts";
 import { pressTune, tuneKeyOf, tuneLines, tuneLitLines, tuneMemorySpans, tuneOpening, type TuneAction } from "./tune-panel.ts";
 import { folderFacts } from "./folder-facts.ts";
@@ -2025,6 +2026,11 @@ export function App({
     if (outcome.kind === "fork") {
       setDraft(draftAt(""));
       forkHere();
+      return;
+    }
+    if (outcome.kind === "compact") {
+      setDraft(draftAt(""));
+      compactHere(outcome.action, outcome.focus);
       return;
     }
     if (outcome.kind === "title") {
@@ -3962,6 +3968,26 @@ export function App({
       },
       (error: unknown) => {
         setChat((state) => ({ ...state, error: messageOf(error) }));
+      },
+    );
+  }
+
+  function compactHere(action: "clear" | "summarise", focus: string | null): void {
+    const current = sessionRef.current;
+    if (current === null || connectionRef.current.status !== "connected") {
+      return;
+    }
+    if (busyRef.current) {
+      setChat((state) => ({ ...state, notice: "wait for the answer to finish before compacting" }));
+      return;
+    }
+    setChat((state) => ({ ...state, error: null, notice: compactWaiting(action) }));
+    void runCompact(client, current, action, focus).then(
+      (notice) => {
+        setChat((state) => ({ ...state, error: null, notice }));
+      },
+      (error: unknown) => {
+        setChat((state) => ({ ...state, notice: null, error: messageOf(error) }));
       },
     );
   }
