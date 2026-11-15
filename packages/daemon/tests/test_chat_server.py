@@ -678,7 +678,13 @@ async def test_stopping_the_daemon_cancels_runs_with_the_shutdown_reason(short_h
 
 
 class _OneTitle:
-    async def title(self, model_profile: str, prompt: str, reply: str) -> str:
+    async def title(
+        self,
+        model_profile: str,
+        prompt: str,
+        reply: str,
+        options: Mapping[str, float | str] | None = None,
+    ) -> str:
         del model_profile, prompt, reply
         return "Greeting"
 

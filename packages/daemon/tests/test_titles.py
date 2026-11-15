@@ -3,14 +3,18 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
+from typing import Any
 
 import pytest
 from fakes import ScriptedChatModel
+from langchain_core.language_models import BaseChatModel
 from langgraph.checkpoint.memory import InMemorySaver
 
+from golem.config import GolemSettings
 from golem.graphs.chat import open_chat
 from golem.models.router import ModelRouter
+from golem.models.tiers import Tier
 from golem.sessions.bus import EventBus
 from golem.sessions.log import SessionLog
 from golem.sessions.manager import BlankTitleError, SessionManager, SessionNotFoundError
@@ -34,7 +38,13 @@ class _Titles:
         self._proposals = list(proposals)
         self.asked: list[tuple[str, str, str]] = []
 
-    async def title(self, model_profile: str, prompt: str, reply: str) -> str:
+    async def title(
+        self,
+        model_profile: str,
+        prompt: str,
+        reply: str,
+        options: Mapping[str, float | str] | None = None,
+    ) -> str:
         self.asked.append((model_profile, prompt, reply))
         proposal = self._proposals.pop(0)
         if isinstance(proposal, Exception):
@@ -48,7 +58,13 @@ class _Gated:
         self.asked = asyncio.Event()
         self.release = asyncio.Event()
 
-    async def title(self, model_profile: str, prompt: str, reply: str) -> str:
+    async def title(
+        self,
+        model_profile: str,
+        prompt: str,
+        reply: str,
+        options: Mapping[str, float | str] | None = None,
+    ) -> str:
         del model_profile, prompt, reply
         self.asked.set()
         await self.release.wait()
@@ -59,7 +75,13 @@ class _Never:
     def __init__(self) -> None:
         self.asked = asyncio.Event()
 
-    async def title(self, model_profile: str, prompt: str, reply: str) -> str:
+    async def title(
+        self,
+        model_profile: str,
+        prompt: str,
+        reply: str,
+        options: Mapping[str, float | str] | None = None,
+    ) -> str:
         del model_profile, prompt, reply
         self.asked.set()
         await asyncio.Event().wait()
@@ -227,3 +249,99 @@ async def test_a_title_set_by_hand_wins_over_one_being_chosen(database: Database
     await _until(ended)
     await manager.cancel_all()
     assert await _titled(events, session_id) == ["Mine"]
+
+
+class _RecordingRouter(ModelRouter):
+    """Real name resolution; records what ``chat_model`` is asked for."""
+
+    def __init__(self, settings: GolemSettings) -> None:
+        super().__init__(settings)
+        self.asked: list[tuple[str, dict[str, float | str]]] = []
+        self.model = ScriptedChatModel(replies=["A title"])
+
+    def chat_model(
+        self, profile: str, overrides: Mapping[str, float | str] | None = None
+    ) -> BaseChatModel:
+        self.asked.append((profile, dict(overrides or {})))
+        return self.model
+
+
+def _settings(**roles: str) -> GolemSettings:
+    return GolemSettings.model_validate(
+        {"default_model": "ollama/qwen3:8b", "routing": {"roles": roles}}
+    )
+
+
+def _tiers(ref: str) -> Tier | None:
+    return "local" if ref.startswith("ollama/") else "frontier"
+
+
+async def test_a_local_title_is_asked_with_the_session_options() -> None:
+    router = _RecordingRouter(_settings())
+    titles = ModelTitles(router)
+    titles.bind(_tiers, list)
+    options: dict[str, float | str] = {"num_ctx": 16384, "temperature": 0.2}
+    await titles.title("ollama/qwen3:8b", "hi", "hello", options)
+    assert router.asked == [("ollama/qwen3:8b", {**options, "num_predict": 64})]
+
+
+async def test_a_title_on_ollama_turns_thinking_off_when_the_model_takes_it() -> None:
+    router = _RecordingRouter(_settings())
+    router.note_think_values("qwen3:8b", ["off", "on"])
+    titles = ModelTitles(router)
+    titles.bind(_tiers, list)
+    await titles.title("ollama/qwen3:8b", "hi", "hello", {"num_ctx": 8192})
+    assert router.asked[0][1] == {"num_ctx": 8192, "num_predict": 64, "think": "off"}
+
+
+async def test_a_hosted_session_asks_the_budget_model_with_no_session_options() -> None:
+    router = _RecordingRouter(_settings())
+    titles = ModelTitles(router)
+    titles.bind(_tiers, lambda: ["ollama/qwen3:8b"])
+    await titles.title("anthropic/claude-opus", "hi", "hello", {"num_ctx": 16384})
+    assert router.asked == [("ollama/qwen3:8b", {"num_predict": 64})]
+
+
+async def test_a_hosted_title_model_gets_no_num_predict() -> None:
+    router = _RecordingRouter(_settings())
+    titles = ModelTitles(router)
+    titles.bind(_tiers, lambda: ["deepseek/deepseek-chat"])
+    await titles.title("anthropic/claude-opus", "hi", "hello", {"num_ctx": 16384})
+    assert router.asked == [("deepseek/deepseek-chat", {})]
+
+
+async def test_a_configured_role_model_wins() -> None:
+    router = _RecordingRouter(_settings(titles="openai/gpt-mini"))
+    titles = ModelTitles(router)
+    titles.bind(_tiers, lambda: ["deepseek/deepseek-chat"])
+    await titles.title("ollama/qwen3:8b", "hi", "hello", {"num_ctx": 16384})
+    assert router.asked == [("openai/gpt-mini", {})]
+
+
+async def test_the_title_request_carries_the_session_num_ctx() -> None:
+    sent: list[dict[str, Any]] = []
+
+    class _Client:
+        async def chat(self, **params: Any) -> AsyncIterator[dict[str, Any]]:
+            sent.append(params)
+
+            async def stream() -> AsyncIterator[dict[str, Any]]:
+                yield {"message": {"role": "assistant", "content": "Greeting"}}
+                yield {"message": {"role": "assistant", "content": ""}, "done": True}
+
+            return stream()
+
+    class _Router(ModelRouter):
+        def chat_model(
+            self, profile: str, overrides: Mapping[str, float | str] | None = None
+        ) -> BaseChatModel:
+            model = super().chat_model(profile, overrides)
+            object.__setattr__(model, "_async_client", _Client())
+            return model
+
+    titles = ModelTitles(_Router(_settings()))
+    titles.bind(_tiers, list)
+    title = await titles.title("ollama/qwen3:8b", "hi", "hello", {"num_ctx": 16384})
+    assert title == "Greeting"
+    assert sent[0]["options"]["num_ctx"] == 16384
+    assert sent[0]["options"]["num_predict"] == 64

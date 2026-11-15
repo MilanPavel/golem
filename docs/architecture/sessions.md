@@ -209,7 +209,7 @@ A step that stops to ask you a question runs again from its first line when you 
 
 ### The session list
 
-`session.list {watch: true}` returns the list and marks the connection as a watcher until it closes. After every stored event except `message.delta`, `SessionLog` sends that session's `session.summary` to every watcher, inside the per-session lock, so one session's summaries arrive in order ([ADR-009](../adr/009-session-list.md)). A session gets a title once, after its first completed run, as a `session.updated` in its own log. `/sessions` in the TUI is that list.
+`session.list {watch: true}` returns the list and marks the connection as a watcher until it closes. After every stored event except `message.delta`, `SessionLog` sends that session's `session.summary` to every watcher, inside the per-session lock, so one session's summaries arrive in order ([ADR-009](../adr/009-session-list.md)). A session gets a title once, after its first completed run, as a `session.updated` in its own log. The title is asked of the model for the role `titles` (`[routing.roles]`, `golem.models.roles.for_role`): on a local session the session's own model, called with the session's options so Ollama keeps it loaded, and on a hosted session a ready budget model when there is one. A title on Ollama is capped at 64 tokens, with `think` off when the model takes it. `/sessions` in the TUI is that list.
 
 ### Files
 

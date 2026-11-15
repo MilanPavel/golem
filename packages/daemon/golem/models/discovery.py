@@ -56,7 +56,7 @@ from golem.models.router import (
     ModelRouter,
     Provider,
 )
-from golem.models.tiers import Tier, tier_of
+from golem.models.tiers import Tier, blended, tier_of
 
 log = logging.getLogger(__name__)
 
@@ -254,6 +254,37 @@ class ModelDiscovery:
         self._modelfile_ctx: dict[str, int] = {}
         self._default_ctx: dict[str, int] = {}
         self._last: tuple[ListedModel, ...] = ()
+
+    def tier_of_ref(self, ref: str) -> Tier | None:
+        """The tier of ``ref`` from what is cached. No I/O. None when the ref has no provider."""
+        provider, _, model_id = ref.partition("/")
+        if model_id == "":
+            return None
+        configured = self._router.provider(provider)
+        if provider == "ollama" or (configured is not None and configured.kind == "ollama"):
+            return "local"
+        overrides: dict[str, Tier | None] = {entry.ref: entry.tier for entry in self._hosted}
+        override = overrides.get(ref)
+        return tier_of(
+            provider,
+            self.price_of(ref),
+            override=override,
+            budget_max_price=self._router.budget_max_price(),
+        )
+
+    def budget_refs(self) -> list[str]:
+        """Ready budget models that do not refuse tools, cheapest first, as last listed. No I/O.
+
+        Empty before the first listing.
+        """
+        found: list[tuple[float, str]] = []
+        for model in self._last:
+            if model.tier != "budget" or model.status != "ready" or model.tools is False:
+                continue
+            cost = None if model.price is None else blended(model.price)
+            if cost is not None:
+                found.append((cost, model.ref))
+        return [ref for _, ref in sorted(found)]
 
     def default_ctx(self, ref: str) -> int | None:
         """The window Ollama gave ``ref`` the last time golem sent no ``num_ctx``. No I/O.

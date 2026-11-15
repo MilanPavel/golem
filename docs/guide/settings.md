@@ -142,6 +142,18 @@ The providers are `openai`, `anthropic`, `google`, `deepseek`, `xai`, `moonshot`
 |---|---|---|
 | `budget_max_price` | `1.50` | The most a hosted model may cost, in USD per million tokens, to be in the `budget` tier. The price is blended as `(3 × input + output) / 4`. A model above it, or with no known price, is `frontier`. Ollama models are `local` |
 
+### `[routing.roles]`
+
+The model for each internal job. A value is `"session"`, a profile name, or a `provider/model` ref.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `titles` | `"session"` | The model that names a chat after its first run |
+| `summarise` | `"session"` | The model that summarises |
+| `explore` | `"session"` | The model that explores |
+
+`"session"` on a local chat uses the chat's own model with the chat's own options, so Ollama does not reload it. On a hosted chat it uses the cheapest ready budget model that takes tools, and the chat's own model when there is none. A model that is not ready is never downloaded for a role.
+
 ### `[[rule]]`
 
 One tool rule. The first rule that matches a call decides it ([Tools and permissions](./permissions.md)).
