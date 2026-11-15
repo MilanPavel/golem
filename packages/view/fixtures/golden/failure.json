@@ -76,7 +76,8 @@
         "tools_bytes": 9160,
         "tools_chars": 9160,
         "tools_sha": "5bbe8827b82738428aa4540afe2fceb5670e11866febf6a6e5e13b4480547611",
-        "window_estimated": false
+        "window_estimated": false,
+        "window_planned": false
       },
       "run_id": "id-2",
       "seq": 5,
@@ -194,7 +195,8 @@
         "tools_bytes": 9160,
         "tools_chars": 9160,
         "tools_sha": "5bbe8827b82738428aa4540afe2fceb5670e11866febf6a6e5e13b4480547611",
-        "window_estimated": false
+        "window_estimated": false,
+        "window_planned": false
       },
       "run_id": "id-2",
       "seq": 5,

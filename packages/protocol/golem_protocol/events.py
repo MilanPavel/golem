@@ -341,7 +341,8 @@ class ModelCallStartedData(BaseModel):
 
     ``window_estimated`` is true when golem did not send the window and read it
     from Ollama (the loaded context or the Modelfile). An older event has no
-    field and reads as False.
+    field and reads as False. ``window_planned`` is true when golem chose the ``num_ctx`` it
+    sent (``[context] window``), and false for one that someone set or that golem did not send.
 
     The size fields count what was sent, in UTF-8 bytes and in characters: the
     system text, the tool schemas as compact JSON, and each history message in
@@ -364,6 +365,7 @@ class ModelCallStartedData(BaseModel):
     context_window: int | None = Field(default=None, ge=1)
     num_ctx: int | None = Field(default=None, ge=1)
     window_estimated: bool = False
+    window_planned: bool = False
     system_sections: list[PromptSectionInfo] | None = None
     system_chars: int | None = Field(default=None, ge=0)
     system_bytes: int | None = Field(default=None, ge=0)

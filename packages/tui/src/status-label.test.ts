@@ -276,7 +276,7 @@ test("at 80 columns the context segment fits beside the model and the model outl
     folder: "~/repos/golem",
     messageCount: 4,
     uptimeSeconds: 90,
-    context: { spanId: "m", used: 84_000, window: 1_049_400, windowEstimated: false, numCtx: null },
+    context: { spanId: "m", used: 84_000, window: 1_049_400, windowEstimated: false, windowPlanned: false, numCtx: null },
   });
   const wide = fitSegments(segments, 80).map((segment) => segment.id);
   assert.ok(wide.includes("context") && wide.includes("model"));
@@ -285,7 +285,7 @@ test("at 80 columns the context segment fits beside the model and the model outl
 });
 
 test("contextTone: dim below 80%, warn from 80%, alert from 95% or at num_ctx", () => {
-  const at = (used: number, numCtx: number | null = null) => contextTone({ spanId: "m", used, window: 100, windowEstimated: false, numCtx });
+  const at = (used: number, numCtx: number | null = null) => contextTone({ spanId: "m", used, window: 100, windowEstimated: false, windowPlanned: false, numCtx });
   assert.equal(contextTone(null), "dim");
   assert.equal(at(25), "dim");
   assert.equal(at(80), "warn");
@@ -293,7 +293,7 @@ test("contextTone: dim below 80%, warn from 80%, alert from 95% or at num_ctx", 
   assert.equal(at(95), "alert");
   assert.equal(at(10, 8), "alert");
   assert.equal(at(7, 8), "dim");
-  assert.equal(contextTone({ spanId: "m", used: 50, window: null, windowEstimated: false, numCtx: null }), "dim");
+  assert.equal(contextTone({ spanId: "m", used: 50, window: null, windowEstimated: false, windowPlanned: false, numCtx: null }), "dim");
 });
 
 test("the mode segment follows the model, and goes before it", () => {
@@ -317,7 +317,7 @@ test("context sits after the model and leaves the line after the skills and befo
     uptimeSeconds: null,
     freshLines: 3,
     skills: ["ship"],
-    context: { spanId: "m", used: 85, window: 100, windowEstimated: false, numCtx: null },
+    context: { spanId: "m", used: 85, window: 100, windowEstimated: false, windowPlanned: false, numCtx: null },
   });
   assert.deepEqual(
     segments.map((segment) => segment.id).slice(0, 6),

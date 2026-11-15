@@ -215,6 +215,7 @@ def _recorded_models(
                 context_window=window,
                 num_ctx=data.num_ctx,
                 context_window_estimated=estimated,
+                window_planned=data.window_planned,
                 preview=replies.get(data.message_id, "")[:_PREVIEW_CHARS],
             )
         )

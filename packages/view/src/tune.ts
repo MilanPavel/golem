@@ -18,8 +18,8 @@ export type TuneState = {
   options: readonly ModelOption[];
   /** The model's own values, else Ollama's. */
   defaults: Readonly<Record<string, TuneValue>>;
-  /** Where a default that is not Ollama's fixed one came from: the Modelfile, or Ollama's own load. */
-  defaultFrom: Readonly<Record<string, "modelfile" | "ollama">>;
+  /** Where a default that is not Ollama's fixed one came from: the Modelfile, Ollama's own load, or golem's plan. */
+  defaultFrom: Readonly<Record<string, "modelfile" | "ollama" | "golem">>;
   saved: Readonly<Record<string, TuneValue>>;
   session: Readonly<Record<string, TuneValue>>;
   /** What the daemon knows of this machine's memory and the model's size, or null when it does not. */
@@ -139,7 +139,9 @@ export function defaultNote(state: TuneState, row: TuneRow): string | null {
   }
   const origin = state.defaultFrom[name];
   if (origin !== undefined) {
-    return `model default ${formatTuneValue(row.option, fallback)} · from ${origin === "ollama" ? "Ollama" : "the Modelfile"}`;
+    const value = formatTuneValue(row.option, fallback);
+    if (origin === "golem") return `model default ${value} · planned by golem`;
+    return `model default ${value} · from ${origin === "ollama" ? "Ollama" : "the Modelfile"}`;
   }
   return differsFromDefault(state, row) ? `model default ${formatTuneValue(row.option, fallback)}` : null;
 }

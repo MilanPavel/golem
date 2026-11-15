@@ -35,6 +35,10 @@ A local model runs in [Ollama](https://ollama.com), on your Mac. It's free, it n
 - **golem starts Ollama** when a local model needs it, and stops it after 30 minutes unused. Its log is `~/.golem/logs/ollama.log`.
 - **Your own Ollama wins.** If you run Ollama yourself, for example with `brew services start ollama`, golem uses that one and never stops it.
 
+### The window golem picks
+
+Ollama reloads a model whenever a request asks for another context window, and its own default window can be small. So golem picks one window for each local model and sends it on every call. It is based on the model's size and maximum and your Mac's memory, and a model that does not fit on the GPU at that size is stepped down once, and golem remembers it. It can be below Ollama's default on a Mac with 48 GiB or more, because a very large window costs a lot of memory. To choose yourself, set `[context] window` to a number, or to `"ollama"` to send no window at all and get what Ollama does without golem. A `num_ctx` you set for the model or a chat always wins. golem does not read `OLLAMA_NUM_PARALLEL`, which multiplies the memory a window takes, so keep it at 1 or set the window yourself. See [Settings](./settings.md#context).
+
 ## Hosted models and API keys
 
 A hosted model needs an API key from its provider. golem keeps the key in the macOS Keychain, never in a file.

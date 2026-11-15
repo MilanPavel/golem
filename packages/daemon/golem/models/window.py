@@ -18,12 +18,14 @@ class ContextWindow:
     """``window`` is the tokens the model can take in, ``num_ctx`` the Ollama option sent.
 
     Each is None when unknown or not sent. Never 0. ``estimated`` is true when golem
-    did not send the window itself and read it from Ollama.
+    did not send the window itself and read it from Ollama. ``planned`` is true when
+    golem chose the window itself.
     """
 
     window: int | None = None
     num_ctx: int | None = None
     estimated: bool = False
+    planned: bool = False
 
 
 WindowOf = Callable[[str, Mapping[str, float | str] | None], ContextWindow]
@@ -51,11 +53,11 @@ def resolve_window(
 
     This is a forecast, made before the call. An Ollama model has what golem sends
     (``overrides``, the saved option, the profile's ``ctx``), which is exact, then the
-    Modelfile's ``num_ctx``, then the window Ollama gave the model the last time golem
-    sent no ``num_ctx``. Those two are estimated, because Ollama may have restarted with
-    another default. What a load of another request holds is never used. The model's
-    maximum is never used. Another provider has the profile's ``ctx``, then the listed
-    model's, then the price book's.
+    window golem plans (also exact, and ``planned``), then the Modelfile's ``num_ctx``, then
+    the window Ollama gave the model the last time golem sent no ``num_ctx``. Those two are
+    estimated, because Ollama may have restarted with another default. What a load of
+    another request holds is never used. The model's maximum is never used. Another
+    provider has the profile's ``ctx``, then the listed model's, then the price book's.
     """
     try:
         resolved = router.resolve(profile)
@@ -72,6 +74,9 @@ def resolve_window(
         return ContextWindow(int(sent), int(sent))
     if resolved.ctx is not None:
         return ContextWindow(resolved.ctx, resolved.ctx)
+    plan = None if router.plans is None else router.plans.planned(resolved.model_id)
+    if plan is not None:
+        return ContextWindow(plan, plan, planned=True)
     # golem sends no num_ctx, so Ollama runs with its own default context, not the
     # model's maximum from the listing.
     if listed is None:

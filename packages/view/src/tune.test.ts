@@ -392,6 +392,8 @@ test("a default from Ollama or the Modelfile says where it came from", () => {
   assert.equal(defaultNote(ollama, numCtxRow(ollama)), "model default 32K · from Ollama");
   const modelfile = tuneState(result({ defaults: { num_ctx: 8192 }, default_from: { num_ctx: "modelfile" }, saved: { num_ctx: 16384 } }));
   assert.equal(defaultNote(modelfile, numCtxRow(modelfile)), "model default 8K · from the Modelfile");
+  const planned = tuneState(result({ defaults: { num_ctx: 32768 }, default_from: { num_ctx: "golem" } }));
+  assert.equal(defaultNote(planned, numCtxRow(planned)), "model default 32K · planned by golem");
   const plain = tuneState(result({ saved: { top_k: 20 } }));
   const topK = tuneRows(plain).find((row) => row.option.name === "top_k") as ReturnType<typeof tuneRows>[number];
   assert.equal(defaultNote(plain, topK), "model default 40");

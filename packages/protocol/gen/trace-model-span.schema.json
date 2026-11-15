@@ -416,6 +416,11 @@
         }
       ],
       "default": null
+    },
+    "window_planned": {
+      "default": false,
+      "title": "Window Planned",
+      "type": "boolean"
     }
   },
   "required": [

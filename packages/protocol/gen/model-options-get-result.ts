@@ -33,7 +33,8 @@ export type Session = {
  * ``default_from`` says where a default came from when it is not Ollama's fixed one:
  * ``modelfile`` for the model's own, ``ollama`` for the window Ollama gave the model
  * on a call that sent no ``num_ctx``. ``num_ctx`` has no default until one of the two
- * is known.
+ * is known. ``golem`` is the window golem plans for the model, which it sends when nothing
+ * else sets ``num_ctx``.
  */
 export interface ModelOptionsGetResult {
   default_from?: DefaultFrom;
@@ -45,7 +46,7 @@ export interface ModelOptionsGetResult {
   session?: Session;
 }
 export interface DefaultFrom {
-  [k: string]: 'modelfile' | 'ollama';
+  [k: string]: 'modelfile' | 'ollama' | 'golem';
 }
 export interface Defaults {
   [k: string]: number | string;

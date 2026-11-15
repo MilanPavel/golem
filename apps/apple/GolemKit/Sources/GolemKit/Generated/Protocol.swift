@@ -5159,7 +5159,9 @@ public enum ModelCallCompletedEventType: String, Codable {
 ///
 /// ``window_estimated`` is true when golem did not send the window and read it
 /// from Ollama (the loaded context or the Modelfile). An older event has no
-/// field and reads as False.
+/// field and reads as False. ``window_planned`` is true when golem chose the ``num_ctx`` it
+/// sent (``[context] window``), and false for one that someone set or that golem did not
+/// send.
 ///
 /// The size fields count what was sent, in UTF-8 bytes and in characters: the
 /// system text, the tool schemas as compact JSON, and each history message in
@@ -5187,6 +5189,7 @@ public struct ModelCallStartedData: Codable {
     public let toolsChars: Int?
     public let toolsSHA: String?
     public let windowEstimated: Bool?
+    public let windowPlanned: Bool?
 
     public enum CodingKeys: String, CodingKey {
         case contextWindow = "context_window"
@@ -5208,9 +5211,10 @@ public struct ModelCallStartedData: Codable {
         case toolsChars = "tools_chars"
         case toolsSHA = "tools_sha"
         case windowEstimated = "window_estimated"
+        case windowPlanned = "window_planned"
     }
 
-    public init(contextWindow: Int?, index: Int, messageBytes: [Int]?, messageChars: [Int]?, messageID: String, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String, provider: String?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [PurplePromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?) {
+    public init(contextWindow: Int?, index: Int, messageBytes: [Int]?, messageChars: [Int]?, messageID: String, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String, provider: String?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [PurplePromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?) {
         self.contextWindow = contextWindow
         self.index = index
         self.messageBytes = messageBytes
@@ -5230,6 +5234,7 @@ public struct ModelCallStartedData: Codable {
         self.toolsChars = toolsChars
         self.toolsSHA = toolsSHA
         self.windowEstimated = windowEstimated
+        self.windowPlanned = windowPlanned
     }
 }
 
@@ -5301,7 +5306,9 @@ public struct ModelCallStartedEvent: Codable {
 ///
 /// ``window_estimated`` is true when golem did not send the window and read it
 /// from Ollama (the loaded context or the Modelfile). An older event has no
-/// field and reads as False.
+/// field and reads as False. ``window_planned`` is true when golem chose the ``num_ctx`` it
+/// sent (``[context] window``), and false for one that someone set or that golem did not
+/// send.
 ///
 /// The size fields count what was sent, in UTF-8 bytes and in characters: the
 /// system text, the tool schemas as compact JSON, and each history message in
@@ -5329,6 +5336,7 @@ public struct ModelCallStartedEventData: Codable {
     public let toolsChars: Int?
     public let toolsSHA: String?
     public let windowEstimated: Bool?
+    public let windowPlanned: Bool?
 
     public enum CodingKeys: String, CodingKey {
         case contextWindow = "context_window"
@@ -5350,9 +5358,10 @@ public struct ModelCallStartedEventData: Codable {
         case toolsChars = "tools_chars"
         case toolsSHA = "tools_sha"
         case windowEstimated = "window_estimated"
+        case windowPlanned = "window_planned"
     }
 
-    public init(contextWindow: Int?, index: Int, messageBytes: [Int]?, messageChars: [Int]?, messageID: String, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String, provider: String?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [FluffyPromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?) {
+    public init(contextWindow: Int?, index: Int, messageBytes: [Int]?, messageChars: [Int]?, messageID: String, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String, provider: String?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [FluffyPromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?) {
         self.contextWindow = contextWindow
         self.index = index
         self.messageBytes = messageBytes
@@ -5372,6 +5381,7 @@ public struct ModelCallStartedEventData: Codable {
         self.toolsChars = toolsChars
         self.toolsSHA = toolsSHA
         self.windowEstimated = windowEstimated
+        self.windowPlanned = windowPlanned
     }
 }
 
@@ -5906,7 +5916,8 @@ public struct ModelOptionsGetParams: Codable {
 /// ``default_from`` says where a default came from when it is not Ollama's fixed one:
 /// ``modelfile`` for the model's own, ``ollama`` for the window Ollama gave the model
 /// on a call that sent no ``num_ctx``. ``num_ctx`` has no default until one of the two
-/// is known.
+/// is known. ``golem`` is the window golem plans for the model, which it sends when nothing
+/// else sets ``num_ctx``.
 // MARK: - ModelOptionsGetResult
 public struct ModelOptionsGetResult: Codable {
     public let defaultFrom: [String: DefaultFrom]?
@@ -5939,6 +5950,7 @@ public struct ModelOptionsGetResult: Codable {
 }
 
 public enum DefaultFrom: String, Codable {
+    case golem = "golem"
     case modelfile = "modelfile"
     case ollama = "ollama"
 }
@@ -7246,7 +7258,9 @@ public struct Params: Codable {
 ///
 /// ``window_estimated`` is true when golem did not send the window and read it
 /// from Ollama (the loaded context or the Modelfile). An older event has no
-/// field and reads as False.
+/// field and reads as False. ``window_planned`` is true when golem chose the ``num_ctx`` it
+/// sent (``[context] window``), and false for one that someone set or that golem did not
+/// send.
 ///
 /// The size fields count what was sent, in UTF-8 bytes and in characters: the
 /// system text, the tool schemas as compact JSON, and each history message in
@@ -7392,6 +7406,7 @@ public struct ParamsData: Codable {
     public let toolsChars: Int?
     public let toolsSHA: String?
     public let windowEstimated: Bool?
+    public let windowPlanned: Bool?
     public let costUsd: Double?
     public let failed: Bool?
     public let firstTokenMS: Int?
@@ -7461,6 +7476,7 @@ public struct ParamsData: Codable {
         case toolsChars = "tools_chars"
         case toolsSHA = "tools_sha"
         case windowEstimated = "window_estimated"
+        case windowPlanned = "window_planned"
         case costUsd = "cost_usd"
         case failed = "failed"
         case firstTokenMS = "first_token_ms"
@@ -7490,7 +7506,7 @@ public struct ParamsData: Codable {
         case path = "path"
     }
 
-    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, title: String?, runID: String?, status: DataStatus?, summary: String?, reason: PurpleReason?, options: [String: Option]?, mode: Mode?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, contextWindow: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String?, provider: String?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, price: FluffyCallPrice?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, todos: [PurpleTodo]?, hash: String?, how: How?, path: String?) {
+    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, title: String?, runID: String?, status: DataStatus?, summary: String?, reason: PurpleReason?, options: [String: Option]?, mode: Mode?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, contextWindow: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String?, provider: String?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, price: FluffyCallPrice?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, todos: [PurpleTodo]?, hash: String?, how: How?, path: String?) {
         self.cwd = cwd
         self.forkedFrom = forkedFrom
         self.modelName = modelName
@@ -7531,6 +7547,7 @@ public struct ParamsData: Codable {
         self.toolsChars = toolsChars
         self.toolsSHA = toolsSHA
         self.windowEstimated = windowEstimated
+        self.windowPlanned = windowPlanned
         self.costUsd = costUsd
         self.failed = failed
         self.firstTokenMS = firstTokenMS
@@ -11274,6 +11291,7 @@ public struct RunChild: Codable {
     public let start: String
     public let status: ChildStatus
     public let tokens: RunTraceTokens?
+    public let windowPlanned: Bool?
 
     public enum CodingKeys: String, CodingKey {
         case approvalWaitMS = "approval_wait_ms"
@@ -11298,9 +11316,10 @@ public struct RunChild: Codable {
         case start = "start"
         case status = "status"
         case tokens = "tokens"
+        case windowPlanned = "window_planned"
     }
 
-    public init(approvalWaitMS: Int?, children: [PurpleTraceToolSpan]?, contextWindow: Int?, contextWindowEstimated: Bool?, costUsd: Double?, droppedMessageIDS: [String]?, droppedTokens: Int?, durationMS: Int?, end: String?, firstTokenMS: Int?, id: String, kind: ChildKind, model: String?, name: String, numCtx: Int?, preview: String?, promptCut: PromptCut?, promptCutKind: PromptCutKind?, recorded: Bool?, start: String, status: ChildStatus, tokens: RunTraceTokens?) {
+    public init(approvalWaitMS: Int?, children: [PurpleTraceToolSpan]?, contextWindow: Int?, contextWindowEstimated: Bool?, costUsd: Double?, droppedMessageIDS: [String]?, droppedTokens: Int?, durationMS: Int?, end: String?, firstTokenMS: Int?, id: String, kind: ChildKind, model: String?, name: String, numCtx: Int?, preview: String?, promptCut: PromptCut?, promptCutKind: PromptCutKind?, recorded: Bool?, start: String, status: ChildStatus, tokens: RunTraceTokens?, windowPlanned: Bool?) {
         self.approvalWaitMS = approvalWaitMS
         self.children = children
         self.contextWindow = contextWindow
@@ -11323,6 +11342,7 @@ public struct RunChild: Codable {
         self.start = start
         self.status = status
         self.tokens = tokens
+        self.windowPlanned = windowPlanned
     }
 }
 
@@ -11483,6 +11503,7 @@ public struct TraceModelSpan: Codable {
     public let start: String
     public let status: ChildStatus
     public let tokens: TraceModelSpanTraceTokens?
+    public let windowPlanned: Bool?
 
     public enum CodingKeys: String, CodingKey {
         case approvalWaitMS = "approval_wait_ms"
@@ -11507,9 +11528,10 @@ public struct TraceModelSpan: Codable {
         case start = "start"
         case status = "status"
         case tokens = "tokens"
+        case windowPlanned = "window_planned"
     }
 
-    public init(approvalWaitMS: Int?, children: [TraceModelSpanChild]?, contextWindow: Int?, contextWindowEstimated: Bool?, costUsd: Double?, droppedMessageIDS: [String]?, droppedTokens: Int?, durationMS: Int?, end: String?, firstTokenMS: Int?, id: String, kind: ChildKind, model: String?, name: String, numCtx: Int?, preview: String?, promptCut: PromptCut?, promptCutKind: PromptCutKind?, recorded: Bool?, start: String, status: ChildStatus, tokens: TraceModelSpanTraceTokens?) {
+    public init(approvalWaitMS: Int?, children: [TraceModelSpanChild]?, contextWindow: Int?, contextWindowEstimated: Bool?, costUsd: Double?, droppedMessageIDS: [String]?, droppedTokens: Int?, durationMS: Int?, end: String?, firstTokenMS: Int?, id: String, kind: ChildKind, model: String?, name: String, numCtx: Int?, preview: String?, promptCut: PromptCut?, promptCutKind: PromptCutKind?, recorded: Bool?, start: String, status: ChildStatus, tokens: TraceModelSpanTraceTokens?, windowPlanned: Bool?) {
         self.approvalWaitMS = approvalWaitMS
         self.children = children
         self.contextWindow = contextWindow
@@ -11532,6 +11554,7 @@ public struct TraceModelSpan: Codable {
         self.start = start
         self.status = status
         self.tokens = tokens
+        self.windowPlanned = windowPlanned
     }
 }
 
@@ -11696,6 +11719,7 @@ public struct TraceRunSpanChild: Codable {
     public let start: String
     public let status: ChildStatus
     public let tokens: TraceRunSpanTraceTokens?
+    public let windowPlanned: Bool?
 
     public enum CodingKeys: String, CodingKey {
         case approvalWaitMS = "approval_wait_ms"
@@ -11720,9 +11744,10 @@ public struct TraceRunSpanChild: Codable {
         case start = "start"
         case status = "status"
         case tokens = "tokens"
+        case windowPlanned = "window_planned"
     }
 
-    public init(approvalWaitMS: Int?, children: [FluffyTraceToolSpan]?, contextWindow: Int?, contextWindowEstimated: Bool?, costUsd: Double?, droppedMessageIDS: [String]?, droppedTokens: Int?, durationMS: Int?, end: String?, firstTokenMS: Int?, id: String, kind: ChildKind, model: String?, name: String, numCtx: Int?, preview: String?, promptCut: PromptCut?, promptCutKind: PromptCutKind?, recorded: Bool?, start: String, status: ChildStatus, tokens: TraceRunSpanTraceTokens?) {
+    public init(approvalWaitMS: Int?, children: [FluffyTraceToolSpan]?, contextWindow: Int?, contextWindowEstimated: Bool?, costUsd: Double?, droppedMessageIDS: [String]?, droppedTokens: Int?, durationMS: Int?, end: String?, firstTokenMS: Int?, id: String, kind: ChildKind, model: String?, name: String, numCtx: Int?, preview: String?, promptCut: PromptCut?, promptCutKind: PromptCutKind?, recorded: Bool?, start: String, status: ChildStatus, tokens: TraceRunSpanTraceTokens?, windowPlanned: Bool?) {
         self.approvalWaitMS = approvalWaitMS
         self.children = children
         self.contextWindow = contextWindow
@@ -11745,6 +11770,7 @@ public struct TraceRunSpanChild: Codable {
         self.start = start
         self.status = status
         self.tokens = tokens
+        self.windowPlanned = windowPlanned
     }
 }
 
