@@ -8,6 +8,7 @@ public enum MethodAccess {
         "config.get",
         "config.raw.get",
         "config.raw.set",
+        "cost.get",
         "daemon.status",
         "fs.list_dirs",
         "hello",

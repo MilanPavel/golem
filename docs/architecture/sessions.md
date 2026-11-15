@@ -150,7 +150,7 @@ The daemon keeps its files under one home directory. `resolve_paths` picks it: a
 | `config.toml` | Settings for this user | Built |
 | `logs/golem.jsonl` | The daemon's own log, one JSON object per line | Built |
 | `cache/` | Hosted model lists (`models-<provider>.json`) and LiteLLM's prices (`litellm-prices.json`), each refreshed after a day. Safe to delete | Built |
-| `golem.db` | The event log, the `sessions` and `runs` tables derived from it, and `artifacts`, the long tool output. Costs later | Built |
+| `golem.db` | The event log, the `sessions` and `runs` tables derived from it, and `artifacts`, the long tool output, and `model_calls`, one row for each model call | Built |
 | `memory.db` | Long-term memory | Planned |
 | `skills/` | Skills you added on this machine, one folder each | Built |
 | `flows/` | Flows you added on this machine | Planned |
@@ -160,6 +160,10 @@ The settings in `config.toml` are in the [Settings](../guide/settings.md).
 ### The event log
 
 In `golem.db`, `events` is the source. `sessions` and `runs` are written in the same transaction as the event they follow: `session.created` adds a session with its project folder (`cwd`), `run.started` opens a run, `approval.needed` marks it `waiting` and `approval.resolved` marks it running again, and `run.completed`, `run.failed`, or `run.cancelled` closes it. An `approval.resolved` with `allow_session` adds the tool to `sessions.allowed_tools`. `session.updated` sets the title, or the folder of a session that had none. `session.closed` records `closed_at`, which hides the session from `session.list`; the events stay. `artifacts` is not derived from events: the `tools` node writes a row for each long tool output, by session. Each model call also leaves `model.call.started` and `model.call.completed` in the log, and [Tracing](./tracing.md) reads them back, with the checkpoint, as a tree of spans.
+
+### The usage table
+
+`model_calls` has one row for each model call: `call_id` (the assistant message id of a chat call, or a new id for a `titles` call), `session_id`, `run_id`, `role` (`chat` or `titles`), `provider`, `model`, `tier`, `started_at`, `day`, the tokens (`input`, `output`, `cache_read`, `cache_write`), `cost_usd` and `failed`. `day` is the user's local date, `YYYY-MM-DD`, written with the row, and an index on it makes "what did I spend today" one query. `model.call.started` inserts the row and `model.call.completed` fills in tokens, cost and `failed`, in the same transaction as the event, so replaying the events gives the same rows. A call outside a run, a title today, is written directly by `Usage.record_role_call` and is not rebuilt from events. The migration does not backfill: when the table is empty at daemon start, `backfill` replays the stored `model.call.*` events into it. An old call has no cost, and a `model.call.started` from before `tier` existed is `local` for ollama and has no tier otherwise. Money is a float, summed in SQL and rounded only for display. `cost_usd` takes `input` to include the cached tokens, and prices a cache write at the input price.
 
 ### Migrations and backups
 

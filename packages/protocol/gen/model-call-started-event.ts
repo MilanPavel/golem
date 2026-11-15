@@ -16,6 +16,7 @@ export type SystemPromptSha = string | null;
 export type SystemSections = PromptSectionInfo[] | null;
 export type Chars = number;
 export type Name = string;
+export type Tier = ('local' | 'budget' | 'frontier') | null;
 export type ToolsBytes = number | null;
 export type ToolsChars = number | null;
 export type ToolsSha = string | null;
@@ -43,6 +44,9 @@ export interface ModelCallStartedEvent {
  * ``message_id`` is the assistant reply's id, which identifies the model
  * call. ``index`` counts the calls of this run from 1. ``provider`` and
  * ``model`` are None when the profile does not resolve.
+ *
+ * ``tier`` is the model's tier when the call was sent (``local``, ``budget`` or
+ * ``frontier``), and None on an older event or when the profile does not resolve.
  *
  * ``system_prompt_sha`` and ``tools_sha`` are the sha256 of the system
  * prompt and of the tool schemas (compact JSON, sorted keys) sent with the
@@ -78,6 +82,7 @@ export interface ModelCallStartedData {
   system_chars?: SystemChars;
   system_prompt_sha?: SystemPromptSha;
   system_sections?: SystemSections;
+  tier?: Tier;
   tools_bytes?: ToolsBytes;
   tools_chars?: ToolsChars;
   tools_sha?: ToolsSha;

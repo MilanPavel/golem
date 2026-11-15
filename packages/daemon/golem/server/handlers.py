@@ -34,6 +34,7 @@ from golem.models.install import InstallError, OllamaInstaller
 from golem.models.keys import KeyStore, KeyStoreError, MemoryKeyStore
 from golem.models.pulls import PullError, PullManager
 from golem.models.router import OLLAMA_BASE_URL, ModelConfigError, ModelRouter
+from golem.models.tiers import blended
 from golem.permissions.policy import PROJECT_POLICY
 from golem.secrets import SecretStore, SecretStoreError, check_name
 from golem.server.dispatcher import (
@@ -94,6 +95,7 @@ from golem.sessions.manager import (
     SpanNotFoundError,
 )
 from golem.sessions.summaries import summarize
+from golem.sessions.usage import EVER, Reference, Totals
 from golem.skills.index import build_index
 from golem.skills.invoke import SkillInvokeError
 from golem.skills.pinned import SkillPinError
@@ -117,6 +119,11 @@ from golem_protocol.commands import (
     ConfigRawGetParams,
     ConfigRawSetParams,
     ConfigRule,
+    CostDayRow,
+    CostGetParams,
+    CostGetResult,
+    CostModelRow,
+    CostTotals,
     DaemonStatus,
     FsListDirsParams,
     FsListDirsResult,
@@ -488,6 +495,80 @@ async def _trace_get(ctx: RequestContext, params: TraceGetParams) -> TraceGetRes
     except SchemaMismatchError as exc:
         raise RpcCallError(SESSION_NOT_FOUND, str(exc)) from exc
     return TraceGetResult(session_id=params.session_id, title=title, runs=runs)
+
+
+def _cost_totals(totals: Totals) -> CostTotals:
+    return CostTotals(
+        calls=totals.calls,
+        input=totals.input,
+        output=totals.output,
+        cost_usd=totals.cost_usd,
+        saved_usd=totals.saved_usd,
+    )
+
+
+async def _saved_reference(ctx: RequestContext) -> Reference | None:
+    """The model whose prices say what local tokens would have cost.
+
+    The cheapest budget-tier model in the listing that takes tools. Nothing else sets one
+    yet: ``[routing.ladder]`` does not exist.
+    """
+    models = ctx.state.models
+    if models is None:
+        return None
+    best: tuple[float, Reference] | None = None
+    for model in (await models.list()).models:
+        if model.tier != "budget" or model.tools is False or model.price is None:
+            continue
+        cost = blended(model.price)
+        if cost is not None and (best is None or cost < best[0]):
+            best = (cost, Reference(model.ref, model.price))
+    return None if best is None else best[1]
+
+
+async def _cost_get(ctx: RequestContext, params: CostGetParams) -> CostGetResult:
+    usage = ctx.state.usage
+    if usage is None:
+        raise RpcCallError(INTERNAL_ERROR, "usage is not ready")
+    reference = await _saved_reference(ctx)
+    week = await usage.summary(since_day=usage.days_back(6), reference=reference)
+    today = await usage.summary(since_day=usage.today(), reference=reference)
+    session = None
+    if params.session_id is not None:
+        session = _cost_totals(
+            (
+                await usage.summary(
+                    since_day=EVER, session_id=params.session_id, reference=reference
+                )
+            ).totals
+        )
+    return CostGetResult(
+        today=_cost_totals(today.totals),
+        week=_cost_totals(week.totals),
+        session=session,
+        by_model=[
+            CostModelRow(
+                provider=row.provider,
+                model=row.model,
+                tier=cast(Literal["local", "budget", "frontier"] | None, row.tier),
+                calls=row.calls,
+                input=row.input,
+                output=row.output,
+                cost_usd=row.cost_usd,
+            )
+            for row in week.by_model
+        ],
+        by_day=[
+            CostDayRow(
+                day=row.day,
+                local_tokens=row.local_tokens,
+                paid_tokens=row.paid_tokens,
+                cost_usd=row.cost_usd,
+            )
+            for row in week.by_day
+        ],
+        saved_reference=week.saved_reference,
+    )
 
 
 async def _trace_span(ctx: RequestContext, params: TraceSpanParams) -> TraceSpanResult:
@@ -1210,6 +1291,7 @@ def standard_methods() -> dict[str, Method]:
         "run.cancel": Method("run.cancel", RunCancelParams, True, _run_cancel),
         "artifact.read": Method("artifact.read", ArtifactReadParams, True, _artifact_read),
         "session.inspect": Method("session.inspect", SessionInspectParams, True, _session_inspect),
+        "cost.get": Method("cost.get", CostGetParams, True, _cost_get),
         "trace.get": Method("trace.get", TraceGetParams, True, _trace_get),
         "trace.span": Method("trace.span", TraceSpanParams, True, _trace_span),
         "auth.set": Method("auth.set", AuthSetParams, True, _auth_set),
