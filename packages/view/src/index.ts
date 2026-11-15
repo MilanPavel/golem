@@ -2,6 +2,7 @@ export type { ApprovalChoice } from "@golem/client";
 export { formatDuration, formatElapsed, formatTurnTime } from "./duration.ts";
 export { approvalQuestion, DETAILS, displayToolName, isDetail, stepCount, stepFailed, stepMark, summarizeSteps, type Detail, type StepMark } from "./activity.ts";
 export { REPLY_CUT_NOTE, replyWasCut } from "./stop.ts";
+export { formatCost, sessionCostLabel, turnFooterParts, turnTotals, type TurnTotals } from "./cost.ts";
 export { groupTurns, turnFooter, type Turn } from "./turns.ts";
 export { editedArgs, parseArgs, type ParsedArgs } from "./approval-args.ts";
 export {
@@ -29,6 +30,7 @@ export {
   type ChatMessage,
   type ChatState,
   type DeltaBatcher,
+  type MessageCall,
   type PendingApproval,
   type ToolApproval,
   type ToolBlock,

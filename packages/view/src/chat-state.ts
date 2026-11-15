@@ -54,6 +54,18 @@ export const LIVE_OUTPUT_CHARS = 4_000;
 /** How far the model got writing a `write_file` or `edit_file` call. `path` is null until it is whole. */
 export type WritingBlock = { name: string; path: string | null; lines: number; chars: number };
 
+/** What one model call that wrote a reply used, from `model.call.started` and `model.call.completed`. */
+export type MessageCall = {
+  model: string | null;
+  tier: "local" | "budget" | "frontier" | null;
+  /** Input plus output tokens. Null until the call completes, or when it reported none. */
+  tokens: number | null;
+  /** golem's estimate of the cost. Null when the price is not known. */
+  costUsd: number | null;
+  /** The call has ended. */
+  done: boolean;
+};
+
 export type ChatMessage = {
   id: string;
   role: "user" | "assistant";
@@ -71,6 +83,8 @@ export type ChatMessage = {
   thinkingMs?: number;
   /** The model stopped at the length limit and the reply asked for no tool, from `model.call.completed`. */
   cut?: boolean;
+  /** The model call that wrote this reply. */
+  call?: MessageCall;
   /** Tool calls this reply asked for, in order. */
   tools?: ToolBlock[];
   /** A file the model is still writing, from `tool.writing`. Gone once the call is requested or the reply completes. */
@@ -110,6 +124,8 @@ export type ChatState = {
   unreadCall: boolean;
   /** The context of the newest model call that reported its input, from the `model.call.*` events. */
   context: LiveContextState;
+  /** The model calls seen so far, by the id of the reply each one wrote. */
+  calls: Readonly<Record<string, MessageCall>>;
   /** The session's option overrides, from the newest `model.options.changed`: the whole set. */
   options: Readonly<Record<string, number | string>>;
   /** The session's permission mode override, from the newest `session.mode.changed`. Null follows config.toml. */
@@ -131,6 +147,7 @@ export const emptyChat: ChatState = {
   retry: null,
   unreadCall: false,
   context: emptyLiveContext,
+  calls: {},
   options: {},
   permissionMode: null,
 };
@@ -251,6 +268,16 @@ function reduceChatEvent(state: ChatState, event: ChatEvent): ChatState {
       return { ...state, options: event.data.options };
     case "session.mode.changed":
       return { ...state, permissionMode: event.data.mode };
+    case "model.call.started": {
+      const call: MessageCall = {
+        model: event.data.model ?? null,
+        tier: event.data.tier ?? null,
+        tokens: null,
+        costUsd: null,
+        done: false,
+      };
+      return withCall(state, event.data.message_id, call);
+    }
     case "message.started":
       return {
         ...state,
@@ -263,6 +290,7 @@ function reduceChatEvent(state: ChatState, event: ChatEvent): ChatState {
             text: "",
             streaming: true,
             at: event.ts,
+            ...callOf(state, event.data.message_id),
           },
         ],
       };
@@ -271,7 +299,7 @@ function reduceChatEvent(state: ChatState, event: ChatEvent): ChatState {
     case "message.thinking.delta":
       return appendThinking(state, event.data.message_id, event.data.text);
     case "message.completed":
-      return { ...state, messages: upsertCompleted(state.messages, event, state.runStartedAt) };
+      return { ...state, messages: upsertCompleted(state.messages, event, state.runStartedAt, state.calls) };
     case "run.started":
       return {
         ...state,
@@ -283,7 +311,18 @@ function reduceChatEvent(state: ChatState, event: ChatEvent): ChatState {
         runId: event.run_id,
       };
     case "model.call.completed": {
-      const next = event.data.text_tool_calls === "unread" ? { ...state, unreadCall: true } : state;
+      const usage = event.data.usage;
+      const counted = typeof usage?.input === "number" || typeof usage?.output === "number";
+      const before = state.calls[event.data.message_id];
+      const call: MessageCall = {
+        model: before?.model ?? null,
+        tier: before?.tier ?? null,
+        tokens: counted ? (usage?.input ?? 0) + (usage?.output ?? 0) : null,
+        costUsd: event.data.cost_usd ?? null,
+        done: true,
+      };
+      const noted = withCall(state, event.data.message_id, call);
+      const next = event.data.text_tool_calls === "unread" ? { ...noted, unreadCall: true } : noted;
       if (!replyWasCut(event.data.stop_reason)) {
         return next;
       }
@@ -542,10 +581,25 @@ export function createDeltaBatcher(
   };
 }
 
+function callOf(state: Pick<ChatState, "calls">, id: string): { call?: MessageCall } {
+  const call = state.calls[id];
+  return call === undefined ? {} : { call };
+}
+
+/** Keep a call by its reply's id, and put it on the reply when that is already in the list. */
+function withCall(state: ChatState, id: string, call: MessageCall): ChatState {
+  return {
+    ...state,
+    calls: { ...state.calls, [id]: call },
+    messages: state.messages.map((message) => (message.id === id ? { ...message, call } : message)),
+  };
+}
+
 function upsertCompleted(
   messages: readonly ChatMessage[],
   event: ChatEvent,
   runStartedAt: string | null,
+  calls: Readonly<Record<string, MessageCall>>,
 ): ChatMessage[] {
   if (event.type !== "message.completed") {
     return [...messages];
@@ -560,6 +614,7 @@ function upsertCompleted(
     at: event.ts,
     ...(durationMs === undefined ? {} : { durationMs }),
     ...(event.data.skill == null ? {} : { skill: event.data.skill }),
+    ...callOf({ calls }, event.data.message_id),
   };
   const index = messages.findIndex((message) => message.id === next.id);
   if (index < 0) {

@@ -8,6 +8,8 @@ import {
   parseDiff,
   REPLY_CUT_NOTE,
   thinkingLine,
+  turnFooterParts,
+  turnTotals,
   visibleText,
   type ChatMessage,
   type Detail,
@@ -96,8 +98,12 @@ export function layoutMessages(
   const width = Math.max(1, columns);
   const lines: LayoutLine[] = [];
   let previous: ChatMessage | undefined;
-  for (const message of messages) {
+  let runStart = 0;
+  for (const [index, message] of messages.entries()) {
     const continues = previous?.role === "assistant" && message.role === "assistant";
+    if (!continues) {
+      runStart = index;
+    }
     previous = message;
     if (lines.length > 0 && !continues) {
       lines.push({ role: "plain", spans: [{ text: "" }] });
@@ -128,7 +134,7 @@ export function layoutMessages(
         lines.push(wrappedLine(role, spans));
       }
     }
-    const duration = tools.length > 0 ? null : answerDuration(message);
+    const duration = tools.length > 0 ? null : answerDuration(message, messages.slice(runStart, index + 1));
     if (duration !== null) {
       lines.push(paint({ role, spans: [{ text: duration, dim: true }] }, width));
     }
@@ -458,11 +464,13 @@ function labelSpans(label: string, message: ChatMessage, options: TranscriptOpti
   return spans;
 }
 
-function answerDuration(message: ChatMessage): string | null {
+/** The footer of an answer: its time, then the model, tokens and cost of the run's calls. */
+function answerDuration(message: ChatMessage, run: readonly ChatMessage[]): string | null {
   if (message.role !== "assistant" || message.streaming || message.durationMs === undefined) {
     return null;
   }
-  const text = formatDuration(message.durationMs);
+  const time = formatDuration(message.durationMs);
+  const text = [time, ...turnFooterParts(turnTotals(run))].filter((part) => part.length > 0).join(" · ");
   return text.length > 0 ? text : null;
 }
 
