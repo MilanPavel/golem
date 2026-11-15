@@ -49,6 +49,7 @@ const EMPTY_LISTING: ModelListResult = {
       source: "installed",
       status: "ready",
       price: { input: 0, output: 0 },
+      tier: "local",
     },
   ],
   providers: [{ provider: "ollama", status: "ready" }],
