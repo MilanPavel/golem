@@ -1291,6 +1291,56 @@ test("model.server.status reaches onModelServer, and a malformed one does not", 
   }
 });
 
+test("skill.read, write, create and set_disabled send their params, and local clients use the protected twins", async () => {
+  const sent: Record<string, unknown>[] = [];
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: {
+        "skill.read": { path: "/s/ship/SKILL.md", text: "x", mtime_ns: 5, source: "user" },
+        "skill.write": { ok: true, written: true, mtime_ns: 6 },
+        "skill.write_protected": { ok: true, written: true, mtime_ns: 7 },
+        "skill.create": { path: "/s/new/SKILL.md", mtime_ns: 8 },
+        "skill.create_protected": { path: "/p/new/SKILL.md", mtime_ns: 9 },
+        "skill.set_disabled": { name: "ship", disabled: true },
+      },
+      onRequest: (_socket, method, params) => {
+        if (method.startsWith("skill.")) {
+          sent.push({ method, ...params });
+        }
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    assert.equal((await client.readSkill("ship", "/repo")).mtime_ns, 5);
+    assert.equal((await client.writeSkill({ path: "/s/ship/SKILL.md", text: "y", baseMtimeNs: 5 })).mtime_ns, 6);
+    const local = await client.writeSkill(
+      { path: "/s/ship/SKILL.md", text: "y", baseMtimeNs: 5, cwd: "/repo", dryRun: true },
+      { local: true },
+    );
+    assert.equal(local.mtime_ns, 7);
+    assert.equal((await client.createSkill({ name: "new", scope: "user", description: "d" })).mtime_ns, 8);
+    const project = await client.createSkill(
+      { name: "new", scope: "project", description: "d", cwd: "/repo", modelInvocable: false },
+      { local: true },
+    );
+    assert.equal(project.mtime_ns, 9);
+    assert.deepEqual(await client.setSkillDisabled("ship", true), { name: "ship", disabled: true });
+    assert.deepEqual(sent, [
+      { method: "skill.read", name: "ship", cwd: "/repo" },
+      { method: "skill.write", path: "/s/ship/SKILL.md", text: "y", base_mtime_ns: 5 },
+      { method: "skill.write_protected", path: "/s/ship/SKILL.md", text: "y", base_mtime_ns: 5, cwd: "/repo", dry_run: true },
+      { method: "skill.create", name: "new", scope: "user", description: "d" },
+      { method: "skill.create_protected", name: "new", scope: "project", description: "d", cwd: "/repo", model_invocable: false },
+      { method: "skill.set_disabled", name: "ship", disabled: true },
+    ]);
+  } finally {
+    client.close();
+    await server.close();
+  }
+});
+
 test("skill.list reads the skills, and skill.registry.changed reaches onSkillsChanged", async () => {
   const ship = { name: "ship", description: "Ship it.", source: "project", path: "/repo/.agents/skills/ship", usable: true };
   const sent: Record<string, unknown>[] = [];

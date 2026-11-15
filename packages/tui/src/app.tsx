@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { homedir } from "node:os";
+import { dirname, join } from "node:path";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Box, Text, useApp, useInput, usePaste, useStdin, useWindowSize } from "ink";
 import {
@@ -198,7 +199,7 @@ import {
   type ToolsUi,
 } from "./setup-frame-tools.ts";
 import { SetupFrame } from "./setup-frame.tsx";
-import { draftAt, edit, editDraft, insertText, type Draft } from "./edit.ts";
+import { draftAt, edit, editDraft, editFile, insertText, type Draft } from "./edit.ts";
 import { collapsePaste, deleteToken, expandPastes, noPastes, type Pastes } from "./paste.ts";
 import {
   browseHistory,
@@ -289,10 +290,15 @@ import {
 import {
   closedSkillsManager,
   layoutSkillsManager,
+  openNewSkill,
   openSkillsManager,
   pressSkillsManager,
+  showSkillDetail,
+  skillCreateFailed,
   type SkillList,
+  type SkillsManagerAction,
   skillsManagerKeyOf,
+  skillsManagerTyping,
   type SkillsManagerState,
 } from "./skills-manager.ts";
 import { assistantChars, elapsedSeconds, meterLine, meterPhase } from "./progress.ts";
@@ -1786,6 +1792,14 @@ export function App({
       const opened = openSkillsManager();
       skillsManagerRef.current = opened;
       setSkillsManager(opened);
+      loadSkills();
+      return;
+    }
+    if (outcome.kind === "skill-new") {
+      setDraft(draftAt(""));
+      setKeysOpen(false);
+      setSwitcher(closedSwitcher);
+      showSkillsManager(openNewSkill());
       loadSkills();
       return;
     }
@@ -3475,13 +3489,143 @@ export function App({
   }
 
   function onSkillsManagerPress(press: Press): void {
-    const key = skillsManagerKeyOf(press);
+    const key = skillsManagerKeyOf(press, skillsManagerTyping(skillsManagerRef.current));
     if (key === null) {
       return;
     }
-    const pressed = pressSkillsManager(skillsManagerRef.current, skillListRef.current.skills ?? [], key);
-    skillsManagerRef.current = pressed.state;
-    setSkillsManager(pressed.state);
+    const pressed = pressSkillsManager(
+      skillsManagerRef.current,
+      skillListRef.current.skills ?? [],
+      key,
+      chatRef.current.activeSkills,
+    );
+    showSkillsManager(pressed.state);
+    runSkillsAction(pressed.action);
+  }
+
+  function showSkillsManager(next: SkillsManagerState): void {
+    skillsManagerRef.current = next;
+    setSkillsManager(next);
+  }
+
+  function runSkillsAction(action: SkillsManagerAction): void {
+    const notify = (notice: string) => setChat((state) => ({ ...state, notice }));
+    const failed = (error: unknown) => notify(messageOf(error));
+    if (action.kind === "run") {
+      showSkillsManager(closedSkillsManager);
+      setDraft(draftAt(`/${action.name} `));
+    } else if (action.kind === "pin") {
+      const current = sessionRef.current;
+      if (current === null) {
+        notify("open a session first");
+        return;
+      }
+      const change = action.pin ? { pin: [action.name] } : { unpin: [action.name] };
+      client
+        .setSkills(current, change)
+        .then(() => notify(action.pin ? `${action.name} is pinned for this session` : `${action.name} is unpinned`), failed);
+    } else if (action.kind === "edit") {
+      void editSkillFile(action.path);
+    } else if (action.kind === "copy") {
+      void copyBundledSkill(action.name);
+    } else if (action.kind === "set-disabled") {
+      client.setSkillDisabled(action.name, action.disabled).then(() => {
+        notify(action.disabled ? `${action.name} is turned off` : `${action.name} is turned on`);
+        loadSkills();
+      }, failed);
+    } else if (action.kind === "reveal") {
+      revealInFolder(join(action.path, "SKILL.md"));
+    } else if (action.kind === "create") {
+      const where = action.scope === "user" ? {} : { cwd: skillsFolder() };
+      client
+        .createSkill({ name: action.name, scope: action.scope, description: action.description, ...where }, { local: true })
+        .then(
+          (created) => editSkillFile(dirname(created.path)),
+          (error: unknown) => showSkillsManager(skillCreateFailed(skillsManagerRef.current, messageOf(error))),
+        );
+    }
+  }
+
+  /**
+   * Open a skill's real `SKILL.md` in `$EDITOR`, then read the skills again and
+   * show that skill's detail, with its errors if the file is now broken.
+   */
+  async function editSkillFile(folder: string): Promise<void> {
+    if (editing.current) {
+      return;
+    }
+    editing.current = true;
+    let notice = "";
+    try {
+      const saved = await editFile(join(folder, "SKILL.md"), suspendTerminal);
+      notice = saved ? "" : "the editor did not exit cleanly";
+    } catch (error) {
+      notice = messageOf(error);
+    } finally {
+      editing.current = false;
+    }
+    try {
+      const listed = await client.listSkills(skillsFolder());
+      setSkillList({ skills: listed.skills, error: null });
+      const skill = listed.skills.find((item) => item.path === folder);
+      if (skill !== undefined && notice === "") {
+        const first = skill.errors?.[0];
+        notice = skill.usable
+          ? `${skill.name} saved · reloaded · ✔ usable`
+          : first !== undefined
+            ? `✘ ${skill.name}: ${first}`
+            : `${skill.name} saved · reloaded · not usable`;
+      }
+    } catch (error) {
+      notice = notice === "" ? messageOf(error) : notice;
+    }
+    showSkillsManager(showSkillDetail(skillsManagerRef.current, folder));
+    if (notice !== "") {
+      setChat((state) => ({ ...state, notice }));
+    }
+  }
+
+  /** A bundled skill is read-only, so Copy to Yours makes `~/.golem/skills/<name>` with the same text. */
+  async function copyBundledSkill(name: string): Promise<void> {
+    try {
+      const folder = skillsFolder();
+      const original = await client.readSkill(name, folder);
+      if (original.source !== "bundled") {
+        throw new Error(`${name} is hidden by another skill: edit that one`);
+      }
+      const bundled = skillListRef.current.skills?.find((item) => item.name === name && item.source === "bundled");
+      const created = await client.createSkill(
+        { name, scope: "user", description: bundled?.description || name },
+        { local: true },
+      );
+      const written = await client.writeSkill(
+        { path: created.path, text: original.text, baseMtimeNs: created.mtime_ns },
+        { local: true },
+      );
+      if (!written.written) {
+        throw new Error(written.errors?.[0]?.message ?? `could not copy ${name}`);
+      }
+      const listed = await client.listSkills(folder);
+      setSkillList({ skills: listed.skills, error: null });
+      showSkillsManager(showSkillDetail(skillsManagerRef.current, dirname(created.path)));
+      setChat((state) => ({ ...state, notice: `${name} is copied to ~/.golem/skills and now yours to edit` }));
+    } catch (error) {
+      setChat((state) => ({ ...state, notice: messageOf(error) }));
+    }
+  }
+
+  /** Show a file in Finder, or its folder in the desktop's file manager. */
+  function revealInFolder(file: string): void {
+    const [bin, args] =
+      process.platform === "darwin" ? (["open", ["-R", file]] as const) : (["xdg-open", [dirname(file)]] as const);
+    const failed = () => setChat((state) => ({ ...state, notice: `could not open ${dirname(file)}` }));
+    try {
+      const child = spawn(bin, args, { stdio: "ignore", detached: true });
+      child.on("error", failed);
+      child.unref();
+    } catch {
+      failed();
+    }
   }
 
   function onTunePress(press: Press): void {
@@ -4270,6 +4414,7 @@ export function App({
             home: homedir(),
             columns,
             rows: budget.body,
+            pinned: chat.activeSkills,
           }).map((line, index) => (
             <McpManagerRow key={index} line={line} />
           ))}

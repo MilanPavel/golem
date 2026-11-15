@@ -125,6 +125,23 @@ export async function editDraft(
   }
 }
 
+/**
+ * Runs the editor on the real file at `path` while the terminal is suspended.
+ * Nothing is copied: the editor saves in place. Resolves with whether it exited cleanly.
+ */
+export async function editFile(
+  path: string,
+  suspend: (run: () => Promise<void>) => Promise<void>,
+  run: (command: readonly string[], file: string) => Promise<number> = runEditor,
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<boolean> {
+  let code = 1;
+  await suspend(async () => {
+    code = await run(editorCommand(env), path);
+  });
+  return code === 0;
+}
+
 function runEditor(command: readonly string[], file: string): Promise<number> {
   const [bin, ...args] = command;
   if (bin === undefined) {
