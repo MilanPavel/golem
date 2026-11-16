@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { addNote, editNote, noNotes, notesChip, notesFor, removeNote, withNotes, type NotesState } from "./notes.ts";
+import { dropNotes, takeNotes, NO_NOTES, notesNotice, addNote, editNote, noNotes, notesChip, notesFor, removeNote, withNotes, type NotesState } from "./notes.ts";
 
 const fetchNote = { path: "src/fetch.py", line: 64, side: "new", code: "    wait = 0.5", text: "read this from settings, and cap it at 30 s" } as const;
 const testNote = { path: "tests/test_fetch.py", line: 12, side: "new", code: "def test_retries_three_times():", text: "also test the 4th failure raises" } as const;
@@ -90,4 +90,24 @@ test("a long code row is cut at 200 characters", () => {
   const out = withNotes(addNote(noNotes, { ...fetchNote, code: "x".repeat(300) }), "");
   assert.ok(out.includes(`   + ${"x".repeat(200)}\n`));
   assert.ok(!out.includes("x".repeat(201)));
+});
+
+test("notesNotice says there are none, or lists each note by file and line", () => {
+  assert.equal(notesNotice(noNotes), NO_NOTES);
+  assert.equal(
+    notesNotice(two()),
+    "2 notes\n1. src/fetch.py:64  read this from settings, and cap it at 30 s\n2. tests/test_fetch.py:12  also test the 4th failure raises",
+  );
+});
+
+test("a send takes the notes ahead of the text, and drops only those after it worked", () => {
+  const taken = takeNotes(two(), "please fix");
+  assert.equal(taken.text, withNotes(two(), "please fix"));
+  assert.equal(taken.text.endsWith("\n\nplease fix"), true);
+  assert.equal(taken.text.startsWith("Review notes:\n\n1. src/fetch.py:64"), true);
+  const meanwhile = addNote(two(), { ...fetchNote, line: 70, text: "later" });
+  const left = dropNotes(meanwhile, taken.ids);
+  assert.deepEqual(left.notes.map((note) => note.text), ["later"]);
+  assert.deepEqual(dropNotes(noNotes, taken.ids), noNotes);
+  assert.equal(takeNotes(noNotes, "hi").text, "hi");
 });

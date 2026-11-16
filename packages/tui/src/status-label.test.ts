@@ -376,3 +376,12 @@ test("the route segment follows the model, and is empty without a route", () => 
   const hidden = fitSegments(statusSegments({ ...input, route: "", mode: "balanced" }), 80).map((part) => part.id);
   assert.deepEqual(hidden.slice(0, 4), ["connection", "title", "model", "mode"]);
 });
+
+test("the notes segment reads 💬 and the count, and is hidden with none", () => {
+  const base = { connection: "connected", title: "t", model: "m", folder: "~/x", messageCount: 1, uptimeSeconds: null };
+  const shown = statusSegments({ ...base, notes: "2 notes" }).find((part) => part.id === "notes");
+  assert.equal(shown?.text, "💬 2 notes");
+  const none = fitSegments(statusSegments({ ...base }), 200);
+  assert.equal(none.some((part) => part.id === "notes"), false);
+  assert.equal(fitSegments(statusSegments({ ...base, notes: "1 note" }), 200).some((part) => part.text === "💬 1 note"), true);
+});

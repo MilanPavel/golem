@@ -1,8 +1,7 @@
 import type { ChangedFile, ChangesRevertTarget } from "@golem/client";
-import { parseDiff, shellTrackingNote, type DiffLine, type DiffTone, type ShellTracking } from "@golem/view";
+import { numberDiff, parseDiff, shellTrackingNote, type DiffLine, type DiffTone, type NumberedLine, type ReviewNote, type ShellTracking } from "@golem/view";
 
 import { layoutCommitBand, type CommitBand } from "./commit-band.ts";
-import { clampDiffOffset } from "./diff-view.ts";
 import type { Press } from "./keys.ts";
 
 /**
@@ -15,6 +14,10 @@ export type ChangesManagerState = {
   file: number;
   hunk: number;
   offset: number;
+  /** The row of the diff the cursor is on, an index into its parsed lines. */
+  row: number;
+  /** A note being typed on a row, shown in the hint row. */
+  input: NoteInput | null;
   /** The commit band, while it is open. */
   commit?: CommitBand | null;
   /** A line of news, such as the hash of a commit, shown in front of the key hint. */
@@ -25,7 +28,12 @@ export type ChangesManagerState = {
   message: string | null;
 };
 
+/** Where a note is being written: the row, as `addNote` wants it, and the text so far. */
+export type NoteInput = { path: string; line: number; side: "new" | "old"; code: string; text: string };
+
 export type ChangesData = {
+  /** The review notes waiting for the next message. */
+  notes?: readonly ReviewNote[];
   /** The list `changes.list` returned, or null while it is asked. */
   files: readonly ChangedFile[] | null;
   error: string | null;
@@ -44,6 +52,10 @@ export type ChangesKey =
   | "prev-hunk"
   | "page-up"
   | "page-down"
+  | "row-up"
+  | "row-down"
+  | "note"
+  | "remove-note"
   | "back"
   | "undo-hunk"
   | "undo-file"
@@ -55,6 +67,10 @@ export type ChangesAction =
   | { kind: "close" }
   | { kind: "load"; path: string }
   | { kind: "revert"; target: ChangesRevertTarget }
+  /** Enter on a note: the app adds it to the session's notes. */
+  | { kind: "add-note"; note: Omit<ReviewNote, "id"> }
+  /** `x`: the app removes these notes. */
+  | { kind: "remove-notes"; ids: readonly string[] }
   /** `g`: ask git about the folder, then open the commit band. */
   | { kind: "commit-info" };
 
@@ -77,8 +93,38 @@ export type ChangesLine = {
 export const WIDE_COLUMNS = 100;
 const LEFT_WIDTH = 28;
 const PAGE = 10;
-const HINT = "↑↓ file · n/p hunk · PgUp/PgDn scroll · u undo hunk · U undo file · g commit · esc back";
+const HINT_PARTS = [
+  "↑↓ file",
+  "j/k row",
+  "n/p hunk",
+  "c note",
+  "x remove note",
+  "PgUp/Dn scroll",
+  "u undo hunk",
+  "U undo file",
+  "g commit",
+  "esc back",
+];
+/** What leaves the hint first on a narrow screen. `g commit` and `esc back` stay. */
+const HINT_DROP = ["PgUp/Dn scroll", "U undo file", "u undo hunk", "x remove note", "c note", "n/p hunk", "j/k row"];
+
+/** The key hint, with the least needed keys left out until it fits `width`. */
+function hintFor(width: number, lead: string): string {
+  const parts = [...HINT_PARTS];
+  const text = (): string => [...(lead === "" ? [] : [lead]), ...parts].join(" · ");
+  for (const drop of HINT_DROP) {
+    if (text().length <= width) {
+      break;
+    }
+    parts.splice(parts.indexOf(drop), 1);
+  }
+  return text();
+}
 export const WAIT_MESSAGE = "Wait for golem to finish.";
+export const NO_NOTE_ROW_MESSAGE = "A note goes on an added, removed or unchanged line.";
+/** The first column of a diff row: where the cursor is drawn. */
+export const CURSOR = "▌";
+const NOTE_MARK = "💬";
 const BARE_HINT = "esc back";
 
 export const closedChangesManager: ChangesManagerState = {
@@ -86,6 +132,8 @@ export const closedChangesManager: ChangesManagerState = {
   file: 0,
   hunk: 0,
   offset: 0,
+  row: 0,
+  input: null,
   confirm: null,
   message: null,
 };
@@ -96,6 +144,9 @@ export function openChangesManager(): ChangesManagerState {
 
 export function changesKeyOf(press: Press): ChangesKey | null {
   if (press.name === "up" || press.name === "down") {
+    if (press.shift === true) {
+      return press.name === "up" ? "row-up" : "row-down";
+    }
     return press.name;
   }
   if (press.name === "page-up" || press.name === "page-down") {
@@ -110,6 +161,18 @@ export function changesKeyOf(press: Press): ChangesKey | null {
     }
     if (press.input === "p") {
       return "prev-hunk";
+    }
+    if (press.input === "j") {
+      return "row-down";
+    }
+    if (press.input === "k") {
+      return "row-up";
+    }
+    if (press.input === "c") {
+      return "note";
+    }
+    if (press.input === "x") {
+      return "remove-note";
     }
     if (press.input === "g") {
       return "commit";
@@ -181,7 +244,7 @@ export function pressChanges(
       return { state: { ...state, file }, action: none };
     }
     const target = files[next]?.path;
-    const moved = { ...state, file: next, hunk: 0, offset: 0 };
+    const moved = { ...state, file: next, hunk: 0, offset: 0, row: 0 };
     const load = target !== undefined && data.diffs[target] === undefined;
     return { state: moved, action: load ? { kind: "load", path: target } : none };
   }
@@ -201,19 +264,107 @@ export function pressChanges(
   }
   const lines = parseDiff(data.diffs[path] ?? "");
   const rows = hunkRows(lines);
-  const at = (offset: number): ChangesManagerState => {
-    const clamped = Math.max(0, Math.min(offset, lines.length - 1));
-    return { ...state, file, offset: clamped, hunk: Math.max(0, rows.filter((row) => row <= clamped).length - 1) };
+  const last = Math.max(0, lines.length - 1);
+  const row = Math.min(Math.max(state.row, 0), last);
+  const at = (offset: number, onRow: number): ChangesManagerState => {
+    const clamped = Math.max(0, Math.min(offset, last));
+    const cursor = Math.max(0, Math.min(onRow, last));
+    return { ...state, file, offset: clamped, row: cursor, hunk: Math.max(0, rows.filter((header) => header <= cursor).length - 1) };
   };
+  if (key === "row-up" || key === "row-down") {
+    const cursor = Math.max(0, Math.min(row + (key === "row-up" ? -1 : 1), last));
+    // The window follows the cursor, so it never leaves the screen.
+    const room = Math.max(1, page);
+    const offset = cursor < state.offset ? cursor : cursor >= state.offset + room ? cursor - room + 1 : state.offset;
+    return { state: at(offset, cursor), action: none };
+  }
+  if (key === "note") {
+    const here = numberDiff(lines)[row];
+    const place = placeOf(here);
+    if (here === undefined || place === null) {
+      return { state: { ...state, file, row, message: NO_NOTE_ROW_MESSAGE }, action: none };
+    }
+    return { state: { ...state, file, row, input: { path, ...place, code: here.text.slice(1), text: "" } }, action: none };
+  }
+  if (key === "remove-note") {
+    const ids = notesOnRow(data, path, lines, row).map((note) => note.id);
+    return { state: { ...state, file, row }, action: ids.length === 0 ? none : { kind: "remove-notes", ids } };
+  }
+  // The first changed row of each hunk: where `n` and `p` put the cursor.
+  const starts = rows.map((header, index) => ({ header, row: firstChanged(lines, header, rows[index + 1] ?? lines.length) }));
   if (key === "next-hunk") {
-    const row = rows.find((candidate) => candidate > state.offset);
-    return { state: row === undefined ? state : at(row), action: none };
+    const target = starts.find((candidate) => candidate.row > row);
+    return { state: target === undefined ? state : at(target.header, target.row), action: none };
   }
   if (key === "prev-hunk") {
-    const row = [...rows].reverse().find((candidate) => candidate < state.offset);
-    return { state: row === undefined ? state : at(row), action: none };
+    const target = [...starts].reverse().find((candidate) => candidate.row < row);
+    return { state: target === undefined ? state : at(target.header, target.row), action: none };
   }
-  return { state: at(state.offset + (key === "page-up" ? -page : page)), action: none };
+  const step = key === "page-up" ? -page : page;
+  return { state: at(state.offset + step, row + step), action: none };
+}
+
+/** The first added or removed row after the `@@` row `header`, or the row after it when the hunk changes nothing. */
+function firstChanged(lines: readonly DiffLine[], header: number, end: number): number {
+  for (let index = header + 1; index < end; index += 1) {
+    const tone = lines[index]?.tone;
+    if (tone === "add" || tone === "del") {
+      return index;
+    }
+  }
+  return Math.min(header + 1, Math.max(0, lines.length - 1));
+}
+
+/** The side and line number a row carries, or null for a `@@` or meta row. */
+function placeOf(numbered: NumberedLine | undefined): { side: "new" | "old"; line: number } | null {
+  if (numbered === undefined || numbered.tone === "hunk" || numbered.tone === "meta") {
+    return null;
+  }
+  const line = numbered.tone === "del" ? numbered.old : numbered.new;
+  return line === null ? null : { side: numbered.tone === "del" ? "old" : "new", line };
+}
+
+function notesOnRow(data: ChangesData, path: string, lines: readonly DiffLine[], row: number): ReviewNote[] {
+  const place = placeOf(numberDiff(lines)[row]);
+  if (place === null) {
+    return [];
+  }
+  return (data.notes ?? []).filter((note) => note.path === path && note.side === place.side && note.line === place.line);
+}
+
+/**
+ * A key while a note is typed: text goes in, Backspace takes it back, Enter saves
+ * and Escape drops it. An empty note is not saved.
+ */
+export function pressNoteInput(
+  state: ChangesManagerState,
+  press: Press,
+): { state: ChangesManagerState; action: ChangesAction } {
+  const input = state.input;
+  const none = { kind: "none" } as const;
+  if (input === null) {
+    return { state, action: none };
+  }
+  if (press.name === "escape") {
+    return { state: { ...state, input: null }, action: none };
+  }
+  if (press.name === "return") {
+    const text = input.text.trim();
+    const cleared = { ...state, input: null };
+    if (text === "") {
+      return { state: cleared, action: none };
+    }
+    const { path, line, side, code } = input;
+    return { state: cleared, action: { kind: "add-note", note: { path, line, side, code, text } } };
+  }
+  if (press.name === "backspace") {
+    return { state: { ...state, input: { ...input, text: Array.from(input.text).slice(0, -1).join("") } }, action: none };
+  }
+  if (press.name === null && !press.ctrl && !press.meta && press.input !== "") {
+    const typed = press.input.replace(/[\r\n]+/g, " ");
+    return { state: { ...state, input: { ...input, text: input.text + typed } }, action: none };
+  }
+  return { state, action: none };
 }
 
 function confirmText(target: ChangesRevertTarget): string {
@@ -281,7 +432,7 @@ export function layoutChanges(
     body = [plain("No changes yet."), ...noteLines];
   } else {
     title = titleOf(files);
-    hint = state.note === undefined || state.note === null ? HINT : `${state.note} · ${HINT}`;
+    hint = hintFor(width, state.note === undefined || state.note === null ? "" : state.note);
     const file = clamp(state.file, files.length);
     const chosen = files[file];
     const path = chosen?.path ?? "";
@@ -292,7 +443,7 @@ export function layoutChanges(
       head.push(plain(label, { bold: true }));
     }
     const diffRoom = Math.max(0, room - head.length);
-    const right = diffRows(data, path, state.offset, diffRoom, Math.max(1, rightWidth));
+    const right = diffRows(data, path, state, diffRoom, Math.max(1, rightWidth));
     const left = wide ? leftRows(files, file, diffRoom) : null;
     body = [
       ...head,
@@ -309,6 +460,8 @@ export function layoutChanges(
   }
   if (asked !== null) {
     hint = confirmText(asked);
+  } else if (state.input !== null) {
+    hint = `note on ${state.input.path}:${state.input.line} › ${state.input.text}_`;
   } else if (state.message !== null) {
     hint = state.message;
   }
@@ -330,7 +483,7 @@ function leftRows(files: readonly ChangedFile[], selected: number, room: number)
   }));
 }
 
-function diffRows(data: ChangesData, path: string, offset: number, room: number, width: number): ChangesLine[] {
+function diffRows(data: ChangesData, path: string, state: ChangesManagerState, room: number, width: number): ChangesLine[] {
   const text = data.diffs[path];
   const note = (words: string, dim = true): ChangesLine[] => [
     { left: null, text: cut(words, width), tone: "plain", dim },
@@ -344,16 +497,41 @@ function diffRows(data: ChangesData, path: string, offset: number, room: number,
     return note("No text diff.");
   }
   const rows = hunkRows(lines);
-  const start = clampDiffOffset(offset, lines.length, room);
-  return lines.slice(start, start + room).map((line, index) => {
-    const hunk = rows.indexOf(start + index);
-    if (hunk < 0) {
-      return { left: null, text: cut(line.text, width), tone: line.tone };
+  const numbered = numberDiff(lines);
+  const cursor = Math.min(Math.max(state.row, 0), lines.length - 1);
+  // Each diff row, then the text of its notes on rows of their own. `at` is the diff row they belong to.
+  const shown: { at: number; line: ChangesLine }[] = [];
+  const textWidth = Math.max(0, width - 1);
+  lines.forEach((line, index) => {
+    const place = placeOf(numbered[index]);
+    const here = place === null ? [] : (data.notes ?? []).filter((candidate) => candidate.path === path && candidate.side === place.side && candidate.line === place.line);
+    const hunk = rows.indexOf(index);
+    let body: string;
+    if (hunk >= 0) {
+      const tag = `hunk ${hunk + 1}/${rows.length}`;
+      const cutText = cut(line.text, Math.max(0, textWidth - tag.length - 1));
+      body = `${cutText.padEnd(Math.max(0, textWidth - tag.length))}${tag}`.slice(-textWidth);
+    } else if (here.length > 0) {
+      body = `${cut(line.text, Math.max(0, textWidth - 3)).padEnd(Math.max(0, textWidth - 3))} ${NOTE_MARK}`;
+    } else {
+      body = cut(line.text, textWidth);
     }
-    const tag = `hunk ${hunk + 1}/${rows.length}`;
-    const cutText = cut(line.text, Math.max(0, width - tag.length - 1));
-    return { left: null, text: `${cutText.padEnd(Math.max(0, width - tag.length))}${tag}`.slice(-width), tone: line.tone };
+    const mark = index === cursor ? CURSOR : " ";
+    shown.push({ at: index, line: { left: null, text: `${mark}${body}`, tone: line.tone } });
+    for (const saved of here) {
+      shown.push({ at: index, line: { left: null, text: cut(`   ${saved.text.split("\n").join(" ")}`, width), tone: "plain", dim: true } });
+    }
   });
+  // The window starts at the offset, and moves only as far as the cursor needs.
+  let start = shown.findIndex((entry) => entry.at >= Math.max(0, Math.min(state.offset, lines.length - 1)));
+  start = Math.max(0, Math.min(start < 0 ? 0 : start, shown.length - room));
+  const cursorAt = shown.findIndex((entry) => entry.at === cursor);
+  if (cursorAt < start) {
+    start = cursorAt;
+  } else if (room > 0 && cursorAt >= start + room) {
+    start = cursorAt - room + 1;
+  }
+  return shown.slice(start, start + room).map((entry) => entry.line);
 }
 
 /** Keep the end of a path, with a `…` where the start was cut. */

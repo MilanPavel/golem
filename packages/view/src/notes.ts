@@ -53,6 +53,19 @@ function block(note: ReviewNote, index: number): string {
   return `${index + 1}. ${note.path}:${note.line}\n   ${sign} ${code}\n${text}`;
 }
 
+export const NOTES_CLEARED = "Notes removed.";
+export const NO_NOTES = "No notes.";
+
+/** What `/notes` says: the count, then one row per note as `path:line  text`. */
+export function notesNotice(state: NotesState): string {
+  const chip = notesChip(state);
+  if (chip === null) {
+    return NO_NOTES;
+  }
+  const rows = ordered(state).map((note, index) => `${index + 1}. ${note.path}:${note.line}  ${note.text.split("\n").join(" ")}`);
+  return [chip, ...rows].join("\n");
+}
+
 /** The message to send: the notes first, then the user's own text. */
 export function withNotes(state: NotesState, text: string): string {
   if (state.notes.length === 0) {
@@ -60,4 +73,14 @@ export function withNotes(state: NotesState, text: string): string {
   }
   const notes = `Review notes:\n\n${ordered(state).map(block).join("\n\n")}`;
   return text === "" ? notes : `${notes}\n\n${text}`;
+}
+
+/** What a send takes: the text that goes out, and the ids of the notes in it, which `dropNotes` removes once it worked. */
+export function takeNotes(state: NotesState, text: string): { text: string; ids: string[] } {
+  return { text: withNotes(state, text), ids: state.notes.map((note) => note.id) };
+}
+
+/** The notes without these ids: a note written while the send ran stays. */
+export function dropNotes(state: NotesState, ids: readonly string[]): NotesState {
+  return { ...state, notes: state.notes.filter((note) => !ids.includes(note.id)) };
 }
