@@ -52,3 +52,10 @@ const ALIASES: Record<string, LanguageId> = {
 export function languageFor(name: string): LanguageId | null {
   return ALIASES[name.toLowerCase()] ?? null;
 }
+
+/** The grammar for a file path, picked from its extension, or null when golem does not highlight it. */
+export function languageForPath(path: string): LanguageId | null {
+  const name = path.slice(path.lastIndexOf("/") + 1);
+  const dot = name.lastIndexOf(".");
+  return dot <= 0 ? null : languageFor(name.slice(dot + 1));
+}

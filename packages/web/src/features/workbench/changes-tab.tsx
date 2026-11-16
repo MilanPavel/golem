@@ -8,7 +8,7 @@ import { ChangesViewSwitch, useChangesView } from "./changes-view.tsx";
 import { CommitDialog } from "./commit-dialog.tsx";
 import { Counts, DiffPanel, Row, plural } from "./file-row.tsx";
 import { TurnsTab } from "./turns-view.tsx";
-import { useCommitRequest, useRequestedChange } from "./workbench-state.ts";
+import { openFile, useCommitRequest, useRequestedChange } from "./workbench-state.ts";
 import { useWorkbenchWidth } from "./workbench-width.ts";
 
 /** From this panel width, in rem, a diff may be shown side by side. Narrower, it is unified. */
@@ -25,6 +25,8 @@ type ChangesViewProps = {
   onMode: (mode: DiffMode) => void;
   /** Whether the panel has room for the split layout. */
   canSplit: boolean;
+  /** Shows a file in the Files tab. Without it the rows have no open button. */
+  onOpenFile?: (path: string) => void;
   /** Beside the totals: the Commit button. */
   footer?: ReactNode;
   /** With it, a diff in the unified layout takes review notes. */
@@ -37,7 +39,7 @@ type ChangesViewProps = {
 };
 
 /** The list of changed files, the open one with its diff, and the totals. It reads nothing itself. */
-export function ChangesView({ files, error, open, onOpen, diff, mode, onMode, canSplit, footer, notes }: ChangesViewProps) {
+export function ChangesView({ files, error, open, onOpen, diff, mode, onMode, canSplit, onOpenFile, footer, notes }: ChangesViewProps) {
   const panel = useId();
   if (files === null) {
     return <p className="text-sm text-muted">{error === null ? "Reading the changes." : `Could not read the changes. ${error}`}</p>;
@@ -56,6 +58,7 @@ export function ChangesView({ files, error, open, onOpen, diff, mode, onMode, ca
             file={file}
             open={file.path === open}
             panel={panel}
+            onOpenFile={onOpenFile}
             noteCount={notes === undefined ? 0 : notesFor(notes.state, file.path).length}
             onToggle={() => {
               onOpen(file.path === open ? null : file.path);
@@ -169,6 +172,7 @@ function ByFileTab({ sessionId }: { sessionId: string }) {
         mode={mode}
         onMode={setMode}
         canSplit={width >= SPLIT_MIN_WIDTH}
+        onOpenFile={openFile}
         notes={{
           state: notes.state,
           onAdd: (line, text) => {

@@ -48,6 +48,24 @@ export function openChange(path: string): void {
   openWorkbench("changes");
 }
 
+/** A file the Files tab was asked to show, and the line to scroll to. */
+export type FileRequest = { path: string; line: number | null };
+
+const requestedFileStore = createStore<FileRequest | null>(null);
+
+/** Opens the panel on Files with `path` shown, scrolled to `line` (1 is the first) when given. */
+export function openFile(path: string, line?: number): void {
+  requestedFileStore.set({ path, line: line ?? null });
+  openWorkbench("files");
+}
+
+/** The requested file, and a function that clears the request. */
+export function useRequestedFile(): [FileRequest | null, () => void] {
+  const request = useSyncExternalStore(requestedFileStore.subscribe, requestedFileStore.getSnapshot);
+  const clear = useCallback(() => requestedFileStore.set(null), []);
+  return [request, clear];
+}
+
 const commitRequestStore = createStore<boolean>(false);
 
 /** Asks the Changes tab to open its commit dialog. Opens the tab too. */

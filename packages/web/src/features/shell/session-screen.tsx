@@ -13,7 +13,7 @@ import type { SessionModel, SessionView } from "../../store/session-store.ts";
 import { Transcript } from "../chat/index.ts";
 import { SessionDock } from "../composer/index.ts";
 import { TodoList, useDrawerOpen } from "../drawer/index.ts";
-import { ChangesTab, checksBadge, ChecksTab, Workbench, WORKBENCH_ID, type WorkbenchTab } from "../workbench/index.ts";
+import { ChangesTab, checksBadge, ChecksTab, FilesTab, Workbench, WORKBENCH_ID, type WorkbenchTab } from "../workbench/index.ts";
 import { closeModelDialog, ModelDialog, openModelDialog, useModelDialogOpen } from "../models/index.ts";
 import { folderName, useSessionActions } from "../sessions/index.ts";
 import { useRememberSettingsContext } from "../settings/index.ts";
@@ -217,6 +217,7 @@ export function SessionFrame({ id, children }: { id: string; children: ReactNode
               ...(changed !== null && changed.length > 0 ? { badge: String(changed.length) } : {}),
               render: () => <ChangesTab sessionId={id} />,
             },
+            { id: "files", label: "Files", render: () => <FilesTab sessionId={id} /> },
             {
               id: "checks",
               label: "Checks",

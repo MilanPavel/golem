@@ -24,7 +24,7 @@ export function keepQueriesHonest(client: QueryWiringClient, queryClient: QueryC
   const stale = (...queryKey: unknown[]): void => {
     void queryClient.invalidateQueries({ queryKey });
   };
-  // A burst of `file.changed` events for a session marks its two keys once.
+  // A burst of `file.changed` events for a session marks its three keys once.
   const waiting = new Map<string, ReturnType<typeof setTimeout>>();
   const staleChanges = (sessionId: string): void => {
     if (waiting.has(sessionId)) return;
@@ -34,6 +34,7 @@ export function keepQueriesHonest(client: QueryWiringClient, queryClient: QueryC
         waiting.delete(sessionId);
         stale("changes.list", sessionId);
         stale("changes.diff", sessionId);
+        stale("file.read", sessionId);
         stale("changes.commit_info", sessionId);
       }, CHANGES_REFETCH_MS),
     );

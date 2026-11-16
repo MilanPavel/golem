@@ -61,6 +61,14 @@ export const CopyIcon = (props: IconProps) => (
     <path d="M10.5 3.5v-.5A1.5 1.5 0 0 0 9 1.5H4A1.5 1.5 0 0 0 2.5 3v5A1.5 1.5 0 0 0 4 9.5h.5" />
   </Icon>
 );
+/** A page with an arrow leaving it: open this somewhere else. */
+export const OpenIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M9.5 2.5h4v4" />
+    <path d="M13.5 2.5L7.5 8.5" />
+    <path d="M11.5 9v3A1.5 1.5 0 0 1 10 13.5H4A1.5 1.5 0 0 1 2.5 12V6A1.5 1.5 0 0 1 4 4.5h3" />
+  </Icon>
+);
 export const SearchIcon = (props: IconProps) => (
   <Icon {...props}>
     <circle cx="7" cy="7" r="4" />

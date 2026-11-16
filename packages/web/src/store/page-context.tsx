@@ -3,6 +3,7 @@ import { createContext, useCallback, useContext, useMemo, useSyncExternalStore, 
 import { useSyncExternalStoreWithSelector } from "use-sync-external-store/with-selector";
 import { ConnectionProvider } from "./connection-context.tsx";
 import { changeDiffKey, changesDiffKey, changesListKey, commitInfoKey, type ChangedFiles, type ChangesCommitInfoResult, type FileDiff } from "./changes.ts";
+import { fileListKey, fileReadKey, type FileRead } from "./files.ts";
 import { configKey, type ConfigGetResult } from "./config.ts";
 import { KEYS_KEY } from "./keys.ts";
 import type { FsListDirsResult } from "./dirs.ts";
@@ -12,7 +13,7 @@ import type { AppInstallSnapshot } from "./app-install.ts";
 import type { PageHostSnapshot } from "./page-host.ts";
 import type { PullsSnapshot } from "./pulls.ts";
 import type { Route } from "./router.ts";
-import type { AuthListResult, CostGetResult, McpListResult, SessionSummary, SetupStatusResult, SkillListResult } from "@golem/client";
+import type { AuthListResult, FileListResult, CostGetResult, McpListResult, SessionSummary, SetupStatusResult, SkillListResult } from "@golem/client";
 import { ARTIFACT_PAGE, artifactKey, traceKey, traceSpanKey, type ArtifactReadResult, type TraceGetResult, type TraceSpanResult } from "./trace.ts";
 import { mcpCatalogKey, mcpListKey, mcpToolsKey, type McpCatalogResult, type McpToolsResult } from "./mcp.ts";
 import { turnCards, type NotesState, type Pastes, type ReviewNote, type TurnCard } from "@golem/view";
@@ -311,6 +312,29 @@ export function useFileDiff(sessionId: string, path: string | null): FileDiff {
     truncated: result.data?.truncated ?? false,
     error: result.error === null ? null : result.error.message,
   };
+}
+
+/** The paths of the session's folder that hold `query`, at most `limit`. The last answer stays while a new one is read. */
+export function useFileList(sessionId: string, query: string, limit: number): UseQueryResult<FileListResult> {
+  const { queries } = usePage();
+  return useQuery({
+    queryKey: fileListKey(sessionId, query),
+    queryFn: () => queries.listFiles(sessionId, query, limit),
+    placeholderData: keepPreviousData,
+    retry: false,
+  });
+}
+
+/** The start of one file of the session's folder. Not read for a null path; read again after `file.changed`. */
+export function useFileRead(sessionId: string, path: string | null): FileRead {
+  const { queries } = usePage();
+  const result = useQuery({
+    queryKey: fileReadKey(sessionId, path ?? ""),
+    queryFn: () => queries.readFile(sessionId, path ?? ""),
+    enabled: path !== null,
+    retry: false,
+  });
+  return { file: result.data ?? null, error: result.error === null ? null : result.error.message };
 }
 
 /** The diff of one change, as one turn made it. Not read for a null id. */
