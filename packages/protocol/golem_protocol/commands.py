@@ -476,6 +476,18 @@ class CostModelRow(BaseModel):
     cost_usd: float = Field(ge=0)
 
 
+class CostRoleRow(BaseModel):
+    """One job's calls over the last 7 days: ``chat``, ``explore`` (a helper), ``title``..."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    role: str = Field(min_length=1)
+    calls: int = Field(ge=0)
+    input: int = Field(ge=0)
+    output: int = Field(ge=0)
+    cost_usd: float = Field(ge=0)
+
+
 class CostDayRow(BaseModel):
     """One local day. ``local_tokens`` are input plus output of ``local`` calls, and
     ``paid_tokens`` those of every other call."""
@@ -491,7 +503,8 @@ class CostDayRow(BaseModel):
 class CostGetResult(BaseModel):
     """``week`` is the last 7 local days, today included. ``session`` is set when the
     request named a session. ``by_model`` is sorted by cost, highest first, and ``by_day``
-    has one row for each of the 7 days, oldest first. ``saved_reference`` is the
+    has one row for each of the 7 days, oldest first. ``by_role`` is sorted by cost, highest
+    first. ``saved_reference`` is the
     ``provider/model`` ref whose prices ``saved_usd`` uses, or null when there is none."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -501,6 +514,7 @@ class CostGetResult(BaseModel):
     session: CostTotals | None = None
     by_model: list[CostModelRow] = Field(default_factory=list[CostModelRow])
     by_day: list[CostDayRow] = Field(default_factory=list[CostDayRow])
+    by_role: list[CostRoleRow] = Field(default_factory=list[CostRoleRow])
     saved_reference: str | None = None
 
 
@@ -3444,6 +3458,7 @@ __all__ = [
     "CostGetParams",
     "CostGetResult",
     "CostModelRow",
+    "CostRoleRow",
     "CostTotals",
     "DaemonStatus",
     "DirEntry",

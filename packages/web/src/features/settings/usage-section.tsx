@@ -1,4 +1,4 @@
-import { formatCost, formatCount, referenceName } from "@golem/view";
+import { formatCost, formatCount, referenceName, roleName } from "@golem/view";
 import type { CostGetResult } from "../../store/cost.ts";
 import { actionErrorText } from "../../store/errors.ts";
 import { useCost } from "../../store/page-context.tsx";
@@ -64,6 +64,7 @@ export function UsageView({ result }: { result: CostGetResult }) {
   const models = [...(result.by_model ?? [])].sort(
     (a, b) => b.cost_usd - a.cost_usd || b.input + b.output - (a.input + a.output),
   );
+  const roles = result.by_role ?? [];
   return (
     <div className="flex max-w-column flex-col gap-6">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -111,6 +112,31 @@ export function UsageView({ result }: { result: CostGetResult }) {
           ))}
         </tbody>
       </table>
+      {roles.length < 2 ? null : (
+        <table className="w-full text-left text-sm">
+          <caption className="sr-only">By job, last 7 days</caption>
+          <thead className="border-b border-line text-muted">
+            <tr>
+              <th scope="col" className={CELL}>Job</th>
+              <th scope="col" className={cn(CELL, "text-right")}>Calls</th>
+              <th scope="col" className={cn(CELL, "text-right")}>Tokens in</th>
+              <th scope="col" className={cn(CELL, "text-right")}>Tokens out</th>
+              <th scope="col" className={cn(CELL, "text-right")}>Cost</th>
+            </tr>
+          </thead>
+          <tbody>
+            {roles.map((row) => (
+              <tr key={row.role} className="border-b border-line">
+                <td className={CELL}>{roleName(row.role)}</td>
+                <td className={NUM}>{row.calls}</td>
+                <td className={NUM}>{formatCount(row.input)}</td>
+                <td className={NUM}>{formatCount(row.output)}</td>
+                <td className={NUM}>{formatCost(row.cost_usd)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }

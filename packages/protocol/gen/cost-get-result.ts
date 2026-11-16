@@ -13,22 +13,30 @@ export type Output = number;
 export type Provider = string | null;
 export type Tier = ('local' | 'budget' | 'frontier') | null;
 export type ByModel = CostModelRow[];
-export type SavedReference = string | null;
 export type Calls1 = number;
 export type CostUsd2 = number;
 export type Input1 = number;
 export type Output1 = number;
+export type Role = string;
+export type ByRole = CostRoleRow[];
+export type SavedReference = string | null;
+export type Calls2 = number;
+export type CostUsd3 = number;
+export type Input2 = number;
+export type Output2 = number;
 export type SavedUsd = number;
 
 /**
  * ``week`` is the last 7 local days, today included. ``session`` is set when the
  * request named a session. ``by_model`` is sorted by cost, highest first, and ``by_day``
- * has one row for each of the 7 days, oldest first. ``saved_reference`` is the
+ * has one row for each of the 7 days, oldest first. ``by_role`` is sorted by cost, highest
+ * first. ``saved_reference`` is the
  * ``provider/model`` ref whose prices ``saved_usd`` uses, or null when there is none.
  */
 export interface CostGetResult {
   by_day?: ByDay;
   by_model?: ByModel;
+  by_role?: ByRole;
   saved_reference?: SavedReference;
   session?: CostTotals | null;
   today: CostTotals;
@@ -65,6 +73,19 @@ export interface CostModelRow {
   tier?: Tier;
 }
 /**
+ * One job's calls over the last 7 days: ``chat``, ``explore`` (a helper), ``title``...
+ *
+ * This interface was referenced by `CostGetResult`'s JSON-Schema
+ * via the `definition` "CostRoleRow".
+ */
+export interface CostRoleRow {
+  calls: Calls1;
+  cost_usd: CostUsd2;
+  input: Input1;
+  output: Output1;
+  role: Role;
+}
+/**
  * Calls, tokens and money over one span.
  *
  * ``cost_usd`` is what paid calls cost, at the price golem knew then. ``saved_usd`` is what
@@ -75,9 +96,9 @@ export interface CostModelRow {
  * via the `definition` "CostTotals".
  */
 export interface CostTotals {
-  calls: Calls1;
-  cost_usd: CostUsd2;
-  input: Input1;
-  output: Output1;
+  calls: Calls2;
+  cost_usd: CostUsd3;
+  input: Input2;
+  output: Output2;
   saved_usd: SavedUsd;
 }

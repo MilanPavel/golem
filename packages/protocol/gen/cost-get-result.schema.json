@@ -110,6 +110,46 @@
       "title": "CostModelRow",
       "type": "object"
     },
+    "CostRoleRow": {
+      "additionalProperties": false,
+      "description": "One job's calls over the last 7 days: ``chat``, ``explore`` (a helper), ``title``...",
+      "properties": {
+        "calls": {
+          "minimum": 0,
+          "title": "Calls",
+          "type": "integer"
+        },
+        "cost_usd": {
+          "minimum": 0,
+          "title": "Cost Usd",
+          "type": "number"
+        },
+        "input": {
+          "minimum": 0,
+          "title": "Input",
+          "type": "integer"
+        },
+        "output": {
+          "minimum": 0,
+          "title": "Output",
+          "type": "integer"
+        },
+        "role": {
+          "minLength": 1,
+          "title": "Role",
+          "type": "string"
+        }
+      },
+      "required": [
+        "role",
+        "calls",
+        "input",
+        "output",
+        "cost_usd"
+      ],
+      "title": "CostRoleRow",
+      "type": "object"
+    },
     "CostTotals": {
       "additionalProperties": false,
       "description": "Calls, tokens and money over one span.\n\n``cost_usd`` is what paid calls cost, at the price golem knew then. ``saved_usd`` is what\nthe tokens of ``local`` calls would have cost at the reference model's price, and 0 when\nthere is no reference. Money is a float on purpose: sub-cent amounts. Round to show it.",
@@ -152,7 +192,7 @@
     }
   },
   "additionalProperties": false,
-  "description": "``week`` is the last 7 local days, today included. ``session`` is set when the\nrequest named a session. ``by_model`` is sorted by cost, highest first, and ``by_day``\nhas one row for each of the 7 days, oldest first. ``saved_reference`` is the\n``provider/model`` ref whose prices ``saved_usd`` uses, or null when there is none.",
+  "description": "``week`` is the last 7 local days, today included. ``session`` is set when the\nrequest named a session. ``by_model`` is sorted by cost, highest first, and ``by_day``\nhas one row for each of the 7 days, oldest first. ``by_role`` is sorted by cost, highest\nfirst. ``saved_reference`` is the\n``provider/model`` ref whose prices ``saved_usd`` uses, or null when there is none.",
   "properties": {
     "by_day": {
       "items": {
@@ -166,6 +206,13 @@
         "$ref": "#/$defs/CostModelRow"
       },
       "title": "By Model",
+      "type": "array"
+    },
+    "by_role": {
+      "items": {
+        "$ref": "#/$defs/CostRoleRow"
+      },
+      "title": "By Role",
       "type": "array"
     },
     "saved_reference": {

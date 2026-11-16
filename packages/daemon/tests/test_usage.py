@@ -233,6 +233,10 @@ async def test_summary_totals_by_model_and_by_day(database: Database) -> None:
         ("deepseek", "budget", 2, 0.75),
         ("ollama", "local", 1, 0.0),
     ]
+    assert [(r.role, r.calls, r.cost_usd) for r in found.by_role] == [
+        ("chat", 2, 0.5),
+        ("titles", 1, 0.25),
+    ]
     assert len(found.by_day) == 7
     assert found.by_day[-1].day == usage.today()
     assert (found.by_day[-1].local_tokens, found.by_day[-1].paid_tokens) == (1_000_000, 122)

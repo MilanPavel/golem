@@ -159,6 +159,7 @@ from golem_protocol.commands import (
     CostGetParams,
     CostGetResult,
     CostModelRow,
+    CostRoleRow,
     CostTotals,
     DaemonStatus,
     FileListParams,
@@ -947,6 +948,16 @@ async def _cost_get(ctx: RequestContext, params: CostGetParams) -> CostGetResult
                 cost_usd=row.cost_usd,
             )
             for row in week.by_day
+        ],
+        by_role=[
+            CostRoleRow(
+                role=row.role,
+                calls=row.calls,
+                input=row.input,
+                output=row.output,
+                cost_usd=row.cost_usd,
+            )
+            for row in week.by_role
         ],
         saved_reference=week.saved_reference,
     )

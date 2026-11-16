@@ -1801,12 +1801,14 @@ public struct CostGetParams: Codable {
 
 /// ``week`` is the last 7 local days, today included. ``session`` is set when the
 /// request named a session. ``by_model`` is sorted by cost, highest first, and ``by_day``
-/// has one row for each of the 7 days, oldest first. ``saved_reference`` is the
+/// has one row for each of the 7 days, oldest first. ``by_role`` is sorted by cost, highest
+/// first. ``saved_reference`` is the
 /// ``provider/model`` ref whose prices ``saved_usd`` uses, or null when there is none.
 // MARK: - CostGetResult
 public struct CostGetResult: Codable {
     public let byDay: [ByDayElement]?
     public let byModel: [ByModelElement]?
+    public let byRole: [CostRoleRow]?
     public let savedReference: String?
     public let session: CostTotalsClass?
     public let today: CostTotalsClass
@@ -1815,15 +1817,17 @@ public struct CostGetResult: Codable {
     public enum CodingKeys: String, CodingKey {
         case byDay = "by_day"
         case byModel = "by_model"
+        case byRole = "by_role"
         case savedReference = "saved_reference"
         case session = "session"
         case today = "today"
         case week = "week"
     }
 
-    public init(byDay: [ByDayElement]?, byModel: [ByModelElement]?, savedReference: String?, session: CostTotalsClass?, today: CostTotalsClass, week: CostTotalsClass) {
+    public init(byDay: [ByDayElement]?, byModel: [ByModelElement]?, byRole: [CostRoleRow]?, savedReference: String?, session: CostTotalsClass?, today: CostTotalsClass, week: CostTotalsClass) {
         self.byDay = byDay
         self.byModel = byModel
+        self.byRole = byRole
         self.savedReference = savedReference
         self.session = session
         self.today = today
@@ -1893,6 +1897,32 @@ public enum Tier: String, Codable {
     case budget = "budget"
     case frontier = "frontier"
     case local = "local"
+}
+
+/// One job's calls over the last 7 days: ``chat``, ``explore`` (a helper), ``title``...
+// MARK: - CostRoleRow
+public struct CostRoleRow: Codable {
+    public let calls: Int
+    public let costUsd: Double
+    public let input: Int
+    public let output: Int
+    public let role: String
+
+    public enum CodingKeys: String, CodingKey {
+        case calls = "calls"
+        case costUsd = "cost_usd"
+        case input = "input"
+        case output = "output"
+        case role = "role"
+    }
+
+    public init(calls: Int, costUsd: Double, input: Int, output: Int, role: String) {
+        self.calls = calls
+        self.costUsd = costUsd
+        self.input = input
+        self.output = output
+        self.role = role
+    }
 }
 
 /// Calls, tokens and money over one span.

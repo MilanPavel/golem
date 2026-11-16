@@ -44,7 +44,7 @@ What exists today:
    - Model calls: 15 by default. Past the limit the child makes one last call without tools, asking for the answer from what it knows.
    - Wall time: 5 minutes by default.
    - Size of the returned answer: 6,000 characters by default, cut.
-   - Hitting a limit ends the child with what it has. The tool result's first line names the reason: `explorer finished: <reason>` when it is not `done`. The reasons are `done`, `calls`, `time` and `cancelled` in this step. Later limits (a token ceiling, a spent budget) add reasons the same way. They are settings from #913.
+   - Hitting a limit ends the child with what it has. The tool result's first line names the reason: `explorer finished: <reason>` when it is not `done`. The reasons are `done`, `calls`, `time`, `budget`, `tokens` and `cancelled`. The limits are the `[agents.explorer]` settings (#913); `budget` is a spent cap in `[budget]`, and `tokens` is input tokens past 8 times the window.
 
 6. **Cancellation and restart.**
    - The child runs inside the `delegate` tool call, in the parent's run task. Cancelling the parent's run cancels the child with it ([ADR-008](008-cancellation.md)). Child tool calls still open are failed with the cancel message, like the parent's. The `delegate` call is then unanswered in the parent's checkpoint, and the existing rule for unanswered calls gives it a cancelled result on the next turn (`answer_dangling`).

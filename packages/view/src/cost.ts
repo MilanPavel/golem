@@ -81,9 +81,14 @@ function table(rows: string[][], right: readonly boolean[]): string[] {
   );
 }
 
+/** What a usage row's role is called to the user: a helper is `explore` in the log. */
+export function roleName(role: string): string {
+  return role === "explore" ? "helper" : role;
+}
+
 /**
  * `/cost` and `golem cost` as plain lines: tokens and cost for the session (when the result has
- * one), today and the week, the week by model, and what running locally saved.
+ * one), today and the week, the week by model and by job, and what running locally saved.
  */
 export function costReportLines(result: CostGetResult): string[] {
   const totals = (label: string, span: CostTotals): string[] => [
@@ -109,6 +114,17 @@ export function costReportLines(result: CostGetResult): string[] {
           formatCost(row.cost_usd),
         ]),
         [false, false, true, true],
+      ),
+    );
+  }
+  const roles = result.by_role ?? [];
+  if (roles.length > 1) {
+    lines.push(
+      "",
+      "by job (7 days)",
+      ...table(
+        roles.map((row) => [roleName(row.role), formatCount(row.input + row.output), formatCost(row.cost_usd)]),
+        [false, true, true],
       ),
     );
   }
