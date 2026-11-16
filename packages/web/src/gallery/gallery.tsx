@@ -1,4 +1,4 @@
-import { COMMANDS, mcpStatusWord, noPastes, pickerGroups, withModelChoices, withSkillChoices, type TodoItem } from "@golem/view";
+import { checksSummary, COMMANDS, mcpStatusWord, noPastes, pickerGroups, withModelChoices, withSkillChoices, type CheckRun, type ChecksState, type TodoItem, type TurnChecks } from "@golem/view";
 import { createContext, useContext, useEffect, useId, useState, type ReactNode } from "react";
 import { Badge } from "../ui/badge.tsx";
 import { Button } from "../ui/button.tsx";
@@ -20,16 +20,16 @@ import { Dot, serverSummary, SignInPanel, type Login } from "../features/setting
 import type { McpServer } from "../store/mcp.ts";
 import { ConnectionScreen } from "../features/connection/connection-screen.tsx";
 import { connectionScreen, type ConnectionHost } from "../features/connection/connection-screen.ts";
-import { DetailSwitch, EditCards, ToolLine, TranscriptMessages, WritingRow } from "../features/chat/index.ts";
+import { ChecksStrip, DetailSwitch, EditCards, ToolLine, TranscriptMessages, WritingRow } from "../features/chat/index.ts";
 import { COST_CASES, CUT_REPLY, SAMPLE_CHAT, SAMPLE_TOOLS, THINKING_CASES, TURN_CHAT } from "../features/chat/sample.ts";
 import { ApprovalBar } from "../features/approval/index.ts";
 import { ANSWERED, PENDING_EDIT, PENDING_SHELL } from "../features/approval/sample.ts";
 import { DiffModeSwitch, DiffView } from "../features/diff/index.ts";
 import { SAMPLE_EDIT_DIFF, SAMPLE_LONG_LINE_DIFF, SAMPLE_NEW_FILE_DIFF } from "../features/diff/sample.ts";
 import { TodoList } from "../features/drawer/index.ts";
-import { ChangesView, Workbench, type WorkbenchTab } from "../features/workbench/index.ts";
+import { ChangesView, ChecksView, Workbench, type WorkbenchTab } from "../features/workbench/index.ts";
 import type { ChangedFile } from "../store/changes.ts";
-import { Composer, ContextChipView, DockView, Meter, ModeChipView, TuneChipView } from "../features/composer/index.ts";
+import { ChecksQuestionView, Composer, ContextChipView, DockView, Meter, ModeChipView, TuneChipView } from "../features/composer/index.ts";
 import { createHistory } from "../features/composer/history.ts";
 import { CommandsDialog } from "../features/composer/help-dialog.tsx";
 import { HomeView, NewSessionModelChipView, SessionTitle } from "../features/shell/index.ts";
@@ -326,6 +326,88 @@ function ChangesDemo() {
             <ChangesView files={[]} error={null} open={null} onOpen={() => {}} diff={{ diff: null, truncated: false, error: null }} mode="unified" onMode={() => {}} canSplit={false} />
           </div>
         </div>
+      </div>
+    </section>
+  );
+}
+
+const SAMPLE_CHECK_RUNS: CheckRun[] = [
+  { checkId: "k1", name: "ruff", command: "ruff check .", round: 0, status: "failed", exitCode: 1, durationMs: 800, output: "src/socket.ts:12:5: F401 `os` imported but unused\nFound 1 error.", artifactId: null },
+  { checkId: "k2", name: "ruff", command: "ruff check .", round: 1, status: "passed", exitCode: 0, durationMs: 700, output: "All checks passed!", artifactId: null },
+  { checkId: "k3", name: "tsc", command: "pnpm run typecheck", round: 1, status: "passed", exitCode: 0, durationMs: 5500, output: "", artifactId: null },
+];
+const SAMPLE_CHECKS: ChecksState = {
+  turns: [
+    { runId: "r_old", runs: [{ ...SAMPLE_CHECK_RUNS[0]!, checkId: "k0", round: 0 }] },
+    { runId: "r_new", runs: SAMPLE_CHECK_RUNS },
+  ],
+  offered: null,
+  allowed: true,
+};
+
+/** The line under a turn, in each tone. */
+function ChecksStripDemo() {
+  const anchor = useAnchor();
+  const cases: { label: string; turn: TurnChecks; running: boolean }[] = [
+    { label: "Running", turn: { runId: "r", runs: [{ ...SAMPLE_CHECK_RUNS[1]!, checkId: "a", round: 0 }, { ...SAMPLE_CHECK_RUNS[2]!, checkId: "b", round: 0, status: "running", durationMs: null }] }, running: true },
+    { label: "Passed", turn: { runId: "r", runs: SAMPLE_CHECK_RUNS.slice(1) }, running: false },
+    { label: "Failed, being fixed", turn: { runId: "r", runs: SAMPLE_CHECK_RUNS.slice(0, 1) }, running: true },
+    { label: "Failed for good", turn: { runId: "r", runs: SAMPLE_CHECK_RUNS.slice(0, 1) }, running: false },
+  ];
+  return (
+    <section className="mt-6" id={anchor("Checks strip")}>
+      <h3 className="mb-2 font-mono text-xs text-faint">Checks strip</h3>
+      <div className="flex max-w-xl flex-col gap-3">
+        {cases.map(({ label, turn, running }) => (
+          <div key={label}>
+            <p className="mb-1 text-xs text-muted">{label}</p>
+            <ChecksStrip {...checksSummary(turn, running)} onShow={() => {}} />
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/** The Checks tab: the newest turn failed once and then passed, an older turn failed, and one output is cut. */
+function ChecksTabDemo() {
+  const anchor = useAnchor();
+  const [allowed, setAllowed] = useState<boolean | null>(true);
+  const cut: ChecksState = {
+    ...SAMPLE_CHECKS,
+    allowed,
+    turns: [SAMPLE_CHECKS.turns[0]!, { runId: "r_new", runs: [{ ...SAMPLE_CHECK_RUNS[0]!, checkId: "k9", artifactId: "a_1" }] }],
+  };
+  return (
+    <section className="mt-6" id={anchor("Checks tab")}>
+      <h3 className="mb-2 font-mono text-xs text-faint">Checks tab</h3>
+      <div className="flex flex-wrap items-start gap-4">
+        {([["Passed after a fix", { ...SAMPLE_CHECKS, allowed }], ["Failed, output cut", cut], ["Nothing yet", { turns: [], offered: null, allowed }]] as [string, ChecksState][]).map(([title, checks]) => (
+          <div key={title} className="flex w-80 flex-col gap-3">
+            <p className="text-xs text-muted">{title}</p>
+            <div className="rounded-lg border border-line bg-surface p-4">
+              <ChecksView checks={checks} running={null} error={null} onAllow={setAllowed} readAll={() => <p className="text-xs text-muted">The whole output.</p>} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/** The question above the composer. */
+function ChecksQuestionDemo() {
+  const anchor = useAnchor();
+  return (
+    <section className="mt-6" id={anchor("Checks question")}>
+      <h3 className="mb-2 font-mono text-xs text-faint">Checks question</h3>
+      <div className="max-w-xl rounded-lg border border-line bg-bg p-4">
+        <DockView
+          busy={false}
+          meter={<Meter state="idle" runStartedAt={null} />}
+          question={<ChecksQuestionView offered={[{ name: "ruff", command: "ruff check ." }, { name: "tsc", command: "pnpm run typecheck" }]} onAnswer={() => {}} />}
+          composer={<DemoComposer />}
+        />
       </div>
     </section>
   );
@@ -1352,6 +1434,12 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
       <WorkbenchDemo />
 
       <ChangesDemo />
+
+      <ChecksStripDemo />
+
+      <ChecksTabDemo />
+
+      <ChecksQuestionDemo />
 
       <section className="mt-6" id={anchor("Command palette and keys")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Command palette and keys</h3>

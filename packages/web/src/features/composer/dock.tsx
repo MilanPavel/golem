@@ -5,6 +5,7 @@ import { NoticeLine, type CommandNotice } from "./notice-line.tsx";
 export function DockView({
   meter,
   approval = null,
+  question = null,
   composer,
   error,
   notice = null,
@@ -13,6 +14,8 @@ export function DockView({
   meter: ReactNode;
   /** The approval that waits, directly above the composer. */
   approval?: ReactNode;
+  /** The question about running checks, above the composer. */
+  question?: ReactNode;
   composer: ReactNode;
   error?: string | null;
   /** What the last command did, in a muted status line. */
@@ -24,6 +27,7 @@ export function DockView({
     <div data-dock="" className="flex flex-col gap-2">
       {meter}
       {approval}
+      {question}
       {composer}
       {error ? (
         <p role="alert" className="px-1 text-xs text-deny">

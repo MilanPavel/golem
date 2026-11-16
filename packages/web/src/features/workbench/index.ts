@@ -1,4 +1,5 @@
 export { ChangesTab, ChangesView } from "./changes-tab.tsx";
+export { checksBadge, ChecksTab, ChecksView } from "./checks-tab.tsx";
 export { Workbench, WORKBENCH_ID } from "./workbench.tsx";
 export type { WorkbenchTab } from "./workbench.tsx";
 export {

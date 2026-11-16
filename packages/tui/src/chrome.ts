@@ -15,6 +15,8 @@ export type FrameBudget = {
   todos: number;
   /** `brew install ollama`, above the todo list. */
   install: number;
+  /** The question about running checks, one row above the todo list. */
+  checks: number;
   /** The thin rules around the composer: 2 is above and below, 1 is above only. */
   rules: number;
   composer: number;
@@ -62,6 +64,8 @@ export function frameBudget(input: {
   approval?: number;
   todos?: number;
   install?: number;
+  /** One row for the question about running checks, or none. */
+  checks?: number;
   /** The most rows the composer may grow to. */
   composerMax?: number;
 }): FrameBudget {
@@ -77,6 +81,7 @@ export function frameBudget(input: {
       approval: 0,
       todos: 0,
       install: 0,
+      checks: 0,
       rules: 0,
       composer: 0,
       status: 0,
@@ -90,6 +95,7 @@ export function frameBudget(input: {
   let approval = Math.max(0, Math.floor(input.approval ?? 0));
   let todos = Math.max(0, Math.floor(input.todos ?? 0));
   let install = Math.max(0, Math.floor(input.install ?? 0));
+  let checks = Math.min(1, Math.max(0, Math.floor(input.checks ?? 0)));
   let suggestions = approval > 0 ? 0 : Math.min(SUGGEST_ROWS, Math.max(0, Math.floor(input.suggestions ?? 0)));
   let status = 1;
   let debug = input.debug === true ? DEBUG_ROWS : 0;
@@ -127,6 +133,10 @@ export function frameBudget(input: {
     }
     if (meter > 0) {
       meter = 0;
+      return true;
+    }
+    if (checks > 0) {
+      checks = 0;
       return true;
     }
     if (header > 1) {
@@ -169,7 +179,7 @@ export function frameBudget(input: {
   };
 
   const total = (): number =>
-    header + banner + meter + suggestions + approval + todos + install + rules + composer + status + debug;
+    header + banner + meter + suggestions + approval + todos + install + checks + rules + composer + status + debug;
   while (total() >= rows && shrink()) {
     // Leave at least one row for the transcript when the terminal has a row.
   }
@@ -185,6 +195,7 @@ export function frameBudget(input: {
     approval,
     todos,
     install,
+    checks,
     rules,
     composer,
     status,

@@ -1,5 +1,6 @@
 import {
   applyComposer,
+  checksChanged,
   closedDebug,
   COMMANDS,
   COMPACTING,
@@ -264,6 +265,13 @@ export function useCommands({ session, cwd, typing, send }: UseCommandsOptions):
           case "changes":
             openWorkbench("changes");
             return "handled";
+          case "checks":
+            try {
+              await actions.setChecks(sessionId, found.on);
+              return say(checksChanged(found.on));
+            } catch (err) {
+              return fail(err, "Could not change the checks.");
+            }
           case "compact": {
             const started = Date.now();
             say(found.action === "summarise" ? COMPACTING : "Clearing \u2026");

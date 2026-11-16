@@ -1,4 +1,4 @@
-import { displayToolName, formatTurnTime, groupTurns, turnFooterParts, stepCount, stepMark, summarizeSteps, turnFooter, LIVE_OUTPUT_CHARS, thinkingLine, unreadCallNotice, writingLabel, REPLY_CUT_NOTE, type ChatMessage, type ChatState, type Detail, type StepMark, type ToolBlock, type WritingBlock } from "@golem/view";
+import { checksOf, checksSummary, displayToolName, formatTurnTime, groupTurns, turnFooterParts, stepCount, stepMark, summarizeSteps, turnFooter, LIVE_OUTPUT_CHARS, thinkingLine, unreadCallNotice, writingLabel, REPLY_CUT_NOTE, type ChatMessage, type ChatState, type Detail, type StepMark, type ToolBlock, type WritingBlock } from "@golem/view";
 import { memo, useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { usePulls, useSession } from "../../store/page-context.tsx";
 import type { PullsSnapshot } from "../../store/pulls.ts";
@@ -17,6 +17,7 @@ import type { DiffMode } from "../diff/diff-mode.ts";
 import { DiffModeSwitch } from "../diff/diff-mode-switch.tsx";
 import { useDiffMode } from "../diff/diff-mode.ts";
 import { DiffView } from "../diff/diff-view.tsx";
+import { ChecksStrip } from "./checks-strip.tsx";
 import { EditCards, isEditCard } from "./edit-card.tsx";
 import { Markdown } from "./markdown-view.tsx";
 
@@ -309,7 +310,8 @@ export function GolemTurn({
   pendingId = null,
   thinkingShown,
   detail: detailOverride,
-}: { steps: readonly ChatMessage[]; pendingId?: string | null; thinkingShown?: boolean; detail?: Detail }) {
+  checks = null,
+}: { steps: readonly ChatMessage[]; pendingId?: string | null; thinkingShown?: boolean; detail?: Detail; checks?: ReturnType<typeof checksSummary> | null }) {
   const chosenDetail = useDetail();
   const detail = detailOverride ?? chosenDetail;
   const footer = turnFooter(steps);
@@ -326,13 +328,22 @@ export function GolemTurn({
       {detail === "quiet" ? null : <EditCards tools={tools.filter(isEditCard)} />}
       <ActivityLine tools={tools} detail={detail} streaming={steps.some((step) => step.streaming)} pendingId={pendingId} />
       {steps.map((step) => (step.writing == null ? null : <WritingRow key={step.id} writing={step.writing} />))}
+      {checks === null ? null : <ChecksStrip {...checks} />}
       {foot.length > 0 ?<p className="font-mono text-xs text-faint">{foot.join(" · ")}</p> : null}
     </article>
   );
 }
 
 /** What the transcript draws of the chat. `approval` names the call whose approval waits in the dock. */
-export type TranscriptChat = Pick<ChatState, "messages" | "error" | "notice"> & Partial<Pick<ChatState, "approval" | "unreadCall">>;
+export type TranscriptChat = Pick<ChatState, "messages" | "error" | "notice"> & Partial<Pick<ChatState, "approval" | "unreadCall" | "checks" | "busy" | "runId">>;
+
+/** How a turn's checks went, or null when its run ran none. It is being fixed while that run goes on. */
+function turnChecks(chat: TranscriptChat, steps: readonly ChatMessage[]): ReturnType<typeof checksSummary> | null {
+  if (chat.checks === undefined) return null;
+  const runId = [...steps].reverse().find((step) => step.runId !== undefined)?.runId;
+  const turn = checksOf(chat.checks, runId);
+  return turn === null ? null : checksSummary(turn, chat.busy === true && chat.runId === runId);
+}
 
 /** The messages and the closing error or notice. Pure: the page's stores are not read here. */
 export function TranscriptMessages({ chat, thinkingShown, detail, waiting = null }: { chat: TranscriptChat; thinkingShown?: boolean; detail?: Detail; waiting?: string | null }) {
@@ -353,6 +364,7 @@ export function TranscriptMessages({ chat, thinkingShown, detail, waiting = null
             pendingId={pendingId}
             thinkingShown={thinkingShown}
             detail={detail}
+            checks={turnChecks(chat, turn.steps)}
           />
         ),
       )}

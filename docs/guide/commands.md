@@ -131,6 +131,7 @@ The line under an answer ends with the model, `local` for a model on your machin
 | `/config [project]` | Open the config file: in the web UI, Settings → Config file (the project's file with `project`). In a terminal it says to run `golem config edit [--project]` |
 | `/mcp add [id]` | Add a server from golem's list, or Other. In the web UI it opens the Add dialog in Settings |
 | `/mcp enable <name>`, `/mcp disable <name>` | Turn a server on or off for this chat |
+| `/checks on`, `/checks off` | Let golem run the project's checks (lint, type check) after its edits in this chat, or stop it. When golem first edits files it asks; in the terminal `y` and `n` answer, in the web UI the buttons above the composer do. The Checks tab has the same switch and shows each check's output |
 
 [Tools and permissions](./permissions.md), [Skills](./skills.md), and [MCP servers](./mcp.md) have the details.
 

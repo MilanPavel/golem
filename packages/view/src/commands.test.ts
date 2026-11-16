@@ -197,6 +197,15 @@ test("/mode shows, sets, or returns to the default", () => {
   assert.deepEqual(COMMANDS.find((entry) => entry.name === "/mode")?.choices, ["careful", "balanced", "autopilot", "default"]);
 });
 
+test("/checks takes on or off", () => {
+  assert.deepEqual(applyComposer(closedDebug, "/checks on"), { kind: "checks", on: true });
+  assert.deepEqual(applyComposer(closedDebug, "/checks off"), { kind: "checks", on: false });
+  assert.equal(applyComposer(closedDebug, "/checks").kind, "unknown");
+  assert.equal(applyComposer(closedDebug, "/checks maybe").kind, "unknown");
+  assert.equal(applyComposer(closedDebug, "/checks on now").kind, "unknown");
+  assert.deepEqual(COMMANDS.find((entry) => entry.name === "/checks")?.choices, ["on", "off"]);
+});
+
 test("/close takes no arguments", () => {
   assert.deepEqual(applyComposer(closedDebug, "/close"), { kind: "close-session" });
   assert.equal(applyComposer(closedDebug, "/close now").kind, "unknown");

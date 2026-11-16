@@ -139,6 +139,7 @@ import {
   tuneState,
   tuneChip,
   effectiveMode,
+  checksChanged,
   modeChanged,
   modeReport,
   nextMode,
@@ -244,6 +245,7 @@ import {
 } from "./keys.ts";
 import { layoutTranscript, type LayoutLine } from "./layout-chat.ts";
 import { DEFAULT_PREFS, loadPrefs, prefsPath, savePref } from "./prefs.ts";
+import { ChecksBand } from "./checks-band.tsx";
 import { TodoBand } from "./todo-band.tsx";
 import { InstallBand } from "./install-band.tsx";
 import { RESTARTING, type ServiceControl, type WindowDaemon } from "./service.ts";
@@ -726,6 +728,8 @@ export function App({
   const composerText = draft.text;
   const suggestSelected =
     suggestPick.draft === draft.text ? Math.min(suggestPick.index, Math.max(0, suggestMatches.length - 1)) : 0;
+  /** The checks golem offered to run and the session has not answered. */
+  const checksOffer = chat.checks.allowed === null ? chat.checks.offered : null;
   const budget = frameBudget({
     rows,
     columns,
@@ -738,6 +742,7 @@ export function App({
     composerMax: argsEdit !== null ? ARGS_EDIT_ROWS : undefined,
     todos: showTodos ? todoRows(chat.todos) : 0,
     install: install === null ? 0 : installRows(install.state),
+    checks: checksOffer === null ? 0 : 1,
   });
   suggestRef.current = {
     items: suggestMatches,
@@ -798,7 +803,15 @@ export function App({
     }
   }
   const writingSeconds = (id: string) => Math.max(0, Math.floor((Date.now() - (writingSince.get(id) ?? Date.now())) / 1000));
-  const transcriptOptions = { times: showTimes, now, toolOutput, thinking: showThinking, writingSeconds };
+  const transcriptOptions = {
+    times: showTimes,
+    now,
+    toolOutput,
+    thinking: showThinking,
+    writingSeconds,
+    checks: chat.checks,
+    runId: chat.runId,
+  };
   const measured = layoutTranscript(chat.messages, columns, chatHeight, offset, transcriptOptions);
   const widthKey = measured.overflow ? Math.max(1, columns - 1) : columns;
   const followed = followTail(tail, measured.lineCount, widthKey, offset);
@@ -1925,6 +1938,15 @@ export function App({
           setChat((state) => ({ ...state, notice }));
         },
       );
+      return;
+    }
+    if (outcome.kind === "checks") {
+      setDraft(draftAt(""));
+      if (sessionRef.current === null) {
+        setChat((state) => ({ ...state, notice: "open a session first" }));
+        return;
+      }
+      answerChecks(outcome.on, true);
       return;
     }
     if (outcome.kind === "mode") {
@@ -4053,6 +4075,7 @@ export function App({
       approval: approvalRef.current !== null,
       approvalDiff: approvalRef.current !== null && approvalRef.current.diff !== null,
       approvalEdit: argsEditRef.current !== null,
+      question: chatRef.current.checks.allowed === null && chatRef.current.checks.offered !== null,
     };
   }
 
@@ -4124,6 +4147,9 @@ export function App({
       case "approve":
         answerApproval(effect.decision);
         return;
+      case "checks":
+        answerChecks(effect.on, false);
+        return;
       case "edit-args":
         if (approvalRef.current !== null) {
           setArgsEdit(startArgsEdit(approvalRef.current));
@@ -4175,6 +4201,24 @@ export function App({
       case "ignore":
         return;
     }
+  }
+
+  /** Tells the daemon whether golem may run the project's checks. The question closes from `session.checks.changed`. */
+  function answerChecks(on: boolean, say: boolean): void {
+    const current = sessionRef.current;
+    if (current === null) {
+      return;
+    }
+    client.setChecks(current, on).then(
+      () => {
+        if (say) {
+          setChat((state) => ({ ...state, notice: checksChanged(on) }));
+        }
+      },
+      (error: unknown) => {
+        setChat((state) => ({ ...state, error: messageOf(error) }));
+      },
+    );
   }
 
   function answerApproval(decision: ApprovalChoice): void {
@@ -4754,6 +4798,9 @@ export function App({
       {budget.install > 0 && install !== null ? (
         <InstallBand state={install.state} columns={columns} height={budget.install} />
       ) : null}
+      {budget.checks > 0 && checksOffer !== null ? (
+        <ChecksBand offered={checksOffer} columns={columns} height={budget.checks} />
+      ) : null}
       {budget.todos > 0 ? <TodoBand todos={chat.todos} columns={columns} height={budget.todos} /> : null}
       {budget.approval > 0 && chat.approval !== null ? (
         <ApprovalBand
@@ -4848,7 +4895,9 @@ function LineView({ line, columns }: { line: LayoutLine; columns: [number, numbe
           italic={span.italic}
           dimColor={span.dim === true}
           color={
-            span.tone === "add"
+            span.color !== undefined
+              ? span.color
+              : span.tone === "add"
               ? DIFF_ADD
               : span.tone === "del"
                 ? DIFF_DEL

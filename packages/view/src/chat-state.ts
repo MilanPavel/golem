@@ -1,5 +1,6 @@
 import type { ApprovalChoice, ChatEvent, SkillCall } from "@golem/client";
 
+import { noChecks, reduceChecks, type ChecksState } from "./checks.ts";
 import { emptyLiveContext, foldLiveContext, type LiveContextState } from "./context.ts";
 import { replyWasCut } from "./stop.ts";
 import type { TodoItem } from "./todos.ts";
@@ -89,6 +90,8 @@ export type ChatMessage = {
   tools?: ToolBlock[];
   /** A file the model is still writing, from `tool.writing`. Gone once the call is requested or the reply completes. */
   writing?: WritingBlock | null;
+  /** The run that wrote this reply, from the event that started or completed it. */
+  runId?: string;
   /** Set on a user message that ran a skill. `text` is then the filled-in body. */
   skill?: SkillCall;
 };
@@ -132,6 +135,8 @@ export type ChatState = {
   options: Readonly<Record<string, number | string>>;
   /** The session's permission mode override, from the newest `session.mode.changed`. Null follows config.toml. */
   permissionMode: "careful" | "balanced" | "autopilot" | null;
+  /** The project's checks per run, the question about running them, and the answer, from the `check.*` events. */
+  checks: ChecksState;
 };
 
 export const emptyChat: ChatState = {
@@ -153,6 +158,7 @@ export const emptyChat: ChatState = {
   calls: {},
   options: {},
   permissionMode: null,
+  checks: noChecks,
 };
 
 /** What to do after a model server did not answer, besides fixing it. */
@@ -260,7 +266,8 @@ function retryFor(messages: readonly ChatMessage[], data: RunFailure): ChatState
 export function reduceChat(state: ChatState, event: ChatEvent): ChatState {
   const next = reduceChatEvent(state, event);
   const context = foldLiveContext(state.context, event);
-  return context === state.context ? next : { ...next, context };
+  const checks = reduceChecks(next.checks, event);
+  return context === next.context && checks === next.checks ? next : { ...next, context, checks };
 }
 
 function reduceChatEvent(state: ChatState, event: ChatEvent): ChatState {
@@ -296,6 +303,7 @@ function reduceChatEvent(state: ChatState, event: ChatEvent): ChatState {
             text: "",
             streaming: true,
             at: event.ts,
+            ...(event.run_id === null ? {} : { runId: event.run_id }),
             ...callOf(state, event.data.message_id),
           },
         ],
@@ -613,6 +621,8 @@ function upsertCompleted(
     return [...messages];
   }
   const durationMs = event.data.role === "assistant" ? answerDuration(runStartedAt, event.ts) : undefined;
+  const index = messages.findIndex((message) => message.id === event.data.message_id);
+  const runId = messages[index]?.runId ?? event.run_id;
   const next: ChatMessage = {
     id: event.data.message_id,
     role: event.data.role,
@@ -620,11 +630,11 @@ function upsertCompleted(
     streaming: false,
     interrupted: event.data.interrupted === true,
     at: event.ts,
+    ...(runId === null || runId === undefined || event.data.role !== "assistant" ? {} : { runId }),
     ...(durationMs === undefined ? {} : { durationMs }),
     ...(event.data.skill == null ? {} : { skill: event.data.skill }),
     ...callOf({ calls }, event.data.message_id),
   };
-  const index = messages.findIndex((message) => message.id === next.id);
   if (index < 0) {
     return [...messages, withThinking(next, event.data.thinking, event.data.thinking_ms)];
   }

@@ -58,6 +58,8 @@ export type ComposerOutcome =
   | { kind: "time" }
   | { kind: "todos" }
   | { kind: "changes" }
+  /** `/checks on` or `/checks off`: whether golem runs the project's checks after its edits in this chat. */
+  | { kind: "checks"; on: boolean }
   | { kind: "thinking" }
   | { kind: "detail"; level: Detail | null }
   /** Show the permission mode ("show"), or set it for this chat. A null `mode` returns to the default. */
@@ -410,6 +412,18 @@ export const COMMANDS: readonly Command[] = [
     args: "",
     description: "Shows the files this session changed, with their diffs.",
     run: withoutArgs({ kind: "changes" }),
+  },
+  {
+    name: "/checks",
+    group: "tools",
+    args: "[on|off]",
+    description: "Lets golem run the project's checks after its edits in this chat, or stops it.",
+    choices: ["on", "off"],
+    run: (_debug, args) => {
+      const [word] = args;
+      if (args.length === 1 && (word === "on" || word === "off")) return { kind: "checks", on: word === "on" };
+      return { kind: "unknown", notice: "/checks on or /checks off" };
+    },
   },
   {
     name: "/todos",
