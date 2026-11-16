@@ -45,7 +45,7 @@ from golem.graphs.context_view import (
 )
 from golem.graphs.estimate import TokenRatios
 from golem.graphs.fit import Fitted, fit_prompt, num_predict_of, prompt_estimate, reply_reserve
-from golem.graphs.notes import is_note
+from golem.graphs.notes import is_note, note
 from golem.graphs.prompt import PINNED_KEY, PromptContext, SystemPrompt
 from golem.graphs.result_budget import ResultBudget, result_budget
 from golem.graphs.state import AgentState
@@ -109,6 +109,9 @@ class TooManyStepsError(Exception):
 class _Checkpoint(Protocol):
     @property
     def values(self) -> Mapping[str, object]: ...
+
+
+_MAX_UNDONE = 20
 
 
 class _RunningGraph(Protocol):
@@ -261,13 +264,16 @@ class ChatRuntime:
         }
         await self.answer_dangling(session_id)
         existing = await self.values(session_id)
+        undone = await self._undone_note(session_id, existing)
         graph_input = _turn_input(
-            HumanMessage(content=text, id=user_message_id),
+            [*undone[0], HumanMessage(content=text, id=user_message_id)],
             session_id=session_id,
             model_profile=model_profile,
             schema_version=schema_version,
             has_checkpoint=bool(existing),
         )
+        if undone[1] is not None:
+            graph_input["changes_seen"] = undone[1]
         if skill_folder is not None:
             graph_input["skill_folders"] = [skill_folder]
         async with aclosing(self._parts(graph_input, config)) as parts:
@@ -338,6 +344,25 @@ class ChatRuntime:
                     yield part
             except GraphRecursionError as exc:
                 raise TooManyStepsError from exc
+
+    async def _undone_note(
+        self, session_id: str, existing: Mapping[str, object]
+    ) -> tuple[list[HumanMessage], int | None]:
+        """The note that tells the model of undone changes, and the new ``changes_seen``."""
+        if self.changes is None:
+            return [], None
+        seen = existing.get("changes_seen")
+        paths = await self.changes.reverted_since(session_id, seen if isinstance(seen, int) else 0)
+        if not paths:
+            return [], None
+        shown = ", ".join(paths[:_MAX_UNDONE])
+        if len(paths) > _MAX_UNDONE:
+            shown += f" and {len(paths) - _MAX_UNDONE} more"
+        text = (
+            f"Since your last reply the user undid your changes to: {shown}. "
+            "These files are back to their earlier text. Read a file again before you edit it."
+        )
+        return [note(text)], await self.changes.last_seq(session_id)
 
     async def answer_dangling(self, session_id: str) -> int:
         """Give each tool call without a result a cancelled one. Returns how many."""
@@ -1150,7 +1175,7 @@ def _messages(values: Mapping[str, object]) -> list[BaseMessage]:
 
 
 def _turn_input(
-    message: HumanMessage,
+    messages: list[HumanMessage],
     *,
     session_id: str,
     model_profile: str,
@@ -1161,15 +1186,18 @@ def _turn_input(
         # model_profile rides along so that session.set_model applies from this turn.
         return cast(
             AgentState,
-            {"messages": [message], "model_profile": model_profile, "check_round": 0},
+            {"messages": messages, "model_profile": model_profile, "check_round": 0},
         )
-    return {
-        "messages": [message],
-        "check_round": 0,
-        "session_id": session_id,
-        "model_profile": model_profile,
-        "schema_version": schema_version,
-    }
+    return cast(
+        AgentState,
+        {
+            "messages": messages,
+            "check_round": 0,
+            "session_id": session_id,
+            "model_profile": model_profile,
+            "schema_version": schema_version,
+        },
+    )
 
 
 __all__ = ["INTERRUPTED_KEY", "MAX_MODEL_CALLS", "ChatRuntime", "TooManyStepsError", "open_chat"]

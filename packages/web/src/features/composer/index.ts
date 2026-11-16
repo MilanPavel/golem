@@ -2,6 +2,7 @@ export { ChecksQuestionView, DockedChecksQuestion } from "./checks-question.tsx"
 export { Composer, type ComposerProps } from "./composer.tsx";
 export { ContextChip, ContextChipView } from "./context-chip.tsx";
 export { ModeChip, ModeChipView, useSessionMode } from "./mode-chip.tsx";
+export { NotesChip, NotesChipView } from "./notes-chip.tsx";
 export { TuneChip, TuneChipView } from "./tune-chip.tsx";
 export { DockView } from "./dock.tsx";
 export { Meter } from "./meter.tsx";

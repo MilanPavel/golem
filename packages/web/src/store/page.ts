@@ -2,6 +2,7 @@ import { OLLAMA_FAILED, RpcError, type ApprovalChoice, type ConfigGetResult, typ
 import { changeToolFilter, installEventOf, type InstallEvent, type PermissionMode, type CompactAction } from "@golem/view";
 import type { QueryClient } from "@tanstack/react-query";
 import { createDrafts, type Drafts } from "./drafts.ts";
+import { createNotes, type Notes } from "./notes.ts";
 import { createConnectionStore, type ConnectionStore } from "./connection.ts";
 import { createAppInstall, type AppInstallStore } from "./app-install.ts";
 import { createPageHost, type PageHostStore } from "./page-host.ts";
@@ -304,6 +305,7 @@ export type Page = {
   sessionList: SessionList;
   newSession: NewSessionStore;
   drafts: Drafts;
+  notes: Notes;
   pulls: Pulls;
   setupStart: SetupStart;
   queryClient: QueryClient;
@@ -331,6 +333,7 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
   const sessionList = createSessionList(client);
   const newSession = createNewSession();
   const drafts = createDrafts();
+  const notes = createNotes();
   const queryClient = createQueryClient();
   const pulls = createPulls(client, Date.now, () => {
     void queryClient.invalidateQueries({ queryKey: MODEL_LIST_KEY });
@@ -358,6 +361,7 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
     sessionList,
     newSession,
     drafts,
+    notes,
     pulls,
     setupStart,
     queryClient,
