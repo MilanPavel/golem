@@ -321,12 +321,12 @@ export function useFileDiff(sessionId: string, path: string | null): FileDiff {
   };
 }
 
-/** The paths of the session's folder that hold `query`, at most `limit`. The last answer stays while a new one is read. */
-export function useFileList(sessionId: string, query: string, limit: number): UseQueryResult<FileListResult> {
+/** The paths of the session's folder that hold `query`, at most `limit`; dot files only when `hidden`. The last answer stays while a new one is read. */
+export function useFileList(sessionId: string, query: string, limit: number, hidden: boolean): UseQueryResult<FileListResult> {
   const { queries } = usePage();
   return useQuery({
-    queryKey: fileListKey(sessionId, query),
-    queryFn: () => queries.listFiles(sessionId, query, limit),
+    queryKey: fileListKey(sessionId, query, hidden),
+    queryFn: () => queries.listFiles(sessionId, query, limit, hidden),
     placeholderData: keepPreviousData,
     retry: false,
   });

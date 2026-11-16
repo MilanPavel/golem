@@ -435,6 +435,7 @@ export function delay(attempt: number): number {
 function FilesDemo() {
   const anchor = useAnchor();
   const [typed, setTyped] = useState("");
+  const [hiddenFiles, setHiddenFiles] = useState(false);
   const none = { file: null, error: null };
   return (
     <section className="mt-6" id={anchor("Files tab")}>
@@ -453,6 +454,8 @@ function FilesDemo() {
               <FilesView
                 typed={typed}
                 onTyped={setTyped}
+                hidden={hiddenFiles}
+                onHidden={setHiddenFiles}
                 changed={["src/socket.ts", "src/utils/clamp.ts"]}
                 found={["src/fetch.ts", "src/socket.ts", "src/utils/clamp.ts", "docs/notes.md"]}
                 more={false}

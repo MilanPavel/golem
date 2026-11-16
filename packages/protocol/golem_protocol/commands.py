@@ -2995,13 +2995,17 @@ class FileReadResult(BaseModel):
 
 
 class FileListParams(BaseModel):
-    """``file.list``. Files of the session's folder whose path holds ``query``, case-insensitive."""
+    """``file.list``. Files of the session's folder whose path holds ``query``, case-insensitive.
+
+    Dot files and files in dot folders are listed only when ``hidden`` is true.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     session_id: str = Field(min_length=1)
     query: str = ""
     limit: int = Field(default=50, ge=1, le=200)
+    hidden: bool = False
 
 
 class FileListResult(BaseModel):

@@ -318,7 +318,7 @@ export type PageQueries = {
   /** The start of one text file of the session's folder. */
   readFile(sessionId: string, path: string): Promise<FileReadResult>;
   /** Files of the session's folder whose path holds `query`. */
-  listFiles(sessionId: string, query?: string, limit?: number): Promise<FileListResult>;
+  listFiles(sessionId: string, query?: string, limit?: number, hidden?: boolean): Promise<FileListResult>;
   /** The folders directly under `path` in the home folder; `null` is home itself. */
   dirs(path: string | null): Promise<FsListDirsResult>;
 };
@@ -414,7 +414,7 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       changesRevert: (sessionId, target, force) => client.changesRevert(sessionId, target, force),
       changesCommitInfo: (sessionId) => client.changesCommitInfo(sessionId),
       readFile: (sessionId, path) => client.readFile(sessionId, path),
-      listFiles: (sessionId, query, limit) => client.listFiles(sessionId, query, limit),
+      listFiles: (sessionId, query, limit, hidden) => client.listFiles(sessionId, query, limit, hidden),
       mcpCatalog: (sessionId) => client.mcpCatalog(sessionId ?? undefined),
       dirs: (path) => (path === null ? client.listDirs() : client.listDirs(path)),
     },

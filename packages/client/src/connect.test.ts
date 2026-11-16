@@ -1751,11 +1751,11 @@ test("readFile and listFiles send their arguments and reject a malformed result"
   try {
     assert.deepEqual(await client.readFile("s_1", "a.txt"), read);
     assert.deepEqual(await client.listFiles("s_1"), { paths: ["a.txt"], more: false });
-    await client.listFiles("s_1", "a", 5);
+    await client.listFiles("s_1", "a", 5, true);
     assert.deepEqual(seen, [
       ["file.read", { session_id: "s_1", path: "a.txt" }],
       ["file.list", { session_id: "s_1" }],
-      ["file.list", { session_id: "s_1", query: "a", limit: 5 }],
+      ["file.list", { session_id: "s_1", query: "a", limit: 5, hidden: true }],
     ]);
   } finally {
     client.close();
