@@ -264,10 +264,28 @@ class ChatRuntime:
         cwd: str | None,
         pinned: Sequence[str] = (),
         mcp_servers: Sequence[str] = (),
+        *,
+        profile: str | None = None,
+        options: Mapping[str, float | str] | None = None,
+        tools: Sequence[str] = (),
     ) -> str:
-        """The system prompt the next model call of ``session_id`` would get, or ``""``."""
+        """The system prompt the next model call of ``session_id`` would get, or ``""``.
+
+        With ``profile``, the sections that depend on the model's window see it, and ``tools``
+        are the names of the tools the call would offer.
+        """
         values = await self.values(session_id)
-        context = PromptContext(values, cwd, tuple(pinned), mcp_servers=tuple(mcp_servers))
+        window = None
+        if profile is not None and self.window_of is not None:
+            window = self.window_of(profile, options).window
+        context = PromptContext(
+            values,
+            cwd,
+            tuple(pinned),
+            mcp_servers=tuple(mcp_servers),
+            tools=tuple(tools),
+            window=window,
+        )
         return self.prompt.text(context)
 
     async def stream(
@@ -729,20 +747,7 @@ def open_chat(
         tools = registry.scoped(scope)
         plan_first = _plan(config)
         schemas = [] if final else tools.schemas(plan_first=plan_first)
-        context = PromptContext(
-            state,
-            _cwd(config),
-            _pinned(config),
-            get_stream_writer(),
-            tuple(sorted(scope.enabled)),
-            plan_first=plan_first,
-        )
-        parts = [("helper", CHILD_PROMPT)] if child is not None else system_prompt.parts(context)
-        text = "\n\n".join(t for _, t in parts)
-        system = SystemMessage(content=text) if text else None
-        # The system message is sent, never returned, so it stays out of the checkpoint.
         history = view(_without_thinking(messages), state.get("context_view"))
-        sent = _outgoing(system, history, final)
         async with _held(router, local, profile):
             if learn_window is not None:
                 try:
@@ -750,6 +755,26 @@ def open_chat(
                 except Exception:
                     log.debug("learning the model %s failed", profile, exc_info=True)
             window = window_of(profile, overrides) if window_of is not None else ContextWindow()
+            offered = (
+                tuple(_schema_name(item) for item in schemas) if binder.offers(profile) else ()
+            )
+            context = PromptContext(
+                state,
+                _cwd(config),
+                _pinned(config),
+                get_stream_writer(),
+                tuple(sorted(scope.enabled)),
+                plan_first=plan_first,
+                tools=offered,
+                window=window.window,
+            )
+            parts = (
+                [("helper", CHILD_PROMPT)] if child is not None else system_prompt.parts(context)
+            )
+            text = "\n\n".join(t for _, t in parts)
+            system = SystemMessage(content=text) if text else None
+            # The system message is sent, never returned, so it stays out of the checkpoint.
+            sent = _outgoing(system, history, final)
             current = state.get("context_view")
             original = current
             plain = _without_thinking(messages)
@@ -1467,6 +1492,15 @@ class Blobs(Protocol):
     """Keeps text by its hash. ``put`` returns the sha256 hex of ``text``."""
 
     async def put(self, kind: str, text: str) -> str: ...
+
+
+def _schema_name(schema: Mapping[str, object]) -> str:
+    """The tool name in an OpenAI format schema."""
+    function = schema.get("function")
+    if not isinstance(function, dict):
+        return ""
+    name = cast(Mapping[str, object], function).get("name")
+    return name if isinstance(name, str) else ""
 
 
 class _ToolBinder:
