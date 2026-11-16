@@ -83,6 +83,7 @@ const USAGE =
   "       golem ask \"<prompt>\" [--folder <dir>] [--model <profile>] [--skill <name>] [--detach] | golem open <id> [--web]\n" +
   "       golem config show [--resolved] | golem config edit [--project] | golem skills [list] | golem skills check <path>\n" +
   "       golem skills new <name> [--project] [--description \"…\"] | golem skills edit <name>\n" +
+  "       golem coding bench <profile-or-model> [--task <name>]\n" +
   "       golem web [--port N] [--no-open] [--json] (the same as golem) | golem web serve [--port N]\n" +
   "       golem web install [--port N] | golem web uninstall | golem web logout";
 
@@ -138,6 +139,9 @@ async function run(args: string[]): Promise<number> {
   }
   if (command === "skills" && rest[0] === "check" && rest.length === 2 && rest[1] !== undefined) {
     return runSkillsCheck(rest[1]);
+  }
+  if (command === "coding" && rest[0] === "bench") {
+    return runCodingBench(rest.slice(1));
   }
   if (command === "skills" && (rest[0] === "new" || rest[0] === "edit")) {
     const deps = { ...SKILLS_DEPS, cwd: process.cwd() };
@@ -303,6 +307,18 @@ async function runSkillsCheck(path: string): Promise<number> {
     return 1;
   }
   return runLocated(located.command, [...located.args, "skills", "check", resolve(path)]);
+}
+
+/** Run by the daemon executable too: it talks to the model itself and needs no daemon. */
+async function runCodingBench(args: string[]): Promise<number> {
+  let located;
+  try {
+    located = locate();
+  } catch (error) {
+    process.stderr.write(`${explain(error)}\n`);
+    return 1;
+  }
+  return runLocated(located.command, [...located.args, "coding", "bench", ...args]);
 }
 
 async function runModels(refresh: boolean): Promise<number> {

@@ -3,7 +3,8 @@
 ``serve`` runs the daemon. ``daemon install|start|stop|restart|uninstall`` talk to launchd.
 ``daemon logs`` prints ``logs/golem.jsonl``. ``doctor`` prints the install
 checks as JSON for ``golem doctor``. ``skills check <path>`` validates skills
-without a daemon. The user-facing ``golem`` bin is
+without a daemon. ``coding bench <model>`` measures how often a model's edits apply.
+The user-facing ``golem`` bin is
 the TypeScript package; it delegates these subcommands here.
 """
 
@@ -86,6 +87,15 @@ def _parser() -> argparse.ArgumentParser:
     )
     check.add_argument("path", type=Path)
     check.set_defaults(func=_skills_check)
+
+    coding = sub.add_parser("coding", help="coding tools that need no daemon")
+    coding_sub = coding.add_subparsers(dest="action", required=True)
+    bench = coding_sub.add_parser(
+        "bench", help="measure how often a model's edits apply, on twelve small tasks"
+    )
+    bench.add_argument("model", help="a profile name or a provider/model ref")
+    bench.add_argument("--task", help="run only the task with this name")
+    bench.set_defaults(func=_coding_bench)
     return parser
 
 
@@ -95,6 +105,36 @@ def _skills_check(args: argparse.Namespace) -> int:
     report, ok = check_skills(cast(Path, args.path).expanduser())
     print(report)
     return 0 if ok else 1
+
+
+def _coding_bench(args: argparse.Namespace) -> int:
+    """Run the edit tasks on a real model and print the table. A measure, not a gate."""
+    import tempfile
+
+    from golem.coding.bench import report, run_all
+    from golem.coding.bench_tasks import TASKS
+    from golem.config import load_settings
+    from golem.models.keys import ProviderKeys
+    from golem.models.router import ModelConfigError, ModelRouter
+    from golem.secrets import KeychainSecrets
+
+    wanted = cast("str | None", args.task)
+    tasks = [task for task in TASKS if wanted is None or task.name == wanted]
+    if not tasks:
+        print(f"no task named {wanted}; the tasks are {', '.join(t.name for t in TASKS)}")
+        return 1
+    paths = resolve_paths()
+    settings = load_settings(home=paths.home, project_dir=paths.home)
+    router = ModelRouter(settings, home=paths.home, keys=ProviderKeys(KeychainSecrets()))
+    try:
+        model = router.chat_model(cast(str, args.model))
+    except ModelConfigError as exc:
+        print(exc, file=sys.stderr)
+        return 1
+    with tempfile.TemporaryDirectory(prefix="golem-bench-") as folder:
+        results = asyncio.run(run_all(model, tasks, Path(folder)))
+    print(report(results))
+    return 0
 
 
 def _serve(_args: argparse.Namespace) -> int:
