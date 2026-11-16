@@ -22,6 +22,7 @@ function total(budget: FrameBudget): number {
     budget.approval +
     budget.todos +
     budget.install +
+    budget.checks +
     budget.rules +
     budget.composer +
     budget.status +
