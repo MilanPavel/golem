@@ -18,17 +18,20 @@ export function ConsentBar({
   consent,
   sending = false,
   error = null,
+  id,
   onAnswer,
 }: {
   consent: PendingConsent;
   sending?: boolean;
   error?: string | null;
+  /** The element id, so the Inbox can scroll to the card. */
+  id?: string;
   onAnswer: (answer: ConsentChoice) => void;
 }) {
   const caps = consentCapsLine(consent);
   const answers = consentAnswers(consent);
   return (
-    <section role="group" aria-label="Paid model" data-consent-bar="" className="overflow-hidden rounded-lg border border-line-strong bg-surface shadow-soft">
+    <section id={id} role="group" aria-label="Paid model" data-consent-bar="" className="overflow-hidden rounded-lg border border-line-strong bg-surface shadow-soft">
       <div className="flex items-start gap-2.5 px-3 pt-3 pb-2">
         <Seal />
         <div className="min-w-0">

@@ -2,6 +2,7 @@ import type { ConsentChoice } from "@golem/view";
 import { useCallback, useState } from "react";
 import { sendErrorText } from "../../store/errors.ts";
 import { usePageActions, useSession } from "../../store/page-context.tsx";
+import { CONSENT_CARD_ID } from "../../store/inbox.ts";
 import { ConsentBar } from "./consent-bar.tsx";
 
 /**
@@ -31,6 +32,7 @@ export function DockedConsent({ sessionId }: { sessionId: string }) {
     <ConsentBar
       key={consent.runId}
       consent={consent}
+      id={CONSENT_CARD_ID}
       sending={sent === consent.runId}
       error={failed !== null && failed.run === consent.runId ? failed.text : null}
       onAnswer={answer}

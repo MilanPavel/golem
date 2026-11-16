@@ -1,6 +1,7 @@
 import type { ApprovalChoice, ToolBlock } from "@golem/view";
 import { useCallback, useState } from "react";
 import { useDraftReader, usePageActions, useSession } from "../../store/page-context.tsx";
+import { approvalCardId } from "../../store/inbox.ts";
 import { ApprovalBar } from "./approval-bar.tsx";
 import { useApprovalAnswer } from "./use-approval-answer.ts";
 import { useApprovalKeys } from "./use-approval-keys.ts";
@@ -57,6 +58,7 @@ export function DockedApproval({ sessionId }: { sessionId: string }) {
     <ApprovalBar
       key={callId}
       tool={tool}
+      id={approvalCardId(callId)}
       sending={sendingId === callId}
       error={error}
       editing={editing}

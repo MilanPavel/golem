@@ -3,6 +3,7 @@ Session stores, the live store, the query client, and the router.
 - `create-store.ts`: a snapshot and its listeners; `set` with the same reference notifies nobody.
 - `session-store.ts`: one session's `SessionView`; deltas fold once per frame, any other event folds at once.
 - `sessions.ts`: the open sessions; routes events by session id, attaches on open, detaches on close.
+- `inbox.ts`: the Inbox: `useInbox` (items from the session list, busy and error by item), `answerInboxItem` (through `respond`), `openInboxItem` (go to the session and scroll to its card), and the ids of the cards.
 - `session-list.ts`: the live session list, and `groupByFolder` for the sidebar.
 - `new-session.ts`: the folder the next new session gets: a pick, else the last opened session's, else the newest session's.
 - `drafts.ts`: the unsent text and its long pastes per session id (or `"new"`), in memory only.
