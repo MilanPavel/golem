@@ -448,6 +448,11 @@ class SessionManager:
         """What a waiting session waits for, read from its stored events."""
         return await self._events.pending(activity)
 
+    def _offered(self, session: _LiveSession) -> list[str]:
+        """The names of the tools the session's next model call would offer."""
+        found = self._runtime.tools.scoped(_scope(session)).schemas()
+        return [str(cast(Mapping[str, object], item["function"])["name"]) for item in found]
+
     async def inspect(self, session_id: str) -> SessionView:
         """The messages the next model call would see, system prompt first. Does not start a run."""
         async with self._lock:
@@ -455,7 +460,13 @@ class SessionManager:
             values = await self._runtime.values(session_id)
             identity = self._runtime.router.identity(session.model_profile)
             system = await self._runtime.system_prompt(
-                session_id, session.cwd, session.skills, sorted(session.mcp_servers)
+                session_id,
+                session.cwd,
+                session.skills,
+                sorted(session.mcp_servers),
+                profile=session.model_profile,
+                options=dict(session.options),
+                tools=self._offered(session),
             )
             messages = plain_messages(_as_sent(values))
             return SessionView(
@@ -493,7 +504,13 @@ class SessionManager:
             session.compacting = True
         try:
             system = await self._runtime.system_prompt(
-                session_id, session.cwd, session.skills, sorted(session.mcp_servers)
+                session_id,
+                session.cwd,
+                session.skills,
+                sorted(session.mcp_servers),
+                profile=session.model_profile,
+                options=dict(session.options),
+                tools=self._offered(session),
             )
             schemas = self._runtime.tools.scoped(_scope(session)).schemas()
             done = await self._runtime.compact(

@@ -40,6 +40,10 @@ class PromptContext:
     """The on-demand MCP servers the session has turned on."""
     plan_first: bool = False
     """Whether the session is in plan first."""
+    tools: tuple[str, ...] = ()
+    """The names of the tools offered on this call. Empty for a model that takes no tools."""
+    window: int | None = None
+    """The context window of this call's model in tokens, or None when unknown."""
 
 
 SectionFn = Callable[[PromptContext], str | None]
