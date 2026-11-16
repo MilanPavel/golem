@@ -58,6 +58,7 @@ test("an approval docks as a bar, not in the transcript, and Allow once answers 
   await wait();
   ask(send);
   const bar = screen.getByRole("group", { name: "Approval" });
+  expect(bar.id).toBe("approval-c1");
   expect(screen.getByTestId("dock").contains(bar)).toBe(true);
   expect(screen.getAllByRole("group", { name: "Approval" })).toHaveLength(1);
   expect(document.querySelector("article")?.contains(bar)).toBe(false);

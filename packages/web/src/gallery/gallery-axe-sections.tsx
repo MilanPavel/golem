@@ -15,6 +15,7 @@ export const GALLERY_SECTIONS = [
   "connection-screens",
   "sidebar",
   "rail",
+  "inbox-panel",
   "folder-browser",
   "setup-form",
   "mcp-servers",

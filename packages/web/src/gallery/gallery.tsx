@@ -68,6 +68,9 @@ import { PullStatusView, pullSummary } from "../features/models/index.ts";
 import { NO_OLLAMA_LISTING, OLLAMA_DOWN_LISTING, SAMPLE_LISTING, SAMPLE_PULLS, THINKING_LISTING } from "../features/models/sample.ts";
 import { CloseSessionDialog, RenameField, SidebarView } from "../features/sessions/index.ts";
 import { Rail } from "../features/sidebar/index.ts";
+import { InboxPanel } from "../features/inbox/index.ts";
+import { SAMPLE_INBOX } from "../features/inbox/sample.ts";
+import { inboxKey } from "../store/inbox.ts";
 import { faviconHref, tabTitle } from "../features/tab-status/index.ts";
 import type { ConnectionSnapshot } from "../store/connection.ts";
 import type { SessionSummary } from "../store/session-list.ts";
@@ -1484,6 +1487,31 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
               <figcaption className="mt-1 font-mono text-xs text-faint">{label}</figcaption>
             </figure>
           ))}
+        </div>
+      </section>
+
+      <section className="mt-6" id={anchor("Inbox panel")}>
+        <h3 className="mb-2 font-mono text-xs text-faint">Inbox panel</h3>
+        <div className="flex flex-wrap items-start gap-4">
+          <figure className="m-0 w-72">
+            <InboxPanel items={[]} onAnswer={() => {}} onOpen={() => {}} />
+            <figcaption className="mt-1 font-mono text-xs text-faint">empty</figcaption>
+          </figure>
+          <figure className="m-0 w-72">
+            <InboxPanel items={SAMPLE_INBOX} label={`Inbox, ${theme}`} onAnswer={() => {}} onOpen={() => {}} />
+            <figcaption className="mt-1 font-mono text-xs text-faint">two approvals and a consent</figcaption>
+          </figure>
+          <figure className="m-0 w-72">
+            <InboxPanel
+              items={SAMPLE_INBOX}
+              label={`Inbox, answering and failed, ${theme}`}
+              busy={{ [inboxKey(SAMPLE_INBOX[2]!)]: true }}
+              errors={{ [inboxKey(SAMPLE_INBOX[1]!)]: "golem is still answering. Stop it first, or wait." }}
+              onAnswer={() => {}}
+              onOpen={() => {}}
+            />
+            <figcaption className="mt-1 font-mono text-xs text-faint">one card answering, one with an error</figcaption>
+          </figure>
         </div>
       </section>
 
