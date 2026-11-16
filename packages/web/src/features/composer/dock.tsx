@@ -6,6 +6,7 @@ export function DockView({
   meter,
   approval = null,
   question = null,
+  hint = null,
   composer,
   error,
   notice = null,
@@ -16,6 +17,8 @@ export function DockView({
   approval?: ReactNode;
   /** The question about running checks, above the composer. */
   question?: ReactNode;
+  /** A line above the composer, such as how long a local model will take. */
+  hint?: ReactNode;
   composer: ReactNode;
   error?: string | null;
   /** What the last command did, in a muted status line. */
@@ -28,6 +31,7 @@ export function DockView({
       {meter}
       {approval}
       {question}
+      {hint}
       {composer}
       {error ? (
         <p role="alert" className="px-1 text-xs text-deny">

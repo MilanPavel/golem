@@ -459,11 +459,24 @@
     },
     "TraceRoute": {
       "additionalProperties": false,
-      "description": "Why a run used the model it did: the pick of a session that is not ``pinned``.\n\n``reason`` and ``detail`` are those of ``model.routed``, and ``rejected`` the\ncandidates the pick dropped.",
+      "description": "Why a run used the model it did: the pick of a session that is not ``pinned``.\n\n``reason`` and ``detail`` are those of ``model.routed``, and ``rejected`` the\ncandidates the pick dropped. ``model`` and ``tier`` are the pick itself. An older\ndaemon leaves them out.",
       "properties": {
         "detail": {
           "title": "Detail",
           "type": "string"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
         },
         "reason": {
           "enum": [
@@ -485,6 +498,23 @@
           },
           "title": "Rejected",
           "type": "array"
+        },
+        "tier": {
+          "anyOf": [
+            {
+              "enum": [
+                "local",
+                "budget",
+                "frontier"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tier"
         }
       },
       "required": [

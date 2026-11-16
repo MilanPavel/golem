@@ -16,6 +16,7 @@ import {
   providerMissing,
   sizeLabel,
   statusLabel,
+  tierLabel,
   withPulls,
   type Category,
   type PullState,
@@ -403,7 +404,7 @@ function categoryTabs(category: Category | null): PickerRow {
 }
 
 function modelRow(model: ListedModel, selected: boolean, current: boolean, columns: number, missing: boolean, category: Category | null): PickerRow {
-  const facts = [recommendedLabel(model, category), categoriesLabel(model), contextLabel(model.ctx), priceLabel(model), sizeLabel(model), statusLabel(model, missing)]
+  const facts = [recommendedLabel(model, category), categoriesLabel(model), tierLabel(model), contextLabel(model.ctx), priceLabel(model), sizeLabel(model), statusLabel(model, missing)]
     .filter((part) => part.length > 0)
     .join("  ");
   const profiles = model.profiles ?? [];

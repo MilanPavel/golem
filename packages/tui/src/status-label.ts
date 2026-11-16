@@ -77,6 +77,7 @@ export const STATUS_PRIORITY = {
   title: 80,
   model: 60,
   local: 59,
+  route: 59,
   mode: 58,
   plan: 59,
   fresh: 55,
@@ -255,6 +256,8 @@ export function statusSegments(input: {
   context?: LiveContext | null;
   /** The options changed from the model's defaults, as `tuneChip` says them. */
   tune?: string;
+  /** The route mode after the model: `auto`, `local`. Empty on `pinned`. */
+  route?: string;
   /** The permission mode the session runs in: `balanced`. */
   mode?: string;
   /** The session is in plan first. */
@@ -271,6 +274,7 @@ export function statusSegments(input: {
     segment("alert", input.alert ?? "", STATUS_PRIORITY.alert, "alert"),
     segment("title", input.title, STATUS_PRIORITY.title, "title"),
     segment("model", input.model, STATUS_PRIORITY.model, "model"),
+    segment("route", input.route ?? "", STATUS_PRIORITY.route, "dim"),
     segment("mode", input.mode ?? "", STATUS_PRIORITY.mode, "dim"),
     segment("context", contextLabel(input.context ?? null), STATUS_PRIORITY.context, contextTone(input.context ?? null)),
     segment("plan", input.plan === true ? "◇ plan" : "", STATUS_PRIORITY.plan, "fresh"),

@@ -1,4 +1,4 @@
-import { type Category, categoryName, contextLabel, priceLabel, recommendedLabel, sizeLabel, statusLabel } from "@golem/view";
+import { type Category, categoryName, contextLabel, priceLabel, recommendedLabel, sizeLabel, statusLabel, tierLabel } from "@golem/view";
 import type { ReactNode } from "react";
 import type { ListedModel } from "../../store/models.ts";
 import type { PullEntry } from "../../store/pulls.ts";
@@ -103,6 +103,7 @@ export function ModelRow({ model, providerMissing, current, isDefault, category,
           {detail === "" ? null : <span className="font-mono text-xs text-faint">{detail}</span>}
           {isDefault ? <Badge className="px-1.5 py-0">default</Badge> : null}
           {tag === undefined || tag === "" ? null : <Badge className="px-1.5 py-0 text-allow">{tag}</Badge>}
+          {tierLabel(model) === "" ? null : <Badge className="px-1.5 py-0 text-faint">{tierLabel(model)}</Badge>}
           {recommended === "" ? null : <Badge className="px-1.5 py-0 text-allow">{recommended}</Badge>}
           {categories.map((category) => (
             <Badge key={category} className="px-1.5 py-0 text-faint">

@@ -839,6 +839,41 @@ async def test_list_names_the_session_a_fork_came_from(short_home: Path) -> None
         await stop_daemon(app, task)
 
 
+async def test_config_get_has_the_ladder_and_the_caps(short_home: Path) -> None:
+    app, task = await start_daemon(
+        short_home, router=ModelRouter(model=ScriptedChatModel(replies=[]))
+    )
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        bare = rpc_result(await client.call("config.get", {}))
+        assert isinstance(bare, dict)
+        assert bare["routing"] == {
+            "ladder": {"local": None, "budget": None, "frontier": None},
+            "daily_usd": None,
+            "session_usd": None,
+        }
+        (short_home / "config.toml").write_text(
+            '[routing.ladder]\nlocal = "ollama/qwen3:8b"\nbudget = "deepseek/deepseek-chat"\n'
+            "[budget]\ndaily_usd = 2.0\nsession_usd = 0.5\n",
+            encoding="utf-8",
+        )
+        set_up = rpc_result(await client.call("config.get", {}))
+        assert isinstance(set_up, dict)
+        assert set_up["routing"] == {
+            "ladder": {
+                "local": "ollama/qwen3:8b",
+                "budget": "deepseek/deepseek-chat",
+                "frontier": None,
+            },
+            "daily_usd": 2.0,
+            "session_usd": 0.5,
+        }
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+
+
 async def test_config_get_lists_the_rules_for_a_folder(short_home: Path) -> None:
     (short_home / "config.toml").write_text(
         '[[rule]]\ntool = "grep"\nmatch = "*secret*"\naction = "deny"\n', encoding="utf-8"

@@ -126,6 +126,7 @@ export function fakeClient() {
     setSessionMode: vi.fn<PageClient["setSessionMode"]>(async () => ({}) as never),
     setPlan: vi.fn<PageClient["setPlan"]>(async (sessionId, on) => ({ session_id: sessionId, on })),
     setChecks: vi.fn<PageClient["setChecks"]>(async (sessionId, on) => ({ session_id: sessionId, on })),
+    setRoute: vi.fn<PageClient["setRoute"]>(async (sessionId, mode) => ({ session_id: sessionId, mode })),
     compactSession: vi.fn<PageClient["compactSession"]>(async () => ({ before_tokens: 100, after_tokens: 50, count: 0 })),
     getConfig: vi.fn<PageClient["getConfig"]>(async () => ({ rules: [] }) as never),
     listDirs: vi.fn<PageClient["listDirs"]>(async () => ({ path: "/home/me", home: "/home/me", parent: null, entries: [], truncated: false })),

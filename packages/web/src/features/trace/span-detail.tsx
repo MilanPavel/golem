@@ -1,6 +1,6 @@
 import { Fragment, useRef, useState, type ComponentType, type ReactNode } from "react";
-import { formatTokens, summaryOfLine } from "@golem/view";
-import type { TraceMessage, TraceSpanResult } from "../../store/trace.ts";
+import { formatTokens, summaryOfLine, routeHeadline, whyRows, type RouteMode } from "@golem/view";
+import type { TraceMessage, TraceSpanResult, TraceRoute } from "../../store/trace.ts";
 import { Button } from "../../ui/button.tsx";
 import { CopyButton, selectText } from "../../ui/copy-command.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../ui/tabs.tsx";
@@ -36,6 +36,34 @@ import {
 export type ArtifactViewer = ComponentType<{ sessionId: string; artifactId: string; open: boolean; onOpenChange: (open: boolean) => void }>;
 
 const BLOCK = "overflow-x-auto whitespace-pre-wrap break-words rounded-sm bg-code-bg p-3 font-mono text-xs";
+
+/** Why this model: the reason, then each candidate with its tier and what happened to it. */
+export function RouteBlock({ route, mode }: { route: TraceRoute; mode: RouteMode | null }) {
+  const rows = whyRows(route);
+  return (
+    <section aria-label="Route" className="flex flex-col gap-2 border-b border-line px-4 py-3">
+      <h3 className="font-mono text-xs text-muted">{routeHeadline(route.reason, mode)}</h3>
+      <table className="w-full text-left text-xs">
+        <thead>
+          <tr className="text-faint">
+            <th className="py-1 pr-3 font-normal">Model</th>
+            <th className="py-1 pr-3 font-normal">Tier</th>
+            <th className="py-1 font-normal">Result</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, index) => (
+            <tr key={`${row.model}:${index}`} className={index === 0 ? "text-ink" : "text-muted"}>
+              <td className="py-0.5 pr-3 align-top font-mono">{row.model}</td>
+              <td className="py-0.5 pr-3 align-top font-mono">{row.tier}</td>
+              <td className="py-0.5 align-top">{row.result}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
+  );
+}
 
 function NotRecorded() {
   return <p className="text-sm text-faint">{NOT_RECORDED_LINE}</p>;
@@ -385,7 +413,21 @@ function Panel({ tab, result, sessionId, Artifact, mode, setMode }: { tab: Tab; 
  * Metadata; a tool has Args, Result, and Approval when the call had one. A run has no input or
  * output of its own.
  */
-export function SpanDetail({ result, sessionId, Artifact = ArtifactDialog }: { result: TraceSpanResult; sessionId: string; Artifact?: ArtifactViewer }) {
+export function SpanDetail({
+  result,
+  sessionId,
+  Artifact = ArtifactDialog,
+  route = null,
+  routeMode = null,
+}: {
+  result: TraceSpanResult;
+  sessionId: string;
+  Artifact?: ArtifactViewer;
+  /** Why the run used its model: shown on the run, and on its first model call. */
+  route?: TraceRoute | null;
+  /** The session's route mode, for the line over the table. */
+  routeMode?: RouteMode | null;
+}) {
   // Pretty or JSON stays as chosen while the tabs change, and starts again with the next span.
   const [mode, setMode] = useState<Mode>("pretty");
   const tabs = tabsOf(result);
@@ -393,6 +435,7 @@ export function SpanDetail({ result, sessionId, Artifact = ArtifactDialog }: { r
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
       <Header result={result} />
+      {route === null ? null : <RouteBlock route={route} mode={routeMode} />}
       {result.span.kind === "model" && result.context ? <ContextMeter context={result.context} provider={result.provider ?? null} /> : null}
       {first === undefined ? (
         <p className="p-4 text-sm text-faint">A run has no input or output of its own. Select a model call or a tool.</p>

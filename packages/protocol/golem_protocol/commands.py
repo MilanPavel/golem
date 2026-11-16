@@ -563,11 +563,14 @@ class TraceRoute(BaseModel):
     """Why a run used the model it did: the pick of a session that is not ``pinned``.
 
     ``reason`` and ``detail`` are those of ``model.routed``, and ``rejected`` the
-    candidates the pick dropped.
+    candidates the pick dropped. ``model`` and ``tier`` are the pick itself. An older
+    daemon leaves them out.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
+    model: str | None = Field(default=None, min_length=1)
+    tier: Literal["local", "budget", "frontier"] | None = None
     reason: Literal[
         "pinned", "privacy", "fit", "budget", "cheapest", "escalated", "fallback", "user"
     ]
@@ -2603,6 +2606,29 @@ class ConfigAllowance(BaseModel):
     subject: str | None = None
 
 
+class ConfigLadder(BaseModel):
+    """``[routing.ladder]``: the model named for each tier. Null means golem chooses."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    local: str | None = None
+    budget: str | None = None
+    frontier: str | None = None
+
+
+class ConfigRouting(BaseModel):
+    """What a route chip needs from ``[routing]`` and ``[budget]``.
+
+    ``daily_usd`` and ``session_usd`` are the caps on paid models, null for no cap.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    ladder: ConfigLadder = Field(default_factory=ConfigLadder)
+    daily_usd: float | None = Field(default=None, ge=0)
+    session_usd: float | None = Field(default=None, ge=0)
+
+
 class ConfigGetResult(BaseModel):
     """Resolved settings. Keys are never included.
 
@@ -2611,6 +2637,7 @@ class ConfigGetResult(BaseModel):
     without a ``cwd``. ``default_permission_mode`` is ``[permissions] mode``,
     and ``permission_mode`` the mode the ``rules`` were built for: the session's
     when ``session_id`` is given, else the default. An older daemon leaves both out.
+    ``routing`` is the ladder and the spending caps. An older daemon leaves it out.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -2626,6 +2653,7 @@ class ConfigGetResult(BaseModel):
     permission_mode: PermissionMode = "balanced"
     rules: list[ConfigRule]
     session_allowed: list[ConfigAllowance] = Field(default_factory=list[ConfigAllowance])
+    routing: ConfigRouting | None = None
 
 
 class RoutingGetParams(BaseModel):
@@ -3366,10 +3394,12 @@ __all__ = [
     "ConfigError",
     "ConfigGetParams",
     "ConfigGetResult",
+    "ConfigLadder",
     "ConfigRawGetParams",
     "ConfigRawGetResult",
     "ConfigRawResult",
     "ConfigRawSetParams",
+    "ConfigRouting",
     "ConfigRule",
     "CostDayRow",
     "CostGetParams",

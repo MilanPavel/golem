@@ -53,11 +53,13 @@ export type Name2 = string;
 export type Preview2 = string;
 export type Recorded2 = boolean;
 export type Detail = string;
+export type Model3 = string | null;
 export type Reason = 'pinned' | 'privacy' | 'fit' | 'budget' | 'cheapest' | 'escalated' | 'fallback' | 'user';
 export type Ref = string;
 export type Tier = 'local' | 'budget' | 'frontier';
 export type Why = string;
 export type Rejected = ModelRejection[];
+export type Tier1 = ('local' | 'budget' | 'frontier') | null;
 export type Start2 = string;
 export type Status2 = 'ok' | 'failed' | 'cancelled' | 'denied' | 'running';
 
@@ -167,15 +169,18 @@ export interface TraceTokens {
  * Why a run used the model it did: the pick of a session that is not ``pinned``.
  *
  * ``reason`` and ``detail`` are those of ``model.routed``, and ``rejected`` the
- * candidates the pick dropped.
+ * candidates the pick dropped. ``model`` and ``tier`` are the pick itself. An older
+ * daemon leaves them out.
  *
  * This interface was referenced by `TraceRunSpan`'s JSON-Schema
  * via the `definition` "TraceRoute".
  */
 export interface TraceRoute {
   detail: Detail;
+  model?: Model3;
   reason: Reason;
   rejected?: Rejected;
+  tier?: Tier1;
 }
 /**
  * A candidate the pick left out, and why in plain words.

@@ -138,3 +138,14 @@ test("costReportLines: an unknown model and tier are named", () => {
   });
   assert.equal(lines.at(-1), "unknown  -  10  $0.00");
 });
+
+test("turnFooterParts puts the routed note before the model", () => {
+  const totals = { model: "deepseek-chat", tier: "budget", tokens: 1200, costUsd: 0.004 } as const;
+  assert.deepEqual(turnFooterParts(totals, "", "\u2191 deepseek-chat \u00b7 did not fit in 32K"), [
+    "\u2191 deepseek-chat \u00b7 did not fit in 32K",
+    "deepseek-chat",
+    "1.2K tok",
+    "$0.004",
+  ]);
+  assert.deepEqual(turnFooterParts(totals), ["deepseek-chat", "1.2K tok", "$0.004"]);
+});

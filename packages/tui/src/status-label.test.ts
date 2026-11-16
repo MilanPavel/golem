@@ -320,8 +320,8 @@ test("context sits after the model and leaves the line after the skills and befo
     context: { spanId: "m", used: 85, window: 100, windowEstimated: false, windowPlanned: false, numCtx: null },
   });
   assert.deepEqual(
-    segments.map((segment) => segment.id).slice(0, 6),
-    ["connection", "alert", "title", "model", "mode", "context"],
+    segments.map((segment) => segment.id).slice(0, 7),
+    ["connection", "alert", "title", "model", "route", "mode", "context"],
   );
   const context = segments.find((segment) => segment.id === "context");
   assert.equal(context?.text, "███████░ 85% 85/100");
@@ -362,4 +362,17 @@ test("the cost segment ends the line, and is empty until the session has a paid 
   const paid = statusSegments({ ...base, cost: "$0.03" });
   assert.equal(paid[paid.length - 1]?.id, "cost");
   assert.deepEqual(fitSegments(paid, 80).map((part) => part.text).slice(-1), ["$0.03"]);
+});
+
+test("the route segment follows the model, and is empty without a route", () => {
+  const input = { connection: "connected", title: "Trip", model: "qwen3:27b", folder: "~/repos/golem", messageCount: null, uptimeSeconds: null };
+  const route = statusSegments({ ...input, route: "auto" }).find((part) => part.id === "route");
+  assert.equal(route?.text, "auto");
+  assert.equal(route?.tone, "dim");
+  assert.equal(statusSegments(input).find((part) => part.id === "route")?.text, "");
+  assert.ok(STATUS_PRIORITY.route < STATUS_PRIORITY.model && STATUS_PRIORITY.route > STATUS_PRIORITY.mode);
+  const kept = fitSegments(statusSegments({ ...input, route: "auto", mode: "balanced" }), 80).map((part) => part.id);
+  assert.deepEqual(kept.slice(0, 5), ["connection", "title", "model", "route", "mode"]);
+  const hidden = fitSegments(statusSegments({ ...input, route: "", mode: "balanced" }), 80).map((part) => part.id);
+  assert.deepEqual(hidden.slice(0, 4), ["connection", "title", "model", "mode"]);
 });

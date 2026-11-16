@@ -28,6 +28,87 @@
       "title": "ConfigAllowance",
       "type": "object"
     },
+    "ConfigLadder": {
+      "additionalProperties": false,
+      "description": "``[routing.ladder]``: the model named for each tier. Null means golem chooses.",
+      "properties": {
+        "budget": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Budget"
+        },
+        "frontier": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Frontier"
+        },
+        "local": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Local"
+        }
+      },
+      "title": "ConfigLadder",
+      "type": "object"
+    },
+    "ConfigRouting": {
+      "additionalProperties": false,
+      "description": "What a route chip needs from ``[routing]`` and ``[budget]``.\n\n``daily_usd`` and ``session_usd`` are the caps on paid models, null for no cap.",
+      "properties": {
+        "daily_usd": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Daily Usd"
+        },
+        "ladder": {
+          "$ref": "#/$defs/ConfigLadder"
+        },
+        "session_usd": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Session Usd"
+        }
+      },
+      "title": "ConfigRouting",
+      "type": "object"
+    },
     "ConfigRule": {
       "additionalProperties": false,
       "description": "One tool rule, in the order rules are checked.\n\n``source`` names the file and the rule's number in it, or ``built-in\ndefault``. ``ignored`` says why a listed rule never matches. ``file`` and\n``index`` are what ``policy.update`` and ``policy.remove`` take.",
@@ -121,7 +202,7 @@
     }
   },
   "additionalProperties": false,
-  "description": "Resolved settings. Keys are never included.\n\n``project_policy`` is the project's ``.golem/policy.toml`` when it exists,\nand ``project_trusted`` whether its allow rules count. Both are null\nwithout a ``cwd``. ``default_permission_mode`` is ``[permissions] mode``,\nand ``permission_mode`` the mode the ``rules`` were built for: the session's\nwhen ``session_id`` is given, else the default. An older daemon leaves both out.",
+  "description": "Resolved settings. Keys are never included.\n\n``project_policy`` is the project's ``.golem/policy.toml`` when it exists,\nand ``project_trusted`` whether its allow rules count. Both are null\nwithout a ``cwd``. ``default_permission_mode`` is ``[permissions] mode``,\nand ``permission_mode`` the mode the ``rules`` were built for: the session's\nwhen ``session_id`` is given, else the default. An older daemon leaves both out.\n``routing`` is the ladder and the spending caps. An older daemon leaves it out.",
   "properties": {
     "config_file": {
       "minLength": 1,
@@ -188,6 +269,17 @@
       ],
       "default": null,
       "title": "Project Trusted"
+    },
+    "routing": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ConfigRouting"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "rules": {
       "items": {

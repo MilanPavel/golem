@@ -20,6 +20,7 @@ import {
   recommendedLabel,
   sizeLabel,
   statusLabel,
+  tierLabel,
   withPulls,
 } from "./model-list.ts";
 
@@ -208,4 +209,10 @@ test("a pick is named for what is being looked at", () => {
   assert.equal(recommendedLabel(pick, "vision"), "");
   assert.equal(recommendedLabel(model("ollama/b", { recommended_for: ["long-context"] }), "long-context"), "recommended for long context");
   assert.equal(recommendedLabel(model("ollama/c"), null), "");
+});
+
+test("tierLabel is the tier word the picker shows", () => {
+  assert.equal(tierLabel(model("ollama/qwen3:8b")), "local");
+  assert.equal(tierLabel(model("anthropic/opus")), "frontier");
+  assert.equal(tierLabel(model("deepseek/chat", { tier: "budget" })), "budget");
 });
