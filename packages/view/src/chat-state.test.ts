@@ -233,6 +233,17 @@ test("a failure without a code shows the hint and no /model", () => {
   );
 });
 
+test("a rate limit, no credit and a refused key show their hint and /model", () => {
+  const hints = [
+    ["rate_limited", "deepseek is rate-limited", "wait a minute and try again"],
+    ["no_credit", "deepseek has no credit left", "add credit at deepseek"],
+    ["auth_failed", "deepseek did not accept the key", "/login deepseek"],
+  ] as const;
+  for (const [code, message, hint] of hints) {
+    assert.equal(failureText({ message, code, hint }), `${message} · ${hint} · /model to switch`);
+  }
+});
+
 test("an Ollama that is not installed marks the model down and offers /model to install it", () => {
   const missing = reduceChat(emptyChat, {
     seq: 2,

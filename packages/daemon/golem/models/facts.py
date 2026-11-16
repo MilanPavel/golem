@@ -5,11 +5,12 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Protocol
 
 from golem.config import ModelPrice
 from golem.models.discovery import ListedModel
+from golem.models.health import Health
 from golem.models.keys import KeyStoreError
 from golem.models.router import KeyStatus, ModelRouter
 from golem.models.tiers import Tier, blended, tier_of
@@ -116,7 +117,8 @@ class ListedFacts:
     """Facts from the cached listing. Makes no network call itself.
 
     Before the first listing it starts one in the background and answers from the router
-    alone: the provider's kind, and for a hosted model whether a key is set.
+    alone: the provider's kind, and for a hosted model whether a key is set. A model of a
+    provider that failed in the last minute (``health``) is not ready, with the reason.
     """
 
     def __init__(
@@ -125,7 +127,9 @@ class ListedFacts:
         router: ModelRouter,
         window_of: WindowOf,
         speed_of: SpeedOf | None = None,
+        health: Health | None = None,
     ) -> None:
+        self._health = router.health if health is None else health
         self._discovery = discovery
         self._router = router
         self._window_of = window_of
@@ -150,7 +154,13 @@ class ListedFacts:
             window = self._window_of(profile, overrides) if ollama else None
             speed = None if self._speed_of is None else self._speed_of(ref)
             found.append(facts_of(listed, window=window, speed=speed, ollama=ollama))
-        return found
+        return [self._checked(model) for model in found]
+
+    def _checked(self, model: ModelFacts) -> ModelFacts:
+        why = self._health.why(model.ref.partition("/")[0])
+        if why is None or not model.ready:
+            return model
+        return replace(model, ready=False, why_not_ready=why)
 
     def _is_ollama(self, provider: str) -> bool:
         configured = self._router.provider(provider)

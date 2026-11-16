@@ -14,9 +14,10 @@ graph state.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
-from collections.abc import Mapping, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal, cast
@@ -40,6 +41,7 @@ from golem.config import (
 from golem.models import ollama
 from golem.models import options as model_options
 from golem.models.errors import ModelUnreachable
+from golem.models.health import Health
 from golem.models.keys import KeyStore, KeyStoreError
 from golem.models.ollama_chat import OllamaChat
 from golem.models.tiers import BUDGET_MAX_PRICE
@@ -192,6 +194,10 @@ class ModelRouter:
         self.keys = keys
         # The planned window of a local model. Set after construction.
         self.plans: WindowPlans | None = None
+        # Providers that failed in the last minute. ``ListedFacts`` and the fallback read it.
+        self.health = Health()
+        # Waits before the retry of a failed call. A test swaps it for a function that returns.
+        self.sleep: Callable[[float], Awaitable[None]] = asyncio.sleep
         self._think_values: dict[str, tuple[str, ...]] = {}
         self._config_file = resolve_paths(home).config_file if home is not None else None
         self._stamp = self._file_stamp()

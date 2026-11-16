@@ -191,13 +191,24 @@ class RunFailedData(BaseModel):
     ``run ollama serve``. ``context_full``: the prompt does not fit the model's window,
     even after clearing and summarising, and nothing was sent. ``local_only``: the chat's
     folder stays on this Mac and a hosted model was about to be called, so nothing was sent.
+    ``rate_limited``, ``no_credit`` and ``auth_failed``: a hosted provider answered with a
+    rate limit, no credit left, or a refused key, and no other model was allowed.
     """
 
     model_config = _CONFIG
 
     message: str = Field(min_length=1)
     code: (
-        Literal["model_unreachable", "not_installed", "context_full", "budget_spent", "local_only"]
+        Literal[
+            "model_unreachable",
+            "not_installed",
+            "context_full",
+            "budget_spent",
+            "local_only",
+            "rate_limited",
+            "no_credit",
+            "auth_failed",
+        ]
         | None
     ) = None
     provider: str | None = Field(default=None, min_length=1)

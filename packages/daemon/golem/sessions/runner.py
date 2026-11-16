@@ -566,6 +566,21 @@ async def _apply(
             "message.started", MessageStartedData(message_id=fact.message_id, role="assistant")
         )
     elif isinstance(fact, ModelRouted):
+        if fact.reason == "fallback" and progress.call is not None:
+            # The call that was open failed. Text it showed is closed, and never stored.
+            await _end_call(progress, emit, failed=True)
+            if progress.open is not None and progress.parts:
+                await emit(
+                    "message.completed",
+                    MessageCompletedData(
+                        message_id=progress.open,
+                        role="assistant",
+                        text="".join(progress.parts),
+                        interrupted=True,
+                    ),
+                )
+                progress.open = None
+                progress.parts = []
         identity = progress.identify(fact.profile) if progress.identify is not None else None
         await emit(
             "model.routed",

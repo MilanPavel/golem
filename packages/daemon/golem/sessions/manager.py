@@ -1309,26 +1309,34 @@ class SessionManager:
         """The model the rest of a run moves to, or None when it stays on ``profile``.
 
         A struggle asks for the tier above the current one, a prompt that does not fit for a
-        model with a larger window. The privacy, the caps and the paid question are the pick's
-        own. A paid model needs a yes the session already gave: without it the run stays, since
-        a run in progress has no one to ask.
+        model with a larger window. A failing provider (``fallback``) asks for another model:
+        the same tier first, then the tier above, then, from a hosted model, a local one. The
+        failed model and the providers marked in ``router.health`` are left out. The privacy,
+        the caps and the paid question are the pick's own. A paid model needs a yes the session
+        already gave: without it the run stays, since a run in progress has no one to ask.
         """
         session = await self._resolve(session_id)
         router = self._runtime.router
         settings = router.routing_settings()
         local_only = self.local_only(session.cwd) or session.route == "local"
         tier = None if self._runtime.tier_of is None else self._runtime.tier_of(profile)
-        floor: Tier | None = None
-        if ask.signal != "context_full":
+        fallback = ask.signal == "fallback"
+        floor: Tier | None = None  # for a fallback, the failed model's tier, below
+        if not fallback and ask.signal != "context_full":
             if tier is None or tier == TIERS[-1]:
                 return None
             floor = TIERS[TIERS.index(tier) + 1]
         interactive = not session.origin.startswith("routine:")
         room = None if self.budget is None else await self.budget.room(session_id)
         everything = await self._facts_of(session, settings.ladder.model_dump().values())
-        candidates = ladder(settings.ladder, profile, everything)
+        candidates = everything if fallback else ladder(settings.ladder, profile, everything)
         own = next((m for m in candidates if profile in (m.profile, m.ref)), None)
-        if own is None:
+        if fallback:
+            tier = tier if own is None else own.tier
+            floor = tier
+            candidates = [m for m in candidates if self._usable(profile, m)]
+            own = own or next(iter(candidates), None)
+        if own is None or (fallback and tier is None):
             return None
         if local_only or settings.paid == "never" or not interactive:
             candidates = [m for m in candidates if m.tier == "local"]
@@ -1342,15 +1350,32 @@ class SessionManager:
         )
         choice = pick("auto", own, candidates, traits)
         found = choice.model
+        if fallback and (found is None or choice.needs_consent) and tier != "local":
+            # No other hosted model is allowed: a local one does not need a yes.
+            local = [m for m in candidates if m.tier == "local"]
+            choice = pick("auto", own, local, replace(traits, min_tier=None))
+            found = choice.model
         if found is None or choice.needs_consent or found.ref == own.ref:
             return None
         if local_only and found.tier != "local":
             return None
+        if fallback:
+            return StepUp(found.profile, found.tier, choice)
         count = session.step_ups.get(ask.signal, 0) + 1
         session.step_ups[ask.signal] = count
         if count >= 2 and not local_only and found.tier != "local":
             session.step_floor = found.tier
         return StepUp(found.profile, found.tier, choice)
+
+    def _usable(self, failed: str, model: ModelFacts) -> bool:
+        """Whether ``model`` may replace ``failed``: another, ready, with a healthy provider."""
+        router = self._runtime.router
+        try:
+            if router.resolve(failed).ref == model.ref:
+                return False
+        except ModelConfigError:
+            pass
+        return model.ready and router.health.why(model.ref.partition("/")[0]) is None
 
     def _question(
         self,
