@@ -150,3 +150,38 @@ export const UndoIcon = (props: IconProps) => (
     <path d="M3.5 6.5H10a3 3 0 010 6H6M3.5 6.5l3-3M3.5 6.5l3 3" />
   </Icon>
 );
+/** A speech bubble: the sessions. */
+export const SessionsIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M3.5 3h9A1.5 1.5 0 0 1 14 4.5v5a1.5 1.5 0 0 1-1.5 1.5H8l-3 2.5V11h-1.5A1.5 1.5 0 0 1 2 9.5v-5A1.5 1.5 0 0 1 3.5 3z" />
+  </Icon>
+);
+/** A tray with a dip: what waits for you. */
+export const InboxIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M2 9.5l1.7-5.2A1.5 1.5 0 0 1 5.1 3.3h5.8a1.5 1.5 0 0 1 1.4 1L14 9.5v2.5a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z" />
+    <path d="M2 9.5h3.5l.8 1.5h3.4l.8-1.5H14" />
+  </Icon>
+);
+/** A clock: things that run on a schedule. */
+export const RoutinesIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <circle cx="8" cy="8" r="5.5" />
+    <path d="M8 5v3.2l2 1.3" />
+  </Icon>
+);
+/** Boxes joined by a line: steps in order. */
+export const WorkflowsIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <rect x="2" y="2.5" width="4" height="4" rx="1" />
+    <rect x="10" y="9.5" width="4" height="4" rx="1" />
+    <path d="M6 4.5h2.5A1.5 1.5 0 0 1 10 6v3.5" />
+  </Icon>
+);
+/** A play triangle in a ring: a run that has started. */
+export const RunsIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <circle cx="8" cy="8" r="5.5" />
+    <path d="M6.8 5.8v4.4L10.4 8z" />
+  </Icon>
+);

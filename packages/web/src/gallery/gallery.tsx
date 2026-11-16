@@ -67,6 +67,7 @@ import { TOOLS_CASES } from "../features/setup/tools-sample.ts";
 import { PullStatusView, pullSummary } from "../features/models/index.ts";
 import { NO_OLLAMA_LISTING, OLLAMA_DOWN_LISTING, SAMPLE_LISTING, SAMPLE_PULLS, THINKING_LISTING } from "../features/models/sample.ts";
 import { CloseSessionDialog, RenameField, SidebarView } from "../features/sessions/index.ts";
+import { Rail } from "../features/sidebar/index.ts";
 import { faviconHref, tabTitle } from "../features/tab-status/index.ts";
 import type { ConnectionSnapshot } from "../store/connection.ts";
 import type { SessionSummary } from "../store/session-list.ts";
@@ -1454,6 +1455,35 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
             actions={{ rename: () => Promise.resolve(), close: () => Promise.resolve() }}
             onSearch={() => {}}
           />
+        </div>
+      </section>
+
+      <section className="mt-6" id={anchor("Rail")}>
+        <h3 className="mb-2 font-mono text-xs text-faint">Rail</h3>
+        <div className="flex flex-wrap gap-4">
+          {(
+            [
+              ["empty", { state: "idle", inboxCount: 0, settingsDot: false, connected: "connected", picked: "sessions" }],
+              ["2 waiting", { state: "waiting", inboxCount: 2, settingsDot: false, connected: "connected", picked: "inbox" }],
+              ["setup dot", { state: "idle", inboxCount: 0, settingsDot: true, connected: "connected", picked: "routines" }],
+              ["connection lost", { state: "offline", inboxCount: 0, settingsDot: true, connected: "offline", picked: null }],
+            ] as const
+          ).map(([label, props]) => (
+            <figure key={label} className="m-0">
+              <div className="h-136 overflow-hidden rounded-lg border border-line">
+                <Rail
+                  {...props}
+                  label={`Sidebar rail, ${label}, ${theme}`}
+                  version="0.9.1"
+                  onPick={() => {}}
+                  onNew={() => {}}
+                  onSearch={() => {}}
+                  onSettings={() => {}}
+                />
+              </div>
+              <figcaption className="mt-1 font-mono text-xs text-faint">{label}</figcaption>
+            </figure>
+          ))}
         </div>
       </section>
 

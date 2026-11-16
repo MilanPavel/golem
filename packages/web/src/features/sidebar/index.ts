@@ -1,3 +1,4 @@
+export { Rail, golemName, type RailConnection, type RailItem, type RailProps } from "./rail.tsx";
 export { SIDEBAR_OPEN_KEY, sidebarOpenStore, useSidebarOpen } from "./sidebar-open.ts";
 export {
   COLLAPSE_BELOW,
