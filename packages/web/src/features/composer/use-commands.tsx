@@ -14,6 +14,8 @@ import {
   modeChanged,
   modeReport,
   modelNames,
+  NOTES_CLEARED,
+  notesNotice,
   planChanged,
   namesModel,
   pickerName,
@@ -28,7 +30,7 @@ import {
 } from "@golem/view";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { actionErrorText, isNoModelChosen } from "../../store/errors.ts";
-import { useConfig, useModelList, useNavigate, useNewSessionModel, usePageActions, useSessionReader, useSkillList } from "../../store/page-context.tsx";
+import { useConfig, useModelList, useNavigate, useNewSessionModel, useNotes, usePageActions, useSessionReader, useSkillList } from "../../store/page-context.tsx";
 import { detailStore, setDetail, setThinkingShown, setTimesShown, thinkingShownStore, timesShownStore } from "../chat/index.ts";
 import { drawerOpenStore, useDrawerOpen } from "../drawer/index.ts";
 import { openWorkbench, requestCommit } from "../workbench/index.ts";
@@ -94,6 +96,11 @@ export function useCommands({ session, cwd, typing, send }: UseCommandsOptions):
   const skills = useSkillList(cwd, typing);
   const config = useConfig(cwd, sessionId, sessionId !== null);
   const [, setDrawerOpen] = useDrawerOpen();
+  const notesNow = useNotes(sessionId ?? "");
+  const reviewNotesRef = useRef(notesNow);
+  useEffect(() => {
+    reviewNotesRef.current = notesNow;
+  });
   const [ownNotice, setNotice] = useState<CommandNotice | null>(null);
   const startNotice = useStartNotice();
   const notice = ownNotice ?? (startNotice === null ? null : { text: startNotice });
@@ -309,6 +316,14 @@ export function useCommands({ session, cwd, typing, send }: UseCommandsOptions):
             } catch (err) {
               return fail(err, "Could not compact the session.");
             }
+          }
+          case "notes": {
+            const reviewNotes = reviewNotesRef.current;
+            if (found.clear) {
+              reviewNotes.clear();
+              return say(NOTES_CLEARED);
+            }
+            return say(notesNotice(reviewNotes.state));
           }
           case "todos": {
             const next = !drawerOpenStore.getSnapshot();

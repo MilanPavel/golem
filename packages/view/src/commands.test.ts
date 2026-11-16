@@ -226,6 +226,12 @@ test("/changes takes no arguments", () => {
   assert.equal(applyComposer(closedDebug, "/changes x").kind, "unknown");
 });
 
+test("/notes lists the notes, and /notes clear drops them", () => {
+  assert.deepEqual(applyComposer(closedDebug, "/notes"), { kind: "notes", clear: false });
+  assert.deepEqual(applyComposer(closedDebug, "/notes clear"), { kind: "notes", clear: true });
+  assert.equal(applyComposer(closedDebug, "/notes wipe").kind, "unknown");
+});
+
 test("/undo takes no arguments and is in the session group", () => {
   assert.deepEqual(applyComposer(closedDebug, "/undo"), { kind: "undo" });
   assert.equal(applyComposer(closedDebug, "/undo now").kind, "unknown");

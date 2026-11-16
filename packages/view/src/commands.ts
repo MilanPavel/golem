@@ -59,6 +59,8 @@ export type ComposerOutcome =
   | { kind: "time" }
   | { kind: "todos" }
   | { kind: "changes" }
+  /** `/notes` lists the review notes, `/notes clear` drops them. */
+  | { kind: "notes"; clear: boolean }
   /** `/checks on` or `/checks off`: whether golem runs the project's checks after its edits in this chat. */
   | { kind: "checks"; on: boolean }
   /** `/commit` opens the commit screen: a dialog on the web, a band under `/changes` in the terminal. */
@@ -448,6 +450,17 @@ export const COMMANDS: readonly Command[] = [
     args: "",
     description: "Shows the files this session changed, with their diffs.",
     run: withoutArgs({ kind: "changes" }),
+  },
+  {
+    name: "/notes",
+    group: "view",
+    args: "[clear]",
+    description: "Lists the review notes that go out with your next message, or drops them.",
+    choices: ["clear"],
+    run: (_debug, args) => {
+      if (args.length === 0) return { kind: "notes", clear: false };
+      return args.length === 1 && args[0] === "clear" ? { kind: "notes", clear: true } : { kind: "unknown", notice: "/notes or /notes clear" };
+    },
   },
   {
     name: "/checks",

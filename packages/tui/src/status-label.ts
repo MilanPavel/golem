@@ -84,6 +84,7 @@ export const STATUS_PRIORITY = {
   context: 50,
   tune: 48,
   skills: 45,
+  notes: 44,
   changed: 42,
   folder: 40,
   cost: 30,
@@ -266,6 +267,8 @@ export function statusSegments(input: {
   cost?: string;
   /** How many files the session changed. The segment is hidden at 0. */
   changedFiles?: number;
+  /** The review notes waiting for the next message, as `notesChip` says them. Hidden when empty. */
+  notes?: string;
   /** `local only` while the session's folder stays on this Mac. */
   localOnly?: string;
 }): StatusSegment[] {
@@ -281,6 +284,7 @@ export function statusSegments(input: {
     segment("local", input.localOnly ?? "", STATUS_PRIORITY.local, "warn"),
     segment("tune", input.tune ?? "", STATUS_PRIORITY.tune, "dim"),
     segment("skills", skillsLabel(input.skills ?? [], input.skippedSkills ?? []), STATUS_PRIORITY.skills, "dim"),
+    segment("notes", input.notes === undefined || input.notes === "" ? "" : `💬 ${input.notes}`, STATUS_PRIORITY.notes, "warn"),
     segment("changed", changedLabel(input.changedFiles ?? 0), STATUS_PRIORITY.changed, "dim"),
     segment("folder", input.folder, STATUS_PRIORITY.folder, "dim"),
     segment(

@@ -42,7 +42,7 @@ export type Press = {
   input: string;
   ctrl: boolean;
   meta: boolean;
-  /** Set on a Tab press that had Shift held: a tab backwards. */
+  /** Set on a Tab, Up or Down press that had Shift held: a tab backwards, or a row in `/changes`. */
   shift?: boolean;
 };
 
@@ -756,10 +756,10 @@ export function classifyPress(input: string, key: KeyFlags): Press {
     return { ...press, name: "end" };
   }
   if (key.upArrow) {
-    return { ...press, name: "up" };
+    return key.shift ? { ...press, name: "up", shift: true } : { ...press, name: "up" };
   }
   if (key.downArrow) {
-    return { ...press, name: "down" };
+    return key.shift ? { ...press, name: "down", shift: true } : { ...press, name: "down" };
   }
   if (key.escape) {
     return { ...press, name: "escape" };

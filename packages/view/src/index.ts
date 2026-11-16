@@ -374,11 +374,16 @@ export {
 } from "./changes.ts";
 export {
   addNote,
+  dropNotes,
   editNote,
+  NO_NOTES,
   noNotes,
+  NOTES_CLEARED,
   notesChip,
   notesFor,
+  notesNotice,
   removeNote,
+  takeNotes,
   withNotes,
   type NotesState,
   type ReviewNote,

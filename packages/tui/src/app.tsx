@@ -119,6 +119,15 @@ import {
   changedPaths,
   noChanges,
   type ChangesState,
+  addNote,
+  dropNotes,
+  noNotes,
+  notesChip,
+  notesNotice,
+  NOTES_CLEARED,
+  removeNote,
+  takeNotes,
+  type NotesState,
   unreadCallNotice,
   RETRY_QUESTION,
   serverUp,
@@ -341,6 +350,7 @@ import {
   layoutChanges,
   openChangesManager,
   pressChanges,
+  pressNoteInput,
   type ChangesAction,
   type ChangesData,
   type ChangesLine,
@@ -621,6 +631,9 @@ export function App({
   const [changes, setChanges] = useState<ChangesData>({ files: null, error: null, diffs: {} });
   const changesRef = useRef(changes);
   changesRef.current = changes;
+  // The review notes of each session, for the next message. They live here, not in the daemon.
+  const [notesBy, setNotesBy] = useState<ReadonlyMap<string, NotesState>>(() => new Map());
+  const notesByRef = useRef(notesBy);
   // The paths whose diff is being read, so a key press does not ask twice.
   const changesAsked = useRef(new Set<string>());
   const budgetBodyRef = useRef(0);
@@ -1049,6 +1062,7 @@ export function App({
   const uptimeRefresh = uptimeRefreshMs(uptimeSeconds);
   const status = fitSegments(
     statusSegments({
+      notes: sessionId === null || changesManager.open ? "" : (notesChip(notesBy.get(sessionId) ?? noNotes) ?? ""),
       connection: statusLabel(connection),
       title: titleLabel,
       model: chip,
@@ -2023,6 +2037,15 @@ export function App({
       openCommit(id);
       return;
     }
+    if (outcome.kind === "notes") {
+      const id = sessionRef.current;
+      setDraft(draftAt(""));
+      if (outcome.clear && id !== null) {
+        putNotes(id, noNotes);
+      }
+      setChat((state) => ({ ...state, notice: outcome.clear ? NOTES_CLEARED : notesNotice(notesOf(id)) }));
+      return;
+    }
     if (outcome.kind === "undo") {
       setDraft(draftAt(""));
       startUndo();
@@ -2347,14 +2370,20 @@ export function App({
     setDraft(draftAt(""));
     // The draft is gone, so its pastes are too. The numbers keep counting.
     pastesRef.current = { next: pastesRef.current.next, texts: new Map() };
-    sendText(outcome.text, outcome.kind === "skill" ? { name: outcome.name, args: outcome.args } : undefined);
+    if (outcome.kind === "send") {
+      // The notes go out ahead of the message, and are dropped once the send worked.
+      const taken = notesOf(sessionRef.current);
+      sendText(outcome.text, undefined, taken.notes.length === 0 ? undefined : takeNotes(taken, outcome.text));
+      return;
+    }
+    sendText(outcome.text, { name: outcome.name, args: outcome.args });
   }
 
   /**
    * Send `text` to this session. On an error it goes back into the composer.
    * With `skill`, the daemon runs that skill once, and `text` is the line as typed.
    */
-  function sendText(text: string, skill?: SkillCall): void {
+  function sendText(text: string, skill?: SkillCall, withReview?: { text: string; ids: readonly string[] }): void {
     const currentSession = sessionRef.current;
     if (currentSession === null || busyRef.current || connectionRef.current.status !== "connected") {
       setDraft(draftAt(text));
@@ -2364,9 +2393,12 @@ export function App({
     setWelcomeModel(null);
     setChat((current) => ({ ...current, notice: null }));
     const options = skill === undefined ? { cwd: process.cwd() } : { cwd: process.cwd(), skill };
-    void client.sendMessage(currentSession, text, options).then(
+    void client.sendMessage(currentSession, withReview?.text ?? text, options).then(
       () => {
         sentHistory.current.remember(text);
+        if (withReview !== undefined) {
+          putNotes(currentSession, dropNotes(notesOf(currentSession), withReview.ids));
+        }
       },
       (error: unknown) => {
         setDraft(draftAt(text));
@@ -4004,8 +4036,33 @@ export function App({
     runCommitAction(pressed.action, pressed.band);
   }
 
+  function notesOf(id: string | null): NotesState {
+    return id === null ? noNotes : (notesByRef.current.get(id) ?? noNotes);
+  }
+
+  function putNotes(id: string, next: NotesState): void {
+    const all = new Map(notesByRef.current);
+    if (next.notes.length === 0) {
+      all.delete(id);
+    } else {
+      all.set(id, next);
+    }
+    notesByRef.current = all;
+    setNotesBy(all);
+  }
+
+  /** The data the review screen draws: what the daemon said, and the notes of this session. */
+  function changesWithNotes(): ChangesData {
+    return { ...changesRef.current, notes: notesOf(sessionRef.current).notes };
+  }
+
   function runChangesAction(action: ChangesAction): void {
-    if (action.kind === "commit-info" && sessionRef.current !== null) {
+    const id = sessionRef.current;
+    if (action.kind === "add-note" && id !== null) {
+      putNotes(id, addNote(notesOf(id), action.note));
+    } else if (action.kind === "remove-notes" && id !== null) {
+      putNotes(id, action.ids.reduce(removeNote, notesOf(id)));
+    } else if (action.kind === "commit-info" && sessionRef.current !== null) {
       openCommit(sessionRef.current);
     } else if (action.kind === "close") {
       changesAsked.current.clear();
@@ -4044,13 +4101,19 @@ export function App({
       onCommitBandPress(press, band);
       return;
     }
+    if (changesManagerRef.current.input !== null) {
+      const typed = pressNoteInput(changesManagerRef.current, press);
+      showChangesManager(typed.state);
+      runChangesAction(typed.action);
+      return;
+    }
     const key = changesKeyOf(press);
     if (key === null) {
       return;
     }
     const pressed = pressChanges(
       changesManagerRef.current,
-      changesRef.current,
+      changesWithNotes(),
       key,
       Math.max(1, budgetBodyRef.current - 3),
       busyRef.current,
@@ -5110,7 +5173,7 @@ export function App({
         </Box>
       ) : changesManager.open ? (
         <Box flexDirection="column" width={columns} height={budget.body} flexShrink={0} overflow="hidden">
-          {layoutChanges(changesManager, changes, columns, budget.body).map((line, index) => (
+          {layoutChanges(changesManager, { ...changes, notes: notesOf(sessionId).notes }, columns, budget.body).map((line, index) => (
             <ChangesRow key={index} line={line} />
           ))}
         </Box>
