@@ -15,8 +15,9 @@ export type WindowTo = number | null;
  * ``cleared`` means old tool results are now sent as one line each: ``count`` is how
  * many, and ``before_tokens`` and ``after_tokens`` are rough sizes of the history before
  * and after. For ``summarised``, ``count`` is the messages a summary now stands for.
- * ``grew`` is for a later change: ``window_from`` and ``window_to`` are the window
- * before and after, and ``reload_ms`` the time the model took to load again. The
+ * ``grew`` means the planned window of the local model went up one step before this turn:
+ * ``window_from`` and ``window_to`` are the window before and after, and ``reload_ms`` the
+ * time the model took to load again, None when the server did not say. The
  * checkpoint keeps every message, so no transcript event changes. A field a change
  * does not use is None.
  */

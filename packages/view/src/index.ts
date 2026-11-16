@@ -5,6 +5,8 @@ export { approvalQuestion, DETAILS, displayToolName, isDetail, stepCount, stepFa
 export {
   COMPACTING,
   compactLine,
+  loadingLine,
+  windowGrewLine,
   NOTHING_TO_COMPACT,
   type CompactAction,
 } from "./compact.ts";

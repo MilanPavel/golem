@@ -346,7 +346,9 @@ export function isSessionCompactResult(value: unknown): value is SessionCompactR
     typeof value["after_tokens"] === "number" &&
     typeof value["count"] === "number" &&
     (value["window"] === undefined || value["window"] === null || typeof value["window"] === "number") &&
-    (value["model"] === undefined || value["model"] === null || typeof value["model"] === "string")
+    (value["model"] === undefined || value["model"] === null || typeof value["model"] === "string") &&
+    (value["window_from"] === undefined || value["window_from"] === null || typeof value["window_from"] === "number") &&
+    (value["window_to"] === undefined || value["window_to"] === null || typeof value["window_to"] === "number")
   );
 }
 

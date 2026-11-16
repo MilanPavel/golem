@@ -49,10 +49,15 @@ class ModelStarted:
 
 @dataclass(frozen=True, slots=True)
 class ModelWaiting:
-    """The call with this ``message_id`` waits, or stopped waiting, for the local model."""
+    """The call with this ``message_id`` waits, or stopped waiting, for the local model.
+
+    ``model`` and ``window`` are set while it loads the model again with a larger window.
+    """
 
     message_id: str
     waiting: bool
+    model: str | None = None
+    window: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -98,18 +103,21 @@ class ModelRequested:
 
 @dataclass(frozen=True, slots=True)
 class ContextChanged:
-    """The context view changed before a model call: old tool results were cleared, or old
-    turns were summarised.
+    """The context view changed before a model call: old tool results were cleared, old
+    turns were summarised, or the window of the local model grew.
 
     The token counts are rough. ``count`` is the number of results cleared, or of messages
-    the summary stands for.
+    the summary stands for. For ``grew``, the windows before and after, and the reload time.
     """
 
-    action: Literal["cleared", "summarised"]
+    action: Literal["cleared", "summarised", "grew"]
     before_tokens: int | None = None
     after_tokens: int | None = None
     count: int | None = None
     room: int | None = None
+    window_from: int | None = None
+    window_to: int | None = None
+    reload_ms: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -804,7 +812,13 @@ def _custom(data: object) -> Fact | None:
     if kind == "model.started" and isinstance(message_id, str):
         return ModelStarted(message_id)
     if kind == "model.waiting" and isinstance(message_id, str):
-        return ModelWaiting(message_id, item.get("waiting") is True)
+        model = item.get("model")
+        return ModelWaiting(
+            message_id,
+            item.get("waiting") is True,
+            model if isinstance(model, str) and model else None,
+            _positive(item.get("window")),
+        )
     if kind == "model.request" and isinstance(message_id, str):
         return _request(message_id, item)
     if kind == "model.response" and isinstance(message_id, str):
@@ -815,13 +829,17 @@ def _custom(data: object) -> Fact | None:
             _text_calls(text_calls),
             _timings(item.get("timings")),
         )
-    if kind == "context.changed" and item.get("action") in ("cleared", "summarised"):
+    if kind == "context.changed" and item.get("action") in ("cleared", "summarised", "grew"):
+        action = cast(Literal["cleared", "summarised", "grew"], item.get("action"))
         return ContextChanged(
-            "summarised" if item.get("action") == "summarised" else "cleared",
+            action,
             _count(item.get("before_tokens")),
             _count(item.get("after_tokens")),
             _count(item.get("count")),
             _positive(item.get("room")),
+            _positive(item.get("window_from")),
+            _positive(item.get("window_to")),
+            _count(item.get("reload_ms")),
         )
     if kind in (PIN_READ_KIND, PIN_SKIPPED_KIND):
         return _pin(kind, item)

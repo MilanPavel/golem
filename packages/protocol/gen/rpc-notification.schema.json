@@ -606,7 +606,7 @@
     },
     "ContextChangedData": {
       "additionalProperties": false,
-      "description": "What golem sends of the history changed before a model call.\n\n``cleared`` means old tool results are now sent as one line each: ``count`` is how\nmany, and ``before_tokens`` and ``after_tokens`` are rough sizes of the history before\nand after. For ``summarised``, ``count`` is the messages a summary now stands for.\n``grew`` is for a later change: ``window_from`` and ``window_to`` are the window\nbefore and after, and ``reload_ms`` the time the model took to load again. The\ncheckpoint keeps every message, so no transcript event changes. A field a change\ndoes not use is None.",
+      "description": "What golem sends of the history changed before a model call.\n\n``cleared`` means old tool results are now sent as one line each: ``count`` is how\nmany, and ``before_tokens`` and ``after_tokens`` are rough sizes of the history before\nand after. For ``summarised``, ``count`` is the messages a summary now stands for.\n``grew`` means the planned window of the local model went up one step before this turn:\n``window_from`` and ``window_to`` are the window before and after, and ``reload_ms`` the\ntime the model took to load again, None when the server did not say. The\ncheckpoint keeps every message, so no transcript event changes. A field a change\ndoes not use is None.",
       "properties": {
         "action": {
           "enum": [
@@ -2088,16 +2088,42 @@
     },
     "ModelWaitingData": {
       "additionalProperties": false,
-      "description": "A chat call waits, or no longer waits, for its turn on a local model server.\n\nSent for the reply ``message_id`` only, so other sessions never show it. Stored only\nuntil its message completes.",
+      "description": "A chat call waits, or no longer waits, for its turn on a local model server.\n\nSent for the reply ``message_id`` only, so other sessions never show it. Stored only\nuntil its message completes. With ``waiting`` true, ``model`` and ``window`` say the call\nis loading ``model`` again with a larger ``window``, and the meter says so.",
       "properties": {
         "message_id": {
           "minLength": 1,
           "title": "Message Id",
           "type": "string"
         },
+        "model": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
+        },
         "waiting": {
           "title": "Waiting",
           "type": "boolean"
+        },
+        "window": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Window"
         }
       },
       "required": [

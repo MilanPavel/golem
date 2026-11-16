@@ -2,9 +2,10 @@
 
 import type { SessionCompactResult } from "@golem/client";
 
+import { formatWindow } from "./context.ts";
 import { formatTurnTime } from "./duration.ts";
 
-export type CompactAction = "clear" | "summarise";
+export type CompactAction = "clear" | "summarise" | "grow";
 
 export const NOTHING_TO_COMPACT = "nothing to compact yet";
 
@@ -35,6 +36,13 @@ function took(ms: number): string {
  * `ms` is how long the call took, shown for a summary.
  */
 export function compactLine(action: CompactAction, result: SessionCompactResult, ms: number): string {
+  if (action === "grow") {
+    const from = result.window_from ?? null;
+    const to = result.window_to ?? null;
+    return from === null || to === null
+      ? "the window will grow on the next turn"
+      : `the window will grow ${formatWindow(from)} → ${formatWindow(to)} on the next turn`;
+  }
   if (result.count === 0) {
     return NOTHING_TO_COMPACT;
   }
@@ -45,4 +53,24 @@ export function compactLine(action: CompactAction, result: SessionCompactResult,
   const model = result.model ? ` with ${result.model}` : "";
   const time = Number.isFinite(ms) && ms >= 0 ? ` · ${took(ms)}` : "";
   return `summarised ${plural(result.count, "earlier turn", "earlier turns")}${model} · ${shift}${time}`;
+}
+
+function reloadTime(ms: number): string {
+  if (ms < 1000) {
+    return `${Math.round(ms)} ms`;
+  }
+  return ms < 60_000 ? `${Math.round(ms / 1000)} s` : formatTurnTime(ms);
+}
+
+/** What the chat says once the window grew: `window grew 32K → 64K · reloaded in 8 s`. */
+export function windowGrewLine(from: number, to: number, reloadMs: number | null): string {
+  const grew = `window grew ${formatWindow(from)} → ${formatWindow(to)}`;
+  return reloadMs === null || !Number.isFinite(reloadMs) || reloadMs < 0
+    ? grew
+    : `${grew} · reloaded in ${reloadTime(reloadMs)}`;
+}
+
+/** What the meter says while a call loads the model again with a larger window. */
+export function loadingLine(model: string, window: number): string {
+  return `loading ${model} with a ${formatWindow(window)} window`;
 }

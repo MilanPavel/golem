@@ -68,10 +68,13 @@ export function meterLine(
   starting: string | null = null,
   localWait = false,
   writing: string | null = null,
+  loading: string | null = null,
 ): string {
   const label =
     phase === "thinking"
-      ? localWait
+      ? loading !== null
+        ? loading
+        : localWait
         ? WAITING_FOR_LOCAL_MODEL
         : starting === null
           ? "thinking"

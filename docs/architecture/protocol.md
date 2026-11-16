@@ -212,7 +212,7 @@ Each event line is one JSON-RPC 2.0 notification. The fields that matter:
 
 `tool.writing` says how far the model got writing a `write_file` or `edit_file` call, while the reply is still streaming: `message_id`, `index` (the call's place in the reply), `name`, `path` (null until the whole path is written), and `lines` and `chars` of the file text so far. It comes at most once a second per call, only from providers that stream tool calls, and `golem.db` deletes it when the reply's `message.completed` is written.
 
-`model.waiting` says a chat call waits, or no longer waits, for its turn on a local model server: `message_id` and `waiting`. It is sent only for the call that waits, after it has waited more than a second, and never for a title or another internal job. `golem.db` deletes it when the reply's `message.completed` is written, and a client clears it at the first token or when the run ends.
+`model.waiting` says a chat call waits, or no longer waits, for its turn on a local model server: `message_id` and `waiting`. When the call loads the model again with a larger window (see `context.changed` with `grew`), it also sends `model` and `window` with `waiting` true, and the meter says `loading <model> with a 64K window`. Otherwise it is sent only for the call that waits, after it has waited more than a second, and never for a title or another internal job. `golem.db` deletes it when the reply's `message.completed` is written, and a client clears it at the first token or when the run ends.
 
 `tool.output` works the same way for a running tool call: its rows are deleted when the call's `tool.completed` or `tool.failed` is written, which keeps a short preview.
 

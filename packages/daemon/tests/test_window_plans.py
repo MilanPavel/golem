@@ -113,3 +113,33 @@ def test_the_plan_follows_the_settings() -> None:
     assert plans.planned(MODEL) == 8192
     held["now"] = ContextSettings(window="ollama")
     assert plans.planned(MODEL) is None
+
+
+BIG: dict[str, tuple[int | None, float | None]] = {MODEL: (131072, 5.2)}
+
+
+def test_next_up_is_one_step_above_the_plan() -> None:
+    plans = _plans(facts=BIG)
+    assert plans.planned(MODEL) == 32768
+    assert plans.next_up(MODEL) == 65536
+    plans.raised(MODEL, 65536)
+    assert plans.planned(MODEL) == 65536
+    assert plans.next_up(MODEL) is None
+
+
+def test_next_up_is_none_when_the_model_or_the_mac_cannot_hold_more() -> None:
+    assert _plans().next_up(MODEL) is None
+    assert _plans(facts={MODEL: (131072, 5.2)}, ram_gb=8.0).next_up(MODEL) is None
+    assert _plans(facts=BIG).next_up("other:1b") is None
+
+
+def test_next_up_is_none_when_the_user_set_the_window() -> None:
+    assert _plans(ContextSettings(window=16384), facts=BIG).next_up(MODEL) is None
+    assert _plans(ContextSettings(window="ollama"), facts=BIG).next_up(MODEL) is None
+
+
+def test_next_up_stops_at_a_window_that_spilled() -> None:
+    plans = _plans(facts=BIG)
+    plans.raised(MODEL, 65536)
+    assert plans.lower(MODEL) == 32768
+    assert plans.next_up(MODEL) is None

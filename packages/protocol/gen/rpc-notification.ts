@@ -278,7 +278,9 @@ export type SessionId23 = string;
 export type Ts22 = string;
 export type Type22 = 'tool.writing';
 export type MessageId9 = string;
+export type Model2 = string | null;
 export type Waiting = boolean;
+export type Window = number | null;
 export type RunId24 = string;
 export type Seq23 = number;
 export type SessionId24 = string;
@@ -351,7 +353,7 @@ export type SessionUsd = number | null;
 export type SpentSession = number;
 export type SpentToday = number;
 export type EstimatedUsd = number | null;
-export type Model2 = string | null;
+export type Model3 = string | null;
 export type ModelProfile3 = string;
 export type Provider3 = string | null;
 export type Tier3 = 'local' | 'budget' | 'frontier';
@@ -1425,8 +1427,9 @@ export interface ContextChangedEvent {
  * ``cleared`` means old tool results are now sent as one line each: ``count`` is how
  * many, and ``before_tokens`` and ``after_tokens`` are rough sizes of the history before
  * and after. For ``summarised``, ``count`` is the messages a summary now stands for.
- * ``grew`` is for a later change: ``window_from`` and ``window_to`` are the window
- * before and after, and ``reload_ms`` the time the model took to load again. The
+ * ``grew`` means the planned window of the local model went up one step before this turn:
+ * ``window_from`` and ``window_to`` are the window before and after, and ``reload_ms`` the
+ * time the model took to load again, None when the server did not say. The
  * checkpoint keeps every message, so no transcript event changes. A field a change
  * does not use is None.
  *
@@ -1615,14 +1618,17 @@ export interface ModelWaitingEvent {
  * A chat call waits, or no longer waits, for its turn on a local model server.
  *
  * Sent for the reply ``message_id`` only, so other sessions never show it. Stored only
- * until its message completes.
+ * until its message completes. With ``waiting`` true, ``model`` and ``window`` say the call
+ * is loading ``model`` again with a larger ``window``, and the meter says so.
  *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "ModelWaitingData".
  */
 export interface ModelWaitingData {
   message_id: MessageId9;
+  model?: Model2;
   waiting: Waiting;
+  window?: Window;
 }
 /**
  * The tool call is running.
@@ -1858,7 +1864,7 @@ export interface RouteConsentNeededData {
   alternatives: Alternatives;
   caps?: ConsentCaps | null;
   estimated_usd?: EstimatedUsd;
-  model?: Model2;
+  model?: Model3;
   model_profile: ModelProfile3;
   provider?: Provider3;
   tier: Tier3;

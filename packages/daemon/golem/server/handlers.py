@@ -99,6 +99,7 @@ from golem.sessions.manager import (
     BlankTitleError,
     BudgetSpentError,
     ConsentAnswerError,
+    GrowRefusedError,
     InvalidToolArgsError,
     MessageNotFoundError,
     RuleWriteError,
@@ -1294,6 +1295,8 @@ async def _session_compact(
         raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
     except SessionBusyError as exc:
         raise RpcCallError(SESSION_BUSY, "session is busy") from exc
+    except GrowRefusedError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
     except Exception as exc:
         log.warning("session compact failed session=%s", params.session_id, exc_info=True)
         raise RpcCallError(INTERNAL_ERROR, f"could not {params.action}: {exc}") from exc

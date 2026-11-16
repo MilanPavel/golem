@@ -3,7 +3,7 @@ import { test } from "node:test";
 
 import type { SessionCompactResult } from "@golem/client";
 
-import { compactLine, contextShift } from "./compact.ts";
+import { compactLine, contextShift, loadingLine, windowGrewLine } from "./compact.ts";
 
 const summary: SessionCompactResult = { before_tokens: 6_000, after_tokens: 2_000, count: 9, window: 7_000, model: "qwen3:27b" };
 
@@ -36,4 +36,21 @@ test("nothing to do says so, whatever the action", () => {
 test("an unknown window shows token counts", () => {
   assert.equal(contextShift({ ...summary, window: null }), "ctx 6000 → 2000 tokens");
   assert.equal(contextShift({ before_tokens: 1, after_tokens: 1, count: 1 }), "ctx 1 → 1 tokens");
+});
+
+test("a manual grow says the two windows, and that the next turn loads them", () => {
+  const grown = { before_tokens: 0, after_tokens: 0, count: 0, window: 61_440, window_from: 32_768, window_to: 65_536 };
+  assert.equal(compactLine("grow", grown, 5), "the window will grow 32K → 64K on the next turn");
+  assert.equal(compactLine("grow", { ...grown, window_from: null }, 5), "the window will grow on the next turn");
+});
+
+test("the chat says the window grew and how long the reload took", () => {
+  assert.equal(windowGrewLine(32_768, 65_536, 8_200), "window grew 32K → 64K · reloaded in 8 s");
+  assert.equal(windowGrewLine(32_768, 65_536, 400), "window grew 32K → 64K · reloaded in 400 ms");
+  assert.equal(windowGrewLine(32_768, 65_536, 75_000), "window grew 32K → 64K · reloaded in 1m 15s");
+  assert.equal(windowGrewLine(32_768, 65_536, null), "window grew 32K → 64K");
+});
+
+test("the meter says which model loads with which window", () => {
+  assert.equal(loadingLine("qwen3:8b", 65_536), "loading qwen3:8b with a 64K window");
 });

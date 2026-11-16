@@ -1171,12 +1171,16 @@ class SessionCompactParams(BaseModel):
     given, says what the summary must keep. Nothing is deleted from the session: only the
     context view changes. The call can take a minute with a local model, and other requests
     go on meanwhile. Error ``-32004`` when the session has a run or is compacting.
+
+    ``grow`` moves the planned window of a local model up one step, which the next turn's first
+    call loads. It needs no test of how full the context is. Error ``-32602`` with the reason
+    when this Mac cannot hold a larger window, or the window is set by the user.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     session_id: str = Field(min_length=1)
-    action: Literal["clear", "summarise"]
+    action: Literal["clear", "summarise", "grow"]
     focus: str | None = None
 
 
@@ -1186,7 +1190,10 @@ class SessionCompactResult(BaseModel):
     ``count`` is the tool results cleared, or the turns summarised, and 0 when there was
     nothing to do (``before_tokens`` and ``after_tokens`` are then equal, and no event is
     stored). ``window`` is the tokens the history may fill (the model's window less the
-    reply reserve), None when it is unknown. ``model`` is the model that wrote a summary.
+    reply reserve), None when it is unknown. ``model`` is the model that wrote a summary, or
+    the model whose window ``grow`` moved. For ``grow``, ``count`` is 0, ``window_from`` and
+    ``window_to`` are the planned windows before and after, and ``window`` is the room of the
+    new one. Both are None for the other actions.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -1196,6 +1203,8 @@ class SessionCompactResult(BaseModel):
     count: int = Field(ge=0)
     window: int | None = Field(default=None, ge=1)
     model: str | None = None
+    window_from: int | None = Field(default=None, ge=1)
+    window_to: int | None = Field(default=None, ge=1)
 
 
 class SessionSetChecksParams(BaseModel):

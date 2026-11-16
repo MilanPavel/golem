@@ -27,8 +27,8 @@ export type ComposerOutcome =
   | { kind: "help" }
   | { kind: "context" }
   | { kind: "cost" }
-  /** `/compact [focus]` summarises old turns, `/context clear` clears old tool results. */
-  | { kind: "compact"; action: "clear" | "summarise"; focus: string | null }
+  /** `/compact [focus]` summarises old turns, `/context clear` clears old tool results, `/context grow` grows the window. */
+  | { kind: "compact"; action: "clear" | "summarise" | "grow"; focus: string | null }
   | { kind: "tune" }
   /** Set one option for this session, or with a null `value` remove its override. `notice` is what to print. */
   | { kind: "tune-set"; name: string; value: TuneValue | null; notice: string }
@@ -184,14 +184,15 @@ export const COMMANDS: readonly Command[] = [
   {
     name: "/context",
     group: "view",
-    args: "[clear]",
-    description: "Shows what fills the context. clear drops old tool results from it.",
-    choices: ["clear"],
+    args: "[clear|grow]",
+    description: "Shows what fills the context. clear drops old tool results, grow gives a larger window.",
+    choices: ["clear", "grow"],
     run: (_debug, args) => {
       if (args.length === 0) return { kind: "context" };
-      return args.length === 1 && args[0] === "clear"
-        ? { kind: "compact", action: "clear", focus: null }
-        : { kind: "unknown", notice: "/context or /context clear" };
+      if (args.length === 1 && (args[0] === "clear" || args[0] === "grow")) {
+        return { kind: "compact", action: args[0], focus: null };
+      }
+      return { kind: "unknown", notice: "/context, /context clear or /context grow" };
     },
   },
   {

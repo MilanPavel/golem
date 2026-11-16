@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import time
 from collections.abc import AsyncGenerator, Callable, Coroutine, Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field, replace
@@ -23,7 +24,7 @@ from langchain_core.messages import BaseMessage
 
 from golem.config import ModelPrice, PermissionMode, RouteMode
 from golem.graphs.adapter import PlainMessage, plain_messages, trace_messages
-from golem.graphs.chat import ChatRuntime
+from golem.graphs.chat import ChatRuntime, Growth
 from golem.graphs.context_view import ContextView, view
 from golem.graphs.state import SCHEMA_VERSION
 from golem.models import options as model_options
@@ -34,6 +35,7 @@ from golem.models.facts import FactsSource, ModelFacts
 from golem.models.pick import Choice, Rejected, Traits, ladder, pick
 from golem.models.router import ModelConfigError, ModelIdentity, ModelRouter
 from golem.models.tiers import Tier
+from golem.models.window_plan import should_grow
 from golem.permissions.engine import MCP_ENABLE, Allowance, server_grant
 from golem.permissions.policy import explain
 from golem.sessions.approvals import pending_approval, pending_consent
@@ -105,6 +107,9 @@ from golem_protocol.events import (
 
 NOT_APPROVED = "cancelled before it was approved"
 
+GROW_EVERY = 600.0
+"""Seconds between two growths of the window in one session."""
+
 log = logging.getLogger("golem.sessions")
 
 
@@ -172,6 +177,17 @@ class BudgetSpentError(Exception):
         super().__init__(message)
 
 
+class GrowRefusedError(Exception):
+    """The window cannot grow. The message says why, in words for the user."""
+
+
+@dataclass(frozen=True, slots=True)
+class _Step:
+    model_id: str
+    current: int
+    size: int
+
+
 class SchemaMismatchError(Exception):
     """The checkpoint's ``schema_version`` is not the one this process writes."""
 
@@ -212,6 +228,16 @@ class _LiveSession:
     task: asyncio.Task[None] | None = None
     compacting: bool = False
     """A compaction is writing the session's context view. No run may start."""
+    clears: int = 0
+    """How many times this session's context was cleared, counted from ``context.changed``."""
+    summaries: int = 0
+    """How many times it was summarised."""
+    counted_seq: int = 0
+    """The newest event ``clears`` and ``summaries`` have read."""
+    grew_at: float | None = None
+    """When the session last grew the window, on the manager's clock."""
+    growth: Growth | None = None
+    """A growth the user asked for, which the next turn's first call reports."""
 
 
 def _schemas(text: str | None) -> list[dict[str, object]] | None:
@@ -284,6 +310,8 @@ class SessionManager:
         self._runs: dict[str, _LiveRun] = {}
         self._naming: set[asyncio.Task[None]] = set()
         self._lock = asyncio.Lock()
+        self.clock: Callable[[], float] = time.monotonic
+        """Seconds for the limit on growing, replaceable in tests."""
 
     async def create(
         self, model_profile: str | None, *, cwd: str | None = None, origin: str | None = None
@@ -425,9 +453,12 @@ class SessionManager:
             )
 
     async def compact(
-        self, session_id: str, action: Literal["clear", "summarise"], focus: str | None
+        self, session_id: str, action: Literal["clear", "summarise", "grow"], focus: str | None
     ) -> SessionCompactResult:
-        """Clear old tool results or summarise old turns of an idle session.
+        """Clear old tool results, summarise old turns, or grow the window of an idle session.
+
+        ``grow`` moves the planned window up one step for the next turn, with no test of how
+        full the context is. Raises :class:`GrowRefusedError` when it cannot.
 
         Only the context view changes: the checkpoint keeps every message, and the next
         model call sends the smaller view. Stores ``context.changed`` (no run) unless there was
@@ -443,6 +474,8 @@ class SessionManager:
                 raise SessionBusyError(session_id)
             if await self._run_records.waiting(session_id) is not None:
                 raise SessionBusyError(session_id)
+            if action == "grow":
+                return await self._grow_now(session)
             session.compacting = True
         try:
             system = await self._runtime.system_prompt(
@@ -879,6 +912,9 @@ class SessionManager:
             if routed.ask is None:
                 self._check_budget(routed.profile, room)
             self._runtime.router.chat_model(routed.profile)
+            growth = None
+            if routed.ask is None:
+                growth = await self._growth_for(session, routed.profile)
             folder = session.cwd if session.cwd is not None else cwd
             invocation = None if skill is None else self._invoke(session_id, folder, skill)
             if session.cwd is None and cwd is not None:
@@ -894,6 +930,7 @@ class SessionManager:
                 text=text if invocation is None else invocation.text,
                 skill=invocation,
                 typed=None if invocation is None else text,
+                growth=growth,
             )
             if routed.ask is not None:
                 await ask_consent(self._runtime, self._events, turn, routed.ask)
@@ -913,6 +950,7 @@ class SessionManager:
         skill: Invocation | None,
         typed: str | None,
         begun: bool = False,
+        growth: Growth | None = None,
     ) -> Turn:
         return Turn(
             session_id=session.session_id,
@@ -937,6 +975,7 @@ class SessionManager:
             pins=session.pins,
             routed=routed.choice,
             begun=begun,
+            growth=growth,
         )
 
     async def answer_consent(self, session_id: str, run_id: str, answer: ConsentAnswer) -> str:
@@ -1003,6 +1042,7 @@ class SessionManager:
                 skill=invocation,
                 typed=None,
                 begun=True,
+                growth=await self._growth_for(session, routed.profile),
             )
             if answer == "once" and room is not None and room.spent and self.budget is not None:
                 self.budget.exempt(session_id)
@@ -1013,6 +1053,100 @@ class SessionManager:
     async def _fail_waiting(self, session_id: str, run_id: str, failed: RunFailedData) -> None:
         await self._events.emit(session_id, run_id, "run.failed", failed)
         await self._ended(session_id, run_id, None)
+
+    def _growth_step(self, session: _LiveSession, profile: str) -> _Step:
+        """The next window of ``profile``'s model, or raise why it cannot grow."""
+        router = self._runtime.router
+        plans = router.plans
+        resolved = router.resolve(profile)
+        name = resolved.model_id
+        if plans is None or resolved.provider.kind != "ollama":
+            raise GrowRefusedError(f"{name} is not a local model with a window golem plans")
+        set_by_user = (
+            router.context_settings().window != "auto"
+            or resolved.ctx is not None
+            or "num_ctx" in router.ollama_options(name, session.options)
+        )
+        if set_by_user:
+            raise GrowRefusedError("the window is set by you")
+        current = plans.planned(name)
+        if current is None:
+            raise GrowRefusedError(f"golem has not planned a window for {name}")
+        size = plans.next_up(name)
+        if size is None:
+            raise GrowRefusedError(f"this Mac cannot hold a larger window for {name}")
+        return _Step(name, current, size)
+
+    def _apply_growth(self, session: _LiveSession, step: _Step) -> Growth:
+        plans = self._runtime.router.plans
+        assert plans is not None
+        plans.raised(step.model_id, step.size)
+        session.grew_at = self.clock()
+        log.info(
+            "window grows session=%s model=%s %d -> %d",
+            session.session_id,
+            step.model_id,
+            step.current,
+            step.size,
+        )
+        return Growth(step.current, step.size)
+
+    async def _grow_now(self, session: _LiveSession) -> SessionCompactResult:
+        """The manual ``grow``: the next turn's first call loads the larger window."""
+        step = self._growth_step(session, session.model_profile)
+        session.growth = self._apply_growth(session, step)
+        reserve = self._runtime.router.context_settings().reply_reserve
+        used = await self._records.last_input(session.session_id) or 0
+        return SessionCompactResult(
+            before_tokens=used,
+            after_tokens=used,
+            count=0,
+            window=max(1, step.size - reserve),
+            model=step.model_id,
+            window_from=step.current,
+            window_to=step.size,
+        )
+
+    async def _growth_for(self, session: _LiveSession, profile: str) -> Growth | None:
+        """The growth this turn's first call reports: the one asked for, or one the session earned.
+
+        A local session on a planned window that is full again after clearing or summarising
+        moves up one step, at most once in ``GROW_EVERY`` seconds. Never during a run.
+        """
+        asked, session.growth = session.growth, None
+        if asked is not None:
+            return asked
+        try:
+            step = self._growth_step(session, profile)
+        except (GrowRefusedError, ModelConfigError):
+            return None
+        if session.grew_at is not None and self.clock() - session.grew_at < GROW_EVERY:
+            return None
+        used = await self._records.last_input(session.session_id)
+        if used is None:
+            return None
+        reserve = self._runtime.router.context_settings().reply_reserve
+        await self._count_context(session)
+        if not should_grow(
+            used=used,
+            window=step.current,
+            reserve=reserve,
+            clears_this_session=session.clears,
+            summaries_this_session=session.summaries,
+        ):
+            return None
+        return self._apply_growth(session, step)
+
+    async def _count_context(self, session: _LiveSession) -> None:
+        """Count the clears and summaries in the events the session stored since last time."""
+        for event in await self._events.since(session.session_id, session.counted_seq):
+            session.counted_seq = max(session.counted_seq, event.seq)
+            if event.type != "context.changed":
+                continue
+            if event.data.action == "cleared":
+                session.clears += 1
+            elif event.data.action == "summarised":
+                session.summaries += 1
 
     def _check_budget(self, profile: str, room: Room | None) -> None:
         """Refuse a turn on a paid model while a cap is spent. A local model is never refused.

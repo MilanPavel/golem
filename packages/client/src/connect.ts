@@ -382,7 +382,7 @@ export interface GolemClient {
    * Clear old tool results, or summarise old turns, of an idle session, so the next call sends less.
    * `focus` is what a summary must keep. The call can take a minute with a local model. Nothing is deleted.
    */
-  compactSession(sessionId: string, action: "clear" | "summarise", focus?: string): Promise<SessionCompactResult>;
+  compactSession(sessionId: string, action: "clear" | "summarise" | "grow", focus?: string): Promise<SessionCompactResult>;
   /** Say whether golem may run the project's checks in one session. The session stores `session.checks.changed`. */
   setChecks(sessionId: string, on: boolean): Promise<SessionSetChecksResult>;
   /** Set how one session picks the model of each turn. The session stores `session.updated` with its `route`. */
@@ -1551,7 +1551,7 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       }
       return result;
     },
-    async compactSession(sessionId: string, action: "clear" | "summarise", focus?: string): Promise<SessionCompactResult> {
+    async compactSession(sessionId: string, action: "clear" | "summarise" | "grow", focus?: string): Promise<SessionCompactResult> {
       await ready;
       const result = await call("session.compact", { session_id: sessionId, action, focus: focus ?? null });
       if (!isSessionCompactResult(result)) {

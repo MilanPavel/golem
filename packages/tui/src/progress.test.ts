@@ -28,6 +28,11 @@ test("while a chat call waits for the local model, the meter says so", () => {
   assert.match(meterLine("thinking", 0, 0, 0, 40, null, false), /^thinking/);
 });
 
+test("while the model loads with a larger window, the meter says which", () => {
+  const line = meterLine("thinking", 0, 0, 0, 60, null, true, null, "loading qwen3:8b with a 64K window");
+  assert.match(line, /^loading qwen3:8b with a 64K window {2}█/);
+});
+
 test("elapsed seconds come from the run timestamp", () => {
   assert.equal(elapsedSeconds(null, 1_000), 0);
   assert.equal(elapsedSeconds("not-a-date", 1_000), 0);
