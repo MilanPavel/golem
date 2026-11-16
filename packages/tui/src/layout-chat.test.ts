@@ -487,3 +487,17 @@ test("an answer from an old session with no call data shows its time only", () =
   const lines = layoutMessages([{ ...message("a", "assistant", "ok"), durationMs: 12_400 }], 80);
   assert.ok(lines.some((line) => textOf(line.spans) === "0m 12.4s"));
 });
+
+test("a notice is one dim row after the message it followed, and the messages are unchanged", () => {
+  const messages = [message("u", "user", "hi"), message("a", "assistant", "ok")];
+  const notices = [
+    { id: "context-1", afterId: "u", action: "cleared" as const, text: "golem cleared 12 old tool results · ctx 71% → 38%", at: "t" },
+  ];
+  const lines = layoutMessages(messages, 80, { times: false, now: 0, notices });
+  const rows = lines.map((line) => textOf(line.spans));
+  const at = rows.findIndex((row) => row.includes("golem cleared 12 old tool results"));
+  assert.ok(at > rows.findIndex((row) => row.includes("hi")));
+  assert.ok(at < rows.findIndex((row) => row.includes("ok")));
+  assert.equal(lines[at]?.spans[0]?.dim, true);
+  assert.equal(layoutMessages(messages, 80, { times: false, now: 0 }).length, lines.length - 1);
+});

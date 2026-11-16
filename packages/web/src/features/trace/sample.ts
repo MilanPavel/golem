@@ -1,4 +1,4 @@
-import type { TraceMessage, TraceModelSpan, TraceRunSpan, TraceSpanResult, TraceToolSpan } from "../../store/trace.ts";
+import type { TraceContextEvent, TraceMessage, TraceModelSpan, TraceRunSpan, TraceSpanResult, TraceToolSpan } from "../../store/trace.ts";
 
 const BASE = Date.parse("2026-11-07T10:00:00.000Z");
 const at = (ms: number): string => new Date(BASE + ms).toISOString();
@@ -73,6 +73,12 @@ export const GROWING_TRACE: TraceRunSpan[] = [
     sampleModel("m_3", 3, 70000, 40000, [], { tokens: [28400, 800], window: 128000 }),
     sampleModel("m_4", 4, 120000, 40800, [], { tokens: [32000, 1800], window: 128000 }),
   ]),
+];
+
+/** golem cleared old tool results before the third call and grew the window before the fourth. */
+export const GROWING_EVENTS: TraceContextEvent[] = [
+  { seq: 9, action: "cleared", call_id: "m_3", run_id: "r_2", before_tokens: 91000, after_tokens: 52000, count: 12, room: 124000 },
+  { seq: 14, action: "grew", call_id: "m_4", run_id: "r_2", window_from: 65536, window_to: 131072, reload_ms: 8200 },
 ];
 
 /** One run with 25 model calls, each asking for one tool, then a short run after it. */
@@ -160,6 +166,36 @@ export const MODEL_DETAIL: TraceSpanResult = {
       { key: "user", tokens: 8, chars: 26, items: [] },
       { key: "assistant", tokens: 30, chars: 120, items: [] },
       { key: "tool_results", tokens: 3254, chars: 13016, items: [] },
+    ],
+  },
+};
+
+const STUBBED: TraceMessage = {
+  ...SEEN,
+  text: "[read_file result cleared: 1,020 characters. Call the tool again if you need it.]",
+  original: SEEN.text,
+  tokens: 20,
+};
+
+/** A call that was sent a summary, one tool result as a stub, and has a reply reserve. */
+export const CLEARED_DETAIL: TraceSpanResult = {
+  ...MODEL_DETAIL,
+  messages: [USER, ASKED, STUBBED],
+  summary_of: 9,
+  context: {
+    ...MODEL_DETAIL.context!,
+    used: 8000,
+    window: 32768,
+    reserve: 4096,
+    window_planned: true,
+    cleared: { count: 12, tokens: 11200 },
+    parts: [
+      { key: "system", tokens: 1000, chars: 4000, items: [] },
+      { key: "tools", tokens: 1500, chars: 6000, items: [] },
+      { key: "user", tokens: 500, chars: 2000, items: [] },
+      { key: "assistant", tokens: 1200, chars: 4800, items: [] },
+      { key: "tool_results", tokens: 2800, chars: 11200, items: [] },
+      { key: "summary", tokens: 1000, chars: 4000, items: [] },
     ],
   },
 };

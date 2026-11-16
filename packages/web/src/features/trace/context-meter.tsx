@@ -1,8 +1,10 @@
 import {
   CONTEXT_KEYS,
   CONTEXT_LABELS,
+  clearedLegend,
   clearedNote,
   contextLevel,
+  contextRoom,
   contextSummary,
   contextUsed,
   contextWarning,
@@ -23,6 +25,9 @@ export const PART_COLOR: Record<ContextKey, string> = {
   summary: "bg-ctx-summary",
 };
 
+/** Hatched, so the reserve and the cleared results read without colour. */
+const HATCH = { background: "repeating-linear-gradient(135deg, var(--color-line-strong) 0 2px, transparent 2px 4px)" };
+
 /** How full a model call's context window was, and what filled it. */
 export function ContextMeter({ context, provider }: { context: TraceContext; provider: string | null }) {
   const used = contextUsed(context);
@@ -32,7 +37,9 @@ export function ContextMeter({ context, provider }: { context: TraceContext; pro
     (part) => part.key !== "summary" || part.tokens > 0,
   );
   const warning = contextWarning(context);
-  const note = cutNote(context);
+  const note = cutNote(context, context.window_planned === true);
+  const room = contextRoom(context);
+  const clearedRow = clearedLegend(context);
   const cleared = clearedNote(context);
   const severe = contextLevel(used, size) === "full";
   const summary = contextSummary(used, size, context.window_estimated ?? false);
@@ -54,6 +61,9 @@ export function ContextMeter({ context, provider }: { context: TraceContext; pro
           .map((part) => (
             <span key={part.key} className={PART_COLOR[part.key]} style={{ width: `${(part.tokens / total) * 100}%` }} />
           ))}
+        {room === null || room.reserve === 0 || total === 0 ? null : (
+          <span data-part="reserve" className="ml-auto" style={{ ...HATCH, width: `${(room.reserve / total) * 100}%` }} />
+        )}
       </div>
       {cleared === null ? null : (
         <p role="note" className="text-xs text-muted">
@@ -78,7 +88,20 @@ export function ContextMeter({ context, provider }: { context: TraceContext; pro
           <li className="flex items-center gap-2">
             <span aria-hidden="true" className="size-2 shrink-0 rounded-xs border border-line-strong" />
             <span className="text-muted">{CONTEXT_LABELS.free}</span>
-            <span className="ml-auto text-ink tabular-nums">{formatTokens(Math.max(0, size - used))}</span>
+            <span className="ml-auto text-ink tabular-nums">{formatTokens(room?.free ?? Math.max(0, size - used))}</span>
+          </li>
+        )}
+        {room === null || room.reserve === 0 ? null : (
+          <li className="flex items-center gap-2">
+            <span aria-hidden="true" className="size-2 shrink-0 rounded-xs border border-line-strong" style={HATCH} />
+            <span className="text-muted">{CONTEXT_LABELS.reserve}</span>
+            <span className="ml-auto text-ink tabular-nums">{formatTokens(room.reserve)}</span>
+          </li>
+        )}
+        {clearedRow === null ? null : (
+          <li className="flex items-center gap-2 text-faint">
+            <span aria-hidden="true" className="size-2 shrink-0 rounded-xs border border-dashed border-line-strong" style={HATCH} />
+            <span>{clearedRow}</span>
           </li>
         )}
       </ul>

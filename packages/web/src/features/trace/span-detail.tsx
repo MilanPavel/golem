@@ -1,5 +1,5 @@
 import { Fragment, useRef, useState, type ComponentType, type ReactNode } from "react";
-import { formatTokens } from "@golem/view";
+import { formatTokens, summaryOfLine } from "@golem/view";
 import type { TraceMessage, TraceSpanResult } from "../../store/trace.ts";
 import { Button } from "../../ui/button.tsx";
 import { CopyButton, selectText } from "../../ui/copy-command.tsx";
@@ -74,11 +74,14 @@ export type NotSeen = "not seen" | "probably not seen";
 function MessageRow({ message, names, total, notSeen = null }: { message: TraceMessage; names: ReadonlyMap<string, string>; total: number | null; notSeen?: NotSeen | null }) {
   const calls = message.tool_calls ?? [];
   const tokens = typeof message.tokens === "number" ? message.tokens : null;
+  const original = typeof message.original === "string" ? message.original : null;
+  const [showOriginal, setShowOriginal] = useState(false);
   return (
     <li className={`flex gap-3 ${notSeen === null ? "" : "opacity-60"}`}>
       <span className="flex w-16 shrink-0 flex-col items-end pt-0.5 font-mono text-xs text-faint">
         <span>{labelOf(message, names)}</span>
         {notSeen === null ? null : <span className="whitespace-nowrap rounded-xs border border-line-strong px-1 text-wait">{notSeen}</span>}
+        {original === null ? null : <span className="whitespace-nowrap rounded-xs border border-dashed border-line-strong px-1 text-muted">cleared</span>}
         {tokens === null ? null : <span>{`≈${formatTokens(tokens)}`}</span>}
       </span>
       <div className="min-w-0 flex-1 text-sm">
@@ -86,7 +89,14 @@ function MessageRow({ message, names, total, notSeen = null }: { message: TraceM
           <span aria-hidden="true" className="mb-1 block h-0.5 rounded-full bg-line-strong" style={{ width: `${Math.max(1, (tokens / total) * 100)}%` }} />
         ) : null}
         {message.role === "tool" ? (
-          <FoldedBlock text={message.text} />
+          <>
+            <FoldedBlock text={original !== null && showOriginal ? original : message.text} />
+            {original === null ? null : (
+              <Button kind="ghost" size="sm" className="mt-1" aria-pressed={showOriginal} onClick={() => setShowOriginal(!showOriginal)}>
+                {showOriginal ? "Show what was sent" : "Show original"}
+              </Button>
+            )}
+          </>
         ) : (
           <>
             {message.text === "" ? null : (
@@ -106,9 +116,15 @@ function MessageRow({ message, names, total, notSeen = null }: { message: TraceM
   );
 }
 
-function Messages({ messages, newFrom, names, total, notSeen }: { messages: readonly TraceMessage[]; newFrom: number | null; names: ReadonlyMap<string, string>; total: number | null; notSeen: ReadonlyMap<string, NotSeen> }) {
+function Messages({ messages, newFrom, names, total, notSeen, summaryOf = null }: { messages: readonly TraceMessage[]; newFrom: number | null; names: ReadonlyMap<string, string>; total: number | null; notSeen: ReadonlyMap<string, NotSeen>; summaryOf?: number | null }) {
   return (
     <ul aria-label="Messages" className="flex flex-col gap-3">
+      {summaryOf === null ? null : (
+        <li className="flex gap-3">
+          <span className="flex w-16 shrink-0 flex-col items-end pt-0.5 font-mono text-xs text-faint">summary</span>
+          <p className="min-w-0 flex-1 text-sm text-muted">{summaryOfLine(summaryOf)}</p>
+        </li>
+      )}
       {messages.map((message, index) => (
         <Fragment key={message.id ?? index}>
           {index === newFrom && index > 0 ? (
@@ -214,7 +230,7 @@ function Context({ result }: { result: TraceSpanResult }) {
         <SystemPrompt result={result} prompt={prompt} />
       )}
       {tools === null || tools === undefined ? null : <Tools result={result} />}
-      {messages.length === 0 ? <p className="text-sm text-faint">No messages.</p> : <Messages messages={messages} newFrom={result.new_from ?? null} names={names} total={usedTokens(result)} notSeen={notSeen} />}
+      {messages.length === 0 ? <p className="text-sm text-faint">No messages.</p> : <Messages messages={messages} newFrom={result.new_from ?? null} names={names} total={usedTokens(result)} notSeen={notSeen} summaryOf={result.summary_of ?? null} />}
     </div>
   );
 }

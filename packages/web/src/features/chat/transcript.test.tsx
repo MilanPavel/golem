@@ -4,7 +4,7 @@ import axe from "axe-core";
 import { afterEach, expect, test } from "vitest";
 import { ToolLine, TranscriptColumn, TranscriptMessages, waitingLine } from "./transcript.tsx";
 import type { PullsSnapshot } from "../../store/pulls.ts";
-import { SAMPLE_CHAT } from "./sample.ts";
+import { NOTICE_CHAT, SAMPLE_CHAT } from "./sample.ts";
 import { detailStore } from "./detail.ts";
 import { setThinkingShown } from "./thinking-shown.ts";
 
@@ -550,4 +550,15 @@ test("an old answer with no cost data shows tokens only", () => {
   const call = { model: null, tier: null, tokens: 900, costUsd: null, done: true };
   render(<TranscriptMessages chat={chat([answer({ durationMs: 3000, call })])} />);
   expect(screen.getByText("3.0s · 900 tok")).toBeTruthy();
+});
+
+test("notices draw as one muted line after the step they followed, and Quiet hides a clear only", () => {
+  const { rerender } = render(<TranscriptMessages chat={NOTICE_CHAT} detail="normal" />);
+  expect(screen.getAllByRole("note").map((n) => n.textContent)).toEqual([
+    "⊖golem cleared 12 old tool results · ctx 71% → 38%",
+    "⊖golem summarised 9 earlier turns · ctx 84% → 31%",
+    "⊖window grew 32K → 64K · reloaded in 8 s",
+  ]);
+  rerender(<TranscriptMessages chat={NOTICE_CHAT} detail="quiet" />);
+  expect(screen.getAllByRole("note").map((n) => n.getAttribute("data-notice"))).toEqual(["summarised", "grew"]);
 });

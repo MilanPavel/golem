@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
 import { expect, test } from "vitest";
 import type { TraceSpanResult } from "../../store/trace.ts";
-import { APPROVAL_DETAIL, CUT_LIKELY_DETAIL, CUT_MIDDLE_DETAIL, CUT_NO_DETAIL, CUT_YES_DETAIL, FULL_DETAIL, MODEL_DETAIL, NO_PROMPT_DETAIL, NUM_CTX_DETAIL, OLD_DETAIL, SECTIONS_DETAIL, TOOL_DETAIL, UNKNOWN_WINDOW_DETAIL } from "./sample.ts";
+import { APPROVAL_DETAIL, CLEARED_DETAIL, CUT_LIKELY_DETAIL, CUT_MIDDLE_DETAIL, CUT_NO_DETAIL, CUT_YES_DETAIL, FULL_DETAIL, MODEL_DETAIL, NO_PROMPT_DETAIL, NUM_CTX_DETAIL, OLD_DETAIL, SECTIONS_DETAIL, TOOL_DETAIL, UNKNOWN_WINDOW_DETAIL } from "./sample.ts";
 import { SpanDetail } from "./span-detail.tsx";
 import { copyText, jsonOf, metadataRows, modelLine, promptSections, sectionLabel, tabsOf, toolGroups } from "./span-text.ts";
 
@@ -346,4 +346,41 @@ test("the meter says how many results were cleared at the selected call, and say
   view.unmount();
   show(MODEL_DETAIL);
   expect(screen.getByRole("region", { name: "Context window" }).textContent).not.toContain("one line");
+});
+
+test("the meter has Summary, a hatched reply reserve, a muted Cleared row, and the rows add up to the window", () => {
+  show(CLEARED_DETAIL);
+  const rows = legend().getAllByRole("listitem").map((row) => row.textContent);
+  expect(rows).toEqual([
+    "System prompt1.0K",
+    "Tool definitions · 0 tools1.5K",
+    "Your messages500",
+    "Replies1.2K",
+    "Tool results2.8K",
+    "Summary1.0K",
+    "Free20.7K",
+    "Reply reserve4.1K",
+    "Cleared · 12 tool results · 11.2K not sent",
+  ]);
+  // 8000 used + 20672 free + 4096 reserve = 32768
+  expect(8000 + 20672 + 4096).toBe(32768);
+  expect(document.querySelector("[data-part=reserve]")).not.toBeNull();
+});
+
+test("a stub is tagged cleared and shows the original on request, and the summary row names its size", async () => {
+  const user = userEvent.setup();
+  show(CLEARED_DETAIL);
+  expect(screen.getByText("summary of 9 earlier messages")).toBeTruthy();
+  expect(screen.getByText("cleared", { selector: "span" })).toBeTruthy();
+  expect(screen.getByText(/read_file result cleared/)).toBeTruthy();
+  await user.click(screen.getByRole("button", { name: "Show original" }));
+  expect(screen.getByText(/line 1: the answer is 42/)).toBeTruthy();
+  await user.click(screen.getByRole("button", { name: "Show what was sent" }));
+  expect(screen.getByText(/read_file result cleared/)).toBeTruthy();
+});
+
+test("a cut prompt in a planned window says it should not happen", () => {
+  const planned = { ...CUT_YES_DETAIL, context: { ...CUT_YES_DETAIL.context!, window_planned: true } };
+  show(planned);
+  expect(screen.getByRole("note").textContent).toBe("The model server cut this prompt. That should not happen: please report it.");
 });

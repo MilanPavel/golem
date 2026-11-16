@@ -829,11 +829,14 @@ async def _changes_suggest_message(
 async def _trace_get(ctx: RequestContext, params: TraceGetParams) -> TraceGetResult:
     try:
         title, runs = await _sessions(ctx).trace(params.session_id)
+        changes = await _sessions(ctx).trace_context_events(params.session_id)
     except SessionNotFoundError as exc:
         raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
     except SchemaMismatchError as exc:
         raise RpcCallError(SESSION_NOT_FOUND, str(exc)) from exc
-    return TraceGetResult(session_id=params.session_id, title=title, runs=runs)
+    return TraceGetResult(
+        session_id=params.session_id, title=title, runs=runs, context_events=changes
+    )
 
 
 def _cost_totals(totals: Totals) -> CostTotals:

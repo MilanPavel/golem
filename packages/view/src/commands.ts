@@ -60,6 +60,8 @@ export type ComposerOutcome =
   | { kind: "changes" }
   /** `/checks on` or `/checks off`: whether golem runs the project's checks after its edits in this chat. */
   | { kind: "checks"; on: boolean }
+  /** `/commit` opens the commit screen: a dialog on the web, a band under `/changes` in the terminal. */
+  | { kind: "commit" }
   /** `/undo`: take back the files the last turn changed. */
   | { kind: "undo" }
   | { kind: "thinking" }
@@ -426,6 +428,13 @@ export const COMMANDS: readonly Command[] = [
       if (args.length === 1 && (word === "on" || word === "off")) return { kind: "checks", on: word === "on" };
       return { kind: "unknown", notice: "/checks on or /checks off" };
     },
+  },
+  {
+    name: "/commit",
+    group: "view",
+    args: "",
+    description: "Commits the files this session changed, with a message you can edit.",
+    run: withoutArgs({ kind: "commit" }),
   },
   {
     name: "/undo",

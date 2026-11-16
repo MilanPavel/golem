@@ -273,3 +273,25 @@ async def test_one_long_turn_has_nothing_to_summarise_and_clears_harder(
     assert not _changes(events, "summarised")
     assert _changes(events, "cleared")
     assert any(e.type == "run.completed" for e in events)
+
+
+async def test_the_trace_says_how_many_messages_a_summary_stands_for(
+    database: Database, tmp_path: Path
+) -> None:
+    model = _Summing(replies=_replies(12))
+    chat = _chat(database, model, 8192, SETTINGS)
+    project = _project(tmp_path)
+    events: list[ChatEvent] = []
+    for n in range(12):
+        events += await chat.turn(_ask(n), project)
+
+    starts = [e.data for e in events if isinstance(e, ModelCallStartedEvent)]
+    first = await chat.manager.trace_span(chat.session_id, starts[0].message_id)
+    assert first.summary_of is None
+    last = next(s for s in reversed(starts) if s.summary_chars)
+    result = await chat.manager.trace_span(chat.session_id, last.message_id)
+    assert result.summary_of is not None and result.summary_of > 0
+    assert result.context is not None
+    summary = next(p for p in result.context.parts if p.key == "summary")
+    assert summary.tokens > 0
+    assert result.context.reserve == SETTINGS.reply_reserve

@@ -63,7 +63,7 @@ export function InspectorPanel({ id, span, onClose }: { id: string; span: string
       </div>
       {runs.length === 0 ? null : (
         <div className="flex items-center border-b border-line px-3 py-1.5">
-          <TraceSummary runs={runs} stacked />
+          <TraceSummary runs={runs} events={data.trace.data?.context_events ?? []} stacked />
         </div>
       )}
       <TraceBody id={id} span={span} data={data} layout="stacked" onSelect={(next) => navigate(inspectPath(id, next), { replace: true })} />

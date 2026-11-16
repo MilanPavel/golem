@@ -1,4 +1,4 @@
-import { OLLAMA_FAILED, RpcError, type ApprovalChoice, type ConfigGetResult, type ConfigRawGetResult, type ConfigRawResult, type FsListDirsResult, type McpAddParams, type McpCallResult, type McpImportApplyParams, type McpImportApplyResult, type McpImportScanResult, type McpCatalogResult, type McpListResult, type McpLogsResult, type McpServerConfig, type McpServerDetail, type McpServerLog, type McpLoginDone, type McpTestProgress, type McpTestResult, type GolemClient, type RuntimeName, type SetupStatusResult, type SkillListResult, type TraceGetResult, type TraceSpanResult, type ArtifactReadResult, type ChangesDiffResult, type ChangesDiffTarget, type ChangesListResult, type ChangesRevertResult, type ChangesRevertTarget, type ModelOptionsGetResult, type ModelOptionsSetResult, type SessionSetOptionsResult, type SkillCreateResult, type SkillReadResult, type SkillWriteResult, type AuthListResult, type FileListResult, type FileReadResult, type CostGetResult, type SessionCompactResult } from "@golem/client";
+import { OLLAMA_FAILED, RpcError, type ApprovalChoice, type ConfigGetResult, type ConfigRawGetResult, type ConfigRawResult, type FsListDirsResult, type McpAddParams, type McpCallResult, type McpImportApplyParams, type McpImportApplyResult, type McpImportScanResult, type McpCatalogResult, type McpListResult, type McpLogsResult, type McpServerConfig, type McpServerDetail, type McpServerLog, type McpLoginDone, type McpTestProgress, type McpTestResult, type GolemClient, type RuntimeName, type SetupStatusResult, type SkillListResult, type TraceGetResult, type TraceSpanResult, type ArtifactReadResult, type ChangesDiffResult, type ChangesDiffTarget, type ChangesListResult, type ChangesRevertResult, type ChangesRevertTarget, type ChangesCommitResult, type ChangesCommitInfoResult, type ChangesSuggestMessageResult, type ModelOptionsGetResult, type ModelOptionsSetResult, type SessionSetOptionsResult, type SkillCreateResult, type SkillReadResult, type SkillWriteResult, type AuthListResult, type FileListResult, type FileReadResult, type CostGetResult, type SessionCompactResult } from "@golem/client";
 import { changeToolFilter, installEventOf, type InstallEvent, type PermissionMode, type CompactAction } from "@golem/view";
 import type { QueryClient } from "@tanstack/react-query";
 import { createDrafts, type Drafts } from "./drafts.ts";
@@ -62,6 +62,9 @@ export type PageClient = Pick<
   | "changesList"
   | "changesDiff"
   | "changesRevert"
+  | "changesCommit"
+  | "changesCommitInfo"
+  | "changesSuggestMessage"
   | "readFile"
   | "listFiles"
   | "restartMcp"
@@ -145,6 +148,13 @@ export type PageActions = {
    * The summary can take a minute. Nothing leaves the transcript. Rejects with `SESSION_BUSY` while a run is open.
    */
   compact(sessionId: string, action: CompactAction, focus: string | null): Promise<SessionCompactResult>;
+  /** A commit message the session's model suggests for `paths`. */
+  suggestCommitMessage(sessionId: string, paths: string[]): Promise<ChangesSuggestMessageResult>;
+  /**
+   * Commits `paths` with the person's own git, outside the sandbox. It runs only from their action on
+   * the commit screen. A git failure resolves with `ok: false` and git's output. Never pushes.
+   */
+  commit(sessionId: string, paths: string[], message: string): Promise<ChangesCommitResult>;
   /** Sets the title. What the page shows afterwards comes from the daemon's summary. */
   rename(sessionId: string, title: string): Promise<void>;
   /** Forks at a message and resolves with the new session's id. */
@@ -287,6 +297,8 @@ export type PageQueries = {
   changesDiff(sessionId: string, target: ChangesDiffTarget): Promise<ChangesDiffResult>;
   /** Put back a change, a file, a hunk or a turn. A file changed on disk comes back in `conflicts`. */
   changesRevert(sessionId: string, target: ChangesRevertTarget, force?: boolean): Promise<ChangesRevertResult>;
+  /** Whether the session folder is in a git work tree, its branch, and which changed files git sees. */
+  changesCommitInfo(sessionId: string): Promise<ChangesCommitInfoResult>;
   /** The start of one text file of the session's folder. */
   readFile(sessionId: string, path: string): Promise<FileReadResult>;
   /** Files of the session's folder whose path holds `query`. */
@@ -383,6 +395,7 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       changesList: (sessionId) => client.changesList(sessionId),
       changesDiff: (sessionId, target) => client.changesDiff(sessionId, target),
       changesRevert: (sessionId, target, force) => client.changesRevert(sessionId, target, force),
+      changesCommitInfo: (sessionId) => client.changesCommitInfo(sessionId),
       readFile: (sessionId, path) => client.readFile(sessionId, path),
       listFiles: (sessionId, query, limit) => client.listFiles(sessionId, query, limit),
       mcpCatalog: (sessionId) => client.mcpCatalog(sessionId ?? undefined),
@@ -429,6 +442,16 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       },
       async setChecks(sessionId, on) {
         await client.setChecks(sessionId, on);
+      },
+      async suggestCommitMessage(sessionId, paths) {
+        return client.changesSuggestMessage(sessionId, paths);
+      },
+      async commit(sessionId, paths, message) {
+        try {
+          return await client.changesCommit(sessionId, paths, message);
+        } finally {
+          await queryClient.invalidateQueries({ queryKey: ["changes.commit_info", sessionId] });
+        }
       },
       async compact(sessionId, action, focus) {
         return client.compactSession(sessionId, action, focus ?? undefined);

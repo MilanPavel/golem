@@ -1,5 +1,5 @@
-import { checksOf, checksSummary, displayToolName, formatTurnTime, groupTurns, turnFooterParts, stepCount, stepMark, summarizeSteps, turnFooter, LIVE_OUTPUT_CHARS, thinkingLine, unreadCallNotice, writingLabel, REPLY_CUT_NOTE, type ChatMessage, type ChatState, type Detail, type StepMark, type ToolBlock, type WritingBlock } from "@golem/view";
-import { memo, useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { checksOf, checksSummary, displayToolName, formatTurnTime, groupTurns, turnFooterParts, stepCount, stepMark, summarizeSteps, turnFooter, LIVE_OUTPUT_CHARS, thinkingLine, unreadCallNotice, writingLabel, REPLY_CUT_NOTE, type ChatMessage, type ChatState, type Detail, type StepMark, type ToolBlock, type WritingBlock, noticesAfter, type ChatNotice } from "@golem/view";
+import { memo, useCallback, useEffect, useId, useLayoutEffect, useRef, useState, Fragment } from "react";
 import { usePulls, useSession } from "../../store/page-context.tsx";
 import type { PullsSnapshot } from "../../store/pulls.ts";
 import type { SessionModel } from "../../store/session-store.ts";
@@ -304,6 +304,18 @@ export function ActivityLine({ tools, detail, streaming = false, pendingId = nul
   );
 }
 
+/** What golem did to keep the context small, as one muted line. The glyph is not the only signal: the words are. */
+export function NoticeLine({ notice }: { notice: ChatNotice }) {
+  return (
+    <p role="note" data-notice={notice.action} className="flex items-center gap-2 text-xs text-muted">
+      <span aria-hidden="true" className="text-faint">
+        ⊖
+      </span>
+      <span>{notice.text}</span>
+    </p>
+  );
+}
+
 /** One run: one golem, each model step in order, one activity line for all their tools, and one footer once the run is done. */
 export function GolemTurn({
   steps,
@@ -311,7 +323,8 @@ export function GolemTurn({
   thinkingShown,
   detail: detailOverride,
   checks = null,
-}: { steps: readonly ChatMessage[]; pendingId?: string | null; thinkingShown?: boolean; detail?: Detail; checks?: ReturnType<typeof checksSummary> | null }) {
+  notices = [],
+}: { steps: readonly ChatMessage[]; pendingId?: string | null; thinkingShown?: boolean; detail?: Detail; checks?: ReturnType<typeof checksSummary> | null; notices?: readonly ChatNotice[] }) {
   const chosenDetail = useDetail();
   const detail = detailOverride ?? chosenDetail;
   const footer = turnFooter(steps);
@@ -323,7 +336,12 @@ export function GolemTurn({
     <article aria-label="golem" className="flex min-w-0 flex-col gap-2.5">
       <PixelGolem state={golemState(steps)} size="sm" />
       {steps.map((message) => (
-        <GolemStep key={message.id} message={message} thinkingShown={thinkingShown} />
+        <Fragment key={message.id}>
+          <GolemStep message={message} thinkingShown={thinkingShown} />
+          {noticesAfter(notices, message.id, detail === "quiet").map((notice) => (
+            <NoticeLine key={notice.id} notice={notice} />
+          ))}
+        </Fragment>
       ))}
       {detail === "quiet" ? null : <EditCards tools={tools.filter(isEditCard)} />}
       <ActivityLine tools={tools} detail={detail} streaming={steps.some((step) => step.streaming)} pendingId={pendingId} />
@@ -335,7 +353,7 @@ export function GolemTurn({
 }
 
 /** What the transcript draws of the chat. `approval` names the call whose approval waits in the dock. */
-export type TranscriptChat = Pick<ChatState, "messages" | "error" | "notice"> & Partial<Pick<ChatState, "approval" | "unreadCall" | "checks" | "busy" | "runId">>;
+export type TranscriptChat = Pick<ChatState, "messages" | "error" | "notice"> & Partial<Pick<ChatState, "approval" | "unreadCall" | "checks" | "busy" | "runId" | "notices">>;
 
 /** How a turn's checks went, or null when its run ran none. It is being fixed while that run goes on. */
 function turnChecks(chat: TranscriptChat, steps: readonly ChatMessage[]): ReturnType<typeof checksSummary> | null {
@@ -348,15 +366,26 @@ function turnChecks(chat: TranscriptChat, steps: readonly ChatMessage[]): Return
 /** The messages and the closing error or notice. Pure: the page's stores are not read here. */
 export function TranscriptMessages({ chat, thinkingShown, detail, waiting = null }: { chat: TranscriptChat; thinkingShown?: boolean; detail?: Detail; waiting?: string | null }) {
   const pendingId = chat.approval?.callId ?? null;
+  const chosenDetail = useDetail();
+  const quiet = (detail ?? chosenDetail) === "quiet";
+  const notices = chat.notices ?? [];
   const notice = chat.notice ?? (chat.unreadCall === true ? unreadCallNotice("web") : null);
   if (chat.messages.length === 0 && !chat.error && !notice) {
     return <p className="text-sm text-faint">No messages yet.</p>;
   }
   return (
     <>
+      {noticesAfter(notices, null, quiet).map((item) => (
+        <NoticeLine key={item.id} notice={item} />
+      ))}
       {groupTurns(chat.messages).map((turn) =>
         turn.kind === "user" ? (
-          <UserMessage key={turn.id} message={turn.message} />
+          <Fragment key={turn.id}>
+            <UserMessage message={turn.message} />
+            {noticesAfter(notices, turn.id, quiet).map((item) => (
+              <NoticeLine key={item.id} notice={item} />
+            ))}
+          </Fragment>
         ) : (
           <GolemTurn
             key={turn.id}
@@ -365,6 +394,7 @@ export function TranscriptMessages({ chat, thinkingShown, detail, waiting = null
             thinkingShown={thinkingShown}
             detail={detail}
             checks={turnChecks(chat, turn.steps)}
+            notices={notices}
           />
         ),
       )}

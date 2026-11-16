@@ -32,6 +32,149 @@
       "title": "ModelRejection",
       "type": "object"
     },
+    "TraceContextEvent": {
+      "additionalProperties": false,
+      "description": "One ``context.changed`` of the session, for the trace.\n\n``call_id`` is the model call that came right after the change, null when none has yet.\nThe other fields are those of ``context.changed``.",
+      "properties": {
+        "action": {
+          "enum": [
+            "cleared",
+            "summarised",
+            "grew"
+          ],
+          "title": "Action",
+          "type": "string"
+        },
+        "after_tokens": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "After Tokens"
+        },
+        "before_tokens": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Before Tokens"
+        },
+        "call_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Call Id"
+        },
+        "count": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Count"
+        },
+        "reload_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reload Ms"
+        },
+        "room": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Room"
+        },
+        "run_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Run Id"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "window_from": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Window From"
+        },
+        "window_to": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Window To"
+        }
+      },
+      "required": [
+        "seq",
+        "action"
+      ],
+      "title": "TraceContextEvent",
+      "type": "object"
+    },
     "TraceModelSpan": {
       "additionalProperties": false,
       "description": "A model call, with the tool calls it asked for, in request order.\n\n``prompt_cut`` says whether Ollama cut the prompt that did not fit: \"no\"\nand \"yes\" are proven from exact numbers, \"likely\" is an estimate, and null\nmeans golem cannot tell. ``prompt_cut_kind`` is set with \"yes\" and\n\"likely\". ``dropped_message_ids`` are the messages the model probably did\nnot see (older messages only), and ``dropped_tokens`` is an estimate of\ntheir size.\n\n``cost_usd`` is what the call cost, as its ``model.call.completed`` recorded\nit. Null when the price was not known or the call has no token counts.\n\n``load_ms``, ``prompt_ms`` and ``reply_ms`` are from the model server's own clock.\nOllama only.",
@@ -695,8 +838,15 @@
     }
   },
   "additionalProperties": false,
-  "description": "Runs of a session, oldest first.\n\nThe tree is run, then model call, then tool call. A client picks a span\nby ``id`` and loads it with ``trace.span``.",
+  "description": "Runs of a session, oldest first.\n\nThe tree is run, then model call, then tool call. A client picks a span\nby ``id`` and loads it with ``trace.span``. ``context_events`` are the\nsession's ``context.changed`` events, oldest first.",
   "properties": {
+    "context_events": {
+      "items": {
+        "$ref": "#/$defs/TraceContextEvent"
+      },
+      "title": "Context Events",
+      "type": "array"
+    },
     "runs": {
       "items": {
         "$ref": "#/$defs/TraceRunSpan"
