@@ -58,6 +58,8 @@ export type ComposerOutcome =
   | { kind: "time" }
   | { kind: "todos" }
   | { kind: "changes" }
+  /** `/commit` opens the commit screen: a dialog on the web, a band under `/changes` in the terminal. */
+  | { kind: "commit" }
   | { kind: "thinking" }
   | { kind: "detail"; level: Detail | null }
   /** Show the permission mode ("show"), or set it for this chat. A null `mode` returns to the default. */
@@ -410,6 +412,13 @@ export const COMMANDS: readonly Command[] = [
     args: "",
     description: "Shows the files this session changed, with their diffs.",
     run: withoutArgs({ kind: "changes" }),
+  },
+  {
+    name: "/commit",
+    group: "view",
+    args: "",
+    description: "Commits the files this session changed, with a message you can edit.",
+    run: withoutArgs({ kind: "commit" }),
   },
   {
     name: "/todos",

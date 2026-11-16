@@ -27,7 +27,7 @@ import { actionErrorText, isNoModelChosen } from "../../store/errors.ts";
 import { useConfig, useModelList, useNavigate, useNewSessionModel, usePageActions, useSessionReader, useSkillList } from "../../store/page-context.tsx";
 import { detailStore, setDetail, setThinkingShown, setTimesShown, thinkingShownStore, timesShownStore } from "../chat/index.ts";
 import { drawerOpenStore, useDrawerOpen } from "../drawer/index.ts";
-import { openWorkbench } from "../workbench/index.ts";
+import { openWorkbench, requestCommit } from "../workbench/index.ts";
 import { openModelDialog } from "../models/index.ts";
 import { startNoticeStore, useStartNotice } from "../setup/index.ts";
 import { CloseSessionDialog, useSessionActions } from "../sessions/index.ts";
@@ -263,6 +263,10 @@ export function useCommands({ session, cwd, typing, send }: UseCommandsOptions):
           }
           case "changes":
             openWorkbench("changes");
+            return "handled";
+          case "commit":
+            // Opens the dialog; the person still presses Commit in it.
+            requestCommit();
             return "handled";
           case "compact": {
             const started = Date.now();

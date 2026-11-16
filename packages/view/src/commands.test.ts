@@ -207,6 +207,11 @@ test("/fork takes no arguments", () => {
   assert.equal(applyComposer(closedDebug, "/fork here").kind, "unknown");
 });
 
+test("/commit takes no arguments", () => {
+  assert.deepEqual(applyComposer(closedDebug, "/commit"), { kind: "commit" });
+  assert.equal(applyComposer(closedDebug, "/commit x").kind, "unknown");
+});
+
 test("/changes takes no arguments", () => {
   assert.deepEqual(applyComposer(closedDebug, "/changes"), { kind: "changes" });
   assert.equal(applyComposer(closedDebug, "/changes x").kind, "unknown");

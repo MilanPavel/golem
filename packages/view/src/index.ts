@@ -7,6 +7,7 @@ export {
   NOTHING_TO_COMPACT,
   type CompactAction,
 } from "./compact.ts";
+export { branchLine, COMMIT_NOTE, commitTitle, committedLine, failureTail, FAILURE_LINES, SUGGESTING, withSuggestion } from "./commit.ts";
 export { REPLY_CUT_NOTE, replyWasCut } from "./stop.ts";
 export { costReportLines, formatCost, formatCount, referenceName, sessionCostLabel, turnFooterParts, turnTotals, type TurnTotals } from "./cost.ts";
 export { groupTurns, turnFooter, type Turn } from "./turns.ts";
