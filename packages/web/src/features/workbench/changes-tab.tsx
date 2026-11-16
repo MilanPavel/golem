@@ -1,7 +1,8 @@
+import { notesFor, type NotesState } from "@golem/view";
 import { useEffect, useId, useRef, useState } from "react";
-import { useChangedFiles, useFileDiff } from "../../store/page-context.tsx";
+import { useChangedFiles, useFileDiff, useNotes } from "../../store/page-context.tsx";
 import type { ChangedFile, FileDiff } from "../../store/changes.ts";
-import { useDiffMode, type DiffMode } from "../diff/index.ts";
+import { useDiffMode, type DiffMode, type NoteLine } from "../diff/index.ts";
 import { ChangesViewSwitch, useChangesView } from "./changes-view.tsx";
 import { Counts, DiffPanel, Row, plural } from "./file-row.tsx";
 import { TurnsTab } from "./turns-view.tsx";
@@ -22,10 +23,17 @@ type ChangesViewProps = {
   onMode: (mode: DiffMode) => void;
   /** Whether the panel has room for the split layout. */
   canSplit: boolean;
+  /** With it, a diff in the unified layout takes review notes. */
+  notes?: {
+    state: NotesState;
+    onAdd: (line: NoteLine, text: string) => void;
+    onEdit: (id: string, text: string) => void;
+    onRemove: (id: string) => void;
+  };
 };
 
 /** The list of changed files, the open one with its diff, and the totals. It reads nothing itself. */
-export function ChangesView({ files, error, open, onOpen, diff, mode, onMode, canSplit }: ChangesViewProps) {
+export function ChangesView({ files, error, open, onOpen, diff, mode, onMode, canSplit, notes }: ChangesViewProps) {
   const panel = useId();
   if (files === null) {
     return <p className="text-sm text-muted">{error === null ? "Reading the changes." : `Could not read the changes. ${error}`}</p>;
@@ -44,11 +52,27 @@ export function ChangesView({ files, error, open, onOpen, diff, mode, onMode, ca
             file={file}
             open={file.path === open}
             panel={panel}
+            noteCount={notes === undefined ? 0 : notesFor(notes.state, file.path).length}
             onToggle={() => {
               onOpen(file.path === open ? null : file.path);
             }}
           >
-            <DiffPanel diff={diff} mode={mode} onMode={onMode} canSplit={canSplit} />
+            <DiffPanel
+              diff={diff}
+              mode={mode}
+              onMode={onMode}
+              canSplit={canSplit}
+              {...(notes === undefined
+                ? {}
+                : {
+                    notes: {
+                      notes: notesFor(notes.state, file.path),
+                      onAddNote: notes.onAdd,
+                      onEditNote: notes.onEdit,
+                      onRemoveNote: notes.onRemove,
+                    },
+                  })}
+            />
           </Row>
         ))}
       </ul>
@@ -80,6 +104,7 @@ function ByFileTab({ sessionId }: { sessionId: string }) {
   // A file that left the list (an undo, say) is not open.
   const open = paths !== null && wanted !== null && paths.includes(wanted) ? wanted : null;
   const diff = useFileDiff(sessionId, open);
+  const notes = useNotes(sessionId);
 
   // A new request opens its row in this render; the effect below takes the request off the store.
   const [taken, setTaken] = useState<string | null>(null);
@@ -114,6 +139,14 @@ function ByFileTab({ sessionId }: { sessionId: string }) {
         mode={mode}
         onMode={setMode}
         canSplit={width >= SPLIT_MIN_WIDTH}
+        notes={{
+          state: notes.state,
+          onAdd: (line, text) => {
+            notes.add({ ...line, text });
+          },
+          onEdit: notes.edit,
+          onRemove: notes.remove,
+        }}
       />
     </div>
   );

@@ -107,7 +107,7 @@ sequenceDiagram
 - **An undo is a change.** It writes the old text and records a change with `source: "revert"`, so it shows in the list and can be undone. Nothing is lost.
 - **`stale`.** A file is stale when what is on disk is no longer what golem last wrote. That is a conflict: without `force`, nothing is written for it and the result lists it.
 - **Why a turn undo rewinds.** Taking back a middle turn alone could leave a file that no turn ever wrote, because a later turn built on it. So undoing a turn also takes back the turns after it.
-- A revert while a run is active is refused. The chat is kept, and the model reads a short note on its next turn saying which files were put back.
+- A revert while a run is active is refused. The chat is kept. The model reads a short note before the next user message that names the files put back (the first 20, then "and N more"). The graph state field `changes_seen` holds the last change the model was told about, so each undo is told once.
 
 ### Edits that land
 

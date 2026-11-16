@@ -3,6 +3,7 @@ export const TERMINAL_ONLY: ReadonlySet<string> = new Set([
   "/artifact",
   "/debug",
   "/tune",
+  "/undo",
 ]);
 
 export const IN_TERMINAL_LABEL = "In the terminal for now";
@@ -16,6 +17,7 @@ export const NOT_YET = {
   artifact: inTerminal("Tool output opens", "/artifact"),
   debug: inTerminal("The debug panel is", "/debug"),
   tune: inTerminal("Tuning a model is", "/tune"),
+  undo: inTerminal("Undoing a turn is", "/undo"),
   sessions: "The sidebar lists your sessions.",
 } as const;
 

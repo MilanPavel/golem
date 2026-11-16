@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import { Badge } from "../../ui/badge.tsx";
 import { cn } from "../../ui/cn.ts";
 import { ChevronDownIcon } from "../../ui/icons.tsx";
@@ -37,9 +37,11 @@ export function Row({
   open,
   onToggle,
   panel,
+  noteCount = 0,
   children,
 }: {
   file: ChangedFile;
+  noteCount?: number;
   open: boolean;
   onToggle: () => void;
   panel: string;
@@ -64,6 +66,7 @@ export function Row({
         {file.status === "created" ? <Badge tone="allow" className={SMALL}>new</Badge> : null}
         {file.status === "deleted" ? <Badge tone="deny" className={SMALL}>deleted</Badge> : null}
         {file.stale ? <Badge tone="wait" className={SMALL}>changed on disk</Badge> : null}
+        {noteCount > 0 ? <Badge tone="wait" className={SMALL}>{plural(noteCount, "note")}</Badge> : null}
         <Counts added={file.added} removed={file.removed} />
       </button>
       {open ? (
@@ -75,8 +78,20 @@ export function Row({
   );
 }
 
-/** The layout switch and the diff of the open row, or a line saying it is being read or failed. */
-export function DiffPanel({ diff, mode, onMode, canSplit }: { diff: FileDiff; mode: DiffMode; onMode: (mode: DiffMode) => void; canSplit: boolean }) {
+/** The layout switch and the diff of the open row, or a line saying it is being read or failed. With `notes`, the diff takes review notes. */
+export function DiffPanel({
+  diff,
+  mode,
+  onMode,
+  canSplit,
+  notes,
+}: {
+  diff: FileDiff;
+  mode: DiffMode;
+  onMode: (mode: DiffMode) => void;
+  canSplit: boolean;
+  notes?: NonNullable<ComponentProps<typeof DiffView>["notes"]>;
+}) {
   const shown: DiffMode = canSplit ? mode : "unified";
   return (
     <>
@@ -89,7 +104,7 @@ export function DiffPanel({ diff, mode, onMode, canSplit }: { diff: FileDiff; mo
         <p className="text-sm text-muted">Reading the diff.</p>
       ) : (
         <>
-          <DiffView diff={diff.diff} mode={shown} />
+          <DiffView diff={diff.diff} mode={shown} {...(notes === undefined ? {} : { notes })} />
           {diff.truncated ? <p className="mt-2 text-xs text-muted">This diff is cut. Open the file to see all of it.</p> : null}
         </>
       )}
