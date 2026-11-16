@@ -26,6 +26,7 @@ from golem.logging import configure_logging
 from golem.mcp import McpSupervisor
 from golem.mcp.prompt import mcp_section
 from golem.models.budget import Budget
+from golem.models.check import CheckManager
 from golem.models.discovery import Loaded, ModelDiscovery
 from golem.models.facts import FactsSource, ListedFacts
 from golem.models.gate import ServerGate
@@ -366,6 +367,17 @@ class DaemonApp:
                 sessions.facts = self.state.facts
                 sessions.listed_refs = lambda: [listed.ref for listed in models.cached()]
                 self.state.pulls = pulls
+                checks = CheckManager(
+                    router,
+                    scores,
+                    tools=default_registry(None, policy.web()),
+                    broadcast=self._broadcast,
+                    gate=gate,
+                    local=local,
+                    learn_window=learn_window,
+                    price_of=lambda profile: _price_of(router, models, profile),
+                )
+                self.state.checks = checks
                 self.state.installer = OllamaInstaller(broadcast=self._broadcast)
                 self.state.runtimes = {
                     name: runtime_installer(name, broadcast=self._broadcast) for name in RUNTIMES
@@ -407,6 +419,9 @@ class DaemonApp:
             for runtime in self.state.runtimes.values():
                 await runtime.aclose()
             self.state.runtimes = {}
+            if self.state.checks is not None:
+                await self.state.checks.aclose()
+            self.state.checks = None
             if self.state.pulls is not None:
                 await self.state.pulls.aclose()
             self.state.pulls = None

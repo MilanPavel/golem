@@ -167,4 +167,14 @@ MIGRATIONS: tuple[tuple[str, ...], ...] = (
         )
         """,
     ),
+    (
+        """
+        CREATE TABLE model_check_seeds (
+            ref TEXT PRIMARY KEY,
+            working INTEGER NOT NULL,
+            total INTEGER NOT NULL,
+            at TEXT NOT NULL
+        )
+        """,
+    ),
 )

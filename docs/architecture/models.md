@@ -180,6 +180,8 @@ golem remembers how each model did on this Mac. The projection of the event log 
 
 `Scores` (`golem/models/scores.py`) reads them, kept in memory for a minute. `tool_score` is `1 − bad / tool_calls` over the newest 200 tool calls, and unknown under 20. `golem models score --reset <ref>` (`model.score_reset`) stores a `reset_at` for the ref in `model_score_resets`; the score ignores older rows, and no usage row is deleted.
 
+`golem models check` leaves a seed in `model_check_seeds` (`ref`, `working`, `total`, `at`; one row per ref, replaced by the next check). `Scores` uses it as `tool_score` while the real count is under 20 (`Score.seeded` is true then), and ignores a seed older than the ref's `reset_at`. Real use never writes to the table.
+
 `ListedFacts` gives `pick` the `tool_score`. `pick` leaves out a local model below `MIN_LOCAL_TOOL_SCORE` (0.5) for a call that needs tools, only when another candidate passes. `model.list` carries `score` on each model, and the pickers show one line from `scoreLabel` in `packages/view`.
 
 ### The paid question
@@ -282,6 +284,8 @@ Downloads go through Ollama (`golem/models/pulls.py`):
 | `packages/daemon/golem/models/pulls.py`, `registry.py` | Downloads, and sizes from the registry |
 | `packages/daemon/golem/models/discovery.py` | `model.list`: every model, with status, price, and size |
 | `packages/daemon/golem/models/speed.py` | `SpeedBook`: the typical load, prompt and reply speed of each local model |
+| `packages/daemon/golem/models/check_cases.py` | The ten cases of `golem models check`: prompt, offered tools, and a checker of the replies |
+| `packages/daemon/golem/models/check.py` | `run_cases` and `CheckManager`: run the cases on one model, stream `model.check.progress` and `model.check.done`, seed `Scores` |
 | `packages/daemon/golem/models/scores.py` | `Scores`: tool score, step-ups and retries of each model, from real use |
 | `packages/daemon/golem/models/prices.py`, `catalog.py`, `hardware.py` | Prices from LiteLLM, the local catalog, and this Mac's memory |
 | `packages/daemon/golem/models/errors.py` | `ModelUnreachable`, `BudgetSpent` and their codes |

@@ -10,6 +10,8 @@ from golem_protocol.commands import (
     McpServer,
     McpServerLog,
     McpTestProgress,
+    ModelCheckDone,
+    ModelCheckProgress,
     ModelOptionsSaved,
     ModelPullDone,
     ModelPullProgress,
@@ -119,6 +121,26 @@ class ModelPullDoneNotification(BaseModel):
     params: ModelPullDone
 
 
+class ModelCheckProgressNotification(BaseModel):
+    """Server → every connection: one case of a tool-calling check finished. Not stored."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    jsonrpc: Literal["2.0"] = "2.0"
+    method: Literal["model.check.progress"] = "model.check.progress"
+    params: ModelCheckProgress
+
+
+class ModelCheckDoneNotification(BaseModel):
+    """Server → every connection: a tool-calling check ended. Not stored."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    jsonrpc: Literal["2.0"] = "2.0"
+    method: Literal["model.check.done"] = "model.check.done"
+    params: ModelCheckDone
+
+
 class ModelOptionsSavedNotification(BaseModel):
     """Server → every connection: the saved options of a model changed. Not stored."""
 
@@ -225,6 +247,8 @@ __all__ = [
     "McpServerLogNotification",
     "McpServerStatusNotification",
     "McpTestProgressNotification",
+    "ModelCheckDoneNotification",
+    "ModelCheckProgressNotification",
     "ModelOptionsSavedNotification",
     "ModelPullDoneNotification",
     "ModelPullProgressNotification",

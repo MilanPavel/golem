@@ -6891,6 +6891,358 @@ public enum ModelCallStartedEventType: String, Codable {
     case modelCallStarted = "model.call.started"
 }
 
+/// How one case went. ``recovered``: the model wrote its call as text and golem read it.
+// MARK: - ModelCheckCase
+public struct ModelCheckCase: Codable {
+    public let detail: String?
+    public let id: String
+    public let ms: Int
+    public let outcome: ModelCheckCaseOutcome
+    public let title: String
+
+    public enum CodingKeys: String, CodingKey {
+        case detail = "detail"
+        case id = "id"
+        case ms = "ms"
+        case outcome = "outcome"
+        case title = "title"
+    }
+
+    public init(detail: String?, id: String, ms: Int, outcome: ModelCheckCaseOutcome, title: String) {
+        self.detail = detail
+        self.id = id
+        self.ms = ms
+        self.outcome = outcome
+        self.title = title
+    }
+}
+
+public enum ModelCheckCaseOutcome: String, Codable {
+    case fail = "fail"
+    case pass = "pass"
+    case recovered = "recovered"
+}
+
+/// Server → every connection: a tool-calling check ended. Not stored.
+// MARK: - ModelCheckDoneNotification
+public struct ModelCheckDoneNotification: Codable {
+    public let jsonrpc: Jsonrpc?
+    public let method: ModelCheckDoneNotificationMethod?
+    public let params: ModelCheckDoneNotificationParams
+
+    public enum CodingKeys: String, CodingKey {
+        case jsonrpc = "jsonrpc"
+        case method = "method"
+        case params = "params"
+    }
+
+    public init(jsonrpc: Jsonrpc?, method: ModelCheckDoneNotificationMethod?, params: ModelCheckDoneNotificationParams) {
+        self.jsonrpc = jsonrpc
+        self.method = method
+        self.params = params
+    }
+}
+
+public enum ModelCheckDoneNotificationMethod: String, Codable {
+    case modelCheckDone = "model.check.done"
+}
+
+/// A check ended. ``error`` says why when ``ok`` is false, and then ``cases`` may be short.
+///
+/// ``verdict`` is ``reliable``, ``usable`` or ``not_recommended``. ``cost_usd`` is set for a
+/// model with a price, from the calls' usage.
+// MARK: - ModelCheckDoneNotificationParams
+public struct ModelCheckDoneNotificationParams: Codable {
+    public let cases: [ParamsCase]?
+    public let costUsd: Double?
+    public let error: String?
+    public let ok: Bool
+    public let passed: Int?
+    public let recovered: Int?
+    public let ref: String
+    public let total: Int?
+    public let verdict: Verdict?
+
+    public enum CodingKeys: String, CodingKey {
+        case cases = "cases"
+        case costUsd = "cost_usd"
+        case error = "error"
+        case ok = "ok"
+        case passed = "passed"
+        case recovered = "recovered"
+        case ref = "ref"
+        case total = "total"
+        case verdict = "verdict"
+    }
+
+    public init(cases: [ParamsCase]?, costUsd: Double?, error: String?, ok: Bool, passed: Int?, recovered: Int?, ref: String, total: Int?, verdict: Verdict?) {
+        self.cases = cases
+        self.costUsd = costUsd
+        self.error = error
+        self.ok = ok
+        self.passed = passed
+        self.recovered = recovered
+        self.ref = ref
+        self.total = total
+        self.verdict = verdict
+    }
+}
+
+/// How one case went. ``recovered``: the model wrote its call as text and golem read it.
+// MARK: - ParamsCase
+public struct ParamsCase: Codable {
+    public let detail: String?
+    public let id: String
+    public let ms: Int
+    public let outcome: ModelCheckCaseOutcome
+    public let title: String
+
+    public enum CodingKeys: String, CodingKey {
+        case detail = "detail"
+        case id = "id"
+        case ms = "ms"
+        case outcome = "outcome"
+        case title = "title"
+    }
+
+    public init(detail: String?, id: String, ms: Int, outcome: ModelCheckCaseOutcome, title: String) {
+        self.detail = detail
+        self.id = id
+        self.ms = ms
+        self.outcome = outcome
+        self.title = title
+    }
+}
+
+public enum Verdict: String, Codable {
+    case notRecommended = "not_recommended"
+    case reliable = "reliable"
+    case usable = "usable"
+}
+
+/// A check ended. ``error`` says why when ``ok`` is false, and then ``cases`` may be short.
+///
+/// ``verdict`` is ``reliable``, ``usable`` or ``not_recommended``. ``cost_usd`` is set for a
+/// model with a price, from the calls' usage.
+// MARK: - ModelCheckDone
+public struct ModelCheckDone: Codable {
+    public let cases: [ModelCheckDoneCase]?
+    public let costUsd: Double?
+    public let error: String?
+    public let ok: Bool
+    public let passed: Int?
+    public let recovered: Int?
+    public let ref: String
+    public let total: Int?
+    public let verdict: Verdict?
+
+    public enum CodingKeys: String, CodingKey {
+        case cases = "cases"
+        case costUsd = "cost_usd"
+        case error = "error"
+        case ok = "ok"
+        case passed = "passed"
+        case recovered = "recovered"
+        case ref = "ref"
+        case total = "total"
+        case verdict = "verdict"
+    }
+
+    public init(cases: [ModelCheckDoneCase]?, costUsd: Double?, error: String?, ok: Bool, passed: Int?, recovered: Int?, ref: String, total: Int?, verdict: Verdict?) {
+        self.cases = cases
+        self.costUsd = costUsd
+        self.error = error
+        self.ok = ok
+        self.passed = passed
+        self.recovered = recovered
+        self.ref = ref
+        self.total = total
+        self.verdict = verdict
+    }
+}
+
+/// How one case went. ``recovered``: the model wrote its call as text and golem read it.
+// MARK: - ModelCheckDoneCase
+public struct ModelCheckDoneCase: Codable {
+    public let detail: String?
+    public let id: String
+    public let ms: Int
+    public let outcome: ModelCheckCaseOutcome
+    public let title: String
+
+    public enum CodingKeys: String, CodingKey {
+        case detail = "detail"
+        case id = "id"
+        case ms = "ms"
+        case outcome = "outcome"
+        case title = "title"
+    }
+
+    public init(detail: String?, id: String, ms: Int, outcome: ModelCheckCaseOutcome, title: String) {
+        self.detail = detail
+        self.id = id
+        self.ms = ms
+        self.outcome = outcome
+        self.title = title
+    }
+}
+
+/// ``model.check``. Run golem's tool-calling test against a model.
+///
+/// ``name`` is a profile, a ref (``ollama/qwen3:8b``), or an Ollama name. Each case's result
+/// arrives as ``model.check.progress`` and the end as ``model.check.done``. No tool is run.
+// MARK: - ModelCheckParams
+public struct ModelCheckParams: Codable {
+    public let name: String
+
+    public enum CodingKeys: String, CodingKey {
+        case name = "name"
+    }
+
+    public init(name: String) {
+        self.name = name
+    }
+}
+
+/// Server → every connection: one case of a tool-calling check finished. Not stored.
+// MARK: - ModelCheckProgressNotification
+public struct ModelCheckProgressNotification: Codable {
+    public let jsonrpc: Jsonrpc?
+    public let method: ModelCheckProgressNotificationMethod?
+    public let params: ModelCheckProgressNotificationParams
+
+    public enum CodingKeys: String, CodingKey {
+        case jsonrpc = "jsonrpc"
+        case method = "method"
+        case params = "params"
+    }
+
+    public init(jsonrpc: Jsonrpc?, method: ModelCheckProgressNotificationMethod?, params: ModelCheckProgressNotificationParams) {
+        self.jsonrpc = jsonrpc
+        self.method = method
+        self.params = params
+    }
+}
+
+public enum ModelCheckProgressNotificationMethod: String, Codable {
+    case modelCheckProgress = "model.check.progress"
+}
+
+/// One case finished. ``index`` counts from 1 of ``total``.
+// MARK: - ModelCheckProgressNotificationParams
+public struct ModelCheckProgressNotificationParams: Codable {
+    public let index: Int
+    public let ref: String
+    public let result: ParamsResult
+    public let total: Int
+
+    public enum CodingKeys: String, CodingKey {
+        case index = "index"
+        case ref = "ref"
+        case result = "result"
+        case total = "total"
+    }
+
+    public init(index: Int, ref: String, result: ParamsResult, total: Int) {
+        self.index = index
+        self.ref = ref
+        self.result = result
+        self.total = total
+    }
+}
+
+/// How one case went. ``recovered``: the model wrote its call as text and golem read it.
+// MARK: - ParamsResult
+public struct ParamsResult: Codable {
+    public let detail: String?
+    public let id: String
+    public let ms: Int
+    public let outcome: ModelCheckCaseOutcome
+    public let title: String
+
+    public enum CodingKeys: String, CodingKey {
+        case detail = "detail"
+        case id = "id"
+        case ms = "ms"
+        case outcome = "outcome"
+        case title = "title"
+    }
+
+    public init(detail: String?, id: String, ms: Int, outcome: ModelCheckCaseOutcome, title: String) {
+        self.detail = detail
+        self.id = id
+        self.ms = ms
+        self.outcome = outcome
+        self.title = title
+    }
+}
+
+/// One case finished. ``index`` counts from 1 of ``total``.
+// MARK: - ModelCheckProgress
+public struct ModelCheckProgress: Codable {
+    public let index: Int
+    public let ref: String
+    public let result: ModelCheckProgressResult
+    public let total: Int
+
+    public enum CodingKeys: String, CodingKey {
+        case index = "index"
+        case ref = "ref"
+        case result = "result"
+        case total = "total"
+    }
+
+    public init(index: Int, ref: String, result: ModelCheckProgressResult, total: Int) {
+        self.index = index
+        self.ref = ref
+        self.result = result
+        self.total = total
+    }
+}
+
+/// How one case went. ``recovered``: the model wrote its call as text and golem read it.
+// MARK: - ModelCheckProgressResult
+public struct ModelCheckProgressResult: Codable {
+    public let detail: String?
+    public let id: String
+    public let ms: Int
+    public let outcome: ModelCheckCaseOutcome
+    public let title: String
+
+    public enum CodingKeys: String, CodingKey {
+        case detail = "detail"
+        case id = "id"
+        case ms = "ms"
+        case outcome = "outcome"
+        case title = "title"
+    }
+
+    public init(detail: String?, id: String, ms: Int, outcome: ModelCheckCaseOutcome, title: String) {
+        self.detail = detail
+        self.id = id
+        self.ms = ms
+        self.outcome = outcome
+        self.title = title
+    }
+}
+
+/// ``started`` is false when this model was already being checked.
+// MARK: - ModelCheckResult
+public struct ModelCheckResult: Codable {
+    public let ref: String
+    public let started: Bool
+
+    public enum CodingKeys: String, CodingKey {
+        case ref = "ref"
+        case started = "started"
+    }
+
+    public init(ref: String, started: Bool) {
+        self.ref = ref
+        self.started = started
+    }
+}
+
 /// ``model.delete``. Remove an installed local model from Ollama.
 // MARK: - ModelDeleteParams
 public struct ModelDeleteParams: Codable {
@@ -8620,7 +8972,7 @@ public enum OllamaInstallDoneNotificationMethod: String, Codable {
 /// The install ended. ``reason`` says why when it ``failed``.
 // MARK: - OllamaInstallDoneNotificationParams
 public struct OllamaInstallDoneNotificationParams: Codable {
-    public let outcome: Outcome
+    public let outcome: ParamsOutcome
     public let reason: String?
 
     public enum CodingKeys: String, CodingKey {
@@ -8628,13 +8980,13 @@ public struct OllamaInstallDoneNotificationParams: Codable {
         case reason = "reason"
     }
 
-    public init(outcome: Outcome, reason: String?) {
+    public init(outcome: ParamsOutcome, reason: String?) {
         self.outcome = outcome
         self.reason = reason
     }
 }
 
-public enum Outcome: String, Codable {
+public enum ParamsOutcome: String, Codable {
     case failed = "failed"
     case installed = "installed"
     case stopped = "stopped"
@@ -8643,7 +8995,7 @@ public enum Outcome: String, Codable {
 /// The install ended. ``reason`` says why when it ``failed``.
 // MARK: - OllamaInstallDone
 public struct OllamaInstallDone: Codable {
-    public let outcome: Outcome
+    public let outcome: ParamsOutcome
     public let reason: String?
 
     public enum CodingKeys: String, CodingKey {
@@ -8651,7 +9003,7 @@ public struct OllamaInstallDone: Codable {
         case reason = "reason"
     }
 
-    public init(outcome: Outcome, reason: String?) {
+    public init(outcome: ParamsOutcome, reason: String?) {
         self.outcome = outcome
         self.reason = reason
     }

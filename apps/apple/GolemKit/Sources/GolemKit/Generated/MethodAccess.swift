@@ -97,6 +97,7 @@ public enum MethodAccess {
         "auth.set",
         "config.raw.set_protected",
         "eval.routing",
+        "model.check",
         "notify.test",
         "skill.create_protected",
         "skill.write_protected",

@@ -1578,6 +1578,70 @@ class ModelPullDone(BaseModel):
     error: str | None = None
 
 
+class ModelCheckParams(BaseModel):
+    """``model.check``. Run golem's tool-calling test against a model.
+
+    ``name`` is a profile, a ref (``ollama/qwen3:8b``), or an Ollama name. Each case's result
+    arrives as ``model.check.progress`` and the end as ``model.check.done``. No tool is run.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+
+
+class ModelCheckResult(BaseModel):
+    """``started`` is false when this model was already being checked."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    ref: str = Field(min_length=3)
+    started: bool
+
+
+class ModelCheckCase(BaseModel):
+    """How one case went. ``recovered``: the model wrote its call as text and golem read it."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str = Field(min_length=1)
+    title: str = Field(min_length=1)
+    outcome: Literal["pass", "fail", "recovered"]
+    ms: int = Field(ge=0)
+    detail: str | None = None
+
+
+class ModelCheckProgress(BaseModel):
+    """One case finished. ``index`` counts from 1 of ``total``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    ref: str = Field(min_length=3)
+    index: int = Field(ge=1)
+    total: int = Field(ge=1)
+    result: ModelCheckCase
+
+
+class ModelCheckDone(BaseModel):
+    """A check ended. ``error`` says why when ``ok`` is false, and then ``cases`` may be short.
+
+    ``verdict`` is ``reliable``, ``usable`` or ``not_recommended``. ``cost_usd`` is set for a
+    model with a price, from the calls' usage.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    ref: str = Field(min_length=3)
+    ok: bool
+    error: str | None = None
+    cases: list[ModelCheckCase] = Field(default_factory=list[ModelCheckCase])
+    passed: int = Field(default=0, ge=0)
+    recovered: int = Field(default=0, ge=0)
+    total: int = Field(default=0, ge=0)
+    verdict: Literal["reliable", "usable", "not_recommended"] | None = None
+    cost_usd: float | None = Field(default=None, ge=0)
+
+
 class SkillRegistryChanged(BaseModel):
     """Skills changed on disk. List them again for the folders it covers.
 
@@ -3659,6 +3723,11 @@ __all__ = [
     "McpUpdateParams",
     "MessageSendParams",
     "MessageSendResult",
+    "ModelCheckCase",
+    "ModelCheckDone",
+    "ModelCheckParams",
+    "ModelCheckProgress",
+    "ModelCheckResult",
     "ModelDeleteParams",
     "ModelDeleteResult",
     "ModelListParams",

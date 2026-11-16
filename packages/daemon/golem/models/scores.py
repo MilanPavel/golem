@@ -1,8 +1,10 @@
 """A scoreboard per model, from real use on this Mac.
 
 The counts are written by the store's projection (``model_calls`` and ``model_outcomes``).
-This module reads them. Tool failures that are the world's fault (a tool that raised, a
-denied call, a cancelled call) never count against a model.
+This module reads them. ``golem models check`` leaves a seed (``model_check_seeds``): until a
+model has :data:`MIN_TOOL_CALLS` real tool calls, its tool score is the check's pass rate.
+Tool failures that are the world's fault (a tool that raised, a denied call, a cancelled
+call) never count against a model.
 """
 
 from __future__ import annotations
@@ -42,6 +44,7 @@ class Score:
     retried: int  # answers the user asked another model to redo
     tool_score: float | None  # 1 - bad / tool_calls over the window; None under the minimum
     runs: int  # runs that called this model
+    seeded: bool = False  # tool_score is the check's pass rate, not real use
 
 
 def tool_score_of(tool_calls: int, bad: int) -> float | None:
@@ -77,6 +80,13 @@ SELECT o.provider || '/' || o.model AS ref, o.outcome, COUNT(*)
 FROM model_outcomes o LEFT JOIN model_score_resets r ON r.ref = o.provider || '/' || o.model
 WHERE r.reset_at IS NULL OR julianday(o.at) > julianday(r.reset_at)
 GROUP BY ref, o.outcome
+"""
+
+
+_SEEDS = """
+SELECT s.ref, s.working, s.total
+FROM model_check_seeds s LEFT JOIN model_score_resets r ON r.ref = s.ref
+WHERE r.reset_at IS NULL OR julianday(s.at) > julianday(r.reset_at)
 """
 
 
@@ -121,6 +131,16 @@ class Scores:
             )
         self._cache = _Cache()
 
+    async def seed(self, ref: str, working: int, total: int) -> None:
+        """Keep a check's result for ``ref``: ``working`` of ``total`` cases passed or recovered."""
+        async with self._database.transaction() as tx:
+            await tx.execute(
+                "INSERT OR REPLACE INTO model_check_seeds (ref, working, total, at) "
+                "VALUES (?, ?, ?, ?)",
+                (ref, working, total, self._now().isoformat()),
+            )
+        self._cache = _Cache()
+
     async def _read(self) -> dict[str, Score]:
         window = {
             str(r[0]): (int(r[1]), int(r[2]))
@@ -130,19 +150,27 @@ class Scores:
         outcomes: dict[str, dict[str, int]] = {}
         for row in await self._database.fetch_all(_OUTCOMES):
             outcomes.setdefault(str(row[0]), {})[str(row[1])] = int(row[2])
+        seeds = {
+            str(r[0]): int(r[1]) / int(r[2])
+            for r in await self._database.fetch_all(_SEEDS)
+            if int(r[2]) > 0
+        }
         found: dict[str, Score] = {}
-        for ref in sorted(calls.keys() | outcomes.keys()):
+        for ref in sorted(calls.keys() | outcomes.keys() | seeds.keys()):
             count, runs = calls.get(ref, (0, 0))
             tools, bad = window.get(ref, (0, 0))
             counted = outcomes.get(ref, {})
+            real = tool_score_of(tools, bad)
+            seed = seeds.get(ref)
             found[ref] = Score(
                 calls=count,
                 tool_calls=tools,
                 bad_tool_calls=bad,
                 stepped_up=counted.get("stepped_up", 0),
                 retried=counted.get("retried_by_user", 0),
-                tool_score=tool_score_of(tools, bad),
+                tool_score=real if real is not None or seed is None else seed,
                 runs=runs,
+                seeded=real is None and seed is not None,
             )
         return found
 

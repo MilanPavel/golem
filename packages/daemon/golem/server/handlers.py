@@ -40,6 +40,7 @@ from golem.folders import FolderError, list_dirs
 from golem.mcp import McpServerError, McpSupervisor
 from golem.models import hardware, ollama
 from golem.models import options as model_options
+from golem.models.check import CheckError
 from golem.models.discovery import KeyRejected, KeyUnchecked
 from golem.models.errors import ModelUnreachable
 from golem.models.install import InstallError, OllamaInstaller
@@ -197,6 +198,8 @@ from golem_protocol.commands import (
     MessageSendParams,
     MessageSendResult,
     ModelCategory,
+    ModelCheckParams,
+    ModelCheckResult,
     ModelDeleteParams,
     ModelDeleteResult,
     ModelListParams,
@@ -1657,6 +1660,17 @@ async def _model_probe(ctx: RequestContext, params: ModelProbeParams) -> ModelPr
     )
 
 
+async def _model_check(ctx: RequestContext, params: ModelCheckParams) -> ModelCheckResult:
+    checks = ctx.state.checks
+    if checks is None:
+        raise RpcCallError(INTERNAL_ERROR, "checks are not ready")
+    try:
+        ref, started = checks.start(params.name)
+    except CheckError as exc:
+        raise RpcCallError(MODEL_NOT_CONFIGURED, str(exc)) from exc
+    return ModelCheckResult(ref=ref, started=started)
+
+
 async def _model_pull(ctx: RequestContext, params: ModelPullParams) -> ModelPullResult:
     try:
         ref, started = await _pulls(ctx).start(params.name)
@@ -1883,6 +1897,7 @@ def standard_methods() -> dict[str, Method]:
             "session.set_skills", SessionSetSkillsParams, True, _session_set_skills
         ),
         "model.probe": Method("model.probe", ModelProbeParams, True, _model_probe),
+        "model.check": Method("model.check", ModelCheckParams, True, _model_check),
         "model.pull": Method("model.pull", ModelPullParams, True, _model_pull),
         "model.pull_cancel": Method(
             "model.pull_cancel", ModelPullCancelParams, True, _model_pull_cancel
