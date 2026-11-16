@@ -303,7 +303,7 @@ function reduceChatEvent(state: ChatState, event: ChatEvent): ChatState {
             text: "",
             streaming: true,
             at: event.ts,
-            ...(event.run_id === null ? {} : { runId: event.run_id }),
+            ...(event.run_id == null ? {} : { runId: event.run_id }),
             ...callOf(state, event.data.message_id),
           },
         ],

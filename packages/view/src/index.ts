@@ -269,7 +269,9 @@ export {
 } from "./checks.ts";
 export {
   changedPaths,
+  CHANGES_ROW_WIDE,
   changesLine,
+  changesRow,
   noChanges,
   reduceChanges,
   totals,

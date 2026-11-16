@@ -114,6 +114,10 @@ import {
   type SetupWindow,
   providersUp,
   reduceChat,
+  reduceChanges,
+  changedPaths,
+  noChanges,
+  type ChangesState,
   unreadCallNotice,
   RETRY_QUESTION,
   serverUp,
@@ -460,6 +464,7 @@ export function App({
     }
   }, [connection, service]);
   const [chat, setChat] = useState<ChatState>(emptyChat);
+  const [changesState, setChangesState] = useState<ChangesState>(noChanges);
   const [hint, setHint] = useState<Hint | null>(null);
   useEffect(() => {
     if (hint === null) {
@@ -811,6 +816,9 @@ export function App({
     writingSeconds,
     checks: chat.checks,
     runId: chat.runId,
+    changes: changesState,
+    liveRunId: chat.busy ? chat.runId : null,
+    commands: COMMANDS.map((command) => command.name),
   };
   const measured = layoutTranscript(chat.messages, columns, chatHeight, offset, transcriptOptions);
   const widthKey = measured.overflow ? Math.max(1, columns - 1) : columns;
@@ -853,6 +861,7 @@ export function App({
       historyCursorRef.current = null;
       setHistoryCursor(null);
       setChat((current) => ({ ...emptyChat, notice: current.notice }));
+      setChangesState(noChanges);
       setSessionModel(null);
       setSessionCwd(null);
       setModelMessages([]);
@@ -963,6 +972,7 @@ export function App({
       model: chip,
       folder: cwd,
       messageCount: sessionId === null ? null : chat.messages.length,
+      changedFiles: sessionId === null ? 0 : changedPaths(changesState).length,
       uptimeSeconds,
       freshLines: followed.fresh,
       alert: alertLabel(chat.down, mcpAlert(mcp.servers)),
@@ -1221,6 +1231,7 @@ export function App({
         batcher.current?.flush();
       }
       setChat((current) => reduceChat(current, event));
+      setChangesState((current) => reduceChanges(current, event));
       if (event.type === "run.cancelled" && event.data.reason === "user") {
         showHint(CANCELLED_NOTICE);
       }
