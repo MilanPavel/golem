@@ -1,6 +1,7 @@
 import { ThemeSwitch } from "../../theme-switch.tsx";
 import { sessionPath, settingsPath } from "../../store/router.ts";
 import { installOffer } from "../../store/app-install.ts";
+import { useConnection } from "../../store/connection-context.tsx";
 import { useAppInstall, useNavigate } from "../../store/page-context.tsx";
 import { cn } from "../../ui/cn.ts";
 import { IconButton } from "../../ui/icon-button.tsx";
@@ -73,6 +74,7 @@ function Body({ section }: { section: string }) {
 export function SettingsScreen({ section }: { section: string }) {
   const navigate = useNavigate();
   const context = useSettingsContext();
+  const version = useConnection().daemonVersion;
   const current = SECTIONS.find((item) => item.id === section);
   const back = context === null ? "/" : sessionPath(context.sessionId);
   return (
@@ -100,6 +102,9 @@ export function SettingsScreen({ section }: { section: string }) {
             {item.title}
           </Link>
         ))}
+        {version === null ? null : (
+          <span className="my-auto ml-auto shrink-0 pl-4 font-mono text-xs whitespace-nowrap text-faint">golem v{version}</span>
+        )}
       </nav>
       <section className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto px-7 py-5">
         {current === undefined ? (

@@ -101,6 +101,6 @@ test("a model picked on the home screen is the session's model, and the next new
   await page.waitForURL(/\/s\/[^/]+$/);
   // The stub Ollama does not chat, so the run is not waited for: the session's model is what counts.
   await expect(chip(page)).toHaveAccessibleName(/^Model: .*llama3\.2/i);
-  await page.getByRole("complementary", { name: "Sessions" }).getByRole("button", { name: "New session", exact: true }).click();
+  await page.getByRole("navigation", { name: "Sidebar rail" }).getByRole("button", { name: "New session", exact: true }).click();
   await expect(page.getByRole("button", { name: /^Model: .*, default$/ })).toBeVisible();
 });

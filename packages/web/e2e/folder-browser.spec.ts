@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { expect, test } from "./fixtures.ts";
-import { answers, send, sessionsPanel, startStack } from "./stack.ts";
+import { answers, railConnected, send, sessionsPanel, startStack } from "./stack.ts";
 
 test("browse to a folder under home, use it, and the new session runs there", async ({ page, rig }) => {
   // The daemon lists the user's home folder, so the tree is a short-lived folder in it.
@@ -14,7 +14,7 @@ test("browse to a folder under home, use it, and the new session runs there", as
     const stack = await startStack(rig);
     stack.model.reply("Done.");
     await page.goto(stack.gateway.url);
-    await expect(page.getByText("connected", { exact: true })).toBeVisible();
+    await expect(railConnected(page)).toBeVisible();
 
     await page.getByRole("button", { name: /^Folder:/ }).click();
     await page.getByRole("menuitem", { name: "Choose a folder…" }).click();
@@ -48,7 +48,7 @@ test("browse to a folder under home, use it, and the new session runs there", as
 test("a folder outside home cannot be listed, and a typed path there is used as typed", async ({ page, rig }) => {
   const stack = await startStack(rig);
   await page.goto(stack.gateway.url);
-  await expect(page.getByText("connected", { exact: true })).toBeVisible();
+  await expect(railConnected(page)).toBeVisible();
   await page.getByRole("button", { name: /^Folder:/ }).click();
   await page.getByRole("menuitem", { name: "Choose a folder…" }).click();
   const browser = page.getByRole("dialog", { name: "Choose a folder" });

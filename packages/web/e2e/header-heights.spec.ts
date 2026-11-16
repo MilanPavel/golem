@@ -2,7 +2,7 @@ import { realpathSync } from "node:fs";
 import type { Locator } from "@playwright/test";
 
 import { expect, test } from "./fixtures.ts";
-import { startStack } from "./stack.ts";
+import { railConnected, startStack } from "./stack.ts";
 
 const bottom = async (el: Locator): Promise<number> => el.evaluate((node) => node.getBoundingClientRect().bottom);
 
@@ -10,9 +10,9 @@ test("the line under the top bar meets the line under a panel's header", async (
   const stack = await startStack(rig);
   const { session_id: sessionId } = await stack.second.client.createSession({ cwd: realpathSync(rig.home()) });
   await page.goto(stack.gateway.url);
-  await expect(page.getByText("connected", { exact: true })).toBeVisible();
+  await expect(railConnected(page)).toBeVisible();
   await page.goto(new URL(`/s/${sessionId}`, stack.gateway.url).href);
-  await expect(page.getByText("connected", { exact: true })).toBeVisible();
+  await expect(railConnected(page)).toBeVisible();
 
   const topBar = page.locator("main header").first();
 

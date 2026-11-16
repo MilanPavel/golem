@@ -2,7 +2,7 @@ import { realpathSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 import { expect, test } from "./fixtures.ts";
-import { answers, composer, startStack } from "./stack.ts";
+import { answers, composer, railConnected, startStack } from "./stack.ts";
 
 const NAME = "llama3.2:3b";
 const TURNS = 6;
@@ -14,9 +14,9 @@ test("a few large tool results fill the context, and Clear in the chip's popover
   for (let at = 0; at < TURNS; at += 1) writeFileSync(path.join(dir, `big-${at}.txt`), Array.from({ length: 250 }, (_, row) => `row ${at}.${row} of a file that is long`).join("\n"));
 
   await page.goto(stack.gateway.url);
-  await expect(page.getByText("connected", { exact: true })).toBeVisible();
+  await expect(railConnected(page)).toBeVisible();
   await page.goto(new URL(`/s/${sessionId}`, stack.gateway.url).href);
-  await expect(page.getByText("connected", { exact: true })).toBeVisible();
+  await expect(railConnected(page)).toBeVisible();
 
   // The first answer teaches golem the window; before it, golem clears early to be safe.
   await composer(page).fill("hello");

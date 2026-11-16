@@ -1,4 +1,4 @@
-export { ConnectionLine } from "./connection-line.tsx";
+export { ConnectionStrip } from "./connection-strip.tsx";
 export { ConnectionScreen } from "./connection-screen.tsx";
 export {
   connectionScreen,

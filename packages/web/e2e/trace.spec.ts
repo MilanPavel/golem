@@ -4,14 +4,14 @@ import type { Page } from "@playwright/test";
 
 import { axeViolations } from "./axe.ts";
 import { expect, test } from "./fixtures.ts";
-import { answers, composer, setTheme, startStack } from "./stack.ts";
+import { answers, composer, railConnected, setTheme, startStack } from "./stack.ts";
 
 /** The gateway link carries the login, so open it first, then the session. */
 async function openSession(page: Page, url: string, sessionId: string): Promise<void> {
   await page.goto(url);
-  await expect(page.getByText("connected", { exact: true })).toBeVisible();
+  await expect(railConnected(page)).toBeVisible();
   await page.goto(new URL(`/s/${sessionId}`, url).href);
-  await expect(page.getByText("connected", { exact: true })).toBeVisible();
+  await expect(railConnected(page)).toBeVisible();
 }
 
 test("a run that used a tool shows as a run, a model call, and a tool call in the inspector, and on the trace page", async ({ page, rig }) => {

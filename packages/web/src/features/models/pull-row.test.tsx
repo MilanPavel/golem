@@ -68,7 +68,7 @@ test("a download shows in the sidebar on home, in a session and in Settings, and
   await user.click(within(sidebar()).getByRole("link", { name: /UTF-8 split/ }));
   expect(location.pathname).toBe("/s/a");
   expect(row()).not.toBeNull();
-  await user.click(within(sidebar()).getByRole("button", { name: /^Settings/ }));
+  await user.click(within(screen.getByRole("navigation", { name: "Sidebar rail" })).getByRole("button", { name: "Settings" }));
   expect(location.pathname).toBe("/settings");
   expect(row()).not.toBeNull();
   done(fake, true);

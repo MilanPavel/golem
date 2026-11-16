@@ -2,7 +2,7 @@ import { readFileSync, realpathSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 import { expect, test } from "./fixtures.ts";
-import { startStack } from "./stack.ts";
+import { railConnected, startStack } from "./stack.ts";
 
 test("the default route set in Settings is the route of the next new session", async ({ page, rig }) => {
   const stack = await startStack(rig);
@@ -16,7 +16,7 @@ test("the default route set in Settings is the route of the next new session", a
   expect(first?.route).toBe("pinned");
 
   await page.goto(stack.gateway.url);
-  await expect(page.getByText("connected", { exact: true })).toBeVisible();
+  await expect(railConnected(page)).toBeVisible();
   await page.goto(new URL("/settings/routing", stack.gateway.url).href);
   await expect(page.getByRole("heading", { name: "How a new chat picks its model" })).toBeVisible();
   await page.getByRole("radio", { name: /^Local only/ }).click();

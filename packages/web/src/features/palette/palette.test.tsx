@@ -262,10 +262,9 @@ test("with no composer on screen the palette lists the commands, says so, and En
   expect(screen.getByRole("dialog", { name: "Commands" })).toBeTruthy();
 });
 
-test("the sidebar's Search button opens it, and focus returns to the button", async () => {
+test("the rail's Search button opens it, and focus returns to the button", async () => {
   const { user } = setup("/");
-  const button = screen.getByRole("button", { name: /Search or run a command/ });
-  expect(button.querySelector("kbd")?.textContent).toBe("Ctrl K");
+  const button = screen.getByRole("button", { name: "Search Ctrl K" });
   await user.click(button);
   await screen.findByRole("dialog", { name: "Commands" });
   await user.keyboard("{Escape}");
@@ -273,11 +272,11 @@ test("the sidebar's Search button opens it, and focus returns to the button", as
   expect(document.activeElement).toBe(button);
 });
 
-test("the Search button shows ⌘K on macOS, and New session has no ⌘N hint", async () => {
+test("the Search button names ⌘K on macOS, and New session has no ⌘N hint", async () => {
   vi.spyOn(navigator, "platform", "get").mockReturnValue("MacIntel");
   setup("/");
-  expect(screen.getByRole("button", { name: /Search or run a command/ }).querySelector("kbd")?.textContent).toBe("⌘K");
-  expect(screen.getByRole("button", { name: /New session/ }).querySelector("kbd")).toBeNull();
+  expect(screen.getByRole("button", { name: "Search ⌘K" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "New session" }).querySelector("kbd")).toBeNull();
   expect(screen.queryByText("⌘N")).toBeNull();
 });
 
@@ -300,7 +299,7 @@ test("? typed in a field is a character, not the key list", async () => {
   await user.keyboard("why?");
   expect(box().value).toBe("why?");
   expect(screen.queryByRole("dialog")).toBeNull();
-  await user.click(screen.getByRole("button", { name: /Search or run a command/ }));
+  await user.click(screen.getByRole("button", { name: /^Search / }));
   await screen.findByRole("dialog", { name: "Commands" });
   await user.keyboard("?");
   expect(search().value).toBe("?");

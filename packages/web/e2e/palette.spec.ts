@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 
 import { expect, test } from "./fixtures.ts";
-import { answers, composer, firstMessage, send, sessionId, sessionsPanel, startStack } from "./stack.ts";
+import { answers, composer, firstMessage, railConnected, send, sessionId, sessionsPanel, startStack } from "./stack.ts";
 
 const KEY = process.platform === "darwin" ? "Meta+K" : "Control+K";
 
@@ -12,14 +12,14 @@ const status = (page: Page) => page.getByRole("status");
 test("the palette opens with the key and with the sidebar button, and Escape closes it", async ({ page, rig }) => {
   const { gateway } = await startStack(rig);
   await page.goto(gateway.url);
-  await expect(page.getByText("connected", { exact: true })).toBeVisible();
+  await expect(railConnected(page)).toBeVisible();
   await page.keyboard.press(KEY);
   await expect(paletteSearch(page)).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(palette(page)).toBeHidden();
   await expect(composer(page)).toBeFocused();
 
-  await page.getByRole("button", { name: /Search or run a command/ }).click();
+  await page.getByRole("button", { name: /^Search / }).click();
   await expect(paletteSearch(page)).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(palette(page)).toBeHidden();
@@ -58,7 +58,7 @@ test("a palette command can open another dialog: /model", async ({ page, rig }) 
 test("slash commands typed in the composer: /title, /fork, and no session", async ({ page, rig }) => {
   const { model, gateway, second } = await startStack(rig);
   await page.goto(gateway.url);
-  await expect(page.getByText("connected", { exact: true })).toBeVisible();
+  await expect(railConnected(page)).toBeVisible();
   await send(page, "/fork");
   await expect(status(page)).toContainText("Start a session first: send a message.");
 

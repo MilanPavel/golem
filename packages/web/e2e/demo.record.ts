@@ -13,6 +13,7 @@ import { DEMO_ASK, demoConfig, queueDemo, startDemoDaemon, writeDemoProject } fr
 import { startFakeModel } from "./fake-model.ts";
 import { expect, test } from "./fixtures.ts";
 import { startGateway, startSecondClient, writeConfig } from "./harness.ts";
+import { railConnected } from "./stack.ts";
 
 const FRAMES = process.env.DEMO_FRAMES ?? path.resolve("test-results/demo/frames");
 
@@ -65,9 +66,9 @@ test("record the web UI demo", async ({ page, rig }) => {
   queueDemo(model);
 
   await page.goto(gateway.url);
-  await expect(page.getByText("connected", { exact: true })).toBeVisible();
+  await expect(railConnected(page)).toBeVisible();
   await page.goto(new URL(`/s/${id}`, gateway.url).href);
-  await expect(page.getByText("connected", { exact: true })).toBeVisible();
+  await expect(railConnected(page)).toBeVisible();
   const hide = page.locator("header").getByRole("button", { name: "Hide details" });
   if (await hide.isVisible()) await hide.click();
   await page.waitForTimeout(300);

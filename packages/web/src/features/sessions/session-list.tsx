@@ -1,26 +1,15 @@
-import { setupProblem } from "@golem/view";
-import { useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 import { cn } from "../../ui/cn.ts";
-import { Button } from "../../ui/button.tsx";
-import { GOLEM_STATE_LABEL } from "../../ui/golem-state.ts";
 import { IconButton } from "../../ui/icon-button.tsx";
-import { FolderIcon, GearIcon, MoreIcon, PlusIcon, SearchIcon } from "../../ui/icons.tsx";
-import { Kbd } from "../../ui/kbd.tsx";
+import { FolderIcon, MoreIcon } from "../../ui/icons.tsx";
 import { Link } from "../../ui/link.tsx";
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "../../ui/menu.tsx";
-import { PixelGolem } from "../../ui/pixel-golem.tsx";
-import { isMac, modShortcut } from "../../ui/platform.ts";
-import type { ConnectionSnapshot } from "../../store/connection.ts";
-import { useConnection } from "../../store/connection-context.tsx";
-import { useNavigate, useRoute, useSessionList, useSetupStatus } from "../../store/page-context.tsx";
+import { useNavigate, useRoute, useSessionList } from "../../store/page-context.tsx";
 import { groupByFolder, type SessionSummary } from "../../store/session-list.ts";
-import { sessionPath, settingsPath } from "../../store/router.ts";
-import { ConnectionLine } from "../connection/index.ts";
-import { NewSessionModelDialog, PullStatus } from "../models/index.ts";
+import { sessionPath } from "../../store/router.ts";
 import { CloseSessionDialog } from "./close-dialog.tsx";
 import { folderName } from "./folder.ts";
 import { forkRows, type ForkRow } from "./fork-tree.ts";
-import { overallState } from "./overall-state.ts";
 import { RenameField } from "./rename-field.tsx";
 import { useSessionActions } from "./use-session-actions.ts";
 import { timeAgo } from "./time-ago.ts";
@@ -212,119 +201,41 @@ function FolderGroup({
   );
 }
 
-export type SidebarViewProps = {
+export type SessionListProps = {
   sessions: readonly SessionSummary[];
   /** The session in view, if any. */
   selectedId: string | null;
-  connection: ConnectionSnapshot;
   now: number;
   onNavigate: (path: string) => void;
-  /** The landmark's name. A page has one sidebar; the gallery shows several and names each. */
-  label?: string;
   /** Rename and close from each row's menu. Without it the rows have no menu. */
   actions?: SidebarActions;
-  /** Opens the command palette; `trigger` is the button, for focus afterwards. Without it there is no Search button. */
-  onSearch?: (trigger: HTMLElement) => void;
-  /** What is wrong with the setup, in a line, or null. It shows under the Settings button. */
-  setupProblem?: string | null;
-  /** The settings page is the one in view. */
-  settingsOpen?: boolean;
-  /** The download row. It shows above the Settings button. */
-  downloads?: ReactNode;
 };
 
-/** The Settings button: a gear, and when the setup has a problem, a dot and the problem as text. */
-function SettingsButton({ problem, open, onNavigate }: { problem: string | null; open: boolean; onNavigate: (path: string) => void }) {
-  return (
-    <Button kind="ghost" className="w-full justify-start" aria-current={open ? "page" : undefined} onClick={() => onNavigate(settingsPath())}>
-      <GearIcon />
-      <span className="flex min-w-0 flex-col items-start text-left">
-        <span className="flex items-center gap-2">
-          {problem === null ? null : <span aria-hidden="true" className="size-2 rounded-xs bg-wait" />}
-          Settings
-          {problem === null ? null : <span className="sr-only">, {problem}</span>}
-        </span>
-        {problem === null ? null : (
-          <span aria-hidden="true" title={problem} className="max-w-full truncate text-xs text-muted">
-            {problem}
-          </span>
-        )}
-      </span>
-    </Button>
-  );
-}
-
-/** The sidebar of docs/design/index.md: golem's state, New session, sessions by folder, the connection and Settings. */
-export function SidebarView({
-  sessions,
-  selectedId,
-  connection,
-  now,
-  onNavigate,
-  label = "Sessions",
-  actions,
-  onSearch,
-  setupProblem: problem = null,
-  settingsOpen = false,
-  downloads,
-}: SidebarViewProps) {
+/** The sessions by folder, closed ones left out, with the dialog that confirms a close. */
+export function SessionList({ sessions, selectedId, now, onNavigate, actions }: SessionListProps) {
   const [closing, setClosing] = useState<SessionSummary | null>(null);
-  // Where focus goes when the dialog shuts: the row's menu button, or New session once the row is gone.
+  // Where focus goes when the dialog shuts: the row's menu button, or the list once the row is gone.
   const closeTrigger = useRef<HTMLButtonElement | null>(null);
-  const newSession = useRef<HTMLButtonElement>(null);
+  const list = useRef<HTMLDivElement>(null);
   const askClose: AskClose = (session, trigger) => {
     closeTrigger.current = trigger;
     setClosing(session);
   };
   const shown = sessions.filter((session) => session.status !== "closed");
-  const state = overallState(connection.state.status === "connected", shown);
   return (
-    <aside
-      aria-label={label}
-      className="flex h-full w-sidebar min-w-40 shrink flex-col gap-2.5 border-r border-line bg-sunken px-2.5 pt-3.5 pb-2.5 text-sm"
-    >
-      <div className="flex items-center gap-2.5 px-1.5 py-1">
-        <PixelGolem state={state} size="sm" />
-        <span className="text-lg leading-none font-semibold tracking-tight">golem</span>
-        <span className="ml-auto font-mono text-xs text-muted">{GOLEM_STATE_LABEL[state]}</span>
-      </div>
-      <Button ref={newSession} className="w-full justify-start" onClick={() => onNavigate("/")}>
-        <PlusIcon />
-        New session
-      </Button>
-      {onSearch ? (
-        <Button
-          kind="ghost"
-          className="w-full justify-start"
-          aria-keyshortcuts={isMac() ? "Meta+K" : "Control+K"}
-          onClick={(event) => onSearch(event.currentTarget)}
-        >
-          <SearchIcon />
-          <span className="truncate">Search or run a command</span>
-          <Kbd className="ml-auto" aria-hidden="true">
-            {modShortcut("K")}
-          </Kbd>
-        </Button>
-      ) : null}
-      <div className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto pr-0.5">
-        {groupByFolder(shown).map((group) => (
-          <FolderGroup
-            key={group.folder ?? ""}
-            folder={group.folder}
-            sessions={group.sessions}
-            selectedId={selectedId}
-            now={now}
-            onNavigate={onNavigate}
-            onRename={actions?.rename}
-            onAskClose={actions ? askClose : undefined}
-          />
-        ))}
-      </div>
-      <div className="flex flex-col gap-2 border-t border-line px-2 pt-2.5">
-        {downloads}
-        <SettingsButton problem={problem} open={settingsOpen} onNavigate={onNavigate} />
-        <ConnectionLine snapshot={connection} />
-      </div>
+    <div ref={list} tabIndex={-1} className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto pr-0.5 outline-none">
+      {groupByFolder(shown).map((group) => (
+        <FolderGroup
+          key={group.folder ?? ""}
+          folder={group.folder}
+          sessions={group.sessions}
+          selectedId={selectedId}
+          now={now}
+          onNavigate={onNavigate}
+          onRename={actions?.rename}
+          onAskClose={actions ? askClose : undefined}
+        />
+      ))}
       {actions ? (
         <CloseSessionDialog
           open={closing !== null}
@@ -336,43 +247,29 @@ export function SidebarView({
             event.preventDefault();
             const trigger = closeTrigger.current;
             closeTrigger.current = null;
-            (trigger?.isConnected ? trigger : newSession.current)?.focus();
+            (trigger?.isConnected ? trigger : list.current)?.focus();
           }}
         />
       ) : null}
-    </aside>
+    </div>
   );
 }
 
-/** The sidebar on the live page. It refreshes its "2m" labels once a minute. */
-export function Sidebar({ onSearch }: { onSearch?: (trigger: HTMLElement) => void }) {
+/** The session list on the live page. It refreshes its "2m" labels once a minute. */
+export function LiveSessionList() {
   const sessions = useSessionList();
   const route = useRoute();
   const navigate = useNavigate();
-  const connection = useConnection();
   const now = useNow();
   const { rename, close } = useSessionActions();
   const actions = useMemo(() => ({ rename, close }), [rename, close]);
-  // A failed or loading query shows nothing: the connection line already says when the daemon is gone.
-  const status = useSetupStatus();
-  const problem = status.isError || status.data === undefined ? null : setupProblem(status.data.rows);
   return (
-    <SidebarView
+    <SessionList
       sessions={sessions}
       selectedId={route.name === "session" ? route.id : null}
-      connection={connection}
       now={now}
       onNavigate={navigate}
       actions={actions}
-      onSearch={onSearch}
-      setupProblem={problem}
-      settingsOpen={route.name === "settings"}
-      downloads={
-        <>
-          <PullStatus />
-          <NewSessionModelDialog />
-        </>
-      }
     />
   );
 }

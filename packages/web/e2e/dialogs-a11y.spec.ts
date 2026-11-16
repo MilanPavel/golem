@@ -2,7 +2,7 @@ import type { Locator, Page } from "@playwright/test";
 
 import { axeViolations } from "./axe.ts";
 import { expect, test } from "./fixtures.ts";
-import { answers, firstMessage, send, setTheme, startStack } from "./stack.ts";
+import { answers, firstMessage, railConnected, send, setTheme, startStack } from "./stack.ts";
 
 const KEY = process.platform === "darwin" ? "Meta+K" : "Control+K";
 const INSTALLED = "llama3.2:3b";
@@ -40,7 +40,7 @@ for (const [theme, label] of THEMES) {
   test(`no serious accessibility violations on the palette in the ${label} theme`, async ({ page, rig }) => {
     const { model, gateway } = await startStack(rig);
     await page.goto(gateway.url);
-    await expect(page.getByText("connected", { exact: true })).toBeVisible();
+    await expect(railConnected(page)).toBeVisible();
     await setTheme(page, theme);
     await page.keyboard.press(KEY);
     await expect(page.getByRole("dialog", { name: "Commands" })).toBeVisible();

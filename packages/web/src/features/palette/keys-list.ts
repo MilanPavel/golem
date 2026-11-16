@@ -12,6 +12,7 @@ export function keySections(): KeySection[] {
       rows: [
         { keys: [modShortcut("K")], label: "the palette" },
         { keys: [modShortcut(".")], label: "the trace inspector, in a session" },
+        { keys: [modShortcut("B")], label: "hide or show the sidebar" },
         { keys: ["?"], label: "this list" },
         { keys: ["Esc"], label: "close a dialog or the inspector" },
       ],

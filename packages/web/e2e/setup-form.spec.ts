@@ -4,7 +4,7 @@ import type { Page } from "@playwright/test";
 
 import { axeViolations } from "./axe.ts";
 import { expect, test } from "./fixtures.ts";
-import { setTheme, startStack } from "./stack.ts";
+import { railConnected, setTheme, startStack } from "./stack.ts";
 
 const NAME = "llama3.2:3b";
 
@@ -15,8 +15,8 @@ const picker = (page: Page) => page.getByRole("dialog", { name: "Choose a model"
 async function open(page: Page, url: string): Promise<void> {
   // The gateway's link carries a token, so the page is reached by it and then by the sidebar.
   await page.goto(url);
-  await expect(page.getByText("connected", { exact: true })).toBeVisible();
-  await page.getByRole("complementary", { name: "Sessions" }).getByRole("button", { name: /^Settings/ }).click();
+  await expect(railConnected(page)).toBeVisible();
+  await page.getByRole("navigation", { name: "Sidebar rail" }).getByRole("button", { name: "Settings" }).click();
   await expect(page).toHaveURL(/\/settings$/);
   await expect(cards(page)).toBeVisible();
 }
