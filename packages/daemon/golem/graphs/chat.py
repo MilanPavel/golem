@@ -101,10 +101,25 @@ log = logging.getLogger("golem.graphs")
 OPTIONS_KEY = "golem_model_options"
 """The ``configurable`` key with the session's Ollama option overrides, for each model call."""
 
+GROWTH_KEY = "golem_window_growth"
+"""The ``configurable`` key with the turn's :class:`Growth`, when its window grew."""
+
 INTERRUPTED_KEY = "golem_interrupted"
 """``response_metadata`` flag on a reply the run did not finish."""
 
 _ASSISTANT_ID = "golem_assistant_message_id"
+
+
+@dataclass(slots=True)
+class Growth:
+    """The planned window of a local model went up between turns, from ``window_from`` to
+    ``window_to``. The first call of the turn loads it and says so, and ``reported`` is then true.
+    """
+
+    window_from: int
+    window_to: int
+    reported: bool = False
+
 
 MAX_MODEL_CALLS = 25
 """Model calls in one run before it stops. Each tool round is one more."""
@@ -248,6 +263,7 @@ class ChatRuntime:
         checks: bool | None = None,
         plan_first: bool = False,
         local_only: bool = False,
+        growth: Growth | None = None,
     ) -> AsyncGenerator[object]:
         """Stream one user turn. The first turn writes the state fields.
 
@@ -278,6 +294,7 @@ class ChatRuntime:
                 CHECKS_KEY: checks,
                 PLAN_KEY: plan_first,
                 LOCAL_ONLY_KEY: local_only,
+                GROWTH_KEY: growth,
             },
             "recursion_limit": _RECURSION_LIMIT,
         }
@@ -772,8 +789,19 @@ def open_chat(
                     request["tools_sha"] = await blobs.put("tools", text)
             request.update(_sizes(system, history, schemas if binder.offers(profile) else []))
             get_stream_writer()(request)
+            growth = _growth(config)
             try:
                 async with _gated(router, gate, profile, message_id):
+                    if growth is not None:
+                        get_stream_writer()(
+                            {
+                                STREAM_KEY: "model.waiting",
+                                "message_id": message_id,
+                                "waiting": True,
+                                "model": router.resolve(profile).model_id,
+                                "window": growth.window_to,
+                            }
+                        )
                     response = await binder.invoke(
                         profile, router.chat_model(profile, overrides), sent, schemas
                     )
@@ -827,6 +855,20 @@ def open_chat(
         if timings:
             response_item["timings"] = timings
         get_stream_writer()(response_item)
+        if growth is not None:
+            growth.reported = True
+            get_stream_writer()(
+                {STREAM_KEY: "model.waiting", "message_id": message_id, "waiting": False}
+            )
+            get_stream_writer()(
+                {
+                    STREAM_KEY: "context.changed",
+                    "action": "grew",
+                    "window_from": growth.window_from,
+                    "window_to": growth.window_to,
+                    "reload_ms": timings.get("load_ms"),
+                }
+            )
         result: dict[str, object] = {"messages": [response.model_copy(update=update)]}
         if current is not original:
             result["context_view"] = current
@@ -1271,6 +1313,12 @@ def _outgoing(
 def _local_only(config: RunnableConfig) -> bool:
     """Whether the session stays on this Mac."""
     return cast(Mapping[str, object], config.get("configurable", {})).get(LOCAL_ONLY_KEY) is True
+
+
+def _growth(config: RunnableConfig) -> Growth | None:
+    """The turn's window growth that no call has reported yet."""
+    raw = cast(Mapping[str, object], config.get("configurable", {})).get(GROWTH_KEY)
+    return raw if isinstance(raw, Growth) and not raw.reported else None
 
 
 def _plan(config: RunnableConfig) -> bool:

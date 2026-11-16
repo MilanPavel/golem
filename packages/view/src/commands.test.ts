@@ -395,6 +395,7 @@ test("every command has a group and the names are unique", () => {
 test("/context opens the context panel, and /context clear clears old tool results", () => {
   assert.deepEqual(applyComposer(closedDebug, "/context"), { kind: "context" });
   assert.deepEqual(applyComposer(closedDebug, "/context clear"), { kind: "compact", action: "clear", focus: null });
+  assert.deepEqual(applyComposer(closedDebug, "/context grow"), { kind: "compact", action: "grow", focus: null });
   assert.equal(applyComposer(closedDebug, "/context x").kind, "unknown");
   assert.equal(applyComposer(closedDebug, "/context clear x").kind, "unknown");
 });

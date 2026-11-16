@@ -30,6 +30,11 @@ test("waiting for you, with no clock", () => {
   expect(screen.getByText("waiting for you")).toBeTruthy();
 });
 
+test("while the model loads with a larger window, the meter says which", () => {
+  render(<Meter state="thinking" runStartedAt={START} localWait loading="loading qwen3:8b with a 64K window" />);
+  expect(screen.getByText("loading qwen3:8b with a 64K window")).toBeTruthy();
+});
+
 test("elapsed seconds never go below zero or come out as NaN", () => {
   expect(elapsedSeconds(null, 5000)).toBe(0);
   expect(elapsedSeconds("nonsense", 5000)).toBe(0);

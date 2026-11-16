@@ -1132,3 +1132,24 @@ test("a notice before any message is at the top", () => {
   assert.equal(state.notices[0]?.afterId, null);
   assert.equal(state.notices[0]?.text, "window grew 32K → 64K · reloaded in 8 s");
 });
+
+test("a call that loads the model with a larger window shows it until the first token, then the chat says it grew", () => {
+  const base = { session_id: "s", run_id: "r", ts: "t" } as const;
+  const loading: ChatEvent = {
+    ...base,
+    seq: 2,
+    type: "model.waiting",
+    data: { message_id: "a", waiting: true, model: "qwen3:8b", window: 65_536 },
+  };
+  const on = reduceChat(emptyChat, loading);
+  assert.deepEqual(on.loading, { model: "qwen3:8b", window: 65_536 });
+  const delta: ChatEvent = { ...base, seq: 3, type: "message.delta", data: { message_id: "a", text: "hi" } };
+  assert.equal(reduceChat(on, delta).loading, null);
+  const grew: ChatEvent = {
+    ...base,
+    seq: 4,
+    type: "context.changed",
+    data: { action: "grew", window_from: 32_768, window_to: 65_536, reload_ms: 8_200 },
+  };
+  assert.equal(reduceChat(on, grew).notices[0]?.text, "window grew 32K → 64K · reloaded in 8 s");
+});

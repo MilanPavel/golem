@@ -147,6 +147,7 @@ The line under an answer ends with the model, `local` for a model on your machin
 | `/cost` | What model calls cost: this session, today, the week, the week by model, and what running locally saved. In the web UI it opens Settings → Usage |
 | `/compact [focus]` | Replace the old turns with a summary, so the next call sends less. `focus` is what the summary must keep, such as `/compact the file names and the plan`. The last turns stay as they are |
 | `/context clear` | Send old tool results as one line each, keeping the newest few, so the next call sends less |
+| `/context grow` | Give a local model the next larger window on the next turn, if this Mac can hold it. It reloads the model |
 | `/time` | Show or hide the time beside each message |
 | `/thinking` | Show or hide the thinking line above each answer. It only changes what you see; the `think` setting in `/tune` is what the model is asked to do |
 | `/detail [quiet\|normal\|verbose]` | Web UI: how much of a turn's tool steps shows. Quiet is the step count, Normal a one-line summary you can open, Verbose opens every step with its arguments and output. Alone, it says the current level |

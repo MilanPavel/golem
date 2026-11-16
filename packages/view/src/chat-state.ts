@@ -174,6 +174,8 @@ export type ChatState = {
   retry: { text: string; provider: string } | null;
   /** True while a chat call waits for its turn on a local model, from `model.waiting`. */
   localWait: boolean;
+  /** What a call loads while the model reloads with a larger window, from `model.waiting`. */
+  loading: { model: string; window: number } | null;
   /** True after a model call wrote a tool call as text that golem could not read, until the next run starts. */
   unreadCall: boolean;
   /** The context of the newest model call that reported its input, from the `model.call.*` events. */
@@ -207,6 +209,7 @@ export const emptyChat: ChatState = {
   down: null,
   retry: null,
   localWait: false,
+  loading: null,
   unreadCall: false,
   context: emptyLiveContext,
   calls: {},
@@ -376,8 +379,14 @@ function reduceChatEvent(state: ChatState, event: ChatEvent): ChatState {
       return appendDelta(notWaiting(state), event.data.message_id, event.data.text);
     case "message.thinking.delta":
       return appendThinking(notWaiting(state), event.data.message_id, event.data.text);
-    case "model.waiting":
-      return event.data.waiting === state.localWait ? state : { ...state, localWait: event.data.waiting };
+    case "model.waiting": {
+      const { waiting, model, window } = event.data;
+      const loading = waiting && model != null && window != null ? { model, window } : null;
+      if (waiting === state.localWait && loading?.model === state.loading?.model && loading?.window === state.loading?.window) {
+        return state;
+      }
+      return { ...state, localWait: waiting, loading };
+    }
     case "message.completed":
       return { ...notWaiting(state), messages: upsertCompleted(state.messages, event, state.runStartedAt, state.calls) };
     case "context.changed": {
@@ -757,7 +766,7 @@ function upsertCompleted(
 }
 
 function notWaiting(state: ChatState): ChatState {
-  return state.localWait ? { ...state, localWait: false } : state;
+  return state.localWait || state.loading !== null ? { ...state, localWait: false, loading: null } : state;
 }
 
 function withoutWriting(message: ChatMessage): ChatMessage {

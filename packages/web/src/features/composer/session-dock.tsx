@@ -1,4 +1,4 @@
-import { golemState, withNotes, type PermissionMode } from "@golem/view";
+import { golemState, loadingLine, withNotes, type PermissionMode } from "@golem/view";
 import { useMutation } from "@tanstack/react-query";
 import { useConnection } from "../../store/connection-context.tsx";
 import { actionErrorText, sendErrorText } from "../../store/errors.ts";
@@ -24,6 +24,7 @@ type Run = {
   runStartedAt: string | null;
   waiting: boolean;
   localWait: boolean;
+  loading: string | null;
   failed: boolean;
 };
 
@@ -33,6 +34,7 @@ const selectRun = ({ chat }: SessionView): Run => ({
   runStartedAt: chat.runStartedAt,
   waiting: chat.approval !== null || chat.consent !== null,
   localWait: chat.localWait,
+  loading: chat.loading === null ? null : loadingLine(chat.loading.model, chat.loading.window),
   failed: chat.error !== null,
 });
 
@@ -45,6 +47,7 @@ const sameRun = (a: Run, b: Run): boolean =>
   a.runStartedAt === b.runStartedAt &&
   a.waiting === b.waiting &&
   a.localWait === b.localWait &&
+  a.loading === b.loading &&
   a.failed === b.failed;
 
 /** The dock of a session: the meter, the composer, and the key hints. */
@@ -107,7 +110,7 @@ export function SessionDock({ sessionId }: { sessionId: string }) {
         busy={run.busy}
         error={line}
         notice={commands.notice}
-        meter={<Meter state={state} runStartedAt={run.runStartedAt} localWait={run.localWait} aside={
+        meter={<Meter state={state} runStartedAt={run.runStartedAt} localWait={run.localWait} loading={run.loading} aside={
               <span className="flex items-center gap-2">
                 <NotesChip sessionId={sessionId} />
                 <TuneChip sessionId={sessionId} />

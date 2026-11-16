@@ -5,6 +5,8 @@ export type BeforeTokens = number;
 export type Count = number;
 export type Model = string | null;
 export type Window = number | null;
+export type WindowFrom = number | null;
+export type WindowTo = number | null;
 
 /**
  * What the compaction did.
@@ -12,7 +14,10 @@ export type Window = number | null;
  * ``count`` is the tool results cleared, or the turns summarised, and 0 when there was
  * nothing to do (``before_tokens`` and ``after_tokens`` are then equal, and no event is
  * stored). ``window`` is the tokens the history may fill (the model's window less the
- * reply reserve), None when it is unknown. ``model`` is the model that wrote a summary.
+ * reply reserve), None when it is unknown. ``model`` is the model that wrote a summary, or
+ * the model whose window ``grow`` moved. For ``grow``, ``count`` is 0, ``window_from`` and
+ * ``window_to`` are the planned windows before and after, and ``window`` is the room of the
+ * new one. Both are None for the other actions.
  */
 export interface SessionCompactResult {
   after_tokens: AfterTokens;
@@ -20,4 +25,6 @@ export interface SessionCompactResult {
   count: Count;
   model?: Model;
   window?: Window;
+  window_from?: WindowFrom;
+  window_to?: WindowTo;
 }

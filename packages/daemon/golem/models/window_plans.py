@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Protocol
 
 from golem.config import ContextSettings
-from golem.models.window_plan import plan_window, step_down
+from golem.models.window_plan import next_step, plan_window, step_down
 
 log = logging.getLogger(__name__)
 
@@ -83,6 +83,23 @@ class WindowPlans:
         self._saved[model_id] = {"lowered_to": lower}
         self._write()
         return self.planned(model_id)
+
+    def next_up(self, model_id: str) -> int | None:
+        """The window one step above the plan that this Mac holds, or None.
+
+        None too when the plan is a number the user set, or there is no plan. A window the
+        model spilled at (``lowered_to``) is never grown past.
+        """
+        if self._settings().window != "auto":
+            return None
+        current = self.planned(model_id)
+        if current is None:
+            return None
+        model_max, size_gb = self._facts(model_id)
+        lowered = self._saved.get(model_id, {}).get("lowered_to")
+        return next_step(
+            current, model_max=model_max, size_gb=size_gb, ram_gb=self._ram_gb, lowered_to=lowered
+        )
 
     def raised(self, model_id: str, to: int) -> None:
         """Remember that ``model_id`` ran well at ``to``, which is now its plan."""

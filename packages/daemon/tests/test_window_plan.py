@@ -6,6 +6,7 @@ from golem.models.window_plan import (
     CEILING,
     next_step,
     plan_window,
+    should_grow,
     spilled,
     step_down,
 )
@@ -70,3 +71,34 @@ def test_the_plan_respects_the_limits(ram: float, model_max: int | None) -> None
         if plan is not None:
             assert plan <= CEILING
             assert plan <= (model_max or CEILING)
+
+
+def _grow(**changes: int) -> bool:
+    found = {
+        "used": 25000,
+        "window": 32768,
+        "reserve": 4096,
+        "clears_this_session": 2,
+        "summaries_this_session": 0,
+    }
+    found.update(changes)
+    return should_grow(**found)
+
+
+def test_should_grow_when_full_after_two_clears_or_one_summary() -> None:
+    assert _grow() is True
+    assert _grow(clears_this_session=0, summaries_this_session=1) is True
+
+
+def test_should_not_grow_with_the_cheap_means_unused() -> None:
+    assert _grow(clears_this_session=1, summaries_this_session=0) is False
+    assert _grow(clears_this_session=0, summaries_this_session=0) is False
+
+
+def test_should_not_grow_below_four_fifths_of_the_room() -> None:
+    assert _grow(window=24576, used=16384) is True
+    assert _grow(window=24576, used=16383) is False
+
+
+def test_should_not_grow_with_no_room() -> None:
+    assert _grow(window=4096) is False

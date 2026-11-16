@@ -3,7 +3,7 @@ import { COMPACTING, compactLine, type CompactAction } from "@golem/view";
 
 /** What the notice line says while the call runs. */
 export function compactWaiting(action: CompactAction): string {
-  return action === "summarise" ? COMPACTING : "clearing …";
+  return action === "summarise" ? COMPACTING : action === "grow" ? "growing the window …" : "clearing …";
 }
 
 /**

@@ -163,6 +163,7 @@ import {
   sessionCostLabel,
   costReportLines,
   tryTitle,
+  loadingLine,
   type TryRun,
 } from "@golem/view";
 import { compactWaiting, runCompact } from "./compact.ts";
@@ -4276,7 +4277,7 @@ export function App({
     );
   }
 
-  function compactHere(action: "clear" | "summarise", focus: string | null): void {
+  function compactHere(action: "clear" | "summarise" | "grow", focus: string | null): void {
     const current = sessionRef.current;
     if (current === null || connectionRef.current.status !== "connected") {
       return;
@@ -5120,6 +5121,7 @@ export function App({
             startingServer(servers, model.provider),
             chat.localWait,
             writingText,
+            chat.loading === null ? null : loadingLine(chat.loading.model, chat.loading.window),
           )}
         </Text>
       ) : null}

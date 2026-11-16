@@ -56,7 +56,7 @@ from golem.graphs.adapter import (
     ToolWriting,
     Translator,
 )
-from golem.graphs.chat import ChatRuntime
+from golem.graphs.chat import ChatRuntime, Growth
 from golem.graphs.tools_node import Answer
 from golem.models.cost import cost_usd
 from golem.models.errors import ContextFull, ModelUnreachable
@@ -149,6 +149,8 @@ class Turn:
     """The pick for this turn, None on a ``pinned`` session. ``model_profile`` is its model."""
     begun: bool = False
     """The run has its user message and ``run.started`` already: it waited on a question."""
+    growth: Growth | None = field(default=None, compare=False)
+    """The window growth this turn's first call loads and reports, None when none."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -320,6 +322,7 @@ async def run_turn(
             checks=turn.checks,
             plan_first=turn.plan_first,
             local_only=turn.local_only,
+            growth=turn.growth,
             skill_folder=None if skill is None else str(skill.path),
         )
         return await _finish(stream, progress, emit)
@@ -553,7 +556,12 @@ async def _apply(
     elif isinstance(fact, ModelWaiting):
         await emit(
             "model.waiting",
-            ModelWaitingData(message_id=fact.message_id, waiting=fact.waiting),
+            ModelWaitingData(
+                message_id=fact.message_id,
+                waiting=fact.waiting,
+                model=fact.model,
+                window=fact.window,
+            ),
         )
     elif isinstance(fact, ModelRequested):
         progress.index += 1
@@ -606,6 +614,9 @@ async def _apply(
                 after_tokens=fact.after_tokens,
                 count=fact.count,
                 room=fact.room,
+                window_from=fact.window_from,
+                window_to=fact.window_to,
+                reload_ms=fact.reload_ms,
             ),
         )
     elif isinstance(fact, ModelResponded):

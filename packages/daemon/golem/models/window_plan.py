@@ -15,6 +15,9 @@ TIGHT_CEILING = 32768
 GROW_STEPS: tuple[int, ...] = (*STEPS, 131072)
 
 _SPILL_SHARE = 0.98
+GROW_AT = 0.8
+GROW_CLEARS = 2
+GROW_SUMMARIES = 1
 
 
 def plan_window(
@@ -63,6 +66,25 @@ def next_step(
             return step
         return None
     return None
+
+
+def should_grow(
+    *,
+    used: int,
+    window: int,
+    reserve: int,
+    clears_this_session: int,
+    summaries_this_session: int,
+) -> bool:
+    """True when the last call filled the room and the cheap means were already used.
+
+    The room is the window less the reply reserve. Clearing twice or summarising once
+    has run in this session, and the context is full again.
+    """
+    room = window - reserve
+    if room <= 0 or used < GROW_AT * room:
+        return False
+    return clears_this_session >= GROW_CLEARS or summaries_this_session >= GROW_SUMMARIES
 
 
 def step_down(current: int) -> int | None:

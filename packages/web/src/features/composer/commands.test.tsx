@@ -340,6 +340,21 @@ test("/compact summarises through the client and prints one line, and /context c
   expect(dockNotice()).toBe("nothing to compact yet");
 });
 
+test("/context grow asks the daemon and says the next turn loads the window", async () => {
+  const { fake, user } = await session();
+  fake.raw.compactSession.mockResolvedValueOnce({
+    before_tokens: 0,
+    after_tokens: 0,
+    count: 0,
+    window: 61_440,
+    window_from: 32_768,
+    window_to: 65_536,
+  });
+  await say(user, "/context grow");
+  expect(fake.raw.compactSession).toHaveBeenLastCalledWith("a", "grow", undefined);
+  expect(dockNotice()).toBe("the window will grow 32K \u2192 64K on the next turn");
+});
+
 test("/compact reports a busy session", async () => {
   const { fake, user } = await session();
   fake.raw.compactSession.mockRejectedValueOnce(rpcError(-32004, "session is busy"));

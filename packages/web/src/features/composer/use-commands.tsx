@@ -290,7 +290,7 @@ export function useCommands({ session, cwd, typing, send }: UseCommandsOptions):
             return "handled";
           case "compact": {
             const started = Date.now();
-            say(found.action === "summarise" ? COMPACTING : "Clearing \u2026");
+            say(found.action === "summarise" ? COMPACTING : found.action === "grow" ? "Growing the window \u2026" : "Clearing \u2026");
             try {
               const result = await actions.compact(sessionId, found.action, found.focus);
               return say(compactLine(found.action, result, Date.now() - started));

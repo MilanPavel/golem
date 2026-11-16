@@ -1,6 +1,6 @@
 {
   "additionalProperties": false,
-  "description": "What the compaction did.\n\n``count`` is the tool results cleared, or the turns summarised, and 0 when there was\nnothing to do (``before_tokens`` and ``after_tokens`` are then equal, and no event is\nstored). ``window`` is the tokens the history may fill (the model's window less the\nreply reserve), None when it is unknown. ``model`` is the model that wrote a summary.",
+  "description": "What the compaction did.\n\n``count`` is the tool results cleared, or the turns summarised, and 0 when there was\nnothing to do (``before_tokens`` and ``after_tokens`` are then equal, and no event is\nstored). ``window`` is the tokens the history may fill (the model's window less the\nreply reserve), None when it is unknown. ``model`` is the model that wrote a summary, or\nthe model whose window ``grow`` moved. For ``grow``, ``count`` is 0, ``window_from`` and\n``window_to`` are the planned windows before and after, and ``window`` is the room of the\nnew one. Both are None for the other actions.",
   "properties": {
     "after_tokens": {
       "minimum": 0,
@@ -41,6 +41,32 @@
       ],
       "default": null,
       "title": "Window"
+    },
+    "window_from": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Window From"
+    },
+    "window_to": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Window To"
     }
   },
   "required": [

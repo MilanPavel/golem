@@ -1514,8 +1514,9 @@ public struct ConsentCaps: Codable {
 /// ``cleared`` means old tool results are now sent as one line each: ``count`` is how
 /// many, and ``before_tokens`` and ``after_tokens`` are rough sizes of the history before
 /// and after. For ``summarised``, ``count`` is the messages a summary now stands for.
-/// ``grew`` is for a later change: ``window_from`` and ``window_to`` are the window
-/// before and after, and ``reload_ms`` the time the model took to load again. The
+/// ``grew`` means the planned window of the local model went up one step before this turn:
+/// ``window_from`` and ``window_to`` are the window before and after, and ``reload_ms`` the
+/// time the model took to load again, None when the server did not say. The
 /// checkpoint keeps every message, so no transcript event changes. A field a change
 /// does not use is None.
 // MARK: - ContextChangedData
@@ -1594,8 +1595,9 @@ public struct ContextChangedEvent: Codable {
 /// ``cleared`` means old tool results are now sent as one line each: ``count`` is how
 /// many, and ``before_tokens`` and ``after_tokens`` are rough sizes of the history before
 /// and after. For ``summarised``, ``count`` is the messages a summary now stands for.
-/// ``grew`` is for a later change: ``window_from`` and ``window_to`` are the window
-/// before and after, and ``reload_ms`` the time the model took to load again. The
+/// ``grew`` means the planned window of the local model went up one step before this turn:
+/// ``window_from`` and ``window_to`` are the window before and after, and ``reload_ms`` the
+/// time the model took to load again, None when the server did not say. The
 /// checkpoint keeps every message, so no transcript event changes. A field a change
 /// does not use is None.
 // MARK: - ContextChangedEventData
@@ -7956,20 +7958,27 @@ public struct ModelSpeedInfo: Codable {
 /// A chat call waits, or no longer waits, for its turn on a local model server.
 ///
 /// Sent for the reply ``message_id`` only, so other sessions never show it. Stored only
-/// until its message completes.
+/// until its message completes. With ``waiting`` true, ``model`` and ``window`` say the call
+/// is loading ``model`` again with a larger ``window``, and the meter says so.
 // MARK: - ModelWaitingData
 public struct ModelWaitingData: Codable {
     public let messageID: String
+    public let model: String?
     public let waiting: Bool
+    public let window: Int?
 
     public enum CodingKeys: String, CodingKey {
         case messageID = "message_id"
+        case model = "model"
         case waiting = "waiting"
+        case window = "window"
     }
 
-    public init(messageID: String, waiting: Bool) {
+    public init(messageID: String, model: String?, waiting: Bool, window: Int?) {
         self.messageID = messageID
+        self.model = model
         self.waiting = waiting
+        self.window = window
     }
 }
 
@@ -8005,20 +8014,27 @@ public struct ModelWaitingEvent: Codable {
 /// A chat call waits, or no longer waits, for its turn on a local model server.
 ///
 /// Sent for the reply ``message_id`` only, so other sessions never show it. Stored only
-/// until its message completes.
+/// until its message completes. With ``waiting`` true, ``model`` and ``window`` say the call
+/// is loading ``model`` again with a larger ``window``, and the meter says so.
 // MARK: - ModelWaitingEventData
 public struct ModelWaitingEventData: Codable {
     public let messageID: String
+    public let model: String?
     public let waiting: Bool
+    public let window: Int?
 
     public enum CodingKeys: String, CodingKey {
         case messageID = "message_id"
+        case model = "model"
         case waiting = "waiting"
+        case window = "window"
     }
 
-    public init(messageID: String, waiting: Bool) {
+    public init(messageID: String, model: String?, waiting: Bool, window: Int?) {
         self.messageID = messageID
+        self.model = model
         self.waiting = waiting
+        self.window = window
     }
 }
 
@@ -10251,8 +10267,9 @@ public struct Params: Codable {
 /// ``cleared`` means old tool results are now sent as one line each: ``count`` is how
 /// many, and ``before_tokens`` and ``after_tokens`` are rough sizes of the history before
 /// and after. For ``summarised``, ``count`` is the messages a summary now stands for.
-/// ``grew`` is for a later change: ``window_from`` and ``window_to`` are the window
-/// before and after, and ``reload_ms`` the time the model took to load again. The
+/// ``grew`` means the planned window of the local model went up one step before this turn:
+/// ``window_from`` and ``window_to`` are the window before and after, and ``reload_ms`` the
+/// time the model took to load again, None when the server did not say. The
 /// checkpoint keeps every message, so no transcript event changes. A field a change
 /// does not use is None.
 ///
@@ -10286,7 +10303,8 @@ public struct Params: Codable {
 /// A chat call waits, or no longer waits, for its turn on a local model server.
 ///
 /// Sent for the reply ``message_id`` only, so other sessions never show it. Stored only
-/// until its message completes.
+/// until its message completes. With ``waiting`` true, ``model`` and ``window`` say the call
+/// is loading ``model`` again with a larger ``window``, and the meter says so.
 ///
 /// A requested tool call is running.
 ///
@@ -10476,6 +10494,7 @@ public struct ParamsData: Codable {
     public let lines: Int?
     public let path: String?
     public let waiting: Bool?
+    public let window: Int?
     public let artifactID: String?
     public let diff: String?
     public let durationMS: Int?
@@ -10586,6 +10605,7 @@ public struct ParamsData: Codable {
         case lines = "lines"
         case path = "path"
         case waiting = "waiting"
+        case window = "window"
         case artifactID = "artifact_id"
         case diff = "diff"
         case durationMS = "duration_ms"
@@ -10617,7 +10637,7 @@ public struct ParamsData: Codable {
         case output = "output"
     }
 
-    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, route: Route?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, paidOk: Bool?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: PurpleReason?, detail: String?, model: String?, provider: String?, rejected: [FluffyModelRejection]?, tier: Tier?, options: [String: Option]?, mode: Mode?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, estimatedTokens: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, numCtx: Int?, parentCallID: String?, profile: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, room: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, chars: Int?, lines: Int?, path: String?, waiting: Bool?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, alternatives: [Answer]?, caps: FluffyConsentCaps?, estimatedUsd: Double?, why: String?, answer: Answer?, todos: [PurpleTodo]?, planID: String?, steps: [FluffyPlanStep]?, added: Int?, changeID: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?) {
+    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, route: Route?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, paidOk: Bool?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: PurpleReason?, detail: String?, model: String?, provider: String?, rejected: [FluffyModelRejection]?, tier: Tier?, options: [String: Option]?, mode: Mode?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, estimatedTokens: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, numCtx: Int?, parentCallID: String?, profile: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, room: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, chars: Int?, lines: Int?, path: String?, waiting: Bool?, window: Int?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, alternatives: [Answer]?, caps: FluffyConsentCaps?, estimatedUsd: Double?, why: String?, answer: Answer?, todos: [PurpleTodo]?, planID: String?, steps: [FluffyPlanStep]?, added: Int?, changeID: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?) {
         self.cwd = cwd
         self.forkedFrom = forkedFrom
         self.modelName = modelName
@@ -10697,6 +10717,7 @@ public struct ParamsData: Codable {
         self.lines = lines
         self.path = path
         self.waiting = waiting
+        self.window = window
         self.artifactID = artifactID
         self.diff = diff
         self.durationMS = durationMS
@@ -11772,6 +11793,11 @@ public enum SessionClosedEventType: String, Codable {
 /// given, says what the summary must keep. Nothing is deleted from the session: only the
 /// context view changes. The call can take a minute with a local model, and other requests
 /// go on meanwhile. Error ``-32004`` when the session has a run or is compacting.
+///
+/// ``grow`` moves the planned window of a local model up one step, which the next turn's
+/// first
+/// call loads. It needs no test of how full the context is. Error ``-32602`` with the reason
+/// when this Mac cannot hold a larger window, or the window is set by the user.
 // MARK: - SessionCompactParams
 public struct SessionCompactParams: Codable {
     public let action: SessionCompactParamsAction
@@ -11793,6 +11819,7 @@ public struct SessionCompactParams: Codable {
 
 public enum SessionCompactParamsAction: String, Codable {
     case clear = "clear"
+    case grow = "grow"
     case summarise = "summarise"
 }
 
@@ -11801,7 +11828,10 @@ public enum SessionCompactParamsAction: String, Codable {
 /// ``count`` is the tool results cleared, or the turns summarised, and 0 when there was
 /// nothing to do (``before_tokens`` and ``after_tokens`` are then equal, and no event is
 /// stored). ``window`` is the tokens the history may fill (the model's window less the
-/// reply reserve), None when it is unknown. ``model`` is the model that wrote a summary.
+/// reply reserve), None when it is unknown. ``model`` is the model that wrote a summary, or
+/// the model whose window ``grow`` moved. For ``grow``, ``count`` is 0, ``window_from`` and
+/// ``window_to`` are the planned windows before and after, and ``window`` is the room of the
+/// new one. Both are None for the other actions.
 // MARK: - SessionCompactResult
 public struct SessionCompactResult: Codable {
     public let afterTokens: Int
@@ -11809,6 +11839,8 @@ public struct SessionCompactResult: Codable {
     public let count: Int
     public let model: String?
     public let window: Int?
+    public let windowFrom: Int?
+    public let windowTo: Int?
 
     public enum CodingKeys: String, CodingKey {
         case afterTokens = "after_tokens"
@@ -11816,14 +11848,18 @@ public struct SessionCompactResult: Codable {
         case count = "count"
         case model = "model"
         case window = "window"
+        case windowFrom = "window_from"
+        case windowTo = "window_to"
     }
 
-    public init(afterTokens: Int, beforeTokens: Int, count: Int, model: String?, window: Int?) {
+    public init(afterTokens: Int, beforeTokens: Int, count: Int, model: String?, window: Int?, windowFrom: Int?, windowTo: Int?) {
         self.afterTokens = afterTokens
         self.beforeTokens = beforeTokens
         self.count = count
         self.model = model
         self.window = window
+        self.windowFrom = windowFrom
+        self.windowTo = windowTo
     }
 }
 
