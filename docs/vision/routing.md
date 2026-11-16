@@ -145,6 +145,30 @@ saved ≈ $3.40 by running locally
 
 In the web UI, spend is under Settings, Usage. The reason for a pick is in the trace, as a table of the models golem considered and why each was kept or dropped. The routing settings are under Settings, Routing, and in `config.toml`. The context chip opens a popover with the actions: clear, summarise, grow the window, use a larger model.
 
+### Replaying recorded sessions
+
+`golem eval routing` answers "what would my work have cost on `auto`?" from the sessions already stored on this Mac. It does not call a model. Each session's events say how big every model call was (the system text, the tools, each message), how many tokens came back and what it cost. The command goes through those calls again and runs golem's decisions on them: which model the pick chooses, which tool results are cleared, when old turns are summarised, whether the prompt fits, and whether a struggle of a local model would have sent the run to a stronger one. A summary adds the cost of its own call.
+
+It prints three scenarios and what really happened:
+
+```text
+14 days · 37 sessions · 1,912 model calls
+                  cost    cut prompts  step-ups  peak ctx
+pinned frontier   $41.20  0            –         9%
+pinned local      $0.00   212          –         100%
+auto              $1.84   0            23        78%
+as it really ran  $0.00   187
+```
+
+The numbers above only show the shape of the report. Run the command to get the real ones. `--days` sets how far back to look and `--session <id>` replays one session.
+
+What it cannot say:
+
+- A stronger model would have made different calls, with fewer retries or a shorter way to the answer. The report estimates cost and cut prompts, not quality.
+- Tokens are estimated from characters with the ratio the session itself showed, so another model's tokenizer can differ.
+- A call recorded before sizes were stored, and a call that failed, are left out. The report counts them.
+- It holds counts and money, never message text.
+
 ### What comes later
 
 - **Plan on a big model, work on a local one.** A big model writes a short plan, which costs a few cents. A local model carries it out. The big model may check the result.

@@ -17,12 +17,14 @@ import time
 from collections.abc import AsyncGenerator, Callable, Coroutine, Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field, replace
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Literal, cast
 
 from langchain_core.messages import BaseMessage
 
 from golem.config import ModelPrice, PermissionMode, RouteMode
+from golem.evals.whatif import build_report, session_model
 from golem.graphs.adapter import PlainMessage, plain_messages, trace_messages
 from golem.graphs.chat import ChatRuntime, Growth
 from golem.graphs.context_view import ContextView, view
@@ -72,6 +74,7 @@ from golem.store.blobs import BlobStore
 from golem.store.records import RunRecords, SessionActivity, SessionRecords
 from golem.tools.registry import ToolError, ToolScope
 from golem_protocol.commands import (
+    EvalRoutingResult,
     PendingItem,
     SessionCompactResult,
     TraceContextEvent,
@@ -442,6 +445,39 @@ class SessionManager:
     async def watch(self, limit: int, target: SummaryTarget) -> list[SessionActivity]:
         """Like :meth:`recent`, and ``target`` gets each later change as a summary."""
         return await self._events.watch(limit, target)
+
+    async def eval_routing(
+        self, days: int, session_id: str | None, now: datetime
+    ) -> EvalRoutingResult:
+        """What the recorded sessions would have cost on each route. Calls no model.
+
+        Reads the stored events of the sessions with activity in the last ``days`` days, or of
+        ``session_id`` alone. Raises :class:`SessionNotFoundError` for an unknown id.
+        """
+        if session_id is not None:
+            if await self._records.get(session_id) is None:
+                raise SessionNotFoundError(session_id)
+            ids = [session_id]
+        else:
+            ids = await self._records.updated_since(now - timedelta(days=days))
+        sessions = {found: await self._events.stored(found) for found in ids}
+        router = self._runtime.router
+        routing = router.routing_settings()
+        names = [n for n in routing.ladder.model_dump().values() if isinstance(n, str)]
+        names += [p for p in (session_model(e) for e in sessions.values()) if p is not None]
+        refs: list[str] = []
+        for name in names:
+            try:
+                refs.append(router.resolve(name).ref)
+            except ModelConfigError:
+                continue
+        refs.extend(self.listed_refs())
+        facts: list[ModelFacts] = []
+        if self.facts is not None:
+            facts = await self.facts.facts(list(dict.fromkeys(refs)))
+        return build_report(
+            sessions, routing=routing, context=router.context_settings(), facts=facts, days=days
+        )
 
     async def pending(self, activity: SessionActivity) -> PendingItem | None:
         """What a waiting session waits for, read from its stored events."""

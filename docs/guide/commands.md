@@ -39,6 +39,7 @@ golem has commands in two places: `golem …` in your shell, and `/…` inside t
 | `golem auth list` | Which providers have a key |
 | `golem models` | Every model you can use or download, with size, price, and context. `--refresh` asks the providers again |
 | `golem cost` | What model calls cost: tokens and money for today and the last 7 days, the week by model, and what running locally saved. Same report as `/cost`, without the session row |
+| `golem eval routing [--days 14] [--session <id>]` | What the sessions recorded on this Mac would have cost on a frontier model, on a local model and on `auto`: cost, prompts that would not fit the window, step-ups and the largest share of a window. It also lists the five sessions where `auto` would have spent most. It is a calculation over the stored events, so it calls no model and costs nothing. Sessions from before sizes were recorded are skipped, and the report says how many. See [Replaying recorded sessions](../vision/routing.md#replaying-recorded-sessions) |
 | `golem config edit [--project]` | Opens `config.toml` (or the project's) in `$EDITOR`, and saves it only when the daemon accepts it. If a setting needs a restart, it offers one |
 | `golem config show` | The settings and tool rules in effect for this folder. `--resolved` is accepted and prints the same |
 | `golem skills` | The skills this folder sees, and why one is not used. `golem skills list` is the same |

@@ -518,6 +518,65 @@ class CostGetResult(BaseModel):
     saved_reference: str | None = None
 
 
+class EvalRoutingParams(BaseModel):
+    """``eval.routing``. What the recorded sessions of the last ``days`` days would have cost
+    on a frontier model, on a local model and on ``auto``. A calculation over the stored
+    events: it calls no model. With ``session_id``, only that session. Not for a browser."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    days: int = Field(default=14, ge=1, le=3650)
+    session_id: str | None = Field(default=None, min_length=1)
+
+
+class EvalScenarioRow(BaseModel):
+    """One scenario over every session asked for.
+
+    ``cuts`` are prompts that would not fit the model's window. ``step_ups`` is null for a
+    scenario that never steps up. ``peak_share`` is the largest share of a window one prompt
+    took, from 0 to 1, and null when no window was known.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    calls: int = Field(ge=0)
+    input: int = Field(ge=0)
+    output: int = Field(ge=0)
+    cost_usd: float = Field(ge=0)
+    cuts: int = Field(ge=0)
+    step_ups: int | None = Field(default=None, ge=0)
+    clears: int = Field(ge=0)
+    summaries: int = Field(ge=0)
+    peak_share: float | None = Field(default=None, ge=0, le=1)
+
+
+class EvalTopSession(BaseModel):
+    """A session where ``auto`` would have spent much. No title and no text."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    calls: int = Field(ge=0)
+    cost_usd: float = Field(ge=0)
+
+
+class EvalRoutingResult(BaseModel):
+    """``scenarios`` are the what-if rows, ``actual`` is what really ran. ``skipped`` counts the
+    model calls that could not be sized (an old event, or a failed call) and are in no row.
+    ``top`` are the sessions where ``auto`` would have spent most, the dearest first."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    days: int = Field(ge=1)
+    sessions: int = Field(ge=0)
+    calls: int = Field(ge=0)
+    skipped: int = Field(ge=0)
+    scenarios: list[EvalScenarioRow] = Field(default_factory=list[EvalScenarioRow])
+    actual: EvalScenarioRow
+    top: list[EvalTopSession] = Field(default_factory=list[EvalTopSession])
+
+
 class TraceGetParams(BaseModel):
     """``trace.get``. Read one session as a tree of spans. Does not call the model."""
 
@@ -3462,6 +3521,10 @@ __all__ = [
     "CostTotals",
     "DaemonStatus",
     "DirEntry",
+    "EvalRoutingParams",
+    "EvalRoutingResult",
+    "EvalScenarioRow",
+    "EvalTopSession",
     "FileListParams",
     "FileListResult",
     "FileReadParams",

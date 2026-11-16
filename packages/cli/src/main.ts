@@ -60,6 +60,7 @@ import {
   uninstallWebJob,
   webPlistPath,
 } from "./web-launchd.ts";
+import { formatEvalRouting, parseEvalArgs } from "./format-eval.ts";
 import { findWorkspaceRoot } from "./workspace.ts";
 import { resolveRunDir } from "@golem/gateway/node";
 
@@ -78,6 +79,7 @@ const USAGE =
   "       golem --version | golem --help | golem status | golem doctor [--mcp]\n" +
   "       golem daemon install|start|stop|restart|uninstall|logs\n" +
   "       golem auth set <provider> [--no-check] | golem auth remove <provider> | golem auth list | golem models [--refresh] | golem cost\n" +
+  "       golem eval routing [--days N] [--session ID]\n" +
   "       golem mcp add <name> -- <command…> [--token-env VAR] | golem mcp add <name> --url <url> [--token] [--env K=V] [--header K=V] [--cwd D] [--on-demand] [--project] [--timeout S] [--approval allow] | golem mcp add --catalog <id> [--input <id>=<value>] | golem mcp remove <name> | golem mcp export [--format claude|vscode] [--scope user|project]\n" +
   "       golem mcp list [--json] | show <name> [--json] | test <name> | test --catalog <id> | edit <name> [--project] | import [--from <app>|<file>] [--all] | logs <name> [-f] | enable <name> [--on-demand] | disable <name> | restart <name> | login <name> | logout <name> | tools <name> [--hide <glob>] [--show <glob>]\n" +
   "       golem ask \"<prompt>\" [--folder <dir>] [--model <profile>] [--skill <name>] [--detach] | golem open <id> [--web]\n" +
@@ -133,6 +135,9 @@ async function run(args: string[]): Promise<number> {
   }
   if (command === "cost" && rest.length === 0) {
     return runCost();
+  }
+  if (command === "eval" && rest[0] === "routing") {
+    return runEvalRouting(rest.slice(1));
   }
   if (command === "skills" && (rest.length === 0 || (rest.length === 1 && rest[0] === "list"))) {
     return runSkillsList();
@@ -338,6 +343,25 @@ async function runCost(): Promise<number> {
   const client = connectOnce();
   try {
     process.stdout.write(`${costReportLines(await client.getCost()).join("\n")}\n`);
+    return 0;
+  } catch (error) {
+    process.stderr.write(`${explainClient(error)}\n`);
+    return 1;
+  } finally {
+    client.close();
+  }
+}
+
+/** What the recorded sessions would have cost on each route. The daemon calculates it, no model runs. */
+async function runEvalRouting(given: string[]): Promise<number> {
+  const parsed = parseEvalArgs(given);
+  if (parsed === null) {
+    process.stderr.write(`${USAGE}\n`);
+    return 1;
+  }
+  const client = connectOnce();
+  try {
+    process.stdout.write(`${formatEvalRouting(await client.evalRouting(parsed.days, parsed.sessionId))}\n`);
     return 0;
   } catch (error) {
     process.stderr.write(`${explainClient(error)}\n`);

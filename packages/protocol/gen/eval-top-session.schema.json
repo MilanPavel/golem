@@ -1,0 +1,28 @@
+{
+  "additionalProperties": false,
+  "description": "A session where ``auto`` would have spent much. No title and no text.",
+  "properties": {
+    "calls": {
+      "minimum": 0,
+      "title": "Calls",
+      "type": "integer"
+    },
+    "cost_usd": {
+      "minimum": 0,
+      "title": "Cost Usd",
+      "type": "number"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "session_id",
+    "calls",
+    "cost_usd"
+  ],
+  "title": "EvalTopSession",
+  "type": "object"
+}

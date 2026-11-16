@@ -162,6 +162,8 @@ from golem_protocol.commands import (
     CostRoleRow,
     CostTotals,
     DaemonStatus,
+    EvalRoutingParams,
+    EvalRoutingResult,
     FileListParams,
     FileListResult,
     FileReadParams,
@@ -961,6 +963,13 @@ async def _cost_get(ctx: RequestContext, params: CostGetParams) -> CostGetResult
         ],
         saved_reference=week.saved_reference,
     )
+
+
+async def _eval_routing(ctx: RequestContext, params: EvalRoutingParams) -> EvalRoutingResult:
+    try:
+        return await _sessions(ctx).eval_routing(params.days, params.session_id, ctx.state.clock())
+    except SessionNotFoundError as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
 
 
 async def _trace_span(ctx: RequestContext, params: TraceSpanParams) -> TraceSpanResult:
@@ -1787,6 +1796,7 @@ def standard_methods() -> dict[str, Method]:
         ),
         "session.inspect": Method("session.inspect", SessionInspectParams, True, _session_inspect),
         "cost.get": Method("cost.get", CostGetParams, True, _cost_get),
+        "eval.routing": Method("eval.routing", EvalRoutingParams, True, _eval_routing),
         "trace.get": Method("trace.get", TraceGetParams, True, _trace_get),
         "trace.span": Method("trace.span", TraceSpanParams, True, _trace_span),
         "auth.set": Method("auth.set", AuthSetParams, True, _auth_set),
